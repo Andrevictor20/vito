@@ -3,7 +3,7 @@
 # ==============================================================================
 
 # Stage 1: Build
-FROM --platform=$BUILDPLATFORM golang:1.23-alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:alpine AS builder
 
 ARG TARGETOS
 ARG TARGETARCH
@@ -12,8 +12,8 @@ WORKDIR /app
 
 RUN apk add --no-cache ca-certificates git tzdata
 
-COPY go.mod ./
-# COPY go.sum ./ (será gerado quando houver dependências externas)
+COPY go.mod go.sum ./
+RUN go mod download
 
 COPY . .
 

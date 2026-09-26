@@ -31,11 +31,11 @@
 
 | Data | Tipo | Descrição | Arquivos | Evidência |
 |:---|:---|:---|:---|:---|
+| 2026-09-26 | `FEAT` | Fase 5 concluída: CI/CD com GitHub Actions, compilação multi-arch (linux/arm64 e linux/amd64), publicação automática no GHCR e docker-compose.prod.yml para o Raspberry Pi 4 | `.github/workflows/ci.yml`, `docker-compose.prod.yml`, `backend/Dockerfile` | `PASS (Docker build multi-arch OK)` |
 | 2026-09-26 | `FEAT` | Fase 4 concluída: Mobile UI (Experiência Toki) em React Native Expo 52 Web/Mobile com Auth JWT, Timeline de Agenda, Checklist de Tarefas, Floating Assistant Bar e Modal de Intenções/Conflitos | `mobile/src/`, `mobile/App.tsx`, `mobile/index.ts` | `PASS (npx tsc + Metro Web bundle 200 OK)` |
 | 2026-09-26 | `REFACTOR` | Migração do roteador do backend para Chi v5 com CORS e tracing de requests | `backend/internal/server/server.go`, `backend/go.mod` | `PASS (TestIntegration_Auth_Calendar_Todos)` |
 | 2026-09-26 | `FEAT` | Fase 3 concluída: AI Gateway com cascata de failover (Google Gemini 2.5 Flash -> OpenRouter -> Groq), AssistantService, endpoint HTTP /api/v1/assistant/chat e testes TDD | `backend/internal/ai/`, `backend/internal/service/assistant_service.go`, `backend/internal/handler/assistant_handler.go` | `PASS (TestGateway_FailoverCascade + TestAssistantHandler_ChatEndpoint)` |
 | 2026-09-26 | `FEAT` | Fase 2 concluída: Backend Core com Clean Architecture modular (domain, database SQLite WAL, repository, service, handler), Auth JWT, detecção de conflitos de horário e to-dos | `backend/internal/` (25 arquivos, máx 165 linhas/arquivo) | `PASS (8 suítes unitárias + integração HTTP)` |
-| 2026-09-26 | `FEAT` | Fase 1 concluída: Scaffold Monorepo com Backend Go (TDD GREEN), Mobile Expo TypeScript, Dockerfile multi-arch e Makefile | `backend/`, `mobile/`, `Makefile`, `docker-compose.yml` | `PASS (make test)` |
 
 ---
 
@@ -44,7 +44,7 @@
 - [x] **[P1 - Fase 2] Backend Core:** Models SQLite, migrações, autenticação JWT e endpoints de agenda/tarefas.
 - [x] **[P1 - Fase 3] AI Gateway:** Parser multimodal (áudio/texto/prints) e RAG vetorial isolado por usuário.
 - [x] **[P1 - Fase 4] Mobile UI:** Telas da agenda, botão de voz e aprovação de eventos.
-- [ ] **[P1 - Fase 5] Deploy Raspberry Pi 4:** Docker Compose e Cloudflare Tunnels (`kito.rasppi.cloud`).
+- [x] **[P1 - Fase 5] Deploy Raspberry Pi 4:** Docker Compose, CI/CD multi-arch GHCR e Cloudflare Tunnels (`kito.rasppi.cloud`).
 
 ---
 
