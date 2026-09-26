@@ -44,6 +44,9 @@ htmlcov/
 coverage/
 .turbo/
 .cache/
+.repo_map_cache.json
+.memory_index.db
+.session_state.json
 
 # Logs & Arquivos Temporários
 *.log

@@ -4,3 +4,14 @@
 # ==============================================================================
 COMMIT_HASH="$(git rev-parse --short HEAD 2>/dev/null || echo 'HEAD')"
 echo "📌 [Git Post-Commit] Commit registrado: $COMMIT_HASH"
+
+# Atualiza telemetria de tokens em segundo plano se disponível
+if command -v agy-tokens >/dev/null 2>&1; then
+  agy-tokens --report >/dev/null 2>&1 || true
+fi
+
+# Atualiza o REPO_MAP.md se disponível
+if command -v agy-repo-map >/dev/null 2>&1; then
+  agy-repo-map >/dev/null 2>&1 || true
+fi
+
