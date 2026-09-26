@@ -3,7 +3,7 @@ import { AuthResponse, Event, Todo, AssistantChatResponse } from '../types';
 
 const TOKEN_KEY = '@vito_jwt_token';
 const SERVER_URL_KEY = '@vito_server_url';
-export const DEFAULT_SERVER_URL = 'http://localhost:8080';
+export const DEFAULT_SERVER_URL = 'http://localhost:8180';
 export const CLOUDFLARE_SERVER_URL = 'https://vito.rasppi.cloud';
 
 class ApiService {
