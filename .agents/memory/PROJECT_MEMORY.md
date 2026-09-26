@@ -31,11 +31,11 @@
 
 | Data | Tipo | Descrição | Arquivos | Evidência |
 |:---|:---|:---|:---|:---|
+| 2026-09-26 | `FIX` | Correção de compatibilidade Expo SDK 52 no mobile (alinhamento de @expo/metro-runtime e expo-asset) e suporte a PORT dinâmica 8180 no compose | `mobile/package.json`, `mobile/app.json`, `docker-compose.prod.yml` | `PASS (npx tsc 0 errors + Metro SDK 52 OK)` |
 | 2026-09-26 | `FIX/FEAT` | Correção de sintaxe no Dockerfile (comentário `#`) para destravar CI/CD no GH Actions e adição do Watchtower (intervalo de 60s, cleanup e label enable) no `docker-compose.prod.yml` para auto-update no Raspberry Pi 4 | `backend/Dockerfile`, `docker-compose.prod.yml` | `PASS (docker build local 20/20 FINISHED)` |
 | 2026-09-26 | `FEAT` | Zero-Token Scope Guard (Tier 0) para rejeição instantânea de matemática e off-topic, integração de chaves Gemini/Groq/OpenRouter no `.env`, modelos atualizados e compatibilidade retroativa mobile (`prompt`/`text`, `reply`/`message`) | `backend/internal/service/scope_guard.go`, `assistant_service.go`, `main.go`, `mobile/` | `PASS (TestAssistantService_ScopeGuard_BlocksOffTopicAndMath + curl e2e 200 OK)` |
 | 2026-09-26 | `FEAT` | Fase 5 concluída: CI/CD com GitHub Actions, compilação multi-arch (linux/arm64 e linux/amd64), publicação automática no GHCR e docker-compose.prod.yml para o Raspberry Pi 4 | `.github/workflows/ci.yml`, `docker-compose.prod.yml`, `backend/Dockerfile` | `PASS (Docker build multi-arch OK)` |
 | 2026-09-26 | `FEAT` | Fase 4 concluída: Mobile UI (Experiência Toki) em React Native Expo 52 Web/Mobile com Auth JWT, Timeline de Agenda, Checklist de Tarefas, Floating Assistant Bar e Modal de Intenções/Conflitos | `mobile/src/`, `mobile/App.tsx`, `mobile/index.ts` | `PASS (npx tsc + Metro Web bundle 200 OK)` |
-| 2026-09-26 | `REFACTOR` | Migração do roteador do backend para Chi v5 com CORS e tracing de requests | `backend/internal/server/server.go`, `backend/go.mod` | `PASS (TestIntegration_Auth_Calendar_Todos)` |
 
 ---
 
