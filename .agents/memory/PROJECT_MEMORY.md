@@ -55,7 +55,8 @@
 ---
 
 ## 6. Gotchas, Hurdles & Learned Playbooks (Procedural Memory)
-- **[L-001]** (Adicionar lições aprendidas ao longo do projeto)
+- **[L-001] Git Pre-commit Regex Precision:** Marcadores de conflito de merge devem casar especificamente `^[+](<{7}\s|={7}\s*$|>{7}\s)` para evitar falso positivo em cabeçalhos de comentários `# ======`.
+- **[L-002] Modularidade Estrita e Anti-God-Files Mandatórios:** Arquivos limitados a 200-300 linhas (<500 max rígido). Todo backend em Go segue Clean Architecture (`domain`, `database`, `repository`, `service`, `ai`, `handler`) e Mobile segue atomic design (<150 linhas por componente, <250 por tela). TDD/SDD inegociável.
 
 ---
 

@@ -112,6 +112,16 @@ Instruções mestras, disciplinas inegociáveis e governança arquitetural do **
 
 ---
 
+## 10. Arquitetura Modular, SDD, TDD & Regra Anti-God-Files
+- **Engenharia Guiada por Especificação (SDD):** Toda nova funcionalidade deve derivar de uma especificação ou contrato formal antes da implementação ([spec-driven-development](file:///home/andrevmp/Downloads/kito/.agents/skills/spec-driven-development/SKILL.md)).
+- **Ciclo TDD Rigoroso:** RED (teste falhando) -> GREEN (código mínimo) -> REFACTOR ([tdd-safety-net](file:///home/andrevmp/Downloads/kito/.agents/skills/tdd-safety-net/SKILL.md)). Proibido escrever código de produção sem teste nativo correspondente.
+- **Estruturação Modular & No God Files:**
+  - Arquivos devem ser estritamente focados e coesos, com teto recomendado de **200 a 300 linhas** e **limite máximo absoluto de 500 linhas** ([refactor-watchdog](file:///home/andrevmp/Downloads/kito/.agents/skills/refactor-watchdog/SKILL.md), [.agents/rules/modular-architecture.md](file:///home/andrevmp/Downloads/kito/.agents/rules/modular-architecture.md)).
+  - **Backend (Go):** Clean Architecture estrita: `internal/domain` (entidades/interfaces), `internal/database` (sqlite), `internal/repository` (persistência), `internal/service` (casos de uso), `internal/ai` (adaptadores IA) e `internal/handler` (HTTP/JSON).
+  - **Mobile (React Native):** Componentes atômicos reaproveitáveis (< 150 linhas), telas desacopladas (< 250 linhas) e custom hooks isolados.
+
+---
+
 ## 🗺️ Mapa de Diretórios e Recursos do Kit
 - **Agentes (`.agents/agents/`):** `orchestrator`, `navigator`, `designer`, `sentinel`, `test-guardian`, `builder`, `refactor-warden`, `archivist`, `release-gatekeeper`, `shipper`, `genesis`.
 - **Workflows (`.agents/workflows/`):** `trivial.md` (L0), `small.md` (L1), `feature.md` (L2), `critical.md` (L3), `spec-driven.md` (SDD), `migration.md`, `performance-benchmark.md`, `bugfix.md`, `incident.md`, `release.md`.
