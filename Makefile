@@ -23,9 +23,18 @@ build:
 	@cd backend && go build -v -o bin/kito-server ./cmd/server
 
 # Desenvolvimento Local
+start:
+	@bash scripts/dev.sh
+
+dev-all: start
+
 dev:
 	@echo "🚀 Iniciando backend Go em modo desenvolvimento..."
 	@cd backend && go run ./cmd/server
+
+web:
+	@echo "🌐 Abrindo Expo no navegador..."
+	@cd mobile && npx expo start --web
 
 mobile:
 	@echo "📱 Iniciando Expo Dev Server (escaneie o QR code no Expo Go)..."

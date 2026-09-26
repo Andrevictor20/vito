@@ -1,0 +1,12 @@
+{
+  "name": "kito-root",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "start": "bash scripts/dev.sh",
+    "dev": "bash scripts/dev.sh",
+    "web": "make web",
+    "backend": "make dev",
+    "test": "make test"
+  }
+}

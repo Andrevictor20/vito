@@ -4,16 +4,15 @@ import { StatusBar } from 'expo-status-bar';
 
 export default function App() {
   const [serverStatus, setServerStatus] = useState<'checking' | 'online' | 'offline'>('checking');
-  const [serverUrl, setServerUrl] = useState('https://kito.rasppi.cloud');
+  const [serverUrl, setServerUrl] = useState('http://localhost:8080');
 
-  const checkHealth = async () => {
+  const checkHealth = async (targetUrl = serverUrl) => {
     setServerStatus('checking');
     try {
-      // Tenta conexão com timeout de 3 segundos
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 3000);
 
-      const res = await fetch(`${serverUrl}/healthz`, { signal: controller.signal });
+      const res = await fetch(`${targetUrl}/healthz`, { signal: controller.signal });
       clearTimeout(timeoutId);
 
       if (res.ok) {
@@ -24,6 +23,12 @@ export default function App() {
     } catch {
       setServerStatus('offline');
     }
+  };
+
+  const toggleServer = () => {
+    const nextUrl = serverUrl.includes('localhost') ? 'https://kito.rasppi.cloud' : 'http://localhost:8080';
+    setServerUrl(nextUrl);
+    checkHealth(nextUrl);
   };
 
   useEffect(() => {
@@ -52,13 +57,18 @@ export default function App() {
           </Text>
         </View>
 
-        <TouchableOpacity style={styles.button} onPress={checkHealth}>
-          {serverStatus === 'checking' ? (
-            <ActivityIndicator color="#fff" size="small" />
-          ) : (
-            <Text style={styles.buttonText}>Testar Conexão</Text>
-          )}
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: 10, marginTop: 18 }}>
+          <TouchableOpacity style={[styles.button, { flex: 1, backgroundColor: '#E5E7EB' }]} onPress={toggleServer}>
+            <Text style={[styles.buttonText, { color: '#1F2937' }]}>Alternar URL</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.button, { flex: 1 }]} onPress={() => checkHealth()}>
+            {serverStatus === 'checking' ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <Text style={styles.buttonText}>Testar</Text>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Action Preview */}
