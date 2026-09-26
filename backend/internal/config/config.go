@@ -9,6 +9,7 @@ type Config struct {
 	Port        string
 	Environment string
 	DBPath      string
+	JWTSecret   string
 }
 
 // Load carrega a configuração a partir de variáveis de ambiente com fallbacks seguros.
@@ -28,9 +29,15 @@ func Load() *Config {
 		dbPath = "./data/kito.db"
 	}
 
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		jwtSecret = "kito-development-secret-change-in-production-12345"
+	}
+
 	return &Config{
 		Port:        port,
 		Environment: env,
 		DBPath:      dbPath,
+		JWTSecret:   jwtSecret,
 	}
 }
