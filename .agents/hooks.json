@@ -1,0 +1,48 @@
+{
+  "token-badge": {
+    "PostInvocation": [
+      {
+        "type": "command",
+        "command": "python3 /home/andrevmp/Downloads/xp-multiagent-kit/scripts/hooks/token-badge-hook.py",
+        "timeout": 10
+      }
+    ]
+  },
+  "tool-size-guard": {
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /home/andrevmp/Downloads/xp-multiagent-kit/scripts/hooks/tool-size-guard.py",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  },
+  "smart-tool-optimizer": {
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /home/andrevmp/Downloads/xp-multiagent-kit/scripts/hooks/smart_tool_optimizer.py",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  },
+  "dynamic-effort-router": {
+    "PreInvocation": [
+      {
+        "type": "command",
+        "command": "python3 /home/andrevmp/Downloads/xp-multiagent-kit/scripts/hooks/dynamic_effort_hook.py",
+        "timeout": 5
+      }
+    ]
+  }
+}
