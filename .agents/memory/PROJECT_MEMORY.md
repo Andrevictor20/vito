@@ -31,11 +31,11 @@
 
 | Data | Tipo | Descrição | Arquivos | Evidência |
 |:---|:---|:---|:---|:---|
+| 2026-09-26 | `FEAT` | Fase 4 concluída: Mobile UI (Experiência Toki) em React Native Expo 52 Web/Mobile com Auth JWT, Timeline de Agenda, Checklist de Tarefas, Floating Assistant Bar e Modal de Intenções/Conflitos | `mobile/src/`, `mobile/App.tsx`, `mobile/index.ts` | `PASS (npx tsc + Metro Web bundle 200 OK)` |
+| 2026-09-26 | `REFACTOR` | Migração do roteador do backend para Chi v5 com CORS e tracing de requests | `backend/internal/server/server.go`, `backend/go.mod` | `PASS (TestIntegration_Auth_Calendar_Todos)` |
 | 2026-09-26 | `FEAT` | Fase 3 concluída: AI Gateway com cascata de failover (Google Gemini 2.5 Flash -> OpenRouter -> Groq), AssistantService, endpoint HTTP /api/v1/assistant/chat e testes TDD | `backend/internal/ai/`, `backend/internal/service/assistant_service.go`, `backend/internal/handler/assistant_handler.go` | `PASS (TestGateway_FailoverCascade + TestAssistantHandler_ChatEndpoint)` |
 | 2026-09-26 | `FEAT` | Fase 2 concluída: Backend Core com Clean Architecture modular (domain, database SQLite WAL, repository, service, handler), Auth JWT, detecção de conflitos de horário e to-dos | `backend/internal/` (25 arquivos, máx 165 linhas/arquivo) | `PASS (8 suítes unitárias + integração HTTP)` |
 | 2026-09-26 | `FEAT` | Fase 1 concluída: Scaffold Monorepo com Backend Go (TDD GREEN), Mobile Expo TypeScript, Dockerfile multi-arch e Makefile | `backend/`, `mobile/`, `Makefile`, `docker-compose.yml` | `PASS (make test)` |
-| 2026-09-26 | `DOCS` | Especificação formal do MVP e plano em 5 fases em `docs/specs/MVP_SPEC.md` | `docs/specs/MVP_SPEC.md`, `.agents/memory/PROJECT_MEMORY.md` | `PASS (EV-SPEC-20260926-01)` |
-| 2026-09-26 | `FEAT` | Integração completa do XP Multi-Agent Kit v2 (symlinks, REPO_MAP, TOKEN_TELEMETRY, rules, hooks de auto-refresh) | `.agents/`, `.githooks/post-commit`, `.gitignore` | `PASS (commit 0e775c5)` |
 
 ---
 
@@ -43,7 +43,7 @@
 - [x] **[P1 - Fase 1] Scaffold do Monorepo:** Criar estrutura `/backend` (Go module, Dockerfile multi-arch) e `/mobile` (Expo TypeScript).
 - [x] **[P1 - Fase 2] Backend Core:** Models SQLite, migrações, autenticação JWT e endpoints de agenda/tarefas.
 - [x] **[P1 - Fase 3] AI Gateway:** Parser multimodal (áudio/texto/prints) e RAG vetorial isolado por usuário.
-- [ ] **[P1 - Fase 4] Mobile UI:** Telas da agenda, botão de voz e aprovação de eventos.
+- [x] **[P1 - Fase 4] Mobile UI:** Telas da agenda, botão de voz e aprovação de eventos.
 - [ ] **[P1 - Fase 5] Deploy Raspberry Pi 4:** Docker Compose e Cloudflare Tunnels (`kito.rasppi.cloud`).
 
 ---
