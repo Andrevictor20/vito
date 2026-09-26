@@ -15,3 +15,9 @@ if command -v agy-repo-map >/dev/null 2>&1; then
   agy-repo-map >/dev/null 2>&1 || true
 fi
 
+# Reindexa a busca de memória FTS5 se disponível
+if command -v agy-memory-search >/dev/null 2>&1; then
+  agy-memory-search --index >/dev/null 2>&1 || true
+fi
+
+

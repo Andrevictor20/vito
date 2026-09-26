@@ -4,5 +4,8 @@
 ### / (raiz)
 - `AGENTS.md`
 
+### docs/specs/
+- `MVP_SPEC.md`
+
 ### scripts/
 - `setup-hooks.sh`
