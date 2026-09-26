@@ -20,6 +20,9 @@
 - `kito.db`
 - `kito.db-shm`
 - `kito.db-wal`
+- `vito.db`
+- `vito.db-shm`
+- `vito.db-wal`
 
 ### backend/internal/ai/
 - `gateway.go`

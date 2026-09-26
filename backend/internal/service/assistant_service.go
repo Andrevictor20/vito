@@ -14,10 +14,12 @@ type AIParsingGateway interface {
 	ParseIntent(ctx context.Context, input ai.UserInput) (*ai.ParsedIntent, error)
 }
 
-// AssistantResponse representa o retorno da interação com a secretária Kito.
+// AssistantResponse representa o retorno da interação com a secretária Vito.
 type AssistantResponse struct {
 	Action       ai.IntentAction      `json:"action"`
+	Intent       string               `json:"intent,omitempty"`
 	Message      string               `json:"message"`
+	Reply        string               `json:"reply,omitempty"`
 	Event        *domain.Event        `json:"event,omitempty"`
 	Conflict     *domain.ConflictInfo `json:"conflict,omitempty"`
 	Todo         *domain.Todo         `json:"todo,omitempty"`
@@ -46,6 +48,11 @@ func (s *AssistantService) Process(ctx context.Context, userID string, input ai.
 		input.Now = time.Now().UTC()
 	}
 
+	// 🛡️ Scope Guard (Tier 0): Rejeita consultas fora de escopo (ex: matemática, piadas, trivia) com ZERO consumo de tokens
+	if guarded := CheckLocalScopeGuard(input.Text); guarded != nil {
+		return guarded, nil
+	}
+
 	intent, err := s.aiGateway.ParseIntent(ctx, input)
 	if err != nil {
 		return nil, fmt.Errorf("falha ao interpretar comando com IA: %w", err)
@@ -53,7 +60,9 @@ func (s *AssistantService) Process(ctx context.Context, userID string, input ai.
 
 	res := &AssistantResponse{
 		Action:       intent.Action,
+		Intent:       string(intent.Action),
 		Message:      intent.Message,
+		Reply:        intent.Message,
 		ProviderUsed: intent.ProviderUsed,
 	}
 

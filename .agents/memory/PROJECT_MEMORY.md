@@ -31,11 +31,11 @@
 
 | Data | Tipo | Descrição | Arquivos | Evidência |
 |:---|:---|:---|:---|:---|
+| 2026-09-26 | `FEAT` | Zero-Token Scope Guard (Tier 0) para rejeição instantânea de matemática e off-topic, integração de chaves Gemini/Groq/OpenRouter no `.env`, modelos atualizados e compatibilidade retroativa mobile (`prompt`/`text`, `reply`/`message`) | `backend/internal/service/scope_guard.go`, `assistant_service.go`, `main.go`, `mobile/` | `PASS (TestAssistantService_ScopeGuard_BlocksOffTopicAndMath + curl e2e 200 OK)` |
 | 2026-09-26 | `FEAT` | Fase 5 concluída: CI/CD com GitHub Actions, compilação multi-arch (linux/arm64 e linux/amd64), publicação automática no GHCR e docker-compose.prod.yml para o Raspberry Pi 4 | `.github/workflows/ci.yml`, `docker-compose.prod.yml`, `backend/Dockerfile` | `PASS (Docker build multi-arch OK)` |
 | 2026-09-26 | `FEAT` | Fase 4 concluída: Mobile UI (Experiência Toki) em React Native Expo 52 Web/Mobile com Auth JWT, Timeline de Agenda, Checklist de Tarefas, Floating Assistant Bar e Modal de Intenções/Conflitos | `mobile/src/`, `mobile/App.tsx`, `mobile/index.ts` | `PASS (npx tsc + Metro Web bundle 200 OK)` |
 | 2026-09-26 | `REFACTOR` | Migração do roteador do backend para Chi v5 com CORS e tracing de requests | `backend/internal/server/server.go`, `backend/go.mod` | `PASS (TestIntegration_Auth_Calendar_Todos)` |
 | 2026-09-26 | `FEAT` | Fase 3 concluída: AI Gateway com cascata de failover (Google Gemini 2.5 Flash -> OpenRouter -> Groq), AssistantService, endpoint HTTP /api/v1/assistant/chat e testes TDD | `backend/internal/ai/`, `backend/internal/service/assistant_service.go`, `backend/internal/handler/assistant_handler.go` | `PASS (TestGateway_FailoverCascade + TestAssistantHandler_ChatEndpoint)` |
-| 2026-09-26 | `FEAT` | Fase 2 concluída: Backend Core com Clean Architecture modular (domain, database SQLite WAL, repository, service, handler), Auth JWT, detecção de conflitos de horário e to-dos | `backend/internal/` (25 arquivos, máx 165 linhas/arquivo) | `PASS (8 suítes unitárias + integração HTTP)` |
 
 ---
 
@@ -58,6 +58,7 @@
 ## 6. Gotchas, Hurdles & Learned Playbooks (Procedural Memory)
 - **[L-001] Git Pre-commit Regex Precision:** Marcadores de conflito de merge devem casar especificamente `^[+](<{7}\s|={7}\s*$|>{7}\s)` para evitar falso positivo em cabeçalhos de comentários `# ======`.
 - **[L-002] Modularidade Estrita e Anti-God-Files Mandatórios:** Arquivos limitados a 200-300 linhas (<500 max rígido). Todo backend em Go segue Clean Architecture (`domain`, `database`, `repository`, `service`, `ai`, `handler`) e Mobile segue atomic design (<150 linhas por componente, <250 por tela). TDD/SDD inegociável.
+- **[L-003] Zero-Token Local Scope Guard & Interoperabilidade DTO:** Consultas matemáticas (ex: `923/342`) ou off-topic de trivia devem ser interceptadas no Tier 0 (Go local) com regex e whitelists sem invocar LLMs, economizando 100% dos tokens de terceiros. Além disso, compatibilidade de payload (`prompt`/`text` e `reply`/`message`) entre Mobile e Backend assegura robustez contra disparidades de cliente.
 
 ---
 

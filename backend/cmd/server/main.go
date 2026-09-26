@@ -40,15 +40,15 @@ func main() {
 	var aiProviders []ai.Provider
 	if cfg.GeminiAPIKey != "" {
 		log.Println("🤖 [AI Provider] Google AI Studio ativado.")
-		aiProviders = append(aiProviders, ai.NewGeminiProvider(cfg.GeminiAPIKey, "gemini-2.5-flash"))
-	}
-	if cfg.OpenRouterAPIKey != "" {
-		log.Println("🤖 [AI Provider] OpenRouter ativado como fallback.")
-		aiProviders = append(aiProviders, ai.NewOpenRouterProvider(cfg.OpenRouterAPIKey, "google/gemini-2.0-flash-exp:free"))
+		aiProviders = append(aiProviders, ai.NewGeminiProvider(cfg.GeminiAPIKey, "gemini-flash-latest"))
 	}
 	if cfg.GroqAPIKey != "" {
 		log.Println("🤖 [AI Provider] Groq Cloud ativado como fallback.")
-		aiProviders = append(aiProviders, ai.NewGroqProvider(cfg.GroqAPIKey, "llama-3.3-70b-versatile"))
+		aiProviders = append(aiProviders, ai.NewGroqProvider(cfg.GroqAPIKey, "qwen/qwen3.8-27b"))
+	}
+	if cfg.OpenRouterAPIKey != "" {
+		log.Println("🤖 [AI Provider] OpenRouter ativado como fallback.")
+		aiProviders = append(aiProviders, ai.NewOpenRouterProvider(cfg.OpenRouterAPIKey, "openrouter/auto"))
 	}
 
 	aiGateway := ai.NewGateway(aiProviders...)

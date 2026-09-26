@@ -29,7 +29,7 @@ export const AssistantResultModal: React.FC<AssistantResultModalProps> = ({
           </View>
 
           {/* Reply message */}
-          <Text style={styles.replyText}>{result.reply}</Text>
+          <Text style={styles.replyText}>{result.reply || (result as any).message}</Text>
 
           {/* Conflict Warning */}
           {hasConflict && (

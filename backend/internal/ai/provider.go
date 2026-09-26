@@ -13,6 +13,7 @@ const (
 	ActionCreateTodo    IntentAction = "CREATE_TODO"
 	ActionQuerySchedule IntentAction = "QUERY_SCHEDULE"
 	ActionGeneralChat   IntentAction = "GENERAL_CHAT"
+	ActionOutOfScope    IntentAction = "OUT_OF_SCOPE"
 )
 
 // UserInput encapsula a mensagem de entrada do usuário (texto ou áudio em base64).

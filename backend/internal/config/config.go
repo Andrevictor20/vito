@@ -2,9 +2,10 @@ package config
 
 import (
 	"os"
+	"strings"
 )
 
-// Config armazena as configurações do ambiente do servidor Kito.
+// Config armazena as configurações do ambiente do servidor Vito.
 type Config struct {
 	Port             string
 	Environment      string
@@ -17,6 +18,8 @@ type Config struct {
 
 // Load carrega a configuração a partir de variáveis de ambiente com fallbacks seguros.
 func Load() *Config {
+	loadEnvFile(".env", "../.env", "./backend/.env")
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
@@ -50,5 +53,31 @@ func Load() *Config {
 		GeminiAPIKey:     geminiKey,
 		OpenRouterAPIKey: os.Getenv("OPENROUTER_API_KEY"),
 		GroqAPIKey:       os.Getenv("GROQ_API_KEY"),
+	}
+}
+
+func loadEnvFile(paths ...string) {
+	for _, p := range paths {
+		data, err := os.ReadFile(p)
+		if err != nil {
+			continue
+		}
+		lines := strings.Split(string(data), "\n")
+		for _, line := range lines {
+			line = strings.TrimSpace(line)
+			if line == "" || strings.HasPrefix(line, "#") {
+				continue
+			}
+			parts := strings.SplitN(line, "=", 2)
+			if len(parts) == 2 {
+				key := strings.TrimSpace(parts[0])
+				val := strings.TrimSpace(parts[1])
+				val = strings.Trim(val, `"'`)
+				if os.Getenv(key) == "" {
+					_ = os.Setenv(key, val)
+				}
+			}
+		}
+		break
 	}
 }

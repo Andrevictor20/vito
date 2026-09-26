@@ -20,6 +20,7 @@ func NewAssistantHandler(astSvc *service.AssistantService) *AssistantHandler {
 
 type assistantChatRequest struct {
 	Text      string `json:"text,omitempty"`
+	Prompt    string `json:"prompt,omitempty"`
 	AudioB64  string `json:"audio_b64,omitempty"`
 	AudioMime string `json:"audio_mime,omitempty"`
 	ImageB64  string `json:"image_b64,omitempty"`
@@ -39,13 +40,18 @@ func (h *AssistantHandler) Chat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Text == "" && req.AudioB64 == "" && req.ImageB64 == "" {
-		http.Error(w, `{"error":"forneça texto, áudio ou imagem para o assistente"}`, http.StatusBadRequest)
+	rawText := req.Text
+	if rawText == "" {
+		rawText = req.Prompt
+	}
+
+	if rawText == "" && req.AudioB64 == "" && req.ImageB64 == "" {
+		http.Error(w, `{"error":"forneça texto ou prompt para o assistente"}`, http.StatusBadRequest)
 		return
 	}
 
 	input := ai.UserInput{
-		Text:      req.Text,
+		Text:      rawText,
 		AudioB64:  req.AudioB64,
 		AudioMime: req.AudioMime,
 		ImageB64:  req.ImageB64,
