@@ -17,7 +17,7 @@ RUN go mod download
 
 COPY . .
 
-// Compilação estática com suporte multi-arquitetura nativo de Go
+# Compilação estática com suporte multi-arquitetura nativo de Go
 RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} \
     go build -ldflags="-w -s" -o /app/vito-server ./cmd/server
 

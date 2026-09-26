@@ -73,6 +73,7 @@
 - `auth_service_test.go`
 - `calendar_service.go`
 - `calendar_service_test.go`
+- `scope_guard.go`
 - `todo_service.go`
 - `todo_service_test.go`
 

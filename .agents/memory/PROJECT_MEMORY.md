@@ -10,7 +10,7 @@
 - **Propósito:** Vito — Secretário Executivo com IA Pessoal e Familiar self-hosted no Raspberry Pi 4.
 - **Tech Stack:** Go (Backend) + React Native / Expo (Mobile TypeScript) + SQLite (WAL + sqlite-vec) + Docker Multi-arch (ARM64/AMD64)
 - **Arquitetura Chave:** Monorepo (`/backend` em Go + `/mobile` em Expo). RAG pessoal isolado por usuário, gateway de IA com free-tiers (Google AI Studio, OpenRouter, Groq) e conectividade via Cloudflare Tunnels.
-- **Especificação Detalhada:** [docs/specs/MVP_SPEC.md](file:///home/andrevmp/Downloads/kito/docs/specs/MVP_SPEC.md)
+- **Especificação Detalhada:** [docs/specs/MVP_SPEC.md](file:///home/andrevmp/Downloads/vito/docs/specs/MVP_SPEC.md)
 - **Comandos Essenciais:**
   - Build Backend: `cd backend && go build -v ./...`
   - Testes Backend: `cd backend && go test -v ./...`
@@ -31,11 +31,11 @@
 
 | Data | Tipo | Descrição | Arquivos | Evidência |
 |:---|:---|:---|:---|:---|
+| 2026-09-26 | `FIX/FEAT` | Correção de sintaxe no Dockerfile (comentário `#`) para destravar CI/CD no GH Actions e adição do Watchtower (intervalo de 60s, cleanup e label enable) no `docker-compose.prod.yml` para auto-update no Raspberry Pi 4 | `backend/Dockerfile`, `docker-compose.prod.yml` | `PASS (docker build local 20/20 FINISHED)` |
 | 2026-09-26 | `FEAT` | Zero-Token Scope Guard (Tier 0) para rejeição instantânea de matemática e off-topic, integração de chaves Gemini/Groq/OpenRouter no `.env`, modelos atualizados e compatibilidade retroativa mobile (`prompt`/`text`, `reply`/`message`) | `backend/internal/service/scope_guard.go`, `assistant_service.go`, `main.go`, `mobile/` | `PASS (TestAssistantService_ScopeGuard_BlocksOffTopicAndMath + curl e2e 200 OK)` |
 | 2026-09-26 | `FEAT` | Fase 5 concluída: CI/CD com GitHub Actions, compilação multi-arch (linux/arm64 e linux/amd64), publicação automática no GHCR e docker-compose.prod.yml para o Raspberry Pi 4 | `.github/workflows/ci.yml`, `docker-compose.prod.yml`, `backend/Dockerfile` | `PASS (Docker build multi-arch OK)` |
 | 2026-09-26 | `FEAT` | Fase 4 concluída: Mobile UI (Experiência Toki) em React Native Expo 52 Web/Mobile com Auth JWT, Timeline de Agenda, Checklist de Tarefas, Floating Assistant Bar e Modal de Intenções/Conflitos | `mobile/src/`, `mobile/App.tsx`, `mobile/index.ts` | `PASS (npx tsc + Metro Web bundle 200 OK)` |
 | 2026-09-26 | `REFACTOR` | Migração do roteador do backend para Chi v5 com CORS e tracing de requests | `backend/internal/server/server.go`, `backend/go.mod` | `PASS (TestIntegration_Auth_Calendar_Todos)` |
-| 2026-09-26 | `FEAT` | Fase 3 concluída: AI Gateway com cascata de failover (Google Gemini 2.5 Flash -> OpenRouter -> Groq), AssistantService, endpoint HTTP /api/v1/assistant/chat e testes TDD | `backend/internal/ai/`, `backend/internal/service/assistant_service.go`, `backend/internal/handler/assistant_handler.go` | `PASS (TestGateway_FailoverCascade + TestAssistantHandler_ChatEndpoint)` |
 
 ---
 
@@ -49,7 +49,7 @@
 ---
 
 ## 5. Architectural Decisions & Domain Models (Semantic Memory)
-- **2026-09-26 — Stack Oficial:** Go + React Native (Expo) + SQLite (com `sqlite-vec`) + Docker multi-arch (`linux/arm64`, `linux/amd64`). Detalhes em [docs/specs/MVP_SPEC.md](file:///home/andrevmp/Downloads/kito/docs/specs/MVP_SPEC.md).
+- **2026-09-26 — Stack Oficial:** Go + React Native (Expo) + SQLite (com `sqlite-vec`) + Docker multi-arch (`linux/arm64`, `linux/amd64`). Detalhes em [docs/specs/MVP_SPEC.md](file:///home/andrevmp/Downloads/vito/docs/specs/MVP_SPEC.md).
 - **2026-09-26 — IA com Custo Zero:** Failover em cascata: Google AI Studio (Gemini 2.5 Flash) -> OpenRouter (`:free`) -> Groq Cloud (Llama 3.3 70B + Whisper).
 - **2026-09-26 — RAG Multi-Tenant:** Cada usuário possui espaço vetorial e histórico semântico estritamente isolado por `user_id`.
 
