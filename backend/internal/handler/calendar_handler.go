@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/go-chi/chi/v5"
+
 	"github.com/andrevmp/kito/backend/internal/domain"
 	"github.com/andrevmp/kito/backend/internal/handler/middleware"
 	"github.com/andrevmp/kito/backend/internal/service"
@@ -107,7 +109,10 @@ func (h *CalendarHandler) DeleteEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	eventID := r.PathValue("id")
+	eventID := chi.URLParam(r, "id")
+	if eventID == "" {
+		eventID = r.PathValue("id")
+	}
 	if eventID == "" {
 		http.Error(w, `{"error":"id ausente"}`, http.StatusBadRequest)
 		return

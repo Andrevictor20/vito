@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/go-chi/chi/v5"
+
 	"github.com/andrevmp/kito/backend/internal/domain"
 	"github.com/andrevmp/kito/backend/internal/handler/middleware"
 	"github.com/andrevmp/kito/backend/internal/service"
@@ -77,7 +79,10 @@ func (h *TodoHandler) CompleteTodo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	todoID := r.PathValue("id")
+	todoID := chi.URLParam(r, "id")
+	if todoID == "" {
+		todoID = r.PathValue("id")
+	}
 	if todoID == "" {
 		http.Error(w, `{"error":"id ausente"}`, http.StatusBadRequest)
 		return
@@ -103,7 +108,10 @@ func (h *TodoHandler) DeleteTodo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	todoID := r.PathValue("id")
+	todoID := chi.URLParam(r, "id")
+	if todoID == "" {
+		todoID = r.PathValue("id")
+	}
 	if todoID == "" {
 		http.Error(w, `{"error":"id ausente"}`, http.StatusBadRequest)
 		return

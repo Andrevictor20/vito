@@ -4,14 +4,18 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/go-chi/chi/v5"
+	chimiddleware "github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/cors"
+
 	"github.com/andrevmp/kito/backend/internal/handler"
 	"github.com/andrevmp/kito/backend/internal/handler/middleware"
 	"github.com/andrevmp/kito/backend/internal/service"
 )
 
-// Server encapsula o roteador e dependências HTTP do Kito.
+// Server encapsula o roteador Chi e dependências HTTP do Kito.
 type Server struct {
-	mux         *http.ServeMux
+	router      *chi.Mux
 	authHandler *handler.AuthHandler
 	calHandler  *handler.CalendarHandler
 	todoHandler *handler.TodoHandler
@@ -28,10 +32,10 @@ type Config struct {
 	AuthSvc     *service.AuthService
 }
 
-// New instancia o servidor com as rotas e middlewares registrados.
+// New instancia o servidor com o roteador Chi, middlewares e rotas registrados.
 func New(cfg ...Config) *Server {
 	s := &Server{
-		mux: http.NewServeMux(),
+		router: chi.NewRouter(),
 	}
 
 	if len(cfg) > 0 {
@@ -42,62 +46,74 @@ func New(cfg ...Config) *Server {
 		s.authSvc = cfg[0].AuthSvc
 	}
 
+	s.setupMiddlewares()
 	s.registerRoutes()
 	return s
 }
 
-// Router retorna o handler HTTP com suporte a CORS básico.
+// Router retorna o handler HTTP principal.
 func (s *Server) Router() http.Handler {
-	return s.corsMiddleware(s.mux)
+	return s.router
+}
+
+func (s *Server) setupMiddlewares() {
+	s.router.Use(chimiddleware.RequestID)
+	s.router.Use(chimiddleware.RealIP)
+	s.router.Use(chimiddleware.Logger)
+	s.router.Use(chimiddleware.Recoverer)
+
+	// Configuração segura e completa de CORS para Mobile e Web
+	s.router.Use(cors.Handler(cors.Options{
+		AllowedOrigins:   []string{"*"},
+		AllowedMethods:   []string{"GET", "POST", "PATCH", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
+		ExposedHeaders:   []string{"Link"},
+		AllowCredentials: false,
+		MaxAge:           300,
+	}))
 }
 
 func (s *Server) registerRoutes() {
-	s.mux.HandleFunc("GET /healthz", s.handleHealthCheck)
+	s.router.Get("/healthz", s.handleHealthCheck)
 
-	if s.authHandler != nil {
-		s.mux.HandleFunc("POST /api/v1/auth/register", s.authHandler.Register)
-		s.mux.HandleFunc("POST /api/v1/auth/login", s.authHandler.Login)
-	}
-
-	// Rotas protegidas por JWT
-	if s.authSvc != nil {
-		authMW := middleware.AuthMiddleware(s.authSvc)
-
+	s.router.Route("/api/v1", func(r chi.Router) {
+		// Rotas públicas de autenticação
 		if s.authHandler != nil {
-			s.mux.Handle("GET /api/v1/auth/me", authMW(http.HandlerFunc(s.authHandler.Me)))
+			r.Post("/auth/register", s.authHandler.Register)
+			r.Post("/auth/login", s.authHandler.Login)
 		}
 
-		if s.calHandler != nil {
-			s.mux.Handle("POST /api/v1/events", authMW(http.HandlerFunc(s.calHandler.CreateEvent)))
-			s.mux.Handle("GET /api/v1/events", authMW(http.HandlerFunc(s.calHandler.ListEvents)))
-			s.mux.Handle("DELETE /api/v1/events/{id}", authMW(http.HandlerFunc(s.calHandler.DeleteEvent)))
+		// Rotas protegidas por JWT
+		if s.authSvc != nil {
+			r.Group(func(protected chi.Router) {
+				protected.Use(middleware.AuthMiddleware(s.authSvc))
+
+				if s.authHandler != nil {
+					protected.Get("/auth/me", s.authHandler.Me)
+				}
+
+				if s.calHandler != nil {
+					protected.Route("/events", func(cr chi.Router) {
+						cr.Post("/", s.calHandler.CreateEvent)
+						cr.Get("/", s.calHandler.ListEvents)
+						cr.Delete("/{id}", s.calHandler.DeleteEvent)
+					})
+				}
+
+				if s.todoHandler != nil {
+					protected.Route("/todos", func(tr chi.Router) {
+						tr.Post("/", s.todoHandler.CreateTodo)
+						tr.Get("/", s.todoHandler.ListTodos)
+						tr.Patch("/{id}/complete", s.todoHandler.CompleteTodo)
+						tr.Delete("/{id}", s.todoHandler.DeleteTodo)
+					})
+				}
+
+				if s.astHandler != nil {
+					protected.Post("/assistant/chat", s.astHandler.Chat)
+				}
+			})
 		}
-
-		if s.todoHandler != nil {
-			s.mux.Handle("POST /api/v1/todos", authMW(http.HandlerFunc(s.todoHandler.CreateTodo)))
-			s.mux.Handle("GET /api/v1/todos", authMW(http.HandlerFunc(s.todoHandler.ListTodos)))
-			s.mux.Handle("PATCH /api/v1/todos/{id}/complete", authMW(http.HandlerFunc(s.todoHandler.CompleteTodo)))
-			s.mux.Handle("DELETE /api/v1/todos/{id}", authMW(http.HandlerFunc(s.todoHandler.DeleteTodo)))
-		}
-
-		if s.astHandler != nil {
-			s.mux.Handle("POST /api/v1/assistant/chat", authMW(http.HandlerFunc(s.astHandler.Chat)))
-		}
-	}
-}
-
-func (s *Server) corsMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-
-		if r.Method == http.MethodOptions {
-			w.WriteHeader(http.StatusOK)
-			return
-		}
-
-		next.ServeHTTP(w, r)
 	})
 }
 
@@ -109,5 +125,6 @@ func (s *Server) handleHealthCheck(w http.ResponseWriter, r *http.Request) {
 		"status":  "ok",
 		"service": "kito-backend",
 		"version": "v0.1.0",
+		"router":  "chi/v5",
 	})
 }
