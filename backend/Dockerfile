@@ -1,0 +1,48 @@
+# ==============================================================================
+# Dockerfile — Kito Backend (Multi-Arquitetura: linux/amd64, linux/arm64)
+# ==============================================================================
+
+# Stage 1: Build
+FROM --platform=$BUILDPLATFORM golang:1.23-alpine AS builder
+
+ARG TARGETOS
+ARG TARGETARCH
+
+WORKDIR /app
+
+RUN apk add --no-cache ca-certificates git tzdata
+
+COPY go.mod ./
+# COPY go.sum ./ (será gerado quando houver dependências externas)
+
+COPY . .
+
+# Compilação estática com suporte multi-arquitetura nativo de Go
+RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} \
+    go build -ldflags="-w -s" -o /app/kito-server ./cmd/server
+
+# Stage 2: Runtime Minimalista Non-Root
+FROM alpine:3.20 AS runner
+
+RUN apk add --no-cache ca-certificates tzdata \
+    && addgroup -S appgroup && adduser -S appuser -G appgroup
+
+WORKDIR /app
+
+# Cria diretório para dados persistentes (SQLite)
+RUN mkdir -p /app/data && chown -R appuser:appgroup /app/data
+
+COPY --from=builder --chown=appuser:appgroup /app/kito-server /app/kito-server
+
+USER appuser
+
+EXPOSE 8080
+
+ENV PORT=8080 \
+    APP_ENV=production \
+    DB_PATH=/app/data/kito.db
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD wget -qO- http://localhost:8080/healthz || exit 1
+
+ENTRYPOINT ["/app/kito-server"]
