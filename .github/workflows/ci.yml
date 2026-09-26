@@ -1,0 +1,51 @@
+# ==============================================================================
+# .github/workflows/ci.yml — CI Pipeline & Security Gate (Kito)
+# ==============================================================================
+name: CI & Security Gate
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master, develop]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  security-gate:
+    name: Security & Secret Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Secret Leak Detection
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+
+  integrity-check:
+    name: Git & Memory Integrity Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify Project Memory Exists
+        run: |
+          if [ ! -f ".agents/memory/PROJECT_MEMORY.md" ]; then
+            echo "❌ ERRO: .agents/memory/PROJECT_MEMORY.md não encontrado!"
+            exit 1
+          fi
+          echo "✅ Memória do projeto validada."
+
+      - name: Verify Git Hooks Setup Script
+        run: |
+          if [ -f "scripts/setup-hooks.sh" ]; then
+            bash scripts/setup-hooks.sh
+          fi

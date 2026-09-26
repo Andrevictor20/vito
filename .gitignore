@@ -1,0 +1,69 @@
+# ==============================================================================
+# .gitignore — Kito
+# Regras de exclusão de versionamento para o projeto
+# ==============================================================================
+
+# Ambientes & Segredos
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.cert
+
+# Dependências & Gerenciadores de Pacotes
+node_modules/
+.pnpm-store/
+vendor/
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+*.egg-info/
+
+# Builds, Artefatos & Compilados
+dist/
+build/
+target/
+out/
+.next/
+.nuxt/
+bin/
+obj/
+*.o
+*.so
+*.exe
+
+# Caches & Testes
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+coverage/
+.turbo/
+.cache/
+
+# Logs & Arquivos Temporários
+*.log
+*.tmp
+*.bak
+*.swp
+*~
+scratch/
+/tmp/
+
+# IDEs & Editores
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Sistema Operacional
+.DS_Store
+Thumbs.db

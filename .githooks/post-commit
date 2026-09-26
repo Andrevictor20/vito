@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# .githooks/post-commit: Sincronização e telemetria após commits
+# ==============================================================================
+COMMIT_HASH="$(git rev-parse --short HEAD 2>/dev/null || echo 'HEAD')"
+echo "📌 [Git Post-Commit] Commit registrado: $COMMIT_HASH"

@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# .githooks/post-push: Trigger assíncrono para o CI/CD Auto-Healer
+# Dispara monitoramento em segundo plano após push para autocorreção do pipeline.
+# ==============================================================================
+set -euo pipefail
+
+if command -v agy-ci-heal >/dev/null 2>&1; then
+  CURRENT_BRANCH="$(git branch --show-current 2>/dev/null || echo 'main')"
+  echo "🚀 [CI Auto-Healer] Disparando monitoramento em segundo plano para o branch '$CURRENT_BRANCH'..."
+  (sleep 3 && nohup agy-ci-heal --watch --heal --auto-push >/dev/null 2>&1 &) &
+fi
