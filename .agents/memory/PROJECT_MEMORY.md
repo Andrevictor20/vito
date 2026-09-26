@@ -28,7 +28,10 @@
 
 ## 3. Recent Changes & Activity Log (Episodic - Sliding Window: 5 Entregas)
 
-| 2026-09-26 | `CHORE` | Bootstrap inicial: memória do projeto, git hooks, CI/CD pipeline e ignore rules | `.agents/`, `.githooks/`, `.github/workflows/ci.yml`, `AGENTS.md`, `.gitignore`, `scripts/setup-hooks.sh` | `PASS (EV-GENESIS-20260926-01)` |
+| Data | Tipo | Descrição | Arquivos | Evidência |
+|:---|:---|:---|:---|:---|
+| 2026-09-26 | `FEAT` | Integração completa do XP Multi-Agent Kit v2 (symlinks, REPO_MAP, TOKEN_TELEMETRY, rules, hooks de auto-refresh) | `.agents/`, `.githooks/post-commit`, `.gitignore` | `PASS (commit 0e775c5)` |
+| 2026-09-26 | `CHORE` | Bootstrap inicial: memória do projeto, git hooks, CI/CD pipeline e ignore rules | `.agents/`, `.githooks/`, `.github/workflows/ci.yml`, `AGENTS.md`, `.gitignore`, `scripts/setup-hooks.sh` | `PASS (commit 843cbc7)` |
 
 ---
 
