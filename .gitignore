@@ -47,6 +47,12 @@ coverage/
 .repo_map_cache.json
 .memory_index.db
 .session_state.json
+.expo/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+backend/data/
 
 # Logs & Arquivos Temporários
 *.log

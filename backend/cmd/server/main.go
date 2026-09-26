@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/andrevmp/kito/backend/internal/ai"
 	"github.com/andrevmp/kito/backend/internal/config"
 	"github.com/andrevmp/kito/backend/internal/database"
 	"github.com/andrevmp/kito/backend/internal/handler"
@@ -35,21 +36,41 @@ func main() {
 	eventRepo := repository.NewEventRepository(db)
 	todoRepo := repository.NewTodoRepository(db)
 
-	// 3. Serviços
+	// 3. Provedores de IA & AI Gateway com Failover
+	var aiProviders []ai.Provider
+	if cfg.GeminiAPIKey != "" {
+		log.Println("🤖 [AI Provider] Google AI Studio ativado.")
+		aiProviders = append(aiProviders, ai.NewGeminiProvider(cfg.GeminiAPIKey, "gemini-2.5-flash"))
+	}
+	if cfg.OpenRouterAPIKey != "" {
+		log.Println("🤖 [AI Provider] OpenRouter ativado como fallback.")
+		aiProviders = append(aiProviders, ai.NewOpenRouterProvider(cfg.OpenRouterAPIKey, "google/gemini-2.0-flash-exp:free"))
+	}
+	if cfg.GroqAPIKey != "" {
+		log.Println("🤖 [AI Provider] Groq Cloud ativado como fallback.")
+		aiProviders = append(aiProviders, ai.NewGroqProvider(cfg.GroqAPIKey, "llama-3.3-70b-versatile"))
+	}
+
+	aiGateway := ai.NewGateway(aiProviders...)
+
+	// 4. Serviços
 	authSvc := service.NewAuthService(userRepo, cfg.JWTSecret)
 	calSvc := service.NewCalendarService(eventRepo)
 	todoSvc := service.NewTodoService(todoRepo)
+	astSvc := service.NewAssistantService(aiGateway, calSvc, todoSvc)
 
-	// 4. Handlers HTTP
+	// 5. Handlers HTTP
 	authHandler := handler.NewAuthHandler(authSvc, userRepo)
 	calHandler := handler.NewCalendarHandler(calSvc)
 	todoHandler := handler.NewTodoHandler(todoSvc)
+	astHandler := handler.NewAssistantHandler(astSvc)
 
-	// 5. Servidor HTTP
+	// 6. Servidor HTTP
 	srv := server.New(server.Config{
 		AuthHandler: authHandler,
 		CalHandler:  calHandler,
 		TodoHandler: todoHandler,
+		AstHandler:  astHandler,
 		AuthSvc:     authSvc,
 	})
 

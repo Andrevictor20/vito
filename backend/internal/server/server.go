@@ -15,6 +15,7 @@ type Server struct {
 	authHandler *handler.AuthHandler
 	calHandler  *handler.CalendarHandler
 	todoHandler *handler.TodoHandler
+	astHandler  *handler.AssistantHandler
 	authSvc     *service.AuthService
 }
 
@@ -23,6 +24,7 @@ type Config struct {
 	AuthHandler *handler.AuthHandler
 	CalHandler  *handler.CalendarHandler
 	TodoHandler *handler.TodoHandler
+	AstHandler  *handler.AssistantHandler
 	AuthSvc     *service.AuthService
 }
 
@@ -36,6 +38,7 @@ func New(cfg ...Config) *Server {
 		s.authHandler = cfg[0].AuthHandler
 		s.calHandler = cfg[0].CalHandler
 		s.todoHandler = cfg[0].TodoHandler
+		s.astHandler = cfg[0].AstHandler
 		s.authSvc = cfg[0].AuthSvc
 	}
 
@@ -75,6 +78,10 @@ func (s *Server) registerRoutes() {
 			s.mux.Handle("GET /api/v1/todos", authMW(http.HandlerFunc(s.todoHandler.ListTodos)))
 			s.mux.Handle("PATCH /api/v1/todos/{id}/complete", authMW(http.HandlerFunc(s.todoHandler.CompleteTodo)))
 			s.mux.Handle("DELETE /api/v1/todos/{id}", authMW(http.HandlerFunc(s.todoHandler.DeleteTodo)))
+		}
+
+		if s.astHandler != nil {
+			s.mux.Handle("POST /api/v1/assistant/chat", authMW(http.HandlerFunc(s.astHandler.Chat)))
 		}
 	}
 }

@@ -5,6 +5,7 @@
 - `AGENTS.md`
 - `Makefile`
 - `docker-compose.yml`
+- `package.json`
 
 ### backend/
 - `Dockerfile`
@@ -60,8 +61,10 @@
 ### mobile/
 - `App.tsx`
 - `app.json`
+- `package-lock.json`
 - `package.json`
 - `tsconfig.json`
 
 ### scripts/
+- `dev.sh`
 - `setup-hooks.sh`
