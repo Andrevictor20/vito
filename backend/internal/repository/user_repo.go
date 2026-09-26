@@ -5,7 +5,7 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/andrevmp/kito/backend/internal/domain"
+	"github.com/andrevmp/vito/backend/internal/domain"
 )
 
 // UserRepositorySQLite implementa domain.UserRepository usando SQLite.

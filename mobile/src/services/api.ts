@@ -1,10 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthResponse, Event, Todo, AssistantChatResponse } from '../types';
 
-const TOKEN_KEY = '@kito_jwt_token';
-const SERVER_URL_KEY = '@kito_server_url';
+const TOKEN_KEY = '@vito_jwt_token';
+const SERVER_URL_KEY = '@vito_server_url';
 export const DEFAULT_SERVER_URL = 'http://localhost:8080';
-export const CLOUDFLARE_SERVER_URL = 'https://kito.rasppi.cloud';
+export const CLOUDFLARE_SERVER_URL = 'https://vito.rasppi.cloud';
 
 class ApiService {
   private baseUrl: string = DEFAULT_SERVER_URL;

@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/andrevmp/kito/backend/internal/domain"
+	"github.com/andrevmp/vito/backend/internal/domain"
 )
 
 // TodoRepositorySQLite implementa domain.TodoRepository usando SQLite.

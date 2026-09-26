@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/andrevmp/kito/backend/internal/domain"
+	"github.com/andrevmp/vito/backend/internal/domain"
 )
 
 // EventRepositorySQLite implementa domain.EventRepository usando SQLite.

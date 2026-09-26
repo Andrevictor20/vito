@@ -1,24 +1,24 @@
 # ==============================================================================
-# docker-compose.prod.yml — Kito Production (Raspberry Pi 4 / Docker Pull)
+# docker-compose.prod.yml — Vito Production (Raspberry Pi 4 / Docker Pull)
 # ==============================================================================
 services:
-  kito:
-    image: ghcr.io/andrevictor20/kito:latest
-    container_name: kito-backend
+  vito:
+    image: ghcr.io/andrevictor20/vito:latest
+    container_name: vito-backend
     restart: unless-stopped
     ports:
       - "8080:8080"
     environment:
       - PORT=8080
       - APP_ENV=production
-      - DB_PATH=/app/data/kito.db
+      - DB_PATH=/app/data/vito.db
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
       - GROQ_API_KEY=${GROQ_API_KEY:-}
-      - JWT_SECRET=${JWT_SECRET:-kito-raspberry-pi-secret-key-32chars!}
+      - JWT_SECRET=${JWT_SECRET:-vito-raspberry-pi-secret-key-32chars!}
     volumes:
-      - kito_data:/app/data
+      - vito_data:/app/data
 
 volumes:
-  kito_data:
+  vito_data:
     driver: local

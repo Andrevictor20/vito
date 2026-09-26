@@ -4,10 +4,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/andrevmp/kito/backend/internal/database"
-	"github.com/andrevmp/kito/backend/internal/domain"
-	"github.com/andrevmp/kito/backend/internal/repository"
-	"github.com/andrevmp/kito/backend/internal/service"
+	"github.com/andrevmp/vito/backend/internal/database"
+	"github.com/andrevmp/vito/backend/internal/domain"
+	"github.com/andrevmp/vito/backend/internal/repository"
+	"github.com/andrevmp/vito/backend/internal/service"
 )
 
 func setupAuthService(t *testing.T) (*service.AuthService, domain.UserRepository) {

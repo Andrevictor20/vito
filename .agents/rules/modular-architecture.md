@@ -1,6 +1,6 @@
-# 🏛️ Regra de Arquitetura Modular & Anti-God-Files — Kito
+# 🏛️ Regra de Arquitetura Modular & Anti-God-Files — Vito
 
-Esta regra é mandatória para todo o desenvolvimento no projeto **Kito**, garantindo código sustentável, de fácil manutenção e sem retrabalho de refatorações futuras.
+Esta regra é mandatória para todo o desenvolvimento no projeto **Vito**, garantindo código sustentável, de fácil manutenção e sem retrabalho de refatorações futuras.
 
 ---
 

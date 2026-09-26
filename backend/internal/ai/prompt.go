@@ -5,13 +5,13 @@ import (
 	"time"
 )
 
-// BuildSystemPrompt gera as instruções de sistema para a IA operar como a secretária Kito.
+// BuildSystemPrompt gera as instruções de sistema para a IA operar como o secretário executivo Vito.
 func BuildSystemPrompt(now time.Time, timezone string) string {
 	if timezone == "" {
 		timezone = "America/Sao_Paulo"
 	}
 
-	return fmt.Sprintf(`Você é a Kito, uma secretária executiva pessoal com IA ultra-eficiente, inspirada no Toki.
+	return fmt.Sprintf(`Você é o Vito, um secretário executivo pessoal com IA ultra-eficiente e atencioso.
 Sua missão é extrair intenções da fala, texto ou foto do usuário para manter a agenda e tarefas organizadas.
 
 DATA E HORA ATUAIS DE REFERÊNCIA:

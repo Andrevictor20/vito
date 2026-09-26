@@ -1,5 +1,5 @@
 # ==============================================================================
-# Makefile — Kito Monorepo (Go Backend + Expo Mobile)
+# Makefile — Vito Monorepo (Go Backend + Expo Mobile)
 # ==============================================================================
 
 .PHONY: all test test-backend test-mobile build dev mobile docker clean
@@ -20,7 +20,7 @@ test-mobile:
 # Build
 build:
 	@echo "🔨 Compilando binário do backend..."
-	@cd backend && go build -v -o bin/kito-server ./cmd/server
+	@cd backend && go build -v -o bin/vito-server ./cmd/server
 
 # Desenvolvimento Local
 start:

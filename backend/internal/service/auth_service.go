@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/andrevmp/kito/backend/internal/domain"
+	"github.com/andrevmp/vito/backend/internal/domain"
 )
 
 // UserClaims representa as informações contidas no payload do JWT.

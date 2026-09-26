@@ -4,6 +4,7 @@
 ### / (raiz)
 - `AGENTS.md`
 - `Makefile`
+- `docker-compose.prod.yml`
 - `docker-compose.yml`
 - `package.json`
 
@@ -14,6 +15,19 @@
 
 ### backend/cmd/server/
 - `main.go`
+
+### backend/data/
+- `kito.db`
+- `kito.db-shm`
+- `kito.db-wal`
+
+### backend/internal/ai/
+- `gateway.go`
+- `gateway_test.go`
+- `gemini.go`
+- `openai_compat.go`
+- `prompt.go`
+- `provider.go`
 
 ### backend/internal/config/
 - `config.go`
@@ -27,6 +41,7 @@
 - `user.go`
 
 ### backend/internal/handler/
+- `assistant_handler.go`
 - `auth_handler.go`
 - `calendar_handler.go`
 - `todo_handler.go`
@@ -43,11 +58,14 @@
 - `user_repo_test.go`
 
 ### backend/internal/server/
+- `assistant_integration_test.go`
 - `integration_test.go`
 - `server.go`
 - `server_test.go`
 
 ### backend/internal/service/
+- `assistant_service.go`
+- `assistant_service_test.go`
 - `auth_service.go`
 - `auth_service_test.go`
 - `calendar_service.go`
@@ -55,16 +73,4 @@
 - `todo_service.go`
 - `todo_service_test.go`
 
-### docs/specs/
-- `MVP_SPEC.md`
-
-### mobile/
-- `App.tsx`
-- `app.json`
-- `package-lock.json`
-- `package.json`
-- `tsconfig.json`
-
-### scripts/
-- `dev.sh`
-- `setup-hooks.sh`
+... [demais arquivos omitidos para manter < 80 linhas]

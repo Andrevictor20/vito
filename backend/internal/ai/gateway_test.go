@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/andrevmp/kito/backend/internal/ai"
+	"github.com/andrevmp/vito/backend/internal/ai"
 )
 
 // MockProvider implementa ai.Provider para testes de failover.

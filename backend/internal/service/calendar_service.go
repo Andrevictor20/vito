@@ -6,7 +6,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/andrevmp/kito/backend/internal/domain"
+	"github.com/andrevmp/vito/backend/internal/domain"
 )
 
 // CalendarService orquestra criação, listagem e detecção de conflitos de eventos.

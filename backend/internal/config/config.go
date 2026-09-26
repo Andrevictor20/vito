@@ -29,12 +29,12 @@ func Load() *Config {
 
 	dbPath := os.Getenv("DB_PATH")
 	if dbPath == "" {
-		dbPath = "./data/kito.db"
+		dbPath = "./data/vito.db"
 	}
 
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
-		jwtSecret = "kito-development-secret-change-in-production-12345"
+		jwtSecret = "vito-development-secret-change-in-production-12345"
 	}
 
 	geminiKey := os.Getenv("GEMINI_API_KEY")

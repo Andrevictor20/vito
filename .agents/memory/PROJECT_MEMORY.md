@@ -7,7 +7,7 @@
 ---
 
 ## 1. Quick Project Summary (Semantic)
-- **Propósito:** Kito — Secretária Executiva com IA Pessoal e Familiar (estilo Toki) self-hosted no Raspberry Pi 4.
+- **Propósito:** Vito — Secretário Executivo com IA Pessoal e Familiar self-hosted no Raspberry Pi 4.
 - **Tech Stack:** Go (Backend) + React Native / Expo (Mobile TypeScript) + SQLite (WAL + sqlite-vec) + Docker Multi-arch (ARM64/AMD64)
 - **Arquitetura Chave:** Monorepo (`/backend` em Go + `/mobile` em Expo). RAG pessoal isolado por usuário, gateway de IA com free-tiers (Google AI Studio, OpenRouter, Groq) e conectividade via Cloudflare Tunnels.
 - **Especificação Detalhada:** [docs/specs/MVP_SPEC.md](file:///home/andrevmp/Downloads/kito/docs/specs/MVP_SPEC.md)
@@ -66,6 +66,6 @@
 
 ---
 
-> ⚠️ **ISOLAMENTO DE MEMÓRIA:** Este arquivo pertence **exclusivamente** ao projeto `kito`.
+> ⚠️ **ISOLAMENTO DE MEMÓRIA:** Este arquivo pertence **exclusivamente** ao projeto `vito`.
 > Não misture com a memória do XP Multi-Agent Kit (`~/.gemini/config/`) ou de outros projetos.
 > Cada projeto tem seu próprio `.agents/memory/PROJECT_MEMORY.md` independente.

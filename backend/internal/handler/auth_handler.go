@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/andrevmp/kito/backend/internal/domain"
-	"github.com/andrevmp/kito/backend/internal/handler/middleware"
-	"github.com/andrevmp/kito/backend/internal/service"
+	"github.com/andrevmp/vito/backend/internal/domain"
+	"github.com/andrevmp/vito/backend/internal/handler/middleware"
+	"github.com/andrevmp/vito/backend/internal/service"
 )
 
 type AuthHandler struct {

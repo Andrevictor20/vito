@@ -10,26 +10,26 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/andrevmp/kito/backend/internal/ai"
-	"github.com/andrevmp/kito/backend/internal/config"
-	"github.com/andrevmp/kito/backend/internal/database"
-	"github.com/andrevmp/kito/backend/internal/handler"
-	"github.com/andrevmp/kito/backend/internal/repository"
-	"github.com/andrevmp/kito/backend/internal/server"
-	"github.com/andrevmp/kito/backend/internal/service"
+	"github.com/andrevmp/vito/backend/internal/ai"
+	"github.com/andrevmp/vito/backend/internal/config"
+	"github.com/andrevmp/vito/backend/internal/database"
+	"github.com/andrevmp/vito/backend/internal/handler"
+	"github.com/andrevmp/vito/backend/internal/repository"
+	"github.com/andrevmp/vito/backend/internal/server"
+	"github.com/andrevmp/vito/backend/internal/service"
 )
 
 func main() {
 	cfg := config.Load()
 
 	// 1. Conexão ao SQLite com WAL mode e Migrações
-	log.Printf("📦 [Kito DB] Inicializando banco SQLite em '%s'...", cfg.DBPath)
+	log.Printf("📦 [Vito DB] Inicializando banco SQLite em '%s'...", cfg.DBPath)
 	db, err := database.Open(cfg.DBPath)
 	if err != nil {
 		log.Fatalf("❌ Falha crítica ao inicializar banco de dados: %v", err)
 	}
 	defer db.Close()
-	log.Println("✅ [Kito DB] Banco SQLite e migrações aplicadas com sucesso.")
+	log.Println("✅ [Vito DB] Banco SQLite e migrações aplicadas com sucesso.")
 
 	// 2. Repositórios
 	userRepo := repository.NewUserRepository(db)
@@ -89,14 +89,14 @@ func main() {
 		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 		<-sigChan
 
-		log.Println("🛑 [Kito Server] Recebido sinal de encerramento, finalizando graciosamente...")
+		log.Println("🛑 [Vito Server] Recebido sinal de encerramento, finalizando graciosamente...")
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
 		shutdownErr <- httpServer.Shutdown(ctx)
 	}()
 
-	log.Printf("🚀 [Kito Server] Servidor ativo em :%s (Ambiente: %s)...", cfg.Port, cfg.Environment)
+	log.Printf("🚀 [Vito Server] Servidor ativo em :%s (Ambiente: %s)...", cfg.Port, cfg.Environment)
 	if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Fatalf("❌ Erro fatal ao iniciar o servidor: %v", err)
 	}
@@ -104,5 +104,5 @@ func main() {
 	if err := <-shutdownErr; err != nil {
 		log.Printf("⚠️ Erro durante o shutdown gracioso: %v", err)
 	}
-	log.Println("✅ [Kito Server] Servidor finalizado com sucesso.")
+	log.Println("✅ [Vito Server] Servidor finalizado com sucesso.")
 }

@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/andrevmp/kito/backend/internal/database"
-	"github.com/andrevmp/kito/backend/internal/domain"
-	"github.com/andrevmp/kito/backend/internal/repository"
+	"github.com/andrevmp/vito/backend/internal/database"
+	"github.com/andrevmp/vito/backend/internal/domain"
+	"github.com/andrevmp/vito/backend/internal/repository"
 )
 
 func setupTestDB(t *testing.T) *repository.UserRepositorySQLite {

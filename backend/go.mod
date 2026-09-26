@@ -1,4 +1,4 @@
-module github.com/andrevmp/kito/backend
+module github.com/andrevmp/vito/backend
 
 go 1.26.0
 

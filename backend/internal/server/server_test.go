@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/andrevmp/kito/backend/internal/server"
+	"github.com/andrevmp/vito/backend/internal/server"
 )
 
 func TestHealthCheckEndpoint(t *testing.T) {
@@ -33,7 +33,7 @@ func TestHealthCheckEndpoint(t *testing.T) {
 		t.Errorf("expected status 'ok', got '%v'", body["status"])
 	}
 
-	if body["service"] != "kito-backend" {
-		t.Errorf("expected service 'kito-backend', got '%v'", body["service"])
+	if body["service"] != "vito-backend" {
+		t.Errorf("expected service 'vito-backend', got '%v'", body["service"])
 	}
 }

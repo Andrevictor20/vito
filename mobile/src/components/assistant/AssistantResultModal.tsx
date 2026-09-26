@@ -25,7 +25,7 @@ export const AssistantResultModal: React.FC<AssistantResultModalProps> = ({
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.assistantIcon}>🤖</Text>
-            <Text style={styles.title}>Kito Secretária</Text>
+            <Text style={styles.title}>Vito Secretário</Text>
           </View>
 
           {/* Reply message */}

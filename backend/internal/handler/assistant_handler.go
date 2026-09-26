@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/andrevmp/kito/backend/internal/ai"
-	"github.com/andrevmp/kito/backend/internal/handler/middleware"
-	"github.com/andrevmp/kito/backend/internal/service"
+	"github.com/andrevmp/vito/backend/internal/ai"
+	"github.com/andrevmp/vito/backend/internal/handler/middleware"
+	"github.com/andrevmp/vito/backend/internal/service"
 )
 
 type AssistantHandler struct {

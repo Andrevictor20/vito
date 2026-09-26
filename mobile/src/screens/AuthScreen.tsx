@@ -40,7 +40,7 @@ export const AuthScreen: React.FC = () => {
 
   const handleDemoLogin = async () => {
     setError(null);
-    const demoEmail = 'andre@kito.local';
+    const demoEmail = 'andre@vito.local';
     const demoPass = 'segredo123';
     try {
       await login(demoEmail, demoPass);
@@ -61,14 +61,14 @@ export const AuthScreen: React.FC = () => {
     >
       <View style={styles.card}>
         <View style={styles.brandRow}>
-          <Text style={styles.title}>kito</Text>
+          <Text style={styles.title}>vito</Text>
           <View style={styles.badge}>
             <Text style={styles.badgeText}>AI</Text>
           </View>
         </View>
 
         <Text style={styles.subtitle}>
-          {isRegister ? 'Crie sua conta pessoal' : 'Sua secretária executiva pessoal'}
+          {isRegister ? 'Crie sua conta pessoal' : 'Seu secretário executivo pessoal'}
         </Text>
 
         {error && (

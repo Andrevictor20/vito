@@ -8,13 +8,13 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 echo "======================================================================"
-echo "🚀 Iniciando ambiente de desenvolvimento Kito (Backend + Frontend)"
+echo "🚀 Iniciando ambiente de desenvolvimento Vito (Backend + Frontend)"
 echo "======================================================================"
 
 # Cleanup ao sair (Ctrl+C)
 cleanup() {
   echo ""
-  echo "🛑 Encerrando serviços do Kito..."
+  echo "🛑 Encerrando serviços do Vito..."
   if [ -n "${BACKEND_PID:-}" ]; then
     kill "$BACKEND_PID" 2>/dev/null || true
   fi

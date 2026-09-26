@@ -22,7 +22,7 @@ export const Header: React.FC<HeaderProps> = ({ serverUrl, onToggleServer }) => 
     <View style={styles.header}>
       <View>
         <View style={styles.brandRow}>
-          <Text style={styles.brand}>kito</Text>
+          <Text style={styles.brand}>vito</Text>
           <View style={styles.badge}>
             <Text style={styles.badgeText}>AI</Text>
           </View>

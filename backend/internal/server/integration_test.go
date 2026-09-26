@@ -9,11 +9,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/andrevmp/kito/backend/internal/database"
-	"github.com/andrevmp/kito/backend/internal/handler"
-	"github.com/andrevmp/kito/backend/internal/repository"
-	"github.com/andrevmp/kito/backend/internal/server"
-	"github.com/andrevmp/kito/backend/internal/service"
+	"github.com/andrevmp/vito/backend/internal/database"
+	"github.com/andrevmp/vito/backend/internal/handler"
+	"github.com/andrevmp/vito/backend/internal/repository"
+	"github.com/andrevmp/vito/backend/internal/server"
+	"github.com/andrevmp/vito/backend/internal/service"
 )
 
 func setupFullServer(t *testing.T) (*httptest.Server, string) {

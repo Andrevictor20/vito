@@ -8,9 +8,9 @@ import (
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 
-	"github.com/andrevmp/kito/backend/internal/handler"
-	"github.com/andrevmp/kito/backend/internal/handler/middleware"
-	"github.com/andrevmp/kito/backend/internal/service"
+	"github.com/andrevmp/vito/backend/internal/handler"
+	"github.com/andrevmp/vito/backend/internal/handler/middleware"
+	"github.com/andrevmp/vito/backend/internal/service"
 )
 
 // Server encapsula o roteador Chi e dependências HTTP do Kito.
@@ -123,7 +123,7 @@ func (s *Server) handleHealthCheck(w http.ResponseWriter, r *http.Request) {
 
 	_ = json.NewEncoder(w).Encode(map[string]string{
 		"status":  "ok",
-		"service": "kito-backend",
+		"service": "vito-backend",
 		"version": "v0.1.0",
 		"router":  "chi/v5",
 	})

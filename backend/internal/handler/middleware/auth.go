@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/andrevmp/kito/backend/internal/service"
+	"github.com/andrevmp/vito/backend/internal/service"
 )
 
 type contextKey string
