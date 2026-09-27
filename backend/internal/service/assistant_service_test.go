@@ -129,6 +129,33 @@ func TestAssistantService_ScopeGuard_BlocksOffTopicAndMath(t *testing.T) {
 	}
 }
 
+func TestAssistantService_ScopeGuard_AllowsDates(t *testing.T) {
+	astSvc, _, _, userID := setupAssistantTest(t)
+
+	datePrompts := []string{
+		"Marcar dentista dia 17/10 às 14h",
+		"Reunião em 17/10",
+		"Lembrete para 05/11/2026",
+		"17/10 às 15h consulta médica",
+	}
+
+	for _, prompt := range datePrompts {
+		t.Run(prompt, func(t *testing.T) {
+			resp, err := astSvc.Process(context.Background(), userID, ai.UserInput{
+				Text: prompt,
+				Now:  time.Now().UTC(),
+			})
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if resp.Action == ai.ActionOutOfScope {
+				t.Errorf("prompt '%s' foi indevidamente bloqueado pelo ScopeGuard como matemática!", prompt)
+			}
+		})
+	}
+}
+
+
 func TestAssistantService_SaveMemory(t *testing.T) {
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "test_memory.db")

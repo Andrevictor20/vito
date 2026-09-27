@@ -78,7 +78,7 @@ func (p *GeminiProvider) ParseIntent(ctx context.Context, input UserInput) (*Par
 
 	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", p.model, p.apiKey)
 
-	systemPrompt := BuildSystemPrompt(input.Now, input.Timezone)
+	systemPrompt := BuildSystemPrompt(input.Now, input.Timezone, input.ContextMemories...)
 
 	var userParts []geminiPart
 	if input.Text != "" {

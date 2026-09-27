@@ -31,6 +31,8 @@
 - `openai_compat.go`
 - `prompt.go`
 - `provider.go`
+- `whisper.go`
+- `whisper_test.go`
 
 ### backend/internal/config/
 - `config.go`
@@ -40,11 +42,13 @@
 
 ### backend/internal/domain/
 - `calendar.go`
+- `memory.go`
 - `todo.go`
 - `user.go`
 
 ### backend/internal/handler/
 - `assistant_handler.go`
+- `assistant_handler_test.go`
 - `auth_handler.go`
 - `calendar_handler.go`
 - `todo_handler.go`
@@ -55,6 +59,8 @@
 ### backend/internal/repository/
 - `calendar_repo.go`
 - `calendar_repo_test.go`
+- `memory_repo.go`
+- `memory_repo_test.go`
 - `todo_repo.go`
 - `todo_repo_test.go`
 - `user_repo.go`
@@ -70,11 +76,5 @@
 - `assistant_service.go`
 - `assistant_service_test.go`
 - `auth_service.go`
-- `auth_service_test.go`
-- `calendar_service.go`
-- `calendar_service_test.go`
-- `scope_guard.go`
-- `todo_service.go`
-- `todo_service_test.go`
 
 ... [demais arquivos omitidos para manter < 80 linhas]

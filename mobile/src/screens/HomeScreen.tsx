@@ -12,6 +12,7 @@ import { tokens } from '../theme/tokens';
 import { Event, Todo, AssistantChatResponse } from '../types';
 import { api } from '../services/api';
 import { Header } from '../components/common/Header';
+import { CalendarView } from '../components/calendar/CalendarView';
 import { EventCard } from '../components/calendar/EventCard';
 import { TodoItem } from '../components/todos/TodoItem';
 import { AssistantBar } from '../components/assistant/AssistantBar';
@@ -28,6 +29,7 @@ export const HomeScreen: React.FC<{
   const [todos, setTodos] = useState<Todo[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
   // Assistant state
   const [assistantLoading, setAssistantLoading] = useState(false);
@@ -149,6 +151,14 @@ export const HomeScreen: React.FC<{
     }
   };
 
+  const selectedDateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
+  const dayEvents = events.filter((ev) => {
+    const startDay = ev.start_at.substring(0, 10);
+    const endDay = ev.end_at.substring(0, 10);
+    return selectedDateStr >= startDay && selectedDateStr <= endDay;
+  });
+  const isTodaySelected = selectedDate.toDateString() === new Date().toDateString();
+
   return (
     <View style={styles.container}>
       <Header serverUrl={serverUrl} onToggleServer={onToggleServer} />
@@ -164,26 +174,41 @@ export const HomeScreen: React.FC<{
           />
         }
       >
+        {/* Calendário Interativo do Mês */}
+        <CalendarView
+          events={events}
+          selectedDate={selectedDate}
+          onSelectDate={setSelectedDate}
+        />
+
         {/* Section: Timeline da Agenda */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Agenda de Hoje</Text>
-          <Text style={styles.countBadge}>{events.length}</Text>
+          <Text style={styles.sectionTitle}>
+            {isTodaySelected
+              ? 'Agenda de Hoje'
+              : `Agenda (${selectedDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })})`}
+          </Text>
+          <Text style={styles.countBadge}>{dayEvents.length}</Text>
         </View>
 
         {loading && events.length === 0 ? (
           <ActivityIndicator color={tokens.colors.primary} style={{ marginVertical: 20 }} />
-        ) : events.length === 0 ? (
+        ) : dayEvents.length === 0 ? (
           <View style={styles.emptyCard}>
             <View style={styles.emptyIconContainer}>
               <Text style={styles.emptyIconSymbol}>📅</Text>
             </View>
             <View style={styles.emptyContent}>
               <Text style={styles.emptyTitle}>Dia Livre</Text>
-              <Text style={styles.emptySub}>Nenhum compromisso marcado para hoje.</Text>
+              <Text style={styles.emptySub}>
+                {isTodaySelected
+                  ? 'Nenhum compromisso marcado para hoje.'
+                  : `Nenhum compromisso marcado para ${selectedDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}.`}
+              </Text>
             </View>
           </View>
         ) : (
-          events.map((ev) => (
+          dayEvents.map((ev) => (
             <EventCard key={ev.id} event={ev} onDelete={handleDeleteEvent} />
           ))
         )}

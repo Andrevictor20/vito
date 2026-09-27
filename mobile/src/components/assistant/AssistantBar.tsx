@@ -1,7 +1,7 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { StyleSheet, View, TextInput, TouchableOpacity, Text, ActivityIndicator, Alert } from 'react-native';
-import { Audio } from 'expo-av';
 import { tokens } from '../../theme/tokens';
+import { SafeAudioRecorder } from '../../services/audioRecorder';
 
 interface AssistantBarProps {
   onSubmit: (prompt: string) => Promise<void>;
@@ -12,7 +12,6 @@ interface AssistantBarProps {
 export const AssistantBar: React.FC<AssistantBarProps> = ({ onSubmit, onAudioSubmit, isLoading }) => {
   const [prompt, setPrompt] = useState('');
   const [isRecording, setIsRecording] = useState(false);
-  const recordingRef = useRef<Audio.Recording | null>(null);
 
   const handleSend = async () => {
     if (!prompt.trim() || isLoading) return;
@@ -21,54 +20,13 @@ export const AssistantBar: React.FC<AssistantBarProps> = ({ onSubmit, onAudioSub
     await onSubmit(text);
   };
 
-  const startRecording = async () => {
-    try {
-      const permission = await Audio.requestPermissionsAsync();
-      if (permission.status !== 'granted') {
-        Alert.alert('Microfone necessário', 'Conceda permissão de acesso ao microfone nas configurações para usar comandos por voz.');
-        return;
-      }
-
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-      });
-
-      const { recording } = await Audio.Recording.createAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY
-      );
-      recordingRef.current = recording;
-      setIsRecording(true);
-    } catch (err: any) {
-      console.error('Falha ao iniciar gravação:', err);
-      Alert.alert('Erro ao gravar', 'Não foi possível iniciar a captura de áudio.');
-    }
-  };
-
-  const stopRecording = async () => {
-    if (!recordingRef.current) return;
-    try {
-      setIsRecording(false);
-      await recordingRef.current.stopAndUnloadAsync();
-      const uri = recordingRef.current.getURI();
-      recordingRef.current = null;
-
-      if (uri && onAudioSubmit) {
-        await onAudioSubmit(uri);
-      }
-    } catch (err: any) {
-      console.error('Falha ao parar gravação:', err);
-      Alert.alert('Erro no áudio', 'Houve uma falha ao finalizar a gravação.');
-    }
-  };
-
-  const handleMicPress = () => {
+  const handleMicPress = async () => {
     if (isLoading) return;
-    if (isRecording) {
-      stopRecording();
-    } else {
-      startRecording();
-    }
+    Alert.alert(
+      'Entrada por Voz',
+      'Para gravação de áudio no Expo Go, é necessária uma build de desenvolvimento (npx expo run:android). Por enquanto, você pode digitar qualquer comando no campo de texto!',
+      [{ text: 'Entendido' }]
+    );
   };
 
   const hasText = prompt.trim().length > 0;

@@ -12,6 +12,9 @@ var (
 	// Regex para detectar expressões matemáticas do tipo "923/342", "2 + 2", "15 * 8", "10 - 4"
 	mathExprRegex = regexp.MustCompile(`(?i)\b\d+([\.,]\d+)?\s*[\+\-\*\/x\^÷]\s*\d+([\.,]\d+)?\b`)
 
+	// Regex para detectar datas (ex: 17/10, 05/11/2026) e evitar falso positivo de divisão
+	dateRegex = regexp.MustCompile(`(?i)\b(0?[1-9]|[12][0-9]|3[01])\s*/\s*(0?[1-9]|1[0-2])(\s*/\s*\d{2,4})?\b`)
+
 	// Palavras-chave estritamente fora de escopo (trivia, piadas, redações, etc.)
 	offTopicPhrases = []string{
 		"quem descobriu",
@@ -37,7 +40,7 @@ var (
 	scheduleWhitelist = []string{
 		"agend", "reuni", "compromisso", "event", "lembr", "taref", "afazer", "todo",
 		"horári", "calendári", "amanhã", "hoje", "consulta", "academia", "almoço",
-		"jantar", "prazo", "entregar",
+		"jantar", "prazo", "entregar", "marcar", "marca", "dia", "às",
 	}
 )
 
@@ -98,8 +101,18 @@ func CheckLocalScopeGuard(text string) *AssistantResponse {
 }
 
 func isMathQuery(s string) bool {
+	// Se tiver qualquer palavra da whitelist de agendamento (ex: marcar, dia, consulta, reunião, às), não é matemática
+	for _, w := range scheduleWhitelist {
+		if strings.Contains(s, w) {
+			return false
+		}
+	}
+
+	// Remove padrões de data (ex: "17/10", "05/11/2026") para não confundir barra de data com divisão aritmética
+	sWithoutDates := dateRegex.ReplaceAllString(s, " ")
+
 	// 1. Regex de expressão aritmética direta (ex: "923/342", "2 + 2", "15 * 8")
-	if mathExprRegex.MatchString(s) {
+	if mathExprRegex.MatchString(sWithoutDates) {
 		return true
 	}
 

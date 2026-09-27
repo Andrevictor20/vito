@@ -82,7 +82,7 @@ func (p *OpenAICompatProvider) ParseIntent(ctx context.Context, input UserInput)
 		return nil, errors.New("chave de api não configurada para " + p.providerName)
 	}
 
-	systemPrompt := BuildSystemPrompt(input.Now, input.Timezone)
+	systemPrompt := BuildSystemPrompt(input.Now, input.Timezone, input.ContextMemories...)
 	userContent := input.Text
 	if userContent == "" && input.AudioB64 != "" {
 		return nil, errors.New("áudio direto não suportado por este provedor, requer transcrição prévia")
