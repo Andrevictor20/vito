@@ -19,6 +19,7 @@ import { ChatQuotaBanner } from '../components/chat/ChatQuotaBanner';
 import { ChatQuickChips } from '../components/chat/ChatQuickChips';
 import { ChatInputDock } from '../components/chat/ChatInputDock';
 import { useAuth } from '../context/AuthContext';
+import { SafeAudioRecorder } from '../services/audioRecorder';
 
 interface ChatScreenProps {
   onDataChanged?: () => void;
@@ -33,7 +34,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
 }) => {
   const { user } = useAuth();
   const firstName = user?.name ? user.name.split(' ')[0] : 'Usuário';
-  const { messages, loading, sendMessage, clearHistory } = useChat(onDataChanged);
+  const { messages, loading, sendMessage, sendAudio, clearHistory } = useChat(onDataChanged);
   const [inputText, setInputText] = useState('');
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -85,13 +86,36 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
     sendMessage(prompt);
   };
 
-  const handleToggleRecording = () => {
+  const handleToggleRecording = async () => {
     if (loading) return;
+
     if (!isRecording) {
-      setIsRecording(true);
+      // --- INICIAR GRAVAÇÃO ---
+      if (!SafeAudioRecorder.isAudioSupported()) {
+        // Fallback: Expo Go sem expo-audio nativo. Usa modo texto
+        console.warn('[Voice] expo-audio não disponível neste runtime.');
+        setIsRecording(true);
+        return;
+      }
+      const granted = await SafeAudioRecorder.requestPermissions();
+      if (!granted) {
+        console.warn('[Voice] Permissão de microfone negada.');
+        return;
+      }
+      const started = await SafeAudioRecorder.startRecording();
+      if (started) {
+        setIsRecording(true);
+      }
     } else {
+      // --- PARAR E ENVIAR ---
       setIsRecording(false);
-      setInputText('Organizar minha sexta-feira e agendar alinhamento de produto às 14h');
+      const result = await SafeAudioRecorder.stopRecording();
+      if (result?.uri) {
+        // Envia o áudio real para o backend (Groq Whisper)
+        await sendAudio(result.uri);
+      } else {
+        console.warn('[Voice] Nenhum URI de áudio retornado.');
+      }
     }
   };
 

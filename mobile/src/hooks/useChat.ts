@@ -96,6 +96,67 @@ export function useChat(onDataChanged?: () => void) {
     [messages, loading, onDataChanged, saveMessages]
   );
 
+  const sendAudio = useCallback(
+    async (audioUri: string) => {
+      if (loading) return;
+
+      // Mensagem placeholder do usuário indicando envio de voz
+      const userMsg: ChatMessage = {
+        id: `user-audio-${Date.now()}`,
+        sender: 'user',
+        text: '🎙️ Mensagem de voz enviada...',
+        timestamp: new Date().toISOString(),
+      };
+
+      const withUser = [...messages, userMsg];
+      setMessages(withUser);
+      saveMessages(withUser);
+      setLoading(true);
+
+      try {
+        const res = await api.assistantAudio(audioUri);
+
+        // Substitui o placeholder com a transcrição real
+        const transcriptText = (res as any).transcript
+          ? `🎙️ "${(res as any).transcript}"`
+          : '🎙️ Voz processada';
+
+        const updatedUserMsg: ChatMessage = { ...userMsg, text: transcriptText };
+        const vitoMsg: ChatMessage = {
+          id: `vito-audio-${Date.now()}`,
+          sender: 'vito',
+          text: res.reply || res.message || 'Instrução de voz processada.',
+          timestamp: new Date().toISOString(),
+          action_performed: res.action_performed,
+          event: res.event,
+          todo: res.todo,
+          conflict: res.conflict,
+        };
+
+        const withVito = [...messages, updatedUserMsg, vitoMsg];
+        setMessages(withVito);
+        saveMessages(withVito);
+
+        if (res.event || res.todo || res.action_performed !== 'none') {
+          onDataChanged?.();
+        }
+      } catch (err: any) {
+        const errorMsg: ChatMessage = {
+          id: `err-audio-${Date.now()}`,
+          sender: 'vito',
+          text: `Não consegui processar o áudio: ${err?.message || 'Erro desconhecido'}`,
+          timestamp: new Date().toISOString(),
+        };
+        const withError = [...withUser, errorMsg];
+        setMessages(withError);
+        saveMessages(withError);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [messages, loading, onDataChanged, saveMessages]
+  );
+
   const clearHistory = useCallback(async () => {
     const reset = [INITIAL_MESSAGE];
     setMessages(reset);
@@ -106,6 +167,7 @@ export function useChat(onDataChanged?: () => void) {
     messages,
     loading,
     sendMessage,
+    sendAudio,
     clearHistory,
   };
 }
