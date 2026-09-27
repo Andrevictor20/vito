@@ -94,36 +94,46 @@ func TestAssistantService_ProcessText(t *testing.T) {
 	}
 }
 
-func TestAssistantService_ScopeGuard_BlocksOffTopicAndMath(t *testing.T) {
+func TestAssistantService_EmptyInputReturnsGreeting(t *testing.T) {
 	astSvc, _, _, userID := setupAssistantTest(t)
 
-	testCases := []struct {
-		prompt   string
-		expected ai.IntentAction
-	}{
-		{"Quanto é 923/342 ?", ai.ActionOutOfScope},
-		{"923/342", ai.ActionOutOfScope},
-		{"Quanto é 2 + 2?", ai.ActionOutOfScope},
-		{"Calcule 15 * 8", ai.ActionOutOfScope},
-		{"Quem descobriu o Brasil?", ai.ActionOutOfScope},
-		{"Me conte uma piada", ai.ActionOutOfScope},
-		{"Escreva um poema", ai.ActionOutOfScope},
+	resp, err := astSvc.Process(context.Background(), userID, ai.UserInput{
+		Text: "   ",
+		Now:  time.Now().UTC(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.Action != ai.ActionGeneralChat {
+		t.Errorf("expected action GENERAL_CHAT for empty input, got %s", resp.Action)
+	}
+	if resp.ProviderUsed != "system" {
+		t.Errorf("expected ProviderUsed 'system', got %s", resp.ProviderUsed)
+	}
+}
+
+func TestAssistantService_ChatPassesThroughWithoutRestrictions(t *testing.T) {
+	astSvc, _, _, userID := setupAssistantTest(t)
+
+	prompts := []string{
+		"Olá, como você pode me ajudar?",
+		"Quanto é 2 + 2?",
+		"Conte uma piada",
+		"Me fale sobre seus recursos",
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.prompt, func(t *testing.T) {
+	for _, p := range prompts {
+		t.Run(p, func(t *testing.T) {
 			resp, err := astSvc.Process(context.Background(), userID, ai.UserInput{
-				Text: tc.prompt,
+				Text: p,
 				Now:  time.Now().UTC(),
 			})
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			if resp.Action != tc.expected {
-				t.Errorf("expected action %s for prompt '%s', got %s", tc.expected, tc.prompt, resp.Action)
-			}
-			if resp.ProviderUsed != "local-scope-guard" {
-				t.Errorf("expected ProviderUsed 'local-scope-guard', got %s", resp.ProviderUsed)
+			// Verifica que NENHUM desses prompts foi bloqueado localmente com OUT_OF_SCOPE
+			if resp.Action == ai.ActionOutOfScope && resp.ProviderUsed == "local-scope-guard" {
+				t.Errorf("prompt '%s' foi indevidamente bloqueado pelo ScopeGuard!", p)
 			}
 		})
 	}

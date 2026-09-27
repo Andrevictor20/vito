@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -52,9 +53,16 @@ func (s *AssistantService) Process(ctx context.Context, userID string, input ai.
 		input.Now = time.Now().UTC()
 	}
 
-	// 🛡️ Scope Guard (Tier 0): Rejeita consultas fora de escopo (ex: matemática, piadas, trivia) com ZERO consumo de tokens
-	if guarded := CheckLocalScopeGuard(input.Text); guarded != nil {
-		return guarded, nil
+	// Validação básica de input vazio
+	if strings.TrimSpace(input.Text) == "" && input.AudioB64 == "" && input.ImageB64 == "" {
+		msg := "Olá! Como posso ajudar com sua agenda ou tarefas hoje?"
+		return &AssistantResponse{
+			Action:       ai.ActionGeneralChat,
+			Intent:       string(ai.ActionGeneralChat),
+			Message:      msg,
+			Reply:        msg,
+			ProviderUsed: "system",
+		}, nil
 	}
 
 	// Carrega memórias de longo prazo se ainda não informadas
