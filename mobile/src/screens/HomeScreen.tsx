@@ -129,22 +129,21 @@ export const HomeScreen: React.FC<{
             />
           ))
         )}
+
+        {/* Botão de Criação Rápida — sempre visível no fundo do scroll */}
+        <View style={styles.createBtnWrapper}>
+          <TouchableOpacity
+            style={styles.createFab}
+            onPress={() => setCreateModalVisible(true)}
+            activeOpacity={0.85}
+            accessibilityLabel="Criar nova tarefa ou evento"
+          >
+            <MaterialIcons name="add" size={20} color="#ffffff" />
+            <Text style={styles.createFabText}>Nova Tarefa ou Evento</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
 
-          {/* Botão de Criação Rápida de Nova Tarefa / Evento (Stitch CTA) */}
-          <View style={styles.createBtnWrapper}>
-            <TouchableOpacity
-              style={styles.createFab}
-              onPress={() => setCreateModalVisible(true)}
-              activeOpacity={0.85}
-              accessibilityLabel="Criar nova tarefa ou evento"
-            >
-              <MaterialIcons name="add" size={20} color="#ffffff" />
-              <Text style={styles.createFabText}>Nova Tarefa ou Evento</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Modal de Criação Executiva */}
           <CreateItemModal
             visible={createModalVisible}
             onClose={() => setCreateModalVisible(false)}
@@ -188,7 +187,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: tokens.spacing.lg,
-    paddingBottom: 40,
+    paddingBottom: 100,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -280,7 +279,8 @@ const styles = StyleSheet.create({
   },
   createBtnWrapper: {
     paddingHorizontal: tokens.spacing.md,
-    paddingBottom: tokens.spacing.sm,
+    paddingTop: tokens.spacing.sm,
+    paddingBottom: tokens.spacing.md,
   },
   createFab: {
     flexDirection: 'row',
