@@ -12,7 +12,12 @@ import { tokens } from '../theme/tokens';
 import { useAuth } from '../context/AuthContext';
 import { styles } from './AuthScreen.styles';
 
-export const AuthScreen: React.FC = () => {
+interface AuthScreenProps {
+  serverUrl?: string;
+  onToggleServer?: () => void;
+}
+
+export const AuthScreen: React.FC<AuthScreenProps> = ({ serverUrl, onToggleServer }) => {
   const { login, register, isLoading } = useAuth();
   const [isRegister, setIsRegister] = useState(false);
   const [name, setName] = useState('');
@@ -34,7 +39,12 @@ export const AuthScreen: React.FC = () => {
         await login(email, password);
       }
     } catch (err: any) {
-      setError(err?.message || 'Falha ao autenticar.');
+      const msg = err?.message || '';
+      if (msg.includes('Network') || msg.includes('fetch') || msg.includes('Failed')) {
+        setError(`Falha ao conectar no servidor (${serverUrl || '192.168.100.17'}). Verifique o Wi-Fi.`);
+      } else {
+        setError(msg || 'Falha ao autenticar.');
+      }
     }
   };
 
@@ -150,6 +160,23 @@ export const AuthScreen: React.FC = () => {
               : 'Não tem conta? Cadastre-se em 10 segundos'}
           </Text>
         </TouchableOpacity>
+
+        {serverUrl && onToggleServer && (
+          <TouchableOpacity
+            style={{ marginTop: 20, alignItems: 'center', padding: 6 }}
+            onPress={onToggleServer}
+          >
+            <Text style={{ fontSize: 11, color: tokens.colors.textMuted }}>
+              Conectado a:{' '}
+              <Text style={{ color: tokens.colors.primary, fontWeight: '700' }}>
+                {serverUrl.includes('192.168.100.17') ? 'Raspberry Pi Local' : 'Cloudflare Tunnel'}
+              </Text>
+            </Text>
+            <Text style={{ fontSize: 10, color: tokens.colors.accent, marginTop: 2 }}>
+              Toque para alternar o servidor
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
     </KeyboardAvoidingView>
   );

@@ -12,7 +12,7 @@ const MainNavigator: React.FC = () => {
   const [serverUrl, setServerUrl] = useState(DEFAULT_SERVER_URL);
 
   const toggleServer = async () => {
-    const nextUrl = serverUrl.includes('localhost') ? CLOUDFLARE_SERVER_URL : DEFAULT_SERVER_URL;
+    const nextUrl = serverUrl.includes('192.168.100.17') ? CLOUDFLARE_SERVER_URL : DEFAULT_SERVER_URL;
     setServerUrl(nextUrl);
     await api.setBaseUrl(nextUrl);
   };
@@ -31,7 +31,7 @@ const MainNavigator: React.FC = () => {
       {user ? (
         <HomeScreen serverUrl={serverUrl} onToggleServer={toggleServer} />
       ) : (
-        <AuthScreen />
+        <AuthScreen serverUrl={serverUrl} onToggleServer={toggleServer} />
       )}
     </SafeAreaView>
   );

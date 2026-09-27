@@ -3,8 +3,9 @@ import { AuthResponse, Event, Todo, AssistantChatResponse } from '../types';
 
 const TOKEN_KEY = '@vito_jwt_token';
 const SERVER_URL_KEY = '@vito_server_url';
-export const DEFAULT_SERVER_URL = 'http://localhost:8180';
+export const PI_SERVER_URL = 'http://192.168.100.17:8180';
 export const CLOUDFLARE_SERVER_URL = 'https://vito.rasppi.cloud';
+export const DEFAULT_SERVER_URL = PI_SERVER_URL;
 
 class ApiService {
   private baseUrl: string = DEFAULT_SERVER_URL;
@@ -12,7 +13,12 @@ class ApiService {
 
   async init() {
     const savedUrl = await AsyncStorage.getItem(SERVER_URL_KEY);
-    if (savedUrl) this.baseUrl = savedUrl;
+    if (savedUrl && !savedUrl.includes('localhost')) {
+      this.baseUrl = savedUrl;
+    } else {
+      this.baseUrl = PI_SERVER_URL;
+      await AsyncStorage.setItem(SERVER_URL_KEY, PI_SERVER_URL);
+    }
     this.token = await AsyncStorage.getItem(TOKEN_KEY);
   }
 
