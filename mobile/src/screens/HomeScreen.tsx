@@ -7,6 +7,7 @@ import {
   RefreshControl,
   ActivityIndicator,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { tokens } from '../theme/tokens';
 import { Event, Todo, AssistantChatResponse } from '../types';
 import { api } from '../services/api';
@@ -15,6 +16,9 @@ import { EventCard } from '../components/calendar/EventCard';
 import { TodoItem } from '../components/todos/TodoItem';
 import { AssistantBar } from '../components/assistant/AssistantBar';
 import { AssistantResultModal } from '../components/assistant/AssistantResultModal';
+
+const CACHE_EVENTS_KEY = '@vito_cache_events';
+const CACHE_TODOS_KEY = '@vito_cache_todos';
 
 export const HomeScreen: React.FC<{
   serverUrl: string;
@@ -30,7 +34,8 @@ export const HomeScreen: React.FC<{
   const [assistantResult, setAssistantResult] = useState<AssistantChatResponse | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     try {
       const [fetchedEvents, fetchedTodos] = await Promise.all([
         api.getEvents(),
@@ -38,6 +43,8 @@ export const HomeScreen: React.FC<{
       ]);
       setEvents(fetchedEvents);
       setTodos(fetchedTodos);
+      AsyncStorage.setItem(CACHE_EVENTS_KEY, JSON.stringify(fetchedEvents)).catch(() => {});
+      AsyncStorage.setItem(CACHE_TODOS_KEY, JSON.stringify(fetchedTodos)).catch(() => {});
     } catch (e) {
       console.error('Falha ao carregar dados:', e);
     } finally {
@@ -47,12 +54,32 @@ export const HomeScreen: React.FC<{
   }, []);
 
   useEffect(() => {
-    loadData();
+    // 1. Hidratação Instantânea de Cache (< 5ms)
+    AsyncStorage.multiGet([CACHE_EVENTS_KEY, CACHE_TODOS_KEY]).then(([eventsEntry, todosEntry]) => {
+      let hasCachedData = false;
+      if (eventsEntry && eventsEntry[1]) {
+        try {
+          setEvents(JSON.parse(eventsEntry[1]));
+          hasCachedData = true;
+        } catch {}
+      }
+      if (todosEntry && todosEntry[1]) {
+        try {
+          setTodos(JSON.parse(todosEntry[1]));
+          hasCachedData = true;
+        } catch {}
+      }
+      if (hasCachedData) {
+        setLoading(false);
+      }
+      // 2. Revalidação silenciosa em background (Stale-While-Revalidate)
+      loadData(hasCachedData);
+    });
   }, [loadData]);
 
   const onRefresh = () => {
     setRefreshing(true);
-    loadData();
+    loadData(false);
   };
 
   const handleDeleteEvent = async (id: string) => {
@@ -124,15 +151,17 @@ export const HomeScreen: React.FC<{
           <Text style={styles.countBadge}>{events.length}</Text>
         </View>
 
-        {loading ? (
+        {loading && events.length === 0 ? (
           <ActivityIndicator color={tokens.colors.primary} style={{ marginVertical: 20 }} />
         ) : events.length === 0 ? (
           <View style={styles.emptyCard}>
-            <Text style={styles.emptyIcon}>🗓️</Text>
-            <Text style={styles.emptyText}>Nenhum compromisso marcado para hoje.</Text>
-            <Text style={styles.emptySub}>
-              Use a barra abaixo para falar ou digitar seu próximo evento!
-            </Text>
+            <View style={styles.emptyIconContainer}>
+              <Text style={styles.emptyIconSymbol}>📅</Text>
+            </View>
+            <View style={styles.emptyContent}>
+              <Text style={styles.emptyTitle}>Dia Livre</Text>
+              <Text style={styles.emptySub}>Nenhum compromisso marcado para hoje.</Text>
+            </View>
           </View>
         ) : (
           events.map((ev) => (
@@ -146,12 +175,17 @@ export const HomeScreen: React.FC<{
           <Text style={styles.countBadge}>{todos.length}</Text>
         </View>
 
-        {loading ? (
+        {loading && todos.length === 0 ? (
           <ActivityIndicator color={tokens.colors.primary} style={{ marginVertical: 20 }} />
         ) : todos.length === 0 ? (
           <View style={styles.emptyCard}>
-            <Text style={styles.emptyIcon}>⚡</Text>
-            <Text style={styles.emptyText}>Tudo em dia! Nenhuma tarefa pendente.</Text>
+            <View style={[styles.emptyIconContainer, { backgroundColor: 'rgba(34, 197, 94, 0.1)' }]}>
+              <Text style={styles.emptyIconSymbol}>⚡</Text>
+            </View>
+            <View style={styles.emptyContent}>
+              <Text style={styles.emptyTitle}>Tudo em Dia</Text>
+              <Text style={styles.emptySub}>Nenhuma tarefa pendente no momento.</Text>
+            </View>
           </View>
         ) : (
           todos.map((t) => (
@@ -217,25 +251,36 @@ const styles = StyleSheet.create({
     backgroundColor: tokens.colors.surface,
     borderWidth: 1,
     borderColor: tokens.colors.surfaceBorder,
-    borderRadius: tokens.radii.md,
-    padding: tokens.spacing.xl,
+    borderRadius: tokens.radii.lg,
+    padding: tokens.spacing.md,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 12,
     marginBottom: tokens.spacing.md,
   },
-  emptyIcon: {
-    fontSize: 28,
-    marginBottom: 8,
+  emptyIconContainer: {
+    width: 38,
+    height: 38,
+    borderRadius: tokens.radii.md,
+    backgroundColor: 'rgba(99, 102, 241, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  emptyText: {
+  emptyIconSymbol: {
+    fontSize: 18,
+  },
+  emptyContent: {
+    flex: 1,
+  },
+  emptyTitle: {
     color: tokens.colors.textPrimary,
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: -0.2,
   },
   emptySub: {
     color: tokens.colors.textMuted,
-    fontSize: 11,
-    marginTop: 4,
-    textAlign: 'center',
+    fontSize: 12,
+    marginTop: 2,
   },
 });
