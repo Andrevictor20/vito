@@ -9,6 +9,7 @@ import {
   Platform,
   ActivityIndicator,
   Keyboard,
+  KeyboardEvent,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens } from '../theme/tokens';
@@ -43,7 +44,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
 
-    const onShow = () => {
+    const onShow = (_e: KeyboardEvent) => {
       setIsKeyboardOpen(true);
       if (onKeyboardStateChange) onKeyboardStateChange(true);
       setTimeout(() => {
@@ -97,7 +98,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 44 : 0}
     >
       {/* Top Header Stitch */}
@@ -173,7 +174,14 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
       )}
 
       {/* Dock Flutuante de Digitação com Cápsula Arredondada */}
-      <View style={[styles.dockContainer, { paddingBottom: isKeyboardOpen ? 4 : 58 }]}>
+      <View style={[
+        styles.dockContainer,
+        {
+          paddingBottom: isKeyboardOpen
+            ? (Platform.OS === 'android' ? 8 : 4)
+            : 58,
+        },
+      ]}>
         <ChatInputDock
           value={inputText}
           onChangeText={setInputText}
