@@ -1,0 +1,77 @@
+# ==============================================================================
+# universal.geminiignore (ou .antigravityignore)
+# Modelo universal de exclusão de contexto para o Antigravity IDE & CLI
+# Impede a indexação de diretórios pesados e poupa dezenas de milhares de tokens
+# ==============================================================================
+
+# VCS & Git
+.git/
+.svn/
+.hg/
+
+# Dependências & Gerenciadores de Pacotes
+node_modules/
+.pnpm-store/
+vendor/
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+*.egg-info/
+.bundle/
+
+# Builds, Artefatos & Compilados
+dist/
+build/
+target/
+out/
+.next/
+.nuxt/
+.astro/
+bin/
+obj/
+*.class
+*.o
+*.so
+*.dylib
+*.dll
+*.exe
+
+# Caches de Ferramentas & Testes
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.turbo/
+.cache/
+.parcel-cache/
+
+# Logs & Arquivos Temporários
+*.log
+*.tmp
+*.bak
+*.swp
+*~
+scratch/
+/tmp/
+
+# Diretórios Internos do Antigravity & AI (Logs de conversas e transcripts)
+.system_generated/
+*.jsonl
+.agents/memory/TOKEN_TELEMETRY.md
+
+# Mídias Grandes e Arquivos Binários
+*.zip
+*.tar
+*.gz
+*.rar
+*.7z
+*.iso
+*.mp4
+*.mov
+*.avi
+*.wmv
+*.pdf
+*.wasm
