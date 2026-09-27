@@ -14,6 +14,7 @@ import {
 import { tokens } from '../theme/tokens';
 import { useChat } from '../hooks/useChat';
 import { ChatMessageBubble } from '../components/chat/ChatMessageBubble';
+import { useAuth } from '../context/AuthContext';
 
 const QUICK_PROMPTS = [
   'O que tenho na agenda hoje?',
@@ -28,6 +29,8 @@ interface ChatScreenProps {
 }
 
 export const ChatScreen: React.FC<ChatScreenProps> = ({ onDataChanged, onPressProfile }) => {
+  const { user } = useAuth();
+  const firstName = user?.name ? user.name.split(' ')[0] : 'Usuário';
   const { messages, loading, sendMessage, clearHistory } = useChat(onDataChanged);
   const [inputText, setInputText] = useState('');
   const flatListRef = useRef<FlatList>(null);
@@ -60,19 +63,34 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ onDataChanged, onPressPr
       {/* Top Header do Chat */}
       <View style={styles.header}>
         <View style={styles.headerTitleRow}>
-          <View style={styles.onlineDot} />
-          <Text style={styles.headerTitle}>Vito IA</Text>
-          <Text style={styles.headerSubtitle}>Secretário Executivo</Text>
+          <Text style={styles.headerBrand}>vito</Text>
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>AI</Text>
+          </View>
         </View>
 
-        <TouchableOpacity
-          style={styles.clearButton}
-          onPress={clearHistory}
-          activeOpacity={0.7}
-          hitSlop={tokens.hitSlop.sm}
-        >
-          <Text style={styles.clearButtonText}>Limpar</Text>
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={styles.clearButton}
+            onPress={clearHistory}
+            activeOpacity={0.7}
+            hitSlop={tokens.hitSlop.sm}
+          >
+            <Text style={styles.clearButtonText}>Limpar</Text>
+          </TouchableOpacity>
+
+          {user && (
+            <TouchableOpacity
+              style={styles.userAvatar}
+              onPress={onPressProfile}
+              activeOpacity={0.7}
+              accessibilityLabel="Perfil e Configurações"
+              hitSlop={tokens.hitSlop.sm}
+            >
+              <Text style={styles.avatarText}>{firstName.charAt(0).toUpperCase()}</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* Lista de Mensagens */}
@@ -154,31 +172,58 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: tokens.spacing.xs,
   },
-  onlineDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: tokens.colors.success,
-  },
-  headerTitle: {
-    fontSize: tokens.typography.size.md,
+  headerBrand: {
+    fontSize: tokens.typography.size.xxl,
     fontWeight: tokens.typography.weight.bold,
     color: tokens.colors.textPrimary,
+    letterSpacing: -0.5,
   },
-  headerSubtitle: {
-    fontSize: tokens.typography.size.xs,
-    color: tokens.colors.textMuted,
-    marginLeft: tokens.spacing.xs,
+  badge: {
+    backgroundColor: tokens.colors.primaryLight,
+    paddingHorizontal: tokens.spacing.xs + 2,
+    paddingVertical: tokens.spacing.xxs,
+    borderRadius: tokens.radii.xs,
+    borderWidth: 1,
+    borderColor: 'rgba(59, 130, 246, 0.3)',
+  },
+  badgeText: {
+    color: tokens.colors.primary,
+    fontSize: tokens.typography.size.xs - 1,
+    fontWeight: tokens.typography.weight.bold,
+    letterSpacing: 0.5,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.spacing.sm,
   },
   clearButton: {
     paddingHorizontal: tokens.spacing.sm,
-    paddingVertical: tokens.spacing.xxs,
+    paddingVertical: tokens.spacing.xs,
     borderRadius: tokens.radii.sm,
     backgroundColor: tokens.colors.surfaceSubtle,
+    borderWidth: 1,
+    borderColor: tokens.colors.surfaceBorder,
   },
   clearButtonText: {
     fontSize: tokens.typography.size.xs,
     color: tokens.colors.textSecondary,
+    fontWeight: tokens.typography.weight.medium,
+  },
+  userAvatar: {
+    width: 34,
+    height: 34,
+    borderRadius: tokens.radii.full,
+    backgroundColor: tokens.colors.surfaceElevated,
+    borderWidth: 1.5,
+    borderColor: tokens.colors.surfaceBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: {
+    color: tokens.colors.primary,
+    fontSize: tokens.typography.size.sm,
+    fontWeight: tokens.typography.weight.semibold,
   },
   messagesList: {
     padding: tokens.spacing.md,

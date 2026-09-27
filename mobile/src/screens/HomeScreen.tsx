@@ -23,7 +23,7 @@ export const HomeScreen: React.FC<{
   serverUrl: string;
   onToggleServer: () => void;
 }> = ({ serverUrl, onToggleServer }) => {
-  const [activeTab, setActiveTab] = useState<'agenda' | 'chat'>('agenda');
+  const [activeTab, setActiveTab] = useState<'chat' | 'calendar'>('chat');
   const [profileVisible, setProfileVisible] = useState(false);
   const {
     events,
@@ -49,7 +49,7 @@ export const HomeScreen: React.FC<{
 
   return (
     <View style={styles.container}>
-      {activeTab === 'agenda' ? (
+      {activeTab === 'calendar' ? (
         <>
           <Header onPressProfile={() => setProfileVisible(true)} />
 
@@ -154,19 +154,19 @@ export const HomeScreen: React.FC<{
       {/* Bottom Tab Bar */}
       <View style={styles.tabBar}>
         <TouchableOpacity
-          style={[styles.tabButton, activeTab === 'agenda' && styles.tabButtonActive]}
-          onPress={() => setActiveTab('agenda')}
-          activeOpacity={0.7}
-        >
-          <Text style={[styles.tabText, activeTab === 'agenda' && styles.tabTextActive]}>📅 Agenda</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
           style={[styles.tabButton, activeTab === 'chat' && styles.tabButtonActive]}
           onPress={() => setActiveTab('chat')}
           activeOpacity={0.7}
         >
-          <Text style={[styles.tabText, activeTab === 'chat' && styles.tabTextActive]}>💬 Vito IA</Text>
+          <Text style={[styles.tabText, activeTab === 'chat' && styles.tabTextActive]}>💬 Chat com Vito</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.tabButton, activeTab === 'calendar' && styles.tabButtonActive]}
+          onPress={() => setActiveTab('calendar')}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.tabText, activeTab === 'calendar' && styles.tabTextActive]}>📅 Calendário</Text>
         </TouchableOpacity>
       </View>
 
