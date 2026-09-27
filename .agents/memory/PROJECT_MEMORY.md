@@ -31,11 +31,11 @@
 
 | Data | Tipo | Descrição | Arquivos | Evidência |
 |:---|:---|:---|:---|:---|
+| 2026-09-27 | `FEAT/UI` | Redesign Mobile Fiel: Chat de IA com persistência contínua (AsyncStorage + feed de mensagens e cards inline), Header limpo sem poluição de conexão e ProfileModal para alternância de servidor e logout | `mobile/src/screens/ChatScreen.tsx`, `ChatMessageBubble.tsx`, `useChat.ts`, `ProfileModal.tsx`, `Header.tsx`, `HomeScreen.tsx` | `PASS (npx tsc 0 errors)` |
 | 2026-09-27 | `REFACTOR/FIX` | Modo Cirúrgico Atômico: Desacoplamento do HomeScreen (<250 linhas) com extração do custom hook useHomeData, eliminação de workarounds (@ts-ignore, as any) e alinhamento de contrato de tipos do ConflictInfo entre mobile e Go | `mobile/src/hooks/useHomeData.ts`, `HomeScreen.tsx`, `api.ts`, `types/index.ts` | `PASS (npx tsc 0 errors + go test targeted 100% PASS)` |
 | 2026-09-26 | `FIX/FEAT` | Correções críticas solicitadas: Remoção do crash ExponentAV no Expo Go substituindo por SafeAudioRecorder resiliente; Correção do Scope Guard em datas DD/MM (17/10 não é mais confundido com divisão); Adição do componente CalendarView interativo no app com navegação de meses e suporte a eventos de múltiplos dias | `backend/`, `mobile/` | `PASS (go test ./... 100% PASS + npx tsc 0 errors)` |
 | 2026-09-26 | `FEAT` | Opções 1 e 2 concluídas: Entrada de Voz com Groq Whisper Large v3 (backend multipart + mobile expo-av) e Memória de Longo Prazo / RAG Pessoal (tabela memories, injeção contextual e ação SAVE_MEMORY), além de Login persistente com salvaguarda no AsyncStorage | `backend/`, `mobile/` | `PASS (go test ./... 100% PASS + npx tsc 0 errors)` |
 | 2026-09-26 | `UPGRADE` | Upgrade oficial do Mobile para Expo SDK 57 (React 19, React Native 0.86) compatível com Expo Go atual de 2026 | `mobile/package.json`, `mobile/package-lock.json` | `PASS (npx tsc 0 errors + sdkVersion 57.0.0 confirmado)` |
-| 2026-09-26 | `FIX/FEAT` | Correção de sintaxe no Dockerfile (comentário `#`) para destravar CI/CD no GH Actions e adição do Watchtower (intervalo de 60s, cleanup e label enable) no `docker-compose.prod.yml` para auto-update no Raspberry Pi 4 | `backend/Dockerfile`, `docker-compose.prod.yml` | `PASS (docker build local 20/20 FINISHED)` |
 
 ---
 

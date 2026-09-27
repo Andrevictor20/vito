@@ -68,3 +68,14 @@ export interface AssistantChatResponse {
   provider_used?: string;
 }
 
+export interface ChatMessage {
+  id: string;
+  sender: 'user' | 'vito';
+  text: string;
+  timestamp: string;
+  action_performed?: string;
+  event?: Event;
+  todo?: Todo;
+  conflict?: ConflictInfo;
+}
+

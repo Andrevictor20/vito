@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -6,6 +6,7 @@ import {
   ScrollView,
   RefreshControl,
   ActivityIndicator,
+  TouchableOpacity,
 } from 'react-native';
 import { tokens } from '../theme/tokens';
 import { Header } from '../components/common/Header';
@@ -14,12 +15,16 @@ import { EventCard } from '../components/calendar/EventCard';
 import { TodoItem } from '../components/todos/TodoItem';
 import { AssistantBar } from '../components/assistant/AssistantBar';
 import { AssistantResultModal } from '../components/assistant/AssistantResultModal';
+import { ProfileModal } from '../components/profile/ProfileModal';
+import { ChatScreen } from './ChatScreen';
 import { useHomeData } from '../hooks/useHomeData';
 
 export const HomeScreen: React.FC<{
   serverUrl: string;
   onToggleServer: () => void;
 }> = ({ serverUrl, onToggleServer }) => {
+  const [activeTab, setActiveTab] = useState<'agenda' | 'chat'>('agenda');
+  const [profileVisible, setProfileVisible] = useState(false);
   const {
     events,
     todos,
@@ -44,7 +49,9 @@ export const HomeScreen: React.FC<{
 
   return (
     <View style={styles.container}>
-      <Header serverUrl={serverUrl} onToggleServer={onToggleServer} />
+      {activeTab === 'agenda' ? (
+        <>
+          <Header onPressProfile={() => setProfileVisible(true)} />
 
       <ScrollView
         style={styles.scroll}
@@ -133,11 +140,41 @@ export const HomeScreen: React.FC<{
         isLoading={assistantLoading}
       />
 
-      {/* Result feedback Modal */}
-      <AssistantResultModal
-        visible={modalVisible}
-        result={assistantResult}
-        onClose={() => setModalVisible(false)}
+          {/* Result feedback Modal */}
+          <AssistantResultModal
+            visible={modalVisible}
+            result={assistantResult}
+            onClose={() => setModalVisible(false)}
+          />
+        </>
+      ) : (
+        <ChatScreen onDataChanged={loadData} onPressProfile={() => setProfileVisible(true)} />
+      )}
+
+      {/* Bottom Tab Bar */}
+      <View style={styles.tabBar}>
+        <TouchableOpacity
+          style={[styles.tabButton, activeTab === 'agenda' && styles.tabButtonActive]}
+          onPress={() => setActiveTab('agenda')}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.tabText, activeTab === 'agenda' && styles.tabTextActive]}>📅 Agenda</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.tabButton, activeTab === 'chat' && styles.tabButtonActive]}
+          onPress={() => setActiveTab('chat')}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.tabText, activeTab === 'chat' && styles.tabTextActive]}>💬 Vito IA</Text>
+        </TouchableOpacity>
+      </View>
+
+      <ProfileModal
+        visible={profileVisible}
+        onClose={() => setProfileVisible(false)}
+        serverUrl={serverUrl}
+        onToggleServer={onToggleServer}
       />
     </View>
   );
@@ -213,5 +250,34 @@ const styles = StyleSheet.create({
     color: tokens.colors.textMuted,
     fontSize: 12,
     marginTop: 2,
+  },
+  tabBar: {
+    flexDirection: 'row',
+    backgroundColor: tokens.colors.surface,
+    borderTopWidth: 1,
+    borderTopColor: tokens.colors.surfaceBorder,
+    paddingVertical: tokens.spacing.xs,
+    paddingHorizontal: tokens.spacing.md,
+    gap: tokens.spacing.sm,
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: tokens.spacing.sm,
+    alignItems: 'center',
+    borderRadius: tokens.radii.md,
+  },
+  tabButtonActive: {
+    backgroundColor: tokens.colors.surfaceSubtle,
+    borderWidth: 1,
+    borderColor: tokens.colors.surfaceBorder,
+  },
+  tabText: {
+    fontSize: tokens.typography.size.sm,
+    color: tokens.colors.textMuted,
+    fontWeight: tokens.typography.weight.medium,
+  },
+  tabTextActive: {
+    color: tokens.colors.primary,
+    fontWeight: tokens.typography.weight.semibold,
   },
 });

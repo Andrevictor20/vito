@@ -4,13 +4,11 @@ import { tokens } from '../../theme/tokens';
 import { useAuth } from '../../context/AuthContext';
 
 interface HeaderProps {
-  serverUrl: string;
-  onToggleServer: () => void;
+  onPressProfile?: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ serverUrl, onToggleServer }) => {
-  const { user, logout } = useAuth();
-  const isCloud = serverUrl.includes('vito.rasppi.cloud');
+export const Header: React.FC<HeaderProps> = ({ onPressProfile }) => {
+  const { user } = useAuth();
 
   const todayStr = new Date().toLocaleDateString('pt-BR', {
     weekday: 'long',
@@ -31,22 +29,17 @@ export const Header: React.FC<HeaderProps> = ({ serverUrl, onToggleServer }) => 
           </View>
         </View>
 
-        <View style={styles.actions}>
+        {user && (
           <TouchableOpacity
-            style={[styles.serverPill, isCloud ? styles.serverPillCloud : styles.serverPillLocal]}
-            onPress={onToggleServer}
+            style={styles.userAvatar}
+            onPress={onPressProfile}
             activeOpacity={0.7}
+            accessibilityLabel="Perfil e Configurações"
+            hitSlop={tokens.hitSlop.sm}
           >
-            <View style={[styles.dot, isCloud ? styles.dotCloud : styles.dotLocal]} />
-            <Text style={styles.serverText}>{isCloud ? 'Cloudflare' : 'Local Pi'}</Text>
+            <Text style={styles.avatarText}>{firstName.charAt(0).toUpperCase()}</Text>
           </TouchableOpacity>
-
-          {user && (
-            <TouchableOpacity style={styles.userAvatar} onPress={logout} accessibilityLabel="Sair">
-              <Text style={styles.avatarText}>{firstName.charAt(0).toUpperCase()}</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+        )}
       </View>
 
       <View style={styles.greetingRow}>
@@ -92,40 +85,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 10,
     fontWeight: '700',
-  },
-  actions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  serverPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: tokens.radii.full,
-    borderWidth: 1,
-  },
-  serverPillCloud: {
-    backgroundColor: 'rgba(14, 165, 233, 0.1)',
-    borderColor: 'rgba(14, 165, 233, 0.25)',
-  },
-  serverPillLocal: {
-    backgroundColor: 'rgba(34, 197, 94, 0.1)',
-    borderColor: 'rgba(34, 197, 94, 0.25)',
-  },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  dotLocal: { backgroundColor: '#22c55e' },
-  dotCloud: { backgroundColor: '#0ea5e9' },
-  serverText: {
-    fontSize: 11,
-    color: tokens.colors.textSecondary,
-    fontWeight: '600',
   },
   userAvatar: {
     width: 32,
