@@ -1,5 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { tokens } from '../../theme/tokens';
 import { Todo } from '../../types';
 
@@ -24,8 +25,10 @@ export const TodoItem: React.FC<TodoItemProps> = ({ todo, onToggle, onDelete }) 
       <TouchableOpacity
         style={[styles.checkbox, isCompleted && styles.checkboxChecked]}
         onPress={() => onToggle(todo.id)}
+        activeOpacity={0.8}
+        accessibilityLabel={isCompleted ? 'Marcar como pendente' : 'Marcar como concluída'}
       >
-        {isCompleted && <Text style={styles.checkmark}>✓</Text>}
+        {isCompleted && <MaterialIcons name="done" size={14} color="#fff" />}
       </TouchableOpacity>
 
       <View style={styles.textContainer}>
@@ -49,9 +52,10 @@ export const TodoItem: React.FC<TodoItemProps> = ({ todo, onToggle, onDelete }) 
       <TouchableOpacity
         style={styles.deleteButton}
         onPress={() => onDelete(todo.id)}
-        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        hitSlop={tokens.hitSlop.sm}
+        accessibilityLabel="Excluir tarefa"
       >
-        <Text style={styles.deleteText}>✕</Text>
+        <MaterialIcons name="close" size={15} color={tokens.colors.textMuted} />
       </TouchableOpacity>
     </View>
   );

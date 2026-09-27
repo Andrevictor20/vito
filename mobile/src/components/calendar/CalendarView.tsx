@@ -1,12 +1,22 @@
 import React, { useState } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { tokens } from '../../theme/tokens';
 import { Event } from '../../types';
+import { CalendarTopBar, CalendarViewMode } from './CalendarTopBar';
+import { CalendarGrid } from './CalendarGrid';
+
+export { CalendarViewMode };
 
 interface CalendarViewProps {
   events: Event[];
   selectedDate: Date;
   onSelectDate: (date: Date) => void;
+  viewMode?: CalendarViewMode;
+  onChangeViewMode?: (mode: CalendarViewMode) => void;
+  onSearchQuery?: (q: string) => void;
+  selectedCategory?: string;
+  onSelectCategory?: (category: string) => void;
 }
 
 const WEEKDAYS = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
@@ -15,11 +25,31 @@ const MONTH_NAMES = [
   'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
 ];
 
+interface CalendarDayItem {
+  dayNumber: number;
+  isCurrentMonth: boolean;
+  date: Date;
+}
+
 export const CalendarView: React.FC<CalendarViewProps> = ({
   events,
   selectedDate,
   onSelectDate,
+  viewMode: controlledViewMode,
+  onChangeViewMode,
+  onSearchQuery,
+  selectedCategory = 'all',
+  onSelectCategory,
 }) => {
+  const [localViewMode, setLocalViewMode] = useState<CalendarViewMode>('month');
+  const activeViewMode = controlledViewMode || localViewMode;
+
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [searchVisible, setSearchVisible] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterVisible, setFilterVisible] = useState(false);
+  const [activeCategory, setActiveCategory] = useState(selectedCategory);
+
   const [currentMonth, setCurrentMonth] = useState(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1));
 
   const year = currentMonth.getFullYear();
@@ -27,6 +57,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
   const firstDayIndex = new Date(year, month, 1).getDay();
   const totalDaysInMonth = new Date(year, month + 1, 0).getDate();
+  const prevMonthDays = new Date(year, month, 0).getDate();
 
   const prevMonth = () => {
     setCurrentMonth(new Date(year, month - 1, 1));
@@ -42,222 +73,319 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     onSelectDate(today);
   };
 
-  const isToday = (d: number) => {
+  const isToday = (d: Date) => {
     const today = new Date();
     return (
-      d === today.getDate() &&
-      month === today.getMonth() &&
-      year === today.getFullYear()
+      d.getDate() === today.getDate() &&
+      d.getMonth() === today.getMonth() &&
+      d.getFullYear() === today.getFullYear()
     );
   };
 
-  const isSelected = (d: number) => {
+  const isSelected = (d: Date) => {
     return (
-      d === selectedDate.getDate() &&
-      month === selectedDate.getMonth() &&
-      year === selectedDate.getFullYear()
+      d.getDate() === selectedDate.getDate() &&
+      d.getMonth() === selectedDate.getMonth() &&
+      d.getFullYear() === selectedDate.getFullYear()
     );
   };
 
-  const hasEventsOnDay = (d: number) => {
-    const targetDateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-    return events.some((e) => {
-      // Suporta eventos de um dia ou múltiplos dias
+  const getDayEvents = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const dateStr = y + '-' + m + '-' + day;
+    return events.filter((e) => {
       const startDay = e.start_at.substring(0, 10);
       const endDay = e.end_at.substring(0, 10);
-      return targetDateStr >= startDay && targetDateStr <= endDay;
+      return dateStr >= startDay && dateStr <= endDay;
     });
   };
 
-  const daysGrid: (number | null)[] = [];
-  for (let i = 0; i < firstDayIndex; i++) {
-    daysGrid.push(null);
+  const setView = (mode: CalendarViewMode) => {
+    setLocalViewMode(mode);
+    if (onChangeViewMode) onChangeViewMode(mode);
+  };
+
+  const handleSearch = (text: string) => {
+    setSearchQuery(text);
+    if (onSearchQuery) onSearchQuery(text);
+  };
+
+  const handleCategorySelect = (cat: string) => {
+    setActiveCategory(cat);
+    if (onSelectCategory) onSelectCategory(cat);
+  };
+
+  // Construir grade completa
+  const allDaysGrid: CalendarDayItem[] = [];
+
+  for (let i = firstDayIndex - 1; i >= 0; i--) {
+    const d = prevMonthDays - i;
+    allDaysGrid.push({
+      dayNumber: d,
+      isCurrentMonth: false,
+      date: new Date(year, month - 1, d),
+    });
   }
+
   for (let d = 1; d <= totalDaysInMonth; d++) {
-    daysGrid.push(d);
+    allDaysGrid.push({
+      dayNumber: d,
+      isCurrentMonth: true,
+      date: new Date(year, month, d),
+    });
+  }
+
+  const remainingCells = 7 - (allDaysGrid.length % 7);
+  if (remainingCells < 7) {
+    for (let d = 1; d <= remainingCells; d++) {
+      allDaysGrid.push({
+        dayNumber: d,
+        isCurrentMonth: false,
+        date: new Date(year, month + 1, d),
+      });
+    }
+  }
+
+  // Filtragem por visualização de Semana vs Mês
+  let displayedGrid = allDaysGrid;
+  if (activeViewMode === 'week') {
+    // Localiza a semana do dia selecionado
+    const selectedIdx = allDaysGrid.findIndex((item) => isSelected(item.date));
+    const weekStartIdx = selectedIdx >= 0 ? Math.floor(selectedIdx / 7) * 7 : 0;
+    displayedGrid = allDaysGrid.slice(weekStartIdx, weekStartIdx + 7);
   }
 
   return (
     <View style={styles.card}>
-      {/* Header do Mês e Navegação */}
-      <View style={styles.header}>
-        <View style={styles.headerTitleGroup}>
-          <TouchableOpacity style={styles.navButton} onPress={prevMonth} hitSlop={tokens.hitSlop.sm}>
-            <Text style={styles.navIcon}>‹</Text>
-          </TouchableOpacity>
+      {/* 1. Barra de Controles Topo (Segmentos, Busca e Filtros Stitch) */}
+      <CalendarTopBar
+        activeViewMode={activeViewMode}
+        onChangeViewMode={setView}
+        searchVisible={searchVisible}
+        onToggleSearch={() => setSearchVisible(!searchVisible)}
+        searchQuery={searchQuery}
+        onSearchChange={handleSearch}
+        filterVisible={filterVisible}
+        onToggleFilter={() => setFilterVisible(!filterVisible)}
+        activeCategory={activeCategory}
+        onSelectCategory={handleCategorySelect}
+      />
 
-          <Text style={styles.monthTitle}>
-            {MONTH_NAMES[month]} {year}
-          </Text>
+      {/* 2. Month Bar & Expand Option (Stitch Lines 35-48) */}
+      {activeViewMode !== 'todos' && (
+        <>
+          <View style={styles.header}>
+            <View style={styles.headerTitleGroup}>
+              <TouchableOpacity style={styles.navButton} onPress={prevMonth} hitSlop={tokens.hitSlop.sm}>
+                <MaterialIcons name="chevron-left" size={22} color={tokens.colors.textSecondary} />
+              </TouchableOpacity>
 
-          <TouchableOpacity style={styles.navButton} onPress={nextMonth} hitSlop={tokens.hitSlop.sm}>
-            <Text style={styles.navIcon}>›</Text>
-          </TouchableOpacity>
-        </View>
-
-        <TouchableOpacity style={styles.todayButton} onPress={jumpToToday} activeOpacity={0.75}>
-          <Text style={styles.todayButtonText}>Hoje</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Dias da semana */}
-      <View style={styles.weekRow}>
-        {WEEKDAYS.map((w, idx) => (
-          <Text key={idx} style={styles.weekText}>
-            {w}
-          </Text>
-        ))}
-      </View>
-
-      {/* Grade de Dias */}
-      <View style={styles.grid}>
-        {daysGrid.map((day, idx) => {
-          if (day === null) {
-            return <View key={idx} style={styles.dayCell} />;
-          }
-
-          const selected = isSelected(day);
-          const today = isToday(day);
-          const hasEvents = hasEventsOnDay(day);
-
-          return (
-            <TouchableOpacity
-              key={idx}
-              style={[
-                styles.dayCell,
-                selected && styles.dayCellSelected,
-                today && !selected && styles.dayCellToday,
-              ]}
-              onPress={() => onSelectDate(new Date(year, month, day))}
-            >
-              <Text
-                style={[
-                  styles.dayText,
-                  selected && styles.dayTextSelected,
-                  today && !selected && styles.dayTextToday,
-                ]}
-              >
-                {day}
+              <Text style={styles.monthTitle}>
+                {MONTH_NAMES[month]} {year}
               </Text>
-              {hasEvents && (
-                <View
-                  style={[
-                    styles.eventDot,
-                    selected && styles.eventDotSelected,
-                  ]}
+
+              <TouchableOpacity style={styles.navButton} onPress={nextMonth} hitSlop={tokens.hitSlop.sm}>
+                <MaterialIcons name="chevron-right" size={22} color={tokens.colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.headerRightGroup}>
+              <TouchableOpacity style={styles.todayButton} onPress={jumpToToday} activeOpacity={0.75}>
+                <Text style={styles.todayButtonText}>Hoje</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.expandBtn, isExpanded && styles.expandBtnActive]}
+                onPress={() => setIsExpanded(!isExpanded)}
+                accessibilityLabel={isExpanded ? 'Visualização normal' : 'Visualização expandida'}
+              >
+                <MaterialIcons
+                  name={isExpanded ? 'close-fullscreen' : 'open-in-full'}
+                  size={16}
+                  color={isExpanded ? tokens.colors.primary : tokens.colors.textSecondary}
                 />
-              )}
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Dias da semana */}
+          <View style={styles.weekRow}>
+            {WEEKDAYS.map((w, idx) => (
+              <Text key={idx} style={styles.weekText}>
+                {w}
+              </Text>
+            ))}
+          </View>
+
+          {/* Grade de Dias Modular */}
+          <CalendarGrid
+            days={displayedGrid}
+            isExpanded={isExpanded}
+            isSelected={isSelected}
+            isToday={isToday}
+            getDayEvents={getDayEvents}
+            onSelectDate={onSelectDate}
+          />
+
+          {/* Legenda de Categorias Stitch */}
+          <View style={styles.legendRow}>
+            <View style={styles.legendLeft}>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: tokens.colors.primary }]} />
+                <Text style={styles.legendText}>Liderança</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: tokens.colors.tertiary }]} />
+                <Text style={styles.legendText}>Foco</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: tokens.colors.secondary }]} />
+                <Text style={styles.legendText}>Pessoal</Text>
+              </View>
+            </View>
+            <Text style={styles.syncMetaText}>Google • Apple</Text>
+          </View>
+        </>
+      )}
+
+      {activeViewMode === 'todos' && (
+        <View style={styles.todosModeContainer}>
+          <MaterialIcons name="checklist" size={24} color={tokens.colors.primary} />
+          <Text style={styles.todosModeTitle}>Visualização de Tarefas Ativa</Text>
+          <Text style={styles.todosModeSub}>
+            Veja a lista completa de pendências e prioridades logo abaixo na sua agenda executiva.
+          </Text>
+        </View>
+      )}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: tokens.colors.surfaceSubtle,
+    backgroundColor: tokens.colors.surfaceContainerLow,
     borderWidth: 1,
     borderColor: tokens.colors.surfaceBorder,
     borderRadius: tokens.radii.lg,
     padding: tokens.spacing.md,
-    marginBottom: tokens.spacing.lg,
+  },
+  todosModeContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: tokens.spacing.lg,
+    paddingHorizontal: tokens.spacing.md,
+    gap: 6,
+  },
+  todosModeTitle: {
+    fontSize: tokens.typography.size.sm,
+    fontWeight: tokens.typography.weight.semibold,
+    color: tokens.colors.textPrimary,
+  },
+  todosModeSub: {
+    fontSize: tokens.typography.size.xs,
+    color: tokens.colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 18,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: tokens.spacing.sm,
+    marginBottom: tokens.spacing.xs,
   },
   headerTitleGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 2,
   },
   monthTitle: {
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: tokens.typography.size.sm + 1,
+    fontWeight: tokens.typography.weight.semibold,
     color: tokens.colors.textPrimary,
-    letterSpacing: -0.3,
   },
   navButton: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    padding: 2,
   },
-  navIcon: {
-    fontSize: 20,
-    color: tokens.colors.textSecondary,
-    fontWeight: '600',
+  headerRightGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   todayButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 3.5,
     borderRadius: tokens.radii.full,
-    backgroundColor: tokens.colors.surfaceElevated,
+    backgroundColor: tokens.colors.surfaceContainerHigh,
     borderWidth: 1,
     borderColor: tokens.colors.surfaceBorder,
   },
   todayButtonText: {
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: tokens.typography.weight.semibold,
     color: tokens.colors.primary,
+  },
+  expandBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: tokens.radii.full,
+    backgroundColor: tokens.colors.surfaceContainer,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: tokens.colors.surfaceBorder,
+  },
+  expandBtnActive: {
+    backgroundColor: tokens.colors.primaryLight,
+    borderColor: tokens.colors.primary,
   },
   weekRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: tokens.spacing.xs,
     paddingVertical: tokens.spacing.xs,
     borderBottomWidth: 1,
-    borderBottomColor: tokens.colors.surfaceBorder,
+    borderBottomColor: 'rgba(255, 255, 255, 0.04)',
+    marginBottom: tokens.spacing.xs,
   },
   weekText: {
     flex: 1,
     textAlign: 'center',
-    fontSize: 11,
+    fontSize: tokens.typography.size.xs,
     color: tokens.colors.outline,
-    fontWeight: '600',
+    fontWeight: tokens.typography.weight.semibold,
   },
-  grid: {
+  legendRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  dayCell: {
-    width: '14.28%',
-    height: 38,
     alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 19,
-    marginVertical: 2,
+    justifyContent: 'space-between',
+    marginTop: tokens.spacing.sm,
+    paddingTop: tokens.spacing.xs + 2,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.04)',
   },
-  dayCellSelected: {
-    backgroundColor: tokens.colors.primaryContainer,
+  legendLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.spacing.md,
   },
-  dayCellToday: {
-    borderWidth: 1.5,
-    borderColor: tokens.colors.primary,
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
-  dayText: {
-    fontSize: 13,
+  legendDot: {
+    width: 6,
+    height: 6,
+    borderRadius: tokens.radii.full,
+  },
+  legendText: {
+    fontSize: 10,
     color: tokens.colors.textSecondary,
-    fontWeight: '500',
+    fontWeight: tokens.typography.weight.medium,
   },
-  dayTextSelected: {
-    color: '#00285d',
-    fontWeight: '700',
-  },
-  dayTextToday: {
-    color: tokens.colors.primary,
-    fontWeight: '700',
-  },
-  eventDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: tokens.colors.primary,
-    marginTop: 2,
-  },
-  eventDotSelected: {
-    backgroundColor: '#00285d',
+  syncMetaText: {
+    fontSize: 10,
+    color: tokens.colors.outline,
   },
 });

@@ -8,13 +8,14 @@ import {
   ActivityIndicator,
   TouchableOpacity,
 } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { tokens } from '../theme/tokens';
+import { FloatingTabBar } from '../components/common/FloatingTabBar';
 import { Header } from '../components/common/Header';
 import { CalendarView } from '../components/calendar/CalendarView';
 import { EventCard } from '../components/calendar/EventCard';
 import { TodoItem } from '../components/todos/TodoItem';
-import { AssistantBar } from '../components/assistant/AssistantBar';
-import { AssistantResultModal } from '../components/assistant/AssistantResultModal';
+import { CreateItemModal } from '../components/calendar/CreateItemModal';
 import { ProfileModal } from '../components/profile/ProfileModal';
 import { ChatScreen } from './ChatScreen';
 import { useHomeData } from '../hooks/useHomeData';
@@ -25,6 +26,8 @@ export const HomeScreen: React.FC<{
 }> = ({ serverUrl, onToggleServer }) => {
   const [activeTab, setActiveTab] = useState<'chat' | 'calendar'>('chat');
   const [profileVisible, setProfileVisible] = useState(false);
+  const [createModalVisible, setCreateModalVisible] = useState(false);
+  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const {
     events,
     todos,
@@ -38,12 +41,7 @@ export const HomeScreen: React.FC<{
     handleDeleteEvent,
     handleToggleTodo,
     handleDeleteTodo,
-    assistantLoading,
-    assistantResult,
-    modalVisible,
-    setModalVisible,
     handleAssistantSubmit,
-    handleAssistantAudioSubmit,
     loadData,
   } = useHomeData();
 
@@ -86,7 +84,7 @@ export const HomeScreen: React.FC<{
         ) : dayEvents.length === 0 ? (
           <View style={styles.emptyCard}>
             <View style={styles.emptyIconContainer}>
-              <Text style={styles.emptyIconSymbol}>📅</Text>
+              <MaterialIcons name="event-available" size={20} color={tokens.colors.primary} />
             </View>
             <View style={styles.emptyContent}>
               <Text style={styles.emptyTitle}>Dia Livre</Text>
@@ -114,7 +112,7 @@ export const HomeScreen: React.FC<{
         ) : todos.length === 0 ? (
           <View style={styles.emptyCard}>
             <View style={[styles.emptyIconContainer, { backgroundColor: 'rgba(34, 197, 94, 0.1)' }]}>
-              <Text style={styles.emptyIconSymbol}>⚡</Text>
+              <MaterialIcons name="done-all" size={20} color={tokens.colors.success} />
             </View>
             <View style={styles.emptyContent}>
               <Text style={styles.emptyTitle}>Tudo em Dia</Text>
@@ -133,46 +131,42 @@ export const HomeScreen: React.FC<{
         )}
       </ScrollView>
 
-      {/* Floating Vito Assistant Bar */}
-      <AssistantBar
-        onSubmit={handleAssistantSubmit}
-        onAudioSubmit={handleAssistantAudioSubmit}
-        isLoading={assistantLoading}
-      />
+          {/* Botão de Criação Rápida de Nova Tarefa / Evento (Stitch CTA) */}
+          <View style={styles.createBtnWrapper}>
+            <TouchableOpacity
+              style={styles.createFab}
+              onPress={() => setCreateModalVisible(true)}
+              activeOpacity={0.85}
+              accessibilityLabel="Criar nova tarefa ou evento"
+            >
+              <MaterialIcons name="add" size={20} color="#ffffff" />
+              <Text style={styles.createFabText}>Nova Tarefa ou Evento</Text>
+            </TouchableOpacity>
+          </View>
 
-          {/* Result feedback Modal */}
-          <AssistantResultModal
-            visible={modalVisible}
-            result={assistantResult}
-            onClose={() => setModalVisible(false)}
+          {/* Modal de Criação Executiva */}
+          <CreateItemModal
+            visible={createModalVisible}
+            onClose={() => setCreateModalVisible(false)}
+            selectedDate={selectedDate}
+            onSaveEvent={(title) => {
+              handleAssistantSubmit(`Agendar evento: ${title} para o dia ${selectedDate.toLocaleDateString('pt-BR')}`);
+            }}
+            onSaveTodo={(title, priority) => {
+              handleAssistantSubmit(`Nova tarefa: ${title} prioridade ${priority}`);
+            }}
           />
         </>
       ) : (
-        <ChatScreen onDataChanged={loadData} onPressProfile={() => setProfileVisible(true)} />
+        <ChatScreen onDataChanged={loadData} onPressProfile={() => setProfileVisible(true)} onKeyboardStateChange={setIsKeyboardOpen} />
       )}
 
-      {/* Bottom Tab Bar (Executive Shell Navigation) */}
-      <View style={styles.tabBar}>
-        <TouchableOpacity
-          style={[styles.tabButton, activeTab === 'chat' && styles.tabButtonActive]}
-          onPress={() => setActiveTab('chat')}
-          activeOpacity={0.75}
-        >
-          <Text style={[styles.tabText, activeTab === 'chat' && styles.tabTextActive]}>
-            💬 Chat Executivo
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.tabButton, activeTab === 'calendar' && styles.tabButtonActive]}
-          onPress={() => setActiveTab('calendar')}
-          activeOpacity={0.75}
-        >
-          <Text style={[styles.tabText, activeTab === 'calendar' && styles.tabTextActive]}>
-            📅 Agenda & Calendário
-          </Text>
-        </TouchableOpacity>
-      </View>
+      {/* Bottom Floating Pill Navigation */}
+      <FloatingTabBar
+        activeTab={activeTab}
+        onSelectTab={setActiveTab}
+        visible={!isKeyboardOpen}
+      />
 
       <ProfileModal
         visible={profileVisible}
@@ -283,5 +277,29 @@ const styles = StyleSheet.create({
   tabTextActive: {
     color: tokens.colors.primary,
     fontWeight: '700',
+  },
+  createBtnWrapper: {
+    paddingHorizontal: tokens.spacing.md,
+    paddingBottom: tokens.spacing.sm,
+  },
+  createFab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: tokens.colors.cobalt,
+    paddingVertical: 13,
+    borderRadius: tokens.radii.full,
+    shadowColor: tokens.colors.cobalt,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.45,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  createFabText: {
+    color: '#ffffff',
+    fontSize: tokens.typography.size.sm,
+    fontWeight: tokens.typography.weight.semibold,
+    letterSpacing: 0.1,
   },
 });

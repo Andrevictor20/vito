@@ -3,44 +3,74 @@ import {
   StyleSheet,
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   FlatList,
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  ScrollView,
+  Keyboard,
 } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { tokens } from '../theme/tokens';
 import { useChat } from '../hooks/useChat';
 import { ChatMessageBubble } from '../components/chat/ChatMessageBubble';
+import { ChatQuotaBanner } from '../components/chat/ChatQuotaBanner';
+import { ChatQuickChips } from '../components/chat/ChatQuickChips';
+import { ChatInputDock } from '../components/chat/ChatInputDock';
 import { useAuth } from '../context/AuthContext';
-
-const QUICK_PROMPTS = [
-  'O que tenho na agenda hoje?',
-  'Listar tarefas pendentes',
-  'Agendar almoço amanhã às 12h',
-  'Nova tarefa: Comprar café',
-];
 
 interface ChatScreenProps {
   onDataChanged?: () => void;
   onPressProfile?: () => void;
+  onKeyboardStateChange?: (isOpen: boolean) => void;
 }
 
-export const ChatScreen: React.FC<ChatScreenProps> = ({ onDataChanged, onPressProfile }) => {
+export const ChatScreen: React.FC<ChatScreenProps> = ({
+  onDataChanged,
+  onPressProfile,
+  onKeyboardStateChange,
+}) => {
   const { user } = useAuth();
   const firstName = user?.name ? user.name.split(' ')[0] : 'Usuário';
   const { messages, loading, sendMessage, clearHistory } = useChat(onDataChanged);
   const [inputText, setInputText] = useState('');
+  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
+  // Monitoramento ativo de eventos do teclado para auto-scroll e recolhimento da navegação
   useEffect(() => {
-    // Rola para a última mensagem quando o histórico mudar
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const onShow = () => {
+      setIsKeyboardOpen(true);
+      if (onKeyboardStateChange) onKeyboardStateChange(true);
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 80);
+    };
+
+    const onHide = () => {
+      setIsKeyboardOpen(false);
+      if (onKeyboardStateChange) onKeyboardStateChange(false);
+    };
+
+    const subShow = Keyboard.addListener(showEvent, onShow);
+    const subHide = Keyboard.addListener(hideEvent, onHide);
+
+    return () => {
+      subShow.remove();
+      subHide.remove();
+    };
+  }, [onKeyboardStateChange]);
+
+  // Rola para a última mensagem ao carregar novas mensagens
+  useEffect(() => {
     setTimeout(() => {
       flatListRef.current?.scrollToEnd({ animated: true });
-    }, 100);
-  }, [messages, loading]);
+    }, 120);
+  }, [messages.length, loading]);
 
   const handleSend = () => {
     if (!inputText.trim() || loading) return;
@@ -54,11 +84,21 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ onDataChanged, onPressPr
     sendMessage(prompt);
   };
 
+  const handleToggleRecording = () => {
+    if (loading) return;
+    if (!isRecording) {
+      setIsRecording(true);
+    } else {
+      setIsRecording(false);
+      setInputText('Organizar minha sexta-feira e agendar alinhamento de produto às 14h');
+    }
+  };
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 44 : 0}
     >
       {/* Top Header Stitch */}
       <View style={styles.header}>
@@ -95,65 +135,53 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ onDataChanged, onPressPr
           onPress={clearHistory}
           activeOpacity={0.75}
           hitSlop={tokens.hitSlop.sm}
+          accessibilityLabel="Limpar histórico do chat"
         >
+          <MaterialIcons name="cleaning-services" size={14} color={tokens.colors.textSecondary} />
           <Text style={styles.clearBtnText}>Limpar</Text>
         </TouchableOpacity>
       </View>
 
+      {/* Banner de Cota Semanal Estilo Toki/Stitch */}
+      <ChatQuotaBanner quotaPercentage={18.5} daysRemaining={4} />
+
       {/* Lista de Mensagens */}
       <FlatList
         ref={flatListRef}
+        style={styles.flatList}
         data={messages}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => <ChatMessageBubble message={item} />}
-        contentContainerStyle={styles.messagesList}
+        contentContainerStyle={[
+          styles.messagesList,
+          { paddingBottom: isKeyboardOpen ? tokens.spacing.sm : 12 },
+        ]}
+        keyboardShouldPersistTaps="handled"
         ListFooterComponent={
           loading ? (
             <View style={styles.loadingBubble}>
               <ActivityIndicator size="small" color={tokens.colors.primary} />
-              <Text style={styles.loadingText}>Vito está pensando...</Text>
+              <Text style={styles.loadingText}>Vito está organizando...</Text>
             </View>
           ) : null
         }
       />
 
-      {/* Chips de Ação Rápida */}
-      <View style={styles.quickPromptsWrapper}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickPromptsList}>
-          {QUICK_PROMPTS.map((prompt, idx) => (
-            <TouchableOpacity
-              key={idx}
-              style={styles.promptChip}
-              onPress={() => handleQuickPrompt(prompt)}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.promptChipText}>{prompt}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
+      {/* Chips Rápidos de Sugestões Executivas */}
+      {!isKeyboardOpen && (
+        <ChatQuickChips onSelectPrompt={handleQuickPrompt} disabled={loading} />
+      )}
 
-      {/* Barra de Envio */}
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.textInput}
-          placeholder="Digite ou instrua o Vito..."
-          placeholderTextColor={tokens.colors.textMuted}
+      {/* Dock Flutuante de Digitação com Cápsula Arredondada */}
+      <View style={[styles.dockContainer, { paddingBottom: isKeyboardOpen ? 4 : 58 }]}>
+        <ChatInputDock
           value={inputText}
           onChangeText={setInputText}
-          onSubmitEditing={handleSend}
-          returnKeyType="send"
-          multiline
+          onSend={handleSend}
+          loading={loading}
+          isRecording={isRecording}
+          onPressMic={handleToggleRecording}
         />
-
-        <TouchableOpacity
-          style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]}
-          onPress={handleSend}
-          disabled={!inputText.trim() || loading}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.sendButtonText}>↑</Text>
-        </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
   );
@@ -168,8 +196,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: tokens.spacing.lg,
-    paddingVertical: tokens.spacing.sm + 2,
+    paddingHorizontal: tokens.spacing.md,
+    paddingTop: Platform.OS === 'ios' ? 44 : tokens.spacing.sm,
+    paddingBottom: tokens.spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: tokens.colors.surfaceBorder,
     backgroundColor: tokens.colors.bg,
@@ -180,161 +209,108 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   brand: {
-    fontSize: 20,
-    fontWeight: '700',
+    fontSize: tokens.typography.size.xl,
+    fontWeight: tokens.typography.weight.bold,
     color: tokens.colors.textPrimary,
-    letterSpacing: -0.4,
+    letterSpacing: -0.5,
   },
   brandDot: {
     width: 6,
     height: 6,
-    borderRadius: 3,
-    backgroundColor: tokens.colors.primaryContainer,
+    borderRadius: tokens.radii.full,
+    backgroundColor: tokens.colors.primary,
   },
   userAvatar: {
     width: 32,
     height: 32,
-    borderRadius: 16,
-    backgroundColor: tokens.colors.surfaceElevated,
-    borderWidth: 1,
-    borderColor: tokens.colors.surfaceBorder,
+    borderRadius: tokens.radii.full,
+    backgroundColor: tokens.colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarText: {
-    color: tokens.colors.primary,
-    fontSize: 13,
-    fontWeight: '700',
+    color: tokens.colors.surface,
+    fontSize: tokens.typography.size.xs + 1,
+    fontWeight: tokens.typography.weight.bold,
   },
   metaUtilityBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: tokens.spacing.lg,
-    paddingVertical: 7,
-    borderBottomWidth: 1,
-    borderBottomColor: tokens.colors.surfaceBorder,
-    backgroundColor: tokens.colors.bg,
+    paddingHorizontal: tokens.spacing.md,
+    paddingVertical: tokens.spacing.xs + 2,
   },
   metaLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: tokens.spacing.sm,
   },
   aiBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
+    backgroundColor: tokens.colors.secondaryContainer,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: tokens.radii.full,
-    backgroundColor: tokens.colors.secondaryContainer,
   },
   aiDot: {
     width: 5,
     height: 5,
-    borderRadius: 2.5,
+    borderRadius: tokens.radii.full,
     backgroundColor: tokens.colors.primary,
   },
   aiBadgeText: {
     fontSize: 10,
-    fontWeight: '700',
     color: tokens.colors.primary,
+    fontWeight: tokens.typography.weight.semibold,
     letterSpacing: 0.5,
   },
   metaSyncText: {
-    fontSize: 11,
-    color: tokens.colors.textMuted,
+    fontSize: tokens.typography.size.xs,
+    color: tokens.colors.textSecondary,
+    fontWeight: tokens.typography.weight.medium,
   },
   clearBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 3,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     borderRadius: tokens.radii.full,
-    backgroundColor: tokens.colors.surfaceElevated,
-    borderWidth: 1,
-    borderColor: tokens.colors.surfaceBorder,
+    backgroundColor: tokens.colors.surfaceContainerLow,
   },
   clearBtnText: {
-    fontSize: 11,
+    fontSize: tokens.typography.size.xs,
     color: tokens.colors.textSecondary,
-    fontWeight: '500',
+    fontWeight: tokens.typography.weight.medium,
   },
   messagesList: {
-    padding: tokens.spacing.md,
-    paddingBottom: tokens.spacing.lg,
+    paddingHorizontal: tokens.spacing.md,
+    paddingTop: tokens.spacing.sm,
   },
   loadingBubble: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: tokens.spacing.xs,
-    padding: tokens.spacing.sm,
-    marginLeft: 32,
-  },
-  loadingText: {
-    fontSize: tokens.typography.size.xs,
-    color: tokens.colors.textMuted,
-    fontStyle: 'italic',
-  },
-  quickPromptsWrapper: {
-    paddingVertical: tokens.spacing.xs,
-    borderTopWidth: 1,
-    borderTopColor: tokens.colors.surfaceBorder,
-    backgroundColor: tokens.colors.bg,
-  },
-  quickPromptsList: {
-    paddingHorizontal: tokens.spacing.md,
-    gap: tokens.spacing.xs,
-  },
-  promptChip: {
-    backgroundColor: tokens.colors.surfaceElevated,
-    borderRadius: tokens.radii.full,
-    paddingHorizontal: tokens.spacing.md,
-    paddingVertical: 6,
-    borderWidth: 1,
-    borderColor: tokens.colors.surfaceBorder,
-  },
-  promptChipText: {
-    fontSize: 12,
-    color: tokens.colors.textSecondary,
-    fontWeight: '500',
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    gap: tokens.spacing.sm,
+    alignSelf: 'flex-start',
+    backgroundColor: tokens.colors.surfaceContainerLow,
     paddingHorizontal: tokens.spacing.md,
     paddingVertical: tokens.spacing.sm,
-    backgroundColor: tokens.colors.surface,
-    borderTopWidth: 1,
-    borderTopColor: tokens.colors.surfaceBorder,
-    gap: tokens.spacing.sm,
-  },
-  textInput: {
-    flex: 1,
-    backgroundColor: tokens.colors.surfaceElevated,
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: Platform.OS === 'ios' ? tokens.spacing.sm : tokens.spacing.xs + 2,
-    color: tokens.colors.textPrimary,
-    fontSize: 14,
-    maxHeight: 100,
+    borderRadius: tokens.radii.lg,
+    borderTopLeftRadius: 4,
+    marginBottom: tokens.spacing.md,
     borderWidth: 1,
     borderColor: tokens.colors.surfaceBorder,
   },
-  sendButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: tokens.colors.primaryContainer,
-    alignItems: 'center',
-    justifyContent: 'center',
+  loadingText: {
+    color: tokens.colors.textSecondary,
+    fontSize: tokens.typography.size.sm,
   },
-  sendButtonDisabled: {
-    backgroundColor: tokens.colors.surfaceElevated,
-    opacity: 0.4,
+  dockContainer: {
+    backgroundColor: 'transparent',
   },
-  sendButtonText: {
-    color: '#00285d',
-    fontSize: 18,
-    fontWeight: '700',
+  flatList: {
+    flex: 1,
   },
 });

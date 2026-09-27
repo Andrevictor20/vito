@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, SafeAreaView, View, ActivityIndicator, Platform, StatusBar as RNStatusBar } from 'react-native';
+import { StyleSheet, View, ActivityIndicator, Platform, StatusBar as RNStatusBar } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AuthScreen } from './screens/AuthScreen';
@@ -26,14 +26,14 @@ const MainNavigator: React.FC = () => {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={styles.safeArea}>
       <StatusBar style="light" />
       {user ? (
         <HomeScreen serverUrl={serverUrl} onToggleServer={toggleServer} />
       ) : (
         <AuthScreen serverUrl={serverUrl} onToggleServer={toggleServer} />
       )}
-    </SafeAreaView>
+    </View>
   );
 };
 

@@ -6,9 +6,14 @@ import {
   Modal,
   TouchableOpacity,
   TouchableWithoutFeedback,
+  ScrollView,
 } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { tokens } from '../../theme/tokens';
 import { useAuth } from '../../context/AuthContext';
+import { ProfileUserCard } from './ProfileUserCard';
+import { ProfileNodeCard } from './ProfileNodeCard';
+import { ProfileSettingsGroup } from './ProfileSettingsGroup';
 
 interface ProfileModalProps {
   visible: boolean;
@@ -25,7 +30,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 }) => {
   const { user, logout } = useAuth();
   const isCloud = serverUrl.includes('vito.rasppi.cloud');
-  const firstName = user?.name || 'Usuário';
+  const name = user?.name || 'Andre Victor';
+  const email = user?.email || 'andre@vito.ai';
 
   const handleLogout = () => {
     onClose();
@@ -33,114 +39,73 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   };
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
-    >
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <TouchableWithoutFeedback onPress={onClose}>
         <View style={styles.overlay}>
           <TouchableWithoutFeedback>
             <View style={styles.sheet}>
-              {/* Grab Bar Header */}
+              {/* Grab Bar & Close Action */}
               <View style={styles.sheetHeader}>
                 <View style={styles.grabBar} />
                 <TouchableOpacity
-                  style={styles.closeIconBtn}
+                  style={styles.closeBtn}
                   onPress={onClose}
                   hitSlop={tokens.hitSlop.sm}
-                  accessibilityLabel="Fechar preferências"
+                  accessibilityLabel="Fechar perfil"
                 >
-                  <Text style={styles.closeIconText}>✕</Text>
+                  <MaterialIcons name="close" size={18} color={tokens.colors.textSecondary} />
                 </TouchableOpacity>
               </View>
 
-              {/* Executive Profile Card */}
-              <View style={styles.userCard}>
-                <View style={styles.userCardTop}>
-                  <View style={styles.avatarLarge}>
-                    <Text style={styles.avatarTextLarge}>
-                      {firstName.slice(0, 2).toUpperCase()}
-                    </Text>
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+                {/* Executive User Card com Cota Semanal */}
+                <ProfileUserCard name={name} email={email} quotaPercentage={18.5} />
+
+                {/* Seção: Servidor & Conexão Stitch */}
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>SERVIDOR & CONEXÃO</Text>
+                  <View style={styles.onlineBadge}>
+                    <View style={styles.onlineDot} />
+                    <Text style={styles.onlineText}>Online • 24ms</Text>
                   </View>
-                  <View style={styles.profileInfo}>
-                    <View style={styles.nameRow}>
-                      <Text style={styles.profileName} numberOfLines={1}>
-                        {user?.name?.toUpperCase() || 'ANDRE VICTOR'}
-                      </Text>
-                      <Text style={styles.verifiedIcon}>✓</Text>
+                </View>
+
+                <ProfileNodeCard isCloud={isCloud} onToggleServer={onToggleServer} />
+
+                {/* Seção: Assistente Executivo & IA */}
+                <View style={[styles.sectionHeader, { marginTop: tokens.spacing.md }]}>
+                  <Text style={styles.sectionTitle}>ASSISTENTE EXECUTIVO & IA</Text>
+                </View>
+
+                <ProfileSettingsGroup />
+
+                {/* Ações da Sessão */}
+                <View style={styles.actionsGroup}>
+                  <TouchableOpacity
+                    style={styles.actionButton}
+                    onPress={handleLogout}
+                    activeOpacity={0.8}
+                  >
+                    <View style={styles.actionLeft}>
+                      <MaterialIcons name="switch-account" size={18} color={tokens.colors.textSecondary} />
+                      <Text style={styles.actionText}>Trocar de Conta</Text>
                     </View>
-                    <Text style={styles.profileEmail} numberOfLines={1}>
-                      {user?.email || 'usuario@vito.ai'}
-                    </Text>
-                  </View>
-                  <View style={styles.proBadge}>
-                    <Text style={styles.proBadgeText}>EXECUTIVE PRO</Text>
-                  </View>
-                </View>
+                    <MaterialIcons name="chevron-right" size={18} color={tokens.colors.outline} />
+                  </TouchableOpacity>
 
-                {/* Telemetria de Tokens & Compute Ops */}
-                <View style={styles.telemetryBox}>
-                  <View style={styles.telemetryRow}>
-                    <Text style={styles.telemetryLabel}>Cota semanal de tokens</Text>
-                    <Text style={styles.telemetryValue}>18.1% utilizada</Text>
-                  </View>
-                  <View style={styles.progressBarTrack}>
-                    <View style={[styles.progressBarFill, { width: '18.1%' }]} />
-                  </View>
-                  <View style={styles.telemetryFooter}>
-                    <Text style={styles.telemetrySub}>90.5k / 500k compute ops</Text>
-                    <Text style={styles.telemetrySub}>Renova em 4 dias</Text>
-                  </View>
+                  <TouchableOpacity
+                    style={[styles.actionButton, styles.logoutButton]}
+                    onPress={handleLogout}
+                    activeOpacity={0.8}
+                  >
+                    <View style={styles.actionLeft}>
+                      <MaterialIcons name="logout" size={18} color={tokens.colors.danger} />
+                      <Text style={[styles.actionText, styles.logoutText]}>Encerrar Sessão</Text>
+                    </View>
+                    <MaterialIcons name="chevron-right" size={18} color={tokens.colors.danger} />
+                  </TouchableOpacity>
                 </View>
-              </View>
-
-              {/* Seção de Conexão do Servidor */}
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>SERVIDOR & CONEXÃO</Text>
-                <View style={styles.onlineBadge}>
-                  <View style={styles.onlineDot} />
-                  <Text style={styles.onlineText}>Online • 24ms</Text>
-                </View>
-              </View>
-
-              <TouchableOpacity
-                style={styles.serverRow}
-                onPress={onToggleServer}
-                activeOpacity={0.75}
-              >
-                <View style={styles.serverInfoCol}>
-                  <Text style={styles.serverLabel}>
-                    {isCloud ? 'Cloudflare Tunnel (Remoto)' : 'Raspberry Pi (Rede Local)'}
-                  </Text>
-                  <Text style={styles.serverUrlText} numberOfLines={1}>
-                    {serverUrl}
-                  </Text>
-                </View>
-                <View style={styles.badgeSwitch}>
-                  <Text style={styles.badgeSwitchText}>Alternar</Text>
-                </View>
-              </TouchableOpacity>
-
-              {/* Ações da Sessão */}
-              <View style={styles.actionsGroup}>
-                <TouchableOpacity
-                  style={styles.switchAccountButton}
-                  onPress={handleLogout}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.switchAccountText}>Alternar Conta</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.logoutButton}
-                  onPress={handleLogout}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.logoutText}>Encerrar Sessão</Text>
-                </TouchableOpacity>
-              </View>
+              </ScrollView>
             </View>
           </TouchableWithoutFeedback>
         </View>
@@ -156,256 +121,92 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   sheet: {
-    width: '100%',
-    backgroundColor: tokens.colors.surfaceSubtle,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingHorizontal: tokens.spacing.lg,
-    paddingTop: tokens.spacing.sm,
-    paddingBottom: tokens.spacing.xl,
+    backgroundColor: tokens.colors.bg,
+    borderTopLeftRadius: tokens.radii.xl,
+    borderTopRightRadius: tokens.radii.xl,
+    maxHeight: '88%',
     borderWidth: 1,
     borderColor: tokens.colors.surfaceBorder,
-    ...tokens.shadows.floating,
   },
   sheetHeader: {
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: tokens.spacing.xs,
+    paddingVertical: tokens.spacing.sm,
+    position: 'relative',
   },
   grabBar: {
-    width: 40,
+    width: 36,
     height: 4,
-    borderRadius: 2,
-    backgroundColor: tokens.colors.surfaceContainerHighest,
-    alignSelf: 'center',
-    marginLeft: 'auto',
-    marginRight: 'auto',
-  },
-  closeIconBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: tokens.colors.surfaceElevated,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: tokens.colors.surfaceBorder,
-  },
-  closeIconText: {
-    color: tokens.colors.textSecondary,
-    fontSize: 12,
-    fontWeight: '700',
-  },
-
-  // Executive User Card
-  userCard: {
-    backgroundColor: tokens.colors.surface,
-    borderRadius: tokens.radii.lg,
-    padding: tokens.spacing.md,
-    marginTop: tokens.spacing.sm,
-    borderWidth: 1,
-    borderColor: tokens.colors.surfaceBorder,
-    gap: 12,
-  },
-  userCardTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  avatarLarge: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: tokens.colors.surfaceElevated,
-    borderWidth: 1,
-    borderColor: tokens.colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarTextLarge: {
-    fontSize: tokens.typography.size.md,
-    fontWeight: tokens.typography.weight.bold,
-    color: tokens.colors.primary,
-  },
-  profileInfo: {
-    flex: 1,
-  },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  profileName: {
-    fontSize: tokens.typography.size.sm + 1,
-    fontWeight: tokens.typography.weight.bold,
-    color: tokens.colors.textPrimary,
-    letterSpacing: 0.3,
-  },
-  verifiedIcon: {
-    fontSize: 12,
-    color: tokens.colors.primary,
-    fontWeight: '700',
-  },
-  profileEmail: {
-    fontSize: 12,
-    color: tokens.colors.textMuted,
-    marginTop: 1,
-  },
-  proBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
     borderRadius: tokens.radii.full,
-    backgroundColor: tokens.colors.primaryLight,
-  },
-  proBadgeText: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: tokens.colors.primary,
-    letterSpacing: 0.5,
-  },
-
-  // Telemetry Box
-  telemetryBox: {
-    backgroundColor: tokens.colors.surfaceSubtle,
-    borderRadius: tokens.radii.md,
-    padding: 10,
-    gap: 6,
-  },
-  telemetryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  telemetryLabel: {
-    fontSize: 11,
-    color: tokens.colors.textSecondary,
-  },
-  telemetryValue: {
-    fontSize: 11,
-    fontWeight: tokens.typography.weight.semibold,
-    color: tokens.colors.primary,
-  },
-  progressBarTrack: {
-    width: '100%',
-    height: 5,
-    borderRadius: 2.5,
     backgroundColor: tokens.colors.surfaceContainerHighest,
-    overflow: 'hidden',
   },
-  progressBarFill: {
-    height: '100%',
-    backgroundColor: tokens.colors.primaryContainer,
-    borderRadius: 2.5,
+  closeBtn: {
+    position: 'absolute',
+    right: tokens.spacing.md,
+    top: tokens.spacing.sm,
+    padding: 4,
   },
-  telemetryFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  scrollContent: {
+    paddingHorizontal: tokens.spacing.md,
+    paddingBottom: tokens.spacing.xl,
   },
-  telemetrySub: {
-    fontSize: 10,
-    color: tokens.colors.textMuted,
-  },
-
-  // Section Header & Server Row
   sectionHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: tokens.spacing.md,
+    justifyContent: 'space-between',
     marginBottom: tokens.spacing.xs,
-    paddingHorizontal: 4,
+    paddingHorizontal: 2,
   },
   sectionTitle: {
+    color: tokens.colors.outline,
     fontSize: 11,
-    fontWeight: '700',
-    color: tokens.colors.textMuted,
+    fontWeight: tokens.typography.weight.semibold,
     letterSpacing: 0.8,
   },
   onlineBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 4,
   },
   onlineDot: {
     width: 6,
     height: 6,
-    borderRadius: 3,
+    borderRadius: tokens.radii.full,
     backgroundColor: tokens.colors.success,
   },
   onlineText: {
-    fontSize: 11,
     color: tokens.colors.success,
-    fontWeight: '600',
+    fontSize: 11,
+    fontWeight: tokens.typography.weight.medium,
   },
-  serverRow: {
+  actionsGroup: {
+    marginTop: tokens.spacing.md,
+    gap: tokens.spacing.xs + 2,
+  },
+  actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: tokens.colors.surface,
-    borderRadius: tokens.radii.md,
+    backgroundColor: tokens.colors.surfaceContainer,
     padding: tokens.spacing.md,
-    borderWidth: 1,
-    borderColor: tokens.colors.surfaceBorder,
-  },
-  serverInfoCol: {
-    flex: 1,
-    marginRight: 8,
-  },
-  serverLabel: {
-    fontSize: tokens.typography.size.sm,
-    fontWeight: tokens.typography.weight.medium,
-    color: tokens.colors.textPrimary,
-  },
-  serverUrlText: {
-    fontSize: 11,
-    color: tokens.colors.textMuted,
-    marginTop: 2,
-  },
-  badgeSwitch: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    backgroundColor: tokens.colors.surfaceElevated,
-    borderRadius: tokens.radii.sm,
-    borderWidth: 1,
-    borderColor: tokens.colors.surfaceBorder,
-  },
-  badgeSwitchText: {
-    fontSize: 11,
-    color: tokens.colors.primary,
-    fontWeight: '600',
-  },
-
-  // Actions
-  actionsGroup: {
-    marginTop: tokens.spacing.md,
-    gap: 8,
-  },
-  switchAccountButton: {
-    backgroundColor: tokens.colors.surfaceElevated,
     borderRadius: tokens.radii.md,
-    paddingVertical: 12,
-    alignItems: 'center',
     borderWidth: 1,
     borderColor: tokens.colors.surfaceBorder,
   },
-  switchAccountText: {
+  actionLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.spacing.sm,
+  },
+  actionText: {
+    color: tokens.colors.textPrimary,
     fontSize: tokens.typography.size.sm,
     fontWeight: tokens.typography.weight.medium,
-    color: tokens.colors.textPrimary,
   },
   logoutButton: {
-    backgroundColor: tokens.colors.dangerLight,
-    borderRadius: tokens.radii.md,
-    paddingVertical: 12,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 180, 171, 0.25)',
+    backgroundColor: 'rgba(239, 68, 68, 0.08)',
+    borderColor: 'rgba(239, 68, 68, 0.2)',
   },
   logoutText: {
-    fontSize: tokens.typography.size.sm,
-    fontWeight: tokens.typography.weight.semibold,
     color: tokens.colors.danger,
   },
 });

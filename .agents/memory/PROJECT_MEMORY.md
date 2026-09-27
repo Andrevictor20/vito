@@ -1,8 +1,7 @@
 # 🧠 Project Memory & Context Snapshot
 
-> **Última Atualização:** 2026-09-27 12:10
-> **Status Geral do Projeto:** BOOTSTRAPPING
-> **Versão / Marco Atual:** v0.1.0 (Genesis — Scaffold Inicial)
+> **Última Atualização:** 2026-09-27 18:45
+> **Status Geral do Projeto:** ACTIVE / FRONTEND REDESIGN
 
 ---
 
@@ -22,7 +21,7 @@
 ## 2. Current Health & System Status
 - **CI/CD Status:** CONFIGURED (pipeline inicial ativo)
 - **Quality Gate / Rules:** TDD Estrito + SSDLC Zero-Trust + Multi-Arch Docker
-- **Última Execução / Evidência:** EV-SPEC-20260926-01 (especificação arquitetural formalizada)
+- **Última Execução / Evidência:** 2026-09-27 18:45 — `npx tsc --noEmit` exit 0
 - **Ambiente Ativo:** Local / Development (Raspberry Pi 4 target: `linux/arm64`)
 
 ---
@@ -31,11 +30,12 @@
 
 | Data | Tipo | Descrição | Arquivos | Evidência |
 |:---|:---|:---|:---|:---|
+| 2026-09-27 18:45 | `UX/REFACTOR` | Finalização do Redesign de Calendário: (1) `CalendarView.tsx` refatorado — controles de busca/filtro/modo extraídos para `CalendarTopBar`, grade extraída para `CalendarGrid` (296 linhas). Total: 392 linhas vs 692 originais (-43%). (2) `HomeScreen.tsx` — removida `AssistantBar` e `AssistantResultModal` do calendário, substituídas por botão FAB cobalt "Nova Tarefa ou Evento" + `CreateItemModal`. Voz no chat via `handleToggleRecording` com transcrição simulada. Teclado corrigido via `softwareKeyboardLayoutMode: resize` + `FlatList flex:1`. | `CalendarView.tsx`, `CalendarTopBar.tsx`, `CalendarGrid.tsx`, `HomeScreen.tsx`, `app.json` | `PASS (npx tsc --noEmit exit 0)` |
+| 2026-09-27 | `REDESIGN/UX` | Stitch Full Redesign & Chat Keyboard Fix: Redesign executivo fiel aos artefatos de Stitch (Cold Luxury, `@expo/vector-icons`), correção definitiva do teclado no chat via Keyboard listeners e ocultação do FloatingTabBar, dock em cápsula arredondada, banner de cota Toki, chips rápidos, cards modulares inline | `ChatScreen.tsx`, `ChatInputDock.tsx`, `CalendarView.tsx`, `FloatingTabBar.tsx`, `ProfileModal.tsx`, `HomeScreen.tsx`, `tokens.ts` | `PASS (npx tsc 0 errors, go test 100%)` |
 | 2026-09-27 | `DESIGN/UI` | Executive Slate Stitch Overhaul: Implementação fiel do design system Stitch (paleta carvão `#121315`, Cobalt `#4d8eff`, acentos `#adc6ff`), chat executivo com bolhas assimétricas e cards com borda lateral, sub-header meta bar com AI pill, bottom sheet executivo com telemetria e botões de conta, e calendário com segmented pills | `tokens.ts`, `ChatMessageBubble.tsx`, `ChatScreen.tsx`, `ProfileModal.tsx`, `CalendarView.tsx`, `EventCard.tsx`, `Header.tsx`, `HomeScreen.tsx` | `PASS (npx tsc 0 errors)` |
 | 2026-09-27 | `UX/UI` | Chat como Tela Principal: O app agora abre diretamente na interface de chat do Vito IA com histórico persistente e acesso ao perfil/configurações, com a guia de Calendário e Tarefas desacoplada na navegação inferior | `mobile/src/screens/HomeScreen.tsx`, `mobile/src/screens/ChatScreen.tsx` | `PASS (npx tsc 0 errors)` |
 | 2026-09-27 | `REFINE/AI` | Backend Chat Desbloqueado & Otimizado: Remoção do bloqueio rígido ScopeGuard permitindo conversa fluida, e otimização do system prompt focado em marcar eventos/agenda e gerenciar tarefas com Action GENERAL_CHAT | `backend/internal/ai/prompt.go`, `assistant_service.go`, `assistant_service_test.go` | `PASS (go test ./... 100% PASS)` |
 | 2026-09-27 | `REFINE/UI` | Design System & Auth Overhaul: Remoção de modo demo e status de conexão na AuthScreen, botão "Trocar de Conta" no ProfileModal, Color Lock unificado no CalendarView/EventCard/TodoItem e remoção de clichês de IA | `AuthScreen.tsx`, `ProfileModal.tsx`, `CalendarView.tsx`, `EventCard.tsx`, `TodoItem.tsx`, `AssistantResultModal.tsx` | `PASS (npx tsc 0 errors)` |
-| 2026-09-27 | `FEAT/UI` | Redesign Mobile Fiel: Chat de IA com persistência contínua (AsyncStorage + feed de mensagens e cards inline), Header limpo sem poluição de conexão e ProfileModal para alternância de servidor e logout | `mobile/src/screens/ChatScreen.tsx`, `ChatMessageBubble.tsx`, `useChat.ts`, `ProfileModal.tsx`, `Header.tsx`, `HomeScreen.tsx` | `PASS (npx tsc 0 errors)` |
 
 ---
 

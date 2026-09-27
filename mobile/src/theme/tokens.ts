@@ -2,17 +2,25 @@ export const tokens = {
   colors: {
     // Executive Slate Surfaces (Stitch Dark Theme)
     bg: '#121315',
+    canvas: '#0a0b0d',
     surface: '#1f2022',
     surfaceSubtle: '#1b1c1e',
     surfaceElevated: '#292a2c',
+    surfaceContainerLowest: '#0d0e10',
+    surfaceContainerLow: '#1b1c1e',
+    surfaceContainer: '#1f2022',
+    surfaceContainerHigh: '#292a2c',
     surfaceContainerHighest: '#343537',
-    surfaceBorder: '#2e3035',
+    surfaceBorder: '#272e3b',
+    structuralBorder: '#272e3b',
 
     // Executive Slate Primary & Accents
     primary: '#adc6ff',
     primaryContainer: '#4d8eff',
     primaryHover: '#3b82f6',
     primaryLight: 'rgba(173, 198, 255, 0.12)',
+    cobalt: '#3b82f6',
+    cobaltGlow: 'rgba(59, 130, 246, 0.16)',
 
     // Accents & Secondary
     secondary: '#b9c8de',
@@ -21,20 +29,24 @@ export const tokens = {
     accentLight: 'rgba(77, 142, 255, 0.14)',
 
     // Typography Colors (WCAG AA Calibrated)
-    textPrimary: '#e3e2e5',
-    textSecondary: '#c2c6d6',
-    textMuted: '#9aa0a6',
+    textPrimary: '#f8fafc',
+    textSecondary: '#94a3b8',
+    textMuted: '#64748b',
     outline: '#8c909f',
+    outlineVariant: '#424754',
 
     // Status Colors & Semantic Badges
-    success: '#4edea3',
-    successLight: 'rgba(78, 222, 163, 0.15)',
+    success: '#10b981',
+    successLight: 'rgba(16, 185, 129, 0.15)',
+    tertiary: '#4edea3',
     tertiaryContainer: '#00a572',
-    warning: '#fcd34d',
-    warningLight: 'rgba(252, 211, 77, 0.15)',
-    danger: '#ffb4ab',
+    warning: '#f59e0b',
+    warningLight: 'rgba(245, 158, 11, 0.15)',
+    danger: '#ef4444',
     dangerContainer: '#93000a',
-    dangerLight: 'rgba(255, 180, 171, 0.15)',
+    dangerLight: 'rgba(239, 68, 68, 0.15)',
+    error: '#ffb4ab',
+    errorContainer: '#93000a',
   },
 
   typography: {

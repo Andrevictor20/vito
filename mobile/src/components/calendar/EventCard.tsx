@@ -1,14 +1,20 @@
 import React from 'react';
 import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { tokens } from '../../theme/tokens';
 import { Event } from '../../types';
 
 interface EventCardProps {
   event: Event;
   onDelete: (id: string) => void;
+  accentColor?: string;
 }
 
-export const EventCard: React.FC<EventCardProps> = ({ event, onDelete }) => {
+export const EventCard: React.FC<EventCardProps> = ({
+  event,
+  onDelete,
+  accentColor = tokens.colors.primaryContainer,
+}) => {
   const formatTime = (iso: string) => {
     try {
       const d = new Date(iso);
@@ -18,29 +24,60 @@ export const EventCard: React.FC<EventCardProps> = ({ event, onDelete }) => {
     }
   };
 
+  const calculateDuration = () => {
+    try {
+      const start = new Date(event.start_at).getTime();
+      const end = new Date(event.end_at).getTime();
+      const diffMinutes = Math.round((end - start) / 60000);
+      if (diffMinutes > 0 && diffMinutes < 1440) {
+        return `${diffMinutes} min`;
+      }
+    } catch {
+      // fallback
+    }
+    return '';
+  };
+
   const startTime = formatTime(event.start_at);
-  const endTime = formatTime(event.end_at);
+  const duration = calculateDuration();
+
+  const getEventIcon = () => {
+    const loc = (event.location || '').toLowerCase();
+    const title = (event.title || '').toLowerCase();
+    if (loc.includes('meet') || loc.includes('zoom') || loc.includes('teams') || title.includes('daily') || title.includes('call')) {
+      return 'videocam' as const;
+    }
+    if (loc.includes('sala') || loc.includes('escritório') || loc.includes('rua') || loc.includes('av')) {
+      return 'location-on' as const;
+    }
+    return 'groups' as const;
+  };
 
   return (
     <View style={styles.card}>
       <View style={styles.timeColumn}>
         <Text style={styles.startTime}>{startTime}</Text>
-        <Text style={styles.endTime}>{endTime}</Text>
+        {duration ? <Text style={styles.duration}>{duration}</Text> : null}
       </View>
 
-      <View style={styles.indicator} />
+      <View style={[styles.indicator, { backgroundColor: accentColor }]} />
 
       <View style={styles.contentColumn}>
-        <Text style={styles.title} numberOfLines={1}>
-          {event.title}
-        </Text>
+        <View style={styles.titleRow}>
+          <Text style={styles.title} numberOfLines={1}>
+            {event.title}
+          </Text>
+          <MaterialIcons name={getEventIcon()} size={15} color={tokens.colors.outline} />
+        </View>
+
         {event.location ? (
           <Text style={styles.meta} numberOfLines={1}>
-            📍 {event.location}
+            {event.location}
           </Text>
         ) : null}
+
         {event.description ? (
-          <Text style={styles.description} numberOfLines={2}>
+          <Text style={styles.description} numberOfLines={1}>
             {event.description}
           </Text>
         ) : null}
@@ -49,9 +86,10 @@ export const EventCard: React.FC<EventCardProps> = ({ event, onDelete }) => {
       <TouchableOpacity
         style={styles.deleteButton}
         onPress={() => onDelete(event.id)}
-        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        hitSlop={tokens.hitSlop.sm}
+        accessibilityLabel="Excluir compromisso"
       >
-        <Text style={styles.deleteText}>✕</Text>
+        <MaterialIcons name="close" size={15} color={tokens.colors.textMuted} />
       </TouchableOpacity>
     </View>
   );
@@ -61,40 +99,47 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: tokens.colors.surfaceSubtle,
+    backgroundColor: tokens.colors.surfaceContainer,
     borderWidth: 1,
     borderColor: tokens.colors.surfaceBorder,
-    borderRadius: tokens.radii.lg,
+    borderRadius: tokens.radii.md,
     padding: tokens.spacing.md,
     marginBottom: tokens.spacing.sm,
   },
   timeColumn: {
-    width: 50,
+    width: 52,
     alignItems: 'flex-start',
   },
   startTime: {
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: tokens.typography.size.sm,
+    fontWeight: tokens.typography.weight.semibold,
     color: tokens.colors.textPrimary,
   },
-  endTime: {
-    fontSize: 11,
+  duration: {
+    fontSize: 10,
     color: tokens.colors.textMuted,
+    marginTop: 2,
   },
   indicator: {
-    width: 3,
+    width: 3.5,
     height: '80%',
-    backgroundColor: tokens.colors.primaryContainer,
-    borderRadius: 2,
+    borderRadius: tokens.radii.full,
     marginHorizontal: tokens.spacing.sm,
   },
   contentColumn: {
     flex: 1,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 4,
+  },
   title: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: tokens.typography.size.sm + 1,
+    fontWeight: tokens.typography.weight.semibold,
     color: tokens.colors.textPrimary,
+    flex: 1,
   },
   meta: {
     fontSize: tokens.typography.size.xs,
@@ -103,17 +148,12 @@ const styles = StyleSheet.create({
     fontWeight: tokens.typography.weight.medium,
   },
   description: {
-    fontSize: 11,
+    fontSize: tokens.typography.size.xs,
     color: tokens.colors.textSecondary,
     marginTop: 2,
   },
   deleteButton: {
     padding: tokens.spacing.xs,
     marginLeft: tokens.spacing.xs,
-  },
-  deleteText: {
-    color: tokens.colors.textMuted,
-    fontSize: 14,
-    fontWeight: '700',
   },
 });
