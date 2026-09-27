@@ -60,37 +60,44 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ onDataChanged, onPressPr
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
     >
-      {/* Top Header do Chat */}
+      {/* Top Header Stitch */}
       <View style={styles.header}>
-        <View style={styles.headerTitleRow}>
-          <Text style={styles.headerBrand}>vito</Text>
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>AI</Text>
-          </View>
+        <View style={styles.brandRow}>
+          <Text style={styles.brand}>vito</Text>
+          <View style={styles.brandDot} />
         </View>
 
-        <View style={styles.headerActions}>
+        {user && (
           <TouchableOpacity
-            style={styles.clearButton}
-            onPress={clearHistory}
-            activeOpacity={0.7}
+            style={styles.userAvatar}
+            onPress={onPressProfile}
+            activeOpacity={0.75}
+            accessibilityLabel="Perfil e Configurações"
             hitSlop={tokens.hitSlop.sm}
           >
-            <Text style={styles.clearButtonText}>Limpar</Text>
+            <Text style={styles.avatarText}>{firstName.charAt(0).toUpperCase()}</Text>
           </TouchableOpacity>
+        )}
+      </View>
 
-          {user && (
-            <TouchableOpacity
-              style={styles.userAvatar}
-              onPress={onPressProfile}
-              activeOpacity={0.7}
-              accessibilityLabel="Perfil e Configurações"
-              hitSlop={tokens.hitSlop.sm}
-            >
-              <Text style={styles.avatarText}>{firstName.charAt(0).toUpperCase()}</Text>
-            </TouchableOpacity>
-          )}
+      {/* Sub-header Meta Utility Bar */}
+      <View style={styles.metaUtilityBar}>
+        <View style={styles.metaLeft}>
+          <View style={styles.aiBadge}>
+            <View style={styles.aiDot} />
+            <Text style={styles.aiBadgeText}>AI ASSISTANT</Text>
+          </View>
+          <Text style={styles.metaSyncText}>Sincronizado</Text>
         </View>
+
+        <TouchableOpacity
+          style={styles.clearBtn}
+          onPress={clearHistory}
+          activeOpacity={0.75}
+          hitSlop={tokens.hitSlop.sm}
+        >
+          <Text style={styles.clearBtnText}>Limpar</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Lista de Mensagens */}
@@ -162,68 +169,95 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: tokens.spacing.lg,
-    paddingVertical: tokens.spacing.md,
+    paddingVertical: tokens.spacing.sm + 2,
     borderBottomWidth: 1,
     borderBottomColor: tokens.colors.surfaceBorder,
-    backgroundColor: tokens.colors.surface,
+    backgroundColor: tokens.colors.bg,
   },
-  headerTitleRow: {
+  brandRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: tokens.spacing.xs,
+    gap: 6,
   },
-  headerBrand: {
-    fontSize: tokens.typography.size.xxl,
-    fontWeight: tokens.typography.weight.bold,
+  brand: {
+    fontSize: 20,
+    fontWeight: '700',
     color: tokens.colors.textPrimary,
-    letterSpacing: -0.5,
+    letterSpacing: -0.4,
   },
-  badge: {
-    backgroundColor: tokens.colors.primaryLight,
-    paddingHorizontal: tokens.spacing.xs + 2,
-    paddingVertical: tokens.spacing.xxs,
-    borderRadius: tokens.radii.xs,
-    borderWidth: 1,
-    borderColor: 'rgba(59, 130, 246, 0.3)',
-  },
-  badgeText: {
-    color: tokens.colors.primary,
-    fontSize: tokens.typography.size.xs - 1,
-    fontWeight: tokens.typography.weight.bold,
-    letterSpacing: 0.5,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: tokens.spacing.sm,
-  },
-  clearButton: {
-    paddingHorizontal: tokens.spacing.sm,
-    paddingVertical: tokens.spacing.xs,
-    borderRadius: tokens.radii.sm,
-    backgroundColor: tokens.colors.surfaceSubtle,
-    borderWidth: 1,
-    borderColor: tokens.colors.surfaceBorder,
-  },
-  clearButtonText: {
-    fontSize: tokens.typography.size.xs,
-    color: tokens.colors.textSecondary,
-    fontWeight: tokens.typography.weight.medium,
+  brandDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: tokens.colors.primaryContainer,
   },
   userAvatar: {
-    width: 34,
-    height: 34,
-    borderRadius: tokens.radii.full,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: tokens.colors.surfaceElevated,
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: tokens.colors.surfaceBorder,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarText: {
     color: tokens.colors.primary,
-    fontSize: tokens.typography.size.sm,
-    fontWeight: tokens.typography.weight.semibold,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  metaUtilityBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: tokens.spacing.lg,
+    paddingVertical: 7,
+    borderBottomWidth: 1,
+    borderBottomColor: tokens.colors.surfaceBorder,
+    backgroundColor: tokens.colors.bg,
+  },
+  metaLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  aiBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: tokens.radii.full,
+    backgroundColor: tokens.colors.secondaryContainer,
+  },
+  aiDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: tokens.colors.primary,
+  },
+  aiBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: tokens.colors.primary,
+    letterSpacing: 0.5,
+  },
+  metaSyncText: {
+    fontSize: 11,
+    color: tokens.colors.textMuted,
+  },
+  clearBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: tokens.radii.full,
+    backgroundColor: tokens.colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: tokens.colors.surfaceBorder,
+  },
+  clearBtnText: {
+    fontSize: 11,
+    color: tokens.colors.textSecondary,
+    fontWeight: '500',
   },
   messagesList: {
     padding: tokens.spacing.md,
@@ -252,16 +286,17 @@ const styles = StyleSheet.create({
     gap: tokens.spacing.xs,
   },
   promptChip: {
-    backgroundColor: tokens.colors.surfaceSubtle,
+    backgroundColor: tokens.colors.surfaceElevated,
     borderRadius: tokens.radii.full,
     paddingHorizontal: tokens.spacing.md,
-    paddingVertical: tokens.spacing.xs,
+    paddingVertical: 6,
     borderWidth: 1,
     borderColor: tokens.colors.surfaceBorder,
   },
   promptChipText: {
-    fontSize: tokens.typography.size.xs,
+    fontSize: 12,
     color: tokens.colors.textSecondary,
+    fontWeight: '500',
   },
   inputContainer: {
     flexDirection: 'row',
@@ -275,31 +310,31 @@ const styles = StyleSheet.create({
   },
   textInput: {
     flex: 1,
-    backgroundColor: tokens.colors.surfaceSubtle,
-    borderRadius: tokens.radii.full,
-    paddingHorizontal: tokens.spacing.md,
-    paddingVertical: Platform.OS === 'ios' ? tokens.spacing.sm : tokens.spacing.xs,
+    backgroundColor: tokens.colors.surfaceElevated,
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: Platform.OS === 'ios' ? tokens.spacing.sm : tokens.spacing.xs + 2,
     color: tokens.colors.textPrimary,
-    fontSize: tokens.typography.size.sm,
+    fontSize: 14,
     maxHeight: 100,
     borderWidth: 1,
     borderColor: tokens.colors.surfaceBorder,
   },
   sendButton: {
-    width: 38,
-    height: 38,
-    borderRadius: tokens.radii.full,
-    backgroundColor: tokens.colors.primary,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: tokens.colors.primaryContainer,
     alignItems: 'center',
     justifyContent: 'center',
   },
   sendButtonDisabled: {
-    backgroundColor: tokens.colors.surfaceSubtle,
-    opacity: 0.5,
+    backgroundColor: tokens.colors.surfaceElevated,
+    opacity: 0.4,
   },
   sendButtonText: {
-    color: '#fff',
-    fontSize: tokens.typography.size.lg,
-    fontWeight: tokens.typography.weight.bold,
+    color: '#00285d',
+    fontSize: 18,
+    fontWeight: '700',
   },
 });

@@ -1,33 +1,40 @@
 export const tokens = {
   colors: {
-    // Background & Surfaces (Off-black matizado, sem preto absoluto #000000)
-    bg: '#0A0B0D',
-    surface: '#13151A',
-    surfaceSubtle: '#1B1E26',
-    surfaceElevated: '#222731',
-    surfaceBorder: '#272E3B',
+    // Executive Slate Surfaces (Stitch Dark Theme)
+    bg: '#121315',
+    surface: '#1f2022',
+    surfaceSubtle: '#1b1c1e',
+    surfaceElevated: '#292a2c',
+    surfaceContainerHighest: '#343537',
+    surfaceBorder: '#2e3035',
 
-    // Brand & Primary (Cobalt Blue sutil de alta precisão)
-    primary: '#3B82F6',
-    primaryHover: '#2563EB',
-    primaryLight: 'rgba(59, 130, 246, 0.12)',
+    // Executive Slate Primary & Accents
+    primary: '#adc6ff',
+    primaryContainer: '#4d8eff',
+    primaryHover: '#3b82f6',
+    primaryLight: 'rgba(173, 198, 255, 0.12)',
 
-    // Accents
-    accent: '#06B6D4',
-    accentLight: 'rgba(6, 182, 212, 0.12)',
+    // Accents & Secondary
+    secondary: '#b9c8de',
+    secondaryContainer: '#39485a',
+    accent: '#adc6ff',
+    accentLight: 'rgba(77, 142, 255, 0.14)',
 
-    // Typography Colors
-    textPrimary: '#F8FAFC',
-    textSecondary: '#94A3B8',
-    textMuted: '#64748B',
+    // Typography Colors (WCAG AA Calibrated)
+    textPrimary: '#e3e2e5',
+    textSecondary: '#c2c6d6',
+    textMuted: '#9aa0a6',
+    outline: '#8c909f',
 
-    // Status Colors & Badges
-    success: '#10B981',
-    successLight: 'rgba(16, 185, 129, 0.12)',
-    warning: '#F59E0B',
-    warningLight: 'rgba(245, 158, 11, 0.12)',
-    danger: '#EF4444',
-    dangerLight: 'rgba(239, 68, 68, 0.12)',
+    // Status Colors & Semantic Badges
+    success: '#4edea3',
+    successLight: 'rgba(78, 222, 163, 0.15)',
+    tertiaryContainer: '#00a572',
+    warning: '#fcd34d',
+    warningLight: 'rgba(252, 211, 77, 0.15)',
+    danger: '#ffb4ab',
+    dangerContainer: '#93000a',
+    dangerLight: 'rgba(255, 180, 171, 0.15)',
   },
 
   typography: {

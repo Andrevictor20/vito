@@ -31,11 +31,11 @@
 
 | Data | Tipo | Descrição | Arquivos | Evidência |
 |:---|:---|:---|:---|:---|
+| 2026-09-27 | `DESIGN/UI` | Executive Slate Stitch Overhaul: Implementação fiel do design system Stitch (paleta carvão `#121315`, Cobalt `#4d8eff`, acentos `#adc6ff`), chat executivo com bolhas assimétricas e cards com borda lateral, sub-header meta bar com AI pill, bottom sheet executivo com telemetria e botões de conta, e calendário com segmented pills | `tokens.ts`, `ChatMessageBubble.tsx`, `ChatScreen.tsx`, `ProfileModal.tsx`, `CalendarView.tsx`, `EventCard.tsx`, `Header.tsx`, `HomeScreen.tsx` | `PASS (npx tsc 0 errors)` |
 | 2026-09-27 | `UX/UI` | Chat como Tela Principal: O app agora abre diretamente na interface de chat do Vito IA com histórico persistente e acesso ao perfil/configurações, com a guia de Calendário e Tarefas desacoplada na navegação inferior | `mobile/src/screens/HomeScreen.tsx`, `mobile/src/screens/ChatScreen.tsx` | `PASS (npx tsc 0 errors)` |
 | 2026-09-27 | `REFINE/AI` | Backend Chat Desbloqueado & Otimizado: Remoção do bloqueio rígido ScopeGuard permitindo conversa fluida, e otimização do system prompt focado em marcar eventos/agenda e gerenciar tarefas com Action GENERAL_CHAT | `backend/internal/ai/prompt.go`, `assistant_service.go`, `assistant_service_test.go` | `PASS (go test ./... 100% PASS)` |
 | 2026-09-27 | `REFINE/UI` | Design System & Auth Overhaul: Remoção de modo demo e status de conexão na AuthScreen, botão "Trocar de Conta" no ProfileModal, Color Lock unificado no CalendarView/EventCard/TodoItem e remoção de clichês de IA | `AuthScreen.tsx`, `ProfileModal.tsx`, `CalendarView.tsx`, `EventCard.tsx`, `TodoItem.tsx`, `AssistantResultModal.tsx` | `PASS (npx tsc 0 errors)` |
 | 2026-09-27 | `FEAT/UI` | Redesign Mobile Fiel: Chat de IA com persistência contínua (AsyncStorage + feed de mensagens e cards inline), Header limpo sem poluição de conexão e ProfileModal para alternância de servidor e logout | `mobile/src/screens/ChatScreen.tsx`, `ChatMessageBubble.tsx`, `useChat.ts`, `ProfileModal.tsx`, `Header.tsx`, `HomeScreen.tsx` | `PASS (npx tsc 0 errors)` |
-| 2026-09-27 | `REFACTOR/FIX` | Modo Cirúrgico Atômico: Desacoplamento do HomeScreen (<250 linhas) com extração do custom hook useHomeData, eliminação de workarounds (@ts-ignore, as any) e alinhamento de contrato de tipos do ConflictInfo entre mobile e Go | `mobile/src/hooks/useHomeData.ts`, `HomeScreen.tsx`, `api.ts`, `types/index.ts` | `PASS (npx tsc 0 errors + go test targeted 100% PASS)` |
 
 ---
 

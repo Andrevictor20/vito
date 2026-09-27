@@ -9,7 +9,7 @@ interface CalendarViewProps {
   onSelectDate: (date: Date) => void;
 }
 
-const WEEKDAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+const WEEKDAYS = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
 const MONTH_NAMES = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
   'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
@@ -34,6 +34,12 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
   const nextMonth = () => {
     setCurrentMonth(new Date(year, month + 1, 1));
+  };
+
+  const jumpToToday = () => {
+    const today = new Date();
+    setCurrentMonth(new Date(today.getFullYear(), today.getMonth(), 1));
+    onSelectDate(today);
   };
 
   const isToday = (d: number) => {
@@ -75,16 +81,22 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     <View style={styles.card}>
       {/* Header do Mês e Navegação */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.navButton} onPress={prevMonth}>
-          <Text style={styles.navIcon}>‹</Text>
-        </TouchableOpacity>
+        <View style={styles.headerTitleGroup}>
+          <TouchableOpacity style={styles.navButton} onPress={prevMonth} hitSlop={tokens.hitSlop.sm}>
+            <Text style={styles.navIcon}>‹</Text>
+          </TouchableOpacity>
 
-        <Text style={styles.monthTitle}>
-          {MONTH_NAMES[month]} {year}
-        </Text>
+          <Text style={styles.monthTitle}>
+            {MONTH_NAMES[month]} {year}
+          </Text>
 
-        <TouchableOpacity style={styles.navButton} onPress={nextMonth}>
-          <Text style={styles.navIcon}>›</Text>
+          <TouchableOpacity style={styles.navButton} onPress={nextMonth} hitSlop={tokens.hitSlop.sm}>
+            <Text style={styles.navIcon}>›</Text>
+          </TouchableOpacity>
+        </View>
+
+        <TouchableOpacity style={styles.todayButton} onPress={jumpToToday} activeOpacity={0.75}>
+          <Text style={styles.todayButtonText}>Hoje</Text>
         </TouchableOpacity>
       </View>
 
@@ -145,7 +157,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: tokens.colors.surface,
+    backgroundColor: tokens.colors.surfaceSubtle,
     borderWidth: 1,
     borderColor: tokens.colors.surfaceBorder,
     borderRadius: tokens.radii.lg,
@@ -158,19 +170,38 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: tokens.spacing.sm,
   },
+  headerTitleGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
   monthTitle: {
     fontSize: 15,
     fontWeight: '700',
     color: tokens.colors.textPrimary,
+    letterSpacing: -0.3,
   },
   navButton: {
-    paddingHorizontal: tokens.spacing.sm,
-    paddingVertical: tokens.spacing.xs,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
   },
   navIcon: {
-    fontSize: 22,
+    fontSize: 20,
     color: tokens.colors.textSecondary,
     fontWeight: '600',
+  },
+  todayButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: tokens.radii.full,
+    backgroundColor: tokens.colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: tokens.colors.surfaceBorder,
+  },
+  todayButtonText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: tokens.colors.primary,
   },
   weekRow: {
     flexDirection: 'row',
@@ -184,7 +215,7 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'center',
     fontSize: 11,
-    color: tokens.colors.textMuted,
+    color: tokens.colors.outline,
     fontWeight: '600',
   },
   grid: {
@@ -196,28 +227,28 @@ const styles = StyleSheet.create({
     height: 38,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: tokens.radii.md,
+    borderRadius: 19,
     marginVertical: 2,
   },
   dayCellSelected: {
-    backgroundColor: tokens.colors.primary,
+    backgroundColor: tokens.colors.primaryContainer,
   },
   dayCellToday: {
     borderWidth: 1.5,
     borderColor: tokens.colors.primary,
   },
   dayText: {
-    fontSize: tokens.typography.size.sm,
+    fontSize: 13,
     color: tokens.colors.textSecondary,
-    fontWeight: tokens.typography.weight.medium,
+    fontWeight: '500',
   },
   dayTextSelected: {
-    color: '#fff',
-    fontWeight: tokens.typography.weight.bold,
+    color: '#00285d',
+    fontWeight: '700',
   },
   dayTextToday: {
     color: tokens.colors.primary,
-    fontWeight: tokens.typography.weight.bold,
+    fontWeight: '700',
   },
   eventDot: {
     width: 4,
@@ -227,6 +258,6 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   eventDotSelected: {
-    backgroundColor: '#fff',
+    backgroundColor: '#00285d',
   },
 });

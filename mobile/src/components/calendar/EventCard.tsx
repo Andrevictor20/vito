@@ -61,10 +61,10 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: tokens.colors.surface,
+    backgroundColor: tokens.colors.surfaceSubtle,
     borderWidth: 1,
     borderColor: tokens.colors.surfaceBorder,
-    borderRadius: tokens.radii.md,
+    borderRadius: tokens.radii.lg,
     padding: tokens.spacing.md,
     marginBottom: tokens.spacing.sm,
   },
@@ -84,7 +84,7 @@ const styles = StyleSheet.create({
   indicator: {
     width: 3,
     height: '80%',
-    backgroundColor: tokens.colors.primary,
+    backgroundColor: tokens.colors.primaryContainer,
     borderRadius: 2,
     marginHorizontal: tokens.spacing.sm,
   },

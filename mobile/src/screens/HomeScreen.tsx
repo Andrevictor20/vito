@@ -151,22 +151,26 @@ export const HomeScreen: React.FC<{
         <ChatScreen onDataChanged={loadData} onPressProfile={() => setProfileVisible(true)} />
       )}
 
-      {/* Bottom Tab Bar */}
+      {/* Bottom Tab Bar (Executive Shell Navigation) */}
       <View style={styles.tabBar}>
         <TouchableOpacity
           style={[styles.tabButton, activeTab === 'chat' && styles.tabButtonActive]}
           onPress={() => setActiveTab('chat')}
-          activeOpacity={0.7}
+          activeOpacity={0.75}
         >
-          <Text style={[styles.tabText, activeTab === 'chat' && styles.tabTextActive]}>💬 Chat com Vito</Text>
+          <Text style={[styles.tabText, activeTab === 'chat' && styles.tabTextActive]}>
+            💬 Chat Executivo
+          </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={[styles.tabButton, activeTab === 'calendar' && styles.tabButtonActive]}
           onPress={() => setActiveTab('calendar')}
-          activeOpacity={0.7}
+          activeOpacity={0.75}
         >
-          <Text style={[styles.tabText, activeTab === 'calendar' && styles.tabTextActive]}>📅 Calendário</Text>
+          <Text style={[styles.tabText, activeTab === 'calendar' && styles.tabTextActive]}>
+            📅 Agenda & Calendário
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -256,28 +260,28 @@ const styles = StyleSheet.create({
     backgroundColor: tokens.colors.surface,
     borderTopWidth: 1,
     borderTopColor: tokens.colors.surfaceBorder,
-    paddingVertical: tokens.spacing.xs,
+    paddingVertical: 8,
     paddingHorizontal: tokens.spacing.md,
     gap: tokens.spacing.sm,
   },
   tabButton: {
     flex: 1,
-    paddingVertical: tokens.spacing.sm,
+    paddingVertical: 10,
     alignItems: 'center',
-    borderRadius: tokens.radii.md,
+    borderRadius: tokens.radii.full,
   },
   tabButtonActive: {
-    backgroundColor: tokens.colors.surfaceSubtle,
+    backgroundColor: tokens.colors.surfaceElevated,
     borderWidth: 1,
     borderColor: tokens.colors.surfaceBorder,
   },
   tabText: {
-    fontSize: tokens.typography.size.sm,
+    fontSize: 12,
     color: tokens.colors.textMuted,
-    fontWeight: tokens.typography.weight.medium,
+    fontWeight: '500',
   },
   tabTextActive: {
     color: tokens.colors.primary,
-    fontWeight: tokens.typography.weight.semibold,
+    fontWeight: '700',
   },
 });
