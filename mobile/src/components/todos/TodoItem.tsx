@@ -17,7 +17,7 @@ export const TodoItem: React.FC<TodoItemProps> = ({ todo, onToggle, onDelete }) 
       ? tokens.colors.danger
       : todo.priority === 'medium'
       ? tokens.colors.warning
-      : tokens.colors.accent;
+      : tokens.colors.success;
 
   return (
     <View style={[styles.container, isCompleted && styles.containerCompleted]}>

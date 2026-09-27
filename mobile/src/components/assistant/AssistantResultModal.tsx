@@ -24,8 +24,10 @@ export const AssistantResultModal: React.FC<AssistantResultModalProps> = ({
         <View style={styles.dialog}>
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.assistantIcon}>🤖</Text>
-            <Text style={styles.title}>Vito Secretário</Text>
+            <View style={styles.vitoAvatar}>
+              <Text style={styles.vitoAvatarText}>V</Text>
+            </View>
+            <Text style={styles.title}>Vito</Text>
           </View>
 
           {/* Transcript preview if voice input */}
@@ -108,8 +110,20 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: tokens.spacing.md,
   },
-  assistantIcon: {
-    fontSize: 20,
+  vitoAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: tokens.radii.full,
+    backgroundColor: tokens.colors.primaryLight,
+    borderWidth: 1,
+    borderColor: tokens.colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  vitoAvatarText: {
+    fontSize: tokens.typography.size.xs,
+    fontWeight: tokens.typography.weight.bold,
+    color: tokens.colors.primary,
   },
   title: {
     fontSize: 16,
@@ -125,9 +139,9 @@ const styles = StyleSheet.create({
     marginBottom: tokens.spacing.sm,
   },
   transcriptLabel: {
-    fontSize: 10,
-    color: tokens.colors.accent,
-    fontWeight: '700',
+    fontSize: tokens.typography.size.xs - 1,
+    color: tokens.colors.primary,
+    fontWeight: tokens.typography.weight.bold,
     textTransform: 'uppercase',
   },
   transcriptText: {

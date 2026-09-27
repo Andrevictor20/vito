@@ -84,6 +84,14 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
               {/* Ações da Sessão */}
               <TouchableOpacity
+                style={styles.switchAccountButton}
+                onPress={handleLogout}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.switchAccountText}>Trocar de Conta</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
                 style={styles.logoutButton}
                 onPress={handleLogout}
                 activeOpacity={0.8}
@@ -207,6 +215,21 @@ const styles = StyleSheet.create({
     fontSize: tokens.typography.size.xs,
     color: tokens.colors.primary,
     fontWeight: tokens.typography.weight.medium,
+  },
+  switchAccountButton: {
+    backgroundColor: tokens.colors.surfaceSubtle,
+    borderRadius: tokens.radii.md,
+    paddingVertical: tokens.spacing.md,
+    alignItems: 'center',
+    marginTop: tokens.spacing.xs,
+    borderWidth: 1,
+    borderColor: tokens.colors.surfaceBorder,
+    marginBottom: tokens.spacing.xs,
+  },
+  switchAccountText: {
+    fontSize: tokens.typography.size.sm,
+    fontWeight: tokens.typography.weight.medium,
+    color: tokens.colors.textPrimary,
   },
   logoutButton: {
     backgroundColor: tokens.colors.dangerLight,

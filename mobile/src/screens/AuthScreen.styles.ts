@@ -94,21 +94,6 @@ export const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
   },
-  demoButton: {
-    backgroundColor: tokens.colors.surfaceSubtle,
-    borderWidth: 1,
-    borderColor: tokens.colors.primary,
-    height: 44,
-    borderRadius: tokens.radii.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: tokens.spacing.md,
-  },
-  demoButtonText: {
-    color: tokens.colors.textPrimary,
-    fontSize: 13,
-    fontWeight: '600',
-  },
   switchButton: {
     marginTop: tokens.spacing.lg,
     alignItems: 'center',

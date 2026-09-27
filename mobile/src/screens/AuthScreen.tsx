@@ -48,22 +48,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ serverUrl, onToggleServe
     }
   };
 
-  const handleDemoLogin = async () => {
-    setError(null);
-    const demoEmail = 'andre@vito.local';
-    const demoPass = 'segredo123';
-    try {
-      await login(demoEmail, demoPass);
-    } catch {
-      // Se não existir, tenta registrar
-      try {
-        await register('André', demoEmail, demoPass);
-      } catch (err: any) {
-        setError(err?.message || 'Falha ao acessar modo demo.');
-      }
-    }
-  };
-
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -140,14 +124,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ serverUrl, onToggleServe
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={styles.demoButton}
-          onPress={handleDemoLogin}
-          disabled={isLoading}
-        >
-          <Text style={styles.demoButtonText}>⚡ Entrar com 1 Toque (Demo)</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
           style={styles.switchButton}
           onPress={() => {
             setIsRegister(!isRegister);
@@ -157,26 +133,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ serverUrl, onToggleServe
           <Text style={styles.switchText}>
             {isRegister
               ? 'Já possui uma conta? Faça login'
-              : 'Não tem conta? Cadastre-se em 10 segundos'}
+              : 'Não tem conta? Cadastre-se em instantes'}
           </Text>
         </TouchableOpacity>
-
-        {serverUrl && onToggleServer && (
-          <TouchableOpacity
-            style={{ marginTop: 20, alignItems: 'center', padding: 6 }}
-            onPress={onToggleServer}
-          >
-            <Text style={{ fontSize: 11, color: tokens.colors.textMuted }}>
-              Conectado a:{' '}
-              <Text style={{ color: tokens.colors.primary, fontWeight: '700' }}>
-                {serverUrl.includes('192.168.100.17') ? 'Raspberry Pi Local' : 'Cloudflare Tunnel'}
-              </Text>
-            </Text>
-            <Text style={{ fontSize: 10, color: tokens.colors.accent, marginTop: 2 }}>
-              Toque para alternar o servidor
-            </Text>
-          </TouchableOpacity>
-        )}
       </View>
     </KeyboardAvoidingView>
   );

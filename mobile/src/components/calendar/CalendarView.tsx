@@ -169,7 +169,7 @@ const styles = StyleSheet.create({
   },
   navIcon: {
     fontSize: 22,
-    color: tokens.colors.accent,
+    color: tokens.colors.textSecondary,
     fontWeight: '600',
   },
   weekRow: {
@@ -203,27 +203,27 @@ const styles = StyleSheet.create({
     backgroundColor: tokens.colors.primary,
   },
   dayCellToday: {
-    borderWidth: 1,
-    borderColor: tokens.colors.accent,
+    borderWidth: 1.5,
+    borderColor: tokens.colors.primary,
   },
   dayText: {
-    fontSize: 13,
+    fontSize: tokens.typography.size.sm,
     color: tokens.colors.textSecondary,
-    fontWeight: '500',
+    fontWeight: tokens.typography.weight.medium,
   },
   dayTextSelected: {
     color: '#fff',
-    fontWeight: '700',
+    fontWeight: tokens.typography.weight.bold,
   },
   dayTextToday: {
-    color: tokens.colors.accent,
-    fontWeight: '700',
+    color: tokens.colors.primary,
+    fontWeight: tokens.typography.weight.bold,
   },
   eventDot: {
     width: 4,
     height: 4,
     borderRadius: 2,
-    backgroundColor: tokens.colors.accent,
+    backgroundColor: tokens.colors.primary,
     marginTop: 2,
   },
   eventDotSelected: {

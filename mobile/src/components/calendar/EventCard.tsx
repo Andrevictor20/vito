@@ -97,9 +97,10 @@ const styles = StyleSheet.create({
     color: tokens.colors.textPrimary,
   },
   meta: {
-    fontSize: 11,
-    color: tokens.colors.accent,
+    fontSize: tokens.typography.size.xs,
+    color: tokens.colors.primary,
     marginTop: 2,
+    fontWeight: tokens.typography.weight.medium,
   },
   description: {
     fontSize: 11,
