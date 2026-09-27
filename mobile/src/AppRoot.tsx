@@ -5,14 +5,14 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { AuthScreen } from './screens/AuthScreen';
 import { HomeScreen } from './screens/HomeScreen';
 import { tokens } from './theme/tokens';
-import { api, DEFAULT_SERVER_URL, CLOUDFLARE_SERVER_URL } from './services/api';
+import { api, DEFAULT_SERVER_URL, CLOUDFLARE_SERVER_URL, PI_SERVER_URL } from './services/api';
 
 const MainNavigator: React.FC = () => {
   const { user, isLoading } = useAuth();
   const [serverUrl, setServerUrl] = useState(DEFAULT_SERVER_URL);
 
   const toggleServer = async () => {
-    const nextUrl = serverUrl.includes('192.168.100.17') ? CLOUDFLARE_SERVER_URL : DEFAULT_SERVER_URL;
+    const nextUrl = serverUrl.includes('vito.rasppi.cloud') ? PI_SERVER_URL : CLOUDFLARE_SERVER_URL;
     setServerUrl(nextUrl);
     await api.setBaseUrl(nextUrl);
   };
