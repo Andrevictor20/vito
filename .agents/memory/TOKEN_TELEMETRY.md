@@ -1,6 +1,6 @@
 # 📊 Relatório de Telemetria de Tokens — Antigravity
-> **Status:** 🟡 Atenção (>50%) | **Última Leitura:** 2026-09-26 22:36:54  
-> **Sessão:** `803890b3-c25a-4657-b491-3a9d66e4b030` | **Modelo Utilizado:** `Gemini 3.8 Flash` (`gemini-3.8-flash`) | **Effort:** `Medium`  
+> **Status:** 🟡 Atenção (>50%) | **Última Leitura:** 2026-09-26 22:56:12  
+> **Sessão:** `18937709-0b90-4a45-89d7-3eaef42fc53a` | **Modelo Utilizado:** `Gemini 3.8 Flash` (`gemini-3.8-flash`) | **Effort:** `Medium`  
 > **Limites do Modelo:** Janela de Contexto: `1.05M` (`1,048,576` tokens) | Saída Máxima: `65.5k` (`65,536` tokens)
 
 ---
@@ -9,29 +9,29 @@
 
 | Camada de Limite | Consumo Usado | Teto / Limite Total | Utilizado (%) | Margem Restante | Status & Ritmo |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **1. Janela de Mensagem (Context)** | `266.7k` tokens | `1.05M` | **25.44%** | `781.9k` livres | Ativa na sessão |
-| **2. Janela Móvel de 5 Horas (Rate)** | `591.8k` tokens | `800.0k` | **73.98%** | `208.2k` livres | 5 sessões (~118.4k/h) |
-| **3. Janela Semanal (7 Dias Quota)** | `4.93M` tokens | `10.00M` | **49.32%** | `5.07M` livres | 61 sessões (~704.5k/dia) |
+| **1. Janela de Mensagem (Context)** | `144.4k` tokens | `1.05M` | **13.77%** | `904.2k` livres | Ativa na sessão |
+| **2. Janela Móvel de 5 Horas (Rate)** | `633.5k` tokens | `800.0k` | **79.18%** | `166.5k` livres | 4 sessões (~126.7k/h) |
+| **3. Janela Semanal (7 Dias Quota)** | `4.99M` tokens | `10.00M` | **49.94%** | `5.01M` livres | 61 sessões (~713.4k/dia) |
 
 ---
 
 ## 2. Distribuição de Consumo da Sessão Atual
 | Categoria | Tokens Estimados | Bytes | Participação |
 | :--- | :--- | :--- | :--- |
-| **System Prompt & Schemas** | `35.8k` | 117,996 B | 13.4% |
-| **Execuções de Ferramentas** | `200.1k` | 640,205 B | 75.0% |
-| **Respostas & Thinking** | `28.2k` | 98,591 B | 10.6% |
-| **Mensagens do Usuário** | `2.7k` | 10,931 B | 1.0% |
+| **System Prompt & Schemas** | `35.8k` | 117,996 B | 24.8% |
+| **Execuções de Ferramentas** | `99.0k` | 316,642 B | 68.5% |
+| **Respostas & Thinking** | `9.3k` | 32,655 B | 6.5% |
+| **Mensagens do Usuário** | `372` | 1,489 B | 0.3% |
 
 ---
 
 ## 3. Top Ferramentas Consumidoras
-| `GENERIC` | 438 | 182.1k | 582,784 B |
-| `SYSTEM_MESSAGE` | 17 | 9.8k | 31,361 B |
-| `EPHEMERAL_MESSAGE` | 30 | 8.1k | 26,060 B |
+| `GENERIC` | 161 | 97.5k | 312,005 B |
+| `EPHEMERAL_MESSAGE` | 5 | 1.3k | 4,093 B |
+| `SYSTEM_MESSAGE` | 1 | 170 | 544 B |
 
 ---
 
 ## 4. Recomendações de Governança
-- **Janela de 5 Horas:** Consumo atual em **74.0%** do teto (208.2k disponíveis). Mantenha comandos e testes com saída concisa.
-- **Janela Semanal:** Consumo atual em **49.3%** da cota semanal (5.07M disponíveis). Utilize `PROJECT_MEMORY.md` para resetar sessões longas ao concluir marcos.
+- **Janela de 5 Horas:** Consumo atual em **79.2%** do teto (166.5k disponíveis). Mantenha comandos e testes com saída concisa.
+- **Janela Semanal:** Consumo atual em **49.9%** da cota semanal (5.01M disponíveis). Utilize `PROJECT_MEMORY.md` para resetar sessões longas ao concluir marcos.

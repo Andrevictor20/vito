@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { User, AuthResponse, Event, Todo, AssistantChatResponse } from '../types';
+import { User, AuthResponse, Event, Todo, AssistantChatResponse, ConflictInfo } from '../types';
 
 const TOKEN_KEY = '@vito_jwt_token';
 const SERVER_URL_KEY = '@vito_server_url';
@@ -102,7 +102,7 @@ class ApiService {
   }
 
   async createEvent(event: { title: string; description?: string; location?: string; start_at: string; end_at: string }) {
-    return this.request<{ event: Event; conflict?: any }>('/api/v1/events', {
+    return this.request<{ event: Event; conflict?: ConflictInfo }>('/api/v1/events', {
       method: 'POST',
       body: JSON.stringify(event),
     });
@@ -147,12 +147,11 @@ class ApiService {
   // Assistant Audio (Groq Whisper v3)
   async assistantAudio(audioUri: string, filename: string = 'audio.m4a'): Promise<AssistantChatResponse> {
     const formData = new FormData();
-    // @ts-ignore React Native FormData aceita objeto { uri, name, type }
     formData.append('audio', {
       uri: audioUri,
       name: filename,
       type: 'audio/m4a',
-    });
+    } as unknown as Blob);
 
     const headers: Record<string, string> = {
       Accept: 'application/json',

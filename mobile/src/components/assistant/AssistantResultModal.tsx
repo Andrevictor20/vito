@@ -37,7 +37,7 @@ export const AssistantResultModal: React.FC<AssistantResultModalProps> = ({
           ) : null}
 
           {/* Reply message */}
-          <Text style={styles.replyText}>{result.reply || (result as any).message}</Text>
+          <Text style={styles.replyText}>{result.reply || result.message}</Text>
 
           {/* Conflict Warning */}
           {hasConflict && (

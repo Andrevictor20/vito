@@ -11,8 +11,9 @@ export interface AuthResponse {
 
 export interface ConflictInfo {
   has_conflict: boolean;
-  conflicting_events: Event[];
-  message: string;
+  conflicting_id?: string;
+  conflicting_title?: string;
+  message?: string;
 }
 
 export interface Event {
