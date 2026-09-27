@@ -55,10 +55,15 @@ export interface ParsedIntent {
 }
 
 export interface AssistantChatResponse {
+  action?: string;
   intent: string;
+  message?: string;
   reply: string;
-  action_performed: string;
+  transcript?: string;
+  action_performed?: string;
   event?: Event;
   todo?: Todo;
   conflict?: ConflictInfo;
+  provider_used?: string;
 }
+

@@ -31,11 +31,11 @@
 
 | Data | Tipo | Descrição | Arquivos | Evidência |
 |:---|:---|:---|:---|:---|
+| 2026-09-26 | `FEAT` | Opções 1 e 2 concluídas: Entrada de Voz com Groq Whisper Large v3 (backend multipart + mobile expo-av) e Memória de Longo Prazo / RAG Pessoal (tabela memories, injeção contextual e ação SAVE_MEMORY), além de Login persistente com salvaguarda no AsyncStorage | `backend/`, `mobile/` | `PASS (go test ./... 100% PASS + npx tsc 0 errors)` |
 | 2026-09-26 | `UPGRADE` | Upgrade oficial do Mobile para Expo SDK 57 (React 19, React Native 0.86) compatível com Expo Go atual de 2026 | `mobile/package.json`, `mobile/package-lock.json` | `PASS (npx tsc 0 errors + sdkVersion 57.0.0 confirmado)` |
 | 2026-09-26 | `FIX/FEAT` | Correção de sintaxe no Dockerfile (comentário `#`) para destravar CI/CD no GH Actions e adição do Watchtower (intervalo de 60s, cleanup e label enable) no `docker-compose.prod.yml` para auto-update no Raspberry Pi 4 | `backend/Dockerfile`, `docker-compose.prod.yml` | `PASS (docker build local 20/20 FINISHED)` |
 | 2026-09-26 | `FEAT` | Zero-Token Scope Guard (Tier 0) para rejeição instantânea de matemática e off-topic, integração de chaves Gemini/Groq/OpenRouter no `.env`, modelos atualizados e compatibilidade retroativa mobile (`prompt`/`text`, `reply`/`message`) | `backend/internal/service/scope_guard.go`, `assistant_service.go`, `main.go`, `mobile/` | `PASS (TestAssistantService_ScopeGuard_BlocksOffTopicAndMath + curl e2e 200 OK)` |
 | 2026-09-26 | `FEAT` | Fase 5 concluída: CI/CD com GitHub Actions, compilação multi-arch (linux/arm64 e linux/amd64), publicação automática no GHCR e docker-compose.prod.yml para o Raspberry Pi 4 | `.github/workflows/ci.yml`, `docker-compose.prod.yml`, `backend/Dockerfile` | `PASS (Docker build multi-arch OK)` |
-| 2026-09-26 | `FEAT` | Fase 4 concluída: Mobile UI (Experiência Toki) em React Native Expo 52 Web/Mobile com Auth JWT, Timeline de Agenda, Checklist de Tarefas, Floating Assistant Bar e Modal de Intenções/Conflitos | `mobile/src/`, `mobile/App.tsx`, `mobile/index.ts` | `PASS (npx tsc + Metro Web bundle 200 OK)` |
 
 ---
 

@@ -111,6 +111,7 @@ func (s *Server) registerRoutes() {
 
 				if s.astHandler != nil {
 					protected.Post("/assistant/chat", s.astHandler.Chat)
+					protected.Post("/assistant/audio", s.astHandler.AudioChat)
 				}
 			})
 		}

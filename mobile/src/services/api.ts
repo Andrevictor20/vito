@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { AuthResponse, Event, Todo, AssistantChatResponse } from '../types';
+import { User, AuthResponse, Event, Todo, AssistantChatResponse } from '../types';
 
 const TOKEN_KEY = '@vito_jwt_token';
 const SERVER_URL_KEY = '@vito_server_url';
@@ -89,8 +89,10 @@ class ApiService {
     return res;
   }
 
-  async getMe() {
-    return this.request<{ user: { id: string; name: string; email: string } }>('/api/v1/auth/me');
+  async getMe(): Promise<{ user: User }> {
+    const data = await this.request<any>('/api/v1/auth/me');
+    const user = data?.user || data;
+    return { user };
   }
 
   // Calendar
@@ -141,6 +143,38 @@ class ApiService {
       body: JSON.stringify({ prompt, timezone }),
     });
   }
+
+  // Assistant Audio (Groq Whisper v3)
+  async assistantAudio(audioUri: string, filename: string = 'audio.m4a'): Promise<AssistantChatResponse> {
+    const formData = new FormData();
+    // @ts-ignore React Native FormData aceita objeto { uri, name, type }
+    formData.append('audio', {
+      uri: audioUri,
+      name: filename,
+      type: 'audio/m4a',
+    });
+
+    const headers: Record<string, string> = {
+      Accept: 'application/json',
+    };
+    if (this.token) {
+      headers['Authorization'] = `Bearer ${this.token}`;
+    }
+
+    const res = await fetch(`${this.baseUrl}/api/v1/assistant/audio`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.error || `Erro HTTP ${res.status}`);
+    }
+
+    return res.json();
+  }
 }
 
 export const api = new ApiService();
+

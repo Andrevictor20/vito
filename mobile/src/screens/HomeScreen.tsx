@@ -130,6 +130,25 @@ export const HomeScreen: React.FC<{
     }
   };
 
+  const handleAssistantAudioSubmit = async (audioUri: string) => {
+    setAssistantLoading(true);
+    try {
+      const res = await api.assistantAudio(audioUri);
+      setAssistantResult(res);
+      setModalVisible(true);
+      await loadData();
+    } catch (e: any) {
+      setAssistantResult({
+        intent: 'error',
+        reply: `Desculpe, ocorreu um erro ao transcrever ou processar seu áudio: ${e?.message || 'Falha de comunicação'}`,
+        action_performed: 'none',
+      });
+      setModalVisible(true);
+    } finally {
+      setAssistantLoading(false);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <Header serverUrl={serverUrl} onToggleServer={onToggleServer} />
@@ -199,8 +218,12 @@ export const HomeScreen: React.FC<{
         )}
       </ScrollView>
 
-      {/* Floating Toki Assistant Bar */}
-      <AssistantBar onSubmit={handleAssistantSubmit} isLoading={assistantLoading} />
+      {/* Floating Vito Assistant Bar */}
+      <AssistantBar
+        onSubmit={handleAssistantSubmit}
+        onAudioSubmit={handleAssistantAudioSubmit}
+        isLoading={assistantLoading}
+      />
 
       {/* Result feedback Modal */}
       <AssistantResultModal

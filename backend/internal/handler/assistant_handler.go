@@ -11,11 +11,15 @@ import (
 )
 
 type AssistantHandler struct {
-	astSvc *service.AssistantService
+	astSvc      *service.AssistantService
+	transcriber ai.AudioTranscriber
 }
 
-func NewAssistantHandler(astSvc *service.AssistantService) *AssistantHandler {
-	return &AssistantHandler{astSvc: astSvc}
+func NewAssistantHandler(astSvc *service.AssistantService, transcriber ai.AudioTranscriber) *AssistantHandler {
+	return &AssistantHandler{
+		astSvc:      astSvc,
+		transcriber: transcriber,
+	}
 }
 
 type assistantChatRequest struct {
@@ -69,4 +73,70 @@ func (h *AssistantHandler) Chat(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(resp)
+}
+
+// AudioChat processa um arquivo de áudio enviado via multipart/form-data, transcreve com Whisper e processa o comando.
+func (h *AssistantHandler) AudioChat(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, `{"error":"não autorizado"}`, http.StatusUnauthorized)
+		return
+	}
+
+	if h.transcriber == nil {
+		http.Error(w, `{"error":"serviço de transcrição de áudio não configurado"}`, http.StatusServiceUnavailable)
+		return
+	}
+
+	if err := r.ParseMultipartForm(25 << 20); err != nil {
+		http.Error(w, `{"error":"falha ao processar formulário multipart: `+err.Error()+`"}`, http.StatusBadRequest)
+		return
+	}
+
+	file, header, err := r.FormFile("audio")
+	if err != nil {
+		file, header, err = r.FormFile("file")
+		if err != nil {
+			http.Error(w, `{"error":"campo 'audio' ou 'file' não encontrado no formulário multipart"}`, http.StatusBadRequest)
+			return
+		}
+	}
+	defer file.Close()
+
+	transcript, err := h.transcriber.Transcribe(r.Context(), file, header.Filename)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadGateway)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "falha na transcrição de voz: " + err.Error()})
+		return
+	}
+
+	input := ai.UserInput{
+		Text: transcript,
+		Now:  time.Now().UTC(),
+	}
+
+	resp, err := h.astSvc.Process(r.Context(), userID, input)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error(), "transcript": transcript})
+		return
+	}
+
+	// Envelope com a transcrição incluída para feedback na UI
+	responseMap := map[string]interface{}{
+		"transcript":    transcript,
+		"action":        resp.Action,
+		"intent":        resp.Intent,
+		"message":       resp.Message,
+		"reply":         resp.Reply,
+		"event":         resp.Event,
+		"conflict":      resp.Conflict,
+		"todo":          resp.Todo,
+		"provider_used": resp.ProviderUsed,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(responseMap)
 }

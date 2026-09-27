@@ -35,6 +35,7 @@ func main() {
 	userRepo := repository.NewUserRepository(db)
 	eventRepo := repository.NewEventRepository(db)
 	todoRepo := repository.NewTodoRepository(db)
+	memoryRepo := repository.NewMemoryRepository(db)
 
 	// 3. Provedores de IA & AI Gateway com Failover
 	var aiProviders []ai.Provider
@@ -57,13 +58,20 @@ func main() {
 	authSvc := service.NewAuthService(userRepo, cfg.JWTSecret)
 	calSvc := service.NewCalendarService(eventRepo)
 	todoSvc := service.NewTodoService(todoRepo)
-	astSvc := service.NewAssistantService(aiGateway, calSvc, todoSvc)
+	astSvc := service.NewAssistantService(aiGateway, calSvc, todoSvc, memoryRepo)
+
+	// Transcritor de voz Whisper
+	var whisperTranscriber ai.AudioTranscriber
+	if cfg.GroqAPIKey != "" {
+		whisperTranscriber = ai.NewGroqWhisper(cfg.GroqAPIKey)
+		log.Println("🎙️ [Audio Whisper] Groq Whisper Large v3 ativado para transcrição de voz.")
+	}
 
 	// 5. Handlers HTTP
 	authHandler := handler.NewAuthHandler(authSvc, userRepo)
 	calHandler := handler.NewCalendarHandler(calSvc)
 	todoHandler := handler.NewTodoHandler(todoSvc)
-	astHandler := handler.NewAssistantHandler(astSvc)
+	astHandler := handler.NewAssistantHandler(astSvc, whisperTranscriber)
 
 	// 6. Servidor HTTP
 	srv := server.New(server.Config{

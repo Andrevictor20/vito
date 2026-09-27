@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/domain"
 )
@@ -26,19 +28,21 @@ type AssistantResponse struct {
 	ProviderUsed string               `json:"provider_used,omitempty"`
 }
 
-// AssistantService orquestra o parsing de IA com os serviços de calendário e tarefas.
+// AssistantService orquestra o parsing de IA com os serviços de calendário, tarefas e memórias.
 type AssistantService struct {
-	aiGateway AIParsingGateway
-	calSvc    *CalendarService
-	todoSvc   *TodoService
+	aiGateway  AIParsingGateway
+	calSvc     *CalendarService
+	todoSvc    *TodoService
+	memoryRepo domain.MemoryRepository
 }
 
 // NewAssistantService instancia o serviço do assistente.
-func NewAssistantService(aiGateway AIParsingGateway, calSvc *CalendarService, todoSvc *TodoService) *AssistantService {
+func NewAssistantService(aiGateway AIParsingGateway, calSvc *CalendarService, todoSvc *TodoService, memoryRepo domain.MemoryRepository) *AssistantService {
 	return &AssistantService{
-		aiGateway: aiGateway,
-		calSvc:    calSvc,
-		todoSvc:   todoSvc,
+		aiGateway:  aiGateway,
+		calSvc:     calSvc,
+		todoSvc:    todoSvc,
+		memoryRepo: memoryRepo,
 	}
 }
 
@@ -51,6 +55,15 @@ func (s *AssistantService) Process(ctx context.Context, userID string, input ai.
 	// 🛡️ Scope Guard (Tier 0): Rejeita consultas fora de escopo (ex: matemática, piadas, trivia) com ZERO consumo de tokens
 	if guarded := CheckLocalScopeGuard(input.Text); guarded != nil {
 		return guarded, nil
+	}
+
+	// Carrega memórias de longo prazo se ainda não informadas
+	if len(input.ContextMemories) == 0 && s.memoryRepo != nil {
+		if mems, err := s.memoryRepo.ListByUser(userID, 15); err == nil && len(mems) > 0 {
+			for _, m := range mems {
+				input.ContextMemories = append(input.ContextMemories, fmt.Sprintf("[%s] %s", m.Category, m.Content))
+			}
+		}
 	}
 
 	intent, err := s.aiGateway.ParseIntent(ctx, input)
@@ -111,6 +124,33 @@ func (s *AssistantService) Process(ctx context.Context, userID string, input ai.
 				res.Message = "Você não tem nenhum compromisso agendado para hoje."
 			} else {
 				res.Message = fmt.Sprintf("Você tem %d compromisso(s) para hoje.", len(events))
+			}
+		}
+
+	case ai.ActionSaveMemory:
+		if s.memoryRepo != nil {
+			cat := intent.MemoryCategory
+			if cat == "" {
+				cat = "geral"
+			}
+			content := intent.MemoryContent
+			if content == "" {
+				content = intent.Message
+			}
+
+			mem := &domain.Memory{
+				ID:        uuid.New().String(),
+				UserID:    userID,
+				Category:  cat,
+				Content:   content,
+				CreatedAt: time.Now().UTC(),
+				UpdatedAt: time.Now().UTC(),
+			}
+			if err := s.memoryRepo.Create(mem); err != nil {
+				return nil, fmt.Errorf("falha ao salvar memória: %w", err)
+			}
+			if res.Message == "" {
+				res.Message = fmt.Sprintf("Guardei na minha memória: %s", content)
 			}
 		}
 	}

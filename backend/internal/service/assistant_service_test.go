@@ -34,6 +34,7 @@ func setupAssistantTest(t *testing.T) (*service.AssistantService, *service.Calen
 	userRepo := repository.NewUserRepository(db)
 	eventRepo := repository.NewEventRepository(db)
 	todoRepo := repository.NewTodoRepository(db)
+	memoryRepo := repository.NewMemoryRepository(db)
 
 	userID := "user-ast-1"
 	_ = userRepo.Create(&domain.User{
@@ -61,7 +62,7 @@ func setupAssistantTest(t *testing.T) (*service.AssistantService, *service.Calen
 		},
 	}
 
-	astSvc := service.NewAssistantService(mockAI, calSvc, todoSvc)
+	astSvc := service.NewAssistantService(mockAI, calSvc, todoSvc, memoryRepo)
 	return astSvc, calSvc, todoSvc, userID
 }
 
@@ -125,5 +126,68 @@ func TestAssistantService_ScopeGuard_BlocksOffTopicAndMath(t *testing.T) {
 				t.Errorf("expected ProviderUsed 'local-scope-guard', got %s", resp.ProviderUsed)
 			}
 		})
+	}
+}
+
+func TestAssistantService_SaveMemory(t *testing.T) {
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "test_memory.db")
+	db, err := database.Open(dbPath)
+	if err != nil {
+		t.Fatalf("failed to open test db: %v", err)
+	}
+	t.Cleanup(func() { db.Close() })
+
+	memRepo := repository.NewMemoryRepository(db)
+	userRepo := repository.NewUserRepository(db)
+	calSvc := service.NewCalendarService(repository.NewEventRepository(db))
+	todoSvc := service.NewTodoService(repository.NewTodoRepository(db))
+
+	userID := "user-mem-1"
+	_ = userRepo.Create(&domain.User{
+		ID:           userID,
+		Name:         "André",
+		Email:        "andre@mem.local",
+		PasswordHash: "hash",
+		CreatedAt:    time.Now().UTC(),
+		UpdatedAt:    time.Now().UTC(),
+	})
+
+	mockAI := &mockAIGateway{
+		intent: &ai.ParsedIntent{
+			Action:         ai.ActionSaveMemory,
+			MemoryCategory: "família",
+			MemoryContent:  "Minha mãe faz aniversário dia 15 de maio",
+			Message:        "Anotado! Lembrei que sua mãe faz aniversário em 15 de maio.",
+		},
+	}
+
+	astSvc := service.NewAssistantService(mockAI, calSvc, todoSvc, memRepo)
+
+	resp, err := astSvc.Process(context.Background(), userID, ai.UserInput{
+		Text: "Lembre que minha mãe faz aniversário dia 15 de maio",
+		Now:  time.Now().UTC(),
+	})
+	if err != nil {
+		t.Fatalf("expected nil error, got: %v", err)
+	}
+
+	if resp.Action != ai.ActionSaveMemory {
+		t.Errorf("expected ActionSaveMemory, got: %s", resp.Action)
+	}
+
+	// Verificar se foi persistido no banco
+	memories, err := memRepo.ListByUser(userID, 10)
+	if err != nil {
+		t.Fatalf("failed to list memories: %v", err)
+	}
+	if len(memories) != 1 {
+		t.Fatalf("expected 1 memory, got %d", len(memories))
+	}
+	if memories[0].Content != "Minha mãe faz aniversário dia 15 de maio" {
+		t.Errorf("unexpected content: %s", memories[0].Content)
+	}
+	if memories[0].Category != "família" {
+		t.Errorf("unexpected category: %s", memories[0].Category)
 	}
 }

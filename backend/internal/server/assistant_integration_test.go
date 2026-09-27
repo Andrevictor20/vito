@@ -47,16 +47,17 @@ func setupAssistantIntegrationServer(t *testing.T) (*httptest.Server, string) {
 	userRepo := repository.NewUserRepository(db)
 	eventRepo := repository.NewEventRepository(db)
 	todoRepo := repository.NewTodoRepository(db)
+	memoryRepo := repository.NewMemoryRepository(db)
 
 	authSvc := service.NewAuthService(userRepo, jwtSecret)
 	calSvc := service.NewCalendarService(eventRepo)
 	todoSvc := service.NewTodoService(todoRepo)
-	astSvc := service.NewAssistantService(&mockGatewaySuccess{}, calSvc, todoSvc)
+	astSvc := service.NewAssistantService(&mockGatewaySuccess{}, calSvc, todoSvc, memoryRepo)
 
 	authHandler := handler.NewAuthHandler(authSvc, userRepo)
 	calHandler := handler.NewCalendarHandler(calSvc)
 	todoHandler := handler.NewTodoHandler(todoSvc)
-	astHandler := handler.NewAssistantHandler(astSvc)
+	astHandler := handler.NewAssistantHandler(astSvc, nil)
 
 	srv := server.New(server.Config{
 		AuthHandler: authHandler,

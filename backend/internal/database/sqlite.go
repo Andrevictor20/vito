@@ -74,6 +74,18 @@ func runMigrations(db *sql.DB) error {
 	);
 
 	CREATE INDEX IF NOT EXISTS idx_todos_user_status ON todos(user_id, status);
+
+	CREATE TABLE IF NOT EXISTS memories (
+		id TEXT PRIMARY KEY,
+		user_id TEXT NOT NULL,
+		category TEXT NOT NULL DEFAULT 'general',
+		content TEXT NOT NULL,
+		created_at DATETIME NOT NULL,
+		updated_at DATETIME NOT NULL,
+		FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_memories_user ON memories(user_id);
 	`
 
 	_, err := db.Exec(schema)

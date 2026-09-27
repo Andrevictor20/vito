@@ -28,6 +28,14 @@ export const AssistantResultModal: React.FC<AssistantResultModalProps> = ({
             <Text style={styles.title}>Vito Secretário</Text>
           </View>
 
+          {/* Transcript preview if voice input */}
+          {result.transcript ? (
+            <View style={styles.transcriptBox}>
+              <Text style={styles.transcriptLabel}>🎙️ Áudio Transcrito:</Text>
+              <Text style={styles.transcriptText}>"{result.transcript}"</Text>
+            </View>
+          ) : null}
+
           {/* Reply message */}
           <Text style={styles.replyText}>{result.reply || (result as any).message}</Text>
 
@@ -107,6 +115,26 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: tokens.colors.textPrimary,
+  },
+  transcriptBox: {
+    backgroundColor: tokens.colors.surfaceSubtle,
+    borderWidth: 1,
+    borderColor: tokens.colors.surfaceBorder,
+    borderRadius: tokens.radii.sm,
+    padding: tokens.spacing.sm,
+    marginBottom: tokens.spacing.sm,
+  },
+  transcriptLabel: {
+    fontSize: 10,
+    color: tokens.colors.accent,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  transcriptText: {
+    fontSize: 12,
+    fontStyle: 'italic',
+    color: tokens.colors.textSecondary,
+    marginTop: 2,
   },
   replyText: {
     fontSize: 14,
