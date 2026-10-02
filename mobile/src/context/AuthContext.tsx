@@ -8,6 +8,7 @@ const USER_KEY = '@vito_user';
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
+  isInitialLoading: boolean;
   login: (email: string, pass: string) => Promise<void>;
   register: (name: string, email: string, pass: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -17,7 +18,8 @@ const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     const bootstrap = async () => {
@@ -27,7 +29,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (cachedUser) {
           try {
             setUser(JSON.parse(cachedUser));
-            setIsLoading(false);
+            setIsInitialLoading(false);
           } catch {}
         }
         if (api.getToken()) {
@@ -45,7 +47,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setUser(null);
         }
       } finally {
-        setIsLoading(false);
+        setIsInitialLoading(false);
       }
     };
     bootstrap();
@@ -80,7 +82,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, isLoading, isInitialLoading, login, register, logout }}>
       {children}
     </AuthContext.Provider>
   );

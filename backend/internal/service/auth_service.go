@@ -3,6 +3,7 @@ package service
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -36,6 +37,9 @@ func NewAuthService(userRepo domain.UserRepository, jwtSecret string) *AuthServi
 
 // Register cria um novo usuário com senha criptografada e retorna seu token de acesso.
 func (s *AuthService) Register(name, email, password string) (*domain.User, string, error) {
+	name = strings.TrimSpace(name)
+	email = strings.ToLower(strings.TrimSpace(email))
+
 	if email == "" {
 		return nil, "", domain.ErrInvalidEmail
 	}
@@ -77,6 +81,8 @@ func (s *AuthService) Register(name, email, password string) (*domain.User, stri
 
 // Login valida as credenciais e retorna o usuário e seu token JWT.
 func (s *AuthService) Login(email, password string) (*domain.User, string, error) {
+	email = strings.ToLower(strings.TrimSpace(email))
+
 	user, err := s.userRepo.GetByEmail(email)
 	if err != nil {
 		if errors.Is(err, domain.ErrUserNotFound) {

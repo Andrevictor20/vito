@@ -35,21 +35,40 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ serverUrl, onToggleServe
 
   const handleSubmit = async () => {
     setError(null);
-    if (!email || !password || (isRegister && !name)) {
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanName = name.trim();
+
+    if (!cleanEmail || !password || (isRegister && !cleanName)) {
       setError('Preencha todos os campos obrigatórios.');
+      return;
+    }
+
+    if (!cleanEmail.includes('@') || !cleanEmail.includes('.')) {
+      setError('Informe um endereço de e-mail válido.');
+      return;
+    }
+
+    if (password.length < 6) {
+      setError('A senha deve ter no mínimo 6 caracteres.');
       return;
     }
 
     try {
       if (isRegister) {
-        await register(name, email, password);
+        await register(cleanName, cleanEmail, password);
       } else {
-        await login(email, password);
+        await login(cleanEmail, password);
       }
     } catch (err: any) {
       const msg = err?.message || '';
-      if (msg.includes('Network') || msg.includes('fetch') || msg.includes('Failed') || msg.includes('esgotado')) {
-        setError(`Falha ao conectar no servidor (${serverUrl || 'vito.rasppi.cloud'}). Toque no botão acima para alternar entre Nuvem e Local.`);
+      if (
+        msg.includes('Network') ||
+        msg.includes('fetch') ||
+        msg.includes('Failed') ||
+        msg.includes('esgotado') ||
+        msg.includes('AbortError')
+      ) {
+        setError(`Falha ao conectar no servidor (${serverUrl || 'vito.rasppi.cloud'}). Toque no botão acima para alternar para a Nuvem.`);
       } else {
         setError(msg || 'Falha ao autenticar.');
       }
@@ -109,6 +128,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ serverUrl, onToggleServe
 
         <Text style={styles.subtitle}>
           {isRegister ? 'Crie sua conta pessoal' : 'Seu secretário executivo pessoal com IA'}
+        </Text>
+        <Text style={styles.serverHostIndicator}>
+          {isCloud ? 'Servidor: Nuvem (vito.rasppi.cloud)' : `Servidor: Local (${serverUrl || 'IP Local'})`}
         </Text>
 
         {error && (

@@ -74,3 +74,31 @@ func TestAuthService_RegisterAndLogin(t *testing.T) {
 		t.Errorf("expected claims UserID %s, got %s", user.ID, claims.UserID)
 	}
 }
+
+func TestAuthService_CaseInsensitiveEmailAndTrim(t *testing.T) {
+	authSvc, _ := setupAuthService(t)
+
+	// 1. Registro com espaços e maiúsculas
+	user, _, err := authSvc.Register("André", "  Andre.Silva@Kito.Local  ", "senha12345")
+	if err != nil {
+		t.Fatalf("expected nil error on register, got: %v", err)
+	}
+	if user.Email != "andre.silva@kito.local" {
+		t.Errorf("expected normalized email andre.silva@kito.local, got %s", user.Email)
+	}
+
+	// 2. Login com formatação limpa
+	loggedUser, _, err := authSvc.Login("andre.silva@kito.local", "senha12345")
+	if err != nil {
+		t.Fatalf("expected successful login with clean email, got: %v", err)
+	}
+	if loggedUser.ID != user.ID {
+		t.Errorf("expected user id %s, got %s", user.ID, loggedUser.ID)
+	}
+
+	// 3. Login com espaços no input
+	_, _, err = authSvc.Login(" andre.silva@kito.local ", "senha12345")
+	if err != nil {
+		t.Fatalf("expected successful login with padded email, got: %v", err)
+	}
+}

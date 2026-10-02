@@ -3,6 +3,7 @@ import { User, AuthResponse, Event, Todo, AssistantChatResponse, ConflictInfo } 
 
 const TOKEN_KEY = '@vito_jwt_token';
 const SERVER_URL_KEY = '@vito_server_url';
+const SERVER_MANUAL_OVERRIDE_KEY = '@vito_server_manual_override_v2';
 export const PI_SERVER_URL = process.env.EXPO_PUBLIC_LOCAL_SERVER_URL || '';
 export const CLOUDFLARE_SERVER_URL = process.env.EXPO_PUBLIC_API_URL || '';
 export const DEFAULT_SERVER_URL = CLOUDFLARE_SERVER_URL || PI_SERVER_URL || 'http://localhost:8080';
@@ -16,15 +17,16 @@ class ApiService {
   private token: string | null = null;
 
   async init() {
+    const hasManualOverride = await AsyncStorage.getItem(SERVER_MANUAL_OVERRIDE_KEY);
     const savedUrl = await AsyncStorage.getItem(SERVER_URL_KEY);
-    // Prioriza Cloudflare se a URL salva for vazia ou se for IP local antigo incompatível
-    if (savedUrl && (savedUrl === CLOUDFLARE_SERVER_URL || savedUrl === PI_SERVER_URL)) {
+
+    // Se o usuário alternou manualmente na UI desta versão, respeita a escolha
+    if (hasManualOverride === 'true' && savedUrl) {
       this.baseUrl = savedUrl;
     } else {
-      this.baseUrl = CLOUDFLARE_SERVER_URL || PI_SERVER_URL || DEFAULT_SERVER_URL;
-      if (this.baseUrl) {
-        await AsyncStorage.setItem(SERVER_URL_KEY, this.baseUrl);
-      }
+      // Caso contrário, SEMPRE prioriza a Nuvem pública (Cloudflare) para garantir que funcione de qualquer lugar (4G, WiFi)
+      this.baseUrl = CLOUDFLARE_SERVER_URL || DEFAULT_SERVER_URL;
+      await AsyncStorage.setItem(SERVER_URL_KEY, this.baseUrl);
     }
     this.token = await AsyncStorage.getItem(TOKEN_KEY);
   }
@@ -36,6 +38,7 @@ class ApiService {
   async setBaseUrl(url: string) {
     this.baseUrl = url;
     await AsyncStorage.setItem(SERVER_URL_KEY, url);
+    await AsyncStorage.setItem(SERVER_MANUAL_OVERRIDE_KEY, 'true');
   }
 
   async setToken(token: string | null) {

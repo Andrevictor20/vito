@@ -66,7 +66,12 @@ export const styles = StyleSheet.create({
   subtitle: {
     fontSize: tokens.typography.size.bodyMedium,
     color: tokens.colors.onSurfaceVariant,
-    marginBottom: tokens.spacing.lg,
+    marginBottom: 4,
+  },
+  serverHostIndicator: {
+    fontSize: tokens.typography.size.labelSmall,
+    color: tokens.colors.outline,
+    marginBottom: tokens.spacing.md,
   },
   errorBox: {
     flexDirection: 'row',

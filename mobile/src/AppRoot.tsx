@@ -9,7 +9,7 @@ import { api, DEFAULT_SERVER_URL, CLOUDFLARE_SERVER_URL, PI_SERVER_URL, isCloudS
 import { UpdateBanner } from './components/common/UpdateBanner';
 
 const MainNavigator: React.FC = () => {
-  const { user, isLoading } = useAuth();
+  const { user, isInitialLoading } = useAuth();
   const [serverUrl, setServerUrl] = useState(DEFAULT_SERVER_URL);
 
   useEffect(() => {
@@ -18,7 +18,7 @@ const MainNavigator: React.FC = () => {
     if (current && current !== serverUrl) {
       setServerUrl(current);
     }
-  }, [isLoading]);
+  }, [isInitialLoading]);
 
   const toggleServer = async () => {
     const nextUrl = isCloudServer(serverUrl) ? PI_SERVER_URL : CLOUDFLARE_SERVER_URL;
@@ -26,7 +26,7 @@ const MainNavigator: React.FC = () => {
     await api.setBaseUrl(nextUrl);
   };
 
-  if (isLoading) {
+  if (isInitialLoading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={tokens.colors.primary} />
