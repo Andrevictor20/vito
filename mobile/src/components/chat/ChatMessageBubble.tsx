@@ -18,7 +18,7 @@ export const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({ message })
     <View style={[styles.messageRow, isUser ? styles.messageRowUser : styles.messageRowVito]}>
       {!isUser && (
         <View style={styles.vitoAvatar}>
-          <Text style={styles.vitoAvatarText}>V</Text>
+          <MaterialIcons name="auto-awesome" size={15} color={tokens.colors.primary} />
         </View>
       )}
 
@@ -61,18 +61,13 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: MD3Shapes.full,
-    backgroundColor: tokens.colors.secondaryContainer,
+    backgroundColor: tokens.colors.surfaceContainerHigh,
     borderWidth: 1,
     borderColor: tokens.colors.outlineVariant,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: tokens.spacing.xs,
     marginBottom: 4,
-  },
-  vitoAvatarText: {
-    fontSize: tokens.typography.size.labelSmall,
-    fontWeight: tokens.typography.weight.bold,
-    color: tokens.colors.onSecondaryContainer,
   },
   bubble: {
     maxWidth: '85%',

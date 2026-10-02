@@ -38,22 +38,26 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
   const [inputText, setInputText] = useState('');
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const flatListRef = useRef<FlatList>(null);
 
-  // Monitoramento ativo de eventos do teclado para auto-scroll e recolhimento da navegação
+  // Monitoramento ativo de eventos do teclado para auto-scroll e elevação precisa
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
 
-    const onShow = (_e: KeyboardEvent) => {
+    const onShow = (e: KeyboardEvent) => {
+      const h = e?.endCoordinates?.height || 0;
+      setKeyboardHeight(h);
       setIsKeyboardOpen(true);
       if (onKeyboardStateChange) onKeyboardStateChange(true);
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
-      }, 80);
+      }, 60);
     };
 
     const onHide = () => {
+      setKeyboardHeight(0);
       setIsKeyboardOpen(false);
       if (onKeyboardStateChange) onKeyboardStateChange(false);
     };
@@ -125,50 +129,43 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 44 : 0}
     >
-      {/* Top Header Stitch */}
-      <View style={styles.header}>
-        <View style={styles.brandRow}>
-          <Text style={styles.brand}>vito</Text>
-          <View style={styles.brandDot} />
-        </View>
-
-        {user && (
-          <TouchableOpacity
-            style={styles.userAvatar}
-            onPress={onPressProfile}
-            activeOpacity={0.75}
-            accessibilityLabel="Perfil e Configurações"
-            hitSlop={tokens.hitSlop.sm}
-          >
-            <Text style={styles.avatarText}>{firstName.charAt(0).toUpperCase()}</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {/* Sub-header Meta Utility Bar */}
-      <View style={styles.metaUtilityBar}>
-        <View style={styles.metaLeft}>
-          <View style={styles.aiBadge}>
-            <View style={styles.aiDot} />
-            <Text style={styles.aiBadgeText}>AI ASSISTANT</Text>
+      {/* Top App Bar M3 Unificada */}
+      <View style={styles.topAppBar}>
+        <View style={styles.topAppBarLeft}>
+          <View style={styles.brandRow}>
+            <Text style={styles.brand}>vito</Text>
+            <View style={styles.brandDot} />
           </View>
-          <Text style={styles.metaSyncText}>Sincronizado</Text>
+          <View style={styles.statusBadge}>
+            <View style={styles.statusDot} />
+            <Text style={styles.statusBadgeText}>AI Assistant</Text>
+          </View>
         </View>
 
-        <TouchableOpacity
-          style={styles.clearBtn}
-          onPress={clearHistory}
-          activeOpacity={0.75}
-          hitSlop={tokens.hitSlop.sm}
-          accessibilityLabel="Limpar histórico do chat"
-        >
-          <MaterialIcons name="cleaning-services" size={14} color={tokens.colors.textSecondary} />
-          <Text style={styles.clearBtnText}>Limpar</Text>
-        </TouchableOpacity>
-      </View>
+        <View style={styles.topAppBarRight}>
+          <TouchableOpacity
+            style={styles.iconActionButton}
+            onPress={clearHistory}
+            activeOpacity={0.7}
+            hitSlop={tokens.hitSlop.sm}
+            accessibilityLabel="Limpar histórico do chat"
+          >
+            <MaterialIcons name="delete-outline" size={18} color={tokens.colors.onSurfaceVariant} />
+          </TouchableOpacity>
 
-      {/* Banner de Cota Semanal Estilo Toki/Stitch */}
-      <ChatQuotaBanner quotaPercentage={18.5} daysRemaining={4} />
+          {user && (
+            <TouchableOpacity
+              style={styles.userAvatar}
+              onPress={onPressProfile}
+              activeOpacity={0.75}
+              accessibilityLabel="Perfil e Configurações"
+              hitSlop={tokens.hitSlop.sm}
+            >
+              <Text style={styles.avatarText}>{firstName.charAt(0).toUpperCase()}</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
 
       {/* Lista de Mensagens */}
       <FlatList
@@ -192,13 +189,22 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
         }
       />
 
-      {/* Chips Rápidos de Sugestões Executivas */}
-      {!isKeyboardOpen && (
-        <ChatQuickChips onSelectPrompt={handleQuickPrompt} disabled={loading} />
+      {/* Chips Rápidos de Sugestões Executivas (Início do Chat) */}
+      {messages.length <= 2 && !isKeyboardOpen && (
+        <View style={styles.suggestionsWrapper}>
+          <ChatQuickChips onSelectPrompt={handleQuickPrompt} disabled={loading} />
+        </View>
       )}
 
-      {/* Dock de Digitação M3 */}
-      <View style={styles.dockContainer}>
+      {/* Dock de Digitação M3 com Elevação Dinâmica de Teclado */}
+      <View
+        style={[
+          styles.dockContainer,
+          Platform.OS === 'android' && keyboardHeight > 0 && {
+            marginBottom: keyboardHeight,
+          },
+        ]}
+      >
         <ChatInputDock
           value={inputText}
           onChangeText={setInputText}
@@ -217,21 +223,26 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: tokens.colors.surface,
   },
-  header: {
+  // M3 Top App Bar: 56dp altura, alinhamento canônico, borda outlineVariant sutil
+  topAppBar: {
+    height: 56,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: tokens.spacing.md,
-    paddingTop: Platform.OS === 'ios' ? 44 : tokens.spacing.sm,
-    paddingBottom: tokens.spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: tokens.colors.outlineVariant,
     backgroundColor: tokens.colors.surface,
   },
+  topAppBarLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.spacing.sm,
+  },
   brandRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
   },
   brand: {
     fontSize: tokens.typography.size.titleLarge,
@@ -245,74 +256,61 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     backgroundColor: tokens.colors.primary,
   },
-  userAvatar: {
-    width: 34,
-    height: 34,
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: tokens.colors.surfaceContainerHigh,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
     borderRadius: MD3Shapes.full,
-    backgroundColor: tokens.colors.secondaryContainer,
+    borderWidth: 1,
+    borderColor: tokens.colors.outlineVariant,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: tokens.colors.tertiary,
+  },
+  statusBadgeText: {
+    fontSize: 10,
+    color: tokens.colors.onSurfaceVariant,
+    fontWeight: tokens.typography.weight.bold,
+    letterSpacing: 0.3,
+  },
+  topAppBarRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.spacing.sm,
+  },
+  iconActionButton: {
+    width: 36,
+    height: 36,
+    borderRadius: MD3Shapes.full,
+    backgroundColor: tokens.colors.surfaceContainerLow,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: tokens.colors.outlineVariant,
+  },
+  userAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: MD3Shapes.full,
+    backgroundColor: tokens.colors.primaryContainer,
     borderWidth: 1,
     borderColor: tokens.colors.outlineVariant,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarText: {
-    color: tokens.colors.onSecondaryContainer,
+    color: tokens.colors.onPrimaryContainer,
     fontSize: tokens.typography.size.labelMedium,
     fontWeight: tokens.typography.weight.bold,
   },
-  metaUtilityBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: tokens.spacing.md,
-    paddingVertical: tokens.spacing.xs + 2,
-  },
-  metaLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: tokens.spacing.sm,
-  },
-  aiBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: tokens.colors.secondaryContainer,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: MD3Shapes.small,
-  },
-  aiDot: {
-    width: 6,
-    height: 6,
-    borderRadius: MD3Shapes.full,
-    backgroundColor: tokens.colors.primary,
-  },
-  aiBadgeText: {
-    fontSize: 10,
-    color: tokens.colors.onSecondaryContainer,
-    fontWeight: tokens.typography.weight.bold,
-    letterSpacing: 0.5,
-  },
-  metaSyncText: {
-    fontSize: tokens.typography.size.labelSmall,
-    color: tokens.colors.onSurfaceVariant,
-    fontWeight: tokens.typography.weight.medium,
-  },
-  clearBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: MD3Shapes.full,
-    backgroundColor: tokens.colors.surfaceContainerLow,
-    borderWidth: 1,
-    borderColor: tokens.colors.outlineVariant,
-  },
-  clearBtnText: {
-    fontSize: tokens.typography.size.labelSmall,
-    color: tokens.colors.onSurfaceVariant,
-    fontWeight: tokens.typography.weight.medium,
+  flatList: {
+    flex: 1,
   },
   messagesList: {
     paddingHorizontal: tokens.spacing.md,
@@ -336,11 +334,11 @@ const styles = StyleSheet.create({
     color: tokens.colors.onSurfaceVariant,
     fontSize: tokens.typography.size.bodySmall,
   },
+  suggestionsWrapper: {
+    paddingBottom: 4,
+  },
   dockContainer: {
     backgroundColor: 'transparent',
     paddingBottom: Platform.OS === 'android' ? 6 : 8,
-  },
-  flatList: {
-    flex: 1,
   },
 });

@@ -70,13 +70,15 @@ Instruções mestras, disciplinas inegociáveis e governança arquitetural do **
 - **Auto-Onboarding (Passo 0-A):** Se ausente ou vazio, popule via `git log -n 10 --oneline`, manifestos do projeto, testes e crie o arquivo via template.
 - **Hierarquia 4 Tiers:** *Working Memory* (sessão), *Episodic* (log recente + [archive/HISTORY.md](file:///home/andrevmp/Downloads/xp-multiagent-kit/.agents/memory/archive/HISTORY.md)), *Semantic* (ADRs e arquitetura) e *Procedural* (lições aprendidas `[L-NNN]` via [lesson-learned](file:///home/andrevmp/Downloads/xp-multiagent-kit/.agents/skills/lesson-learned/SKILL.md)).
 - **Telemetria de Tokens em 3 Camadas & Exibição Obrigatória em Rodapé:** Monitore ativamente a Janela de Mensagem, a Janela Móvel de 5 Horas e a Cota Semanal via `xp-tokens` ou `agy-tokens` (<usado>/<total>).
-  - **Rodapé Obrigatório em Cada Resposta (IDE & CLI) — Universal para Todos os Modelos:** Toda resposta final enviada pelo assistente (no Antigravity CLI ou na IDE, tanto para modelos Google quanto Claude/OpenAI/outros) DEVE obrigatoriamente incluir no rodapé o bloco padronizado com o consumo desta mensagem (delta de entrada, ferramentas e resposta) e a telemetria acumulada em 3 camadas (`agy-tokens --turn`), seguindo com rigor absoluto o seguinte formato canônico (sem backticks extras nas métricas e mantendo alinhamento idêntico):
+  - **Rodapé Obrigatório em Cada Resposta (IDE & CLI) — Universal para Todos os Modelos:** Toda resposta final enviada pelo assistente (no Antigravity CLI ou na IDE, tanto para modelos Google quanto Claude/OpenAI/outros) DEVE obrigatoriamente incluir no rodapé o bloco padronizado gerado por `agy-tokens --turn` na íntegra, incluindo linhas de `Reenvio:` e `RTK:` quando ativas:
     ```text
-    Consumo:  16.2k tokens (Entrada: 113 | Ferramentas: 15.1k | Resposta: 959)  
-    Contexto: [▰▱▱▱▱▱▱▱▱▱] 6.0% usado (63.2k) • 94.0% livre de 1.05M  
-    5h:       [▱▱▱▱▱▱▱▱▱▱] 1.0% usado (8.1k) • 99.0% restante (~791.9k) de 800.0k (renova em 4 h, 46 m)  
-    Semana:   [▰▰▰▰▰▱▱▱▱▱] 50.9% usado (5.09M) • **49.1% restante (4.91M)** de 10.00M (renova em 5 d, 19 h)  
-    Modelo:   Gemini 3.8 Flash (Effort: Medium) | Janela: 1.05M | Saída: 65.5k
+    Consumo:  8.5k tokens (0.8% da janela) • Entrada: 286 (3%) | Ferramentas: 7.6k (89%) | Resposta: 580 (7%)  
+    Reenvio:  1.16M tokens acumulados (99.8% do total da sessão)  
+    RTK:      ⚡ 5.8k economizados em 59 comandos (2.3% de redução)  
+    Contexto: [▱▱▱▱▱▱▱▱▱▱] 3.8% usado (39.5k) • 96.2% livre de 1.05M  
+    5h:       [▰▰▰▰▰▱▱▱▱▱] 47.3% usado • 52.7% restante (renova em 2 h, 26 m)  
+    Semana:   [▰▱▱▱▱▱▱▱▱▱] 8.5% usado • **91.5% restante** (renova em 6 d, 21 h)  
+    Modelo:   Gemini 3.8 Flash (Effort: High) | Janela: 1.05M | Saída: 65.5k
     ```
     - **Modelos Google (Gemini):** O `token_tracker.py` usa dados ao vivo do Language Server RPC (`gemini-5h`, `gemini-weekly`).
     - **Modelos Terceiros (Claude e GPT):** O Antigravity Language Server RPC expõe dados oficiais e em tempo real sob o grupo `Claude and GPT models` (`3p-5h`, `3p-weekly`). O `token_tracker.py` lê essa cota real ao vivo (idêntica à UI oficial). Fallback estimado (`[Estimado · Provider]`) é usado estritamente quando o Language Server estiver indisponível ou para provedores sem integração direta (ex: DeepSeek local). O agente NUNCA deve omitir ou simplificar o rodapé.
@@ -119,6 +121,13 @@ Instruções mestras, disciplinas inegociáveis e governança arquitetural do **
   - Arquivos devem ser estritamente focados e coesos, com teto recomendado de **200 a 300 linhas** e **limite máximo absoluto de 500 linhas** ([refactor-watchdog](file:///home/andrevmp/Downloads/vito/.agents/skills/refactor-watchdog/SKILL.md), [.agents/rules/modular-architecture.md](file:///home/andrevmp/Downloads/vito/.agents/rules/modular-architecture.md)).
   - **Backend (Go):** Clean Architecture estrita: `internal/domain` (entidades/interfaces), `internal/database` (sqlite), `internal/repository` (persistência), `internal/service` (casos de uso), `internal/ai` (adaptadores IA) e `internal/handler` (HTTP/JSON).
   - **Mobile (React Native):** Componentes atômicos reaproveitáveis (< 150 linhas), telas desacopladas (< 250 linhas) e custom hooks isolados.
+## 11. Governança Contínua por Documentação, Planejamento & Roadmap (Regra Inegociável)
+- **Mandato de Consulta Prévia (Passo 0-B):** Antes de analisar, propor ou codificar qualquer alteração ou nova funcionalidade, o assistente DEVE OBRIGATORIAMENTE consultar:
+  1. A pasta de planejamento local (`planning/` — em especial `00_MASTER_PLAN.md`, `01_AI_ORCHESTRATOR_GATEWAY.md`, `02_DESIGN_SYSTEM_MATERIAL3.md` e `06_ROADMAP_AND_SPRINTS.md`).
+  2. A especificação arquitetural central ([MVP_SPEC.md](file:///home/andrevmp/Downloads/vito/docs/specs/MVP_SPEC.md)).
+  3. A memória contínua do projeto ([PROJECT_MEMORY.md](file:///home/andrevmp/Downloads/vito/.agents/memory/PROJECT_MEMORY.md)).
+- **Lembrete Proativo de Escopo e Arquitetura:** O assistente DEVE analisar sistematicamente em qual sprint/fase do roadmap o projeto se encontra e **lembrar ativamente o usuário** do que deve ser projetado, especificado ou construído a seguir (ex: tokens Material 3, gateway canônico de IA, Evolution API, convites/RSVP), evitando perda de foco, retrabalho ou implementação fora de ordem.
+- **Fidelidade ao Planejamento:** Nenhuma decisão arquitetural ou de design pode contradizer o planejamento estabelecido sem alinhamento e atualização formal prévia dos documentos em `planning/`.
 
 ---
 

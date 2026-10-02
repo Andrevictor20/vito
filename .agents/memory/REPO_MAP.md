@@ -12,6 +12,7 @@
 - `Dockerfile`
 - `go.mod`
 - `go.sum`
+- `vito.db`
 
 ### backend/cmd/server/
 - `main.go`
@@ -71,10 +72,5 @@
 - `integration_test.go`
 - `server.go`
 - `server_test.go`
-
-### backend/internal/service/
-- `assistant_service.go`
-- `assistant_service_test.go`
-- `auth_service.go`
 
 ... [demais arquivos omitidos para manter < 80 linhas]

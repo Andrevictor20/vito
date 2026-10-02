@@ -63,6 +63,10 @@ backend/data/
 scratch/
 /tmp/
 
+# Planejamento & Notas Locais (Não versionado)
+planning/
+docs/roadmap/
+
 # IDEs & Editores
 .vscode/*
 !.vscode/settings.json
