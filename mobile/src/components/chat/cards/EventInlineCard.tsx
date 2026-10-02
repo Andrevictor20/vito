@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { tokens } from '../../../theme/tokens';
+import { tokens, MD3Shapes } from '../../../theme/tokens';
 import { Event } from '../../../types';
 
 interface EventInlineCardProps {
@@ -25,7 +25,7 @@ export const EventInlineCard: React.FC<EventInlineCardProps> = ({ event, onPress
           </View>
           <View style={styles.titleCol}>
             <Text style={styles.title} numberOfLines={1}>{event.title}</Text>
-            <Text style={styles.subtitle}>Agenda • Google Calendar</Text>
+            <Text style={styles.subtitle}>Agenda • Confirmado pelo Vito</Text>
           </View>
         </View>
 
@@ -38,16 +38,16 @@ export const EventInlineCard: React.FC<EventInlineCardProps> = ({ event, onPress
       {/* Grid de Detalhes de Horário e Local */}
       <View style={styles.detailsGrid}>
         <View style={styles.detailItem}>
-          <MaterialIcons name="schedule" size={14} color={tokens.colors.textSecondary} />
+          <MaterialIcons name="schedule" size={14} color={tokens.colors.onSurfaceVariant} />
           <Text style={styles.detailText}>{startTime} - {endTime}</Text>
         </View>
         <View style={styles.detailItem}>
-          <MaterialIcons name="meeting-room" size={14} color={tokens.colors.textSecondary} />
+          <MaterialIcons name="meeting-room" size={14} color={tokens.colors.onSurfaceVariant} />
           <Text style={styles.detailText} numberOfLines={1}>Meet • Sala Executiva</Text>
         </View>
       </View>
 
-      {/* Linha de Participantes e Ação */}
+      {/* Linha de Participantes e Ação M3 */}
       <View style={styles.actionRow}>
         <View style={styles.attendeesRow}>
           <View style={[styles.avatarBubble, { backgroundColor: tokens.colors.primaryContainer }]}>
@@ -62,9 +62,9 @@ export const EventInlineCard: React.FC<EventInlineCardProps> = ({ event, onPress
         </View>
 
         {onPressDetail && (
-          <TouchableOpacity style={styles.detailButton} onPress={onPressDetail} activeOpacity={0.8}>
-            <Text style={styles.detailButtonText}>Ver pauta</Text>
-            <MaterialIcons name="arrow-forward" size={14} color={tokens.colors.primary} />
+          <TouchableOpacity style={styles.tonalButton} onPress={onPressDetail} activeOpacity={0.8}>
+            <Text style={styles.tonalButtonText}>Ver pauta</Text>
+            <MaterialIcons name="arrow-forward" size={14} color={tokens.colors.onSecondaryContainer} />
           </TouchableOpacity>
         )}
       </View>
@@ -73,15 +73,16 @@ export const EventInlineCard: React.FC<EventInlineCardProps> = ({ event, onPress
 };
 
 const styles = StyleSheet.create({
+  // Card M3 Filled/Elevated (Surface Container High, 16dp radius)
   card: {
-    backgroundColor: tokens.colors.surfaceContainer,
-    borderRadius: tokens.radii.md,
+    backgroundColor: tokens.colors.surfaceContainerHigh,
+    borderRadius: MD3Shapes.large,
     padding: tokens.spacing.md,
     marginTop: tokens.spacing.xs,
     position: 'relative',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: tokens.colors.surfaceBorder,
+    borderColor: tokens.colors.outlineVariant,
     gap: tokens.spacing.sm,
   },
   accentBar: {
@@ -89,8 +90,8 @@ const styles = StyleSheet.create({
     left: 0,
     top: 0,
     bottom: 0,
-    width: 3.5,
-    backgroundColor: tokens.colors.cobalt,
+    width: 4,
+    backgroundColor: tokens.colors.primary,
   },
   topRow: {
     flexDirection: 'row',
@@ -107,7 +108,7 @@ const styles = StyleSheet.create({
   iconBox: {
     width: 32,
     height: 32,
-    borderRadius: tokens.radii.sm,
+    borderRadius: MD3Shapes.small,
     backgroundColor: tokens.colors.surfaceContainerHighest,
     alignItems: 'center',
     justifyContent: 'center',
@@ -116,41 +117,42 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   title: {
-    color: tokens.colors.textPrimary,
-    fontSize: tokens.typography.size.md,
+    color: tokens.colors.onSurface,
+    fontSize: tokens.typography.size.titleSmall,
     fontWeight: tokens.typography.weight.semibold,
   },
   subtitle: {
-    color: tokens.colors.textSecondary,
-    fontSize: tokens.typography.size.xs,
+    color: tokens.colors.onSurfaceVariant,
+    fontSize: tokens.typography.size.labelSmall,
     marginTop: 1,
   },
+  // Status Pill M3 com Success Container
   statusPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    backgroundColor: tokens.colors.successContainer,
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: tokens.radii.full,
+    borderRadius: MD3Shapes.full,
   },
   statusDot: {
     width: 6,
     height: 6,
-    borderRadius: tokens.radii.full,
-    backgroundColor: tokens.colors.success,
+    borderRadius: MD3Shapes.full,
+    backgroundColor: tokens.colors.onSuccessContainer,
   },
   statusText: {
-    color: tokens.colors.success,
-    fontSize: tokens.typography.size.xs,
+    color: tokens.colors.onSuccessContainer,
+    fontSize: tokens.typography.size.labelSmall,
     fontWeight: tokens.typography.weight.semibold,
   },
   detailsGrid: {
     flexDirection: 'row',
     gap: tokens.spacing.sm,
-    backgroundColor: tokens.colors.surfaceContainerLow,
+    backgroundColor: tokens.colors.surfaceContainerLowest,
     padding: tokens.spacing.xs + 2,
-    borderRadius: tokens.radii.sm,
+    borderRadius: MD3Shapes.small,
   },
   detailItem: {
     flex: 1,
@@ -159,8 +161,8 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   detailText: {
-    color: tokens.colors.textPrimary,
-    fontSize: tokens.typography.size.xs,
+    color: tokens.colors.onSurface,
+    fontSize: tokens.typography.size.labelSmall,
     fontWeight: tokens.typography.weight.medium,
   },
   actionRow: {
@@ -176,29 +178,30 @@ const styles = StyleSheet.create({
   avatarBubble: {
     width: 22,
     height: 22,
-    borderRadius: tokens.radii.full,
+    borderRadius: MD3Shapes.full,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
-    borderColor: tokens.colors.surfaceContainer,
+    borderColor: tokens.colors.surfaceContainerHigh,
   },
   avatarBubbleText: {
-    color: tokens.colors.textPrimary,
+    color: tokens.colors.onSurface,
     fontSize: 9,
     fontWeight: tokens.typography.weight.bold,
   },
-  detailButton: {
+  // M3 Tonal Button
+  tonalButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: tokens.colors.surfaceContainerHigh,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: tokens.radii.full,
+    backgroundColor: tokens.colors.secondaryContainer,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: MD3Shapes.full,
   },
-  detailButtonText: {
-    color: tokens.colors.primary,
-    fontSize: tokens.typography.size.xs,
+  tonalButtonText: {
+    color: tokens.colors.onSecondaryContainer,
+    fontSize: tokens.typography.size.labelSmall,
     fontWeight: tokens.typography.weight.semibold,
   },
 });

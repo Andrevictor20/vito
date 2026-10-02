@@ -3,9 +3,13 @@ import { User, AuthResponse, Event, Todo, AssistantChatResponse, ConflictInfo } 
 
 const TOKEN_KEY = '@vito_jwt_token';
 const SERVER_URL_KEY = '@vito_server_url';
-export const PI_SERVER_URL = 'http://192.168.100.17:8180';
-export const CLOUDFLARE_SERVER_URL = 'https://vito.rasppi.cloud';
-export const DEFAULT_SERVER_URL = CLOUDFLARE_SERVER_URL;
+export const PI_SERVER_URL = process.env.EXPO_PUBLIC_LOCAL_SERVER_URL || '';
+export const CLOUDFLARE_SERVER_URL = process.env.EXPO_PUBLIC_API_URL || '';
+export const DEFAULT_SERVER_URL = CLOUDFLARE_SERVER_URL || PI_SERVER_URL || 'http://localhost:8080';
+
+export const isCloudServer = (url: string): boolean => {
+  return url === CLOUDFLARE_SERVER_URL || (!url.includes('192.168.') && !url.includes('localhost') && !url.includes('127.0.0.1'));
+};
 
 class ApiService {
   private baseUrl: string = DEFAULT_SERVER_URL;
@@ -13,11 +17,14 @@ class ApiService {
 
   async init() {
     const savedUrl = await AsyncStorage.getItem(SERVER_URL_KEY);
-    if (savedUrl && !savedUrl.includes('localhost')) {
+    // Prioriza Cloudflare se a URL salva for vazia ou se for IP local antigo incompatível
+    if (savedUrl && (savedUrl === CLOUDFLARE_SERVER_URL || savedUrl === PI_SERVER_URL)) {
       this.baseUrl = savedUrl;
     } else {
-      this.baseUrl = CLOUDFLARE_SERVER_URL;
-      await AsyncStorage.setItem(SERVER_URL_KEY, CLOUDFLARE_SERVER_URL);
+      this.baseUrl = CLOUDFLARE_SERVER_URL || PI_SERVER_URL || DEFAULT_SERVER_URL;
+      if (this.baseUrl) {
+        await AsyncStorage.setItem(SERVER_URL_KEY, this.baseUrl);
+      }
     }
     this.token = await AsyncStorage.getItem(TOKEN_KEY);
   }
@@ -55,19 +62,32 @@ class ApiService {
       headers['Authorization'] = `Bearer ${this.token}`;
     }
 
-    const res = await fetch(`${this.baseUrl}${endpoint}`, {
-      ...options,
-      headers,
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-    const data = await res.json().catch(() => null);
+    try {
+      const res = await fetch(`${this.baseUrl}${endpoint}`, {
+        ...options,
+        headers,
+        signal: controller.signal,
+      });
 
-    if (!res.ok) {
-      const errorMsg = data?.error || `Erro HTTP ${res.status}`;
-      throw new Error(errorMsg);
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        const errorMsg = data?.error || `Erro HTTP ${res.status}`;
+        throw new Error(errorMsg);
+      }
+
+      return data as T;
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        throw new Error(`Tempo limite esgotado ao conectar no servidor (${this.baseUrl}).`);
+      }
+      throw err;
+    } finally {
+      clearTimeout(timeoutId);
     }
-
-    return data as T;
   }
 
   // Auth

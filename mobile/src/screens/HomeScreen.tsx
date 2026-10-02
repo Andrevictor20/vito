@@ -9,7 +9,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { tokens } from '../theme/tokens';
+import { tokens, MD3Shapes } from '../theme/tokens';
 import { FloatingTabBar } from '../components/common/FloatingTabBar';
 import { Header } from '../components/common/Header';
 import { CalendarView } from '../components/calendar/CalendarView';
@@ -180,7 +180,7 @@ export const HomeScreen: React.FC<{
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: tokens.colors.bg,
+    backgroundColor: tokens.colors.surface,
   },
   scroll: {
     flex: 1,
@@ -196,27 +196,27 @@ const styles = StyleSheet.create({
     marginBottom: tokens.spacing.md,
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: tokens.colors.textPrimary,
-    letterSpacing: -0.2,
+    fontSize: tokens.typography.size.titleMedium,
+    fontWeight: tokens.typography.weight.bold,
+    color: tokens.colors.onSurface,
+    letterSpacing: 0.1,
   },
   countBadge: {
-    backgroundColor: tokens.colors.surfaceSubtle,
+    backgroundColor: tokens.colors.secondaryContainer,
     borderWidth: 1,
-    borderColor: tokens.colors.surfaceBorder,
-    color: tokens.colors.textSecondary,
-    fontSize: 11,
-    fontWeight: '700',
+    borderColor: tokens.colors.outlineVariant,
+    color: tokens.colors.onSecondaryContainer,
+    fontSize: tokens.typography.size.labelSmall,
+    fontWeight: tokens.typography.weight.bold,
     paddingHorizontal: 8,
     paddingVertical: 2,
-    borderRadius: tokens.radii.full,
+    borderRadius: MD3Shapes.small,
   },
   emptyCard: {
-    backgroundColor: tokens.colors.surface,
+    backgroundColor: tokens.colors.surfaceContainer,
     borderWidth: 1,
-    borderColor: tokens.colors.surfaceBorder,
-    borderRadius: tokens.radii.lg,
+    borderColor: tokens.colors.outlineVariant,
+    borderRadius: MD3Shapes.large,
     padding: tokens.spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
@@ -226,8 +226,8 @@ const styles = StyleSheet.create({
   emptyIconContainer: {
     width: 38,
     height: 38,
-    borderRadius: tokens.radii.md,
-    backgroundColor: 'rgba(99, 102, 241, 0.12)',
+    borderRadius: MD3Shapes.medium,
+    backgroundColor: tokens.colors.primaryContainer,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -238,68 +238,41 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   emptyTitle: {
-    color: tokens.colors.textPrimary,
-    fontSize: 14,
-    fontWeight: '700',
-    letterSpacing: -0.2,
+    color: tokens.colors.onSurface,
+    fontSize: tokens.typography.size.titleSmall,
+    fontWeight: tokens.typography.weight.bold,
   },
   emptySub: {
-    color: tokens.colors.textMuted,
-    fontSize: 12,
+    color: tokens.colors.onSurfaceVariant,
+    fontSize: tokens.typography.size.bodySmall,
     marginTop: 2,
-  },
-  tabBar: {
-    flexDirection: 'row',
-    backgroundColor: tokens.colors.surface,
-    borderTopWidth: 1,
-    borderTopColor: tokens.colors.surfaceBorder,
-    paddingVertical: 8,
-    paddingHorizontal: tokens.spacing.md,
-    gap: tokens.spacing.sm,
-  },
-  tabButton: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
-    borderRadius: tokens.radii.full,
-  },
-  tabButtonActive: {
-    backgroundColor: tokens.colors.surfaceElevated,
-    borderWidth: 1,
-    borderColor: tokens.colors.surfaceBorder,
-  },
-  tabText: {
-    fontSize: 12,
-    color: tokens.colors.textMuted,
-    fontWeight: '500',
-  },
-  tabTextActive: {
-    color: tokens.colors.primary,
-    fontWeight: '700',
   },
   createBtnWrapper: {
     paddingHorizontal: tokens.spacing.md,
     paddingTop: tokens.spacing.sm,
     paddingBottom: tokens.spacing.md,
   },
+  // Extended FAB Material Design 3
   createFab: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    backgroundColor: tokens.colors.cobalt,
-    paddingVertical: 13,
-    borderRadius: tokens.radii.full,
-    shadowColor: tokens.colors.cobalt,
+    gap: 8,
+    backgroundColor: tokens.colors.primaryContainer,
+    paddingVertical: 14,
+    borderRadius: MD3Shapes.large,
+    borderWidth: 1,
+    borderColor: tokens.colors.outlineVariant,
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.45,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
   },
   createFabText: {
-    color: '#ffffff',
-    fontSize: tokens.typography.size.sm,
-    fontWeight: tokens.typography.weight.semibold,
-    letterSpacing: 0.1,
+    color: tokens.colors.onPrimaryContainer,
+    fontSize: tokens.typography.size.labelLarge,
+    fontWeight: tokens.typography.weight.bold,
+    letterSpacing: 0.2,
   },
 });

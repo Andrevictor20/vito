@@ -44,13 +44,14 @@ export const Header: React.FC<HeaderProps> = ({ onPressProfile }) => {
 };
 
 const styles = StyleSheet.create({
+  // M3 Top App Bar
   header: {
     paddingHorizontal: tokens.spacing.lg,
     paddingTop: tokens.spacing.sm,
     paddingBottom: tokens.spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: tokens.colors.surfaceBorder,
-    backgroundColor: tokens.colors.bg,
+    borderBottomColor: tokens.colors.outlineVariant,
+    backgroundColor: tokens.colors.surface,
   },
   topRow: {
     flexDirection: 'row',
@@ -63,30 +64,30 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   brand: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: tokens.colors.textPrimary,
-    letterSpacing: -0.4,
+    fontSize: tokens.typography.size.titleLarge,
+    fontWeight: tokens.typography.weight.bold,
+    color: tokens.colors.onSurface,
+    letterSpacing: -0.5,
   },
   brandDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: tokens.colors.primaryContainer,
+    backgroundColor: tokens.colors.primary,
   },
   userAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: tokens.colors.surfaceElevated,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: tokens.colors.secondaryContainer,
     borderWidth: 1,
-    borderColor: tokens.colors.surfaceBorder,
+    borderColor: tokens.colors.outlineVariant,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarText: {
-    color: tokens.colors.primary,
-    fontWeight: '700',
-    fontSize: 13,
+    color: tokens.colors.onSecondaryContainer,
+    fontWeight: tokens.typography.weight.bold,
+    fontSize: tokens.typography.size.labelMedium,
   },
 });

@@ -14,6 +14,7 @@ import { useAuth } from '../../context/AuthContext';
 import { ProfileUserCard } from './ProfileUserCard';
 import { ProfileNodeCard } from './ProfileNodeCard';
 import { ProfileSettingsGroup } from './ProfileSettingsGroup';
+import { isCloudServer } from '../../services/api';
 
 interface ProfileModalProps {
   visible: boolean;
@@ -29,7 +30,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   onToggleServer,
 }) => {
   const { user, logout } = useAuth();
-  const isCloud = serverUrl.includes('vito.rasppi.cloud');
+  const isCloud = isCloudServer(serverUrl);
   const name = user?.name || 'Andre Victor';
   const email = user?.email || 'andre@vito.ai';
 

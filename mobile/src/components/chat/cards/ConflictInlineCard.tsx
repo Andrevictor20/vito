@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { tokens } from '../../../theme/tokens';
+import { tokens, MD3Shapes } from '../../../theme/tokens';
 import { ConflictInfo } from '../../../types';
 
 interface ConflictInlineCardProps {
@@ -17,7 +17,7 @@ export const ConflictInlineCard: React.FC<ConflictInlineCardProps> = ({ conflict
       <View style={styles.contentRow}>
         <View style={styles.leftGroup}>
           <View style={styles.iconBox}>
-            <MaterialIcons name="warning" size={17} color={tokens.colors.danger} />
+            <MaterialIcons name="warning" size={17} color={tokens.colors.onErrorContainer} />
           </View>
           <View style={styles.textCol}>
             <Text style={styles.title} numberOfLines={1}>
@@ -41,22 +41,22 @@ export const ConflictInlineCard: React.FC<ConflictInlineCardProps> = ({ conflict
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: tokens.colors.surfaceContainerLow,
-    borderRadius: tokens.radii.md,
+    backgroundColor: tokens.colors.surfaceContainer,
+    borderRadius: MD3Shapes.medium,
     padding: tokens.spacing.md,
     marginTop: tokens.spacing.xs,
     position: 'relative',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: tokens.colors.surfaceBorder,
+    borderColor: tokens.colors.outlineVariant,
   },
   accentBar: {
     position: 'absolute',
     left: 0,
     top: 0,
     bottom: 0,
-    width: 3.5,
-    backgroundColor: tokens.colors.danger,
+    width: 4,
+    backgroundColor: tokens.colors.error,
   },
   contentRow: {
     flexDirection: 'row',
@@ -73,8 +73,8 @@ const styles = StyleSheet.create({
   iconBox: {
     width: 28,
     height: 28,
-    borderRadius: tokens.radii.sm,
-    backgroundColor: tokens.colors.surfaceContainerHigh,
+    borderRadius: MD3Shapes.small,
+    backgroundColor: tokens.colors.errorContainer,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -82,25 +82,25 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   title: {
-    color: tokens.colors.textPrimary,
-    fontSize: tokens.typography.size.sm,
+    color: tokens.colors.onSurface,
+    fontSize: tokens.typography.size.titleSmall,
     fontWeight: tokens.typography.weight.semibold,
   },
   subtitle: {
-    color: tokens.colors.danger,
-    fontSize: tokens.typography.size.xs,
+    color: tokens.colors.error,
+    fontSize: tokens.typography.size.labelSmall,
     marginTop: 1,
     fontWeight: tokens.typography.weight.medium,
   },
   adjustBtn: {
-    backgroundColor: tokens.colors.surfaceContainer,
-    paddingHorizontal: 10,
+    backgroundColor: tokens.colors.secondaryContainer,
+    paddingHorizontal: 12,
     paddingVertical: 5,
-    borderRadius: tokens.radii.full,
+    borderRadius: MD3Shapes.full,
   },
   adjustBtnText: {
-    color: tokens.colors.textSecondary,
-    fontSize: tokens.typography.size.xs,
+    color: tokens.colors.onSecondaryContainer,
+    fontSize: tokens.typography.size.labelSmall,
     fontWeight: tokens.typography.weight.semibold,
   },
 });

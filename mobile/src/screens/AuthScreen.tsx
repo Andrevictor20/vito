@@ -8,8 +8,12 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
+import * as Updates from 'expo-updates';
 import { tokens } from '../theme/tokens';
 import { useAuth } from '../context/AuthContext';
+import { isCloudServer } from '../services/api';
+import { UpdateBanner } from '../components/common/UpdateBanner';
 import { styles } from './AuthScreen.styles';
 
 interface AuthScreenProps {
@@ -24,6 +28,10 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ serverUrl, onToggleServe
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
+
+  const { currentlyRunning } = Updates.useUpdates();
+  const isCloud = isCloudServer(serverUrl || '');
 
   const handleSubmit = async () => {
     setError(null);
@@ -40,11 +48,28 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ serverUrl, onToggleServe
       }
     } catch (err: any) {
       const msg = err?.message || '';
-      if (msg.includes('Network') || msg.includes('fetch') || msg.includes('Failed')) {
-        setError(`Falha ao conectar no servidor (${serverUrl || '192.168.100.17'}). Verifique o Wi-Fi.`);
+      if (msg.includes('Network') || msg.includes('fetch') || msg.includes('Failed') || msg.includes('esgotado')) {
+        setError(`Falha ao conectar no servidor (${serverUrl || 'vito.rasppi.cloud'}). Toque no botão acima para alternar entre Nuvem e Local.`);
       } else {
         setError(msg || 'Falha ao autenticar.');
       }
+    }
+  };
+
+  const handleManualCheckUpdate = async () => {
+    setIsCheckingUpdate(true);
+    try {
+      const result = await Updates.checkForUpdateAsync();
+      if (result.isAvailable) {
+        await Updates.fetchUpdateAsync();
+        await Updates.reloadAsync();
+      } else {
+        setError(null);
+      }
+    } catch (e: any) {
+      console.warn('[Updates] Erro ao verificar atualização:', e);
+    } finally {
+      setIsCheckingUpdate(false);
     }
   };
 
@@ -53,20 +78,42 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ serverUrl, onToggleServe
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={styles.container}
     >
+      <UpdateBanner />
+
       <View style={styles.card}>
-        <View style={styles.brandRow}>
-          <Text style={styles.title}>vito</Text>
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>AI</Text>
+        {/* Top Header M3 com Seletor de Servidor */}
+        <View style={styles.topHeaderRow}>
+          <View style={styles.brandRow}>
+            <Text style={styles.title}>vito</Text>
+            <View style={styles.brandDot} />
           </View>
+
+          {onToggleServer && (
+            <TouchableOpacity
+              style={styles.serverPill}
+              onPress={onToggleServer}
+              activeOpacity={0.75}
+              accessibilityLabel="Alternar entre servidor nuvem e local"
+            >
+              <MaterialIcons
+                name={isCloud ? 'cloud-done' : 'home'}
+                size={14}
+                color={tokens.colors.onSecondaryContainer}
+              />
+              <Text style={styles.serverPillText}>
+                {isCloud ? 'Nuvem' : 'Local'}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         <Text style={styles.subtitle}>
-          {isRegister ? 'Crie sua conta pessoal' : 'Seu secretário executivo pessoal'}
+          {isRegister ? 'Crie sua conta pessoal' : 'Seu secretário executivo pessoal com IA'}
         </Text>
 
         {error && (
           <View style={styles.errorBox}>
+            <MaterialIcons name="error-outline" size={16} color={tokens.colors.onErrorContainer} />
             <Text style={styles.errorText}>{error}</Text>
           </View>
         )}
@@ -77,7 +124,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ serverUrl, onToggleServe
             <TextInput
               style={styles.input}
               placeholder="Ex: André Silva"
-              placeholderTextColor={tokens.colors.textMuted}
+              placeholderTextColor={tokens.colors.onSurfaceVariant}
               value={name}
               onChangeText={setName}
             />
@@ -89,7 +136,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ serverUrl, onToggleServe
           <TextInput
             style={styles.input}
             placeholder="seu@email.com"
-            placeholderTextColor={tokens.colors.textMuted}
+            placeholderTextColor={tokens.colors.onSurfaceVariant}
             autoCapitalize="none"
             keyboardType="email-address"
             value={email}
@@ -102,7 +149,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ serverUrl, onToggleServe
           <TextInput
             style={styles.input}
             placeholder="••••••••"
-            placeholderTextColor={tokens.colors.textMuted}
+            placeholderTextColor={tokens.colors.onSurfaceVariant}
             secureTextEntry
             value={password}
             onChangeText={setPassword}
@@ -113,9 +160,10 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ serverUrl, onToggleServe
           style={[styles.primaryButton, isLoading && styles.buttonDisabled]}
           onPress={handleSubmit}
           disabled={isLoading}
+          activeOpacity={0.8}
         >
           {isLoading ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator color={tokens.colors.onPrimary} />
           ) : (
             <Text style={styles.primaryButtonText}>
               {isRegister ? 'Criar Conta' : 'Entrar'}
@@ -129,6 +177,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ serverUrl, onToggleServe
             setIsRegister(!isRegister);
             setError(null);
           }}
+          activeOpacity={0.7}
         >
           <Text style={styles.switchText}>
             {isRegister
@@ -136,6 +185,29 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ serverUrl, onToggleServe
               : 'Não tem conta? Cadastre-se em instantes'}
           </Text>
         </TouchableOpacity>
+
+        {/* Rodapé com Versão OTA e Feedback Visual */}
+        <View style={styles.otaFooterRow}>
+          <Text style={styles.otaText}>
+            Build: {currentlyRunning?.updateId ? `OTA ${currentlyRunning.updateId.slice(0, 7)}` : 'v0.1.0'}
+          </Text>
+
+          <TouchableOpacity
+            style={styles.checkUpdatesBtn}
+            onPress={handleManualCheckUpdate}
+            disabled={isCheckingUpdate}
+            activeOpacity={0.75}
+          >
+            {isCheckingUpdate ? (
+              <ActivityIndicator size="small" color={tokens.colors.primary} />
+            ) : (
+              <>
+                <MaterialIcons name="sync" size={13} color={tokens.colors.onSurface} />
+                <Text style={styles.checkUpdatesText}>Buscar update</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
     </KeyboardAvoidingView>
   );

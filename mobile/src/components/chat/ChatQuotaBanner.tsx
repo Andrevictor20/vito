@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { tokens } from '../../theme/tokens';
+import { tokens, MD3Shapes } from '../../theme/tokens';
 
 interface ChatQuotaBannerProps {
   quotaPercentage?: number;
@@ -47,8 +47,8 @@ export const ChatQuotaBanner: React.FC<ChatQuotaBannerProps> = ({
 
 const styles = StyleSheet.create({
   banner: {
-    backgroundColor: tokens.colors.surfaceContainerLow,
-    borderRadius: tokens.radii.md,
+    backgroundColor: tokens.colors.surfaceContainer,
+    borderRadius: MD3Shapes.medium,
     paddingHorizontal: tokens.spacing.md,
     paddingVertical: tokens.spacing.sm,
     marginHorizontal: tokens.spacing.md,
@@ -57,7 +57,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     borderWidth: 1,
-    borderColor: tokens.colors.surfaceBorder,
+    borderColor: tokens.colors.outlineVariant,
   },
   leftRow: {
     flexDirection: 'row',
@@ -68,22 +68,22 @@ const styles = StyleSheet.create({
   pulseDot: {
     width: 6,
     height: 6,
-    borderRadius: tokens.radii.full,
+    borderRadius: MD3Shapes.full,
     backgroundColor: tokens.colors.primary,
   },
   text: {
-    color: tokens.colors.textSecondary,
-    fontSize: tokens.typography.size.xs,
+    color: tokens.colors.onSurfaceVariant,
+    fontSize: tokens.typography.size.labelSmall,
     flex: 1,
   },
   boldText: {
-    color: tokens.colors.textPrimary,
-    fontWeight: tokens.typography.weight.semibold,
+    color: tokens.colors.onSurface,
+    fontWeight: tokens.typography.weight.bold,
   },
   closeBtn: {
     width: 22,
     height: 22,
-    borderRadius: tokens.radii.full,
+    borderRadius: MD3Shapes.full,
     alignItems: 'center',
     justifyContent: 'center',
   },

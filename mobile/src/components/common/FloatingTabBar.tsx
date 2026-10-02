@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { tokens } from '../../theme/tokens';
+import { tokens, MD3Shapes } from '../../theme/tokens';
 
 interface FloatingTabBarProps {
   activeTab: 'chat' | 'calendar';
@@ -18,39 +18,45 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
 
   return (
     <View style={styles.outerContainer} pointerEvents="box-none">
-      <View style={styles.capsule}>
+      <View style={styles.navBar}>
+        {/* Item 1: Chat IA */}
         <TouchableOpacity
-          style={[styles.tabButton, activeTab === 'chat' && styles.tabButtonActive]}
+          style={styles.navItem}
           onPress={() => onSelectTab('chat')}
-          activeOpacity={0.8}
+          activeOpacity={0.7}
           accessibilityRole="tab"
           accessibilityState={{ selected: activeTab === 'chat' }}
-          accessibilityLabel="Aba Chat Executivo"
+          accessibilityLabel="Aba Chat com Vito"
         >
-          <MaterialIcons
-            name="chat-bubble"
-            size={18}
-            color={activeTab === 'chat' ? tokens.colors.primary : tokens.colors.textSecondary}
-          />
-          <Text style={[styles.tabLabel, activeTab === 'chat' && styles.tabLabelActive]}>
+          <View style={[styles.activeIndicator, activeTab === 'chat' && styles.activeIndicatorSelected]}>
+            <MaterialIcons
+              name={activeTab === 'chat' ? 'chat' : 'chat-bubble-outline'}
+              size={22}
+              color={activeTab === 'chat' ? tokens.colors.onPrimaryContainer : tokens.colors.onSurfaceVariant}
+            />
+          </View>
+          <Text style={[styles.navLabel, activeTab === 'chat' && styles.navLabelActive]}>
             Chat
           </Text>
         </TouchableOpacity>
 
+        {/* Item 2: Calendário & Tarefas */}
         <TouchableOpacity
-          style={[styles.tabButton, activeTab === 'calendar' && styles.tabButtonActive]}
+          style={styles.navItem}
           onPress={() => onSelectTab('calendar')}
-          activeOpacity={0.8}
+          activeOpacity={0.7}
           accessibilityRole="tab"
           accessibilityState={{ selected: activeTab === 'calendar' }}
-          accessibilityLabel="Aba Calendário e Agenda"
+          accessibilityLabel="Aba Calendário e Tarefas"
         >
-          <MaterialIcons
-            name="calendar-today"
-            size={18}
-            color={activeTab === 'calendar' ? tokens.colors.primary : tokens.colors.textSecondary}
-          />
-          <Text style={[styles.tabLabel, activeTab === 'calendar' && styles.tabLabelActive]}>
+          <View style={[styles.activeIndicator, activeTab === 'calendar' && styles.activeIndicatorSelected]}>
+            <MaterialIcons
+              name={activeTab === 'calendar' ? 'calendar-month' : 'calendar-today'}
+              size={22}
+              color={activeTab === 'calendar' ? tokens.colors.onPrimaryContainer : tokens.colors.onSurfaceVariant}
+            />
+          </View>
+          <Text style={[styles.navLabel, activeTab === 'calendar' && styles.navLabelActive]}>
             Calendário
           </Text>
         </TouchableOpacity>
@@ -69,42 +75,52 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     zIndex: 100,
   },
-  capsule: {
+  // Superfície Tonal M3 Elevada (Surface Container High)
+  navBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(31, 32, 34, 0.95)',
-    borderRadius: tokens.radii.full,
-    padding: 4,
+    justifyContent: 'center',
+    backgroundColor: tokens.colors.surfaceContainerHigh,
+    borderRadius: MD3Shapes.extraLarge,
+    paddingHorizontal: tokens.spacing.md,
+    paddingVertical: 6,
     borderWidth: 1,
-    borderColor: tokens.colors.surfaceBorder,
+    borderColor: tokens.colors.outlineVariant,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
-    elevation: 10,
-    gap: 4,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+    gap: tokens.spacing.lg,
   },
-  tabButton: {
-    flexDirection: 'row',
+  navItem: {
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: tokens.spacing.md + 2,
-    paddingVertical: 8,
-    borderRadius: tokens.radii.full,
-    minHeight: 40,
+    justifyContent: 'center',
+    minWidth: 80,
+    paddingVertical: 2,
   },
-  tabButtonActive: {
-    backgroundColor: tokens.colors.secondaryContainer,
-    borderWidth: 1,
-    borderColor: 'rgba(173, 198, 255, 0.15)',
+  // Indicador Ativo M3 Canônico: Pílula Oval Horizontal 64x32dp
+  activeIndicator: {
+    width: 64,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+    marginBottom: 4,
   },
-  tabLabel: {
-    fontSize: tokens.typography.size.sm,
-    color: tokens.colors.textSecondary,
+  activeIndicatorSelected: {
+    backgroundColor: tokens.colors.primaryContainer,
+  },
+  navLabel: {
+    fontSize: tokens.typography.size.labelSmall,
     fontWeight: tokens.typography.weight.medium,
+    color: tokens.colors.onSurfaceVariant,
+    letterSpacing: 0.2,
   },
-  tabLabelActive: {
-    color: tokens.colors.primary,
-    fontWeight: tokens.typography.weight.semibold,
+  navLabelActive: {
+    color: tokens.colors.onSurface,
+    fontWeight: tokens.typography.weight.bold,
   },
 });
+

@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { tokens } from '../../theme/tokens';
+import { tokens, MD3Shapes } from '../../theme/tokens';
 import { Todo } from '../../types';
 
 interface TodoItemProps {
@@ -13,22 +13,25 @@ interface TodoItemProps {
 export const TodoItem: React.FC<TodoItemProps> = ({ todo, onToggle, onDelete }) => {
   const isCompleted = todo.status === 'completed';
 
-  const priorityColor =
+  const priorityStyle =
     todo.priority === 'high'
-      ? tokens.colors.danger
+      ? { bg: tokens.colors.errorContainer, text: tokens.colors.error, label: 'ALTA' }
       : todo.priority === 'medium'
-      ? tokens.colors.warning
-      : tokens.colors.success;
+      ? { bg: 'rgba(255, 217, 102, 0.16)', text: tokens.colors.warning, label: 'MÉDIA' }
+      : { bg: tokens.colors.surfaceContainerHighest, text: tokens.colors.onSurfaceVariant, label: 'BAIXA' };
 
   return (
     <View style={[styles.container, isCompleted && styles.containerCompleted]}>
+      {/* Checkbox Circular M3 */}
       <TouchableOpacity
         style={[styles.checkbox, isCompleted && styles.checkboxChecked]}
         onPress={() => onToggle(todo.id)}
         activeOpacity={0.8}
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked: isCompleted }}
         accessibilityLabel={isCompleted ? 'Marcar como pendente' : 'Marcar como concluída'}
       >
-        {isCompleted && <MaterialIcons name="done" size={14} color="#fff" />}
+        {isCompleted && <MaterialIcons name="done" size={14} color={tokens.colors.onPrimary} />}
       </TouchableOpacity>
 
       <View style={styles.textContainer}>
@@ -36,9 +39,9 @@ export const TodoItem: React.FC<TodoItemProps> = ({ todo, onToggle, onDelete }) 
           {todo.title}
         </Text>
         <View style={styles.metaRow}>
-          <View style={[styles.priorityBadge, { borderColor: priorityColor }]}>
-            <Text style={[styles.priorityText, { color: priorityColor }]}>
-              {todo.priority.toUpperCase()}
+          <View style={[styles.priorityBadge, { backgroundColor: priorityStyle.bg }]}>
+            <Text style={[styles.priorityText, { color: priorityStyle.text }]}>
+              {priorityStyle.label}
             </Text>
           </View>
           {todo.due_date && (
@@ -55,55 +58,54 @@ export const TodoItem: React.FC<TodoItemProps> = ({ todo, onToggle, onDelete }) 
         hitSlop={tokens.hitSlop.sm}
         accessibilityLabel="Excluir tarefa"
       >
-        <MaterialIcons name="close" size={15} color={tokens.colors.textMuted} />
+        <MaterialIcons name="close" size={15} color={tokens.colors.onSurfaceVariant} />
       </TouchableOpacity>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  // Card M3 Outlined (Surface Container com borda outlineVariant)
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: tokens.colors.surface,
+    backgroundColor: tokens.colors.surfaceContainer,
     borderWidth: 1,
-    borderColor: tokens.colors.surfaceBorder,
-    borderRadius: tokens.radii.md,
+    borderColor: tokens.colors.outlineVariant,
+    borderRadius: MD3Shapes.medium,
     padding: tokens.spacing.md,
     marginBottom: tokens.spacing.sm,
   },
   containerCompleted: {
-    opacity: 0.5,
+    opacity: 0.65,
+    backgroundColor: tokens.colors.surfaceContainerLow,
   },
   checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 6,
+    width: 22,
+    height: 22,
+    borderRadius: MD3Shapes.full,
     borderWidth: 1.5,
-    borderColor: tokens.colors.primary,
+    borderColor: tokens.colors.outline,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: tokens.spacing.md,
+    backgroundColor: 'transparent',
   },
   checkboxChecked: {
     backgroundColor: tokens.colors.primary,
-  },
-  checkmark: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '800',
+    borderColor: tokens.colors.primary,
   },
   textContainer: {
     flex: 1,
   },
   title: {
-    fontSize: 14,
-    color: tokens.colors.textPrimary,
-    fontWeight: '500',
+    fontSize: tokens.typography.size.titleSmall,
+    color: tokens.colors.onSurface,
+    fontWeight: tokens.typography.weight.medium,
   },
   titleCompleted: {
     textDecorationLine: 'line-through',
-    color: tokens.colors.textMuted,
+    color: tokens.colors.onSurfaceVariant,
   },
   metaRow: {
     flexDirection: 'row',
@@ -112,24 +114,20 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   priorityBadge: {
-    borderWidth: 1,
-    borderRadius: 4,
-    paddingHorizontal: 4,
-    paddingVertical: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: MD3Shapes.small,
   },
   priorityText: {
-    fontSize: 9,
-    fontWeight: '700',
+    fontSize: 10,
+    fontWeight: tokens.typography.weight.bold,
+    letterSpacing: 0.4,
   },
   dueDate: {
-    fontSize: 11,
-    color: tokens.colors.textMuted,
+    fontSize: tokens.typography.size.labelSmall,
+    color: tokens.colors.onSurfaceVariant,
   },
   deleteButton: {
     padding: tokens.spacing.xs,
-  },
-  deleteText: {
-    color: tokens.colors.textMuted,
-    fontSize: 14,
   },
 });

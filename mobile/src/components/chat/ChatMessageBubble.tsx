@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, View, Text } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { tokens } from '../../theme/tokens';
+import { tokens, MD3Shapes } from '../../theme/tokens';
 import { ChatMessage } from '../../types';
 import { EventInlineCard } from './cards/EventInlineCard';
 import { ConflictInlineCard } from './cards/ConflictInlineCard';
@@ -37,7 +37,7 @@ export const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({ message })
             {new Date(message.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
           </Text>
           {isUser && (
-            <MaterialIcons name="done-all" size={13} color={tokens.colors.primary} />
+            <MaterialIcons name="done-all" size={13} color={tokens.colors.onPrimaryContainer} />
           )}
         </View>
       </View>
@@ -60,62 +60,63 @@ const styles = StyleSheet.create({
   vitoAvatar: {
     width: 28,
     height: 28,
-    borderRadius: tokens.radii.full,
-    backgroundColor: tokens.colors.primaryLight,
+    borderRadius: MD3Shapes.full,
+    backgroundColor: tokens.colors.secondaryContainer,
     borderWidth: 1,
-    borderColor: tokens.colors.primary,
+    borderColor: tokens.colors.outlineVariant,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: tokens.spacing.xs,
     marginBottom: 4,
   },
   vitoAvatarText: {
-    fontSize: tokens.typography.size.xs,
+    fontSize: tokens.typography.size.labelSmall,
     fontWeight: tokens.typography.weight.bold,
-    color: tokens.colors.primary,
+    color: tokens.colors.onSecondaryContainer,
   },
   bubble: {
     maxWidth: '85%',
-    borderRadius: tokens.radii.lg,
+    borderRadius: MD3Shapes.large,
     paddingHorizontal: tokens.spacing.md,
-    paddingVertical: tokens.spacing.sm + 3,
+    paddingVertical: tokens.spacing.sm + 2,
   },
+  // Balão do Usuário: M3 Primary Container com texto On-Primary-Container
   bubbleUser: {
-    backgroundColor: tokens.colors.surfaceElevated,
-    borderTopRightRadius: 4,
-    borderWidth: 1,
-    borderColor: tokens.colors.surfaceBorder,
+    backgroundColor: tokens.colors.primaryContainer,
+    borderBottomRightRadius: MD3Shapes.extraSmall,
   },
+  // Balão do Vito: M3 Surface Container com texto On-Surface
   bubbleVito: {
-    backgroundColor: tokens.colors.surfaceSubtle,
-    borderTopLeftRadius: 4,
+    backgroundColor: tokens.colors.surfaceContainer,
+    borderBottomLeftRadius: MD3Shapes.extraSmall,
     borderWidth: 1,
-    borderColor: tokens.colors.surfaceBorder,
+    borderColor: tokens.colors.outlineVariant,
   },
   messageText: {
-    fontSize: tokens.typography.size.md,
-    lineHeight: tokens.typography.lineHeight.md,
+    fontSize: tokens.typography.size.bodyLarge,
+    lineHeight: tokens.typography.lineHeight.bodyLarge,
   },
   messageTextUser: {
-    color: tokens.colors.textPrimary,
+    color: tokens.colors.onPrimaryContainer,
   },
   messageTextVito: {
-    color: tokens.colors.textPrimary,
+    color: tokens.colors.onSurface,
   },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-end',
-    marginTop: 4,
+    marginTop: tokens.spacing.xs,
     gap: 4,
   },
   timestamp: {
-    fontSize: 11,
+    fontSize: tokens.typography.size.labelSmall,
   },
   timestampUser: {
-    color: tokens.colors.textMuted,
+    color: tokens.colors.onPrimaryContainer,
+    opacity: 0.8,
   },
   timestampVito: {
-    color: tokens.colors.textMuted,
+    color: tokens.colors.onSurfaceVariant,
   },
 });

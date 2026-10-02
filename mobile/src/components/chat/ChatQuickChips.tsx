@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { tokens } from '../../theme/tokens';
+import { tokens, MD3Shapes } from '../../theme/tokens';
 
 interface PromptChipItem {
   icon: keyof typeof MaterialIcons.glyphMap;
@@ -75,20 +75,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: tokens.spacing.md,
     gap: tokens.spacing.sm,
   },
+  // M3 Suggestion Chip (8dp radius)
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: tokens.colors.surfaceContainerHigh,
-    paddingHorizontal: tokens.spacing.md,
-    paddingVertical: 7,
-    borderRadius: tokens.radii.full,
+    backgroundColor: tokens.colors.surfaceContainerLow,
+    paddingHorizontal: tokens.spacing.md - 2,
+    paddingVertical: 6,
+    borderRadius: MD3Shapes.small,
     borderWidth: 1,
-    borderColor: tokens.colors.surfaceBorder,
+    borderColor: tokens.colors.outlineVariant,
   },
   chipLabel: {
-    color: tokens.colors.textPrimary,
-    fontSize: tokens.typography.size.xs + 1,
+    color: tokens.colors.onSurfaceVariant,
+    fontSize: tokens.typography.size.labelMedium,
     fontWeight: tokens.typography.weight.medium,
   },
 });

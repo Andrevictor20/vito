@@ -1,56 +1,107 @@
-export const tokens = {
-  colors: {
-    // Executive Slate Surfaces (Stitch Dark Theme)
-    bg: '#121315',
-    canvas: '#0a0b0d',
-    surface: '#1f2022',
-    surfaceSubtle: '#1b1c1e',
-    surfaceElevated: '#292a2c',
-    surfaceContainerLowest: '#0d0e10',
-    surfaceContainerLow: '#1b1c1e',
-    surfaceContainer: '#1f2022',
-    surfaceContainerHigh: '#292a2c',
-    surfaceContainerHighest: '#343537',
-    surfaceBorder: '#272e3b',
-    structuralBorder: '#272e3b',
+// Google Material Design 3 (M3 / Material You) Design Tokens
+// Paleta tonal calibrada para Dark Theme Executivo (WCAG AA)
 
-    // Executive Slate Primary & Accents
-    primary: '#adc6ff',
-    primaryContainer: '#4d8eff',
+export const MD3Shapes = {
+  none: 0,
+  extraSmall: 4,  // Badges pequenos, tags de prioridade
+  small: 8,       // Chips de filtro, caixas de seleção
+  medium: 12,     // Cards de tarefas, alertas inline
+  large: 16,      // Cards de eventos, balões de chat, FAB regular
+  extraLarge: 28, // Bottom sheets, Search Bars, Modais principais, Input Dock
+  full: 9999,     // Pílulas de navegação, botões circulares, avatares
+};
+
+export const tokens = {
+  // 1. Paleta Tonal Material Design 3 (M3)
+  colors: {
+    // M3 System Primary & Tonal Containers
+    primary: '#A8C7FA',              // md.sys.color.primary (Acentos primários, botões ativos)
+    onPrimary: '#082F5A',            // md.sys.color.on-primary (Texto/ícones sobre primary)
+    primaryContainer: '#1A4072',     // md.sys.color.primary-container (Fundos de destaque/cards)
+    onPrimaryContainer: '#D3E3FD',   // md.sys.color.on-primary-container (Texto sobre primary-container)
     primaryHover: '#3b82f6',
-    primaryLight: 'rgba(173, 198, 255, 0.12)',
+    primaryLight: 'rgba(168, 199, 250, 0.14)',
     cobalt: '#3b82f6',
     cobaltGlow: 'rgba(59, 130, 246, 0.16)',
 
-    // Accents & Secondary
-    secondary: '#b9c8de',
-    secondaryContainer: '#39485a',
-    accent: '#adc6ff',
-    accentLight: 'rgba(77, 142, 255, 0.14)',
+    // M3 System Secondary & Tertiary
+    secondary: '#C2E7FF',            // md.sys.color.secondary (Ações secundárias, chips)
+    onSecondary: '#283141',          // md.sys.color.on-secondary
+    secondaryContainer: '#3E4758',   // md.sys.color.secondary-container (Chips ativos, pílulas)
+    onSecondaryContainer: '#DEE3F5', // md.sys.color.on-secondary-container
+    tertiary: '#70D7C4',             // md.sys.color.tertiary
+    onTertiary: '#003730',
+    tertiaryContainer: '#005047',
+    onTertiaryContainer: '#8EF3E0',
 
-    // Typography Colors (WCAG AA Calibrated)
-    textPrimary: '#f8fafc',
-    textSecondary: '#94a3b8',
-    textMuted: '#64748b',
-    outline: '#8c909f',
-    outlineVariant: '#424754',
+    // M3 Surface & Tonal Surface Containers (Dark Executive Mode)
+    bg: '#111318',                   // md.sys.color.surface
+    canvas: '#0E1014',               // md.sys.color.surface-dim
+    surface: '#111318',              // md.sys.color.surface
+    surfaceDim: '#0E1014',           // md.sys.color.surface-dim
+    surfaceBright: '#37393E',        // md.sys.color.surface-bright
+    surfaceSubtle: '#191C21',
+    surfaceElevated: '#282A2F',
 
-    // Status Colors & Semantic Badges
-    success: '#10b981',
-    successLight: 'rgba(16, 185, 129, 0.15)',
-    tertiary: '#4edea3',
-    tertiaryContainer: '#00a572',
-    warning: '#f59e0b',
-    warningLight: 'rgba(245, 158, 11, 0.15)',
-    danger: '#ef4444',
-    dangerContainer: '#93000a',
-    dangerLight: 'rgba(239, 68, 68, 0.15)',
-    error: '#ffb4ab',
-    errorContainer: '#93000a',
+    // Camadas de Profundidade por Tonalidade (M3 Surface Containers)
+    surfaceContainerLowest: '#0C0E12', // Nível 0
+    surfaceContainerLow: '#191C21',    // Nível 1
+    surfaceContainer: '#1E2025',       // Nível 2 (Fundo de cards e balões)
+    surfaceContainerHigh: '#282A2F',   // Nível 3 (Fundo de modais, menus suspensos, Input Dock)
+    surfaceContainerHighest: '#33353A',// Nível 4 (Hover, estados pressionados, chips inativos)
+
+    // M3 Typography & Content Colors (WCAG AA Contrast)
+    onSurface: '#E2E2E9',              // Texto primário em superfícies
+    onSurfaceVariant: '#C4C6D0',       // Texto secundário/apoio
+    textPrimary: '#E2E2E9',            // Retrocompatibilidade
+    textSecondary: '#C4C6D0',          // Retrocompatibilidade
+    textMuted: '#8E919A',              // Texto desativado / metadados
+
+    // M3 Outlines & Borders
+    outline: '#8E919A',                // md.sys.color.outline (Bordas de cards Outlined)
+    outlineVariant: '#44474E',         // md.sys.color.outline-variant (Divisores, separadores)
+    surfaceBorder: '#44474E',          // Retrocompatibilidade
+    structuralBorder: '#282A2F',       // Retrocompatibilidade
+
+    // M3 Error & Status
+    error: '#FFB4AB',                  // md.sys.color.error
+    onError: '#690005',                // md.sys.color.on-error
+    errorContainer: '#93000A',         // md.sys.color.error-container
+    onErrorContainer: '#FFDAD6',       // md.sys.color.on-error-container
+    danger: '#FFB4AB',                 // Retrocompatibilidade
+    dangerContainer: '#93000A',        // Retrocompatibilidade
+    dangerLight: 'rgba(255, 180, 171, 0.16)',
+
+    // Status Semânticos
+    success: '#82D996',
+    onSuccess: '#003914',
+    successContainer: '#005322',
+    onSuccessContainer: '#9EF6B0',
+    successLight: 'rgba(130, 217, 150, 0.16)',
+    warning: '#FFD966',
+    warningLight: 'rgba(255, 217, 102, 0.16)',
+
+    // Retrocompatibilidade adicional
+    accent: '#A8C7FA',
+    accentLight: 'rgba(168, 199, 250, 0.14)',
   },
 
+  // 2. Escala Tipográfica Material Design 3
   typography: {
     size: {
+      headlineLarge: 32,
+      headlineMedium: 28,
+      headlineSmall: 24,
+      titleLarge: 22,
+      titleMedium: 16,
+      titleSmall: 14,
+      bodyLarge: 16,
+      bodyMedium: 14,
+      bodySmall: 12,
+      labelLarge: 14,
+      labelMedium: 12,
+      labelSmall: 11,
+      // Chaves retrocompatíveis
       xs: 11,
       sm: 13,
       md: 15,
@@ -60,6 +111,19 @@ export const tokens = {
       title: 28,
     },
     lineHeight: {
+      headlineLarge: 40,
+      headlineMedium: 36,
+      headlineSmall: 32,
+      titleLarge: 28,
+      titleMedium: 24,
+      titleSmall: 20,
+      bodyLarge: 24,
+      bodyMedium: 20,
+      bodySmall: 16,
+      labelLarge: 20,
+      labelMedium: 16,
+      labelSmall: 16,
+      // Chaves retrocompatíveis
       xs: 14,
       sm: 18,
       md: 22,
@@ -76,15 +140,24 @@ export const tokens = {
     },
   },
 
+  // 3. Escala de Shapes do Material 3
   radii: {
-    xs: 6,
-    sm: 8,
-    md: 12,
-    lg: 16,
-    xl: 20,
-    full: 9999,
+    none: MD3Shapes.none,
+    xs: MD3Shapes.extraSmall,
+    sm: MD3Shapes.small,
+    md: MD3Shapes.medium,
+    lg: MD3Shapes.large,
+    xl: MD3Shapes.extraLarge,
+    full: MD3Shapes.full,
+    // Aliases explícitos M3
+    extraSmall: MD3Shapes.extraSmall,
+    small: MD3Shapes.small,
+    medium: MD3Shapes.medium,
+    large: MD3Shapes.large,
+    extraLarge: MD3Shapes.extraLarge,
   },
 
+  // 4. Espaçamentos M3 (Grid de 4dp / 8dp)
   spacing: {
     xxs: 2,
     xs: 4,
@@ -95,7 +168,34 @@ export const tokens = {
     xxl: 32,
   },
 
+  // 5. Elevações Tonais e Sombras Sutis
   shadows: {
+    level0: {
+      shadowOpacity: 0,
+      elevation: 0,
+    },
+    level1: {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.15,
+      shadowRadius: 3,
+      elevation: 1,
+    },
+    level2: {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.20,
+      shadowRadius: 6,
+      elevation: 3,
+    },
+    level3: {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.25,
+      shadowRadius: 10,
+      elevation: 6,
+    },
+    // Chaves retrocompatíveis
     subtle: {
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 2 },

@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { tokens } from '../../theme/tokens';
+import { tokens, MD3Shapes } from '../../theme/tokens';
 import { Event } from '../../types';
 
 interface EventCardProps {
@@ -89,7 +89,7 @@ export const EventCard: React.FC<EventCardProps> = ({
         hitSlop={tokens.hitSlop.sm}
         accessibilityLabel="Excluir compromisso"
       >
-        <MaterialIcons name="close" size={15} color={tokens.colors.textMuted} />
+        <MaterialIcons name="close" size={15} color={tokens.colors.onSurfaceVariant} />
       </TouchableOpacity>
     </View>
   );
@@ -99,10 +99,10 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: tokens.colors.surfaceContainer,
+    backgroundColor: tokens.colors.surfaceContainerHigh,
     borderWidth: 1,
-    borderColor: tokens.colors.surfaceBorder,
-    borderRadius: tokens.radii.md,
+    borderColor: tokens.colors.outlineVariant,
+    borderRadius: MD3Shapes.large,
     padding: tokens.spacing.md,
     marginBottom: tokens.spacing.sm,
   },
@@ -111,19 +111,19 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   startTime: {
-    fontSize: tokens.typography.size.sm,
+    fontSize: tokens.typography.size.labelMedium,
     fontWeight: tokens.typography.weight.semibold,
-    color: tokens.colors.textPrimary,
+    color: tokens.colors.onSurface,
   },
   duration: {
     fontSize: 10,
-    color: tokens.colors.textMuted,
+    color: tokens.colors.onSurfaceVariant,
     marginTop: 2,
   },
   indicator: {
-    width: 3.5,
+    width: 4,
     height: '80%',
-    borderRadius: tokens.radii.full,
+    borderRadius: MD3Shapes.full,
     marginHorizontal: tokens.spacing.sm,
   },
   contentColumn: {
@@ -136,20 +136,20 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   title: {
-    fontSize: tokens.typography.size.sm + 1,
+    fontSize: tokens.typography.size.titleSmall,
     fontWeight: tokens.typography.weight.semibold,
-    color: tokens.colors.textPrimary,
+    color: tokens.colors.onSurface,
     flex: 1,
   },
   meta: {
-    fontSize: tokens.typography.size.xs,
+    fontSize: tokens.typography.size.labelSmall,
     color: tokens.colors.primary,
     marginTop: 2,
     fontWeight: tokens.typography.weight.medium,
   },
   description: {
-    fontSize: tokens.typography.size.xs,
-    color: tokens.colors.textSecondary,
+    fontSize: tokens.typography.size.labelSmall,
+    color: tokens.colors.onSurfaceVariant,
     marginTop: 2,
   },
   deleteButton: {

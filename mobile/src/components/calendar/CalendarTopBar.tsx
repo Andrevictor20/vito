@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, TextInput } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { tokens } from '../../theme/tokens';
+import { tokens, MD3Shapes } from '../../theme/tokens';
 
 export type CalendarViewMode = 'month' | 'week' | 'todos';
 
@@ -144,29 +144,32 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: tokens.spacing.xs + 2,
   },
+  // Segmented Buttons M3
   segmentCapsule: {
     flexDirection: 'row',
-    backgroundColor: tokens.colors.surfaceContainerHigh,
-    borderRadius: tokens.radii.full,
+    backgroundColor: tokens.colors.surfaceContainer,
+    borderRadius: MD3Shapes.full,
     padding: 3,
     gap: 2,
+    borderWidth: 1,
+    borderColor: tokens.colors.outlineVariant,
   },
   segmentBtn: {
     paddingHorizontal: 12,
     paddingVertical: 5,
-    borderRadius: tokens.radii.full,
+    borderRadius: MD3Shapes.full,
   },
   segmentBtnActive: {
-    backgroundColor: tokens.colors.primaryContainer,
+    backgroundColor: tokens.colors.secondaryContainer,
   },
   segmentText: {
-    fontSize: tokens.typography.size.xs,
-    color: tokens.colors.textSecondary,
+    fontSize: tokens.typography.size.labelSmall,
+    color: tokens.colors.onSurfaceVariant,
     fontWeight: tokens.typography.weight.medium,
   },
   segmentTextActive: {
-    color: '#ffffff',
-    fontWeight: tokens.typography.weight.semibold,
+    color: tokens.colors.onSecondaryContainer,
+    fontWeight: tokens.typography.weight.bold,
   },
   actionsRow: {
     flexDirection: 'row',
@@ -174,35 +177,36 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   circleBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: tokens.radii.full,
-    backgroundColor: tokens.colors.surfaceContainer,
+    width: 34,
+    height: 34,
+    borderRadius: MD3Shapes.full,
+    backgroundColor: tokens.colors.surfaceContainerHigh,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: tokens.colors.surfaceBorder,
+    borderColor: tokens.colors.outlineVariant,
   },
   circleBtnActive: {
-    backgroundColor: tokens.colors.primaryLight,
-    borderColor: tokens.colors.primary,
+    backgroundColor: tokens.colors.secondaryContainer,
+    borderColor: tokens.colors.secondary,
   },
+  // Search Bar M3
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: tokens.colors.surfaceContainer,
-    borderRadius: tokens.radii.md,
-    paddingHorizontal: tokens.spacing.sm,
+    backgroundColor: tokens.colors.surfaceContainerHigh,
+    borderRadius: MD3Shapes.extraLarge,
+    paddingHorizontal: tokens.spacing.sm + 2,
     paddingVertical: 6,
     marginBottom: tokens.spacing.xs + 2,
     gap: 6,
     borderWidth: 1,
-    borderColor: tokens.colors.surfaceBorder,
+    borderColor: tokens.colors.outlineVariant,
   },
   searchInput: {
     flex: 1,
-    color: tokens.colors.textPrimary,
-    fontSize: tokens.typography.size.xs + 1,
+    color: tokens.colors.onSurface,
+    fontSize: tokens.typography.size.bodySmall,
     padding: 0,
   },
   filterRow: {
@@ -212,32 +216,33 @@ const styles = StyleSheet.create({
     gap: 6,
     marginBottom: tokens.spacing.xs + 2,
   },
+  // M3 Filter Chip (8dp radius)
   filterPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: tokens.colors.surfaceContainer,
+    backgroundColor: tokens.colors.surfaceContainerLow,
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: tokens.radii.full,
+    borderRadius: MD3Shapes.small,
     borderWidth: 1,
-    borderColor: tokens.colors.surfaceBorder,
+    borderColor: tokens.colors.outlineVariant,
   },
   filterPillActive: {
-    backgroundColor: tokens.colors.primaryLight,
-    borderColor: tokens.colors.primary,
+    backgroundColor: tokens.colors.secondaryContainer,
+    borderColor: tokens.colors.secondary,
   },
   filterDot: {
     width: 6,
     height: 6,
-    borderRadius: tokens.radii.full,
+    borderRadius: MD3Shapes.full,
   },
   filterText: {
-    color: tokens.colors.textSecondary,
+    color: tokens.colors.onSurfaceVariant,
     fontSize: 11,
   },
   filterTextActive: {
-    color: tokens.colors.primary,
+    color: tokens.colors.onSecondaryContainer,
     fontWeight: tokens.typography.weight.semibold,
   },
 });

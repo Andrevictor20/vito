@@ -7,7 +7,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { tokens } from '../../theme/tokens';
+import { tokens, MD3Shapes } from '../../theme/tokens';
 
 interface ChatInputDockProps {
   value: string;
@@ -33,26 +33,26 @@ export const ChatInputDock: React.FC<ChatInputDockProps> = ({
   return (
     <View style={styles.dockWrapper}>
       <View style={styles.capsule}>
-        {/* Botão de Ditado / Microfone */}
+        {/* Botão de Ditado / Microfone Tonal M3 */}
         <TouchableOpacity
-          style={[styles.iconButton, isRecording && styles.micButtonRecording]}
+          style={[styles.iconButton, isRecording ? styles.micButtonRecording : styles.micButtonIdle]}
           onPress={onPressMic}
           activeOpacity={0.7}
           hitSlop={tokens.hitSlop.sm}
-          accessibilityLabel={isRecording ? 'Parar gravação' : 'Gravar áudio'}
+          accessibilityLabel={isRecording ? 'Parar gravação' : 'Gravar áudio com Vito'}
         >
           <MaterialIcons
             name={isRecording ? 'stop' : 'mic'}
             size={20}
-            color={isRecording ? '#ffffff' : tokens.colors.textSecondary}
+            color={isRecording ? tokens.colors.onErrorContainer : tokens.colors.primary}
           />
         </TouchableOpacity>
 
-        {/* Campo de Entrada de Texto */}
+        {/* Campo de Entrada de Texto M3 */}
         <TextInput
           style={styles.input}
           placeholder={isRecording ? 'Ouvindo... Toque no botão para concluir' : 'Instrua o Vito ou pergunte algo...'}
-          placeholderTextColor={isRecording ? tokens.colors.danger : tokens.colors.textMuted}
+          placeholderTextColor={isRecording ? tokens.colors.error : tokens.colors.onSurfaceVariant}
           value={value}
           onChangeText={onChangeText}
           multiline
@@ -61,20 +61,20 @@ export const ChatInputDock: React.FC<ChatInputDockProps> = ({
           returnKeyType="default"
         />
 
-        {/* Botão de Anexo / Contexto */}
+        {/* Botão de Anexo / Contexto M3 */}
         {onPressAttach && (
           <TouchableOpacity
             style={styles.iconButton}
             onPress={onPressAttach}
             activeOpacity={0.7}
             hitSlop={tokens.hitSlop.sm}
-            accessibilityLabel="Anexar contexto"
+            accessibilityLabel="Anexar imagem ou documento"
           >
-            <MaterialIcons name="add-circle" size={20} color={tokens.colors.textSecondary} />
+            <MaterialIcons name="add-photo-alternate" size={20} color={tokens.colors.onSurfaceVariant} />
           </TouchableOpacity>
         )}
 
-        {/* Botão Primário de Envio (Cobalt Circle) */}
+        {/* Botão Primário de Envio M3 (Filled Circle) */}
         <TouchableOpacity
           style={[styles.sendButton, !canSend && styles.sendButtonDisabled]}
           onPress={onSend}
@@ -83,9 +83,13 @@ export const ChatInputDock: React.FC<ChatInputDockProps> = ({
           accessibilityLabel="Enviar mensagem"
         >
           {loading ? (
-            <ActivityIndicator size="small" color="#fff" />
+            <ActivityIndicator size="small" color={tokens.colors.onPrimary} />
           ) : (
-            <MaterialIcons name="arrow-upward" size={20} color="#fff" />
+            <MaterialIcons
+              name="arrow-upward"
+              size={20}
+              color={canSend ? tokens.colors.onPrimary : tokens.colors.outline}
+            />
           )}
         </TouchableOpacity>
       </View>
@@ -99,37 +103,41 @@ const styles = StyleSheet.create({
     paddingVertical: tokens.spacing.xs + 2,
     backgroundColor: 'transparent',
   },
+  // Cápsula Arredondada M3 (Surface Container High, 28dp radius)
   capsule: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: tokens.colors.surfaceContainerHigh,
-    borderRadius: tokens.radii.full,
+    borderRadius: MD3Shapes.extraLarge,
     paddingHorizontal: 6,
     paddingVertical: 5,
     borderWidth: 1,
-    borderColor: tokens.colors.surfaceBorder,
+    borderColor: tokens.colors.outlineVariant,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.35,
-    shadowRadius: 16,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 6,
     gap: 4,
   },
   iconButton: {
     width: 38,
     height: 38,
-    borderRadius: tokens.radii.full,
+    borderRadius: MD3Shapes.full,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  micButtonIdle: {
+    backgroundColor: tokens.colors.surfaceContainerHighest,
+  },
   micButtonRecording: {
-    backgroundColor: tokens.colors.danger,
+    backgroundColor: tokens.colors.errorContainer,
   },
   input: {
     flex: 1,
-    color: tokens.colors.textPrimary,
-    fontSize: tokens.typography.size.sm + 1,
-    lineHeight: tokens.typography.lineHeight.md,
+    color: tokens.colors.onSurface,
+    fontSize: tokens.typography.size.bodyMedium,
+    lineHeight: tokens.typography.lineHeight.bodyMedium,
     paddingHorizontal: tokens.spacing.xs,
     paddingVertical: 6,
     maxHeight: 90,
@@ -137,19 +145,18 @@ const styles = StyleSheet.create({
   sendButton: {
     width: 38,
     height: 38,
-    borderRadius: tokens.radii.full,
-    backgroundColor: tokens.colors.cobalt,
+    borderRadius: MD3Shapes.full,
+    backgroundColor: tokens.colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: tokens.colors.cobalt,
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.4,
-    shadowRadius: 6,
-    elevation: 4,
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   sendButtonDisabled: {
     backgroundColor: tokens.colors.surfaceContainerHighest,
-    opacity: 0.5,
     shadowOpacity: 0,
     elevation: 0,
   },

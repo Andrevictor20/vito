@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { tokens } from '../../../theme/tokens';
+import { tokens, MD3Shapes } from '../../../theme/tokens';
 import { Todo } from '../../../types';
 
 interface TodoInlineCardProps {
@@ -20,16 +20,26 @@ export const TodoInlineCard: React.FC<TodoInlineCardProps> = ({ todo, onToggle }
     }
   };
 
+  const priorityColor =
+    todo.priority === 'high'
+      ? { bg: tokens.colors.errorContainer, text: tokens.colors.error, label: 'ALTA' }
+      : todo.priority === 'medium'
+      ? { bg: 'rgba(255, 217, 102, 0.16)', text: tokens.colors.warning, label: 'MÉDIA' }
+      : { bg: tokens.colors.surfaceContainerHighest, text: tokens.colors.onSurfaceVariant, label: 'BAIXA' };
+
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, completed && styles.cardCompleted]}>
       <View style={styles.leftGroup}>
+        {/* Checkbox Circular M3 */}
         <TouchableOpacity
           style={[styles.checkbox, completed && styles.checkboxCompleted]}
           onPress={handleToggle}
           activeOpacity={0.8}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: completed }}
         >
           {completed && (
-            <MaterialIcons name="done" size={14} color={tokens.colors.textPrimary} />
+            <MaterialIcons name="done" size={14} color={tokens.colors.onPrimary} />
           )}
         </TouchableOpacity>
 
@@ -46,25 +56,33 @@ export const TodoInlineCard: React.FC<TodoInlineCardProps> = ({ todo, onToggle }
         </View>
       </View>
 
-      <View style={styles.priorityBadge}>
-        <Text style={styles.priorityBadgeText}>ALTA</Text>
+      {/* Tag Tonal M3 de Urgência */}
+      <View style={[styles.priorityBadge, { backgroundColor: priorityColor.bg }]}>
+        <Text style={[styles.priorityBadgeText, { color: priorityColor.text }]}>
+          {priorityColor.label}
+        </Text>
       </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  // Card M3 Outlined (Borda em outline-variant, fundo surface-container)
   card: {
     backgroundColor: tokens.colors.surfaceContainer,
-    borderRadius: tokens.radii.md,
+    borderRadius: MD3Shapes.medium,
     padding: tokens.spacing.md,
     marginTop: tokens.spacing.xs,
     borderWidth: 1,
-    borderColor: tokens.colors.surfaceBorder,
+    borderColor: tokens.colors.outlineVariant,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: tokens.spacing.sm,
+  },
+  cardCompleted: {
+    opacity: 0.7,
+    backgroundColor: tokens.colors.surfaceContainerLow,
   },
   leftGroup: {
     flexDirection: 'row',
@@ -75,44 +93,42 @@ const styles = StyleSheet.create({
   checkbox: {
     width: 22,
     height: 22,
-    borderRadius: tokens.radii.full,
+    borderRadius: MD3Shapes.full,
     borderWidth: 1.5,
     borderColor: tokens.colors.outline,
-    backgroundColor: tokens.colors.surfaceContainerHighest,
+    backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
   },
   checkboxCompleted: {
-    backgroundColor: tokens.colors.tertiaryContainer,
-    borderColor: tokens.colors.tertiary,
+    backgroundColor: tokens.colors.primary,
+    borderColor: tokens.colors.primary,
   },
   titleCol: {
     flex: 1,
   },
   title: {
-    color: tokens.colors.textPrimary,
-    fontSize: tokens.typography.size.sm,
+    color: tokens.colors.onSurface,
+    fontSize: tokens.typography.size.titleSmall,
     fontWeight: tokens.typography.weight.medium,
   },
   titleCompleted: {
     textDecorationLine: 'line-through',
-    color: tokens.colors.textMuted,
+    color: tokens.colors.onSurfaceVariant,
   },
   subtitle: {
-    color: tokens.colors.textSecondary,
-    fontSize: tokens.typography.size.xs,
+    color: tokens.colors.onSurfaceVariant,
+    fontSize: tokens.typography.size.labelSmall,
     marginTop: 1,
   },
   priorityBadge: {
-    backgroundColor: 'rgba(239, 68, 68, 0.18)',
     paddingHorizontal: 8,
-    paddingVertical: 2.5,
-    borderRadius: tokens.radii.full,
+    paddingVertical: 3,
+    borderRadius: MD3Shapes.small,
   },
   priorityBadgeText: {
-    color: tokens.colors.danger,
     fontSize: 10,
     fontWeight: tokens.typography.weight.bold,
-    letterSpacing: 0.5,
+    letterSpacing: 0.4,
   },
 });

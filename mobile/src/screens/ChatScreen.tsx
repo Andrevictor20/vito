@@ -12,7 +12,7 @@ import {
   KeyboardEvent,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { tokens } from '../theme/tokens';
+import { tokens, MD3Shapes } from '../theme/tokens';
 import { useChat } from '../hooks/useChat';
 import { ChatMessageBubble } from '../components/chat/ChatMessageBubble';
 import { ChatQuotaBanner } from '../components/chat/ChatQuotaBanner';
@@ -222,7 +222,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: tokens.colors.bg,
+    backgroundColor: tokens.colors.surface,
   },
   header: {
     flexDirection: 'row',
@@ -232,8 +232,8 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === 'ios' ? 44 : tokens.spacing.sm,
     paddingBottom: tokens.spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: tokens.colors.surfaceBorder,
-    backgroundColor: tokens.colors.bg,
+    borderBottomColor: tokens.colors.outlineVariant,
+    backgroundColor: tokens.colors.surface,
   },
   brandRow: {
     flexDirection: 'row',
@@ -241,28 +241,30 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   brand: {
-    fontSize: tokens.typography.size.xl,
+    fontSize: tokens.typography.size.titleLarge,
     fontWeight: tokens.typography.weight.bold,
-    color: tokens.colors.textPrimary,
+    color: tokens.colors.onSurface,
     letterSpacing: -0.5,
   },
   brandDot: {
     width: 6,
     height: 6,
-    borderRadius: tokens.radii.full,
+    borderRadius: 3,
     backgroundColor: tokens.colors.primary,
   },
   userAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: tokens.radii.full,
-    backgroundColor: tokens.colors.primary,
+    width: 34,
+    height: 34,
+    borderRadius: MD3Shapes.full,
+    backgroundColor: tokens.colors.secondaryContainer,
+    borderWidth: 1,
+    borderColor: tokens.colors.outlineVariant,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarText: {
-    color: tokens.colors.surface,
-    fontSize: tokens.typography.size.xs + 1,
+    color: tokens.colors.onSecondaryContainer,
+    fontSize: tokens.typography.size.labelMedium,
     fontWeight: tokens.typography.weight.bold,
   },
   metaUtilityBar: {
@@ -284,23 +286,23 @@ const styles = StyleSheet.create({
     backgroundColor: tokens.colors.secondaryContainer,
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: tokens.radii.full,
+    borderRadius: MD3Shapes.small,
   },
   aiDot: {
-    width: 5,
-    height: 5,
-    borderRadius: tokens.radii.full,
+    width: 6,
+    height: 6,
+    borderRadius: MD3Shapes.full,
     backgroundColor: tokens.colors.primary,
   },
   aiBadgeText: {
     fontSize: 10,
-    color: tokens.colors.primary,
-    fontWeight: tokens.typography.weight.semibold,
+    color: tokens.colors.onSecondaryContainer,
+    fontWeight: tokens.typography.weight.bold,
     letterSpacing: 0.5,
   },
   metaSyncText: {
-    fontSize: tokens.typography.size.xs,
-    color: tokens.colors.textSecondary,
+    fontSize: tokens.typography.size.labelSmall,
+    color: tokens.colors.onSurfaceVariant,
     fontWeight: tokens.typography.weight.medium,
   },
   clearBtn: {
@@ -309,12 +311,14 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: tokens.radii.full,
+    borderRadius: MD3Shapes.full,
     backgroundColor: tokens.colors.surfaceContainerLow,
+    borderWidth: 1,
+    borderColor: tokens.colors.outlineVariant,
   },
   clearBtnText: {
-    fontSize: tokens.typography.size.xs,
-    color: tokens.colors.textSecondary,
+    fontSize: tokens.typography.size.labelSmall,
+    color: tokens.colors.onSurfaceVariant,
     fontWeight: tokens.typography.weight.medium,
   },
   messagesList: {
@@ -326,18 +330,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: tokens.spacing.sm,
     alignSelf: 'flex-start',
-    backgroundColor: tokens.colors.surfaceContainerLow,
+    backgroundColor: tokens.colors.surfaceContainer,
     paddingHorizontal: tokens.spacing.md,
     paddingVertical: tokens.spacing.sm,
-    borderRadius: tokens.radii.lg,
-    borderTopLeftRadius: 4,
+    borderRadius: MD3Shapes.large,
+    borderBottomLeftRadius: MD3Shapes.extraSmall,
     marginBottom: tokens.spacing.md,
     borderWidth: 1,
-    borderColor: tokens.colors.surfaceBorder,
+    borderColor: tokens.colors.outlineVariant,
   },
   loadingText: {
-    color: tokens.colors.textSecondary,
-    fontSize: tokens.typography.size.sm,
+    color: tokens.colors.onSurfaceVariant,
+    fontSize: tokens.typography.size.bodySmall,
   },
   dockContainer: {
     backgroundColor: 'transparent',

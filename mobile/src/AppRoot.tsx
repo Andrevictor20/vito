@@ -1,18 +1,27 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, ActivityIndicator, Platform, StatusBar as RNStatusBar } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AuthScreen } from './screens/AuthScreen';
 import { HomeScreen } from './screens/HomeScreen';
 import { tokens } from './theme/tokens';
-import { api, DEFAULT_SERVER_URL, CLOUDFLARE_SERVER_URL, PI_SERVER_URL } from './services/api';
+import { api, DEFAULT_SERVER_URL, CLOUDFLARE_SERVER_URL, PI_SERVER_URL, isCloudServer } from './services/api';
+import { UpdateBanner } from './components/common/UpdateBanner';
 
 const MainNavigator: React.FC = () => {
   const { user, isLoading } = useAuth();
   const [serverUrl, setServerUrl] = useState(DEFAULT_SERVER_URL);
 
+  useEffect(() => {
+    // Sincroniza a URL ativa com a instância inicializada da API
+    const current = api.getBaseUrl();
+    if (current && current !== serverUrl) {
+      setServerUrl(current);
+    }
+  }, [isLoading]);
+
   const toggleServer = async () => {
-    const nextUrl = serverUrl.includes('vito.rasppi.cloud') ? PI_SERVER_URL : CLOUDFLARE_SERVER_URL;
+    const nextUrl = isCloudServer(serverUrl) ? PI_SERVER_URL : CLOUDFLARE_SERVER_URL;
     setServerUrl(nextUrl);
     await api.setBaseUrl(nextUrl);
   };
@@ -28,6 +37,7 @@ const MainNavigator: React.FC = () => {
   return (
     <View style={styles.safeArea}>
       <StatusBar style="light" />
+      <UpdateBanner />
       {user ? (
         <HomeScreen serverUrl={serverUrl} onToggleServer={toggleServer} />
       ) : (
@@ -48,12 +58,12 @@ export const AppRoot: React.FC = () => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: tokens.colors.bg,
+    backgroundColor: tokens.colors.surface,
     paddingTop: Platform.OS === 'android' ? (RNStatusBar.currentHeight || 28) : 0,
   },
   loadingContainer: {
     flex: 1,
-    backgroundColor: tokens.colors.bg,
+    backgroundColor: tokens.colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
