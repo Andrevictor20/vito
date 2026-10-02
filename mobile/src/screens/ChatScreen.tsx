@@ -122,7 +122,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 44 : 0}
     >
       {/* Top Header Stitch */}
@@ -197,15 +197,8 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
         <ChatQuickChips onSelectPrompt={handleQuickPrompt} disabled={loading} />
       )}
 
-      {/* Dock Flutuante de Digitação com Cápsula Arredondada */}
-      <View style={[
-        styles.dockContainer,
-        {
-          paddingBottom: isKeyboardOpen
-            ? (Platform.OS === 'android' ? 8 : 4)
-            : 58,
-        },
-      ]}>
+      {/* Dock de Digitação M3 */}
+      <View style={styles.dockContainer}>
         <ChatInputDock
           value={inputText}
           onChangeText={setInputText}
@@ -345,6 +338,7 @@ const styles = StyleSheet.create({
   },
   dockContainer: {
     backgroundColor: 'transparent',
+    paddingBottom: Platform.OS === 'android' ? 6 : 8,
   },
   flatList: {
     flex: 1,

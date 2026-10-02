@@ -47,7 +47,8 @@ export const HomeScreen: React.FC<{
 
   return (
     <View style={styles.container}>
-      {activeTab === 'calendar' ? (
+      <View style={styles.mainContent}>
+        {activeTab === 'calendar' ? (
         <>
           <Header onPressProfile={() => setProfileVisible(true)} />
 
@@ -159,8 +160,9 @@ export const HomeScreen: React.FC<{
       ) : (
         <ChatScreen onDataChanged={loadData} onPressProfile={() => setProfileVisible(true)} onKeyboardStateChange={setIsKeyboardOpen} />
       )}
+      </View>
 
-      {/* Bottom Floating Pill Navigation */}
+      {/* Bottom M3 Navigation Bar */}
       <FloatingTabBar
         activeTab={activeTab}
         onSelectTab={setActiveTab}
@@ -181,6 +183,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: tokens.colors.surface,
+  },
+  mainContent: {
+    flex: 1,
   },
   scroll: {
     flex: 1,
