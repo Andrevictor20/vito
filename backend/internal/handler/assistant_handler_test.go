@@ -89,3 +89,87 @@ func TestAssistantHandler_AudioChat(t *testing.T) {
 		t.Errorf("expected action %s, got %s", ai.ActionSaveMemory, resp.Action)
 	}
 }
+
+func TestAssistantHandler_AudioChat_FallbackToNative(t *testing.T) {
+	// Simula erro no Whisper
+	mockTrans := &mockTranscriber{err: io.ErrUnexpectedEOF}
+	mockAI := &mockAIGateway{
+		intent: &ai.ParsedIntent{
+			Action:       ai.ActionGeneralChat,
+			Message:      "Áudio nativo processado via fallback!",
+			ProviderUsed: "Gemini Native Audio",
+		},
+	}
+
+	astSvc := service.NewAssistantService(mockAI, nil, nil, nil)
+	astHandler := handler.NewAssistantHandler(astSvc, mockTrans)
+
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	part, err := writer.CreateFormFile("audio", "sample.m4a")
+	if err != nil {
+		t.Fatalf("failed to create form file: %v", err)
+	}
+	_, _ = part.Write([]byte("fake-audio-bytes"))
+	_ = writer.Close()
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/assistant/audio", body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	ctx := context.WithValue(req.Context(), middleware.UserIDKey, "user-123")
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	astHandler.AudioChat(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200 via fallback, got %d. Body: %s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestAssistantHandler_VisionChat(t *testing.T) {
+	mockAI := &mockAIGateway{
+		intent: &ai.ParsedIntent{
+			Action:       ai.ActionCreateTodo,
+			Message:      "Recibo processado com sucesso!",
+			ProviderUsed: "Gemini Vision",
+		},
+	}
+
+	astSvc := service.NewAssistantService(mockAI, nil, nil, nil)
+	astHandler := handler.NewAssistantHandler(astSvc, nil)
+
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	_ = writer.WriteField("prompt", "Extraia os itens deste recibo")
+	part, err := writer.CreateFormFile("image", "receipt.jpg")
+	if err != nil {
+		t.Fatalf("failed to create image form file: %v", err)
+	}
+	_, _ = part.Write([]byte("fake-jpeg-data"))
+	_ = writer.Close()
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/assistant/vision", body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	ctx := context.WithValue(req.Context(), middleware.UserIDKey, "user-vision-1")
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	astHandler.VisionChat(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d. Body: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp struct {
+		Action       string `json:"action"`
+		Message      string `json:"message"`
+		ProviderUsed string `json:"provider_used"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse json response: %v", err)
+	}
+
+	if resp.Action != string(ai.ActionCreateTodo) {
+		t.Errorf("expected ActionCreateTodo, got %s", resp.Action)
+	}
+}

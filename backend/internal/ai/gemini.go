@@ -34,6 +34,14 @@ func (p *GeminiProvider) Name() string {
 	return "Google AI Studio (" + p.model + ")"
 }
 
+func (p *GeminiProvider) SupportsVision() bool {
+	return true
+}
+
+func (p *GeminiProvider) SupportsAudio() bool {
+	return true
+}
+
 type geminiPart struct {
 	Text       string            `json:"text,omitempty"`
 	InlineData *geminiInlineData `json:"inlineData,omitempty"`
@@ -78,11 +86,11 @@ func (p *GeminiProvider) ParseIntent(ctx context.Context, input UserInput) (*Par
 
 	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", p.model, p.apiKey)
 
-	systemPrompt := BuildSystemPrompt(input.Now, input.Timezone, input.ContextMemories...)
+	systemPrompt := BuildSystemPromptFromInput(input)
 
 	var userParts []geminiPart
 	if input.Text != "" {
-		userParts = append(userParts, geminiPart{Text: input.Text})
+		userParts = append(userParts, geminiPart{Text: SanitizeUntrustedInput(input.Text)})
 	}
 	if input.AudioB64 != "" {
 		mime := input.AudioMime
@@ -159,8 +167,8 @@ func (p *GeminiProvider) ParseIntent(ctx context.Context, input UserInput) (*Par
 
 	rawJSON := geminiResp.Candidates[0].Content.Parts[0].Text
 	var intent ParsedIntent
-	if err := json.Unmarshal([]byte(rawJSON), &intent); err != nil {
-		return nil, fmt.Errorf("falha ao interpretar json da ia: %w (raw: %s)", err, rawJSON)
+	if err := UnmarshalIntent(rawJSON, &intent); err != nil {
+		return nil, fmt.Errorf("falha ao interpretar json do gemini: %w", err)
 	}
 
 	return &intent, nil

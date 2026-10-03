@@ -64,3 +64,36 @@ func TestGateway_FailoverCascade(t *testing.T) {
 		t.Errorf("expected error when all providers fail, got nil")
 	}
 }
+
+type MockVisionProvider struct {
+	MockProvider
+}
+
+func (m *MockVisionProvider) SupportsVision() bool { return true }
+
+func TestGateway_MultimodalImageRouting(t *testing.T) {
+	intent := &ai.ParsedIntent{
+		Action:  ai.ActionCreateTodo,
+		Message: "Recibo lido com sucesso",
+	}
+
+	textOnly := &MockProvider{name: "Groq Llama", shouldError: false, intent: intent}
+	visionPro := &MockVisionProvider{MockProvider: MockProvider{name: "Gemini Vision", shouldError: false, intent: intent}}
+
+	// textOnly vem primeiro na ordem padrão da cascata
+	gw := ai.NewGateway(textOnly, visionPro)
+
+	// Quando o input contém imagem, o gateway DEVE priorizar o visionPro e não o textOnly
+	res, err := gw.ParseIntent(context.Background(), ai.UserInput{
+		Text:     "Extraia o valor deste recibo",
+		ImageB64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY44YAAAAASUVORK5CYII=",
+	})
+
+	if err != nil {
+		t.Fatalf("ParseIntent falhou inesperadamente: %v", err)
+	}
+
+	if res.ProviderUsed != "Gemini Vision" {
+		t.Errorf("Esperava provedor 'Gemini Vision' para requisição com imagem, mas obteve '%s'", res.ProviderUsed)
+	}
+}

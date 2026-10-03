@@ -65,11 +65,48 @@ func (s *AssistantService) Process(ctx context.Context, userID string, input ai.
 		}, nil
 	}
 
-	// Carrega memórias de longo prazo se ainda não informadas
+	// Carrega memórias de longo prazo se ainda não informadas (Camada 3)
 	if len(input.ContextMemories) == 0 && s.memoryRepo != nil {
 		if mems, err := s.memoryRepo.ListByUser(userID, 15); err == nil && len(mems) > 0 {
 			for _, m := range mems {
 				input.ContextMemories = append(input.ContextMemories, fmt.Sprintf("[%s] %s", m.Category, m.Content))
+			}
+		}
+	}
+
+	// Carrega compromissos ativos próximos na agenda (Camada 2 - Próximos 7 dias, até 5)
+	if len(input.ActiveSchedule) == 0 && s.calSvc != nil {
+		start := input.Now
+		end := input.Now.Add(7 * 24 * time.Hour)
+		if events, err := s.calSvc.ListEvents(userID, start, end); err == nil && len(events) > 0 {
+			limit := 5
+			if len(events) < limit {
+				limit = len(events)
+			}
+			for _, ev := range events[:limit] {
+				input.ActiveSchedule = append(input.ActiveSchedule, fmt.Sprintf("%s (%s às %s): %s",
+					ev.StartAt.Format("02/01/2006"),
+					ev.StartAt.Format("15:04"),
+					ev.EndAt.Format("15:04"),
+					ev.Title,
+				))
+			}
+		}
+	}
+
+	// Carrega tarefas pendentes mais urgentes (Camada 2 - Até 5 não concluídas)
+	if len(input.PendingTodos) == 0 && s.todoSvc != nil {
+		if todos, err := s.todoSvc.ListTodos(userID, domain.TodoStatusPending); err == nil && len(todos) > 0 {
+			limit := 5
+			if len(todos) < limit {
+				limit = len(todos)
+			}
+			for _, td := range todos[:limit] {
+				dueStr := "Sem prazo"
+				if td.DueDate != nil {
+					dueStr = td.DueDate.Format("02/01 15:04")
+				}
+				input.PendingTodos = append(input.PendingTodos, fmt.Sprintf("[%s - %s] %s", td.Priority, dueStr, td.Title))
 			}
 		}
 	}

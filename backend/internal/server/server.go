@@ -61,6 +61,7 @@ func (s *Server) setupMiddlewares() {
 	s.router.Use(chimiddleware.RealIP)
 	s.router.Use(chimiddleware.Logger)
 	s.router.Use(chimiddleware.Recoverer)
+	s.router.Use(middleware.SecurityHeadersMiddleware)
 
 	// Configuração segura e completa de CORS para Mobile e Web
 	s.router.Use(cors.Handler(cors.Options{
@@ -112,6 +113,7 @@ func (s *Server) registerRoutes() {
 				if s.astHandler != nil {
 					protected.Post("/assistant/chat", s.astHandler.Chat)
 					protected.Post("/assistant/audio", s.astHandler.AudioChat)
+					protected.Post("/assistant/vision", s.astHandler.VisionChat)
 				}
 			})
 		}

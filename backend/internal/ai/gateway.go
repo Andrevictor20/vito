@@ -23,14 +23,44 @@ func NewGateway(providers ...Provider) *Gateway {
 	return &Gateway{providers: active}
 }
 
+// getOrderedProviders filtra e prioriza provedores conforme o tipo de entrada (imagem, áudio ou texto).
+func (g *Gateway) getOrderedProviders(input UserInput) []Provider {
+	if input.ImageB64 != "" {
+		var visionProviders []Provider
+		for _, p := range g.providers {
+			if vc, ok := p.(VisionCapable); ok && vc.SupportsVision() {
+				visionProviders = append(visionProviders, p)
+			}
+		}
+		if len(visionProviders) > 0 {
+			return visionProviders
+		}
+	}
+
+	if input.AudioB64 != "" {
+		var audioProviders []Provider
+		for _, p := range g.providers {
+			if ac, ok := p.(AudioCapable); ok && ac.SupportsAudio() {
+				audioProviders = append(audioProviders, p)
+			}
+		}
+		if len(audioProviders) > 0 {
+			return audioProviders
+		}
+	}
+
+	return g.providers
+}
+
 // ParseIntent tenta analisar a intenção percorrendo os provedores até obter sucesso.
 func (g *Gateway) ParseIntent(ctx context.Context, input UserInput) (*ParsedIntent, error) {
-	if len(g.providers) == 0 {
-		return nil, errors.New("nenhum provedor de IA configurado no gateway")
+	candidates := g.getOrderedProviders(input)
+	if len(candidates) == 0 {
+		return nil, errors.New("nenhum provedor de IA compatível configurado no gateway")
 	}
 
 	var lastErr error
-	for _, provider := range g.providers {
+	for _, provider := range candidates {
 		intent, err := provider.ParseIntent(ctx, input)
 		if err == nil && intent != nil {
 			intent.ProviderUsed = provider.Name()

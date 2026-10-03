@@ -14,10 +14,12 @@ import (
 )
 
 type mockAIGateway struct {
-	intent *ai.ParsedIntent
+	intent        *ai.ParsedIntent
+	capturedInput ai.UserInput
 }
 
 func (m *mockAIGateway) ParseIntent(ctx context.Context, input ai.UserInput) (*ai.ParsedIntent, error) {
+	m.capturedInput = input
 	return m.intent, nil
 }
 
@@ -226,5 +228,45 @@ func TestAssistantService_SaveMemory(t *testing.T) {
 	}
 	if memories[0].Category != "família" {
 		t.Errorf("unexpected category: %s", memories[0].Category)
+	}
+}
+
+func TestAssistantService_ContextLayersInjection(t *testing.T) {
+	_, calSvc, todoSvc, userID := setupAssistantTest(t)
+
+	// Inserir evento futuro
+	now := time.Now().UTC()
+	_, _, err := calSvc.CreateEvent(userID, "Dentista Geral", "", "Consultório", now.Add(24*time.Hour), now.Add(25*time.Hour))
+	if err != nil {
+		t.Fatalf("failed to create event: %v", err)
+	}
+
+	// Inserir tarefa pendente
+	_, err = todoSvc.CreateTodo(userID, "Comprar café em grãos", "high", nil)
+	if err != nil {
+		t.Fatalf("failed to create todo: %v", err)
+	}
+
+	mockAI := &mockAIGateway{
+		intent: &ai.ParsedIntent{
+			Action:  ai.ActionGeneralChat,
+			Message: "Entendido!",
+		},
+	}
+	astSvcCustom := service.NewAssistantService(mockAI, calSvc, todoSvc, nil)
+
+	_, err = astSvcCustom.Process(context.Background(), userID, ai.UserInput{
+		Text: "O que tenho para fazer?",
+		Now:  now,
+	})
+	if err != nil {
+		t.Fatalf("Process failed: %v", err)
+	}
+
+	if len(mockAI.capturedInput.ActiveSchedule) == 0 {
+		t.Errorf("expected ActiveSchedule to be injected, got 0 items")
+	}
+	if len(mockAI.capturedInput.PendingTodos) == 0 {
+		t.Errorf("expected PendingTodos to be injected, got 0 items")
 	}
 }

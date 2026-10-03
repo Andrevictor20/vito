@@ -53,6 +53,14 @@ func (p *OpenAICompatProvider) Name() string {
 	return p.providerName
 }
 
+func (p *OpenAICompatProvider) SupportsVision() bool {
+	return false
+}
+
+func (p *OpenAICompatProvider) SupportsAudio() bool {
+	return false
+}
+
 type openAIChatMessage struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
@@ -82,8 +90,8 @@ func (p *OpenAICompatProvider) ParseIntent(ctx context.Context, input UserInput)
 		return nil, errors.New("chave de api não configurada para " + p.providerName)
 	}
 
-	systemPrompt := BuildSystemPrompt(input.Now, input.Timezone, input.ContextMemories...)
-	userContent := input.Text
+	systemPrompt := BuildSystemPromptFromInput(input)
+	userContent := SanitizeUntrustedInput(input.Text)
 	if userContent == "" && input.AudioB64 != "" {
 		return nil, errors.New("áudio direto não suportado por este provedor, requer transcrição prévia")
 	}
@@ -141,8 +149,8 @@ func (p *OpenAICompatProvider) ParseIntent(ctx context.Context, input UserInput)
 
 	content := strings.TrimSpace(chatResp.Choices[0].Message.Content)
 	var intent ParsedIntent
-	if err := json.Unmarshal([]byte(content), &intent); err != nil {
-		return nil, fmt.Errorf("falha ao interpretar json retornado: %w (raw: %s)", err, content)
+	if err := UnmarshalIntent(content, &intent); err != nil {
+		return nil, fmt.Errorf("falha ao interpretar json do provedor: %w", err)
 	}
 
 	return &intent, nil

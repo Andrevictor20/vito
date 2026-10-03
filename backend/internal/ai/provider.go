@@ -27,6 +27,8 @@ type UserInput struct {
 	Timezone        string    `json:"timezone,omitempty"` // ex: "America/Sao_Paulo"
 	Now             time.Time `json:"now"`
 	ContextMemories []string  `json:"context_memories,omitempty"` // RAG in-context pessoal
+	ActiveSchedule  []string  `json:"active_schedule,omitempty"`   // Próximos compromissos
+	PendingTodos    []string  `json:"pending_todos,omitempty"`     // Tarefas urgentes/pendentes
 }
 
 // ParsedEvent dados extraídos para criação de evento.
@@ -60,4 +62,14 @@ type ParsedIntent struct {
 type Provider interface {
 	Name() string
 	ParseIntent(ctx context.Context, input UserInput) (*ParsedIntent, error)
+}
+
+// VisionCapable indica se o provedor suporta processamento direto de imagens.
+type VisionCapable interface {
+	SupportsVision() bool
+}
+
+// AudioCapable indica se o provedor suporta processamento direto de áudio.
+type AudioCapable interface {
+	SupportsAudio() bool
 }

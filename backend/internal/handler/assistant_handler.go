@@ -1,7 +1,12 @@
 package handler
 
 import (
+	"bytes"
+	"encoding/base64"
 	"encoding/json"
+	"errors"
+	"io"
+	"log"
 	"net/http"
 	"time"
 
@@ -76,15 +81,11 @@ func (h *AssistantHandler) Chat(w http.ResponseWriter, r *http.Request) {
 }
 
 // AudioChat processa um arquivo de áudio enviado via multipart/form-data, transcreve com Whisper e processa o comando.
+// Caso a transcrição falhe ou o transcritor esteja indisponível, aplica fallback para áudio nativo.
 func (h *AssistantHandler) AudioChat(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
 		http.Error(w, `{"error":"não autorizado"}`, http.StatusUnauthorized)
-		return
-	}
-
-	if h.transcriber == nil {
-		http.Error(w, `{"error":"serviço de transcrição de áudio não configurado"}`, http.StatusServiceUnavailable)
 		return
 	}
 
@@ -103,17 +104,36 @@ func (h *AssistantHandler) AudioChat(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	transcript, err := h.transcriber.Transcribe(r.Context(), file, header.Filename)
+	fileBytes, err := io.ReadAll(file)
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadGateway)
-		_ = json.NewEncoder(w).Encode(map[string]string{"error": "falha na transcrição de voz: " + err.Error()})
+		http.Error(w, `{"error":"falha ao ler arquivo de áudio: `+err.Error()+`"}`, http.StatusBadRequest)
 		return
 	}
 
-	input := ai.UserInput{
-		Text: transcript,
-		Now:  time.Now().UTC(),
+	var transcript string
+	var input ai.UserInput
+	if h.transcriber != nil {
+		transcript, err = h.transcriber.Transcribe(r.Context(), bytes.NewReader(fileBytes), header.Filename)
+	} else {
+		err = errors.New("transcritor Whisper não configurado")
+	}
+
+	if err != nil {
+		log.Printf("⚠️ [AudioChat] Transcrição Whisper falhou (%v). Acionando fallback para áudio nativo...", err)
+		mime := header.Header.Get("Content-Type")
+		if mime == "" {
+			mime = "audio/m4a"
+		}
+		input = ai.UserInput{
+			AudioB64:  base64.StdEncoding.EncodeToString(fileBytes),
+			AudioMime: mime,
+			Now:       time.Now().UTC(),
+		}
+	} else {
+		input = ai.UserInput{
+			Text: transcript,
+			Now:  time.Now().UTC(),
+		}
 	}
 
 	resp, err := h.astSvc.Process(r.Context(), userID, input)
@@ -139,4 +159,67 @@ func (h *AssistantHandler) AudioChat(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(responseMap)
+}
+
+// VisionChat processa upload de imagem (recibos, fotos de documentos ou anotações) via multipart/form-data.
+func (h *AssistantHandler) VisionChat(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, `{"error":"não autorizado"}`, http.StatusUnauthorized)
+		return
+	}
+
+	// Limite de 15MB para upload de imagem
+	if err := r.ParseMultipartForm(15 << 20); err != nil {
+		http.Error(w, `{"error":"falha ao processar formulário multipart: `+err.Error()+`"}`, http.StatusBadRequest)
+		return
+	}
+
+	file, header, err := r.FormFile("image")
+	if err != nil {
+		file, header, err = r.FormFile("file")
+		if err != nil {
+			http.Error(w, `{"error":"campo 'image' ou 'file' não encontrado"}`, http.StatusBadRequest)
+			return
+		}
+	}
+	defer file.Close()
+
+	fileBytes, err := io.ReadAll(file)
+	if err != nil {
+		http.Error(w, `{"error":"falha ao ler bytes da imagem"}`, http.StatusBadRequest)
+		return
+	}
+
+	mime := header.Header.Get("Content-Type")
+	if mime == "" {
+		mime = http.DetectContentType(fileBytes)
+	}
+
+	prompt := r.FormValue("prompt")
+	if prompt == "" {
+		prompt = r.FormValue("text")
+	}
+	if prompt == "" {
+		prompt = "Analise esta imagem e extraia eventos para a agenda ou tarefas a realizar."
+	}
+
+	input := ai.UserInput{
+		Text:      prompt,
+		ImageB64:  base64.StdEncoding.EncodeToString(fileBytes),
+		ImageMime: mime,
+		Timezone:  r.FormValue("timezone"),
+		Now:       time.Now().UTC(),
+	}
+
+	resp, err := h.astSvc.Process(r.Context(), userID, input)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(resp)
 }
