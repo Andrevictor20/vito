@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   ScrollView,
   Platform,
+  StatusBar as RNStatusBar,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { MD3Shapes } from '../../theme/tokens';
@@ -483,6 +484,7 @@ export const CalendarModal: React.FC<CalendarModalProps> = ({
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
+    paddingTop: Platform.OS === 'android' ? Math.max((RNStatusBar.currentHeight || 0) + 6, 44) : 0,
   },
   container: {
     flex: 1,

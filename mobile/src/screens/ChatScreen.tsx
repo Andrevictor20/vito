@@ -267,7 +267,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
         style={[
           styles.dockContainer,
           Platform.OS === 'android' && keyboardHeight > 0 && {
-            marginBottom: keyboardHeight,
+            marginBottom: keyboardHeight + 14,
           },
         ]}
       >
@@ -396,6 +396,6 @@ const styles = StyleSheet.create({
   },
   dockContainer: {
     backgroundColor: 'transparent',
-    paddingBottom: Platform.OS === 'android' ? 6 : 8,
+    paddingBottom: Platform.OS === 'android' ? 8 : 8,
   },
 });

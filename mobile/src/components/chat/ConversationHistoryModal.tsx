@@ -7,6 +7,8 @@ import {
   SafeAreaView,
   TouchableOpacity,
   ScrollView,
+  Platform,
+  StatusBar as RNStatusBar,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens, MD3Shapes } from '../../theme/tokens';
@@ -203,6 +205,7 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: tokens.colors.surface,
+    paddingTop: Platform.OS === 'android' ? Math.max((RNStatusBar.currentHeight || 0) + 6, 44) : 0,
   },
   container: {
     flex: 1,
