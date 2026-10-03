@@ -7,6 +7,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { EventInlineCard } from './cards/EventInlineCard';
 import { ConflictInlineCard } from './cards/ConflictInlineCard';
 import { TodoInlineCard } from './cards/TodoInlineCard';
+import { VitoMascot } from '../common/VitoMascot';
 
 interface ChatMessageBubbleProps {
   message: ChatMessage;
@@ -20,7 +21,7 @@ export const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({ message })
     <View style={[styles.messageRow, isUser ? styles.messageRowUser : styles.messageRowVito]}>
       {!isUser && (
         <View style={[styles.vitoAvatar, { backgroundColor: colors.surfaceContainerHigh, borderWidth: 1, borderColor: colors.outlineVariant }]}>
-          <MaterialIcons name="auto-awesome" size={15} color={colors.primary} />
+          <VitoMascot size={20} animated={false} />
         </View>
       )}
 

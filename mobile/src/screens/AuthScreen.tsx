@@ -15,6 +15,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { isCloudServer } from '../services/api';
 import { UpdateBanner } from '../components/common/UpdateBanner';
+import { VitoLogo } from '../components/common/VitoLogo';
 import { createAuthStyles } from './AuthScreen.styles';
 
 interface AuthScreenProps {
@@ -106,10 +107,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ serverUrl, onToggleServe
       <View style={styles.card}>
         {/* Top Header M3 com Seletor de Servidor e Alternador de Tema */}
         <View style={styles.topHeaderRow}>
-          <View style={styles.brandRow}>
-            <Text style={styles.title}>vito</Text>
-            <View style={styles.brandDot} />
-          </View>
+          <VitoLogo size="small" />
 
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <TouchableOpacity

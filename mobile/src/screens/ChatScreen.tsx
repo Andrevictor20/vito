@@ -20,6 +20,7 @@ import { ChatQuotaBanner } from '../components/chat/ChatQuotaBanner';
 import { ChatQuickChips } from '../components/chat/ChatQuickChips';
 import { ChatInputDock } from '../components/chat/ChatInputDock';
 import { ConversationHistoryModal } from '../components/chat/ConversationHistoryModal';
+import { VitoMascot } from '../components/common/VitoMascot';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { SafeAudioRecorder } from '../services/audioRecorder';
@@ -183,6 +184,11 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
       <View style={[styles.topAppBar, { backgroundColor: colors.surface, borderBottomColor: colors.outlineVariant }]}>
         <View style={styles.topAppBarLeft}>
           <View style={styles.brandRow}>
+            <VitoMascot
+              size={28}
+              state={loading ? 'thinking' : 'idle'}
+              style={{ marginRight: 6 }}
+            />
             <Text style={[styles.chatBrand, { color: colors.onSurface }]}>vito</Text>
             <View style={[styles.statusDot, { backgroundColor: colors.statusOnline }]} />
           </View>
