@@ -150,6 +150,10 @@ func (s *GoogleAuthService) ValidateState(stateStr string) (*OAuthState, error) 
 
 // GetAuthURL constrói a URL oficial de consentimento do Google.
 func (s *GoogleAuthService) GetAuthURL(mode, userID, redirectScheme string) (string, error) {
+	if strings.TrimSpace(s.cfg.ClientID) == "" {
+		return "", errors.New("GOOGLE_CLIENT_ID não configurado no servidor. Configure as credenciais Google OAuth no arquivo .env")
+	}
+
 	state, err := s.GenerateState(mode, userID, redirectScheme)
 	if err != nil {
 		return "", err
