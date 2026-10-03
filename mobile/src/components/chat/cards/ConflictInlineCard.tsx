@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens, MD3Shapes } from '../../../theme/tokens';
+import { useTheme } from '../../../context/ThemeContext';
 import { ConflictInfo } from '../../../types';
 
 interface ConflictInlineCardProps {
@@ -10,28 +11,34 @@ interface ConflictInlineCardProps {
 }
 
 export const ConflictInlineCard: React.FC<ConflictInlineCardProps> = ({ conflict, onPressAdjust }) => {
+  const { colors } = useTheme();
+
   return (
-    <View style={styles.card}>
-      <View style={styles.accentBar} />
+    <View style={[styles.card, { backgroundColor: colors.surfaceContainerHigh, borderColor: colors.outlineVariant }]}>
+      <View style={[styles.accentBar, { backgroundColor: colors.error }]} />
 
       <View style={styles.contentRow}>
         <View style={styles.leftGroup}>
-          <View style={styles.iconBox}>
-            <MaterialIcons name="warning" size={17} color={tokens.colors.onErrorContainer} />
+          <View style={[styles.iconBox, { backgroundColor: colors.errorContainer }]}>
+            <MaterialIcons name="warning" size={17} color={colors.onErrorContainer} />
           </View>
           <View style={styles.textCol}>
-            <Text style={styles.title} numberOfLines={1}>
+            <Text style={[styles.title, { color: colors.onSurface }]} numberOfLines={1}>
               {conflict.conflicting_title || 'Conflito de Agenda'}
             </Text>
-            <Text style={styles.subtitle} numberOfLines={2}>
+            <Text style={[styles.subtitle, { color: colors.error }]} numberOfLines={2}>
               {conflict.message || 'Atenção: Pouco tempo de intervalo entre compromissos'}
             </Text>
           </View>
         </View>
 
         {onPressAdjust && (
-          <TouchableOpacity style={styles.adjustBtn} onPress={onPressAdjust} activeOpacity={0.8}>
-            <Text style={styles.adjustBtnText}>Ajustar</Text>
+          <TouchableOpacity
+            style={[styles.adjustBtn, { backgroundColor: colors.surfaceContainerHighest }]}
+            onPress={onPressAdjust}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.adjustBtnText, { color: colors.onSurface }]}>Ajustar</Text>
           </TouchableOpacity>
         )}
       </View>

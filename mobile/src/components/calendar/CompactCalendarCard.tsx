@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import { tokens, MD3Shapes } from '../../theme/tokens';
+import { useTheme } from '../../context/ThemeContext';
 
 interface CompactCalendarCardProps {
   selectedDate: Date;
@@ -15,6 +16,7 @@ export const CompactCalendarCard: React.FC<CompactCalendarCardProps> = ({
   onOpenFullCalendar,
   eventDates = new Set(),
 }) => {
+  const { colors, isDark } = useTheme();
   // Obter o primeiro dia da semana (Domingo) correspondente à data selecionada
   const current = new Date(selectedDate);
   const dayOfWeek = current.getDay(); // 0 = Domingo
@@ -37,22 +39,22 @@ export const CompactCalendarCard: React.FC<CompactCalendarCardProps> = ({
     d1.getFullYear() === d2.getFullYear();
 
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant, borderWidth: 1 }]}>
       {/* Top Header do Card */}
       <View style={styles.headerRow}>
         <View>
-          <Text style={styles.monthTitle}>{capitalizedMonth}</Text>
-          <Text style={styles.yearSubtitle}>{yearStr}</Text>
+          <Text style={[styles.monthTitle, { color: colors.onSurface }]}>{capitalizedMonth}</Text>
+          <Text style={[styles.yearSubtitle, { color: colors.textMuted }]}>{yearStr}</Text>
         </View>
 
         <TouchableOpacity
-          style={styles.openBtn}
+          style={[styles.openBtn, { backgroundColor: colors.surfaceContainerHighest }]}
           onPress={onOpenFullCalendar}
           activeOpacity={0.75}
           accessibilityLabel="Abrir calendário completo"
           hitSlop={tokens.hitSlop.sm}
         >
-          <Text style={styles.openBtnText}>Abrir calendário</Text>
+          <Text style={[styles.openBtnText, { color: colors.onSurface }]}>Abrir calendário</Text>
         </TouchableOpacity>
       </View>
 
@@ -75,14 +77,21 @@ export const CompactCalendarCard: React.FC<CompactCalendarCardProps> = ({
               activeOpacity={0.7}
               accessibilityLabel={`Selecionar ${weekdayLabel} dia ${dayDate.getDate()}`}
             >
-              <Text style={[styles.dayLabel, isSelected && styles.dayLabelSelected]}>
+              <Text style={[styles.dayLabel, { color: isSelected ? colors.primary : colors.textMuted }]}>
                 {weekdayLabel}
               </Text>
-              <View style={[styles.dayCircle, isSelected && styles.dayCircleSelected]}>
-                <Text style={[styles.dayNumber, isSelected && styles.dayNumberSelected]}>
+              <View style={[styles.dayCircle, isSelected && { backgroundColor: colors.primary }]}>
+                <Text
+                  style={[
+                    styles.dayNumber,
+                    { color: isSelected ? colors.onPrimary : colors.onSurface },
+                  ]}
+                >
                   {dayDate.getDate()}
                 </Text>
-                {hasEvent && !isSelected && <View style={styles.eventDot} />}
+                {hasEvent && !isSelected && (
+                  <View style={[styles.eventDot, { backgroundColor: colors.primary }]} />
+                )}
               </View>
             </TouchableOpacity>
           );

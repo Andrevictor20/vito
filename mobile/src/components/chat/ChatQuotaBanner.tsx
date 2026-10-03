@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens, MD3Shapes } from '../../theme/tokens';
+import { useTheme } from '../../context/ThemeContext';
 
 interface ChatQuotaBannerProps {
   quotaPercentage?: number;
@@ -14,6 +15,7 @@ export const ChatQuotaBanner: React.FC<ChatQuotaBannerProps> = ({
   daysRemaining = 4,
   onClose,
 }) => {
+  const { colors } = useTheme();
   const [dismissed, setDismissed] = useState(false);
 
   if (dismissed) return null;
@@ -24,11 +26,11 @@ export const ChatQuotaBanner: React.FC<ChatQuotaBannerProps> = ({
   };
 
   return (
-    <View style={styles.banner}>
+    <View style={[styles.banner, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
       <View style={styles.leftRow}>
-        <View style={styles.pulseDot} />
-        <Text style={styles.text} numberOfLines={1}>
-          <Text style={styles.boldText}>Plano Pro</Text> • {quotaPercentage}% da cota semanal utilizada. Renova em {daysRemaining}d.
+        <View style={[styles.pulseDot, { backgroundColor: colors.primary }]} />
+        <Text style={[styles.text, { color: colors.onSurfaceVariant }]} numberOfLines={1}>
+          <Text style={[styles.boldText, { color: colors.onSurface }]}>Plano Pro</Text> • {quotaPercentage}% da cota semanal utilizada. Renova em {daysRemaining}d.
         </Text>
       </View>
 
@@ -39,7 +41,7 @@ export const ChatQuotaBanner: React.FC<ChatQuotaBannerProps> = ({
         activeOpacity={0.7}
         accessibilityLabel="Fechar aviso de cota"
       >
-        <MaterialIcons name="close" size={15} color={tokens.colors.textSecondary} />
+        <MaterialIcons name="close" size={15} color={colors.onSurfaceVariant} />
       </TouchableOpacity>
     </View>
   );

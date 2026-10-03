@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens } from '../../theme/tokens';
+import { useTheme } from '../../context/ThemeContext';
 
 interface ProfileNodeCardProps {
   isCloud: boolean;
@@ -12,56 +13,78 @@ export const ProfileNodeCard: React.FC<ProfileNodeCardProps> = ({
   isCloud,
   onToggleServer,
 }) => {
+  const { colors, isDark } = useTheme();
+
   return (
-    <View style={styles.nodeCard}>
+    <View style={[styles.nodeCard, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
       {/* Segmented Control */}
-      <View style={styles.segmentedToggle}>
+      <View style={[styles.segmentedToggle, { backgroundColor: colors.surfaceContainerHighest }]}>
         <TouchableOpacity
-          style={[styles.segmentBtn, isCloud && styles.segmentBtnActive]}
+          style={[
+            styles.segmentBtn,
+            isCloud && [
+              styles.segmentBtnActive,
+              {
+                backgroundColor: isDark ? colors.surfaceContainer : '#FFFFFF',
+                borderWidth: isDark ? 1 : 0,
+                borderColor: colors.outlineVariant,
+              },
+            ],
+          ]}
           onPress={isCloud ? undefined : onToggleServer}
           activeOpacity={0.8}
         >
           <MaterialIcons
             name="cloud-queue"
             size={15}
-            color={isCloud ? tokens.colors.primary : tokens.colors.textSecondary}
+            color={isCloud ? colors.primary : colors.textSecondary}
           />
-          <Text style={[styles.segmentText, isCloud && styles.segmentTextActive]}>
+          <Text style={[styles.segmentText, { color: isCloud ? colors.onSurface : colors.textSecondary }]}>
             Cloudflare Tunnel
           </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.segmentBtn, !isCloud && styles.segmentBtnActive]}
+          style={[
+            styles.segmentBtn,
+            !isCloud && [
+              styles.segmentBtnActive,
+              {
+                backgroundColor: isDark ? colors.surfaceContainer : '#FFFFFF',
+                borderWidth: isDark ? 1 : 0,
+                borderColor: colors.outlineVariant,
+              },
+            ],
+          ]}
           onPress={!isCloud ? undefined : onToggleServer}
           activeOpacity={0.8}
         >
           <MaterialIcons
             name="developer-board"
             size={15}
-            color={!isCloud ? tokens.colors.primary : tokens.colors.textSecondary}
+            color={!isCloud ? colors.primary : colors.textSecondary}
           />
-          <Text style={[styles.segmentText, !isCloud && styles.segmentTextActive]}>
+          <Text style={[styles.segmentText, { color: !isCloud ? colors.onSurface : colors.textSecondary }]}>
             RPi Local Node
           </Text>
         </TouchableOpacity>
       </View>
 
       {/* Detalhes do Nó Ativo */}
-      <View style={styles.nodeDetailRow}>
-        <View style={styles.nodeIconBox}>
-          <MaterialIcons name="dns" size={18} color={tokens.colors.primary} />
+      <View style={[styles.nodeDetailRow, { backgroundColor: colors.surfaceContainerLow, borderColor: colors.outlineVariant, borderWidth: 1 }]}>
+        <View style={[styles.nodeIconBox, { backgroundColor: colors.surfaceContainerHighest }]}>
+          <MaterialIcons name="dns" size={18} color={colors.primary} />
         </View>
         <View style={styles.nodeTextCol}>
-          <Text style={styles.nodeTitle}>
+          <Text style={[styles.nodeTitle, { color: colors.onSurface }]}>
             {isCloud ? 'Cloudflare Edge Tunnel' : 'RPi Local Private Node'}
           </Text>
-          <Text style={styles.nodeMeta} numberOfLines={1}>
+          <Text style={[styles.nodeMeta, { color: colors.textSecondary }]} numberOfLines={1}>
             {isCloud ? 'TLS 1.3 • Saída Segura Zero-Trust' : 'Rede Local Privada • 192.168.1.100'}
           </Text>
         </View>
-        <View style={styles.routeBadge}>
-          <Text style={styles.routeBadgeText}>Automático</Text>
+        <View style={[styles.routeBadge, { backgroundColor: colors.surfaceContainerHighest }]}>
+          <Text style={[styles.routeBadgeText, { color: colors.primary }]}>Automático</Text>
         </View>
       </View>
     </View>

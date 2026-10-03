@@ -1,9 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ChatMessage } from '../types';
+import { ChatMessage, ConversationSession } from '../types';
 import { api } from '../services/api';
 
 const CHAT_STORAGE_KEY = '@vito_persistent_chat';
+const SESSIONS_STORAGE_KEY = '@vito_chat_sessions';
+const ACTIVE_SESSION_ID_KEY = '@vito_active_session_id';
 
 const INITIAL_MESSAGE: ChatMessage = {
   id: 'msg-initial',
@@ -13,34 +15,123 @@ const INITIAL_MESSAGE: ChatMessage = {
 };
 
 export function useChat(onDataChanged?: () => void) {
+  const [sessions, setSessions] = useState<ConversationSession[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState<string>('');
   const [messages, setMessages] = useState<ChatMessage[]>([INITIAL_MESSAGE]);
   const [loading, setLoading] = useState(false);
+  const activeSessionIdRef = useRef<string>('');
 
-  // Carregar histórico persistente do AsyncStorage
+  // Carregar sessões e histórico persistente do AsyncStorage
   useEffect(() => {
-    AsyncStorage.getItem(CHAT_STORAGE_KEY).then((data) => {
-      if (data) {
-        try {
-          const parsed = JSON.parse(data);
+    const loadStoredChat = async () => {
+      try {
+        const storedSessions = await AsyncStorage.getItem(SESSIONS_STORAGE_KEY);
+        const storedActiveId = await AsyncStorage.getItem(ACTIVE_SESSION_ID_KEY);
+        const legacyChat = await AsyncStorage.getItem(CHAT_STORAGE_KEY);
+
+        if (storedSessions) {
+          const parsed = JSON.parse(storedSessions) as ConversationSession[];
           if (Array.isArray(parsed) && parsed.length > 0) {
-            setMessages(parsed);
+            setSessions(parsed);
+            const active = parsed.find((s) => s.id === storedActiveId) || parsed[0];
+            setActiveSessionId(active.id);
+            activeSessionIdRef.current = active.id;
+            setMessages(active.messages && active.messages.length > 0 ? active.messages : [INITIAL_MESSAGE]);
+            return;
           }
-        } catch (e) {
-          console.error('Falha ao restaurar mensagens do chat:', e);
         }
+
+        // Migração do legado ou inicialização da primeira sessão
+        let initialMessages = [INITIAL_MESSAGE];
+        if (legacyChat) {
+          try {
+            const parsedLegacy = JSON.parse(legacyChat);
+            if (Array.isArray(parsedLegacy) && parsedLegacy.length > 0) {
+              initialMessages = parsedLegacy;
+            }
+          } catch {}
+        }
+
+        const firstUser = initialMessages.find((m) => m.sender === 'user');
+        const title = firstUser
+          ? firstUser.text.length > 28
+            ? firstUser.text.slice(0, 28) + '...'
+            : firstUser.text
+          : 'Conversa Atual';
+
+        const initialSession: ConversationSession = {
+          id: `conv-${Date.now()}`,
+          title,
+          preview: initialMessages[initialMessages.length - 1]?.text || INITIAL_MESSAGE.text,
+          timestamp: new Date().toISOString(),
+          messages: initialMessages,
+        };
+
+        setSessions([initialSession]);
+        setActiveSessionId(initialSession.id);
+        activeSessionIdRef.current = initialSession.id;
+        setMessages(initialMessages);
+
+        await AsyncStorage.setItem(SESSIONS_STORAGE_KEY, JSON.stringify([initialSession]));
+        await AsyncStorage.setItem(ACTIVE_SESSION_ID_KEY, initialSession.id);
+      } catch (e) {
+        console.error('Falha ao restaurar sessões do chat:', e);
       }
-    });
+    };
+
+    loadStoredChat();
   }, []);
 
-  const saveMessages = useCallback(async (newMessages: ChatMessage[]) => {
-    try {
-      // Limita a persistência aos últimos 100 itens para performance máxima
-      const trimmed = newMessages.slice(-100);
-      await AsyncStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(trimmed));
-    } catch (e) {
-      console.error('Falha ao salvar chat:', e);
-    }
-  }, []);
+  const saveMessages = useCallback(
+    async (newMessages: ChatMessage[]) => {
+      setMessages(newMessages);
+      const currentId = activeSessionIdRef.current || activeSessionId;
+
+      setSessions((prevSessions) => {
+        const firstUser = newMessages.find((m) => m.sender === 'user');
+        const latestMsg = newMessages[newMessages.length - 1];
+        const previewText = latestMsg?.text || 'Sem mensagens';
+
+        let targetFound = false;
+        const updated = prevSessions.map((s) => {
+          if (s.id === currentId) {
+            targetFound = true;
+            let title = s.title;
+            if ((title === 'Conversa Atual' || title === 'Nova Conversa') && firstUser) {
+              title = firstUser.text.length > 28 ? firstUser.text.slice(0, 28) + '...' : firstUser.text;
+            }
+            return {
+              ...s,
+              title,
+              preview: previewText,
+              timestamp: new Date().toISOString(),
+              messages: newMessages.slice(-100),
+            };
+          }
+          return s;
+        });
+
+        const finalList = targetFound
+          ? updated
+          : [
+              {
+                id: currentId || `conv-${Date.now()}`,
+                title: firstUser ? (firstUser.text.length > 28 ? firstUser.text.slice(0, 28) + '...' : firstUser.text) : 'Conversa Atual',
+                preview: previewText,
+                timestamp: new Date().toISOString(),
+                messages: newMessages.slice(-100),
+              },
+              ...updated,
+            ];
+
+        AsyncStorage.setItem(SESSIONS_STORAGE_KEY, JSON.stringify(finalList)).catch(console.error);
+        AsyncStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(newMessages.slice(-100))).catch(console.error);
+        return finalList;
+      });
+    },
+    [activeSessionId]
+  );
+
 
   const sendMessage = useCallback(
     async (text: string) => {
@@ -214,15 +305,84 @@ export function useChat(onDataChanged?: () => void) {
   const clearHistory = useCallback(async () => {
     const reset = [INITIAL_MESSAGE];
     setMessages(reset);
-    await AsyncStorage.removeItem(CHAT_STORAGE_KEY);
+    await saveMessages(reset);
+  }, [saveMessages]);
+
+  const startNewConversation = useCallback(async () => {
+    const newId = `conv-${Date.now()}`;
+    const newSession: ConversationSession = {
+      id: newId,
+      title: 'Nova Conversa',
+      preview: INITIAL_MESSAGE.text,
+      timestamp: new Date().toISOString(),
+      messages: [INITIAL_MESSAGE],
+    };
+
+    activeSessionIdRef.current = newId;
+    setActiveSessionId(newId);
+    setMessages([INITIAL_MESSAGE]);
+
+    setSessions((prev) => {
+      const filtered = prev.filter((s) => s.messages.length > 1 || (s.title !== 'Nova Conversa' && s.title !== 'Conversa Atual'));
+      const next = [newSession, ...filtered];
+      AsyncStorage.setItem(SESSIONS_STORAGE_KEY, JSON.stringify(next)).catch(console.error);
+      AsyncStorage.setItem(ACTIVE_SESSION_ID_KEY, newId).catch(console.error);
+      AsyncStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify([INITIAL_MESSAGE])).catch(console.error);
+      return next;
+    });
   }, []);
+
+  const switchConversation = useCallback(async (id: string) => {
+    const target = sessions.find((s) => s.id === id);
+    if (!target) return;
+    activeSessionIdRef.current = id;
+    setActiveSessionId(id);
+    const msgs = target.messages && target.messages.length > 0 ? target.messages : [INITIAL_MESSAGE];
+    setMessages(msgs);
+    await AsyncStorage.setItem(ACTIVE_SESSION_ID_KEY, id);
+    await AsyncStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(msgs));
+  }, [sessions]);
+
+  const deleteConversation = useCallback(async (id: string) => {
+    setSessions((prev) => {
+      const remaining = prev.filter((s) => s.id !== id);
+      let nextActive = remaining[0];
+      if (!nextActive) {
+        nextActive = {
+          id: `conv-${Date.now()}`,
+          title: 'Conversa Atual',
+          preview: INITIAL_MESSAGE.text,
+          timestamp: new Date().toISOString(),
+          messages: [INITIAL_MESSAGE],
+        };
+        remaining.push(nextActive);
+      }
+      activeSessionIdRef.current = nextActive.id;
+      setActiveSessionId(nextActive.id);
+      setMessages(nextActive.messages);
+      AsyncStorage.setItem(SESSIONS_STORAGE_KEY, JSON.stringify(remaining)).catch(console.error);
+      AsyncStorage.setItem(ACTIVE_SESSION_ID_KEY, nextActive.id).catch(console.error);
+      AsyncStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(nextActive.messages)).catch(console.error);
+      return remaining;
+    });
+  }, []);
+
+  const sessionsWithActive = sessions.map((s) => ({
+    ...s,
+    active: s.id === activeSessionId,
+  }));
 
   return {
     messages,
     loading,
+    sessions: sessionsWithActive,
+    activeSessionId,
     sendMessage,
     sendAudio,
     sendImage,
     clearHistory,
+    startNewConversation,
+    switchConversation,
+    deleteConversation,
   };
 }

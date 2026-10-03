@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, View, Text } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens } from '../../theme/tokens';
+import { useTheme } from '../../context/ThemeContext';
 
 interface ProfileUserCardProps {
   name: string;
@@ -14,39 +15,40 @@ export const ProfileUserCard: React.FC<ProfileUserCardProps> = ({
   email,
   quotaPercentage = 18.5,
 }) => {
+  const { colors, isDark } = useTheme();
   const initials = (name || 'UV').slice(0, 2).toUpperCase();
 
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
       <View style={styles.topRow}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{initials}</Text>
+        <View style={[styles.avatar, { backgroundColor: isDark ? colors.surfaceContainerHighest : colors.primary, borderWidth: 1, borderColor: colors.outlineVariant }]}>
+          <Text style={[styles.avatarText, { color: isDark ? colors.onSurface : colors.onPrimary }]}>{initials}</Text>
         </View>
 
         <View style={styles.infoCol}>
           <View style={styles.nameRow}>
-            <Text style={styles.name} numberOfLines={1}>{name.toUpperCase()}</Text>
-            <MaterialIcons name="check-circle" size={14} color={tokens.colors.primary} />
+            <Text style={[styles.name, { color: colors.onSurface }]} numberOfLines={1}>{name.toUpperCase()}</Text>
+            <MaterialIcons name="check-circle" size={14} color={colors.primary} />
           </View>
-          <Text style={styles.email} numberOfLines={1}>{email}</Text>
+          <Text style={[styles.email, { color: colors.textSecondary }]} numberOfLines={1}>{email}</Text>
         </View>
 
-        <View style={styles.proBadge}>
-          <Text style={styles.proBadgeText}>PRO</Text>
+        <View style={[styles.proBadge, { backgroundColor: colors.surfaceContainerHighest }]}>
+          <Text style={[styles.proBadgeText, { color: colors.onSurface }]}>PRO</Text>
         </View>
       </View>
 
-      <View style={styles.telemetryBox}>
+      <View style={[styles.telemetryBox, { backgroundColor: colors.surfaceContainerHigh }]}>
         <View style={styles.telemetryRow}>
-          <Text style={styles.telemetryLabel}>Cota semanal utilizada</Text>
-          <Text style={styles.telemetryValue}>{quotaPercentage}%</Text>
+          <Text style={[styles.telemetryLabel, { color: colors.textSecondary }]}>Cota semanal utilizada</Text>
+          <Text style={[styles.telemetryValue, { color: colors.onSurface }]}>{quotaPercentage}%</Text>
         </View>
-        <View style={styles.progressBarTrack}>
-          <View style={[styles.progressBarFill, { width: `${quotaPercentage}%` }]} />
+        <View style={[styles.progressBarTrack, { backgroundColor: colors.surfaceContainerHighest }]}>
+          <View style={[styles.progressBarFill, { width: `${quotaPercentage}%`, backgroundColor: colors.primary }]} />
         </View>
         <View style={styles.telemetryFooter}>
-          <Text style={styles.telemetrySub}>92.5k / 500k ops</Text>
-          <Text style={styles.telemetrySub}>Renova em 4 dias</Text>
+          <Text style={[styles.telemetrySub, { color: colors.textMuted }]}>92.5k / 500k ops</Text>
+          <Text style={[styles.telemetrySub, { color: colors.textMuted }]}>Renova em 4 dias</Text>
         </View>
       </View>
     </View>

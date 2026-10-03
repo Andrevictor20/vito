@@ -2,10 +2,10 @@ import React from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens, MD3Shapes } from '../../theme/tokens';
+import { useTheme } from '../../context/ThemeContext';
 
 interface PromptChipItem {
   icon: keyof typeof MaterialIcons.glyphMap;
-  iconColor: string;
   label: string;
   prompt: string;
 }
@@ -13,25 +13,21 @@ interface PromptChipItem {
 const QUICK_PROMPTS: PromptChipItem[] = [
   {
     icon: 'calendar-month',
-    iconColor: tokens.colors.primary,
     label: 'O que tenho hoje?',
     prompt: 'O que tenho na agenda hoje?',
   },
   {
     icon: 'check-circle',
-    iconColor: tokens.colors.tertiary,
     label: 'Minhas tarefas',
     prompt: 'Listar tarefas pendentes e prazos',
   },
   {
     icon: 'local-cafe',
-    iconColor: tokens.colors.secondary,
     label: 'Almoço amanhã 12h',
     prompt: 'Agendar almoço amanhã às 12h',
   },
   {
     icon: 'bolt',
-    iconColor: tokens.colors.primary,
     label: 'Briefing diário',
     prompt: 'Faça um briefing executivo das minhas prioridades',
   },
@@ -43,6 +39,8 @@ interface ChatQuickChipsProps {
 }
 
 export const ChatQuickChips: React.FC<ChatQuickChipsProps> = ({ onSelectPrompt, disabled }) => {
+  const { colors } = useTheme();
+
   return (
     <View style={styles.container}>
       <ScrollView
@@ -53,13 +51,13 @@ export const ChatQuickChips: React.FC<ChatQuickChipsProps> = ({ onSelectPrompt, 
         {QUICK_PROMPTS.map((item, idx) => (
           <TouchableOpacity
             key={idx}
-            style={styles.chip}
+            style={[styles.chip, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}
             onPress={() => onSelectPrompt(item.prompt)}
             disabled={disabled}
             activeOpacity={0.75}
           >
-            <MaterialIcons name={item.icon} size={15} color={item.iconColor} />
-            <Text style={styles.chipLabel}>{item.label}</Text>
+            <MaterialIcons name={item.icon} size={15} color={colors.primary} />
+            <Text style={[styles.chipLabel, { color: colors.onSurface }]}>{item.label}</Text>
           </TouchableOpacity>
         ))}
       </ScrollView>

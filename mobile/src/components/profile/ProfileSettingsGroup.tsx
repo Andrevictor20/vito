@@ -6,10 +6,10 @@ import { useTheme } from '../../context/ThemeContext';
 
 export const ProfileSettingsGroup: React.FC = () => {
   const [whisperEnabled, setWhisperEnabled] = useState(true);
-  const { isDark, toggleTheme } = useTheme();
+  const { colors, isDark, toggleTheme } = useTheme();
 
   return (
-    <View style={styles.groupCard}>
+    <View style={[styles.groupCard, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
       {/* Alternador de Tema M3 */}
       <TouchableOpacity
         style={styles.groupItem}
@@ -17,16 +17,16 @@ export const ProfileSettingsGroup: React.FC = () => {
         activeOpacity={0.7}
       >
         <View style={styles.itemLeft}>
-          <View style={styles.itemIconBox}>
+          <View style={[styles.itemIconBox, { backgroundColor: colors.surfaceContainerHigh }]}>
             <MaterialIcons
               name={isDark ? 'dark-mode' : 'light-mode'}
               size={18}
-              color={tokens.colors.primary}
+              color={colors.primary}
             />
           </View>
           <View style={styles.itemTextCol}>
-            <Text style={styles.itemTitle}>Tema da Interface</Text>
-            <Text style={styles.itemSub}>
+            <Text style={[styles.itemTitle, { color: colors.onSurface }]}>Tema da Interface</Text>
+            <Text style={[styles.itemSub, { color: colors.textSecondary }]}>
               {isDark ? 'Tema Escuro (M3 Dark)' : 'Tema Claro (M3 Light)'}
             </Text>
           </View>
@@ -34,73 +34,73 @@ export const ProfileSettingsGroup: React.FC = () => {
         <Switch
           value={isDark}
           onValueChange={toggleTheme}
-          trackColor={{ false: tokens.colors.surfaceContainerHighest, true: tokens.colors.primaryContainer }}
-          thumbColor={isDark ? tokens.colors.primary : tokens.colors.outline}
+          trackColor={{ false: colors.surfaceContainerHighest, true: colors.primary }}
+          thumbColor={isDark ? '#FAFAFA' : '#18181B'}
         />
       </TouchableOpacity>
 
-      <View style={styles.divider} />
+      <View style={[styles.divider, { backgroundColor: colors.outlineVariant }]} />
 
       <View style={styles.groupItem}>
         <View style={styles.itemLeft}>
-          <View style={styles.itemIconBox}>
-            <MaterialIcons name="psychology" size={18} color={tokens.colors.primary} />
+          <View style={[styles.itemIconBox, { backgroundColor: colors.surfaceContainerHigh }]}>
+            <MaterialIcons name="psychology" size={18} color={colors.primary} />
           </View>
           <View style={styles.itemTextCol}>
-            <Text style={styles.itemTitle}>Modelo Ativo</Text>
-            <Text style={styles.itemSub}>Gemini 2.5 Flash / Groq Cloud</Text>
+            <Text style={[styles.itemTitle, { color: colors.onSurface }]}>Modelo Ativo</Text>
+            <Text style={[styles.itemSub, { color: colors.onSurfaceVariant }]}>Gemini 2.5 Flash / Groq Cloud</Text>
           </View>
         </View>
-        <MaterialIcons name="chevron-right" size={18} color={tokens.colors.outline} />
+        <MaterialIcons name="chevron-right" size={18} color={colors.outline} />
       </View>
 
-      <View style={styles.divider} />
+      <View style={[styles.divider, { backgroundColor: colors.outlineVariant }]} />
 
       <View style={styles.groupItem}>
         <View style={styles.itemLeft}>
-          <View style={styles.itemIconBox}>
-            <MaterialIcons name="bolt" size={18} color={tokens.colors.tertiary} />
+          <View style={[styles.itemIconBox, { backgroundColor: colors.surfaceContainerHigh }]}>
+            <MaterialIcons name="bolt" size={18} color={colors.primary} />
           </View>
           <View style={styles.itemTextCol}>
-            <Text style={styles.itemTitle}>Modo de Resposta</Text>
-            <Text style={styles.itemSub}>Ultra Conciso & Executivo</Text>
+            <Text style={[styles.itemTitle, { color: colors.onSurface }]}>Modo de Resposta</Text>
+            <Text style={[styles.itemSub, { color: colors.onSurfaceVariant }]}>Ultra Conciso & Executivo</Text>
           </View>
         </View>
-        <MaterialIcons name="chevron-right" size={18} color={tokens.colors.outline} />
+        <MaterialIcons name="chevron-right" size={18} color={colors.outline} />
       </View>
 
-      <View style={styles.divider} />
+      <View style={[styles.divider, { backgroundColor: colors.outlineVariant }]} />
 
       <View style={styles.groupItem}>
         <View style={styles.itemLeft}>
-          <View style={styles.itemIconBox}>
-            <MaterialIcons name="calendar-today" size={18} color={tokens.colors.secondary} />
+          <View style={[styles.itemIconBox, { backgroundColor: colors.surfaceContainerHigh }]}>
+            <MaterialIcons name="calendar-today" size={18} color={colors.primary} />
           </View>
           <View style={styles.itemTextCol}>
-            <Text style={styles.itemTitle}>Sincronização de Calendários</Text>
-            <Text style={styles.itemSub}>Google Calendar + Apple iCloud</Text>
+            <Text style={[styles.itemTitle, { color: colors.onSurface }]}>Sincronização de Calendários</Text>
+            <Text style={[styles.itemSub, { color: colors.onSurfaceVariant }]}>Google Calendar + Apple iCloud</Text>
           </View>
         </View>
-        <MaterialIcons name="chevron-right" size={18} color={tokens.colors.outline} />
+        <MaterialIcons name="chevron-right" size={18} color={colors.outline} />
       </View>
 
-      <View style={styles.divider} />
+      <View style={[styles.divider, { backgroundColor: colors.outlineVariant }]} />
 
       <View style={styles.groupItem}>
         <View style={styles.itemLeft}>
-          <View style={styles.itemIconBox}>
-            <MaterialIcons name="mic" size={18} color={tokens.colors.textSecondary} />
+          <View style={[styles.itemIconBox, { backgroundColor: colors.surfaceContainerHigh }]}>
+            <MaterialIcons name="mic" size={18} color={colors.primary} />
           </View>
           <View style={styles.itemTextCol}>
-            <Text style={styles.itemTitle}>Transcrições de Reuniões</Text>
-            <Text style={styles.itemSub}>Whisper local via RPi</Text>
+            <Text style={[styles.itemTitle, { color: colors.onSurface }]}>Transcrições de Reuniões</Text>
+            <Text style={[styles.itemSub, { color: colors.onSurfaceVariant }]}>Whisper local via RPi</Text>
           </View>
         </View>
         <Switch
           value={whisperEnabled}
           onValueChange={setWhisperEnabled}
-          trackColor={{ false: tokens.colors.surfaceContainerHighest, true: tokens.colors.primaryContainer }}
-          thumbColor={whisperEnabled ? tokens.colors.primary : tokens.colors.outline}
+          trackColor={{ false: colors.surfaceContainerHighest, true: colors.primary }}
+          thumbColor={whisperEnabled ? (isDark ? '#FAFAFA' : '#18181B') : colors.outline}
         />
       </View>
     </View>

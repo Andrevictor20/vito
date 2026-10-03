@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens, MD3Shapes } from '../../theme/tokens';
+import { useTheme } from '../../context/ThemeContext';
 
 interface ChatInputDockProps {
   value: string;
@@ -33,6 +34,7 @@ export const ChatInputDock: React.FC<ChatInputDockProps> = ({
   selectedImageUri,
   onClearImage,
 }) => {
+  const { colors, isDark } = useTheme();
   const canSend = (value.trim().length > 0 || !!selectedImageUri) && !loading;
 
   return (
@@ -52,10 +54,10 @@ export const ChatInputDock: React.FC<ChatInputDockProps> = ({
         </View>
       )}
 
-      <View style={styles.capsule}>
+      <View style={[styles.capsule, { backgroundColor: colors.surfaceContainerHigh, borderColor: colors.outlineVariant }]}>
         {/* Botão de Ditado / Microfone Tonal M3 */}
         <TouchableOpacity
-          style={[styles.iconButton, isRecording ? styles.micButtonRecording : styles.micButtonIdle]}
+          style={[styles.iconButton, isRecording ? styles.micButtonRecording : { backgroundColor: colors.surfaceContainerHighest }]}
           onPress={onPressMic}
           activeOpacity={0.7}
           hitSlop={tokens.hitSlop.sm}
@@ -64,15 +66,15 @@ export const ChatInputDock: React.FC<ChatInputDockProps> = ({
           <MaterialIcons
             name={isRecording ? 'stop' : 'mic'}
             size={20}
-            color={isRecording ? tokens.colors.onErrorContainer : tokens.colors.primary}
+            color={isRecording ? colors.onErrorContainer : colors.primary}
           />
         </TouchableOpacity>
 
         {/* Campo de Entrada de Texto M3 */}
         <TextInput
-          style={styles.input}
+          style={[styles.input, { color: colors.onSurface }]}
           placeholder={isRecording ? 'Ouvindo... Toque no botão para concluir' : 'Instrua o Vito ou pergunte algo...'}
-          placeholderTextColor={isRecording ? tokens.colors.error : tokens.colors.onSurfaceVariant}
+          placeholderTextColor={isRecording ? colors.error : colors.onSurfaceVariant}
           value={value}
           onChangeText={onChangeText}
           multiline
@@ -90,25 +92,30 @@ export const ChatInputDock: React.FC<ChatInputDockProps> = ({
             hitSlop={tokens.hitSlop.sm}
             accessibilityLabel="Anexar imagem ou documento"
           >
-            <MaterialIcons name="add-photo-alternate" size={20} color={tokens.colors.onSurfaceVariant} />
+            <MaterialIcons name="add-photo-alternate" size={20} color={colors.onSurfaceVariant} />
           </TouchableOpacity>
         )}
 
         {/* Botão Primário de Envio M3 (Filled Circle) */}
         <TouchableOpacity
-          style={[styles.sendButton, !canSend && styles.sendButtonDisabled]}
+          style={[
+            styles.sendButton,
+            canSend
+              ? { backgroundColor: colors.primary }
+              : { backgroundColor: colors.surfaceContainerHighest, shadowOpacity: 0, elevation: 0 },
+          ]}
           onPress={onSend}
           disabled={!canSend}
           activeOpacity={0.8}
           accessibilityLabel="Enviar mensagem"
         >
           {loading ? (
-            <ActivityIndicator size="small" color={tokens.colors.onPrimary} />
+            <ActivityIndicator size="small" color={colors.onPrimary} />
           ) : (
             <MaterialIcons
               name="arrow-upward"
               size={20}
-              color={canSend ? tokens.colors.onPrimary : tokens.colors.outline}
+              color={canSend ? colors.onPrimary : colors.outline}
             />
           )}
         </TouchableOpacity>

@@ -3,8 +3,10 @@ import { StyleSheet, View, Text, TouchableOpacity, ActivityIndicator } from 'rea
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Updates from 'expo-updates';
 import { tokens, MD3Shapes } from '../../theme/tokens';
+import { useTheme } from '../../context/ThemeContext';
 
 export const UpdateBanner: React.FC = () => {
+  const { colors } = useTheme();
   const { isChecking, isDownloading, isUpdatePending, isUpdateAvailable } = Updates.useUpdates();
 
   if (!isChecking && !isDownloading && !isUpdatePending && !isUpdateAvailable) {
@@ -30,38 +32,46 @@ export const UpdateBanner: React.FC = () => {
   return (
     <View style={styles.container}>
       {isDownloading && (
-        <View style={[styles.banner, styles.bannerDownloading]}>
-          <ActivityIndicator size="small" color={tokens.colors.onPrimaryContainer} />
-          <Text style={[styles.text, styles.textDownloading]}>
+        <View style={[styles.banner, { backgroundColor: colors.primaryContainer, borderColor: colors.primary, justifyContent: 'center' }]}>
+          <ActivityIndicator size="small" color={colors.onPrimaryContainer} />
+          <Text style={[styles.text, { color: colors.onPrimaryContainer }]}>
             Baixando atualização do Vito...
           </Text>
         </View>
       )}
 
       {isUpdatePending && (
-        <View style={[styles.banner, styles.bannerPending]}>
+        <View style={[styles.banner, { backgroundColor: colors.surfaceContainerHighest, borderColor: colors.outlineVariant }]}>
           <View style={styles.leftRow}>
-            <MaterialIcons name="auto-awesome" size={18} color={tokens.colors.onTertiaryContainer} />
-            <Text style={[styles.text, styles.textPending]}>
+            <MaterialIcons name="auto-awesome" size={18} color={colors.primary} />
+            <Text style={[styles.text, { color: colors.onSurface, fontWeight: '700' }]}>
               Nova versão instalada!
             </Text>
           </View>
-          <TouchableOpacity style={styles.restartBtn} onPress={handleReload} activeOpacity={0.8}>
-            <Text style={styles.restartBtnText}>Reiniciar</Text>
+          <TouchableOpacity
+            style={[styles.restartBtn, { backgroundColor: colors.primary }]}
+            onPress={handleReload}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.restartBtnText, { color: colors.onPrimary }]}>Reiniciar</Text>
           </TouchableOpacity>
         </View>
       )}
 
       {isUpdateAvailable && !isDownloading && !isUpdatePending && (
-        <View style={[styles.banner, styles.bannerAvailable]}>
+        <View style={[styles.banner, { backgroundColor: colors.surfaceContainerHigh, borderColor: colors.outlineVariant }]}>
           <View style={styles.leftRow}>
-            <MaterialIcons name="system-update" size={18} color={tokens.colors.onSecondaryContainer} />
-            <Text style={[styles.text, styles.textAvailable]}>
+            <MaterialIcons name="system-update" size={18} color={colors.primary} />
+            <Text style={[styles.text, { color: colors.onSurface }]}>
               Atualização disponível
             </Text>
           </View>
-          <TouchableOpacity style={styles.fetchBtn} onPress={handleFetch} activeOpacity={0.8}>
-            <Text style={styles.fetchBtnText}>Baixar</Text>
+          <TouchableOpacity
+            style={[styles.fetchBtn, { backgroundColor: colors.primary }]}
+            onPress={handleFetch}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.fetchBtnText, { color: colors.onPrimary }]}>Baixar</Text>
           </TouchableOpacity>
         </View>
       )}

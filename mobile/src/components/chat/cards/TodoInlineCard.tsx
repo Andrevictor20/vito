@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens, MD3Shapes } from '../../../theme/tokens';
+import { useTheme } from '../../../context/ThemeContext';
 import { Todo } from '../../../types';
 
 interface TodoInlineCardProps {
@@ -10,6 +11,7 @@ interface TodoInlineCardProps {
 }
 
 export const TodoInlineCard: React.FC<TodoInlineCardProps> = ({ todo, onToggle }) => {
+  const { colors, isDark } = useTheme();
   const [completed, setCompleted] = useState(todo.status === 'completed');
 
   const handleToggle = () => {
@@ -22,35 +24,48 @@ export const TodoInlineCard: React.FC<TodoInlineCardProps> = ({ todo, onToggle }
 
   const priorityColor =
     todo.priority === 'high'
-      ? { bg: tokens.colors.errorContainer, text: tokens.colors.error, label: 'ALTA' }
+      ? { bg: colors.errorContainer, text: colors.onErrorContainer, label: 'ALTA' }
       : todo.priority === 'medium'
-      ? { bg: 'rgba(255, 217, 102, 0.16)', text: tokens.colors.warning, label: 'MÉDIA' }
-      : { bg: tokens.colors.surfaceContainerHighest, text: tokens.colors.onSurfaceVariant, label: 'BAIXA' };
+      ? { bg: isDark ? 'rgba(251, 191, 36, 0.18)' : 'rgba(245, 158, 11, 0.12)', text: colors.warning, label: 'MÉDIA' }
+      : { bg: colors.surfaceContainerHighest, text: colors.onSurfaceVariant, label: 'BAIXA' };
 
   return (
-    <View style={[styles.card, completed && styles.cardCompleted]}>
+    <View
+      style={[
+        styles.card,
+        { backgroundColor: colors.surfaceContainerHigh, borderColor: colors.outlineVariant },
+        completed && [styles.cardCompleted, { backgroundColor: colors.surfaceContainerLow }],
+      ]}
+    >
       <View style={styles.leftGroup}>
         {/* Checkbox Circular M3 */}
         <TouchableOpacity
-          style={[styles.checkbox, completed && styles.checkboxCompleted]}
+          style={[
+            styles.checkbox,
+            { borderColor: completed ? colors.primary : colors.outline },
+            completed && { backgroundColor: colors.primary },
+          ]}
           onPress={handleToggle}
           activeOpacity={0.8}
           accessibilityRole="checkbox"
           accessibilityState={{ checked: completed }}
         >
           {completed && (
-            <MaterialIcons name="done" size={14} color={tokens.colors.onPrimary} />
+            <MaterialIcons name="done" size={14} color={colors.onPrimary} />
           )}
         </TouchableOpacity>
 
         <View style={styles.titleCol}>
           <Text
-            style={[styles.title, completed && styles.titleCompleted]}
+            style={[
+              styles.title,
+              { color: completed ? colors.textMuted : colors.onSurface },
+            ]}
             numberOfLines={1}
           >
             {todo.title}
           </Text>
-          <Text style={styles.subtitle}>
+          <Text style={[styles.subtitle, { color: colors.textMuted }]}>
             {completed ? 'Concluída com sucesso' : 'Prazo estimado: hoje'}
           </Text>
         </View>

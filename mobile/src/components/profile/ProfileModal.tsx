@@ -11,6 +11,7 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens } from '../../theme/tokens';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
 import { ProfileUserCard } from './ProfileUserCard';
 import { ProfileNodeCard } from './ProfileNodeCard';
 import { ProfileSettingsGroup } from './ProfileSettingsGroup';
@@ -30,6 +31,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   onToggleServer,
 }) => {
   const { user, logout } = useAuth();
+  const { colors, isDark } = useTheme();
   const isCloud = isCloudServer(serverUrl);
   const name = user?.name || 'Andre Victor';
   const email = user?.email || 'andre@vito.ai';
@@ -44,17 +46,17 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
       <TouchableWithoutFeedback onPress={onClose}>
         <View style={styles.overlay}>
           <TouchableWithoutFeedback>
-            <View style={styles.sheet}>
+            <View style={[styles.sheet, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
               {/* Grab Bar & Close Action */}
               <View style={styles.sheetHeader}>
-                <View style={styles.grabBar} />
+                <View style={[styles.grabBar, { backgroundColor: colors.outlineVariant }]} />
                 <TouchableOpacity
                   style={styles.closeBtn}
                   onPress={onClose}
                   hitSlop={tokens.hitSlop.sm}
                   accessibilityLabel="Fechar perfil"
                 >
-                  <MaterialIcons name="close" size={18} color={tokens.colors.textSecondary} />
+                  <MaterialIcons name="close" size={18} color={colors.textSecondary} />
                 </TouchableOpacity>
               </View>
 
@@ -64,7 +66,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
                 {/* Seção: Servidor & Conexão Stitch */}
                 <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionTitle}>SERVIDOR & CONEXÃO</Text>
+                  <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>SERVIDOR & CONEXÃO</Text>
                   <View style={styles.onlineBadge}>
                     <View style={styles.onlineDot} />
                     <Text style={styles.onlineText}>Online • 24ms</Text>
@@ -75,7 +77,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
                 {/* Seção: Assistente Executivo & IA */}
                 <View style={[styles.sectionHeader, { marginTop: tokens.spacing.md }]}>
-                  <Text style={styles.sectionTitle}>ASSISTENTE EXECUTIVO & IA</Text>
+                  <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>ASSISTENTE EXECUTIVO & IA</Text>
                 </View>
 
                 <ProfileSettingsGroup />
@@ -83,15 +85,15 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 {/* Ações da Sessão */}
                 <View style={styles.actionsGroup}>
                   <TouchableOpacity
-                    style={styles.actionButton}
+                    style={[styles.actionButton, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}
                     onPress={handleLogout}
                     activeOpacity={0.8}
                   >
                     <View style={styles.actionLeft}>
-                      <MaterialIcons name="switch-account" size={18} color={tokens.colors.textSecondary} />
-                      <Text style={styles.actionText}>Trocar de Conta</Text>
+                      <MaterialIcons name="switch-account" size={18} color={colors.onSurfaceVariant} />
+                      <Text style={[styles.actionText, { color: colors.onSurface }]}>Trocar de Conta</Text>
                     </View>
-                    <MaterialIcons name="chevron-right" size={18} color={tokens.colors.outline} />
+                    <MaterialIcons name="chevron-right" size={18} color={colors.outline} />
                   </TouchableOpacity>
 
                   <TouchableOpacity
@@ -100,10 +102,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                     activeOpacity={0.8}
                   >
                     <View style={styles.actionLeft}>
-                      <MaterialIcons name="logout" size={18} color={tokens.colors.danger} />
+                      <MaterialIcons name="logout" size={18} color={colors.danger} />
                       <Text style={[styles.actionText, styles.logoutText]}>Encerrar Sessão</Text>
                     </View>
-                    <MaterialIcons name="chevron-right" size={18} color={tokens.colors.danger} />
+                    <MaterialIcons name="chevron-right" size={18} color={colors.danger} />
                   </TouchableOpacity>
                 </View>
               </ScrollView>

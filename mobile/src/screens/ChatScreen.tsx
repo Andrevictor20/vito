@@ -21,6 +21,7 @@ import { ChatQuickChips } from '../components/chat/ChatQuickChips';
 import { ChatInputDock } from '../components/chat/ChatInputDock';
 import { ConversationHistoryModal } from '../components/chat/ConversationHistoryModal';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { SafeAudioRecorder } from '../services/audioRecorder';
 
 interface ChatScreenProps {
@@ -35,8 +36,20 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
   onKeyboardStateChange,
 }) => {
   const { user } = useAuth();
+  const { colors, isDark, toggleTheme } = useTheme();
   const firstName = user?.name ? user.name.split(' ')[0] : 'Usuário';
-  const { messages, loading, sendMessage, sendAudio, sendImage, clearHistory } = useChat(onDataChanged);
+  const {
+    messages,
+    loading,
+    sessions,
+    sendMessage,
+    sendAudio,
+    sendImage,
+    clearHistory,
+    startNewConversation,
+    switchConversation,
+    deleteConversation,
+  } = useChat(onDataChanged);
   const [inputText, setInputText] = useState('');
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
   const [historyVisible, setHistoryVisible] = useState(false);
@@ -162,52 +175,54 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: colors.surface }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 44 : 0}
     >
-      {/* Top App Bar M3 com Ícone do Assistente e Ações */}
-      <View style={styles.topAppBar}>
+      {/* Top App Bar Minimalista & Despoluída estilo ChatGPT/Linear */}
+      <View style={[styles.topAppBar, { backgroundColor: colors.surface, borderBottomColor: colors.outlineVariant }]}>
         <View style={styles.topAppBarLeft}>
-          <View style={styles.assistantIconBox}>
-            <MaterialIcons name="auto-awesome" size={20} color={tokens.colors.primary} />
+          <View style={styles.brandRow}>
+            <Text style={[styles.chatBrand, { color: colors.onSurface }]}>vito</Text>
+            <View style={[styles.statusDot, { backgroundColor: colors.statusOnline }]} />
           </View>
-          <View style={styles.titleColumn}>
-            <Text style={styles.chatTitle}>Vito Assistant</Text>
-            <Text style={styles.chatSubtitle}>Suas conversas e planos</Text>
-          </View>
+          <Text style={[styles.chatSubtitle, { color: colors.textMuted }]}>assistente ia</Text>
         </View>
 
         <View style={styles.topAppBarRight}>
           <TouchableOpacity
-            style={styles.iconActionButton}
+            style={[styles.iconActionButton, { backgroundColor: colors.surfaceContainerLow, borderColor: colors.outlineVariant }]}
             onPress={() => setHistoryVisible(true)}
             activeOpacity={0.7}
             hitSlop={tokens.hitSlop.sm}
             accessibilityLabel="Histórico de conversas"
           >
-            <MaterialIcons name="menu" size={22} color={tokens.colors.onSurface} />
+            <MaterialIcons name="forum" size={18} color={colors.onSurface} />
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.iconActionButton}
-            onPress={clearHistory}
+            style={[styles.iconActionButton, { backgroundColor: colors.surfaceContainerLow, borderColor: colors.outlineVariant }]}
+            onPress={toggleTheme}
             activeOpacity={0.7}
             hitSlop={tokens.hitSlop.sm}
-            accessibilityLabel="Limpar histórico do chat"
+            accessibilityLabel={isDark ? 'Mudar para tema claro' : 'Mudar para tema escuro'}
           >
-            <MaterialIcons name="delete-outline" size={20} color={tokens.colors.onSurfaceVariant} />
+            <MaterialIcons
+              name={isDark ? 'light-mode' : 'dark-mode'}
+              size={18}
+              color={colors.onSurface}
+            />
           </TouchableOpacity>
 
           {user && (
             <TouchableOpacity
-              style={styles.userAvatar}
+              style={[styles.userAvatar, { backgroundColor: colors.surfaceContainerHighest, borderColor: colors.outlineVariant }]}
               onPress={onPressProfile}
               activeOpacity={0.75}
               accessibilityLabel="Perfil e Configurações"
               hitSlop={tokens.hitSlop.sm}
             >
-              <Text style={styles.avatarText}>{firstName.charAt(0).toUpperCase()}</Text>
+              <Text style={[styles.avatarText, { color: colors.onSurface }]}>{firstName.charAt(0).toUpperCase()}</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -227,9 +242,9 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
         keyboardShouldPersistTaps="handled"
         ListFooterComponent={
           loading ? (
-            <View style={styles.loadingBubble}>
-              <ActivityIndicator size="small" color={tokens.colors.primary} />
-              <Text style={styles.loadingText}>Vito está organizando...</Text>
+            <View style={[styles.loadingBubble, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
+              <ActivityIndicator size="small" color={colors.primary} />
+              <Text style={[styles.loadingText, { color: colors.onSurfaceVariant }]}>Vito está organizando...</Text>
             </View>
           ) : null
         }
@@ -266,7 +281,10 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
       <ConversationHistoryModal
         visible={historyVisible}
         onClose={() => setHistoryVisible(false)}
-        onNewChat={clearHistory}
+        onNewChat={startNewConversation}
+        conversations={sessions}
+        onSelectConversation={switchConversation}
+        onDeleteConversation={deleteConversation}
       />
     </KeyboardAvoidingView>
   );
@@ -289,31 +307,29 @@ const styles = StyleSheet.create({
     backgroundColor: tokens.colors.surface,
   },
   topAppBarLeft: {
+    flexDirection: 'column',
+    justifyContent: 'center',
+    gap: 1,
+  },
+  brandRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: tokens.spacing.sm + 2,
+    gap: 6,
   },
-  assistantIconBox: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    backgroundColor: tokens.colors.primaryContainer,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  titleColumn: {
-    flexDirection: 'column',
-    gap: 2,
-  },
-  chatTitle: {
-    fontSize: tokens.typography.size.titleSmall,
+  chatBrand: {
+    fontSize: 18,
     fontWeight: tokens.typography.weight.bold,
-    color: tokens.colors.onSurface,
+    letterSpacing: -0.5,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
   chatSubtitle: {
     fontSize: 10,
-    color: tokens.colors.textMuted,
     fontWeight: tokens.typography.weight.medium,
+    letterSpacing: 0.3,
   },
   topAppBarRight: {
     flexDirection: 'row',

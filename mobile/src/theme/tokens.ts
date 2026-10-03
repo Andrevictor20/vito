@@ -12,161 +12,161 @@ export const MD3Shapes = {
 };
 
 export const lightColors = {
-  // M3 System Primary & Tonal Containers (Material Design 3 Canonical Light)
-  primary: '#6750A4',              // md.sys.color.primary (Acentos primários, botões ativos, FAB)
-  onPrimary: '#FFFFFF',            // md.sys.color.on-primary (Texto/ícones sobre primary)
-  primaryContainer: '#EADDFF',     // md.sys.color.primary-container (Pílulas ativas, balões de chat do usuário)
-  onPrimaryContainer: '#21005D',   // md.sys.color.on-primary-container (Texto sobre primary-container)
-  primaryHover: '#5B4495',
-  primaryLight: 'rgba(103, 80, 164, 0.12)',
-  cobalt: '#6750A4',
-  cobaltGlow: 'rgba(103, 80, 164, 0.16)',
+  // M3 System Primary & Tonal Containers (Executive Black & White Light)
+  primary: '#18181B',              // md.sys.color.primary (Preto / grafite profundo)
+  onPrimary: '#FFFFFF',            // md.sys.color.on-primary (Branco sobre preto)
+  primaryContainer: '#27272A',     // md.sys.color.primary-container
+  onPrimaryContainer: '#FAFAFA',   // md.sys.color.on-primary-container
+  primaryHover: '#27272A',
+  primaryLight: 'rgba(24, 24, 27, 0.08)',
+  cobalt: '#18181B',
+  cobaltGlow: 'rgba(24, 24, 27, 0.12)',
 
   // M3 System Secondary & Tertiary
-  secondary: '#625B71',            // md.sys.color.secondary (Ações secundárias, chips)
+  secondary: '#3F3F46',            // md.sys.color.secondary (Ações secundárias, chips)
   onSecondary: '#FFFFFF',          // md.sys.color.on-secondary
-  secondaryContainer: '#E8DEF8',   // md.sys.color.secondary-container (Chips ativos, pílulas secundárias)
-  onSecondaryContainer: '#1D192B', // md.sys.color.on-secondary-container
-  tertiary: '#7D5260',             // md.sys.color.tertiary
+  secondaryContainer: '#F4F4F5',   // md.sys.color.secondary-container
+  onSecondaryContainer: '#18181B', // md.sys.color.on-secondary-container
+  tertiary: '#52525B',             // md.sys.color.tertiary
   onTertiary: '#FFFFFF',
-  tertiaryContainer: '#FFD8E4',
-  onTertiaryContainer: '#31111D',
+  tertiaryContainer: '#F4F4F5',
+  onTertiaryContainer: '#18181B',
 
-  // M3 Surface & Tonal Surface Containers (Material 3 Tonal Elevation Light)
-  bg: '#FEF7FF',                   // md.sys.color.surface
-  canvas: '#FEF7FF',               // md.sys.color.surface-dim
-  surface: '#FEF7FF',              // md.sys.color.surface (Fundo base)
-  surfaceDim: '#DED8E1',           // md.sys.color.surface-dim
-  surfaceBright: '#FEF7FF',        // md.sys.color.surface-bright
-  surfaceSubtle: '#F7F2FA',
-  surfaceElevated: '#ECE6F0',
+  // M3 Surface & Tonal Surface Containers (Pure Clean White & Soft Neutrals)
+  bg: '#FFFFFF',                   // Fundo base puro
+  canvas: '#FFFFFF',
+  surface: '#FFFFFF',              // Superfície branca limpa (sem lilás)
+  surfaceDim: '#F4F4F5',
+  surfaceBright: '#FFFFFF',
+  surfaceSubtle: '#FAFAFA',
+  surfaceElevated: '#FFFFFF',
 
   // Camadas de Profundidade por Tonalidade (M3 Surface Containers)
   surfaceContainerLowest: '#FFFFFF', // Nível 0
-  surfaceContainerLow: '#F7F2FA',    // Nível 1 (Fundos de listas agrupadas, cartões sutis)
-  surfaceContainer: '#F3EDF7',       // Nível 2 (Fundo de cards e containers padrão)
-  surfaceContainerHigh: '#ECE6F0',   // Nível 3 (Fundo de balões do assistente, modais, menus)
-  surfaceContainerHighest: '#E6E0E9',// Nível 4 (Hover, estados pressionados, chips)
+  surfaceContainerLow: '#FAFAFA',    // Nível 1 (Fundos de listas agrupadas, cartões sutis)
+  surfaceContainer: '#F4F4F5',       // Nível 2 (Fundo de cards e containers padrão neutros)
+  surfaceContainerHigh: '#E4E4E7',   // Nível 3 (Fundo de balões, modais)
+  surfaceContainerHighest: '#D4D4D8',// Nível 4 (Hover, estados pressionados, chips)
 
   // M3 Typography & Content Colors (WCAG AA Contrast)
-  onSurface: '#1D1B20',              // Texto primário em superfícies
-  onSurfaceVariant: '#49454F',       // Texto secundário/apoio
-  textPrimary: '#1D1B20',            // Retrocompatibilidade
-  textSecondary: '#49454F',          // Retrocompatibilidade
-  textMuted: '#79747E',              // Texto desativado / metadados
+  onSurface: '#09090B',              // Texto primário em superfícies (preto nítido)
+  onSurfaceVariant: '#3F3F46',       // Texto secundário/apoio
+  textPrimary: '#09090B',            // Retrocompatibilidade
+  textSecondary: '#52525B',          // Retrocompatibilidade
+  textMuted: '#71717A',              // Texto desativado / metadados
 
   // M3 Outlines & Borders
-  outline: '#79747E',                // md.sys.color.outline (Bordas de cards Outlined, inputs)
-  outlineVariant: '#CAC4D0',         // md.sys.color.outline-variant (Divisores, separadores)
-  surfaceBorder: '#CAC4D0',          // Retrocompatibilidade
-  structuralBorder: '#E6E0E9',       // Retrocompatibilidade
+  outline: '#71717A',                // md.sys.color.outline
+  outlineVariant: '#E4E4E7',         // md.sys.color.outline-variant (Divisores neutros sutis)
+  surfaceBorder: '#E4E4E7',          // Retrocompatibilidade
+  structuralBorder: '#D4D4D8',       // Retrocompatibilidade
 
   // M3 Error & Status
-  error: '#B3261E',                  // md.sys.color.error
-  onError: '#FFFFFF',                // md.sys.color.on-error
-  errorContainer: '#F9DEDC',         // md.sys.color.error-container
-  onErrorContainer: '#410E0B',       // md.sys.color.on-error-container
-  danger: '#B3261E',                 // Retrocompatibilidade
-  dangerContainer: '#F9DEDC',        // Retrocompatibilidade
-  dangerLight: 'rgba(179, 38, 30, 0.12)',
+  error: '#EF4444',
+  onError: '#FFFFFF',
+  errorContainer: '#FEE2E2',
+  onErrorContainer: '#7F1D1D',
+  danger: '#EF4444',
+  dangerContainer: '#FEE2E2',
+  dangerLight: 'rgba(239, 68, 68, 0.12)',
 
   // Status Semânticos e Badges de Categoria M3
-  success: '#2E6C38',
+  success: '#10B981',
   onSuccess: '#FFFFFF',
-  successContainer: '#B8F5B8',
-  onSuccessContainer: '#002107',
-  successLight: 'rgba(46, 108, 56, 0.12)',
-  warning: '#7B4B14',
-  warningLight: 'rgba(123, 75, 20, 0.12)',
-  statusOnline: '#55A46B',
-  categoryBirthdayBg: '#FFE7C5',
-  categoryBirthdayText: '#7B4B14',
-  categoryPartyBg: '#E8DEF8',
-  categoryPartyText: '#1D192B',
-  categoryBbqBg: '#FFD8E4',
-  categoryBbqText: '#31111D',
+  successContainer: '#D1FAE5',
+  onSuccessContainer: '#064E3B',
+  successLight: 'rgba(16, 185, 129, 0.12)',
+  warning: '#F59E0B',
+  warningLight: 'rgba(245, 158, 11, 0.12)',
+  statusOnline: '#10B981',
+  categoryBirthdayBg: '#FEF3C7',
+  categoryBirthdayText: '#92400E',
+  categoryPartyBg: '#E0E7FF',
+  categoryPartyText: '#3730A3',
+  categoryBbqBg: '#FEE2E2',
+  categoryBbqText: '#991B1B',
 
   // Retrocompatibilidade adicional
-  accent: '#6750A4',
-  accentLight: 'rgba(103, 80, 164, 0.12)',
+  accent: '#18181B',
+  accentLight: 'rgba(24, 24, 27, 0.08)',
 };
 
 export const darkColors = {
-  // M3 System Primary & Tonal Containers (Material Design 3 Canonical Dark)
-  primary: '#D0BCFF',              // md.sys.color.primary (Roxo claro para superfície escura)
-  onPrimary: '#381E72',            // md.sys.color.on-primary
-  primaryContainer: '#4F378B',     // md.sys.color.primary-container
-  onPrimaryContainer: '#EADDFF',   // md.sys.color.on-primary-container
-  primaryHover: '#6750A4',
-  primaryLight: 'rgba(208, 188, 255, 0.14)',
-  cobalt: '#D0BCFF',
-  cobaltGlow: 'rgba(208, 188, 255, 0.16)',
+  // M3 System Primary & Tonal Containers (Executive Slate / ChatGPT Dark Style)
+  primary: '#FFFFFF',              // md.sys.color.primary (Branco puro sobre botão escuro)
+  onPrimary: '#171717',            // md.sys.color.on-primary (Preto suave sobre botão branco)
+  primaryContainer: '#2F2F2F',     // md.sys.color.primary-container (Cinza grafite estilo ChatGPT)
+  onPrimaryContainer: '#ECECEC',   // md.sys.color.on-primary-container
+  primaryHover: '#E4E4E7',
+  primaryLight: 'rgba(255, 255, 255, 0.08)',
+  cobalt: '#FFFFFF',
+  cobaltGlow: 'rgba(255, 255, 255, 0.12)',
 
   // M3 System Secondary & Tertiary
-  secondary: '#CCC2DC',
-  onSecondary: '#332D41',
-  secondaryContainer: '#4A4458',
-  onSecondaryContainer: '#E8DEF8',
-  tertiary: '#EFB8C8',
-  onTertiary: '#492532',
-  tertiaryContainer: '#633B48',
-  onTertiaryContainer: '#FFD8E4',
+  secondary: '#B4B4B4',            // md.sys.color.secondary
+  onSecondary: '#171717',
+  secondaryContainer: '#2A2A2A',
+  onSecondaryContainer: '#ECECEC',
+  tertiary: '#D4D4D8',
+  onTertiary: '#171717',
+  tertiaryContainer: '#2A2A2A',
+  onTertiaryContainer: '#ECECEC',
 
-  // M3 Surface & Tonal Surface Containers (Material 3 Tonal Elevation Dark)
-  bg: '#141218',
-  canvas: '#141218',
-  surface: '#141218',
-  surfaceDim: '#141218',
-  surfaceBright: '#3B383E',
-  surfaceSubtle: '#1D1B20',
-  surfaceElevated: '#2B2930',
+  // M3 Surface & Tonal Surface Containers (Cinza Escuro estilo ChatGPT + Preto suave)
+  bg: '#212121',                   // Cinza escuro ChatGPT base (sem full black agressivo)
+  canvas: '#212121',
+  surface: '#212121',              // Fundo principal suave
+  surfaceDim: '#171717',           // Preto suave para barras ou áreas profundas
+  surfaceBright: '#2F2F2F',        // Cinza médio-escuro
+  surfaceSubtle: '#1C1C1E',        // Superfície intermediária
+  surfaceElevated: '#2A2A2A',      // Cards elevados e modais
 
-  surfaceContainerLowest: '#0F0D13',
-  surfaceContainerLow: '#1D1B20',
-  surfaceContainer: '#211F26',
-  surfaceContainerHigh: '#2B2930',
-  surfaceContainerHighest: '#36343B',
+  surfaceContainerLowest: '#171717',
+  surfaceContainerLow: '#1E1E1E',
+  surfaceContainer: '#262626',     // Cards padrão de eventos e tarefas
+  surfaceContainerHigh: '#2F2F2F', // Balões de mensagem, modais
+  surfaceContainerHighest: '#383838', // Chips selecionados, botões
 
   // M3 Typography & Content Colors (WCAG AA Contrast)
-  onSurface: '#E6E0E9',
-  onSurfaceVariant: '#CAC4D0',
-  textPrimary: '#E6E0E9',
-  textSecondary: '#CAC4D0',
-  textMuted: '#938F99',
+  onSurface: '#ECECEC',            // Texto nítido confortável estilo ChatGPT
+  onSurfaceVariant: '#B4B4B4',     // Texto secundário claro
+  textPrimary: '#ECECEC',          // Retrocompatibilidade
+  textSecondary: '#B4B4B4',        // Retrocompatibilidade
+  textMuted: '#8E8E93',            // Metadados
 
   // M3 Outlines & Borders
-  outline: '#938F99',
-  outlineVariant: '#49454F',
-  surfaceBorder: '#49454F',
-  structuralBorder: '#2B2930',
+  outline: '#8E8E93',
+  outlineVariant: '#383838',       // Bordas sutis e nítidas no tema escuro
+  surfaceBorder: '#383838',
+  structuralBorder: '#484848',
 
   // M3 Error & Status
-  error: '#F2B8B5',
-  onError: '#601410',
-  errorContainer: '#8C1D18',
-  onErrorContainer: '#F9DEDC',
-  danger: '#F2B8B5',
-  dangerContainer: '#8C1D18',
-  dangerLight: 'rgba(242, 184, 181, 0.16)',
+  error: '#F87171',
+  onError: '#450A0A',
+  errorContainer: '#7F1D1D',
+  onErrorContainer: '#FEE2E2',
+  danger: '#F87171',
+  dangerContainer: '#7F1D1D',
+  dangerLight: 'rgba(248, 113, 113, 0.16)',
 
   // Status Semânticos e Badges de Categoria M3
-  success: '#82D996',
-  onSuccess: '#003914',
-  successContainer: '#005322',
-  onSuccessContainer: '#9EF6B0',
-  successLight: 'rgba(130, 217, 150, 0.16)',
-  warning: '#FFD966',
-  warningLight: 'rgba(255, 217, 102, 0.16)',
-  statusOnline: '#55A46B',
-  categoryBirthdayBg: '#4A3419',
-  categoryBirthdayText: '#FFDCC1',
-  categoryPartyBg: '#4A4458',
-  categoryPartyText: '#E8DEF8',
-  categoryBbqBg: '#633B48',
-  categoryBbqText: '#FFD8E4',
+  success: '#34D399',
+  onSuccess: '#064E3B',
+  successContainer: '#065F46',
+  onSuccessContainer: '#A7F3D0',
+  successLight: 'rgba(52, 211, 153, 0.16)',
+  warning: '#FBBF24',
+  warningLight: 'rgba(251, 191, 36, 0.16)',
+  statusOnline: '#34D399',
+  categoryBirthdayBg: '#451A03',
+  categoryBirthdayText: '#FDE68A',
+  categoryPartyBg: '#1E1B4B',
+  categoryPartyText: '#C7D2FE',
+  categoryBbqBg: '#450A0A',
+  categoryBbqText: '#FECACA',
 
-  accent: '#D0BCFF',
-  accentLight: 'rgba(208, 188, 255, 0.14)',
+  accent: '#FAFAFA',
+  accentLight: 'rgba(250, 250, 250, 0.12)',
 };
 
 export type ThemeColors = typeof lightColors;

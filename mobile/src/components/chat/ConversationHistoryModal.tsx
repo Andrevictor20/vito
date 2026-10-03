@@ -10,40 +10,46 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens, MD3Shapes } from '../../theme/tokens';
+import { ConversationSession } from '../../types';
+import { useTheme } from '../../context/ThemeContext';
 
 interface ConversationHistoryModalProps {
   visible: boolean;
   onClose: () => void;
   onNewChat: () => void;
+  conversations: ConversationSession[];
+  onSelectConversation: (id: string) => void;
+  onDeleteConversation?: (id: string) => void;
 }
 
-const mockConversations = [
-  {
-    id: '1',
-    title: 'Churrasco de Aniversário',
-    preview: 'Vamos revisar o checklist de bebidas e carnes?',
-    time: 'Hoje',
-    active: true,
-  },
-  {
-    id: '2',
-    title: 'Festa da Família',
-    preview: 'Encontrei 3 ideias de temas e sugestões de pratos.',
-    time: 'Ontem',
-  },
-  {
-    id: '3',
-    title: 'Jantar para 15 Convidados',
-    preview: 'Cálculo de bebidas estimado em 18 litros.',
-    time: '12 out',
-  },
-];
+function formatRelativeTime(dateStr: string): string {
+  try {
+    const d = new Date(dateStr);
+    const now = new Date();
+    const isToday =
+      d.getDate() === now.getDate() &&
+      d.getMonth() === now.getMonth() &&
+      d.getFullYear() === now.getFullYear();
+
+    if (isToday) {
+      return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    }
+    return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).replace('.', '');
+  } catch {
+    return 'Recente';
+  }
+}
 
 export const ConversationHistoryModal: React.FC<ConversationHistoryModalProps> = ({
   visible,
   onClose,
   onNewChat,
+  conversations,
+  onSelectConversation,
+  onDeleteConversation,
 }) => {
+  const { colors, isDark } = useTheme();
+
   return (
     <Modal
       visible={visible}
@@ -51,62 +57,129 @@ export const ConversationHistoryModal: React.FC<ConversationHistoryModalProps> =
       presentationStyle="pageSheet"
       onRequestClose={onClose}
     >
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.container}>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.surface }]}>
+        <View style={[styles.container, { backgroundColor: colors.surface }]}>
           {/* Header M3 */}
-          <View style={styles.header}>
+          <View style={[styles.header, { borderBottomColor: colors.outlineVariant }]}>
             <TouchableOpacity
-              style={styles.backBtn}
+              style={[styles.backBtn, { backgroundColor: colors.surfaceContainerLow }]}
               onPress={onClose}
               activeOpacity={0.7}
               accessibilityLabel="Fechar histórico"
-              hitSlop={tokens.hitSlop.sm}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <MaterialIcons name="arrow-back" size={24} color={tokens.colors.onSurface} />
+              <MaterialIcons name="arrow-back" size={22} color={colors.onSurface} />
             </TouchableOpacity>
 
             <View style={styles.headerTextCol}>
-              <Text style={styles.headerTitle}>Conversas</Text>
-              <Text style={styles.headerSub}>Continue de onde parou</Text>
+              <Text style={[styles.headerTitle, { color: colors.onSurface }]}>Conversas</Text>
+              <Text style={[styles.headerSub, { color: colors.textSecondary }]}>
+                Continue de onde parou ({conversations.length})
+              </Text>
             </View>
           </View>
 
-          {/* Lista de Conversas Recentes */}
-          <ScrollView contentContainerStyle={styles.listContent}>
-            {mockConversations.map((conv) => (
-              <TouchableOpacity
-                key={conv.id}
-                style={[styles.convCard, conv.active && styles.convCardActive]}
-                onPress={onClose}
-                activeOpacity={0.75}
-              >
-                <View style={styles.convIcon}>
-                  <MaterialIcons
-                    name="chat-bubble-outline"
-                    size={20}
-                    color={tokens.colors.primary}
-                  />
+          {/* Lista de Conversas Reais */}
+          <ScrollView
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {conversations.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <View style={[styles.emptyIconBox, { backgroundColor: colors.surfaceContainer }]}>
+                  <MaterialIcons name="chat" size={32} color={colors.outline} />
                 </View>
+                <Text style={[styles.emptyTitle, { color: colors.onSurface }]}>
+                  Nenhuma conversa encontrada
+                </Text>
+                <Text style={[styles.emptySub, { color: colors.textMuted }]}>
+                  Suas trocas de mensagens com o Vito aparecerão listadas aqui para você retomar quando quiser.
+                </Text>
+              </View>
+            ) : (
+              conversations.map((conv) => {
+                const isActive = !!conv.active;
+                return (
+                  <TouchableOpacity
+                    key={conv.id}
+                    style={[
+                      styles.convCard,
+                      {
+                        backgroundColor: isActive
+                          ? isDark
+                            ? colors.surfaceContainerHighest
+                            : '#F4F4F5'
+                          : colors.surfaceContainerLow,
+                        borderColor: isActive ? colors.primary : colors.outlineVariant,
+                      },
+                    ]}
+                    onPress={() => {
+                      onSelectConversation(conv.id);
+                      onClose();
+                    }}
+                    activeOpacity={0.75}
+                  >
+                    <View
+                      style={[
+                        styles.convIcon,
+                        {
+                          backgroundColor: isActive ? colors.primary : colors.surfaceContainerHighest,
+                        },
+                      ]}
+                    >
+                      <MaterialIcons
+                        name="chat-bubble-outline"
+                        size={18}
+                        color={isActive ? colors.onPrimary : colors.textPrimary}
+                      />
+                    </View>
 
-                <View style={styles.convDetails}>
-                  <View style={styles.convTitleRow}>
-                    <Text style={styles.convTitle} numberOfLines={1}>
-                      {conv.title}
-                    </Text>
-                    <Text style={styles.convTime}>{conv.time}</Text>
-                  </View>
-                  <Text style={styles.convPreview} numberOfLines={1}>
-                    {conv.preview}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            ))}
+                    <View style={styles.convDetails}>
+                      <View style={styles.convTitleRow}>
+                        <Text
+                          style={[
+                            styles.convTitle,
+                            {
+                              color: colors.onSurface,
+                              fontWeight: isActive ? '700' : '600',
+                            },
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {conv.title || 'Conversa'}
+                        </Text>
+                        <Text style={[styles.convTime, { color: colors.textMuted }]}>
+                          {formatRelativeTime(conv.timestamp)}
+                        </Text>
+                      </View>
+                      <Text
+                        style={[styles.convPreview, { color: colors.textSecondary }]}
+                        numberOfLines={1}
+                      >
+                        {conv.preview || 'Sem mensagens'}
+                      </Text>
+                    </View>
+
+                    {onDeleteConversation && conversations.length > 1 && (
+                      <TouchableOpacity
+                        style={styles.deleteBtn}
+                        onPress={() => onDeleteConversation(conv.id)}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        accessibilityLabel="Excluir conversa"
+                      >
+                        <MaterialIcons name="delete-outline" size={18} color={colors.outline} />
+                      </TouchableOpacity>
+                    )}
+                  </TouchableOpacity>
+                );
+              })
+            )}
           </ScrollView>
 
           {/* Botão Inferior: Nova Conversa */}
-          <View style={styles.footer}>
+          <View style={[styles.footer, { borderTopColor: colors.outlineVariant }]}>
             <TouchableOpacity
-              style={styles.newChatBtn}
+              style={[styles.newChatBtn, { backgroundColor: colors.primary }]}
               onPress={() => {
                 onClose();
                 onNewChat();
@@ -114,8 +187,10 @@ export const ConversationHistoryModal: React.FC<ConversationHistoryModalProps> =
               activeOpacity={0.85}
               accessibilityLabel="Iniciar nova conversa"
             >
-              <MaterialIcons name="add" size={20} color={tokens.colors.onPrimary} />
-              <Text style={styles.newChatBtnText}>Nova conversa</Text>
+              <MaterialIcons name="add" size={20} color={colors.onPrimary} />
+              <Text style={[styles.newChatBtnText, { color: colors.onPrimary }]}>
+                Nova conversa
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -227,5 +302,34 @@ const styles = StyleSheet.create({
     color: tokens.colors.onPrimary,
     fontSize: tokens.typography.size.labelLarge,
     fontWeight: tokens.typography.weight.bold,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 48,
+    paddingHorizontal: 24,
+    gap: 8,
+  },
+  emptyIconBox: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  emptySub: {
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  deleteBtn: {
+    padding: 6,
+    marginLeft: 4,
   },
 });

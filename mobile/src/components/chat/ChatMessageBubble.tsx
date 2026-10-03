@@ -3,6 +3,7 @@ import { StyleSheet, View, Text, Image } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens, MD3Shapes } from '../../theme/tokens';
 import { ChatMessage } from '../../types';
+import { useTheme } from '../../context/ThemeContext';
 import { EventInlineCard } from './cards/EventInlineCard';
 import { ConflictInlineCard } from './cards/ConflictInlineCard';
 import { TodoInlineCard } from './cards/TodoInlineCard';
@@ -12,21 +13,50 @@ interface ChatMessageBubbleProps {
 }
 
 export const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({ message }) => {
+  const { colors, isDark } = useTheme();
   const isUser = message.sender === 'user';
 
   return (
     <View style={[styles.messageRow, isUser ? styles.messageRowUser : styles.messageRowVito]}>
       {!isUser && (
-        <View style={styles.vitoAvatar}>
-          <MaterialIcons name="auto-awesome" size={15} color={tokens.colors.primary} />
+        <View style={[styles.vitoAvatar, { backgroundColor: colors.surfaceContainerHigh, borderWidth: 1, borderColor: colors.outlineVariant }]}>
+          <MaterialIcons name="auto-awesome" size={15} color={colors.primary} />
         </View>
       )}
 
-      <View style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubbleVito]}>
+      <View
+        style={[
+          styles.bubble,
+          isUser
+            ? [
+                styles.bubbleUser,
+                {
+                  backgroundColor: isDark ? colors.surfaceContainerHigh : colors.primary,
+                  borderWidth: 1,
+                  borderColor: isDark ? colors.outlineVariant : colors.primary,
+                },
+              ]
+            : [
+                styles.bubbleVito,
+                {
+                  backgroundColor: colors.surfaceContainer,
+                  borderColor: colors.outlineVariant,
+                  borderWidth: 1,
+                },
+              ],
+        ]}
+      >
         {message.imageUri && (
           <Image source={{ uri: message.imageUri }} style={styles.imageAttachment} resizeMode="cover" />
         )}
-        <Text style={[styles.messageText, isUser ? styles.messageTextUser : styles.messageTextVito]}>
+        <Text
+          style={[
+            styles.messageText,
+            isUser
+              ? [styles.messageTextUser, { color: isDark ? '#FAFAFA' : '#FFFFFF' }]
+              : [styles.messageTextVito, { color: colors.onSurface }],
+          ]}
+        >
           {message.text}
         </Text>
 
@@ -36,11 +66,20 @@ export const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({ message })
         {message.todo && <TodoInlineCard todo={message.todo} />}
 
         <View style={styles.metaRow}>
-          <Text style={[styles.timestamp, isUser ? styles.timestampUser : styles.timestampVito]}>
+          <Text
+            style={[
+              styles.timestamp,
+              { color: isUser ? (isDark ? '#A1A1AA' : 'rgba(255,255,255,0.7)') : colors.textMuted },
+            ]}
+          >
             {new Date(message.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
           </Text>
           {isUser && (
-            <MaterialIcons name="done-all" size={13} color={tokens.colors.onPrimaryContainer} />
+            <MaterialIcons
+              name="done-all"
+              size={13}
+              color={isDark ? '#FAFAFA' : 'rgba(255,255,255,0.85)'}
+            />
           )}
         </View>
       </View>

@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, Platform } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens } from '../../theme/tokens';
+import { useTheme } from '../../context/ThemeContext';
 
 interface FloatingTabBarProps {
   activeTab: 'chat' | 'calendar';
@@ -14,10 +15,21 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
   onSelectTab,
   visible = true,
 }) => {
+  const { colors, isDark } = useTheme();
+
   if (!visible) return null;
 
   return (
-    <View style={styles.navBar} accessibilityRole="tablist">
+    <View
+      style={[
+        styles.navBar,
+        {
+          backgroundColor: isDark ? colors.surface : '#FFFFFF',
+          borderTopColor: colors.outlineVariant,
+        },
+      ]}
+      accessibilityRole="tablist"
+    >
       {/* Item 1: Chat IA */}
       <TouchableOpacity
         style={styles.navItem}
@@ -27,14 +39,38 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
         accessibilityState={{ selected: activeTab === 'chat' }}
         accessibilityLabel="Aba Chat com Vito"
       >
-        <View style={[styles.activeIndicator, activeTab === 'chat' && styles.activeIndicatorSelected]}>
+        <View
+          style={[
+            styles.activeIndicator,
+            activeTab === 'chat' && [
+              styles.activeIndicatorSelected,
+              {
+                backgroundColor: isDark ? colors.surfaceContainerHighest : colors.primary,
+                borderWidth: isDark ? 1 : 0,
+                borderColor: colors.outlineVariant,
+              },
+            ],
+          ]}
+        >
           <MaterialIcons
             name={activeTab === 'chat' ? 'chat' : 'chat-bubble-outline'}
-            size={22}
-            color={activeTab === 'chat' ? tokens.colors.onPrimaryContainer : tokens.colors.onSurfaceVariant}
+            size={20}
+            color={
+              activeTab === 'chat'
+                ? isDark
+                  ? '#FFFFFF'
+                  : '#FFFFFF'
+                : colors.onSurfaceVariant
+            }
           />
         </View>
-        <Text style={[styles.navLabel, activeTab === 'chat' && styles.navLabelActive]}>
+        <Text
+          style={[
+            styles.navLabel,
+            { color: activeTab === 'chat' ? colors.onSurface : colors.textMuted },
+            activeTab === 'chat' && styles.navLabelActive,
+          ]}
+        >
           Chat
         </Text>
       </TouchableOpacity>
@@ -48,14 +84,38 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
         accessibilityState={{ selected: activeTab === 'calendar' }}
         accessibilityLabel="Aba Calendário e Tarefas"
       >
-        <View style={[styles.activeIndicator, activeTab === 'calendar' && styles.activeIndicatorSelected]}>
+        <View
+          style={[
+            styles.activeIndicator,
+            activeTab === 'calendar' && [
+              styles.activeIndicatorSelected,
+              {
+                backgroundColor: isDark ? colors.surfaceContainerHighest : colors.primary,
+                borderWidth: isDark ? 1 : 0,
+                borderColor: colors.outlineVariant,
+              },
+            ],
+          ]}
+        >
           <MaterialIcons
             name={activeTab === 'calendar' ? 'calendar-month' : 'calendar-today'}
-            size={22}
-            color={activeTab === 'calendar' ? tokens.colors.onPrimaryContainer : tokens.colors.onSurfaceVariant}
+            size={20}
+            color={
+              activeTab === 'calendar'
+                ? isDark
+                  ? '#FFFFFF'
+                  : '#FFFFFF'
+                : colors.onSurfaceVariant
+            }
           />
         </View>
-        <Text style={[styles.navLabel, activeTab === 'calendar' && styles.navLabelActive]}>
+        <Text
+          style={[
+            styles.navLabel,
+            { color: activeTab === 'calendar' ? colors.onSurface : colors.textMuted },
+            activeTab === 'calendar' && styles.navLabelActive,
+          ]}
+        >
           Calendário
         </Text>
       </TouchableOpacity>

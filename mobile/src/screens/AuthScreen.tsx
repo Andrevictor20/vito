@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -12,9 +12,10 @@ import { MaterialIcons } from '@expo/vector-icons';
 import * as Updates from 'expo-updates';
 import { tokens } from '../theme/tokens';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { isCloudServer } from '../services/api';
 import { UpdateBanner } from '../components/common/UpdateBanner';
-import { styles } from './AuthScreen.styles';
+import { createAuthStyles } from './AuthScreen.styles';
 
 interface AuthScreenProps {
   serverUrl?: string;
@@ -23,6 +24,8 @@ interface AuthScreenProps {
 
 export const AuthScreen: React.FC<AuthScreenProps> = ({ serverUrl, onToggleServer }) => {
   const { login, register, isLoading } = useAuth();
+  const { colors, isDark, toggleTheme } = useTheme();
+  const styles = useMemo(() => createAuthStyles(colors), [colors]);
   const [isRegister, setIsRegister] = useState(false);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -101,30 +104,45 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ serverUrl, onToggleServe
       <UpdateBanner />
 
       <View style={styles.card}>
-        {/* Top Header M3 com Seletor de Servidor */}
+        {/* Top Header M3 com Seletor de Servidor e Alternador de Tema */}
         <View style={styles.topHeaderRow}>
           <View style={styles.brandRow}>
             <Text style={styles.title}>vito</Text>
             <View style={styles.brandDot} />
           </View>
 
-          {onToggleServer && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <TouchableOpacity
               style={styles.serverPill}
-              onPress={onToggleServer}
+              onPress={toggleTheme}
               activeOpacity={0.75}
-              accessibilityLabel="Alternar entre servidor nuvem e local"
+              accessibilityLabel={isDark ? 'Mudar para tema claro' : 'Mudar para tema escuro'}
             >
               <MaterialIcons
-                name={isCloud ? 'cloud-done' : 'home'}
+                name={isDark ? 'light-mode' : 'dark-mode'}
                 size={14}
-                color={tokens.colors.onSecondaryContainer}
+                color={colors.onSecondaryContainer}
               />
-              <Text style={styles.serverPillText}>
-                {isCloud ? 'Nuvem' : 'Local'}
-              </Text>
             </TouchableOpacity>
-          )}
+
+            {onToggleServer && (
+              <TouchableOpacity
+                style={styles.serverPill}
+                onPress={onToggleServer}
+                activeOpacity={0.75}
+                accessibilityLabel="Alternar entre servidor nuvem e local"
+              >
+                <MaterialIcons
+                  name={isCloud ? 'cloud-done' : 'home'}
+                  size={14}
+                  color={colors.onSecondaryContainer}
+                />
+                <Text style={styles.serverPillText}>
+                  {isCloud ? 'Nuvem' : 'Local'}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
 
         <Text style={styles.subtitle}>
@@ -136,7 +154,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ serverUrl, onToggleServe
 
         {error && (
           <View style={styles.errorBox}>
-            <MaterialIcons name="error-outline" size={16} color={tokens.colors.onErrorContainer} />
+            <MaterialIcons name="error-outline" size={16} color={colors.onErrorContainer} />
             <Text style={styles.errorText}>{error}</Text>
           </View>
         )}
@@ -147,7 +165,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ serverUrl, onToggleServe
             <TextInput
               style={styles.input}
               placeholder="Ex: André Silva"
-              placeholderTextColor={tokens.colors.onSurfaceVariant}
+              placeholderTextColor={colors.onSurfaceVariant}
               value={name}
               onChangeText={setName}
             />
@@ -159,7 +177,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ serverUrl, onToggleServe
           <TextInput
             style={styles.input}
             placeholder="seu@email.com"
-            placeholderTextColor={tokens.colors.onSurfaceVariant}
+            placeholderTextColor={colors.onSurfaceVariant}
             autoCapitalize="none"
             keyboardType="email-address"
             value={email}
@@ -173,7 +191,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ serverUrl, onToggleServe
             <TextInput
               style={styles.passwordInput}
               placeholder="••••••••"
-              placeholderTextColor={tokens.colors.onSurfaceVariant}
+              placeholderTextColor={colors.onSurfaceVariant}
               secureTextEntry={!showPassword}
               value={password}
               onChangeText={setPassword}
@@ -189,7 +207,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ serverUrl, onToggleServe
               <MaterialIcons
                 name={showPassword ? 'visibility-off' : 'visibility'}
                 size={22}
-                color={tokens.colors.onSurfaceVariant}
+                color={colors.onSurfaceVariant}
               />
             </TouchableOpacity>
           </View>
@@ -202,7 +220,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ serverUrl, onToggleServe
           activeOpacity={0.8}
         >
           {isLoading ? (
-            <ActivityIndicator color={tokens.colors.onPrimary} />
+            <ActivityIndicator color={colors.onPrimary} />
           ) : (
             <Text style={styles.primaryButtonText}>
               {isRegister ? 'Criar Conta' : 'Entrar'}
@@ -238,10 +256,10 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ serverUrl, onToggleServe
             activeOpacity={0.75}
           >
             {isCheckingUpdate ? (
-              <ActivityIndicator size="small" color={tokens.colors.primary} />
+              <ActivityIndicator size="small" color={colors.primary} />
             ) : (
               <>
-                <MaterialIcons name="sync" size={13} color={tokens.colors.onSurface} />
+                <MaterialIcons name="sync" size={13} color={colors.onSurface} />
                 <Text style={styles.checkUpdatesText}>Buscar update</Text>
               </>
             )}

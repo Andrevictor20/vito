@@ -1,29 +1,30 @@
 import { StyleSheet } from 'react-native';
-import { tokens, MD3Shapes } from '../theme/tokens';
+import { tokens, MD3Shapes, ThemeColors } from '../theme/tokens';
 
-export const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: tokens.colors.surface,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: tokens.spacing.lg,
-  },
-  // Card M3 Filled/Elevated (Surface Container High, 28dp radius)
-  card: {
-    width: '100%',
-    maxWidth: 400,
-    backgroundColor: tokens.colors.surfaceContainerHigh,
-    borderWidth: 1,
-    borderColor: tokens.colors.outlineVariant,
-    borderRadius: MD3Shapes.extraLarge,
-    padding: tokens.spacing.xl,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 14,
-    elevation: 8,
-  },
+export const createAuthStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.surface,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: tokens.spacing.lg,
+    },
+    // Card M3 Filled/Elevated (Surface Container High, 28dp radius)
+    card: {
+      width: '100%',
+      maxWidth: 400,
+      backgroundColor: colors.surfaceContainer,
+      borderWidth: 1,
+      borderColor: colors.outlineVariant,
+      borderRadius: MD3Shapes.extraLarge,
+      padding: tokens.spacing.xl,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.3,
+      shadowRadius: 14,
+      elevation: 8,
+    },
   topHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -38,52 +39,52 @@ export const styles = StyleSheet.create({
   title: {
     fontSize: tokens.typography.size.headlineMedium,
     fontWeight: tokens.typography.weight.bold,
-    color: tokens.colors.onSurface,
+    color: colors.onSurface,
     letterSpacing: -0.5,
   },
   brandDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: tokens.colors.primary,
+    backgroundColor: colors.primary,
   },
   serverPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: tokens.colors.secondaryContainer,
+    backgroundColor: colors.secondaryContainer,
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: MD3Shapes.full,
     borderWidth: 1,
-    borderColor: tokens.colors.outlineVariant,
+    borderColor: colors.outlineVariant,
   },
   serverPillText: {
-    color: tokens.colors.onSecondaryContainer,
+    color: colors.onSecondaryContainer,
     fontSize: 11,
     fontWeight: tokens.typography.weight.bold,
   },
   subtitle: {
     fontSize: tokens.typography.size.bodyMedium,
-    color: tokens.colors.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
     marginBottom: 4,
   },
   serverHostIndicator: {
     fontSize: tokens.typography.size.labelSmall,
-    color: tokens.colors.outline,
+    color: colors.outline,
     marginBottom: tokens.spacing.md,
   },
   errorBox: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: tokens.colors.errorContainer,
+    backgroundColor: colors.errorContainer,
     borderRadius: MD3Shapes.small,
     padding: tokens.spacing.sm + 2,
     marginBottom: tokens.spacing.md,
   },
   errorText: {
-    color: tokens.colors.onErrorContainer,
+    color: colors.onErrorContainer,
     fontSize: tokens.typography.size.labelMedium,
     fontWeight: tokens.typography.weight.medium,
     flex: 1,
@@ -94,27 +95,27 @@ export const styles = StyleSheet.create({
   label: {
     fontSize: tokens.typography.size.labelMedium,
     fontWeight: tokens.typography.weight.medium,
-    color: tokens.colors.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
     marginBottom: 6,
   },
   // Outlined Text Field M3
   input: {
     height: 48,
-    backgroundColor: tokens.colors.surfaceContainerLow,
+    backgroundColor: colors.surfaceContainerLow,
     borderWidth: 1,
-    borderColor: tokens.colors.outlineVariant,
+    borderColor: colors.outlineVariant,
     borderRadius: MD3Shapes.small,
     paddingHorizontal: tokens.spacing.md,
-    color: tokens.colors.onSurface,
+    color: colors.onSurface,
     fontSize: tokens.typography.size.bodyLarge,
   },
   passwordInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     height: 48,
-    backgroundColor: tokens.colors.surfaceContainerLow,
+    backgroundColor: colors.surfaceContainerLow,
     borderWidth: 1,
-    borderColor: tokens.colors.outlineVariant,
+    borderColor: colors.outlineVariant,
     borderRadius: MD3Shapes.small,
     paddingRight: 6,
   },
@@ -122,7 +123,7 @@ export const styles = StyleSheet.create({
     flex: 1,
     height: '100%',
     paddingHorizontal: tokens.spacing.md,
-    color: tokens.colors.onSurface,
+    color: colors.onSurface,
     fontSize: tokens.typography.size.bodyLarge,
   },
   passwordEyeButton: {
@@ -133,7 +134,7 @@ export const styles = StyleSheet.create({
   },
   // M3 Filled Primary Button
   primaryButton: {
-    backgroundColor: tokens.colors.primary,
+    backgroundColor: colors.primary,
     height: 48,
     borderRadius: MD3Shapes.full,
     alignItems: 'center',
@@ -149,7 +150,7 @@ export const styles = StyleSheet.create({
     opacity: 0.6,
   },
   primaryButtonText: {
-    color: tokens.colors.onPrimary,
+    color: colors.onPrimary,
     fontSize: tokens.typography.size.labelLarge,
     fontWeight: tokens.typography.weight.bold,
     letterSpacing: 0.2,
@@ -160,7 +161,7 @@ export const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   switchText: {
-    color: tokens.colors.primary,
+    color: colors.primary,
     fontSize: tokens.typography.size.bodySmall,
     fontWeight: tokens.typography.weight.semibold,
   },
@@ -171,10 +172,10 @@ export const styles = StyleSheet.create({
     marginTop: tokens.spacing.xl,
     paddingTop: tokens.spacing.md,
     borderTopWidth: 1,
-    borderTopColor: tokens.colors.outlineVariant,
+    borderTopColor: colors.outlineVariant,
   },
   otaText: {
-    color: tokens.colors.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
     fontSize: 11,
   },
   checkUpdatesBtn: {
@@ -183,12 +184,14 @@ export const styles = StyleSheet.create({
     gap: 4,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    backgroundColor: tokens.colors.surfaceContainerHighest,
+    backgroundColor: colors.surfaceContainerHighest,
     borderRadius: MD3Shapes.small,
   },
   checkUpdatesText: {
-    color: tokens.colors.onSurface,
+    color: colors.onSurface,
     fontSize: 11,
     fontWeight: tokens.typography.weight.semibold,
   },
 });
+
+export const styles = createAuthStyles(tokens.colors);

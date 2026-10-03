@@ -37,7 +37,7 @@ const MainNavigator: React.FC = () => {
   }
 
   return (
-    <View key={isDark ? 'dark' : 'light'} style={[styles.safeArea, { backgroundColor: colors.surface }]}>
+    <View style={[styles.safeArea, { backgroundColor: colors.surface }]}>
       <StatusBar style={isDark ? 'light' : 'dark'} />
       <UpdateBanner />
       {user ? (

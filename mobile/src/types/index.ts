@@ -80,3 +80,13 @@ export interface ChatMessage {
   conflict?: ConflictInfo;
 }
 
+export interface ConversationSession {
+  id: string;
+  title: string;
+  preview: string;
+  timestamp: string;
+  messages: ChatMessage[];
+  active?: boolean;
+}
+
+

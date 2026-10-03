@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens } from '../../theme/tokens';
+import { useTheme } from '../../context/ThemeContext';
 
 interface CreateItemModalProps {
   visible: boolean;
@@ -26,6 +27,7 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
   onSaveEvent,
   onSaveTodo,
 }) => {
+  const { colors, isDark } = useTheme();
   const [tab, setTab] = useState<'event' | 'todo'>('event');
   const [title, setTitle] = useState('');
   const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium');
@@ -51,51 +53,76 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
       <TouchableWithoutFeedback onPress={onClose}>
         <View style={styles.overlay}>
           <TouchableWithoutFeedback>
-            <View style={styles.card}>
+            <View style={[styles.card, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
               {/* Header com Segmented Tabs */}
               <View style={styles.header}>
-                <View style={styles.segmentedGroup}>
+                <View style={[styles.segmentedGroup, { backgroundColor: colors.surfaceContainerLowest, borderColor: colors.outlineVariant, borderWidth: 1 }]}>
                   <TouchableOpacity
-                    style={[styles.segmentBtn, tab === 'event' && styles.segmentBtnActive]}
+                    style={[
+                      styles.segmentBtn,
+                      tab === 'event' && [styles.segmentBtnActive, { backgroundColor: colors.surfaceContainerHighest }],
+                    ]}
                     onPress={() => setTab('event')}
                   >
                     <MaterialIcons
                       name="event"
                       size={15}
-                      color={tab === 'event' ? tokens.colors.primary : tokens.colors.textSecondary}
+                      color={tab === 'event' ? colors.primary : colors.textSecondary}
                     />
-                    <Text style={[styles.segmentText, tab === 'event' && styles.segmentTextActive]}>
+                    <Text
+                      style={[
+                        styles.segmentText,
+                        { color: tab === 'event' ? colors.onSurface : colors.textSecondary },
+                        tab === 'event' && styles.segmentTextActive,
+                      ]}
+                    >
                       Compromisso
                     </Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    style={[styles.segmentBtn, tab === 'todo' && styles.segmentBtnActive]}
+                    style={[
+                      styles.segmentBtn,
+                      tab === 'todo' && [styles.segmentBtnActive, { backgroundColor: colors.surfaceContainerHighest }],
+                    ]}
                     onPress={() => setTab('todo')}
                   >
                     <MaterialIcons
                       name="check-circle"
                       size={15}
-                      color={tab === 'todo' ? tokens.colors.tertiary : tokens.colors.textSecondary}
+                      color={tab === 'todo' ? colors.primary : colors.textSecondary}
                     />
-                    <Text style={[styles.segmentText, tab === 'todo' && styles.segmentTextActive]}>
+                    <Text
+                      style={[
+                        styles.segmentText,
+                        { color: tab === 'todo' ? colors.onSurface : colors.textSecondary },
+                        tab === 'todo' && styles.segmentTextActive,
+                      ]}
+                    >
                       Tarefa
                     </Text>
                   </TouchableOpacity>
                 </View>
 
-                <TouchableOpacity onPress={onClose} hitSlop={tokens.hitSlop.sm}>
-                  <MaterialIcons name="close" size={18} color={tokens.colors.textSecondary} />
+                <TouchableOpacity onPress={onClose} hitSlop={tokens.hitSlop.sm} accessibilityLabel="Fechar">
+                  <MaterialIcons name="close" size={18} color={colors.onSurfaceVariant} />
                 </TouchableOpacity>
               </View>
 
-              <Text style={styles.dateLabel}>Data selecionada: {formattedDate}</Text>
+              <Text style={[styles.dateLabel, { color: colors.textMuted }]}>Data selecionada: {formattedDate}</Text>
 
               {/* Input de Título */}
               <TextInput
-                style={styles.input}
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: colors.surfaceContainerLow,
+                    borderColor: colors.outlineVariant,
+                    color: colors.onSurface,
+                  },
+                ]}
                 placeholder={tab === 'event' ? 'Título da reunião ou evento...' : 'Título da tarefa ou lembrete...'}
-                placeholderTextColor={tokens.colors.textMuted}
+                placeholderTextColor={colors.textMuted}
                 value={title}
                 onChangeText={setTitle}
                 autoFocus
@@ -104,41 +131,56 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
               {/* Seletor de Prioridade (apenas para tarefas) */}
               {tab === 'todo' && (
                 <View style={styles.priorityRow}>
-                  <Text style={styles.priorityLabel}>Prioridade:</Text>
-                  {(['low', 'medium', 'high'] as const).map((p) => (
-                    <TouchableOpacity
-                      key={p}
-                      style={[
-                        styles.priorityChip,
-                        priority === p && styles.priorityChipActive,
-                      ]}
-                      onPress={() => setPriority(p)}
-                    >
-                      <Text
+                  <Text style={[styles.priorityLabel, { color: colors.textSecondary }]}>Prioridade:</Text>
+                  {(['low', 'medium', 'high'] as const).map((p) => {
+                    const isSelected = priority === p;
+                    return (
+                      <TouchableOpacity
+                        key={p}
                         style={[
-                          styles.priorityChipText,
-                          priority === p && styles.priorityChipTextActive,
+                          styles.priorityChip,
+                          {
+                            backgroundColor: isSelected
+                              ? colors.primaryContainer
+                              : colors.surfaceContainerLow,
+                            borderColor: isSelected ? colors.primary : colors.outlineVariant,
+                          },
                         ]}
+                        onPress={() => setPriority(p)}
                       >
-                        {p === 'low' ? 'Baixa' : p === 'medium' ? 'Média' : 'Alta'}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+                        <Text
+                          style={[
+                            styles.priorityChipText,
+                            {
+                              color: isSelected ? colors.onPrimaryContainer : colors.textSecondary,
+                              fontWeight: isSelected ? '700' : '500',
+                            },
+                          ]}
+                        >
+                          {p === 'low' ? 'Baixa' : p === 'medium' ? 'Média' : 'Alta'}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
               )}
 
               {/* Botões de Ação */}
               <View style={styles.footerRow}>
                 <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
-                  <Text style={styles.cancelBtnText}>Cancelar</Text>
+                  <Text style={[styles.cancelBtnText, { color: colors.textSecondary }]}>Cancelar</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[styles.saveBtn, !title.trim() && styles.saveBtnDisabled]}
+                  style={[
+                    styles.saveBtn,
+                    { backgroundColor: colors.primary },
+                    !title.trim() && styles.saveBtnDisabled,
+                  ]}
                   onPress={handleSave}
                   disabled={!title.trim()}
                 >
-                  <Text style={styles.saveBtnText}>Salvar</Text>
+                  <Text style={[styles.saveBtnText, { color: colors.onPrimary }]}>Salvar</Text>
                 </TouchableOpacity>
               </View>
             </View>

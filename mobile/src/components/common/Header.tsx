@@ -11,7 +11,7 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ onPressProfile }) => {
   const { user } = useAuth();
-  const { isDark, toggleTheme } = useTheme();
+  const { colors, isDark, toggleTheme } = useTheme();
 
   const todayStr = new Date().toLocaleDateString('pt-BR', {
     weekday: 'long',
@@ -23,19 +23,19 @@ export const Header: React.FC<HeaderProps> = ({ onPressProfile }) => {
   const firstName = user?.name ? user.name.split(' ')[0] : 'Usuário';
 
   return (
-    <View style={styles.header}>
+    <View style={[styles.header, { backgroundColor: colors.surface }]}>
       <View style={styles.topRow}>
         <View style={styles.titleColumn}>
-          <Text style={styles.dateSubtitle}>{formattedDate}</Text>
+          <Text style={[styles.dateSubtitle, { color: colors.textMuted }]}>{formattedDate}</Text>
           <View style={styles.brandRow}>
-            <Text style={styles.brand}>Vito Events</Text>
-            <View style={styles.statusDot} />
+            <Text style={[styles.brand, { color: colors.onSurface }]}>Vito Events</Text>
+            <View style={[styles.statusDot, { backgroundColor: colors.statusOnline }]} />
           </View>
         </View>
 
         <View style={styles.actionsRow}>
           <TouchableOpacity
-            style={styles.themeToggleBtn}
+            style={[styles.themeToggleBtn, { backgroundColor: colors.surfaceContainerLow, borderColor: colors.outlineVariant }]}
             onPress={toggleTheme}
             activeOpacity={0.7}
             hitSlop={tokens.hitSlop.sm}
@@ -43,20 +43,20 @@ export const Header: React.FC<HeaderProps> = ({ onPressProfile }) => {
           >
             <MaterialIcons
               name={isDark ? 'light-mode' : 'dark-mode'}
-              size={22}
-              color={tokens.colors.onSurfaceVariant}
+              size={20}
+              color={colors.onSurface}
             />
           </TouchableOpacity>
 
           {user && (
             <TouchableOpacity
-              style={styles.userAvatar}
+              style={[styles.userAvatar, { backgroundColor: colors.surfaceContainerHighest, borderColor: colors.outlineVariant }]}
               onPress={onPressProfile}
               activeOpacity={0.75}
               accessibilityLabel="Perfil e Configurações"
               hitSlop={tokens.hitSlop.sm}
             >
-              <Text style={styles.avatarText}>{firstName.charAt(0).toUpperCase()}</Text>
+              <Text style={[styles.avatarText, { color: colors.onSurface }]}>{firstName.charAt(0).toUpperCase()}</Text>
             </TouchableOpacity>
           )}
         </View>

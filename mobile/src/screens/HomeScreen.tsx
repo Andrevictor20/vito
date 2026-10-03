@@ -20,11 +20,13 @@ import { CreateItemModal } from '../components/calendar/CreateItemModal';
 import { ProfileModal } from '../components/profile/ProfileModal';
 import { ChatScreen } from './ChatScreen';
 import { useHomeData } from '../hooks/useHomeData';
+import { useTheme } from '../context/ThemeContext';
 
 export const HomeScreen: React.FC<{
   serverUrl: string;
   onToggleServer: () => void;
 }> = ({ serverUrl, onToggleServer }) => {
+  const { colors, isDark } = useTheme();
   const [activeTab, setActiveTab] = useState<'chat' | 'calendar'>('chat');
   const [profileVisible, setProfileVisible] = useState(false);
   const [createModalVisible, setCreateModalVisible] = useState(false);
@@ -64,20 +66,20 @@ export const HomeScreen: React.FC<{
   }, [todos]);
 
   return (
-    <View style={styles.container}>
-      <View style={styles.mainContent}>
+    <View style={[styles.container, { backgroundColor: colors.surface }]}>
+      <View style={[styles.mainContent, { backgroundColor: colors.surface }]}>
         {activeTab === 'calendar' ? (
         <>
           <Header onPressProfile={() => setProfileVisible(true)} />
 
       <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.content}
+        style={[styles.scroll, { backgroundColor: colors.surface }]}
+        contentContainerStyle={[styles.content, { backgroundColor: colors.surface }]}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={tokens.colors.primary}
+            tintColor={colors.primary}
           />
         }
       >
@@ -91,24 +93,24 @@ export const HomeScreen: React.FC<{
 
         {/* Section: Eventos de hoje */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Eventos de hoje</Text>
-          <View style={styles.countBadgePill}>
-            <Text style={styles.countBadgeText}>
+          <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>Eventos de hoje</Text>
+          <View style={[styles.countBadgePill, { backgroundColor: colors.primaryContainer }]}>
+            <Text style={[styles.countBadgeText, { color: colors.onPrimaryContainer }]}>
               {dayEvents.length} {dayEvents.length === 1 ? 'evento' : 'eventos'}
             </Text>
           </View>
         </View>
 
         {loading && events.length === 0 ? (
-          <ActivityIndicator color={tokens.colors.primary} style={{ marginVertical: 20 }} />
+          <ActivityIndicator color={colors.primary} style={{ marginVertical: 20 }} />
         ) : dayEvents.length === 0 ? (
-          <View style={styles.emptyCard}>
-            <View style={styles.emptyIconContainer}>
-              <MaterialIcons name="event-available" size={20} color={tokens.colors.primary} />
+          <View style={[styles.emptyCard, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
+            <View style={[styles.emptyIconContainer, { backgroundColor: colors.surfaceContainerHigh }]}>
+              <MaterialIcons name="event-available" size={20} color={colors.primary} />
             </View>
             <View style={styles.emptyContent}>
-              <Text style={styles.emptyTitle}>Dia Livre</Text>
-              <Text style={styles.emptySub}>
+              <Text style={[styles.emptyTitle, { color: colors.onSurface }]}>Dia Livre</Text>
+              <Text style={[styles.emptySub, { color: colors.onSurfaceVariant }]}>
                 {isTodaySelected
                   ? 'Nenhum compromisso marcado para hoje.'
                   : `Nenhum compromisso marcado para ${selectedDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}.`}
@@ -124,27 +126,27 @@ export const HomeScreen: React.FC<{
         {/* Section: Checklist da festa */}
         <View style={[styles.sectionHeader, { marginTop: tokens.spacing.lg }]}>
           <View>
-            <Text style={styles.sectionTitle}>Checklist da festa</Text>
-            <Text style={styles.checklistSubtitle}>
+            <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>Checklist da festa</Text>
+            <Text style={[styles.checklistSubtitle, { color: colors.textMuted }]}>
               {completedCount}/{todos.length} concluídos
             </Text>
           </View>
         </View>
 
         {loading && todos.length === 0 ? (
-          <ActivityIndicator color={tokens.colors.primary} style={{ marginVertical: 20 }} />
+          <ActivityIndicator color={colors.primary} style={{ marginVertical: 20 }} />
         ) : todos.length === 0 ? (
-          <View style={styles.emptyCard}>
-            <View style={[styles.emptyIconContainer, { backgroundColor: 'rgba(46, 108, 56, 0.12)' }]}>
-              <MaterialIcons name="done-all" size={20} color={tokens.colors.success} />
+          <View style={[styles.emptyCard, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
+            <View style={[styles.emptyIconContainer, { backgroundColor: 'rgba(52, 211, 153, 0.15)' }]}>
+              <MaterialIcons name="done-all" size={20} color={colors.success} />
             </View>
             <View style={styles.emptyContent}>
-              <Text style={styles.emptyTitle}>Tudo em Dia</Text>
-              <Text style={styles.emptySub}>Nenhuma tarefa pendente no momento.</Text>
+              <Text style={[styles.emptyTitle, { color: colors.onSurface }]}>Tudo em Dia</Text>
+              <Text style={[styles.emptySub, { color: colors.onSurfaceVariant }]}>Nenhuma tarefa pendente no momento.</Text>
             </View>
           </View>
         ) : (
-          <View style={styles.checklistCard}>
+          <View style={[styles.checklistCard, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant, borderWidth: 1 }]}>
             {todos.map((t, idx) => (
               <TodoItem
                 key={t.id}
@@ -161,13 +163,13 @@ export const HomeScreen: React.FC<{
         {/* Botão de Criação Rápida */}
         <View style={styles.createBtnWrapper}>
           <TouchableOpacity
-            style={styles.createFab}
+            style={[styles.createFab, { backgroundColor: colors.primary }]}
             onPress={() => setCreateModalVisible(true)}
             activeOpacity={0.85}
             accessibilityLabel="Criar nova tarefa ou evento"
           >
-            <MaterialIcons name="add" size={20} color={tokens.colors.onPrimary} />
-            <Text style={styles.createFabText}>Nova Tarefa ou Evento</Text>
+            <MaterialIcons name="add" size={22} color={colors.onPrimary} />
+            <Text style={[styles.createFabText, { color: colors.onPrimary }]}>Nova Tarefa ou Evento</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -189,11 +191,12 @@ export const HomeScreen: React.FC<{
             onClose={() => setCalendarModalVisible(false)}
             events={events}
             selectedDate={selectedDate}
-            onSelectDate={(d) => {
-              setSelectedDate(d);
-              setCalendarModalVisible(false);
-            }}
+            onSelectDate={(d) => setSelectedDate(d)}
             onOpenCreate={() => setCreateModalVisible(true)}
+            onDeleteEvent={handleDeleteEvent}
+            todos={todos}
+            onToggleTodo={handleToggleTodo}
+            onDeleteTodo={handleDeleteTodo}
           />
         </>
       ) : (

@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens, MD3Shapes } from '../../theme/tokens';
+import { useTheme } from '../../context/ThemeContext';
 import { Todo } from '../../types';
 
 interface TodoItemProps {
@@ -19,25 +20,32 @@ export const TodoItem: React.FC<TodoItemProps> = ({
   isLast = false,
   grouped = true,
 }) => {
+  const { colors, isDark } = useTheme();
   const isCompleted = todo.status === 'completed';
 
   const priorityStyle =
     todo.priority === 'high'
-      ? { bg: tokens.colors.errorContainer, text: tokens.colors.error, label: 'ALTA' }
+      ? { bg: colors.errorContainer, text: colors.onErrorContainer, label: 'ALTA' }
       : todo.priority === 'medium'
-      ? { bg: 'rgba(255, 217, 102, 0.2)', text: tokens.colors.warning, label: 'MÉDIA' }
-      : { bg: tokens.colors.surfaceContainerHighest, text: tokens.colors.onSurfaceVariant, label: 'BAIXA' };
+      ? { bg: isDark ? 'rgba(251, 191, 36, 0.18)' : 'rgba(245, 158, 11, 0.12)', text: colors.warning, label: 'MÉDIA' }
+      : { bg: colors.surfaceContainerHighest, text: colors.onSurfaceVariant, label: 'BAIXA' };
 
   return (
     <View
       style={[
-        grouped ? styles.groupedRow : styles.container,
-        grouped && !isLast && styles.bottomBorder,
+        grouped
+          ? styles.groupedRow
+          : [styles.container, { backgroundColor: colors.surfaceContainer, borderWidth: 1, borderColor: colors.outlineVariant }],
+        grouped && !isLast && [styles.bottomBorder, { borderBottomColor: colors.outlineVariant }],
       ]}
     >
       {/* Checkbox M3 com cantos levemente arredondados */}
       <TouchableOpacity
-        style={[styles.checkbox, isCompleted && styles.checkboxChecked]}
+        style={[
+          styles.checkbox,
+          { borderColor: isCompleted ? colors.primary : colors.outline },
+          isCompleted && { backgroundColor: colors.primary },
+        ]}
         onPress={() => onToggle(todo.id)}
         activeOpacity={0.75}
         accessibilityRole="checkbox"
@@ -45,7 +53,7 @@ export const TodoItem: React.FC<TodoItemProps> = ({
         accessibilityLabel={isCompleted ? 'Marcar como pendente' : 'Marcar como concluída'}
         hitSlop={tokens.hitSlop.sm}
       >
-        {isCompleted && <MaterialIcons name="check" size={14} color={tokens.colors.onPrimary} />}
+        {isCompleted && <MaterialIcons name="check" size={14} color={colors.onPrimary} />}
       </TouchableOpacity>
 
       <TouchableOpacity
@@ -53,11 +61,18 @@ export const TodoItem: React.FC<TodoItemProps> = ({
         onPress={() => onToggle(todo.id)}
         activeOpacity={0.7}
       >
-        <Text style={[styles.title, isCompleted && styles.titleCompleted]} numberOfLines={2}>
+        <Text
+          style={[
+            styles.title,
+            { color: colors.onSurface },
+            isCompleted && [styles.titleCompleted, { color: colors.textMuted }],
+          ]}
+          numberOfLines={2}
+        >
           {todo.title}
         </Text>
         {todo.due_date ? (
-          <Text style={styles.dueDate}>
+          <Text style={[styles.dueDate, { color: colors.onSurfaceVariant }]}>
             {new Date(todo.due_date).toLocaleDateString('pt-BR')}
           </Text>
         ) : null}
@@ -79,7 +94,7 @@ export const TodoItem: React.FC<TodoItemProps> = ({
         hitSlop={tokens.hitSlop.sm}
         accessibilityLabel="Excluir tarefa"
       >
-        <MaterialIcons name="close" size={16} color={tokens.colors.textMuted} />
+        <MaterialIcons name="close" size={16} color={colors.onSurfaceVariant} />
       </TouchableOpacity>
     </View>
   );

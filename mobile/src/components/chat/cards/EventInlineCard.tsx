@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens, MD3Shapes } from '../../../theme/tokens';
+import { useTheme } from '../../../context/ThemeContext';
 import { Event } from '../../../types';
 
 interface EventInlineCardProps {
@@ -10,61 +11,66 @@ interface EventInlineCardProps {
 }
 
 export const EventInlineCard: React.FC<EventInlineCardProps> = ({ event, onPressDetail }) => {
+  const { colors } = useTheme();
   const startTime = new Date(event.start_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   const endTime = new Date(event.end_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
   return (
-    <View style={styles.card}>
-      <View style={styles.accentBar} />
+    <View style={[styles.card, { backgroundColor: colors.surfaceContainerHigh, borderColor: colors.outlineVariant }]}>
+      <View style={[styles.accentBar, { backgroundColor: colors.primary }]} />
 
       {/* Header do Card */}
       <View style={styles.topRow}>
         <View style={styles.headerLeft}>
-          <View style={styles.iconBox}>
-            <MaterialIcons name="event-available" size={18} color={tokens.colors.primary} />
+          <View style={[styles.iconBox, { backgroundColor: colors.surfaceContainerHighest }]}>
+            <MaterialIcons name="event-available" size={18} color={colors.primary} />
           </View>
           <View style={styles.titleCol}>
-            <Text style={styles.title} numberOfLines={1}>{event.title}</Text>
-            <Text style={styles.subtitle}>Agenda • Confirmado pelo Vito</Text>
+            <Text style={[styles.title, { color: colors.onSurface }]} numberOfLines={1}>{event.title}</Text>
+            <Text style={[styles.subtitle, { color: colors.textMuted }]}>Agenda • Confirmado pelo Vito</Text>
           </View>
         </View>
 
-        <View style={styles.statusPill}>
-          <View style={styles.statusDot} />
-          <Text style={styles.statusText}>Confirmado</Text>
+        <View style={[styles.statusPill, { backgroundColor: colors.successLight }]}>
+          <View style={[styles.statusDot, { backgroundColor: colors.success }]} />
+          <Text style={[styles.statusText, { color: colors.success }]}>Confirmado</Text>
         </View>
       </View>
 
       {/* Grid de Detalhes de Horário e Local */}
       <View style={styles.detailsGrid}>
         <View style={styles.detailItem}>
-          <MaterialIcons name="schedule" size={14} color={tokens.colors.onSurfaceVariant} />
-          <Text style={styles.detailText}>{startTime} - {endTime}</Text>
+          <MaterialIcons name="schedule" size={14} color={colors.onSurfaceVariant} />
+          <Text style={[styles.detailText, { color: colors.onSurfaceVariant }]}>{startTime} - {endTime}</Text>
         </View>
         <View style={styles.detailItem}>
-          <MaterialIcons name="meeting-room" size={14} color={tokens.colors.onSurfaceVariant} />
-          <Text style={styles.detailText} numberOfLines={1}>Meet • Sala Executiva</Text>
+          <MaterialIcons name="meeting-room" size={14} color={colors.onSurfaceVariant} />
+          <Text style={[styles.detailText, { color: colors.onSurfaceVariant }]} numberOfLines={1}>Meet • Sala Executiva</Text>
         </View>
       </View>
 
       {/* Linha de Participantes e Ação M3 */}
       <View style={styles.actionRow}>
         <View style={styles.attendeesRow}>
-          <View style={[styles.avatarBubble, { backgroundColor: tokens.colors.primaryContainer }]}>
-            <Text style={styles.avatarBubbleText}>AV</Text>
+          <View style={[styles.avatarBubble, { backgroundColor: colors.surfaceContainerHighest }]}>
+            <Text style={[styles.avatarBubbleText, { color: colors.onSurface }]}>AV</Text>
           </View>
-          <View style={[styles.avatarBubble, { backgroundColor: tokens.colors.secondaryContainer, marginLeft: -6 }]}>
-            <Text style={styles.avatarBubbleText}>LC</Text>
+          <View style={[styles.avatarBubble, { backgroundColor: colors.surfaceContainerHighest, marginLeft: -6 }]}>
+            <Text style={[styles.avatarBubbleText, { color: colors.onSurface }]}>LC</Text>
           </View>
-          <View style={[styles.avatarBubble, { backgroundColor: tokens.colors.surfaceContainerHighest, marginLeft: -6 }]}>
-            <Text style={styles.avatarBubbleText}>+2</Text>
+          <View style={[styles.avatarBubble, { backgroundColor: colors.surfaceContainerHighest, marginLeft: -6 }]}>
+            <Text style={[styles.avatarBubbleText, { color: colors.onSurface }]}>+2</Text>
           </View>
         </View>
 
         {onPressDetail && (
-          <TouchableOpacity style={styles.tonalButton} onPress={onPressDetail} activeOpacity={0.8}>
-            <Text style={styles.tonalButtonText}>Ver pauta</Text>
-            <MaterialIcons name="arrow-forward" size={14} color={tokens.colors.onSecondaryContainer} />
+          <TouchableOpacity
+            style={[styles.tonalButton, { backgroundColor: colors.surfaceContainerHighest }]}
+            onPress={onPressDetail}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.tonalButtonText, { color: colors.onSurface }]}>Ver pauta</Text>
+            <MaterialIcons name="arrow-forward" size={14} color={colors.onSurface} />
           </TouchableOpacity>
         )}
       </View>
