@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -319,7 +320,8 @@ func (s *GoogleAuthService) exchangeCode(ctx context.Context, code string) (*Goo
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("Google token endpoint retornou status %d", resp.StatusCode)
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("Google token endpoint retornou status %d: %s", resp.StatusCode, strings.TrimSpace(string(bodyBytes)))
 	}
 
 	var tokenResp GoogleTokenResponse
@@ -344,7 +346,8 @@ func (s *GoogleAuthService) fetchUserInfo(ctx context.Context, accessToken strin
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("Google userinfo retornou status %d", resp.StatusCode)
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("Google userinfo retornou status %d: %s", resp.StatusCode, strings.TrimSpace(string(bodyBytes)))
 	}
 
 	var userInfo GoogleUserInfo
