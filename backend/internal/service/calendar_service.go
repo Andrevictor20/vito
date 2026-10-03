@@ -35,6 +35,7 @@ func (s *CalendarService) CreateEvent(userID, title, description, location strin
 	}
 
 	now := time.Now().UTC()
+	cat, col := ClassifyEvent(title, description)
 	event := &domain.Event{
 		ID:          uuid.New().String(),
 		UserID:      userID,
@@ -43,6 +44,8 @@ func (s *CalendarService) CreateEvent(userID, title, description, location strin
 		Location:    location,
 		StartAt:     startAt,
 		EndAt:       endAt,
+		Category:    cat,
+		Color:       col,
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}

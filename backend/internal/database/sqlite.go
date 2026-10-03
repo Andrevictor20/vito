@@ -160,6 +160,8 @@ func runMigrations(db *sql.DB) error {
 
 	// Migração incremental de colunas sem quebrar bancos existentes
 	_, _ = db.Exec("ALTER TABLE events ADD COLUMN source TEXT DEFAULT 'vito'")
+	_, _ = db.Exec("ALTER TABLE events ADD COLUMN category TEXT DEFAULT 'general'")
+	_, _ = db.Exec("ALTER TABLE events ADD COLUMN color TEXT")
 
 	return nil
 }

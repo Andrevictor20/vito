@@ -48,6 +48,35 @@ func (p *GoogleProvider) Name() string {
 	return domain.ProviderGoogle
 }
 
+func mapGoogleColor(colorID string) (category string, hex string) {
+	switch colorID {
+	case "1": // Lavanda
+		return "study", "#7986CB"
+	case "2": // Sálvia
+		return "health", "#33B679"
+	case "3": // Uva
+		return "personal", "#8E24AA"
+	case "4": // Flamingo
+		return "finance", "#E67C73"
+	case "5": // Banana
+		return "leisure", "#F6BF26"
+	case "6": // Tangerina
+		return "leisure", "#F4511E"
+	case "7": // Pavão
+		return "work", "#039BE5"
+	case "8": // Grafite
+		return "general", "#616161"
+	case "9": // Mirtilo
+		return "work", "#3F51B5"
+	case "10": // Basílico
+		return "health", "#0B8043"
+	case "11": // Tomate
+		return "finance", "#D50000"
+	default:
+		return "", ""
+	}
+}
+
 func extractAccessToken(credentials string) string {
 	if strings.HasPrefix(strings.TrimSpace(credentials), "{") {
 		var tokenMap map[string]interface{}
@@ -168,6 +197,7 @@ func (p *GoogleProvider) fetchEventsFromCalendar(ctx context.Context, token, cal
 				Description string `json:"description"`
 				Location    string `json:"location"`
 				Status      string `json:"status"`
+				ColorID     string `json:"colorId"`
 				Start       struct {
 					DateTime string `json:"dateTime"`
 					Date     string `json:"date"`
@@ -208,11 +238,12 @@ func (p *GoogleProvider) fetchEventsFromCalendar(ctx context.Context, token, cal
 				}
 			}
 
-
 			status := strings.ToLower(item.Status)
 			if status == "" {
 				status = "confirmed"
 			}
+
+			cat, col := mapGoogleColor(item.ColorID)
 
 			allItems = append(allItems, SyncItem{
 				ExternalID:  item.ID,
@@ -224,6 +255,8 @@ func (p *GoogleProvider) fetchEventsFromCalendar(ctx context.Context, token, cal
 				EndAt:       endAt,
 				Status:      status,
 				IsAllDay:    isAllDay,
+				Category:    cat,
+				Color:       col,
 			})
 		}
 

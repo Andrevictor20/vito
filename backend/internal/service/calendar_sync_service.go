@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"log"
 	"strings"
 	"sync"
 	"time"
@@ -63,6 +64,61 @@ func ComputeContentHash(title, description, location string, startAt, endAt time
 	)
 	hash := sha256.Sum256([]byte(payload))
 	return hex.EncodeToString(hash[:])
+}
+
+// ClassifyEvent infere a categoria e cor semântica a partir de palavras-chave no título e descrição.
+func ClassifyEvent(title, description string) (string, string) {
+	text := strings.ToLower(title + " " + description)
+
+	// Trabalho / Reuniões (#38BDF8)
+	workTerms := []string{"reunião", "reuniao", "daily", "align", "alinhamento", "1:1", "review", "sprint", "meet", "call", "apresentação", "apresentacao", "entrevista", "cliente", "projeto", "demo", "deploy"}
+	for _, term := range workTerms {
+		if strings.Contains(text, term) {
+			return "work", "#38BDF8"
+		}
+	}
+
+	// Saúde / Bem-Estar (#34D399)
+	healthTerms := []string{"médico", "medico", "consulta", "exame", "dentista", "academia", "treino", "pilates", "fisio", "terapia", "remédio", "remedio", "oftalmo", "psicolog", "nutri", "corrida"}
+	for _, term := range healthTerms {
+		if strings.Contains(text, term) {
+			return "health", "#34D399"
+		}
+	}
+
+	// Finanças (#F87171)
+	financeTerms := []string{"fatura", "pagar", "pagamento", "imposto", "banco", "conta", "boleto", "salário", "salario", "aluguel", "irpf", "darf"}
+	for _, term := range financeTerms {
+		if strings.Contains(text, term) {
+			return "finance", "#F87171"
+		}
+	}
+
+	// Estudo / Educação (#818CF8)
+	studyTerms := []string{"aula", "curso", "faculdade", "prova", "seminário", "seminario", "workshop", "mentoria", "estudo", "tcc", "palestra"}
+	for _, term := range studyTerms {
+		if strings.Contains(text, term) {
+			return "study", "#818CF8"
+		}
+	}
+
+	// Lazer / Social (#FBBF24)
+	leisureTerms := []string{"churrasco", "chopp", "cerveja", "bar", "festa", "cinema", "show", "viagem", "praia", "jogo", "jantar", "aniversário", "aniversario", "parabéns", "parabens"}
+	for _, term := range leisureTerms {
+		if strings.Contains(text, term) {
+			return "leisure", "#FBBF24"
+		}
+	}
+
+	// Pessoal / Família (#D0BCFF)
+	personalTerms := []string{"família", "familia", "mãe", "mae", "pai", "filho", "filha", "casa", "compras", "mercado", "levar", "buscar"}
+	for _, term := range personalTerms {
+		if strings.Contains(text, term) {
+			return "personal", "#D0BCFF"
+		}
+	}
+
+	return "general", "#94A3B8"
 }
 
 // ConnectIntegration armazena de forma criptografada as credenciais e ativa a integração.
@@ -174,6 +230,12 @@ func (s *CalendarSyncService) SyncIntegration(ctx context.Context, userID, provi
 
 		itemHash := ComputeContentHash(item.Title, item.Description, item.Location, item.StartAt, item.EndAt)
 
+		cat := item.Category
+		col := item.Color
+		if cat == "" || col == "" {
+			cat, col = ClassifyEvent(item.Title, item.Description)
+		}
+
 		if err == nil && mapping != nil {
 			// Prevenção de loop (Echo Suppression): Se o hash for idêntico ao já gravado, descarta o ciclo
 			if mapping.ContentHash == itemHash {
@@ -188,6 +250,8 @@ func (s *CalendarSyncService) SyncIntegration(ctx context.Context, userID, provi
 				evt.Location = item.Location
 				evt.StartAt = item.StartAt
 				evt.EndAt = item.EndAt
+				evt.Category = cat
+				evt.Color = col
 				evt.UpdatedAt = now
 				_ = s.eventRepo.Create(evt) // Inserção/atualização por ID
 			}
@@ -208,6 +272,8 @@ func (s *CalendarSyncService) SyncIntegration(ctx context.Context, userID, provi
 				StartAt:     item.StartAt,
 				EndAt:       item.EndAt,
 				Source:      providerName,
+				Category:    cat,
+				Color:       col,
 				CreatedAt:   now,
 				UpdatedAt:   now,
 			}
@@ -225,6 +291,8 @@ func (s *CalendarSyncService) SyncIntegration(ctx context.Context, userID, provi
 					Status:          "synced",
 				}
 				_ = s.syncRepo.UpsertMapping(newMap)
+			} else {
+				log.Printf("[CalendarSync] Falha ao persistir evento '%s' no SQLite: %v", item.Title, err)
 			}
 		}
 	}

@@ -21,6 +21,8 @@ type Event struct {
 	StartAt     time.Time `json:"start_at"`
 	EndAt       time.Time `json:"end_at"`
 	Source      string    `json:"source,omitempty"`
+	Category    string    `json:"category,omitempty"`
+	Color       string    `json:"color,omitempty"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }

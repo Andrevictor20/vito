@@ -79,4 +79,37 @@ func TestCalendarService_CreateEventWithConflictCheck(t *testing.T) {
 	if conflict2.ConflictingTitle != "Dentista" {
 		t.Errorf("expected conflict with 'Dentista', got '%s'", conflict2.ConflictingTitle)
 	}
+
+	if event1.Category != "health" {
+		t.Errorf("expected category health for Dentista, got '%s'", event1.Category)
+	}
+	if event1.Color == "" {
+		t.Errorf("expected non-empty color for health event")
+	}
+}
+
+func TestClassifyEvent(t *testing.T) {
+	cases := []struct {
+		title    string
+		desc     string
+		expected string
+	}{
+		{"Daily Scrum", "Alinhamento com o time", "work"},
+		{"Consulta com Cardiologista", "Levar exames", "health"},
+		{"Pagar fatura Nubank", "Vencimento hoje", "finance"},
+		{"Aula de Arquitetura de Software", "Faculdade", "study"},
+		{"Churrasco de Aniversário", "Na casa do Pedro", "leisure"},
+		{"Almoço com a Família", "Comprar sobremesa", "personal"},
+		{"Lembrete genérico", "Sem contexto", "general"},
+	}
+
+	for _, c := range cases {
+		cat, col := service.ClassifyEvent(c.title, c.desc)
+		if cat != c.expected {
+			t.Errorf("ClassifyEvent(%q, %q) = %q, expected %q", c.title, c.desc, cat, c.expected)
+		}
+		if col == "" {
+			t.Errorf("ClassifyEvent(%q, %q) returned empty color", c.title, c.desc)
+		}
+	}
 }

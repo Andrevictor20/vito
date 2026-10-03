@@ -6,7 +6,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    image: vito-backend:latest
+    image: ghcr.io/andrevictor20/vito:latest
     container_name: vito-backend
     restart: unless-stopped
     ports:
@@ -20,10 +20,29 @@ services:
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
       - GOOGLE_REDIRECT_URL=${GOOGLE_REDIRECT_URL:-https://vito.rasppi.cloud/api/v1/auth/google/callback}
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
     volumes:
       - vito_data:/app/data
     networks:
       - vito_net
+
+  # Watchtower para automação contínua de deploy sem necessidade de SSH no Raspberry Pi
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: vito-watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_POLL_INTERVAL=300
+      - WATCHTOWER_INCLUDE_STOPPED=false
+    networks:
+      - vito_net
+    profiles:
+      - production
+      - watchtower
 
   # Serviço do Cloudflare Tunnel para Zero-Trust (dispensa abertura de portas no roteador)
   tunnel:

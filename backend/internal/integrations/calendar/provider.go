@@ -18,6 +18,8 @@ type SyncItem struct {
 	EndAt       time.Time
 	Status      string // "confirmed", "cancelled"
 	IsAllDay    bool
+	Category    string
+	Color       string
 }
 
 // SyncResult encapsula os eventos sincronizados e os metadados de sync incremental.

@@ -29,29 +29,69 @@ export const EventCard: React.FC<EventCardProps> = ({
   const endTime = event.end_at ? formatTime(event.end_at) : '';
   const timeDisplay = endTime ? `${startTime} – ${endTime}` : startTime;
 
-  // Inferir categoria M3 para a tag
+  // Inferir categoria e cores semânticas M3 para a tag
   const getCategory = () => {
+    if (event.category) {
+      const color = event.color || '#38BDF8';
+      const catMap: Record<string, string> = {
+        work: 'TRABALHO',
+        health: 'SAÚDE',
+        finance: 'FINANÇAS',
+        study: 'ESTUDO',
+        leisure: 'LAZER',
+        personal: 'PESSOAL',
+        general: 'COMPROMISSO',
+      };
+      const label = catMap[event.category] || event.category.toUpperCase();
+      return {
+        label,
+        bg: color + (isDark ? '26' : '1A'),
+        text: color,
+        border: color + (isDark ? '4D' : '33'),
+      };
+    }
+
     const text = `${event.title} ${event.description || ''}`.toLowerCase();
     if (text.includes('anivers') || text.includes('niver')) {
-      return { label: 'ANIVERSÁRIO', bg: colors.categoryBirthdayBg, text: colors.categoryBirthdayText };
+      return { label: 'ANIVERSÁRIO', bg: colors.categoryBirthdayBg, text: colors.categoryBirthdayText, border: colors.categoryBirthdayText + '33' };
     }
     if (text.includes('churras') || text.includes('bbq')) {
-      return { label: 'CHURRASCO', bg: colors.categoryBbqBg, text: colors.categoryBbqText };
+      return { label: 'CHURRASCO', bg: colors.categoryBbqBg, text: colors.categoryBbqText, border: colors.categoryBbqText + '33' };
     }
     if (text.includes('festa') || text.includes('party') || text.includes('balada')) {
-      return { label: 'FESTA', bg: colors.categoryPartyBg, text: colors.categoryPartyText };
+      return { label: 'FESTA', bg: colors.categoryPartyBg, text: colors.categoryPartyText, border: colors.categoryPartyText + '33' };
     }
-    return { label: 'EVENTO', bg: colors.secondaryContainer, text: colors.onSecondaryContainer };
+    return { label: 'EVENTO', bg: colors.secondaryContainer, text: colors.onSecondaryContainer, border: colors.outlineVariant };
   };
 
   const category = getCategory();
+  const accentBarColor = event.color || (category.text !== colors.onSecondaryContainer ? category.text : colors.primary);
 
   return (
-    <View style={[styles.card, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant, borderWidth: 1 }]}>
-      {/* Top Row: Categoria + Ações */}
+    <View
+      style={[
+        styles.card,
+        {
+          backgroundColor: colors.surfaceContainer,
+          borderColor: colors.outlineVariant,
+          borderWidth: 1,
+          borderLeftWidth: 4,
+          borderLeftColor: accentBarColor,
+        },
+      ]}
+    >
+      {/* Top Row: Categoria + Origem + Ações */}
       <View style={styles.topRow}>
-        <View style={[styles.categoryBadge, { backgroundColor: category.bg }]}>
-          <Text style={[styles.categoryText, { color: category.text }]}>{category.label}</Text>
+        <View style={styles.badgeGroup}>
+          <View style={[styles.categoryBadge, { backgroundColor: category.bg, borderColor: category.border, borderWidth: 1 }]}>
+            <Text style={[styles.categoryText, { color: category.text }]}>{category.label}</Text>
+          </View>
+          {event.source === 'google' && (
+            <View style={[styles.sourceBadge, { backgroundColor: isDark ? '#EA433522' : '#EA433515' }]}>
+              <MaterialIcons name="event" size={11} color="#EA4335" />
+              <Text style={styles.sourceText}>Google</Text>
+            </View>
+          )}
         </View>
 
         <TouchableOpacity
@@ -104,6 +144,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: tokens.spacing.sm,
   },
+  badgeGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   categoryBadge: {
     paddingHorizontal: tokens.spacing.sm + 2,
     paddingVertical: 3,
@@ -113,6 +158,19 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: tokens.typography.weight.bold,
     letterSpacing: 0.5,
+  },
+  sourceBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: MD3Shapes.full,
+  },
+  sourceText: {
+    fontSize: 10,
+    fontWeight: tokens.typography.weight.medium,
+    color: '#EA4335',
   },
   deleteButton: {
     padding: tokens.spacing.xs,
