@@ -105,7 +105,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                     setCalendarSyncModalVisible(false);
                     onDataChanged?.();
                   }}
+                  onDataChanged={onDataChanged}
                 />
+
 
                 {/* Ações da Sessão */}
                 <View style={styles.actionsGroup}>

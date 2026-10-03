@@ -188,17 +188,26 @@ func (p *GoogleProvider) fetchEventsFromCalendar(ctx context.Context, token, cal
 			isAllDay := false
 
 			if item.Start.DateTime != "" {
-				startAt, _ = time.Parse(time.RFC3339, item.Start.DateTime)
+				if t, err := time.Parse(time.RFC3339, item.Start.DateTime); err == nil {
+					startAt = t.UTC()
+				}
 			} else if item.Start.Date != "" {
-				startAt, _ = time.Parse("2006-01-02", item.Start.Date)
-				isAllDay = true
+				if t, err := time.Parse("2006-01-02", item.Start.Date); err == nil {
+					startAt = t.UTC()
+					isAllDay = true
+				}
 			}
 
 			if item.End.DateTime != "" {
-				endAt, _ = time.Parse(time.RFC3339, item.End.DateTime)
+				if t, err := time.Parse(time.RFC3339, item.End.DateTime); err == nil {
+					endAt = t.UTC()
+				}
 			} else if item.End.Date != "" {
-				endAt, _ = time.Parse("2006-01-02", item.End.Date)
+				if t, err := time.Parse("2006-01-02", item.End.Date); err == nil {
+					endAt = t.UTC()
+				}
 			}
+
 
 			status := strings.ToLower(item.Status)
 			if status == "" {

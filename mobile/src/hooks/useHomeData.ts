@@ -1,10 +1,14 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Event, Todo, AssistantChatResponse } from '../types';
 import { api } from '../services/api';
 
 const CACHE_EVENTS_KEY = '@vito_cache_events';
 const CACHE_TODOS_KEY = '@vito_cache_todos';
+
+const formatLocalDate = (d: Date): string => {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
 
 export function useHomeData() {
   const [events, setEvents] = useState<Event[]>([]);
@@ -133,13 +137,50 @@ export function useHomeData() {
     }
   };
 
-  const selectedDateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
+  const eventDates = useMemo(() => {
+    const dates = new Set<string>();
+    events.forEach((ev) => {
+      try {
+        const start = new Date(ev.start_at);
+        const end = ev.end_at ? new Date(ev.end_at) : start;
+        const cur = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+        const last = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+
+        // Se o evento termina à meia-noite exata de um dia posterior, não colore o dia seguinte
+        if (last > cur && end.getHours() === 0 && end.getMinutes() === 0 && end.getSeconds() === 0) {
+          last.setDate(last.getDate() - 1);
+        }
+
+        while (cur <= last) {
+          dates.add(formatLocalDate(cur));
+          cur.setDate(cur.getDate() + 1);
+        }
+      } catch {}
+    });
+    return dates;
+  }, [events]);
+
+  const selectedDateStr = formatLocalDate(selectedDate);
   const dayEvents = events.filter((ev) => {
-    const startDay = ev.start_at.substring(0, 10);
-    const endDay = ev.end_at.substring(0, 10);
-    return selectedDateStr >= startDay && selectedDateStr <= endDay;
+    try {
+      const start = new Date(ev.start_at);
+      const end = ev.end_at ? new Date(ev.end_at) : start;
+      const startStr = formatLocalDate(start);
+      let endStr = formatLocalDate(end);
+
+      // Tratamento para término à meia-noite em eventos de dia inteiro do Google
+      if (endStr > startStr && end.getHours() === 0 && end.getMinutes() === 0 && end.getSeconds() === 0) {
+        const adj = new Date(end.getTime() - 1000);
+        endStr = formatLocalDate(adj);
+      }
+
+      return selectedDateStr >= startStr && selectedDateStr <= endStr;
+    } catch {
+      return false;
+    }
   });
   const isTodaySelected = selectedDate.toDateString() === new Date().toDateString();
+
 
   return {
     events,

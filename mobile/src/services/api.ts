@@ -30,14 +30,6 @@ class ApiService {
       await AsyncStorage.setItem(SERVER_URL_KEY, this.baseUrl);
     }
     this.token = await secureStorage.getItem(TOKEN_KEY);
-    if (!this.token) {
-      const legacyToken = await AsyncStorage.getItem(TOKEN_KEY);
-      if (legacyToken) {
-        this.token = legacyToken;
-        await secureStorage.setItem(TOKEN_KEY, legacyToken);
-        await AsyncStorage.removeItem(TOKEN_KEY).catch(() => {});
-      }
-    }
   }
 
   getBaseUrl(): string {
@@ -54,12 +46,11 @@ class ApiService {
     this.token = token;
     if (token) {
       await secureStorage.setItem(TOKEN_KEY, token);
-      await AsyncStorage.removeItem(TOKEN_KEY).catch(() => {});
     } else {
       await secureStorage.removeItem(TOKEN_KEY);
-      await AsyncStorage.removeItem(TOKEN_KEY).catch(() => {});
     }
   }
+
 
   getToken(): string | null {
     return this.token;

@@ -17,11 +17,13 @@ import { useCalendarSync } from '../../hooks/useCalendarSync';
 interface CalendarSyncSettingsModalProps {
   visible: boolean;
   onClose: () => void;
+  onDataChanged?: () => void;
 }
 
 export const CalendarSyncSettingsModal: React.FC<CalendarSyncSettingsModalProps> = ({
   visible,
   onClose,
+  onDataChanged,
 }) => {
   const { colors, isDark } = useTheme();
   const {
@@ -47,6 +49,7 @@ export const CalendarSyncSettingsModal: React.FC<CalendarSyncSettingsModalProps>
   const handleConnectGoogle = async () => {
     try {
       const res = await connectGoogleOAuth();
+      onDataChanged?.();
       Alert.alert('Sucesso', `Google Calendar (${res.email}) conectado com sincronização ativada!`);
     } catch (err: any) {
       if (err?.message?.includes('cancelad')) {
@@ -59,8 +62,10 @@ export const CalendarSyncSettingsModal: React.FC<CalendarSyncSettingsModalProps>
   const handleSyncGoogle = async () => {
     try {
       await syncProvider('google');
+      onDataChanged?.();
       Alert.alert('Sucesso', 'Eventos do Google Calendar sincronizados com sucesso!');
     } catch (err: any) {
+
       const msg = err?.message || '';
       if (msg.includes('403') || msg.includes('insufficient') || msg.includes('permission')) {
         Alert.alert(

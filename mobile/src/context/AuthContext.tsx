@@ -28,36 +28,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const bootstrap = async () => {
       try {
         await api.init();
-        let cachedUser = await secureStorage.getItem(USER_KEY);
-        if (!cachedUser) {
-          const legacyUser = await AsyncStorage.getItem(USER_KEY);
-          if (legacyUser) {
-            cachedUser = legacyUser;
-            await secureStorage.setItem(USER_KEY, legacyUser);
-            await AsyncStorage.removeItem(USER_KEY).catch(() => {});
-          }
-        }
+        const cachedUser = await secureStorage.getItem(USER_KEY);
         if (cachedUser) {
           try {
-            setUser(JSON.parse(cachedUser));
-            setIsInitialLoading(false);
+            const parsed = JSON.parse(cachedUser);
+            if (parsed && parsed.id) {
+              setUser(parsed);
+              setIsInitialLoading(false);
+            }
           } catch {}
         }
+
+        // Validação ou atualização silenciosa do perfil em background se houver token
         if (api.getToken()) {
-          const res = await api.getMe();
-          if (res?.user) {
-            setUser(res.user);
-            await secureStorage.setItem(USER_KEY, JSON.stringify(res.user));
+          try {
+            const res = await api.getMe();
+            if (res?.user) {
+              setUser(res.user);
+              await secureStorage.setItem(USER_KEY, JSON.stringify(res.user));
+            }
+          } catch (meErr: any) {
+            const errMsg = meErr?.message || '';
+            // Apenas desloga se o token for explicitamente rejeitado pelo servidor (401 com token inválido/expirado)
+            if (errMsg.includes('401') && (errMsg.includes('inválido') || errMsg.includes('expirado') || errMsg.includes('não autorizado'))) {
+              console.warn('[AuthContext] Sessão expirada no servidor, deslogando:', errMsg);
+              await api.setToken(null);
+              await secureStorage.removeItem(USER_KEY);
+              setUser(null);
+            } else {
+              // Erros transitórios de rede/timeout: mantém o usuário autenticado com cache local
+              console.log('[AuthContext] Falha transitória de rede ao validar sessão, mantendo offline/cache:', errMsg);
+            }
           }
         }
       } catch (e: any) {
-        // Se foi erro 401 não autorizado, limpa a sessão
-        if (e?.message?.includes('401') || e?.message?.includes('não autorizado')) {
-          await api.setToken(null);
-          await secureStorage.removeItem(USER_KEY);
-          await AsyncStorage.removeItem(USER_KEY).catch(() => {});
-          setUser(null);
-        }
+        console.warn('[AuthContext] Erro no bootstrap de autenticação:', e);
       } finally {
         setIsInitialLoading(false);
       }
@@ -71,7 +76,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const res = await api.login(email, pass);
       setUser(res.user);
       await secureStorage.setItem(USER_KEY, JSON.stringify(res.user));
-      await AsyncStorage.removeItem(USER_KEY).catch(() => {});
     } finally {
       setIsLoading(false);
     }
@@ -83,7 +87,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const res = await api.register(name, email, pass);
       setUser(res.user);
       await secureStorage.setItem(USER_KEY, JSON.stringify(res.user));
-      await AsyncStorage.removeItem(USER_KEY).catch(() => {});
     } finally {
       setIsLoading(false);
     }
@@ -96,7 +99,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await api.setToken(token);
       setUser(googleUser);
       await secureStorage.setItem(USER_KEY, JSON.stringify(googleUser));
-      await AsyncStorage.removeItem(USER_KEY).catch(() => {});
     } finally {
       setIsLoading(false);
     }
@@ -105,9 +107,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = async () => {
     await api.setToken(null);
     await secureStorage.removeItem(USER_KEY);
-    await AsyncStorage.removeItem(USER_KEY).catch(() => {});
     setUser(null);
   };
+
 
   return (
     <AuthContext.Provider value={{ user, isLoading, isInitialLoading, login, register, loginWithGoogle, logout }}>
