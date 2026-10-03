@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { secureStorage } from '../services/secureStore';
 import { User } from '../types';
 import { api } from '../services/api';
+import { googleAuthService } from '../services/googleAuthService';
 
 const USER_KEY = '@vito_user';
 
@@ -12,6 +13,7 @@ interface AuthContextType {
   isInitialLoading: boolean;
   login: (email: string, pass: string) => Promise<void>;
   register: (name: string, email: string, pass: string) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -87,6 +89,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const loginWithGoogle = async () => {
+    setIsLoading(true);
+    try {
+      const { token, user: googleUser } = await googleAuthService.loginWithGoogle(api.getBaseUrl());
+      await api.setToken(token);
+      setUser(googleUser);
+      await secureStorage.setItem(USER_KEY, JSON.stringify(googleUser));
+      await AsyncStorage.removeItem(USER_KEY).catch(() => {});
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const logout = async () => {
     await api.setToken(null);
     await secureStorage.removeItem(USER_KEY);
@@ -95,7 +110,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, isInitialLoading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, isLoading, isInitialLoading, login, register, loginWithGoogle, logout }}>
       {children}
     </AuthContext.Provider>
   );

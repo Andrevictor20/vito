@@ -46,8 +46,11 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
               styles.activeIndicatorSelected,
               {
                 backgroundColor: isDark ? colors.surfaceContainerHighest : colors.primary,
-                borderWidth: isDark ? 1 : 0,
-                borderColor: colors.outlineVariant,
+                borderRadius: 16,
+                overflow: 'hidden',
+                ...(isDark
+                  ? { borderWidth: 1, borderColor: colors.outlineVariant }
+                  : { borderWidth: 0 }),
               },
             ],
           ]}
@@ -95,8 +98,11 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
               styles.activeIndicatorSelected,
               {
                 backgroundColor: isDark ? colors.surfaceContainerHighest : colors.primary,
-                borderWidth: isDark ? 1 : 0,
-                borderColor: colors.outlineVariant,
+                borderRadius: 16,
+                overflow: 'hidden',
+                ...(isDark
+                  ? { borderWidth: 1, borderColor: colors.outlineVariant }
+                  : { borderWidth: 0 }),
               },
             ],
           ]}
@@ -153,12 +159,15 @@ const styles = StyleSheet.create({
     width: 64,
     height: 32,
     borderRadius: 16,
+    overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'transparent',
     marginBottom: 4,
   },
   activeIndicatorSelected: {
+    borderRadius: 16,
+    overflow: 'hidden',
     backgroundColor: tokens.colors.primaryContainer,
   },
   navLabel: {

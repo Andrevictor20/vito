@@ -24,7 +24,7 @@ interface AuthScreenProps {
 }
 
 export const AuthScreen: React.FC<AuthScreenProps> = ({ serverUrl, onToggleServer }) => {
-  const { login, register, isLoading } = useAuth();
+  const { login, register, loginWithGoogle, isLoading } = useAuth();
   const { colors, isDark, toggleTheme } = useTheme();
   const styles = useMemo(() => createAuthStyles(colors), [colors]);
   const [isRegister, setIsRegister] = useState(false);
@@ -77,6 +77,18 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ serverUrl, onToggleServe
       } else {
         setError(msg || 'Falha ao autenticar.');
       }
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setError(null);
+    try {
+      await loginWithGoogle();
+    } catch (err: any) {
+      if (err?.message?.includes('cancelado')) {
+        return;
+      }
+      setError(err?.message || 'Falha ao autenticar com o Google.');
     }
   };
 
@@ -224,6 +236,26 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ serverUrl, onToggleServe
               {isRegister ? 'Criar Conta' : 'Entrar'}
             </Text>
           )}
+        </TouchableOpacity>
+
+        {/* Divisor Visual */}
+        <View style={styles.dividerRow}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>ou</Text>
+          <View style={styles.dividerLine} />
+        </View>
+
+        {/* Botão de Autenticação com a Conta Google */}
+        <TouchableOpacity
+          style={[styles.googleButton, isLoading && styles.buttonDisabled]}
+          onPress={handleGoogleLogin}
+          disabled={isLoading}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Continuar com o Google"
+        >
+          <MaterialIcons name="account-circle" size={20} color={colors.primary} />
+          <Text style={styles.googleButtonText}>Continuar com o Google</Text>
         </TouchableOpacity>
 
         <TouchableOpacity

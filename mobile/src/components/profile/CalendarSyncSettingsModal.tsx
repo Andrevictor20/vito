@@ -27,7 +27,7 @@ export const CalendarSyncSettingsModal: React.FC<CalendarSyncSettingsModalProps>
   const {
     isLoading,
     isSyncing,
-    connectGoogle,
+    connectGoogleOAuth,
     connectAppleCalDAV,
     connectNativeApple,
     syncProvider,
@@ -40,31 +40,18 @@ export const CalendarSyncSettingsModal: React.FC<CalendarSyncSettingsModalProps>
   const [appleId, setAppleId] = useState('');
   const [appSpecificPassword, setAppSpecificPassword] = useState('');
 
-  // Estados de conexão Google
-  const [showGoogleForm, setShowGoogleForm] = useState(false);
-  const [googleEmail, setGoogleEmail] = useState('');
-
   const googleInteg = getIntegration('google');
   const appleCalDAVInteg = getIntegration('apple_caldav');
   const appleNativeInteg = getIntegration('apple_native');
 
   const handleConnectGoogle = async () => {
-    if (!googleEmail.trim()) {
-      Alert.alert('Atenção', 'Informe seu e-mail do Google.');
-      return;
-    }
     try {
-      // Mock / Token OAuth2 para autenticação da conta Google
-      const tokenPayload = JSON.stringify({
-        access_token: `mock_gcal_token_${Date.now()}`,
-        refresh_token: `mock_gcal_refresh_${Date.now()}`,
-        expires_in: 3600,
-      });
-      await connectGoogle(googleEmail.trim(), tokenPayload);
-      setShowGoogleForm(false);
-      setGoogleEmail('');
-      Alert.alert('Sucesso', 'Google Calendar conectado com sincronização ativada!');
+      const res = await connectGoogleOAuth();
+      Alert.alert('Sucesso', `Google Calendar (${res.email}) conectado com sincronização ativada!`);
     } catch (err: any) {
+      if (err?.message?.includes('cancelad')) {
+        return;
+      }
       Alert.alert('Erro', err.message || 'Falha ao conectar com o Google Calendar');
     }
   };
@@ -211,55 +198,21 @@ export const CalendarSyncSettingsModal: React.FC<CalendarSyncSettingsModalProps>
                 </View>
               ) : (
                 <View style={styles.disconnectedActions}>
-                  {!showGoogleForm ? (
-                    <TouchableOpacity
-                      style={[styles.connectBtn, { backgroundColor: colors.primary }]}
-                      onPress={() => setShowGoogleForm(true)}
-                    >
-                      <MaterialIcons name="login" size={16} color="#FFFFFF" />
-                      <Text style={styles.connectBtnText}>Conectar com Google</Text>
-                    </TouchableOpacity>
-                  ) : (
-                    <View style={styles.formContainer}>
-                      <TextInput
-                        style={[
-                          styles.input,
-                          {
-                            backgroundColor: colors.surfaceContainerHigh,
-                            color: colors.onSurface,
-                            borderColor: colors.outlineVariant,
-                          },
-                        ]}
-                        placeholder="E-mail da sua conta Google"
-                        placeholderTextColor={colors.onSurfaceVariant}
-                        value={googleEmail}
-                        onChangeText={setGoogleEmail}
-                        autoCapitalize="none"
-                        keyboardType="email-address"
-                      />
-                      <View style={styles.formButtonRow}>
-                        <TouchableOpacity
-                          style={[styles.confirmBtn, { backgroundColor: colors.primary }]}
-                          onPress={handleConnectGoogle}
-                          disabled={isLoading}
-                        >
-                          {isLoading ? (
-                            <ActivityIndicator size="small" color="#FFFFFF" />
-                          ) : (
-                            <Text style={styles.confirmBtnText}>Salvar e Conectar</Text>
-                          )}
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[styles.cancelBtn, { borderColor: colors.outlineVariant }]}
-                          onPress={() => setShowGoogleForm(false)}
-                        >
-                          <Text style={[styles.cancelBtnText, { color: colors.onSurfaceVariant }]}>
-                            Cancelar
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  )}
+                  <TouchableOpacity
+                    style={[styles.connectBtn, { backgroundColor: colors.primary }]}
+                    onPress={handleConnectGoogle}
+                    disabled={isLoading}
+                    activeOpacity={0.8}
+                  >
+                    {isLoading ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <>
+                        <MaterialIcons name="sync" size={16} color="#FFFFFF" />
+                        <Text style={styles.connectBtnText}>Conectar Conta Google</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
                 </View>
               )}
             </View>

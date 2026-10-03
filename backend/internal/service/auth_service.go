@@ -124,6 +124,11 @@ func (s *AuthService) ValidateToken(tokenString string) (*UserClaims, error) {
 	return claims, nil
 }
 
+// GenerateTokenForUser expõe a geração de token JWT para provedores de autenticação (como Google OAuth).
+func (s *AuthService) GenerateTokenForUser(user *domain.User) (string, error) {
+	return s.generateToken(user)
+}
+
 func (s *AuthService) generateToken(user *domain.User) (string, error) {
 	claims := UserClaims{
 		UserID: user.ID,

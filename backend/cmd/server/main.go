@@ -65,8 +65,21 @@ func main() {
 
 	syncRepo := repository.NewCalendarSyncRepository(db)
 	syncSvc := service.NewCalendarSyncService(syncRepo, eventRepo, cfg.JWTSecret)
-	syncSvc.RegisterProvider(calendar.NewGoogleProvider(calendar.GoogleConfig{}))
+	googleCalCfg := calendar.GoogleConfig{
+		ClientID:     cfg.GoogleClientID,
+		ClientSecret: cfg.GoogleClientSecret,
+		RedirectURI:  cfg.GoogleRedirectURL,
+	}
+	syncSvc.RegisterProvider(calendar.NewGoogleProvider(googleCalCfg))
 	syncSvc.RegisterProvider(calendar.NewAppleCalDAVProvider(calendar.AppleCalDAVConfig{}))
+
+	googleAuthCfg := service.GoogleAuthConfig{
+		ClientID:     cfg.GoogleClientID,
+		ClientSecret: cfg.GoogleClientSecret,
+		RedirectURL:  cfg.GoogleRedirectURL,
+		JWTSecret:    cfg.JWTSecret,
+	}
+	googleAuthSvc := service.NewGoogleAuthService(googleAuthCfg, userRepo, authSvc, syncSvc)
 
 	// Transcritor de voz Whisper
 	var whisperTranscriber ai.AudioTranscriber
@@ -77,6 +90,7 @@ func main() {
 
 	// 5. Handlers HTTP
 	authHandler := handler.NewAuthHandler(authSvc, userRepo)
+	googleAuthHandler := handler.NewGoogleAuthHandler(googleAuthSvc, authSvc)
 	calHandler := handler.NewCalendarHandler(calSvc)
 	todoHandler := handler.NewTodoHandler(todoSvc)
 	astHandler := handler.NewAssistantHandler(astSvc, whisperTranscriber)
@@ -85,13 +99,14 @@ func main() {
 
 	// 6. Servidor HTTP
 	srv := server.New(server.Config{
-		AuthHandler:  authHandler,
-		CalHandler:   calHandler,
-		TodoHandler:  todoHandler,
-		AstHandler:   astHandler,
-		NotifHandler: notifHandler,
-		SyncHandler:  syncHandler,
-		AuthSvc:      authSvc,
+		AuthHandler:       authHandler,
+		GoogleAuthHandler: googleAuthHandler,
+		CalHandler:        calHandler,
+		TodoHandler:       todoHandler,
+		AstHandler:        astHandler,
+		NotifHandler:      notifHandler,
+		SyncHandler:       syncHandler,
+		AuthSvc:           authSvc,
 	})
 
 	httpServer := &http.Server{

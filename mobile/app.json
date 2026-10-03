@@ -2,6 +2,7 @@
   "expo": {
     "name": "Vito",
     "slug": "vito",
+    "scheme": "vito",
     "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -65,7 +66,8 @@
           "icon": "./assets/icon.png",
           "color": "#1A1A1E"
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "extra": {
       "eas": {

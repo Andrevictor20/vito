@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { calendarSyncService, CalendarIntegration } from '../services/calendarSyncService';
 import { nativeCalendarService } from '../services/nativeCalendarService';
+import { googleAuthService } from '../services/googleAuthService';
+import { api } from '../services/api';
 
 export function useCalendarSync() {
   const [integrations, setIntegrations] = useState<CalendarIntegration[]>([]);
@@ -38,6 +40,23 @@ export function useCalendarSync() {
       });
       await loadIntegrations();
       return result;
+    } catch (err: any) {
+      setError(err?.message || 'Falha ao conectar com o Google Calendar');
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const connectGoogleOAuth = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const token = api.getToken() || '';
+      const baseUrl = api.getBaseUrl();
+      const res = await googleAuthService.connectGoogleCalendar(baseUrl, token);
+      await loadIntegrations();
+      return res;
     } catch (err: any) {
       setError(err?.message || 'Falha ao conectar com o Google Calendar');
       throw err;
@@ -134,6 +153,7 @@ export function useCalendarSync() {
     error,
     refresh: loadIntegrations,
     connectGoogle,
+    connectGoogleOAuth,
     connectAppleCalDAV,
     connectNativeApple,
     syncProvider,
