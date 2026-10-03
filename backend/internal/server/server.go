@@ -15,21 +15,25 @@ import (
 
 // Server encapsula o roteador Chi e dependências HTTP do Kito.
 type Server struct {
-	router      *chi.Mux
-	authHandler *handler.AuthHandler
-	calHandler  *handler.CalendarHandler
-	todoHandler *handler.TodoHandler
-	astHandler  *handler.AssistantHandler
-	authSvc     *service.AuthService
+	router       *chi.Mux
+	authHandler  *handler.AuthHandler
+	calHandler   *handler.CalendarHandler
+	todoHandler  *handler.TodoHandler
+	astHandler   *handler.AssistantHandler
+	notifHandler *handler.NotificationHandler
+	syncHandler  *handler.CalendarSyncHandler
+	authSvc      *service.AuthService
 }
 
 // Config contém as dependências necessárias para inicializar o Server.
 type Config struct {
-	AuthHandler *handler.AuthHandler
-	CalHandler  *handler.CalendarHandler
-	TodoHandler *handler.TodoHandler
-	AstHandler  *handler.AssistantHandler
-	AuthSvc     *service.AuthService
+	AuthHandler  *handler.AuthHandler
+	CalHandler   *handler.CalendarHandler
+	TodoHandler  *handler.TodoHandler
+	AstHandler   *handler.AssistantHandler
+	NotifHandler *handler.NotificationHandler
+	SyncHandler  *handler.CalendarSyncHandler
+	AuthSvc      *service.AuthService
 }
 
 // New instancia o servidor com o roteador Chi, middlewares e rotas registrados.
@@ -43,6 +47,8 @@ func New(cfg ...Config) *Server {
 		s.calHandler = cfg[0].CalHandler
 		s.todoHandler = cfg[0].TodoHandler
 		s.astHandler = cfg[0].AstHandler
+		s.notifHandler = cfg[0].NotifHandler
+		s.syncHandler = cfg[0].SyncHandler
 		s.authSvc = cfg[0].AuthSvc
 	}
 
@@ -114,6 +120,23 @@ func (s *Server) registerRoutes() {
 					protected.Post("/assistant/chat", s.astHandler.Chat)
 					protected.Post("/assistant/audio", s.astHandler.AudioChat)
 					protected.Post("/assistant/vision", s.astHandler.VisionChat)
+				}
+
+				if s.notifHandler != nil {
+					protected.Route("/notifications", func(nr chi.Router) {
+						nr.Post("/device-token", s.notifHandler.RegisterDeviceToken)
+						nr.Post("/test", s.notifHandler.SendTestNotification)
+					})
+				}
+
+				if s.syncHandler != nil {
+					protected.Route("/integrations/calendars", func(ir chi.Router) {
+						ir.Get("/", s.syncHandler.ListIntegrations)
+						ir.Post("/connect", s.syncHandler.ConnectIntegration)
+						ir.Post("/{provider}/sync", s.syncHandler.SyncIntegration)
+						ir.Delete("/{provider}", s.syncHandler.DisconnectIntegration)
+						ir.Post("/google/webhook", s.syncHandler.GoogleWebhook)
+					})
 				}
 			})
 		}

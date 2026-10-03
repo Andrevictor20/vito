@@ -1,0 +1,81 @@
+package repository_test
+
+import (
+	"path/filepath"
+	"testing"
+	"time"
+
+	"github.com/andrevmp/vito/backend/internal/database"
+	"github.com/andrevmp/vito/backend/internal/domain"
+	"github.com/andrevmp/vito/backend/internal/repository"
+)
+
+func setupDeviceTokenTestDB(t *testing.T) (*repository.DeviceTokenRepositorySQLite, *repository.UserRepositorySQLite) {
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "test_vito_notifications.db")
+
+	db, err := database.Open(dbPath)
+	if err != nil {
+		t.Fatalf("failed to open test db: %v", err)
+	}
+	t.Cleanup(func() { db.Close() })
+
+	return repository.NewDeviceTokenRepository(db), repository.NewUserRepository(db)
+}
+
+func TestDeviceTokenRepository_SaveAndFind(t *testing.T) {
+	tokenRepo, userRepo := setupDeviceTokenTestDB(t)
+
+	user := &domain.User{
+		ID:           "user-notif-1",
+		Name:         "User Notif",
+		Email:        "notif@example.com",
+		PasswordHash: "hashed",
+		CreatedAt:    time.Now().UTC(),
+		UpdatedAt:    time.Now().UTC(),
+	}
+	if err := userRepo.Create(user); err != nil {
+		t.Fatalf("failed to create user: %v", err)
+	}
+
+	dt := &domain.DeviceToken{
+		ID:       "dt-1",
+		UserID:   user.ID,
+		Token:    "ExponentPushToken[xxxxxxxxxxxx]",
+		Platform: "expo",
+	}
+
+	if err := tokenRepo.Save(dt); err != nil {
+		t.Fatalf("failed to save device token: %v", err)
+	}
+
+	// Idempotência / Upsert no mesmo token
+	dt.Platform = "android"
+	if err := tokenRepo.Save(dt); err != nil {
+		t.Fatalf("failed to update device token on conflict: %v", err)
+	}
+
+	tokens, err := tokenRepo.FindByUserID(user.ID)
+	if err != nil {
+		t.Fatalf("failed to find tokens: %v", err)
+	}
+	if len(tokens) != 1 {
+		t.Fatalf("expected 1 token, got %d", len(tokens))
+	}
+	if tokens[0].Platform != "android" {
+		t.Errorf("expected platform android after upsert, got %s", tokens[0].Platform)
+	}
+
+	// Deletar
+	if err := tokenRepo.Delete(user.ID, dt.Token); err != nil {
+		t.Fatalf("failed to delete token: %v", err)
+	}
+
+	tokensAfter, err := tokenRepo.FindByUserID(user.ID)
+	if err != nil {
+		t.Fatalf("failed to find tokens after delete: %v", err)
+	}
+	if len(tokensAfter) != 0 {
+		t.Errorf("expected 0 tokens after delete, got %d", len(tokensAfter))
+	}
+}

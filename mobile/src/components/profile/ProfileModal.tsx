@@ -15,6 +15,8 @@ import { useTheme } from '../../context/ThemeContext';
 import { ProfileUserCard } from './ProfileUserCard';
 import { ProfileNodeCard } from './ProfileNodeCard';
 import { ProfileSettingsGroup } from './ProfileSettingsGroup';
+import { NotificationSettingsModal } from '../notifications/NotificationSettingsModal';
+import { CalendarSyncSettingsModal } from './CalendarSyncSettingsModal';
 import { isCloudServer } from '../../services/api';
 
 interface ProfileModalProps {
@@ -32,6 +34,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 }) => {
   const { user, logout } = useAuth();
   const { colors, isDark } = useTheme();
+  const [notifModalVisible, setNotifModalVisible] = React.useState(false);
+  const [calendarSyncModalVisible, setCalendarSyncModalVisible] = React.useState(false);
   const isCloud = isCloudServer(serverUrl);
   const name = user?.name || 'Andre Victor';
   const email = user?.email || 'andre@vito.ai';
@@ -81,7 +85,22 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>ASSISTENTE EXECUTIVO & IA</Text>
                 </View>
 
-                <ProfileSettingsGroup />
+                <ProfileSettingsGroup
+                  onOpenNotifications={() => setNotifModalVisible(true)}
+                  onOpenCalendarSync={() => setCalendarSyncModalVisible(true)}
+                />
+
+                {/* Modal de Configuração de Notificações M3 */}
+                <NotificationSettingsModal
+                  visible={notifModalVisible}
+                  onClose={() => setNotifModalVisible(false)}
+                />
+
+                {/* Modal de Sincronização de Calendários M3 */}
+                <CalendarSyncSettingsModal
+                  visible={calendarSyncModalVisible}
+                  onClose={() => setCalendarSyncModalVisible(false)}
+                />
 
                 {/* Ações da Sessão */}
                 <View style={styles.actionsGroup}>

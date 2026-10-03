@@ -14,6 +14,7 @@ import (
 	"github.com/andrevmp/vito/backend/internal/config"
 	"github.com/andrevmp/vito/backend/internal/database"
 	"github.com/andrevmp/vito/backend/internal/handler"
+	"github.com/andrevmp/vito/backend/internal/integrations/calendar"
 	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/andrevmp/vito/backend/internal/server"
 	"github.com/andrevmp/vito/backend/internal/service"
@@ -36,6 +37,7 @@ func main() {
 	eventRepo := repository.NewEventRepository(db)
 	todoRepo := repository.NewTodoRepository(db)
 	memoryRepo := repository.NewMemoryRepository(db)
+	notifRepo := repository.NewDeviceTokenRepository(db)
 
 	// 3. Provedores de IA & AI Gateway com Failover
 	var aiProviders []ai.Provider
@@ -59,6 +61,12 @@ func main() {
 	calSvc := service.NewCalendarService(eventRepo)
 	todoSvc := service.NewTodoService(todoRepo)
 	astSvc := service.NewAssistantService(aiGateway, calSvc, todoSvc, memoryRepo)
+	notifSvc := service.NewNotificationService(notifRepo)
+
+	syncRepo := repository.NewCalendarSyncRepository(db)
+	syncSvc := service.NewCalendarSyncService(syncRepo, eventRepo, cfg.JWTSecret)
+	syncSvc.RegisterProvider(calendar.NewGoogleProvider(calendar.GoogleConfig{}))
+	syncSvc.RegisterProvider(calendar.NewAppleCalDAVProvider(calendar.AppleCalDAVConfig{}))
 
 	// Transcritor de voz Whisper
 	var whisperTranscriber ai.AudioTranscriber
@@ -72,14 +80,18 @@ func main() {
 	calHandler := handler.NewCalendarHandler(calSvc)
 	todoHandler := handler.NewTodoHandler(todoSvc)
 	astHandler := handler.NewAssistantHandler(astSvc, whisperTranscriber)
+	notifHandler := handler.NewNotificationHandler(notifSvc)
+	syncHandler := handler.NewCalendarSyncHandler(syncSvc)
 
 	// 6. Servidor HTTP
 	srv := server.New(server.Config{
-		AuthHandler: authHandler,
-		CalHandler:  calHandler,
-		TodoHandler: todoHandler,
-		AstHandler:  astHandler,
-		AuthSvc:     authSvc,
+		AuthHandler:  authHandler,
+		CalHandler:   calHandler,
+		TodoHandler:  todoHandler,
+		AstHandler:   astHandler,
+		NotifHandler: notifHandler,
+		SyncHandler:  syncHandler,
+		AuthSvc:      authSvc,
 	})
 
 	httpServer := &http.Server{

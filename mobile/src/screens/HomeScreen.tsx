@@ -178,8 +178,9 @@ export const HomeScreen: React.FC<{
             visible={createModalVisible}
             onClose={() => setCreateModalVisible(false)}
             selectedDate={selectedDate}
-            onSaveEvent={(title) => {
-              handleAssistantSubmit(`Agendar evento: ${title} para o dia ${selectedDate.toLocaleDateString('pt-BR')}`);
+            onSaveEvent={(title, priority) => {
+              const priorityText = priority === 'wakeup' ? ' com wake-up call crítico' : priority === 'silent' ? ' silencioso' : '';
+              handleAssistantSubmit(`Agendar evento: ${title} para o dia ${selectedDate.toLocaleDateString('pt-BR')}${priorityText}`);
             }}
             onSaveTodo={(title, priority) => {
               handleAssistantSubmit(`Nova tarefa: ${title} prioridade ${priority}`);

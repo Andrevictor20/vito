@@ -20,23 +20,35 @@ func NewEventRepository(db *sql.DB) *EventRepositorySQLite {
 }
 
 func (r *EventRepositorySQLite) Create(e *domain.Event) error {
+	source := e.Source
+	if source == "" {
+		source = "vito"
+	}
 	query := `
-		INSERT INTO events (id, user_id, title, description, location, start_at, end_at, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO events (id, user_id, title, description, location, start_at, end_at, source, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(id) DO UPDATE SET
+			title = excluded.title,
+			description = excluded.description,
+			location = excluded.location,
+			start_at = excluded.start_at,
+			end_at = excluded.end_at,
+			source = excluded.source,
+			updated_at = excluded.updated_at
 	`
-	_, err := r.db.Exec(query, e.ID, e.UserID, e.Title, e.Description, e.Location, e.StartAt, e.EndAt, e.CreatedAt, e.UpdatedAt)
+	_, err := r.db.Exec(query, e.ID, e.UserID, e.Title, e.Description, e.Location, e.StartAt, e.EndAt, source, e.CreatedAt, e.UpdatedAt)
 	return err
 }
 
 func (r *EventRepositorySQLite) GetByID(id, userID string) (*domain.Event, error) {
 	query := `
-		SELECT id, user_id, title, description, location, start_at, end_at, created_at, updated_at
+		SELECT id, user_id, title, description, location, start_at, end_at, COALESCE(source, 'vito'), created_at, updated_at
 		FROM events
 		WHERE id = ? AND user_id = ?
 	`
 	var e domain.Event
 	err := r.db.QueryRow(query, id, userID).Scan(
-		&e.ID, &e.UserID, &e.Title, &e.Description, &e.Location, &e.StartAt, &e.EndAt, &e.CreatedAt, &e.UpdatedAt,
+		&e.ID, &e.UserID, &e.Title, &e.Description, &e.Location, &e.StartAt, &e.EndAt, &e.Source, &e.CreatedAt, &e.UpdatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -49,7 +61,7 @@ func (r *EventRepositorySQLite) GetByID(id, userID string) (*domain.Event, error
 
 func (r *EventRepositorySQLite) ListByUser(userID string, from, to time.Time) ([]domain.Event, error) {
 	query := `
-		SELECT id, user_id, title, description, location, start_at, end_at, created_at, updated_at
+		SELECT id, user_id, title, description, location, start_at, end_at, COALESCE(source, 'vito'), created_at, updated_at
 		FROM events
 		WHERE user_id = ? AND start_at >= ? AND start_at <= ?
 		ORDER BY start_at ASC
@@ -63,7 +75,7 @@ func (r *EventRepositorySQLite) ListByUser(userID string, from, to time.Time) ([
 	var events []domain.Event
 	for rows.Next() {
 		var e domain.Event
-		if err := rows.Scan(&e.ID, &e.UserID, &e.Title, &e.Description, &e.Location, &e.StartAt, &e.EndAt, &e.CreatedAt, &e.UpdatedAt); err != nil {
+		if err := rows.Scan(&e.ID, &e.UserID, &e.Title, &e.Description, &e.Location, &e.StartAt, &e.EndAt, &e.Source, &e.CreatedAt, &e.UpdatedAt); err != nil {
 			return nil, err
 		}
 		events = append(events, e)

@@ -89,4 +89,25 @@ export interface ConversationSession {
   active?: boolean;
 }
 
+export type NotificationPriority = 'silent' | 'default' | 'wakeup';
+
+export type NotificationChannelId = 'vito_silent' | 'vito_default' | 'vito_wakeup';
+
+export interface NotificationSettings {
+  enabled: boolean;
+  defaultPriority: NotificationPriority;
+  reminderMinutesBefore: number;
+  pushToken?: string;
+}
+
+export interface ScheduleNotificationParams {
+  id?: string;
+  eventId?: string;
+  todoId?: string;
+  title: string;
+  body: string;
+  triggerDate: Date;
+  priority?: NotificationPriority;
+}
+
 

@@ -4,7 +4,15 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { tokens } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 
-export const ProfileSettingsGroup: React.FC = () => {
+interface ProfileSettingsGroupProps {
+  onOpenNotifications?: () => void;
+  onOpenCalendarSync?: () => void;
+}
+
+export const ProfileSettingsGroup: React.FC<ProfileSettingsGroupProps> = ({
+  onOpenNotifications,
+  onOpenCalendarSync,
+}) => {
   const [whisperEnabled, setWhisperEnabled] = useState(true);
   const { colors, isDark, toggleTheme } = useTheme();
 
@@ -48,6 +56,26 @@ export const ProfileSettingsGroup: React.FC = () => {
 
       <View style={[styles.divider, { backgroundColor: colors.outlineVariant }]} />
 
+      {/* Notificações & Wake-up Calls */}
+      <TouchableOpacity
+        style={styles.groupItem}
+        onPress={onOpenNotifications}
+        activeOpacity={0.7}
+      >
+        <View style={styles.itemLeft}>
+          <View style={[styles.itemIconBox, { backgroundColor: colors.surfaceContainerHigh }]}>
+            <MaterialIcons name="notifications-active" size={18} color={colors.primary} />
+          </View>
+          <View style={styles.itemTextCol}>
+            <Text style={[styles.itemTitle, { color: colors.onSurface }]}>Notificações & Wake-up Calls</Text>
+            <Text style={[styles.itemSub, { color: colors.onSurfaceVariant }]}>Lembretes offline e prioridade máxima</Text>
+          </View>
+        </View>
+        <MaterialIcons name="chevron-right" size={18} color={colors.outline} />
+      </TouchableOpacity>
+
+      <View style={[styles.divider, { backgroundColor: colors.outlineVariant }]} />
+
       <View style={styles.groupItem}>
         <View style={styles.itemLeft}>
           <View style={[styles.itemIconBox, { backgroundColor: colors.surfaceContainerHigh }]}>
@@ -78,7 +106,11 @@ export const ProfileSettingsGroup: React.FC = () => {
 
       <View style={[styles.divider, { backgroundColor: colors.outlineVariant }]} />
 
-      <View style={styles.groupItem}>
+      <TouchableOpacity
+        style={styles.groupItem}
+        onPress={onOpenCalendarSync}
+        activeOpacity={0.7}
+      >
         <View style={styles.itemLeft}>
           <View style={[styles.itemIconBox, { backgroundColor: colors.surfaceContainerHigh }]}>
             <MaterialIcons name="calendar-today" size={18} color={colors.primary} />
@@ -89,7 +121,7 @@ export const ProfileSettingsGroup: React.FC = () => {
           </View>
         </View>
         <MaterialIcons name="chevron-right" size={18} color={colors.outline} />
-      </View>
+      </TouchableOpacity>
 
       <View style={[styles.divider, { backgroundColor: colors.outlineVariant }]} />
 

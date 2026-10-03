@@ -20,6 +20,7 @@ type Event struct {
 	Location    string    `json:"location,omitempty"`
 	StartAt     time.Time `json:"start_at"`
 	EndAt       time.Time `json:"end_at"`
+	Source      string    `json:"source,omitempty"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }

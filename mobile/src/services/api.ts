@@ -109,6 +109,30 @@ class ApiService {
     }
   }
 
+  get<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+    return this.request<T>(endpoint, { ...options, method: 'GET' });
+  }
+
+  post<T>(endpoint: string, body?: any, options: RequestInit = {}): Promise<T> {
+    return this.request<T>(endpoint, {
+      ...options,
+      method: 'POST',
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+  }
+
+  patch<T>(endpoint: string, body?: any, options: RequestInit = {}): Promise<T> {
+    return this.request<T>(endpoint, {
+      ...options,
+      method: 'PATCH',
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+  }
+
+  delete<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+    return this.request<T>(endpoint, { ...options, method: 'DELETE' });
+  }
+
   // Auth
   async login(email: string, password: string): Promise<AuthResponse> {
     const res = await this.request<AuthResponse>('/api/v1/auth/login', {
@@ -272,6 +296,21 @@ class ApiService {
     } finally {
       clearTimeout(timeoutId);
     }
+  }
+
+  // Notificações Push
+  async registerPushToken(token: string, platform: string = 'expo'): Promise<{ status: string; token: string }> {
+    return this.request<{ status: string; token: string }>('/api/v1/notifications/device-token', {
+      method: 'POST',
+      body: JSON.stringify({ token, platform }),
+    });
+  }
+
+  async testPushNotification(priority: 'default' | 'wakeup' | 'silent' = 'default', title?: string, body?: string): Promise<{ status: string; dispatched: number }> {
+    return this.request<{ status: string; dispatched: number }>('/api/v1/notifications/test', {
+      method: 'POST',
+      body: JSON.stringify({ priority, title, body }),
+    });
   }
 }
 

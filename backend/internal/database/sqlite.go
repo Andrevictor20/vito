@@ -86,8 +86,76 @@ func runMigrations(db *sql.DB) error {
 	);
 
 	CREATE INDEX IF NOT EXISTS idx_memories_user ON memories(user_id);
+
+	CREATE TABLE IF NOT EXISTS device_tokens (
+		id TEXT PRIMARY KEY,
+		user_id TEXT NOT NULL,
+		token TEXT NOT NULL,
+		platform TEXT NOT NULL DEFAULT 'expo',
+		created_at DATETIME NOT NULL,
+		updated_at DATETIME NOT NULL,
+		FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+	);
+
+	CREATE UNIQUE INDEX IF NOT EXISTS idx_device_tokens_user_token ON device_tokens(user_id, token);
+	CREATE INDEX IF NOT EXISTS idx_device_tokens_user ON device_tokens(user_id);
+
+	CREATE TABLE IF NOT EXISTS calendar_integrations (
+		id TEXT PRIMARY KEY,
+		user_id TEXT NOT NULL,
+		provider TEXT NOT NULL,
+		account_email TEXT NOT NULL,
+		encrypted_credentials TEXT NOT NULL,
+		calendar_id TEXT NOT NULL DEFAULT 'primary',
+		calendar_name TEXT,
+		sync_token TEXT,
+		channel_id TEXT,
+		channel_expiration DATETIME,
+		status TEXT NOT NULL DEFAULT 'active',
+		last_synced_at DATETIME,
+		created_at DATETIME NOT NULL,
+		updated_at DATETIME NOT NULL,
+		FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+	);
+
+	CREATE UNIQUE INDEX IF NOT EXISTS idx_cal_integrations_user_prov ON calendar_integrations(user_id, provider, account_email);
+	CREATE INDEX IF NOT EXISTS idx_cal_integrations_user ON calendar_integrations(user_id);
+
+	CREATE TABLE IF NOT EXISTS external_event_mappings (
+		id TEXT PRIMARY KEY,
+		event_id TEXT NOT NULL,
+		user_id TEXT NOT NULL,
+		provider TEXT NOT NULL,
+		external_event_id TEXT NOT NULL,
+		external_etag TEXT,
+		content_hash TEXT NOT NULL,
+		last_synced_at DATETIME NOT NULL,
+		status TEXT NOT NULL DEFAULT 'synced',
+		FOREIGN KEY(event_id) REFERENCES events(id) ON DELETE CASCADE,
+		FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+	);
+
+	CREATE UNIQUE INDEX IF NOT EXISTS idx_ext_map_user_prov_ext ON external_event_mappings(user_id, provider, external_event_id);
+	CREATE INDEX IF NOT EXISTS idx_ext_map_event_id ON external_event_mappings(event_id);
+
+	CREATE TABLE IF NOT EXISTS calendar_tombstones (
+		id TEXT PRIMARY KEY,
+		user_id TEXT NOT NULL,
+		provider TEXT NOT NULL,
+		external_event_id TEXT NOT NULL,
+		deleted_at DATETIME NOT NULL,
+		FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_tombstones_user_prov ON calendar_tombstones(user_id, provider);
 	`
 
-	_, err := db.Exec(schema)
-	return err
+	if _, err := db.Exec(schema); err != nil {
+		return err
+	}
+
+	// Migração incremental de colunas sem quebrar bancos existentes
+	_, _ = db.Exec("ALTER TABLE events ADD COLUMN source TEXT DEFAULT 'vito'")
+
+	return nil
 }

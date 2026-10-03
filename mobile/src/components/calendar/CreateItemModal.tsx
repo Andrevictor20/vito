@@ -12,11 +12,13 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { tokens } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 
+import { NotificationPriority } from '../../types';
+
 interface CreateItemModalProps {
   visible: boolean;
   onClose: () => void;
   selectedDate: Date;
-  onSaveEvent?: (title: string) => void;
+  onSaveEvent?: (title: string, priority?: NotificationPriority) => void;
   onSaveTodo?: (title: string, priority: 'low' | 'medium' | 'high') => void;
 }
 
@@ -31,6 +33,7 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
   const [tab, setTab] = useState<'event' | 'todo'>('event');
   const [title, setTitle] = useState('');
   const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium');
+  const [notifPriority, setNotifPriority] = useState<NotificationPriority>('default');
 
   const formattedDate = selectedDate.toLocaleDateString('pt-BR', {
     day: '2-digit',
@@ -40,7 +43,7 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
   const handleSave = () => {
     if (!title.trim()) return;
     if (tab === 'event' && onSaveEvent) {
-      onSaveEvent(title.trim());
+      onSaveEvent(title.trim(), notifPriority);
     } else if (tab === 'todo' && onSaveTodo) {
       onSaveTodo(title.trim(), priority);
     }
@@ -127,6 +130,49 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
                 onChangeText={setTitle}
                 autoFocus
               />
+
+              {/* Seletor de Prioridade de Alerta (para eventos) */}
+              {tab === 'event' && (
+                <View style={styles.priorityRow}>
+                  <Text style={[styles.priorityLabel, { color: colors.textSecondary }]}>Alerta:</Text>
+                  {(
+                    [
+                      { key: 'silent', label: '🔕 Silencioso' },
+                      { key: 'default', label: '🔔 Padrão' },
+                      { key: 'wakeup', label: '🚨 Wake-up' },
+                    ] as const
+                  ).map((opt) => {
+                    const isSelected = notifPriority === opt.key;
+                    return (
+                      <TouchableOpacity
+                        key={opt.key}
+                        style={[
+                          styles.priorityChip,
+                          {
+                            backgroundColor: isSelected
+                              ? colors.primaryContainer
+                              : colors.surfaceContainerLow,
+                            borderColor: isSelected ? colors.primary : colors.outlineVariant,
+                          },
+                        ]}
+                        onPress={() => setNotifPriority(opt.key)}
+                      >
+                        <Text
+                          style={[
+                            styles.priorityChipText,
+                            {
+                              color: isSelected ? colors.onPrimaryContainer : colors.textSecondary,
+                              fontWeight: isSelected ? '700' : '500',
+                            },
+                          ]}
+                        >
+                          {opt.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
 
               {/* Seletor de Prioridade (apenas para tarefas) */}
               {tab === 'todo' && (
