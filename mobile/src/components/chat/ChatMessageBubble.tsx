@@ -21,7 +21,7 @@ export const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({ message })
     <View style={[styles.messageRow, isUser ? styles.messageRowUser : styles.messageRowVito]}>
       {!isUser && (
         <View style={[styles.vitoAvatar, { backgroundColor: colors.surfaceContainerHigh, borderWidth: 1, borderColor: colors.outlineVariant }]}>
-          <VitoMascot size={20} animated={false} />
+          <VitoMascot size={26} animated={false} />
         </View>
       )}
 

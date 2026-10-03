@@ -185,9 +185,8 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
         <View style={styles.topAppBarLeft}>
           <View style={styles.brandRow}>
             <VitoMascot
-              size={28}
+              size={30}
               state={loading ? 'thinking' : 'idle'}
-              style={{ marginRight: 6 }}
             />
             <Text style={[styles.chatBrand, { color: colors.onSurface }]}>vito</Text>
             <View style={[styles.statusDot, { backgroundColor: colors.statusOnline }]} />
