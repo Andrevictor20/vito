@@ -56,6 +56,32 @@ export const CalendarSyncSettingsModal: React.FC<CalendarSyncSettingsModalProps>
     }
   };
 
+  const handleSyncGoogle = async () => {
+    try {
+      await syncProvider('google');
+      Alert.alert('Sucesso', 'Eventos do Google Calendar sincronizados com sucesso!');
+    } catch (err: any) {
+      const msg = err?.message || '';
+      if (msg.includes('403') || msg.includes('insufficient') || msg.includes('permission')) {
+        Alert.alert(
+          'Permissão Necessária',
+          'Sua conta precisa de autorização para ler o Google Calendar. Por favor, clique em "Desconectar" e reconecte sua conta Google para autorizar o acesso aos eventos.'
+        );
+      } else {
+        Alert.alert('Erro ao Sincronizar', msg || 'Falha ao sincronizar eventos do Google Calendar.');
+      }
+    }
+  };
+
+  const handleSyncAppleCalDAV = async () => {
+    try {
+      await syncProvider('apple_caldav');
+      Alert.alert('Sucesso', 'Eventos do iCloud sincronizados com sucesso!');
+    } catch (err: any) {
+      Alert.alert('Erro ao Sincronizar', err?.message || 'Falha ao sincronizar eventos do iCloud.');
+    }
+  };
+
   const handleConnectAppleCalDAV = async () => {
     if (!appleId.trim() || !appSpecificPassword.trim()) {
       Alert.alert('Atenção', 'Preencha o Apple ID e a Senha de App Específica.');
@@ -180,7 +206,7 @@ export const CalendarSyncSettingsModal: React.FC<CalendarSyncSettingsModalProps>
                           borderColor: colors.outlineVariant,
                         },
                       ]}
-                      onPress={() => syncProvider('google')}
+                      onPress={handleSyncGoogle}
                       disabled={isSyncing}
                       activeOpacity={0.8}
                     >
@@ -302,12 +328,28 @@ export const CalendarSyncSettingsModal: React.FC<CalendarSyncSettingsModalProps>
                   </Text>
                   <View style={styles.actionRow}>
                     <TouchableOpacity
-                      style={[styles.primaryActionBtn, { backgroundColor: colors.primary }]}
-                      onPress={() => syncProvider('apple_caldav')}
+                      style={[
+                        styles.primaryActionBtn,
+                        {
+                          backgroundColor: isDark ? colors.surfaceContainerHighest : colors.primary,
+                          borderWidth: isDark ? 1 : 0,
+                          borderColor: colors.outlineVariant,
+                        },
+                      ]}
+                      onPress={handleSyncAppleCalDAV}
                       disabled={isSyncing}
+                      activeOpacity={0.8}
                     >
-                      <MaterialIcons name="refresh" size={16} color="#FFFFFF" />
-                      <Text style={styles.primaryActionText}>Sincronizar</Text>
+                      {isSyncing ? (
+                        <ActivityIndicator size="small" color={isDark ? colors.onSurface : '#FFFFFF'} />
+                      ) : (
+                        <>
+                          <MaterialIcons name="refresh" size={16} color={isDark ? colors.onSurface : '#FFFFFF'} />
+                          <Text style={[styles.primaryActionText, { color: isDark ? colors.onSurface : '#FFFFFF' }]}>
+                            Sincronizar
+                          </Text>
+                        </>
+                      )}
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -371,14 +413,24 @@ export const CalendarSyncSettingsModal: React.FC<CalendarSyncSettingsModalProps>
                       />
                       <View style={styles.formButtonRow}>
                         <TouchableOpacity
-                          style={[styles.confirmBtn, { backgroundColor: colors.primary }]}
+                          style={[
+                            styles.confirmBtn,
+                            {
+                              backgroundColor: isDark ? colors.surfaceContainerHighest : colors.primary,
+                              borderWidth: isDark ? 1 : 0,
+                              borderColor: colors.outlineVariant,
+                            },
+                          ]}
                           onPress={handleConnectAppleCalDAV}
                           disabled={isLoading}
+                          activeOpacity={0.8}
                         >
                           {isLoading ? (
-                            <ActivityIndicator size="small" color="#FFFFFF" />
+                            <ActivityIndicator size="small" color={isDark ? colors.onSurface : '#FFFFFF'} />
                           ) : (
-                            <Text style={styles.confirmBtnText}>Salvar CalDAV</Text>
+                            <Text style={[styles.confirmBtnText, { color: isDark ? colors.onSurface : '#FFFFFF' }]}>
+                              Salvar CalDAV
+                            </Text>
                           )}
                         </TouchableOpacity>
                         <TouchableOpacity

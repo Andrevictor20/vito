@@ -99,8 +99,8 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
           ]}
         >
           <MaterialIcons
-            name={activeTab === 'calendar' ? 'event' : 'event-note'}
-            size={22}
+            name="event"
+            size={24}
             color={activeTab === 'calendar' ? '#FFFFFF' : inactiveColor}
           />
         </View>

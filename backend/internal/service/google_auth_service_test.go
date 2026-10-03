@@ -132,7 +132,7 @@ func TestGoogleAuthService_GetAuthURL(t *testing.T) {
 	if q.Get("access_type") != "offline" {
 		t.Errorf("access_type esperado 'offline', obteve: %s", q.Get("access_type"))
 	}
-	if q.Get("scope") != "openid email profile" {
+	if q.Get("scope") != "openid email profile https://www.googleapis.com/auth/calendar.events" {
 		t.Errorf("scope de login incorreto: %s", q.Get("scope"))
 	}
 

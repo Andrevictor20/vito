@@ -160,10 +160,8 @@ func (s *GoogleAuthService) GetAuthURL(mode, userID, redirectScheme string) (str
 		return "", err
 	}
 
-	scope := "openid email profile"
-	if mode == "calendar" {
-		scope = "openid email profile https://www.googleapis.com/auth/calendar.events"
-	}
+	// Solicita perfil e escopo de eventos do Google Calendar para viabilizar sincronização automática imediata
+	scope := "openid email profile https://www.googleapis.com/auth/calendar.events"
 
 	params := url.Values{}
 	params.Set("client_id", s.cfg.ClientID)
