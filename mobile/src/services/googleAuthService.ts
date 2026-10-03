@@ -1,9 +1,18 @@
-import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
+import { Platform } from 'react-native';
 import { User } from '../types';
 
-// Garante que o navegador in-app possa ser descartado de forma limpa
-WebBrowser.maybeCompleteAuthSession();
+// Carregamento defensivo do módulo nativo WebBrowser para evitar crash no bootstrap caso o binário nativo não esteja presente
+let WebBrowser: any = null;
+try {
+  WebBrowser = require('expo-web-browser');
+  if (WebBrowser && typeof WebBrowser.maybeCompleteAuthSession === 'function') {
+    WebBrowser.maybeCompleteAuthSession();
+  }
+} catch (e) {
+  console.warn('[googleAuthService] expo-web-browser não disponível neste runtime:', e);
+  WebBrowser = null;
+}
 
 export interface GoogleLoginResult {
   token: string;
@@ -16,10 +25,18 @@ export interface GoogleCalendarConnectResult {
 }
 
 export const googleAuthService = {
+  isAvailable(): boolean {
+    return WebBrowser !== null && typeof WebBrowser.openAuthSessionAsync === 'function';
+  },
+
   /**
    * Inicia o fluxo de Login / Cadastro via Google OAuth2.
    */
   async loginWithGoogle(serverUrl: string): Promise<GoogleLoginResult> {
+    if (!this.isAvailable()) {
+      throw new Error('A autenticação com Google requer a versão mais recente do aplicativo. Por favor, atualize o APK.');
+    }
+
     const redirectUrl = Linking.createURL('oauth/callback');
     const authStartUrl = `${serverUrl.replace(/\/+$/, '')}/api/v1/auth/google/start?mode=login&redirect_scheme=${encodeURIComponent(redirectUrl)}`;
 
@@ -59,6 +76,10 @@ export const googleAuthService = {
    * Inicia o fluxo de concessão de permissão e vinculação do Google Calendar.
    */
   async connectGoogleCalendar(serverUrl: string, jwtToken: string): Promise<GoogleCalendarConnectResult> {
+    if (!this.isAvailable()) {
+      throw new Error('A sincronização com Google Calendar requer a versão mais recente do aplicativo. Por favor, atualize o APK.');
+    }
+
     const redirectUrl = Linking.createURL('oauth/callback');
     const authStartUrl = `${serverUrl.replace(/\/+$/, '')}/api/v1/auth/google/start?mode=calendar&token=${encodeURIComponent(jwtToken)}&redirect_scheme=${encodeURIComponent(redirectUrl)}`;
 

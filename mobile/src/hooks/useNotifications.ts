@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import * as Notifications from 'expo-notifications';
+import type * as Notifications from 'expo-notifications';
 import { notificationService } from '../services/notificationService';
 import { NotificationPriority, NotificationSettings, ScheduleNotificationParams } from '../types';
 

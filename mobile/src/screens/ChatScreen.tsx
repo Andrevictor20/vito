@@ -11,8 +11,14 @@ import {
   Keyboard,
   KeyboardEvent,
 } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
 import { MaterialIcons } from '@expo/vector-icons';
+
+let ImagePicker: any = null;
+try {
+  ImagePicker = require('expo-image-picker');
+} catch (e) {
+  ImagePicker = null;
+}
 import { tokens, MD3Shapes } from '../theme/tokens';
 import { useChat } from '../hooks/useChat';
 import { ChatMessageBubble } from '../components/chat/ChatMessageBubble';
@@ -98,6 +104,10 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
 
   const handlePickImage = async () => {
     if (loading) return;
+    if (!ImagePicker) {
+      alert('Módulo de fotos não disponível nesta versão.');
+      return;
+    }
 
     try {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
