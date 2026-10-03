@@ -13,7 +13,6 @@ interface EventCardProps {
 export const EventCard: React.FC<EventCardProps> = ({
   event,
   onDelete,
-  accentColor = tokens.colors.primaryContainer,
 }) => {
   const formatTime = (iso: string) => {
     try {
@@ -24,136 +23,119 @@ export const EventCard: React.FC<EventCardProps> = ({
     }
   };
 
-  const calculateDuration = () => {
-    try {
-      const start = new Date(event.start_at).getTime();
-      const end = new Date(event.end_at).getTime();
-      const diffMinutes = Math.round((end - start) / 60000);
-      if (diffMinutes > 0 && diffMinutes < 1440) {
-        return `${diffMinutes} min`;
-      }
-    } catch {
-      // fallback
-    }
-    return '';
-  };
-
   const startTime = formatTime(event.start_at);
-  const duration = calculateDuration();
+  const endTime = event.end_at ? formatTime(event.end_at) : '';
+  const timeDisplay = endTime ? `${startTime} – ${endTime}` : startTime;
 
-  const getEventIcon = () => {
-    const loc = (event.location || '').toLowerCase();
-    const title = (event.title || '').toLowerCase();
-    if (loc.includes('meet') || loc.includes('zoom') || loc.includes('teams') || title.includes('daily') || title.includes('call')) {
-      return 'videocam' as const;
+  // Inferir categoria M3 para a tag
+  const getCategory = () => {
+    const text = `${event.title} ${event.description || ''}`.toLowerCase();
+    if (text.includes('anivers') || text.includes('niver')) {
+      return { label: 'ANIVERSÁRIO', bg: tokens.colors.categoryBirthdayBg, text: tokens.colors.categoryBirthdayText };
     }
-    if (loc.includes('sala') || loc.includes('escritório') || loc.includes('rua') || loc.includes('av')) {
-      return 'location-on' as const;
+    if (text.includes('churras') || text.includes('bbq')) {
+      return { label: 'CHURRASCO', bg: tokens.colors.categoryBbqBg, text: tokens.colors.categoryBbqText };
     }
-    return 'groups' as const;
+    if (text.includes('festa') || text.includes('party') || text.includes('balada')) {
+      return { label: 'FESTA', bg: tokens.colors.categoryPartyBg, text: tokens.colors.categoryPartyText };
+    }
+    return { label: 'EVENTO', bg: tokens.colors.secondaryContainer, text: tokens.colors.onSecondaryContainer };
   };
+
+  const category = getCategory();
 
   return (
     <View style={styles.card}>
-      <View style={styles.timeColumn}>
-        <Text style={styles.startTime}>{startTime}</Text>
-        {duration ? <Text style={styles.duration}>{duration}</Text> : null}
-      </View>
-
-      <View style={[styles.indicator, { backgroundColor: accentColor }]} />
-
-      <View style={styles.contentColumn}>
-        <View style={styles.titleRow}>
-          <Text style={styles.title} numberOfLines={1}>
-            {event.title}
-          </Text>
-          <MaterialIcons name={getEventIcon()} size={15} color={tokens.colors.outline} />
+      {/* Top Row: Categoria + Ações */}
+      <View style={styles.topRow}>
+        <View style={[styles.categoryBadge, { backgroundColor: category.bg }]}>
+          <Text style={[styles.categoryText, { color: category.text }]}>{category.label}</Text>
         </View>
 
-        {event.location ? (
-          <Text style={styles.meta} numberOfLines={1}>
-            {event.location}
-          </Text>
-        ) : null}
-
-        {event.description ? (
-          <Text style={styles.description} numberOfLines={1}>
-            {event.description}
-          </Text>
-        ) : null}
+        <TouchableOpacity
+          style={styles.deleteButton}
+          onPress={() => onDelete(event.id)}
+          hitSlop={tokens.hitSlop.sm}
+          accessibilityLabel="Excluir compromisso"
+        >
+          <MaterialIcons name="close" size={16} color={tokens.colors.onSurfaceVariant} />
+        </TouchableOpacity>
       </View>
 
-      <TouchableOpacity
-        style={styles.deleteButton}
-        onPress={() => onDelete(event.id)}
-        hitSlop={tokens.hitSlop.sm}
-        accessibilityLabel="Excluir compromisso"
-      >
-        <MaterialIcons name="close" size={15} color={tokens.colors.onSurfaceVariant} />
-      </TouchableOpacity>
+      {/* Título do Evento */}
+      <Text style={styles.title} numberOfLines={2}>
+        {event.title}
+      </Text>
+
+      {/* Metadados: Horário e Local */}
+      <View style={styles.metaRow}>
+        {startTime ? (
+          <View style={styles.metaItem}>
+            <MaterialIcons name="schedule" size={15} color={tokens.colors.textSecondary} />
+            <Text style={styles.metaText}>{timeDisplay}</Text>
+          </View>
+        ) : null}
+
+        {event.location ? (
+          <View style={styles.metaItem}>
+            <MaterialIcons name="place" size={15} color={tokens.colors.textSecondary} />
+            <Text style={styles.metaText} numberOfLines={1}>
+              {event.location}
+            </Text>
+          </View>
+        ) : null}
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: tokens.colors.surfaceContainerHigh,
-    borderWidth: 1,
-    borderColor: tokens.colors.outlineVariant,
+    backgroundColor: tokens.colors.surfaceContainer,
     borderRadius: MD3Shapes.large,
     padding: tokens.spacing.md,
     marginBottom: tokens.spacing.sm,
   },
-  timeColumn: {
-    width: 52,
-    alignItems: 'flex-start',
-  },
-  startTime: {
-    fontSize: tokens.typography.size.labelMedium,
-    fontWeight: tokens.typography.weight.semibold,
-    color: tokens.colors.onSurface,
-  },
-  duration: {
-    fontSize: 10,
-    color: tokens.colors.onSurfaceVariant,
-    marginTop: 2,
-  },
-  indicator: {
-    width: 4,
-    height: '80%',
-    borderRadius: MD3Shapes.full,
-    marginHorizontal: tokens.spacing.sm,
-  },
-  contentColumn: {
-    flex: 1,
-  },
-  titleRow: {
+  topRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 4,
+    alignItems: 'center',
+    marginBottom: tokens.spacing.sm,
   },
-  title: {
-    fontSize: tokens.typography.size.titleSmall,
-    fontWeight: tokens.typography.weight.semibold,
-    color: tokens.colors.onSurface,
-    flex: 1,
+  categoryBadge: {
+    paddingHorizontal: tokens.spacing.sm + 2,
+    paddingVertical: 3,
+    borderRadius: MD3Shapes.full,
   },
-  meta: {
-    fontSize: tokens.typography.size.labelSmall,
-    color: tokens.colors.primary,
-    marginTop: 2,
-    fontWeight: tokens.typography.weight.medium,
-  },
-  description: {
-    fontSize: tokens.typography.size.labelSmall,
-    color: tokens.colors.onSurfaceVariant,
-    marginTop: 2,
+  categoryText: {
+    fontSize: 10,
+    fontWeight: tokens.typography.weight.bold,
+    letterSpacing: 0.5,
   },
   deleteButton: {
     padding: tokens.spacing.xs,
-    marginLeft: tokens.spacing.xs,
+  },
+  title: {
+    fontSize: tokens.typography.size.titleMedium,
+    fontWeight: tokens.typography.weight.bold,
+    color: tokens.colors.onSurface,
+    lineHeight: 22,
+    marginBottom: tokens.spacing.md,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: tokens.spacing.md,
+  },
+  metaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  metaText: {
+    fontSize: tokens.typography.size.labelMedium,
+    color: tokens.colors.textSecondary,
+    fontWeight: tokens.typography.weight.medium,
   },
 });

@@ -1,7 +1,9 @@
 import React from 'react';
 import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { tokens } from '../../theme/tokens';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
 
 interface HeaderProps {
   onPressProfile?: () => void;
@@ -9,35 +11,55 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ onPressProfile }) => {
   const { user } = useAuth();
+  const { isDark, toggleTheme } = useTheme();
 
   const todayStr = new Date().toLocaleDateString('pt-BR', {
     weekday: 'long',
     day: 'numeric',
-    month: 'short',
+    month: 'long',
   });
 
-  const formattedDate = todayStr.charAt(0).toUpperCase() + todayStr.slice(1);
+  const formattedDate = todayStr.toUpperCase();
   const firstName = user?.name ? user.name.split(' ')[0] : 'Usuário';
 
   return (
     <View style={styles.header}>
       <View style={styles.topRow}>
-        <View style={styles.brandRow}>
-          <Text style={styles.brand}>vito</Text>
-          <View style={styles.brandDot} />
+        <View style={styles.titleColumn}>
+          <Text style={styles.dateSubtitle}>{formattedDate}</Text>
+          <View style={styles.brandRow}>
+            <Text style={styles.brand}>Vito Events</Text>
+            <View style={styles.statusDot} />
+          </View>
         </View>
 
-        {user && (
+        <View style={styles.actionsRow}>
           <TouchableOpacity
-            style={styles.userAvatar}
-            onPress={onPressProfile}
-            activeOpacity={0.75}
-            accessibilityLabel="Perfil e Configurações"
+            style={styles.themeToggleBtn}
+            onPress={toggleTheme}
+            activeOpacity={0.7}
             hitSlop={tokens.hitSlop.sm}
+            accessibilityLabel={isDark ? 'Mudar para tema claro' : 'Mudar para tema escuro'}
           >
-            <Text style={styles.avatarText}>{firstName.charAt(0).toUpperCase()}</Text>
+            <MaterialIcons
+              name={isDark ? 'light-mode' : 'dark-mode'}
+              size={22}
+              color={tokens.colors.onSurfaceVariant}
+            />
           </TouchableOpacity>
-        )}
+
+          {user && (
+            <TouchableOpacity
+              style={styles.userAvatar}
+              onPress={onPressProfile}
+              activeOpacity={0.75}
+              accessibilityLabel="Perfil e Configurações"
+              hitSlop={tokens.hitSlop.sm}
+            >
+              <Text style={styles.avatarText}>{firstName.charAt(0).toUpperCase()}</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
     </View>
   );
@@ -49,8 +71,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: tokens.spacing.lg,
     paddingTop: tokens.spacing.sm,
     paddingBottom: tokens.spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: tokens.colors.outlineVariant,
     backgroundColor: tokens.colors.surface,
   },
   topRow: {
@@ -58,36 +78,58 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  titleColumn: {
+    flexDirection: 'column',
+    gap: 2,
+  },
+  dateSubtitle: {
+    fontSize: tokens.typography.size.labelSmall,
+    fontWeight: tokens.typography.weight.semibold,
+    color: tokens.colors.textMuted,
+    letterSpacing: 0.8,
+  },
   brandRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   brand: {
-    fontSize: tokens.typography.size.titleLarge,
+    fontSize: tokens.typography.size.headlineSmall,
     fontWeight: tokens.typography.weight.bold,
     color: tokens.colors.onSurface,
-    letterSpacing: -0.5,
+    letterSpacing: -0.3,
   },
-  brandDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: tokens.colors.primary,
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: tokens.colors.statusOnline,
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.spacing.sm,
+  },
+  themeToggleBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   userAvatar: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: tokens.colors.secondaryContainer,
-    borderWidth: 1,
-    borderColor: tokens.colors.outlineVariant,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: tokens.colors.primary,
+    borderWidth: 2,
+    borderColor: tokens.colors.primaryContainer,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarText: {
-    color: tokens.colors.onSecondaryContainer,
+    color: tokens.colors.onPrimary,
     fontWeight: tokens.typography.weight.bold,
-    fontSize: tokens.typography.size.labelMedium,
+    fontSize: tokens.typography.size.titleSmall,
   },
 });

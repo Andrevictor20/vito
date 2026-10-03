@@ -5,6 +5,7 @@ import {
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens, MD3Shapes } from '../../theme/tokens';
@@ -17,6 +18,8 @@ interface ChatInputDockProps {
   onPressMic?: () => void;
   isRecording?: boolean;
   onPressAttach?: () => void;
+  selectedImageUri?: string | null;
+  onClearImage?: () => void;
 }
 
 export const ChatInputDock: React.FC<ChatInputDockProps> = ({
@@ -27,11 +30,28 @@ export const ChatInputDock: React.FC<ChatInputDockProps> = ({
   onPressMic,
   isRecording = false,
   onPressAttach,
+  selectedImageUri,
+  onClearImage,
 }) => {
-  const canSend = value.trim().length > 0 && !loading;
+  const canSend = (value.trim().length > 0 || !!selectedImageUri) && !loading;
 
   return (
     <View style={styles.dockWrapper}>
+      {/* Pré-visualização da Imagem Anexada */}
+      {selectedImageUri && (
+        <View style={styles.imagePreviewContainer}>
+          <Image source={{ uri: selectedImageUri }} style={styles.previewImage} />
+          <TouchableOpacity
+            style={styles.removeImageButton}
+            onPress={onClearImage}
+            hitSlop={tokens.hitSlop.sm}
+            accessibilityLabel="Remover foto anexada"
+          >
+            <MaterialIcons name="close" size={14} color="#FFF" />
+          </TouchableOpacity>
+        </View>
+      )}
+
       <View style={styles.capsule}>
         {/* Botão de Ditado / Microfone Tonal M3 */}
         <TouchableOpacity
@@ -102,6 +122,30 @@ const styles = StyleSheet.create({
     paddingHorizontal: tokens.spacing.md,
     paddingVertical: tokens.spacing.xs + 2,
     backgroundColor: 'transparent',
+  },
+  imagePreviewContainer: {
+    alignSelf: 'flex-start',
+    marginBottom: 6,
+    position: 'relative',
+  },
+  previewImage: {
+    width: 64,
+    height: 64,
+    borderRadius: MD3Shapes.medium,
+    borderWidth: 1.5,
+    borderColor: tokens.colors.primary,
+  },
+  removeImageButton: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: tokens.colors.error,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 3,
   },
   // Cápsula Arredondada M3 (Surface Container High, 28dp radius)
   capsule: {

@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { secureStorage } from './secureStore';
 import { User, AuthResponse, Event, Todo, AssistantChatResponse, ConflictInfo } from '../types';
 
 const TOKEN_KEY = '@vito_jwt_token';
@@ -28,7 +29,15 @@ class ApiService {
       this.baseUrl = CLOUDFLARE_SERVER_URL || DEFAULT_SERVER_URL;
       await AsyncStorage.setItem(SERVER_URL_KEY, this.baseUrl);
     }
-    this.token = await AsyncStorage.getItem(TOKEN_KEY);
+    this.token = await secureStorage.getItem(TOKEN_KEY);
+    if (!this.token) {
+      const legacyToken = await AsyncStorage.getItem(TOKEN_KEY);
+      if (legacyToken) {
+        this.token = legacyToken;
+        await secureStorage.setItem(TOKEN_KEY, legacyToken);
+        await AsyncStorage.removeItem(TOKEN_KEY).catch(() => {});
+      }
+    }
   }
 
   getBaseUrl(): string {
@@ -44,9 +53,11 @@ class ApiService {
   async setToken(token: string | null) {
     this.token = token;
     if (token) {
-      await AsyncStorage.setItem(TOKEN_KEY, token);
+      await secureStorage.setItem(TOKEN_KEY, token);
+      await AsyncStorage.removeItem(TOKEN_KEY).catch(() => {});
     } else {
-      await AsyncStorage.removeItem(TOKEN_KEY);
+      await secureStorage.removeItem(TOKEN_KEY);
+      await AsyncStorage.removeItem(TOKEN_KEY).catch(() => {});
     }
   }
 
@@ -184,6 +195,41 @@ class ApiService {
     }
 
     const res = await fetch(`${this.baseUrl}/api/v1/assistant/audio`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.error || `Erro HTTP ${res.status}`);
+    }
+
+    return res.json();
+  }
+
+  // Assistant Vision (Gemini 2.5 Flash Multimodal)
+  async assistantVision(imageUri: string, prompt?: string, filename: string = 'image.jpg'): Promise<AssistantChatResponse> {
+    const formData = new FormData();
+    formData.append('image', {
+      uri: imageUri,
+      name: filename,
+      type: 'image/jpeg',
+    } as unknown as Blob);
+
+    if (prompt) {
+      formData.append('prompt', prompt);
+    }
+    formData.append('timezone', 'America/Sao_Paulo');
+
+    const headers: Record<string, string> = {
+      Accept: 'application/json',
+    };
+    if (this.token) {
+      headers['Authorization'] = `Bearer ${this.token}`;
+    }
+
+    const res = await fetch(`${this.baseUrl}/api/v1/assistant/vision`, {
       method: 'POST',
       headers,
       body: formData,

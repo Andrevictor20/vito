@@ -1,0 +1,174 @@
+import React from 'react';
+import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
+import { tokens, MD3Shapes } from '../../theme/tokens';
+
+interface CompactCalendarCardProps {
+  selectedDate: Date;
+  onSelectDate: (date: Date) => void;
+  onOpenFullCalendar: () => void;
+  eventDates?: Set<string>;
+}
+
+export const CompactCalendarCard: React.FC<CompactCalendarCardProps> = ({
+  selectedDate,
+  onSelectDate,
+  onOpenFullCalendar,
+  eventDates = new Set(),
+}) => {
+  // Obter o primeiro dia da semana (Domingo) correspondente à data selecionada
+  const current = new Date(selectedDate);
+  const dayOfWeek = current.getDay(); // 0 = Domingo
+  const startOfWeek = new Date(current);
+  startOfWeek.setDate(current.getDate() - dayOfWeek);
+
+  const weekDays = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(startOfWeek);
+    d.setDate(startOfWeek.getDate() + i);
+    return d;
+  });
+
+  const monthName = selectedDate.toLocaleDateString('pt-BR', { month: 'long' });
+  const capitalizedMonth = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+  const yearStr = selectedDate.getFullYear().toString();
+
+  const isSameDay = (d1: Date, d2: Date) =>
+    d1.getDate() === d2.getDate() &&
+    d1.getMonth() === d2.getMonth() &&
+    d1.getFullYear() === d2.getFullYear();
+
+  return (
+    <View style={styles.card}>
+      {/* Top Header do Card */}
+      <View style={styles.headerRow}>
+        <View>
+          <Text style={styles.monthTitle}>{capitalizedMonth}</Text>
+          <Text style={styles.yearSubtitle}>{yearStr}</Text>
+        </View>
+
+        <TouchableOpacity
+          style={styles.openBtn}
+          onPress={onOpenFullCalendar}
+          activeOpacity={0.75}
+          accessibilityLabel="Abrir calendário completo"
+          hitSlop={tokens.hitSlop.sm}
+        >
+          <Text style={styles.openBtnText}>Abrir calendário</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Week Strip (7 Colunas) */}
+      <View style={styles.daysGrid}>
+        {weekDays.map((dayDate, idx) => {
+          const weekdayLabel = dayDate
+            .toLocaleDateString('pt-BR', { weekday: 'short' })
+            .slice(0, 3)
+            .toUpperCase();
+          const isSelected = isSameDay(dayDate, selectedDate);
+          const dateKey = `${dayDate.getFullYear()}-${String(dayDate.getMonth() + 1).padStart(2, '0')}-${String(dayDate.getDate()).padStart(2, '0')}`;
+          const hasEvent = eventDates.has(dateKey);
+
+          return (
+            <TouchableOpacity
+              key={idx}
+              style={styles.dayColumn}
+              onPress={() => onSelectDate(dayDate)}
+              activeOpacity={0.7}
+              accessibilityLabel={`Selecionar ${weekdayLabel} dia ${dayDate.getDate()}`}
+            >
+              <Text style={[styles.dayLabel, isSelected && styles.dayLabelSelected]}>
+                {weekdayLabel}
+              </Text>
+              <View style={[styles.dayCircle, isSelected && styles.dayCircleSelected]}>
+                <Text style={[styles.dayNumber, isSelected && styles.dayNumberSelected]}>
+                  {dayDate.getDate()}
+                </Text>
+                {hasEvent && !isSelected && <View style={styles.eventDot} />}
+              </View>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  card: {
+    backgroundColor: tokens.colors.surfaceContainer,
+    borderRadius: MD3Shapes.large,
+    padding: tokens.spacing.md,
+    marginBottom: tokens.spacing.lg,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: tokens.spacing.md,
+  },
+  monthTitle: {
+    fontSize: tokens.typography.size.titleMedium,
+    fontWeight: tokens.typography.weight.bold,
+    color: tokens.colors.onSurface,
+  },
+  yearSubtitle: {
+    fontSize: tokens.typography.size.labelSmall,
+    color: tokens.colors.textMuted,
+  },
+  openBtn: {
+    backgroundColor: tokens.colors.primaryContainer,
+    borderRadius: MD3Shapes.full,
+    paddingHorizontal: tokens.spacing.md,
+    paddingVertical: tokens.spacing.xs + 2,
+  },
+  openBtnText: {
+    fontSize: tokens.typography.size.labelSmall,
+    fontWeight: tokens.typography.weight.bold,
+    color: tokens.colors.onPrimaryContainer,
+  },
+  daysGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  dayColumn: {
+    alignItems: 'center',
+    flex: 1,
+    gap: 6,
+  },
+  dayLabel: {
+    fontSize: 10,
+    fontWeight: tokens.typography.weight.bold,
+    color: tokens.colors.textMuted,
+  },
+  dayLabelSelected: {
+    color: tokens.colors.primary,
+  },
+  dayCircle: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  dayCircleSelected: {
+    backgroundColor: tokens.colors.primary,
+  },
+  dayNumber: {
+    fontSize: tokens.typography.size.labelLarge,
+    fontWeight: tokens.typography.weight.semibold,
+    color: tokens.colors.onSurfaceVariant,
+  },
+  dayNumberSelected: {
+    color: tokens.colors.onPrimary,
+    fontWeight: tokens.typography.weight.bold,
+  },
+  eventDot: {
+    position: 'absolute',
+    bottom: 2,
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: tokens.colors.primary,
+  },
+});

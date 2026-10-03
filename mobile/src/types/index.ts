@@ -73,6 +73,7 @@ export interface ChatMessage {
   sender: 'user' | 'vito';
   text: string;
   timestamp: string;
+  imageUri?: string;
   action_performed?: string;
   event?: Event;
   todo?: Todo;

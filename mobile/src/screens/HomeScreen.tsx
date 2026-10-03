@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   StyleSheet,
   View,
@@ -12,7 +12,8 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { tokens, MD3Shapes } from '../theme/tokens';
 import { FloatingTabBar } from '../components/common/FloatingTabBar';
 import { Header } from '../components/common/Header';
-import { CalendarView } from '../components/calendar/CalendarView';
+import { CompactCalendarCard } from '../components/calendar/CompactCalendarCard';
+import { CalendarModal } from '../components/calendar/CalendarModal';
 import { EventCard } from '../components/calendar/EventCard';
 import { TodoItem } from '../components/todos/TodoItem';
 import { CreateItemModal } from '../components/calendar/CreateItemModal';
@@ -27,6 +28,7 @@ export const HomeScreen: React.FC<{
   const [activeTab, setActiveTab] = useState<'chat' | 'calendar'>('chat');
   const [profileVisible, setProfileVisible] = useState(false);
   const [createModalVisible, setCreateModalVisible] = useState(false);
+  const [calendarModalVisible, setCalendarModalVisible] = useState(false);
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const {
     events,
@@ -44,6 +46,22 @@ export const HomeScreen: React.FC<{
     handleAssistantSubmit,
     loadData,
   } = useHomeData();
+
+  const eventDates = useMemo(() => {
+    const dates = new Set<string>();
+    events.forEach((ev) => {
+      try {
+        const d = new Date(ev.start_at);
+        const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        dates.add(k);
+      } catch {}
+    });
+    return dates;
+  }, [events]);
+
+  const completedCount = useMemo(() => {
+    return todos.filter((t) => t.status === 'completed').length;
+  }, [todos]);
 
   return (
     <View style={styles.container}>
@@ -63,21 +81,22 @@ export const HomeScreen: React.FC<{
           />
         }
       >
-        {/* Calendário Interativo do Mês */}
-        <CalendarView
-          events={events}
+        {/* Card Compacto de Preview Semanal */}
+        <CompactCalendarCard
           selectedDate={selectedDate}
           onSelectDate={setSelectedDate}
+          onOpenFullCalendar={() => setCalendarModalVisible(true)}
+          eventDates={eventDates}
         />
 
-        {/* Section: Timeline da Agenda */}
+        {/* Section: Eventos de hoje */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>
-            {isTodaySelected
-              ? 'Agenda de Hoje'
-              : `Agenda (${selectedDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })})`}
-          </Text>
-          <Text style={styles.countBadge}>{dayEvents.length}</Text>
+          <Text style={styles.sectionTitle}>Eventos de hoje</Text>
+          <View style={styles.countBadgePill}>
+            <Text style={styles.countBadgeText}>
+              {dayEvents.length} {dayEvents.length === 1 ? 'evento' : 'eventos'}
+            </Text>
+          </View>
         </View>
 
         {loading && events.length === 0 ? (
@@ -102,17 +121,21 @@ export const HomeScreen: React.FC<{
           ))
         )}
 
-        {/* Section: Tarefas Pendentes */}
+        {/* Section: Checklist da festa */}
         <View style={[styles.sectionHeader, { marginTop: tokens.spacing.lg }]}>
-          <Text style={styles.sectionTitle}>Tarefas & Lembretes</Text>
-          <Text style={styles.countBadge}>{todos.length}</Text>
+          <View>
+            <Text style={styles.sectionTitle}>Checklist da festa</Text>
+            <Text style={styles.checklistSubtitle}>
+              {completedCount}/{todos.length} concluídos
+            </Text>
+          </View>
         </View>
 
         {loading && todos.length === 0 ? (
           <ActivityIndicator color={tokens.colors.primary} style={{ marginVertical: 20 }} />
         ) : todos.length === 0 ? (
           <View style={styles.emptyCard}>
-            <View style={[styles.emptyIconContainer, { backgroundColor: 'rgba(34, 197, 94, 0.1)' }]}>
+            <View style={[styles.emptyIconContainer, { backgroundColor: 'rgba(46, 108, 56, 0.12)' }]}>
               <MaterialIcons name="done-all" size={20} color={tokens.colors.success} />
             </View>
             <View style={styles.emptyContent}>
@@ -121,17 +144,21 @@ export const HomeScreen: React.FC<{
             </View>
           </View>
         ) : (
-          todos.map((t) => (
-            <TodoItem
-              key={t.id}
-              todo={t}
-              onToggle={handleToggleTodo}
-              onDelete={handleDeleteTodo}
-            />
-          ))
+          <View style={styles.checklistCard}>
+            {todos.map((t, idx) => (
+              <TodoItem
+                key={t.id}
+                todo={t}
+                onToggle={handleToggleTodo}
+                onDelete={handleDeleteTodo}
+                isLast={idx === todos.length - 1}
+                grouped
+              />
+            ))}
+          </View>
         )}
 
-        {/* Botão de Criação Rápida — sempre visível no fundo do scroll */}
+        {/* Botão de Criação Rápida */}
         <View style={styles.createBtnWrapper}>
           <TouchableOpacity
             style={styles.createFab}
@@ -139,7 +166,7 @@ export const HomeScreen: React.FC<{
             activeOpacity={0.85}
             accessibilityLabel="Criar nova tarefa ou evento"
           >
-            <MaterialIcons name="add" size={20} color="#ffffff" />
+            <MaterialIcons name="add" size={20} color={tokens.colors.onPrimary} />
             <Text style={styles.createFabText}>Nova Tarefa ou Evento</Text>
           </TouchableOpacity>
         </View>
@@ -155,6 +182,18 @@ export const HomeScreen: React.FC<{
             onSaveTodo={(title, priority) => {
               handleAssistantSubmit(`Nova tarefa: ${title} prioridade ${priority}`);
             }}
+          />
+
+          <CalendarModal
+            visible={calendarModalVisible}
+            onClose={() => setCalendarModalVisible(false)}
+            events={events}
+            selectedDate={selectedDate}
+            onSelectDate={(d) => {
+              setSelectedDate(d);
+              setCalendarModalVisible(false);
+            }}
+            onOpenCreate={() => setCreateModalVisible(true)}
           />
         </>
       ) : (
@@ -206,16 +245,28 @@ const styles = StyleSheet.create({
     color: tokens.colors.onSurface,
     letterSpacing: 0.1,
   },
-  countBadge: {
-    backgroundColor: tokens.colors.secondaryContainer,
-    borderWidth: 1,
-    borderColor: tokens.colors.outlineVariant,
-    color: tokens.colors.onSecondaryContainer,
+  countBadgePill: {
+    backgroundColor: tokens.colors.primaryContainer,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: MD3Shapes.full,
+  },
+  countBadgeText: {
+    color: tokens.colors.onPrimaryContainer,
     fontSize: tokens.typography.size.labelSmall,
     fontWeight: tokens.typography.weight.bold,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: MD3Shapes.small,
+  },
+  checklistSubtitle: {
+    fontSize: tokens.typography.size.labelSmall,
+    color: tokens.colors.textMuted,
+    marginTop: 2,
+  },
+  checklistCard: {
+    backgroundColor: tokens.colors.surfaceContainerLow,
+    borderRadius: MD3Shapes.large,
+    paddingHorizontal: tokens.spacing.md,
+    paddingVertical: tokens.spacing.xs,
+    marginBottom: tokens.spacing.md,
   },
   emptyCard: {
     backgroundColor: tokens.colors.surfaceContainer,
@@ -263,19 +314,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: tokens.colors.primaryContainer,
+    backgroundColor: tokens.colors.primary,
     paddingVertical: 14,
     borderRadius: MD3Shapes.large,
-    borderWidth: 1,
-    borderColor: tokens.colors.outlineVariant,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 4,
+    ...tokens.shadows.level3,
   },
   createFabText: {
-    color: tokens.colors.onPrimaryContainer,
+    color: tokens.colors.onPrimary,
     fontSize: tokens.typography.size.labelLarge,
     fontWeight: tokens.typography.weight.bold,
     letterSpacing: 0.2,

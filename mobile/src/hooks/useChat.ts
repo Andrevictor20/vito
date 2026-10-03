@@ -157,6 +157,60 @@ export function useChat(onDataChanged?: () => void) {
     [messages, loading, onDataChanged, saveMessages]
   );
 
+  const sendImage = useCallback(
+    async (imageUri: string, prompt?: string) => {
+      if (loading) return;
+
+      const userMsg: ChatMessage = {
+        id: `user-img-${Date.now()}`,
+        sender: 'user',
+        text: prompt?.trim() || '📷 Imagem enviada para análise...',
+        imageUri,
+        timestamp: new Date().toISOString(),
+      };
+
+      const withUser = [...messages, userMsg];
+      setMessages(withUser);
+      saveMessages(withUser);
+      setLoading(true);
+
+      try {
+        const res = await api.assistantVision(imageUri, prompt);
+        const vitoMsg: ChatMessage = {
+          id: `vito-img-${Date.now()}`,
+          sender: 'vito',
+          text: res.reply || res.message || 'Imagem analisada com sucesso.',
+          timestamp: new Date().toISOString(),
+          action_performed: res.action_performed,
+          event: res.event,
+          todo: res.todo,
+          conflict: res.conflict,
+        };
+
+        const withVito = [...withUser, vitoMsg];
+        setMessages(withVito);
+        saveMessages(withVito);
+
+        if (res.event || res.todo || res.action_performed !== 'none') {
+          onDataChanged?.();
+        }
+      } catch (err: any) {
+        const errorMsg: ChatMessage = {
+          id: `err-img-${Date.now()}`,
+          sender: 'vito',
+          text: `Falha ao processar imagem: ${err?.message || 'Erro desconhecido'}`,
+          timestamp: new Date().toISOString(),
+        };
+        const withError = [...withUser, errorMsg];
+        setMessages(withError);
+        saveMessages(withError);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [messages, loading, onDataChanged, saveMessages]
+  );
+
   const clearHistory = useCallback(async () => {
     const reset = [INITIAL_MESSAGE];
     setMessages(reset);
@@ -168,6 +222,7 @@ export function useChat(onDataChanged?: () => void) {
     loading,
     sendMessage,
     sendAudio,
+    sendImage,
     clearHistory,
   };
 }

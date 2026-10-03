@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, ActivityIndicator, Platform, StatusBar as RNStatusBar } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { AuthScreen } from './screens/AuthScreen';
 import { HomeScreen } from './screens/HomeScreen';
 import { tokens } from './theme/tokens';
@@ -10,6 +11,7 @@ import { UpdateBanner } from './components/common/UpdateBanner';
 
 const MainNavigator: React.FC = () => {
   const { user, isInitialLoading } = useAuth();
+  const { isDark, colors } = useTheme();
   const [serverUrl, setServerUrl] = useState(DEFAULT_SERVER_URL);
 
   useEffect(() => {
@@ -28,15 +30,15 @@ const MainNavigator: React.FC = () => {
 
   if (isInitialLoading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={tokens.colors.primary} />
+      <View style={[styles.loadingContainer, { backgroundColor: colors.surface }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
 
   return (
-    <View style={styles.safeArea}>
-      <StatusBar style="light" />
+    <View key={isDark ? 'dark' : 'light'} style={[styles.safeArea, { backgroundColor: colors.surface }]}>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
       <UpdateBanner />
       {user ? (
         <HomeScreen serverUrl={serverUrl} onToggleServer={toggleServer} />
@@ -49,9 +51,11 @@ const MainNavigator: React.FC = () => {
 
 export const AppRoot: React.FC = () => {
   return (
-    <AuthProvider>
-      <MainNavigator />
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <MainNavigator />
+      </AuthProvider>
+    </ThemeProvider>
   );
 };
 

@@ -345,7 +345,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: tokens.spacing.xs,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.04)',
+    borderBottomColor: tokens.colors.outlineVariant,
     marginBottom: tokens.spacing.xs,
   },
   weekText: {
@@ -362,7 +362,7 @@ const styles = StyleSheet.create({
     marginTop: tokens.spacing.sm,
     paddingTop: tokens.spacing.xs + 2,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.04)',
+    borderTopColor: tokens.colors.outlineVariant,
   },
   legendLeft: {
     flexDirection: 'row',

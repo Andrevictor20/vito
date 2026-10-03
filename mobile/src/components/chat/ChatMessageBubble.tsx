@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, View, Text } from 'react-native';
+import { StyleSheet, View, Text, Image } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens, MD3Shapes } from '../../theme/tokens';
 import { ChatMessage } from '../../types';
@@ -23,6 +23,9 @@ export const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({ message })
       )}
 
       <View style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubbleVito]}>
+        {message.imageUri && (
+          <Image source={{ uri: message.imageUri }} style={styles.imageAttachment} resizeMode="cover" />
+        )}
         <Text style={[styles.messageText, isUser ? styles.messageTextUser : styles.messageTextVito]}>
           {message.text}
         </Text>
@@ -58,34 +61,30 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
   },
   vitoAvatar: {
-    width: 28,
-    height: 28,
-    borderRadius: MD3Shapes.full,
-    backgroundColor: tokens.colors.surfaceContainerHigh,
-    borderWidth: 1,
-    borderColor: tokens.colors.outlineVariant,
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: tokens.colors.primaryContainer,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: tokens.spacing.xs,
+    marginRight: tokens.spacing.xs + 2,
     marginBottom: 4,
   },
   bubble: {
     maxWidth: '85%',
-    borderRadius: MD3Shapes.large,
+    borderRadius: 20,
     paddingHorizontal: tokens.spacing.md,
-    paddingVertical: tokens.spacing.sm + 2,
+    paddingVertical: tokens.spacing.sm + 4,
   },
   // Balão do Usuário: M3 Primary Container com texto On-Primary-Container
   bubbleUser: {
     backgroundColor: tokens.colors.primaryContainer,
-    borderBottomRightRadius: MD3Shapes.extraSmall,
+    borderBottomRightRadius: 4,
   },
-  // Balão do Vito: M3 Surface Container com texto On-Surface
+  // Balão do Vito: M3 Surface Container High
   bubbleVito: {
-    backgroundColor: tokens.colors.surfaceContainer,
-    borderBottomLeftRadius: MD3Shapes.extraSmall,
-    borderWidth: 1,
-    borderColor: tokens.colors.outlineVariant,
+    backgroundColor: tokens.colors.surfaceContainerHigh,
+    borderTopLeftRadius: 4,
   },
   messageText: {
     fontSize: tokens.typography.size.bodyLarge,
@@ -113,5 +112,11 @@ const styles = StyleSheet.create({
   },
   timestampVito: {
     color: tokens.colors.onSurfaceVariant,
+  },
+  imageAttachment: {
+    width: '100%',
+    height: 180,
+    borderRadius: MD3Shapes.medium,
+    marginBottom: tokens.spacing.sm,
   },
 });

@@ -11,6 +11,7 @@ import {
   Keyboard,
   KeyboardEvent,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens, MD3Shapes } from '../theme/tokens';
 import { useChat } from '../hooks/useChat';
@@ -18,6 +19,7 @@ import { ChatMessageBubble } from '../components/chat/ChatMessageBubble';
 import { ChatQuotaBanner } from '../components/chat/ChatQuotaBanner';
 import { ChatQuickChips } from '../components/chat/ChatQuickChips';
 import { ChatInputDock } from '../components/chat/ChatInputDock';
+import { ConversationHistoryModal } from '../components/chat/ConversationHistoryModal';
 import { useAuth } from '../context/AuthContext';
 import { SafeAudioRecorder } from '../services/audioRecorder';
 
@@ -34,8 +36,10 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
 }) => {
   const { user } = useAuth();
   const firstName = user?.name ? user.name.split(' ')[0] : 'Usuário';
-  const { messages, loading, sendMessage, sendAudio, clearHistory } = useChat(onDataChanged);
+  const { messages, loading, sendMessage, sendAudio, sendImage, clearHistory } = useChat(onDataChanged);
   const [inputText, setInputText] = useState('');
+  const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
+  const [historyVisible, setHistoryVisible] = useState(false);
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
@@ -78,11 +82,44 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
     }, 120);
   }, [messages.length, loading]);
 
+  const handlePickImage = async () => {
+    if (loading) return;
+
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        alert('É necessário conceder permissão de fotos para anexar recibos ou imagens.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setSelectedImageUri(result.assets[0].uri);
+      }
+    } catch (e) {
+      console.error('Falha ao selecionar imagem:', e);
+    }
+  };
+
   const handleSend = () => {
-    if (!inputText.trim() || loading) return;
-    const text = inputText;
-    setInputText('');
-    sendMessage(text);
+    if ((!inputText.trim() && !selectedImageUri) || loading) return;
+
+    if (selectedImageUri) {
+      const uri = selectedImageUri;
+      const prompt = inputText.trim() || undefined;
+      setSelectedImageUri(null);
+      setInputText('');
+      sendImage(uri, prompt);
+    } else {
+      const text = inputText;
+      setInputText('');
+      sendMessage(text);
+    }
   };
 
   const handleQuickPrompt = (prompt: string) => {
@@ -129,20 +166,29 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 44 : 0}
     >
-      {/* Top App Bar M3 Unificada */}
+      {/* Top App Bar M3 com Ícone do Assistente e Ações */}
       <View style={styles.topAppBar}>
         <View style={styles.topAppBarLeft}>
-          <View style={styles.brandRow}>
-            <Text style={styles.brand}>vito</Text>
-            <View style={styles.brandDot} />
+          <View style={styles.assistantIconBox}>
+            <MaterialIcons name="auto-awesome" size={20} color={tokens.colors.primary} />
           </View>
-          <View style={styles.statusBadge}>
-            <View style={styles.statusDot} />
-            <Text style={styles.statusBadgeText}>AI Assistant</Text>
+          <View style={styles.titleColumn}>
+            <Text style={styles.chatTitle}>Vito Assistant</Text>
+            <Text style={styles.chatSubtitle}>Suas conversas e planos</Text>
           </View>
         </View>
 
         <View style={styles.topAppBarRight}>
+          <TouchableOpacity
+            style={styles.iconActionButton}
+            onPress={() => setHistoryVisible(true)}
+            activeOpacity={0.7}
+            hitSlop={tokens.hitSlop.sm}
+            accessibilityLabel="Histórico de conversas"
+          >
+            <MaterialIcons name="menu" size={22} color={tokens.colors.onSurface} />
+          </TouchableOpacity>
+
           <TouchableOpacity
             style={styles.iconActionButton}
             onPress={clearHistory}
@@ -150,7 +196,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
             hitSlop={tokens.hitSlop.sm}
             accessibilityLabel="Limpar histórico do chat"
           >
-            <MaterialIcons name="delete-outline" size={18} color={tokens.colors.onSurfaceVariant} />
+            <MaterialIcons name="delete-outline" size={20} color={tokens.colors.onSurfaceVariant} />
           </TouchableOpacity>
 
           {user && (
@@ -212,8 +258,16 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
           loading={loading}
           isRecording={isRecording}
           onPressMic={handleToggleRecording}
+          onPressAttach={handlePickImage}
+          selectedImageUri={selectedImageUri}
+          onClearImage={() => setSelectedImageUri(null)}
         />
       </View>
+      <ConversationHistoryModal
+        visible={historyVisible}
+        onClose={() => setHistoryVisible(false)}
+        onNewChat={clearHistory}
+      />
     </KeyboardAvoidingView>
   );
 };
@@ -237,47 +291,29 @@ const styles = StyleSheet.create({
   topAppBarLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: tokens.spacing.sm,
+    gap: tokens.spacing.sm + 2,
   },
-  brandRow: {
-    flexDirection: 'row',
+  assistantIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: tokens.colors.primaryContainer,
     alignItems: 'center',
-    gap: 5,
+    justifyContent: 'center',
   },
-  brand: {
-    fontSize: tokens.typography.size.titleLarge,
+  titleColumn: {
+    flexDirection: 'column',
+    gap: 2,
+  },
+  chatTitle: {
+    fontSize: tokens.typography.size.titleSmall,
     fontWeight: tokens.typography.weight.bold,
     color: tokens.colors.onSurface,
-    letterSpacing: -0.5,
   },
-  brandDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: tokens.colors.primary,
-  },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: tokens.colors.surfaceContainerHigh,
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderRadius: MD3Shapes.full,
-    borderWidth: 1,
-    borderColor: tokens.colors.outlineVariant,
-  },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: tokens.colors.tertiary,
-  },
-  statusBadgeText: {
+  chatSubtitle: {
     fontSize: 10,
-    color: tokens.colors.onSurfaceVariant,
-    fontWeight: tokens.typography.weight.bold,
-    letterSpacing: 0.3,
+    color: tokens.colors.textMuted,
+    fontWeight: tokens.typography.weight.medium,
   },
   topAppBarRight: {
     flexDirection: 'row',

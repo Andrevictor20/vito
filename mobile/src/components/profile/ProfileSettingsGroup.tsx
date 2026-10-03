@@ -1,13 +1,46 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, Switch } from 'react-native';
+import { StyleSheet, View, Text, Switch, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens } from '../../theme/tokens';
+import { useTheme } from '../../context/ThemeContext';
 
 export const ProfileSettingsGroup: React.FC = () => {
   const [whisperEnabled, setWhisperEnabled] = useState(true);
+  const { isDark, toggleTheme } = useTheme();
 
   return (
     <View style={styles.groupCard}>
+      {/* Alternador de Tema M3 */}
+      <TouchableOpacity
+        style={styles.groupItem}
+        onPress={toggleTheme}
+        activeOpacity={0.7}
+      >
+        <View style={styles.itemLeft}>
+          <View style={styles.itemIconBox}>
+            <MaterialIcons
+              name={isDark ? 'dark-mode' : 'light-mode'}
+              size={18}
+              color={tokens.colors.primary}
+            />
+          </View>
+          <View style={styles.itemTextCol}>
+            <Text style={styles.itemTitle}>Tema da Interface</Text>
+            <Text style={styles.itemSub}>
+              {isDark ? 'Tema Escuro (M3 Dark)' : 'Tema Claro (M3 Light)'}
+            </Text>
+          </View>
+        </View>
+        <Switch
+          value={isDark}
+          onValueChange={toggleTheme}
+          trackColor={{ false: tokens.colors.surfaceContainerHighest, true: tokens.colors.primaryContainer }}
+          thumbColor={isDark ? tokens.colors.primary : tokens.colors.outline}
+        />
+      </TouchableOpacity>
+
+      <View style={styles.divider} />
+
       <View style={styles.groupItem}>
         <View style={styles.itemLeft}>
           <View style={styles.itemIconBox}>
@@ -117,7 +150,7 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    backgroundColor: tokens.colors.outlineVariant,
     marginHorizontal: tokens.spacing.md,
   },
 });

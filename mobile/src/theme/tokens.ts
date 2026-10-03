@@ -11,80 +11,169 @@ export const MD3Shapes = {
   full: 9999,     // Pílulas de navegação, botões circulares, avatares
 };
 
+export const lightColors = {
+  // M3 System Primary & Tonal Containers (Material Design 3 Canonical Light)
+  primary: '#6750A4',              // md.sys.color.primary (Acentos primários, botões ativos, FAB)
+  onPrimary: '#FFFFFF',            // md.sys.color.on-primary (Texto/ícones sobre primary)
+  primaryContainer: '#EADDFF',     // md.sys.color.primary-container (Pílulas ativas, balões de chat do usuário)
+  onPrimaryContainer: '#21005D',   // md.sys.color.on-primary-container (Texto sobre primary-container)
+  primaryHover: '#5B4495',
+  primaryLight: 'rgba(103, 80, 164, 0.12)',
+  cobalt: '#6750A4',
+  cobaltGlow: 'rgba(103, 80, 164, 0.16)',
+
+  // M3 System Secondary & Tertiary
+  secondary: '#625B71',            // md.sys.color.secondary (Ações secundárias, chips)
+  onSecondary: '#FFFFFF',          // md.sys.color.on-secondary
+  secondaryContainer: '#E8DEF8',   // md.sys.color.secondary-container (Chips ativos, pílulas secundárias)
+  onSecondaryContainer: '#1D192B', // md.sys.color.on-secondary-container
+  tertiary: '#7D5260',             // md.sys.color.tertiary
+  onTertiary: '#FFFFFF',
+  tertiaryContainer: '#FFD8E4',
+  onTertiaryContainer: '#31111D',
+
+  // M3 Surface & Tonal Surface Containers (Material 3 Tonal Elevation Light)
+  bg: '#FEF7FF',                   // md.sys.color.surface
+  canvas: '#FEF7FF',               // md.sys.color.surface-dim
+  surface: '#FEF7FF',              // md.sys.color.surface (Fundo base)
+  surfaceDim: '#DED8E1',           // md.sys.color.surface-dim
+  surfaceBright: '#FEF7FF',        // md.sys.color.surface-bright
+  surfaceSubtle: '#F7F2FA',
+  surfaceElevated: '#ECE6F0',
+
+  // Camadas de Profundidade por Tonalidade (M3 Surface Containers)
+  surfaceContainerLowest: '#FFFFFF', // Nível 0
+  surfaceContainerLow: '#F7F2FA',    // Nível 1 (Fundos de listas agrupadas, cartões sutis)
+  surfaceContainer: '#F3EDF7',       // Nível 2 (Fundo de cards e containers padrão)
+  surfaceContainerHigh: '#ECE6F0',   // Nível 3 (Fundo de balões do assistente, modais, menus)
+  surfaceContainerHighest: '#E6E0E9',// Nível 4 (Hover, estados pressionados, chips)
+
+  // M3 Typography & Content Colors (WCAG AA Contrast)
+  onSurface: '#1D1B20',              // Texto primário em superfícies
+  onSurfaceVariant: '#49454F',       // Texto secundário/apoio
+  textPrimary: '#1D1B20',            // Retrocompatibilidade
+  textSecondary: '#49454F',          // Retrocompatibilidade
+  textMuted: '#79747E',              // Texto desativado / metadados
+
+  // M3 Outlines & Borders
+  outline: '#79747E',                // md.sys.color.outline (Bordas de cards Outlined, inputs)
+  outlineVariant: '#CAC4D0',         // md.sys.color.outline-variant (Divisores, separadores)
+  surfaceBorder: '#CAC4D0',          // Retrocompatibilidade
+  structuralBorder: '#E6E0E9',       // Retrocompatibilidade
+
+  // M3 Error & Status
+  error: '#B3261E',                  // md.sys.color.error
+  onError: '#FFFFFF',                // md.sys.color.on-error
+  errorContainer: '#F9DEDC',         // md.sys.color.error-container
+  onErrorContainer: '#410E0B',       // md.sys.color.on-error-container
+  danger: '#B3261E',                 // Retrocompatibilidade
+  dangerContainer: '#F9DEDC',        // Retrocompatibilidade
+  dangerLight: 'rgba(179, 38, 30, 0.12)',
+
+  // Status Semânticos e Badges de Categoria M3
+  success: '#2E6C38',
+  onSuccess: '#FFFFFF',
+  successContainer: '#B8F5B8',
+  onSuccessContainer: '#002107',
+  successLight: 'rgba(46, 108, 56, 0.12)',
+  warning: '#7B4B14',
+  warningLight: 'rgba(123, 75, 20, 0.12)',
+  statusOnline: '#55A46B',
+  categoryBirthdayBg: '#FFE7C5',
+  categoryBirthdayText: '#7B4B14',
+  categoryPartyBg: '#E8DEF8',
+  categoryPartyText: '#1D192B',
+  categoryBbqBg: '#FFD8E4',
+  categoryBbqText: '#31111D',
+
+  // Retrocompatibilidade adicional
+  accent: '#6750A4',
+  accentLight: 'rgba(103, 80, 164, 0.12)',
+};
+
+export const darkColors = {
+  // M3 System Primary & Tonal Containers (Material Design 3 Canonical Dark)
+  primary: '#D0BCFF',              // md.sys.color.primary (Roxo claro para superfície escura)
+  onPrimary: '#381E72',            // md.sys.color.on-primary
+  primaryContainer: '#4F378B',     // md.sys.color.primary-container
+  onPrimaryContainer: '#EADDFF',   // md.sys.color.on-primary-container
+  primaryHover: '#6750A4',
+  primaryLight: 'rgba(208, 188, 255, 0.14)',
+  cobalt: '#D0BCFF',
+  cobaltGlow: 'rgba(208, 188, 255, 0.16)',
+
+  // M3 System Secondary & Tertiary
+  secondary: '#CCC2DC',
+  onSecondary: '#332D41',
+  secondaryContainer: '#4A4458',
+  onSecondaryContainer: '#E8DEF8',
+  tertiary: '#EFB8C8',
+  onTertiary: '#492532',
+  tertiaryContainer: '#633B48',
+  onTertiaryContainer: '#FFD8E4',
+
+  // M3 Surface & Tonal Surface Containers (Material 3 Tonal Elevation Dark)
+  bg: '#141218',
+  canvas: '#141218',
+  surface: '#141218',
+  surfaceDim: '#141218',
+  surfaceBright: '#3B383E',
+  surfaceSubtle: '#1D1B20',
+  surfaceElevated: '#2B2930',
+
+  surfaceContainerLowest: '#0F0D13',
+  surfaceContainerLow: '#1D1B20',
+  surfaceContainer: '#211F26',
+  surfaceContainerHigh: '#2B2930',
+  surfaceContainerHighest: '#36343B',
+
+  // M3 Typography & Content Colors (WCAG AA Contrast)
+  onSurface: '#E6E0E9',
+  onSurfaceVariant: '#CAC4D0',
+  textPrimary: '#E6E0E9',
+  textSecondary: '#CAC4D0',
+  textMuted: '#938F99',
+
+  // M3 Outlines & Borders
+  outline: '#938F99',
+  outlineVariant: '#49454F',
+  surfaceBorder: '#49454F',
+  structuralBorder: '#2B2930',
+
+  // M3 Error & Status
+  error: '#F2B8B5',
+  onError: '#601410',
+  errorContainer: '#8C1D18',
+  onErrorContainer: '#F9DEDC',
+  danger: '#F2B8B5',
+  dangerContainer: '#8C1D18',
+  dangerLight: 'rgba(242, 184, 181, 0.16)',
+
+  // Status Semânticos e Badges de Categoria M3
+  success: '#82D996',
+  onSuccess: '#003914',
+  successContainer: '#005322',
+  onSuccessContainer: '#9EF6B0',
+  successLight: 'rgba(130, 217, 150, 0.16)',
+  warning: '#FFD966',
+  warningLight: 'rgba(255, 217, 102, 0.16)',
+  statusOnline: '#55A46B',
+  categoryBirthdayBg: '#4A3419',
+  categoryBirthdayText: '#FFDCC1',
+  categoryPartyBg: '#4A4458',
+  categoryPartyText: '#E8DEF8',
+  categoryBbqBg: '#633B48',
+  categoryBbqText: '#FFD8E4',
+
+  accent: '#D0BCFF',
+  accentLight: 'rgba(208, 188, 255, 0.14)',
+};
+
+export type ThemeColors = typeof lightColors;
+
 export const tokens = {
-  // 1. Paleta Tonal Material Design 3 (M3)
-  colors: {
-    // M3 System Primary & Tonal Containers
-    primary: '#A8C7FA',              // md.sys.color.primary (Acentos primários, botões ativos)
-    onPrimary: '#082F5A',            // md.sys.color.on-primary (Texto/ícones sobre primary)
-    primaryContainer: '#1A4072',     // md.sys.color.primary-container (Fundos de destaque/cards)
-    onPrimaryContainer: '#D3E3FD',   // md.sys.color.on-primary-container (Texto sobre primary-container)
-    primaryHover: '#3b82f6',
-    primaryLight: 'rgba(168, 199, 250, 0.14)',
-    cobalt: '#3b82f6',
-    cobaltGlow: 'rgba(59, 130, 246, 0.16)',
-
-    // M3 System Secondary & Tertiary
-    secondary: '#C2E7FF',            // md.sys.color.secondary (Ações secundárias, chips)
-    onSecondary: '#283141',          // md.sys.color.on-secondary
-    secondaryContainer: '#3E4758',   // md.sys.color.secondary-container (Chips ativos, pílulas)
-    onSecondaryContainer: '#DEE3F5', // md.sys.color.on-secondary-container
-    tertiary: '#70D7C4',             // md.sys.color.tertiary
-    onTertiary: '#003730',
-    tertiaryContainer: '#005047',
-    onTertiaryContainer: '#8EF3E0',
-
-    // M3 Surface & Tonal Surface Containers (Dark Executive Mode)
-    bg: '#111318',                   // md.sys.color.surface
-    canvas: '#0E1014',               // md.sys.color.surface-dim
-    surface: '#111318',              // md.sys.color.surface
-    surfaceDim: '#0E1014',           // md.sys.color.surface-dim
-    surfaceBright: '#37393E',        // md.sys.color.surface-bright
-    surfaceSubtle: '#191C21',
-    surfaceElevated: '#282A2F',
-
-    // Camadas de Profundidade por Tonalidade (M3 Surface Containers)
-    surfaceContainerLowest: '#0C0E12', // Nível 0
-    surfaceContainerLow: '#191C21',    // Nível 1
-    surfaceContainer: '#1E2025',       // Nível 2 (Fundo de cards e balões)
-    surfaceContainerHigh: '#282A2F',   // Nível 3 (Fundo de modais, menus suspensos, Input Dock)
-    surfaceContainerHighest: '#33353A',// Nível 4 (Hover, estados pressionados, chips inativos)
-
-    // M3 Typography & Content Colors (WCAG AA Contrast)
-    onSurface: '#E2E2E9',              // Texto primário em superfícies
-    onSurfaceVariant: '#C4C6D0',       // Texto secundário/apoio
-    textPrimary: '#E2E2E9',            // Retrocompatibilidade
-    textSecondary: '#C4C6D0',          // Retrocompatibilidade
-    textMuted: '#8E919A',              // Texto desativado / metadados
-
-    // M3 Outlines & Borders
-    outline: '#8E919A',                // md.sys.color.outline (Bordas de cards Outlined)
-    outlineVariant: '#44474E',         // md.sys.color.outline-variant (Divisores, separadores)
-    surfaceBorder: '#44474E',          // Retrocompatibilidade
-    structuralBorder: '#282A2F',       // Retrocompatibilidade
-
-    // M3 Error & Status
-    error: '#FFB4AB',                  // md.sys.color.error
-    onError: '#690005',                // md.sys.color.on-error
-    errorContainer: '#93000A',         // md.sys.color.error-container
-    onErrorContainer: '#FFDAD6',       // md.sys.color.on-error-container
-    danger: '#FFB4AB',                 // Retrocompatibilidade
-    dangerContainer: '#93000A',        // Retrocompatibilidade
-    dangerLight: 'rgba(255, 180, 171, 0.16)',
-
-    // Status Semânticos
-    success: '#82D996',
-    onSuccess: '#003914',
-    successContainer: '#005322',
-    onSuccessContainer: '#9EF6B0',
-    successLight: 'rgba(130, 217, 150, 0.16)',
-    warning: '#FFD966',
-    warningLight: 'rgba(255, 217, 102, 0.16)',
-
-    // Retrocompatibilidade adicional
-    accent: '#A8C7FA',
-    accentLight: 'rgba(168, 199, 250, 0.14)',
-  },
+  // 1. Paleta Tonal Ativa (inicializada com Light)
+  colors: { ...lightColors },
 
   // 2. Escala Tipográfica Material Design 3
   typography: {
@@ -218,4 +307,9 @@ export const tokens = {
   },
 };
 
-export type ThemeTokens = typeof tokens;
+export const getThemeTokens = (isDark: boolean) => ({
+  ...tokens,
+  colors: isDark ? darkColors : lightColors,
+});
+
+export type ThemeTokens = ReturnType<typeof getThemeTokens>;
