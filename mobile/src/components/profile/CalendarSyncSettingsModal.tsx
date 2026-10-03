@@ -172,16 +172,26 @@ export const CalendarSyncSettingsModal: React.FC<CalendarSyncSettingsModalProps>
                   </Text>
                   <View style={styles.actionRow}>
                     <TouchableOpacity
-                      style={[styles.primaryActionBtn, { backgroundColor: colors.primary }]}
+                      style={[
+                        styles.primaryActionBtn,
+                        {
+                          backgroundColor: isDark ? colors.surfaceContainerHighest : colors.primary,
+                          borderWidth: isDark ? 1 : 0,
+                          borderColor: colors.outlineVariant,
+                        },
+                      ]}
                       onPress={() => syncProvider('google')}
                       disabled={isSyncing}
+                      activeOpacity={0.8}
                     >
                       {isSyncing ? (
-                        <ActivityIndicator size="small" color="#FFFFFF" />
+                        <ActivityIndicator size="small" color={isDark ? colors.onSurface : '#FFFFFF'} />
                       ) : (
                         <>
-                          <MaterialIcons name="refresh" size={16} color="#FFFFFF" />
-                          <Text style={styles.primaryActionText}>Sincronizar</Text>
+                          <MaterialIcons name="refresh" size={16} color={isDark ? colors.onSurface : '#FFFFFF'} />
+                          <Text style={[styles.primaryActionText, { color: isDark ? colors.onSurface : '#FFFFFF' }]}>
+                            Sincronizar
+                          </Text>
                         </>
                       )}
                     </TouchableOpacity>
@@ -199,17 +209,26 @@ export const CalendarSyncSettingsModal: React.FC<CalendarSyncSettingsModalProps>
               ) : (
                 <View style={styles.disconnectedActions}>
                   <TouchableOpacity
-                    style={[styles.connectBtn, { backgroundColor: colors.primary }]}
+                    style={[
+                      styles.connectBtn,
+                      {
+                        backgroundColor: isDark ? colors.surfaceContainerHighest : colors.primary,
+                        borderWidth: isDark ? 1 : 0,
+                        borderColor: colors.outlineVariant,
+                      },
+                    ]}
                     onPress={handleConnectGoogle}
                     disabled={isLoading}
                     activeOpacity={0.8}
                   >
                     {isLoading ? (
-                      <ActivityIndicator size="small" color="#FFFFFF" />
+                      <ActivityIndicator size="small" color={isDark ? colors.onSurface : '#FFFFFF'} />
                     ) : (
                       <>
-                        <MaterialIcons name="sync" size={16} color="#FFFFFF" />
-                        <Text style={styles.connectBtnText}>Conectar Conta Google</Text>
+                        <MaterialIcons name="sync" size={16} color={isDark ? colors.onSurface : '#FFFFFF'} />
+                        <Text style={[styles.connectBtnText, { color: isDark ? colors.onSurface : '#FFFFFF' }]}>
+                          Conectar Conta Google
+                        </Text>
                       </>
                     )}
                   </TouchableOpacity>

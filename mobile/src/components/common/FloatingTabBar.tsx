@@ -19,6 +19,9 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
 
   if (!visible) return null;
 
+  const inactiveColor = isDark ? '#A1A1AA' : '#71717A';
+  const activeColor = isDark ? '#FFFFFF' : '#111111';
+
   return (
     <View
       style={[
@@ -41,13 +44,11 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
       >
         <View
           style={[
-            styles.activeIndicator,
+            styles.indicatorBox,
             activeTab === 'chat' && [
-              styles.activeIndicatorSelected,
+              styles.indicatorSelected,
               {
                 backgroundColor: isDark ? colors.surfaceContainerHighest : colors.primary,
-                borderRadius: 16,
-                overflow: 'hidden',
                 ...(isDark
                   ? { borderWidth: 1, borderColor: colors.outlineVariant }
                   : { borderWidth: 0 }),
@@ -57,23 +58,15 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
         >
           <MaterialIcons
             name={activeTab === 'chat' ? 'chat' : 'chat-bubble-outline'}
-            size={20}
-            color={
-              activeTab === 'chat'
-                ? isDark
-                  ? '#FFFFFF'
-                  : '#FFFFFF'
-                : colors.onSurfaceVariant
-            }
+            size={22}
+            color={activeTab === 'chat' ? '#FFFFFF' : inactiveColor}
           />
         </View>
         <Text
           style={[
             styles.navLabel,
             {
-              color: activeTab === 'chat'
-                ? (isDark ? '#FFFFFF' : '#111111')
-                : (isDark ? '#A1A1AA' : '#71717A'),
+              color: activeTab === 'chat' ? activeColor : inactiveColor,
               fontWeight: activeTab === 'chat' ? '700' : '500',
             },
           ]}
@@ -93,13 +86,11 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
       >
         <View
           style={[
-            styles.activeIndicator,
+            styles.indicatorBox,
             activeTab === 'calendar' && [
-              styles.activeIndicatorSelected,
+              styles.indicatorSelected,
               {
                 backgroundColor: isDark ? colors.surfaceContainerHighest : colors.primary,
-                borderRadius: 16,
-                overflow: 'hidden',
                 ...(isDark
                   ? { borderWidth: 1, borderColor: colors.outlineVariant }
                   : { borderWidth: 0 }),
@@ -108,22 +99,16 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
           ]}
         >
           <MaterialIcons
-            name={activeTab === 'calendar' ? 'calendar-month' : 'calendar-today'}
-            size={20}
-            color={
-              activeTab === 'calendar'
-                ? '#FFFFFF'
-                : (isDark ? '#A1A1AA' : colors.onSurfaceVariant)
-            }
+            name={activeTab === 'calendar' ? 'event' : 'event-note'}
+            size={22}
+            color={activeTab === 'calendar' ? '#FFFFFF' : inactiveColor}
           />
         </View>
         <Text
           style={[
             styles.navLabel,
             {
-              color: activeTab === 'calendar'
-                ? (isDark ? '#FFFFFF' : '#111111')
-                : (isDark ? '#A1A1AA' : '#71717A'),
+              color: activeTab === 'calendar' ? activeColor : inactiveColor,
               fontWeight: activeTab === 'calendar' ? '700' : '500',
             },
           ]}
@@ -154,21 +139,17 @@ const styles = StyleSheet.create({
     minWidth: 90,
     paddingVertical: 2,
   },
-  // Indicador Ativo M3 Canônico: Pílula Oval Horizontal 64x32dp
-  activeIndicator: {
+  // Indicador M3: Container transparente quando inativo (sem clipping), pílula oval 64x32dp quando ativo
+  indicatorBox: {
     width: 64,
     height: 32,
-    borderRadius: 16,
-    overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'transparent',
     marginBottom: 4,
   },
-  activeIndicatorSelected: {
+  indicatorSelected: {
     borderRadius: 16,
     overflow: 'hidden',
-    backgroundColor: tokens.colors.primaryContainer,
   },
   navLabel: {
     fontSize: tokens.typography.size.labelSmall,

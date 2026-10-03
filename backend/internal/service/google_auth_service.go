@@ -289,6 +289,27 @@ func (s *GoogleAuthService) HandleCallback(ctx context.Context, code, stateStr s
 		return "", fmt.Errorf("falha ao emitir token JWT de sessão: %w", err)
 	}
 
+	// Auto-vincula e sincroniza o calendário se o serviço de sincronização estiver disponível
+	if s.syncSvc != nil && tokens.AccessToken != "" {
+		credsPayload, _ := json.Marshal(map[string]interface{}{
+			"access_token":  tokens.AccessToken,
+			"refresh_token": tokens.RefreshToken,
+			"expires_in":    tokens.ExpiresIn,
+		})
+		_, _ = s.syncSvc.ConnectIntegration(
+			ctx,
+			user.ID,
+			domain.ProviderGoogle,
+			userInfo.Email,
+			string(credsPayload),
+			"primary",
+			"Google Calendar",
+		)
+		go func() {
+			_ = s.syncSvc.SyncIntegration(context.Background(), user.ID, domain.ProviderGoogle)
+		}()
+	}
+
 	userJSON, _ := json.Marshal(user)
 
 	deepLink := fmt.Sprintf("%s?status=success&token=%s&user=%s",
