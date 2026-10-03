@@ -17,6 +17,26 @@ services:
       - DB_PATH=/app/data/vito.db
     volumes:
       - vito_data:/app/data
+    networks:
+      - vito_net
+
+  # Serviço do Cloudflare Tunnel para Zero-Trust (dispensa abertura de portas no roteador)
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: vito-tunnel
+    restart: unless-stopped
+    command: tunnel run
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN:-}
+    networks:
+      - vito_net
+    profiles:
+      - production
+      - tunnel
+
+networks:
+  vito_net:
+    driver: bridge
 
 volumes:
   vito_data:

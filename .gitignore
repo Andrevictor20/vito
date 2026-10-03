@@ -60,12 +60,14 @@ backend/data/
 *.bak
 *.swp
 *~
+*.zip
 scratch/
 /tmp/
 
-# Planejamento & Notas Locais (Não versionado)
+# Planejamento, Agentes & Notas Locais (Não versionado)
 planning/
 docs/roadmap/
+.agents/
 
 # IDEs & Editores
 .vscode/*
