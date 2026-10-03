@@ -4,6 +4,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { tokens } from '../../theme/tokens';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
+import { VitoMascot } from './VitoMascot';
 
 interface HeaderProps {
   onPressProfile?: () => void;
@@ -28,6 +29,7 @@ export const Header: React.FC<HeaderProps> = ({ onPressProfile }) => {
         <View style={styles.titleColumn}>
           <Text style={[styles.dateSubtitle, { color: colors.textMuted }]}>{formattedDate}</Text>
           <View style={styles.brandRow}>
+            <VitoMascot size={32} />
             <Text style={[styles.brand, { color: colors.onSurface }]}>Eventos</Text>
           </View>
         </View>

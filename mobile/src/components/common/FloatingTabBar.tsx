@@ -67,8 +67,12 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
         <Text
           style={[
             styles.navLabel,
-            { color: activeTab === 'chat' ? colors.onSurface : colors.textMuted },
-            activeTab === 'chat' && styles.navLabelActive,
+            {
+              color: activeTab === 'chat'
+                ? (isDark ? '#FFFFFF' : '#111111')
+                : (isDark ? '#A1A1AA' : '#71717A'),
+              fontWeight: activeTab === 'chat' ? '700' : '500',
+            },
           ]}
         >
           Chat
@@ -102,18 +106,20 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
             size={20}
             color={
               activeTab === 'calendar'
-                ? isDark
-                  ? '#FFFFFF'
-                  : '#FFFFFF'
-                : colors.onSurfaceVariant
+                ? '#FFFFFF'
+                : (isDark ? '#A1A1AA' : colors.onSurfaceVariant)
             }
           />
         </View>
         <Text
           style={[
             styles.navLabel,
-            { color: activeTab === 'calendar' ? colors.onSurface : colors.textMuted },
-            activeTab === 'calendar' && styles.navLabelActive,
+            {
+              color: activeTab === 'calendar'
+                ? (isDark ? '#FFFFFF' : '#111111')
+                : (isDark ? '#A1A1AA' : '#71717A'),
+              fontWeight: activeTab === 'calendar' ? '700' : '500',
+            },
           ]}
         >
           Calendário
@@ -157,13 +163,7 @@ const styles = StyleSheet.create({
   },
   navLabel: {
     fontSize: tokens.typography.size.labelSmall,
-    fontWeight: tokens.typography.weight.medium,
-    color: tokens.colors.onSurfaceVariant,
     letterSpacing: 0.3,
-  },
-  navLabelActive: {
-    color: tokens.colors.onSurface,
-    fontWeight: tokens.typography.weight.bold,
   },
 });
 
