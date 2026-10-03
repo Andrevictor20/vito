@@ -51,12 +51,13 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               <View style={styles.sheetHeader}>
                 <View style={[styles.grabBar, { backgroundColor: colors.outlineVariant }]} />
                 <TouchableOpacity
-                  style={styles.closeBtn}
+                  style={[styles.closeBtn, { backgroundColor: colors.surfaceContainerHighest, borderColor: colors.outlineVariant }]}
                   onPress={onClose}
                   hitSlop={tokens.hitSlop.sm}
                   accessibilityLabel="Fechar perfil"
+                  activeOpacity={0.7}
                 >
-                  <MaterialIcons name="close" size={18} color={colors.textSecondary} />
+                  <MaterialIcons name="close" size={18} color={colors.onSurface} />
                 </TouchableOpacity>
               </View>
 
@@ -133,8 +134,10 @@ const styles = StyleSheet.create({
   },
   sheetHeader: {
     alignItems: 'center',
+    justifyContent: 'center',
     paddingVertical: tokens.spacing.sm,
     position: 'relative',
+    minHeight: 40,
   },
   grabBar: {
     width: 36,
@@ -145,8 +148,13 @@ const styles = StyleSheet.create({
   closeBtn: {
     position: 'absolute',
     right: tokens.spacing.md,
-    top: tokens.spacing.sm,
-    padding: 4,
+    top: 4,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   scrollContent: {
     paddingHorizontal: tokens.spacing.md,

@@ -32,6 +32,11 @@ export const CompactCalendarCard: React.FC<CompactCalendarCardProps> = ({
   const monthName = selectedDate.toLocaleDateString('pt-BR', { month: 'long' });
   const capitalizedMonth = monthName.charAt(0).toUpperCase() + monthName.slice(1);
   const yearStr = selectedDate.getFullYear().toString();
+  const formattedDate = selectedDate.toLocaleDateString('pt-BR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  }).toUpperCase();
 
   const isSameDay = (d1: Date, d2: Date) =>
     d1.getDate() === d2.getDate() &&
@@ -42,9 +47,12 @@ export const CompactCalendarCard: React.FC<CompactCalendarCardProps> = ({
     <View style={[styles.card, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant, borderWidth: 1 }]}>
       {/* Top Header do Card */}
       <View style={styles.headerRow}>
-        <View>
-          <Text style={[styles.monthTitle, { color: colors.onSurface }]}>{capitalizedMonth}</Text>
-          <Text style={[styles.yearSubtitle, { color: colors.textMuted }]}>{yearStr}</Text>
+        <View style={styles.headerTitleColumn}>
+          <Text style={[styles.dateSubtitle, { color: colors.textMuted }]}>{formattedDate}</Text>
+          <View style={styles.monthYearRow}>
+            <Text style={[styles.monthTitle, { color: colors.onSurface }]}>{capitalizedMonth}</Text>
+            <Text style={[styles.yearSubtitle, { color: colors.textMuted }]}>{yearStr}</Text>
+          </View>
         </View>
 
         <TouchableOpacity
@@ -113,6 +121,21 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: tokens.spacing.md,
+  },
+  headerTitleColumn: {
+    flexDirection: 'column',
+    gap: 2,
+  },
+  dateSubtitle: {
+    fontSize: tokens.typography.size.labelSmall,
+    fontWeight: tokens.typography.weight.semibold,
+    color: tokens.colors.textMuted,
+    letterSpacing: 0.8,
+  },
+  monthYearRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 6,
   },
   monthTitle: {
     fontSize: tokens.typography.size.titleMedium,

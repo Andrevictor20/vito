@@ -14,24 +14,14 @@ export const Header: React.FC<HeaderProps> = ({ onPressProfile }) => {
   const { user } = useAuth();
   const { colors, isDark, toggleTheme } = useTheme();
 
-  const todayStr = new Date().toLocaleDateString('pt-BR', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-  });
-
-  const formattedDate = todayStr.toUpperCase();
   const firstName = user?.name ? user.name.split(' ')[0] : 'Usuário';
 
   return (
     <View style={[styles.header, { backgroundColor: colors.surface }]}>
       <View style={styles.topRow}>
-        <View style={styles.titleColumn}>
-          <Text style={[styles.dateSubtitle, { color: colors.textMuted }]}>{formattedDate}</Text>
-          <View style={styles.brandRow}>
-            <VitoMascot size={32} />
-            <Text style={[styles.brand, { color: colors.onSurface }]}>Eventos</Text>
-          </View>
+        <View style={styles.brandRow}>
+          <VitoMascot size={32} />
+          <Text style={[styles.brand, { color: colors.onSurface }]}>Eventos</Text>
         </View>
 
         <View style={styles.actionsRow}>
@@ -78,16 +68,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-  },
-  titleColumn: {
-    flexDirection: 'column',
-    gap: 2,
-  },
-  dateSubtitle: {
-    fontSize: tokens.typography.size.labelSmall,
-    fontWeight: tokens.typography.weight.semibold,
-    color: tokens.colors.textMuted,
-    letterSpacing: 0.8,
   },
   brandRow: {
     flexDirection: 'row',

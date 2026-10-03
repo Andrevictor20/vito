@@ -76,8 +76,12 @@ class ApiService {
       headers['Authorization'] = `Bearer ${this.token}`;
     }
 
+    const isAiEndpoint = endpoint.includes('/assistant/');
+    const defaultTimeout = isAiEndpoint ? 60000 : 15000;
+    const timeoutMs = (options as any)?.timeoutMs || defaultTimeout;
+
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
       const res = await fetch(`${this.baseUrl}${endpoint}`, {
@@ -96,7 +100,8 @@ class ApiService {
       return data as T;
     } catch (err: any) {
       if (err.name === 'AbortError') {
-        throw new Error(`Tempo limite esgotado ao conectar no servidor (${this.baseUrl}).`);
+        const seconds = Math.round(timeoutMs / 1000);
+        throw new Error(`Tempo limite esgotado (${seconds}s) ao conectar no servidor (${this.baseUrl}).`);
       }
       throw err;
     } finally {
@@ -194,18 +199,31 @@ class ApiService {
       headers['Authorization'] = `Bearer ${this.token}`;
     }
 
-    const res = await fetch(`${this.baseUrl}/api/v1/assistant/audio`, {
-      method: 'POST',
-      headers,
-      body: formData,
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
 
-    if (!res.ok) {
-      const errorData = await res.json().catch(() => ({}));
-      throw new Error(errorData.error || `Erro HTTP ${res.status}`);
+    try {
+      const res = await fetch(`${this.baseUrl}/api/v1/assistant/audio`, {
+        method: 'POST',
+        headers,
+        body: formData,
+        signal: controller.signal,
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || `Erro HTTP ${res.status}`);
+      }
+
+      return res.json();
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        throw new Error(`Tempo limite esgotado (60s) ao processar áudio no servidor (${this.baseUrl}).`);
+      }
+      throw err;
+    } finally {
+      clearTimeout(timeoutId);
     }
-
-    return res.json();
   }
 
   // Assistant Vision (Gemini 2.5 Flash Multimodal)
@@ -229,18 +247,31 @@ class ApiService {
       headers['Authorization'] = `Bearer ${this.token}`;
     }
 
-    const res = await fetch(`${this.baseUrl}/api/v1/assistant/vision`, {
-      method: 'POST',
-      headers,
-      body: formData,
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
 
-    if (!res.ok) {
-      const errorData = await res.json().catch(() => ({}));
-      throw new Error(errorData.error || `Erro HTTP ${res.status}`);
+    try {
+      const res = await fetch(`${this.baseUrl}/api/v1/assistant/vision`, {
+        method: 'POST',
+        headers,
+        body: formData,
+        signal: controller.signal,
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || `Erro HTTP ${res.status}`);
+      }
+
+      return res.json();
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        throw new Error(`Tempo limite esgotado (60s) ao processar imagem no servidor (${this.baseUrl}).`);
+      }
+      throw err;
+    } finally {
+      clearTimeout(timeoutId);
     }
-
-    return res.json();
   }
 }
 

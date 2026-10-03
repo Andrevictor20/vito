@@ -34,8 +34,15 @@ export const ProfileSettingsGroup: React.FC = () => {
         <Switch
           value={isDark}
           onValueChange={toggleTheme}
-          trackColor={{ false: colors.surfaceContainerHighest, true: colors.primary }}
-          thumbColor={isDark ? '#FAFAFA' : '#18181B'}
+          trackColor={{
+            false: isDark ? '#383838' : '#D4D4D8',
+            true: isDark ? '#52525B' : '#18181B',
+          }}
+          thumbColor="#FFFFFF"
+          {...({
+            activeThumbColor: '#FFFFFF',
+            activeTrackColor: isDark ? '#52525B' : '#18181B',
+          } as any)}
         />
       </TouchableOpacity>
 
@@ -99,8 +106,15 @@ export const ProfileSettingsGroup: React.FC = () => {
         <Switch
           value={whisperEnabled}
           onValueChange={setWhisperEnabled}
-          trackColor={{ false: colors.surfaceContainerHighest, true: colors.primary }}
-          thumbColor={whisperEnabled ? (isDark ? '#FAFAFA' : '#18181B') : colors.outline}
+          trackColor={{
+            false: isDark ? '#383838' : '#D4D4D8',
+            true: isDark ? '#52525B' : '#18181B',
+          }}
+          thumbColor={whisperEnabled ? '#FFFFFF' : (isDark ? '#71717A' : '#A1A1AA')}
+          {...({
+            activeThumbColor: '#FFFFFF',
+            activeTrackColor: isDark ? '#52525B' : '#18181B',
+          } as any)}
         />
       </View>
     </View>
