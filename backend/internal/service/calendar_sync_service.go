@@ -133,17 +133,30 @@ func (s *CalendarSyncService) SyncIntegration(ctx context.Context, userID, provi
 	from := now.Add(-30 * 24 * time.Hour)
 	to := now.Add(90 * 24 * time.Hour)
 
-	// 1. Inbound Fetch
+	// 1. Inbound Fetch com auto-refresh de credenciais em caso de 401
 	res, err := p.FetchEvents(ctx, creds, integration.CalendarID, integration.SyncToken, from, to)
+	if err != nil && (strings.Contains(err.Error(), "401") || strings.Contains(err.Error(), "expired") || strings.Contains(err.Error(), "invalid_token")) {
+		newCreds, refreshErr := p.RefreshToken(ctx, creds)
+		if refreshErr == nil && newCreds != "" {
+			creds = newCreds
+			if enc, encErr := crypto.Encrypt(newCreds, s.encKey); encErr == nil {
+				integration.EncryptedCredentials = enc
+				_ = s.syncRepo.UpsertIntegration(integration)
+			}
+			res, err = p.FetchEvents(ctx, creds, integration.CalendarID, integration.SyncToken, from, to)
+		}
+	}
 	if err != nil {
 		return err
 	}
 
-	// Trata expiração do token de sync remoto
-	if res.FullSyncReq {
-		res, err = p.FetchEvents(ctx, creds, integration.CalendarID, "", from, to)
-		if err != nil {
-			return err
+	// Trata expiração do token de sync remoto ou fallback para sync completo se syncToken delta estiver vazio
+	if res.FullSyncReq || (integration.SyncToken != "" && len(res.Items) == 0) {
+		fullRes, fullErr := p.FetchEvents(ctx, creds, integration.CalendarID, "", from, to)
+		if fullErr == nil && len(fullRes.Items) > 0 {
+			res = fullRes
+		} else if res.FullSyncReq {
+			return fullErr
 		}
 	}
 

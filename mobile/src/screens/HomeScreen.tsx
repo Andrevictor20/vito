@@ -32,6 +32,13 @@ export const HomeScreen: React.FC<{
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [calendarModalVisible, setCalendarModalVisible] = useState(false);
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
+
+  const handleSelectTab = (tab: 'chat' | 'calendar') => {
+    setActiveTab(tab);
+    if (tab === 'calendar') {
+      loadData(true);
+    }
+  };
   const {
     events,
     todos,
@@ -198,6 +205,7 @@ export const HomeScreen: React.FC<{
             todos={todos}
             onToggleTodo={handleToggleTodo}
             onDeleteTodo={handleDeleteTodo}
+            onRefresh={() => loadData(false)}
           />
         </>
       ) : (
@@ -208,7 +216,7 @@ export const HomeScreen: React.FC<{
       {/* Bottom M3 Navigation Bar */}
       <FloatingTabBar
         activeTab={activeTab}
-        onSelectTab={setActiveTab}
+        onSelectTab={handleSelectTab}
         visible={!isKeyboardOpen}
       />
 
@@ -217,6 +225,7 @@ export const HomeScreen: React.FC<{
         onClose={() => setProfileVisible(false)}
         serverUrl={serverUrl}
         onToggleServer={onToggleServer}
+        onDataChanged={loadData}
       />
     </View>
   );

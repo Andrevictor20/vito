@@ -9,6 +9,7 @@ import {
   ScrollView,
   Platform,
   StatusBar as RNStatusBar,
+  RefreshControl,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { MD3Shapes } from '../../theme/tokens';
@@ -28,6 +29,7 @@ interface CalendarModalProps {
   todos?: Todo[];
   onToggleTodo?: (id: string) => void;
   onDeleteTodo?: (id: string) => void;
+  onRefresh?: () => void;
 }
 
 const WEEKDAYS = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
@@ -47,6 +49,7 @@ export const CalendarModal: React.FC<CalendarModalProps> = ({
   todos = [],
   onToggleTodo,
   onDeleteTodo,
+  onRefresh,
 }) => {
   const { colors, isDark } = useTheme();
   const [modalTab, setModalTab] = useState<'calendar' | 'todos'>('calendar');
@@ -225,14 +228,27 @@ export const CalendarModal: React.FC<CalendarModalProps> = ({
               </TouchableOpacity>
             </View>
 
-            <TouchableOpacity
-              style={[styles.todayBtn, { borderColor: colors.outlineVariant, backgroundColor: colors.surfaceContainerLow }]}
-              onPress={handleGoToday}
-              activeOpacity={0.75}
-              accessibilityLabel="Ir para hoje"
-            >
-              <Text style={[styles.todayBtnText, { color: colors.primary }]}>Hoje</Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              {onRefresh && (
+                <TouchableOpacity
+                  style={[styles.iconBtn, { backgroundColor: colors.surfaceContainerLow }]}
+                  onPress={onRefresh}
+                  activeOpacity={0.75}
+                  accessibilityLabel="Atualizar eventos"
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <MaterialIcons name="refresh" size={20} color={colors.onSurface} />
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                style={[styles.todayBtn, { borderColor: colors.outlineVariant, backgroundColor: colors.surfaceContainerLow }]}
+                onPress={handleGoToday}
+                activeOpacity={0.75}
+                accessibilityLabel="Ir para hoje"
+              >
+                <Text style={[styles.todayBtnText, { color: colors.primary }]}>Hoje</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Conteúdo Principal Expandido */}
@@ -241,6 +257,16 @@ export const CalendarModal: React.FC<CalendarModalProps> = ({
               style={styles.scrollArea}
               contentContainerStyle={styles.scrollContent}
               showsVerticalScrollIndicator={false}
+              refreshControl={
+                onRefresh ? (
+                  <RefreshControl
+                    refreshing={false}
+                    onRefresh={onRefresh}
+                    tintColor={colors.primary}
+                    colors={[colors.primary]}
+                  />
+                ) : undefined
+              }
             >
               {/* Barra de Navegação do Mês */}
               <View style={styles.monthNavRow}>

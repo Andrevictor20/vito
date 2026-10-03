@@ -74,14 +74,14 @@ func (h *CalendarHandler) ListEvents(w http.ResponseWriter, r *http.Request) {
 	fromStr := r.URL.Query().Get("from")
 	toStr := r.URL.Query().Get("to")
 
-	from := time.Now().UTC().AddDate(0, 0, -7)
+	from := time.Now().UTC().AddDate(0, -1, 0)
 	if fromStr != "" {
 		if parsed, err := time.Parse(time.RFC3339, fromStr); err == nil {
 			from = parsed
 		}
 	}
 
-	to := from.AddDate(0, 1, 0)
+	to := time.Now().UTC().AddDate(0, 3, 0)
 	if toStr != "" {
 		if parsed, err := time.Parse(time.RFC3339, toStr); err == nil {
 			to = parsed

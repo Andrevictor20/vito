@@ -22,6 +22,10 @@ func Open(dbPath string) (*sql.DB, error) {
 		return nil, fmt.Errorf("falha ao abrir conexão sqlite: %w", err)
 	}
 
+	if dbPath == ":memory:" {
+		db.SetMaxOpenConns(1)
+	}
+
 	if err := db.Ping(); err != nil {
 		return nil, fmt.Errorf("falha no ping do sqlite: %w", err)
 	}

@@ -60,113 +60,221 @@ func extractAccessToken(credentials string) string {
 	return credentials
 }
 
+type calendarListItem struct {
+	ID       string `json:"id"`
+	Summary  string `json:"summary"`
+	Primary  bool   `json:"primary"`
+	Selected bool   `json:"selected"`
+}
+
+type calendarListResponse struct {
+	Items []calendarListItem `json:"items"`
+}
+
+func (p *GoogleProvider) getCalendarsToSync(ctx context.Context, token, defaultCalID string) []string {
+	reqURL := fmt.Sprintf("%s/calendar/v3/users/me/calendarList", p.cfg.BaseURL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
+	if err != nil {
+		return []string{defaultCalID}
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := p.cfg.HTTPClient.Do(req)
+	if err != nil || resp.StatusCode != http.StatusOK {
+		if resp != nil {
+			resp.Body.Close()
+		}
+		return []string{defaultCalID}
+	}
+	defer resp.Body.Close()
+
+	var clResp calendarListResponse
+	if err := json.NewDecoder(resp.Body).Decode(&clResp); err != nil {
+		return []string{defaultCalID}
+	}
+
+	var calIDs []string
+	hasPrimary := false
+	for _, item := range clResp.Items {
+		if item.Primary || item.Selected {
+			calIDs = append(calIDs, item.ID)
+			if item.Primary || item.ID == "primary" {
+				hasPrimary = true
+			}
+		}
+	}
+
+	if !hasPrimary && defaultCalID != "" {
+		calIDs = append([]string{defaultCalID}, calIDs...)
+	}
+	if len(calIDs) == 0 {
+		return []string{defaultCalID}
+	}
+
+	return calIDs
+}
+
+func (p *GoogleProvider) fetchEventsFromCalendar(ctx context.Context, token, calendarID, syncToken string, from, to time.Time) ([]SyncItem, string, bool, error) {
+	var allItems []SyncItem
+	var nextSyncToken string
+	pageToken := ""
+
+	for {
+		reqURL := fmt.Sprintf("%s/calendar/v3/calendars/%s/events", p.cfg.BaseURL, url.PathEscape(calendarID))
+		q := url.Values{}
+
+		if syncToken != "" {
+			q.Set("syncToken", syncToken)
+		} else {
+			q.Set("timeMin", from.UTC().Format(time.RFC3339))
+			q.Set("timeMax", to.UTC().Format(time.RFC3339))
+			q.Set("singleEvents", "true")
+		}
+		if pageToken != "" {
+			q.Set("pageToken", pageToken)
+		}
+		reqURL += "?" + q.Encode()
+
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
+		if err != nil {
+			return nil, "", false, fmt.Errorf("falha ao criar requisição Google Calendar: %w", err)
+		}
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Accept", "application/json")
+
+		resp, err := p.cfg.HTTPClient.Do(req)
+		if err != nil {
+			return nil, "", false, fmt.Errorf("erro de rede com a Google Calendar API: %w", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode == http.StatusGone {
+			return nil, "", true, nil
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(resp.Body)
+			return nil, "", false, fmt.Errorf("Google Calendar API retornou status %d: %s", resp.StatusCode, string(body))
+		}
+
+		var gResp struct {
+			NextPageToken string `json:"nextPageToken"`
+			NextSyncToken string `json:"nextSyncToken"`
+			Items         []struct {
+				ID          string `json:"id"`
+				ETag        string `json:"etag"`
+				Summary     string `json:"summary"`
+				Description string `json:"description"`
+				Location    string `json:"location"`
+				Status      string `json:"status"`
+				Start       struct {
+					DateTime string `json:"dateTime"`
+					Date     string `json:"date"`
+				} `json:"start"`
+				End struct {
+					DateTime string `json:"dateTime"`
+					Date     string `json:"date"`
+				} `json:"end"`
+			} `json:"items"`
+		}
+
+		if err := json.NewDecoder(resp.Body).Decode(&gResp); err != nil {
+			return nil, "", false, fmt.Errorf("falha ao decodificar resposta JSON do Google: %w", err)
+		}
+
+		for _, item := range gResp.Items {
+			var startAt, endAt time.Time
+			isAllDay := false
+
+			if item.Start.DateTime != "" {
+				startAt, _ = time.Parse(time.RFC3339, item.Start.DateTime)
+			} else if item.Start.Date != "" {
+				startAt, _ = time.Parse("2006-01-02", item.Start.Date)
+				isAllDay = true
+			}
+
+			if item.End.DateTime != "" {
+				endAt, _ = time.Parse(time.RFC3339, item.End.DateTime)
+			} else if item.End.Date != "" {
+				endAt, _ = time.Parse("2006-01-02", item.End.Date)
+			}
+
+			status := strings.ToLower(item.Status)
+			if status == "" {
+				status = "confirmed"
+			}
+
+			allItems = append(allItems, SyncItem{
+				ExternalID:  item.ID,
+				ETag:        item.ETag,
+				Title:       item.Summary,
+				Description: item.Description,
+				Location:    item.Location,
+				StartAt:     startAt,
+				EndAt:       endAt,
+				Status:      status,
+				IsAllDay:    isAllDay,
+			})
+		}
+
+		nextSyncToken = gResp.NextSyncToken
+		if gResp.NextPageToken == "" {
+			break
+		}
+		pageToken = gResp.NextPageToken
+	}
+
+	return allItems, nextSyncToken, false, nil
+}
+
 // FetchEvents obtém eventos da agenda (Full Sync ou Incremental via syncToken).
+// Quando calendarID for primary, também sincroniza automaticamente calendários secundários selecionados pelo usuário.
 func (p *GoogleProvider) FetchEvents(ctx context.Context, credentials, calendarID, syncToken string, from, to time.Time) (*SyncResult, error) {
 	token := extractAccessToken(credentials)
 	if calendarID == "" {
 		calendarID = "primary"
 	}
 
-	reqURL := fmt.Sprintf("%s/calendar/v3/calendars/%s/events", p.cfg.BaseURL, url.PathEscape(calendarID))
-	q := url.Values{}
-
-	if syncToken != "" {
-		q.Set("syncToken", syncToken)
-	} else {
-		q.Set("timeMin", from.UTC().Format(time.RFC3339))
-		q.Set("timeMax", to.UTC().Format(time.RFC3339))
-		q.Set("singleEvents", "true")
-	}
-	reqURL += "?" + q.Encode()
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
-	if err != nil {
-		return nil, fmt.Errorf("falha ao criar requisição Google Calendar: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Accept", "application/json")
-
-	resp, err := p.cfg.HTTPClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("erro de rede com a Google Calendar API: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusGone {
-		// HTTP 410 Gone: syncToken expirou, sinaliza resync completo
-		return &SyncResult{FullSyncReq: true}, nil
+	calendars := []string{calendarID}
+	if calendarID == "primary" {
+		calendars = p.getCalendarsToSync(ctx, token, calendarID)
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("Google Calendar API retornou status %d: %s", resp.StatusCode, string(body))
-	}
+	var totalItems []SyncItem
+	primarySyncToken := ""
+	seenIDs := make(map[string]bool)
 
-	var gResp struct {
-		NextSyncToken string `json:"nextSyncToken"`
-		Items         []struct {
-			ID          string `json:"id"`
-			ETag        string `json:"etag"`
-			Summary     string `json:"summary"`
-			Description string `json:"description"`
-			Location    string `json:"location"`
-			Status      string `json:"status"`
-			Start       struct {
-				DateTime string `json:"dateTime"`
-				Date     string `json:"date"`
-			} `json:"start"`
-			End struct {
-				DateTime string `json:"dateTime"`
-				Date     string `json:"date"`
-			} `json:"end"`
-		} `json:"items"`
-	}
-
-	if err := json.NewDecoder(resp.Body).Decode(&gResp); err != nil {
-		return nil, fmt.Errorf("falha ao decodificar resposta JSON do Google: %w", err)
-	}
-
-	result := &SyncResult{
-		NewSyncToken: gResp.NextSyncToken,
-		Items:        make([]SyncItem, 0, len(gResp.Items)),
-	}
-
-	for _, item := range gResp.Items {
-		var startAt, endAt time.Time
-		isAllDay := false
-
-		if item.Start.DateTime != "" {
-			startAt, _ = time.Parse(time.RFC3339, item.Start.DateTime)
-		} else if item.Start.Date != "" {
-			startAt, _ = time.Parse("2006-01-02", item.Start.Date)
-			isAllDay = true
+	for _, calID := range calendars {
+		calSyncToken := ""
+		if calID == "primary" {
+			calSyncToken = syncToken
 		}
-
-		if item.End.DateTime != "" {
-			endAt, _ = time.Parse(time.RFC3339, item.End.DateTime)
-		} else if item.End.Date != "" {
-			endAt, _ = time.Parse("2006-01-02", item.End.Date)
+		items, newSync, fullSyncReq, err := p.fetchEventsFromCalendar(ctx, token, calID, calSyncToken, from, to)
+		if err != nil {
+			if calID == "primary" || calID == calendarID {
+				return nil, err
+			}
+			continue
 		}
-
-		status := strings.ToLower(item.Status)
-		if status == "" {
-			status = "confirmed"
+		if fullSyncReq {
+			return &SyncResult{FullSyncReq: true}, nil
 		}
-
-		result.Items = append(result.Items, SyncItem{
-			ExternalID:  item.ID,
-			ETag:        item.ETag,
-			Title:       item.Summary,
-			Description: item.Description,
-			Location:    item.Location,
-			StartAt:     startAt,
-			EndAt:       endAt,
-			Status:      status,
-			IsAllDay:    isAllDay,
-		})
+		if calID == "primary" || calID == calendarID {
+			primarySyncToken = newSync
+		}
+		for _, it := range items {
+			if !seenIDs[it.ExternalID] {
+				seenIDs[it.ExternalID] = true
+				totalItems = append(totalItems, it)
+			}
+		}
 	}
 
-	return result, nil
+	return &SyncResult{
+		NewSyncToken: primarySyncToken,
+		Items:        totalItems,
+	}, nil
 }
 
 // CreateEvent cria um novo evento na agenda do Google.

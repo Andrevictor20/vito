@@ -24,6 +24,7 @@ interface ProfileModalProps {
   onClose: () => void;
   serverUrl: string;
   onToggleServer: () => void;
+  onDataChanged?: () => void;
 }
 
 export const ProfileModal: React.FC<ProfileModalProps> = ({
@@ -31,6 +32,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   onClose,
   serverUrl,
   onToggleServer,
+  onDataChanged,
 }) => {
   const { user, logout } = useAuth();
   const { colors, isDark } = useTheme();
@@ -99,7 +101,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 {/* Modal de Sincronização de Calendários M3 */}
                 <CalendarSyncSettingsModal
                   visible={calendarSyncModalVisible}
-                  onClose={() => setCalendarSyncModalVisible(false)}
+                  onClose={() => {
+                    setCalendarSyncModalVisible(false);
+                    onDataChanged?.();
+                  }}
                 />
 
                 {/* Ações da Sessão */}
