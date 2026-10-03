@@ -8,6 +8,7 @@ import { HomeScreen } from './screens/HomeScreen';
 import { tokens } from './theme/tokens';
 import { api, DEFAULT_SERVER_URL, CLOUDFLARE_SERVER_URL, PI_SERVER_URL, isCloudServer } from './services/api';
 import { UpdateBanner } from './components/common/UpdateBanner';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 
 const MainNavigator: React.FC = () => {
   const { user, isInitialLoading } = useAuth();
@@ -51,11 +52,13 @@ const MainNavigator: React.FC = () => {
 
 export const AppRoot: React.FC = () => {
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <MainNavigator />
-      </AuthProvider>
-    </ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider>
+        <AuthProvider>
+          <MainNavigator />
+        </AuthProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 };
 

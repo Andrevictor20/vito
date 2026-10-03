@@ -1,6 +1,4 @@
 import { Platform } from 'react-native';
-import * as Notifications from 'expo-notifications';
-import * as Device from 'expo-device';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { secureStorage } from './secureStore';
 import { api } from './api';
@@ -9,19 +7,30 @@ import { NotificationPriority, NotificationSettings, ScheduleNotificationParams 
 const SETTINGS_STORAGE_KEY = '@vito_notification_settings';
 const PUSH_TOKEN_SECURE_KEY = '@vito_push_token';
 
-// Configuração canônica do manipulador de notificações em primeiro plano
-Notifications.setNotificationHandler({
-  handleNotification: async (notification) => {
-    const priority = notification.request.content.data?.priority as NotificationPriority | undefined;
-    return {
-      shouldShowAlert: true,
-      shouldPlaySound: priority !== 'silent',
-      shouldSetBadge: false,
-      shouldShowBanner: true,
-      shouldShowList: true,
-    };
-  },
-});
+let Notifications: any = null;
+let Device: any = null;
+
+try {
+  Notifications = require('expo-notifications');
+  Device = require('expo-device');
+  if (Notifications && typeof Notifications.setNotificationHandler === 'function') {
+    Notifications.setNotificationHandler({
+      handleNotification: async (notification: any) => {
+        const priority = notification?.request?.content?.data?.priority as NotificationPriority | undefined;
+        return {
+          shouldShowAlert: true,
+          shouldPlaySound: priority !== 'silent',
+          shouldSetBadge: false,
+          shouldShowBanner: true,
+          shouldShowList: true,
+        };
+      },
+    });
+  }
+} catch (e) {
+  Notifications = null;
+  Device = null;
+}
 
 const DEFAULT_SETTINGS: NotificationSettings = {
   enabled: true,
@@ -30,38 +39,49 @@ const DEFAULT_SETTINGS: NotificationSettings = {
 };
 
 export const notificationService = {
+  isAvailable(): boolean {
+    return Platform.OS !== 'web' && Notifications !== null;
+  },
+
   /**
    * Inicializa os canais de notificação no Android e configurações M3.
    */
   async init(): Promise<void> {
+    if (!this.isAvailable()) {
+      return;
+    }
     if (Platform.OS === 'android') {
-      // 1. Canal Silencioso (Low priority)
-      await Notifications.setNotificationChannelAsync('vito_silent', {
-        name: 'Vito — Silencioso',
-        importance: Notifications.AndroidImportance.LOW,
-        enableVibrate: false,
-        sound: null,
-      });
+      try {
+        // 1. Canal Silencioso (Low priority)
+        await Notifications.setNotificationChannelAsync('vito_silent', {
+          name: 'Vito — Silencioso',
+          importance: Notifications.AndroidImportance.LOW,
+          enableVibrate: false,
+          sound: null,
+        });
 
-      // 2. Canal Padrão (Normal priority)
-      await Notifications.setNotificationChannelAsync('vito_default', {
-        name: 'Vito — Lembretes Padrão',
-        importance: Notifications.AndroidImportance.DEFAULT,
-        enableVibrate: true,
-        vibrationPattern: [0, 250, 250, 250],
-        sound: 'default',
-      });
+        // 2. Canal Padrão (Normal priority)
+        await Notifications.setNotificationChannelAsync('vito_default', {
+          name: 'Vito — Lembretes Padrão',
+          importance: Notifications.AndroidImportance.DEFAULT,
+          enableVibrate: true,
+          vibrationPattern: [0, 250, 250, 250],
+          sound: 'default',
+        });
 
-      // 3. Canal Wake-up Call (Prioridade Máxima, substituto de chamada telefônica)
-      await Notifications.setNotificationChannelAsync('vito_wakeup', {
-        name: 'Vito — Wake-up Call (Crítico)',
-        importance: Notifications.AndroidImportance.MAX,
-        enableVibrate: true,
-        vibrationPattern: [0, 500, 250, 500, 250, 500, 250, 1000],
-        sound: 'default',
-        bypassDnd: true,
-        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
-      });
+        // 3. Canal Wake-up Call (Prioridade Máxima, substituto de chamada telefônica)
+        await Notifications.setNotificationChannelAsync('vito_wakeup', {
+          name: 'Vito — Wake-up Call (Crítico)',
+          importance: Notifications.AndroidImportance.MAX,
+          enableVibrate: true,
+          vibrationPattern: [0, 500, 250, 500, 250, 500, 250, 1000],
+          sound: 'default',
+          bypassDnd: true,
+          lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+        });
+      } catch {
+        // Ignora silenciosamente em ambientes onde a API nativa de canais falhe
+      }
     }
   },
 
@@ -69,7 +89,10 @@ export const notificationService = {
    * Solicita permissões nativas e registra o Push Token.
    */
   async requestPermissions(): Promise<{ granted: boolean; pushToken: string | null }> {
-    if (!Device.isDevice && Platform.OS !== 'web') {
+    if (!this.isAvailable()) {
+      return { granted: false, pushToken: null };
+    }
+    if (Device && !Device.isDevice && Platform.OS !== 'web') {
       console.warn('[NotificationService] Notificações push requerem dispositivo físico.');
     }
 
@@ -94,13 +117,15 @@ export const notificationService = {
       const tokenData = await Notifications.getExpoPushTokenAsync();
       pushToken = tokenData.data;
 
-      // Salva em SecureStore com proteção de hardware
-      await secureStorage.setItem(PUSH_TOKEN_SECURE_KEY, pushToken);
+      if (pushToken) {
+        // Salva em SecureStore com proteção de hardware
+        await secureStorage.setItem(PUSH_TOKEN_SECURE_KEY, pushToken);
 
-      // Registra o token no backend Go
-      await api.registerPushToken(pushToken, Platform.OS).catch((err) => {
-        console.warn('[NotificationService] Não foi possível sincronizar token com o backend:', err.message);
-      });
+        // Registra o token no backend Go
+        await api.registerPushToken(pushToken, Platform.OS).catch((err) => {
+          console.warn('[NotificationService] Não foi possível sincronizar token com o backend:', err.message);
+        });
+      }
     } catch (err) {
       console.warn('[NotificationService] Erro ao obter Expo Push Token:', err);
     }
@@ -137,6 +162,7 @@ export const notificationService = {
    * Agenda um lembrete local offline para um compromisso ou tarefa.
    */
   async scheduleEventReminder(params: ScheduleNotificationParams): Promise<string | null> {
+    if (!this.isAvailable()) return null;
     const settings = await this.getSettings();
     if (!settings.enabled) return null;
 
@@ -182,56 +208,63 @@ export const notificationService = {
    * Cancela uma notificação agendada específica.
    */
   async cancelNotification(notificationId: string): Promise<void> {
-    await Notifications.cancelScheduledNotificationAsync(notificationId);
+    if (!this.isAvailable()) return;
+    try {
+      await Notifications.cancelScheduledNotificationAsync(notificationId);
+    } catch {}
   },
 
-  /**
-   * Cancela todas as notificações locais agendadas.
-   */
   async cancelAllNotifications(): Promise<void> {
-    await Notifications.cancelAllScheduledNotificationsAsync();
+    if (!this.isAvailable()) return;
+    try {
+      await Notifications.cancelAllScheduledNotificationsAsync();
+    } catch {}
   },
 
-  /**
-   * Dispara uma notificação imediata para testar o comportamento do som e vibração.
-   */
   async triggerTestNotification(priority: NotificationPriority): Promise<void> {
-    const channelId = priority === 'wakeup' ? 'vito_wakeup' : priority === 'silent' ? 'vito_silent' : 'vito_default';
-    const title = priority === 'wakeup'
-      ? '🚨 [TESTE] Wake-up Call Crítico'
-      : priority === 'silent'
-        ? '🔕 [TESTE] Notificação Silenciosa'
-        : '🔔 [TESTE] Notificação Padrão Vito';
-    
-    const body = priority === 'wakeup'
-      ? 'Este alerta toca com prioridade máxima e vibração persistente para garantir seu despertar.'
-      : priority === 'silent'
-        ? 'Alerta sem som, mantendo total discrição.'
-        : 'Lembrete padrão emitido com sucesso pontual.';
+    if (!this.isAvailable()) return;
+    try {
+      const channelId = priority === 'wakeup' ? 'vito_wakeup' : priority === 'silent' ? 'vito_silent' : 'vito_default';
+      const title = priority === 'wakeup'
+        ? '🚨 [TESTE] Wake-up Call Crítico'
+        : priority === 'silent'
+          ? '🔕 [TESTE] Notificação Silenciosa'
+          : '🔔 [TESTE] Notificação Padrão Vito';
+      
+      const body = priority === 'wakeup'
+        ? 'Este alerta toca com prioridade máxima e vibração persistente para garantir seu despertar.'
+        : priority === 'silent'
+          ? 'Alerta sem som, mantendo total discrição.'
+          : 'Lembrete padrão emitido com sucesso pontual.';
 
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title,
-        body,
-        sound: priority !== 'silent',
-        data: { priority, isTest: true },
-        ...(Platform.OS === 'android' ? { channelId } : {}),
-      },
-      trigger: null, // Disparo imediato
-    });
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title,
+          body,
+          sound: priority !== 'silent',
+          data: { priority, isTest: true },
+          ...(Platform.OS === 'android' ? { channelId } : {}),
+        },
+        trigger: null,
+      });
+    } catch {}
   },
 
-  /**
-   * Adiciona listener para notificação recebida em foreground.
-   */
-  addReceivedListener(callback: (notification: Notifications.Notification) => void) {
-    return Notifications.addNotificationReceivedListener(callback);
+  addReceivedListener(callback: (notification: any) => void) {
+    if (!this.isAvailable()) return { remove: () => {} };
+    try {
+      return Notifications.addNotificationReceivedListener(callback);
+    } catch {
+      return { remove: () => {} };
+    }
   },
 
-  /**
-   * Adiciona listener para interação/clique do usuário na notificação.
-   */
-  addResponseListener(callback: (response: Notifications.NotificationResponse) => void) {
-    return Notifications.addNotificationResponseReceivedListener(callback);
+  addResponseListener(callback: (response: any) => void) {
+    if (!this.isAvailable()) return { remove: () => {} };
+    try {
+      return Notifications.addNotificationResponseReceivedListener(callback);
+    } catch {
+      return { remove: () => {} };
+    }
   },
 };
