@@ -244,10 +244,11 @@ func (s *GoogleAuthService) HandleCallback(ctx context.Context, code, stateStr s
 			return "", fmt.Errorf("falha ao salvar integração do Google Calendar: %w", err)
 		}
 
-		// Dispara sincronização inicial em background
-		go func() {
-			_ = s.syncSvc.SyncIntegration(context.Background(), state.UserID, domain.ProviderGoogle)
-		}()
+		// Sincroniza os eventos imediatamente e captura falhas reais da API do Google
+		errSync := s.syncSvc.SyncIntegration(context.Background(), state.UserID, domain.ProviderGoogle)
+		if errSync != nil {
+			return "", fmt.Errorf("Google conectado, mas falhou ao sincronizar: %v", errSync)
+		}
 
 		deepLink := fmt.Sprintf("%s?status=success&provider=google&email=%s",
 			redirectScheme,
@@ -303,9 +304,10 @@ func (s *GoogleAuthService) HandleCallback(ctx context.Context, code, stateStr s
 			"primary",
 			"Google Calendar",
 		)
-		go func() {
-			_ = s.syncSvc.SyncIntegration(context.Background(), user.ID, domain.ProviderGoogle)
-		}()
+		errSync := s.syncSvc.SyncIntegration(context.Background(), user.ID, domain.ProviderGoogle)
+		if errSync != nil {
+			return "", fmt.Errorf("Login com Google efetuado, mas sincronização do calendário falhou: %v", errSync)
+		}
 	}
 
 	userJSON, _ := json.Marshal(user)
