@@ -54,7 +54,12 @@ func TestDecrypt_TamperedCiphertextFails(t *testing.T) {
 		t.Fatalf("falha ao criptografar: %v", err)
 	}
 
-	tampered := ciphertext[:len(ciphertext)-1] + "X"
+	lastChar := ciphertext[len(ciphertext)-1]
+	replacement := "X"
+	if lastChar == 'X' {
+		replacement = "Y"
+	}
+	tampered := ciphertext[:len(ciphertext)-1] + replacement
 
 	_, err = crypto.Decrypt(tampered, key)
 	if err == nil {
