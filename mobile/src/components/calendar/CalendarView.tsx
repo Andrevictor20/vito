@@ -3,6 +3,7 @@ import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens } from '../../theme/tokens';
 import { Event } from '../../types';
+import { isEventOnDate } from '../../utils/calendarDateUtils';
 import { CalendarTopBar, CalendarViewMode } from './CalendarTopBar';
 import { CalendarGrid } from './CalendarGrid';
 
@@ -91,15 +92,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   };
 
   const getDayEvents = (d: Date) => {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    const dateStr = y + '-' + m + '-' + day;
-    return events.filter((e) => {
-      const startDay = e.start_at.substring(0, 10);
-      const endDay = e.end_at.substring(0, 10);
-      return dateStr >= startDay && dateStr <= endDay;
-    });
+    return events.filter((e) => isEventOnDate(e, d));
   };
 
   const setView = (mode: CalendarViewMode) => {

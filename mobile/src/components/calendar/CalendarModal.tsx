@@ -10,11 +10,13 @@ import {
   Platform,
   StatusBar as RNStatusBar,
   RefreshControl,
+  ActivityIndicator,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { MD3Shapes } from '../../theme/tokens';
 import { Event, Todo } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
+import { toLocalDateString, parseSafeDate, isEventOnDate, getEventDays } from '../../utils/calendarDateUtils';
 import { EventCard } from './EventCard';
 import { TodoItem } from '../todos/TodoItem';
 
@@ -30,6 +32,8 @@ interface CalendarModalProps {
   onToggleTodo?: (id: string) => void;
   onDeleteTodo?: (id: string) => void;
   onRefresh?: () => void;
+  onSyncGoogle?: () => Promise<void>;
+  isSyncingGoogle?: boolean;
 }
 
 const WEEKDAYS = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
@@ -50,6 +54,8 @@ export const CalendarModal: React.FC<CalendarModalProps> = ({
   onToggleTodo,
   onDeleteTodo,
   onRefresh,
+  onSyncGoogle,
+  isSyncingGoogle = false,
 }) => {
   const { colors, isDark } = useTheme();
   const [modalTab, setModalTab] = useState<'calendar' | 'todos'>('calendar');
@@ -116,47 +122,23 @@ export const CalendarModal: React.FC<CalendarModalProps> = ({
     return items;
   }, [year, month]);
 
-  const parseSafeDate = (dStr: string): Date => {
-    if (!dStr) return new Date();
-    let sanitized = dStr.includes(' ') && !dStr.includes('T') ? dStr.replace(' ', 'T') : dStr;
-    
-    // O motor Hermes (React Native) falha ao fazer parse de strings ISO8601 com mais de 3 dígitos fracionários (nanosegundos do Go)
-    sanitized = sanitized.replace(/(\.\d+)/, (match) => match.substring(0, 4));
-    
-    const d = new Date(sanitized);
-    return isNaN(d.getTime()) ? new Date() : d;
-  };
-
-  // Mapa de eventos por dia considerando a duração completa (start até end)
+  // Mapa canônico de eventos por dia (padrão Noctalia / RFC 5545)
   const eventsByDay = useMemo(() => {
     const map = new Map<string, Event[]>();
     events.forEach((ev) => {
-      try {
-        const start = parseSafeDate(ev.start_at);
-        const end = ev.end_at ? parseSafeDate(ev.end_at) : start;
-        const cur = new Date(start.getFullYear(), start.getMonth(), start.getDate());
-        const last = new Date(end.getFullYear(), end.getMonth(), end.getDate());
-
-        if (last > cur && end.getHours() === 0 && end.getMinutes() === 0 && end.getSeconds() === 0) {
-          last.setDate(last.getDate() - 1);
-        }
-
-        while (cur <= last) {
-          const k = `${cur.getFullYear()}-${cur.getMonth()}-${cur.getDate()}`;
-          if (!map.has(k)) map.set(k, []);
-          map.get(k)!.push(ev);
-          cur.setDate(cur.getDate() + 1);
-        }
-      } catch {}
+      const days = getEventDays(ev);
+      days.forEach((dayStr) => {
+        if (!map.has(dayStr)) map.set(dayStr, []);
+        map.get(dayStr)!.push(ev);
+      });
     });
     return map;
   }, [events]);
 
   // Eventos do dia selecionado
   const selectedDayEvents = useMemo(() => {
-    const targetKey = `${selectedDate.getFullYear()}-${selectedDate.getMonth()}-${selectedDate.getDate()}`;
-    return eventsByDay.get(targetKey) || [];
-  }, [eventsByDay, selectedDate]);
+    return events.filter((ev) => isEventOnDate(ev, selectedDate));
+  }, [events, selectedDate]);
 
   // Todos os eventos do mês corrente ordenados cronologicamente
   const monthEvents = useMemo(() => {
@@ -260,6 +242,34 @@ export const CalendarModal: React.FC<CalendarModalProps> = ({
             </View>
 
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              {onSyncGoogle && (
+                <TouchableOpacity
+                  style={[
+                    styles.todayBtn,
+                    {
+                      borderColor: colors.outlineVariant,
+                      backgroundColor: colors.surfaceContainerLow,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 4,
+                      paddingHorizontal: 8,
+                    },
+                  ]}
+                  onPress={onSyncGoogle}
+                  disabled={isSyncingGoogle}
+                  activeOpacity={0.75}
+                  accessibilityLabel="Sincronizar com Google Calendar"
+                >
+                  {isSyncingGoogle ? (
+                    <ActivityIndicator size="small" color={colors.primary} />
+                  ) : (
+                    <>
+                      <MaterialIcons name="sync" size={15} color={colors.primary} />
+                      <Text style={[styles.todayBtnText, { color: colors.primary, fontSize: 11 }]}>Google</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              )}
               {onRefresh && (
                 <TouchableOpacity
                   style={[styles.iconBtn, { backgroundColor: colors.surfaceContainerLow }]}
@@ -350,7 +360,7 @@ export const CalendarModal: React.FC<CalendarModalProps> = ({
                     item.date.getMonth() === today.getMonth() &&
                     item.date.getDate() === today.getDate();
 
-                  const dayKey = `${item.date.getFullYear()}-${item.date.getMonth()}-${item.date.getDate()}`;
+                  const dayKey = toLocalDateString(item.date);
                   const dayEvents = eventsByDay.get(dayKey) || [];
                   const hasEvents = dayEvents.length > 0;
 

@@ -58,6 +58,8 @@ export const HomeScreen: React.FC<{
     handleDeleteTodo,
     handleAssistantSubmit,
     loadData,
+    syncGoogleCalendar,
+    syncingGoogle,
   } = useHomeData();
 
   const completedCount = useMemo(() => {
@@ -234,6 +236,8 @@ export const HomeScreen: React.FC<{
             onToggleTodo={handleToggleTodo}
             onDeleteTodo={handleDeleteTodo}
             onRefresh={() => loadData(false)}
+            onSyncGoogle={syncGoogleCalendar}
+            isSyncingGoogle={syncingGoogle}
           />
         </>
       ) : (

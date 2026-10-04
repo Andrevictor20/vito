@@ -3,23 +3,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Event, Todo, AssistantChatResponse } from '../types';
 import { api } from '../services/api';
 
+import { toLocalDateString, parseSafeDate, isEventOnDate, getEventDays } from '../utils/calendarDateUtils';
+
 const CACHE_EVENTS_KEY = '@vito_cache_events';
 const CACHE_TODOS_KEY = '@vito_cache_todos';
-
-const formatLocalDate = (d: Date): string => {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-};
-
-const parseSafeDate = (dStr: string): Date => {
-  if (!dStr) return new Date();
-  let sanitized = dStr.includes(' ') && !dStr.includes('T') ? dStr.replace(' ', 'T') : dStr;
-  
-  // O motor Hermes (React Native) falha ao fazer parse de strings ISO8601 com mais de 3 dígitos fracionários (nanosegundos do Go)
-  sanitized = sanitized.replace(/(\.\d+)/, (match) => match.substring(0, 4));
-  
-  const d = new Date(sanitized);
-  return isNaN(d.getTime()) ? new Date() : d;
-};
 
 export function useHomeData() {
   const [events, setEvents] = useState<Event[]>([]);
@@ -200,61 +187,43 @@ export function useHomeData() {
     }
   };
 
+  const [syncingGoogle, setSyncingGoogle] = useState(false);
+
+  const syncGoogleCalendar = useCallback(async () => {
+    setSyncingGoogle(true);
+    try {
+      await api.syncCalendar('google');
+      await loadData(true);
+    } catch (e) {
+      console.warn('[useHomeData] Erro ao sincronizar Google Calendar:', e);
+      throw e;
+    } finally {
+      setSyncingGoogle(false);
+    }
+  }, [loadData]);
+
   const eventDates = useMemo(() => {
     const dates = new Set<string>();
     events.forEach((ev) => {
-      try {
-        const start = parseSafeDate(ev.start_at);
-        const end = ev.end_at ? parseSafeDate(ev.end_at) : start;
-        const cur = new Date(start.getFullYear(), start.getMonth(), start.getDate());
-        const last = new Date(end.getFullYear(), end.getMonth(), end.getDate());
-
-        // Se o evento termina à meia-noite exata de um dia posterior, não colore o dia seguinte
-        if (last > cur && end.getHours() === 0 && end.getMinutes() === 0 && end.getSeconds() === 0) {
-          last.setDate(last.getDate() - 1);
-        }
-
-        while (cur <= last) {
-          dates.add(formatLocalDate(cur));
-          cur.setDate(cur.getDate() + 1);
-        }
-      } catch {}
+      const days = getEventDays(ev);
+      days.forEach((d) => dates.add(d));
     });
     return dates;
   }, [events]);
 
-  const selectedDateStr = formatLocalDate(selectedDate);
   const dayEvents = useMemo(() => {
-    return events.filter((ev) => {
-      try {
-        const start = parseSafeDate(ev.start_at);
-        const end = ev.end_at ? parseSafeDate(ev.end_at) : start;
-        const startStr = formatLocalDate(start);
-        let endStr = formatLocalDate(end);
-
-        // Tratamento para término à meia-noite em eventos de dia inteiro do Google
-        if (endStr > startStr && end.getHours() === 0 && end.getMinutes() === 0 && end.getSeconds() === 0) {
-          const adj = new Date(end.getTime() - 1000);
-          endStr = formatLocalDate(adj);
-        }
-
-        return selectedDateStr >= startStr && selectedDateStr <= endStr;
-      } catch {
-        return false;
-      }
-    });
-  }, [events, selectedDateStr]);
+    return events.filter((ev) => isEventOnDate(ev, selectedDate));
+  }, [events, selectedDate]);
 
   // Próximos eventos a partir de hoje em ordem cronológica (para visualização ampla na agenda)
   const upcomingEvents = useMemo(() => {
-    const todayStr = formatLocalDate(new Date());
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
     return events
       .filter((ev) => {
         try {
-          const start = parseSafeDate(ev.start_at);
-          const end = ev.end_at ? parseSafeDate(ev.end_at) : start;
-          const endStr = formatLocalDate(end);
-          return endStr >= todayStr;
+          const end = ev.end_at ? parseSafeDate(ev.end_at) : parseSafeDate(ev.start_at);
+          return end.getTime() >= today.getTime();
         } catch {
           return false;
         }
@@ -292,5 +261,7 @@ export function useHomeData() {
     handleAssistantSubmit,
     handleAssistantAudioSubmit,
     loadData,
+    syncGoogleCalendar,
+    syncingGoogle,
   };
 }

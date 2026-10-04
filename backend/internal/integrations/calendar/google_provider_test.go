@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -210,3 +211,146 @@ func TestGoogleProvider_FetchEvents_DateFormats(t *testing.T) {
 		}
 	}
 }
+
+func TestGoogleProvider_FetchEvents_QueryParametersAndSingleEvents(t *testing.T) {
+	var capturedQueryParams string
+	var calendarListCalled bool
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/calendar/v3/users/me/calendarList" {
+			calendarListCalled = true
+			resp := map[string]interface{}{
+				"items": []map[string]interface{}{
+					{"id": "primary", "primary": true, "summary": "Principal"},
+					{"id": "secondary-cal-id@group.calendar.google.com", "summary": "Aulas da Faculdade", "backgroundColor": "#8E24AA"},
+				},
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(resp)
+			return
+		}
+
+		if r.URL.Path == "/calendar/v3/calendars/primary/events" {
+			capturedQueryParams = r.URL.RawQuery
+			resp := map[string]interface{}{
+				"items": []map[string]interface{}{
+					{
+						"id":      "evt-single-1",
+						"summary": "Aula Recorrente Expandida",
+						"status":  "confirmed",
+						"start": map[string]string{
+							"dateTime": "2026-10-04T10:00:00Z",
+						},
+						"end": map[string]string{
+							"dateTime": "2026-10-04T11:00:00Z",
+						},
+					},
+				},
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(resp)
+			return
+		}
+
+		// Secondary calendar
+		resp := map[string]interface{}{
+			"items": []map[string]interface{}{
+				{
+					"id":      "evt-secondary-1",
+					"summary": "Prova Bimestral",
+					"status":  "confirmed",
+					"start": map[string]string{
+						"dateTime": "2026-10-08T14:00:00Z",
+					},
+					"end": map[string]string{
+						"dateTime": "2026-10-08T16:00:00Z",
+					},
+				},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer ts.Close()
+
+	provider := calendar.NewGoogleProvider(calendar.GoogleConfig{
+		BaseURL:    ts.URL,
+		HTTPClient: ts.Client(),
+	})
+
+	from := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
+	to := time.Date(2026, 10, 31, 23, 59, 59, 0, time.UTC)
+
+	res, err := provider.FetchEvents(context.Background(), "token", "primary", "", from, to)
+	if err != nil {
+		t.Fatalf("fetch events failed: %v", err)
+	}
+
+	if !calendarListCalled {
+		t.Errorf("esperava que calendarList fosse consultado para descobrir agendas do usuário")
+	}
+
+	// Verifica se os parâmetros padrão do Google Calendar e Noctalia v5 estão presentes
+	if !strings.Contains(capturedQueryParams, "singleEvents=true") {
+		t.Errorf("esperava singleEvents=true na query, obteve: %s", capturedQueryParams)
+	}
+	if !strings.Contains(capturedQueryParams, "orderBy=startTime") {
+		t.Errorf("esperava orderBy=startTime na query, obteve: %s", capturedQueryParams)
+	}
+	if !strings.Contains(capturedQueryParams, "maxResults=2500") {
+		t.Errorf("esperava maxResults=2500 na query, obteve: %s", capturedQueryParams)
+	}
+
+	// Verifica se ambos os eventos (primário e da agenda secundária) foram agregados
+	if len(res.Items) != 2 {
+		t.Fatalf("esperava 2 eventos de múltiplas agendas, obteve %d", len(res.Items))
+	}
+}
+
+func TestGoogleProvider_FetchEvents_AllDayExclusiveEnd(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp := map[string]interface{}{
+			"items": []map[string]interface{}{
+				{
+					"id":      "evt-allday-oct4",
+					"summary": "Evento de Dia Inteiro no Domingo",
+					"status":  "confirmed",
+					"start": map[string]string{
+						"date": "2026-10-04",
+					},
+					"end": map[string]string{
+						"date": "2026-10-05", // Google end.date é exclusivo (termina em 04/10 às 23:59:59)
+					},
+				},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer ts.Close()
+
+	provider := calendar.NewGoogleProvider(calendar.GoogleConfig{
+		BaseURL:    ts.URL,
+		HTTPClient: ts.Client(),
+	})
+
+	res, err := provider.FetchEvents(context.Background(), "token", "single-cal", "", time.Now(), time.Now().Add(24*time.Hour))
+	if err != nil {
+		t.Fatalf("fetch events failed: %v", err)
+	}
+
+	if len(res.Items) != 1 {
+		t.Fatalf("esperava 1 item, obteve %d", len(res.Items))
+	}
+
+	item := res.Items[0]
+	if !item.IsAllDay {
+		t.Errorf("esperava IsAllDay=true")
+	}
+
+	// O evento deve começar e terminar no mesmo dia civil (2026-10-04)
+	if item.StartAt.Day() != 4 || item.EndAt.Day() != 4 {
+		t.Errorf("evento de dia inteiro deve pertencer a 04/10, mas obteve Start=%v End=%v", item.StartAt, item.EndAt)
+	}
+}
+

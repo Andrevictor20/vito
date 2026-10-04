@@ -167,6 +167,10 @@ class ApiService {
     return this.request<void>(`/api/v1/events/${id}`, { method: 'DELETE' });
   }
 
+  async syncCalendar(provider: string = 'google'): Promise<{ status: string; provider: string }> {
+    return this.post<{ status: string; provider: string }>(`/api/v1/integrations/calendars/${provider}/sync`, {});
+  }
+
   // Todos
   async getTodos(status?: string): Promise<Todo[]> {
     const query = status ? `?status=${status}` : '';

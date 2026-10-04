@@ -91,10 +91,15 @@ func extractAccessToken(credentials string) string {
 }
 
 type calendarListItem struct {
-	ID       string `json:"id"`
-	Summary  string `json:"summary"`
-	Primary  bool   `json:"primary"`
-	Selected bool   `json:"selected"`
+	ID              string `json:"id"`
+	Summary         string `json:"summary"`
+	SummaryOverride string `json:"summaryOverride"`
+	Primary         bool   `json:"primary"`
+	Selected        bool   `json:"selected"`
+	Hidden          bool   `json:"hidden"`
+	Deleted         bool   `json:"deleted"`
+	BackgroundColor string `json:"backgroundColor"`
+	ForegroundColor string `json:"foregroundColor"`
 }
 
 type calendarListResponse struct {
@@ -127,10 +132,14 @@ func (p *GoogleProvider) getCalendarsToSync(ctx context.Context, token, defaultC
 	var calIDs []string
 	hasPrimary := false
 	for _, item := range clResp.Items {
+		// Ignora apenas agendas explicitamente excluídas ou ocultadas
+		if item.Deleted || item.Hidden {
+			continue
+		}
 		if item.Primary || item.ID == "primary" {
 			hasPrimary = true
 			calIDs = append([]string{"primary"}, calIDs...)
-		} else if item.Selected {
+		} else {
 			calIDs = append(calIDs, item.ID)
 		}
 	}
@@ -157,12 +166,17 @@ func (p *GoogleProvider) fetchEventsFromCalendar(ctx context.Context, token, cal
 		reqURL := fmt.Sprintf("%s/calendar/v3/calendars/%s/events", p.cfg.BaseURL, calPath)
 		q := url.Values{}
 
+		// Padrão Noctalia v5 / Google Calendar API:
+		// Sincronização por janela temporal expande 100% dos eventos recorrentes (RRULE) com singleEvents=true,
+		// ordenando cronologicamente e maximizando a página para evitar truncamento.
+		q.Set("timeMin", from.UTC().Format(time.RFC3339))
+		q.Set("timeMax", to.UTC().Format(time.RFC3339))
+		q.Set("singleEvents", "true")
+		q.Set("orderBy", "startTime")
+		q.Set("maxResults", "2500")
+
 		if syncToken != "" {
 			q.Set("syncToken", syncToken)
-		} else {
-			q.Set("timeMin", from.UTC().Format(time.RFC3339))
-			q.Set("timeMax", to.UTC().Format(time.RFC3339))
-			q.Set("singleEvents", "true")
 		}
 		if pageToken != "" {
 			q.Set("pageToken", pageToken)
@@ -227,8 +241,7 @@ func (p *GoogleProvider) fetchEventsFromCalendar(ctx context.Context, token, cal
 				}
 			} else if item.Start.Date != "" {
 				if t, err := time.Parse("2006-01-02", item.Start.Date); err == nil {
-					// Ancora eventos de dia inteiro ao meio-dia UTC para manter o mesmo dia civil em qualquer fuso do mundo (UTC-11 a UTC+11)
-					startAt = time.Date(t.Year(), t.Month(), t.Day(), 12, 0, 0, 0, time.UTC)
+					startAt = time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)
 					isAllDay = true
 				}
 			}
@@ -239,13 +252,17 @@ func (p *GoogleProvider) fetchEventsFromCalendar(ctx context.Context, token, cal
 				}
 			} else if item.End.Date != "" {
 				if t, err := time.Parse("2006-01-02", item.End.Date); err == nil {
-					endAt = time.Date(t.Year(), t.Month(), t.Day(), 11, 59, 59, 0, time.UTC)
+					// Google end.date para eventos de dia inteiro é EXCLUSIVO (RFC 5545).
+					// Ex: evento de 1 dia em 04/10 tem start.date=2026-10-04 e end.date=2026-10-05.
+					// Subtraímos 1 segundo para fechar às 23:59:59 do último dia civil real.
+					exclusiveEnd := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)
+					endAt = exclusiveEnd.Add(-1 * time.Second)
 				}
 			}
 
 			if endAt.IsZero() || endAt.Before(startAt) {
 				if isAllDay {
-					endAt = startAt.Add(11*time.Hour + 59*time.Minute)
+					endAt = time.Date(startAt.Year(), startAt.Month(), startAt.Day(), 23, 59, 59, 0, time.UTC)
 				} else {
 					endAt = startAt.Add(1 * time.Hour)
 				}
