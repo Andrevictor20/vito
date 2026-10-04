@@ -118,7 +118,11 @@ export const CalendarModal: React.FC<CalendarModalProps> = ({
 
   const parseSafeDate = (dStr: string): Date => {
     if (!dStr) return new Date();
-    const sanitized = dStr.includes(' ') && !dStr.includes('T') ? dStr.replace(' ', 'T') : dStr;
+    let sanitized = dStr.includes(' ') && !dStr.includes('T') ? dStr.replace(' ', 'T') : dStr;
+    
+    // O motor Hermes (React Native) falha ao fazer parse de strings ISO8601 com mais de 3 dígitos fracionários (nanosegundos do Go)
+    sanitized = sanitized.replace(/(\.\d+)/, (match) => match.substring(0, 4));
+    
     const d = new Date(sanitized);
     return isNaN(d.getTime()) ? new Date() : d;
   };
