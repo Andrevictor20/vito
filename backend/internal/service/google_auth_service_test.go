@@ -132,7 +132,7 @@ func TestGoogleAuthService_GetAuthURL(t *testing.T) {
 	if q.Get("access_type") != "offline" {
 		t.Errorf("access_type esperado 'offline', obteve: %s", q.Get("access_type"))
 	}
-	if q.Get("scope") != "openid email profile https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly" {
+	if q.Get("scope") != "openid email profile https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly" {
 		t.Errorf("scope de login incorreto: %s", q.Get("scope"))
 	}
 
@@ -143,7 +143,7 @@ func TestGoogleAuthService_GetAuthURL(t *testing.T) {
 	}
 	parsedCal, _ := url.Parse(calURL)
 	qCal := parsedCal.Query()
-	expectedCalScope := "openid email profile https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly"
+	expectedCalScope := "openid email profile https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly"
 	if qCal.Get("scope") != expectedCalScope {
 		t.Errorf("scope de calendário esperado '%s', obteve: '%s'", expectedCalScope, qCal.Get("scope"))
 	}
