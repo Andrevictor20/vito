@@ -10,6 +10,13 @@ const formatLocalDate = (d: Date): string => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
+const parseSafeDate = (dStr: string): Date => {
+  if (!dStr) return new Date();
+  const sanitized = dStr.includes(' ') && !dStr.includes('T') ? dStr.replace(' ', 'T') : dStr;
+  const d = new Date(sanitized);
+  return isNaN(d.getTime()) ? new Date() : d;
+};
+
 export function useHomeData() {
   const [events, setEvents] = useState<Event[]>([]);
   const [todos, setTodos] = useState<Todo[]>([]);
@@ -29,10 +36,10 @@ export function useHomeData() {
         api.getEvents(),
         api.getTodos(),
       ]);
-      setEvents(fetchedEvents);
-      setTodos(fetchedTodos);
-      AsyncStorage.setItem(CACHE_EVENTS_KEY, JSON.stringify(fetchedEvents)).catch(() => {});
-      AsyncStorage.setItem(CACHE_TODOS_KEY, JSON.stringify(fetchedTodos)).catch(() => {});
+      setEvents(fetchedEvents || []);
+      setTodos(fetchedTodos || []);
+      AsyncStorage.setItem(CACHE_EVENTS_KEY, JSON.stringify(fetchedEvents || [])).catch(() => {});
+      AsyncStorage.setItem(CACHE_TODOS_KEY, JSON.stringify(fetchedTodos || [])).catch(() => {});
     } catch (e) {
       console.error('Falha ao carregar dados:', e);
     } finally {
@@ -47,14 +54,20 @@ export function useHomeData() {
       let hasCachedData = false;
       if (eventsEntry && eventsEntry[1]) {
         try {
-          setEvents(JSON.parse(eventsEntry[1]));
-          hasCachedData = true;
+          const parsed = JSON.parse(eventsEntry[1]);
+          if (Array.isArray(parsed)) {
+            setEvents(parsed);
+            hasCachedData = true;
+          }
         } catch {}
       }
       if (todosEntry && todosEntry[1]) {
         try {
-          setTodos(JSON.parse(todosEntry[1]));
-          hasCachedData = true;
+          const parsed = JSON.parse(todosEntry[1]);
+          if (Array.isArray(parsed)) {
+            setTodos(parsed);
+            hasCachedData = true;
+          }
         } catch {}
       }
       if (hasCachedData) {
@@ -70,10 +83,50 @@ export function useHomeData() {
     loadData(false);
   };
 
+  const handleCreateEvent = async (eventData: { title: string; description?: string; location?: string; start_at: string; end_at: string }) => {
+    try {
+      const res = await api.createEvent(eventData);
+      if (res?.event) {
+        setEvents((prev) => {
+          const next = [...prev, res.event];
+          AsyncStorage.setItem(CACHE_EVENTS_KEY, JSON.stringify(next)).catch(() => {});
+          return next;
+        });
+      }
+      await loadData(true);
+      return res;
+    } catch (e) {
+      console.error('Erro ao criar evento diretamente:', e);
+      throw e;
+    }
+  };
+
+  const handleCreateTodo = async (todoData: { title: string; priority: string; due_date?: string }) => {
+    try {
+      const newTodo = await api.createTodo(todoData);
+      if (newTodo) {
+        setTodos((prev) => {
+          const next = [...prev, newTodo];
+          AsyncStorage.setItem(CACHE_TODOS_KEY, JSON.stringify(next)).catch(() => {});
+          return next;
+        });
+      }
+      await loadData(true);
+      return newTodo;
+    } catch (e) {
+      console.error('Erro ao criar tarefa diretamente:', e);
+      throw e;
+    }
+  };
+
   const handleDeleteEvent = async (id: string) => {
     try {
       await api.deleteEvent(id);
-      setEvents((prev) => prev.filter((e) => e.id !== id));
+      setEvents((prev) => {
+        const next = prev.filter((e) => e.id !== id);
+        AsyncStorage.setItem(CACHE_EVENTS_KEY, JSON.stringify(next)).catch(() => {});
+        return next;
+      });
     } catch (e) {
       console.error('Erro ao deletar evento:', e);
     }
@@ -82,9 +135,11 @@ export function useHomeData() {
   const handleToggleTodo = async (id: string) => {
     try {
       await api.completeTodo(id);
-      setTodos((prev) =>
-        prev.map((t) => (t.id === id ? { ...t, status: 'completed' as const } : t))
-      );
+      setTodos((prev) => {
+        const next = prev.map((t) => (t.id === id ? { ...t, status: 'completed' as const } : t));
+        AsyncStorage.setItem(CACHE_TODOS_KEY, JSON.stringify(next)).catch(() => {});
+        return next;
+      });
     } catch (e) {
       console.error('Erro ao completar tarefa:', e);
     }
@@ -93,7 +148,11 @@ export function useHomeData() {
   const handleDeleteTodo = async (id: string) => {
     try {
       await api.deleteTodo(id);
-      setTodos((prev) => prev.filter((t) => t.id !== id));
+      setTodos((prev) => {
+        const next = prev.filter((t) => t.id !== id);
+        AsyncStorage.setItem(CACHE_TODOS_KEY, JSON.stringify(next)).catch(() => {});
+        return next;
+      });
     } catch (e) {
       console.error('Erro ao deletar tarefa:', e);
     }
@@ -105,7 +164,7 @@ export function useHomeData() {
       const res = await api.assistantChat(prompt);
       setAssistantResult(res);
       setModalVisible(true);
-      await loadData();
+      await loadData(true);
     } catch (e: any) {
       setAssistantResult({
         intent: 'error',
@@ -124,7 +183,7 @@ export function useHomeData() {
       const res = await api.assistantAudio(audioUri);
       setAssistantResult(res);
       setModalVisible(true);
-      await loadData();
+      await loadData(true);
     } catch (e: any) {
       setAssistantResult({
         intent: 'error',
@@ -141,8 +200,8 @@ export function useHomeData() {
     const dates = new Set<string>();
     events.forEach((ev) => {
       try {
-        const start = new Date(ev.start_at);
-        const end = ev.end_at ? new Date(ev.end_at) : start;
+        const start = parseSafeDate(ev.start_at);
+        const end = ev.end_at ? parseSafeDate(ev.end_at) : start;
         const cur = new Date(start.getFullYear(), start.getMonth(), start.getDate());
         const last = new Date(end.getFullYear(), end.getMonth(), end.getDate());
 
@@ -161,26 +220,49 @@ export function useHomeData() {
   }, [events]);
 
   const selectedDateStr = formatLocalDate(selectedDate);
-  const dayEvents = events.filter((ev) => {
-    try {
-      const start = new Date(ev.start_at);
-      const end = ev.end_at ? new Date(ev.end_at) : start;
-      const startStr = formatLocalDate(start);
-      let endStr = formatLocalDate(end);
+  const dayEvents = useMemo(() => {
+    return events.filter((ev) => {
+      try {
+        const start = parseSafeDate(ev.start_at);
+        const end = ev.end_at ? parseSafeDate(ev.end_at) : start;
+        const startStr = formatLocalDate(start);
+        let endStr = formatLocalDate(end);
 
-      // Tratamento para término à meia-noite em eventos de dia inteiro do Google
-      if (endStr > startStr && end.getHours() === 0 && end.getMinutes() === 0 && end.getSeconds() === 0) {
-        const adj = new Date(end.getTime() - 1000);
-        endStr = formatLocalDate(adj);
+        // Tratamento para término à meia-noite em eventos de dia inteiro do Google
+        if (endStr > startStr && end.getHours() === 0 && end.getMinutes() === 0 && end.getSeconds() === 0) {
+          const adj = new Date(end.getTime() - 1000);
+          endStr = formatLocalDate(adj);
+        }
+
+        return selectedDateStr >= startStr && selectedDateStr <= endStr;
+      } catch {
+        return false;
       }
+    });
+  }, [events, selectedDateStr]);
 
-      return selectedDateStr >= startStr && selectedDateStr <= endStr;
-    } catch {
-      return false;
-    }
-  });
+  // Próximos eventos a partir de hoje em ordem cronológica (para visualização ampla na agenda)
+  const upcomingEvents = useMemo(() => {
+    const todayStr = formatLocalDate(new Date());
+    return events
+      .filter((ev) => {
+        try {
+          const start = parseSafeDate(ev.start_at);
+          const end = ev.end_at ? parseSafeDate(ev.end_at) : start;
+          const endStr = formatLocalDate(end);
+          return endStr >= todayStr;
+        } catch {
+          return false;
+        }
+      })
+      .sort((a, b) => {
+        const tA = parseSafeDate(a.start_at).getTime();
+        const tB = parseSafeDate(b.start_at).getTime();
+        return tA - tB;
+      });
+  }, [events]);
+
   const isTodaySelected = selectedDate.toDateString() === new Date().toDateString();
-
 
   return {
     events,
@@ -191,7 +273,11 @@ export function useHomeData() {
     selectedDate,
     setSelectedDate,
     dayEvents,
+    upcomingEvents,
+    eventDates,
     isTodaySelected,
+    handleCreateEvent,
+    handleCreateTodo,
     handleDeleteEvent,
     handleToggleTodo,
     handleDeleteTodo,

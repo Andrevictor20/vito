@@ -227,7 +227,8 @@ func (p *GoogleProvider) fetchEventsFromCalendar(ctx context.Context, token, cal
 				}
 			} else if item.Start.Date != "" {
 				if t, err := time.Parse("2006-01-02", item.Start.Date); err == nil {
-					startAt = t.UTC()
+					// Ancora eventos de dia inteiro ao meio-dia UTC para manter o mesmo dia civil em qualquer fuso do mundo (UTC-11 a UTC+11)
+					startAt = time.Date(t.Year(), t.Month(), t.Day(), 12, 0, 0, 0, time.UTC)
 					isAllDay = true
 				}
 			}
@@ -238,8 +239,21 @@ func (p *GoogleProvider) fetchEventsFromCalendar(ctx context.Context, token, cal
 				}
 			} else if item.End.Date != "" {
 				if t, err := time.Parse("2006-01-02", item.End.Date); err == nil {
-					endAt = t.UTC()
+					endAt = time.Date(t.Year(), t.Month(), t.Day(), 11, 59, 59, 0, time.UTC)
 				}
+			}
+
+			if endAt.IsZero() || endAt.Before(startAt) {
+				if isAllDay {
+					endAt = startAt.Add(11*time.Hour + 59*time.Minute)
+				} else {
+					endAt = startAt.Add(1 * time.Hour)
+				}
+			}
+
+			title := strings.TrimSpace(item.Summary)
+			if title == "" {
+				title = "(Sem Título)"
 			}
 
 			status := strings.ToLower(item.Status)
@@ -252,7 +266,7 @@ func (p *GoogleProvider) fetchEventsFromCalendar(ctx context.Context, token, cal
 			allItems = append(allItems, SyncItem{
 				ExternalID:  item.ID,
 				ETag:        item.ETag,
-				Title:       item.Summary,
+				Title:       title,
 				Description: item.Description,
 				Location:    item.Location,
 				StartAt:     startAt,

@@ -1,6 +1,7 @@
 package repository_test
 
 import (
+	"database/sql"
 	"path/filepath"
 	"testing"
 	"time"
@@ -10,7 +11,7 @@ import (
 	"github.com/andrevmp/vito/backend/internal/repository"
 )
 
-func setupCalendarTestDB(t *testing.T) (*repository.EventRepositorySQLite, *repository.UserRepositorySQLite) {
+func setupCalendarTestDB(t *testing.T) (*repository.EventRepositorySQLite, *repository.UserRepositorySQLite, *sql.DB) {
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "test_kito_cal.db")
 
@@ -33,11 +34,11 @@ func setupCalendarTestDB(t *testing.T) (*repository.EventRepositorySQLite, *repo
 		UpdatedAt:    time.Now().UTC(),
 	})
 
-	return eventRepo, userRepo
+	return eventRepo, userRepo, db
 }
 
 func TestEventRepository_CreateAndCheckConflict(t *testing.T) {
-	eventRepo, _ := setupCalendarTestDB(t)
+	eventRepo, _, _ := setupCalendarTestDB(t)
 
 	now := time.Date(2026, 9, 26, 14, 0, 0, 0, time.UTC)
 
@@ -76,5 +77,70 @@ func TestEventRepository_CreateAndCheckConflict(t *testing.T) {
 	}
 	if noConflict.HasConflict {
 		t.Errorf("expected no conflict, but got conflict with %s", noConflict.ConflictingTitle)
+	}
+}
+
+func TestEventRepository_ListByUser(t *testing.T) {
+	eventRepo, _, _ := setupCalendarTestDB(t)
+
+	now := time.Now().UTC()
+	event := &domain.Event{
+		ID:          "event-list-1",
+		UserID:      "user-cal-1",
+		Title:       "Evento de Teste",
+		Description: "Descrição",
+		Location:    "Local",
+		StartAt:     now,
+		EndAt:       now.Add(1 * time.Hour),
+		Source:      "google",
+		Category:    "work",
+		Color:       "#60A5FA",
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+
+	if err := eventRepo.Create(event); err != nil {
+		t.Fatalf("failed to create event: %v", err)
+	}
+
+	from := now.Add(-24 * time.Hour)
+	to := now.Add(24 * time.Hour)
+	events, err := eventRepo.ListByUser("user-cal-1", from, to)
+	if err != nil {
+		t.Fatalf("ListByUser failed: %v", err)
+	}
+
+	if len(events) != 1 {
+		t.Fatalf("expected 1 event, got %d", len(events))
+	}
+
+	// Teste com fuso horário diferente (ex: Brasil UTC-3)
+	brtZone := time.FixedZone("BRT", -3*3600)
+	localEvent := &domain.Event{
+		ID:        "event-brt-1",
+		UserID:    "user-cal-1",
+		Title:     "Evento Local BRT",
+		StartAt:   time.Date(2026, 10, 4, 15, 0, 0, 0, brtZone), // 15:00 BRT = 18:00 UTC
+		EndAt:     time.Date(2026, 10, 4, 16, 0, 0, 0, brtZone),
+		Source:    "vito",
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	if err := eventRepo.Create(localEvent); err != nil {
+		t.Fatalf("failed to create local event: %v", err)
+	}
+
+	// Busca usando intervalo UTC que engloba o evento (18:00 UTC)
+	queryFrom := time.Date(2026, 10, 4, 17, 0, 0, 0, time.UTC)
+	queryTo := time.Date(2026, 10, 4, 19, 0, 0, 0, time.UTC)
+	brtResults, err := eventRepo.ListByUser("user-cal-1", queryFrom, queryTo)
+	if err != nil {
+		t.Fatalf("ListByUser for BRT failed: %v", err)
+	}
+	if len(brtResults) != 1 {
+		t.Fatalf("expected 1 event for BRT query, got %d", len(brtResults))
+	}
+	if brtResults[0].Title != "Evento Local BRT" {
+		t.Errorf("expected 'Evento Local BRT', got '%s'", brtResults[0].Title)
 	}
 }

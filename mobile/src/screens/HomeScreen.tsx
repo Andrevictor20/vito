@@ -48,25 +48,17 @@ export const HomeScreen: React.FC<{
     selectedDate,
     setSelectedDate,
     dayEvents,
+    upcomingEvents,
+    eventDates,
     isTodaySelected,
+    handleCreateEvent,
+    handleCreateTodo,
     handleDeleteEvent,
     handleToggleTodo,
     handleDeleteTodo,
     handleAssistantSubmit,
     loadData,
   } = useHomeData();
-
-  const eventDates = useMemo(() => {
-    const dates = new Set<string>();
-    events.forEach((ev) => {
-      try {
-        const d = new Date(ev.start_at);
-        const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-        dates.add(k);
-      } catch {}
-    });
-    return dates;
-  }, [events]);
 
   const completedCount = useMemo(() => {
     return todos.filter((t) => t.status === 'completed').length;
@@ -98,9 +90,13 @@ export const HomeScreen: React.FC<{
           eventDates={eventDates}
         />
 
-        {/* Section: Eventos de hoje */}
+        {/* Section: Eventos do dia selecionado */}
         <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>Eventos de hoje</Text>
+          <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>
+            {isTodaySelected
+              ? 'Eventos de hoje'
+              : `Eventos de ${selectedDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`}
+          </Text>
           <View style={[styles.countBadgePill, { backgroundColor: colors.primaryContainer }]}>
             <Text style={[styles.countBadgeText, { color: colors.onPrimaryContainer }]}>
               {dayEvents.length} {dayEvents.length === 1 ? 'evento' : 'eventos'}
@@ -111,29 +107,50 @@ export const HomeScreen: React.FC<{
         {loading && events.length === 0 ? (
           <ActivityIndicator color={colors.primary} style={{ marginVertical: 20 }} />
         ) : dayEvents.length === 0 ? (
-          <View style={[styles.emptyCard, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
-            <View style={[styles.emptyIconContainer, { backgroundColor: colors.surfaceContainerHigh }]}>
-              <MaterialIcons name="event-available" size={20} color={colors.primary} />
+          <>
+            <View style={[styles.emptyCard, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
+              <View style={[styles.emptyIconContainer, { backgroundColor: colors.surfaceContainerHigh }]}>
+                <MaterialIcons name="event-available" size={20} color={colors.primary} />
+              </View>
+              <View style={styles.emptyContent}>
+                <Text style={[styles.emptyTitle, { color: colors.onSurface }]}>Dia Livre</Text>
+                <Text style={[styles.emptySub, { color: colors.onSurfaceVariant }]}>
+                  {isTodaySelected
+                    ? 'Nenhum compromisso marcado para hoje.'
+                    : `Nenhum compromisso marcado para ${selectedDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}.`}
+                </Text>
+              </View>
             </View>
-            <View style={styles.emptyContent}>
-              <Text style={[styles.emptyTitle, { color: colors.onSurface }]}>Dia Livre</Text>
-              <Text style={[styles.emptySub, { color: colors.onSurfaceVariant }]}>
-                {isTodaySelected
-                  ? 'Nenhum compromisso marcado para hoje.'
-                  : `Nenhum compromisso marcado para ${selectedDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}.`}
-              </Text>
-            </View>
-          </View>
+
+            {/* Próximos compromissos na agenda quando o dia atual estiver livre */}
+            {upcomingEvents.length > 0 && (
+              <View style={{ marginTop: tokens.spacing.md }}>
+                <View style={[styles.sectionHeader, { marginBottom: tokens.spacing.sm }]}>
+                  <Text style={[styles.sectionTitle, { fontSize: tokens.typography.size.titleSmall, color: colors.onSurface }]}>
+                    Próximos compromissos na agenda
+                  </Text>
+                  <View style={[styles.countBadgePill, { backgroundColor: colors.surfaceContainerHighest }]}>
+                    <Text style={[styles.countBadgeText, { color: colors.onSurface }]}>
+                      {upcomingEvents.length} no total
+                    </Text>
+                  </View>
+                </View>
+                {upcomingEvents.slice(0, 5).map((ev) => (
+                  <EventCard key={ev.id} event={ev} onDelete={handleDeleteEvent} />
+                ))}
+              </View>
+            )}
+          </>
         ) : (
           dayEvents.map((ev) => (
             <EventCard key={ev.id} event={ev} onDelete={handleDeleteEvent} />
           ))
         )}
 
-        {/* Section: Checklist da festa */}
+        {/* Section: Checklist de tarefas */}
         <View style={[styles.sectionHeader, { marginTop: tokens.spacing.lg }]}>
           <View>
-            <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>Checklist da festa</Text>
+            <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>Tarefas e Pendências</Text>
             <Text style={[styles.checklistSubtitle, { color: colors.textMuted }]}>
               {completedCount}/{todos.length} concluídos
             </Text>
@@ -185,12 +202,23 @@ export const HomeScreen: React.FC<{
             visible={createModalVisible}
             onClose={() => setCreateModalVisible(false)}
             selectedDate={selectedDate}
-            onSaveEvent={(title, priority) => {
-              const priorityText = priority === 'wakeup' ? ' com wake-up call crítico' : priority === 'silent' ? ' silencioso' : '';
-              handleAssistantSubmit(`Agendar evento: ${title} para o dia ${selectedDate.toLocaleDateString('pt-BR')}${priorityText}`);
+            onSaveEvent={async (title) => {
+              const start = new Date(selectedDate);
+              start.setHours(9, 0, 0, 0);
+              const end = new Date(selectedDate);
+              end.setHours(10, 0, 0, 0);
+              await handleCreateEvent({
+                title,
+                start_at: start.toISOString(),
+                end_at: end.toISOString(),
+              });
             }}
-            onSaveTodo={(title, priority) => {
-              handleAssistantSubmit(`Nova tarefa: ${title} prioridade ${priority}`);
+            onSaveTodo={async (title, priority) => {
+              await handleCreateTodo({
+                title,
+                priority,
+                due_date: selectedDate.toISOString(),
+              });
             }}
           />
 

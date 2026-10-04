@@ -160,3 +160,53 @@ func TestGoogleProvider_RefreshToken(t *testing.T) {
 		t.Errorf("access_token incorreto: %v", parsed["access_token"])
 	}
 }
+
+func TestGoogleProvider_FetchEvents_DateFormats(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp := map[string]interface{}{
+			"items": []map[string]interface{}{
+				{
+					"id":      "evt-millis",
+					"summary": "Evento com Milissegundos",
+					"status":  "confirmed",
+					"start": map[string]string{
+						"dateTime": "2026-10-05T14:00:00.000-03:00",
+					},
+					"end": map[string]string{
+						"dateTime": "2026-10-05T15:00:00.000-03:00",
+					},
+				},
+				{
+					"id":      "evt-allday",
+					"summary": "Evento Dia Inteiro",
+					"status":  "confirmed",
+					"start": map[string]string{
+						"date": "2026-10-06",
+					},
+					"end": map[string]string{
+						"date": "2026-10-07",
+					},
+				},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer ts.Close()
+
+	provider := calendar.NewGoogleProvider(calendar.GoogleConfig{
+		BaseURL:    ts.URL,
+		HTTPClient: ts.Client(),
+	})
+
+	res, err := provider.FetchEvents(context.Background(), "token", "primary", "", time.Now(), time.Now().Add(24*time.Hour))
+	if err != nil {
+		t.Fatalf("fetch events failed: %v", err)
+	}
+
+	for _, item := range res.Items {
+		if item.StartAt.IsZero() {
+			t.Errorf("item %s StartAt is zero! Date was not parsed properly", item.ExternalID)
+		}
+	}
+}

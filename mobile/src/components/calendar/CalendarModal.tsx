@@ -116,39 +116,66 @@ export const CalendarModal: React.FC<CalendarModalProps> = ({
     return items;
   }, [year, month]);
 
-  // Eventos do dia selecionado
-  const selectedDayEvents = useMemo(() => {
-    const targetY = selectedDate.getFullYear();
-    const targetM = selectedDate.getMonth();
-    const targetD = selectedDate.getDate();
+  const parseSafeDate = (dStr: string): Date => {
+    if (!dStr) return new Date();
+    const sanitized = dStr.includes(' ') && !dStr.includes('T') ? dStr.replace(' ', 'T') : dStr;
+    const d = new Date(sanitized);
+    return isNaN(d.getTime()) ? new Date() : d;
+  };
 
-    return events.filter((ev) => {
-      try {
-        const d = new Date(ev.start_at);
-        return (
-          d.getFullYear() === targetY &&
-          d.getMonth() === targetM &&
-          d.getDate() === targetD
-        );
-      } catch {
-        return false;
-      }
-    });
-  }, [events, selectedDate]);
-
-  // Mapa de eventos por dia
+  // Mapa de eventos por dia considerando a duração completa (start até end)
   const eventsByDay = useMemo(() => {
     const map = new Map<string, Event[]>();
     events.forEach((ev) => {
       try {
-        const d = new Date(ev.start_at);
-        const k = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-        if (!map.has(k)) map.set(k, []);
-        map.get(k)!.push(ev);
+        const start = parseSafeDate(ev.start_at);
+        const end = ev.end_at ? parseSafeDate(ev.end_at) : start;
+        const cur = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+        const last = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+
+        if (last > cur && end.getHours() === 0 && end.getMinutes() === 0 && end.getSeconds() === 0) {
+          last.setDate(last.getDate() - 1);
+        }
+
+        while (cur <= last) {
+          const k = `${cur.getFullYear()}-${cur.getMonth()}-${cur.getDate()}`;
+          if (!map.has(k)) map.set(k, []);
+          map.get(k)!.push(ev);
+          cur.setDate(cur.getDate() + 1);
+        }
       } catch {}
     });
     return map;
   }, [events]);
+
+  // Eventos do dia selecionado
+  const selectedDayEvents = useMemo(() => {
+    const targetKey = `${selectedDate.getFullYear()}-${selectedDate.getMonth()}-${selectedDate.getDate()}`;
+    return eventsByDay.get(targetKey) || [];
+  }, [eventsByDay, selectedDate]);
+
+  // Todos os eventos do mês corrente ordenados cronologicamente
+  const monthEvents = useMemo(() => {
+    return events
+      .filter((ev) => {
+        try {
+          const start = parseSafeDate(ev.start_at);
+          const end = ev.end_at ? parseSafeDate(ev.end_at) : start;
+          const evYear = start.getFullYear();
+          const evMonth = start.getMonth();
+          const endYear = end.getFullYear();
+          const endMonth = end.getMonth();
+          return (evYear === year && evMonth === month) || (endYear === year && endMonth === month);
+        } catch {
+          return false;
+        }
+      })
+      .sort((a, b) => {
+        const tA = parseSafeDate(a.start_at).getTime();
+        const tB = parseSafeDate(b.start_at).getTime();
+        return tA - tB;
+      });
+  }, [events, year, month]);
 
   const selectedFormatted = selectedDate.toLocaleDateString('pt-BR', {
     weekday: 'long',
