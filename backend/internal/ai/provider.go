@@ -10,6 +10,8 @@ type IntentAction string
 
 const (
 	ActionCreateEvent   IntentAction = "CREATE_EVENT"
+	ActionUpdateEvent   IntentAction = "UPDATE_EVENT"
+	ActionDeleteEvent   IntentAction = "DELETE_EVENT"
 	ActionCreateTodo    IntentAction = "CREATE_TODO"
 	ActionQuerySchedule IntentAction = "QUERY_SCHEDULE"
 	ActionSaveMemory    IntentAction = "SAVE_MEMORY"
@@ -31,13 +33,15 @@ type UserInput struct {
 	PendingTodos    []string  `json:"pending_todos,omitempty"`     // Tarefas urgentes/pendentes
 }
 
-// ParsedEvent dados extraídos para criação de evento.
+// ParsedEvent dados extraídos para criação, atualização ou remoção de evento.
 type ParsedEvent struct {
 	Title       string    `json:"title"`
 	Description string    `json:"description,omitempty"`
 	Location    string    `json:"location,omitempty"`
 	StartAt     time.Time `json:"start_at"`
 	EndAt       time.Time `json:"end_at"`
+	Recurrence  string    `json:"recurrence,omitempty"`   // "WEEKLY", "DAILY", "MONTHLY"
+	TargetQuery string    `json:"target_query,omitempty"` // termo para busca ao atualizar/excluir (ex: "aula de inglês")
 }
 
 // ParsedTodo dados extraídos para criação de to-do.

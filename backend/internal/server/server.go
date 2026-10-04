@@ -113,6 +113,7 @@ func (s *Server) registerRoutes() {
 					protected.Route("/events", func(cr chi.Router) {
 						cr.Post("/", s.calHandler.CreateEvent)
 						cr.Get("/", s.calHandler.ListEvents)
+						cr.Patch("/{id}", s.calHandler.UpdateEvent)
 						cr.Delete("/{id}", s.calHandler.DeleteEvent)
 					})
 				}

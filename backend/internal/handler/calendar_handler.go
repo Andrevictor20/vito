@@ -105,6 +105,77 @@ func (h *CalendarHandler) ListEvents(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(events)
 }
 
+type updateEventRequest struct {
+	Title        string    `json:"title"`
+	Description  string    `json:"description,omitempty"`
+	Location     string    `json:"location,omitempty"`
+	StartAt      time.Time `json:"start_at"`
+	EndAt        time.Time `json:"end_at"`
+	Category     string    `json:"category,omitempty"`
+	Color        string    `json:"color,omitempty"`
+	Recurrence   string    `json:"recurrence,omitempty"`
+	UpdateSeries bool      `json:"update_series,omitempty"`
+}
+
+type updateEventResponse struct {
+	Event        *domain.Event `json:"event"`
+	UpdatedCount int           `json:"updated_count"`
+}
+
+func (h *CalendarHandler) UpdateEvent(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, `{"error":"não autorizado"}`, http.StatusUnauthorized)
+		return
+	}
+
+	eventID := chi.URLParam(r, "id")
+	if eventID == "" {
+		eventID = r.PathValue("id")
+	}
+	if eventID == "" {
+		http.Error(w, `{"error":"id ausente"}`, http.StatusBadRequest)
+		return
+	}
+
+	var req updateEventRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error":"payload inválido"}`, http.StatusBadRequest)
+		return
+	}
+
+	ev := &domain.Event{
+		ID:          eventID,
+		UserID:      userID,
+		Title:       req.Title,
+		Description: req.Description,
+		Location:    req.Location,
+		StartAt:     req.StartAt,
+		EndAt:       req.EndAt,
+		Category:    req.Category,
+		Color:       req.Color,
+		Recurrence:  req.Recurrence,
+	}
+
+	updated, count, err := h.calSvc.UpdateEvent(userID, ev, req.UpdateSeries)
+	if err != nil {
+		if err == domain.ErrEventNotFound {
+			http.Error(w, `{"error":"evento não encontrado"}`, http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(updateEventResponse{
+		Event:        updated,
+		UpdatedCount: count,
+	})
+}
+
 func (h *CalendarHandler) DeleteEvent(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
@@ -121,7 +192,9 @@ func (h *CalendarHandler) DeleteEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.calSvc.DeleteEvent(eventID, userID); err != nil {
+	allSeries := r.URL.Query().Get("all_series") == "true"
+
+	if _, err := h.calSvc.DeleteEventWithOption(eventID, userID, allSeries); err != nil {
 		if err == domain.ErrEventNotFound {
 			http.Error(w, `{"error":"evento não encontrado"}`, http.StatusNotFound)
 			return

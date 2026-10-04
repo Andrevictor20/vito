@@ -110,16 +110,47 @@ export function useHomeData() {
     }
   };
 
-  const handleDeleteEvent = async (id: string) => {
+  const handleDeleteEvent = async (id: string, allSeries: boolean = false) => {
     try {
-      await api.deleteEvent(id);
+      const targetEvent = events.find((e) => e.id === id);
+      await api.deleteEvent(id, allSeries);
       setEvents((prev) => {
-        const next = prev.filter((e) => e.id !== id);
+        let next: Event[];
+        if (allSeries && targetEvent) {
+          const targetTitle = targetEvent.title.trim().toLowerCase();
+          next = prev.filter((e) => e.title.trim().toLowerCase() !== targetTitle && e.id !== id);
+        } else {
+          next = prev.filter((e) => e.id !== id);
+        }
         AsyncStorage.setItem(CACHE_EVENTS_KEY, JSON.stringify(next)).catch(() => {});
         return next;
       });
+      // Revalida em background para garantir integridade com o backend
+      if (allSeries) {
+        loadData(true);
+      }
     } catch (e) {
       console.error('Erro ao deletar evento:', e);
+      throw e;
+    }
+  };
+
+  const handleUpdateEvent = async (id: string, eventData: Partial<Event> & { update_series?: boolean }) => {
+    try {
+      const res = await api.updateEvent(id, eventData);
+      if (eventData.update_series) {
+        await loadData(true);
+      } else if (res?.event) {
+        setEvents((prev) => {
+          const next = prev.map((e) => (e.id === id ? { ...e, ...res.event } : e));
+          AsyncStorage.setItem(CACHE_EVENTS_KEY, JSON.stringify(next)).catch(() => {});
+          return next;
+        });
+      }
+      return res;
+    } catch (e) {
+      console.error('Erro ao atualizar evento:', e);
+      throw e;
     }
   };
 
@@ -215,11 +246,12 @@ export function useHomeData() {
     return events.filter((ev) => isEventOnDate(ev, selectedDate));
   }, [events, selectedDate]);
 
-  // Próximos eventos a partir de hoje em ordem cronológica (para visualização ampla na agenda)
+  // Próximos eventos a partir de hoje em ordem cronológica (com agrupamento inteligente de séries recorrentes)
   const upcomingEvents = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    return events
+
+    const futureEvents = events
       .filter((ev) => {
         try {
           const end = ev.end_at ? parseSafeDate(ev.end_at) : parseSafeDate(ev.start_at);
@@ -233,6 +265,36 @@ export function useHomeData() {
         const tB = parseSafeDate(b.start_at).getTime();
         return tA - tB;
       });
+
+    // Detecta quantas ocorrências futuras existem por título/padrão
+    const titleCounts = new Map<string, number>();
+    for (const ev of futureEvents) {
+      const key = ev.title.trim().toLowerCase();
+      titleCounts.set(key, (titleCounts.get(key) || 0) + 1);
+    }
+
+    // Agrupa para que cada série recorrente apareça apenas como um compromisso único próximo
+    const seenSeries = new Set<string>();
+    const grouped: Event[] = [];
+
+    for (const ev of futureEvents) {
+      const key = ev.title.trim().toLowerCase();
+      const isSeries = (titleCounts.get(key) || 0) > 1 || !!ev.recurrence;
+
+      if (isSeries) {
+        if (!seenSeries.has(key)) {
+          seenSeries.add(key);
+          grouped.push({
+            ...ev,
+            is_recurring: true,
+          });
+        }
+      } else {
+        grouped.push(ev);
+      }
+    }
+
+    return grouped;
   }, [events]);
 
   const isTodaySelected = selectedDate.toDateString() === new Date().toDateString();
@@ -250,6 +312,7 @@ export function useHomeData() {
     eventDates,
     isTodaySelected,
     handleCreateEvent,
+    handleUpdateEvent,
     handleCreateTodo,
     handleDeleteEvent,
     handleToggleTodo,

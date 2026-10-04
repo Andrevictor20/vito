@@ -162,6 +162,7 @@ func runMigrations(db *sql.DB) error {
 	_, _ = db.Exec("ALTER TABLE events ADD COLUMN source TEXT DEFAULT 'vito'")
 	_, _ = db.Exec("ALTER TABLE events ADD COLUMN category TEXT DEFAULT 'general'")
 	_, _ = db.Exec("ALTER TABLE events ADD COLUMN color TEXT")
+	_, _ = db.Exec("ALTER TABLE events ADD COLUMN recurrence TEXT")
 
 	return nil
 }

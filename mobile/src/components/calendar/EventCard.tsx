@@ -7,13 +7,17 @@ import { Event } from '../../types';
 
 interface EventCardProps {
   event: Event;
-  onDelete: (id: string) => void;
+  onDelete: (id: string, allSeries?: boolean) => void;
+  onPress?: (event: Event) => void;
+  onRequestDelete?: (event: Event) => void;
   accentColor?: string;
 }
 
 export const EventCard: React.FC<EventCardProps> = ({
   event,
   onDelete,
+  onPress,
+  onRequestDelete,
 }) => {
   const { colors, isDark } = useTheme();
   const formatTime = (iso: string) => {
@@ -67,8 +71,18 @@ export const EventCard: React.FC<EventCardProps> = ({
   const category = getCategory();
   const accentBarColor = event.color || (category.text !== colors.onSecondaryContainer ? category.text : colors.primary);
 
+  const handleDeletePress = () => {
+    if (onRequestDelete) {
+      onRequestDelete(event);
+    } else {
+      onDelete(event.id);
+    }
+  };
+
   return (
-    <View
+    <TouchableOpacity
+      activeOpacity={onPress ? 0.85 : 1}
+      onPress={onPress ? () => onPress(event) : undefined}
       style={[
         styles.card,
         {
@@ -92,11 +106,17 @@ export const EventCard: React.FC<EventCardProps> = ({
               <Text style={styles.sourceText}>Google</Text>
             </View>
           )}
+          {(event.is_recurring || !!event.recurrence) && (
+            <View style={[styles.sourceBadge, { backgroundColor: isDark ? '#1E293B' : '#E0F2FE', borderColor: colors.primary, borderWidth: 1 }]}>
+              <MaterialIcons name="repeat" size={11} color={colors.primary} />
+              <Text style={[styles.sourceText, { color: colors.primary, fontWeight: '700' }]}>Recorrente</Text>
+            </View>
+          )}
         </View>
 
         <TouchableOpacity
           style={styles.deleteButton}
-          onPress={() => onDelete(event.id)}
+          onPress={handleDeletePress}
           hitSlop={tokens.hitSlop.sm}
           accessibilityLabel="Excluir compromisso"
         >
@@ -127,7 +147,7 @@ export const EventCard: React.FC<EventCardProps> = ({
           </View>
         ) : null}
       </View>
-    </View>
+    </TouchableOpacity>
   );
 };
 

@@ -156,15 +156,23 @@ class ApiService {
     return res || [];
   }
 
-  async createEvent(event: { title: string; description?: string; location?: string; start_at: string; end_at: string }) {
+  async createEvent(event: { title: string; description?: string; location?: string; start_at: string; end_at: string; recurrence?: string }) {
     return this.request<{ event: Event; conflict?: ConflictInfo }>('/api/v1/events', {
       method: 'POST',
       body: JSON.stringify(event),
     });
   }
 
-  async deleteEvent(id: string) {
-    return this.request<void>(`/api/v1/events/${id}`, { method: 'DELETE' });
+  async updateEvent(id: string, eventData: Partial<Event> & { update_series?: boolean }): Promise<{ event: Event; updated_count: number }> {
+    return this.request<{ event: Event; updated_count: number }>(`/api/v1/events/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(eventData),
+    });
+  }
+
+  async deleteEvent(id: string, allSeries: boolean = false) {
+    const query = allSeries ? '?all_series=true' : '';
+    return this.request<void>(`/api/v1/events/${id}${query}`, { method: 'DELETE' });
   }
 
   async syncCalendar(provider: string = 'google'): Promise<{ status: string; provider: string }> {

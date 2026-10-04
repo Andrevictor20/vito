@@ -127,22 +127,90 @@ func (s *AssistantService) Process(ctx context.Context, userID string, input ai.
 	switch intent.Action {
 	case ai.ActionCreateEvent:
 		if intent.Event != nil {
-			event, conflict, err := s.calSvc.CreateEvent(
-				userID,
-				intent.Event.Title,
-				intent.Event.Description,
-				intent.Event.Location,
-				intent.Event.StartAt,
-				intent.Event.EndAt,
-			)
-			if err != nil {
-				return nil, fmt.Errorf("falha ao criar evento: %w", err)
-			}
+			if intent.Event.Recurrence != "" {
+				events, err := s.calSvc.CreateRecurringEvents(
+					userID,
+					intent.Event.Title,
+					intent.Event.Description,
+					intent.Event.Location,
+					intent.Event.StartAt,
+					intent.Event.EndAt,
+					intent.Event.Recurrence,
+					8,
+				)
+				if err != nil {
+					return nil, fmt.Errorf("falha ao criar série recorrente de eventos: %w", err)
+				}
+				if len(events) > 0 {
+					res.Event = events[0]
+				}
+				if res.Message == "" {
+					res.Message = fmt.Sprintf("Agendei '%s' como compromisso recorrente (%s) na sua agenda!", intent.Event.Title, strings.ToLower(intent.Event.Recurrence))
+				}
+			} else {
+				event, conflict, err := s.calSvc.CreateEvent(
+					userID,
+					intent.Event.Title,
+					intent.Event.Description,
+					intent.Event.Location,
+					intent.Event.StartAt,
+					intent.Event.EndAt,
+				)
+				if err != nil {
+					return nil, fmt.Errorf("falha ao criar evento: %w", err)
+				}
 
-			res.Event = event
-			res.Conflict = conflict
-			if conflict != nil && conflict.HasConflict {
-				res.Message += fmt.Sprintf(" ⚠️ Atenção: você já tem '%s' agendado nesse horário!", conflict.ConflictingTitle)
+				res.Event = event
+				res.Conflict = conflict
+				if conflict != nil && conflict.HasConflict {
+					res.Message += fmt.Sprintf(" ⚠️ Atenção: você já tem '%s' agendado nesse horário!", conflict.ConflictingTitle)
+				}
+			}
+		}
+
+	case ai.ActionDeleteEvent:
+		if intent.Event != nil {
+			target := intent.Event.TargetQuery
+			if target == "" {
+				target = intent.Event.Title
+			}
+			if target != "" {
+				count, err := s.calSvc.DeleteEventsByTitle(userID, target)
+				if err != nil {
+					return nil, fmt.Errorf("falha ao excluir evento(s): %w", err)
+				}
+				if count > 1 {
+					res.Message = fmt.Sprintf("Pronto! Removi a série de %d compromissos de '%s' da sua agenda.", count, target)
+				} else if count == 1 {
+					if res.Message == "" {
+						res.Message = fmt.Sprintf("Pronto! Removi o compromisso '%s' da sua agenda.", target)
+					}
+				} else {
+					res.Message = fmt.Sprintf("Não encontrei nenhum compromisso chamado '%s' na sua agenda para remover.", target)
+				}
+			}
+		}
+
+	case ai.ActionUpdateEvent:
+		if intent.Event != nil {
+			target := intent.Event.TargetQuery
+			if target == "" {
+				target = intent.Event.Title
+			}
+			if target != "" && !intent.Event.StartAt.IsZero() && !intent.Event.EndAt.IsZero() {
+				count, err := s.calSvc.UpdateEventTimesByTitle(userID, target, intent.Event.StartAt, intent.Event.EndAt)
+				if err != nil {
+					return nil, fmt.Errorf("falha ao atualizar evento(s): %w", err)
+				}
+				if count > 1 {
+					res.Message = fmt.Sprintf("Pronto! Atualizei o horário de toda a série (%d compromissos de '%s') para %s.", count, target, intent.Event.StartAt.Format("15:04"))
+				} else if count == 1 {
+					if res.Message == "" {
+						res.Message = fmt.Sprintf("Atualizei o horário de '%s' para %s na sua agenda.", target, intent.Event.StartAt.Format("15:04"))
+					}
+				} else {
+					res.Message = fmt.Sprintf("Não encontrei nenhum compromisso chamado '%s' na sua agenda para reagendar.", target)
+				}
 			}
 		}
 

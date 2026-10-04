@@ -27,6 +27,8 @@ export interface Event {
   source?: string;
   category?: string;
   color?: string;
+  recurrence?: string;
+  is_recurring?: boolean;
   created_at: string;
 }
 

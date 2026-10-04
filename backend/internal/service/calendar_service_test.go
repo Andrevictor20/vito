@@ -113,3 +113,45 @@ func TestClassifyEvent(t *testing.T) {
 		}
 	}
 }
+
+func TestCalendarService_UpdateAndSeries(t *testing.T) {
+	calSvc, _ := setupCalendarService(t)
+	now := time.Date(2026, 10, 3, 8, 0, 0, 0, time.UTC)
+	events, err := calSvc.CreateRecurringEvents(
+		"user-cal-svc-1",
+		"Aula de Inglês",
+		"Foco em conversação",
+		"Online",
+		now,
+		now.Add(2*time.Hour),
+		"WEEKLY",
+		4,
+	)
+	if err != nil || len(events) != 4 {
+		t.Fatalf("failed to create recurring events: %v", err)
+	}
+
+	// 1. Atualizar apenas 1 evento
+	events[0].Title = "Aula de Inglês - Teste"
+	upEvent, count, err := calSvc.UpdateEvent("user-cal-svc-1", events[0], false)
+	if err != nil || count != 1 || upEvent.Title != "Aula de Inglês - Teste" {
+		t.Fatalf("expected 1 event updated, got count %d, err %v", count, err)
+	}
+
+	// 2. Atualizar toda a série
+	events[1].Title = "Inglês Executivo"
+	newStart := time.Date(2026, 10, 10, 9, 0, 0, 0, time.UTC)
+	events[1].StartAt = newStart
+	events[1].EndAt = newStart.Add(2 * time.Hour)
+	_, seriesCount, err := calSvc.UpdateEvent("user-cal-svc-1", events[1], true)
+	if err != nil || seriesCount < 3 {
+		t.Fatalf("expected at least 3 events updated in series, got %d, err %v", seriesCount, err)
+	}
+
+	// 3. Excluir série inteira
+	delCount, err := calSvc.DeleteEventWithOption(events[1].ID, "user-cal-svc-1", true)
+	if err != nil || delCount < 3 {
+		t.Fatalf("expected at least 3 events deleted, got %d, err %v", delCount, err)
+	}
+}
+

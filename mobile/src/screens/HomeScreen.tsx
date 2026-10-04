@@ -17,10 +17,12 @@ import { CalendarModal } from '../components/calendar/CalendarModal';
 import { EventCard } from '../components/calendar/EventCard';
 import { TodoItem } from '../components/todos/TodoItem';
 import { CreateItemModal } from '../components/calendar/CreateItemModal';
+import { EditEventModal } from '../components/calendar/EditEventModal';
 import { ProfileModal } from '../components/profile/ProfileModal';
 import { ChatScreen } from './ChatScreen';
 import { useHomeData } from '../hooks/useHomeData';
 import { useTheme } from '../context/ThemeContext';
+import { Event } from '../types';
 
 export const HomeScreen: React.FC<{
   serverUrl: string;
@@ -31,6 +33,8 @@ export const HomeScreen: React.FC<{
   const [profileVisible, setProfileVisible] = useState(false);
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [calendarModalVisible, setCalendarModalVisible] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<Event | null>(null);
+  const [editModalVisible, setEditModalVisible] = useState(false);
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
 
   const handleSelectTab = (tab: 'chat' | 'calendar') => {
@@ -52,6 +56,7 @@ export const HomeScreen: React.FC<{
     eventDates,
     isTodaySelected,
     handleCreateEvent,
+    handleUpdateEvent,
     handleCreateTodo,
     handleDeleteEvent,
     handleToggleTodo,
@@ -138,14 +143,38 @@ export const HomeScreen: React.FC<{
                   </View>
                 </View>
                 {upcomingEvents.slice(0, 5).map((ev) => (
-                  <EventCard key={ev.id} event={ev} onDelete={handleDeleteEvent} />
+                  <EventCard
+                    key={ev.id}
+                    event={ev}
+                    onDelete={handleDeleteEvent}
+                    onPress={(item) => {
+                      setEditingEvent(item);
+                      setEditModalVisible(true);
+                    }}
+                    onRequestDelete={(item) => {
+                      setEditingEvent(item);
+                      setEditModalVisible(true);
+                    }}
+                  />
                 ))}
               </View>
             )}
           </>
         ) : (
           dayEvents.map((ev) => (
-            <EventCard key={ev.id} event={ev} onDelete={handleDeleteEvent} />
+            <EventCard
+              key={ev.id}
+              event={ev}
+              onDelete={handleDeleteEvent}
+              onPress={(item) => {
+                setEditingEvent(item);
+                setEditModalVisible(true);
+              }}
+              onRequestDelete={(item) => {
+                setEditingEvent(item);
+                setEditModalVisible(true);
+              }}
+            />
           ))
         )}
 
@@ -224,6 +253,17 @@ export const HomeScreen: React.FC<{
             }}
           />
 
+          <EditEventModal
+            visible={editModalVisible}
+            onClose={() => {
+              setEditModalVisible(false);
+              setEditingEvent(null);
+            }}
+            event={editingEvent}
+            onSave={handleUpdateEvent}
+            onDelete={handleDeleteEvent}
+          />
+
           <CalendarModal
             visible={calendarModalVisible}
             onClose={() => setCalendarModalVisible(false)}
@@ -232,6 +272,7 @@ export const HomeScreen: React.FC<{
             onSelectDate={(d) => setSelectedDate(d)}
             onOpenCreate={() => setCreateModalVisible(true)}
             onDeleteEvent={handleDeleteEvent}
+            onUpdateEvent={handleUpdateEvent}
             todos={todos}
             onToggleTodo={handleToggleTodo}
             onDeleteTodo={handleDeleteTodo}

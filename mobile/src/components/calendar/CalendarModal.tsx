@@ -19,6 +19,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { toLocalDateString, parseSafeDate, isEventOnDate, getEventDays } from '../../utils/calendarDateUtils';
 import { EventCard } from './EventCard';
 import { TodoItem } from '../todos/TodoItem';
+import { EditEventModal } from './EditEventModal';
 
 interface CalendarModalProps {
   visible: boolean;
@@ -27,7 +28,8 @@ interface CalendarModalProps {
   selectedDate: Date;
   onSelectDate: (date: Date) => void;
   onOpenCreate?: () => void;
-  onDeleteEvent?: (id: string) => void;
+  onDeleteEvent?: (id: string, allSeries?: boolean) => void;
+  onUpdateEvent?: (id: string, data: any) => Promise<any>;
   todos?: Todo[];
   onToggleTodo?: (id: string) => void;
   onDeleteTodo?: (id: string) => void;
@@ -50,6 +52,7 @@ export const CalendarModal: React.FC<CalendarModalProps> = ({
   onSelectDate,
   onOpenCreate,
   onDeleteEvent,
+  onUpdateEvent,
   todos = [],
   onToggleTodo,
   onDeleteTodo,
@@ -59,6 +62,8 @@ export const CalendarModal: React.FC<CalendarModalProps> = ({
 }) => {
   const { colors, isDark } = useTheme();
   const [modalTab, setModalTab] = useState<'calendar' | 'todos'>('calendar');
+  const [editingEvent, setEditingEvent] = useState<Event | null>(null);
+  const [editModalVisible, setEditModalVisible] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(
     new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1)
   );
@@ -515,6 +520,14 @@ export const CalendarModal: React.FC<CalendarModalProps> = ({
                       key={ev.id}
                       event={ev}
                       onDelete={onDeleteEvent || (() => {})}
+                      onPress={(item) => {
+                        setEditingEvent(item);
+                        setEditModalVisible(true);
+                      }}
+                      onRequestDelete={(item) => {
+                        setEditingEvent(item);
+                        setEditModalVisible(true);
+                      }}
                     />
                   ))
                 )}
@@ -593,6 +606,21 @@ export const CalendarModal: React.FC<CalendarModalProps> = ({
               <MaterialIcons name="add" size={28} color={colors.onPrimary} />
             </TouchableOpacity>
           )}
+
+          <EditEventModal
+            visible={editModalVisible}
+            onClose={() => {
+              setEditModalVisible(false);
+              setEditingEvent(null);
+            }}
+            event={editingEvent}
+            onSave={onUpdateEvent || (async () => {})}
+            onDelete={async (id, allSeries) => {
+              if (onDeleteEvent) {
+                onDeleteEvent(id, allSeries);
+              }
+            }}
+          />
         </View>
       </SafeAreaView>
     </Modal>

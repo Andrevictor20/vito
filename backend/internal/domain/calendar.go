@@ -23,6 +23,7 @@ type Event struct {
 	Source      string    `json:"source,omitempty"`
 	Category    string    `json:"category,omitempty"`
 	Color       string    `json:"color,omitempty"`
+	Recurrence  string    `json:"recurrence,omitempty"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
@@ -42,4 +43,9 @@ type EventRepository interface {
 	ListByUser(userID string, from, to time.Time) ([]Event, error)
 	CheckConflict(userID string, startAt, endAt time.Time, excludeEventID string) (*ConflictInfo, error)
 	Delete(id, userID string) error
+	DeleteByTitle(userID, titleQuery string) (int, error)
+	DeleteSeries(id, userID string) (int, error)
+	Update(event *Event) error
+	UpdateSeries(event *Event) (int, error)
+	UpdateTimesByTitle(userID, titleQuery string, newStart, newEnd time.Time) (int, error)
 }

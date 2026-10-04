@@ -223,4 +223,77 @@ func TestRawScanType(t *testing.T) {
 	t.Logf("TIPO de rawStart: %T | VALOR: %#v", rawStart, rawStart)
 }
 
+func TestEventRepository_UpdateAndSeries(t *testing.T) {
+	eventRepo, _, _ := setupCalendarTestDB(t)
+
+	now := time.Date(2026, 10, 3, 8, 0, 0, 0, time.UTC)
+	// Insere 3 ocorrências de uma série "Aula de inglês"
+	ev1 := &domain.Event{
+		ID:         "series-1",
+		UserID:     "user-cal-1",
+		Title:      "Aula de inglês",
+		StartAt:    now,
+		EndAt:      now.Add(2 * time.Hour),
+		Recurrence: "WEEKLY",
+		CreatedAt:  now,
+		UpdatedAt:  now,
+	}
+	ev2 := &domain.Event{
+		ID:         "series-2",
+		UserID:     "user-cal-1",
+		Title:      "Aula de inglês",
+		StartAt:    now.AddDate(0, 0, 7),
+		EndAt:      now.AddDate(0, 0, 7).Add(2 * time.Hour),
+		Recurrence: "WEEKLY",
+		CreatedAt:  now,
+		UpdatedAt:  now,
+	}
+	ev3 := &domain.Event{
+		ID:         "series-3",
+		UserID:     "user-cal-1",
+		Title:      "Aula de inglês",
+		StartAt:    now.AddDate(0, 0, 14),
+		EndAt:      now.AddDate(0, 0, 14).Add(2 * time.Hour),
+		Recurrence: "WEEKLY",
+		CreatedAt:  now,
+		UpdatedAt:  now,
+	}
+	_ = eventRepo.Create(ev1)
+	_ = eventRepo.Create(ev2)
+	_ = eventRepo.Create(ev3)
+
+	// 1. Atualiza apenas 1 ocorrência
+	ev1.Title = "Aula de inglês - Prova Oral"
+	if err := eventRepo.Update(ev1); err != nil {
+		t.Fatalf("Update failed: %v", err)
+	}
+	saved1, err := eventRepo.GetByID("series-1", "user-cal-1")
+	if err != nil || saved1.Title != "Aula de inglês - Prova Oral" {
+		t.Fatalf("expected title updated on series-1")
+	}
+
+	// 2. Atualiza toda a série restante (série 2 e 3 mudando horário de 8h para 10h)
+	newStart := time.Date(2026, 10, 10, 10, 0, 0, 0, time.UTC)
+	newEnd := newStart.Add(2 * time.Hour)
+	ev2.Title = "Curso Avançado de Inglês"
+	ev2.StartAt = newStart
+	ev2.EndAt = newEnd
+	count, err := eventRepo.UpdateSeries(ev2)
+	if err != nil {
+		t.Fatalf("UpdateSeries failed: %v", err)
+	}
+	if count < 2 {
+		t.Errorf("expected at least 2 series events updated, got %d", count)
+	}
+
+	// 3. DeleteSeries
+	deleted, err := eventRepo.DeleteSeries("series-2", "user-cal-1")
+	if err != nil {
+		t.Fatalf("DeleteSeries failed: %v", err)
+	}
+	if deleted < 2 {
+		t.Errorf("expected at least 2 events deleted by series, got %d", deleted)
+	}
+}
+
 

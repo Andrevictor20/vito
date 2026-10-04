@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -68,4 +69,109 @@ func (s *CalendarService) ListEvents(userID string, from, to time.Time) ([]domai
 // DeleteEvent remove um evento pertencente ao usuário.
 func (s *CalendarService) DeleteEvent(id, userID string) error {
 	return s.eventRepo.Delete(id, userID)
+}
+
+// DeleteEventWithOption remove um evento individual ou toda a série recorrente.
+func (s *CalendarService) DeleteEventWithOption(id, userID string, allSeries bool) (int, error) {
+	if allSeries {
+		return s.eventRepo.DeleteSeries(id, userID)
+	}
+	err := s.eventRepo.Delete(id, userID)
+	if err != nil {
+		return 0, err
+	}
+	return 1, nil
+}
+
+// UpdateEvent atualiza os dados de um evento ou de toda a sua série recorrente.
+func (s *CalendarService) UpdateEvent(userID string, event *domain.Event, updateSeries bool) (*domain.Event, int, error) {
+	if event.Title == "" {
+		return nil, 0, errors.New("o título do evento é obrigatório")
+	}
+	if event.EndAt.Before(event.StartAt) || event.EndAt.Equal(event.StartAt) {
+		return nil, 0, errors.New("o horário de término deve ser após o início")
+	}
+	event.UserID = userID
+	if event.Category == "" {
+		cat, col := ClassifyEvent(event.Title, event.Description)
+		event.Category = cat
+		if event.Color == "" {
+			event.Color = col
+		}
+	}
+
+	if updateSeries {
+		count, err := s.eventRepo.UpdateSeries(event)
+		if err != nil {
+			return nil, 0, err
+		}
+		return event, count, nil
+	}
+
+	if err := s.eventRepo.Update(event); err != nil {
+		return nil, 0, err
+	}
+	return event, 1, nil
+}
+
+// DeleteEventsByTitle remove eventos que correspondam ao termo de busca (para comandos de voz/chat).
+func (s *CalendarService) DeleteEventsByTitle(userID, titleQuery string) (int, error) {
+	return s.eventRepo.DeleteByTitle(userID, titleQuery)
+}
+
+// UpdateEventTimesByTitle ajusta o horário de início e término dos eventos que correspondam ao título.
+func (s *CalendarService) UpdateEventTimesByTitle(userID, titleQuery string, newStart, newEnd time.Time) (int, error) {
+	return s.eventRepo.UpdateTimesByTitle(userID, titleQuery, newStart, newEnd)
+}
+
+// CreateRecurringEvents gera uma série de ocorrências para um evento recorrente (ex: semanal).
+func (s *CalendarService) CreateRecurringEvents(userID, title, description, location string, startAt, endAt time.Time, recurrence string, count int) ([]*domain.Event, error) {
+	if count <= 0 {
+		count = 8 // default: próximas 8 ocorrências
+	}
+	if count > 52 {
+		count = 52
+	}
+
+	dur := endAt.Sub(startAt)
+	var created []*domain.Event
+	now := time.Now().UTC()
+	cat, col := ClassifyEvent(title, description)
+
+	for i := 0; i < count; i++ {
+		var curStart, curEnd time.Time
+		switch strings.ToUpper(recurrence) {
+		case "DAILY":
+			curStart = startAt.AddDate(0, 0, i)
+		case "MONTHLY":
+			curStart = startAt.AddDate(0, i, 0)
+		case "WEEKLY":
+			fallthrough
+		default:
+			curStart = startAt.AddDate(0, 0, i*7)
+		}
+		curEnd = curStart.Add(dur)
+
+		ev := &domain.Event{
+			ID:          uuid.New().String(),
+			UserID:      userID,
+			Title:       title,
+			Description: description,
+			Location:    location,
+			StartAt:     curStart,
+			EndAt:       curEnd,
+			Category:    cat,
+			Color:       col,
+			Recurrence:  strings.ToUpper(recurrence),
+			CreatedAt:   now,
+			UpdatedAt:   now,
+		}
+
+		if err := s.eventRepo.Create(ev); err != nil {
+			return created, err
+		}
+		created = append(created, ev)
+	}
+
+	return created, nil
 }

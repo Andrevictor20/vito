@@ -270,3 +270,148 @@ func TestAssistantService_ContextLayersInjection(t *testing.T) {
 		t.Errorf("expected PendingTodos to be injected, got 0 items")
 	}
 }
+
+func TestAssistantService_RecurringEventCreation(t *testing.T) {
+	_, calSvc, todoSvc, userID := setupAssistantTest(t)
+	now := time.Now().UTC()
+
+	mockAI := &mockAIGateway{
+		intent: &ai.ParsedIntent{
+			Action:  ai.ActionCreateEvent,
+			Message: "Agendei sua aula semanal!",
+			Event: &ai.ParsedEvent{
+				Title:      "Aula de inglês",
+				StartAt:    now.Add(24 * time.Hour),
+				EndAt:      now.Add(27 * time.Hour),
+				Recurrence: "WEEKLY",
+			},
+		},
+	}
+	astSvc := service.NewAssistantService(mockAI, calSvc, todoSvc, nil)
+
+	res, err := astSvc.Process(context.Background(), userID, ai.UserInput{
+		Text: "Marque aula de inglês todo sábado das 8h às 11h",
+		Now:  now,
+	})
+	if err != nil {
+		t.Fatalf("Process failed: %v", err)
+	}
+
+	if res.Event == nil {
+		t.Fatalf("expected Event to be returned, got nil")
+	}
+
+	// Verifica se gerou 8 ocorrências da série no banco
+	events, err := calSvc.ListEvents(userID, now, now.Add(90*24*time.Hour))
+	if err != nil {
+		t.Fatalf("failed to list events: %v", err)
+	}
+	if len(events) != 8 {
+		t.Fatalf("expected 8 recurring occurrences, got %d", len(events))
+	}
+	for _, ev := range events {
+		if ev.Title != "Aula de inglês" {
+			t.Errorf("expected title 'Aula de inglês', got '%s'", ev.Title)
+		}
+		if ev.Recurrence != "WEEKLY" {
+			t.Errorf("expected recurrence 'WEEKLY', got '%s'", ev.Recurrence)
+		}
+	}
+}
+
+func TestAssistantService_DeleteEvent(t *testing.T) {
+	_, calSvc, todoSvc, userID := setupAssistantTest(t)
+	now := time.Now().UTC()
+
+	// Cria evento prévio
+	_, _, err := calSvc.CreateEvent(userID, "Dentista Geral", "", "", now.Add(24*time.Hour), now.Add(25*time.Hour))
+	if err != nil {
+		t.Fatalf("failed to create event: %v", err)
+	}
+
+	mockAI := &mockAIGateway{
+		intent: &ai.ParsedIntent{
+			Action: ai.ActionDeleteEvent,
+			Event: &ai.ParsedEvent{
+				Title:       "Dentista",
+				TargetQuery: "Dentista",
+			},
+		},
+	}
+	astSvc := service.NewAssistantService(mockAI, calSvc, todoSvc, nil)
+
+	res, err := astSvc.Process(context.Background(), userID, ai.UserInput{
+		Text: "Cancele o dentista",
+		Now:  now,
+	})
+	if err != nil {
+		t.Fatalf("Process failed: %v", err)
+	}
+
+	if res.Message == "" {
+		t.Errorf("expected confirmation message, got empty")
+	}
+
+	// Verifica que foi removido
+	events, err := calSvc.ListEvents(userID, now, now.Add(48*time.Hour))
+	if err != nil {
+		t.Fatalf("failed to list events: %v", err)
+	}
+	if len(events) != 0 {
+		t.Errorf("expected 0 events, got %d", len(events))
+	}
+}
+
+func TestAssistantService_UpdateEvent(t *testing.T) {
+	_, calSvc, todoSvc, userID := setupAssistantTest(t)
+	now := time.Now().UTC()
+
+	// Cria evento às 10h
+	start := time.Date(now.Year(), now.Month(), now.Day()+1, 10, 0, 0, 0, time.UTC)
+	end := start.Add(1 * time.Hour)
+	_, _, err := calSvc.CreateEvent(userID, "Reunião de Alinhamento", "", "", start, end)
+	if err != nil {
+		t.Fatalf("failed to create event: %v", err)
+	}
+
+	// Atualiza para as 15h
+	newStart := time.Date(now.Year(), now.Month(), now.Day()+1, 15, 0, 0, 0, time.UTC)
+	newEnd := newStart.Add(1 * time.Hour)
+
+	mockAI := &mockAIGateway{
+		intent: &ai.ParsedIntent{
+			Action: ai.ActionUpdateEvent,
+			Event: &ai.ParsedEvent{
+				Title:       "Reunião de Alinhamento",
+				TargetQuery: "Reunião",
+				StartAt:     newStart,
+				EndAt:       newEnd,
+			},
+		},
+	}
+	astSvc := service.NewAssistantService(mockAI, calSvc, todoSvc, nil)
+
+	res, err := astSvc.Process(context.Background(), userID, ai.UserInput{
+		Text: "Remarque a reunião para as 15h",
+		Now:  now,
+	})
+	if err != nil {
+		t.Fatalf("Process failed: %v", err)
+	}
+
+	if res.Message == "" {
+		t.Errorf("expected confirmation message, got empty")
+	}
+
+	// Verifica novo horário
+	events, err := calSvc.ListEvents(userID, now, now.Add(48*time.Hour))
+	if err != nil {
+		t.Fatalf("failed to list events: %v", err)
+	}
+	if len(events) != 1 {
+		t.Fatalf("expected 1 event, got %d", len(events))
+	}
+	if events[0].StartAt.Hour() != 15 {
+		t.Errorf("expected start hour 15, got %d", events[0].StartAt.Hour())
+	}
+}
