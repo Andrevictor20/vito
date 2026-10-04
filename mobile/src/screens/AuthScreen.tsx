@@ -13,9 +13,8 @@ import * as Updates from 'expo-updates';
 import { tokens } from '../theme/tokens';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { isCloudServer } from '../services/api';
-import { UpdateBanner } from '../components/common/UpdateBanner';
 import { VitoLogo } from '../components/common/VitoLogo';
+import { GoogleIcon } from '../components/common/GoogleIcon';
 import { createAuthStyles } from './AuthScreen.styles';
 
 interface AuthScreenProps {
@@ -36,7 +35,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ serverUrl, onToggleServe
   const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
 
   const { currentlyRunning } = Updates.useUpdates();
-  const isCloud = isCloudServer(serverUrl || '');
 
   const handleSubmit = async () => {
     setError(null);
@@ -114,52 +112,27 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ serverUrl, onToggleServe
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={styles.container}
     >
-      <UpdateBanner />
-
       <View style={styles.card}>
-        {/* Top Header M3 com Seletor de Servidor e Alternador de Tema */}
+        {/* Top Header M3 com Alternador de Tema */}
         <View style={styles.topHeaderRow}>
           <VitoLogo size="small" />
 
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <TouchableOpacity
-              style={styles.serverPill}
-              onPress={toggleTheme}
-              activeOpacity={0.75}
-              accessibilityLabel={isDark ? 'Mudar para tema claro' : 'Mudar para tema escuro'}
-            >
-              <MaterialIcons
-                name={isDark ? 'light-mode' : 'dark-mode'}
-                size={14}
-                color={colors.onSecondaryContainer}
-              />
-            </TouchableOpacity>
-
-            {onToggleServer && (
-              <TouchableOpacity
-                style={styles.serverPill}
-                onPress={onToggleServer}
-                activeOpacity={0.75}
-                accessibilityLabel="Alternar entre servidor nuvem e local"
-              >
-                <MaterialIcons
-                  name={isCloud ? 'cloud-done' : 'home'}
-                  size={14}
-                  color={colors.onSecondaryContainer}
-                />
-                <Text style={styles.serverPillText}>
-                  {isCloud ? 'Nuvem' : 'Local'}
-                </Text>
-              </TouchableOpacity>
-            )}
-          </View>
+          <TouchableOpacity
+            style={styles.themePill}
+            onPress={toggleTheme}
+            activeOpacity={0.75}
+            accessibilityLabel={isDark ? 'Mudar para tema claro' : 'Mudar para tema escuro'}
+          >
+            <MaterialIcons
+              name={isDark ? 'light-mode' : 'dark-mode'}
+              size={16}
+              color={colors.onSurface}
+            />
+          </TouchableOpacity>
         </View>
 
         <Text style={styles.subtitle}>
           {isRegister ? 'Crie sua conta pessoal' : 'Seu secretário executivo pessoal com IA'}
-        </Text>
-        <Text style={styles.serverHostIndicator}>
-          {isCloud ? 'Servidor: Nuvem (vito.rasppi.cloud)' : `Servidor: Local (${serverUrl || 'IP Local'})`}
         </Text>
 
         {error && (
@@ -254,7 +227,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ serverUrl, onToggleServe
           accessibilityRole="button"
           accessibilityLabel="Continuar com o Google"
         >
-          <MaterialIcons name="account-circle" size={20} color={colors.primary} />
+          <GoogleIcon size={18} />
           <Text style={styles.googleButtonText}>Continuar com o Google</Text>
         </TouchableOpacity>
 

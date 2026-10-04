@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Updates from 'expo-updates';
@@ -6,9 +6,11 @@ import { tokens, MD3Shapes } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 
 export const UpdateBanner: React.FC = () => {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const { isChecking, isDownloading, isUpdatePending, isUpdateAvailable } = Updates.useUpdates();
+  const [dismissed, setDismissed] = useState(false);
 
+  if (dismissed) return null;
   if (!isChecking && !isDownloading && !isUpdatePending && !isUpdateAvailable) {
     return null;
   }
@@ -31,48 +33,74 @@ export const UpdateBanner: React.FC = () => {
 
   return (
     <View style={styles.container}>
+      {/* 1. Verificando atualizações */}
+      {isChecking && !isDownloading && !isUpdatePending && !isUpdateAvailable && (
+        <View style={[styles.pill, { backgroundColor: colors.surfaceContainerHighest, borderColor: colors.outlineVariant }]}>
+          <ActivityIndicator size="small" color={colors.primary} />
+          <Text style={[styles.text, { color: colors.onSurface }]}>Buscando atualizações...</Text>
+        </View>
+      )}
+
+      {/* 2. Baixando nova versão */}
       {isDownloading && (
-        <View style={[styles.banner, { backgroundColor: colors.primaryContainer, borderColor: colors.primary, justifyContent: 'center' }]}>
-          <ActivityIndicator size="small" color={colors.onPrimaryContainer} />
-          <Text style={[styles.text, { color: colors.onPrimaryContainer }]}>
+        <View style={[styles.pill, { backgroundColor: colors.surfaceContainerHighest, borderColor: colors.primary }]}>
+          <ActivityIndicator size="small" color={colors.primary} />
+          <Text style={[styles.text, { color: colors.onSurface, fontWeight: '600' }]}>
             Baixando atualização do Vito...
           </Text>
         </View>
       )}
 
+      {/* 3. Atualização pronta para reiniciar */}
       {isUpdatePending && (
-        <View style={[styles.banner, { backgroundColor: colors.surfaceContainerHighest, borderColor: colors.outlineVariant }]}>
+        <View style={[styles.pill, { backgroundColor: colors.surfaceContainerHighest, borderColor: colors.outlineVariant }]}>
           <View style={styles.leftRow}>
-            <MaterialIcons name="auto-awesome" size={18} color={colors.primary} />
+            <View style={[styles.iconBox, { backgroundColor: isDark ? '#1E293B' : '#E0F2FE' }]}>
+              <MaterialIcons name="auto-awesome" size={16} color={colors.primary} />
+            </View>
             <Text style={[styles.text, { color: colors.onSurface, fontWeight: '700' }]}>
-              Nova versão instalada!
+              Nova versão pronta
             </Text>
           </View>
           <TouchableOpacity
-            style={[styles.restartBtn, { backgroundColor: colors.primary }]}
+            style={[styles.actionBtn, { backgroundColor: colors.primary }]}
             onPress={handleReload}
             activeOpacity={0.8}
+            accessibilityLabel="Reiniciar aplicativo para aplicar atualização"
           >
-            <Text style={[styles.restartBtnText, { color: colors.onPrimary }]}>Reiniciar</Text>
+            <Text style={[styles.actionBtnText, { color: colors.onPrimary }]}>Reiniciar</Text>
           </TouchableOpacity>
         </View>
       )}
 
+      {/* 4. Atualização encontrada disponível */}
       {isUpdateAvailable && !isDownloading && !isUpdatePending && (
-        <View style={[styles.banner, { backgroundColor: colors.surfaceContainerHigh, borderColor: colors.outlineVariant }]}>
+        <View style={[styles.pill, { backgroundColor: colors.surfaceContainerHighest, borderColor: colors.outlineVariant }]}>
           <View style={styles.leftRow}>
-            <MaterialIcons name="system-update" size={18} color={colors.primary} />
+            <View style={[styles.iconBox, { backgroundColor: isDark ? '#1E293B' : '#E0F2FE' }]}>
+              <MaterialIcons name="system-update" size={16} color={colors.primary} />
+            </View>
             <Text style={[styles.text, { color: colors.onSurface }]}>
               Atualização disponível
             </Text>
           </View>
-          <TouchableOpacity
-            style={[styles.fetchBtn, { backgroundColor: colors.primary }]}
-            onPress={handleFetch}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.fetchBtnText, { color: colors.onPrimary }]}>Baixar</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <TouchableOpacity
+              style={[styles.actionBtn, { backgroundColor: colors.primary }]}
+              onPress={handleFetch}
+              activeOpacity={0.8}
+              accessibilityLabel="Baixar nova versão"
+            >
+              <Text style={[styles.actionBtnText, { color: colors.onPrimary }]}>Baixar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setDismissed(true)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityLabel="Ignorar aviso"
+            >
+              <MaterialIcons name="close" size={16} color={colors.onSurfaceVariant} />
+            </TouchableOpacity>
+          </View>
         </View>
       )}
     </View>
@@ -82,31 +110,28 @@ export const UpdateBanner: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     paddingHorizontal: tokens.spacing.md,
-    paddingVertical: tokens.spacing.xs,
+    paddingTop: tokens.spacing.xs,
+    paddingBottom: tokens.spacing.xs,
+    alignItems: 'center',
     zIndex: 999,
   },
-  banner: {
+  pill: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: tokens.spacing.md,
-    paddingVertical: 10,
-    borderRadius: MD3Shapes.large,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: MD3Shapes.full,
     borderWidth: 1,
-    gap: tokens.spacing.sm,
-  },
-  bannerDownloading: {
-    backgroundColor: tokens.colors.primaryContainer,
-    borderColor: tokens.colors.primary,
-    justifyContent: 'center',
-  },
-  bannerPending: {
-    backgroundColor: tokens.colors.tertiaryContainer,
-    borderColor: tokens.colors.tertiary,
-  },
-  bannerAvailable: {
-    backgroundColor: tokens.colors.secondaryContainer,
-    borderColor: tokens.colors.secondary,
+    minHeight: 44,
+    maxWidth: 420,
+    width: '100%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 4,
+    gap: 12,
   },
   leftRow: {
     flexDirection: 'row',
@@ -114,40 +139,24 @@ const styles = StyleSheet.create({
     gap: 8,
     flex: 1,
   },
+  iconBox: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   text: {
     fontSize: tokens.typography.size.labelMedium,
     fontWeight: tokens.typography.weight.medium,
   },
-  textDownloading: {
-    color: tokens.colors.onPrimaryContainer,
-  },
-  textPending: {
-    color: tokens.colors.onTertiaryContainer,
-    fontWeight: tokens.typography.weight.bold,
-  },
-  textAvailable: {
-    color: tokens.colors.onSecondaryContainer,
-  },
-  restartBtn: {
-    backgroundColor: tokens.colors.onTertiaryContainer,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
+  actionBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
     borderRadius: MD3Shapes.full,
   },
-  restartBtnText: {
-    color: tokens.colors.tertiaryContainer,
-    fontSize: tokens.typography.size.labelSmall,
-    fontWeight: tokens.typography.weight.bold,
-  },
-  fetchBtn: {
-    backgroundColor: tokens.colors.primary,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: MD3Shapes.full,
-  },
-  fetchBtnText: {
-    color: tokens.colors.onPrimary,
-    fontSize: tokens.typography.size.labelSmall,
-    fontWeight: tokens.typography.weight.bold,
+  actionBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
   },
 });

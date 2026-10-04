@@ -48,31 +48,20 @@ export const createAuthStyles = (colors: ThemeColors) =>
     borderRadius: 3,
     backgroundColor: colors.primary,
   },
-  serverPill: {
-    flexDirection: 'row',
+  themePill: {
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: colors.secondaryContainer,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    justifyContent: 'center',
+    width: 32,
+    height: 32,
+    backgroundColor: colors.surfaceContainerHighest,
     borderRadius: MD3Shapes.full,
     borderWidth: 1,
     borderColor: colors.outlineVariant,
   },
-  serverPillText: {
-    color: colors.onSecondaryContainer,
-    fontSize: 11,
-    fontWeight: tokens.typography.weight.bold,
-  },
   subtitle: {
     fontSize: tokens.typography.size.bodyMedium,
     color: colors.onSurfaceVariant,
-    marginBottom: 4,
-  },
-  serverHostIndicator: {
-    fontSize: tokens.typography.size.labelSmall,
-    color: colors.outline,
-    marginBottom: tokens.spacing.md,
+    marginBottom: tokens.spacing.lg,
   },
   errorBox: {
     flexDirection: 'row',
