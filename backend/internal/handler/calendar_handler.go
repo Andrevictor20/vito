@@ -2,6 +2,8 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -90,7 +92,8 @@ func (h *CalendarHandler) ListEvents(w http.ResponseWriter, r *http.Request) {
 
 	events, err := h.calSvc.ListEvents(userID, from, to)
 	if err != nil {
-		http.Error(w, `{"error":"falha ao listar eventos"}`, http.StatusInternalServerError)
+		log.Printf("[CalendarHandler] ListEvents erro ao listar eventos para user %s: %v", userID, err)
+		http.Error(w, fmt.Sprintf(`{"error":"falha ao listar eventos: %v"}`, err), http.StatusInternalServerError)
 		return
 	}
 

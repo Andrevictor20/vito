@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
+	"strings"
 	"time"
 
 	"github.com/andrevmp/vito/backend/internal/domain"
@@ -51,15 +53,72 @@ func (r *EventRepositorySQLite) Create(e *domain.Event) error {
 	return err
 }
 
+// parseDBTime converte defensivamente qualquer tipo vindo do SQLite para time.Time em UTC.
+func parseDBTime(val any) time.Time {
+	if val == nil {
+		return time.Now().UTC()
+	}
+
+	switch v := val.(type) {
+	case time.Time:
+		return v.UTC()
+	case string:
+		v = strings.TrimSpace(v)
+		if v == "" {
+			return time.Now().UTC()
+		}
+
+		formats := []string{
+			time.RFC3339Nano,
+			time.RFC3339,
+			"2006-01-02 15:04:05.999999999-07:00",
+			"2006-01-02 15:04:05.999999999Z07:00",
+			"2006-01-02 15:04:05-07:00",
+			"2006-01-02 15:04:05Z07:00",
+			"2006-01-02 15:04:05 +0000 UTC",
+			"2006-01-02 15:04:05 -0700 MST",
+			"2006-01-02 15:04:05",
+			"2006-01-02T15:04:05",
+			"2006-01-02",
+		}
+		for _, format := range formats {
+			if t, err := time.Parse(format, v); err == nil {
+				return t.UTC()
+			}
+		}
+
+		for _, format := range formats {
+			if t, err := time.ParseInLocation(format, v, time.UTC); err == nil {
+				return t.UTC()
+			}
+		}
+		return time.Now().UTC()
+	case []byte:
+		return parseDBTime(string(v))
+	case int64:
+		if v > 1e11 {
+			return time.UnixMilli(v).UTC()
+		}
+		return time.Unix(v, 0).UTC()
+	default:
+		return time.Now().UTC()
+	}
+}
+
 func (r *EventRepositorySQLite) GetByID(id, userID string) (*domain.Event, error) {
 	query := `
-		SELECT id, user_id, title, COALESCE(description, ''), COALESCE(location, ''), start_at, end_at, COALESCE(source, 'vito'), COALESCE(category, 'general'), COALESCE(color, ''), created_at, updated_at
+		SELECT id, user_id, COALESCE(title, ''), COALESCE(description, ''), COALESCE(location, ''), 
+		       start_at, end_at, COALESCE(source, 'vito'), COALESCE(category, 'general'), 
+		       COALESCE(color, ''), COALESCE(created_at, datetime('now')), COALESCE(updated_at, datetime('now'))
 		FROM events
 		WHERE id = ? AND user_id = ?
 	`
 	var e domain.Event
+	var rawStart, rawEnd, rawCreated, rawUpdated any
 	err := r.db.QueryRow(query, id, userID).Scan(
-		&e.ID, &e.UserID, &e.Title, &e.Description, &e.Location, &e.StartAt, &e.EndAt, &e.Source, &e.Category, &e.Color, &e.CreatedAt, &e.UpdatedAt,
+		&e.ID, &e.UserID, &e.Title, &e.Description, &e.Location, 
+		&rawStart, &rawEnd, &e.Source, &e.Category, &e.Color, 
+		&rawCreated, &rawUpdated,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -67,6 +126,12 @@ func (r *EventRepositorySQLite) GetByID(id, userID string) (*domain.Event, error
 		}
 		return nil, err
 	}
+
+	e.StartAt = parseDBTime(rawStart)
+	e.EndAt = parseDBTime(rawEnd)
+	e.CreatedAt = parseDBTime(rawCreated)
+	e.UpdatedAt = parseDBTime(rawUpdated)
+
 	return &e, nil
 }
 
@@ -75,7 +140,9 @@ func (r *EventRepositorySQLite) ListByUser(userID string, from, to time.Time) ([
 	toUTC := to.UTC()
 
 	query := `
-		SELECT id, user_id, title, COALESCE(description, ''), COALESCE(location, ''), start_at, end_at, COALESCE(source, 'vito'), COALESCE(category, 'general'), COALESCE(color, ''), created_at, updated_at
+		SELECT id, user_id, COALESCE(title, ''), COALESCE(description, ''), COALESCE(location, ''), 
+		       start_at, end_at, COALESCE(source, 'vito'), COALESCE(category, 'general'), 
+		       COALESCE(color, ''), COALESCE(created_at, datetime('now')), COALESCE(updated_at, datetime('now'))
 		FROM events
 		WHERE user_id = ? 
 		  AND ((start_at >= ? AND start_at <= ?) OR (end_at >= ? AND start_at <= ?))
@@ -90,9 +157,21 @@ func (r *EventRepositorySQLite) ListByUser(userID string, from, to time.Time) ([
 	var events []domain.Event
 	for rows.Next() {
 		var e domain.Event
-		if err := rows.Scan(&e.ID, &e.UserID, &e.Title, &e.Description, &e.Location, &e.StartAt, &e.EndAt, &e.Source, &e.Category, &e.Color, &e.CreatedAt, &e.UpdatedAt); err != nil {
-			return nil, err
+		var rawStart, rawEnd, rawCreated, rawUpdated any
+		if err := rows.Scan(
+			&e.ID, &e.UserID, &e.Title, &e.Description, &e.Location, 
+			&rawStart, &rawEnd, &e.Source, &e.Category, &e.Color, 
+			&rawCreated, &rawUpdated,
+		); err != nil {
+			log.Printf("[EventRepo] Alerta: erro ao escanear linha de evento para user %s: %v", userID, err)
+			continue
 		}
+
+		e.StartAt = parseDBTime(rawStart)
+		e.EndAt = parseDBTime(rawEnd)
+		e.CreatedAt = parseDBTime(rawCreated)
+		e.UpdatedAt = parseDBTime(rawUpdated)
+
 		events = append(events, e)
 	}
 	return events, rows.Err()

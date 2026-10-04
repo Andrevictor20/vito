@@ -144,3 +144,58 @@ func TestEventRepository_ListByUser(t *testing.T) {
 		t.Errorf("expected 'Evento Local BRT', got '%s'", brtResults[0].Title)
 	}
 }
+
+func TestEventRepository_ListByUser_LegacyDateFormat(t *testing.T) {
+	eventRepo, _, db := setupCalendarTestDB(t)
+
+	// Simula evento salvo com formato legado '2026-10-03 11:00:00 +0000 UTC'
+	rawQuery := `
+		INSERT INTO events (id, user_id, title, description, location, start_at, end_at, source, category, color, created_at, updated_at)
+		VALUES ('legacy-1', 'user-cal-1', 'Aula de Inglês', '', '', '2026-10-03 11:00:00 +0000 UTC', '2026-10-03 14:15:00 +0000 UTC', 'vito', 'general', '', '2026-10-03 11:00:00 +0000 UTC', '2026-10-03 11:00:00 +0000 UTC')
+	`
+	if _, err := db.Exec(rawQuery); err != nil {
+		t.Fatalf("failed to insert legacy event: %v", err)
+	}
+
+	from := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
+	to := time.Date(2026, 10, 31, 23, 59, 59, 0, time.UTC)
+
+	events, err := eventRepo.ListByUser("user-cal-1", from, to)
+	if err != nil {
+		t.Fatalf("ListByUser falhou ao ler evento com formato legado: %v", err)
+	}
+
+	if len(events) != 1 {
+		t.Fatalf("esperava 1 evento, obteve %d", len(events))
+	}
+}
+
+func TestEventRepository_ListByUser_NullDatesAndFormats(t *testing.T) {
+	eventRepo, _, db := setupCalendarTestDB(t)
+
+	// Simula eventos com múltiplos formatos reais de datas encontrados em SQLite
+	rawQuery := `
+		INSERT INTO events (id, user_id, title, description, location, start_at, end_at, source, category, color, created_at, updated_at)
+		VALUES 
+		('edge-1', 'user-cal-1', 'Evento SQLite Standard', '', '', '2026-10-05 10:00:00', '2026-10-05 11:00:00', 'vito', 'general', '', '2026-10-05 10:00:00', '2026-10-05 10:00:00'),
+		('edge-2', 'user-cal-1', 'Evento ISO T', 'Desc', 'Loc', '2026-10-06T14:00:00Z', '2026-10-06T15:00:00Z', 'google', 'work', '#1a73e8', '2026-10-06T14:00:00Z', '2026-10-06T14:00:00Z'),
+		('edge-3', 'user-cal-1', 'Evento Offset BRT', 'Desc', 'Loc', '2026-10-07T10:00:00-03:00', '2026-10-07T11:00:00-03:00', 'google', 'work', '#1a73e8', '2026-10-07T10:00:00-03:00', '2026-10-07T10:00:00-03:00'),
+		('edge-4', 'user-cal-1', 'Evento Date Only', '', '', '2026-10-08', '2026-10-08', 'vito', 'general', '', '2026-10-08', '2026-10-08')
+	`
+	if _, err := db.Exec(rawQuery); err != nil {
+		t.Fatalf("failed to insert edge events: %v", err)
+	}
+
+	from := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
+	to := time.Date(2026, 10, 31, 23, 59, 59, 0, time.UTC)
+
+	events, err := eventRepo.ListByUser("user-cal-1", from, to)
+	if err != nil {
+		t.Fatalf("ListByUser falhou com datas edge-case: %v", err)
+	}
+
+	if len(events) != 4 {
+		t.Fatalf("esperava 4 eventos, obteve %d", len(events))
+	}
+}
+
