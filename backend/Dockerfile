@@ -17,9 +17,12 @@ RUN go mod download
 
 COPY . .
 
-# Compilação estática com suporte multi-arquitetura nativo de Go
-RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} \
-    go build -ldflags="-w -s" -o /app/vito-server ./cmd/server
+# Compilação estática com suporte multi-arquitetura nativo e local
+RUN if [ -n "$TARGETARCH" ]; then \
+        CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=$TARGETARCH go build -ldflags="-w -s" -o /app/vito-server ./cmd/server; \
+    else \
+        CGO_ENABLED=0 go build -ldflags="-w -s" -o /app/vito-server ./cmd/server; \
+    fi
 
 # Stage 2: Runtime Minimalista Non-Root
 FROM alpine:3.20 AS runner
