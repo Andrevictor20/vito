@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 
@@ -79,12 +80,10 @@ func (h *CalendarSyncHandler) ConnectIntegration(w http.ResponseWriter, r *http.
 		return
 	}
 
-	// Dispara sincronização inicial sincronamente
-	errSync := h.syncSvc.SyncIntegration(r.Context(), userID, req.Provider)
-	if errSync != nil {
-		http.Error(w, `{"error":"Integração salva, mas falhou ao sincronizar: `+errSync.Error()+`"}`, http.StatusInternalServerError)
-		return
-	}
+	// Dispara sincronização inicial em background
+	go func(uID, prov string) {
+		_ = h.syncSvc.SyncIntegration(context.Background(), uID, prov)
+	}(userID, req.Provider)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
