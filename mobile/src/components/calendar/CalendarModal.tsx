@@ -241,44 +241,34 @@ export const CalendarModal: React.FC<CalendarModalProps> = ({
               </TouchableOpacity>
             </View>
 
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              {onSyncGoogle && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              {(onSyncGoogle || onRefresh) && (
                 <TouchableOpacity
                   style={[
-                    styles.todayBtn,
+                    styles.iconBtn,
                     {
-                      borderColor: colors.outlineVariant,
                       backgroundColor: colors.surfaceContainerLow,
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: 4,
-                      paddingHorizontal: 8,
+                      borderWidth: 1,
+                      borderColor: colors.outlineVariant,
                     },
                   ]}
-                  onPress={onSyncGoogle}
+                  onPress={() => {
+                    if (onSyncGoogle) {
+                      onSyncGoogle();
+                    } else if (onRefresh) {
+                      onRefresh();
+                    }
+                  }}
                   disabled={isSyncingGoogle}
                   activeOpacity={0.75}
-                  accessibilityLabel="Sincronizar com Google Calendar"
+                  accessibilityLabel="Sincronizar eventos do calendário"
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
                   {isSyncingGoogle ? (
                     <ActivityIndicator size="small" color={colors.primary} />
                   ) : (
-                    <>
-                      <MaterialIcons name="sync" size={15} color={colors.primary} />
-                      <Text style={[styles.todayBtnText, { color: colors.primary, fontSize: 11 }]}>Google</Text>
-                    </>
+                    <MaterialIcons name="sync" size={20} color={colors.onSurface} />
                   )}
-                </TouchableOpacity>
-              )}
-              {onRefresh && (
-                <TouchableOpacity
-                  style={[styles.iconBtn, { backgroundColor: colors.surfaceContainerLow }]}
-                  onPress={onRefresh}
-                  activeOpacity={0.75}
-                  accessibilityLabel="Atualizar eventos"
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  <MaterialIcons name="refresh" size={20} color={colors.onSurface} />
                 </TouchableOpacity>
               )}
               <TouchableOpacity
@@ -287,7 +277,7 @@ export const CalendarModal: React.FC<CalendarModalProps> = ({
                 activeOpacity={0.75}
                 accessibilityLabel="Ir para hoje"
               >
-                <Text style={[styles.todayBtnText, { color: colors.primary }]}>Hoje</Text>
+                <Text style={[styles.todayBtnText, { color: colors.primary, fontWeight: '600' }]}>Hoje</Text>
               </TouchableOpacity>
             </View>
           </View>

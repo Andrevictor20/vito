@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { StyleSheet, View, TextInput, TouchableOpacity, Text, ActivityIndicator, Alert } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { tokens } from '../../theme/tokens';
 import { SafeAudioRecorder } from '../../services/audioRecorder';
 
@@ -58,7 +59,7 @@ export const AssistantBar: React.FC<AssistantBarProps> = ({ onSubmit, onAudioSub
             {isLoading ? (
               <ActivityIndicator size="small" color="#fff" />
             ) : (
-              <Text style={styles.actionIcon}>✨</Text>
+              <MaterialIcons name="auto-awesome" size={20} color="#fff" />
             )}
           </TouchableOpacity>
         ) : (
@@ -74,7 +75,7 @@ export const AssistantBar: React.FC<AssistantBarProps> = ({ onSubmit, onAudioSub
             {isLoading ? (
               <ActivityIndicator size="small" color="#fff" />
             ) : (
-              <Text style={styles.actionIcon}>{isRecording ? '⏹️' : '🎙️'}</Text>
+              <MaterialIcons name={isRecording ? 'stop' : 'mic'} size={22} color="#fff" />
             )}
           </TouchableOpacity>
         )}

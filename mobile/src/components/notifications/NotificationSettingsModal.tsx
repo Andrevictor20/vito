@@ -61,7 +61,7 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
   const handleTest = async (priority: NotificationPriority) => {
     try {
       await triggerTest(priority);
-      setTestStatus(priority === 'wakeup' ? '🚨 Wake-up Call disparado!' : '🔔 Notificação enviada!');
+      setTestStatus(priority === 'wakeup' ? 'Alerta Wake-up Call disparado com sucesso' : 'Notificação padrão enviada');
       setTimeout(() => setTestStatus(null), 3000);
     } catch (err: any) {
       Alert.alert('Erro ao testar', err.message || 'Falha ao emitir notificação local.');
@@ -158,7 +158,13 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
                     activeOpacity={0.7}
                   >
                     <View style={styles.priorityTop}>
-                      <Text style={styles.priorityEmoji}>🚨</Text>
+                      <View style={[styles.priorityIconBox, { backgroundColor: settings.defaultPriority === 'wakeup' ? colors.primary : colors.surfaceContainerHighest }]}>
+                        <MaterialIcons
+                          name="alarm"
+                          size={18}
+                          color={settings.defaultPriority === 'wakeup' ? colors.onPrimary : colors.onSurface}
+                        />
+                      </View>
                       {settings.defaultPriority === 'wakeup' && (
                         <MaterialIcons name="check-circle" size={18} color={colors.primary} />
                       )}
@@ -183,7 +189,13 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
                     activeOpacity={0.7}
                   >
                     <View style={styles.priorityTop}>
-                      <Text style={styles.priorityEmoji}>🔔</Text>
+                      <View style={[styles.priorityIconBox, { backgroundColor: settings.defaultPriority === 'default' ? colors.primary : colors.surfaceContainerHighest }]}>
+                        <MaterialIcons
+                          name="notifications-active"
+                          size={18}
+                          color={settings.defaultPriority === 'default' ? colors.onPrimary : colors.onSurface}
+                        />
+                      </View>
                       {settings.defaultPriority === 'default' && (
                         <MaterialIcons name="check-circle" size={18} color={colors.primary} />
                       )}
@@ -208,7 +220,13 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
                     activeOpacity={0.7}
                   >
                     <View style={styles.priorityTop}>
-                      <Text style={styles.priorityEmoji}>🔕</Text>
+                      <View style={[styles.priorityIconBox, { backgroundColor: settings.defaultPriority === 'silent' ? colors.primary : colors.surfaceContainerHighest }]}>
+                        <MaterialIcons
+                          name="notifications-off"
+                          size={18}
+                          color={settings.defaultPriority === 'silent' ? colors.onPrimary : colors.onSurface}
+                        />
+                      </View>
                       {settings.defaultPriority === 'silent' && (
                         <MaterialIcons name="check-circle" size={18} color={colors.primary} />
                       )}
@@ -410,8 +428,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 6,
   },
-  priorityEmoji: {
-    fontSize: 20,
+  priorityIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   priorityName: {
     fontSize: tokens.typography.size.sm,

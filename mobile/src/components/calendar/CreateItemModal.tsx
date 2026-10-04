@@ -137,9 +137,9 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
                   <Text style={[styles.priorityLabel, { color: colors.textSecondary }]}>Alerta:</Text>
                   {(
                     [
-                      { key: 'silent', label: '🔕 Silencioso' },
-                      { key: 'default', label: '🔔 Padrão' },
-                      { key: 'wakeup', label: '🚨 Wake-up' },
+                      { key: 'silent', label: 'Silencioso', icon: 'notifications-off' as const },
+                      { key: 'default', label: 'Padrão', icon: 'notifications' as const },
+                      { key: 'wakeup', label: 'Wake-up', icon: 'alarm' as const },
                     ] as const
                   ).map((opt) => {
                     const isSelected = notifPriority === opt.key;
@@ -153,10 +153,18 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
                               ? colors.primaryContainer
                               : colors.surfaceContainerLow,
                             borderColor: isSelected ? colors.primary : colors.outlineVariant,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 4,
                           },
                         ]}
                         onPress={() => setNotifPriority(opt.key)}
                       >
+                        <MaterialIcons
+                          name={opt.icon}
+                          size={14}
+                          color={isSelected ? colors.onPrimaryContainer : colors.textSecondary}
+                        />
                         <Text
                           style={[
                             styles.priorityChipText,

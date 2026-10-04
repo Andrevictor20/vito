@@ -13,17 +13,15 @@ import { tokens } from '../../theme/tokens';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { ProfileUserCard } from './ProfileUserCard';
-import { ProfileNodeCard } from './ProfileNodeCard';
 import { ProfileSettingsGroup } from './ProfileSettingsGroup';
 import { NotificationSettingsModal } from '../notifications/NotificationSettingsModal';
 import { CalendarSyncSettingsModal } from './CalendarSyncSettingsModal';
-import { isCloudServer } from '../../services/api';
 
 interface ProfileModalProps {
   visible: boolean;
   onClose: () => void;
-  serverUrl: string;
-  onToggleServer: () => void;
+  serverUrl?: string;
+  onToggleServer?: () => void;
   onDataChanged?: () => void;
 }
 
@@ -38,7 +36,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   const { colors, isDark } = useTheme();
   const [notifModalVisible, setNotifModalVisible] = React.useState(false);
   const [calendarSyncModalVisible, setCalendarSyncModalVisible] = React.useState(false);
-  const isCloud = isCloudServer(serverUrl);
   const name = user?.name || 'Andre Victor';
   const email = user?.email || 'andre@vito.ai';
 
@@ -70,17 +67,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
                 {/* Executive User Card com Cota Semanal */}
                 <ProfileUserCard name={name} email={email} quotaPercentage={18.5} />
-
-                {/* Seção: Servidor & Conexão Stitch */}
-                <View style={styles.sectionHeader}>
-                  <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>SERVIDOR & CONEXÃO</Text>
-                  <View style={styles.onlineBadge}>
-                    <View style={styles.onlineDot} />
-                    <Text style={styles.onlineText}>Online • 24ms</Text>
-                  </View>
-                </View>
-
-                <ProfileNodeCard isCloud={isCloud} onToggleServer={onToggleServer} />
 
                 {/* Seção: Assistente Executivo & IA */}
                 <View style={[styles.sectionHeader, { marginTop: tokens.spacing.md }]}>

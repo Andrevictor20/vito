@@ -1,5 +1,6 @@
 import React from 'react';
 import { StyleSheet, View, Text, Modal, TouchableOpacity } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { tokens } from '../../theme/tokens';
 import { AssistantChatResponse } from '../../types';
 
@@ -33,7 +34,10 @@ export const AssistantResultModal: React.FC<AssistantResultModalProps> = ({
           {/* Transcript preview if voice input */}
           {result.transcript ? (
             <View style={styles.transcriptBox}>
-              <Text style={styles.transcriptLabel}>🎙️ Áudio Transcrito:</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                <MaterialIcons name="mic" size={16} color={tokens.colors.primary} />
+                <Text style={styles.transcriptLabel}>Áudio Transcrito:</Text>
+              </View>
               <Text style={styles.transcriptText}>"{result.transcript}"</Text>
             </View>
           ) : null}
@@ -44,7 +48,10 @@ export const AssistantResultModal: React.FC<AssistantResultModalProps> = ({
           {/* Conflict Warning */}
           {hasConflict && (
             <View style={styles.conflictBox}>
-              <Text style={styles.conflictTitle}>⚠️ Conflito de Horário Detectado!</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                <MaterialIcons name="warning" size={16} color="#DC2626" />
+                <Text style={styles.conflictTitle}>Conflito de Horário Detectado!</Text>
+              </View>
               <Text style={styles.conflictMessage}>{result.conflict?.message}</Text>
             </View>
           )}
@@ -52,7 +59,10 @@ export const AssistantResultModal: React.FC<AssistantResultModalProps> = ({
           {/* Event Preview */}
           {result.event && (
             <View style={styles.previewBox}>
-              <Text style={styles.previewLabel}>📅 Compromisso:</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                <MaterialIcons name="event" size={16} color={tokens.colors.primary} />
+                <Text style={styles.previewLabel}>Compromisso:</Text>
+              </View>
               <Text style={styles.previewTitle}>{result.event.title}</Text>
               <Text style={styles.previewSub}>
                 {new Date(result.event.start_at).toLocaleTimeString('pt-BR', {
@@ -71,7 +81,10 @@ export const AssistantResultModal: React.FC<AssistantResultModalProps> = ({
           {/* Todo Preview */}
           {result.todo && (
             <View style={styles.previewBox}>
-              <Text style={styles.previewLabel}>✅ Tarefa Criada:</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                <MaterialIcons name="check-circle" size={16} color="#16A34A" />
+                <Text style={styles.previewLabel}>Tarefa Criada:</Text>
+              </View>
               <Text style={styles.previewTitle}>{result.todo.title}</Text>
               <Text style={styles.previewSub}>Prioridade: {result.todo.priority.toUpperCase()}</Text>
             </View>
