@@ -197,5 +197,30 @@ func TestEventRepository_ListByUser_NullDatesAndFormats(t *testing.T) {
 	if len(events) != 4 {
 		t.Fatalf("esperava 4 eventos, obteve %d", len(events))
 	}
+
+	for _, ev := range events {
+		if ev.StartAt.Year() != 2026 || ev.StartAt.Month() != 10 {
+			t.Errorf("evento %s tem data incorreta: %v", ev.ID, ev.StartAt)
+		}
+	}
 }
+
+func TestRawScanType(t *testing.T) {
+	_, _, db := setupCalendarTestDB(t)
+
+	now := time.Date(2026, 10, 3, 11, 0, 0, 0, time.UTC)
+	_, err := db.Exec("INSERT INTO events (id, user_id, title, start_at, end_at, created_at, updated_at) VALUES ('test-raw', 'user-cal-1', 'Raw Test', ?, ?, ?, ?)", now, now, now, now)
+	if err != nil {
+		t.Fatalf("failed to insert: %v", err)
+	}
+
+	var rawStart any
+	err = db.QueryRow("SELECT start_at FROM events WHERE id = 'test-raw'").Scan(&rawStart)
+	if err != nil {
+		t.Fatalf("failed to scan rawStart: %v", err)
+	}
+
+	t.Logf("TIPO de rawStart: %T | VALOR: %#v", rawStart, rawStart)
+}
+
 

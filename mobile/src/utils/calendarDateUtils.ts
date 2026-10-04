@@ -49,12 +49,19 @@ export const isAllDayEvent = (event: Event): boolean => {
   return false;
 };
 
-/**
- * Determina com precisão de fuso horário se um evento ocorre em uma data civil específica.
- */
 export const isEventOnDate = (event: Event, targetDate: Date): boolean => {
   try {
     const targetStr = toLocalDateString(targetDate);
+
+    // Eventos de dia inteiro / feriados (Floating Dates RFC 5545):
+    // As datas representam dias civis reais (ex: 2026-10-12 a 2026-10-12).
+    // Ancorados na data civil sem conversão que desloque para o dia anterior no fuso local.
+    if (isAllDayEvent(event)) {
+      const startUtcStr = event.start_at.substring(0, 10);
+      const endUtcStr = event.end_at ? event.end_at.substring(0, 10) : startUtcStr;
+      return targetStr >= startUtcStr && targetStr <= endUtcStr;
+    }
+
     const start = parseSafeDate(event.start_at);
     const end = event.end_at ? parseSafeDate(event.end_at) : start;
 
@@ -65,15 +72,6 @@ export const isEventOnDate = (event: Event, targetDate: Date): boolean => {
     if (endStr > startStr && end.getHours() === 0 && end.getMinutes() === 0 && end.getSeconds() === 0) {
       const adj = new Date(end.getTime() - 1000);
       endStr = toLocalDateString(adj);
-    }
-
-    // Se o evento é de dia inteiro, compara também a data UTC caso haja deslocamento de fuso
-    if (isAllDayEvent(event)) {
-      const startUtcStr = event.start_at.substring(0, 10);
-      const endUtcStr = event.end_at ? event.end_at.substring(0, 10) : startUtcStr;
-      if (targetStr >= startUtcStr && targetStr <= endUtcStr) {
-        return true;
-      }
     }
 
     return targetStr >= startStr && targetStr <= endStr;
@@ -88,6 +86,25 @@ export const isEventOnDate = (event: Event, targetDate: Date): boolean => {
 export const getEventDays = (event: Event): string[] => {
   const days: string[] = [];
   try {
+    // Eventos de dia inteiro / feriados (Floating Dates RFC 5545):
+    // Utilizam diretamente as datas civis YYYY-MM-DD gravadas no evento.
+    if (isAllDayEvent(event)) {
+      const startUtcStr = event.start_at.substring(0, 10);
+      const endUtcStr = event.end_at ? event.end_at.substring(0, 10) : startUtcStr;
+      
+      const [sy, sm, sd] = startUtcStr.split('-').map(Number);
+      const [ey, em, ed] = endUtcStr.split('-').map(Number);
+      
+      const cur = new Date(sy, sm - 1, sd);
+      const last = new Date(ey, em - 1, ed);
+
+      while (cur <= last) {
+        days.push(toLocalDateString(cur));
+        cur.setDate(cur.getDate() + 1);
+      }
+      return days;
+    }
+
     const start = parseSafeDate(event.start_at);
     const end = event.end_at ? parseSafeDate(event.end_at) : start;
     const cur = new Date(start.getFullYear(), start.getMonth(), start.getDate());
@@ -101,13 +118,6 @@ export const getEventDays = (event: Event): string[] => {
     while (cur <= last) {
       days.push(toLocalDateString(cur));
       cur.setDate(cur.getDate() + 1);
-    }
-
-    if (isAllDayEvent(event)) {
-      const utcDay = event.start_at.substring(0, 10);
-      if (!days.includes(utcDay)) {
-        days.push(utcDay);
-      }
     }
   } catch {}
   return days;

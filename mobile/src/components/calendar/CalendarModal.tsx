@@ -346,8 +346,8 @@ export const CalendarModal: React.FC<CalendarModalProps> = ({
                 ))}
               </View>
 
-              {/* Grade de Dias do Mês */}
-              <View style={styles.calendarGrid}>
+              {/* Grade de Dias do Mês (Estilo Google Agenda Ampliado) */}
+              <View style={[styles.calendarGrid, { borderColor: isDark ? '#333333' : '#E5E7EB' }]}>
                 {monthGrid.map((item, idx) => {
                   const isSelected =
                     item.date.getFullYear() === selectedDate.getFullYear() &&
@@ -370,52 +370,113 @@ export const CalendarModal: React.FC<CalendarModalProps> = ({
                       style={[
                         styles.gridCell,
                         {
-                          borderColor: colors.outlineVariant,
-                          backgroundColor: isSelected
-                            ? colors.primary
+                          borderColor: isDark ? '#2D2D2D' : '#E5E7EB',
+                          backgroundColor: isSelected && !isToday
+                            ? (isDark ? '#2A2A2A' : '#F1F5F9')
                             : isToday
-                            ? colors.surfaceContainerHighest
-                            : colors.surface,
+                            ? (isDark ? '#1E293B' : '#EFF6FF')
+                            : (isDark ? '#1C1C1E' : '#FFFFFF'),
                         },
                       ]}
                       onPress={() => onSelectDate(item.date)}
                       activeOpacity={0.7}
                     >
-                      <Text
-                        style={[
-                          styles.gridCellNumber,
-                          {
-                            color: isSelected
-                              ? colors.onPrimary
-                              : !item.isCurrentMonth
-                              ? colors.outline
-                              : colors.onSurface,
-                            fontWeight: isSelected || isToday ? '700' : '500',
-                          },
-                        ]}
-                      >
-                        {String(item.dayNumber).padStart(2, '0')}
-                      </Text>
-
-                      {hasEvents && (
-                        <View style={styles.eventsIndicatorBox}>
-                          <View
+                      {/* Número do Dia com círculo no estilo Google Agenda para Hoje */}
+                      <View style={styles.cellHeader}>
+                        <View
+                          style={[
+                            styles.dayCircle,
+                            isToday && { backgroundColor: '#1A73E8' },
+                            isSelected && !isToday && {
+                              borderColor: colors.primary,
+                              borderWidth: 1.5,
+                              backgroundColor: colors.surfaceContainerHighest,
+                            },
+                          ]}
+                        >
+                          <Text
                             style={[
-                              styles.eventIndicatorDot,
-                              { backgroundColor: isSelected ? colors.onPrimary : colors.primary },
+                              styles.gridCellNumber,
+                              {
+                                color: isToday
+                                  ? '#FFFFFF'
+                                  : isSelected
+                                  ? colors.primary
+                                  : !item.isCurrentMonth
+                                  ? (isDark ? '#52525B' : '#94A3B8')
+                                  : colors.onSurface,
+                                fontWeight: isToday || isSelected ? '700' : '500',
+                              },
                             ]}
-                          />
-                          {dayEvents[0] && (
-                            <Text
-                              numberOfLines={1}
-                              style={[
-                                styles.cellEventSnippet,
-                                {
-                                  color: isSelected ? colors.onPrimary : colors.textSecondary,
-                                },
-                              ]}
-                            >
-                              {dayEvents[0].title}
+                          >
+                            {item.dayNumber}
+                          </Text>
+                        </View>
+                      </View>
+
+                      {/* Eventos dentro da própria célula (Padrão Google Agenda da Imagem 3) */}
+                      {hasEvents && (
+                        <View style={styles.cellEventsContainer}>
+                          {dayEvents.slice(0, 2).map((ev, evIdx) => {
+                            const isAllDay = isEventOnDate(ev, item.date) && (
+                              ev.start_at.includes('00:00:00') ||
+                              ev.category === 'holiday' ||
+                              (ev.end_at && ev.end_at.includes('23:59:59'))
+                            );
+
+                            const eventColor = ev.color || (
+                              ev.category === 'study' ? '#3F51B5' :
+                              ev.category === 'work' ? '#039BE5' :
+                              ev.category === 'health' ? '#0B8043' :
+                              ev.category === 'leisure' ? '#F4511E' :
+                              ev.category === 'personal' ? '#8E24AA' :
+                              ev.category === 'holiday' ? '#00897B' : '#616161'
+                            );
+
+                            if (isAllDay) {
+                              return (
+                                <View
+                                  key={ev.id || evIdx}
+                                  style={[styles.allDayBar, { backgroundColor: eventColor }]}
+                                >
+                                  <Text numberOfLines={1} style={styles.allDayText}>
+                                    {ev.title}
+                                  </Text>
+                                </View>
+                              );
+                            }
+
+                            // Evento com horário: Ponto colorido + Horário + Título (idêntico ao Google Agenda)
+                            let timeStr = '';
+                            try {
+                              const d = parseSafeDate(ev.start_at);
+                              const h = d.getHours();
+                              const m = d.getMinutes();
+                              timeStr = m === 0 ? `${h}h` : `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+                            } catch {}
+
+                            return (
+                              <View
+                                key={ev.id || evIdx}
+                                style={[
+                                  styles.timedEventRow,
+                                  { backgroundColor: isDark ? eventColor + '33' : eventColor + '20' },
+                                ]}
+                              >
+                                <View style={[styles.eventDot, { backgroundColor: eventColor }]} />
+                                <Text
+                                  numberOfLines={1}
+                                  style={[styles.timedEventText, { color: isDark ? '#F1F5F9' : '#1E293B' }]}
+                                >
+                                  {timeStr ? `${timeStr} ` : ''}{ev.title}
+                                </Text>
+                              </View>
+                            );
+                          })}
+
+                          {dayEvents.length > 2 && (
+                            <Text style={[styles.moreEventsText, { color: colors.textMuted }]}>
+                              +{dayEvents.length - 2} mais
                             </Text>
                           )}
                         </View>
@@ -643,37 +704,78 @@ const styles = StyleSheet.create({
   calendarGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginBottom: 16,
+    marginBottom: 20,
+    borderWidth: 0.5,
+    borderRadius: 8,
+    overflow: 'hidden',
   },
   gridCell: {
-    width: '14.28%',
-    minHeight: 52,
-    padding: 3,
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    borderRadius: 8,
+    width: '14.285%',
+    minHeight: 88,
     borderWidth: 0.5,
-    marginVertical: 1.5,
+    padding: 2,
+    alignItems: 'stretch',
+    justifyContent: 'flex-start',
+  },
+  cellHeader: {
+    alignItems: 'center',
+    paddingVertical: 2,
+  },
+  dayCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   gridCellNumber: {
-    fontSize: 12,
+    fontSize: 11,
+    letterSpacing: -0.2,
   },
-  eventsIndicatorBox: {
-    alignItems: 'center',
-    marginTop: 2,
+  cellEventsContainer: {
+    flex: 1,
     width: '100%',
+    marginTop: 2,
+    gap: 2,
   },
-  eventIndicatorDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
+  allDayBar: {
+    width: '100%',
+    paddingHorizontal: 3,
+    paddingVertical: 1.5,
+    borderRadius: 3,
     marginBottom: 1,
   },
-  cellEventSnippet: {
+  allDayText: {
+    fontSize: 9,
+    color: '#FFFFFF',
+    fontWeight: '700',
+    letterSpacing: -0.2,
+  },
+  timedEventRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2.5,
+    width: '100%',
+    paddingHorizontal: 2.5,
+    paddingVertical: 1.5,
+    borderRadius: 3,
+  },
+  eventDot: {
+    width: 4.5,
+    height: 4.5,
+    borderRadius: 2.5,
+  },
+  timedEventText: {
+    fontSize: 8.5,
+    fontWeight: '600',
+    flexShrink: 1,
+    letterSpacing: -0.2,
+  },
+  moreEventsText: {
     fontSize: 8,
     fontWeight: '600',
-    textAlign: 'center',
-    maxWidth: '100%',
+    paddingLeft: 2,
+    marginTop: 1,
   },
   eventsSection: {
     marginTop: 8,
