@@ -186,11 +186,26 @@ func (s *CalendarSyncService) SyncIntegration(ctx context.Context, userID, provi
 	}
 
 	now := time.Now().UTC()
-	from := now.Add(-30 * 24 * time.Hour)
-	to := now.Add(90 * 24 * time.Hour)
+	from := now.Add(-60 * 24 * time.Hour) // 60 dias atrás
+	to := now.Add(180 * 24 * time.Hour)   // 6 meses à frente
+
+	// Se o usuário ainda não possui nenhum evento sincronizado desta integração no banco local,
+	// força uma sincronização completa (syncToken = "") para garantir a carga inicial de eventos
+	syncToken := integration.SyncToken
+	existingEvents, _ := s.eventRepo.ListByUser(userID, from, to)
+	hasSyncedEvents := false
+	for _, ev := range existingEvents {
+		if ev.Source == providerName {
+			hasSyncedEvents = true
+			break
+		}
+	}
+	if !hasSyncedEvents {
+		syncToken = ""
+	}
 
 	// 1. Inbound Fetch com auto-refresh de credenciais em caso de 401
-	res, err := p.FetchEvents(ctx, creds, integration.CalendarID, integration.SyncToken, from, to)
+	res, err := p.FetchEvents(ctx, creds, integration.CalendarID, syncToken, from, to)
 	if err != nil && (strings.Contains(err.Error(), "401") || strings.Contains(err.Error(), "expired") || strings.Contains(err.Error(), "invalid_token")) {
 		newCreds, refreshErr := p.RefreshToken(ctx, creds)
 		if refreshErr == nil && newCreds != "" {
@@ -199,15 +214,16 @@ func (s *CalendarSyncService) SyncIntegration(ctx context.Context, userID, provi
 				integration.EncryptedCredentials = enc
 				_ = s.syncRepo.UpsertIntegration(integration)
 			}
-			res, err = p.FetchEvents(ctx, creds, integration.CalendarID, integration.SyncToken, from, to)
+			res, err = p.FetchEvents(ctx, creds, integration.CalendarID, syncToken, from, to)
 		}
 	}
 	if err != nil {
+		log.Printf("[CalendarSync] Erro no FetchEvents para usuário %s: %v", userID, err)
 		return err
 	}
 
 	// Trata expiração do token de sync remoto ou fallback para sync completo se syncToken delta estiver vazio
-	if res.FullSyncReq || (integration.SyncToken != "" && len(res.Items) == 0) {
+	if res.FullSyncReq || (syncToken != "" && len(res.Items) == 0) {
 		fullRes, fullErr := p.FetchEvents(ctx, creds, integration.CalendarID, "", from, to)
 		if fullErr == nil && len(fullRes.Items) > 0 {
 			res = fullRes
@@ -215,6 +231,8 @@ func (s *CalendarSyncService) SyncIntegration(ctx context.Context, userID, provi
 			return fullErr
 		}
 	}
+
+	log.Printf("[CalendarSync] Processando %d eventos para usuário %s (provedor %s)", len(res.Items), userID, providerName)
 
 	// Processa eventos retornados
 	for _, item := range res.Items {

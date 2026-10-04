@@ -160,7 +160,7 @@ func (s *Server) handleHealthCheck(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(map[string]string{
 		"status":  "ok",
 		"service": "vito-backend",
-		"version": "v0.1.2",
+		"version": "v0.1.3",
 		"router":  "chi/v5",
 	})
 }

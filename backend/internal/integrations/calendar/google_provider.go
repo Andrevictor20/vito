@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -126,11 +127,11 @@ func (p *GoogleProvider) getCalendarsToSync(ctx context.Context, token, defaultC
 	var calIDs []string
 	hasPrimary := false
 	for _, item := range clResp.Items {
-		if item.Primary || item.Selected {
+		if item.Primary || item.ID == "primary" {
+			hasPrimary = true
+			calIDs = append([]string{"primary"}, calIDs...)
+		} else if item.Selected {
 			calIDs = append(calIDs, item.ID)
-			if item.Primary || item.ID == "primary" {
-				hasPrimary = true
-			}
 		}
 	}
 
@@ -138,7 +139,7 @@ func (p *GoogleProvider) getCalendarsToSync(ctx context.Context, token, defaultC
 		calIDs = append([]string{defaultCalID}, calIDs...)
 	}
 	if len(calIDs) == 0 {
-		return []string{defaultCalID}
+		return []string{"primary"}
 	}
 
 	return calIDs
@@ -149,8 +150,11 @@ func (p *GoogleProvider) fetchEventsFromCalendar(ctx context.Context, token, cal
 	var nextSyncToken string
 	pageToken := ""
 
+	calPath := url.PathEscape(calendarID)
+	calPath = strings.ReplaceAll(calPath, "@", "%40")
+
 	for {
-		reqURL := fmt.Sprintf("%s/calendar/v3/calendars/%s/events", p.cfg.BaseURL, url.PathEscape(calendarID))
+		reqURL := fmt.Sprintf("%s/calendar/v3/calendars/%s/events", p.cfg.BaseURL, calPath)
 		q := url.Values{}
 
 		if syncToken != "" {
@@ -294,11 +298,13 @@ func (p *GoogleProvider) FetchEvents(ctx context.Context, credentials, calendarI
 		}
 		items, newSync, fullSyncReq, err := p.fetchEventsFromCalendar(ctx, token, calID, calSyncToken, from, to)
 		if err != nil {
-			if calID == "primary" || calID == calendarID {
+			log.Printf("[GoogleProvider] Erro ao buscar eventos do calendário '%s': %v", calID, err)
+			if calID == "primary" || calID == calendarID || len(calendars) == 1 {
 				return nil, err
 			}
 			continue
 		}
+		log.Printf("[GoogleProvider] Sucesso: %d eventos obtidos do calendário '%s'", len(items), calID)
 		if fullSyncReq {
 			return &SyncResult{FullSyncReq: true}, nil
 		}
