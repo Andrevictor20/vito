@@ -53,7 +53,7 @@ func (r *EventRepositorySQLite) Create(e *domain.Event) error {
 
 func (r *EventRepositorySQLite) GetByID(id, userID string) (*domain.Event, error) {
 	query := `
-		SELECT id, user_id, title, description, location, start_at, end_at, COALESCE(source, 'vito'), COALESCE(category, 'general'), COALESCE(color, ''), created_at, updated_at
+		SELECT id, user_id, title, COALESCE(description, ''), COALESCE(location, ''), start_at, end_at, COALESCE(source, 'vito'), COALESCE(category, 'general'), COALESCE(color, ''), created_at, updated_at
 		FROM events
 		WHERE id = ? AND user_id = ?
 	`
@@ -75,7 +75,7 @@ func (r *EventRepositorySQLite) ListByUser(userID string, from, to time.Time) ([
 	toUTC := to.UTC()
 
 	query := `
-		SELECT id, user_id, title, description, location, start_at, end_at, COALESCE(source, 'vito'), COALESCE(category, 'general'), COALESCE(color, ''), created_at, updated_at
+		SELECT id, user_id, title, COALESCE(description, ''), COALESCE(location, ''), start_at, end_at, COALESCE(source, 'vito'), COALESCE(category, 'general'), COALESCE(color, ''), created_at, updated_at
 		FROM events
 		WHERE user_id = ? 
 		  AND ((start_at >= ? AND start_at <= ?) OR (end_at >= ? AND start_at <= ?))

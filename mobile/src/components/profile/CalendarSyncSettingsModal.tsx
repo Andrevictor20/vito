@@ -41,10 +41,24 @@ export const CalendarSyncSettingsModal: React.FC<CalendarSyncSettingsModalProps>
   const [showAppleForm, setShowAppleForm] = useState(false);
   const [appleId, setAppleId] = useState('');
   const [appSpecificPassword, setAppSpecificPassword] = useState('');
+  const [disconnectingProvider, setDisconnectingProvider] = useState<string | null>(null);
 
   const googleInteg = getIntegration('google');
   const appleCalDAVInteg = getIntegration('apple_caldav');
   const appleNativeInteg = getIntegration('apple_native');
+
+  const handleDisconnect = async (provider: string, label: string) => {
+    try {
+      setDisconnectingProvider(provider);
+      await disconnectProvider(provider);
+      onDataChanged?.();
+      Alert.alert('Sucesso', `${label} desconectado com sucesso.`);
+    } catch (err: any) {
+      Alert.alert('Erro ao Desconectar', err?.message || `Falha ao desconectar ${label}.`);
+    } finally {
+      setDisconnectingProvider(null);
+    }
+  };
 
   const handleConnectGoogle = async () => {
     try {
@@ -209,10 +223,11 @@ export const CalendarSyncSettingsModal: React.FC<CalendarSyncSettingsModalProps>
                           backgroundColor: isDark ? colors.surfaceContainerHighest : colors.primary,
                           borderWidth: isDark ? 1 : 0,
                           borderColor: colors.outlineVariant,
+                          opacity: isSyncing || disconnectingProvider === 'google' ? 0.6 : 1,
                         },
                       ]}
                       onPress={handleSyncGoogle}
-                      disabled={isSyncing}
+                      disabled={isSyncing || disconnectingProvider === 'google'}
                       activeOpacity={0.8}
                     >
                       {isSyncing ? (
@@ -228,12 +243,23 @@ export const CalendarSyncSettingsModal: React.FC<CalendarSyncSettingsModalProps>
                     </TouchableOpacity>
 
                     <TouchableOpacity
-                      style={[styles.secondaryActionBtn, { borderColor: colors.outlineVariant }]}
-                      onPress={() => disconnectProvider('google')}
+                      style={[
+                        styles.secondaryActionBtn,
+                        {
+                          borderColor: colors.outlineVariant,
+                          opacity: isSyncing || disconnectingProvider === 'google' ? 0.6 : 1,
+                        },
+                      ]}
+                      onPress={() => handleDisconnect('google', 'Google Calendar')}
+                      disabled={isSyncing || disconnectingProvider === 'google'}
                     >
-                      <Text style={[styles.secondaryActionText, { color: colors.error }]}>
-                        Desconectar
-                      </Text>
+                      {disconnectingProvider === 'google' ? (
+                        <ActivityIndicator size="small" color={colors.error} />
+                      ) : (
+                        <Text style={[styles.secondaryActionText, { color: colors.error }]}>
+                          Desconectar
+                        </Text>
+                      )}
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -358,12 +384,23 @@ export const CalendarSyncSettingsModal: React.FC<CalendarSyncSettingsModalProps>
                     </TouchableOpacity>
 
                     <TouchableOpacity
-                      style={[styles.secondaryActionBtn, { borderColor: colors.outlineVariant }]}
-                      onPress={() => disconnectProvider('apple_caldav')}
+                      style={[
+                        styles.secondaryActionBtn,
+                        {
+                          borderColor: colors.outlineVariant,
+                          opacity: isSyncing || disconnectingProvider === 'apple_caldav' ? 0.6 : 1,
+                        },
+                      ]}
+                      onPress={() => handleDisconnect('apple_caldav', 'iCloud CalDAV')}
+                      disabled={isSyncing || disconnectingProvider === 'apple_caldav'}
                     >
-                      <Text style={[styles.secondaryActionText, { color: colors.error }]}>
-                        Desconectar
-                      </Text>
+                      {disconnectingProvider === 'apple_caldav' ? (
+                        <ActivityIndicator size="small" color={colors.error} />
+                      ) : (
+                        <Text style={[styles.secondaryActionText, { color: colors.error }]}>
+                          Desconectar
+                        </Text>
+                      )}
                     </TouchableOpacity>
                   </View>
                 </View>

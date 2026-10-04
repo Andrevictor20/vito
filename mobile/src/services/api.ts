@@ -68,7 +68,8 @@ class ApiService {
     }
 
     const isAiEndpoint = endpoint.includes('/assistant/');
-    const defaultTimeout = isAiEndpoint ? 60000 : 15000;
+    const isIntegrationEndpoint = endpoint.includes('/integrations/');
+    const defaultTimeout = isAiEndpoint || isIntegrationEndpoint ? 60000 : 15000;
     const timeoutMs = (options as any)?.timeoutMs || defaultTimeout;
 
     const controller = new AbortController();

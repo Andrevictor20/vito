@@ -205,7 +205,7 @@ func (s *CalendarSyncService) SyncIntegration(ctx context.Context, userID, provi
 	}
 
 	// 1. Inbound Fetch com auto-refresh de credenciais em caso de 401
-	res, err := p.FetchEvents(ctx, creds, integration.CalendarID, syncToken, from, to)
+	res, err := p.FetchEvents(ctx, creds, integration.CalendarID, "", from, to)
 	if err != nil && (strings.Contains(err.Error(), "401") || strings.Contains(err.Error(), "expired") || strings.Contains(err.Error(), "invalid_token")) {
 		newCreds, refreshErr := p.RefreshToken(ctx, creds)
 		if refreshErr == nil && newCreds != "" {
@@ -214,7 +214,7 @@ func (s *CalendarSyncService) SyncIntegration(ctx context.Context, userID, provi
 				integration.EncryptedCredentials = enc
 				_ = s.syncRepo.UpsertIntegration(integration)
 			}
-			res, err = p.FetchEvents(ctx, creds, integration.CalendarID, syncToken, from, to)
+			res, err = p.FetchEvents(ctx, creds, integration.CalendarID, "", from, to)
 		}
 	}
 	if err != nil {

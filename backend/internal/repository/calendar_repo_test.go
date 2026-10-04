@@ -83,28 +83,28 @@ func TestEventRepository_CreateAndCheckConflict(t *testing.T) {
 func TestEventRepository_ListByUser(t *testing.T) {
 	eventRepo, _, _ := setupCalendarTestDB(t)
 
-	now := time.Now().UTC()
+	pastDate := time.Date(2026, 9, 1, 10, 0, 0, 0, time.UTC)
 	event := &domain.Event{
 		ID:          "event-list-1",
 		UserID:      "user-cal-1",
 		Title:       "Evento de Teste",
 		Description: "Descrição",
 		Location:    "Local",
-		StartAt:     now,
-		EndAt:       now.Add(1 * time.Hour),
+		StartAt:     pastDate,
+		EndAt:       pastDate.Add(1 * time.Hour),
 		Source:      "google",
 		Category:    "work",
 		Color:       "#60A5FA",
-		CreatedAt:   now,
-		UpdatedAt:   now,
+		CreatedAt:   pastDate,
+		UpdatedAt:   pastDate,
 	}
 
 	if err := eventRepo.Create(event); err != nil {
 		t.Fatalf("failed to create event: %v", err)
 	}
 
-	from := now.Add(-24 * time.Hour)
-	to := now.Add(24 * time.Hour)
+	from := pastDate.Add(-24 * time.Hour)
+	to := pastDate.Add(24 * time.Hour)
 	events, err := eventRepo.ListByUser("user-cal-1", from, to)
 	if err != nil {
 		t.Fatalf("ListByUser failed: %v", err)
@@ -123,8 +123,8 @@ func TestEventRepository_ListByUser(t *testing.T) {
 		StartAt:   time.Date(2026, 10, 4, 15, 0, 0, 0, brtZone), // 15:00 BRT = 18:00 UTC
 		EndAt:     time.Date(2026, 10, 4, 16, 0, 0, 0, brtZone),
 		Source:    "vito",
-		CreatedAt: now,
-		UpdatedAt: now,
+		CreatedAt: pastDate,
+		UpdatedAt: pastDate,
 	}
 	if err := eventRepo.Create(localEvent); err != nil {
 		t.Fatalf("failed to create local event: %v", err)
