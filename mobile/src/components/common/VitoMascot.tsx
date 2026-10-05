@@ -12,11 +12,12 @@ export interface VitoMascotProps {
 }
 
 /**
- * Componente vetorial nativo do mascote executivo do Vito (O Polvo Executivo).
- * Suporta animações nativas a 60-120fps via React Native Animated:
- * - idle: Piscar orgânico de olhos a cada 4s + respiração sutil
- * - thinking: Ondulação rítmica enquanto a IA processa
- * - success: Pequeno salto elástico (bounce) da cartola e mascote
+ * Componente executivo do mascote Vito (O Polvo Executivo).
+ * Design comercial ultra-polido:
+ * - Corpo estável e elegante (sem pulos ou giros infantis).
+ * - Olhar vivo e atento com piscar orgânico (3.5s - 5.5s).
+ * - Movimento ocular de raciocínio (thinking): olhos olham para o alto/laterais de forma sutil.
+ * - Confirmação expressiva (success): piscadela orgânica de conclusão.
  */
 export const VitoMascot: React.FC<VitoMascotProps> = ({
   size = 48,
@@ -24,109 +25,183 @@ export const VitoMascot: React.FC<VitoMascotProps> = ({
   state = 'idle',
   style,
 }) => {
-  // Valores animados
-  const floatAnim = useRef(new Animated.Value(0)).current;
-  const rotateAnim = useRef(new Animated.Value(0)).current;
-  const bounceAnim = useRef(new Animated.Value(1)).current;
+  // Valores animados exclusivamente faciais/oculares
+  const blinkAnim = useRef(new Animated.Value(1)).current;
+  const eyeMoveX = useRef(new Animated.Value(0)).current;
+  const eyeMoveY = useRef(new Animated.Value(0)).current;
 
-  // 2. Loop de Pensamento (Thinking) / Respiração Sutil (Idle)
+  // 1. Loop Orgânico de Piscar de Olhos (Blink)
+  useEffect(() => {
+    if (!animated) return;
+
+    let isMounted = true;
+    let blinkTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const triggerBlink = () => {
+      if (!isMounted) return;
+
+      Animated.sequence([
+        Animated.timing(blinkAnim, {
+          toValue: 0.08,
+          duration: 85,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(blinkAnim, {
+          toValue: 1,
+          duration: 110,
+          easing: Easing.in(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        if (!isMounted) return;
+        // Intervalo aleatório natural entre 3.2s e 5.8s
+        const nextDelay = 3200 + Math.random() * 2600;
+        blinkTimer = setTimeout(triggerBlink, nextDelay);
+      });
+    };
+
+    blinkTimer = setTimeout(triggerBlink, 1800);
+
+    return () => {
+      isMounted = false;
+      if (blinkTimer) clearTimeout(blinkTimer);
+    };
+  }, [animated, blinkAnim]);
+
+  // 2. Movimentação Ocular Dinâmica (Idle / Thinking / Success)
   useEffect(() => {
     if (!animated) return;
 
     if (state === 'thinking') {
+      // Pensando: olhos se movem com curiosidade e foco (olhando para cima e lados)
       const thinkingLoop = Animated.loop(
         Animated.sequence([
+          // Olha sutilmente para cima e à direita (buscando dados/pensando)
           Animated.parallel([
-            Animated.timing(floatAnim, {
-              toValue: -3,
-              duration: 600,
-              easing: Easing.inOut(Easing.sin),
+            Animated.timing(eyeMoveX, {
+              toValue: 1.8,
+              duration: 450,
+              easing: Easing.inOut(Easing.cubic),
               useNativeDriver: true,
             }),
-            Animated.timing(rotateAnim, {
-              toValue: 1,
-              duration: 600,
-              easing: Easing.inOut(Easing.sin),
+            Animated.timing(eyeMoveY, {
+              toValue: -1.6,
+              duration: 450,
+              easing: Easing.inOut(Easing.cubic),
               useNativeDriver: true,
             }),
           ]),
+          Animated.delay(650),
+          // Desliza para o lado esquerdo
           Animated.parallel([
-            Animated.timing(floatAnim, {
-              toValue: 3,
-              duration: 600,
-              easing: Easing.inOut(Easing.sin),
+            Animated.timing(eyeMoveX, {
+              toValue: -1.8,
+              duration: 550,
+              easing: Easing.inOut(Easing.cubic),
               useNativeDriver: true,
             }),
-            Animated.timing(rotateAnim, {
-              toValue: -1,
-              duration: 600,
-              easing: Easing.inOut(Easing.sin),
+            Animated.timing(eyeMoveY, {
+              toValue: -1.0,
+              duration: 550,
+              easing: Easing.inOut(Easing.cubic),
               useNativeDriver: true,
             }),
           ]),
+          Animated.delay(650),
+          // Retorna suavemente ao centro
+          Animated.parallel([
+            Animated.timing(eyeMoveX, {
+              toValue: 0,
+              duration: 400,
+              easing: Easing.out(Easing.quad),
+              useNativeDriver: true,
+            }),
+            Animated.timing(eyeMoveY, {
+              toValue: 0,
+              duration: 400,
+              easing: Easing.out(Easing.quad),
+              useNativeDriver: true,
+            }),
+          ]),
+          Animated.delay(400),
         ])
       );
+
       thinkingLoop.start();
       return () => thinkingLoop.stop();
     } else if (state === 'success') {
-      Animated.sequence([
-        Animated.timing(bounceAnim, {
-          toValue: 1.15,
-          duration: 200,
-          easing: Easing.out(Easing.back(2)),
-          useNativeDriver: true,
-        }),
-        Animated.spring(bounceAnim, {
-          toValue: 1,
-          friction: 4,
-          tension: 80,
-          useNativeDriver: true,
-        }),
+      // Sucesso: breve piscadela com retorno imediato e estável ao centro
+      Animated.parallel([
+        Animated.timing(eyeMoveX, { toValue: 0, duration: 200, useNativeDriver: true }),
+        Animated.timing(eyeMoveY, { toValue: 0, duration: 200, useNativeDriver: true }),
+        Animated.sequence([
+          Animated.timing(blinkAnim, {
+            toValue: 0.08,
+            duration: 90,
+            easing: Easing.out(Easing.quad),
+            useNativeDriver: true,
+          }),
+          Animated.timing(blinkAnim, {
+            toValue: 1,
+            duration: 120,
+            easing: Easing.in(Easing.quad),
+            useNativeDriver: true,
+          }),
+        ]),
       ]).start();
     } else {
-      // Idle: flutuação quase imperceptível (1px)
-      const idleLoop = Animated.loop(
-        Animated.sequence([
-          Animated.timing(floatAnim, {
-            toValue: -1.5,
-            duration: 1800,
-            easing: Easing.inOut(Easing.quad),
-            useNativeDriver: true,
-          }),
-          Animated.timing(floatAnim, {
-            toValue: 0,
-            duration: 1800,
-            easing: Easing.inOut(Easing.quad),
-            useNativeDriver: true,
-          }),
-        ])
-      );
-      idleLoop.start();
-      return () => idleLoop.stop();
-    }
-  }, [animated, state, floatAnim, rotateAnim, bounceAnim]);
+      // Idle: Olhos centralizados com micro-olhadas ocasionais e imperceptíveis
+      let isMounted = true;
+      let idleTimer: ReturnType<typeof setTimeout> | null = null;
 
-  const rotation = rotateAnim.interpolate({
-    inputRange: [-1, 1],
-    outputRange: ['-3deg', '3deg'],
-  });
+      const triggerIdleGaze = () => {
+        if (!isMounted) return;
+
+        // Deslocamento sutil de 1px a 1.5px
+        const direction = Math.random() > 0.5 ? 1.2 : -1.2;
+        Animated.sequence([
+          Animated.timing(eyeMoveX, {
+            toValue: direction,
+            duration: 350,
+            easing: Easing.inOut(Easing.quad),
+            useNativeDriver: true,
+          }),
+          Animated.delay(1200),
+          Animated.timing(eyeMoveX, {
+            toValue: 0,
+            duration: 350,
+            easing: Easing.inOut(Easing.quad),
+            useNativeDriver: true,
+          }),
+        ]).start(() => {
+          if (!isMounted) return;
+          const nextGaze = 6000 + Math.random() * 4000;
+          idleTimer = setTimeout(triggerIdleGaze, nextGaze);
+        });
+      };
+
+      idleTimer = setTimeout(triggerIdleGaze, 4500);
+
+      return () => {
+        isMounted = false;
+        if (idleTimer) clearTimeout(idleTimer);
+      };
+    }
+  }, [animated, state, eyeMoveX, eyeMoveY, blinkAnim]);
+
+  // Proporções geométricas exatas dos olhos (calibradas a partir do canvas 512x512)
+  const eyeWidth = Math.max(2, size * 0.055);
+  const eyeHeight = Math.max(3, size * 0.137);
+  const eyeBorderRadius = eyeWidth / 2;
+
+  const eyeTop = size * 0.354;
+  const leftEyeLeft = size * 0.392;
+  const rightEyeLeft = size * 0.553;
 
   return (
-    <AnimatedView
-      style={[
-        styles.container,
-        {
-          width: size,
-          height: size,
-          transform: [
-            { translateY: floatAnim },
-            { rotate: rotation },
-            { scale: bounceAnim },
-          ],
-        },
-        style,
-      ]}
-    >
+    <View style={[styles.container, { width: size, height: size }, style]}>
+      {/* Imagem de alta fidelidade do mascote Vito — Corpo estático e nítido */}
       <Image
         source={MASCOT_IMAGE}
         style={{
@@ -135,7 +210,52 @@ export const VitoMascot: React.FC<VitoMascotProps> = ({
         }}
         resizeMode="contain"
       />
-    </AnimatedView>
+
+      {/* Camada Ocular Ativa — Olhos Vivos com Piscar e Movimentação */}
+      {animated && (
+        <>
+          {/* Olho Esquerdo */}
+          <AnimatedView
+            pointerEvents="none"
+            style={[
+              styles.eyePill,
+              {
+                width: eyeWidth,
+                height: eyeHeight,
+                borderRadius: eyeBorderRadius,
+                top: eyeTop,
+                left: leftEyeLeft,
+                transform: [
+                  { translateX: eyeMoveX },
+                  { translateY: eyeMoveY },
+                  { scaleY: blinkAnim },
+                ],
+              },
+            ]}
+          />
+
+          {/* Olho Direito */}
+          <AnimatedView
+            pointerEvents="none"
+            style={[
+              styles.eyePill,
+              {
+                width: eyeWidth,
+                height: eyeHeight,
+                borderRadius: eyeBorderRadius,
+                top: eyeTop,
+                left: rightEyeLeft,
+                transform: [
+                  { translateX: eyeMoveX },
+                  { translateY: eyeMoveY },
+                  { scaleY: blinkAnim },
+                ],
+              },
+            ]}
+          />
+        </>
+      )}
+    </View>
   );
 };
 
@@ -143,5 +263,11 @@ const styles = StyleSheet.create({
   container: {
     justifyContent: 'center',
     alignItems: 'center',
+    position: 'relative',
+  },
+  eyePill: {
+    position: 'absolute',
+    backgroundColor: '#0A0A0C', // Preto profundo idêntico às pupilas do mascote
   },
 });
+

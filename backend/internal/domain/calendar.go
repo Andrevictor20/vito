@@ -28,12 +28,20 @@ type Event struct {
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
+// TimeSlot representa uma janela de tempo disponível na agenda.
+type TimeSlot struct {
+	StartAt time.Time `json:"start_at"`
+	EndAt   time.Time `json:"end_at"`
+	Label   string    `json:"label"`
+}
+
 // ConflictInfo detalha um evento que colide em horário.
 type ConflictInfo struct {
-	HasConflict   bool   `json:"has_conflict"`
-	ConflictingID string `json:"conflicting_id,omitempty"`
-	ConflictingTitle string `json:"conflicting_title,omitempty"`
-	Message       string `json:"message,omitempty"`
+	HasConflict      bool       `json:"has_conflict"`
+	ConflictingID    string     `json:"conflicting_id,omitempty"`
+	ConflictingTitle string     `json:"conflicting_title,omitempty"`
+	Message          string     `json:"message,omitempty"`
+	SuggestedSlots   []TimeSlot `json:"suggested_slots,omitempty"`
 }
 
 // EventRepository define o contrato de persistência para eventos.

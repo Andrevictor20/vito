@@ -1,5 +1,6 @@
 import React from 'react';
 import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { tokens, MD3Shapes } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 
@@ -17,6 +18,8 @@ export const CompactCalendarCard: React.FC<CompactCalendarCardProps> = ({
   eventDates = new Set(),
 }) => {
   const { colors, isDark } = useTheme();
+  const today = new Date();
+
   // Obter o primeiro dia da semana (Domingo) correspondente à data selecionada
   const current = new Date(selectedDate);
   const dayOfWeek = current.getDay(); // 0 = Domingo
@@ -56,13 +59,14 @@ export const CompactCalendarCard: React.FC<CompactCalendarCardProps> = ({
         </View>
 
         <TouchableOpacity
-          style={[styles.openBtn, { backgroundColor: colors.surfaceContainerHighest }]}
+          style={[styles.openBtn, { backgroundColor: colors.surfaceContainerHighest, borderColor: colors.outlineVariant, borderWidth: 1 }]}
           onPress={onOpenFullCalendar}
           activeOpacity={0.75}
           accessibilityLabel="Abrir calendário completo"
           hitSlop={tokens.hitSlop.sm}
         >
-          <Text style={[styles.openBtnText, { color: colors.onSurface }]}>Abrir calendário</Text>
+          <MaterialIcons name="calendar-month" size={15} color={colors.primary} />
+          <Text style={[styles.openBtnText, { color: colors.onSurface }]}>Ver Mês</Text>
         </TouchableOpacity>
       </View>
 
@@ -74,6 +78,7 @@ export const CompactCalendarCard: React.FC<CompactCalendarCardProps> = ({
             .slice(0, 3)
             .toUpperCase();
           const isSelected = isSameDay(dayDate, selectedDate);
+          const isToday = isSameDay(dayDate, today);
           const dateKey = `${dayDate.getFullYear()}-${String(dayDate.getMonth() + 1).padStart(2, '0')}-${String(dayDate.getDate()).padStart(2, '0')}`;
           const hasEvent = eventDates.has(dateKey);
 
@@ -85,20 +90,37 @@ export const CompactCalendarCard: React.FC<CompactCalendarCardProps> = ({
               activeOpacity={0.7}
               accessibilityLabel={`Selecionar ${weekdayLabel} dia ${dayDate.getDate()}`}
             >
-              <Text style={[styles.dayLabel, { color: isSelected ? colors.primary : colors.textMuted }]}>
+              <Text style={[styles.dayLabel, { color: isSelected ? colors.primary : isToday ? colors.onSurface : colors.textMuted }]}>
                 {weekdayLabel}
               </Text>
-              <View style={[styles.dayCircle, isSelected && { backgroundColor: colors.primary }]}>
+              <View
+                style={[
+                  styles.dayCircle,
+                  isSelected && { backgroundColor: colors.primary },
+                  !isSelected && isToday && {
+                    borderWidth: 1.5,
+                    borderColor: colors.primary,
+                    backgroundColor: colors.surfaceContainerHigh,
+                  },
+                ]}
+              >
                 <Text
                   style={[
                     styles.dayNumber,
-                    { color: isSelected ? colors.onPrimary : colors.onSurface },
+                    {
+                      color: isSelected
+                        ? colors.onPrimary
+                        : isToday
+                        ? colors.primary
+                        : colors.onSurface,
+                      fontWeight: isSelected || isToday ? '700' : '500',
+                    },
                   ]}
                 >
                   {dayDate.getDate()}
                 </Text>
                 {hasEvent && !isSelected && (
-                  <View style={[styles.eventDot, { backgroundColor: colors.primary }]} />
+                  <View style={[styles.eventDot, { backgroundColor: isToday ? colors.primary : colors.textMuted }]} />
                 )}
               </View>
             </TouchableOpacity>
@@ -149,12 +171,15 @@ const styles = StyleSheet.create({
   openBtn: {
     backgroundColor: tokens.colors.primaryContainer,
     borderRadius: MD3Shapes.full,
-    paddingHorizontal: tokens.spacing.md,
+    paddingHorizontal: tokens.spacing.md - 2,
     paddingVertical: tokens.spacing.xs + 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   openBtnText: {
     fontSize: tokens.typography.size.labelSmall,
-    fontWeight: tokens.typography.weight.bold,
+    fontWeight: '700',
     color: tokens.colors.onPrimaryContainer,
   },
   daysGrid: {

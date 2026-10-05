@@ -18,14 +18,16 @@ interface CreateItemModalProps {
   visible: boolean;
   onClose: () => void;
   selectedDate: Date;
+  events?: import('../../types').Event[];
   onSaveEvent?: (title: string, priority?: NotificationPriority) => void;
-  onSaveTodo?: (title: string, priority: 'low' | 'medium' | 'high') => void;
+  onSaveTodo?: (title: string, priority: 'low' | 'medium' | 'high', eventId?: string, eventTitle?: string) => void;
 }
 
 export const CreateItemModal: React.FC<CreateItemModalProps> = ({
   visible,
   onClose,
   selectedDate,
+  events,
   onSaveEvent,
   onSaveTodo,
 }) => {
@@ -34,6 +36,7 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
   const [title, setTitle] = useState('');
   const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium');
   const [notifPriority, setNotifPriority] = useState<NotificationPriority>('default');
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
 
   const formattedDate = selectedDate.toLocaleDateString('pt-BR', {
     day: '2-digit',
@@ -45,9 +48,11 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
     if (tab === 'event' && onSaveEvent) {
       onSaveEvent(title.trim(), notifPriority);
     } else if (tab === 'todo' && onSaveTodo) {
-      onSaveTodo(title.trim(), priority);
+      const linkedEvent = events?.find((e) => e.id === selectedEventId);
+      onSaveTodo(title.trim(), priority, linkedEvent?.id, linkedEvent?.title);
     }
     setTitle('');
+    setSelectedEventId(null);
     onClose();
   };
 
@@ -219,6 +224,69 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
                 </View>
               )}
 
+              {/* Seletor de Vínculo com Evento (apenas para tarefas) */}
+              {tab === 'todo' && events && events.length > 0 && (
+                <View style={styles.eventLinkSection}>
+                  <Text style={[styles.priorityLabel, { color: colors.textSecondary }]}>
+                    Vincular a compromisso:
+                  </Text>
+                  <View style={styles.eventChipsWrap}>
+                    <TouchableOpacity
+                      style={[
+                        styles.eventLinkChip,
+                        {
+                          backgroundColor: selectedEventId === null ? colors.primaryContainer : colors.surfaceContainerLow,
+                          borderColor: selectedEventId === null ? colors.primary : colors.outlineVariant,
+                        },
+                      ]}
+                      onPress={() => setSelectedEventId(null)}
+                      activeOpacity={0.75}
+                    >
+                      <Text
+                        style={[
+                          styles.eventLinkChipText,
+                          { color: selectedEventId === null ? colors.onPrimaryContainer : colors.textSecondary },
+                        ]}
+                      >
+                        Nenhum
+                      </Text>
+                    </TouchableOpacity>
+                    {events.slice(0, 5).map((ev) => {
+                      const isSelected = selectedEventId === ev.id;
+                      return (
+                        <TouchableOpacity
+                          key={ev.id}
+                          style={[
+                            styles.eventLinkChip,
+                            {
+                              backgroundColor: isSelected ? colors.primaryContainer : colors.surfaceContainerLow,
+                              borderColor: isSelected ? colors.primary : colors.outlineVariant,
+                            },
+                          ]}
+                          onPress={() => setSelectedEventId(isSelected ? null : ev.id)}
+                          activeOpacity={0.75}
+                        >
+                          <MaterialIcons
+                            name="event"
+                            size={12}
+                            color={isSelected ? colors.onPrimaryContainer : colors.primary}
+                          />
+                          <Text
+                            style={[
+                              styles.eventLinkChipText,
+                              { color: isSelected ? colors.onPrimaryContainer : colors.onSurface },
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {ev.title}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              )}
+
               {/* Botões de Ação */}
               <View style={styles.footerRow}>
                 <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
@@ -362,5 +430,28 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: tokens.typography.size.xs + 1,
     fontWeight: tokens.typography.weight.semibold,
+  },
+  eventLinkSection: {
+    marginTop: tokens.spacing.sm,
+  },
+  eventChipsWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 6,
+  },
+  eventLinkChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: tokens.radii.sm,
+    borderWidth: 1,
+    maxWidth: 180,
+  },
+  eventLinkChipText: {
+    fontSize: 11,
+    fontWeight: tokens.typography.weight.medium,
   },
 });

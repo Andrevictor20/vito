@@ -11,9 +11,10 @@ import { VitoMascot } from '../common/VitoMascot';
 
 interface ChatMessageBubbleProps {
   message: ChatMessage;
+  onSelectSlot?: (slot: import('../../types').TimeSlot, message: ChatMessage) => void;
 }
 
-export const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({ message }) => {
+export const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({ message, onSelectSlot }) => {
   const { colors, isDark } = useTheme();
   const isUser = message.sender === 'user';
 
@@ -63,7 +64,12 @@ export const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({ message })
 
         {/* Cards Estruturados Modulares */}
         {message.event && <EventInlineCard event={message.event} />}
-        {message.conflict?.has_conflict && <ConflictInlineCard conflict={message.conflict} />}
+        {message.conflict?.has_conflict && (
+          <ConflictInlineCard
+            conflict={message.conflict}
+            onSelectSlot={(slot) => onSelectSlot?.(slot, message)}
+          />
+        )}
         {message.todo && <TodoInlineCard todo={message.todo} />}
 
         <View style={styles.metaRow}>

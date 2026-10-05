@@ -61,6 +61,9 @@ export const HomeScreen: React.FC<{
     handleDeleteEvent,
     handleToggleTodo,
     handleDeleteTodo,
+    handleToggleSubtask,
+    handleAddSubtask,
+    handleDeleteSubtask,
     handleAssistantSubmit,
     loadData,
     syncGoogleCalendar,
@@ -208,6 +211,9 @@ export const HomeScreen: React.FC<{
                 todo={t}
                 onToggle={handleToggleTodo}
                 onDelete={handleDeleteTodo}
+                onToggleSubtask={handleToggleSubtask}
+                onAddSubtask={handleAddSubtask}
+                onDeleteSubtask={handleDeleteSubtask}
                 isLast={idx === todos.length - 1}
                 grouped
               />
@@ -233,6 +239,7 @@ export const HomeScreen: React.FC<{
             visible={createModalVisible}
             onClose={() => setCreateModalVisible(false)}
             selectedDate={selectedDate}
+            events={events}
             onSaveEvent={async (title) => {
               const start = new Date(selectedDate);
               start.setHours(9, 0, 0, 0);
@@ -244,11 +251,13 @@ export const HomeScreen: React.FC<{
                 end_at: end.toISOString(),
               });
             }}
-            onSaveTodo={async (title, priority) => {
+            onSaveTodo={async (title, priority, eventId, eventTitle) => {
               await handleCreateTodo({
                 title,
                 priority,
                 due_date: selectedDate.toISOString(),
+                event_id: eventId,
+                event_title: eventTitle,
               });
             }}
           />

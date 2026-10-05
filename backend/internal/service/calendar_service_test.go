@@ -203,3 +203,57 @@ func TestCalendarService_SyncPusherIntegration(t *testing.T) {
 	}
 }
 
+func TestCalendarService_ConflictAlternativeSlots(t *testing.T) {
+	calSvc, _ := setupCalendarService(t)
+
+	// Evento existente: Aula de Inglês das 08:00 às 10:00
+	baseDate := time.Date(2026, 10, 10, 8, 0, 0, 0, time.UTC)
+	_, _, err := calSvc.CreateEvent(
+		"user-cal-svc-1",
+		"Aula de Inglês",
+		"Conversação",
+		"Online",
+		baseDate,
+		baseDate.Add(2*time.Hour), // 08:00 - 10:00
+	)
+	if err != nil {
+		t.Fatalf("falha ao criar evento inicial: %v", err)
+	}
+
+	// Tentativa conflitante: Reunião das 09:00 às 10:00
+	reqStart := time.Date(2026, 10, 10, 9, 0, 0, 0, time.UTC)
+	reqEnd := reqStart.Add(1 * time.Hour) // duração: 1h
+
+	_, conflict, err := calSvc.CreateEvent(
+		"user-cal-svc-1",
+		"Reunião de Alinhamento",
+		"Briefing",
+		"Google Meet",
+		reqStart,
+		reqEnd,
+	)
+	if err != nil {
+		t.Fatalf("falha ao criar evento conflitante: %v", err)
+	}
+	if !conflict.HasConflict {
+		t.Fatalf("esperava detecção de conflito")
+	}
+
+	// Verifica se gerou slots sugeridos
+	if len(conflict.SuggestedSlots) == 0 {
+		t.Fatalf("esperava pelo menos 1 sugestão de horário livre alternativo")
+	}
+
+	// O primeiro slot deve ser adjacente logo após o término do conflito (ex: 10:00 ou 10:30)
+	slot1 := conflict.SuggestedSlots[0]
+	if slot1.StartAt.Before(baseDate.Add(2 * time.Hour)) {
+		t.Errorf("slot sugerido %v deve ser após o término do evento conflitante (10:00)", slot1.StartAt)
+	}
+	if slot1.EndAt.Sub(slot1.StartAt) != (1 * time.Hour) {
+		t.Errorf("duração do slot sugerido deve preservar a duração requerida (1h), obteve %v", slot1.EndAt.Sub(slot1.StartAt))
+	}
+	if slot1.Label == "" {
+		t.Errorf("label descritivo do slot não deve ser vazio")
+	}
+}
+

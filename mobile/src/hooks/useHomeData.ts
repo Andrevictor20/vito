@@ -92,7 +92,7 @@ export function useHomeData() {
     }
   };
 
-  const handleCreateTodo = async (todoData: { title: string; priority: string; due_date?: string }) => {
+  const handleCreateTodo = async (todoData: { title: string; priority?: string; due_date?: string; event_id?: string; event_title?: string }) => {
     try {
       const newTodo = await api.createTodo(todoData);
       if (newTodo) {
@@ -177,6 +177,59 @@ export function useHomeData() {
       });
     } catch (e) {
       console.error('Erro ao deletar tarefa:', e);
+    }
+  };
+
+  const handleToggleSubtask = async (todoId: string, subtaskId: string) => {
+    try {
+      const updated = await api.toggleSubtask(todoId, subtaskId);
+      setTodos((prev) => {
+        const next = prev.map((t) => {
+          if (t.id !== todoId) return t;
+          const subtasks = (t.subtasks || []).map((st) =>
+            st.id === subtaskId ? { ...st, completed: updated.completed } : st
+          );
+          return { ...t, subtasks };
+        });
+        AsyncStorage.setItem(CACHE_TODOS_KEY, JSON.stringify(next)).catch(() => {});
+        return next;
+      });
+    } catch (e) {
+      console.error('Erro ao alternar subtarefa:', e);
+    }
+  };
+
+  const handleAddSubtask = async (todoId: string, title: string) => {
+    try {
+      const newSubtask = await api.addSubtask(todoId, title);
+      setTodos((prev) => {
+        const next = prev.map((t) => {
+          if (t.id !== todoId) return t;
+          const subtasks = [...(t.subtasks || []), newSubtask];
+          return { ...t, subtasks };
+        });
+        AsyncStorage.setItem(CACHE_TODOS_KEY, JSON.stringify(next)).catch(() => {});
+        return next;
+      });
+    } catch (e) {
+      console.error('Erro ao adicionar subtarefa:', e);
+    }
+  };
+
+  const handleDeleteSubtask = async (todoId: string, subtaskId: string) => {
+    try {
+      await api.deleteSubtask(todoId, subtaskId);
+      setTodos((prev) => {
+        const next = prev.map((t) => {
+          if (t.id !== todoId) return t;
+          const subtasks = (t.subtasks || []).filter((st) => st.id !== subtaskId);
+          return { ...t, subtasks };
+        });
+        AsyncStorage.setItem(CACHE_TODOS_KEY, JSON.stringify(next)).catch(() => {});
+        return next;
+      });
+    } catch (e) {
+      console.error('Erro ao excluir subtarefa:', e);
     }
   };
 
@@ -317,6 +370,9 @@ export function useHomeData() {
     handleDeleteEvent,
     handleToggleTodo,
     handleDeleteTodo,
+    handleToggleSubtask,
+    handleAddSubtask,
+    handleDeleteSubtask,
     assistantLoading,
     assistantResult,
     modalVisible,

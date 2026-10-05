@@ -164,6 +164,13 @@ func (s *AssistantService) Process(ctx context.Context, userID string, input ai.
 				res.Conflict = conflict
 				if conflict != nil && conflict.HasConflict {
 					res.Message += fmt.Sprintf(" ⚠️ Atenção: você já tem '%s' agendado nesse horário!", conflict.ConflictingTitle)
+					if len(conflict.SuggestedSlots) > 0 {
+						var slotLabels []string
+						for _, sl := range conflict.SuggestedSlots {
+							slotLabels = append(slotLabels, sl.Label)
+						}
+						res.Message += fmt.Sprintf(" Que tal agendar para %s?", strings.Join(slotLabels, " ou "))
+					}
 				}
 			}
 		}

@@ -9,11 +9,18 @@ export interface AuthResponse {
   user: User;
 }
 
+export interface TimeSlot {
+  start_at: string;
+  end_at: string;
+  label: string;
+}
+
 export interface ConflictInfo {
   has_conflict: boolean;
   conflicting_id?: string;
   conflicting_title?: string;
   message?: string;
+  suggested_slots?: TimeSlot[];
 }
 
 export interface Event {
@@ -32,6 +39,15 @@ export interface Event {
   created_at: string;
 }
 
+export interface Subtask {
+  id: string;
+  todo_id: string;
+  title: string;
+  completed: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface Todo {
   id: string;
   user_id: string;
@@ -39,6 +55,9 @@ export interface Todo {
   priority: 'low' | 'medium' | 'high';
   status: 'pending' | 'completed';
   due_date?: string;
+  event_id?: string;
+  event_title?: string;
+  subtasks?: Subtask[];
   created_at: string;
 }
 

@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"strings"
 	"time"
@@ -48,6 +49,9 @@ func (s *CalendarService) CreateEvent(userID, title, description, location strin
 	if err != nil {
 		return nil, nil, err
 	}
+	if conflict != nil && conflict.HasConflict {
+		conflict.SuggestedSlots = s.FindAlternativeSlots(userID, startAt, endAt, conflict)
+	}
 
 	now := time.Now().UTC()
 	cat, col := ClassifyEvent(title, description)
@@ -80,6 +84,78 @@ func (s *CalendarService) CreateEvent(userID, title, description, location strin
 	}
 
 	return event, conflict, nil
+}
+
+// FindAlternativeSlots sugere até 3 janelas livres adjacentes para resolver conflitos de agenda.
+func (s *CalendarService) FindAlternativeSlots(userID string, requestedStart, requestedEnd time.Time, conflict *domain.ConflictInfo) []domain.TimeSlot {
+	dur := requestedEnd.Sub(requestedStart)
+	if dur <= 0 {
+		dur = 1 * time.Hour
+	}
+
+	dayStart := time.Date(requestedStart.Year(), requestedStart.Month(), requestedStart.Day(), 0, 0, 0, 0, requestedStart.Location())
+	dayEnd := dayStart.Add(24 * time.Hour)
+
+	events, err := s.eventRepo.ListByUser(userID, dayStart, dayEnd)
+	if err != nil {
+		return nil
+	}
+
+	hasOverlap := func(start, end time.Time) bool {
+		for _, e := range events {
+			if start.Before(e.EndAt) && end.After(e.StartAt) {
+				return true
+			}
+		}
+		return false
+	}
+
+	var suggestions []domain.TimeSlot
+
+	var confEnd time.Time
+	if conflict != nil && conflict.ConflictingID != "" {
+		for _, e := range events {
+			if e.ID == conflict.ConflictingID {
+				confEnd = e.EndAt
+				break
+			}
+		}
+	}
+	if confEnd.IsZero() {
+		confEnd = requestedEnd
+	}
+
+	candidates := []time.Time{
+		confEnd,
+		confEnd.Add(30 * time.Minute),
+		time.Date(requestedStart.Year(), requestedStart.Month(), requestedStart.Day(), 10, 30, 0, 0, requestedStart.Location()),
+		time.Date(requestedStart.Year(), requestedStart.Month(), requestedStart.Day(), 14, 0, 0, 0, requestedStart.Location()),
+		time.Date(requestedStart.Year(), requestedStart.Month(), requestedStart.Day(), 16, 0, 0, 0, requestedStart.Location()),
+	}
+
+	seen := make(map[int64]bool)
+	for _, candStart := range candidates {
+		candEnd := candStart.Add(dur)
+		if candStart.Hour() < 7 || candEnd.Hour() > 22 || (candEnd.Hour() == 22 && candEnd.Minute() > 0) {
+			continue
+		}
+		if seen[candStart.Unix()] {
+			continue
+		}
+		if !hasOverlap(candStart, candEnd) {
+			seen[candStart.Unix()] = true
+			suggestions = append(suggestions, domain.TimeSlot{
+				StartAt: candStart,
+				EndAt:   candEnd,
+				Label:   fmt.Sprintf("%s às %s", candStart.Format("15:04"), candEnd.Format("15:04")),
+			})
+			if len(suggestions) >= 3 {
+				break
+			}
+		}
+	}
+
+	return suggestions
 }
 
 // ListEvents lista os eventos do usuário no intervalo especificado.

@@ -186,7 +186,7 @@ class ApiService {
     return res || [];
   }
 
-  async createTodo(todo: { title: string; priority: string; due_date?: string }): Promise<Todo> {
+  async createTodo(todo: { title: string; priority?: string; due_date?: string; event_id?: string; event_title?: string }): Promise<Todo> {
     return this.request<Todo>('/api/v1/todos', {
       method: 'POST',
       body: JSON.stringify(todo),
@@ -201,6 +201,25 @@ class ApiService {
 
   async deleteTodo(id: string): Promise<void> {
     return this.request<void>(`/api/v1/todos/${id}`, { method: 'DELETE' });
+  }
+
+  async addSubtask(todoId: string, title: string): Promise<import('../types').Subtask> {
+    return this.request<import('../types').Subtask>(`/api/v1/todos/${todoId}/subtasks`, {
+      method: 'POST',
+      body: JSON.stringify({ title }),
+    });
+  }
+
+  async toggleSubtask(todoId: string, subtaskId: string): Promise<import('../types').Subtask> {
+    return this.request<import('../types').Subtask>(`/api/v1/todos/${todoId}/subtasks/${subtaskId}/toggle`, {
+      method: 'PATCH',
+    });
+  }
+
+  async deleteSubtask(todoId: string, subtaskId: string): Promise<void> {
+    return this.request<void>(`/api/v1/todos/${todoId}/subtasks/${subtaskId}`, {
+      method: 'DELETE',
+    });
   }
 
   private getUserTimezone(): string {

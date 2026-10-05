@@ -152,6 +152,16 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
     sendMessage(prompt);
   };
 
+  const handleSelectSlot = (slot: import('../types').TimeSlot, msg: import('../types').ChatMessage) => {
+    if (loading) return;
+    const title = msg.event?.title || msg.conflict?.conflicting_title;
+    if (title) {
+      sendMessage(`Reagendar "${title}" para ${slot.label}`);
+    } else {
+      sendMessage(`Reagendar compromisso para ${slot.label}`);
+    }
+  };
+
   const handleToggleRecording = async () => {
     if (loading) return;
 
@@ -196,13 +206,13 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
         <View style={styles.topAppBarLeft}>
           <View style={styles.brandRow}>
             <VitoMascot
-              size={30}
+              size={32}
               state={loading ? 'thinking' : 'idle'}
             />
-            <Text style={[styles.chatBrand, { color: colors.onSurface }]}>vito</Text>
+            <Text style={[styles.chatBrand, { color: colors.onSurface }]}>Vito</Text>
             <View style={[styles.statusDot, { backgroundColor: colors.statusOnline }]} />
           </View>
-          <Text style={[styles.chatSubtitle, { color: colors.textMuted }]}>assistente ia</Text>
+          <Text style={[styles.chatSubtitle, { color: colors.textMuted }]}>Assistente Executivo</Text>
         </View>
 
         <View style={styles.topAppBarRight}>
@@ -250,12 +260,31 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
         style={styles.flatList}
         data={messages}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <ChatMessageBubble message={item} />}
+        renderItem={({ item }) => (
+          <ChatMessageBubble
+            message={item}
+            onSelectSlot={handleSelectSlot}
+          />
+        )}
         contentContainerStyle={[
           styles.messagesList,
+          messages.length === 0 && styles.emptyMessagesList,
           { paddingBottom: isKeyboardOpen ? tokens.spacing.sm : 12 },
         ]}
         keyboardShouldPersistTaps="handled"
+        ListEmptyComponent={
+          <View style={styles.emptyWelcomeContainer}>
+            <View style={styles.emptyMascotWrapper}>
+              <VitoMascot size={64} state={loading ? 'thinking' : 'idle'} />
+            </View>
+            <Text style={[styles.emptyWelcomeTitle, { color: colors.onSurface }]}>
+              Olá, {firstName}
+            </Text>
+            <Text style={[styles.emptyWelcomeSubtitle, { color: colors.onSurfaceVariant }]}>
+              Sou seu secretário executivo com IA. Como posso organizar sua rotina, compromissos ou tarefas hoje?
+            </Text>
+          </View>
+        }
         ListFooterComponent={
           loading ? (
             <View style={[styles.loadingBubble, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
@@ -401,6 +430,32 @@ const styles = StyleSheet.create({
   loadingText: {
     color: tokens.colors.onSurfaceVariant,
     fontSize: tokens.typography.size.bodySmall,
+  },
+  emptyMessagesList: {
+    flexGrow: 1,
+    justifyContent: 'center',
+  },
+  emptyWelcomeContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: tokens.spacing.xl,
+    paddingVertical: tokens.spacing.xl,
+  },
+  emptyMascotWrapper: {
+    marginBottom: tokens.spacing.md,
+  },
+  emptyWelcomeTitle: {
+    fontSize: tokens.typography.size.headlineSmall,
+    fontWeight: '700',
+    letterSpacing: -0.5,
+    textAlign: 'center',
+    marginBottom: tokens.spacing.xs,
+  },
+  emptyWelcomeSubtitle: {
+    fontSize: tokens.typography.size.bodyMedium,
+    lineHeight: 22,
+    textAlign: 'center',
+    maxWidth: 320,
   },
   suggestionsWrapper: {
     paddingBottom: 4,

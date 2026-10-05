@@ -152,6 +152,18 @@ func runMigrations(db *sql.DB) error {
 	);
 
 	CREATE INDEX IF NOT EXISTS idx_tombstones_user_prov ON calendar_tombstones(user_id, provider);
+
+	CREATE TABLE IF NOT EXISTS todo_subtasks (
+		id TEXT PRIMARY KEY,
+		todo_id TEXT NOT NULL,
+		title TEXT NOT NULL,
+		completed BOOLEAN NOT NULL DEFAULT 0,
+		created_at DATETIME NOT NULL,
+		updated_at DATETIME NOT NULL,
+		FOREIGN KEY(todo_id) REFERENCES todos(id) ON DELETE CASCADE
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_todo_subtasks_todo ON todo_subtasks(todo_id);
 	`
 
 	if _, err := db.Exec(schema); err != nil {
@@ -163,6 +175,8 @@ func runMigrations(db *sql.DB) error {
 	_, _ = db.Exec("ALTER TABLE events ADD COLUMN category TEXT DEFAULT 'general'")
 	_, _ = db.Exec("ALTER TABLE events ADD COLUMN color TEXT")
 	_, _ = db.Exec("ALTER TABLE events ADD COLUMN recurrence TEXT")
+	_, _ = db.Exec("ALTER TABLE todos ADD COLUMN event_id TEXT")
+	_, _ = db.Exec("ALTER TABLE todos ADD COLUMN event_title TEXT")
 
 	return nil
 }

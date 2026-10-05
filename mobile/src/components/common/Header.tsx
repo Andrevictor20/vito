@@ -20,13 +20,25 @@ export const Header: React.FC<HeaderProps> = ({ onPressProfile }) => {
     <View style={[styles.header, { backgroundColor: colors.surface }]}>
       <View style={styles.topRow}>
         <View style={styles.brandRow}>
-          <VitoMascot size={32} />
-          <Text style={[styles.brand, { color: colors.onSurface }]}>Eventos</Text>
+          <VitoMascot size={34} />
+          <View style={styles.titleColumn}>
+            <Text style={[styles.brand, { color: colors.onSurface }]}>Agenda & Tarefas</Text>
+            <Text style={[styles.brandSubtitle, { color: colors.textMuted }]}>
+              Organização Pessoal
+            </Text>
+          </View>
         </View>
 
         <View style={styles.actionsRow}>
           <TouchableOpacity
-            style={[styles.themeToggleBtn, { backgroundColor: colors.surfaceContainerLow, borderColor: colors.outlineVariant }]}
+            style={[
+              styles.themeToggleBtn,
+              {
+                backgroundColor: colors.surfaceContainerLow,
+                borderColor: colors.outlineVariant,
+                borderWidth: 1,
+              },
+            ]}
             onPress={toggleTheme}
             activeOpacity={0.7}
             hitSlop={tokens.hitSlop.sm}
@@ -34,20 +46,29 @@ export const Header: React.FC<HeaderProps> = ({ onPressProfile }) => {
           >
             <MaterialIcons
               name={isDark ? 'light-mode' : 'dark-mode'}
-              size={20}
+              size={18}
               color={colors.onSurface}
             />
           </TouchableOpacity>
 
           {user && (
             <TouchableOpacity
-              style={[styles.userAvatar, { backgroundColor: colors.surfaceContainerHighest, borderColor: colors.outlineVariant }]}
+              style={[
+                styles.userAvatar,
+                {
+                  backgroundColor: colors.surfaceContainerHighest,
+                  borderColor: colors.outlineVariant,
+                  borderWidth: 1,
+                },
+              ]}
               onPress={onPressProfile}
               activeOpacity={0.75}
               accessibilityLabel="Perfil e Configurações"
               hitSlop={tokens.hitSlop.sm}
             >
-              <Text style={[styles.avatarText, { color: colors.onSurface }]}>{firstName.charAt(0).toUpperCase()}</Text>
+              <Text style={[styles.avatarText, { color: colors.onSurface }]}>
+                {firstName.charAt(0).toUpperCase()}
+              </Text>
             </TouchableOpacity>
           )}
         </View>
@@ -72,13 +93,23 @@ const styles = StyleSheet.create({
   brandRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
+  },
+  titleColumn: {
+    flexDirection: 'column',
+    justifyContent: 'center',
   },
   brand: {
-    fontSize: tokens.typography.size.headlineSmall,
-    fontWeight: tokens.typography.weight.bold,
+    fontSize: tokens.typography.size.titleLarge,
+    fontWeight: '700',
     color: tokens.colors.onSurface,
-    letterSpacing: -0.3,
+    letterSpacing: -0.4,
+  },
+  brandSubtitle: {
+    fontSize: tokens.typography.size.labelSmall,
+    fontWeight: '500',
+    letterSpacing: 0.2,
+    marginTop: -1,
   },
   statusDot: {
     width: 8,

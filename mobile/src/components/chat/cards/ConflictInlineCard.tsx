@@ -8,9 +8,10 @@ import { ConflictInfo } from '../../../types';
 interface ConflictInlineCardProps {
   conflict: ConflictInfo;
   onPressAdjust?: () => void;
+  onSelectSlot?: (slot: import('../../../types').TimeSlot) => void;
 }
 
-export const ConflictInlineCard: React.FC<ConflictInlineCardProps> = ({ conflict, onPressAdjust }) => {
+export const ConflictInlineCard: React.FC<ConflictInlineCardProps> = ({ conflict, onPressAdjust, onSelectSlot }) => {
   const { colors } = useTheme();
 
   return (
@@ -27,7 +28,7 @@ export const ConflictInlineCard: React.FC<ConflictInlineCardProps> = ({ conflict
               {conflict.conflicting_title || 'Conflito de Agenda'}
             </Text>
             <Text style={[styles.subtitle, { color: colors.error }]} numberOfLines={2}>
-              {conflict.message || 'Atenção: Pouco tempo de intervalo entre compromissos'}
+              {conflict.message || 'Atenção: Horário sobreposto com outro compromisso'}
             </Text>
           </View>
         </View>
@@ -42,6 +43,32 @@ export const ConflictInlineCard: React.FC<ConflictInlineCardProps> = ({ conflict
           </TouchableOpacity>
         )}
       </View>
+
+      {conflict.suggested_slots && conflict.suggested_slots.length > 0 && (
+        <View style={styles.slotsSection}>
+          <Text style={[styles.slotsHeader, { color: colors.onSurfaceVariant }]}>
+            Sugestões de horário livre:
+          </Text>
+          <View style={styles.slotsRow}>
+            {conflict.suggested_slots.map((slot, idx) => (
+              <TouchableOpacity
+                key={idx}
+                style={[
+                  styles.slotChip,
+                  { backgroundColor: colors.surfaceContainerHighest, borderColor: colors.outlineVariant },
+                ]}
+                onPress={() => onSelectSlot?.(slot)}
+                activeOpacity={0.7}
+              >
+                <MaterialIcons name="schedule" size={13} color={colors.primary} />
+                <Text style={[styles.slotChipText, { color: colors.onSurface }]}>
+                  {slot.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      )}
     </View>
   );
 };
@@ -108,6 +135,35 @@ const styles = StyleSheet.create({
   adjustBtnText: {
     color: tokens.colors.onSecondaryContainer,
     fontSize: tokens.typography.size.labelSmall,
+    fontWeight: tokens.typography.weight.semibold,
+  },
+  slotsSection: {
+    marginTop: tokens.spacing.sm,
+    paddingTop: tokens.spacing.xs + 2,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.08)',
+  },
+  slotsHeader: {
+    fontSize: 11,
+    fontWeight: tokens.typography.weight.medium,
+    marginBottom: tokens.spacing.xs,
+  },
+  slotsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: tokens.spacing.xs,
+  },
+  slotChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: MD3Shapes.small,
+    borderWidth: 1,
+  },
+  slotChipText: {
+    fontSize: 11,
     fontWeight: tokens.typography.weight.semibold,
   },
 });
