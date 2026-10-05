@@ -203,22 +203,33 @@ class ApiService {
     return this.request<void>(`/api/v1/todos/${id}`, { method: 'DELETE' });
   }
 
+  private getUserTimezone(): string {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Sao_Paulo';
+    } catch {
+      return 'America/Sao_Paulo';
+    }
+  }
+
   // Assistant Chat
-  async assistantChat(prompt: string, timezone: string = 'America/Sao_Paulo'): Promise<AssistantChatResponse> {
+  async assistantChat(prompt: string, timezone?: string): Promise<AssistantChatResponse> {
+    const tz = timezone || this.getUserTimezone();
     return this.request<AssistantChatResponse>('/api/v1/assistant/chat', {
       method: 'POST',
-      body: JSON.stringify({ prompt, timezone }),
+      body: JSON.stringify({ prompt, timezone: tz }),
     });
   }
 
   // Assistant Audio (Groq Whisper v3)
-  async assistantAudio(audioUri: string, filename: string = 'audio.m4a'): Promise<AssistantChatResponse> {
+  async assistantAudio(audioUri: string, filename: string = 'audio.m4a', timezone?: string): Promise<AssistantChatResponse> {
+    const tz = timezone || this.getUserTimezone();
     const formData = new FormData();
     formData.append('audio', {
       uri: audioUri,
       name: filename,
       type: 'audio/m4a',
     } as unknown as Blob);
+    formData.append('timezone', tz);
 
     const headers: Record<string, string> = {
       Accept: 'application/json',
@@ -255,7 +266,8 @@ class ApiService {
   }
 
   // Assistant Vision (Gemini 2.5 Flash Multimodal)
-  async assistantVision(imageUri: string, prompt?: string, filename: string = 'image.jpg'): Promise<AssistantChatResponse> {
+  async assistantVision(imageUri: string, prompt?: string, filename: string = 'image.jpg', timezone?: string): Promise<AssistantChatResponse> {
+    const tz = timezone || this.getUserTimezone();
     const formData = new FormData();
     formData.append('image', {
       uri: imageUri,
@@ -266,7 +278,7 @@ class ApiService {
     if (prompt) {
       formData.append('prompt', prompt);
     }
-    formData.append('timezone', 'America/Sao_Paulo');
+    formData.append('timezone', tz);
 
     const headers: Record<string, string> = {
       Accept: 'application/json',

@@ -118,6 +118,11 @@ func (h *AssistantHandler) AudioChat(w http.ResponseWriter, r *http.Request) {
 		err = errors.New("transcritor Whisper não configurado")
 	}
 
+	tz := r.FormValue("timezone")
+	if tz == "" {
+		tz = "America/Sao_Paulo"
+	}
+
 	if err != nil {
 		log.Printf("⚠️ [AudioChat] Transcrição Whisper falhou (%v). Acionando fallback para áudio nativo...", err)
 		mime := header.Header.Get("Content-Type")
@@ -127,12 +132,14 @@ func (h *AssistantHandler) AudioChat(w http.ResponseWriter, r *http.Request) {
 		input = ai.UserInput{
 			AudioB64:  base64.StdEncoding.EncodeToString(fileBytes),
 			AudioMime: mime,
+			Timezone:  tz,
 			Now:       time.Now().UTC(),
 		}
 	} else {
 		input = ai.UserInput{
-			Text: transcript,
-			Now:  time.Now().UTC(),
+			Text:     transcript,
+			Timezone: tz,
+			Now:      time.Now().UTC(),
 		}
 	}
 
@@ -204,11 +211,16 @@ func (h *AssistantHandler) VisionChat(w http.ResponseWriter, r *http.Request) {
 		prompt = "Analise esta imagem e extraia eventos para a agenda ou tarefas a realizar."
 	}
 
+	tzVision := r.FormValue("timezone")
+	if tzVision == "" {
+		tzVision = "America/Sao_Paulo"
+	}
+
 	input := ai.UserInput{
 		Text:      prompt,
 		ImageB64:  base64.StdEncoding.EncodeToString(fileBytes),
 		ImageMime: mime,
-		Timezone:  r.FormValue("timezone"),
+		Timezone:  tzVision,
 		Now:       time.Now().UTC(),
 	}
 

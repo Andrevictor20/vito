@@ -23,11 +23,28 @@ export const AssistantBar: React.FC<AssistantBarProps> = ({ onSubmit, onAudioSub
 
   const handleMicPress = async () => {
     if (isLoading) return;
-    Alert.alert(
-      'Entrada por Voz',
-      'Para gravação de áudio no Expo Go, é necessária uma build de desenvolvimento (npx expo run:android). Por enquanto, você pode digitar qualquer comando no campo de texto!',
-      [{ text: 'Entendido' }]
-    );
+
+    if (!isRecording) {
+      if (!SafeAudioRecorder.isAudioSupported()) {
+        Alert.alert('Gravação de Áudio', 'O módulo de gravação de áudio não está disponível neste dispositivo.');
+        return;
+      }
+      const granted = await SafeAudioRecorder.requestPermissions();
+      if (!granted) {
+        Alert.alert('Microfone Necessário', 'Por favor, conceda permissão de microfone para usar comandos de voz.');
+        return;
+      }
+      const started = await SafeAudioRecorder.startRecording();
+      if (started) {
+        setIsRecording(true);
+      }
+    } else {
+      setIsRecording(false);
+      const result = await SafeAudioRecorder.stopRecording();
+      if (result?.uri && onAudioSubmit) {
+        await onAudioSubmit(result.uri);
+      }
+    }
   };
 
   const hasText = prompt.trim().length > 0;

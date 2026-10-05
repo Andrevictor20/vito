@@ -72,6 +72,7 @@ func main() {
 	}
 	syncSvc.RegisterProvider(calendar.NewGoogleProvider(googleCalCfg))
 	syncSvc.RegisterProvider(calendar.NewAppleCalDAVProvider(calendar.AppleCalDAVConfig{}))
+	calSvc.SetSyncPusher(syncSvc)
 
 	googleAuthCfg := service.GoogleAuthConfig{
 		ClientID:     cfg.GoogleClientID,

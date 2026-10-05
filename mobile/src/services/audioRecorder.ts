@@ -1,8 +1,8 @@
-// audioRecorder.ts — Gravação de áudio resiliente para Expo Go + builds nativas
-let AudioModule: any = null;
+// audioRecorder.ts — Gravação de áudio resiliente para Expo Go + builds nativas com expo-audio
+let ExpoAudio: any = null;
 
 try {
-  AudioModule = require('expo-audio');
+  ExpoAudio = require('expo-audio');
 } catch (e) {
   console.warn('⚠️ [Audio] expo-audio não disponível neste runtime:', e);
 }
@@ -16,70 +16,61 @@ export class SafeAudioRecorder {
   private static recorderInstance: any = null;
 
   static isAudioSupported(): boolean {
-    return AudioModule !== null;
+    return ExpoAudio !== null && (!!ExpoAudio.AudioRecorder || !!ExpoAudio.AudioModule?.AudioRecorder);
   }
 
   static async requestPermissions(): Promise<boolean> {
-    if (!AudioModule) return false;
+    if (!ExpoAudio) return false;
     try {
       const fn =
-        AudioModule.requestRecordingPermissionsAsync ||
-        AudioModule.Audio?.requestPermissionsAsync;
+        ExpoAudio.requestRecordingPermissionsAsync ||
+        ExpoAudio.AudioModule?.requestRecordingPermissionsAsync;
       if (fn) {
         const res = await fn();
         return res.granted ?? res.status === 'granted';
       }
-      return true;
+      return false;
     } catch {
       return false;
     }
   }
 
   static async startRecording(): Promise<boolean> {
-    if (!AudioModule) return false;
+    if (!ExpoAudio) return false;
     try {
+      const granted = await this.requestPermissions();
+      if (!granted) {
+        console.warn('⚠️ [Audio] Permissão para gravar áudio não concedida.');
+        return false;
+      }
+
       // Ativa modo de áudio para gravação
-      if (AudioModule.setAudioModeAsync) {
-        await AudioModule.setAudioModeAsync({
-          allowsRecordingIOS: true,
-          playsInSilentModeIOS: true,
+      if (ExpoAudio.setAudioModeAsync) {
+        await ExpoAudio.setAudioModeAsync({
+          allowsRecording: true,
+          playsInSilentMode: true,
         });
       }
 
-      // Cria e inicia o Recording com qualidade M4A (compatível com backend)
-      const Recording =
-        AudioModule.Recording ||
-        AudioModule.Audio?.Recording;
+      const AudioRecorderClass = ExpoAudio.AudioRecorder || ExpoAudio.AudioModule?.AudioRecorder;
+      if (!AudioRecorderClass) {
+        console.warn('⚠️ [Audio] AudioRecorder não encontrado em expo-audio.');
+        return false;
+      }
 
-      if (!Recording) return false;
+      const preset = ExpoAudio.RecordingPresets?.HIGH_QUALITY || {
+        extension: '.m4a',
+        sampleRate: 44100,
+        numberOfChannels: 2,
+        bitRate: 128000,
+      };
 
-      const preset =
-        AudioModule.RecordingOptionsPresets?.HIGH_QUALITY ||
-        AudioModule.Audio?.RecordingOptionsPresets?.HIGH_QUALITY ||
-        {
-          android: {
-            extension: '.m4a',
-            outputFormat: 2, // MPEG_4
-            audioEncoder: 3, // AAC
-            sampleRate: 44100,
-            numberOfChannels: 2,
-            bitRate: 128000,
-          },
-          ios: {
-            extension: '.m4a',
-            audioQuality: 127, // MAX
-            sampleRate: 44100,
-            numberOfChannels: 2,
-            bitRate: 128000,
-            linearPCMBitDepth: 16,
-            linearPCMIsBigEndian: false,
-            linearPCMIsFloat: false,
-          },
-          web: {},
-        };
-
-      const { recording } = await Recording.createAsync(preset);
-      this.recorderInstance = recording;
+      const recorder = new AudioRecorderClass(preset);
+      if (typeof recorder.prepareToRecordAsync === 'function') {
+        await recorder.prepareToRecordAsync();
+      }
+      recorder.record();
+      this.recorderInstance = recorder;
       return true;
     } catch (e) {
       console.warn('⚠️ [Audio] Falha ao iniciar gravação:', e);
@@ -90,13 +81,17 @@ export class SafeAudioRecorder {
   static async stopRecording(): Promise<AudioRecordingResult | null> {
     if (!this.recorderInstance) return null;
     try {
-      await this.recorderInstance.stopAndUnloadAsync();
-      const status = await this.recorderInstance.getStatusAsync?.();
-      const uri = this.recorderInstance.getURI?.() ?? this.recorderInstance._uri;
+      const recorder = this.recorderInstance;
+      await recorder.stop();
+      const uri = recorder.uri;
+      const durationMs = (recorder.currentTime || 0) * 1000;
       this.recorderInstance = null;
 
-      if (!uri) return null;
-      return { uri, durationMs: status?.durationMillis ?? 0 };
+      if (!uri) {
+        console.warn('⚠️ [Audio] Gravação finalizada sem URI');
+        return null;
+      }
+      return { uri, durationMs };
     } catch (e) {
       console.warn('⚠️ [Audio] Falha ao parar gravação:', e);
       this.recorderInstance = null;

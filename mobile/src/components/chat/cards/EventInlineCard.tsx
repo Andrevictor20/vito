@@ -12,22 +12,32 @@ interface EventInlineCardProps {
 
 export const EventInlineCard: React.FC<EventInlineCardProps> = ({ event, onPressDetail }) => {
   const { colors } = useTheme();
-  const startTime = new Date(event.start_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-  const endTime = new Date(event.end_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  const startDate = new Date(event.start_at);
+  const endDate = new Date(event.end_at);
+
+  const formattedDate = startDate.toLocaleDateString('pt-BR', {
+    weekday: 'short',
+    day: '2-digit',
+    month: 'short',
+  });
+  const startTime = startDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  const endTime = endDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
   return (
     <View style={[styles.card, { backgroundColor: colors.surfaceContainerHigh, borderColor: colors.outlineVariant }]}>
-      <View style={[styles.accentBar, { backgroundColor: colors.primary }]} />
+      <View style={[styles.accentBar, { backgroundColor: event.color || colors.primary }]} />
 
       {/* Header do Card */}
       <View style={styles.topRow}>
         <View style={styles.headerLeft}>
           <View style={[styles.iconBox, { backgroundColor: colors.surfaceContainerHighest }]}>
-            <MaterialIcons name="event-available" size={18} color={colors.primary} />
+            <MaterialIcons name="event-available" size={18} color={event.color || colors.primary} />
           </View>
           <View style={styles.titleCol}>
             <Text style={[styles.title, { color: colors.onSurface }]} numberOfLines={1}>{event.title}</Text>
-            <Text style={[styles.subtitle, { color: colors.textMuted }]}>Agenda • Confirmado pelo Vito</Text>
+            <Text style={[styles.subtitle, { color: colors.textMuted }]}>
+              {formattedDate} • Salvo na Agenda
+            </Text>
           </View>
         </View>
 
@@ -43,37 +53,33 @@ export const EventInlineCard: React.FC<EventInlineCardProps> = ({ event, onPress
           <MaterialIcons name="schedule" size={14} color={colors.onSurfaceVariant} />
           <Text style={[styles.detailText, { color: colors.onSurfaceVariant }]}>{startTime} - {endTime}</Text>
         </View>
-        <View style={styles.detailItem}>
-          <MaterialIcons name="meeting-room" size={14} color={colors.onSurfaceVariant} />
-          <Text style={[styles.detailText, { color: colors.onSurfaceVariant }]} numberOfLines={1}>Meet • Sala Executiva</Text>
-        </View>
+        {event.location ? (
+          <View style={styles.detailItem}>
+            <MaterialIcons name="place" size={14} color={colors.onSurfaceVariant} />
+            <Text style={[styles.detailText, { color: colors.onSurfaceVariant }]} numberOfLines={1}>{event.location}</Text>
+          </View>
+        ) : (
+          <View style={styles.detailItem}>
+            <MaterialIcons name="sync" size={14} color={colors.onSurfaceVariant} />
+            <Text style={[styles.detailText, { color: colors.onSurfaceVariant }]} numberOfLines={1}>
+              {event.recurrence ? `Repete: ${event.recurrence.toLowerCase()}` : 'Google Agenda'}
+            </Text>
+          </View>
+        )}
       </View>
 
-      {/* Linha de Participantes e Ação M3 */}
-      <View style={styles.actionRow}>
-        <View style={styles.attendeesRow}>
-          <View style={[styles.avatarBubble, { backgroundColor: colors.surfaceContainerHighest }]}>
-            <Text style={[styles.avatarBubbleText, { color: colors.onSurface }]}>AV</Text>
-          </View>
-          <View style={[styles.avatarBubble, { backgroundColor: colors.surfaceContainerHighest, marginLeft: -6 }]}>
-            <Text style={[styles.avatarBubbleText, { color: colors.onSurface }]}>LC</Text>
-          </View>
-          <View style={[styles.avatarBubble, { backgroundColor: colors.surfaceContainerHighest, marginLeft: -6 }]}>
-            <Text style={[styles.avatarBubbleText, { color: colors.onSurface }]}>+2</Text>
-          </View>
-        </View>
-
-        {onPressDetail && (
+      {onPressDetail && (
+        <View style={styles.actionRow}>
           <TouchableOpacity
             style={[styles.tonalButton, { backgroundColor: colors.surfaceContainerHighest }]}
             onPress={onPressDetail}
             activeOpacity={0.8}
           >
-            <Text style={[styles.tonalButtonText, { color: colors.onSurface }]}>Ver pauta</Text>
+            <Text style={[styles.tonalButtonText, { color: colors.onSurface }]}>Ver detalhes</Text>
             <MaterialIcons name="arrow-forward" size={14} color={colors.onSurface} />
           </TouchableOpacity>
-        )}
-      </View>
+        </View>
+      )}
     </View>
   );
 };

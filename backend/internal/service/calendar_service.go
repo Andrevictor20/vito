@@ -1,7 +1,9 @@
 package service
 
 import (
+	"context"
 	"errors"
+	"log"
 	"strings"
 	"time"
 
@@ -10,14 +12,26 @@ import (
 	"github.com/andrevmp/vito/backend/internal/domain"
 )
 
+// CalendarSyncPusher define o contrato para propagação de eventos locais para agendas remotas (ex: Google Calendar).
+type CalendarSyncPusher interface {
+	PushEvent(ctx context.Context, userID string, event *domain.Event) error
+	DeleteEvent(ctx context.Context, userID, eventID string) error
+}
+
 // CalendarService orquestra criação, listagem e detecção de conflitos de eventos.
 type CalendarService struct {
-	eventRepo domain.EventRepository
+	eventRepo  domain.EventRepository
+	syncPusher CalendarSyncPusher
 }
 
 // NewCalendarService instancia o serviço de calendário.
 func NewCalendarService(eventRepo domain.EventRepository) *CalendarService {
 	return &CalendarService{eventRepo: eventRepo}
+}
+
+// SetSyncPusher registra o serviço responsável por empurrar eventos para agendas remotas.
+func (s *CalendarService) SetSyncPusher(pusher CalendarSyncPusher) {
+	s.syncPusher = pusher
 }
 
 // CreateEvent valida horários, checa conflitos e persiste o evento.
@@ -55,6 +69,16 @@ func (s *CalendarService) CreateEvent(userID, title, description, location strin
 		return nil, nil, err
 	}
 
+	if s.syncPusher != nil {
+		go func(evt *domain.Event) {
+			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer cancel()
+			if err := s.syncPusher.PushEvent(ctx, userID, evt); err != nil {
+				log.Printf("[CalendarService] Falha ao sincronizar novo evento '%s' na agenda remota: %v", evt.Title, err)
+			}
+		}(event)
+	}
+
 	return event, conflict, nil
 }
 
@@ -68,6 +92,13 @@ func (s *CalendarService) ListEvents(userID string, from, to time.Time) ([]domai
 
 // DeleteEvent remove um evento pertencente ao usuário.
 func (s *CalendarService) DeleteEvent(id, userID string) error {
+	if s.syncPusher != nil {
+		go func(eventID string) {
+			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer cancel()
+			_ = s.syncPusher.DeleteEvent(ctx, userID, eventID)
+		}(id)
+	}
 	return s.eventRepo.Delete(id, userID)
 }
 
@@ -169,6 +200,15 @@ func (s *CalendarService) CreateRecurringEvents(userID, title, description, loca
 
 		if err := s.eventRepo.Create(ev); err != nil {
 			return created, err
+		}
+		if s.syncPusher != nil {
+			go func(evt *domain.Event) {
+				ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+				defer cancel()
+				if err := s.syncPusher.PushEvent(ctx, userID, evt); err != nil {
+					log.Printf("[CalendarService] Falha ao sincronizar evento recorrente '%s': %v", evt.Title, err)
+				}
+			}(ev)
 		}
 		created = append(created, ev)
 	}

@@ -1,6 +1,7 @@
 package service_test
 
 import (
+	"context"
 	"path/filepath"
 	"testing"
 	"time"
@@ -152,6 +153,53 @@ func TestCalendarService_UpdateAndSeries(t *testing.T) {
 	delCount, err := calSvc.DeleteEventWithOption(events[1].ID, "user-cal-svc-1", true)
 	if err != nil || delCount < 3 {
 		t.Fatalf("expected at least 3 events deleted, got %d, err %v", delCount, err)
+	}
+}
+
+type mockSyncPusher struct {
+	pushedEvents []*domain.Event
+	deletedIDs   []string
+}
+
+func (m *mockSyncPusher) PushEvent(ctx context.Context, userID string, event *domain.Event) error {
+	m.pushedEvents = append(m.pushedEvents, event)
+	return nil
+}
+
+func (m *mockSyncPusher) DeleteEvent(ctx context.Context, userID, eventID string) error {
+	m.deletedIDs = append(m.deletedIDs, eventID)
+	return nil
+}
+
+func TestCalendarService_SyncPusherIntegration(t *testing.T) {
+	calSvc, _ := setupCalendarService(t)
+	pusher := &mockSyncPusher{}
+	calSvc.SetSyncPusher(pusher)
+
+	start := time.Date(2026, 10, 15, 14, 0, 0, 0, time.UTC)
+	evt, _, err := calSvc.CreateEvent("user-cal-svc-1", "Alinhamento Diretoria", "", "Sala 1", start, start.Add(time.Hour))
+	if err != nil {
+		t.Fatalf("erro ao criar evento: %v", err)
+	}
+
+	// Aguarda processamento assíncrono do pusher
+	time.Sleep(50 * time.Millisecond)
+
+	if len(pusher.pushedEvents) == 0 {
+		t.Fatalf("esperava que PushEvent fosse acionado pelo CalendarService")
+	}
+	if pusher.pushedEvents[0].ID != evt.ID {
+		t.Errorf("evento empurrado diverge do criado")
+	}
+
+	err = calSvc.DeleteEvent(evt.ID, "user-cal-svc-1")
+	if err != nil {
+		t.Fatalf("erro ao deletar evento: %v", err)
+	}
+
+	time.Sleep(50 * time.Millisecond)
+	if len(pusher.deletedIDs) == 0 || pusher.deletedIDs[0] != evt.ID {
+		t.Errorf("esperava DeleteEvent propagado para o pusher")
 	}
 }
 

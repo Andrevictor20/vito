@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Keyboard,
   KeyboardEvent,
+  Alert,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 
@@ -157,19 +158,19 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
     if (!isRecording) {
       // --- INICIAR GRAVAÇÃO ---
       if (!SafeAudioRecorder.isAudioSupported()) {
-        // Fallback: Expo Go sem expo-audio nativo. Usa modo texto
-        console.warn('[Voice] expo-audio não disponível neste runtime.');
-        setIsRecording(true);
+        Alert.alert('Gravação de Áudio', 'O módulo de gravação de áudio nativo não está disponível neste ambiente.');
         return;
       }
       const granted = await SafeAudioRecorder.requestPermissions();
       if (!granted) {
-        console.warn('[Voice] Permissão de microfone negada.');
+        Alert.alert('Microfone Necessário', 'Por favor, conceda permissão de microfone para enviar mensagens de voz ao Vito.');
         return;
       }
       const started = await SafeAudioRecorder.startRecording();
       if (started) {
         setIsRecording(true);
+      } else {
+        Alert.alert('Gravação', 'Não foi possível iniciar a gravação de áudio no momento.');
       }
     } else {
       // --- PARAR E ENVIAR ---
