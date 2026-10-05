@@ -173,12 +173,12 @@ func (s *Server) handleHomePage(w http.ResponseWriter, r *http.Request) {
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8">
-  <title>Vito assistant — AI Executive Assistant</title>
+  <title>Vito assistant</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="google-site-verification" content="PuSMriy69YLNFxqoXeHisikpyCA0Iw9XEKAvPY55vXM" />
 </head>
 <body style="font-family: system-ui, sans-serif; max-width: 600px; margin: 40px auto; padding: 20px; line-height: 1.6; color: #18181B; background: #FFFFFF;">
-  <h1>🐙 Vito assistant</h1>
+  <h1>Vito assistant</h1>
   <p>Secretário Executivo com Inteligência Artificial Pessoal e Familiar self-hosted.</p>
   <p><a href="/privacy">Política de Privacidade</a> | <a href="/terms">Termos de Uso</a></p>
 </body>
