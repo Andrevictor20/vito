@@ -296,4 +296,59 @@ func TestEventRepository_UpdateAndSeries(t *testing.T) {
 	}
 }
 
+func TestEventRepository_UpdateTimesByTitle_PreservesUserTimezone(t *testing.T) {
+	eventRepo, _, _ := setupCalendarTestDB(t)
+
+	loc, err := time.LoadLocation("America/Sao_Paulo")
+	if err != nil {
+		loc = time.FixedZone("BRT", -3*3600)
+	}
+
+	// Evento original criado no dia 07/10/2026 às 09:00 BRT (12:00 UTC)
+	startLocal := time.Date(2026, 10, 7, 9, 0, 0, 0, loc)
+	originalEvent := &domain.Event{
+		ID:          "event-tz-1",
+		UserID:      "user-cal-1",
+		Title:       "Reunião com equipe de desenvolvimento do app",
+		Description: "Daily",
+		StartAt:     startLocal,
+		EndAt:       startLocal.Add(1 * time.Hour),
+		CreatedAt:   time.Now().UTC(),
+		UpdatedAt:   time.Now().UTC(),
+	}
+
+	if err := eventRepo.Create(originalEvent); err != nil {
+		t.Fatalf("falha ao criar evento inicial: %v", err)
+	}
+
+	// Usuário pede alteração para as 17:00 (17:00 às 18:00 no fuso local de Brasília)
+	newStartLocal := time.Date(2026, 10, 7, 17, 0, 0, 0, loc)
+	newEndLocal := newStartLocal.Add(1 * time.Hour)
+
+	count, err := eventRepo.UpdateTimesByTitle("user-cal-1", "equipe de desenvolvimento", newStartLocal, newEndLocal)
+	if err != nil {
+		t.Fatalf("UpdateTimesByTitle falhou: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("esperava 1 evento atualizado, obteve %d", count)
+	}
+
+	updated, err := eventRepo.GetByID("event-tz-1", "user-cal-1")
+	if err != nil {
+		t.Fatalf("falha ao buscar evento atualizado: %v", err)
+	}
+
+	// 17:00 BRT (-03:00) corresponde rigorosamente a 20:00 UTC
+	expectedUTC := time.Date(2026, 10, 7, 20, 0, 0, 0, time.UTC)
+	if !updated.StartAt.Equal(expectedUTC) {
+		t.Fatalf("FALHA DE FUSO: horário no banco salvo como %v (esperava %v UTC para equivaler a 17:00 no fuso do usuário)", updated.StartAt, expectedUTC)
+	}
+
+	// No fuso local do usuário, a hora deve ser exatamente 17
+	if updated.StartAt.In(loc).Hour() != 17 {
+		t.Errorf("hora local no fuso do usuário deve ser 17, mas foi %d", updated.StartAt.In(loc).Hour())
+	}
+}
+
+
 

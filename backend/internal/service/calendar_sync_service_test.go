@@ -2,6 +2,7 @@ package service_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -18,10 +19,12 @@ type mockProvider struct {
 	name                  string
 	fetchResult           *calendar.SyncResult
 	fetchErr              error
+	createErr             error
 	createdItems          []*domain.Event
 	updatedItems          []*domain.Event
 	deletedEvents         []string
 	lastCreatedExternalID string
+	refreshCalled         bool
 }
 
 func (m *mockProvider) Name() string { return m.name }
@@ -35,6 +38,11 @@ func (m *mockProvider) FetchEvents(ctx context.Context, credentials, calendarID,
 	return &calendar.SyncResult{Items: []calendar.SyncItem{}}, nil
 }
 func (m *mockProvider) CreateEvent(ctx context.Context, credentials, calendarID string, event *domain.Event) (*calendar.SyncItem, error) {
+	if m.createErr != nil {
+		err := m.createErr
+		m.createErr = nil // limpa após falha simulada (ex: após refresh)
+		return nil, err
+	}
 	m.createdItems = append(m.createdItems, event)
 	m.lastCreatedExternalID = "ext-" + uuid.New().String()
 	return &calendar.SyncItem{
@@ -62,7 +70,8 @@ func (m *mockProvider) DeleteEvent(ctx context.Context, credentials, calendarID,
 	return nil
 }
 func (m *mockProvider) RefreshToken(ctx context.Context, credentials string) (string, error) {
-	return credentials, nil
+	m.refreshCalled = true
+	return "refreshed-credentials-token", nil
 }
 
 func setupServiceTest(t *testing.T) (*service.CalendarSyncService, domain.EventRepository, domain.CalendarSyncRepository, string) {
@@ -238,3 +247,88 @@ func TestCalendarSyncService_DeletePropagation(t *testing.T) {
 		t.Fatalf("mapping deveria ter sido removido, obteve: %v", err)
 	}
 }
+
+func TestCalendarSyncService_PushEvent_AutoRefreshOn401(t *testing.T) {
+	svc, eventRepo, syncRepo, userID := setupServiceTest(t)
+
+	mockG := &mockProvider{
+		name:      domain.ProviderGoogle,
+		createErr: errors.New("Google Calendar falhou ao criar evento (status 401): token expired"),
+	}
+	svc.RegisterProvider(mockG)
+
+	_, _ = svc.ConnectIntegration(context.Background(), userID, domain.ProviderGoogle, "user@gmail.com", "expired-token", "primary", "Principal")
+
+	evt := &domain.Event{
+		ID:        uuid.New().String(),
+		UserID:    userID,
+		Title:     "Reunião com token expirado",
+		StartAt:   time.Now().UTC(),
+		EndAt:     time.Now().Add(time.Hour).UTC(),
+		CreatedAt: time.Now().UTC(),
+		UpdatedAt: time.Now().UTC(),
+	}
+	_ = eventRepo.Create(evt)
+
+	// Dispara PushEvent
+	err := svc.PushEvent(context.Background(), userID, evt)
+	if err != nil {
+		t.Fatalf("PushEvent não deveria retornar erro crítico mesmo sob 401: %v", err)
+	}
+
+	// Deve ter chamado RefreshToken
+	if !mockG.refreshCalled {
+		t.Fatalf("esperava que PushEvent acionasse RefreshToken após erro 401")
+	}
+
+	// E o evento deve ter sido criado com sucesso no provedor e registrado no mapping
+	if len(mockG.createdItems) != 1 {
+		t.Fatalf("esperava 1 evento criado no provedor após refresh, obteve %d", len(mockG.createdItems))
+	}
+
+	mapping, err := syncRepo.GetMappingByEventID(evt.ID, domain.ProviderGoogle)
+	if err != nil || mapping == nil {
+		t.Fatalf("esperava mapping criado após PushEvent com refresh: %v", err)
+	}
+}
+
+func TestCalendarSyncService_SyncIntegration_OutboundLocalEvents(t *testing.T) {
+	svc, eventRepo, syncRepo, userID := setupServiceTest(t)
+
+	mockG := &mockProvider{name: domain.ProviderGoogle}
+	svc.RegisterProvider(mockG)
+
+	_, _ = svc.ConnectIntegration(context.Background(), userID, domain.ProviderGoogle, "user@gmail.com", "tok", "primary", "Principal")
+
+	// Evento criado localmente no Vito (source="vito"), sem mapping ainda
+	localEvent := &domain.Event{
+		ID:        uuid.New().String(),
+		UserID:    userID,
+		Title:     "Evento Local Criado no Vito",
+		Source:    "vito",
+		StartAt:   time.Now().Add(24 * time.Hour).UTC(),
+		EndAt:     time.Now().Add(25 * time.Hour).UTC(),
+		CreatedAt: time.Now().UTC(),
+		UpdatedAt: time.Now().UTC(),
+	}
+	if err := eventRepo.Create(localEvent); err != nil {
+		t.Fatalf("falha ao criar evento local: %v", err)
+	}
+
+	// Executa ciclo de sincronização geral
+	if err := svc.SyncIntegration(context.Background(), userID, domain.ProviderGoogle); err != nil {
+		t.Fatalf("SyncIntegration falhou: %v", err)
+	}
+
+	// Deve ter propagado o evento local para o Google
+	if len(mockG.createdItems) == 0 {
+		t.Fatalf("esperava que SyncIntegration fizesse outbound de evento local pendente para o Google")
+	}
+
+	// Deve ter criado o mapping
+	mapping, err := syncRepo.GetMappingByEventID(localEvent.ID, domain.ProviderGoogle)
+	if err != nil || mapping == nil {
+		t.Fatalf("esperava mapping criado para evento local sincronizado no outbound: %v", err)
+	}
+}
+

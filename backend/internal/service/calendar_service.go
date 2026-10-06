@@ -223,13 +223,58 @@ func (s *CalendarService) UpdateEvent(userID string, event *domain.Event, update
 
 // DeleteEventsByTitle remove eventos que correspondam ao termo de busca (para comandos de voz/chat).
 func (s *CalendarService) DeleteEventsByTitle(userID, titleQuery string) (int, error) {
+	if s.syncPusher != nil {
+		from := time.Now().Add(-60 * 24 * time.Hour)
+		to := time.Now().Add(180 * 24 * time.Hour)
+		events, listErr := s.eventRepo.ListByUser(userID, from, to)
+		if listErr == nil {
+			cleanQuery := strings.ToLower(strings.TrimSpace(titleQuery))
+			for _, ev := range events {
+				if strings.Contains(strings.ToLower(ev.Title), cleanQuery) {
+					evID := ev.ID
+					go func(id string) {
+						ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+						defer cancel()
+						_ = s.syncPusher.DeleteEvent(ctx, userID, id)
+					}(evID)
+				}
+			}
+		}
+	}
 	return s.eventRepo.DeleteByTitle(userID, titleQuery)
 }
 
 // UpdateEventTimesByTitle ajusta o horário de início e término dos eventos que correspondam ao título.
 func (s *CalendarService) UpdateEventTimesByTitle(userID, titleQuery string, newStart, newEnd time.Time) (int, error) {
-	return s.eventRepo.UpdateTimesByTitle(userID, titleQuery, newStart, newEnd)
+	count, err := s.eventRepo.UpdateTimesByTitle(userID, titleQuery, newStart, newEnd)
+	if err != nil || count == 0 {
+		return count, err
+	}
+
+	if s.syncPusher != nil {
+		from := newStart.Add(-48 * time.Hour)
+		to := newEnd.Add(48 * time.Hour)
+		events, listErr := s.eventRepo.ListByUser(userID, from, to)
+		if listErr == nil {
+			cleanQuery := strings.ToLower(strings.TrimSpace(titleQuery))
+			for _, ev := range events {
+				if strings.Contains(strings.ToLower(ev.Title), cleanQuery) {
+					evCopy := ev
+					go func(evt *domain.Event) {
+						ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+						defer cancel()
+						if pErr := s.syncPusher.PushEvent(ctx, userID, evt); pErr != nil {
+							log.Printf("[CalendarService] Falha ao propagar atualização de '%s' para syncPusher: %v", evt.Title, pErr)
+						}
+					}(&evCopy)
+				}
+			}
+		}
+	}
+
+	return count, nil
 }
+
 
 // CreateRecurringEvents gera uma série de ocorrências para um evento recorrente (ex: semanal).
 func (s *CalendarService) CreateRecurringEvents(userID, title, description, location string, startAt, endAt time.Time, recurrence string, count int) ([]*domain.Event, error) {

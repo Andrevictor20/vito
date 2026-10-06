@@ -323,6 +323,43 @@ func (s *CalendarSyncService) SyncIntegration(ctx context.Context, userID, provi
 		}
 	}
 
+	// 2.1 Outbound Sync: propaga eventos locais do Vito sem mapeamento no Google
+	localEvents, _ := s.eventRepo.ListByUser(userID, from, to)
+	for _, le := range localEvents {
+		if le.Source != "" && le.Source != "vito" {
+			continue // evento importado de outro provedor externo
+		}
+		existingMap, _ := s.syncRepo.GetMappingByEventID(le.ID, providerName)
+		if existingMap == nil {
+			created, cErr := p.CreateEvent(ctx, creds, integration.CalendarID, &le)
+			if cErr != nil && isAuthError(cErr) {
+				if newCreds, rErr := p.RefreshToken(ctx, creds); rErr == nil && newCreds != "" {
+					creds = newCreds
+					if enc, encErr := crypto.Encrypt(newCreds, s.encKey); encErr == nil {
+						integration.EncryptedCredentials = enc
+						_ = s.syncRepo.UpsertIntegration(integration)
+					}
+					created, cErr = p.CreateEvent(ctx, creds, integration.CalendarID, &le)
+				}
+			}
+			if cErr == nil && created != nil {
+				hash := ComputeContentHash(le.Title, le.Description, le.Location, le.StartAt, le.EndAt)
+				newMap := &domain.ExternalEventMapping{
+					ID:              uuid.New().String(),
+					EventID:         le.ID,
+					UserID:          userID,
+					Provider:        providerName,
+					ExternalEventID: created.ExternalID,
+					ExternalETag:    created.ETag,
+					ContentHash:     hash,
+					LastSyncedAt:    now,
+					Status:          "synced",
+				}
+				_ = s.syncRepo.UpsertMapping(newMap)
+			}
+		}
+	}
+
 	// 3. Atualiza estado da integração
 	if res.NewSyncToken != "" {
 		integration.SyncToken = res.NewSyncToken
@@ -330,6 +367,14 @@ func (s *CalendarSyncService) SyncIntegration(ctx context.Context, userID, provi
 	integration.LastSyncedAt = &now
 	integration.UpdatedAt = now
 	return s.syncRepo.UpsertIntegration(integration)
+}
+
+func isAuthError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "401") || strings.Contains(msg, "expired") || strings.Contains(msg, "invalid_token")
 }
 
 // PushEvent propaga um evento do Vito para todas as integrações ativas do usuário.
@@ -364,6 +409,16 @@ func (s *CalendarSyncService) PushEvent(ctx context.Context, userID string, even
 			}
 
 			updated, err := p.UpdateEvent(ctx, creds, integ.CalendarID, mapping.ExternalEventID, event)
+			if err != nil && isAuthError(err) {
+				if newCreds, rErr := p.RefreshToken(ctx, creds); rErr == nil && newCreds != "" {
+					creds = newCreds
+					if enc, encErr := crypto.Encrypt(newCreds, s.encKey); encErr == nil {
+						integ.EncryptedCredentials = enc
+						_ = s.syncRepo.UpsertIntegration(&integ)
+					}
+					updated, err = p.UpdateEvent(ctx, creds, integ.CalendarID, mapping.ExternalEventID, event)
+				}
+			}
 			if err == nil && updated != nil {
 				mapping.ContentHash = hash
 				mapping.ExternalETag = updated.ETag
@@ -372,6 +427,16 @@ func (s *CalendarSyncService) PushEvent(ctx context.Context, userID string, even
 			}
 		} else {
 			created, err := p.CreateEvent(ctx, creds, integ.CalendarID, event)
+			if err != nil && isAuthError(err) {
+				if newCreds, rErr := p.RefreshToken(ctx, creds); rErr == nil && newCreds != "" {
+					creds = newCreds
+					if enc, encErr := crypto.Encrypt(newCreds, s.encKey); encErr == nil {
+						integ.EncryptedCredentials = enc
+						_ = s.syncRepo.UpsertIntegration(&integ)
+					}
+					created, err = p.CreateEvent(ctx, creds, integ.CalendarID, event)
+				}
+			}
 			if err == nil && created != nil {
 				newMap := &domain.ExternalEventMapping{
 					ID:              uuid.New().String(),

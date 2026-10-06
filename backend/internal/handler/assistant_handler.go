@@ -28,12 +28,34 @@ func NewAssistantHandler(astSvc *service.AssistantService, transcriber ai.AudioT
 }
 
 type assistantChatRequest struct {
-	Text      string `json:"text,omitempty"`
-	Prompt    string `json:"prompt,omitempty"`
-	AudioB64  string `json:"audio_b64,omitempty"`
-	AudioMime string `json:"audio_mime,omitempty"`
-	ImageB64  string `json:"image_b64,omitempty"`
-	Timezone  string `json:"timezone,omitempty"`
+	Text             string `json:"text,omitempty"`
+	Prompt           string `json:"prompt,omitempty"`
+	AudioB64         string `json:"audio_b64,omitempty"`
+	AudioMime        string `json:"audio_mime,omitempty"`
+	ImageB64         string `json:"image_b64,omitempty"`
+	Timezone         string `json:"timezone,omitempty"`
+	CurrentLocalTime string `json:"current_local_time,omitempty"`
+}
+
+func parseClientNow(rawTime, tz string) (time.Time, string) {
+	if tz == "" || tz == "UTC" || tz == "Etc/UTC" {
+		tz = "America/Sao_Paulo"
+	}
+	if rawTime != "" {
+		layouts := []string{
+			time.RFC3339Nano,
+			time.RFC3339,
+			"2006-01-02T15:04:05-07:00",
+			"2006-01-02T15:04:05Z",
+			"2006-01-02T15:04:05",
+		}
+		for _, layout := range layouts {
+			if t, err := time.Parse(layout, rawTime); err == nil {
+				return t, tz
+			}
+		}
+	}
+	return time.Now().UTC(), tz
 }
 
 func (h *AssistantHandler) Chat(w http.ResponseWriter, r *http.Request) {
@@ -59,13 +81,15 @@ func (h *AssistantHandler) Chat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	nowRef, tz := parseClientNow(req.CurrentLocalTime, req.Timezone)
+
 	input := ai.UserInput{
 		Text:      rawText,
 		AudioB64:  req.AudioB64,
 		AudioMime: req.AudioMime,
 		ImageB64:  req.ImageB64,
-		Timezone:  req.Timezone,
-		Now:       time.Now().UTC(),
+		Timezone:  tz,
+		Now:       nowRef,
 	}
 
 	resp, err := h.astSvc.Process(r.Context(), userID, input)
@@ -119,10 +143,7 @@ func (h *AssistantHandler) AudioChat(w http.ResponseWriter, r *http.Request) {
 		err = errors.New("transcritor Whisper não configurado")
 	}
 
-	tz := r.FormValue("timezone")
-	if tz == "" {
-		tz = "America/Sao_Paulo"
-	}
+	nowRef, tz := parseClientNow(r.FormValue("current_local_time"), r.FormValue("timezone"))
 
 	if err != nil {
 		log.Printf("⚠️ [AudioChat] Transcrição Whisper falhou (%v). Acionando fallback para áudio nativo...", err)
@@ -134,13 +155,13 @@ func (h *AssistantHandler) AudioChat(w http.ResponseWriter, r *http.Request) {
 			AudioB64:  base64.StdEncoding.EncodeToString(fileBytes),
 			AudioMime: mime,
 			Timezone:  tz,
-			Now:       time.Now().UTC(),
+			Now:       nowRef,
 		}
 	} else {
 		input = ai.UserInput{
 			Text:     transcript,
 			Timezone: tz,
-			Now:      time.Now().UTC(),
+			Now:      nowRef,
 		}
 	}
 
@@ -216,17 +237,14 @@ func (h *AssistantHandler) VisionChat(w http.ResponseWriter, r *http.Request) {
 		prompt = "Analise esta imagem e extraia eventos para a agenda ou tarefas a realizar."
 	}
 
-	tzVision := r.FormValue("timezone")
-	if tzVision == "" {
-		tzVision = "America/Sao_Paulo"
-	}
+	nowRef, tzVision := parseClientNow(r.FormValue("current_local_time"), r.FormValue("timezone"))
 
 	input := ai.UserInput{
 		Text:      prompt,
 		ImageB64:  base64.StdEncoding.EncodeToString(fileBytes),
 		ImageMime: mime,
 		Timezone:  tzVision,
-		Now:       time.Now().UTC(),
+		Now:       nowRef,
 	}
 
 	resp, err := h.astSvc.Process(r.Context(), userID, input)

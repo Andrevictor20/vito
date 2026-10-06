@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/handler"
@@ -29,12 +30,15 @@ func (m *mockTranscriber) Transcribe(ctx context.Context, audioReader io.Reader,
 }
 
 type mockAIGateway struct {
-	intent *ai.ParsedIntent
+	intent        *ai.ParsedIntent
+	capturedInput ai.UserInput
 }
 
 func (m *mockAIGateway) ParseIntent(ctx context.Context, input ai.UserInput) (*ai.ParsedIntent, error) {
+	m.capturedInput = input
 	return m.intent, nil
 }
+
 
 func TestAssistantHandler_AudioChat(t *testing.T) {
 	mockTrans := &mockTranscriber{text: "Lembrar de comprar leite"}
@@ -173,3 +177,57 @@ func TestAssistantHandler_VisionChat(t *testing.T) {
 		t.Errorf("expected ActionCreateTodo, got %s", resp.Action)
 	}
 }
+
+func TestAssistantHandler_Chat_CurrentLocalTime(t *testing.T) {
+	mockAI := &mockAIGateway{
+		intent: &ai.ParsedIntent{
+			Action:       ai.ActionCreateEvent,
+			Message:      "Reunião agendada!",
+			ProviderUsed: "MockAI",
+		},
+	}
+
+	astSvc := service.NewAssistantService(mockAI, nil, nil, nil)
+	astHandler := handler.NewAssistantHandler(astSvc, nil)
+
+	// Simula cliente enviando às 21:32 do dia 05/10/2026 em Brasília (-03:00)
+	clientLocalTime := "2026-10-05T21:32:00-03:00"
+	reqPayload := map[string]string{
+		"text":               "Marque reunião para amanhã",
+		"current_local_time": clientLocalTime,
+		"timezone":           "America/Sao_Paulo",
+	}
+	bodyBytes, _ := json.Marshal(reqPayload)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/assistant/chat", bytes.NewReader(bodyBytes))
+	req.Header.Set("Content-Type", "application/json")
+	ctx := context.WithValue(req.Context(), middleware.UserIDKey, "user-chat-1")
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	astHandler.Chat(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d. Body: %s", rr.Code, rr.Body.String())
+	}
+
+	// Verifica se o UserInput recebido pelo gateway ancorou o Now na data/hora informada pelo cliente
+	captured := mockAI.capturedInput
+	if captured.Now.IsZero() {
+		t.Fatalf("captured.Now não deveria ser zero")
+	}
+
+	// Converte para o fuso informado e verifica o dia civil
+	loc, err := time.LoadLocation("America/Sao_Paulo")
+	if err != nil {
+		loc = time.FixedZone("BRT", -3*3600)
+	}
+	nowInLoc := captured.Now.In(loc)
+	if nowInLoc.Day() != 5 || nowInLoc.Month() != 10 || nowInLoc.Year() != 2026 {
+		t.Fatalf("Dia local do usuário capturado incorretamente: %v (esperava 2026-10-05)", nowInLoc)
+	}
+	if nowInLoc.Hour() != 21 || nowInLoc.Minute() != 32 {
+		t.Fatalf("Hora local do usuário capturada incorretamente: %v (esperava 21:32)", nowInLoc)
+	}
+}
+

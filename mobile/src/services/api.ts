@@ -224,24 +224,61 @@ class ApiService {
 
   private getUserTimezone(): string {
     try {
-      return Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Sao_Paulo';
+      const resolved = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const offsetMinutes = new Date().getTimezoneOffset();
+      // No motor Hermes no Android, resolved frequentemente retorna 'UTC' ou 'Etc/UTC'
+      // mesmo quando o dispositivo está no Brasil (offset 180 = UTC-3).
+      if (!resolved || resolved === 'UTC' || resolved === 'Etc/UTC') {
+        if (offsetMinutes === 180) return 'America/Sao_Paulo';
+        if (offsetMinutes === 240) return 'America/Manaus';
+        if (offsetMinutes === 120) return 'America/Noronha';
+        if (offsetMinutes === 300) return 'America/Rio_Branco';
+        return 'America/Sao_Paulo';
+      }
+      return resolved;
     } catch {
       return 'America/Sao_Paulo';
     }
   }
 
+  private getCurrentLocalTimeISO(): string {
+    const now = new Date();
+    const tzo = -now.getTimezoneOffset();
+    const dif = tzo >= 0 ? '+' : '-';
+    const pad = (num: number) => (num < 10 ? '0' : '') + num;
+    return (
+      now.getFullYear() +
+      '-' +
+      pad(now.getMonth() + 1) +
+      '-' +
+      pad(now.getDate()) +
+      'T' +
+      pad(now.getHours()) +
+      ':' +
+      pad(now.getMinutes()) +
+      ':' +
+      pad(now.getSeconds()) +
+      dif +
+      pad(Math.floor(Math.abs(tzo) / 60)) +
+      ':' +
+      pad(Math.abs(tzo) % 60)
+    );
+  }
+
   // Assistant Chat
   async assistantChat(prompt: string, timezone?: string): Promise<AssistantChatResponse> {
     const tz = timezone || this.getUserTimezone();
+    const currentLocalTime = this.getCurrentLocalTimeISO();
     return this.request<AssistantChatResponse>('/api/v1/assistant/chat', {
       method: 'POST',
-      body: JSON.stringify({ prompt, timezone: tz }),
+      body: JSON.stringify({ prompt, timezone: tz, current_local_time: currentLocalTime }),
     });
   }
 
   // Assistant Audio (Groq Whisper v3)
   async assistantAudio(audioUri: string, filename: string = 'audio.m4a', timezone?: string): Promise<AssistantChatResponse> {
     const tz = timezone || this.getUserTimezone();
+    const currentLocalTime = this.getCurrentLocalTimeISO();
     const formData = new FormData();
     formData.append('audio', {
       uri: audioUri,
@@ -249,6 +286,7 @@ class ApiService {
       type: 'audio/m4a',
     } as unknown as Blob);
     formData.append('timezone', tz);
+    formData.append('current_local_time', currentLocalTime);
 
     const headers: Record<string, string> = {
       Accept: 'application/json',
@@ -287,6 +325,7 @@ class ApiService {
   // Assistant Vision (Gemini 2.5 Flash Multimodal)
   async assistantVision(imageUri: string, prompt?: string, filename: string = 'image.jpg', timezone?: string): Promise<AssistantChatResponse> {
     const tz = timezone || this.getUserTimezone();
+    const currentLocalTime = this.getCurrentLocalTimeISO();
     const formData = new FormData();
     formData.append('image', {
       uri: imageUri,
@@ -298,6 +337,7 @@ class ApiService {
       formData.append('prompt', prompt);
     }
     formData.append('timezone', tz);
+    formData.append('current_local_time', currentLocalTime);
 
     const headers: Record<string, string> = {
       Accept: 'application/json',

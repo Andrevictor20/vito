@@ -380,11 +380,14 @@ func (r *EventRepositorySQLite) UpdateTimesByTitle(userID, titleQuery string, ne
 	nowUTC := time.Now().UTC()
 	updatedCount := 0
 
+	loc := newStart.Location()
 	for _, item := range items {
-		targetStart := time.Date(
-			item.startAt.Year(), item.startAt.Month(), item.startAt.Day(),
-			newStart.Hour(), newStart.Minute(), newStart.Second(), 0, time.UTC,
+		itemLocal := item.startAt.In(loc)
+		targetLocal := time.Date(
+			itemLocal.Year(), itemLocal.Month(), itemLocal.Day(),
+			newStart.Hour(), newStart.Minute(), newStart.Second(), 0, loc,
 		)
+		targetStart := targetLocal.UTC()
 		targetEnd := targetStart.Add(dur)
 
 		queryUpdate := `UPDATE events SET start_at = ?, end_at = ?, updated_at = ? WHERE id = ? AND user_id = ?`

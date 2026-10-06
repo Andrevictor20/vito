@@ -257,3 +257,42 @@ func TestCalendarService_ConflictAlternativeSlots(t *testing.T) {
 	}
 }
 
+func TestCalendarService_UpdateEventTimesByTitle_PropagatesToSyncPusher(t *testing.T) {
+	calSvc, _ := setupCalendarService(t)
+	pusher := &mockSyncPusher{}
+	calSvc.SetSyncPusher(pusher)
+
+	start := time.Date(2026, 10, 7, 9, 0, 0, 0, time.UTC)
+	evt, _, err := calSvc.CreateEvent("user-cal-svc-1", "Reunião de Equipe", "", "Meet", start, start.Add(time.Hour))
+	if err != nil {
+		t.Fatalf("erro ao criar evento: %v", err)
+	}
+
+	time.Sleep(50 * time.Millisecond)
+	pusher.pushedEvents = nil // limpa o evento da criação
+
+	// Reagenda evento para as 17:00
+	newStart := time.Date(2026, 10, 7, 17, 0, 0, 0, time.UTC)
+	newEnd := newStart.Add(time.Hour)
+	count, err := calSvc.UpdateEventTimesByTitle("user-cal-svc-1", "Reunião de Equipe", newStart, newEnd)
+	if err != nil {
+		t.Fatalf("erro ao atualizar evento por título: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("esperava 1 evento atualizado, obteve %d", count)
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	if len(pusher.pushedEvents) == 0 {
+		t.Fatalf("esperava que PushEvent fosse acionado após UpdateEventTimesByTitle")
+	}
+	if pusher.pushedEvents[0].ID != evt.ID {
+		t.Errorf("ID do evento atualizado no pusher (%s) diverge do esperado (%s)", pusher.pushedEvents[0].ID, evt.ID)
+	}
+	if !pusher.pushedEvents[0].StartAt.Equal(newStart) {
+		t.Errorf("novo horário no pusher (%v) diverge do horário atualizado (%v)", pusher.pushedEvents[0].StartAt, newStart)
+	}
+}
+
+
