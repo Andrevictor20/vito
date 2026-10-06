@@ -29,8 +29,8 @@ type UserInput struct {
 	Timezone        string    `json:"timezone,omitempty"` // ex: "America/Sao_Paulo"
 	Now             time.Time `json:"now"`
 	ContextMemories []string  `json:"context_memories,omitempty"` // RAG in-context pessoal
-	ActiveSchedule  []string  `json:"active_schedule,omitempty"`   // Próximos compromissos
-	PendingTodos    []string  `json:"pending_todos,omitempty"`     // Tarefas urgentes/pendentes
+	ActiveSchedule  []string  `json:"active_schedule,omitempty"`  // Próximos compromissos
+	PendingTodos    []string  `json:"pending_todos,omitempty"`    // Tarefas urgentes/pendentes
 }
 
 // ParsedEvent dados extraídos para criação, atualização ou remoção de evento.
@@ -42,6 +42,9 @@ type ParsedEvent struct {
 	EndAt       time.Time `json:"end_at"`
 	Recurrence  string    `json:"recurrence,omitempty"`   // "WEEKLY", "DAILY", "MONTHLY"
 	TargetQuery string    `json:"target_query,omitempty"` // termo para busca ao atualizar/excluir (ex: "aula de inglês")
+
+	startWallClock bool
+	endWallClock   bool
 }
 
 // ParsedTodo dados extraídos para criação de to-do.
@@ -49,6 +52,8 @@ type ParsedTodo struct {
 	Title    string     `json:"title"`
 	Priority string     `json:"priority"` // low, medium, high
 	DueDate  *time.Time `json:"due_date,omitempty"`
+
+	dueWallClock bool
 }
 
 // ParsedIntent resultado normalizado da interpretação do assistente Toki-like.

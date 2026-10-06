@@ -115,15 +115,15 @@ Responda EXCLUSIVAMENTE com um objeto JSON válido, sem backticks markdown ou te
     "title": "Título conciso do evento",
     "description": "Detalhes mencionados se houver",
     "location": "Local se houver",
-    "start_at": "YYYY-MM-DDTHH:MM:SS%s" (ou em UTC YYYY-MM-DDTHH:MM:SSZ),
-    "end_at": "YYYY-MM-DDTHH:MM:SS%s" (ou em UTC YYYY-MM-DDTHH:MM:SSZ),
+    "start_at": "YYYY-MM-DDTHH:MM:SS" (horário LOCAL do usuário, SEM offset e SEM "Z"; fuso %s aplicado pelo sistema; use "" se não se aplicar),
+    "end_at": "YYYY-MM-DDTHH:MM:SS" (horário LOCAL do usuário, SEM offset e SEM "Z"; fuso %s aplicado pelo sistema; use "" se não se aplicar),
     "recurrence": "WEEKLY" | "DAILY" | "MONTHLY" (ou vazio se não for recorrente),
     "target_query": "Termo de busca para identificar o evento ao editar ou excluir"
   },
   "todo": {
     "title": "Descrição da tarefa",
     "priority": "low" | "medium" | "high",
-    "due_date": "YYYY-MM-DDTHH:MM:SS%s" (ou null)
+    "due_date": "YYYY-MM-DDTHH:MM:SS" (horário LOCAL, SEM offset; fuso %s) ou null
   },
   "memory_category": "família" | "preferência" | "trabalho" | "saúde" | "geral",
   "memory_content": "Fato ou preferência a ser guardada para o futuro"
@@ -134,7 +134,7 @@ DIRETRIZES DE AÇÃO E FOCO EM CALENDÁRIO:
    - CÁLCULO E MARCAÇÃO DE HORÁRIOS:
      * O usuário fala SEMPRE no horário LOCAL dele (%s).
      * Se o usuário disser "às 15h", "às 10:30" ou "às 8 da noite" (20h), configure o horário com a hora exata expressa pelo usuário.
-     * PREFIRA SEMPRE emitir "start_at" e "end_at" com o offset local (ex: "YYYY-MM-DDTHH:MM:SS%s"), pois isso elimina qualquer erro de fuso horário.
+     * Emita SEMPRE "start_at" e "end_at" exatamente com a hora dita pelo usuário, SEM offset e SEM "Z" (ex: "17h" -> "YYYY-MM-DDT17:00:00"). Nunca converta para UTC (offset local %s é aplicado pelo sistema).
      * Termos relativos:
        - "hoje": utilize a data %s
        - "amanhã": utilize a data %s

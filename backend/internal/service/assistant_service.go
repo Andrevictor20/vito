@@ -83,11 +83,13 @@ func (s *AssistantService) Process(ctx context.Context, userID string, input ai.
 			if len(events) < limit {
 				limit = len(events)
 			}
+			loc := userLocation(input.Timezone)
 			for _, ev := range events[:limit] {
+				start, end := ev.StartAt.In(loc), ev.EndAt.In(loc)
 				input.ActiveSchedule = append(input.ActiveSchedule, fmt.Sprintf("%s (%s às %s): %s",
-					ev.StartAt.Format("02/01/2006"),
-					ev.StartAt.Format("15:04"),
-					ev.EndAt.Format("15:04"),
+					start.Format("02/01/2006"),
+					start.Format("15:04"),
+					end.Format("15:04"),
 					ev.Title,
 				))
 			}
@@ -104,7 +106,7 @@ func (s *AssistantService) Process(ctx context.Context, userID string, input ai.
 			for _, td := range todos[:limit] {
 				dueStr := "Sem prazo"
 				if td.DueDate != nil {
-					dueStr = td.DueDate.Format("02/01 15:04")
+					dueStr = td.DueDate.In(userLocation(input.Timezone)).Format("02/01 15:04")
 				}
 				input.PendingTodos = append(input.PendingTodos, fmt.Sprintf("[%s - %s] %s", td.Priority, dueStr, td.Title))
 			}
@@ -276,4 +278,13 @@ func (s *AssistantService) Process(ctx context.Context, userID string, input ai.
 	}
 
 	return res, nil
+}
+
+func userLocation(timezone string) *time.Location {
+	if timezone != "" {
+		if loc, err := time.LoadLocation(timezone); err == nil {
+			return loc
+		}
+	}
+	return time.FixedZone("BRT", -3*3600)
 }

@@ -64,6 +64,7 @@ func (g *Gateway) ParseIntent(ctx context.Context, input UserInput) (*ParsedInte
 		intent, err := provider.ParseIntent(ctx, input)
 		if err == nil && intent != nil {
 			intent.ProviderUsed = provider.Name()
+			intent.LocalizeTimes(input.Timezone)
 			return intent, nil
 		}
 

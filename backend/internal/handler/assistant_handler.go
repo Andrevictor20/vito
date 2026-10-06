@@ -72,7 +72,8 @@ func (h *AssistantHandler) Chat(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
-		_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		log.Printf("❌ [Assistant] falha ao processar comando (user=%s): %v", userID, err)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": assistantFriendlyError})
 		return
 	}
 
@@ -147,7 +148,8 @@ func (h *AssistantHandler) AudioChat(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
-		_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error(), "transcript": transcript})
+		log.Printf("❌ [AudioChat] falha ao processar comando (user=%s): %v", userID, err)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": assistantFriendlyError, "transcript": transcript})
 		return
 	}
 
@@ -167,6 +169,9 @@ func (h *AssistantHandler) AudioChat(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(responseMap)
 }
+
+// assistantFriendlyError evita vazar detalhes internos (stack de provedores/JSON bruto) no chat.
+const assistantFriendlyError = "Não consegui processar seu pedido agora. Pode tentar de novo em instantes?"
 
 // VisionChat processa upload de imagem (recibos, fotos de documentos ou anotações) via multipart/form-data.
 func (h *AssistantHandler) VisionChat(w http.ResponseWriter, r *http.Request) {
@@ -228,7 +233,8 @@ func (h *AssistantHandler) VisionChat(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
-		_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		log.Printf("❌ [Assistant] falha ao processar comando (user=%s): %v", userID, err)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": assistantFriendlyError})
 		return
 	}
 

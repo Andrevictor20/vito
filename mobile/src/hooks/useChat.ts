@@ -170,11 +170,12 @@ export function useChat(onDataChanged?: () => void) {
         if (res.event || res.todo || res.action_performed !== 'none') {
           onDataChanged?.();
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
+        console.warn('[useChat] falha no assistente:', err);
         const errorMsg: ChatMessage = {
           id: `err-${Date.now()}`,
           sender: 'vito',
-          text: `Desculpe, ocorreu uma falha de comunicação: ${err?.message || 'Erro desconhecido'}`,
+          text: 'Não consegui processar seu pedido agora. Pode tentar de novo em instantes?',
           timestamp: new Date().toISOString(),
         };
         const withError = [...withUser, errorMsg];
@@ -231,11 +232,12 @@ export function useChat(onDataChanged?: () => void) {
         if (res.event || res.todo || res.action_performed !== 'none') {
           onDataChanged?.();
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
+        console.warn('[useChat] falha no assistente:', err);
         const errorMsg: ChatMessage = {
           id: `err-audio-${Date.now()}`,
           sender: 'vito',
-          text: `Não consegui processar o áudio: ${err?.message || 'Erro desconhecido'}`,
+          text: 'Não consegui entender o áudio agora. Pode tentar de novo ou digitar o pedido?',
           timestamp: new Date().toISOString(),
         };
         const withError = [...withUser, errorMsg];
@@ -285,11 +287,12 @@ export function useChat(onDataChanged?: () => void) {
         if (res.event || res.todo || res.action_performed !== 'none') {
           onDataChanged?.();
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
+        console.warn('[useChat] falha no assistente:', err);
         const errorMsg: ChatMessage = {
           id: `err-img-${Date.now()}`,
           sender: 'vito',
-          text: `Falha ao processar imagem: ${err?.message || 'Erro desconhecido'}`,
+          text: 'Não consegui analisar a imagem agora. Pode tentar de novo em instantes?',
           timestamp: new Date().toISOString(),
         };
         const withError = [...withUser, errorMsg];
