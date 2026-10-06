@@ -7,13 +7,14 @@ import (
 
 // Config armazena as configurações do ambiente do servidor Vito.
 type Config struct {
-	Port             string
-	Environment      string
-	DBPath           string
-	JWTSecret        string
-	GeminiAPIKey     string
-	OpenRouterAPIKey string
-	GroqAPIKey       string
+	Port               string
+	Environment        string
+	DBPath             string
+	JWTSecret          string
+	GeminiAPIKey       string
+	GeminiModel        string
+	OpenRouterAPIKey   string
+	GroqAPIKey         string
 	GoogleClientID     string
 	GoogleClientSecret string
 	GoogleRedirectURL  string
@@ -48,6 +49,11 @@ func Load() *Config {
 		geminiKey = os.Getenv("GOOGLE_AI_API_KEY")
 	}
 
+	geminiModel := os.Getenv("GEMINI_MODEL")
+	if geminiModel == "" {
+		geminiModel = "gemini-2.5-flash"
+	}
+
 	googleRedirectURL := os.Getenv("GOOGLE_REDIRECT_URL")
 	if googleRedirectURL == "" {
 		googleRedirectURL = "https://vito.rasppi.cloud/api/v1/auth/google/callback"
@@ -59,6 +65,7 @@ func Load() *Config {
 		DBPath:             dbPath,
 		JWTSecret:          jwtSecret,
 		GeminiAPIKey:       geminiKey,
+		GeminiModel:        geminiModel,
 		OpenRouterAPIKey:   os.Getenv("OPENROUTER_API_KEY"),
 		GroqAPIKey:         os.Getenv("GROQ_API_KEY"),
 		GoogleClientID:     os.Getenv("GOOGLE_CLIENT_ID"),

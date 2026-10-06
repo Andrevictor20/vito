@@ -42,8 +42,8 @@ func main() {
 	// 3. Provedores de IA & AI Gateway com Failover
 	var aiProviders []ai.Provider
 	if cfg.GeminiAPIKey != "" {
-		log.Println("🤖 [AI Provider] Google AI Studio ativado.")
-		aiProviders = append(aiProviders, ai.NewGeminiProvider(cfg.GeminiAPIKey, "gemini-flash-latest"))
+		log.Printf("🤖 [AI Provider] Google AI Studio ativado (%s).", cfg.GeminiModel)
+		aiProviders = append(aiProviders, ai.NewGeminiProvider(cfg.GeminiAPIKey, cfg.GeminiModel))
 	}
 	if cfg.GroqAPIKey != "" {
 		log.Println("🤖 [AI Provider] Groq Cloud ativado como fallback.")

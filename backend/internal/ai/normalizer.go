@@ -64,5 +64,7 @@ func UnmarshalIntent(raw string, target *ParsedIntent) error {
 		return fmt.Errorf("falha ao decodificar json estruturado da ia: %w (raw: %s)", err, string(cleanBytes))
 	}
 
+	target.Action = IntentAction(strings.ToUpper(string(target.Action)))
+
 	return nil
 }

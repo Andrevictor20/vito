@@ -289,10 +289,15 @@ export function useChat(onDataChanged?: () => void) {
         }
       } catch (err: unknown) {
         console.warn('[useChat] falha no assistente:', err);
+        const errMsg = err instanceof Error ? err.message : '';
+        let fallbackText = 'Não consegui analisar a imagem agora. Pode tentar de novo em instantes?';
+        if (errMsg && (errMsg.includes('tempo limite') || errMsg.includes('60s') || errMsg.includes('Network request failed'))) {
+          fallbackText = 'O envio da imagem demorou mais do que o esperado ou houve instabilidade de rede. Verifique sua conexão e tente novamente.';
+        }
         const errorMsg: ChatMessage = {
           id: `err-img-${Date.now()}`,
           sender: 'vito',
-          text: 'Não consegui analisar a imagem agora. Pode tentar de novo em instantes?',
+          text: fallbackText,
           timestamp: new Date().toISOString(),
         };
         const withError = [...withUser, errorMsg];
