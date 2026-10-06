@@ -354,3 +354,93 @@ func TestGoogleProvider_FetchEvents_AllDayExclusiveEnd(t *testing.T) {
 	}
 }
 
+func TestGoogleProvider_CreateUpdateDelete_EscapedCalendarID(t *testing.T) {
+	var capturedCreatePath, capturedUpdatePath, capturedDeletePath string
+	var capturedCreatePayload map[string]interface{}
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			capturedCreatePath = r.RequestURI
+			_ = json.NewDecoder(r.Body).Decode(&capturedCreatePayload)
+			w.WriteHeader(http.StatusCreated)
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"id":     "created-123",
+				"etag":   `"etag-123"`,
+				"status": "confirmed",
+			})
+		case http.MethodPatch:
+			capturedUpdatePath = r.RequestURI
+			w.WriteHeader(http.StatusOK)
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"id":     "updated-123",
+				"etag":   `"etag-updated-123"`,
+				"status": "confirmed",
+			})
+		case http.MethodDelete:
+			capturedDeletePath = r.RequestURI
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	}))
+	defer ts.Close()
+
+	provider := calendar.NewGoogleProvider(calendar.GoogleConfig{
+		BaseURL:    ts.URL,
+		HTTPClient: ts.Client(),
+	})
+
+	now := time.Now().UTC()
+	// Evento com EndAt igual ou anterior a StartAt para validar ajuste defensivo
+	event := &domain.Event{
+		Title:   "Almoço Executivo",
+		StartAt: now,
+		EndAt:   now, // Deve ser ajustado automaticamente para now + 1h
+	}
+
+	calID := "andrevictor20@gmail.com"
+	created, err := provider.CreateEvent(context.Background(), "token", calID, event)
+	if err != nil {
+		t.Fatalf("CreateEvent falhou: %v", err)
+	}
+	if created.ExternalID != "created-123" {
+		t.Errorf("ID inesperado: %s", created.ExternalID)
+	}
+
+	expectedPath := "/calendar/v3/calendars/andrevictor20%40gmail.com/events"
+	if capturedCreatePath != expectedPath {
+		t.Errorf("Path do CreateEvent incorreto: esperava %s, obteve %s", expectedPath, capturedCreatePath)
+	}
+
+	// Valida que end.dateTime foi ajustado após start.dateTime
+	startStr := capturedCreatePayload["start"].(map[string]interface{})["dateTime"].(string)
+	endStr := capturedCreatePayload["end"].(map[string]interface{})["dateTime"].(string)
+	tStart, _ := time.Parse(time.RFC3339, startStr)
+	tEnd, _ := time.Parse(time.RFC3339, endStr)
+	if !tEnd.After(tStart) {
+		t.Errorf("esperava tEnd posterior a tStart, mas tStart=%v tEnd=%v", tStart, tEnd)
+	}
+
+	// UpdateEvent
+	_, err = provider.UpdateEvent(context.Background(), "token", calID, "ext-999", event)
+	if err != nil {
+		t.Fatalf("UpdateEvent falhou: %v", err)
+	}
+	expectedUpdatePath := "/calendar/v3/calendars/andrevictor20%40gmail.com/events/ext-999"
+	if capturedUpdatePath != expectedUpdatePath {
+		t.Errorf("Path do UpdateEvent incorreto: esperava %s, obteve %s", expectedUpdatePath, capturedUpdatePath)
+	}
+
+	// DeleteEvent
+	err = provider.DeleteEvent(context.Background(), "token", calID, "ext-999")
+	if err != nil {
+		t.Fatalf("DeleteEvent falhou: %v", err)
+	}
+	expectedDeletePath := "/calendar/v3/calendars/andrevictor20%40gmail.com/events/ext-999"
+	if capturedDeletePath != expectedDeletePath {
+		t.Errorf("Path do DeleteEvent incorreto: esperava %s, obteve %s", expectedDeletePath, capturedDeletePath)
+	}
+}
+
+

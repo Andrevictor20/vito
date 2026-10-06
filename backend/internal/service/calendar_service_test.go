@@ -192,14 +192,27 @@ func TestCalendarService_SyncPusherIntegration(t *testing.T) {
 		t.Errorf("evento empurrado diverge do criado")
 	}
 
-	err = calSvc.DeleteEvent(evt.ID, "user-cal-svc-1")
+	// Testa UpdateEvent propagando para syncPusher
+	evt.Title = "Alinhamento Diretoria Atualizado"
+	_, _, err = calSvc.UpdateEvent("user-cal-svc-1", evt, false)
 	if err != nil {
-		t.Fatalf("erro ao deletar evento: %v", err)
+		t.Fatalf("erro ao atualizar evento: %v", err)
 	}
 
 	time.Sleep(50 * time.Millisecond)
-	if len(pusher.deletedIDs) == 0 || pusher.deletedIDs[0] != evt.ID {
-		t.Errorf("esperava DeleteEvent propagado para o pusher")
+	if len(pusher.pushedEvents) < 2 {
+		t.Fatalf("esperava que UpdateEvent propagasse alteração para o pusher")
+	}
+
+	// Testa DeleteEventWithOption propagando para syncPusher
+	delCount, err := calSvc.DeleteEventWithOption(evt.ID, "user-cal-svc-1", false)
+	if err != nil || delCount != 1 {
+		t.Fatalf("erro ao deletar com opção: %v", err)
+	}
+
+	time.Sleep(50 * time.Millisecond)
+	if len(pusher.deletedIDs) == 0 || pusher.deletedIDs[len(pusher.deletedIDs)-1] != evt.ID {
+		t.Errorf("esperava DeleteEventWithOption propagado para o pusher")
 	}
 }
 

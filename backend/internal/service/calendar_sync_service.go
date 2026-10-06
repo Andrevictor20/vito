@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"log"
 	"strings"
@@ -123,6 +124,25 @@ func ClassifyEvent(title, description string) (string, string) {
 
 // ConnectIntegration armazena de forma criptografada as credenciais e ativa a integração.
 func (s *CalendarSyncService) ConnectIntegration(ctx context.Context, userID, provider, email, rawCredentials, calendarID, calendarName string) (*domain.CalendarIntegration, error) {
+	// Se já existe uma integração com refresh_token válido e o novo payload não trouxe refresh_token,
+	// preserva o refresh_token existente para evitar invalidação de sessões de longa duração.
+	existing, _ := s.syncRepo.GetIntegration(userID, provider)
+	if existing != nil && existing.EncryptedCredentials != "" {
+		if oldCreds, decErr := crypto.Decrypt(existing.EncryptedCredentials, s.encKey); decErr == nil {
+			var oldMap, newMap map[string]interface{}
+			if json.Unmarshal([]byte(oldCreds), &oldMap) == nil && json.Unmarshal([]byte(rawCredentials), &newMap) == nil {
+				oldRef, _ := oldMap["refresh_token"].(string)
+				newRef, _ := newMap["refresh_token"].(string)
+				if newRef == "" && oldRef != "" {
+					newMap["refresh_token"] = oldRef
+					if merged, mErr := json.Marshal(newMap); mErr == nil {
+						rawCredentials = string(merged)
+					}
+				}
+			}
+		}
+	}
+
 	encrypted, err := crypto.Encrypt(rawCredentials, s.encKey)
 	if err != nil {
 		return nil, fmt.Errorf("falha ao criptografar credenciais: %w", err)
@@ -374,7 +394,14 @@ func isAuthError(err error) bool {
 		return false
 	}
 	msg := strings.ToLower(err.Error())
-	return strings.Contains(msg, "401") || strings.Contains(msg, "expired") || strings.Contains(msg, "invalid_token")
+	return strings.Contains(msg, "401") ||
+		strings.Contains(msg, "403") ||
+		strings.Contains(msg, "expired") ||
+		strings.Contains(msg, "invalid_token") ||
+		strings.Contains(msg, "invalid_grant") ||
+		strings.Contains(msg, "unauthorized") ||
+		strings.Contains(msg, "autherror") ||
+		strings.Contains(msg, "credentials")
 }
 
 // PushEvent propaga um evento do Vito para todas as integrações ativas do usuário.
@@ -386,6 +413,7 @@ func (s *CalendarSyncService) PushEvent(ctx context.Context, userID string, even
 
 	hash := ComputeContentHash(event.Title, event.Description, event.Location, event.StartAt, event.EndAt)
 	now := time.Now().UTC()
+	var lastErr error
 
 	for _, integ := range integrations {
 		if integ.Status != domain.IntegrationStatusActive {
@@ -394,11 +422,15 @@ func (s *CalendarSyncService) PushEvent(ctx context.Context, userID string, even
 
 		p, err := s.getProvider(integ.Provider)
 		if err != nil {
+			lastErr = err
+			log.Printf("[CalendarSync] Provedor '%s' não encontrado para usuário %s: %v", integ.Provider, userID, err)
 			continue
 		}
 
 		creds, err := crypto.Decrypt(integ.EncryptedCredentials, s.encKey)
 		if err != nil {
+			lastErr = err
+			log.Printf("[CalendarSync] Falha ao descriptografar credenciais para %s (usuário %s): %v", integ.Provider, userID, err)
 			continue
 		}
 
@@ -419,11 +451,15 @@ func (s *CalendarSyncService) PushEvent(ctx context.Context, userID string, even
 					updated, err = p.UpdateEvent(ctx, creds, integ.CalendarID, mapping.ExternalEventID, event)
 				}
 			}
-			if err == nil && updated != nil {
+			if err != nil {
+				lastErr = err
+				log.Printf("[CalendarSync] Falha ao atualizar evento '%s' em %s (%s): %v", event.Title, integ.Provider, integ.AccountEmail, err)
+			} else if updated != nil {
 				mapping.ContentHash = hash
 				mapping.ExternalETag = updated.ETag
 				mapping.LastSyncedAt = now
 				_ = s.syncRepo.UpsertMapping(mapping)
+				log.Printf("[CalendarSync] Evento '%s' atualizado com sucesso em %s (%s)", event.Title, integ.Provider, integ.AccountEmail)
 			}
 		} else {
 			created, err := p.CreateEvent(ctx, creds, integ.CalendarID, event)
@@ -437,7 +473,10 @@ func (s *CalendarSyncService) PushEvent(ctx context.Context, userID string, even
 					created, err = p.CreateEvent(ctx, creds, integ.CalendarID, event)
 				}
 			}
-			if err == nil && created != nil {
+			if err != nil {
+				lastErr = err
+				log.Printf("[CalendarSync] Falha ao propagar evento '%s' para %s (%s): %v", event.Title, integ.Provider, integ.AccountEmail, err)
+			} else if created != nil {
 				newMap := &domain.ExternalEventMapping{
 					ID:              uuid.New().String(),
 					EventID:         event.ID,
@@ -450,11 +489,12 @@ func (s *CalendarSyncService) PushEvent(ctx context.Context, userID string, even
 					Status:          "synced",
 				}
 				_ = s.syncRepo.UpsertMapping(newMap)
+				log.Printf("[CalendarSync] Evento '%s' criado com sucesso em %s (%s, extID %s)", event.Title, integ.Provider, integ.AccountEmail, created.ExternalID)
 			}
 		}
 	}
 
-	return nil
+	return lastErr
 }
 
 // DeleteEvent remove um evento do Vito e propaga a exclusão para as agendas remotas.

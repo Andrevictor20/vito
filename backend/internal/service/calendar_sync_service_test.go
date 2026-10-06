@@ -2,12 +2,14 @@ package service_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 
+	"github.com/andrevmp/vito/backend/internal/crypto"
 	"github.com/andrevmp/vito/backend/internal/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/integrations/calendar"
@@ -20,6 +22,7 @@ type mockProvider struct {
 	fetchResult           *calendar.SyncResult
 	fetchErr              error
 	createErr             error
+	permanentCreateErr    error
 	createdItems          []*domain.Event
 	updatedItems          []*domain.Event
 	deletedEvents         []string
@@ -38,6 +41,9 @@ func (m *mockProvider) FetchEvents(ctx context.Context, credentials, calendarID,
 	return &calendar.SyncResult{Items: []calendar.SyncItem{}}, nil
 }
 func (m *mockProvider) CreateEvent(ctx context.Context, credentials, calendarID string, event *domain.Event) (*calendar.SyncItem, error) {
+	if m.permanentCreateErr != nil {
+		return nil, m.permanentCreateErr
+	}
 	if m.createErr != nil {
 		err := m.createErr
 		m.createErr = nil // limpa após falha simulada (ex: após refresh)
@@ -331,4 +337,75 @@ func TestCalendarSyncService_SyncIntegration_OutboundLocalEvents(t *testing.T) {
 		t.Fatalf("esperava mapping criado para evento local sincronizado no outbound: %v", err)
 	}
 }
+
+func TestCalendarSyncService_ConnectIntegration_PreservesRefreshToken(t *testing.T) {
+	svc, _, syncRepo, userID := setupServiceTest(t)
+
+	// 1. Conexão inicial com refresh_token
+	initialCreds := `{"access_token":"initial-access","refresh_token":"original-secret-refresh","expires_in":3600}`
+	_, err := svc.ConnectIntegration(context.Background(), userID, domain.ProviderGoogle, "user@gmail.com", initialCreds, "primary", "Google Principal")
+	if err != nil {
+		t.Fatalf("ConnectIntegration falhou: %v", err)
+	}
+
+	// 2. Reconexão posterior onde o Google não reenviou refresh_token (comum em logins subsequentes)
+	subsequentCreds := `{"access_token":"new-access-token","refresh_token":"","expires_in":3600}`
+	_, err = svc.ConnectIntegration(context.Background(), userID, domain.ProviderGoogle, "user@gmail.com", subsequentCreds, "primary", "Google Principal")
+	if err != nil {
+		t.Fatalf("segunda ConnectIntegration falhou: %v", err)
+	}
+
+	// 3. Recupera a integração salva e verifica que o refresh_token original foi preservado
+	integ, err := syncRepo.GetIntegration(userID, domain.ProviderGoogle)
+	if err != nil || integ == nil {
+		t.Fatalf("falha ao buscar integração: %v", err)
+	}
+
+	encKey := "test-encryption-key-32-chars-long"
+	decCreds, err := crypto.Decrypt(integ.EncryptedCredentials, encKey)
+	if err != nil {
+		t.Fatalf("falha ao descriptografar: %v", err)
+	}
+
+	var parsed map[string]interface{}
+	if err := json.Unmarshal([]byte(decCreds), &parsed); err != nil {
+		t.Fatalf("JSON inválido: %v", err)
+	}
+
+	if parsed["refresh_token"] != "original-secret-refresh" {
+		t.Fatalf("esperava que refresh_token fosse preservado como 'original-secret-refresh', obteve: %v", parsed["refresh_token"])
+	}
+	if parsed["access_token"] != "new-access-token" {
+		t.Fatalf("esperava que access_token fosse atualizado para 'new-access-token', obteve: %v", parsed["access_token"])
+	}
+}
+
+func TestCalendarSyncService_PushEvent_ReturnsErrorOnProviderFailure(t *testing.T) {
+	svc, eventRepo, _, userID := setupServiceTest(t)
+
+	mockG := &mockProvider{
+		name:               domain.ProviderGoogle,
+		permanentCreateErr: errors.New("Google Calendar falhou ao criar evento (status 403): insufficientPermissions"),
+	}
+	svc.RegisterProvider(mockG)
+
+	_, _ = svc.ConnectIntegration(context.Background(), userID, domain.ProviderGoogle, "user@gmail.com", "tok", "primary", "Principal")
+
+	evt := &domain.Event{
+		ID:        uuid.New().String(),
+		UserID:    userID,
+		Title:     "Reunião com erro permanente",
+		StartAt:   time.Now().UTC(),
+		EndAt:     time.Now().Add(time.Hour).UTC(),
+		CreatedAt: time.Now().UTC(),
+		UpdatedAt: time.Now().UTC(),
+	}
+	_ = eventRepo.Create(evt)
+
+	err := svc.PushEvent(context.Background(), userID, evt)
+	if err == nil {
+		t.Fatalf("esperava que PushEvent retornasse erro quando provider falha de forma permanente")
+	}
+}
+
 

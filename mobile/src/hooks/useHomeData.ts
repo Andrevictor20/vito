@@ -85,6 +85,8 @@ export function useHomeData() {
         });
       }
       await loadData(true);
+      // Reconciliação transparente em segundo plano com o Google Calendar
+      api.syncCalendar('google').catch(() => {});
       return res;
     } catch (e) {
       console.error('Erro ao criar evento diretamente:', e);

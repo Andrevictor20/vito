@@ -363,17 +363,25 @@ func (p *GoogleProvider) CreateEvent(ctx context.Context, credentials, calendarI
 		calendarID = "primary"
 	}
 
-	reqURL := fmt.Sprintf("%s/calendar/v3/calendars/%s/events", p.cfg.BaseURL, url.PathEscape(calendarID))
+	calPath := url.PathEscape(calendarID)
+	calPath = strings.ReplaceAll(calPath, "@", "%40")
+	reqURL := fmt.Sprintf("%s/calendar/v3/calendars/%s/events", p.cfg.BaseURL, calPath)
+
+	startAt := event.StartAt.UTC()
+	endAt := event.EndAt.UTC()
+	if endAt.Before(startAt) || endAt.Equal(startAt) {
+		endAt = startAt.Add(time.Hour)
+	}
 
 	payload := map[string]interface{}{
 		"summary":     event.Title,
 		"description": event.Description,
 		"location":    event.Location,
 		"start": map[string]string{
-			"dateTime": event.StartAt.UTC().Format(time.RFC3339),
+			"dateTime": startAt.Format(time.RFC3339),
 		},
 		"end": map[string]string{
-			"dateTime": event.EndAt.UTC().Format(time.RFC3339),
+			"dateTime": endAt.Format(time.RFC3339),
 		},
 	}
 
@@ -423,17 +431,25 @@ func (p *GoogleProvider) UpdateEvent(ctx context.Context, credentials, calendarI
 		calendarID = "primary"
 	}
 
-	reqURL := fmt.Sprintf("%s/calendar/v3/calendars/%s/events/%s", p.cfg.BaseURL, url.PathEscape(calendarID), url.PathEscape(externalID))
+	calPath := url.PathEscape(calendarID)
+	calPath = strings.ReplaceAll(calPath, "@", "%40")
+	reqURL := fmt.Sprintf("%s/calendar/v3/calendars/%s/events/%s", p.cfg.BaseURL, calPath, url.PathEscape(externalID))
+
+	startAt := event.StartAt.UTC()
+	endAt := event.EndAt.UTC()
+	if endAt.Before(startAt) || endAt.Equal(startAt) {
+		endAt = startAt.Add(time.Hour)
+	}
 
 	payload := map[string]interface{}{
 		"summary":     event.Title,
 		"description": event.Description,
 		"location":    event.Location,
 		"start": map[string]string{
-			"dateTime": event.StartAt.UTC().Format(time.RFC3339),
+			"dateTime": startAt.Format(time.RFC3339),
 		},
 		"end": map[string]string{
-			"dateTime": event.EndAt.UTC().Format(time.RFC3339),
+			"dateTime": endAt.Format(time.RFC3339),
 		},
 	}
 
@@ -483,7 +499,9 @@ func (p *GoogleProvider) DeleteEvent(ctx context.Context, credentials, calendarI
 		calendarID = "primary"
 	}
 
-	reqURL := fmt.Sprintf("%s/calendar/v3/calendars/%s/events/%s", p.cfg.BaseURL, url.PathEscape(calendarID), url.PathEscape(externalID))
+	calPath := url.PathEscape(calendarID)
+	calPath = strings.ReplaceAll(calPath, "@", "%40")
+	reqURL := fmt.Sprintf("%s/calendar/v3/calendars/%s/events/%s", p.cfg.BaseURL, calPath, url.PathEscape(externalID))
 	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, reqURL, nil)
 	if err != nil {
 		return err

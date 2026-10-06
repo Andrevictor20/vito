@@ -75,7 +75,7 @@ func (s *CalendarService) CreateEvent(userID, title, description, location strin
 
 	if s.syncPusher != nil {
 		go func(evt *domain.Event) {
-			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
 			if err := s.syncPusher.PushEvent(ctx, userID, evt); err != nil {
 				log.Printf("[CalendarService] Falha ao sincronizar novo evento '%s' na agenda remota: %v", evt.Title, err)
@@ -180,6 +180,14 @@ func (s *CalendarService) DeleteEvent(id, userID string) error {
 
 // DeleteEventWithOption remove um evento individual ou toda a série recorrente.
 func (s *CalendarService) DeleteEventWithOption(id, userID string, allSeries bool) (int, error) {
+	if s.syncPusher != nil {
+		go func(eventID string) {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			_ = s.syncPusher.DeleteEvent(ctx, userID, eventID)
+		}(id)
+	}
+
 	if allSeries {
 		return s.eventRepo.DeleteSeries(id, userID)
 	}
@@ -205,6 +213,17 @@ func (s *CalendarService) UpdateEvent(userID string, event *domain.Event, update
 		if event.Color == "" {
 			event.Color = col
 		}
+	}
+
+	if s.syncPusher != nil {
+		evCopy := *event
+		go func(evt *domain.Event) {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			if pErr := s.syncPusher.PushEvent(ctx, userID, evt); pErr != nil {
+				log.Printf("[CalendarService] Falha ao propagar atualização de '%s' para syncPusher: %v", evt.Title, pErr)
+			}
+		}(&evCopy)
 	}
 
 	if updateSeries {
