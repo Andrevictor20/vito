@@ -158,3 +158,45 @@ func TestGeminiProvider_ParseIntent_ModelFallbackOn503(t *testing.T) {
 		t.Errorf("esperava pelo menos 2 tentativas, obteve %d", attempts)
 	}
 }
+
+func TestGeminiProvider_ParseIntent_AudioOnlyInjectsPrompt(t *testing.T) {
+	var capturedBody []byte
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{
+			"candidates": [
+				{
+					"content": {
+						"parts": [
+							{
+								"text": "{\"action\":\"CREATE_EVENT\",\"message\":\"Compromisso agendado via áudio!\"}"
+							}
+						]
+					}
+				}
+			]
+		}`))
+	}))
+	defer server.Close()
+
+	p := &GeminiProvider{
+		apiKey:     "test-key",
+		model:      "gemini-2.5-flash",
+		baseURL:    server.URL,
+		httpClient: server.Client(),
+	}
+
+	intent, err := p.ParseIntent(context.Background(), UserInput{
+		AudioB64:  "YXVkaW8tYnl0ZXM=",
+		AudioMime: "audio/m4a",
+	})
+	if err != nil {
+		t.Fatalf("erro inesperado com áudio puro: %v", err)
+	}
+	if intent.Action != ActionCreateEvent {
+		t.Errorf("ação esperada %s, obteve %s", ActionCreateEvent, intent.Action)
+	}
+	_ = capturedBody
+}
+

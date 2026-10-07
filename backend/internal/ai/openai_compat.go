@@ -116,6 +116,7 @@ func (p *OpenAICompatProvider) ParseIntent(ctx context.Context, input UserInput)
 	if err != nil {
 		return nil, err
 	}
+	req.Header.Set("User-Agent", "vito-assistant/1.0")
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+p.apiKey)
 

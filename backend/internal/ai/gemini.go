@@ -92,13 +92,22 @@ func (p *GeminiProvider) ParseIntent(ctx context.Context, input UserInput) (*Par
 
 	systemPrompt := BuildSystemPromptFromInput(input)
 
+	promptText := input.Text
+	if promptText == "" {
+		if input.AudioB64 != "" {
+			promptText = "Ouça atentamente esta mensagem de áudio do usuário e processe a solicitação gerando o JSON estruturado."
+		} else if input.ImageB64 != "" {
+			promptText = "Analise atentamente esta imagem e processe a solicitação gerando o JSON estruturado."
+		}
+	}
+
 	var userParts []geminiPart
-	if input.Text != "" {
-		userParts = append(userParts, geminiPart{Text: SanitizeUntrustedInput(input.Text)})
+	if promptText != "" {
+		userParts = append(userParts, geminiPart{Text: SanitizeUntrustedInput(promptText)})
 	}
 	if input.AudioB64 != "" {
 		mime := input.AudioMime
-		if mime == "" {
+		if mime == "" || mime == "audio/m4a" || mime == "audio/x-m4a" {
 			mime = "audio/mp4"
 		}
 		userParts = append(userParts, geminiPart{

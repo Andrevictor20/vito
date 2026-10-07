@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/andrevmp/vito/backend/internal/ai"
@@ -145,13 +146,18 @@ func (h *AssistantHandler) AudioChat(w http.ResponseWriter, r *http.Request) {
 
 	nowRef, tz := parseClientNow(r.FormValue("current_local_time"), r.FormValue("timezone"))
 
-	if err != nil {
-		log.Printf("⚠️ [AudioChat] Transcrição Whisper falhou (%v). Acionando fallback para áudio nativo...", err)
+	if err != nil || strings.TrimSpace(transcript) == "" || strings.TrimSpace(transcript) == "." {
+		if err != nil {
+			log.Printf("⚠️ [AudioChat] Transcrição Whisper falhou (%v). Acionando fallback para áudio nativo...", err)
+		} else {
+			log.Println("⚠️ [AudioChat] Transcrição Whisper retornou vazia. Acionando fallback para áudio nativo...")
+		}
 		mime := header.Header.Get("Content-Type")
 		if mime == "" {
 			mime = "audio/m4a"
 		}
 		input = ai.UserInput{
+			Text:      "Ouça atentamente esta mensagem de voz e extraia compromissos para a agenda ou tarefas a realizar.",
 			AudioB64:  base64.StdEncoding.EncodeToString(fileBytes),
 			AudioMime: mime,
 			Timezone:  tz,

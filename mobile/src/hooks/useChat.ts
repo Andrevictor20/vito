@@ -234,10 +234,15 @@ export function useChat(onDataChanged?: () => void) {
         }
       } catch (err: unknown) {
         console.warn('[useChat] falha no assistente:', err);
+        const errMsg = err instanceof Error ? err.message : '';
+        let fallbackText = 'Não consegui entender o áudio agora. Pode tentar de novo ou digitar o pedido?';
+        if (errMsg && (errMsg.includes('tempo limite') || errMsg.includes('60s') || errMsg.includes('Network request failed'))) {
+          fallbackText = 'O processamento do áudio demorou mais do que o esperado ou houve instabilidade de rede. Verifique sua conexão e tente novamente.';
+        }
         const errorMsg: ChatMessage = {
           id: `err-audio-${Date.now()}`,
           sender: 'vito',
-          text: 'Não consegui entender o áudio agora. Pode tentar de novo ou digitar o pedido?',
+          text: fallbackText,
           timestamp: new Date().toISOString(),
         };
         const withError = [...withUser, errorMsg];
