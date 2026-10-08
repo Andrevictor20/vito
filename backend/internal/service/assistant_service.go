@@ -129,6 +129,12 @@ func (s *AssistantService) Process(ctx context.Context, userID string, input ai.
 	switch intent.Action {
 	case ai.ActionCreateEvent:
 		if intent.Event != nil {
+			if intent.Event.StartAt.IsZero() {
+				intent.Event.StartAt = input.Now
+			}
+			if intent.Event.EndAt.IsZero() || intent.Event.EndAt.Before(intent.Event.StartAt) || intent.Event.EndAt.Equal(intent.Event.StartAt) {
+				intent.Event.EndAt = intent.Event.StartAt.Add(1 * time.Hour)
+			}
 			if intent.Event.Recurrence != "" {
 				events, err := s.calSvc.CreateRecurringEvents(
 					userID,

@@ -231,3 +231,99 @@ func TestAssistantHandler_Chat_CurrentLocalTime(t *testing.T) {
 	}
 }
 
+func TestAssistantHandler_AudioChat_JSON(t *testing.T) {
+	mockTrans := &mockTranscriber{text: "Reunião de alinhamento amanhã"}
+	mockAI := &mockAIGateway{
+		intent: &ai.ParsedIntent{
+			Action:       ai.ActionCreateEvent,
+			Message:      "Reunião agendada!",
+			ProviderUsed: "MockAI",
+		},
+	}
+
+	astSvc := service.NewAssistantService(mockAI, nil, nil, nil)
+	astHandler := handler.NewAssistantHandler(astSvc, mockTrans)
+
+	// Simula payload JSON com audio_b64 (sem multipart)
+	jsonPayload := map[string]string{
+		"audio_b64":          "ZmFrZS1hdWRpby1ieXRlcw==", // base64 de "fake-audio-bytes"
+		"timezone":           "America/Sao_Paulo",
+		"current_local_time": "2026-10-08T19:00:00-03:00",
+	}
+	bodyBytes, _ := json.Marshal(jsonPayload)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/assistant/audio", bytes.NewReader(bodyBytes))
+	req.Header.Set("Content-Type", "application/json")
+	ctx := context.WithValue(req.Context(), middleware.UserIDKey, "user-audio-json")
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	astHandler.AudioChat(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d. Body: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp struct {
+		Action     string `json:"action"`
+		Transcript string `json:"transcript"`
+		Message    string `json:"message"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if resp.Transcript != "Reunião de alinhamento amanhã" {
+		t.Errorf("expected transcript 'Reunião de alinhamento amanhã', got '%s'", resp.Transcript)
+	}
+	if resp.Action != string(ai.ActionCreateEvent) {
+		t.Errorf("expected action %s, got %s", ai.ActionCreateEvent, resp.Action)
+	}
+}
+
+func TestAssistantHandler_VisionChat_JSON(t *testing.T) {
+	mockAI := &mockAIGateway{
+		intent: &ai.ParsedIntent{
+			Action:       ai.ActionCreateEvent,
+			Message:      "Evento extraído da imagem!",
+			ProviderUsed: "MockAI",
+		},
+	}
+
+	astSvc := service.NewAssistantService(mockAI, nil, nil, nil)
+	astHandler := handler.NewAssistantHandler(astSvc, nil)
+
+	// Simula payload JSON com image_b64 (sem multipart)
+	jsonPayload := map[string]string{
+		"image_b64":          "LzlqLzRBQVFza1pJRmdBQkFRRUFTQUJJQUFE...",
+		"prompt":             "Analise o convite",
+		"timezone":           "America/Sao_Paulo",
+		"current_local_time": "2026-10-08T19:00:00-03:00",
+	}
+	bodyBytes, _ := json.Marshal(jsonPayload)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/assistant/vision", bytes.NewReader(bodyBytes))
+	req.Header.Set("Content-Type", "application/json")
+	ctx := context.WithValue(req.Context(), middleware.UserIDKey, "user-vision-json")
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	astHandler.VisionChat(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d. Body: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp struct {
+		Action  string `json:"action"`
+		Message string `json:"message"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if resp.Action != string(ai.ActionCreateEvent) {
+		t.Errorf("expected action %s, got %s", ai.ActionCreateEvent, resp.Action)
+	}
+}
+

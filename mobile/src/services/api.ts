@@ -1,6 +1,89 @@
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { secureStorage } from './secureStore';
 import { User, AuthResponse, Event, Todo, AssistantChatResponse, ConflictInfo } from '../types';
+
+let FileSystemModule: any = null;
+try {
+  FileSystemModule = require('expo-file-system');
+} catch (e) {
+  FileSystemModule = null;
+}
+
+export async function fileUriToBase64(uri: string): Promise<string> {
+  if (!uri) return '';
+  if (uri.startsWith('data:')) {
+    return uri.split(',')[1] || '';
+  }
+
+  // Se já for uma string base64 pura sem scheme (ex: sem / e sem ://)
+  if (!uri.includes('://') && !uri.startsWith('/') && uri.length > 100) {
+    return uri;
+  }
+
+  const cleanUri =
+    Platform.OS === 'android' && !uri.startsWith('file://') && !uri.startsWith('content://')
+      ? `file://${uri}`
+      : uri;
+
+  // 1. Tenta expo-file-system (mecanismo primário e mais estável do Expo para leitura binária local)
+  const fsRead = FileSystemModule?.readAsStringAsync || FileSystemModule?.FileSystem?.readAsStringAsync;
+  if (typeof fsRead === 'function') {
+    try {
+      const encoding = FileSystemModule?.EncodingType?.Base64 || 'base64';
+      const b64 = await fsRead(cleanUri, { encoding });
+      if (b64 && typeof b64 === 'string' && b64.length > 0) {
+        return b64;
+      }
+    } catch (fsErr) {
+      console.warn('[fileUriToBase64] expo-file-system falhou:', fsErr);
+    }
+  }
+
+  // 2. Tenta XMLHttpRequest nativo do React Native (lê local files como blob)
+  try {
+    const b64 = await new Promise<string>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.onload = () => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const res = reader.result as string;
+          resolve(res && res.includes(',') ? res.split(',')[1] : res || '');
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(xhr.response);
+      };
+      xhr.onerror = reject;
+      xhr.responseType = 'blob';
+      xhr.open('GET', cleanUri, true);
+      xhr.send(null);
+    });
+    if (b64 && b64.length > 0) {
+      return b64;
+    }
+  } catch (xhrErr) {
+    console.warn('[fileUriToBase64] XMLHttpRequest falhou:', xhrErr);
+  }
+
+  // 3. Fallback defensivo com fetch
+  try {
+    const response = await fetch(cleanUri);
+    const blob = await response.blob();
+    return await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const dataUrl = reader.result as string;
+        const base64 = dataUrl && dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl || '';
+        resolve(base64);
+      };
+      reader.onerror = (e) => reject(e);
+      reader.readAsDataURL(blob);
+    });
+  } catch (fetchErr) {
+    console.warn('[fileUriToBase64] fetch falhou:', fetchErr);
+    throw fetchErr;
+  }
+}
 
 const TOKEN_KEY = '@vito_jwt_token';
 const SERVER_URL_KEY = '@vito_server_url';
@@ -275,13 +358,39 @@ class ApiService {
     });
   }
 
-  // Assistant Audio (Groq Whisper v3)
+  // Assistant Audio (Groq Whisper v3 + Gemini Fallback)
   async assistantAudio(audioUri: string, filename: string = 'audio.m4a', timezone?: string): Promise<AssistantChatResponse> {
     const tz = timezone || this.getUserTimezone();
     const currentLocalTime = this.getCurrentLocalTimeISO();
+
+    // 1. Prioriza envio resiliente em JSON com Base64 (imune a quebras de FormData no Android/Hermes)
+    try {
+      const b64 = await fileUriToBase64(audioUri);
+      if (b64 && b64.length > 0) {
+        return await this.request<AssistantChatResponse>('/api/v1/assistant/audio', {
+          method: 'POST',
+          body: JSON.stringify({
+            audio_b64: b64,
+            audio_mime: 'audio/m4a',
+            filename,
+            timezone: tz,
+            current_local_time: currentLocalTime,
+          }),
+        });
+      }
+    } catch (b64Err) {
+      console.warn('[assistantAudio] Falha ao converter áudio para base64, tentando multipart:', b64Err);
+    }
+
+    // 2. Fallback Multipart Normalizado
+    const cleanUri =
+      Platform.OS === 'android' && !audioUri.startsWith('file://') && !audioUri.startsWith('content://')
+        ? `file://${audioUri}`
+        : audioUri;
+
     const formData = new FormData();
     formData.append('audio', {
-      uri: audioUri,
+      uri: cleanUri,
       name: filename,
       type: 'audio/m4a',
     } as unknown as Blob);
@@ -323,14 +432,47 @@ class ApiService {
   }
 
   // Assistant Vision (Gemini 2.5 Flash Multimodal)
-  async assistantVision(imageUri: string, prompt?: string, filename: string = 'image.jpg', timezone?: string): Promise<AssistantChatResponse> {
+  async assistantVision(
+    imageUri: string,
+    prompt?: string,
+    filename: string = 'image.jpg',
+    timezone?: string,
+    base64Override?: string
+  ): Promise<AssistantChatResponse> {
     const tz = timezone || this.getUserTimezone();
     const currentLocalTime = this.getCurrentLocalTimeISO();
+    const mimeType = filename.endsWith('.png') ? 'image/png' : 'image/jpeg';
+
+    // 1. Prioriza envio resiliente em JSON com Base64 (elimina falhas nativas de stream de arquivos)
+    try {
+      const b64 = base64Override || (await fileUriToBase64(imageUri));
+      if (b64 && b64.length > 0) {
+        return await this.request<AssistantChatResponse>('/api/v1/assistant/vision', {
+          method: 'POST',
+          body: JSON.stringify({
+            image_b64: b64,
+            image_mime: mimeType,
+            prompt,
+            timezone: tz,
+            current_local_time: currentLocalTime,
+          }),
+        });
+      }
+    } catch (b64Err) {
+      console.warn('[assistantVision] Falha ao converter imagem para base64, tentando multipart:', b64Err);
+    }
+
+    // 2. Fallback Multipart Normalizado
+    const cleanUri =
+      Platform.OS === 'android' && !imageUri.startsWith('file://') && !imageUri.startsWith('content://')
+        ? `file://${imageUri}`
+        : imageUri;
+
     const formData = new FormData();
     formData.append('image', {
-      uri: imageUri,
+      uri: cleanUri,
       name: filename,
-      type: 'image/jpeg',
+      type: mimeType,
     } as unknown as Blob);
 
     if (prompt) {

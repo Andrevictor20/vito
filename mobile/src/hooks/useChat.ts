@@ -256,7 +256,7 @@ export function useChat(onDataChanged?: () => void) {
   );
 
   const sendImage = useCallback(
-    async (imageUri: string, prompt?: string) => {
+    async (imageUri: string, prompt?: string, base64Override?: string) => {
       if (loading) return;
 
       const userMsg: ChatMessage = {
@@ -273,7 +273,7 @@ export function useChat(onDataChanged?: () => void) {
       setLoading(true);
 
       try {
-        const res = await api.assistantVision(imageUri, prompt);
+        const res = await api.assistantVision(imageUri, prompt, 'image.jpg', undefined, base64Override);
         const vitoMsg: ChatMessage = {
           id: `vito-img-${Date.now()}`,
           sender: 'vito',

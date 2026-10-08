@@ -91,7 +91,11 @@ export class SafeAudioRecorder {
         console.warn('⚠️ [Audio] Gravação finalizada sem URI');
         return null;
       }
-      return { uri, durationMs };
+      const cleanUri =
+        typeof uri === 'string' && !uri.startsWith('file://') && !uri.startsWith('content://')
+          ? `file://${uri}`
+          : uri;
+      return { uri: cleanUri, durationMs };
     } catch (e) {
       console.warn('⚠️ [Audio] Falha ao parar gravação:', e);
       this.recorderInstance = null;

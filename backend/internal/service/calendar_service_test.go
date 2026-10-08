@@ -308,4 +308,28 @@ func TestCalendarService_UpdateEventTimesByTitle_PropagatesToSyncPusher(t *testi
 	}
 }
 
+func TestCalendarService_CreateEvent_AutoEndTimeWhenZeroOrBefore(t *testing.T) {
+	calSvc, _ := setupCalendarService(t)
+	start := time.Date(2026, 10, 15, 19, 0, 0, 0, time.UTC)
+
+	// Caso 1: EndAt zero (comum em convites e mensagens de voz)
+	evt1, _, err := calSvc.CreateEvent("user-cal-svc-1", "Festa Zero End", "Desc", "Local", start, time.Time{})
+	if err != nil {
+		t.Fatalf("esperava sucesso com EndAt zero, obteve erro: %v", err)
+	}
+	expectedEnd := start.Add(1 * time.Hour)
+	if !evt1.EndAt.Equal(expectedEnd) {
+		t.Errorf("esperava EndAt %v, obteve %v", expectedEnd, evt1.EndAt)
+	}
+
+	// Caso 2: EndAt anterior ou igual ao início
+	evt2, _, err := calSvc.CreateEvent("user-cal-svc-1", "Festa Equal End", "Desc", "Local", start, start)
+	if err != nil {
+		t.Fatalf("esperava sucesso com EndAt igual a StartAt, obteve erro: %v", err)
+	}
+	if !evt2.EndAt.Equal(expectedEnd) {
+		t.Errorf("esperava EndAt %v, obteve %v", expectedEnd, evt2.EndAt)
+	}
+}
+
 

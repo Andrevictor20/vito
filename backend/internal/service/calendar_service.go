@@ -40,8 +40,8 @@ func (s *CalendarService) CreateEvent(userID, title, description, location strin
 	if title == "" {
 		return nil, nil, errors.New("o título do evento é obrigatório")
 	}
-	if endAt.Before(startAt) || endAt.Equal(startAt) {
-		return nil, nil, errors.New("o horário de término deve ser após o início")
+	if endAt.IsZero() || endAt.Before(startAt) || endAt.Equal(startAt) {
+		endAt = startAt.Add(1 * time.Hour)
 	}
 
 	// Verifica se há conflito antes de salvar

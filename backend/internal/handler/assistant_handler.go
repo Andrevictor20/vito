@@ -107,7 +107,8 @@ func (h *AssistantHandler) Chat(w http.ResponseWriter, r *http.Request) {
 }
 
 // AudioChat processa um arquivo de áudio enviado via multipart/form-data, transcreve com Whisper e processa o comando.
-// Caso a transcrição falhe ou o transcritor esteja indisponível, aplica fallback para áudio nativo.
+// AudioChat processa um arquivo de áudio enviado via multipart/form-data ou payload JSON com audio_b64.
+// Transcreve com Whisper e processa o comando, aplicando fallback para áudio nativo se necessário.
 func (h *AssistantHandler) AudioChat(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
@@ -115,36 +116,80 @@ func (h *AssistantHandler) AudioChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := r.ParseMultipartForm(25 << 20); err != nil {
-		http.Error(w, `{"error":"falha ao processar formulário multipart: `+err.Error()+`"}`, http.StatusBadRequest)
-		return
-	}
+	var fileBytes []byte
+	var filename string
+	var mime string
+	var clientTime string
+	var tzVal string
 
-	file, header, err := r.FormFile("audio")
-	if err != nil {
-		file, header, err = r.FormFile("file")
-		if err != nil {
-			http.Error(w, `{"error":"campo 'audio' ou 'file' não encontrado no formulário multipart"}`, http.StatusBadRequest)
+	contentType := r.Header.Get("Content-Type")
+	if strings.Contains(contentType, "application/json") {
+		var req struct {
+			AudioB64         string `json:"audio_b64"`
+			AudioMime        string `json:"audio_mime,omitempty"`
+			Filename         string `json:"filename,omitempty"`
+			Timezone         string `json:"timezone,omitempty"`
+			CurrentLocalTime string `json:"current_local_time,omitempty"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, `{"error":"payload JSON inválido"}`, http.StatusBadRequest)
 			return
 		}
-	}
-	defer file.Close()
+		if req.AudioB64 == "" {
+			http.Error(w, `{"error":"campo 'audio_b64' obrigatório"}`, http.StatusBadRequest)
+			return
+		}
+		decoded, err := base64.StdEncoding.DecodeString(req.AudioB64)
+		if err != nil {
+			http.Error(w, `{"error":"falha ao decodificar base64 do áudio: `+err.Error()+`"}`, http.StatusBadRequest)
+			return
+		}
+		fileBytes = decoded
+		filename = req.Filename
+		if filename == "" {
+			filename = "audio.m4a"
+		}
+		mime = req.AudioMime
+		clientTime = req.CurrentLocalTime
+		tzVal = req.Timezone
+	} else {
+		if err := r.ParseMultipartForm(25 << 20); err != nil {
+			http.Error(w, `{"error":"falha ao processar formulário multipart: `+err.Error()+`"}`, http.StatusBadRequest)
+			return
+		}
 
-	fileBytes, err := io.ReadAll(file)
-	if err != nil {
-		http.Error(w, `{"error":"falha ao ler arquivo de áudio: `+err.Error()+`"}`, http.StatusBadRequest)
-		return
+		file, header, err := r.FormFile("audio")
+		if err != nil {
+			file, header, err = r.FormFile("file")
+			if err != nil {
+				http.Error(w, `{"error":"campo 'audio' ou 'file' não encontrado no formulário multipart"}`, http.StatusBadRequest)
+				return
+			}
+		}
+		defer file.Close()
+
+		readBytes, err := io.ReadAll(file)
+		if err != nil {
+			http.Error(w, `{"error":"falha ao ler arquivo de áudio: `+err.Error()+`"}`, http.StatusBadRequest)
+			return
+		}
+		fileBytes = readBytes
+		filename = header.Filename
+		mime = header.Header.Get("Content-Type")
+		clientTime = r.FormValue("current_local_time")
+		tzVal = r.FormValue("timezone")
 	}
 
 	var transcript string
+	var err error
 	var input ai.UserInput
 	if h.transcriber != nil {
-		transcript, err = h.transcriber.Transcribe(r.Context(), bytes.NewReader(fileBytes), header.Filename)
+		transcript, err = h.transcriber.Transcribe(r.Context(), bytes.NewReader(fileBytes), filename)
 	} else {
 		err = errors.New("transcritor Whisper não configurado")
 	}
 
-	nowRef, tz := parseClientNow(r.FormValue("current_local_time"), r.FormValue("timezone"))
+	nowRef, tz := parseClientNow(clientTime, tzVal)
 
 	if err != nil || strings.TrimSpace(transcript) == "" || strings.TrimSpace(transcript) == "." {
 		if err != nil {
@@ -152,7 +197,6 @@ func (h *AssistantHandler) AudioChat(w http.ResponseWriter, r *http.Request) {
 		} else {
 			log.Println("⚠️ [AudioChat] Transcrição Whisper retornou vazia. Acionando fallback para áudio nativo...")
 		}
-		mime := header.Header.Get("Content-Type")
 		if mime == "" {
 			mime = "audio/m4a"
 		}
@@ -200,7 +244,7 @@ func (h *AssistantHandler) AudioChat(w http.ResponseWriter, r *http.Request) {
 // assistantFriendlyError evita vazar detalhes internos (stack de provedores/JSON bruto) no chat.
 const assistantFriendlyError = "Não consegui processar seu pedido agora. Pode tentar de novo em instantes?"
 
-// VisionChat processa upload de imagem (recibos, fotos de documentos ou anotações) via multipart/form-data.
+// VisionChat processa upload de imagem (recibos, fotos de documentos ou anotações) via multipart/form-data ou JSON com image_b64.
 func (h *AssistantHandler) VisionChat(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
@@ -208,46 +252,86 @@ func (h *AssistantHandler) VisionChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Limite de 15MB para upload de imagem
-	if err := r.ParseMultipartForm(15 << 20); err != nil {
-		http.Error(w, `{"error":"falha ao processar formulário multipart: `+err.Error()+`"}`, http.StatusBadRequest)
-		return
-	}
+	var imageB64 string
+	var mime string
+	var prompt string
+	var clientTime string
+	var tzVal string
 
-	file, header, err := r.FormFile("image")
-	if err != nil {
-		file, header, err = r.FormFile("file")
-		if err != nil {
-			http.Error(w, `{"error":"campo 'image' ou 'file' não encontrado"}`, http.StatusBadRequest)
+	contentType := r.Header.Get("Content-Type")
+	if strings.Contains(contentType, "application/json") {
+		var req struct {
+			ImageB64         string `json:"image_b64"`
+			ImageMime        string `json:"image_mime,omitempty"`
+			Prompt           string `json:"prompt,omitempty"`
+			Text             string `json:"text,omitempty"`
+			Timezone         string `json:"timezone,omitempty"`
+			CurrentLocalTime string `json:"current_local_time,omitempty"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, `{"error":"payload JSON inválido"}`, http.StatusBadRequest)
 			return
 		}
-	}
-	defer file.Close()
+		if req.ImageB64 == "" {
+			http.Error(w, `{"error":"campo 'image_b64' obrigatório"}`, http.StatusBadRequest)
+			return
+		}
+		imageB64 = req.ImageB64
+		mime = req.ImageMime
+		if mime == "" {
+			mime = "image/jpeg"
+		}
+		prompt = req.Prompt
+		if prompt == "" {
+			prompt = req.Text
+		}
+		clientTime = req.CurrentLocalTime
+		tzVal = req.Timezone
+	} else {
+		// Limite de 15MB para upload de imagem multipart
+		if err := r.ParseMultipartForm(15 << 20); err != nil {
+			http.Error(w, `{"error":"falha ao processar formulário multipart: `+err.Error()+`"}`, http.StatusBadRequest)
+			return
+		}
 
-	fileBytes, err := io.ReadAll(file)
-	if err != nil {
-		http.Error(w, `{"error":"falha ao ler bytes da imagem"}`, http.StatusBadRequest)
-		return
+		file, header, err := r.FormFile("image")
+		if err != nil {
+			file, header, err = r.FormFile("file")
+			if err != nil {
+				http.Error(w, `{"error":"campo 'image' ou 'file' não encontrado"}`, http.StatusBadRequest)
+				return
+			}
+		}
+		defer file.Close()
+
+		fileBytes, err := io.ReadAll(file)
+		if err != nil {
+			http.Error(w, `{"error":"falha ao ler bytes da imagem"}`, http.StatusBadRequest)
+			return
+		}
+
+		mime = header.Header.Get("Content-Type")
+		if mime == "" {
+			mime = http.DetectContentType(fileBytes)
+		}
+		imageB64 = base64.StdEncoding.EncodeToString(fileBytes)
+		prompt = r.FormValue("prompt")
+		if prompt == "" {
+			prompt = r.FormValue("text")
+		}
+		clientTime = r.FormValue("current_local_time")
+		tzVal = r.FormValue("timezone")
 	}
 
-	mime := header.Header.Get("Content-Type")
-	if mime == "" {
-		mime = http.DetectContentType(fileBytes)
-	}
-
-	prompt := r.FormValue("prompt")
-	if prompt == "" {
-		prompt = r.FormValue("text")
-	}
 	if prompt == "" {
 		prompt = "Analise esta imagem e extraia eventos para a agenda ou tarefas a realizar."
 	}
 
-	nowRef, tzVision := parseClientNow(r.FormValue("current_local_time"), r.FormValue("timezone"))
+	nowRef, tzVision := parseClientNow(clientTime, tzVal)
 
 	input := ai.UserInput{
 		Text:      prompt,
-		ImageB64:  base64.StdEncoding.EncodeToString(fileBytes),
+		ImageB64:  imageB64,
 		ImageMime: mime,
 		Timezone:  tzVision,
 		Now:       nowRef,

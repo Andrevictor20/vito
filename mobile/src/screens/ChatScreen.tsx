@@ -60,6 +60,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
   } = useChat(onDataChanged);
   const [inputText, setInputText] = useState('');
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
+  const [selectedImageBase64, setSelectedImageBase64] = useState<string | null>(null);
   const [historyVisible, setHistoryVisible] = useState(false);
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -103,32 +104,77 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
     }, 120);
   }, [messages.length, loading]);
 
-  const handlePickImage = async () => {
+  const openImagePicker = async (useCamera: boolean = false) => {
     if (loading) return;
     if (!ImagePicker) {
-      alert('Módulo de fotos não disponível nesta versão.');
+      Alert.alert('Fotos', 'Módulo de fotos não disponível nesta versão.');
       return;
     }
 
     try {
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permission.granted) {
-        alert('É necessário conceder permissão de fotos para anexar recibos ou imagens.');
-        return;
-      }
+      if (useCamera) {
+        const permission = await ImagePicker.requestCameraPermissionsAsync();
+        if (!permission.granted) {
+          Alert.alert('Permissão da Câmera', 'É necessário conceder permissão de câmera para tirar foto de convites e recibos.');
+          return;
+        }
 
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        quality: 0.8,
-      });
+        const result = await ImagePicker.launchCameraAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          quality: 0.8,
+          base64: true,
+        });
 
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        setSelectedImageUri(result.assets[0].uri);
+        if (!result.canceled && result.assets && result.assets.length > 0) {
+          setSelectedImageUri(result.assets[0].uri);
+          setSelectedImageBase64(result.assets[0].base64 || null);
+        }
+      } else {
+        const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!permission.granted) {
+          Alert.alert('Permissão de Fotos', 'É necessário conceder permissão de galeria para anexar imagens.');
+          return;
+        }
+
+        const result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          quality: 0.8,
+          base64: true,
+        });
+
+        if (!result.canceled && result.assets && result.assets.length > 0) {
+          setSelectedImageUri(result.assets[0].uri);
+          setSelectedImageBase64(result.assets[0].base64 || null);
+        }
       }
     } catch (e) {
       console.error('Falha ao selecionar imagem:', e);
+      Alert.alert('Erro', 'Não foi possível carregar a imagem.');
     }
+  };
+
+  const handlePickImage = () => {
+    if (loading) return;
+    Alert.alert(
+      'Anexar Imagem',
+      'Como deseja enviar a foto ou documento para o Vito?',
+      [
+        {
+          text: 'Tirar Foto',
+          onPress: () => openImagePicker(true),
+        },
+        {
+          text: 'Escolher da Galeria',
+          onPress: () => openImagePicker(false),
+        },
+        {
+          text: 'Cancelar',
+          style: 'cancel',
+        },
+      ]
+    );
   };
 
   const handleSend = () => {
@@ -136,10 +182,12 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
 
     if (selectedImageUri) {
       const uri = selectedImageUri;
+      const b64 = selectedImageBase64 || undefined;
       const prompt = inputText.trim() || undefined;
       setSelectedImageUri(null);
+      setSelectedImageBase64(null);
       setInputText('');
-      sendImage(uri, prompt);
+      sendImage(uri, prompt, b64);
     } else {
       const text = inputText;
       setInputText('');
@@ -320,7 +368,10 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
           onPressMic={handleToggleRecording}
           onPressAttach={handlePickImage}
           selectedImageUri={selectedImageUri}
-          onClearImage={() => setSelectedImageUri(null)}
+          onClearImage={() => {
+            setSelectedImageUri(null);
+            setSelectedImageBase64(null);
+          }}
         />
       </View>
       <ConversationHistoryModal
