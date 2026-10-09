@@ -137,6 +137,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     minWidth: 90,
+    minHeight: 48,
     paddingVertical: 2,
   },
   // Indicador M3: Container transparente quando inativo (sem clipping), pílula oval 64x32dp quando ativo
@@ -152,7 +153,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   navLabel: {
-    fontSize: tokens.typography.size.labelSmall,
+    fontSize: tokens.typography.size.labelMedium,
     letterSpacing: 0.3,
   },
 });

@@ -160,8 +160,8 @@ func (s *GoogleAuthService) GetAuthURL(mode, userID, redirectScheme string) (str
 		return "", err
 	}
 
-	// Solicita perfil, eventos e leitura de múltiplos calendários do Google para viabilizar sincronização completa
-	scope := "openid email profile https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly"
+	// Solicita perfil, identificação, leitura de listas de agendas e gerenciamento de eventos (Princípio do Menor Privilégio)
+	scope := "openid email profile https://www.googleapis.com/auth/calendar.calendarlist.readonly https://www.googleapis.com/auth/calendar.events"
 
 	params := url.Values{}
 	params.Set("client_id", s.cfg.ClientID)

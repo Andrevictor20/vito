@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, Switch, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
+import { M3Switch } from '../ui/M3Switch';
 
 interface ProfileSettingsGroupProps {
   onOpenNotifications?: () => void;
@@ -39,18 +40,9 @@ export const ProfileSettingsGroup: React.FC<ProfileSettingsGroupProps> = ({
             </Text>
           </View>
         </View>
-        <Switch
+        <M3Switch
           value={isDark}
           onValueChange={toggleTheme}
-          trackColor={{
-            false: isDark ? '#383838' : '#D4D4D8',
-            true: isDark ? '#52525B' : '#18181B',
-          }}
-          thumbColor="#FFFFFF"
-          {...({
-            activeThumbColor: '#FFFFFF',
-            activeTrackColor: isDark ? '#52525B' : '#18181B',
-          } as any)}
         />
       </TouchableOpacity>
 
@@ -135,18 +127,9 @@ export const ProfileSettingsGroup: React.FC<ProfileSettingsGroupProps> = ({
             <Text style={[styles.itemSub, { color: colors.onSurfaceVariant }]}>Whisper local via RPi</Text>
           </View>
         </View>
-        <Switch
+        <M3Switch
           value={whisperEnabled}
           onValueChange={setWhisperEnabled}
-          trackColor={{
-            false: isDark ? '#383838' : '#D4D4D8',
-            true: isDark ? '#52525B' : '#18181B',
-          }}
-          thumbColor={whisperEnabled ? '#FFFFFF' : (isDark ? '#71717A' : '#A1A1AA')}
-          {...({
-            activeThumbColor: '#FFFFFF',
-            activeTrackColor: isDark ? '#52525B' : '#18181B',
-          } as any)}
         />
       </View>
     </View>

@@ -12,6 +12,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { tokens, MD3Shapes } from '../theme/tokens';
 import { FloatingTabBar } from '../components/common/FloatingTabBar';
 import { Header } from '../components/common/Header';
+import { HeroDayOverview } from '../components/home/HeroDayOverview';
 import { CompactCalendarCard } from '../components/calendar/CompactCalendarCard';
 import { CalendarModal } from '../components/calendar/CalendarModal';
 import { EventCard } from '../components/calendar/EventCard';
@@ -92,6 +93,13 @@ export const HomeScreen: React.FC<{
           />
         }
       >
+        {/* Hero Widget de Produtividade & Relógio */}
+        <HeroDayOverview
+          dayEvents={dayEvents}
+          totalTodos={todos.length}
+          completedTodos={completedCount}
+        />
+
         {/* Card Compacto de Preview Semanal */}
         <CompactCalendarCard
           selectedDate={selectedDate}

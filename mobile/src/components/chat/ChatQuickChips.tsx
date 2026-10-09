@@ -48,18 +48,29 @@ export const ChatQuickChips: React.FC<ChatQuickChipsProps> = ({ onSelectPrompt, 
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.scrollList}
       >
-        {QUICK_PROMPTS.map((item, idx) => (
-          <TouchableOpacity
-            key={idx}
-            style={[styles.chip, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}
-            onPress={() => onSelectPrompt(item.prompt)}
-            disabled={disabled}
-            activeOpacity={0.75}
-          >
-            <MaterialIcons name={item.icon} size={15} color={colors.primary} />
-            <Text style={[styles.chipLabel, { color: colors.onSurface }]}>{item.label}</Text>
-          </TouchableOpacity>
-        ))}
+        {QUICK_PROMPTS.map((item, idx) => {
+          const iconColor =
+            item.icon === 'calendar-month'
+              ? colors.accents.sky
+              : item.icon === 'check-circle'
+              ? colors.accents.emerald
+              : item.icon === 'local-cafe'
+              ? colors.accents.orange
+              : colors.accents.amber;
+
+          return (
+            <TouchableOpacity
+              key={idx}
+              style={[styles.chip, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}
+              onPress={() => onSelectPrompt(item.prompt)}
+              disabled={disabled}
+              activeOpacity={0.75}
+            >
+              <MaterialIcons name={item.icon} size={15} color={iconColor} />
+              <Text style={[styles.chipLabel, { color: colors.onSurface }]}>{item.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
       </ScrollView>
     </View>
   );

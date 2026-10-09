@@ -37,9 +37,9 @@ export const TodoItem: React.FC<TodoItemProps> = ({
 
   const priorityStyle =
     todo.priority === 'high'
-      ? { bg: colors.errorContainer, text: colors.onErrorContainer, label: 'ALTA' }
+      ? { bg: colors.accents.coralContainer, text: colors.accents.coral, label: 'ALTA' }
       : todo.priority === 'medium'
-      ? { bg: isDark ? 'rgba(251, 191, 36, 0.18)' : 'rgba(245, 158, 11, 0.12)', text: colors.warning, label: 'MÉDIA' }
+      ? { bg: colors.accents.amberContainer, text: colors.accents.amber, label: 'MÉDIA' }
       : { bg: colors.surfaceContainerHighest, text: colors.onSurfaceVariant, label: 'BAIXA' };
 
   const handleCreateSubtask = () => {
@@ -67,8 +67,8 @@ export const TodoItem: React.FC<TodoItemProps> = ({
       <TouchableOpacity
         style={[
           styles.checkbox,
-          { borderColor: isCompleted ? colors.primary : colors.outline },
-          isCompleted && { backgroundColor: colors.primary },
+          { borderColor: isCompleted ? colors.accents.emerald : colors.outline },
+          isCompleted && { backgroundColor: colors.accents.emerald },
         ]}
         onPress={() => onToggle(todo.id)}
         activeOpacity={0.75}
@@ -77,7 +77,7 @@ export const TodoItem: React.FC<TodoItemProps> = ({
         accessibilityLabel={isCompleted ? 'Marcar como pendente' : 'Marcar como concluída'}
         hitSlop={tokens.hitSlop.sm}
       >
-        {isCompleted && <MaterialIcons name="check" size={14} color={colors.onPrimary} />}
+        {isCompleted && <MaterialIcons name="check" size={14} color="#FFFFFF" />}
       </TouchableOpacity>
 
       <TouchableOpacity

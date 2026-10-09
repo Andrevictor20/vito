@@ -35,11 +35,6 @@ export const CompactCalendarCard: React.FC<CompactCalendarCardProps> = ({
   const monthName = selectedDate.toLocaleDateString('pt-BR', { month: 'long' });
   const capitalizedMonth = monthName.charAt(0).toUpperCase() + monthName.slice(1);
   const yearStr = selectedDate.getFullYear().toString();
-  const formattedDate = selectedDate.toLocaleDateString('pt-BR', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-  }).toUpperCase();
 
   const isSameDay = (d1: Date, d2: Date) =>
     d1.getDate() === d2.getDate() &&
@@ -50,12 +45,9 @@ export const CompactCalendarCard: React.FC<CompactCalendarCardProps> = ({
     <View style={[styles.card, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant, borderWidth: 1 }]}>
       {/* Top Header do Card */}
       <View style={styles.headerRow}>
-        <View style={styles.headerTitleColumn}>
-          <Text style={[styles.dateSubtitle, { color: colors.textMuted }]}>{formattedDate}</Text>
-          <View style={styles.monthYearRow}>
-            <Text style={[styles.monthTitle, { color: colors.onSurface }]}>{capitalizedMonth}</Text>
-            <Text style={[styles.yearSubtitle, { color: colors.textMuted }]}>{yearStr}</Text>
-          </View>
+        <View style={styles.monthYearRow}>
+          <Text style={[styles.monthTitle, { color: colors.onSurface }]}>{capitalizedMonth}</Text>
+          <Text style={[styles.yearSubtitle, { color: colors.textMuted }]}>{yearStr}</Text>
         </View>
 
         <TouchableOpacity
@@ -99,7 +91,7 @@ export const CompactCalendarCard: React.FC<CompactCalendarCardProps> = ({
                   isSelected && { backgroundColor: colors.primary },
                   !isSelected && isToday && {
                     borderWidth: 1.5,
-                    borderColor: colors.primary,
+                    borderColor: colors.accents.sky,
                     backgroundColor: colors.surfaceContainerHigh,
                   },
                 ]}
@@ -111,7 +103,7 @@ export const CompactCalendarCard: React.FC<CompactCalendarCardProps> = ({
                       color: isSelected
                         ? colors.onPrimary
                         : isToday
-                        ? colors.primary
+                        ? colors.accents.sky
                         : colors.onSurface,
                       fontWeight: isSelected || isToday ? '700' : '500',
                     },
@@ -120,7 +112,12 @@ export const CompactCalendarCard: React.FC<CompactCalendarCardProps> = ({
                   {dayDate.getDate()}
                 </Text>
                 {hasEvent && !isSelected && (
-                  <View style={[styles.eventDot, { backgroundColor: isToday ? colors.primary : colors.textMuted }]} />
+                  <View
+                    style={[
+                      styles.eventDot,
+                      { backgroundColor: isToday ? colors.accents.sky : colors.accents.emerald },
+                    ]}
+                  />
                 )}
               </View>
             </TouchableOpacity>
@@ -134,9 +131,9 @@ export const CompactCalendarCard: React.FC<CompactCalendarCardProps> = ({
 const styles = StyleSheet.create({
   card: {
     backgroundColor: tokens.colors.surfaceContainer,
-    borderRadius: MD3Shapes.large,
+    borderRadius: MD3Shapes.largeIncreased,
     padding: tokens.spacing.md,
-    marginBottom: tokens.spacing.lg,
+    marginBottom: tokens.spacing.md,
   },
   headerRow: {
     flexDirection: 'row',

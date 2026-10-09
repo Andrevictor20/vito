@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   TouchableWithoutFeedback,
   ScrollView,
-  Switch,
   Alert,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -15,6 +14,7 @@ import { tokens, MD3Shapes } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { useNotifications } from '../../hooks/useNotifications';
 import { NotificationPriority } from '../../types';
+import { M3Switch } from '../ui/M3Switch';
 
 interface NotificationSettingsModalProps {
   visible: boolean;
@@ -112,18 +112,9 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
                         </Text>
                       </View>
                     </View>
-                    <Switch
+                    <M3Switch
                       value={settings.enabled}
                       onValueChange={handleToggleEnabled}
-                      trackColor={{
-                        false: isDark ? '#383838' : '#D4D4D8',
-                        true: isDark ? '#52525B' : '#18181B',
-                      }}
-                      thumbColor="#FFFFFF"
-                      {...({
-                        activeThumbColor: '#FFFFFF',
-                        activeTrackColor: isDark ? '#52525B' : '#18181B',
-                      } as any)}
                     />
                   </View>
 

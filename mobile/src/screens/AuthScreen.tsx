@@ -2,7 +2,6 @@ import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -15,6 +14,9 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { VitoLogo } from '../components/common/VitoLogo';
 import { GoogleIcon } from '../components/common/GoogleIcon';
+import { Button } from '../components/ui/Button';
+import { TextInput } from '../components/ui/TextInput';
+import { Card } from '../components/ui/Card';
 import { createAuthStyles } from './AuthScreen.styles';
 
 interface AuthScreenProps {
@@ -112,7 +114,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ serverUrl, onToggleServe
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={styles.container}
     >
-      <View style={styles.card}>
+      <Card variant="elevated" style={styles.card}>
         {/* Top Header M3 com Alternador de Tema */}
         <View style={styles.topHeaderRow}>
           <VitoLogo size="small" />
@@ -144,43 +146,40 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ serverUrl, onToggleServe
 
         {isRegister && (
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Nome Completo</Text>
             <TextInput
-              style={styles.input}
+              label="Nome Completo"
               placeholder="Ex: André Silva"
-              placeholderTextColor={colors.onSurfaceVariant}
               value={name}
               onChangeText={setName}
+              variant="outlined"
             />
           </View>
         )}
 
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>E-mail</Text>
           <TextInput
-            style={styles.input}
+            label="E-mail"
             placeholder="seu@email.com"
-            placeholderTextColor={colors.onSurfaceVariant}
             autoCapitalize="none"
             keyboardType="email-address"
             value={email}
             onChangeText={setEmail}
+            variant="outlined"
           />
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Senha</Text>
-          <View style={styles.passwordInputContainer}>
+          <View>
             <TextInput
-              style={styles.passwordInput}
+              label="Senha"
               placeholder="••••••••"
-              placeholderTextColor={colors.onSurfaceVariant}
               secureTextEntry={!showPassword}
               value={password}
               onChangeText={setPassword}
+              variant="outlined"
             />
             <TouchableOpacity
-              style={styles.passwordEyeButton}
+              style={[styles.passwordEyeButton, { position: 'absolute', right: 4, top: 8 }]}
               onPress={() => setShowPassword((prev) => !prev)}
               activeOpacity={0.7}
               hitSlop={tokens.hitSlop.sm}
@@ -196,20 +195,13 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ serverUrl, onToggleServe
           </View>
         </View>
 
-        <TouchableOpacity
-          style={[styles.primaryButton, isLoading && styles.buttonDisabled]}
+        <Button
+          label={isRegister ? 'Criar Conta' : 'Entrar'}
+          variant="filled"
           onPress={handleSubmit}
-          disabled={isLoading}
-          activeOpacity={0.8}
-        >
-          {isLoading ? (
-            <ActivityIndicator color={colors.onPrimary} />
-          ) : (
-            <Text style={styles.primaryButtonText}>
-              {isRegister ? 'Criar Conta' : 'Entrar'}
-            </Text>
-          )}
-        </TouchableOpacity>
+          isLoading={isLoading}
+          style={{ marginTop: tokens.spacing.sm }}
+        />
 
         {/* Divisor Visual */}
         <View style={styles.dividerRow}>
@@ -219,32 +211,23 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ serverUrl, onToggleServe
         </View>
 
         {/* Botão de Autenticação com a Conta Google */}
-        <TouchableOpacity
-          style={[styles.googleButton, isLoading && styles.buttonDisabled]}
+        <Button
+          label="Continuar com o Google"
+          variant="outlined"
+          icon={<GoogleIcon size={18} />}
           onPress={handleGoogleLogin}
-          disabled={isLoading}
-          activeOpacity={0.8}
-          accessibilityRole="button"
-          accessibilityLabel="Continuar com o Google"
-        >
-          <GoogleIcon size={18} />
-          <Text style={styles.googleButtonText}>Continuar com o Google</Text>
-        </TouchableOpacity>
+          isLoading={isLoading}
+        />
 
-        <TouchableOpacity
-          style={styles.switchButton}
+        <Button
+          label={isRegister ? 'Já possui uma conta? Faça login' : 'Não tem conta? Cadastre-se em instantes'}
+          variant="text"
           onPress={() => {
             setIsRegister(!isRegister);
             setError(null);
           }}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.switchText}>
-            {isRegister
-              ? 'Já possui uma conta? Faça login'
-              : 'Não tem conta? Cadastre-se em instantes'}
-          </Text>
-        </TouchableOpacity>
+          style={{ marginTop: tokens.spacing.lg }}
+        />
 
         {/* Rodapé com Versão OTA e Feedback Visual */}
         <View style={styles.otaFooterRow}>
@@ -268,7 +251,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ serverUrl, onToggleServe
             )}
           </TouchableOpacity>
         </View>
-      </View>
+      </Card>
     </KeyboardAvoidingView>
   );
 };

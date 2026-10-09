@@ -420,12 +420,13 @@ export const CalendarModal: React.FC<CalendarModalProps> = ({
                             );
 
                             const eventColor = ev.color || (
-                              ev.category === 'study' ? '#3F51B5' :
-                              ev.category === 'work' ? '#039BE5' :
-                              ev.category === 'health' ? '#0B8043' :
-                              ev.category === 'leisure' ? '#F4511E' :
-                              ev.category === 'personal' ? '#8E24AA' :
-                              ev.category === 'holiday' ? '#00897B' : '#616161'
+                              ev.category === 'study' ? colors.accents.indigo :
+                              ev.category === 'work' ? colors.accents.sky :
+                              ev.category === 'health' ? colors.accents.mint :
+                              ev.category === 'leisure' ? colors.accents.orange :
+                              ev.category === 'finance' ? colors.accents.coral :
+                              ev.category === 'personal' ? colors.accents.emerald :
+                              ev.category === 'holiday' ? colors.accents.mint : colors.primary
                             );
 
                             if (isAllDay) {

@@ -36,22 +36,30 @@ export const EventCard: React.FC<EventCardProps> = ({
   // Inferir categoria e cores semânticas M3 para a tag
   const getCategory = () => {
     if (event.category) {
-      const color = event.color || '#38BDF8';
-      const catMap: Record<string, string> = {
-        work: 'TRABALHO',
-        health: 'SAÚDE',
-        finance: 'FINANÇAS',
-        study: 'ESTUDO',
-        leisure: 'LAZER',
-        personal: 'PESSOAL',
-        general: 'COMPROMISSO',
+      const catColorMap: Record<string, { label: string; color: string; container: string }> = {
+        work: { label: 'TRABALHO', color: colors.accents.sky, container: colors.accents.skyContainer },
+        health: { label: 'SAÚDE', color: colors.accents.mint, container: colors.accents.mintContainer },
+        finance: { label: 'FINANÇAS', color: colors.accents.coral, container: colors.accents.coralContainer },
+        study: { label: 'ESTUDO', color: colors.accents.indigo, container: colors.accents.indigoContainer },
+        leisure: { label: 'LAZER', color: colors.accents.orange, container: colors.accents.orangeContainer },
+        personal: { label: 'PESSOAL', color: colors.accents.emerald, container: colors.accents.emeraldContainer },
+        general: { label: 'COMPROMISSO', color: colors.primary, container: colors.surfaceContainerHighest },
       };
-      const label = catMap[event.category] || event.category.toUpperCase();
+      const found = catColorMap[event.category];
+      if (found) {
+        return {
+          label: found.label,
+          bg: found.container,
+          text: found.color,
+          border: found.color + '4D',
+        };
+      }
+      const customColor = event.color || colors.accents.sky;
       return {
-        label,
-        bg: color + (isDark ? '26' : '1A'),
-        text: color,
-        border: color + (isDark ? '4D' : '33'),
+        label: event.category.toUpperCase(),
+        bg: customColor + (isDark ? '26' : '1A'),
+        text: customColor,
+        border: customColor + (isDark ? '4D' : '33'),
       };
     }
 
@@ -154,7 +162,7 @@ export const EventCard: React.FC<EventCardProps> = ({
 const styles = StyleSheet.create({
   card: {
     backgroundColor: tokens.colors.surfaceContainer,
-    borderRadius: MD3Shapes.large,
+    borderRadius: MD3Shapes.largeIncreased,
     padding: tokens.spacing.md,
     marginBottom: tokens.spacing.sm,
   },
