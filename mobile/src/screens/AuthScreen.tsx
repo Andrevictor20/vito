@@ -172,11 +172,12 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ serverUrl, onToggleServe
           <View>
             <TextInput
               label="Senha"
-              placeholder="••••••••"
+              placeholder="Mínimo 6 caracteres"
               secureTextEntry={!showPassword}
               value={password}
               onChangeText={setPassword}
               variant="outlined"
+              style={{ paddingRight: 44 }}
             />
             <TouchableOpacity
               style={[styles.passwordEyeButton, { position: 'absolute', right: 4, top: 8 }]}

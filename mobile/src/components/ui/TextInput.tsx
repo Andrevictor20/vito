@@ -26,15 +26,18 @@ export const TextInput: React.FC<TextInputProps> = ({
   style,
   onFocus,
   onBlur,
+  placeholder,
   ...props
 }) => {
   const { colors, tokens } = useTheme();
   const [isFocused, setIsFocused] = useState(false);
+  const hasValue = Boolean(props.value && String(props.value).length > 0);
+  const isFloating = isFocused || hasValue;
 
   const styles = useMemo(() => {
     let baseContainer: ViewStyle = {
-      minHeight: 56, // M3 default height for text fields
-      borderRadius: tokens.radii.xs, // M3 defined radius (4dp for filled, usually outlined too)
+      minHeight: 56, // Altura padrão Material Design 3
+      borderRadius: tokens.radii.xs,
       paddingHorizontal: tokens.spacing.lg,
       justifyContent: 'center',
     };
@@ -67,17 +70,18 @@ export const TextInput: React.FC<TextInputProps> = ({
         fontFamily: tokens.typography.family.regular,
         fontSize: tokens.typography.size.bodyLarge,
         color: colors.onSurface,
-        paddingTop: label ? tokens.spacing.md : 0,
-        paddingBottom: tokens.spacing.xs,
+        paddingTop: label ? (isFloating ? 18 : 0) : 0,
+        paddingBottom: label ? (isFloating ? 4 : 0) : 0,
         minHeight: 24,
       },
       label: {
         position: 'absolute',
         left: tokens.spacing.lg,
-        top: isFocused || props.value ? tokens.spacing.xs : 18,
+        top: isFloating ? 6 : 18,
         fontFamily: tokens.typography.family.medium,
-        fontSize: isFocused || props.value ? tokens.typography.size.labelSmall : tokens.typography.size.bodyLarge,
+        fontSize: isFloating ? tokens.typography.size.labelSmall : tokens.typography.size.bodyLarge,
         color: error ? colors.error : isFocused ? colors.primary : colors.onSurfaceVariant,
+        zIndex: 1,
       },
       errorText: {
         fontFamily: tokens.typography.family.regular,
@@ -87,14 +91,23 @@ export const TextInput: React.FC<TextInputProps> = ({
         marginLeft: tokens.spacing.md,
       },
     });
-  }, [variant, isFocused, error, colors, tokens, props.value, label]);
+  }, [variant, isFocused, isFloating, error, colors, tokens, label]);
+
+  // Se houver label, o placeholder só é exibido quando o campo estiver focado ou preenchido,
+  // eliminando 100% da sobreposição entre o label em repouso e o texto de dica
+  const activePlaceholder = isFloating ? placeholder : undefined;
 
   return (
     <View style={containerStyle}>
       <View style={styles.container}>
-        {label && <Text style={styles.label}>{label}</Text>}
+        {label && (
+          <Text style={styles.label} pointerEvents="none">
+            {label}
+          </Text>
+        )}
         <RNTextInput
           style={[styles.input, style]}
+          placeholder={activePlaceholder}
           placeholderTextColor={colors.onSurfaceVariant}
           onFocus={(e) => {
             setIsFocused(true);
