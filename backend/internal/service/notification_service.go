@@ -101,10 +101,11 @@ func (s *NotificationService) SendPushToUser(userID, title, body, priority strin
 	expoPriority := "default"
 	sound := "default"
 
-	if priority == "wakeup" {
+	switch priority {
+	case "wakeup":
 		channelID = "vito_wakeup"
 		expoPriority = "high"
-	} else if priority == "silent" {
+	case "silent":
 		channelID = "vito_silent"
 		sound = ""
 	}

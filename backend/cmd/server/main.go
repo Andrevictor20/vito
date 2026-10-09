@@ -74,6 +74,11 @@ func main() {
 	syncSvc.RegisterProvider(calendar.NewAppleCalDAVProvider(calendar.AppleCalDAVConfig{}))
 	calSvc.SetSyncPusher(syncSvc)
 
+	// Worker em segundo plano para lembretes de compromissos
+	reminderWorker := service.NewReminderWorker(eventRepo, notifSvc, 15*time.Minute)
+	reminderWorker.Start()
+	defer reminderWorker.Stop()
+
 	googleAuthCfg := service.GoogleAuthConfig{
 		ClientID:     cfg.GoogleClientID,
 		ClientSecret: cfg.GoogleClientSecret,

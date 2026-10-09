@@ -296,6 +296,9 @@ func (r *EventRepositorySQLite) UpdateSeries(e *domain.Event) (int, error) {
 			items = append(items, evItem{id: id, startAt: parseDBTime(rawStart)})
 		}
 	}
+	if err := rows.Err(); err != nil {
+		return 0, err
+	}
 
 	if len(items) == 0 {
 		return 0, domain.ErrEventNotFound
@@ -371,6 +374,9 @@ func (r *EventRepositorySQLite) UpdateTimesByTitle(userID, titleQuery string, ne
 			items = append(items, evItem{id: id, startAt: parseDBTime(rawStart)})
 		}
 	}
+	if err := rows.Err(); err != nil {
+		return 0, err
+	}
 
 	if len(items) == 0 {
 		return 0, domain.ErrEventNotFound
@@ -397,4 +403,51 @@ func (r *EventRepositorySQLite) UpdateTimesByTitle(userID, titleQuery string, ne
 	}
 
 	return updatedCount, nil
+}
+
+// ListUpcomingUnreminded busca compromissos futuros sem notificação enviada no intervalo especificado.
+func (r *EventRepositorySQLite) ListUpcomingUnreminded(from, to time.Time) ([]domain.Event, error) {
+	fromUTC := from.UTC()
+	toUTC := to.UTC()
+
+	query := `
+		SELECT id, user_id, COALESCE(title, ''), COALESCE(description, ''), COALESCE(location, ''), 
+		       start_at, end_at, COALESCE(source, 'vito'), COALESCE(category, 'general'), 
+		       COALESCE(color, ''), COALESCE(recurrence, ''), COALESCE(created_at, datetime('now')), COALESCE(updated_at, datetime('now'))
+		FROM events
+		WHERE start_at >= ? AND start_at <= ? AND reminder_sent_at IS NULL
+		ORDER BY start_at ASC
+	`
+	rows, err := r.db.Query(query, fromUTC, toUTC)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var events []domain.Event
+	for rows.Next() {
+		var e domain.Event
+		var rawStart, rawEnd, rawCreated, rawUpdated any
+		if err := rows.Scan(
+			&e.ID, &e.UserID, &e.Title, &e.Description, &e.Location, 
+			&rawStart, &rawEnd, &e.Source, &e.Category, &e.Color, &e.Recurrence,
+			&rawCreated, &rawUpdated,
+		); err != nil {
+			continue
+		}
+
+		e.StartAt = parseDBTime(rawStart)
+		e.EndAt = parseDBTime(rawEnd)
+		e.CreatedAt = parseDBTime(rawCreated)
+		e.UpdatedAt = parseDBTime(rawUpdated)
+		events = append(events, e)
+	}
+	return events, rows.Err()
+}
+
+// MarkReminderSent registra o timestamp em que o lembrete foi despachado para o usuário.
+func (r *EventRepositorySQLite) MarkReminderSent(eventID string, sentAt time.Time) error {
+	query := `UPDATE events SET reminder_sent_at = ? WHERE id = ?`
+	_, err := r.db.Exec(query, sentAt.UTC(), eventID)
+	return err
 }

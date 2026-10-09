@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Event, Todo, AssistantChatResponse } from '../types';
 import { api } from '../services/api';
+import { notificationService } from '../services/notificationService';
 
 import { toLocalDateString, parseSafeDate, isEventOnDate, getEventDays } from '../utils/calendarDateUtils';
 
@@ -31,6 +32,9 @@ export function useHomeData() {
       setTodos(fetchedTodos || []);
       AsyncStorage.setItem(CACHE_EVENTS_KEY, JSON.stringify(fetchedEvents || [])).catch(() => {});
       AsyncStorage.setItem(CACHE_TODOS_KEY, JSON.stringify(fetchedTodos || [])).catch(() => {});
+      if (fetchedEvents && fetchedEvents.length > 0) {
+        notificationService.scheduleAllUpcomingReminders(fetchedEvents).catch(() => {});
+      }
     } catch (e) {
       console.error('Falha ao carregar dados:', e);
     } finally {
@@ -116,6 +120,7 @@ export function useHomeData() {
     try {
       const targetEvent = events.find((e) => e.id === id);
       await api.deleteEvent(id, allSeries);
+      notificationService.cancelEventReminder(id).catch(() => {});
       setEvents((prev) => {
         let next: Event[];
         if (allSeries && targetEvent) {

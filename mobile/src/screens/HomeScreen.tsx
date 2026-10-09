@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import {
   StyleSheet,
   View,
@@ -7,6 +7,8 @@ import {
   RefreshControl,
   ActivityIndicator,
   TouchableOpacity,
+  Animated,
+  Easing,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens, MD3Shapes } from '../theme/tokens';
@@ -20,7 +22,7 @@ import { TodoItem } from '../components/todos/TodoItem';
 import { CreateItemModal } from '../components/calendar/CreateItemModal';
 import { EditEventModal } from '../components/calendar/EditEventModal';
 import { ProfileModal } from '../components/profile/ProfileModal';
-import { ChatScreen } from './ChatScreen';
+import { ChatScreen, ChatScreenRef } from './ChatScreen';
 import { useHomeData } from '../hooks/useHomeData';
 import { useTheme } from '../context/ThemeContext';
 import { Event } from '../types';
@@ -37,9 +39,19 @@ export const HomeScreen: React.FC<{
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
+  const [isChatLoading, setIsChatLoading] = useState(false);
+
+  const chatRef = useRef<ChatScreenRef>(null);
+  const tabFadeAnim = useRef(new Animated.Value(activeTab === 'chat' ? 1 : 0)).current;
 
   const handleSelectTab = (tab: 'chat' | 'calendar') => {
     setActiveTab(tab);
+    Animated.timing(tabFadeAnim, {
+      toValue: tab === 'chat' ? 1 : 0,
+      duration: 220,
+      easing: Easing.bezier(0.2, 0, 0, 1),
+      useNativeDriver: true,
+    }).start();
     if (tab === 'calendar') {
       loadData(true);
     }
@@ -77,14 +89,29 @@ export const HomeScreen: React.FC<{
 
   return (
     <View style={[styles.container, { backgroundColor: colors.surface }]}>
-      <View style={[styles.mainContent, { backgroundColor: colors.surface }]}>
-        {activeTab === 'calendar' ? (
-        <>
-          <Header onPressProfile={() => setProfileVisible(true)} />
+      {/* Top App Bar Persistente M3 com transição suave e contínua */}
+      <Header
+        activeTab={activeTab}
+        onPressProfile={() => setProfileVisible(true)}
+        onPressHistory={() => chatRef.current?.openHistory()}
+        mascotState={activeTab === 'chat' && isChatLoading ? 'thinking' : 'idle'}
+      />
 
-      <ScrollView
-        style={[styles.scroll, { backgroundColor: colors.surface }]}
-        contentContainerStyle={[styles.content, { backgroundColor: colors.surface }]}
+      <View style={[styles.mainContent, { backgroundColor: colors.surface }]}>
+        {/* Camada 1: Agenda & Tarefas */}
+        <Animated.View
+          style={[
+            styles.tabLayer,
+            {
+              opacity: tabFadeAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }),
+              zIndex: activeTab === 'calendar' ? 2 : 1,
+            },
+          ]}
+          pointerEvents={activeTab === 'calendar' ? 'auto' : 'none'}
+        >
+          <ScrollView
+            style={[styles.scroll, { backgroundColor: colors.surface }]}
+            contentContainerStyle={[styles.content, { backgroundColor: colors.surface }]}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -297,10 +324,26 @@ export const HomeScreen: React.FC<{
             onSyncGoogle={syncGoogleCalendar}
             isSyncingGoogle={syncingGoogle}
           />
-        </>
-      ) : (
-        <ChatScreen onDataChanged={loadData} onPressProfile={() => setProfileVisible(true)} onKeyboardStateChange={setIsKeyboardOpen} />
-      )}
+        </Animated.View>
+
+        {/* Camada 2: Chat com IA */}
+        <Animated.View
+          style={[
+            styles.tabLayer,
+            {
+              opacity: tabFadeAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] }),
+              zIndex: activeTab === 'chat' ? 2 : 1,
+            },
+          ]}
+          pointerEvents={activeTab === 'chat' ? 'auto' : 'none'}
+        >
+          <ChatScreen
+            ref={chatRef}
+            onDataChanged={loadData}
+            onKeyboardStateChange={setIsKeyboardOpen}
+            onLoadingStateChange={setIsChatLoading}
+          />
+        </Animated.View>
       </View>
 
       {/* Bottom M3 Navigation Bar */}
@@ -328,6 +371,14 @@ const styles = StyleSheet.create({
   },
   mainContent: {
     flex: 1,
+    position: 'relative',
+  },
+  tabLayer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   scroll: {
     flex: 1,

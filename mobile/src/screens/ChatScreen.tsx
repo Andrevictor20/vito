@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import {
   StyleSheet,
   View,
@@ -32,19 +32,23 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { SafeAudioRecorder } from '../services/audioRecorder';
 
-interface ChatScreenProps {
+export interface ChatScreenProps {
   onDataChanged?: () => void;
-  onPressProfile?: () => void;
   onKeyboardStateChange?: (isOpen: boolean) => void;
+  onLoadingStateChange?: (loading: boolean) => void;
 }
 
-export const ChatScreen: React.FC<ChatScreenProps> = ({
+export interface ChatScreenRef {
+  openHistory: () => void;
+}
+
+export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
   onDataChanged,
-  onPressProfile,
   onKeyboardStateChange,
-}) => {
+  onLoadingStateChange,
+}, ref) => {
   const { user } = useAuth();
-  const { colors, isDark, toggleTheme } = useTheme();
+  const { colors, isDark } = useTheme();
   const firstName = user?.name ? user.name.split(' ')[0] : 'Usuário';
   const {
     messages,
@@ -66,6 +70,14 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
   const [isRecording, setIsRecording] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const flatListRef = useRef<FlatList>(null);
+
+  useImperativeHandle(ref, () => ({
+    openHistory: () => setHistoryVisible(true),
+  }), []);
+
+  useEffect(() => {
+    onLoadingStateChange?.(loading);
+  }, [loading, onLoadingStateChange]);
 
   // Monitoramento ativo de eventos do teclado para auto-scroll e elevação precisa
   useEffect(() => {
@@ -249,59 +261,6 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 44 : 0}
     >
-      {/* Top App Bar Minimalista & Despoluída estilo ChatGPT/Linear */}
-      <View style={[styles.topAppBar, { backgroundColor: colors.surface, borderBottomColor: colors.outlineVariant }]}>
-        <View style={styles.topAppBarLeft}>
-          <View style={styles.brandRow}>
-            <VitoMascot
-              size={32}
-              state={loading ? 'thinking' : 'idle'}
-            />
-            <Text style={[styles.chatBrand, { color: colors.onSurface }]}>Vito</Text>
-            <View style={[styles.statusDot, { backgroundColor: colors.statusOnline }]} />
-          </View>
-          <Text style={[styles.chatSubtitle, { color: colors.textMuted }]}>Assistente Executivo</Text>
-        </View>
-
-        <View style={styles.topAppBarRight}>
-          <TouchableOpacity
-            style={[styles.iconActionButton, { backgroundColor: colors.surfaceContainerLow, borderColor: colors.outlineVariant }]}
-            onPress={() => setHistoryVisible(true)}
-            activeOpacity={0.7}
-            hitSlop={tokens.hitSlop.sm}
-            accessibilityLabel="Histórico de conversas"
-          >
-            <MaterialIcons name="forum" size={18} color={colors.onSurface} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.iconActionButton, { backgroundColor: colors.surfaceContainerLow, borderColor: colors.outlineVariant }]}
-            onPress={toggleTheme}
-            activeOpacity={0.7}
-            hitSlop={tokens.hitSlop.sm}
-            accessibilityLabel={isDark ? 'Mudar para tema claro' : 'Mudar para tema escuro'}
-          >
-            <MaterialIcons
-              name={isDark ? 'light-mode' : 'dark-mode'}
-              size={18}
-              color={colors.onSurface}
-            />
-          </TouchableOpacity>
-
-          {user && (
-            <TouchableOpacity
-              style={[styles.userAvatar, { backgroundColor: colors.surfaceContainerHighest, borderColor: colors.outlineVariant }]}
-              onPress={onPressProfile}
-              activeOpacity={0.75}
-              accessibilityLabel="Perfil e Configurações"
-              hitSlop={tokens.hitSlop.sm}
-            >
-              <Text style={[styles.avatarText, { color: colors.onSurface }]}>{firstName.charAt(0).toUpperCase()}</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-
       {/* Lista de Mensagens */}
       <FlatList
         ref={flatListRef}
@@ -384,78 +343,12 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
       />
     </KeyboardAvoidingView>
   );
-};
+});
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: tokens.colors.surface,
-  },
-  // M3 Top App Bar: 56dp altura, alinhamento canônico, borda outlineVariant sutil
-  topAppBar: {
-    height: 56,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: tokens.spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: tokens.colors.outlineVariant,
-    backgroundColor: tokens.colors.surface,
-  },
-  topAppBarLeft: {
-    flexDirection: 'column',
-    justifyContent: 'center',
-    gap: 1,
-  },
-  brandRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  chatBrand: {
-    fontSize: 18,
-    fontWeight: tokens.typography.weight.bold,
-    letterSpacing: -0.5,
-  },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  chatSubtitle: {
-    fontSize: 10,
-    fontWeight: tokens.typography.weight.medium,
-    letterSpacing: 0.3,
-  },
-  topAppBarRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: tokens.spacing.sm,
-  },
-  iconActionButton: {
-    width: 36,
-    height: 36,
-    borderRadius: MD3Shapes.full,
-    backgroundColor: tokens.colors.surfaceContainerLow,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: tokens.colors.outlineVariant,
-  },
-  userAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: MD3Shapes.full,
-    backgroundColor: tokens.colors.primaryContainer,
-    borderWidth: 1,
-    borderColor: tokens.colors.outlineVariant,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    color: tokens.colors.onPrimaryContainer,
-    fontSize: tokens.typography.size.labelMedium,
-    fontWeight: tokens.typography.weight.bold,
   },
   flatList: {
     flex: 1,

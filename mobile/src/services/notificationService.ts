@@ -92,6 +92,8 @@ export const notificationService = {
     if (!this.isAvailable()) {
       return { granted: false, pushToken: null };
     }
+    await this.init();
+
     if (Device && !Device.isDevice && Platform.OS !== 'web') {
       console.warn('[NotificationService] Notificações push requerem dispositivo físico.');
     }
@@ -114,7 +116,8 @@ export const notificationService = {
 
     let pushToken: string | null = null;
     try {
-      const tokenData = await Notifications.getExpoPushTokenAsync();
+      const projectId = 'b376b3f5-a93f-4f3e-a262-ddded8f96586';
+      const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
       pushToken = tokenData.data;
 
       if (pushToken) {
@@ -202,6 +205,49 @@ export const notificationService = {
     });
 
     return notificationId;
+  },
+
+  /**
+   * Reconcilia e agenda lembretes locais nativos para todos os compromissos futuros.
+   */
+  async scheduleAllUpcomingReminders(events: Array<{ id: string; title: string; start_at: string; category?: string; location?: string }>): Promise<number> {
+    if (!this.isAvailable()) return 0;
+    const settings = await this.getSettings();
+    if (!settings.enabled) return 0;
+
+    const now = Date.now();
+    const minutesBefore = settings.reminderMinutesBefore || 10;
+    let scheduledCount = 0;
+
+    for (const event of events) {
+      try {
+        const start = new Date(event.start_at).getTime();
+        if (isNaN(start)) continue;
+
+        const scheduledTime = new Date(start - minutesBefore * 60 * 1000);
+        if (scheduledTime.getTime() > now && scheduledTime.getTime() < now + 7 * 24 * 60 * 60 * 1000) {
+          const priority: NotificationPriority =
+            event.category === 'work' || event.category === 'health' ? 'wakeup' : settings.defaultPriority;
+
+          await this.scheduleEventReminder({
+            id: `event-reminder-${event.id}`,
+            eventId: event.id,
+            title: event.title,
+            body: `Começa em ${minutesBefore} minutos${event.location ? ' em ' + event.location : ''}`,
+            triggerDate: new Date(start),
+            priority,
+          });
+          scheduledCount++;
+        }
+      } catch (err) {
+        console.warn('[NotificationService] Falha ao agendar lembrete para evento:', event.id, err);
+      }
+    }
+    return scheduledCount;
+  },
+
+  async cancelEventReminder(eventId: string): Promise<void> {
+    await this.cancelNotification(`event-reminder-${eventId}`);
   },
 
   /**

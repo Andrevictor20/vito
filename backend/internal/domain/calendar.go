@@ -23,9 +23,10 @@ type Event struct {
 	Source      string    `json:"source,omitempty"`
 	Category    string    `json:"category,omitempty"`
 	Color       string    `json:"color,omitempty"`
-	Recurrence  string    `json:"recurrence,omitempty"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	Recurrence  string     `json:"recurrence,omitempty"`
+	ReminderSentAt *time.Time `json:"reminder_sent_at,omitempty"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
 }
 
 // TimeSlot representa uma janela de tempo disponível na agenda.
@@ -49,6 +50,8 @@ type EventRepository interface {
 	Create(event *Event) error
 	GetByID(id, userID string) (*Event, error)
 	ListByUser(userID string, from, to time.Time) ([]Event, error)
+	ListUpcomingUnreminded(from, to time.Time) ([]Event, error)
+	MarkReminderSent(eventID string, sentAt time.Time) error
 	CheckConflict(userID string, startAt, endAt time.Time, excludeEventID string) (*ConflictInfo, error)
 	Delete(id, userID string) error
 	DeleteByTitle(userID, titleQuery string) (int, error)

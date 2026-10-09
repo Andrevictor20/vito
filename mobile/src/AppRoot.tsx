@@ -7,6 +7,7 @@ import { AuthScreen } from './screens/AuthScreen';
 import { HomeScreen } from './screens/HomeScreen';
 import { tokens } from './theme/tokens';
 import { api, DEFAULT_SERVER_URL, CLOUDFLARE_SERVER_URL, PI_SERVER_URL, isCloudServer } from './services/api';
+import { notificationService } from './services/notificationService';
 import { UpdateBanner } from './components/common/UpdateBanner';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 
@@ -14,6 +15,13 @@ const MainNavigator: React.FC = () => {
   const { user, isInitialLoading } = useAuth();
   const { isDark, colors } = useTheme();
   const [serverUrl, setServerUrl] = useState(DEFAULT_SERVER_URL);
+
+  useEffect(() => {
+    if (user) {
+      // Auto-registro e inicialização de canais/push token
+      notificationService.requestPermissions().catch(() => {});
+    }
+  }, [user?.id]);
 
   useEffect(() => {
     // Sincroniza a URL ativa com a instância inicializada da API
