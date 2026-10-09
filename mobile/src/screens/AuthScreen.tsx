@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Updates from 'expo-updates';
@@ -95,15 +96,40 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ serverUrl, onToggleServe
   const handleManualCheckUpdate = async () => {
     setIsCheckingUpdate(true);
     try {
+      if (!Updates.isEnabled) {
+        Alert.alert(
+          'Atualizações OTA',
+          'O serviço de atualizações OTA está desativado em ambiente de desenvolvimento (Metro). Ele opera ativamente em builds standalone instalados no dispositivo.'
+        );
+        return;
+      }
       const result = await Updates.checkForUpdateAsync();
       if (result.isAvailable) {
-        await Updates.fetchUpdateAsync();
-        await Updates.reloadAsync();
+        Alert.alert(
+          'Atualização Encontrada',
+          'Baixando a versão mais recente em segundo plano...',
+          [
+            {
+              text: 'Aplicar Agora',
+              onPress: async () => {
+                await Updates.fetchUpdateAsync();
+                await Updates.reloadAsync();
+              },
+            },
+          ]
+        );
       } else {
-        setError(null);
+        Alert.alert(
+          'Aplicativo Atualizado',
+          'Você já está executando a versão mais recente disponível para este aplicativo instalado.'
+        );
       }
     } catch (e: any) {
       console.warn('[Updates] Erro ao verificar atualização:', e);
+      Alert.alert(
+        'Verificação de Atualização',
+        `Não foi possível verificar atualizações: ${e?.message || 'Falha de conexão com os servidores do Expo'}.`
+      );
     } finally {
       setIsCheckingUpdate(false);
     }
@@ -233,7 +259,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ serverUrl, onToggleServe
         {/* Rodapé com Versão OTA e Feedback Visual */}
         <View style={styles.otaFooterRow}>
           <Text style={styles.otaText}>
-            Build: {currentlyRunning?.updateId ? `OTA ${currentlyRunning.updateId.slice(0, 7)}` : 'v0.1.0'}
+            Build: {currentlyRunning?.updateId ? `OTA ${currentlyRunning.updateId.slice(0, 7)}` : 'v0.1.3'}
           </Text>
 
           <TouchableOpacity
