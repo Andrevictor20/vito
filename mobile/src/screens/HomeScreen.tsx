@@ -93,6 +93,7 @@ export const HomeScreen: React.FC<{
       <Header
         activeTab={activeTab}
         onPressProfile={() => setProfileVisible(true)}
+        onPressNewChat={() => chatRef.current?.startNewChat()}
         onPressHistory={() => chatRef.current?.openHistory()}
         mascotState={activeTab === 'chat' && isChatLoading ? 'thinking' : 'idle'}
       />

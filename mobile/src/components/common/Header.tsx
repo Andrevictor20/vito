@@ -20,6 +20,7 @@ export interface HeaderProps {
   onPressTitle?: () => void;
   activeTab?: 'calendar' | 'chat';
   onPressHistory?: () => void;
+  onPressNewChat?: () => void;
 }
 
 export interface HeaderIconButtonProps {
@@ -69,6 +70,7 @@ export const Header: React.FC<HeaderProps> = ({
   onPressTitle,
   activeTab,
   onPressHistory,
+  onPressNewChat,
 }) => {
   const { user } = useAuth();
   const { colors, isDark, toggleTheme } = useTheme();
@@ -95,7 +97,7 @@ export const Header: React.FC<HeaderProps> = ({
   const chatTranslateY = tabTransition.interpolate({ inputRange: [0, 1], outputRange: [4, 0] });
 
   const titleContent = activeTab ? (
-    <View style={styles.titleColumn}>
+    <View style={[styles.titleColumn, { minWidth: activeTab === 'chat' ? 115 : 150 }]}>
       {/* Camada Calendário */}
       <Animated.View
         style={[
@@ -181,22 +183,36 @@ export const Header: React.FC<HeaderProps> = ({
         </View>
 
         <View style={styles.actionsRow}>
-          {onPressHistory ? (
+          {((activeTab === 'chat' || !activeTab) && (onPressNewChat || onPressHistory)) ? (
             <Animated.View
-              style={{
-                opacity: tabTransition.interpolate({ inputRange: [0, 1], outputRange: [0, 1] }),
-                transform: [
-                  { scale: tabTransition.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1] }) },
-                  { translateX: tabTransition.interpolate({ inputRange: [0, 1], outputRange: [6, 0] }) },
-                ],
-              }}
-              pointerEvents={activeTab === 'chat' ? 'auto' : 'none'}
+              style={[
+                styles.chatActionsGroup,
+                activeTab ? {
+                  opacity: tabTransition.interpolate({ inputRange: [0, 1], outputRange: [0, 1] }),
+                  transform: [
+                    { scale: tabTransition.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1] }) },
+                    { translateX: tabTransition.interpolate({ inputRange: [0, 1], outputRange: [6, 0] }) },
+                  ],
+                } : undefined,
+              ]}
+              pointerEvents={activeTab === 'chat' || !activeTab ? 'auto' : 'none'}
             >
-              <HeaderIconButton
-                icon="forum"
-                onPress={onPressHistory}
-                accessibilityLabel="Histórico de conversas"
-              />
+              {onPressNewChat && (
+                <HeaderIconButton
+                  icon="add"
+                  onPress={onPressNewChat}
+                  accessibilityLabel="Nova conversa"
+                  size={20}
+                />
+              )}
+              {onPressHistory && (
+                <HeaderIconButton
+                  icon="history"
+                  onPress={onPressHistory}
+                  accessibilityLabel="Mensagens anteriores e histórico"
+                  size={20}
+                />
+              )}
             </Animated.View>
           ) : (
             contextualActions
@@ -250,9 +266,9 @@ export const Header: React.FC<HeaderProps> = ({
 export const TopAppBar = Header;
 
 const styles = StyleSheet.create({
-  // M3 Top App Bar: 58dp de altura, alinhamento canônico, borda outlineVariant sutil
+  // M3 Top App Bar: 62dp de altura, alinhamento canônico, borda outlineVariant sutil
   header: {
-    height: 58,
+    height: 62,
     justifyContent: 'center',
     paddingHorizontal: tokens.spacing.md,
     backgroundColor: tokens.colors.surface,
@@ -269,7 +285,7 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   titleColumn: {
-    minHeight: 38,
+    minHeight: 44,
     justifyContent: 'center',
     position: 'relative',
     minWidth: 155,
@@ -279,6 +295,7 @@ const styles = StyleSheet.create({
     left: 0,
     top: 0,
     bottom: 0,
+    right: 0,
     justifyContent: 'center',
   },
   titleRow: {
@@ -288,14 +305,17 @@ const styles = StyleSheet.create({
   },
   brand: {
     fontSize: 18,
+    lineHeight: 22,
     fontWeight: '700',
     letterSpacing: -0.4,
   },
   brandSubtitle: {
     fontSize: 11,
+    lineHeight: 15,
     fontWeight: '500',
     letterSpacing: 0.2,
-    marginTop: -1,
+    marginTop: 1,
+    paddingBottom: 2,
   },
   statusDot: {
     width: 7,
@@ -305,7 +325,12 @@ const styles = StyleSheet.create({
   actionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: tokens.spacing.sm,
+    gap: 6,
+  },
+  chatActionsGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   actionBtn: {
     width: 38,

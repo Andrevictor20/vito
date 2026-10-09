@@ -40,6 +40,7 @@ export interface ChatScreenProps {
 
 export interface ChatScreenRef {
   openHistory: () => void;
+  startNewChat: () => void;
 }
 
 export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
@@ -73,7 +74,13 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
 
   useImperativeHandle(ref, () => ({
     openHistory: () => setHistoryVisible(true),
-  }), []);
+    startNewChat: () => {
+      setInputText('');
+      setSelectedImageUri(null);
+      setSelectedImageBase64(null);
+      startNewConversation();
+    },
+  }), [startNewConversation]);
 
   useEffect(() => {
     onLoadingStateChange?.(loading);
