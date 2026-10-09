@@ -31,18 +31,15 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
     permissionGranted,
     requestPermissions,
     updateSettings,
-    triggerTest,
   } = useNotifications();
-
-  const [testStatus, setTestStatus] = useState<string | null>(null);
 
   const handleToggleEnabled = async (value: boolean) => {
     if (value && !permissionGranted) {
-      const res = await requestPermissions();
+      const res = await requestPermissions(true);
       if (!res.granted) {
         Alert.alert(
           'Permissão Necessária',
-          'Para receber alertas e Wake-up Calls, autorize as notificações nas configurações do seu aparelho.'
+          'Para receber alertas de compromissos, autorize as notificações nas configurações do seu aparelho.'
         );
         return;
       }
@@ -56,16 +53,6 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
 
   const handleSelectMinutes = async (minutes: number) => {
     await updateSettings({ reminderMinutesBefore: minutes });
-  };
-
-  const handleTest = async (priority: NotificationPriority) => {
-    try {
-      await triggerTest(priority);
-      setTestStatus(priority === 'wakeup' ? 'Alerta Wake-up Call disparado com sucesso' : 'Notificação padrão enviada');
-      setTimeout(() => setTestStatus(null), 3000);
-    } catch (err: any) {
-      Alert.alert('Erro ao testar', err.message || 'Falha ao emitir notificação local.');
-    }
   };
 
   return (
@@ -85,7 +72,7 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
                     <View>
                       <Text style={[styles.title, { color: colors.onSurface }]}>Notificações & Alertas</Text>
                       <Text style={[styles.subtitle, { color: colors.onSurfaceVariant }]}>
-                        Resiliência offline e Wake-up Calls
+                        Alertas discretos e pontuais
                       </Text>
                     </View>
                   </View>
@@ -121,7 +108,9 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
                   {!permissionGranted && (
                     <TouchableOpacity
                       style={[styles.permissionBanner, { backgroundColor: isDark ? '#3F2C1D' : '#FFF3E0', borderColor: '#F59E0B' }]}
-                      onPress={requestPermissions}
+                      onPress={() => {
+                        requestPermissions(true).catch(() => {});
+                      }}
                       activeOpacity={0.8}
                     >
                       <MaterialIcons name="warning" size={18} color="#D97706" />
@@ -132,39 +121,9 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
                   )}
                 </View>
 
-                {/* 2. Nível de Prioridade (Wake-up Call vs Padrão vs Silencioso) */}
+                {/* 2. Nível de Prioridade (Padrão vs Silencioso) */}
                 <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>PRIORIDADE DO ALERTA</Text>
                 <View style={styles.priorityGrid}>
-                  {/* Wake-up Call */}
-                  <TouchableOpacity
-                    style={[
-                      styles.priorityOption,
-                      { backgroundColor: colors.surfaceContainerHigh, borderColor: colors.outlineVariant },
-                      settings.defaultPriority === 'wakeup' && {
-                        borderColor: colors.primary,
-                        backgroundColor: isDark ? '#2E2025' : '#FCE7F3',
-                      },
-                    ]}
-                    onPress={() => handleSelectPriority('wakeup')}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.priorityTop}>
-                      <View style={[styles.priorityIconBox, { backgroundColor: settings.defaultPriority === 'wakeup' ? colors.primary : colors.surfaceContainerHighest }]}>
-                        <MaterialIcons
-                          name="alarm"
-                          size={18}
-                          color={settings.defaultPriority === 'wakeup' ? colors.onPrimary : colors.onSurface}
-                        />
-                      </View>
-                      {settings.defaultPriority === 'wakeup' && (
-                        <MaterialIcons name="check-circle" size={18} color={colors.primary} />
-                      )}
-                    </View>
-                    <Text style={[styles.priorityName, { color: colors.onSurface }]}>Wake-up Call</Text>
-                    <Text style={[styles.priorityDesc, { color: colors.onSurfaceVariant }]}>
-                      Prioridade Máxima (MAX), som contínuo e vibração agressiva. Substitui chamada.
-                    </Text>
-                  </TouchableOpacity>
 
                   {/* Padrão */}
                   <TouchableOpacity
@@ -259,35 +218,7 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
                   })}
                 </View>
 
-                {/* 4. Teste em Tempo Real */}
-                <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>TESTAR NO DISPOSITIVO</Text>
-                <View style={styles.testButtonsRow}>
-                  <TouchableOpacity
-                    style={[styles.testBtn, { backgroundColor: colors.surfaceContainerHigh, borderColor: colors.outlineVariant }]}
-                    onPress={() => handleTest('default')}
-                    activeOpacity={0.7}
-                  >
-                    <MaterialIcons name="notifications" size={18} color={colors.primary} />
-                    <Text style={[styles.testBtnText, { color: colors.onSurface }]}>Testar Padrão</Text>
-                  </TouchableOpacity>
 
-                  <TouchableOpacity
-                    style={[styles.testBtn, { backgroundColor: colors.primary, borderColor: colors.primary }]}
-                    onPress={() => handleTest('wakeup')}
-                    activeOpacity={0.8}
-                  >
-                    <MaterialIcons name="alarm" size={18} color={colors.onPrimary} />
-                    <Text style={[styles.testBtnText, { color: colors.onPrimary, fontWeight: '700' }]}>
-                      Testar Wake-up
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-
-                {testStatus && (
-                  <View style={[styles.testFeedback, { backgroundColor: colors.surfaceContainerHighest }]}>
-                    <Text style={[styles.testFeedbackText, { color: colors.primary }]}>{testStatus}</Text>
-                  </View>
-                )}
               </ScrollView>
             </View>
           </TouchableWithoutFeedback>

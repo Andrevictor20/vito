@@ -6,6 +6,59 @@ import { NotificationPriority, NotificationSettings, ScheduleNotificationParams 
 
 const SETTINGS_STORAGE_KEY = '@vito_notification_settings';
 const PUSH_TOKEN_SECURE_KEY = '@vito_push_token';
+const PROMPTED_ONCE_KEY = '@vito_notification_prompted_once';
+
+export function getNotificationContextEmoji(title: string, category?: string): string | null {
+  const t = title.toLowerCase();
+  const c = (category || '').toLowerCase();
+
+  if (/(\brem[eé]dio|\bmedicamento|\bcomprimido|\bantibi[oó]tico|\bp[ií]lula|\bdose|\bfarm[aá]cia|\breceita)/i.test(t)) {
+    return '💊';
+  }
+  if (/(\b[aá]gua|\bhidratar|\bhidrata[cç][aã]o)/i.test(t)) {
+    return '💧';
+  }
+  if (/(\bm[eé]dic[oa]|\bconsulta|\bexame|\bdentista|\bcardiologista|\bdermatologista|\bterapeuta|\bpsic[oó]logo|\bhospital|\bcl[ií]nica|\blaborat[oó]rio)/i.test(t)) {
+    return '🩺';
+  }
+  if (/(\bacademia|\btreino|\btreinar|\bmuscula[cç][aã]o|\bcorrida|\bcorrer|\bcaminhada|\bpilates|\byoga|\bcrossfit|\bnata[cç][aã]o)/i.test(t)) {
+    return '🏋️';
+  }
+  if (/(\balmo[cç]o|\balmo[cç]ar|\bjantar|\bjanta|\bcaf[eé] da manh[aã]|\brefei[cç][aã]o|\blanche|\brestaurante)/i.test(t)) {
+    return '🍽️';
+  }
+  if (/(\bacordar|\bdespertar|\blevantar|\bdespertador)/i.test(t)) {
+    return '⏰';
+  }
+  if (/(\baula|\bestudar|\bestudo|\bprova|\bcurso|\blivro|\bleitura|\bfaculdade|\bworkshop)/i.test(t)) {
+    return '📚';
+  }
+  if (/(\bvoo|\bavi[aã]o|\baeroporto|\bviagem|\bembarque|\bhotel|\brodovi[aá]ria)/i.test(t)) {
+    return '✈️';
+  }
+  if (/(\bcompras|\bmercado|\bsupermercado|\bcomprar|\bfeira|\bshopping|\bpadaria)/i.test(t)) {
+    return '🛒';
+  }
+  if (/(\bboleto|\bpagar|\bpagamento|\bfatura|\bbanco|\bpix|\bimposto)/i.test(t)) {
+    return '💳';
+  }
+  if (/(\banivers[aá]rio|\bparab[eé]ns|\bfesta|\bcomemora[cç][aã]o)/i.test(t)) {
+    return '🎂';
+  }
+  if (/(\bcarro|\bve[ií]culo|\boficina|\bmec[aâ]nico|\brevis[aã]o do carro|\brevis[aã]o veicular|\bposto de gasolina|\bipva)/i.test(t)) {
+    return '🚗';
+  }
+  if (/(\bpet|\bcachorro|\bc[aã]o|\bgato|\bveterin[aá]rio|\bra[cç][aã]o)/i.test(t)) {
+    return '🐾';
+  }
+
+  if (c === 'health') return '🩺';
+  if (c === 'study') return '📚';
+  if (c === 'finance') return '💳';
+  if (c === 'work') return '💼';
+
+  return null;
+}
 
 let Notifications: any = null;
 let Device: any = null;
@@ -62,22 +115,11 @@ export const notificationService = {
 
         // 2. Canal Padrão (Normal priority)
         await Notifications.setNotificationChannelAsync('vito_default', {
-          name: 'Vito — Lembretes Padrão',
+          name: 'Vito — Lembretes',
           importance: Notifications.AndroidImportance.DEFAULT,
           enableVibrate: true,
           vibrationPattern: [0, 250, 250, 250],
           sound: 'default',
-        });
-
-        // 3. Canal Wake-up Call (Prioridade Máxima, substituto de chamada telefônica)
-        await Notifications.setNotificationChannelAsync('vito_wakeup', {
-          name: 'Vito — Wake-up Call (Crítico)',
-          importance: Notifications.AndroidImportance.MAX,
-          enableVibrate: true,
-          vibrationPattern: [0, 500, 250, 500, 250, 500, 250, 1000],
-          sound: 'default',
-          bypassDnd: true,
-          lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
         });
       } catch {
         // Ignora silenciosamente em ambientes onde a API nativa de canais falhe
@@ -88,7 +130,7 @@ export const notificationService = {
   /**
    * Solicita permissões nativas e registra o Push Token.
    */
-  async requestPermissions(): Promise<{ granted: boolean; pushToken: string | null }> {
+  async requestPermissions(userInitiated: boolean = false): Promise<{ granted: boolean; pushToken: string | null }> {
     if (!this.isAvailable()) {
       return { granted: false, pushToken: null };
     }
@@ -106,6 +148,14 @@ export const notificationService = {
     let finalStatus = existingStatus;
 
     if (existingStatus !== 'granted') {
+      const alreadyPrompted = await AsyncStorage.getItem(PROMPTED_ONCE_KEY);
+      // Se não for iniciado pelo usuário e já foi solicitado anteriormente, não reabre diálogo nativo
+      if (!userInitiated && alreadyPrompted === 'true') {
+        return { granted: false, pushToken: null };
+      }
+
+      // Dispara solicitação nativa e registra que já foi solicitado
+      await AsyncStorage.setItem(PROMPTED_ONCE_KEY, 'true');
       const { status } = await Notifications.requestPermissionsAsync();
       finalStatus = status;
     }
@@ -170,7 +220,7 @@ export const notificationService = {
     if (!settings.enabled) return null;
 
     const priority: NotificationPriority = params.priority || settings.defaultPriority;
-    const channelId = priority === 'wakeup' ? 'vito_wakeup' : priority === 'silent' ? 'vito_silent' : 'vito_default';
+    const channelId = priority === 'silent' ? 'vito_silent' : 'vito_default';
 
     // Determina o horário do disparo (subtraindo os minutos de antecedência)
     const minutesBefore = settings.reminderMinutesBefore || 10;
@@ -181,8 +231,8 @@ export const notificationService = {
       return null;
     }
 
-    const titlePrefix = priority === 'wakeup' ? '🚨 [Wake-up Call] ' : '🔔 ';
-    const title = `${titlePrefix}${params.title}`;
+    const emoji = getNotificationContextEmoji(params.title);
+    const title = emoji ? `${emoji} ${params.title}` : params.title;
 
     const notificationId = await Notifications.scheduleNotificationAsync({
       identifier: params.id,
@@ -190,7 +240,7 @@ export const notificationService = {
         title,
         body: params.body,
         sound: priority !== 'silent',
-        priority: priority === 'wakeup' ? Notifications.AndroidNotificationPriority.MAX : Notifications.AndroidNotificationPriority.DEFAULT,
+        priority: Notifications.AndroidNotificationPriority.DEFAULT,
         data: {
           eventId: params.eventId,
           todoId: params.todoId,
@@ -226,8 +276,7 @@ export const notificationService = {
 
         const scheduledTime = new Date(start - minutesBefore * 60 * 1000);
         if (scheduledTime.getTime() > now && scheduledTime.getTime() < now + 7 * 24 * 60 * 60 * 1000) {
-          const priority: NotificationPriority =
-            event.category === 'work' || event.category === 'health' ? 'wakeup' : settings.defaultPriority;
+          const priority: NotificationPriority = settings.defaultPriority;
 
           await this.scheduleEventReminder({
             id: `event-reminder-${event.id}`,
@@ -270,18 +319,14 @@ export const notificationService = {
   async triggerTestNotification(priority: NotificationPriority): Promise<void> {
     if (!this.isAvailable()) return;
     try {
-      const channelId = priority === 'wakeup' ? 'vito_wakeup' : priority === 'silent' ? 'vito_silent' : 'vito_default';
-      const title = priority === 'wakeup'
-        ? '🚨 [TESTE] Wake-up Call Crítico'
-        : priority === 'silent'
-          ? '🔕 [TESTE] Notificação Silenciosa'
-          : '🔔 [TESTE] Notificação Padrão Vito';
+      const channelId = priority === 'silent' ? 'vito_silent' : 'vito_default';
+      const title = priority === 'silent'
+        ? '[TESTE] Notificação Silenciosa'
+        : '[TESTE] Notificação Vito';
       
-      const body = priority === 'wakeup'
-        ? 'Este alerta toca com prioridade máxima e vibração persistente para garantir seu despertar.'
-        : priority === 'silent'
-          ? 'Alerta sem som, mantendo total discrição.'
-          : 'Lembrete padrão emitido com sucesso pontual.';
+      const body = priority === 'silent'
+        ? 'Alerta sem som, mantendo total discrição.'
+        : 'Lembrete emitido com sucesso pontual.';
 
       await Notifications.scheduleNotificationAsync({
         content: {

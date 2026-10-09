@@ -56,7 +56,11 @@ func (w *ReminderWorker) CheckAndDispatchReminders(now time.Time) (int, error) {
 
 	dispatchedCount := 0
 	for _, event := range events {
-		title := fmt.Sprintf("🔔 Lembrete: %s", event.Title)
+		emoji := GetNotificationContextEmoji(event.Title, event.Category)
+		title := event.Title
+		if emoji != "" {
+			title = fmt.Sprintf("%s %s", emoji, event.Title)
+		}
 		timeStr := event.StartAt.Local().Format("15:04")
 		body := fmt.Sprintf("Começa às %s", timeStr)
 		if event.Location != "" {
@@ -64,9 +68,6 @@ func (w *ReminderWorker) CheckAndDispatchReminders(now time.Time) (int, error) {
 		}
 
 		priority := "default"
-		if event.Category == "work" || event.Category == "health" {
-			priority = "wakeup"
-		}
 
 		data := map[string]interface{}{
 			"eventId":  event.ID,

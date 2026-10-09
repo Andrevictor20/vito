@@ -51,16 +51,27 @@ export const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({ message, o
         {message.imageUri && (
           <Image source={{ uri: message.imageUri }} style={styles.imageAttachment} resizeMode="cover" />
         )}
-        <Text
-          style={[
-            styles.messageText,
-            isUser
-              ? [styles.messageTextUser, { color: isDark ? '#FAFAFA' : '#FFFFFF' }]
-              : [styles.messageTextVito, { color: colors.onSurface }],
-          ]}
-        >
-          {message.text}
-        </Text>
+        <View style={message.id.includes('audio') ? styles.voiceTextRow : undefined}>
+          {message.id.includes('audio') && (
+            <MaterialIcons
+              name="mic"
+              size={16}
+              color={isUser ? (isDark ? '#FAFAFA' : '#FFFFFF') : colors.primary}
+              style={{ marginRight: 6, marginTop: 2 }}
+            />
+          )}
+          <Text
+            style={[
+              styles.messageText,
+              message.id.includes('audio') && { flexShrink: 1 },
+              isUser
+                ? [styles.messageTextUser, { color: isDark ? '#FAFAFA' : '#FFFFFF' }]
+                : [styles.messageTextVito, { color: colors.onSurface }],
+            ]}
+          >
+            {message.text}
+          </Text>
+        </View>
 
         {/* Cards Estruturados Modulares */}
         {message.event && <EventInlineCard event={message.event} />}
@@ -158,6 +169,10 @@ const styles = StyleSheet.create({
   },
   timestampVito: {
     color: tokens.colors.onSurfaceVariant,
+  },
+  voiceTextRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
   },
   imageAttachment: {
     width: '100%',

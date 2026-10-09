@@ -73,13 +73,7 @@ func (h *NotificationHandler) SendTestNotification(w http.ResponseWriter, r *htt
 		title = "Vito — Lembrete de Teste"
 	}
 	body := req.Body
-	if body == "" {
-		if req.Priority == "wakeup" {
-			body = "🚨 Alerta Crítico Wake-up Call ativado! Toque persistente e prioridade máxima."
-		} else {
-			body = "Notificação padrão de compromisso entregue com sucesso."
-		}
-	}
+		body = "Notificação de lembrete do Vito entregue com sucesso."
 	priority := req.Priority
 	if priority == "" {
 		priority = "default"

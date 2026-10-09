@@ -50,6 +50,10 @@
     "web": {
       "bundler": "metro"
     },
+    "notification": {
+      "icon": "./assets/notification-icon.png",
+      "color": "#1A1A1E"
+    },
     "plugins": [
       "expo-asset",
       "expo-audio",
@@ -64,7 +68,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/icon.png",
+          "icon": "./assets/notification-icon.png",
           "color": "#1A1A1E"
         }
       ],

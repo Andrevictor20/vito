@@ -113,9 +113,9 @@ export interface ConversationSession {
   active?: boolean;
 }
 
-export type NotificationPriority = 'silent' | 'default' | 'wakeup';
+export type NotificationPriority = 'silent' | 'default';
 
-export type NotificationChannelId = 'vito_silent' | 'vito_default' | 'vito_wakeup';
+export type NotificationChannelId = 'vito_silent' | 'vito_default';
 
 export interface NotificationSettings {
   enabled: boolean;

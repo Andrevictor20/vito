@@ -44,8 +44,8 @@ export function useNotifications() {
     };
   }, []);
 
-  const requestPermissions = useCallback(async () => {
-    const res = await notificationService.requestPermissions();
+  const requestPermissions = useCallback(async (userInitiated: boolean = false) => {
+    const res = await notificationService.requestPermissions(userInitiated);
     setPermissionGranted(res.granted);
     if (res.granted) {
       const updated = await notificationService.getSettings();
@@ -64,10 +64,6 @@ export function useNotifications() {
     return notificationService.scheduleEventReminder(params);
   }, []);
 
-  const triggerTest = useCallback(async (priority: NotificationPriority) => {
-    return notificationService.triggerTestNotification(priority);
-  }, []);
-
   return {
     settings,
     permissionGranted,
@@ -76,6 +72,5 @@ export function useNotifications() {
     requestPermissions,
     updateSettings,
     scheduleReminder,
-    triggerTest,
   };
 }

@@ -196,7 +196,7 @@ export function useChat(onDataChanged?: () => void) {
       const userMsg: ChatMessage = {
         id: `user-audio-${Date.now()}`,
         sender: 'user',
-        text: '🎙️ Mensagem de voz enviada...',
+        text: 'Mensagem de voz enviada',
         timestamp: new Date().toISOString(),
       };
 
@@ -210,8 +210,8 @@ export function useChat(onDataChanged?: () => void) {
 
         // Substitui o placeholder com a transcrição real
         const transcriptText = (res as any).transcript
-          ? `🎙️ "${(res as any).transcript}"`
-          : '🎙️ Voz processada';
+          ? `"${(res as any).transcript}"`
+          : 'Voz processada';
 
         const updatedUserMsg: ChatMessage = { ...userMsg, text: transcriptText };
         const vitoMsg: ChatMessage = {
@@ -262,7 +262,7 @@ export function useChat(onDataChanged?: () => void) {
       const userMsg: ChatMessage = {
         id: `user-img-${Date.now()}`,
         sender: 'user',
-        text: prompt?.trim() || '📷 Imagem enviada para análise...',
+        text: prompt?.trim() || 'Imagem enviada para análise',
         imageUri,
         timestamp: new Date().toISOString(),
       };

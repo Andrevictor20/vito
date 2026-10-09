@@ -523,7 +523,7 @@ class ApiService {
     });
   }
 
-  async testPushNotification(priority: 'default' | 'wakeup' | 'silent' = 'default', title?: string, body?: string): Promise<{ status: string; dispatched: number }> {
+  async testPushNotification(priority: 'default' | 'silent' = 'default', title?: string, body?: string): Promise<{ status: string; dispatched: number }> {
     return this.request<{ status: string; dispatched: number }>('/api/v1/notifications/test', {
       method: 'POST',
       body: JSON.stringify({ priority, title, body }),
