@@ -125,7 +125,7 @@ export const TriggersScreen: React.FC = () => {
       <View style={styles.minimalHeader}>
         <View style={styles.titleArea}>
           <Text style={[styles.headerTitle, { color: colors.onSurface }]}>
-            Vigília de Inteligência
+            Radares do Vito
           </Text>
           <View
             style={[
@@ -135,12 +135,12 @@ export const TriggersScreen: React.FC = () => {
           >
             <View style={[styles.activeDot, { backgroundColor: '#10B981' }]} />
             <Text style={[styles.activeBadgeText, { color: '#10B981' }]}>
-              {stats.active} {stats.active === 1 ? 'ativa' : 'ativas'}
+              {stats.active} {stats.active === 1 ? 'ativo' : 'ativos'}
             </Text>
           </View>
         </View>
         <Text style={[styles.headerSubtitle, { color: colors.onSurfaceVariant }]}>
-          Monitoramento autônomo e relatórios programados
+          O Vito fica de olho na internet por você e avisa na hora certa.
         </Text>
       </View>
 
@@ -160,7 +160,7 @@ export const TriggersScreen: React.FC = () => {
             style={[styles.naturalInput, { color: colors.onSurface }]}
             value={naturalPrompt}
             onChangeText={setNaturalPrompt}
-            placeholder="O que vigiar? Ex: Avise se o dólar passar de 5,60"
+            placeholder="No que quer ficar de olho? Ex: Dólar, voos, eleições..."
             placeholderTextColor={colors.onSurfaceVariant}
             onSubmitEditing={handleCreateFromNaturalPrompt}
             returnKeyType="send"
@@ -271,7 +271,7 @@ export const TriggersScreen: React.FC = () => {
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={[styles.loadingText, { color: colors.onSurfaceVariant }]}>
-            Sincronizando disparadores...
+            Atualizando seus radares...
           </Text>
         </View>
       ) : (
@@ -316,11 +316,11 @@ export const TriggersScreen: React.FC = () => {
               </View>
               <Text style={[styles.emptyTitle, { color: colors.onSurface }]}>
                 {selectedCategory === 'all'
-                  ? 'Nenhuma vigília ativa'
-                  : 'Nenhum disparador nesta categoria'}
+                  ? 'Nenhum radar ativo por enquanto'
+                  : 'Nenhum radar nesta categoria'}
               </Text>
               <Text style={[styles.emptySubtitle, { color: colors.onSurfaceVariant }]}>
-                Digite acima o que você deseja monitorar ou peça ao Vito no Chat.
+                Digite acima o que você quer acompanhar ou peça pro Vito no chat.
               </Text>
             </View>
           }

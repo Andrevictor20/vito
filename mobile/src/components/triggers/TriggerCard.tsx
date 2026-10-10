@@ -42,12 +42,12 @@ export const TriggerCard: React.FC<TriggerCardProps> = ({
 
   const handleDeletePress = () => {
     Alert.alert(
-      'Excluir disparador',
-      `Deseja realmente remover o monitoramento de "${trigger.title}"?`,
+      'Remover radar',
+      `Deseja parar de acompanhar "${trigger.title}"?`,
       [
         { text: 'Cancelar', style: 'cancel' },
         {
-          text: 'Excluir',
+          text: 'Remover',
           style: 'destructive',
           onPress: () => onDelete(trigger.id),
         },
@@ -65,12 +65,17 @@ export const TriggerCard: React.FC<TriggerCardProps> = ({
       case 'daily_evening':
         return 'Diário às 18:00';
       case 'immediate':
-        return 'Alerta frequente';
+        return 'Em tempo real';
       case 'daily_morning':
       default:
         return 'Diário às 08:30';
     }
   };
+
+  // Evita duplicar se a query for idêntica ao título
+  const hasDistinctQuery =
+    Boolean(trigger.query) &&
+    trigger.query.trim().toLowerCase() !== trigger.title.trim().toLowerCase();
 
   return (
     <TouchableOpacity
@@ -84,28 +89,21 @@ export const TriggerCard: React.FC<TriggerCardProps> = ({
       ]}
       onPress={() => onPress(trigger)}
       activeOpacity={0.85}
-      accessibilityLabel={`Disparador ${trigger.title}. Toque para ver relatórios.`}
+      accessibilityLabel={`Radar ${trigger.title}. Toque para ver relatórios e histórico.`}
     >
-      {/* Top Header do Card: Categoria, Horário & Ações */}
+      {/* Top Header do Card: Categoria (Esquerda) & Ações (Direita) */}
       <View style={styles.headerRow}>
         <View style={styles.categoryBadgeRow}>
           <View style={[styles.iconCircle, { backgroundColor: categoryBg }]}>
-            <MaterialIcons name={categoryMeta.icon as any} size={16} color={categoryColor} />
+            <MaterialIcons name={categoryMeta.icon as any} size={15} color={categoryColor} />
           </View>
-          <Text style={[styles.categoryLabel, { color: categoryColor }]}>
+          <Text
+            style={[styles.categoryLabel, { color: categoryColor }]}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
             {categoryMeta.label}
           </Text>
-          <View
-            style={[
-              styles.timePill,
-              { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' },
-            ]}
-          >
-            <MaterialIcons name="schedule" size={12} color={colors.onSurfaceVariant} />
-            <Text style={[styles.timePillText, { color: colors.onSurfaceVariant }]}>
-              {getFrequencyLabel()}
-            </Text>
-          </View>
         </View>
 
         <View style={styles.actionsRight}>
@@ -116,9 +114,9 @@ export const TriggerCard: React.FC<TriggerCardProps> = ({
               onEdit(trigger);
             }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            accessibilityLabel="Editar disparador"
+            accessibilityLabel="Editar radar"
           >
-            <MaterialIcons name="edit" size={18} color={isDark ? '#A1A1AA' : '#71717A'} />
+            <MaterialIcons name="edit" size={17} color={isDark ? '#A1A1AA' : '#71717A'} />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -128,7 +126,7 @@ export const TriggerCard: React.FC<TriggerCardProps> = ({
               handleDeletePress();
             }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            accessibilityLabel="Excluir disparador"
+            accessibilityLabel="Remover radar"
           >
             <MaterialIcons
               name="delete-outline"
@@ -143,15 +141,32 @@ export const TriggerCard: React.FC<TriggerCardProps> = ({
         </View>
       </View>
 
+      {/* Linha de Metadados: Horário / Frequência isolada (nunca colide com ações) */}
+      <View style={styles.metaRow}>
+        <View
+          style={[
+            styles.timePill,
+            { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' },
+          ]}
+        >
+          <MaterialIcons name="schedule" size={12} color={colors.onSurfaceVariant} />
+          <Text style={[styles.timePillText, { color: colors.onSurfaceVariant }]}>
+            {getFrequencyLabel()}
+          </Text>
+        </View>
+      </View>
+
       {/* Título & Detalhes da Consulta */}
       <View style={styles.body}>
         <Text style={[styles.title, { color: colors.onSurface }]}>{trigger.title}</Text>
-        <Text
-          style={[styles.queryText, { color: colors.onSurfaceVariant }]}
-          numberOfLines={2}
-        >
-          {trigger.query}
-        </Text>
+        {hasDistinctQuery && (
+          <Text
+            style={[styles.queryText, { color: colors.onSurfaceVariant }]}
+            numberOfLines={2}
+          >
+            {trigger.query}
+          </Text>
+        )}
       </View>
 
       {/* Footer Minimalista: Atalho para Relatórios */}
@@ -164,7 +179,7 @@ export const TriggerCard: React.FC<TriggerCardProps> = ({
         <View style={styles.reportHintRow}>
           <MaterialIcons name="history" size={15} color={colors.primary} />
           <Text style={[styles.reportHintText, { color: colors.primary }]}>
-            Ver relatórios e histórico
+            Ver histórico e novidades
           </Text>
         </View>
         <MaterialIcons name="chevron-right" size={18} color={colors.onSurfaceVariant} />
@@ -189,26 +204,33 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   categoryBadgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     flexShrink: 1,
+    maxWidth: '65%',
   },
   iconCircle: {
-    width: 28,
-    height: 28,
+    width: 26,
+    height: 26,
     borderRadius: MD3Shapes.full,
     alignItems: 'center',
     justifyContent: 'center',
   },
   categoryLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.4,
+    flexShrink: 1,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
   },
   timePill: {
     flexDirection: 'row',
@@ -225,7 +247,7 @@ const styles = StyleSheet.create({
   actionsRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   actionIconButton: {
     padding: 4,

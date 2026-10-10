@@ -105,7 +105,7 @@ export const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({ message, o
             <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
               <MaterialIcons name="radar" size={13} color="#10B981" style={{ marginRight: 4 }} />
               <Text style={{ fontSize: 11, fontWeight: '600', color: '#10B981' }}>
-                Vigília Ativa em Disparadores
+                Radar Ativo no Vito
               </Text>
             </View>
           </View>

@@ -142,7 +142,7 @@ export const TriggerReportsView: React.FC<TriggerReportsViewProps> = ({
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <MaterialIcons name="arrow-back" size={22} color={colors.onSurface} />
-          <Text style={[styles.backButtonText, { color: colors.onSurface }]}>Vigílias</Text>
+          <Text style={[styles.backButtonText, { color: colors.onSurface }]}>Radares</Text>
         </TouchableOpacity>
 
         <View style={styles.topBarActions}>
@@ -514,7 +514,7 @@ export const TriggerReportsView: React.FC<TriggerReportsViewProps> = ({
               </Text>
               <Text style={[styles.emptySubtitle, { color: colors.onSurfaceVariant }]}>
                 Toque em "Verificar Agora" acima para realizar a primeira consulta com a IA e
-                gravar o primeiro relatório neste disparador.
+                gravar o primeiro relatório neste radar.
               </Text>
             </View>
           ) : null

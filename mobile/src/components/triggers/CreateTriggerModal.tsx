@@ -72,7 +72,7 @@ export const CreateTriggerModal: React.FC<CreateTriggerModalProps> = ({
       finalQuery = promptText.trim();
     } else {
       if (!finalTitle) {
-        Alert.alert('Atenção', 'Informe o título do disparador.');
+        Alert.alert('Atenção', 'Informe o título do radar.');
         return;
       }
       if (!finalQuery) {
@@ -95,7 +95,7 @@ export const CreateTriggerModal: React.FC<CreateTriggerModalProps> = ({
       setQuery('');
       onClose();
     } catch (err: any) {
-      Alert.alert('Erro ao criar disparador', err?.message || 'Tente novamente em instantes.');
+      Alert.alert('Erro ao criar radar', err?.message || 'Tente novamente em instantes.');
     } finally {
       setSubmitting(false);
     }
@@ -134,10 +134,10 @@ export const CreateTriggerModal: React.FC<CreateTriggerModalProps> = ({
               </View>
               <View>
                 <Text style={[styles.modalTitle, { color: colors.onSurface }]}>
-                  Novo Disparador
+                  Novo Radar
                 </Text>
                 <Text style={[styles.modalSubtitle, { color: colors.onSurfaceVariant }]}>
-                  Vigília autônoma e inteligência proativa
+                  O Vito pesquisa e avisa das novidades
                 </Text>
               </View>
             </View>
@@ -329,7 +329,7 @@ export const CreateTriggerModal: React.FC<CreateTriggerModalProps> = ({
 
                 {/* Título */}
                 <Text style={[styles.fieldLabel, { color: colors.onSurface, marginTop: 12 }]}>
-                  Título do Disparador:
+                  Título do Radar:
                 </Text>
                 <View
                   style={[
@@ -450,7 +450,7 @@ export const CreateTriggerModal: React.FC<CreateTriggerModalProps> = ({
               ) : (
                 <>
                   <MaterialIcons name="add" size={18} color="#FFFFFF" />
-                  <Text style={styles.saveButtonText}>Criar Disparador</Text>
+                  <Text style={styles.saveButtonText}>Criar Radar</Text>
                 </>
               )}
             </TouchableOpacity>

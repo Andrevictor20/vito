@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -7,8 +7,11 @@ import {
   TouchableOpacity,
   TouchableWithoutFeedback,
   ScrollView,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import * as Updates from 'expo-updates';
 import { tokens } from '../../theme/tokens';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -34,10 +37,53 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 }) => {
   const { user, logout } = useAuth();
   const { colors, isDark } = useTheme();
-  const [notifModalVisible, setNotifModalVisible] = React.useState(false);
-  const [calendarSyncModalVisible, setCalendarSyncModalVisible] = React.useState(false);
+  const [notifModalVisible, setNotifModalVisible] = useState(false);
+  const [calendarSyncModalVisible, setCalendarSyncModalVisible] = useState(false);
+  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
   const name = user?.name || 'Andre Victor';
   const email = user?.email || 'andre@vito.ai';
+
+  const handleManualCheckUpdate = async () => {
+    setIsCheckingUpdate(true);
+    try {
+      if (!Updates.isEnabled) {
+        Alert.alert(
+          'Atualizações OTA',
+          'O serviço de atualizações OTA está desativado em ambiente de desenvolvimento (Metro). Ele opera ativamente em builds standalone instalados no dispositivo.'
+        );
+        return;
+      }
+      const result = await Updates.checkForUpdateAsync();
+      if (result.isAvailable) {
+        Alert.alert(
+          'Atualização Encontrada',
+          'Baixando a versão mais recente em segundo plano...',
+          [
+            {
+              text: 'Aplicar Agora',
+              onPress: async () => {
+                await Updates.fetchUpdateAsync();
+                await Updates.reloadAsync();
+              },
+            },
+          ]
+        );
+      } else {
+        Alert.alert(
+          'Aplicativo Atualizado',
+          'Você já está executando a versão mais recente disponível para este aplicativo instalado.'
+        );
+      }
+    } catch (e: any) {
+      console.warn('[Updates] Erro ao verificar atualização:', e);
+      Alert.alert(
+        'Verificação de Atualização',
+        `Não foi possível verificar atualizações: ${e?.message || 'Falha de conexão com os servidores do Expo'}.`
+      );
+    } finally {
+      setIsCheckingUpdate(false);
+    }
+  };
 
   const handleLogout = () => {
     onClose();
@@ -97,6 +143,25 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
                 {/* Ações da Sessão */}
                 <View style={styles.actionsGroup}>
+                  <TouchableOpacity
+                    style={[styles.actionButton, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}
+                    onPress={handleManualCheckUpdate}
+                    activeOpacity={0.8}
+                    disabled={isCheckingUpdate}
+                  >
+                    <View style={styles.actionLeft}>
+                      <MaterialIcons name="system-update" size={18} color={colors.primary} />
+                      <Text style={[styles.actionText, { color: colors.onSurface }]}>
+                        {isCheckingUpdate ? 'Buscando atualizações...' : 'Buscar Atualizações'}
+                      </Text>
+                    </View>
+                    {isCheckingUpdate ? (
+                      <ActivityIndicator size="small" color={colors.primary} />
+                    ) : (
+                      <MaterialIcons name="chevron-right" size={18} color={colors.outline} />
+                    )}
+                  </TouchableOpacity>
+
                   <TouchableOpacity
                     style={[styles.actionButton, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}
                     onPress={handleLogout}

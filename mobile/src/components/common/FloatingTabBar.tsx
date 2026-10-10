@@ -117,14 +117,14 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
         </Text>
       </TouchableOpacity>
 
-      {/* Item 3: Disparadores (Vigília Proativa) */}
+      {/* Item 3: Radares (Acompanhamento Proativo) */}
       <TouchableOpacity
         style={styles.navItem}
         onPress={() => onSelectTab('triggers')}
         activeOpacity={0.7}
         accessibilityRole="tab"
         accessibilityState={{ selected: activeTab === 'triggers' }}
-        accessibilityLabel="Aba Disparadores e Monitoramentos"
+        accessibilityLabel="Aba Radares e Alertas"
       >
         <View
           style={[
@@ -155,7 +155,7 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
             },
           ]}
         >
-          Disparadores
+          Radares
         </Text>
       </TouchableOpacity>
     </View>

@@ -169,7 +169,11 @@ func (s *GoogleAuthService) GetAuthURL(mode, userID, redirectScheme string) (str
 	params.Set("response_type", "code")
 	params.Set("scope", scope)
 	params.Set("access_type", "offline")
-	params.Set("prompt", "consent")
+	if mode == "calendar" {
+		params.Set("prompt", "consent")
+	} else {
+		params.Set("prompt", "select_account")
+	}
 	params.Set("state", state)
 
 	return s.cfg.AuthURL + "?" + params.Encode(), nil

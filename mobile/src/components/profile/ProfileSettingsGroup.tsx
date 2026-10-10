@@ -14,7 +14,6 @@ export const ProfileSettingsGroup: React.FC<ProfileSettingsGroupProps> = ({
   onOpenNotifications,
   onOpenCalendarSync,
 }) => {
-  const [whisperEnabled, setWhisperEnabled] = useState(true);
   const { colors, isDark, toggleTheme } = useTheme();
 
   return (
@@ -48,7 +47,7 @@ export const ProfileSettingsGroup: React.FC<ProfileSettingsGroupProps> = ({
 
       <View style={[styles.divider, { backgroundColor: colors.outlineVariant }]} />
 
-      {/* Notificações & Wake-up Calls */}
+      {/* Notificações */}
       <TouchableOpacity
         style={styles.groupItem}
         onPress={onOpenNotifications}
@@ -59,8 +58,8 @@ export const ProfileSettingsGroup: React.FC<ProfileSettingsGroupProps> = ({
             <MaterialIcons name="notifications-active" size={18} color={colors.primary} />
           </View>
           <View style={styles.itemTextCol}>
-            <Text style={[styles.itemTitle, { color: colors.onSurface }]}>Notificações & Wake-up Calls</Text>
-            <Text style={[styles.itemSub, { color: colors.onSurfaceVariant }]}>Lembretes offline e prioridade máxima</Text>
+            <Text style={[styles.itemTitle, { color: colors.onSurface }]}>Notificações</Text>
+            <Text style={[styles.itemSub, { color: colors.onSurfaceVariant }]}>Lembretes e avisos</Text>
           </View>
         </View>
         <MaterialIcons name="chevron-right" size={18} color={colors.outline} />
@@ -68,36 +67,7 @@ export const ProfileSettingsGroup: React.FC<ProfileSettingsGroupProps> = ({
 
       <View style={[styles.divider, { backgroundColor: colors.outlineVariant }]} />
 
-      <View style={styles.groupItem}>
-        <View style={styles.itemLeft}>
-          <View style={[styles.itemIconBox, { backgroundColor: colors.surfaceContainerHigh }]}>
-            <MaterialIcons name="psychology" size={18} color={colors.primary} />
-          </View>
-          <View style={styles.itemTextCol}>
-            <Text style={[styles.itemTitle, { color: colors.onSurface }]}>Modelo Ativo</Text>
-            <Text style={[styles.itemSub, { color: colors.onSurfaceVariant }]}>Gemini 2.5 Flash / Groq Cloud</Text>
-          </View>
-        </View>
-        <MaterialIcons name="chevron-right" size={18} color={colors.outline} />
-      </View>
-
-      <View style={[styles.divider, { backgroundColor: colors.outlineVariant }]} />
-
-      <View style={styles.groupItem}>
-        <View style={styles.itemLeft}>
-          <View style={[styles.itemIconBox, { backgroundColor: colors.surfaceContainerHigh }]}>
-            <MaterialIcons name="bolt" size={18} color={colors.primary} />
-          </View>
-          <View style={styles.itemTextCol}>
-            <Text style={[styles.itemTitle, { color: colors.onSurface }]}>Modo de Resposta</Text>
-            <Text style={[styles.itemSub, { color: colors.onSurfaceVariant }]}>Ultra Conciso & Executivo</Text>
-          </View>
-        </View>
-        <MaterialIcons name="chevron-right" size={18} color={colors.outline} />
-      </View>
-
-      <View style={[styles.divider, { backgroundColor: colors.outlineVariant }]} />
-
+      {/* Sincronização de Calendários */}
       <TouchableOpacity
         style={styles.groupItem}
         onPress={onOpenCalendarSync}
@@ -109,29 +79,11 @@ export const ProfileSettingsGroup: React.FC<ProfileSettingsGroupProps> = ({
           </View>
           <View style={styles.itemTextCol}>
             <Text style={[styles.itemTitle, { color: colors.onSurface }]}>Sincronização de Calendários</Text>
-            <Text style={[styles.itemSub, { color: colors.onSurfaceVariant }]}>Google Calendar + Apple iCloud</Text>
+            <Text style={[styles.itemSub, { color: colors.onSurfaceVariant }]}>Google Calendar</Text>
           </View>
         </View>
         <MaterialIcons name="chevron-right" size={18} color={colors.outline} />
       </TouchableOpacity>
-
-      <View style={[styles.divider, { backgroundColor: colors.outlineVariant }]} />
-
-      <View style={styles.groupItem}>
-        <View style={styles.itemLeft}>
-          <View style={[styles.itemIconBox, { backgroundColor: colors.surfaceContainerHigh }]}>
-            <MaterialIcons name="mic" size={18} color={colors.primary} />
-          </View>
-          <View style={styles.itemTextCol}>
-            <Text style={[styles.itemTitle, { color: colors.onSurface }]}>Transcrições de Reuniões</Text>
-            <Text style={[styles.itemSub, { color: colors.onSurfaceVariant }]}>Whisper local via RPi</Text>
-          </View>
-        </View>
-        <M3Switch
-          value={whisperEnabled}
-          onValueChange={setWhisperEnabled}
-        />
-      </View>
     </View>
   );
 };

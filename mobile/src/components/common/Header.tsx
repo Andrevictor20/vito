@@ -155,12 +155,12 @@ export const Header: React.FC<HeaderProps> = ({
       >
         <View style={styles.titleRow}>
           <Text style={[styles.brand, { color: colors.onSurface }]} numberOfLines={1}>
-            Disparadores
+            Radares
           </Text>
           <View style={[styles.statusDot, { backgroundColor: '#10B981' }]} />
         </View>
         <Text style={[styles.brandSubtitle, { color: colors.textMuted }]} numberOfLines={1}>
-          Vigília & Inteligência
+          Radar do Vito
         </Text>
       </Animated.View>
     </View>

@@ -156,7 +156,7 @@ export const CalendarSyncSettingsModal: React.FC<CalendarSyncSettingsModalProps>
                   Sincronização de Calendários
                 </Text>
                 <Text style={[styles.subtitle, { color: colors.onSurfaceVariant }]}>
-                  Google Calendar & Apple iCloud
+                  Google Calendar & Calendário do Dispositivo
                 </Text>
               </View>
             </View>
@@ -170,13 +170,6 @@ export const CalendarSyncSettingsModal: React.FC<CalendarSyncSettingsModalProps>
           </View>
 
           <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-            {/* Banner Informativo */}
-            <View style={[styles.infoBanner, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
-              <MaterialIcons name="security" size={18} color={colors.primary} />
-              <Text style={[styles.infoBannerText, { color: colors.onSurfaceVariant }]}>
-                Sincronização bidirecional com supressão de eco e proteção de dados em repouso com AES-256.
-              </Text>
-            </View>
 
             {/* CARD 1: GOOGLE CALENDAR */}
             <View
@@ -293,7 +286,7 @@ export const CalendarSyncSettingsModal: React.FC<CalendarSyncSettingsModalProps>
               )}
             </View>
 
-            {/* CARD 2: APPLE CALENDAR (iCloud CalDAV & Nativo) */}
+            {/* CARD 2: APPLE CALENDAR (Nativo do Dispositivo) */}
             <View
               style={[
                 styles.card,
@@ -310,16 +303,14 @@ export const CalendarSyncSettingsModal: React.FC<CalendarSyncSettingsModalProps>
                       Apple Calendar
                     </Text>
                     <Text style={[styles.cardSub, { color: colors.onSurfaceVariant }]}>
-                      {appleCalDAVInteg
-                        ? `iCloud CalDAV: ${appleCalDAVInteg.account_email}`
-                        : appleNativeInteg
+                      {appleNativeInteg
                         ? 'Calendário Nativo iOS Ativo'
-                        : 'iCloud 24/7 ou Local do Dispositivo'}
+                        : 'Sincronização local via EventKit no iOS'}
                     </Text>
                   </View>
                 </View>
 
-                {(appleCalDAVInteg || appleNativeInteg) && (
+                {appleNativeInteg && (
                   <View style={[styles.badgeActive, { backgroundColor: '#10B981' + '20' }]}>
                     <View style={[styles.statusDot, { backgroundColor: '#10B981' }]} />
                     <Text style={[styles.badgeText, { color: '#10B981' }]}>Ativo</Text>
@@ -350,144 +341,6 @@ export const CalendarSyncSettingsModal: React.FC<CalendarSyncSettingsModalProps>
                   color={appleNativeInteg ? '#10B981' : colors.outline}
                 />
               </TouchableOpacity>
-
-              {/* Opção CalDAV Headless 24/7 */}
-              {appleCalDAVInteg ? (
-                <View style={[styles.connectedActions, { borderTopWidth: 1, borderTopColor: colors.outlineVariant }]}>
-                  <Text style={[styles.syncTimeText, { color: colors.onSurfaceVariant }]}>
-                    Última sincronização CalDAV: {formatLastSync(appleCalDAVInteg.last_synced_at)}
-                  </Text>
-                  <View style={styles.actionRow}>
-                    <TouchableOpacity
-                      style={[
-                        styles.primaryActionBtn,
-                        {
-                          backgroundColor: isDark ? colors.surfaceContainerHighest : colors.primary,
-                          borderWidth: isDark ? 1 : 0,
-                          borderColor: colors.outlineVariant,
-                        },
-                      ]}
-                      onPress={handleSyncAppleCalDAV}
-                      disabled={isSyncing}
-                      activeOpacity={0.8}
-                    >
-                      {isSyncing ? (
-                        <ActivityIndicator size="small" color={isDark ? colors.onSurface : '#FFFFFF'} />
-                      ) : (
-                        <>
-                          <MaterialIcons name="refresh" size={16} color={isDark ? colors.onSurface : '#FFFFFF'} />
-                          <Text style={[styles.primaryActionText, { color: isDark ? colors.onSurface : '#FFFFFF' }]}>
-                            Sincronizar
-                          </Text>
-                        </>
-                      )}
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={[
-                        styles.secondaryActionBtn,
-                        {
-                          borderColor: colors.outlineVariant,
-                          opacity: isSyncing || disconnectingProvider === 'apple_caldav' ? 0.6 : 1,
-                        },
-                      ]}
-                      onPress={() => handleDisconnect('apple_caldav', 'iCloud CalDAV')}
-                      disabled={isSyncing || disconnectingProvider === 'apple_caldav'}
-                    >
-                      {disconnectingProvider === 'apple_caldav' ? (
-                        <ActivityIndicator size="small" color={colors.error} />
-                      ) : (
-                        <Text style={[styles.secondaryActionText, { color: colors.error }]}>
-                          Desconectar
-                        </Text>
-                      )}
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ) : (
-                <View style={[styles.optionContainer, { borderTopWidth: 1, borderTopColor: colors.outlineVariant }]}>
-                  {!showAppleForm ? (
-                    <TouchableOpacity
-                      style={[styles.connectBtnSecondary, { borderColor: colors.outlineVariant }]}
-                      onPress={() => setShowAppleForm(true)}
-                    >
-                      <MaterialIcons name="cloud" size={16} color={colors.onSurface} />
-                      <Text style={[styles.connectBtnSecondaryText, { color: colors.onSurface }]}>
-                        Conectar iCloud CalDAV 24/7
-                      </Text>
-                    </TouchableOpacity>
-                  ) : (
-                    <View style={styles.formContainer}>
-                      <Text style={[styles.formHelper, { color: colors.onSurfaceVariant }]}>
-                        Utilize sua Senha de App Específica gerada em appleid.apple.com
-                      </Text>
-                      <TextInput
-                        style={[
-                          styles.input,
-                          {
-                            backgroundColor: colors.surfaceContainerHigh,
-                            color: colors.onSurface,
-                            borderColor: colors.outlineVariant,
-                          },
-                        ]}
-                        placeholder="Apple ID (ex: seu-nome@icloud.com)"
-                        placeholderTextColor={colors.onSurfaceVariant}
-                        value={appleId}
-                        onChangeText={setAppleId}
-                        autoCapitalize="none"
-                        keyboardType="email-address"
-                      />
-                      <TextInput
-                        style={[
-                          styles.input,
-                          {
-                            backgroundColor: colors.surfaceContainerHigh,
-                            color: colors.onSurface,
-                            borderColor: colors.outlineVariant,
-                          },
-                        ]}
-                        placeholder="Senha de App (xxxx-xxxx-xxxx-xxxx)"
-                        placeholderTextColor={colors.onSurfaceVariant}
-                        value={appSpecificPassword}
-                        onChangeText={setAppSpecificPassword}
-                        secureTextEntry
-                        autoCapitalize="none"
-                      />
-                      <View style={styles.formButtonRow}>
-                        <TouchableOpacity
-                          style={[
-                            styles.confirmBtn,
-                            {
-                              backgroundColor: isDark ? colors.surfaceContainerHighest : colors.primary,
-                              borderWidth: isDark ? 1 : 0,
-                              borderColor: colors.outlineVariant,
-                            },
-                          ]}
-                          onPress={handleConnectAppleCalDAV}
-                          disabled={isLoading}
-                          activeOpacity={0.8}
-                        >
-                          {isLoading ? (
-                            <ActivityIndicator size="small" color={isDark ? colors.onSurface : '#FFFFFF'} />
-                          ) : (
-                            <Text style={[styles.confirmBtnText, { color: isDark ? colors.onSurface : '#FFFFFF' }]}>
-                              Salvar CalDAV
-                            </Text>
-                          )}
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[styles.cancelBtn, { borderColor: colors.outlineVariant }]}
-                          onPress={() => setShowAppleForm(false)}
-                        >
-                          <Text style={[styles.cancelBtnText, { color: colors.onSurfaceVariant }]}>
-                            Cancelar
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  )}
-                </View>
-              )}
             </View>
           </ScrollView>
         </View>

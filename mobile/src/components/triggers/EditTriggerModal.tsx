@@ -63,7 +63,7 @@ export const EditTriggerModal: React.FC<EditTriggerModalProps> = ({
 
   const handleSave = async () => {
     if (!title.trim()) {
-      setError('O título do disparador é obrigatório.');
+      setError('O título do radar é obrigatório.');
       return;
     }
     if (!query.trim()) {
@@ -124,7 +124,7 @@ export const EditTriggerModal: React.FC<EditTriggerModalProps> = ({
               >
                 <MaterialIcons name="edit" size={20} color={colors.primary} />
               </View>
-              <Text style={[styles.title, { color: colors.onSurface }]}>Editar Disparador</Text>
+              <Text style={[styles.title, { color: colors.onSurface }]}>Editar Radar</Text>
             </View>
             <TouchableOpacity
               onPress={onClose}
@@ -160,9 +160,9 @@ export const EditTriggerModal: React.FC<EditTriggerModalProps> = ({
               placeholderTextColor={colors.onSurfaceVariant}
             />
 
-            {/* Consulta / Instrução de Vigília */}
+            {/* Consulta / Instrução de Acompanhamento */}
             <Text style={[styles.fieldLabel, { color: colors.onSurfaceVariant }]}>
-              Instrução de Vigília (Linguagem Natural)
+              O que acompanhar na web? (Linguagem natural)
             </Text>
             <TextInput
               style={[

@@ -137,6 +137,10 @@ func TestGoogleAuthService_GetAuthURL(t *testing.T) {
 		t.Errorf("scope de login incorreto: %s", q.Get("scope"))
 	}
 
+	if q.Get("prompt") != "select_account" {
+		t.Errorf("prompt esperado 'select_account' no modo login, obteve: %s", q.Get("prompt"))
+	}
+
 	// Teste URL para calendário
 	calURL, err := svc.GetAuthURL("calendar", "user-uuid-1", "vito://oauth/callback")
 	if err != nil {
@@ -146,6 +150,9 @@ func TestGoogleAuthService_GetAuthURL(t *testing.T) {
 	qCal := parsedCal.Query()
 	if qCal.Get("scope") != expectedScope {
 		t.Errorf("scope de calendário esperado '%s', obteve: '%s'", expectedScope, qCal.Get("scope"))
+	}
+	if qCal.Get("prompt") != "consent" {
+		t.Errorf("prompt esperado 'consent' no modo calendar, obteve: %s", qCal.Get("prompt"))
 	}
 }
 

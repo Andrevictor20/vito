@@ -247,29 +247,6 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
                   </Text>
                 </View>
 
-                {/* 4. Diagnóstico & Teste de Notificação */}
-                <Text style={[styles.sectionTitle, { color: colors.onSurface, marginTop: 24 }]}>DIAGNÓSTICO & TESTE</Text>
-                <TouchableOpacity
-                  style={[styles.testButton, { backgroundColor: colors.surfaceContainerHigh, borderColor: colors.outlineVariant }]}
-                  onPress={async () => {
-                    if (!permissionGranted) {
-                      Alert.alert('Aviso', 'Conceda permissão primeiro para testar notificações.');
-                      return;
-                    }
-                    setTestingNotif(true);
-                    await notificationService.triggerTestNotification(settings.defaultPriority);
-                    Alert.alert('Teste Disparado', 'Uma notificação de teste será exibida em 2 segundos.');
-                    setTimeout(() => setTestingNotif(false), 2500);
-                  }}
-                  activeOpacity={0.8}
-                  disabled={testingNotif}
-                >
-                  <MaterialIcons name="notifications-active" size={20} color={colors.primary} />
-                  <Text style={[styles.testButtonText, { color: colors.onSurface }]}>
-                    {testingNotif ? 'Emitindo alerta...' : 'Testar Alerta no Aparelho Agora'}
-                  </Text>
-                </TouchableOpacity>
-
               </ScrollView>
             </View>
           </TouchableWithoutFeedback>
