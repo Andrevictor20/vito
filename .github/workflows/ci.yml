@@ -95,7 +95,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Trigger Auto-Deploy Webhook (Saturn / Watchtower / Self-Hosted)
-        if: env.DEPLOY_WEBHOOK_URL != ''
+        if: ${{ secrets.DEPLOY_WEBHOOK_URL != '' }}
         env:
           DEPLOY_WEBHOOK_URL: ${{ secrets.DEPLOY_WEBHOOK_URL }}
         run: |
