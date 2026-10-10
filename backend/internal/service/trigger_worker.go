@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"sync"
@@ -60,8 +61,18 @@ func (e *AITriggerEvaluator) Evaluate(ctx context.Context, t *domain.Trigger) (s
 	if e.evaluateFn != nil {
 		res, err := e.evaluateFn(ctx, t)
 		if err == nil && res != nil {
-			payload := fmt.Sprintf(`{"status":"evaluated","condition_met":%t,"data":%q,"tested_at":%q}`, res.ConditionMet, res.CurrentData, res.TestedAt.Format(time.RFC3339))
-			return res.Summary, payload, nil
+			payloadObj := map[string]interface{}{
+				"status":                 "evaluated",
+				"condition_met":          res.ConditionMet,
+				"data":                   res.CurrentData,
+				"simulated_notification": res.SimulatedNotification,
+				"tested_at":              res.TestedAt.Format(time.RFC3339),
+			}
+			payloadBytes, errMarshal := json.Marshal(payloadObj)
+			if errMarshal == nil {
+				return res.Summary, string(payloadBytes), nil
+			}
+			return res.Summary, `{"status":"evaluated"}`, nil
 		}
 	}
 	def := &DefaultTriggerEvaluator{}

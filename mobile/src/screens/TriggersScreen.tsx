@@ -16,7 +16,7 @@ import { tokens, MD3Shapes } from '../theme/tokens';
 import { useTheme } from '../context/ThemeContext';
 import { useTriggers } from '../hooks/useTriggers';
 import { TriggerCard } from '../components/triggers/TriggerCard';
-import { TriggerReportsModal } from '../components/triggers/TriggerReportsModal';
+import { TriggerReportsView } from '../components/triggers/TriggerReportsView';
 import { EditTriggerModal } from '../components/triggers/EditTriggerModal';
 import { TRIGGER_CATEGORIES, Trigger, TriggerCategory } from '../types';
 import { api } from '../services/api';
@@ -36,11 +36,10 @@ export const TriggersScreen: React.FC = () => {
     handleDeleteTrigger,
     handleUpdateTrigger,
     handleRunTrigger,
-    handleTestTrigger,
     stats,
   } = useTriggers();
 
-  // Modais
+  // Modais e navegação
   const [reportTrigger, setReportTrigger] = useState<Trigger | null>(null);
   const [editTrigger, setEditTrigger] = useState<Trigger | null>(null);
 
@@ -80,6 +79,45 @@ export const TriggersScreen: React.FC = () => {
       setIsSubmittingPrompt(false);
     }
   };
+
+  if (reportTrigger) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.surface }]}>
+        <TriggerReportsView
+          trigger={reportTrigger}
+          onBack={() => setReportTrigger(null)}
+          onEdit={(t) => {
+            setEditTrigger(t);
+          }}
+          onRunNow={handleRunTrigger}
+          onToggle={async (id) => {
+            await handleToggleTrigger(id);
+            setReportTrigger((prev) =>
+              prev && prev.id === id
+                ? {
+                    ...prev,
+                    status: prev.status === 'active' ? 'paused' : 'active',
+                  }
+                : prev
+            );
+          }}
+        />
+
+        {/* Modal de Edição sobre a página dedicada de relatórios */}
+        <EditTriggerModal
+          visible={editTrigger !== null}
+          trigger={editTrigger}
+          onClose={() => setEditTrigger(null)}
+          onSave={async (id, updates) => {
+            const updated = await handleUpdateTrigger(id, updates);
+            if (reportTrigger && reportTrigger.id === id) {
+              setReportTrigger(updated);
+            }
+          }}
+        />
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: colors.surface }]}>
@@ -288,19 +326,6 @@ export const TriggersScreen: React.FC = () => {
           }
         />
       )}
-
-      {/* Modal de Relatórios e Histórico */}
-      <TriggerReportsModal
-        visible={reportTrigger !== null}
-        trigger={reportTrigger}
-        onClose={() => setReportTrigger(null)}
-        onEdit={(t) => {
-          setReportTrigger(null);
-          setEditTrigger(t);
-        }}
-        onRunNow={handleRunTrigger}
-        onTestNow={handleTestTrigger}
-      />
 
       {/* Modal de Edição */}
       <EditTriggerModal
