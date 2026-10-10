@@ -13,6 +13,7 @@ import (
 	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/config"
 	"github.com/andrevmp/vito/backend/internal/database"
+	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/handler"
 	"github.com/andrevmp/vito/backend/internal/integrations/calendar"
 	"github.com/andrevmp/vito/backend/internal/repository"
@@ -42,9 +43,11 @@ func main() {
 
 	// 3. Provedores de IA & AI Gateway com Failover
 	var aiProviders []ai.Provider
+	var geminiProv *ai.GeminiProvider
 	if cfg.GeminiAPIKey != "" {
 		log.Printf("🤖 [AI Provider] Google AI Studio ativado (%s).", cfg.GeminiModel)
-		aiProviders = append(aiProviders, ai.NewGeminiProvider(cfg.GeminiAPIKey, cfg.GeminiModel))
+		geminiProv = ai.NewGeminiProvider(cfg.GeminiAPIKey, cfg.GeminiModel)
+		aiProviders = append(aiProviders, geminiProv)
 	}
 	if cfg.GroqAPIKey != "" {
 		log.Println("🤖 [AI Provider] Groq Cloud ativado como fallback.")
@@ -81,6 +84,17 @@ func main() {
 	reminderWorker.Start()
 	defer reminderWorker.Stop()
 
+	// Worker em segundo plano para vigília autônoma de disparadores
+	var triggerEvaluator service.TriggerEvaluator = &service.DefaultTriggerEvaluator{}
+	if geminiProv != nil {
+		triggerEvaluator = service.NewAITriggerEvaluator(func(ctx context.Context, t *domain.Trigger) (*domain.TriggerTestResult, error) {
+			return geminiProv.TestEvaluateTrigger(ctx, t)
+		})
+	}
+	triggerWorker := service.NewTriggerWorker(triggerRepo, notifSvc, triggerEvaluator, 1*time.Minute)
+	triggerWorker.Start()
+	defer triggerWorker.Stop()
+
 	googleAuthCfg := service.GoogleAuthConfig{
 		ClientID:     cfg.GoogleClientID,
 		ClientSecret: cfg.GoogleClientSecret,
@@ -104,7 +118,7 @@ func main() {
 	astHandler := handler.NewAssistantHandler(astSvc, whisperTranscriber)
 	notifHandler := handler.NewNotificationHandler(notifSvc)
 	syncHandler := handler.NewCalendarSyncHandler(syncSvc)
-	triggerHandler := handler.NewTriggerHandler(triggerSvc)
+	triggerHandler := handler.NewTriggerHandler(triggerSvc, triggerWorker)
 
 	// 6. Servidor HTTP
 	srv := server.New(server.Config{

@@ -164,6 +164,8 @@ func (s *Server) registerRoutes() {
 						tr.Get("/{id}", s.triggerHandler.GetTrigger)
 						tr.Patch("/{id}", s.triggerHandler.UpdateTrigger)
 						tr.Patch("/{id}/toggle", s.triggerHandler.ToggleStatus)
+						tr.Post("/{id}/test", s.triggerHandler.TestTrigger)
+						tr.Post("/{id}/run", s.triggerHandler.RunTrigger)
 						tr.Delete("/{id}", s.triggerHandler.DeleteTrigger)
 						tr.Get("/{id}/logs", s.triggerHandler.ListLogs)
 					})

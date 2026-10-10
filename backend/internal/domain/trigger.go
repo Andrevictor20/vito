@@ -66,6 +66,9 @@ type Trigger struct {
 	CurrentValue  string               `json:"current_value"`
 	Status        TriggerStatus        `json:"status"`
 	Frequency     TriggerFrequency     `json:"frequency"`
+	ScheduledTime string               `json:"scheduled_time,omitempty"`
+	DaysOfWeek    string               `json:"days_of_week,omitempty"`
+	LastRunStatus string               `json:"last_run_status,omitempty"`
 	LastCheckedAt *time.Time           `json:"last_checked_at,omitempty"`
 	NextCheckAt   *time.Time           `json:"next_check_at,omitempty"`
 	CreatedAt     time.Time            `json:"created_at"`
@@ -82,6 +85,18 @@ type TriggerLog struct {
 	IsRead      bool      `json:"is_read"`
 }
 
+// TriggerTestResult resultado de uma simulação ou teste sob demanda de disparador.
+type TriggerTestResult struct {
+	TriggerID             string    `json:"trigger_id"`
+	Title                 string    `json:"title"`
+	Query                 string    `json:"query"`
+	ConditionMet          bool      `json:"condition_met"`
+	CurrentData           string    `json:"current_data"`
+	Summary               string    `json:"summary"`
+	SimulatedNotification string    `json:"simulated_notification"`
+	TestedAt              time.Time `json:"tested_at"`
+}
+
 // CreateTriggerInput contém os dados necessários para registrar um novo monitoramento.
 type CreateTriggerInput struct {
 	Title         string               `json:"title"`
@@ -90,6 +105,8 @@ type CreateTriggerInput struct {
 	ConditionType TriggerConditionType `json:"condition_type,omitempty"`
 	TargetValue   string               `json:"target_value,omitempty"`
 	Frequency     TriggerFrequency     `json:"frequency,omitempty"`
+	ScheduledTime string               `json:"scheduled_time,omitempty"`
+	DaysOfWeek    string               `json:"days_of_week,omitempty"`
 }
 
 // UpdateTriggerInput contém campos passíveis de edição manual.
@@ -101,6 +118,8 @@ type UpdateTriggerInput struct {
 	TargetValue   *string               `json:"target_value,omitempty"`
 	Frequency     *TriggerFrequency     `json:"frequency,omitempty"`
 	Status        *TriggerStatus        `json:"status,omitempty"`
+	ScheduledTime *string               `json:"scheduled_time,omitempty"`
+	DaysOfWeek    *string               `json:"days_of_week,omitempty"`
 }
 
 // TriggerRepository define o contrato de persistência dos disparadores no banco.
@@ -109,9 +128,11 @@ type TriggerRepository interface {
 	GetByID(id, userID string) (*Trigger, error)
 	ListByUser(userID string, category TriggerCategory, status TriggerStatus) ([]Trigger, error)
 	ListActive() ([]Trigger, error)
+	ListDueTriggers(now time.Time) ([]Trigger, error)
 	Update(trigger *Trigger) error
 	UpdateStatus(id, userID string, status TriggerStatus) error
 	UpdateEvaluation(id string, currentValue string, status TriggerStatus, lastChecked time.Time, nextCheck *time.Time) error
+	UpdateRunResult(id string, currentValue string, status TriggerStatus, lastRunStatus string, lastChecked time.Time, nextCheck *time.Time) error
 	Delete(id, userID string) error
 	CreateLog(log *TriggerLog) error
 	ListLogsByTrigger(triggerID string) ([]TriggerLog, error)

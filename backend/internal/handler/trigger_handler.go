@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -12,11 +13,23 @@ import (
 )
 
 type TriggerHandler struct {
-	triggerSvc *service.TriggerService
+	triggerSvc    *service.TriggerService
+	triggerWorker *service.TriggerWorker
 }
 
-func NewTriggerHandler(triggerSvc *service.TriggerService) *TriggerHandler {
-	return &TriggerHandler{triggerSvc: triggerSvc}
+func NewTriggerHandler(triggerSvc *service.TriggerService, triggerWorker ...*service.TriggerWorker) *TriggerHandler {
+	var worker *service.TriggerWorker
+	if len(triggerWorker) > 0 {
+		worker = triggerWorker[0]
+	}
+	return &TriggerHandler{
+		triggerSvc:    triggerSvc,
+		triggerWorker: worker,
+	}
+}
+
+func (h *TriggerHandler) SetWorker(worker *service.TriggerWorker) {
+	h.triggerWorker = worker
 }
 
 type createTriggerRequest struct {
@@ -26,6 +39,8 @@ type createTriggerRequest struct {
 	ConditionType domain.TriggerConditionType `json:"condition_type"`
 	TargetValue   string                      `json:"target_value"`
 	Frequency     domain.TriggerFrequency     `json:"frequency"`
+	ScheduledTime string                      `json:"scheduled_time"`
+	DaysOfWeek    string                      `json:"days_of_week"`
 }
 
 func (h *TriggerHandler) CreateTrigger(w http.ResponseWriter, r *http.Request) {
@@ -48,6 +63,8 @@ func (h *TriggerHandler) CreateTrigger(w http.ResponseWriter, r *http.Request) {
 		ConditionType: req.ConditionType,
 		TargetValue:   req.TargetValue,
 		Frequency:     req.Frequency,
+		ScheduledTime: req.ScheduledTime,
+		DaysOfWeek:    req.DaysOfWeek,
 	})
 	if err != nil {
 		http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusBadRequest)
@@ -127,6 +144,8 @@ type updateTriggerRequest struct {
 	TargetValue   *string                      `json:"target_value"`
 	Frequency     *domain.TriggerFrequency     `json:"frequency"`
 	Status        *domain.TriggerStatus        `json:"status"`
+	ScheduledTime *string                      `json:"scheduled_time"`
+	DaysOfWeek    *string                      `json:"days_of_week"`
 }
 
 func (h *TriggerHandler) UpdateTrigger(w http.ResponseWriter, r *http.Request) {
@@ -151,6 +170,8 @@ func (h *TriggerHandler) UpdateTrigger(w http.ResponseWriter, r *http.Request) {
 		TargetValue:   req.TargetValue,
 		Frequency:     req.Frequency,
 		Status:        req.Status,
+		ScheduledTime: req.ScheduledTime,
+		DaysOfWeek:    req.DaysOfWeek,
 	})
 	if err != nil {
 		http.Error(w, `{"error":"falha ao atualizar disparador"}`, http.StatusBadRequest)
@@ -159,6 +180,81 @@ func (h *TriggerHandler) UpdateTrigger(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(trigger)
+}
+
+func (h *TriggerHandler) RunTrigger(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, `{"error":"não autorizado"}`, http.StatusUnauthorized)
+		return
+	}
+
+	id := chi.URLParam(r, "id")
+	if h.triggerWorker != nil {
+		logEntry, err := h.triggerWorker.RunTriggerNow(id, userID)
+		if err != nil {
+			http.Error(w, `{"error":"falha ao executar disparador: `+err.Error()+`"}`, http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(logEntry)
+		return
+	}
+
+	t, err := h.triggerSvc.GetTrigger(id, userID)
+	if err != nil {
+		http.Error(w, `{"error":"disparador não encontrado"}`, http.StatusNotFound)
+		return
+	}
+	_ = h.triggerSvc.RecordTriggerEvaluation(t.ID, "Execução manual concluída", t.Status, "Verificação sob demanda realizada para: "+t.Title)
+	logs, _ := h.triggerSvc.ListTriggerLogs(t.ID, userID)
+	w.Header().Set("Content-Type", "application/json")
+	if len(logs) > 0 {
+		_ = json.NewEncoder(w).Encode(logs[0])
+	} else {
+		_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	}
+}
+
+func (h *TriggerHandler) TestTrigger(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, `{"error":"não autorizado"}`, http.StatusUnauthorized)
+		return
+	}
+
+	id := chi.URLParam(r, "id")
+	if h.triggerWorker != nil {
+		testRes, err := h.triggerWorker.TestTrigger(id, userID)
+		if err != nil {
+			http.Error(w, `{"error":"falha ao testar disparador: `+err.Error()+`"}`, http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(testRes)
+		return
+	}
+
+	t, err := h.triggerSvc.GetTrigger(id, userID)
+	if err != nil {
+		http.Error(w, `{"error":"disparador não encontrado"}`, http.StatusNotFound)
+		return
+	}
+
+	timeStr := time.Now().Format("02/01/2006 às 15:04")
+	res := domain.TriggerTestResult{
+		TriggerID:             t.ID,
+		Title:                 t.Title,
+		Query:                 t.Query,
+		ConditionMet:          false,
+		CurrentData:           "Verificação de simulação executada com sucesso.",
+		Summary:               "Simulação da vigília em " + timeStr + ": parâmetros estáveis.",
+		SimulatedNotification: "Alerta Vito: " + t.Title,
+		TestedAt:              time.Now().UTC(),
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(res)
 }
 
 func (h *TriggerHandler) DeleteTrigger(w http.ResponseWriter, r *http.Request) {

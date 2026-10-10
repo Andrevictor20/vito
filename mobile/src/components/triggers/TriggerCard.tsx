@@ -9,13 +9,17 @@ import { M3Switch } from '../ui/M3Switch';
 interface TriggerCardProps {
   trigger: Trigger;
   onToggle: (id: string) => void;
+  onEdit: (trigger: Trigger) => void;
   onDelete: (id: string) => void;
+  onPress: (trigger: Trigger) => void;
 }
 
 export const TriggerCard: React.FC<TriggerCardProps> = ({
   trigger,
   onToggle,
+  onEdit,
   onDelete,
+  onPress,
 }) => {
   const { colors, isDark } = useTheme();
 
@@ -52,159 +56,120 @@ export const TriggerCard: React.FC<TriggerCardProps> = ({
   };
 
   const getFrequencyLabel = () => {
+    if (trigger.scheduled_time) {
+      return `Diário às ${trigger.scheduled_time}`;
+    }
     switch (trigger.frequency) {
       case 'hourly':
         return 'A cada hora';
       case 'daily_evening':
-        return 'Diário no final do dia';
+        return 'Diário às 18:00';
       case 'immediate':
-        return 'Alerta imediato';
+        return 'Alerta frequente';
       case 'daily_morning':
       default:
-        return 'Diário pela manhã';
+        return 'Diário às 08:30';
     }
   };
 
   return (
-    <View
+    <TouchableOpacity
       style={[
         styles.card,
         {
           backgroundColor: isDark ? colors.surfaceContainerLow : '#FFFFFF',
           borderColor: isDark ? colors.outlineVariant : 'rgba(0,0,0,0.06)',
-          opacity: isActive || isTriggered ? 1 : 0.72,
+          opacity: isActive ? 1 : 0.75,
         },
       ]}
+      onPress={() => onPress(trigger)}
+      activeOpacity={0.85}
+      accessibilityLabel={`Disparador ${trigger.title}. Toque para ver relatórios.`}
     >
-      {/* Top Header do Card: Categoria, Status Badge & Ações */}
+      {/* Top Header do Card: Categoria, Horário & Ações */}
       <View style={styles.headerRow}>
         <View style={styles.categoryBadgeRow}>
           <View style={[styles.iconCircle, { backgroundColor: categoryBg }]}>
-            <MaterialIcons
-              name={categoryMeta.icon as any}
-              size={18}
-              color={categoryColor}
-            />
+            <MaterialIcons name={categoryMeta.icon as any} size={16} color={categoryColor} />
           </View>
           <Text style={[styles.categoryLabel, { color: categoryColor }]}>
             {categoryMeta.label}
           </Text>
+          <View
+            style={[
+              styles.timePill,
+              { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' },
+            ]}
+          >
+            <MaterialIcons name="schedule" size={12} color={colors.onSurfaceVariant} />
+            <Text style={[styles.timePillText, { color: colors.onSurfaceVariant }]}>
+              {getFrequencyLabel()}
+            </Text>
+          </View>
         </View>
 
         <View style={styles.actionsRight}>
-          {isTriggered && (
-            <View style={[styles.statusBadge, { backgroundColor: 'rgba(239, 68, 68, 0.15)' }]}>
-              <View style={[styles.statusDot, { backgroundColor: '#EF4444' }]} />
-              <Text style={[styles.statusText, { color: '#EF4444' }]}>Disparado</Text>
-            </View>
-          )}
-
-          {!isTriggered && (
-            <View
-              style={[
-                styles.statusBadge,
-                {
-                  backgroundColor: isActive
-                    ? 'rgba(16, 185, 129, 0.12)'
-                    : isDark
-                    ? 'rgba(255, 255, 255, 0.08)'
-                    : 'rgba(0, 0, 0, 0.05)',
-                },
-              ]}
-            >
-              <View
-                style={[
-                  styles.statusDot,
-                  { backgroundColor: isActive ? '#10B981' : isDark ? '#71717A' : '#A1A1AA' },
-                ]}
-              />
-              <Text
-                style={[
-                  styles.statusText,
-                  { color: isActive ? '#10B981' : isDark ? '#A1A1AA' : '#71717A' },
-                ]}
-              >
-                {isActive ? 'Ativo' : 'Pausado'}
-              </Text>
-            </View>
-          )}
+          <TouchableOpacity
+            style={styles.actionIconButton}
+            onPress={(e) => {
+              e.stopPropagation();
+              onEdit(trigger);
+            }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityLabel="Editar disparador"
+          >
+            <MaterialIcons name="edit" size={18} color={isDark ? '#A1A1AA' : '#71717A'} />
+          </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.deleteButton}
-            onPress={handleDeletePress}
+            style={styles.actionIconButton}
+            onPress={(e) => {
+              e.stopPropagation();
+              handleDeletePress();
+            }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            accessibilityLabel="Excluir monitoramento"
+            accessibilityLabel="Excluir disparador"
           >
             <MaterialIcons
               name="delete-outline"
-              size={20}
+              size={18}
               color={isDark ? '#71717A' : '#9CA3AF'}
             />
           </TouchableOpacity>
+
+          <View style={styles.switchWrapper}>
+            <M3Switch value={isActive} onValueChange={() => onToggle(trigger.id)} />
+          </View>
         </View>
       </View>
 
       {/* Título & Detalhes da Consulta */}
       <View style={styles.body}>
-        <Text style={[styles.title, { color: colors.onSurface }]}>
-          {trigger.title}
-        </Text>
-
-        <Text style={[styles.queryText, { color: colors.onSurfaceVariant }]}>
+        <Text style={[styles.title, { color: colors.onSurface }]}>{trigger.title}</Text>
+        <Text
+          style={[styles.queryText, { color: colors.onSurfaceVariant }]}
+          numberOfLines={2}
+        >
           {trigger.query}
         </Text>
-
-        {/* Card Toki Hero: Valor Atual / Achado de Inteligência */}
-        {trigger.current_value ? (
-          <View
-            style={[
-              styles.currentValueCard,
-              {
-                backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)',
-                borderColor: isDark ? colors.outlineVariant : 'rgba(0, 0, 0, 0.05)',
-              },
-            ]}
-          >
-            <View style={styles.valueRow}>
-              <MaterialIcons
-                name="info-outline"
-                size={16}
-                color={categoryColor}
-              />
-              <Text style={[styles.currentValueText, { color: colors.onSurface }]}>
-                {trigger.current_value}
-              </Text>
-            </View>
-          </View>
-        ) : null}
       </View>
 
-      {/* Rodapé: Frequência & M3Switch de Ativar/Desativar */}
+      {/* Footer Minimalista: Atalho para Relatórios */}
       <View
         style={[
           styles.footerRow,
-          { borderTopColor: isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.05)' },
+          { borderTopColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' },
         ]}
       >
-        <View style={styles.frequencyInfo}>
-          <MaterialIcons
-            name="schedule"
-            size={15}
-            color={isDark ? '#A1A1AA' : '#71717A'}
-          />
-          <Text style={[styles.frequencyText, { color: colors.onSurfaceVariant }]}>
-            {getFrequencyLabel()}
+        <View style={styles.reportHintRow}>
+          <MaterialIcons name="history" size={15} color={colors.primary} />
+          <Text style={[styles.reportHintText, { color: colors.primary }]}>
+            Ver relatórios e histórico
           </Text>
         </View>
-
-        <View style={styles.switchContainer}>
-          <M3Switch
-            value={isActive}
-            onValueChange={() => onToggle(trigger.id)}
-          />
-        </View>
+        <MaterialIcons name="chevron-right" size={18} color={colors.onSurfaceVariant} />
       </View>
-    </View>
+    </TouchableOpacity>
   );
 };
 
@@ -229,92 +194,72 @@ const styles = StyleSheet.create({
   categoryBadgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 6,
+    flexShrink: 1,
   },
   iconCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 28,
+    height: 28,
+    borderRadius: MD3Shapes.full,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 8,
   },
   categoryLabel: {
-    fontSize: tokens.typography.size.labelMedium,
+    fontSize: 12,
     fontWeight: '700',
-    letterSpacing: 0.2,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
   },
-  actionsRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  statusBadge: {
+  timePill: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 12,
-    marginRight: 8,
+    borderRadius: MD3Shapes.full,
+    gap: 4,
   },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginRight: 5,
-  },
-  statusText: {
+  timePillText: {
     fontSize: 11,
     fontWeight: '600',
   },
-  deleteButton: {
+  actionsRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  actionIconButton: {
     padding: 4,
   },
+  switchWrapper: {
+    marginLeft: 2,
+  },
   body: {
-    marginBottom: 12,
+    gap: 4,
+    marginBottom: 10,
   },
   title: {
     fontSize: 16,
     fontWeight: '700',
-    lineHeight: 22,
-    marginBottom: 4,
+    letterSpacing: -0.2,
   },
   queryText: {
     fontSize: 13,
     lineHeight: 18,
-    marginBottom: 8,
-  },
-  currentValueCard: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
-    borderWidth: 1,
-    marginTop: 4,
-  },
-  valueRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  currentValueText: {
-    fontSize: 13,
-    fontWeight: '600',
-    marginLeft: 6,
-    flex: 1,
   },
   footerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingTop: 10,
-    borderTopWidth: 1,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
-  frequencyInfo: {
+  reportHintRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 6,
   },
-  frequencyText: {
+  reportHintText: {
     fontSize: 12,
-    marginLeft: 5,
-  },
-  switchContainer: {
-    transform: [{ scale: 0.85 }],
+    fontWeight: '600',
   },
 });

@@ -65,6 +65,8 @@ type ParsedTrigger struct {
 	TargetValue   string `json:"target_value,omitempty"`
 	ConditionType string `json:"condition_type,omitempty"`
 	Frequency     string `json:"frequency,omitempty"`
+	ScheduledTime string `json:"scheduled_time,omitempty"`
+	DaysOfWeek    string `json:"days_of_week,omitempty"`
 }
 
 // ParsedIntent resultado normalizado da interpretação do assistente Toki-like.

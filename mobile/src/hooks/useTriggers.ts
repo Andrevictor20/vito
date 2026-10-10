@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { api } from '../services/api';
-import { Trigger, TriggerCategory, TriggerStatus, CreateTriggerInput } from '../types';
+import { Trigger, TriggerLog, TriggerTestResult, TriggerCategory, TriggerStatus, CreateTriggerInput } from '../types';
 
 export const useTriggers = () => {
   const [triggers, setTriggers] = useState<Trigger[]>([]);
@@ -78,10 +78,31 @@ export const useTriggers = () => {
   }, [loadTriggers]);
 
   const handleUpdateTrigger = useCallback(
-    async (id: string, input: Partial<CreateTriggerInput> & { status?: TriggerStatus }): Promise<Trigger> => {
+    async (
+      id: string,
+      input: Partial<CreateTriggerInput> & { status?: TriggerStatus; scheduled_time?: string; days_of_week?: string }
+    ): Promise<Trigger> => {
       const updated = await api.updateTrigger(id, input);
       setTriggers((prev) => prev.map((t) => (t.id === id ? updated : t)));
       return updated;
+    },
+    []
+  );
+
+  const handleRunTrigger = useCallback(
+    async (id: string): Promise<TriggerLog> => {
+      const log = await api.runTrigger(id);
+      setTriggers((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, current_value: log.message, last_run_status: 'success' } : t))
+      );
+      return log;
+    },
+    []
+  );
+
+  const handleTestTrigger = useCallback(
+    async (id: string): Promise<TriggerTestResult> => {
+      return await api.testTrigger(id);
     },
     []
   );
@@ -119,6 +140,8 @@ export const useTriggers = () => {
     handleToggleTrigger,
     handleDeleteTrigger,
     handleUpdateTrigger,
+    handleRunTrigger,
+    handleTestTrigger,
     stats,
   };
 };

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   StyleSheet,
   View,
@@ -6,16 +6,20 @@ import {
   FlatList,
   ScrollView,
   TouchableOpacity,
+  TextInput,
   RefreshControl,
   ActivityIndicator,
+  Keyboard,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens, MD3Shapes } from '../theme/tokens';
 import { useTheme } from '../context/ThemeContext';
 import { useTriggers } from '../hooks/useTriggers';
 import { TriggerCard } from '../components/triggers/TriggerCard';
-import { CreateTriggerModal } from '../components/triggers/CreateTriggerModal';
-import { TRIGGER_CATEGORIES, TriggerCategory } from '../types';
+import { TriggerReportsModal } from '../components/triggers/TriggerReportsModal';
+import { EditTriggerModal } from '../components/triggers/EditTriggerModal';
+import { TRIGGER_CATEGORIES, Trigger, TriggerCategory } from '../types';
+import { api } from '../services/api';
 
 export const TriggersScreen: React.FC = () => {
   const { colors, isDark } = useTheme();
@@ -30,196 +34,201 @@ export const TriggersScreen: React.FC = () => {
     handleCreateTrigger,
     handleToggleTrigger,
     handleDeleteTrigger,
+    handleUpdateTrigger,
+    handleRunTrigger,
+    handleTestTrigger,
     stats,
   } = useTriggers();
 
-  const [createModalVisible, setCreateModalVisible] = useState(false);
+  // Modais
+  const [reportTrigger, setReportTrigger] = useState<Trigger | null>(null);
+  const [editTrigger, setEditTrigger] = useState<Trigger | null>(null);
+
+  // Entrada em Linguagem Natural
+  const [naturalPrompt, setNaturalPrompt] = useState('');
+  const [isSubmittingPrompt, setIsSubmittingPrompt] = useState(false);
+  const [promptError, setPromptError] = useState<string | null>(null);
+
+  // Categorias ativas com pelo menos 1 disparador
+  const activeCategories = useMemo(() => {
+    const presentCats = new Set(allTriggers.map((t) => t.category));
+    return TRIGGER_CATEGORIES.filter((c) => presentCats.has(c.id));
+  }, [allTriggers]);
+
+  const handleCreateFromNaturalPrompt = async () => {
+    const trimmed = naturalPrompt.trim();
+    if (!trimmed) return;
+
+    setIsSubmittingPrompt(true);
+    setPromptError(null);
+    Keyboard.dismiss();
+
+    try {
+      const parsed = await api.parseTriggerPrompt(trimmed);
+      await handleCreateTrigger({
+        title: parsed.suggested_title || trimmed,
+        category: parsed.category,
+        query: trimmed,
+        condition_type: (parsed.condition_type as any) || 'daily_brief',
+        frequency: 'daily_morning',
+      });
+      setNaturalPrompt('');
+    } catch (err: any) {
+      console.error('[TriggersScreen] Erro ao criar disparador:', err);
+      setPromptError(err?.message || 'Falha ao interpretar pedido. Tente novamente.');
+    } finally {
+      setIsSubmittingPrompt(false);
+    }
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.surface }]}>
-      {/* 1. Hero Card: Vigília Ativa e Estatísticas */}
-      <View style={styles.heroWrapper}>
+      {/* 1. Header Minimalista */}
+      <View style={styles.minimalHeader}>
+        <View style={styles.titleArea}>
+          <Text style={[styles.headerTitle, { color: colors.onSurface }]}>
+            Vigília de Inteligência
+          </Text>
+          <View
+            style={[
+              styles.activeBadge,
+              { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5' },
+            ]}
+          >
+            <View style={[styles.activeDot, { backgroundColor: '#10B981' }]} />
+            <Text style={[styles.activeBadgeText, { color: '#10B981' }]}>
+              {stats.active} {stats.active === 1 ? 'ativa' : 'ativas'}
+            </Text>
+          </View>
+        </View>
+        <Text style={[styles.headerSubtitle, { color: colors.onSurfaceVariant }]}>
+          Monitoramento autônomo e relatórios programados
+        </Text>
+      </View>
+
+      {/* 2. Barra de Criação por Linguagem Natural */}
+      <View style={styles.inputSection}>
         <View
           style={[
-            styles.heroCard,
+            styles.inputCard,
             {
               backgroundColor: isDark ? colors.surfaceContainerLow : '#FFFFFF',
-              borderColor: isDark ? colors.outlineVariant : 'rgba(0, 0, 0, 0.06)',
+              borderColor: isDark ? colors.outlineVariant : 'rgba(0,0,0,0.08)',
             },
           ]}
         >
-          <View style={styles.heroTop}>
-            <View style={styles.heroTitleRow}>
-              <View
-                style={[
-                  styles.heroRadarIcon,
-                  { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5' },
-                ]}
-              >
-                <MaterialIcons name="radar" size={22} color="#10B981" />
-              </View>
-              <View>
-                <Text style={[styles.heroHeading, { color: colors.onSurface }]}>
-                  Vigília de Inteligência
-                </Text>
-                <Text style={[styles.heroSubheading, { color: colors.onSurfaceVariant }]}>
-                  Monitoramento contínuo em background
-                </Text>
-              </View>
-            </View>
-
-            <TouchableOpacity
-              style={[
-                styles.createHeroButton,
-                { backgroundColor: colors.primary },
-              ]}
-              onPress={() => setCreateModalVisible(true)}
-              activeOpacity={0.8}
-            >
-              <MaterialIcons name="add" size={18} color="#FFFFFF" />
-              <Text style={styles.createHeroButtonText}>Novo</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Métricas Rápidas */}
-          <View style={styles.metricsRow}>
-            <View style={styles.metricItem}>
-              <Text style={[styles.metricNumber, { color: '#10B981' }]}>
-                {stats.active}
-              </Text>
-              <Text style={[styles.metricLabel, { color: colors.onSurfaceVariant }]}>
-                Ativos
-              </Text>
-            </View>
-
-            <View
-              style={[
-                styles.metricDivider,
-                { backgroundColor: isDark ? colors.outlineVariant : 'rgba(0,0,0,0.08)' },
-              ]}
-            />
-
-            <View style={styles.metricItem}>
-              <Text style={[styles.metricNumber, { color: colors.onSurface }]}>
-                {stats.total}
-              </Text>
-              <Text style={[styles.metricLabel, { color: colors.onSurfaceVariant }]}>
-                Total
-              </Text>
-            </View>
-
-            <View
-              style={[
-                styles.metricDivider,
-                { backgroundColor: isDark ? colors.outlineVariant : 'rgba(0,0,0,0.08)' },
-              ]}
-            />
-
-            <View style={styles.metricItem}>
-              <Text style={[styles.metricNumber, { color: isDark ? '#A1A1AA' : '#71717A' }]}>
-                {stats.paused}
-              </Text>
-              <Text style={[styles.metricLabel, { color: colors.onSurfaceVariant }]}>
-                Pausados
-              </Text>
-            </View>
-          </View>
-        </View>
-      </View>
-
-      {/* 2. Carrossel Horizontal de Filtros pelas 12 Categorias */}
-      <View style={styles.filterSection}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterContent}
-        >
-          {/* Chip 'Todos' */}
+          <MaterialIcons name="auto-awesome" size={20} color={colors.primary} />
+          <TextInput
+            style={[styles.naturalInput, { color: colors.onSurface }]}
+            value={naturalPrompt}
+            onChangeText={setNaturalPrompt}
+            placeholder="O que vigiar? Ex: Avise se o dólar passar de 5,60"
+            placeholderTextColor={colors.onSurfaceVariant}
+            onSubmitEditing={handleCreateFromNaturalPrompt}
+            returnKeyType="send"
+            editable={!isSubmittingPrompt}
+          />
           <TouchableOpacity
             style={[
-              styles.filterChip,
-              selectedCategory === 'all'
-                ? [
-                    styles.filterChipActive,
-                    { backgroundColor: isDark ? colors.surfaceContainerHighest : colors.primary },
-                  ]
-                : [
-                    styles.filterChipInactive,
-                    {
-                      backgroundColor: isDark ? colors.surfaceContainerLowest : '#F4F4F5',
-                      borderColor: isDark ? colors.outlineVariant : 'rgba(0,0,0,0.06)',
-                    },
-                  ],
+              styles.sendButton,
+              { backgroundColor: colors.primary },
+              (!naturalPrompt.trim() || isSubmittingPrompt) && { opacity: 0.5 },
             ]}
-            onPress={() => setSelectedCategory('all')}
+            onPress={handleCreateFromNaturalPrompt}
+            disabled={!naturalPrompt.trim() || isSubmittingPrompt}
           >
-            <MaterialIcons
-              name="apps"
-              size={16}
-              color={selectedCategory === 'all' ? '#FFFFFF' : isDark ? '#A1A1AA' : '#71717A'}
-            />
-            <Text
-              style={[
-                styles.filterChipText,
-                {
-                  color: selectedCategory === 'all' ? '#FFFFFF' : colors.onSurface,
-                  fontWeight: selectedCategory === 'all' ? '700' : '500',
-                },
-              ]}
-            >
-              Todos ({allTriggers.length})
-            </Text>
+            {isSubmittingPrompt ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <MaterialIcons name="arrow-forward" size={16} color="#FFFFFF" />
+            )}
           </TouchableOpacity>
-
-          {/* Chips das 12 Categorias */}
-          {TRIGGER_CATEGORIES.map((cat) => {
-            const count = allTriggers.filter((t) => t.category === cat.id).length;
-            const isSelected = selectedCategory === cat.id;
-            const catColor = isDark ? cat.colorDark : cat.colorLight;
-
-            return (
-              <TouchableOpacity
-                key={cat.id}
-                style={[
-                  styles.filterChip,
-                  isSelected
-                    ? [
-                        styles.filterChipActive,
-                        { backgroundColor: isDark ? colors.surfaceContainerHighest : colors.primary },
-                      ]
-                    : [
-                        styles.filterChipInactive,
-                        {
-                          backgroundColor: isDark ? colors.surfaceContainerLowest : '#F4F4F5',
-                          borderColor: isDark ? colors.outlineVariant : 'rgba(0,0,0,0.06)',
-                        },
-                      ],
-                ]}
-                onPress={() => setSelectedCategory(cat.id)}
-              >
-                <MaterialIcons
-                  name={cat.icon as any}
-                  size={16}
-                  color={isSelected ? '#FFFFFF' : catColor}
-                />
-                <Text
-                  style={[
-                    styles.filterChipText,
-                    {
-                      color: isSelected ? '#FFFFFF' : colors.onSurface,
-                      fontWeight: isSelected ? '700' : '500',
-                    },
-                  ]}
-                >
-                  {cat.label} {count > 0 ? `(${count})` : ''}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
+        </View>
+        {promptError && <Text style={styles.inputErrorText}>{promptError}</Text>}
       </View>
 
-      {/* 3. Lista de Disparadores */}
+      {/* 3. Filtros Contextuais (Apenas categorias com itens) */}
+      {activeCategories.length > 0 && (
+        <View style={styles.filterSection}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filterContent}
+          >
+            <TouchableOpacity
+              style={[
+                styles.filterChip,
+                selectedCategory === 'all'
+                  ? [styles.filterChipActive, { backgroundColor: colors.primary }]
+                  : [
+                      styles.filterChipInactive,
+                      {
+                        backgroundColor: isDark ? colors.surfaceContainerLowest : '#F4F4F5',
+                        borderColor: isDark ? colors.outlineVariant : 'rgba(0,0,0,0.06)',
+                      },
+                    ],
+              ]}
+              onPress={() => setSelectedCategory('all')}
+            >
+              <Text
+                style={[
+                  styles.filterChipText,
+                  {
+                    color: selectedCategory === 'all' ? '#FFFFFF' : colors.onSurface,
+                    fontWeight: selectedCategory === 'all' ? '700' : '500',
+                  },
+                ]}
+              >
+                Todos ({allTriggers.length})
+              </Text>
+            </TouchableOpacity>
+
+            {activeCategories.map((cat) => {
+              const count = allTriggers.filter((t) => t.category === cat.id).length;
+              const isSelected = selectedCategory === cat.id;
+              const catColor = isDark ? cat.colorDark : cat.colorLight;
+
+              return (
+                <TouchableOpacity
+                  key={cat.id}
+                  style={[
+                    styles.filterChip,
+                    isSelected
+                      ? [styles.filterChipActive, { backgroundColor: colors.primary }]
+                      : [
+                          styles.filterChipInactive,
+                          {
+                            backgroundColor: isDark ? colors.surfaceContainerLowest : '#F4F4F5',
+                            borderColor: isDark ? colors.outlineVariant : 'rgba(0,0,0,0.06)',
+                          },
+                        ],
+                  ]}
+                  onPress={() => setSelectedCategory(cat.id)}
+                >
+                  <MaterialIcons
+                    name={cat.icon as any}
+                    size={15}
+                    color={isSelected ? '#FFFFFF' : catColor}
+                  />
+                  <Text
+                    style={[
+                      styles.filterChipText,
+                      {
+                        color: isSelected ? '#FFFFFF' : colors.onSurface,
+                        fontWeight: isSelected ? '700' : '500',
+                      },
+                    ]}
+                  >
+                    {cat.label} ({count})
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+      )}
+
+      {/* 4. Lista Minimalista de Disparadores */}
       {loading && !refreshing ? (
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
@@ -235,7 +244,9 @@ export const TriggersScreen: React.FC = () => {
             <TriggerCard
               trigger={item}
               onToggle={handleToggleTrigger}
+              onEdit={(t) => setEditTrigger(t)}
               onDelete={handleDeleteTrigger}
+              onPress={(t) => setReportTrigger(t)}
             />
           )}
           contentContainerStyle={[
@@ -254,40 +265,51 @@ export const TriggersScreen: React.FC = () => {
               <View
                 style={[
                   styles.emptyIconCircle,
-                  { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' },
+                  {
+                    backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+                  },
                 ]}
               >
                 <MaterialIcons
-                  name="track-changes"
-                  size={36}
+                  name="radar"
+                  size={32}
                   color={isDark ? '#71717A' : '#9CA3AF'}
                 />
               </View>
               <Text style={[styles.emptyTitle, { color: colors.onSurface }]}>
                 {selectedCategory === 'all'
-                  ? 'Nenhum disparador ativo'
+                  ? 'Nenhuma vigília ativa'
                   : 'Nenhum disparador nesta categoria'}
               </Text>
               <Text style={[styles.emptySubtitle, { color: colors.onSurfaceVariant }]}>
-                Peça ao Vito para vigiar preços, cotações, notícias, jogos ou editais para você.
+                Digite acima o que você deseja monitorar ou peça ao Vito no Chat.
               </Text>
-              <TouchableOpacity
-                style={[styles.emptyButton, { backgroundColor: colors.primary }]}
-                onPress={() => setCreateModalVisible(true)}
-              >
-                <MaterialIcons name="add" size={18} color="#FFFFFF" />
-                <Text style={styles.emptyButtonText}>Criar Primeiro Disparador</Text>
-              </TouchableOpacity>
             </View>
           }
         />
       )}
 
-      {/* Modal de Criação */}
-      <CreateTriggerModal
-        visible={createModalVisible}
-        onClose={() => setCreateModalVisible(false)}
-        onSubmit={handleCreateTrigger}
+      {/* Modal de Relatórios e Histórico */}
+      <TriggerReportsModal
+        visible={reportTrigger !== null}
+        trigger={reportTrigger}
+        onClose={() => setReportTrigger(null)}
+        onEdit={(t) => {
+          setReportTrigger(null);
+          setEditTrigger(t);
+        }}
+        onRunNow={handleRunTrigger}
+        onTestNow={handleTestTrigger}
+      />
+
+      {/* Modal de Edição */}
+      <EditTriggerModal
+        visible={editTrigger !== null}
+        trigger={editTrigger}
+        onClose={() => setEditTrigger(null)}
+        onSave={async (id, updates) => {
+          await handleUpdateTrigger(id, updates);
+        }}
       />
     </View>
   );
@@ -297,85 +319,75 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  heroWrapper: {
+  minimalHeader: {
     paddingHorizontal: 16,
     paddingTop: 12,
-    paddingBottom: 6,
+    paddingBottom: 8,
   },
-  heroCard: {
+  titleArea: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 4,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+  },
+  activeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: MD3Shapes.full,
+    gap: 5,
+  },
+  activeDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  activeBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  headerSubtitle: {
+    fontSize: 13,
+  },
+  inputSection: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  inputCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
     borderRadius: MD3Shapes.largeIncreased,
-    padding: 16,
     borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    gap: 10,
   },
-  heroTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 14,
+  naturalInput: {
+    flex: 1,
+    fontSize: 14,
+    paddingVertical: 4,
   },
-  heroTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  heroRadarIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+  sendButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 10,
   },
-  heroHeading: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  heroSubheading: {
+  inputErrorText: {
+    color: '#EF4444',
     fontSize: 12,
-  },
-  createHeroButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 7,
-    paddingHorizontal: 12,
-    borderRadius: 18,
-    gap: 4,
-  },
-  createHeroButtonText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  metricsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.05)',
-  },
-  metricItem: {
-    alignItems: 'center',
-  },
-  metricNumber: {
-    fontSize: 18,
-    fontWeight: '800',
-  },
-  metricLabel: {
-    fontSize: 11,
-    fontWeight: '500',
-    marginTop: 2,
-  },
-  metricDivider: {
-    width: 1,
-    height: 24,
+    marginTop: 6,
+    marginLeft: 4,
   },
   filterSection: {
-    paddingVertical: 8,
+    paddingVertical: 6,
   },
   filterContent: {
     paddingHorizontal: 16,
@@ -385,79 +397,61 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 20,
+    paddingVertical: 6,
+    borderRadius: MD3Shapes.full,
     gap: 6,
   },
   filterChipActive: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
     elevation: 2,
   },
   filterChipInactive: {
     borderWidth: 1,
   },
   filterChipText: {
-    fontSize: 12,
+    fontSize: 13,
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+    gap: 12,
+  },
+  loadingText: {
+    fontSize: 14,
   },
   listContent: {
     paddingHorizontal: 16,
-    paddingTop: 4,
-    paddingBottom: 90, // Margem para a FloatingTabBar
+    paddingTop: 8,
+    paddingBottom: 90,
   },
   listEmptyContent: {
     flexGrow: 1,
     justifyContent: 'center',
   },
-  centerContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 32,
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-  },
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 40,
-    paddingHorizontal: 24,
+    padding: 40,
+    gap: 8,
   },
   emptyIconCircle: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    marginBottom: 8,
   },
   emptyTitle: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '700',
-    marginBottom: 6,
     textAlign: 'center',
   },
   emptySubtitle: {
     fontSize: 13,
-    lineHeight: 19,
     textAlign: 'center',
-    marginBottom: 20,
-  },
-  emptyButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-    borderRadius: 20,
-    gap: 6,
-  },
-  emptyButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '700',
+    lineHeight: 18,
+    maxWidth: 280,
   },
 });

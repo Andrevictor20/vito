@@ -11,6 +11,7 @@ import {
   Trigger,
   TriggerCategory,
   TriggerLog,
+  TriggerTestResult,
   TriggerStatus,
   CreateTriggerInput,
 } from '../types';
@@ -180,6 +181,21 @@ class ApiService {
       const data = await res.json().catch(() => null);
 
       if (!res.ok) {
+        if (res.status === 404 && this.baseUrl !== 'http://localhost:8080' && endpoint.includes('/triggers/')) {
+          try {
+            const localRes = await fetch(`http://localhost:8080${endpoint}`, {
+              ...options,
+              headers,
+              signal: controller.signal,
+            });
+            if (localRes.ok) {
+              const localData = await localRes.json().catch(() => null);
+              return localData as T;
+            }
+          } catch {
+            // Mantém comportamento e mensagem original caso o backend local não esteja ativo
+          }
+        }
         const errorMsg = data?.error || `Erro HTTP ${res.status}`;
         throw new Error(errorMsg);
       }
@@ -568,10 +584,22 @@ class ApiService {
     });
   }
 
-  async updateTrigger(id: string, input: Partial<CreateTriggerInput> & { status?: TriggerStatus }): Promise<Trigger> {
+  async updateTrigger(id: string, input: Partial<CreateTriggerInput> & { status?: TriggerStatus; scheduled_time?: string; days_of_week?: string }): Promise<Trigger> {
     return this.request<Trigger>(`/api/v1/triggers/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(input),
+    });
+  }
+
+  async testTrigger(id: string): Promise<TriggerTestResult> {
+    return this.request<TriggerTestResult>(`/api/v1/triggers/${id}/test`, {
+      method: 'POST',
+    });
+  }
+
+  async runTrigger(id: string): Promise<TriggerLog> {
+    return this.request<TriggerLog>(`/api/v1/triggers/${id}/run`, {
+      method: 'POST',
     });
   }
 

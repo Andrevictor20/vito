@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -156,7 +157,16 @@ func (s *TriggerService) CreateTrigger(userID string, input domain.CreateTrigger
 		frequency = domain.FrequencyDailyMorning
 	}
 
+	daysOfWeek := strings.TrimSpace(input.DaysOfWeek)
+	if daysOfWeek == "" {
+		daysOfWeek = "DAILY"
+	}
+
+	scheduledTime := strings.TrimSpace(input.ScheduledTime)
 	now := time.Now().UTC()
+	loc := time.FixedZone("BRT", -3*3600)
+	nextCheck := CalculateNextCheck(scheduledTime, frequency, now, loc)
+
 	trigger := &domain.Trigger{
 		ID:            uuid.New().String(),
 		UserID:        userID,
@@ -168,6 +178,10 @@ func (s *TriggerService) CreateTrigger(userID string, input domain.CreateTrigger
 		CurrentValue:  "",
 		Status:        domain.TriggerStatusActive,
 		Frequency:     frequency,
+		ScheduledTime: scheduledTime,
+		DaysOfWeek:    daysOfWeek,
+		LastRunStatus: "",
+		NextCheckAt:   &nextCheck,
 		CreatedAt:     now,
 		UpdatedAt:     now,
 	}
@@ -177,6 +191,52 @@ func (s *TriggerService) CreateTrigger(userID string, input domain.CreateTrigger
 	}
 
 	return trigger, nil
+}
+
+// CalculateNextCheck calcula a próxima ocorrência para execução do disparador.
+func CalculateNextCheck(scheduledTime string, frequency domain.TriggerFrequency, now time.Time, loc *time.Location) time.Time {
+	if loc == nil {
+		loc = time.UTC
+	}
+	localNow := now.In(loc)
+
+	// Se houver horário exato especificado (ex: "08:30" ou "16:00")
+	if scheduledTime != "" && strings.Contains(scheduledTime, ":") {
+		parts := strings.Split(scheduledTime, ":")
+		if len(parts) == 2 {
+			var hour, minute int
+			_, _ = fmt.Sscanf(parts[0], "%d", &hour)
+			_, _ = fmt.Sscanf(parts[1], "%d", &minute)
+
+			candidate := time.Date(localNow.Year(), localNow.Month(), localNow.Day(), hour, minute, 0, 0, loc)
+			if !candidate.After(localNow) {
+				candidate = candidate.AddDate(0, 0, 1)
+			}
+			return candidate.UTC()
+		}
+	}
+
+	// Caso contrário, deriva da frequência padrão
+	switch frequency {
+	case domain.FrequencyHourly:
+		return now.Add(1 * time.Hour).UTC()
+	case domain.FrequencyDailyEvening:
+		candidate := time.Date(localNow.Year(), localNow.Month(), localNow.Day(), 18, 0, 0, 0, loc)
+		if !candidate.After(localNow) {
+			candidate = candidate.AddDate(0, 0, 1)
+		}
+		return candidate.UTC()
+	case domain.FrequencyImmediate:
+		return now.Add(2 * time.Minute).UTC()
+	case domain.FrequencyDailyMorning:
+		fallthrough
+	default:
+		candidate := time.Date(localNow.Year(), localNow.Month(), localNow.Day(), 8, 30, 0, 0, loc)
+		if !candidate.After(localNow) {
+			candidate = candidate.AddDate(0, 0, 1)
+		}
+		return candidate.UTC()
+	}
 }
 
 // GetTrigger retorna um disparador específico do usuário.
@@ -235,6 +295,15 @@ func (s *TriggerService) UpdateTrigger(id, userID string, input domain.UpdateTri
 	if input.Frequency != nil {
 		t.Frequency = *input.Frequency
 	}
+	if input.ScheduledTime != nil {
+		t.ScheduledTime = strings.TrimSpace(*input.ScheduledTime)
+		loc := time.FixedZone("BRT", -3*3600)
+		next := CalculateNextCheck(t.ScheduledTime, t.Frequency, time.Now().UTC(), loc)
+		t.NextCheckAt = &next
+	}
+	if input.DaysOfWeek != nil {
+		t.DaysOfWeek = strings.TrimSpace(*input.DaysOfWeek)
+	}
 	if input.Status != nil {
 		t.Status = *input.Status
 	}
@@ -275,7 +344,6 @@ func (s *TriggerService) RecordTriggerEvaluation(id string, currentValue string,
 
 // ListTriggerLogs retorna o histórico de disparos de um monitoramento.
 func (s *TriggerService) ListTriggerLogs(triggerID, userID string) ([]domain.TriggerLog, error) {
-	// Verifica primeiro se o trigger pertence ao usuário
 	if _, err := s.repo.GetByID(triggerID, userID); err != nil {
 		return nil, err
 	}

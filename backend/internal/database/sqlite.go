@@ -214,6 +214,10 @@ func runMigrations(db *sql.DB) error {
 	_, _ = db.Exec("ALTER TABLE events ADD COLUMN start_reminder_sent_at DATETIME")
 	_, _ = db.Exec("ALTER TABLE todos ADD COLUMN event_id TEXT")
 	_, _ = db.Exec("ALTER TABLE todos ADD COLUMN event_title TEXT")
+	_, _ = db.Exec("ALTER TABLE triggers ADD COLUMN scheduled_time TEXT DEFAULT ''")
+	_, _ = db.Exec("ALTER TABLE triggers ADD COLUMN days_of_week TEXT DEFAULT 'DAILY'")
+	_, _ = db.Exec("ALTER TABLE triggers ADD COLUMN last_run_status TEXT DEFAULT ''")
+	_, _ = db.Exec("CREATE INDEX IF NOT EXISTS idx_triggers_worker ON triggers(status, next_check_at)")
 
 	return nil
 }

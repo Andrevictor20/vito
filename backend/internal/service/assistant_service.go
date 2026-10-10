@@ -301,6 +301,8 @@ func (s *AssistantService) Process(ctx context.Context, userID string, input ai.
 				TargetValue:   intent.Trigger.TargetValue,
 				ConditionType: cond,
 				Frequency:     freq,
+				ScheduledTime: intent.Trigger.ScheduledTime,
+				DaysOfWeek:    intent.Trigger.DaysOfWeek,
 			})
 			if err != nil {
 				return nil, fmt.Errorf("falha ao criar disparador: %w", err)

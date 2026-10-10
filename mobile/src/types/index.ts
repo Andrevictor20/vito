@@ -177,6 +177,9 @@ export interface Trigger {
   current_value: string;
   status: TriggerStatus;
   frequency: TriggerFrequency;
+  scheduled_time?: string;
+  days_of_week?: string;
+  last_run_status?: string;
   last_checked_at?: string;
   next_check_at?: string;
   created_at: string;
@@ -192,6 +195,17 @@ export interface TriggerLog {
   is_read: boolean;
 }
 
+export interface TriggerTestResult {
+  trigger_id: string;
+  title: string;
+  query: string;
+  condition_met: boolean;
+  current_data: string;
+  summary: string;
+  simulated_notification: string;
+  tested_at: string;
+}
+
 export interface CreateTriggerInput {
   title: string;
   category: TriggerCategory;
@@ -199,6 +213,20 @@ export interface CreateTriggerInput {
   condition_type?: TriggerConditionType;
   target_value?: string;
   frequency?: TriggerFrequency;
+  scheduled_time?: string;
+  days_of_week?: string;
+}
+
+export interface UpdateTriggerInput {
+  title?: string;
+  category?: TriggerCategory;
+  query?: string;
+  condition_type?: TriggerConditionType;
+  target_value?: string;
+  frequency?: TriggerFrequency;
+  status?: TriggerStatus;
+  scheduled_time?: string;
+  days_of_week?: string;
 }
 
 export interface CategoryMeta {

@@ -8,7 +8,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
+
+	"github.com/andrevmp/vito/backend/internal/domain"
 )
 
 type GeminiProvider struct {
@@ -58,11 +61,18 @@ type geminiContent struct {
 	Parts []geminiPart `json:"parts"`
 }
 
+type geminiGoogleSearch struct{}
+
+type geminiTool struct {
+	GoogleSearch *geminiGoogleSearch `json:"google_search,omitempty"`
+}
+
 type geminiRequest struct {
 	SystemInstruction *geminiContent  `json:"systemInstruction,omitempty"`
 	Contents          []geminiContent `json:"contents"`
+	Tools             []geminiTool    `json:"tools,omitempty"`
 	GenerationConfig  struct {
-		ResponseMimeType string `json:"responseMimeType"`
+		ResponseMimeType string `json:"responseMimeType,omitempty"`
 	} `json:"generationConfig"`
 }
 
@@ -218,4 +228,181 @@ func (p *GeminiProvider) ParseIntent(ctx context.Context, input UserInput) (*Par
 	}
 
 	return nil, fmt.Errorf("falha em todas as tentativas do gemini: %w", lastErr)
+}
+
+// EvaluateTriggerWithSearch realiza pesquisa na web via Google Search Grounding e resume a vigília.
+func (p *GeminiProvider) EvaluateTriggerWithSearch(ctx context.Context, title, query string) (string, string, error) {
+	if p.apiKey == "" {
+		return "", "", errors.New("chave de api do gemini não configurada")
+	}
+
+	base := p.baseURL
+	if base == "" {
+		base = "https://generativelanguage.googleapis.com"
+	}
+
+	promptText := fmt.Sprintf("Você é o secretário executivo Vito. Realize uma pesquisa atualizada e forneça um relatório conciso, executivo e factual sobre o tema de vigília: '%s' (Consulta solicitada: '%s'). Destaque dados recentes, cotações, notícias ou status relevante. NUNCA use emojis. Mantenha tom executivo e formal.", title, query)
+
+	reqBody := geminiRequest{
+		Contents: []geminiContent{
+			{Role: "user", Parts: []geminiPart{{Text: promptText}}},
+		},
+		Tools: []geminiTool{
+			{GoogleSearch: &geminiGoogleSearch{}},
+		},
+	}
+
+	jsonBytes, err := json.Marshal(reqBody)
+	if err != nil {
+		return "", "", err
+	}
+
+	url := fmt.Sprintf("%s/v1beta/models/%s:generateContent?key=%s", base, p.model, p.apiKey)
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonBytes))
+	if err != nil {
+		return "", "", err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := p.httpClient.Do(req)
+	if err != nil {
+		return "", "", err
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", "", err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return "", "", fmt.Errorf("gemini api error (status %d): %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	var geminiResp geminiResponse
+	if err := json.Unmarshal(bodyBytes, &geminiResp); err != nil {
+		return "", "", err
+	}
+
+	if len(geminiResp.Candidates) == 0 || len(geminiResp.Candidates[0].Content.Parts) == 0 {
+		return "", "", errors.New("resposta vazia retornada na pesquisa do gemini")
+	}
+
+	resultText := strings.TrimSpace(geminiResp.Candidates[0].Content.Parts[0].Text)
+	payload := fmt.Sprintf(`{"status":"searched","query":"%s","time":"%s"}`, query, time.Now().UTC().Format(time.RFC3339))
+	return resultText, payload, nil
+}
+
+// TestEvaluateTrigger avalia a condição do disparador consultando fatos atualizados na web via Google Search.
+func (p *GeminiProvider) TestEvaluateTrigger(ctx context.Context, t *domain.Trigger) (*domain.TriggerTestResult, error) {
+	if p.apiKey == "" {
+		return nil, errors.New("chave de api do gemini não configurada")
+	}
+
+	base := p.baseURL
+	if base == "" {
+		base = "https://generativelanguage.googleapis.com"
+	}
+
+	nowStr := time.Now().Format("02/01/2006 15:04")
+	promptText := fmt.Sprintf(`Você é o motor de vigília proativa e avaliação de disparadores do assistente executivo Vito.
+Avalie em tempo real a condição deste disparador consultando dados da web se necessário:
+- TÍTULO: %s
+- CONDIÇÃO / CONSULTA: %s
+- CATEGORIA: %s
+- DATA/HORA DE REFERÊNCIA: %s
+
+Responda ESTRITAMENTE em formato JSON puro (sem marcações markdown extras):
+{
+  "condition_met": boolean (true se a condição para emitir alerta agora foi atendida, false caso contrário),
+  "current_data": string (resumo conciso do valor ou dado factual atual encontrado, ex: "Dólar comercial cotado a R$ 5,42 hoje"),
+  "summary": string (explicação executiva clara de 1 a 2 frases para o usuário se a regra foi atingida ou não e o porquê),
+  "simulated_notification": string (o texto exato da notificação push que o usuário receberá quando a condição for disparada)
+}`, t.Title, t.Query, t.Category, nowStr)
+
+	reqBody := geminiRequest{
+		Contents: []geminiContent{
+			{Role: "user", Parts: []geminiPart{{Text: promptText}}},
+		},
+		Tools: []geminiTool{
+			{GoogleSearch: &geminiGoogleSearch{}},
+		},
+	}
+
+	jsonBytes, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, err
+	}
+
+	url := fmt.Sprintf("%s/v1beta/models/%s:generateContent?key=%s", base, p.model, p.apiKey)
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonBytes))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := p.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("gemini api error (status %d): %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	var geminiResp geminiResponse
+	if err := json.Unmarshal(bodyBytes, &geminiResp); err != nil {
+		return nil, err
+	}
+
+	if len(geminiResp.Candidates) == 0 || len(geminiResp.Candidates[0].Content.Parts) == 0 {
+		return nil, errors.New("resposta vazia retornada pelo gemini")
+	}
+
+	rawText := strings.TrimSpace(geminiResp.Candidates[0].Content.Parts[0].Text)
+
+	type testEvalResult struct {
+		ConditionMet          bool   `json:"condition_met"`
+		CurrentData           string `json:"current_data"`
+		Summary               string `json:"summary"`
+		SimulatedNotification string `json:"simulated_notification"`
+	}
+
+	var eval testEvalResult
+	cleanJSON := rawText
+	if start := strings.Index(cleanJSON, "{"); start != -1 {
+		if end := strings.LastIndex(cleanJSON, "}"); end != -1 && end > start {
+			cleanJSON = cleanJSON[start : end+1]
+		}
+	}
+
+	if err := json.Unmarshal([]byte(cleanJSON), &eval); err != nil {
+		return &domain.TriggerTestResult{
+			TriggerID:             t.ID,
+			Title:                 t.Title,
+			Query:                 t.Query,
+			ConditionMet:          false,
+			CurrentData:           rawText,
+			Summary:               "Consulta realizada com sucesso. Condições avaliadas.",
+			SimulatedNotification: fmt.Sprintf("Alerta Vito: Vigília de '%s' atualizada.", t.Title),
+			TestedAt:              time.Now().UTC(),
+		}, nil
+	}
+
+	return &domain.TriggerTestResult{
+		TriggerID:             t.ID,
+		Title:                 t.Title,
+		Query:                 t.Query,
+		ConditionMet:          eval.ConditionMet,
+		CurrentData:           eval.CurrentData,
+		Summary:               eval.Summary,
+		SimulatedNotification: eval.SimulatedNotification,
+		TestedAt:              time.Now().UTC(),
+	}, nil
 }

@@ -131,7 +131,9 @@ Responda EXCLUSIVAMENTE com um objeto JSON válido, sem backticks markdown ou te
     "query": "Instrução ou consulta de monitoramento",
     "target_value": "Valor alvo ou limite se aplicável",
     "condition_type": "daily_brief" | "price_above" | "price_below" | "event_upcoming" | "change_detected",
-    "frequency": "daily_morning" | "hourly" | "daily_evening" | "immediate"
+    "frequency": "daily_morning" | "hourly" | "daily_evening" | "immediate",
+    "scheduled_time": "HH:MM" (horário local específico se solicitado pelo usuário, ex: "15:30", "08:00", "18:00"; caso contrário ""),
+    "days_of_week": "DAILY" | "MON-FRI" | "WEEKDAYS" | "SAT,SUN" (ou vazio se diário)
   },
   "memory_category": "família" | "preferência" | "trabalho" | "saúde" | "geral",
   "memory_content": "Fato ou preferência a ser guardada para o futuro"
@@ -183,9 +185,13 @@ DIRETRIZES DE AÇÃO E FOCO EM CALENDÁRIO:
    - Se o usuário pedir para guardar um fato ou preferência (ex: "minha esposa gosta de flores vermelhas", "anote que tomo remédio X"):
      - Use "action": "SAVE_MEMORY".
 5. DISPARADORES E VIGÍLIA PROATIVA (CREATE_TRIGGER):
-   - Se o usuário pedir para monitorar, acompanhar, vigiar ou avisar no futuro sobre finanças/ações, viagens/voos, jogos, vagas, compras, tempo ou outros temas (ex: "monitore a PETR3 acima de R$ 35", "avise-me sobre voos para Lisboa", "acompanhe o próximo jogo do Flamengo", "avise quando sair a restituição do IR", "fique de olho no preço do iPhone 17"):
+   - Se o usuário pedir para monitorar, acompanhar, vigiar ou avisar no futuro sobre finanças/ações, viagens/voos, jogos, vagas, compras, tempo ou outros temas (ex: "monitore a PETR3 acima de R$ 35", "avise-me sobre voos para Lisboa", "acompanhe o próximo jogo do Flamengo", "avise todo dia às 15:30 sobre o euro", "fique de olho no preço do iPhone 17 de segunda a sexta"):
      - Use "action": "CREATE_TRIGGER".
-     - Preencha o objeto "trigger" com "title", "category", "query", "target_value" e "frequency".
+     - Preencha o objeto "trigger" com "title", "category", "query", "target_value", "frequency", "scheduled_time" e "days_of_week".
+     - EXTRAÇÃO PRECISA DE HORÁRIOS E DIAS:
+       * Se o usuário indicar um horário exato ("às 15:30", "às 8h", "ao meio-dia", "às 18:00"): preencha "scheduled_time": "15:30" (formato HH:MM, hora local).
+       * Se indicar periodicidade de dias ("de segunda a sexta" -> "MON-FRI", "todo dia" -> "DAILY", "finais de semana" -> "SAT,SUN"): preencha "days_of_week".
+       * Na "message", confirme cordial e entusiasticamente que você iniciou a vigília para aquele assunto e cumprirá o horário estipulado.
 6. CONVERSA GERAL E SUPORTE (GENERAL_CHAT):
    - Se o usuário fizer uma saudação ("olá", "boa tarde"), fizer perguntas gerais, comentários casuais ou pedir ajuda:
      - Use "action": "GENERAL_CHAT".
