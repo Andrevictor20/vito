@@ -27,11 +27,21 @@ services:
     restart: unless-stopped
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      # Herda as credenciais do docker login do host para autenticar no GHCR sem erro 401
+      - ${DOCKER_CONFIG_PATH:-/root/.docker/config.json}:/config.json:ro
     environment:
       - WATCHTOWER_POLL_INTERVAL=60
       - WATCHTOWER_CLEANUP=true
       - WATCHTOWER_LABEL_ENABLE=true
       - WATCHTOWER_INCLUDE_RESTARTING=true
+      - WATCHTOWER_INCLUDE_STOPPED=false
+      - WATCHTOWER_REVIVE_STOPPED=false
+      # Ativa API HTTP para que o Saturn ou Webhooks possam forçar a atualização imediata
+      - WATCHTOWER_HTTP_API_UPDATE=true
+      - WATCHTOWER_HTTP_API_TOKEN=${WATCHTOWER_TOKEN:-vito-update-token-2026}
+      - WATCHTOWER_HTTP_API_PERIODIC_POLLS=true
+    ports:
+      - "8082:8080" # Porta da API de update do Watchtower (para chamadas do Saturn/curl)
 
 volumes:
   vito_data:
