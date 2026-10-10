@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -67,6 +68,10 @@ func (h *TriggerHandler) CreateTrigger(w http.ResponseWriter, r *http.Request) {
 		DaysOfWeek:    req.DaysOfWeek,
 	})
 	if err != nil {
+		if strings.Contains(err.Error(), "FOREIGN KEY") {
+			http.Error(w, `{"error":"Sua sessão é de outro servidor ou foi redefinida. Por favor, saia e faça login novamente."}`, http.StatusUnauthorized)
+			return
+		}
 		http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusBadRequest)
 		return
 	}

@@ -121,8 +121,18 @@ class ApiService {
     if (hasManualOverride === 'true' && savedUrl) {
       this.baseUrl = savedUrl;
     } else {
-      // Caso contrário, SEMPRE prioriza a Nuvem pública (Cloudflare) para garantir que funcione de qualquer lugar (4G, WiFi)
-      this.baseUrl = CLOUDFLARE_SERVER_URL || DEFAULT_SERVER_URL;
+      // Se for ambiente Web executando em localhost, conecta ao backend local na 8080 para evitar divergência de banco SQLite
+      const isWebLocalhost =
+        Platform.OS === 'web' &&
+        typeof window !== 'undefined' &&
+        (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
+      if (isWebLocalhost) {
+        this.baseUrl = 'http://localhost:8080';
+      } else {
+        // Caso contrário, prioriza a Nuvem pública (Cloudflare) para funcionar de qualquer lugar (4G, WiFi)
+        this.baseUrl = CLOUDFLARE_SERVER_URL || DEFAULT_SERVER_URL;
+      }
       await AsyncStorage.setItem(SERVER_URL_KEY, this.baseUrl);
     }
     this.token = await secureStorage.getItem(TOKEN_KEY);

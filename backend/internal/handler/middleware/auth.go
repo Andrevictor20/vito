@@ -37,6 +37,13 @@ func AuthMiddleware(authSvc *service.AuthService) func(http.Handler) http.Handle
 				return
 			}
 
+			// Valida se o usuário referenciado no token realmente existe no banco ativo
+			user, err := authSvc.GetUserByID(claims.UserID)
+			if err != nil || user == nil {
+				http.Error(w, `{"error":"sessão inválida ou usuário não encontrado no banco ativo"}`, http.StatusUnauthorized)
+				return
+			}
+
 			ctx := context.WithValue(r.Context(), UserIDKey, claims.UserID)
 			ctx = context.WithValue(ctx, UserEmailKey, claims.Email)
 

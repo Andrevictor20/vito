@@ -144,3 +144,8 @@ func (s *AuthService) generateToken(user *domain.User) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString(s.jwtSecret)
 }
+
+// GetUserByID recupera o usuário ativo pelo ID para garantir integridade referencial.
+func (s *AuthService) GetUserByID(id string) (*domain.User, error) {
+	return s.userRepo.GetByID(id)
+}
