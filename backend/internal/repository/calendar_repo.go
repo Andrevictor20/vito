@@ -445,9 +445,56 @@ func (r *EventRepositorySQLite) ListUpcomingUnreminded(from, to time.Time) ([]do
 	return events, rows.Err()
 }
 
-// MarkReminderSent registra o timestamp em que o lembrete foi despachado para o usuário.
+// MarkReminderSent registra o timestamp em que o lembrete de antecedência foi despachado para o usuário.
 func (r *EventRepositorySQLite) MarkReminderSent(eventID string, sentAt time.Time) error {
 	query := `UPDATE events SET reminder_sent_at = ? WHERE id = ?`
+	_, err := r.db.Exec(query, sentAt.UTC(), eventID)
+	return err
+}
+
+// ListStartingNowUnreminded busca compromissos que iniciam no intervalo especificado e ainda não tiveram alerta de início disparado.
+func (r *EventRepositorySQLite) ListStartingNowUnreminded(from, to time.Time) ([]domain.Event, error) {
+	fromUTC := from.UTC()
+	toUTC := to.UTC()
+
+	query := `
+		SELECT id, user_id, COALESCE(title, ''), COALESCE(description, ''), COALESCE(location, ''), 
+		       start_at, end_at, COALESCE(source, 'vito'), COALESCE(category, 'general'), 
+		       COALESCE(color, ''), COALESCE(recurrence, ''), COALESCE(created_at, datetime('now')), COALESCE(updated_at, datetime('now'))
+		FROM events
+		WHERE start_at >= ? AND start_at <= ? AND start_reminder_sent_at IS NULL
+		ORDER BY start_at ASC
+	`
+	rows, err := r.db.Query(query, fromUTC, toUTC)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var events []domain.Event
+	for rows.Next() {
+		var e domain.Event
+		var rawStart, rawEnd, rawCreated, rawUpdated any
+		if err := rows.Scan(
+			&e.ID, &e.UserID, &e.Title, &e.Description, &e.Location, 
+			&rawStart, &rawEnd, &e.Source, &e.Category, &e.Color, &e.Recurrence,
+			&rawCreated, &rawUpdated,
+		); err != nil {
+			continue
+		}
+
+		e.StartAt = parseDBTime(rawStart)
+		e.EndAt = parseDBTime(rawEnd)
+		e.CreatedAt = parseDBTime(rawCreated)
+		e.UpdatedAt = parseDBTime(rawUpdated)
+		events = append(events, e)
+	}
+	return events, rows.Err()
+}
+
+// MarkStartReminderSent registra o timestamp em que o alerta de início de evento foi despachado.
+func (r *EventRepositorySQLite) MarkStartReminderSent(eventID string, sentAt time.Time) error {
+	query := `UPDATE events SET start_reminder_sent_at = ? WHERE id = ?`
 	_, err := r.db.Exec(query, sentAt.UTC(), eventID)
 	return err
 }

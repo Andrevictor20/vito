@@ -97,7 +97,26 @@ export const notificationService = {
   },
 
   /**
-   * Inicializa os canais de notificação no Android e configurações M3.
+   * Verifica o status real da permissão de notificação no sistema operacional.
+   */
+  async checkPermissionStatus(): Promise<{ granted: boolean; canAskAgain: boolean; status: string }> {
+    if (!this.isAvailable()) {
+      return { granted: false, canAskAgain: false, status: 'denied' };
+    }
+    try {
+      const { status, canAskAgain } = await Notifications.getPermissionsAsync();
+      return {
+        granted: status === 'granted',
+        canAskAgain: canAskAgain ?? true,
+        status,
+      };
+    } catch {
+      return { granted: false, canAskAgain: true, status: 'undetermined' };
+    }
+  },
+
+  /**
+   * Inicializa os canais de notificação no Android com alta prioridade (Heads-Up).
    */
   async init(): Promise<void> {
     if (!this.isAvailable()) {
@@ -113,13 +132,37 @@ export const notificationService = {
           sound: null,
         });
 
-        // 2. Canal Padrão (Normal priority)
+        // 2. Canal Padrão (High priority - Heads-Up banner flutuante, som e vibração)
         await Notifications.setNotificationChannelAsync('vito_default', {
           name: 'Vito — Lembretes',
-          importance: Notifications.AndroidImportance.DEFAULT,
+          importance: Notifications.AndroidImportance.HIGH,
           enableVibrate: true,
           vibrationPattern: [0, 250, 250, 250],
           sound: 'default',
+          lightColor: '#3B82F6',
+          lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+        });
+
+        // 3. Canal de Início Imediato / Urgente (Max priority - Pop-up de alta prioridade)
+        await Notifications.setNotificationChannelAsync('vito_urgent', {
+          name: 'Vito — Alertas Imediatos',
+          importance: Notifications.AndroidImportance.MAX,
+          enableVibrate: true,
+          vibrationPattern: [0, 500, 250, 500],
+          sound: 'default',
+          lightColor: '#EF4444',
+          lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+        });
+
+        // 4. Canal Wake-up Call (Max priority)
+        await Notifications.setNotificationChannelAsync('vito_wakeup', {
+          name: 'Vito — Wake-up Call',
+          importance: Notifications.AndroidImportance.MAX,
+          enableVibrate: true,
+          vibrationPattern: [0, 500, 250, 500],
+          sound: 'default',
+          lightColor: '#EF4444',
+          lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
         });
       } catch {
         // Ignora silenciosamente em ambientes onde a API nativa de canais falhe
@@ -130,9 +173,9 @@ export const notificationService = {
   /**
    * Solicita permissões nativas e registra o Push Token.
    */
-  async requestPermissions(userInitiated: boolean = false): Promise<{ granted: boolean; pushToken: string | null }> {
+  async requestPermissions(userInitiated: boolean = false): Promise<{ granted: boolean; pushToken: string | null; canAskAgain: boolean }> {
     if (!this.isAvailable()) {
-      return { granted: false, pushToken: null };
+      return { granted: false, pushToken: null, canAskAgain: false };
     }
     await this.init();
 
@@ -141,17 +184,17 @@ export const notificationService = {
     }
 
     if (Platform.OS === 'web') {
-      return { granted: false, pushToken: null };
+      return { granted: false, pushToken: null, canAskAgain: false };
     }
 
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    const { status: existingStatus, canAskAgain = true } = await Notifications.getPermissionsAsync();
     let finalStatus = existingStatus;
 
     if (existingStatus !== 'granted') {
       const alreadyPrompted = await AsyncStorage.getItem(PROMPTED_ONCE_KEY);
       // Se não for iniciado pelo usuário e já foi solicitado anteriormente, não reabre diálogo nativo
       if (!userInitiated && alreadyPrompted === 'true') {
-        return { granted: false, pushToken: null };
+        return { granted: false, pushToken: null, canAskAgain };
       }
 
       // Dispara solicitação nativa e registra que já foi solicitado
@@ -160,8 +203,9 @@ export const notificationService = {
       finalStatus = status;
     }
 
-    if (finalStatus !== 'granted') {
-      return { granted: false, pushToken: null };
+    const isGranted = finalStatus === 'granted';
+    if (!isGranted) {
+      return { granted: false, pushToken: null, canAskAgain };
     }
 
     let pushToken: string | null = null;
@@ -180,10 +224,10 @@ export const notificationService = {
         });
       }
     } catch (err) {
-      console.warn('[NotificationService] Erro ao obter Expo Push Token:', err);
+      console.warn('[NotificationService] Aviso ao obter Expo Push Token (notificações locais operantes):', err);
     }
 
-    return { granted: true, pushToken };
+    return { granted: true, pushToken, canAskAgain: true };
   },
 
   /**
@@ -212,7 +256,7 @@ export const notificationService = {
   },
 
   /**
-   * Agenda um lembrete local offline para um compromisso ou tarefa.
+   * Agenda um lembrete local pontual (compatibilidade).
    */
   async scheduleEventReminder(params: ScheduleNotificationParams): Promise<string | null> {
     if (!this.isAvailable()) return null;
@@ -222,11 +266,9 @@ export const notificationService = {
     const priority: NotificationPriority = params.priority || settings.defaultPriority;
     const channelId = priority === 'silent' ? 'vito_silent' : 'vito_default';
 
-    // Determina o horário do disparo (subtraindo os minutos de antecedência)
     const minutesBefore = settings.reminderMinutesBefore || 10;
     const scheduledTime = new Date(params.triggerDate.getTime() - minutesBefore * 60 * 1000);
 
-    // Se o horário calculado já passou, não agenda
     if (scheduledTime.getTime() <= Date.now()) {
       return null;
     }
@@ -240,7 +282,7 @@ export const notificationService = {
         title,
         body: params.body,
         sound: priority !== 'silent',
-        priority: Notifications.AndroidNotificationPriority.DEFAULT,
+        priority: Notifications.AndroidNotificationPriority.HIGH,
         data: {
           eventId: params.eventId,
           todoId: params.todoId,
@@ -258,7 +300,96 @@ export const notificationService = {
   },
 
   /**
-   * Reconcilia e agenda lembretes locais nativos para todos os compromissos futuros.
+   * Agenda os dois lembretes (antecedência + início exato) para um compromisso.
+   */
+  async scheduleEventDualReminders(event: {
+    id: string;
+    title: string;
+    start_at: string;
+    category?: string;
+    location?: string;
+  }): Promise<{ advanceId: string | null; startId: string | null }> {
+    if (!this.isAvailable()) return { advanceId: null, startId: null };
+    const settings = await this.getSettings();
+    if (!settings.enabled) return { advanceId: null, startId: null };
+
+    const start = new Date(event.start_at).getTime();
+    if (isNaN(start)) return { advanceId: null, startId: null };
+
+    const now = Date.now();
+    const minutesBefore = settings.reminderMinutesBefore || 10;
+    const advanceTime = new Date(start - minutesBefore * 60 * 1000);
+    const startTime = new Date(start);
+
+    const priority: NotificationPriority = settings.defaultPriority;
+    const channelId = priority === 'silent' ? 'vito_silent' : 'vito_default';
+    const startChannelId = priority === 'silent' ? 'vito_silent' : 'vito_urgent';
+
+    const emoji = getNotificationContextEmoji(event.title, event.category);
+    const title = emoji ? `${emoji} ${event.title}` : event.title;
+
+    let advanceId: string | null = null;
+    let startId: string | null = null;
+
+    // 1. Alerta de Antecedência (ex: 10 min antes)
+    if (advanceTime.getTime() > now) {
+      try {
+        advanceId = await Notifications.scheduleNotificationAsync({
+          identifier: `event-reminder-adv-${event.id}`,
+          content: {
+            title,
+            body: `Começa em ${minutesBefore} minutos${event.location ? ' em ' + event.location : ''}`,
+            sound: priority !== 'silent',
+            priority: Notifications.AndroidNotificationPriority.HIGH,
+            data: {
+              eventId: event.id,
+              type: 'advance',
+              priority,
+            },
+            ...(Platform.OS === 'android' ? { channelId } : {}),
+          },
+          trigger: {
+            type: Notifications.SchedulableTriggerInputTypes.DATE,
+            date: advanceTime,
+          },
+        });
+      } catch (err) {
+        console.warn('[NotificationService] Erro ao agendar alerta de antecedência:', err);
+      }
+    }
+
+    // 2. Alerta do Horário de Início (Começando agora)
+    if (startTime.getTime() > now) {
+      try {
+        startId = await Notifications.scheduleNotificationAsync({
+          identifier: `event-reminder-start-${event.id}`,
+          content: {
+            title,
+            body: `Começando agora${event.location ? ' em ' + event.location : ''}!`,
+            sound: priority !== 'silent',
+            priority: Notifications.AndroidNotificationPriority.MAX,
+            data: {
+              eventId: event.id,
+              type: 'start',
+              priority,
+            },
+            ...(Platform.OS === 'android' ? { channelId: startChannelId } : {}),
+          },
+          trigger: {
+            type: Notifications.SchedulableTriggerInputTypes.DATE,
+            date: startTime,
+          },
+        });
+      } catch (err) {
+        console.warn('[NotificationService] Erro ao agendar alerta de início:', err);
+      }
+    }
+
+    return { advanceId, startId };
+  },
+
+  /**
+   * Reconcilia e agenda lembretes locais nativos (antecedência + início) para todos os compromissos futuros.
    */
   async scheduleAllUpcomingReminders(events: Array<{ id: string; title: string; start_at: string; category?: string; location?: string }>): Promise<number> {
     if (!this.isAvailable()) return 0;
@@ -266,26 +397,16 @@ export const notificationService = {
     if (!settings.enabled) return 0;
 
     const now = Date.now();
-    const minutesBefore = settings.reminderMinutesBefore || 10;
+    const maxWindow = now + 7 * 24 * 60 * 60 * 1000;
     let scheduledCount = 0;
 
     for (const event of events) {
       try {
         const start = new Date(event.start_at).getTime();
-        if (isNaN(start)) continue;
+        if (isNaN(start) || start <= now || start > maxWindow) continue;
 
-        const scheduledTime = new Date(start - minutesBefore * 60 * 1000);
-        if (scheduledTime.getTime() > now && scheduledTime.getTime() < now + 7 * 24 * 60 * 60 * 1000) {
-          const priority: NotificationPriority = settings.defaultPriority;
-
-          await this.scheduleEventReminder({
-            id: `event-reminder-${event.id}`,
-            eventId: event.id,
-            title: event.title,
-            body: `Começa em ${minutesBefore} minutos${event.location ? ' em ' + event.location : ''}`,
-            triggerDate: new Date(start),
-            priority,
-          });
+        const res = await this.scheduleEventDualReminders(event);
+        if (res.advanceId || res.startId) {
           scheduledCount++;
         }
       } catch (err) {
@@ -295,8 +416,16 @@ export const notificationService = {
     return scheduledCount;
   },
 
+  /**
+   * Cancela todos os lembretes vinculados a um evento (legado, antecedência e início).
+   */
   async cancelEventReminder(eventId: string): Promise<void> {
-    await this.cancelNotification(`event-reminder-${eventId}`);
+    if (!this.isAvailable()) return;
+    await Promise.all([
+      this.cancelNotification(`event-reminder-${eventId}`),
+      this.cancelNotification(`event-reminder-adv-${eventId}`),
+      this.cancelNotification(`event-reminder-start-${eventId}`),
+    ]);
   },
 
   /**
@@ -326,19 +455,25 @@ export const notificationService = {
       
       const body = priority === 'silent'
         ? 'Alerta sem som, mantendo total discrição.'
-        : 'Lembrete emitido com sucesso pontual.';
+        : 'Alerta com som e banner em alta prioridade.';
 
       await Notifications.scheduleNotificationAsync({
         content: {
           title,
           body,
           sound: priority !== 'silent',
+          priority: Notifications.AndroidNotificationPriority.HIGH,
           data: { priority, isTest: true },
           ...(Platform.OS === 'android' ? { channelId } : {}),
         },
-        trigger: null,
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+          seconds: 2,
+        },
       });
-    } catch {}
+    } catch (e) {
+      console.warn('[NotificationService] Erro ao disparar notificação de teste:', e);
+    }
   },
 
   addReceivedListener(callback: (notification: any) => void) {

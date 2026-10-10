@@ -59,6 +59,7 @@ func runMigrations(db *sql.DB) error {
 		start_at DATETIME NOT NULL,
 		end_at DATETIME NOT NULL,
 		reminder_sent_at DATETIME,
+		start_reminder_sent_at DATETIME,
 		created_at DATETIME NOT NULL,
 		updated_at DATETIME NOT NULL,
 		FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -210,6 +211,7 @@ func runMigrations(db *sql.DB) error {
 	_, _ = db.Exec("ALTER TABLE events ADD COLUMN color TEXT")
 	_, _ = db.Exec("ALTER TABLE events ADD COLUMN recurrence TEXT")
 	_, _ = db.Exec("ALTER TABLE events ADD COLUMN reminder_sent_at DATETIME")
+	_, _ = db.Exec("ALTER TABLE events ADD COLUMN start_reminder_sent_at DATETIME")
 	_, _ = db.Exec("ALTER TABLE todos ADD COLUMN event_id TEXT")
 	_, _ = db.Exec("ALTER TABLE todos ADD COLUMN event_title TEXT")
 

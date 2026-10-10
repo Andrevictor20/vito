@@ -44,51 +44,91 @@ func NewReminderWorker(
 	}
 }
 
-// CheckAndDispatchReminders busca eventos que começam entre now e now + windowAhead e despacha push.
+// CheckAndDispatchReminders busca eventos com alertas pendentes (antecedência e início) e despacha push.
 func (w *ReminderWorker) CheckAndDispatchReminders(now time.Time) (int, error) {
-	from := now.UTC()
-	to := now.Add(w.windowAhead).UTC()
-
-	events, err := w.eventRepo.ListUpcomingUnreminded(from, to)
-	if err != nil {
-		return 0, fmt.Errorf("erro ao listar eventos para lembrete: %w", err)
-	}
+	fromAdv := now.UTC()
+	toAdv := now.Add(w.windowAhead).UTC()
 
 	dispatchedCount := 0
-	for _, event := range events {
-		emoji := GetNotificationContextEmoji(event.Title, event.Category)
-		title := event.Title
-		if emoji != "" {
-			title = fmt.Sprintf("%s %s", emoji, event.Title)
-		}
-		timeStr := event.StartAt.Local().Format("15:04")
-		body := fmt.Sprintf("Começa às %s", timeStr)
-		if event.Location != "" {
-			body += fmt.Sprintf(" em %s", event.Location)
-		}
 
-		priority := "default"
+	// 1. Lembretes de Antecedência ("Começa às HH:MM")
+	advEvents, err := w.eventRepo.ListUpcomingUnreminded(fromAdv, toAdv)
+	if err != nil {
+		log.Printf("[ReminderWorker] Erro ao listar eventos para lembrete prévio: %v", err)
+	} else {
+		for _, event := range advEvents {
+			emoji := GetNotificationContextEmoji(event.Title, event.Category)
+			title := event.Title
+			if emoji != "" {
+				title = fmt.Sprintf("%s %s", emoji, event.Title)
+			}
+			timeStr := event.StartAt.Local().Format("15:04")
+			body := fmt.Sprintf("Começa às %s", timeStr)
+			if event.Location != "" {
+				body += fmt.Sprintf(" em %s", event.Location)
+			}
 
-		data := map[string]interface{}{
-			"eventId":  event.ID,
-			"title":    event.Title,
-			"start_at": event.StartAt.Format(time.RFC3339),
-			"priority": priority,
+			priority := "default"
+			data := map[string]interface{}{
+				"eventId":  event.ID,
+				"type":     "advance",
+				"title":    event.Title,
+				"start_at": event.StartAt.Format(time.RFC3339),
+				"priority": priority,
+			}
+
+			sent, pushErr := w.notifSvc.SendPushToUser(event.UserID, title, body, priority, data)
+			if pushErr != nil {
+				log.Printf("[ReminderWorker] Erro ao enviar push de antecedência para evento %s (user %s): %v", event.ID, event.UserID, pushErr)
+			} else if sent > 0 {
+				dispatchedCount++
+			}
+
+			// Marca como notificado mesmo se o usuário não possuir tokens ativos no momento
+			if markErr := w.eventRepo.MarkReminderSent(event.ID, now); markErr != nil {
+				log.Printf("[ReminderWorker] Erro ao marcar reminder_sent para evento %s: %v", event.ID, markErr)
+			}
 		}
+	}
 
-		sent, err := w.notifSvc.SendPushToUser(event.UserID, title, body, priority, data)
-		if err != nil {
-			log.Printf("[ReminderWorker] Erro ao enviar push para evento %s (user %s): %v", event.ID, event.UserID, err)
-			continue
-		}
+	// 2. Alertas no Horário Exato de Início ("Começando agora!")
+	fromStart := now.Add(-2 * time.Minute).UTC()
+	toStart := now.Add(1 * time.Minute).UTC()
 
-		if sent > 0 {
-			dispatchedCount++
-		}
+	startEvents, err := w.eventRepo.ListStartingNowUnreminded(fromStart, toStart)
+	if err != nil {
+		log.Printf("[ReminderWorker] Erro ao listar eventos iniciando agora: %v", err)
+	} else {
+		for _, event := range startEvents {
+			emoji := GetNotificationContextEmoji(event.Title, event.Category)
+			title := event.Title
+			if emoji != "" {
+				title = fmt.Sprintf("%s %s", emoji, event.Title)
+			}
+			body := "Começando agora!"
+			if event.Location != "" {
+				body = fmt.Sprintf("Começando agora em %s!", event.Location)
+			}
 
-		// Marca como notificado mesmo se o usuário não possuir tokens ativos no momento
-		if markErr := w.eventRepo.MarkReminderSent(event.ID, now); markErr != nil {
-			log.Printf("[ReminderWorker] Erro ao marcar reminder_sent para evento %s: %v", event.ID, markErr)
+			priority := "urgent"
+			data := map[string]interface{}{
+				"eventId":  event.ID,
+				"type":     "start",
+				"title":    event.Title,
+				"start_at": event.StartAt.Format(time.RFC3339),
+				"priority": priority,
+			}
+
+			sent, pushErr := w.notifSvc.SendPushToUser(event.UserID, title, body, priority, data)
+			if pushErr != nil {
+				log.Printf("[ReminderWorker] Erro ao enviar push de início para evento %s (user %s): %v", event.ID, event.UserID, pushErr)
+			} else if sent > 0 {
+				dispatchedCount++
+			}
+
+			if markErr := w.eventRepo.MarkStartReminderSent(event.ID, now); markErr != nil {
+				log.Printf("[ReminderWorker] Erro ao marcar start_reminder_sent para evento %s: %v", event.ID, markErr)
+			}
 		}
 	}
 

@@ -8,11 +8,13 @@ import {
   TouchableWithoutFeedback,
   ScrollView,
   Alert,
+  Linking,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens, MD3Shapes } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { useNotifications } from '../../hooks/useNotifications';
+import { notificationService } from '../../services/notificationService';
 import { NotificationPriority } from '../../types';
 import { M3Switch } from '../ui/M3Switch';
 
@@ -29,18 +31,31 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
   const {
     settings,
     permissionGranted,
+    canAskAgain,
     requestPermissions,
     updateSettings,
   } = useNotifications();
+  const [testingNotif, setTestingNotif] = useState(false);
 
   const handleToggleEnabled = async (value: boolean) => {
     if (value && !permissionGranted) {
       const res = await requestPermissions(true);
       if (!res.granted) {
-        Alert.alert(
-          'Permissão Necessária',
-          'Para receber alertas de compromissos, autorize as notificações nas configurações do seu aparelho.'
-        );
+        if (!res.canAskAgain) {
+          Alert.alert(
+            'Permissão Bloqueada',
+            'As notificações estão desativadas para o Vito no seu celular. Deseja abrir as configurações do aparelho para permitir?',
+            [
+              { text: 'Cancelar', style: 'cancel' },
+              { text: 'Abrir Configurações', onPress: () => Linking.openSettings() },
+            ]
+          );
+        } else {
+          Alert.alert(
+            'Permissão Necessária',
+            'Para receber alertas de compromissos, autorize as notificações nas configurações do seu aparelho.'
+          );
+        }
         return;
       }
     }
@@ -109,13 +124,19 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
                     <TouchableOpacity
                       style={[styles.permissionBanner, { backgroundColor: isDark ? '#3F2C1D' : '#FFF3E0', borderColor: '#F59E0B' }]}
                       onPress={() => {
-                        requestPermissions(true).catch(() => {});
+                        if (!canAskAgain) {
+                          Linking.openSettings();
+                        } else {
+                          requestPermissions(true).catch(() => {});
+                        }
                       }}
                       activeOpacity={0.8}
                     >
-                      <MaterialIcons name="warning" size={18} color="#D97706" />
+                      <MaterialIcons name={canAskAgain ? 'warning' : 'settings'} size={18} color="#D97706" />
                       <Text style={[styles.permissionText, { color: isDark ? '#FDE68A' : '#B45309' }]}>
-                        Permissão pendente no aparelho. Toque para conceder.
+                        {canAskAgain
+                          ? 'Permissão pendente no aparelho. Toque para conceder.'
+                          : 'Permissão bloqueada no aparelho. Toque para abrir Configurações.'}
                       </Text>
                     </TouchableOpacity>
                   )}
@@ -218,6 +239,36 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
                   })}
                 </View>
 
+                {/* Nota Informativa sobre Disparo Duplo */}
+                <View style={[styles.dualTriggerCard, { backgroundColor: colors.surfaceContainerLow, borderColor: colors.outlineVariant }]}>
+                  <MaterialIcons name="schedule" size={18} color={colors.primary} />
+                  <Text style={[styles.dualTriggerText, { color: colors.onSurfaceVariant }]}>
+                    O Vito emitirá <Text style={{ fontWeight: '700', color: colors.onSurface }}>dois alertas automáticos</Text>: na antecedência selecionada e no <Text style={{ fontWeight: '700', color: colors.onSurface }}>horário exato de início</Text> do compromisso.
+                  </Text>
+                </View>
+
+                {/* 4. Diagnóstico & Teste de Notificação */}
+                <Text style={[styles.sectionTitle, { color: colors.onSurface, marginTop: 24 }]}>DIAGNÓSTICO & TESTE</Text>
+                <TouchableOpacity
+                  style={[styles.testButton, { backgroundColor: colors.surfaceContainerHigh, borderColor: colors.outlineVariant }]}
+                  onPress={async () => {
+                    if (!permissionGranted) {
+                      Alert.alert('Aviso', 'Conceda permissão primeiro para testar notificações.');
+                      return;
+                    }
+                    setTestingNotif(true);
+                    await notificationService.triggerTestNotification(settings.defaultPriority);
+                    Alert.alert('Teste Disparado', 'Uma notificação de teste será exibida em 2 segundos.');
+                    setTimeout(() => setTestingNotif(false), 2500);
+                  }}
+                  activeOpacity={0.8}
+                  disabled={testingNotif}
+                >
+                  <MaterialIcons name="notifications-active" size={20} color={colors.primary} />
+                  <Text style={[styles.testButtonText, { color: colors.onSurface }]}>
+                    {testingNotif ? 'Emitindo alerta...' : 'Testar Alerta no Aparelho Agora'}
+                  </Text>
+                </TouchableOpacity>
 
               </ScrollView>
             </View>
@@ -410,5 +461,34 @@ const styles = StyleSheet.create({
   testFeedbackText: {
     fontSize: tokens.typography.size.xs,
     fontWeight: '700',
+  },
+  dualTriggerCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 12,
+    borderRadius: MD3Shapes.medium,
+    borderWidth: 1,
+    marginTop: 4,
+  },
+  dualTriggerText: {
+    flex: 1,
+    fontSize: tokens.typography.size.xs,
+    lineHeight: 16,
+  },
+  testButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: MD3Shapes.medium,
+    borderWidth: 1,
+    marginTop: 8,
+    marginBottom: 20,
+  },
+  testButtonText: {
+    fontSize: tokens.typography.size.sm,
+    fontWeight: '600',
   },
 });

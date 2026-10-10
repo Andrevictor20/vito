@@ -25,6 +25,7 @@ type Event struct {
 	Color       string    `json:"color,omitempty"`
 	Recurrence  string     `json:"recurrence,omitempty"`
 	ReminderSentAt *time.Time `json:"reminder_sent_at,omitempty"`
+	StartReminderSentAt *time.Time `json:"start_reminder_sent_at,omitempty"`
 	CreatedAt   time.Time  `json:"created_at"`
 	UpdatedAt   time.Time  `json:"updated_at"`
 }
@@ -51,7 +52,9 @@ type EventRepository interface {
 	GetByID(id, userID string) (*Event, error)
 	ListByUser(userID string, from, to time.Time) ([]Event, error)
 	ListUpcomingUnreminded(from, to time.Time) ([]Event, error)
+	ListStartingNowUnreminded(from, to time.Time) ([]Event, error)
 	MarkReminderSent(eventID string, sentAt time.Time) error
+	MarkStartReminderSent(eventID string, sentAt time.Time) error
 	CheckConflict(userID string, startAt, endAt time.Time, excludeEventID string) (*ConflictInfo, error)
 	Delete(id, userID string) error
 	DeleteByTitle(userID, titleQuery string) (int, error)

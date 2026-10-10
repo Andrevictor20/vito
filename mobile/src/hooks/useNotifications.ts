@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { AppState, AppStateStatus } from 'react-native';
 import type * as Notifications from 'expo-notifications';
 import { notificationService } from '../services/notificationService';
 import { NotificationPriority, NotificationSettings, ScheduleNotificationParams } from '../types';
@@ -10,6 +11,7 @@ export function useNotifications() {
     reminderMinutesBefore: 10,
   });
   const [permissionGranted, setPermissionGranted] = useState<boolean>(false);
+  const [canAskAgain, setCanAskAgain] = useState<boolean>(true);
   const [lastNotification, setLastNotification] = useState<Notifications.Notification | null>(null);
   const [lastResponse, setLastResponse] = useState<Notifications.NotificationResponse | null>(null);
 
@@ -17,16 +19,31 @@ export function useNotifications() {
   useEffect(() => {
     let isMounted = true;
 
+    async function checkStatus() {
+      const perm = await notificationService.checkPermissionStatus();
+      if (isMounted) {
+        setPermissionGranted(perm.granted);
+        setCanAskAgain(perm.canAskAgain);
+      }
+    }
+
     async function setup() {
       await notificationService.init();
       const saved = await notificationService.getSettings();
       if (isMounted) {
         setSettings(saved);
-        setPermissionGranted(!!saved.pushToken);
       }
+      await checkStatus();
     }
 
     setup();
+
+    // Reavalia permissão ao retornar das Configurações do Android/iOS
+    const appStateSub = AppState.addEventListener('change', (nextState: AppStateStatus) => {
+      if (nextState === 'active') {
+        checkStatus();
+      }
+    });
 
     // Listeners para recebimento e resposta (toque)
     const receivedSub = notificationService.addReceivedListener((notif) => {
@@ -39,6 +56,7 @@ export function useNotifications() {
 
     return () => {
       isMounted = false;
+      appStateSub.remove();
       receivedSub.remove();
       responseSub.remove();
     };
@@ -47,6 +65,7 @@ export function useNotifications() {
   const requestPermissions = useCallback(async (userInitiated: boolean = false) => {
     const res = await notificationService.requestPermissions(userInitiated);
     setPermissionGranted(res.granted);
+    setCanAskAgain(res.canAskAgain);
     if (res.granted) {
       const updated = await notificationService.getSettings();
       setSettings(updated);
@@ -67,6 +86,7 @@ export function useNotifications() {
   return {
     settings,
     permissionGranted,
+    canAskAgain,
     lastNotification,
     lastResponse,
     requestPermissions,

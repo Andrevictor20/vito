@@ -87,6 +87,7 @@ export function useHomeData() {
           AsyncStorage.setItem(CACHE_EVENTS_KEY, JSON.stringify(next)).catch(() => {});
           return next;
         });
+        notificationService.scheduleEventDualReminders(res.event).catch(() => {});
       }
       await loadData(true);
       // Reconciliação transparente em segundo plano com o Google Calendar
@@ -153,6 +154,7 @@ export function useHomeData() {
           AsyncStorage.setItem(CACHE_EVENTS_KEY, JSON.stringify(next)).catch(() => {});
           return next;
         });
+        notificationService.scheduleEventDualReminders(res.event).catch(() => {});
       }
       return res;
     } catch (e) {

@@ -98,16 +98,20 @@ func (s *NotificationService) SendPushToUser(userID, title, body, priority strin
 	}
 
 	channelID := "vito_default"
-	expoPriority := "default"
+	expoPriority := "high"
 	sound := "default"
 
 	switch priority {
 	case "wakeup":
 		channelID = "vito_wakeup"
 		expoPriority = "high"
+	case "urgent":
+		channelID = "vito_urgent"
+		expoPriority = "high"
 	case "silent":
 		channelID = "vito_silent"
 		sound = ""
+		expoPriority = "normal"
 	}
 
 	var messages []PushMessage
