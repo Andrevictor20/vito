@@ -18,7 +18,7 @@ export interface HeaderProps {
   showDivider?: boolean;
   onPressProfile?: () => void;
   onPressTitle?: () => void;
-  activeTab?: 'calendar' | 'chat';
+  activeTab?: 'calendar' | 'chat' | 'triggers';
   onPressHistory?: () => void;
   onPressNewChat?: () => void;
 }
@@ -78,12 +78,13 @@ export const Header: React.FC<HeaderProps> = ({
   const firstName = user?.name ? user.name.split(' ')[0] : 'Usuário';
   const effectiveStatusColor = statusColor || colors.statusOnline;
 
-  const tabTransition = useRef(new Animated.Value(activeTab === 'chat' ? 1 : 0)).current;
+  const tabTransition = useRef(new Animated.Value(activeTab === 'chat' ? 1 : activeTab === 'triggers' ? 2 : 0)).current;
 
   useEffect(() => {
     if (activeTab) {
+      const targetVal = activeTab === 'chat' ? 1 : activeTab === 'triggers' ? 2 : 0;
       Animated.timing(tabTransition, {
-        toValue: activeTab === 'chat' ? 1 : 0,
+        toValue: targetVal,
         duration: 220,
         easing: Easing.bezier(0.2, 0, 0, 1),
         useNativeDriver: true,
@@ -91,10 +92,12 @@ export const Header: React.FC<HeaderProps> = ({
     }
   }, [activeTab]);
 
-  const calendarOpacity = tabTransition.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
-  const calendarTranslateY = tabTransition.interpolate({ inputRange: [0, 1], outputRange: [0, -4] });
-  const chatOpacity = tabTransition.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
-  const chatTranslateY = tabTransition.interpolate({ inputRange: [0, 1], outputRange: [4, 0] });
+  const calendarOpacity = tabTransition.interpolate({ inputRange: [0, 0.5, 1, 2], outputRange: [1, 0, 0, 0] });
+  const calendarTranslateY = tabTransition.interpolate({ inputRange: [0, 1, 2], outputRange: [0, -4, -4] });
+  const chatOpacity = tabTransition.interpolate({ inputRange: [0, 0.5, 1, 1.5, 2], outputRange: [0, 0, 1, 0, 0] });
+  const chatTranslateY = tabTransition.interpolate({ inputRange: [0, 1, 2], outputRange: [4, 0, -4] });
+  const triggersOpacity = tabTransition.interpolate({ inputRange: [0, 1, 1.5, 2], outputRange: [0, 0, 0, 1] });
+  const triggersTranslateY = tabTransition.interpolate({ inputRange: [0, 1, 2], outputRange: [4, 4, 0] });
 
   const titleContent = activeTab ? (
     <View style={[styles.titleColumn, { minWidth: activeTab === 'chat' ? 115 : 150 }]}>
@@ -136,6 +139,28 @@ export const Header: React.FC<HeaderProps> = ({
         </View>
         <Text style={[styles.brandSubtitle, { color: colors.textMuted }]} numberOfLines={1}>
           Assistente Executivo
+        </Text>
+      </Animated.View>
+
+      {/* Camada Disparadores */}
+      <Animated.View
+        style={[
+          styles.titleCrossfadeLayer,
+          {
+            opacity: triggersOpacity,
+            transform: [{ translateY: triggersTranslateY }],
+          },
+        ]}
+        pointerEvents={activeTab === 'triggers' ? 'auto' : 'none'}
+      >
+        <View style={styles.titleRow}>
+          <Text style={[styles.brand, { color: colors.onSurface }]} numberOfLines={1}>
+            Disparadores
+          </Text>
+          <View style={[styles.statusDot, { backgroundColor: '#10B981' }]} />
+        </View>
+        <Text style={[styles.brandSubtitle, { color: colors.textMuted }]} numberOfLines={1}>
+          Vigília & Inteligência
         </Text>
       </Animated.View>
     </View>

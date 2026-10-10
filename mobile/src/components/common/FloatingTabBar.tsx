@@ -5,8 +5,8 @@ import { tokens } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 
 interface FloatingTabBarProps {
-  activeTab: 'chat' | 'calendar';
-  onSelectTab: (tab: 'chat' | 'calendar') => void;
+  activeTab: 'chat' | 'calendar' | 'triggers';
+  onSelectTab: (tab: 'chat' | 'calendar' | 'triggers') => void;
   visible?: boolean;
 }
 
@@ -114,6 +114,48 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
           ]}
         >
           Calendário
+        </Text>
+      </TouchableOpacity>
+
+      {/* Item 3: Disparadores (Vigília Proativa) */}
+      <TouchableOpacity
+        style={styles.navItem}
+        onPress={() => onSelectTab('triggers')}
+        activeOpacity={0.7}
+        accessibilityRole="tab"
+        accessibilityState={{ selected: activeTab === 'triggers' }}
+        accessibilityLabel="Aba Disparadores e Monitoramentos"
+      >
+        <View
+          style={[
+            styles.indicatorBox,
+            activeTab === 'triggers' && [
+              styles.indicatorSelected,
+              {
+                backgroundColor: isDark ? colors.surfaceContainerHighest : colors.primary,
+                ...(isDark
+                  ? { borderWidth: 1, borderColor: colors.outlineVariant }
+                  : { borderWidth: 0 }),
+              },
+            ],
+          ]}
+        >
+          <MaterialIcons
+            name={activeTab === 'triggers' ? 'radar' : 'track-changes'}
+            size={23}
+            color={activeTab === 'triggers' ? '#FFFFFF' : inactiveColor}
+          />
+        </View>
+        <Text
+          style={[
+            styles.navLabel,
+            {
+              color: activeTab === 'triggers' ? activeColor : inactiveColor,
+              fontWeight: activeTab === 'triggers' ? '700' : '500',
+            },
+          ]}
+        >
+          Disparadores
         </Text>
       </TouchableOpacity>
     </View>

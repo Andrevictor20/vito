@@ -1,7 +1,19 @@
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { secureStorage } from './secureStore';
-import { User, AuthResponse, Event, Todo, AssistantChatResponse, ConflictInfo } from '../types';
+import {
+  User,
+  AuthResponse,
+  Event,
+  Todo,
+  AssistantChatResponse,
+  ConflictInfo,
+  Trigger,
+  TriggerCategory,
+  TriggerLog,
+  TriggerStatus,
+  CreateTriggerInput,
+} from '../types';
 
 let FileSystemModule: any = null;
 try {
@@ -528,6 +540,61 @@ class ApiService {
       method: 'POST',
       body: JSON.stringify({ priority, title, body }),
     });
+  }
+
+  // Disparadores / Triggers
+  async getTriggers(category?: TriggerCategory, status?: TriggerStatus): Promise<Trigger[]> {
+    const params = new URLSearchParams();
+    if (category) params.append('category', category);
+    if (status) params.append('status', status);
+    const qs = params.toString();
+    return this.request<Trigger[]>(`/api/v1/triggers${qs ? `?${qs}` : ''}`);
+  }
+
+  async getTrigger(id: string): Promise<Trigger> {
+    return this.request<Trigger>(`/api/v1/triggers/${id}`);
+  }
+
+  async createTrigger(input: CreateTriggerInput): Promise<Trigger> {
+    return this.request<Trigger>('/api/v1/triggers', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  }
+
+  async toggleTrigger(id: string): Promise<Trigger> {
+    return this.request<Trigger>(`/api/v1/triggers/${id}/toggle`, {
+      method: 'PATCH',
+    });
+  }
+
+  async updateTrigger(id: string, input: Partial<CreateTriggerInput> & { status?: TriggerStatus }): Promise<Trigger> {
+    return this.request<Trigger>(`/api/v1/triggers/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(input),
+    });
+  }
+
+  async deleteTrigger(id: string): Promise<void> {
+    await this.request<void>(`/api/v1/triggers/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async parseTriggerPrompt(prompt: string): Promise<{
+    category: TriggerCategory;
+    suggested_title: string;
+    query: string;
+    condition_type: string;
+  }> {
+    return this.request('/api/v1/triggers/parse', {
+      method: 'POST',
+      body: JSON.stringify({ prompt }),
+    });
+  }
+
+  async getTriggerLogs(id: string): Promise<TriggerLog[]> {
+    return this.request<TriggerLog[]>(`/api/v1/triggers/${id}/logs`);
   }
 }
 

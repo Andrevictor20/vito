@@ -165,6 +165,39 @@ func runMigrations(db *sql.DB) error {
 	);
 
 	CREATE INDEX IF NOT EXISTS idx_todo_subtasks_todo ON todo_subtasks(todo_id);
+
+	CREATE TABLE IF NOT EXISTS triggers (
+		id TEXT PRIMARY KEY,
+		user_id TEXT NOT NULL,
+		title TEXT NOT NULL,
+		category TEXT NOT NULL,
+		query TEXT NOT NULL,
+		condition_type TEXT NOT NULL DEFAULT 'daily_brief',
+		target_value TEXT NOT NULL DEFAULT '',
+		current_value TEXT NOT NULL DEFAULT '',
+		status TEXT NOT NULL DEFAULT 'active',
+		frequency TEXT NOT NULL DEFAULT 'daily_morning',
+		last_checked_at DATETIME,
+		next_check_at DATETIME,
+		created_at DATETIME NOT NULL,
+		updated_at DATETIME NOT NULL,
+		FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_triggers_user_status ON triggers(user_id, status);
+	CREATE INDEX IF NOT EXISTS idx_triggers_user_category ON triggers(user_id, category);
+
+	CREATE TABLE IF NOT EXISTS trigger_logs (
+		id TEXT PRIMARY KEY,
+		trigger_id TEXT NOT NULL,
+		triggered_at DATETIME NOT NULL,
+		message TEXT NOT NULL,
+		payload TEXT,
+		is_read BOOLEAN NOT NULL DEFAULT 0,
+		FOREIGN KEY(trigger_id) REFERENCES triggers(id) ON DELETE CASCADE
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_trigger_logs_trigger ON trigger_logs(trigger_id);
 	`
 
 	if _, err := db.Exec(schema); err != nil {

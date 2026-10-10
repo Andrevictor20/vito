@@ -159,6 +159,7 @@ export function useChat(onDataChanged?: () => void) {
           action_performed: res.action_performed,
           event: res.event,
           todo: res.todo,
+          trigger: res.trigger,
           conflict: res.conflict,
         };
 
@@ -222,6 +223,7 @@ export function useChat(onDataChanged?: () => void) {
           action_performed: res.action_performed,
           event: res.event,
           todo: res.todo,
+          trigger: res.trigger,
           conflict: res.conflict,
         };
 
@@ -282,6 +284,7 @@ export function useChat(onDataChanged?: () => void) {
           action_performed: res.action_performed,
           event: res.event,
           todo: res.todo,
+          trigger: res.trigger,
           conflict: res.conflict,
         };
 

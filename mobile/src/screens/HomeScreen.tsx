@@ -23,6 +23,7 @@ import { CreateItemModal } from '../components/calendar/CreateItemModal';
 import { EditEventModal } from '../components/calendar/EditEventModal';
 import { ProfileModal } from '../components/profile/ProfileModal';
 import { ChatScreen, ChatScreenRef } from './ChatScreen';
+import { TriggersScreen } from './TriggersScreen';
 import { useHomeData } from '../hooks/useHomeData';
 import { useTheme } from '../context/ThemeContext';
 import { Event } from '../types';
@@ -32,7 +33,7 @@ export const HomeScreen: React.FC<{
   onToggleServer: () => void;
 }> = ({ serverUrl, onToggleServer }) => {
   const { colors, isDark } = useTheme();
-  const [activeTab, setActiveTab] = useState<'chat' | 'calendar'>('chat');
+  const [activeTab, setActiveTab] = useState<'chat' | 'calendar' | 'triggers'>('chat');
   const [profileVisible, setProfileVisible] = useState(false);
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [calendarModalVisible, setCalendarModalVisible] = useState(false);
@@ -42,12 +43,15 @@ export const HomeScreen: React.FC<{
   const [isChatLoading, setIsChatLoading] = useState(false);
 
   const chatRef = useRef<ChatScreenRef>(null);
-  const tabFadeAnim = useRef(new Animated.Value(activeTab === 'chat' ? 1 : 0)).current;
+  const tabFadeAnim = useRef(
+    new Animated.Value(activeTab === 'chat' ? 0 : activeTab === 'calendar' ? 1 : 2)
+  ).current;
 
-  const handleSelectTab = (tab: 'chat' | 'calendar') => {
+  const handleSelectTab = (tab: 'chat' | 'calendar' | 'triggers') => {
     setActiveTab(tab);
+    const target = tab === 'chat' ? 0 : tab === 'calendar' ? 1 : 2;
     Animated.timing(tabFadeAnim, {
-      toValue: tab === 'chat' ? 1 : 0,
+      toValue: target,
       duration: 220,
       easing: Easing.bezier(0.2, 0, 0, 1),
       useNativeDriver: true,
@@ -104,7 +108,10 @@ export const HomeScreen: React.FC<{
           style={[
             styles.tabLayer,
             {
-              opacity: tabFadeAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }),
+              opacity: tabFadeAnim.interpolate({
+                inputRange: [0, 0.5, 1, 1.5, 2],
+                outputRange: [0, 0, 1, 0, 0],
+              }),
               zIndex: activeTab === 'calendar' ? 2 : 1,
             },
           ]}
@@ -332,7 +339,10 @@ export const HomeScreen: React.FC<{
           style={[
             styles.tabLayer,
             {
-              opacity: tabFadeAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] }),
+              opacity: tabFadeAnim.interpolate({
+                inputRange: [0, 0.5, 1, 2],
+                outputRange: [1, 0, 0, 0],
+              }),
               zIndex: activeTab === 'chat' ? 2 : 1,
             },
           ]}
@@ -344,6 +354,23 @@ export const HomeScreen: React.FC<{
             onKeyboardStateChange={setIsKeyboardOpen}
             onLoadingStateChange={setIsChatLoading}
           />
+        </Animated.View>
+
+        {/* Camada 3: Disparadores / Vigília de Inteligência */}
+        <Animated.View
+          style={[
+            styles.tabLayer,
+            {
+              opacity: tabFadeAnim.interpolate({
+                inputRange: [0, 1, 1.5, 2],
+                outputRange: [0, 0, 0, 1],
+              }),
+              zIndex: activeTab === 'triggers' ? 2 : 1,
+            },
+          ]}
+          pointerEvents={activeTab === 'triggers' ? 'auto' : 'none'}
+        >
+          <TriggersScreen />
         </Animated.View>
       </View>
 

@@ -15,6 +15,7 @@ const (
 	ActionCreateTodo    IntentAction = "CREATE_TODO"
 	ActionQuerySchedule IntentAction = "QUERY_SCHEDULE"
 	ActionSaveMemory    IntentAction = "SAVE_MEMORY"
+	ActionCreateTrigger IntentAction = "CREATE_TRIGGER"
 	ActionGeneralChat   IntentAction = "GENERAL_CHAT"
 	ActionOutOfScope    IntentAction = "OUT_OF_SCOPE"
 )
@@ -56,15 +57,26 @@ type ParsedTodo struct {
 	dueWallClock bool
 }
 
+// ParsedTrigger dados extraídos para criação de disparador / monitoramento contínuo.
+type ParsedTrigger struct {
+	Title         string `json:"title"`
+	Category      string `json:"category"`
+	Query         string `json:"query"`
+	TargetValue   string `json:"target_value,omitempty"`
+	ConditionType string `json:"condition_type,omitempty"`
+	Frequency     string `json:"frequency,omitempty"`
+}
+
 // ParsedIntent resultado normalizado da interpretação do assistente Toki-like.
 type ParsedIntent struct {
-	Action         IntentAction `json:"action"`
-	Message        string       `json:"message"` // Resposta amigável da secretária
-	Event          *ParsedEvent `json:"event,omitempty"`
-	Todo           *ParsedTodo  `json:"todo,omitempty"`
-	MemoryContent  string       `json:"memory_content,omitempty"`
-	MemoryCategory string       `json:"memory_category,omitempty"`
-	ProviderUsed   string       `json:"provider_used,omitempty"`
+	Action         IntentAction   `json:"action"`
+	Message        string         `json:"message"` // Resposta amigável da secretária
+	Event          *ParsedEvent   `json:"event,omitempty"`
+	Todo           *ParsedTodo    `json:"todo,omitempty"`
+	Trigger        *ParsedTrigger `json:"trigger,omitempty"`
+	MemoryContent  string         `json:"memory_content,omitempty"`
+	MemoryCategory string         `json:"memory_category,omitempty"`
+	ProviderUsed   string         `json:"provider_used,omitempty"`
 }
 
 // Provider contrato unificado para provedores de IA (Google, OpenRouter, Groq).

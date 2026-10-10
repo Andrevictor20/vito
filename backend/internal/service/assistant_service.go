@@ -26,24 +26,31 @@ type AssistantResponse struct {
 	Event        *domain.Event        `json:"event,omitempty"`
 	Conflict     *domain.ConflictInfo `json:"conflict,omitempty"`
 	Todo         *domain.Todo         `json:"todo,omitempty"`
+	Trigger      *domain.Trigger      `json:"trigger,omitempty"`
 	ProviderUsed string               `json:"provider_used,omitempty"`
 }
 
-// AssistantService orquestra o parsing de IA com os serviços de calendário, tarefas e memórias.
+// AssistantService orquestra o parsing de IA com os serviços de calendário, tarefas, memórias e disparadores.
 type AssistantService struct {
 	aiGateway  AIParsingGateway
 	calSvc     *CalendarService
 	todoSvc    *TodoService
 	memoryRepo domain.MemoryRepository
+	triggerSvc *TriggerService
 }
 
 // NewAssistantService instancia o serviço do assistente.
-func NewAssistantService(aiGateway AIParsingGateway, calSvc *CalendarService, todoSvc *TodoService, memoryRepo domain.MemoryRepository) *AssistantService {
+func NewAssistantService(aiGateway AIParsingGateway, calSvc *CalendarService, todoSvc *TodoService, memoryRepo domain.MemoryRepository, triggerSvc ...*TriggerService) *AssistantService {
+	var ts *TriggerService
+	if len(triggerSvc) > 0 {
+		ts = triggerSvc[0]
+	}
 	return &AssistantService{
 		aiGateway:  aiGateway,
 		calSvc:     calSvc,
 		todoSvc:    todoSvc,
 		memoryRepo: memoryRepo,
+		triggerSvc: ts,
 	}
 }
 
@@ -279,6 +286,28 @@ func (s *AssistantService) Process(ctx context.Context, userID string, input ai.
 			}
 			if res.Message == "" {
 				res.Message = fmt.Sprintf("Guardei na minha memória: %s", content)
+			}
+		}
+
+	case ai.ActionCreateTrigger:
+		if intent.Trigger != nil && s.triggerSvc != nil {
+			cat := domain.TriggerCategory(intent.Trigger.Category)
+			freq := domain.TriggerFrequency(intent.Trigger.Frequency)
+			cond := domain.TriggerConditionType(intent.Trigger.ConditionType)
+			trig, err := s.triggerSvc.CreateTrigger(userID, domain.CreateTriggerInput{
+				Title:         intent.Trigger.Title,
+				Category:      cat,
+				Query:         intent.Trigger.Query,
+				TargetValue:   intent.Trigger.TargetValue,
+				ConditionType: cond,
+				Frequency:     freq,
+			})
+			if err != nil {
+				return nil, fmt.Errorf("falha ao criar disparador: %w", err)
+			}
+			res.Trigger = trig
+			if res.Message == "" {
+				res.Message = fmt.Sprintf("Pronto! Criei o disparador '%s' na seção de Disparadores e já iniciei a vigília para você.", trig.Title)
 			}
 		}
 	}

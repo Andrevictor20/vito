@@ -109,7 +109,7 @@ REGRAS DE RESPOSTA OBRIGATÓRIAS:
 Responda EXCLUSIVAMENTE com um objeto JSON válido, sem backticks markdown ou texto extra, no seguinte schema:
 
 {
-  "action": "CREATE_EVENT" | "UPDATE_EVENT" | "DELETE_EVENT" | "CREATE_TODO" | "QUERY_SCHEDULE" | "SAVE_MEMORY" | "GENERAL_CHAT",
+  "action": "CREATE_EVENT" | "UPDATE_EVENT" | "DELETE_EVENT" | "CREATE_TODO" | "QUERY_SCHEDULE" | "CREATE_TRIGGER" | "SAVE_MEMORY" | "GENERAL_CHAT",
   "message": "Mensagem atenciosa, prestativa e amigável da secretária executiva",
   "event": {
     "title": "Título conciso do evento",
@@ -124,6 +124,14 @@ Responda EXCLUSIVAMENTE com um objeto JSON válido, sem backticks markdown ou te
     "title": "Descrição da tarefa",
     "priority": "low" | "medium" | "high",
     "due_date": "YYYY-MM-DDTHH:MM:SS" (horário LOCAL, SEM offset; fuso %s) ou null
+  },
+  "trigger": {
+    "title": "Título conciso do disparador",
+    "category": "finance" | "taxes_docs" | "real_estate" | "automotive" | "career" | "news" | "tech" | "travel" | "shopping" | "events_sports" | "entertainment" | "weather" | "custom",
+    "query": "Instrução ou consulta de monitoramento",
+    "target_value": "Valor alvo ou limite se aplicável",
+    "condition_type": "daily_brief" | "price_above" | "price_below" | "event_upcoming" | "change_detected",
+    "frequency": "daily_morning" | "hourly" | "daily_evening" | "immediate"
   },
   "memory_category": "família" | "preferência" | "trabalho" | "saúde" | "geral",
   "memory_content": "Fato ou preferência a ser guardada para o futuro"
@@ -174,7 +182,11 @@ DIRETRIZES DE AÇÃO E FOCO EM CALENDÁRIO:
 4. MEMÓRIA PESSOAL DE LONGO PRAZO:
    - Se o usuário pedir para guardar um fato ou preferência (ex: "minha esposa gosta de flores vermelhas", "anote que tomo remédio X"):
      - Use "action": "SAVE_MEMORY".
-5. CONVERSA GERAL E SUPORTE (GENERAL_CHAT):
+5. DISPARADORES E VIGÍLIA PROATIVA (CREATE_TRIGGER):
+   - Se o usuário pedir para monitorar, acompanhar, vigiar ou avisar no futuro sobre finanças/ações, viagens/voos, jogos, vagas, compras, tempo ou outros temas (ex: "monitore a PETR3 acima de R$ 35", "avise-me sobre voos para Lisboa", "acompanhe o próximo jogo do Flamengo", "avise quando sair a restituição do IR", "fique de olho no preço do iPhone 17"):
+     - Use "action": "CREATE_TRIGGER".
+     - Preencha o objeto "trigger" com "title", "category", "query", "target_value" e "frequency".
+6. CONVERSA GERAL E SUPORTE (GENERAL_CHAT):
    - Se o usuário fizer uma saudação ("olá", "boa tarde"), fizer perguntas gerais, comentários casuais ou pedir ajuda:
      - Use "action": "GENERAL_CHAT".
      - Seja atencioso, caloroso e pronto para ajudar na organização diária.

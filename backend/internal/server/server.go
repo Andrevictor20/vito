@@ -23,6 +23,7 @@ type Server struct {
 	astHandler        *handler.AssistantHandler
 	notifHandler      *handler.NotificationHandler
 	syncHandler       *handler.CalendarSyncHandler
+	triggerHandler    *handler.TriggerHandler
 	authSvc           *service.AuthService
 }
 
@@ -35,6 +36,7 @@ type Config struct {
 	AstHandler        *handler.AssistantHandler
 	NotifHandler      *handler.NotificationHandler
 	SyncHandler       *handler.CalendarSyncHandler
+	TriggerHandler    *handler.TriggerHandler
 	AuthSvc           *service.AuthService
 }
 
@@ -52,6 +54,7 @@ func New(cfg ...Config) *Server {
 		s.astHandler = cfg[0].AstHandler
 		s.notifHandler = cfg[0].NotifHandler
 		s.syncHandler = cfg[0].SyncHandler
+		s.triggerHandler = cfg[0].TriggerHandler
 		s.authSvc = cfg[0].AuthSvc
 	}
 
@@ -150,6 +153,19 @@ func (s *Server) registerRoutes() {
 						ir.Post("/{provider}/sync", s.syncHandler.SyncIntegration)
 						ir.Delete("/{provider}", s.syncHandler.DisconnectIntegration)
 						ir.Post("/google/webhook", s.syncHandler.GoogleWebhook)
+					})
+				}
+
+				if s.triggerHandler != nil {
+					protected.Route("/triggers", func(tr chi.Router) {
+						tr.Post("/", s.triggerHandler.CreateTrigger)
+						tr.Get("/", s.triggerHandler.ListTriggers)
+						tr.Post("/parse", s.triggerHandler.ParsePrompt)
+						tr.Get("/{id}", s.triggerHandler.GetTrigger)
+						tr.Patch("/{id}", s.triggerHandler.UpdateTrigger)
+						tr.Patch("/{id}/toggle", s.triggerHandler.ToggleStatus)
+						tr.Delete("/{id}", s.triggerHandler.DeleteTrigger)
+						tr.Get("/{id}/logs", s.triggerHandler.ListLogs)
 					})
 				}
 			})

@@ -82,6 +82,34 @@ export const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({ message, o
           />
         )}
         {message.todo && <TodoInlineCard todo={message.todo} />}
+        {message.trigger && (
+          <View
+            style={{
+              marginTop: 8,
+              padding: 10,
+              borderRadius: 12,
+              backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+              borderWidth: 1,
+              borderColor: isDark ? colors.outlineVariant : 'rgba(0,0,0,0.08)',
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+              <MaterialIcons name="track-changes" size={16} color="#10B981" style={{ marginRight: 6 }} />
+              <Text style={{ fontSize: 13, fontWeight: '700', color: colors.onSurface, flex: 1 }}>
+                {message.trigger.title}
+              </Text>
+            </View>
+            <Text style={{ fontSize: 12, color: colors.onSurfaceVariant }} numberOfLines={2}>
+              {message.trigger.query}
+            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
+              <MaterialIcons name="radar" size={13} color="#10B981" style={{ marginRight: 4 }} />
+              <Text style={{ fontSize: 11, fontWeight: '600', color: '#10B981' }}>
+                Vigília Ativa em Disparadores
+              </Text>
+            </View>
+          </View>
+        )}
 
         <View style={styles.metaRow}>
           <Text

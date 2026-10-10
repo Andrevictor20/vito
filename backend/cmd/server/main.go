@@ -38,6 +38,7 @@ func main() {
 	todoRepo := repository.NewTodoRepository(db)
 	memoryRepo := repository.NewMemoryRepository(db)
 	notifRepo := repository.NewDeviceTokenRepository(db)
+	triggerRepo := repository.NewTriggerRepository(db)
 
 	// 3. Provedores de IA & AI Gateway com Failover
 	var aiProviders []ai.Provider
@@ -60,8 +61,9 @@ func main() {
 	authSvc := service.NewAuthService(userRepo, cfg.JWTSecret)
 	calSvc := service.NewCalendarService(eventRepo)
 	todoSvc := service.NewTodoService(todoRepo)
-	astSvc := service.NewAssistantService(aiGateway, calSvc, todoSvc, memoryRepo)
 	notifSvc := service.NewNotificationService(notifRepo)
+	triggerSvc := service.NewTriggerService(triggerRepo)
+	astSvc := service.NewAssistantService(aiGateway, calSvc, todoSvc, memoryRepo, triggerSvc)
 
 	syncRepo := repository.NewCalendarSyncRepository(db)
 	syncSvc := service.NewCalendarSyncService(syncRepo, eventRepo, cfg.JWTSecret)
@@ -102,6 +104,7 @@ func main() {
 	astHandler := handler.NewAssistantHandler(astSvc, whisperTranscriber)
 	notifHandler := handler.NewNotificationHandler(notifSvc)
 	syncHandler := handler.NewCalendarSyncHandler(syncSvc)
+	triggerHandler := handler.NewTriggerHandler(triggerSvc)
 
 	// 6. Servidor HTTP
 	srv := server.New(server.Config{
@@ -112,6 +115,7 @@ func main() {
 		AstHandler:        astHandler,
 		NotifHandler:      notifHandler,
 		SyncHandler:       syncHandler,
+		TriggerHandler:    triggerHandler,
 		AuthSvc:           authSvc,
 	})
 
