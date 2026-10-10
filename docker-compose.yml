@@ -10,13 +10,17 @@ services:
     container_name: vito-backend
     restart: unless-stopped
     ports:
-      - "${PORT:-8080}:${PORT:-8080}"
+      - "${PORT:-8180}:${PORT:-8180}"
     env_file:
       - .env
     environment:
-      - PORT=${PORT:-8080}
+      - PORT=${PORT:-8180}
       - APP_ENV=production
       - DB_PATH=/app/data/vito.db
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - JWT_SECRET=${JWT_SECRET:-vito-raspberry-pi-secret-key-32chars!}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
       - GOOGLE_REDIRECT_URL=${GOOGLE_REDIRECT_URL:-https://vito.rasppi.cloud/api/v1/auth/google/callback}
@@ -34,15 +38,23 @@ services:
     restart: unless-stopped
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      # Herda as credenciais do docker login do host para autenticar no GHCR sem erro 401
+      - ${DOCKER_CONFIG_PATH:-/root/.docker/config.json}:/config.json:ro
     environment:
+      - WATCHTOWER_POLL_INTERVAL=30
       - WATCHTOWER_CLEANUP=true
-      - WATCHTOWER_POLL_INTERVAL=300
+      - WATCHTOWER_LABEL_ENABLE=true
+      - WATCHTOWER_INCLUDE_RESTARTING=true
       - WATCHTOWER_INCLUDE_STOPPED=false
+      - WATCHTOWER_REVIVE_STOPPED=false
+      # Ativa API HTTP para que o Saturn ou Webhooks possam forçar a atualização imediata
+      - WATCHTOWER_HTTP_API_UPDATE=true
+      - WATCHTOWER_HTTP_API_TOKEN=${WATCHTOWER_TOKEN:-vito-update-token-2026}
+      - WATCHTOWER_HTTP_API_PERIODIC_POLLS=true
+    ports:
+      - "8082:8080" # Porta da API de update do Watchtower (para chamadas do Saturn/curl)
     networks:
       - vito_net
-    profiles:
-      - production
-      - watchtower
 
   # Serviço do Cloudflare Tunnel para Zero-Trust (dispensa abertura de portas no roteador)
   tunnel:

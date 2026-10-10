@@ -39,13 +39,13 @@ COPY --from=builder --chown=appuser:appgroup /app/vito-server /app/vito-server
 
 USER appuser
 
-EXPOSE 8080
+EXPOSE 8080 8180
 
 ENV PORT=8080 \
     APP_ENV=production \
     DB_PATH=/app/data/vito.db
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD wget -qO- http://localhost:8080/healthz || exit 1
+    CMD wget -qO- http://localhost:${PORT:-8080}/healthz || exit 1
 
 ENTRYPOINT ["/app/vito-server"]
