@@ -37,6 +37,7 @@ type AssistantService struct {
 	todoSvc    *TodoService
 	memoryRepo domain.MemoryRepository
 	triggerSvc *TriggerService
+	userRepo   domain.UserRepository
 }
 
 // NewAssistantService instancia o serviço do assistente.
@@ -54,10 +55,22 @@ func NewAssistantService(aiGateway AIParsingGateway, calSvc *CalendarService, to
 	}
 }
 
+// SetUserRepository configura o repositório de usuários para enriquecimento do perfil.
+func (s *AssistantService) SetUserRepository(repo domain.UserRepository) {
+	s.userRepo = repo
+}
+
 // Process recebe o input (voz/texto), invoca a IA e aplica a ação no banco de dados.
 func (s *AssistantService) Process(ctx context.Context, userID string, input ai.UserInput) (*AssistantResponse, error) {
 	if input.Now.IsZero() {
 		input.Now = time.Now().UTC()
+	}
+
+	// Carrega nome do usuário para contextualização e tratamento pessoal
+	if input.UserName == "" && s.userRepo != nil {
+		if u, err := s.userRepo.GetByID(userID); err == nil && u != nil && strings.TrimSpace(u.Name) != "" {
+			input.UserName = strings.TrimSpace(u.Name)
+		}
 	}
 
 	// Validação básica de input vazio
@@ -120,9 +133,31 @@ func (s *AssistantService) Process(ctx context.Context, userID string, input ai.
 		}
 	}
 
+	// Carrega disparadores e vigílias ativas do usuário (Camada 2 - Até 8 vigílias ativas)
+	if len(input.ActiveTriggers) == 0 && s.triggerSvc != nil {
+		if trigs, err := s.triggerSvc.ListTriggers(userID, "", domain.TriggerStatusActive); err == nil && len(trigs) > 0 {
+			limit := 8
+			if len(trigs) < limit {
+				limit = len(trigs)
+			}
+			for _, tr := range trigs[:limit] {
+				schedule := string(tr.Frequency)
+				if tr.ScheduledTime != "" {
+					schedule = fmt.Sprintf("%s às %s", schedule, tr.ScheduledTime)
+				}
+				input.ActiveTriggers = append(input.ActiveTriggers, fmt.Sprintf("[%s - %s] %s (%s)", tr.Category, schedule, tr.Title, tr.Query))
+			}
+		}
+	}
+
 	intent, err := s.aiGateway.ParseIntent(ctx, input)
 	if err != nil {
 		return nil, fmt.Errorf("falha ao interpretar comando com IA: %w", err)
+	}
+
+	// Aprendizado contínuo autônomo: se a IA captou um fato/preferência/rotina, grava de forma perene no SQLite
+	if s.memoryRepo != nil && strings.TrimSpace(intent.MemoryContent) != "" {
+		s.persistLearnedMemory(userID, intent.MemoryCategory, intent.MemoryContent)
 	}
 
 	res := &AssistantResponse{
@@ -272,18 +307,7 @@ func (s *AssistantService) Process(ctx context.Context, userID string, input ai.
 			if content == "" {
 				content = intent.Message
 			}
-
-			mem := &domain.Memory{
-				ID:        uuid.New().String(),
-				UserID:    userID,
-				Category:  cat,
-				Content:   content,
-				CreatedAt: time.Now().UTC(),
-				UpdatedAt: time.Now().UTC(),
-			}
-			if err := s.memoryRepo.Create(mem); err != nil {
-				return nil, fmt.Errorf("falha ao salvar memória: %w", err)
-			}
+			s.persistLearnedMemory(userID, cat, content)
 			if res.Message == "" {
 				res.Message = fmt.Sprintf("Guardei na minha memória: %s", content)
 			}
@@ -315,6 +339,36 @@ func (s *AssistantService) Process(ctx context.Context, userID string, input ai.
 	}
 
 	return res, nil
+}
+
+func (s *AssistantService) persistLearnedMemory(userID, category, content string) {
+	content = strings.TrimSpace(content)
+	if content == "" {
+		return
+	}
+	if category == "" {
+		category = "geral"
+	}
+
+	// Evita duplicar memória idêntica recente
+	if mems, err := s.memoryRepo.ListByUser(userID, 25); err == nil {
+		contentLower := strings.ToLower(content)
+		for _, m := range mems {
+			if strings.ToLower(strings.TrimSpace(m.Content)) == contentLower {
+				return
+			}
+		}
+	}
+
+	mem := &domain.Memory{
+		ID:        uuid.New().String(),
+		UserID:    userID,
+		Category:  category,
+		Content:   content,
+		CreatedAt: time.Now().UTC(),
+		UpdatedAt: time.Now().UTC(),
+	}
+	_ = s.memoryRepo.Create(mem)
 }
 
 func userLocation(timezone string) *time.Location {

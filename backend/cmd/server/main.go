@@ -67,6 +67,7 @@ func main() {
 	notifSvc := service.NewNotificationService(notifRepo)
 	triggerSvc := service.NewTriggerService(triggerRepo)
 	astSvc := service.NewAssistantService(aiGateway, calSvc, todoSvc, memoryRepo, triggerSvc)
+	astSvc.SetUserRepository(userRepo)
 
 	syncRepo := repository.NewCalendarSyncRepository(db)
 	syncSvc := service.NewCalendarSyncService(syncRepo, eventRepo, cfg.JWTSecret)

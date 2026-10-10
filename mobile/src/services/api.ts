@@ -109,6 +109,16 @@ export const isCloudServer = (url: string): boolean => {
   return url === CLOUDFLARE_SERVER_URL || (!url.includes('192.168.') && !url.includes('localhost') && !url.includes('127.0.0.1'));
 };
 
+export interface ChatHistoryItem {
+  sender: 'user' | 'vito';
+  text: string;
+}
+
+export interface AssistantChatOptions {
+  timezone?: string;
+  history?: ChatHistoryItem[];
+}
+
 class ApiService {
   private baseUrl: string = DEFAULT_SERVER_URL;
   private token: string | null = null;
@@ -387,18 +397,34 @@ class ApiService {
   }
 
   // Assistant Chat
-  async assistantChat(prompt: string, timezone?: string): Promise<AssistantChatResponse> {
-    const tz = timezone || this.getUserTimezone();
+  async assistantChat(
+    prompt: string,
+    options?: string | AssistantChatOptions
+  ): Promise<AssistantChatResponse> {
+    const opts: AssistantChatOptions =
+      typeof options === 'string' ? { timezone: options } : options || {};
+    const tz = opts.timezone || this.getUserTimezone();
     const currentLocalTime = this.getCurrentLocalTimeISO();
     return this.request<AssistantChatResponse>('/api/v1/assistant/chat', {
       method: 'POST',
-      body: JSON.stringify({ prompt, timezone: tz, current_local_time: currentLocalTime }),
+      body: JSON.stringify({
+        prompt,
+        timezone: tz,
+        current_local_time: currentLocalTime,
+        history: opts.history,
+      }),
     });
   }
 
   // Assistant Audio (Groq Whisper v3 + Gemini Fallback)
-  async assistantAudio(audioUri: string, filename: string = 'audio.m4a', timezone?: string): Promise<AssistantChatResponse> {
-    const tz = timezone || this.getUserTimezone();
+  async assistantAudio(
+    audioUri: string,
+    filename: string = 'audio.m4a',
+    options?: string | AssistantChatOptions
+  ): Promise<AssistantChatResponse> {
+    const opts: AssistantChatOptions =
+      typeof options === 'string' ? { timezone: options } : options || {};
+    const tz = opts.timezone || this.getUserTimezone();
     const currentLocalTime = this.getCurrentLocalTimeISO();
 
     // 1. Prioriza envio resiliente em JSON com Base64 (imune a quebras de FormData no Android/Hermes)
@@ -413,6 +439,7 @@ class ApiService {
             filename,
             timezone: tz,
             current_local_time: currentLocalTime,
+            history: opts.history,
           }),
         });
       }

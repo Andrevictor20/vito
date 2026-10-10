@@ -327,3 +327,45 @@ func TestAssistantHandler_VisionChat_JSON(t *testing.T) {
 	}
 }
 
+func TestAssistantHandler_ChatWithHistory(t *testing.T) {
+	mockAI := &mockAIGateway{
+		intent: &ai.ParsedIntent{
+			Action:       ai.ActionGeneralChat,
+			Message:      "Continuando nossa conversa sobre estudos...",
+			ProviderUsed: "MockAI",
+		},
+	}
+
+	astSvc := service.NewAssistantService(mockAI, nil, nil, nil)
+	astHandler := handler.NewAssistantHandler(astSvc, nil)
+
+	payload := map[string]interface{}{
+		"prompt": "Qual foi a última dica que você me deu?",
+		"history": []map[string]string{
+			{"sender": "user", "text": "Quero estudar cálculo"},
+			{"sender": "vito", "text": "Recomendo começar por derivadas"},
+		},
+	}
+	bodyBytes, _ := json.Marshal(payload)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/assistant/chat", bytes.NewReader(bodyBytes))
+	req.Header.Set("Content-Type", "application/json")
+	ctx := context.WithValue(req.Context(), middleware.UserIDKey, "user-chat-hist")
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	astHandler.Chat(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d. Body: %s", rr.Code, rr.Body.String())
+	}
+
+	if len(mockAI.capturedInput.ConversationHistory) != 2 {
+		t.Fatalf("expected 2 history items in captured input, got %d", len(mockAI.capturedInput.ConversationHistory))
+	}
+	if mockAI.capturedInput.ConversationHistory[0].Text != "Quero estudar cálculo" {
+		t.Errorf("expected history item text 'Quero estudar cálculo', got: %s", mockAI.capturedInput.ConversationHistory[0].Text)
+	}
+}
+
+

@@ -28,14 +28,20 @@ func NewAssistantHandler(astSvc *service.AssistantService, transcriber ai.AudioT
 	}
 }
 
+type ChatMessagePayload struct {
+	Sender string `json:"sender"`
+	Text   string `json:"text"`
+}
+
 type assistantChatRequest struct {
-	Text             string `json:"text,omitempty"`
-	Prompt           string `json:"prompt,omitempty"`
-	AudioB64         string `json:"audio_b64,omitempty"`
-	AudioMime        string `json:"audio_mime,omitempty"`
-	ImageB64         string `json:"image_b64,omitempty"`
-	Timezone         string `json:"timezone,omitempty"`
-	CurrentLocalTime string `json:"current_local_time,omitempty"`
+	Text             string               `json:"text,omitempty"`
+	Prompt           string               `json:"prompt,omitempty"`
+	AudioB64         string               `json:"audio_b64,omitempty"`
+	AudioMime        string               `json:"audio_mime,omitempty"`
+	ImageB64         string               `json:"image_b64,omitempty"`
+	Timezone         string               `json:"timezone,omitempty"`
+	CurrentLocalTime string               `json:"current_local_time,omitempty"`
+	History          []ChatMessagePayload `json:"history,omitempty"`
 }
 
 func parseClientNow(rawTime, tz string) (time.Time, string) {
@@ -84,13 +90,24 @@ func (h *AssistantHandler) Chat(w http.ResponseWriter, r *http.Request) {
 
 	nowRef, tz := parseClientNow(req.CurrentLocalTime, req.Timezone)
 
+	var convHistory []ai.ChatMessageContext
+	for _, h := range req.History {
+		if strings.TrimSpace(h.Text) != "" {
+			convHistory = append(convHistory, ai.ChatMessageContext{
+				Sender: h.Sender,
+				Text:   h.Text,
+			})
+		}
+	}
+
 	input := ai.UserInput{
-		Text:      rawText,
-		AudioB64:  req.AudioB64,
-		AudioMime: req.AudioMime,
-		ImageB64:  req.ImageB64,
-		Timezone:  tz,
-		Now:       nowRef,
+		Text:                rawText,
+		AudioB64:            req.AudioB64,
+		AudioMime:           req.AudioMime,
+		ImageB64:            req.ImageB64,
+		Timezone:            tz,
+		Now:                 nowRef,
+		ConversationHistory: convHistory,
 	}
 
 	resp, err := h.astSvc.Process(r.Context(), userID, input)

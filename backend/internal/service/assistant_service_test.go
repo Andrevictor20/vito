@@ -3,6 +3,7 @@ package service_test
 import (
 	"context"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -415,3 +416,140 @@ func TestAssistantService_UpdateEvent(t *testing.T) {
 		t.Errorf("expected start hour 15, got %d", events[0].StartAt.Hour())
 	}
 }
+
+func TestAssistantService_AutonomousMemoryLearningOnGeneralChat(t *testing.T) {
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "test_learning.db")
+	db, err := database.Open(dbPath)
+	if err != nil {
+		t.Fatalf("failed to open test db: %v", err)
+	}
+	t.Cleanup(func() { db.Close() })
+
+	memRepo := repository.NewMemoryRepository(db)
+	userRepo := repository.NewUserRepository(db)
+	calSvc := service.NewCalendarService(repository.NewEventRepository(db))
+	todoSvc := service.NewTodoService(repository.NewTodoRepository(db))
+
+	userID := "user-learn-1"
+	_ = userRepo.Create(&domain.User{
+		ID:           userID,
+		Name:         "André",
+		Email:        "andre@learn.local",
+		PasswordHash: "hash",
+		CreatedAt:    time.Now().UTC(),
+		UpdatedAt:    time.Now().UTC(),
+	})
+
+	mockAI := &mockAIGateway{
+		intent: &ai.ParsedIntent{
+			Action:         ai.ActionGeneralChat,
+			Message:        "A matemática é a linguagem do universo. Posso sugerir um horário para você estudar?",
+			MemoryCategory: "preferência",
+			MemoryContent:  "Gosta de estudar matemática",
+		},
+	}
+
+	astSvc := service.NewAssistantService(mockAI, calSvc, todoSvc, memRepo)
+
+	resp, err := astSvc.Process(context.Background(), userID, ai.UserInput{
+		Text: "Eu adoro estudar matemática",
+		Now:  time.Now().UTC(),
+	})
+	if err != nil {
+		t.Fatalf("expected nil error, got: %v", err)
+	}
+
+	if resp.Action != ai.ActionGeneralChat {
+		t.Errorf("expected ActionGeneralChat, got: %s", resp.Action)
+	}
+
+	// Verifica se a memória foi aprendida e salva no banco de forma autônoma
+	memories, err := memRepo.ListByUser(userID, 10)
+	if err != nil {
+		t.Fatalf("failed to list memories: %v", err)
+	}
+	if len(memories) != 1 {
+		t.Fatalf("expected 1 autonomously learned memory, got %d", len(memories))
+	}
+	if memories[0].Content != "Gosta de estudar matemática" {
+		t.Errorf("unexpected content: %s", memories[0].Content)
+	}
+	if memories[0].Category != "preferência" {
+		t.Errorf("unexpected category: %s", memories[0].Category)
+	}
+
+	// Executa novamente com mesma memória: não deve duplicar
+	_, err = astSvc.Process(context.Background(), userID, ai.UserInput{
+		Text: "Estou lendo sobre matrizes em matemática",
+		Now:  time.Now().UTC(),
+	})
+	if err != nil {
+		t.Fatalf("expected nil error, got: %v", err)
+	}
+
+	memoriesAfter, _ := memRepo.ListByUser(userID, 10)
+	if len(memoriesAfter) != 1 {
+		t.Errorf("expected 1 memory without duplicates, got %d", len(memoriesAfter))
+	}
+}
+
+func TestAssistantService_PopulatesActiveTriggersInInput(t *testing.T) {
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "test_triggers_context.db")
+	db, err := database.Open(dbPath)
+	if err != nil {
+		t.Fatalf("failed to open test db: %v", err)
+	}
+	t.Cleanup(func() { db.Close() })
+
+	userRepo := repository.NewUserRepository(db)
+	trigRepo := repository.NewTriggerRepository(db)
+	trigSvc := service.NewTriggerService(trigRepo)
+
+	userID := "user-trig-ctx-1"
+	_ = userRepo.Create(&domain.User{
+		ID:           userID,
+		Name:         "André",
+		Email:        "andre@trigctx.local",
+		PasswordHash: "hash",
+		CreatedAt:    time.Now().UTC(),
+		UpdatedAt:    time.Now().UTC(),
+	})
+
+	_, err = trigSvc.CreateTrigger(userID, domain.CreateTriggerInput{
+		Title:         "PETR3 Alerta",
+		Category:      domain.CategoryFinance,
+		Query:         "PETR3 acima de R$ 35",
+		ScheduledTime: "15:30",
+		Frequency:     domain.FrequencyDailyMorning,
+	})
+	if err != nil {
+		t.Fatalf("failed to create trigger: %v", err)
+	}
+
+	mockAI := &mockAIGateway{
+		intent: &ai.ParsedIntent{
+			Action:  ai.ActionGeneralChat,
+			Message: "Estou monitorando suas ações conforme configurado.",
+		},
+	}
+
+	astSvc := service.NewAssistantService(mockAI, nil, nil, nil, trigSvc)
+
+	_, err = astSvc.Process(context.Background(), userID, ai.UserInput{
+		Text: "O que você está vigiando para mim?",
+		Now:  time.Now().UTC(),
+	})
+	if err != nil {
+		t.Fatalf("expected nil error, got: %v", err)
+	}
+
+	if len(mockAI.capturedInput.ActiveTriggers) == 0 {
+		t.Fatalf("expected ActiveTriggers to be populated in captured input, got 0")
+	}
+	if !strings.Contains(mockAI.capturedInput.ActiveTriggers[0], "PETR3 Alerta") {
+		t.Errorf("expected trigger title 'PETR3 Alerta', got: %s", mockAI.capturedInput.ActiveTriggers[0])
+	}
+}
+

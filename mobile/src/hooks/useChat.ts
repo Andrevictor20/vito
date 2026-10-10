@@ -150,7 +150,11 @@ export function useChat(onDataChanged?: () => void) {
       setLoading(true);
 
       try {
-        const res = await api.assistantChat(text.trim());
+        const recentHistory = messages.slice(-6).map((m) => ({
+          sender: m.sender === 'user' ? ('user' as const) : ('vito' as const),
+          text: m.text,
+        }));
+        const res = await api.assistantChat(text.trim(), { history: recentHistory });
         const vitoMsg: ChatMessage = {
           id: `vito-${Date.now()}`,
           sender: 'vito',
@@ -207,7 +211,11 @@ export function useChat(onDataChanged?: () => void) {
       setLoading(true);
 
       try {
-        const res = await api.assistantAudio(audioUri);
+        const recentHistory = messages.slice(-6).map((m) => ({
+          sender: m.sender === 'user' ? ('user' as const) : ('vito' as const),
+          text: m.text,
+        }));
+        const res = await api.assistantAudio(audioUri, 'audio.m4a', { history: recentHistory });
 
         // Substitui o placeholder com a transcrição real
         const transcriptText = (res as any).transcript

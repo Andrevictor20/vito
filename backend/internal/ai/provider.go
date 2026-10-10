@@ -20,18 +20,27 @@ const (
 	ActionOutOfScope    IntentAction = "OUT_OF_SCOPE"
 )
 
+// ChatMessageContext representa uma mensagem no histórico da conversa para contexto multi-turn.
+type ChatMessageContext struct {
+	Sender string `json:"sender"` // "user" ou "vito"
+	Text   string `json:"text"`
+}
+
 // UserInput encapsula a mensagem de entrada do usuário (texto ou áudio em base64).
 type UserInput struct {
-	Text            string    `json:"text,omitempty"`
-	AudioB64        string    `json:"audio_b64,omitempty"`
-	AudioMime       string    `json:"audio_mime,omitempty"`
-	ImageB64        string    `json:"image_b64,omitempty"`
-	ImageMime       string    `json:"image_mime,omitempty"`
-	Timezone        string    `json:"timezone,omitempty"` // ex: "America/Sao_Paulo"
-	Now             time.Time `json:"now"`
-	ContextMemories []string  `json:"context_memories,omitempty"` // RAG in-context pessoal
-	ActiveSchedule  []string  `json:"active_schedule,omitempty"`  // Próximos compromissos
-	PendingTodos    []string  `json:"pending_todos,omitempty"`    // Tarefas urgentes/pendentes
+	Text                string               `json:"text,omitempty"`
+	AudioB64            string               `json:"audio_b64,omitempty"`
+	AudioMime           string               `json:"audio_mime,omitempty"`
+	ImageB64            string               `json:"image_b64,omitempty"`
+	ImageMime           string               `json:"image_mime,omitempty"`
+	Timezone            string               `json:"timezone,omitempty"` // ex: "America/Sao_Paulo"
+	Now                 time.Time            `json:"now"`
+	ContextMemories     []string             `json:"context_memories,omitempty"`     // RAG in-context pessoal
+	ActiveSchedule      []string             `json:"active_schedule,omitempty"`      // Próximos compromissos
+	PendingTodos        []string             `json:"pending_todos,omitempty"`        // Tarefas urgentes/pendentes
+	ActiveTriggers      []string             `json:"active_triggers,omitempty"`      // Vigílias / disparadores em andamento
+	ConversationHistory []ChatMessageContext `json:"conversation_history,omitempty"` // Histórico recente da conversa multi-turn
+	UserName            string               `json:"user_name,omitempty"`            // Nome do usuário para personalização
 }
 
 // ParsedEvent dados extraídos para criação, atualização ou remoção de evento.
