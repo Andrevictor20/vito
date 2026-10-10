@@ -6,10 +6,14 @@ import {
   ScrollView,
   TouchableOpacity,
   Modal,
+  SafeAreaView,
+  Platform,
+  StatusBar as RNStatusBar,
   Share,
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens, MD3Shapes } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
@@ -402,7 +406,8 @@ export const WeeklySummariesView: React.FC<WeeklySummariesViewProps> = ({ onBack
           presentationStyle="pageSheet"
           onRequestClose={() => setSelectedSummary(null)}
         >
-          <View style={[styles.detailModalContainer, { backgroundColor: colors.surface }]}>
+          <StatusBar style={isDark ? 'light' : 'dark'} />
+          <SafeAreaView style={[styles.detailModalContainer, { backgroundColor: colors.surface }]}>
             {/* Modal TopBar */}
             <View style={styles.modalHeader}>
               <TouchableOpacity
@@ -600,7 +605,7 @@ export const WeeklySummariesView: React.FC<WeeklySummariesViewProps> = ({ onBack
                 </Text>
               </View>
             </ScrollView>
-          </View>
+          </SafeAreaView>
         </Modal>
       )}
     </View>
@@ -897,6 +902,7 @@ const styles = StyleSheet.create({
   },
   detailModalContainer: {
     flex: 1,
+    paddingTop: Platform.OS === 'android' ? Math.max((RNStatusBar.currentHeight || 0) + 6, 44) : 0,
   },
   modalHeader: {
     flexDirection: 'row',

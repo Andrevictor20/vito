@@ -107,7 +107,7 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
 const styles = StyleSheet.create({
   floatingWrapper: {
     position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 14 : 10,
+    bottom: Platform.OS === 'ios' ? 24 : 26,
     left: 0,
     right: 0,
     alignItems: 'center',

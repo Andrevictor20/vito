@@ -324,8 +324,8 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
             paddingBottom: isKeyboardOpen
               ? 8
               : Platform.OS === 'ios'
-              ? 64
-              : 58,
+              ? 76
+              : 74,
           },
           Platform.OS === 'android' && keyboardHeight > 0 && {
             marginBottom: keyboardHeight + 14,
