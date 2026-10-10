@@ -320,6 +320,13 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
       <View
         style={[
           styles.dockContainer,
+          {
+            paddingBottom: isKeyboardOpen
+              ? 8
+              : Platform.OS === 'ios'
+              ? 64
+              : 58,
+          },
           Platform.OS === 'android' && keyboardHeight > 0 && {
             marginBottom: keyboardHeight + 14,
           },

@@ -35,8 +35,6 @@ export const TriggerCard: React.FC<TriggerCardProps> = ({
   };
 
   const isActive = trigger.status === 'active';
-  const isTriggered = trigger.status === 'triggered';
-
   const categoryColor = isDark ? categoryMeta.colorDark : categoryMeta.colorLight;
   const categoryBg = isDark ? categoryMeta.bgDark : categoryMeta.bgLight;
 
@@ -72,11 +70,6 @@ export const TriggerCard: React.FC<TriggerCardProps> = ({
     }
   };
 
-  // Evita duplicar se a query for idêntica ao título
-  const hasDistinctQuery =
-    Boolean(trigger.query) &&
-    trigger.query.trim().toLowerCase() !== trigger.title.trim().toLowerCase();
-
   return (
     <TouchableOpacity
       style={[
@@ -88,24 +81,40 @@ export const TriggerCard: React.FC<TriggerCardProps> = ({
         },
       ]}
       onPress={() => onPress(trigger)}
-      activeOpacity={0.85}
+      activeOpacity={0.7}
       accessibilityLabel={`Radar ${trigger.title}. Toque para ver relatórios e histórico.`}
     >
-      {/* Top Header do Card: Categoria (Esquerda) & Ações (Direita) */}
-      <View style={styles.headerRow}>
-        <View style={styles.categoryBadgeRow}>
-          <View style={[styles.iconCircle, { backgroundColor: categoryBg }]}>
-            <MaterialIcons name={categoryMeta.icon as any} size={15} color={categoryColor} />
-          </View>
+      <View style={styles.contentRow}>
+        {/* Ícone da Categoria com container circular tonal */}
+        <View style={[styles.iconCircle, { backgroundColor: categoryBg }]}>
+          <MaterialIcons name={categoryMeta.icon as any} size={18} color={categoryColor} />
+        </View>
+
+        {/* Informações Centrais: Título + Linha de Meta (Categoria • Horário) */}
+        <View style={styles.textContainer}>
           <Text
-            style={[styles.categoryLabel, { color: categoryColor }]}
+            style={[styles.title, { color: colors.onSurface }]}
             numberOfLines={1}
             ellipsizeMode="tail"
           >
-            {categoryMeta.label}
+            {trigger.title}
           </Text>
+          <View style={styles.metaRow}>
+            <Text
+              style={[styles.categoryLabel, { color: categoryColor }]}
+              numberOfLines={1}
+            >
+              {categoryMeta.label}
+            </Text>
+            <Text style={[styles.metaDot, { color: colors.onSurfaceVariant }]}>•</Text>
+            <MaterialIcons name="schedule" size={11} color={colors.onSurfaceVariant} />
+            <Text style={[styles.timeText, { color: colors.onSurfaceVariant }]} numberOfLines={1}>
+              {getFrequencyLabel()}
+            </Text>
+          </View>
         </View>
 
+        {/* Ações Rápidas: Editar + Excluir + Switch On/Off + Seta */}
         <View style={styles.actionsRight}>
           <TouchableOpacity
             style={styles.actionIconButton}
@@ -116,7 +125,7 @@ export const TriggerCard: React.FC<TriggerCardProps> = ({
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityLabel="Editar radar"
           >
-            <MaterialIcons name="edit" size={17} color={isDark ? '#A1A1AA' : '#71717A'} />
+            <MaterialIcons name="edit" size={16} color={isDark ? '#A1A1AA' : '#71717A'} />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -130,7 +139,7 @@ export const TriggerCard: React.FC<TriggerCardProps> = ({
           >
             <MaterialIcons
               name="delete-outline"
-              size={18}
+              size={17}
               color={isDark ? '#71717A' : '#9CA3AF'}
             />
           </TouchableOpacity>
@@ -138,51 +147,14 @@ export const TriggerCard: React.FC<TriggerCardProps> = ({
           <View style={styles.switchWrapper}>
             <M3Switch value={isActive} onValueChange={() => onToggle(trigger.id)} />
           </View>
-        </View>
-      </View>
 
-      {/* Linha de Metadados: Horário / Frequência isolada (nunca colide com ações) */}
-      <View style={styles.metaRow}>
-        <View
-          style={[
-            styles.timePill,
-            { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' },
-          ]}
-        >
-          <MaterialIcons name="schedule" size={12} color={colors.onSurfaceVariant} />
-          <Text style={[styles.timePillText, { color: colors.onSurfaceVariant }]}>
-            {getFrequencyLabel()}
-          </Text>
+          <MaterialIcons
+            name="chevron-right"
+            size={18}
+            color={colors.onSurfaceVariant}
+            style={styles.chevron}
+          />
         </View>
-      </View>
-
-      {/* Título & Detalhes da Consulta */}
-      <View style={styles.body}>
-        <Text style={[styles.title, { color: colors.onSurface }]}>{trigger.title}</Text>
-        {hasDistinctQuery && (
-          <Text
-            style={[styles.queryText, { color: colors.onSurfaceVariant }]}
-            numberOfLines={2}
-          >
-            {trigger.query}
-          </Text>
-        )}
-      </View>
-
-      {/* Footer Minimalista: Atalho para Relatórios */}
-      <View
-        style={[
-          styles.footerRow,
-          { borderTopColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' },
-        ]}
-      >
-        <View style={styles.reportHintRow}>
-          <MaterialIcons name="history" size={15} color={colors.primary} />
-          <Text style={[styles.reportHintText, { color: colors.primary }]}>
-            Ver histórico e novidades
-          </Text>
-        </View>
-        <MaterialIcons name="chevron-right" size={18} color={colors.onSurfaceVariant} />
       </View>
     </TouchableOpacity>
   );
@@ -190,98 +162,73 @@ export const TriggerCard: React.FC<TriggerCardProps> = ({
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: MD3Shapes.largeIncreased,
-    padding: 16,
-    marginBottom: 12,
+    borderRadius: MD3Shapes.large,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 8,
     borderWidth: 1,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 1,
+    minHeight: 58,
+    justifyContent: 'center',
   },
-  headerRow: {
+  contentRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  categoryBadgeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    flexShrink: 1,
-    maxWidth: '65%',
   },
   iconCircle: {
-    width: 26,
-    height: 26,
+    width: 34,
+    height: 34,
     borderRadius: MD3Shapes.full,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  categoryLabel: {
-    fontSize: 11,
+  textContainer: {
+    flex: 1,
+    marginHorizontal: 10,
+    justifyContent: 'center',
+  },
+  title: {
+    fontSize: 14,
     fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-    flexShrink: 1,
+    letterSpacing: -0.2,
+    marginBottom: 2,
   },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
-  },
-  timePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: MD3Shapes.full,
     gap: 4,
   },
-  timePillText: {
+  categoryLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  metaDot: {
+    fontSize: 10,
+    opacity: 0.6,
+  },
+  timeText: {
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: '500',
   },
   actionsRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
   },
   actionIconButton: {
-    padding: 4,
+    padding: 3,
   },
   switchWrapper: {
     marginLeft: 2,
+    transform: [{ scale: 0.85 }],
   },
-  body: {
-    gap: 4,
-    marginBottom: 10,
-  },
-  title: {
-    fontSize: 16,
-    fontWeight: '700',
-    letterSpacing: -0.2,
-  },
-  queryText: {
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  footerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 10,
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  reportHintRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  reportHintText: {
-    fontSize: 12,
-    fontWeight: '600',
+  chevron: {
+    marginLeft: -2,
   },
 });

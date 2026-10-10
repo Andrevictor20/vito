@@ -82,3 +82,4 @@ docs/roadmap/
 # Sistema Operacional
 .DS_Store
 Thumbs.db
+*.apk

@@ -14,9 +14,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { tokens, MD3Shapes } from '../theme/tokens';
 import { FloatingTabBar } from '../components/common/FloatingTabBar';
 import { Header } from '../components/common/Header';
-import { HeroDayOverview } from '../components/home/HeroDayOverview';
-import { CompactCalendarCard } from '../components/calendar/CompactCalendarCard';
-import { CalendarModal } from '../components/calendar/CalendarModal';
+import { ExecutiveMonthCalendarCard } from '../components/home/ExecutiveMonthCalendarCard';
 import { EventCard } from '../components/calendar/EventCard';
 import { TodoItem } from '../components/todos/TodoItem';
 import { CreateItemModal } from '../components/calendar/CreateItemModal';
@@ -36,7 +34,6 @@ export const HomeScreen: React.FC<{
   const [activeTab, setActiveTab] = useState<'chat' | 'calendar' | 'triggers'>('chat');
   const [profileVisible, setProfileVisible] = useState(false);
   const [createModalVisible, setCreateModalVisible] = useState(false);
-  const [calendarModalVisible, setCalendarModalVisible] = useState(false);
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
@@ -91,6 +88,19 @@ export const HomeScreen: React.FC<{
     return todos.filter((t) => t.status === 'completed').length;
   }, [todos]);
 
+  // Modo de foco dedicado: 'events' vs 'todos' para eliminar rolagem infinita dupla
+  const [homeFocusMode, setHomeFocusMode] = useState<'events' | 'todos'>('events');
+  const [showCompletedTodos, setShowCompletedTodos] = useState(false);
+
+  const pendingTodos = useMemo(
+    () => todos.filter((t) => t.status !== 'completed'),
+    [todos]
+  );
+  const completedTodosList = useMemo(
+    () => todos.filter((t) => t.status === 'completed'),
+    [todos]
+  );
+
   return (
     <View style={[styles.container, { backgroundColor: colors.surface }]}>
       {/* Top App Bar Persistente M3 com transição suave e contínua */}
@@ -120,149 +130,297 @@ export const HomeScreen: React.FC<{
           <ScrollView
             style={[styles.scroll, { backgroundColor: colors.surface }]}
             contentContainerStyle={[styles.content, { backgroundColor: colors.surface }]}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={colors.primary}
-          />
-        }
-      >
-        {/* Hero Widget de Produtividade & Relógio */}
-        <HeroDayOverview
-          dayEvents={dayEvents}
-          totalTodos={todos.length}
-          completedTodos={completedCount}
-        />
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor={colors.primary}
+              />
+            }
+          >
+            {/* Mini Calendário Mensal Executivo & Resumo */}
+            <ExecutiveMonthCalendarCard
+              selectedDate={selectedDate}
+              onSelectDate={setSelectedDate}
+              dayEvents={dayEvents}
+              totalTodos={todos.length}
+              completedTodos={completedCount}
+              eventDates={eventDates}
+            />
 
-        {/* Card Compacto de Preview Semanal */}
-        <CompactCalendarCard
-          selectedDate={selectedDate}
-          onSelectDate={setSelectedDate}
-          onOpenFullCalendar={() => setCalendarModalVisible(true)}
-          eventDates={eventDates}
-        />
-
-        {/* Section: Eventos do dia selecionado */}
-        <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>
-            {isTodaySelected
-              ? 'Eventos de hoje'
-              : `Eventos de ${selectedDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`}
-          </Text>
-          <View style={[styles.countBadgePill, { backgroundColor: colors.primaryContainer }]}>
-            <Text style={[styles.countBadgeText, { color: colors.onPrimaryContainer }]}>
-              {dayEvents.length} {dayEvents.length === 1 ? 'evento' : 'eventos'}
-            </Text>
-          </View>
-        </View>
-
-        {loading && events.length === 0 ? (
-          <ActivityIndicator color={colors.primary} style={{ marginVertical: 20 }} />
-        ) : dayEvents.length === 0 ? (
-          <>
-            <View style={[styles.emptyCard, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
-              <View style={[styles.emptyIconContainer, { backgroundColor: colors.surfaceContainerHigh }]}>
-                <MaterialIcons name="event-available" size={20} color={colors.primary} />
-              </View>
-              <View style={styles.emptyContent}>
-                <Text style={[styles.emptyTitle, { color: colors.onSurface }]}>Dia Livre</Text>
-                <Text style={[styles.emptySub, { color: colors.onSurfaceVariant }]}>
-                  {isTodaySelected
-                    ? 'Nenhum compromisso marcado para hoje.'
-                    : `Nenhum compromisso marcado para ${selectedDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}.`}
+            {/* Seletor Segmentado de Foco: Eventos vs Tarefas (Elimina a Rolagem Infinita) */}
+            <View
+              style={[
+                styles.focusSegmentedContainer,
+                {
+                  backgroundColor: isDark ? colors.surfaceContainerLow : '#F4F4F5',
+                  borderColor: colors.outlineVariant,
+                },
+              ]}
+            >
+              <TouchableOpacity
+                style={[
+                  styles.focusSegmentBtn,
+                  homeFocusMode === 'events' && [
+                    styles.focusSegmentBtnActive,
+                    { backgroundColor: isDark ? colors.surfaceContainerHighest : colors.primary },
+                  ],
+                ]}
+                onPress={() => setHomeFocusMode('events')}
+                activeOpacity={0.75}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: homeFocusMode === 'events' }}
+              >
+                <MaterialIcons
+                  name="event"
+                  size={16}
+                  color={
+                    homeFocusMode === 'events'
+                      ? (isDark ? colors.onSurface : colors.onPrimary)
+                      : colors.onSurfaceVariant
+                  }
+                />
+                <Text
+                  style={[
+                    styles.focusSegmentText,
+                    {
+                      color:
+                        homeFocusMode === 'events'
+                          ? (isDark ? colors.onSurface : colors.onPrimary)
+                          : colors.onSurfaceVariant,
+                      fontWeight: homeFocusMode === 'events' ? '700' : '500',
+                    },
+                  ]}
+                >
+                  Eventos ({dayEvents.length})
                 </Text>
-              </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.focusSegmentBtn,
+                  homeFocusMode === 'todos' && [
+                    styles.focusSegmentBtnActive,
+                    { backgroundColor: isDark ? colors.surfaceContainerHighest : colors.primary },
+                  ],
+                ]}
+                onPress={() => setHomeFocusMode('todos')}
+                activeOpacity={0.75}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: homeFocusMode === 'todos' }}
+              >
+                <MaterialIcons
+                  name="check-circle-outline"
+                  size={16}
+                  color={
+                    homeFocusMode === 'todos'
+                      ? (isDark ? colors.onSurface : colors.onPrimary)
+                      : colors.onSurfaceVariant
+                  }
+                />
+                <Text
+                  style={[
+                    styles.focusSegmentText,
+                    {
+                      color:
+                        homeFocusMode === 'todos'
+                          ? (isDark ? colors.onSurface : colors.onPrimary)
+                          : colors.onSurfaceVariant,
+                      fontWeight: homeFocusMode === 'todos' ? '700' : '500',
+                    },
+                  ]}
+                >
+                  Tarefas ({pendingTodos.length})
+                </Text>
+              </TouchableOpacity>
             </View>
 
-            {/* Próximos compromissos na agenda quando o dia atual estiver livre */}
-            {upcomingEvents.length > 0 && (
-              <View style={{ marginTop: tokens.spacing.md }}>
-                <View style={[styles.sectionHeader, { marginBottom: tokens.spacing.sm }]}>
-                  <Text style={[styles.sectionTitle, { fontSize: tokens.typography.size.titleSmall, color: colors.onSurface }]}>
-                    Próximos compromissos na agenda
+            {/* Visualização de Eventos com Foco Dedicado */}
+            {homeFocusMode === 'events' ? (
+              <View style={styles.focusSectionContainer}>
+                <View style={styles.sectionHeader}>
+                  <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>
+                    {isTodaySelected
+                      ? 'Eventos de hoje'
+                      : `Eventos de ${selectedDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`}
                   </Text>
-                  <View style={[styles.countBadgePill, { backgroundColor: colors.surfaceContainerHighest }]}>
-                    <Text style={[styles.countBadgeText, { color: colors.onSurface }]}>
-                      {upcomingEvents.length} no total
+                  <View style={[styles.countBadgePill, { backgroundColor: colors.primaryContainer }]}>
+                    <Text style={[styles.countBadgeText, { color: colors.onPrimaryContainer }]}>
+                      {dayEvents.length} {dayEvents.length === 1 ? 'evento' : 'eventos'}
                     </Text>
                   </View>
                 </View>
-                {upcomingEvents.slice(0, 5).map((ev) => (
-                  <EventCard
-                    key={ev.id}
-                    event={ev}
-                    onDelete={handleDeleteEvent}
-                    onPress={(item) => {
-                      setEditingEvent(item);
-                      setEditModalVisible(true);
-                    }}
-                    onRequestDelete={(item) => {
-                      setEditingEvent(item);
-                      setEditModalVisible(true);
-                    }}
-                  />
-                ))}
+
+                {loading && events.length === 0 ? (
+                  <ActivityIndicator color={colors.primary} style={{ marginVertical: 20 }} />
+                ) : dayEvents.length === 0 ? (
+                  <>
+                    <View style={[styles.emptyCard, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
+                      <View style={[styles.emptyIconContainer, { backgroundColor: colors.surfaceContainerHigh }]}>
+                        <MaterialIcons name="event-available" size={20} color={colors.primary} />
+                      </View>
+                      <View style={styles.emptyContent}>
+                        <Text style={[styles.emptyTitle, { color: colors.onSurface }]}>Dia Livre</Text>
+                        <Text style={[styles.emptySub, { color: colors.onSurfaceVariant }]}>
+                          {isTodaySelected
+                            ? 'Nenhum compromisso marcado para hoje.'
+                            : `Nenhum compromisso marcado para ${selectedDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}.`}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Próximos compromissos na agenda quando o dia atual estiver livre */}
+                    {upcomingEvents.length > 0 && (
+                      <View style={{ marginTop: tokens.spacing.md }}>
+                        <View style={[styles.sectionHeader, { marginBottom: tokens.spacing.sm }]}>
+                          <Text style={[styles.sectionTitle, { fontSize: tokens.typography.size.titleSmall, color: colors.onSurface }]}>
+                            Próximos compromissos na agenda
+                          </Text>
+                          <View style={[styles.countBadgePill, { backgroundColor: colors.surfaceContainerHighest }]}>
+                            <Text style={[styles.countBadgeText, { color: colors.onSurface }]}>
+                              {upcomingEvents.length} no total
+                            </Text>
+                          </View>
+                        </View>
+                        {upcomingEvents.slice(0, 5).map((ev) => (
+                          <EventCard
+                            key={ev.id}
+                            event={ev}
+                            onDelete={handleDeleteEvent}
+                            onPress={(item) => {
+                              setEditingEvent(item);
+                              setEditModalVisible(true);
+                            }}
+                            onRequestDelete={(item) => {
+                              setEditingEvent(item);
+                              setEditModalVisible(true);
+                            }}
+                          />
+                        ))}
+                      </View>
+                    )}
+                  </>
+                ) : (
+                  dayEvents.map((ev) => (
+                    <EventCard
+                      key={ev.id}
+                      event={ev}
+                      onDelete={handleDeleteEvent}
+                      onPress={(item) => {
+                        setEditingEvent(item);
+                        setEditModalVisible(true);
+                      }}
+                      onRequestDelete={(item) => {
+                        setEditingEvent(item);
+                        setEditModalVisible(true);
+                      }}
+                    />
+                  ))
+                )}
+              </View>
+            ) : (
+              /* Visualização de Tarefas com Foco Dedicado e Gaveta de Concluídas */
+              <View style={styles.focusSectionContainer}>
+                <View style={styles.sectionHeader}>
+                  <View>
+                    <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>Tarefas e Pendências</Text>
+                    <Text style={[styles.checklistSubtitle, { color: colors.textMuted }]}>
+                      {completedCount}/{todos.length} concluídas
+                    </Text>
+                  </View>
+                </View>
+
+                {loading && todos.length === 0 ? (
+                  <ActivityIndicator color={colors.primary} style={{ marginVertical: 20 }} />
+                ) : pendingTodos.length === 0 ? (
+                  <View style={[styles.emptyCard, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
+                    <View style={[styles.emptyIconContainer, { backgroundColor: 'rgba(52, 211, 153, 0.15)' }]}>
+                      <MaterialIcons name="done-all" size={20} color={colors.success} />
+                    </View>
+                    <View style={styles.emptyContent}>
+                      <Text style={[styles.emptyTitle, { color: colors.onSurface }]}>Tudo em Dia</Text>
+                      <Text style={[styles.emptySub, { color: colors.onSurfaceVariant }]}>Nenhuma tarefa pendente no momento.</Text>
+                    </View>
+                  </View>
+                ) : (
+                  <View style={[styles.checklistCard, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant, borderWidth: 1 }]}>
+                    {pendingTodos.map((t, idx) => (
+                      <TodoItem
+                        key={t.id}
+                        todo={t}
+                        onToggle={handleToggleTodo}
+                        onDelete={handleDeleteTodo}
+                        onToggleSubtask={handleToggleSubtask}
+                        onAddSubtask={handleAddSubtask}
+                        onDeleteSubtask={handleDeleteSubtask}
+                        isLast={idx === pendingTodos.length - 1}
+                        grouped
+                      />
+                    ))}
+                  </View>
+                )}
+
+                {/* Gaveta Colapsável de Concluídas (Zero-Slop List) */}
+                {completedTodosList.length > 0 && (
+                  <View style={styles.completedSectionWrapper}>
+                    <TouchableOpacity
+                      style={[
+                        styles.completedSectionToggle,
+                        {
+                          backgroundColor: isDark ? colors.surfaceContainerLow : '#F4F4F5',
+                          borderColor: colors.outlineVariant,
+                        },
+                      ]}
+                      onPress={() => setShowCompletedTodos(!showCompletedTodos)}
+                      activeOpacity={0.7}
+                      accessibilityRole="button"
+                      accessibilityLabel="Alternar visualização de tarefas concluídas"
+                    >
+                      <View style={styles.completedToggleLeft}>
+                        <MaterialIcons name="done-all" size={16} color={colors.accents.emerald} />
+                        <Text style={[styles.completedToggleText, { color: colors.onSurfaceVariant }]}>
+                          Concluídas ({completedTodosList.length})
+                        </Text>
+                      </View>
+                      <MaterialIcons
+                        name={showCompletedTodos ? 'expand-less' : 'expand-more'}
+                        size={20}
+                        color={colors.onSurfaceVariant}
+                      />
+                    </TouchableOpacity>
+
+                    {showCompletedTodos && (
+                      <View
+                        style={[
+                          styles.checklistCard,
+                          {
+                            backgroundColor: colors.surfaceContainer,
+                            borderColor: colors.outlineVariant,
+                            borderWidth: 1,
+                            marginTop: 8,
+                            opacity: 0.85,
+                          },
+                        ]}
+                      >
+                        {completedTodosList.map((t, idx) => (
+                          <TodoItem
+                            key={t.id}
+                            todo={t}
+                            onToggle={handleToggleTodo}
+                            onDelete={handleDeleteTodo}
+                            onToggleSubtask={handleToggleSubtask}
+                            onAddSubtask={handleAddSubtask}
+                            onDeleteSubtask={handleDeleteSubtask}
+                            isLast={idx === completedTodosList.length - 1}
+                            grouped
+                          />
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                )}
               </View>
             )}
-          </>
-        ) : (
-          dayEvents.map((ev) => (
-            <EventCard
-              key={ev.id}
-              event={ev}
-              onDelete={handleDeleteEvent}
-              onPress={(item) => {
-                setEditingEvent(item);
-                setEditModalVisible(true);
-              }}
-              onRequestDelete={(item) => {
-                setEditingEvent(item);
-                setEditModalVisible(true);
-              }}
-            />
-          ))
-        )}
-
-        {/* Section: Checklist de tarefas */}
-        <View style={[styles.sectionHeader, { marginTop: tokens.spacing.lg }]}>
-          <View>
-            <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>Tarefas e Pendências</Text>
-            <Text style={[styles.checklistSubtitle, { color: colors.textMuted }]}>
-              {completedCount}/{todos.length} concluídos
-            </Text>
-          </View>
-        </View>
-
-        {loading && todos.length === 0 ? (
-          <ActivityIndicator color={colors.primary} style={{ marginVertical: 20 }} />
-        ) : todos.length === 0 ? (
-          <View style={[styles.emptyCard, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
-            <View style={[styles.emptyIconContainer, { backgroundColor: 'rgba(52, 211, 153, 0.15)' }]}>
-              <MaterialIcons name="done-all" size={20} color={colors.success} />
-            </View>
-            <View style={styles.emptyContent}>
-              <Text style={[styles.emptyTitle, { color: colors.onSurface }]}>Tudo em Dia</Text>
-              <Text style={[styles.emptySub, { color: colors.onSurfaceVariant }]}>Nenhuma tarefa pendente no momento.</Text>
-            </View>
-          </View>
-        ) : (
-          <View style={[styles.checklistCard, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant, borderWidth: 1 }]}>
-            {todos.map((t, idx) => (
-              <TodoItem
-                key={t.id}
-                todo={t}
-                onToggle={handleToggleTodo}
-                onDelete={handleDeleteTodo}
-                onToggleSubtask={handleToggleSubtask}
-                onAddSubtask={handleAddSubtask}
-                onDeleteSubtask={handleDeleteSubtask}
-                isLast={idx === todos.length - 1}
-                grouped
-              />
-            ))}
-          </View>
-        )}
 
         {/* Botão de Criação Rápida */}
         <View style={styles.createBtnWrapper}>
@@ -316,22 +474,7 @@ export const HomeScreen: React.FC<{
             onDelete={handleDeleteEvent}
           />
 
-          <CalendarModal
-            visible={calendarModalVisible}
-            onClose={() => setCalendarModalVisible(false)}
-            events={events}
-            selectedDate={selectedDate}
-            onSelectDate={(d) => setSelectedDate(d)}
-            onOpenCreate={() => setCreateModalVisible(true)}
-            onDeleteEvent={handleDeleteEvent}
-            onUpdateEvent={handleUpdateEvent}
-            todos={todos}
-            onToggleTodo={handleToggleTodo}
-            onDeleteTodo={handleDeleteTodo}
-            onRefresh={() => loadData(false)}
-            onSyncGoogle={syncGoogleCalendar}
-            isSyncingGoogle={syncingGoogle}
-          />
+
         </Animated.View>
 
         {/* Camada 2: Chat com IA */}
@@ -414,6 +557,9 @@ const styles = StyleSheet.create({
   content: {
     padding: tokens.spacing.lg,
     paddingBottom: 100,
+    maxWidth: 640,
+    width: '100%',
+    alignSelf: 'center',
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -506,5 +652,54 @@ const styles = StyleSheet.create({
     fontSize: tokens.typography.size.labelLarge,
     fontWeight: tokens.typography.weight.bold,
     letterSpacing: 0.2,
+  },
+  focusSegmentedContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: MD3Shapes.full,
+    borderWidth: 1,
+    padding: 3,
+    marginTop: tokens.spacing.md,
+    marginBottom: tokens.spacing.md,
+    gap: 4,
+  },
+  focusSegmentBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    borderRadius: MD3Shapes.full,
+    gap: 6,
+  },
+  focusSegmentBtnActive: {
+    ...tokens.shadows.level1,
+  },
+  focusSegmentText: {
+    fontSize: tokens.typography.size.labelMedium,
+  },
+  focusSectionContainer: {
+    marginBottom: tokens.spacing.sm,
+  },
+  completedSectionWrapper: {
+    marginTop: tokens.spacing.md,
+  },
+  completedSectionToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: MD3Shapes.large,
+    borderWidth: 1,
+  },
+  completedToggleLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  completedToggleText: {
+    fontSize: tokens.typography.size.labelMedium,
+    fontWeight: tokens.typography.weight.bold,
   },
 });

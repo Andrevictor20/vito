@@ -446,11 +446,11 @@ export const CreateTriggerModal: React.FC<CreateTriggerModalProps> = ({
               disabled={submitting}
             >
               {submitting ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
+                <ActivityIndicator size="small" color={colors.onPrimary} />
               ) : (
                 <>
-                  <MaterialIcons name="add" size={18} color="#FFFFFF" />
-                  <Text style={styles.saveButtonText}>Criar Radar</Text>
+                  <MaterialIcons name="add" size={18} color={colors.onPrimary} />
+                  <Text style={[styles.saveButtonText, { color: colors.onPrimary }]}>Criar Radar</Text>
                 </>
               )}
             </TouchableOpacity>

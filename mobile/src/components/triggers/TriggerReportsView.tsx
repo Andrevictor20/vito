@@ -301,13 +301,13 @@ export const TriggerReportsView: React.FC<TriggerReportsViewProps> = ({
                 >
                   {runningNow ? (
                     <>
-                      <ActivityIndicator size="small" color="#FFFFFF" />
-                      <Text style={styles.runPrimaryButtonText}>Pesquisando e avaliando...</Text>
+                      <ActivityIndicator size="small" color={colors.onPrimary} />
+                      <Text style={[styles.runPrimaryButtonText, { color: colors.onPrimary }]}>Pesquisando e avaliando...</Text>
                     </>
                   ) : (
                     <>
-                      <MaterialIcons name="play-arrow" size={20} color="#FFFFFF" />
-                      <Text style={styles.runPrimaryButtonText}>Verificar Agora</Text>
+                      <MaterialIcons name="play-arrow" size={20} color={colors.onPrimary} />
+                      <Text style={[styles.runPrimaryButtonText, { color: colors.onPrimary }]}>Verificar Agora</Text>
                     </>
                   )}
                 </TouchableOpacity>

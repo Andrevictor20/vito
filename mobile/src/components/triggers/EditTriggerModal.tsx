@@ -338,11 +338,11 @@ export const EditTriggerModal: React.FC<EditTriggerModalProps> = ({
               disabled={saving}
             >
               {saving ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
+                <ActivityIndicator size="small" color={colors.onPrimary} />
               ) : (
                 <>
-                  <MaterialIcons name="check" size={18} color="#FFFFFF" />
-                  <Text style={styles.saveButtonText}>Salvar Alterações</Text>
+                  <MaterialIcons name="check" size={18} color={colors.onPrimary} />
+                  <Text style={[styles.saveButtonText, { color: colors.onPrimary }]}>Salvar Alterações</Text>
                 </>
               )}
             </TouchableOpacity>

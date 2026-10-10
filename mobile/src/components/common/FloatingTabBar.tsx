@@ -19,184 +19,125 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
 
   if (!visible) return null;
 
-  const inactiveColor = isDark ? '#A1A1AA' : '#71717A';
-  const activeColor = isDark ? '#FFFFFF' : '#111111';
-
   return (
-    <View
-      style={[
-        styles.navBar,
-        {
-          backgroundColor: isDark ? colors.surface : '#FFFFFF',
-          borderTopColor: colors.outlineVariant,
-        },
-      ]}
-      accessibilityRole="tablist"
-    >
-      {/* Item 1: Chat IA */}
-      <TouchableOpacity
-        style={styles.navItem}
-        onPress={() => onSelectTab('chat')}
-        activeOpacity={0.7}
-        accessibilityRole="tab"
-        accessibilityState={{ selected: activeTab === 'chat' }}
-        accessibilityLabel="Aba Chat com Vito"
+    <View style={styles.floatingWrapper} pointerEvents="box-none">
+      <View
+        style={[
+          styles.dockPill,
+          {
+            backgroundColor: isDark ? 'rgba(24, 24, 27, 0.92)' : 'rgba(255, 255, 255, 0.92)',
+            borderColor: colors.outlineVariant,
+          },
+        ]}
+        accessibilityRole="tablist"
       >
-        <View
+        {/* Item 1: Chat IA */}
+        <TouchableOpacity
           style={[
-            styles.indicatorBox,
+            styles.tabButton,
             activeTab === 'chat' && [
-              styles.indicatorSelected,
-              {
-                backgroundColor: isDark ? colors.surfaceContainerHighest : colors.primary,
-                ...(isDark
-                  ? { borderWidth: 1, borderColor: colors.outlineVariant }
-                  : { borderWidth: 0 }),
-              },
+              styles.tabButtonActive,
+              { backgroundColor: isDark ? colors.surfaceContainerHighest : colors.primary },
             ],
           ]}
+          onPress={() => onSelectTab('chat')}
+          activeOpacity={0.7}
+          hitSlop={tokens.hitSlop.sm}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: activeTab === 'chat' }}
+          accessibilityLabel="Aba Chat com Vito"
         >
           <MaterialIcons
             name={activeTab === 'chat' ? 'chat' : 'chat-bubble-outline'}
-            size={22}
-            color={activeTab === 'chat' ? '#FFFFFF' : inactiveColor}
+            size={20}
+            color={activeTab === 'chat' ? (isDark ? colors.onSurface : colors.onPrimary) : colors.onSurfaceVariant}
           />
-        </View>
-        <Text
-          style={[
-            styles.navLabel,
-            {
-              color: activeTab === 'chat' ? activeColor : inactiveColor,
-              fontWeight: activeTab === 'chat' ? '700' : '500',
-            },
-          ]}
-        >
-          Chat
-        </Text>
-      </TouchableOpacity>
+        </TouchableOpacity>
 
-      {/* Item 2: Calendário & Tarefas */}
-      <TouchableOpacity
-        style={styles.navItem}
-        onPress={() => onSelectTab('calendar')}
-        activeOpacity={0.7}
-        accessibilityRole="tab"
-        accessibilityState={{ selected: activeTab === 'calendar' }}
-        accessibilityLabel="Aba Calendário e Tarefas"
-      >
-        <View
+        {/* Item 2: Calendário & Tarefas */}
+        <TouchableOpacity
           style={[
-            styles.indicatorBox,
+            styles.tabButton,
             activeTab === 'calendar' && [
-              styles.indicatorSelected,
-              {
-                backgroundColor: isDark ? colors.surfaceContainerHighest : colors.primary,
-                ...(isDark
-                  ? { borderWidth: 1, borderColor: colors.outlineVariant }
-                  : { borderWidth: 0 }),
-              },
+              styles.tabButtonActive,
+              { backgroundColor: isDark ? colors.surfaceContainerHighest : colors.primary },
             ],
           ]}
+          onPress={() => onSelectTab('calendar')}
+          activeOpacity={0.7}
+          hitSlop={tokens.hitSlop.sm}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: activeTab === 'calendar' }}
+          accessibilityLabel="Aba Calendário e Tarefas"
         >
           <MaterialIcons
-            name="event"
-            size={24}
-            color={activeTab === 'calendar' ? '#FFFFFF' : inactiveColor}
+            name={activeTab === 'calendar' ? 'event' : 'calendar-today'}
+            size={20}
+            color={activeTab === 'calendar' ? (isDark ? colors.onSurface : colors.onPrimary) : colors.onSurfaceVariant}
           />
-        </View>
-        <Text
-          style={[
-            styles.navLabel,
-            {
-              color: activeTab === 'calendar' ? activeColor : inactiveColor,
-              fontWeight: activeTab === 'calendar' ? '700' : '500',
-            },
-          ]}
-        >
-          Calendário
-        </Text>
-      </TouchableOpacity>
+        </TouchableOpacity>
 
-      {/* Item 3: Radares (Acompanhamento Proativo) */}
-      <TouchableOpacity
-        style={styles.navItem}
-        onPress={() => onSelectTab('triggers')}
-        activeOpacity={0.7}
-        accessibilityRole="tab"
-        accessibilityState={{ selected: activeTab === 'triggers' }}
-        accessibilityLabel="Aba Radares e Alertas"
-      >
-        <View
+        {/* Item 3: Radares */}
+        <TouchableOpacity
           style={[
-            styles.indicatorBox,
+            styles.tabButton,
             activeTab === 'triggers' && [
-              styles.indicatorSelected,
-              {
-                backgroundColor: isDark ? colors.surfaceContainerHighest : colors.primary,
-                ...(isDark
-                  ? { borderWidth: 1, borderColor: colors.outlineVariant }
-                  : { borderWidth: 0 }),
-              },
+              styles.tabButtonActive,
+              { backgroundColor: isDark ? colors.surfaceContainerHighest : colors.primary },
             ],
           ]}
+          onPress={() => onSelectTab('triggers')}
+          activeOpacity={0.7}
+          hitSlop={tokens.hitSlop.sm}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: activeTab === 'triggers' }}
+          accessibilityLabel="Aba Radares e Alertas"
         >
           <MaterialIcons
             name={activeTab === 'triggers' ? 'radar' : 'track-changes'}
-            size={23}
-            color={activeTab === 'triggers' ? '#FFFFFF' : inactiveColor}
+            size={20}
+            color={activeTab === 'triggers' ? (isDark ? colors.onSurface : colors.onPrimary) : colors.onSurfaceVariant}
           />
-        </View>
-        <Text
-          style={[
-            styles.navLabel,
-            {
-              color: activeTab === 'triggers' ? activeColor : inactiveColor,
-              fontWeight: activeTab === 'triggers' ? '700' : '500',
-            },
-          ]}
-        >
-          Radares
-        </Text>
-      </TouchableOpacity>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  // Barra de Navegação M3 Canônica Ancorada na Base
-  navBar: {
-    width: '100%',
+  floatingWrapper: {
+    position: 'absolute',
+    bottom: Platform.OS === 'ios' ? 14 : 10,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 99,
+  },
+  dockPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-around',
-    backgroundColor: tokens.colors.surfaceContainer,
-    borderTopWidth: 1,
-    borderTopColor: tokens.colors.outlineVariant,
-    paddingTop: 8,
-    paddingBottom: Platform.OS === 'ios' ? 24 : 12,
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 28,
+    borderWidth: 1,
+    gap: 8,
+    elevation: 8,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.14,
+    shadowRadius: 10,
   },
-  navItem: {
+  tabButton: {
+    width: 44,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    minWidth: 90,
-    minHeight: 48,
-    paddingVertical: 2,
   },
-  // Indicador M3: Container transparente quando inativo (sem clipping), pílula oval 64x32dp quando ativo
-  indicatorBox: {
-    width: 64,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 4,
-  },
-  indicatorSelected: {
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  navLabel: {
-    fontSize: tokens.typography.size.labelMedium,
-    letterSpacing: 0.3,
+  tabButtonActive: {
+    elevation: 2,
   },
 });
 

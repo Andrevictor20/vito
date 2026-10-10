@@ -60,7 +60,7 @@ export const Header: React.FC<HeaderProps> = ({
   title = 'Agenda & Tarefas',
   subtitle = 'Organização Pessoal',
   showMascot = true,
-  mascotSize = 34,
+  mascotSize = 28,
   mascotState = 'idle',
   showStatusDot = false,
   statusColor,
@@ -291,9 +291,9 @@ export const Header: React.FC<HeaderProps> = ({
 export const TopAppBar = Header;
 
 const styles = StyleSheet.create({
-  // M3 Top App Bar: 62dp de altura, alinhamento canônico, borda outlineVariant sutil
+  // Top App Bar Compacta: 50dp de altura para maior respiro vertical
   header: {
-    height: 62,
+    height: 50,
     justifyContent: 'center',
     paddingHorizontal: tokens.spacing.md,
     backgroundColor: tokens.colors.surface,
@@ -306,14 +306,14 @@ const styles = StyleSheet.create({
   brandRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
     flexShrink: 1,
   },
   titleColumn: {
-    minHeight: 44,
+    minHeight: 38,
     justifyContent: 'center',
     position: 'relative',
-    minWidth: 155,
+    minWidth: 145,
   },
   titleCrossfadeLayer: {
     position: 'absolute',
@@ -326,48 +326,48 @@ const styles = StyleSheet.create({
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
   },
   brand: {
-    fontSize: 18,
-    lineHeight: 22,
+    fontSize: 16,
+    lineHeight: 20,
     fontWeight: '700',
-    letterSpacing: -0.4,
+    letterSpacing: -0.3,
   },
   brandSubtitle: {
-    fontSize: 11,
-    lineHeight: 15,
+    fontSize: 10,
+    lineHeight: 13,
     fontWeight: '500',
-    letterSpacing: 0.2,
-    marginTop: 1,
-    paddingBottom: 2,
+    letterSpacing: 0.1,
+    marginTop: 0,
+    paddingBottom: 1,
   },
   statusDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
   actionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
   },
   chatActionsGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
   },
   actionBtn: {
-    width: 38,
-    height: 38,
+    width: 32,
+    height: 32,
     borderRadius: MD3Shapes.full,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   userAvatar: {
-    width: 38,
-    height: 38,
+    width: 32,
+    height: 32,
     borderRadius: MD3Shapes.full,
     borderWidth: 1,
     alignItems: 'center',
@@ -375,6 +375,6 @@ const styles = StyleSheet.create({
   },
   avatarText: {
     fontWeight: '700',
-    fontSize: 14,
+    fontSize: 12,
   },
 });
