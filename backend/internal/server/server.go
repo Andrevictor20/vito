@@ -29,6 +29,7 @@ type Server struct {
 	briefingHandler   *handler.BriefingHandler
 	aiSettingsHandler *handler.AISettingsHandler
 	pendingHandler    *handler.PendingHandler
+	bookingHandler    *handler.BookingHandler
 	authSvc           *service.AuthService
 }
 
@@ -45,6 +46,7 @@ type Config struct {
 	BriefingHandler   *handler.BriefingHandler
 	AISettingsHandler *handler.AISettingsHandler
 	PendingHandler    *handler.PendingHandler
+	BookingHandler    *handler.BookingHandler
 	AuthSvc           *service.AuthService
 }
 
@@ -66,6 +68,7 @@ func New(cfg ...Config) *Server {
 		s.briefingHandler = cfg[0].BriefingHandler
 		s.aiSettingsHandler = cfg[0].AISettingsHandler
 		s.pendingHandler = cfg[0].PendingHandler
+		s.bookingHandler = cfg[0].BookingHandler
 		s.authSvc = cfg[0].AuthSvc
 	}
 
@@ -102,6 +105,16 @@ func (s *Server) registerRoutes() {
 	s.router.Get("/healthz", s.handleHealthCheck)
 	s.router.Get("/privacy", s.handlePrivacyPolicy)
 	s.router.Get("/terms", s.handleTermsOfService)
+
+	bookingLimiter := middleware.NewRateLimiter(60, 1*time.Minute)
+	if s.bookingHandler != nil {
+		s.router.Group(func(pub chi.Router) {
+			pub.Use(bookingLimiter)
+			pub.Get("/book/{username}/{slug}", s.bookingHandler.ServePublicPage)
+			pub.Get("/api/public/book/{username}/{slug}/slots", s.bookingHandler.GetPublicSlots)
+			pub.Post("/api/public/book/{username}/{slug}/reserve", s.bookingHandler.ReservePublicSlot)
+		})
+	}
 
 	authLimiter := middleware.NewRateLimiter(10, 1*time.Minute)
 	aiLimiter := middleware.NewRateLimiter(30, 1*time.Minute)
@@ -217,6 +230,16 @@ func (s *Server) registerRoutes() {
 						pr.Post("/{id}/schedule", s.pendingHandler.SchedulePending)
 						pr.Post("/{id}/complete", s.pendingHandler.CompletePending)
 						pr.Delete("/{id}", s.pendingHandler.DeletePending)
+					})
+				}
+
+				if s.bookingHandler != nil {
+					protected.Route("/booking", func(br chi.Router) {
+						br.Get("/types", s.bookingHandler.ListTypes)
+						br.Post("/types", s.bookingHandler.CreateType)
+						br.Put("/types/{id}", s.bookingHandler.UpdateType)
+						br.Delete("/types/{id}", s.bookingHandler.DeleteType)
+						br.Get("/appointments", s.bookingHandler.ListAppointments)
 					})
 				}
 			})

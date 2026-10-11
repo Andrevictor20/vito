@@ -238,6 +238,46 @@ func runMigrations(db *sql.DB) error {
 
 	CREATE INDEX IF NOT EXISTS idx_pending_items_user_status ON pending_items(user_id, status);
 	CREATE INDEX IF NOT EXISTS idx_pending_items_user_date ON pending_items(user_id, scheduled_date);
+
+	CREATE TABLE IF NOT EXISTS booking_types (
+		id TEXT PRIMARY KEY,
+		user_id TEXT NOT NULL,
+		slug TEXT NOT NULL,
+		title TEXT NOT NULL,
+		description TEXT,
+		duration_minutes INTEGER NOT NULL DEFAULT 30,
+		buffer_minutes INTEGER NOT NULL DEFAULT 10,
+		days_of_week TEXT NOT NULL DEFAULT '[1,2,3,4,5]',
+		start_hour TEXT NOT NULL DEFAULT '09:00',
+		end_hour TEXT NOT NULL DEFAULT '18:00',
+		is_active BOOLEAN NOT NULL DEFAULT 1,
+		created_at DATETIME NOT NULL,
+		updated_at DATETIME NOT NULL,
+		FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+	);
+
+	CREATE UNIQUE INDEX IF NOT EXISTS idx_booking_types_user_slug ON booking_types(user_id, slug);
+	CREATE INDEX IF NOT EXISTS idx_booking_types_user ON booking_types(user_id);
+
+	CREATE TABLE IF NOT EXISTS booking_appointments (
+		id TEXT PRIMARY KEY,
+		booking_type_id TEXT NOT NULL,
+		user_id TEXT NOT NULL,
+		guest_name TEXT NOT NULL,
+		guest_email TEXT NOT NULL,
+		guest_notes TEXT,
+		start_at DATETIME NOT NULL,
+		end_at DATETIME NOT NULL,
+		status TEXT NOT NULL DEFAULT 'confirmed',
+		event_id TEXT,
+		created_at DATETIME NOT NULL,
+		FOREIGN KEY(booking_type_id) REFERENCES booking_types(id) ON DELETE CASCADE,
+		FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+		FOREIGN KEY(event_id) REFERENCES events(id) ON DELETE SET NULL
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_booking_appts_user_time ON booking_appointments(user_id, start_at, end_at);
+	CREATE INDEX IF NOT EXISTS idx_booking_appts_type ON booking_appointments(booking_type_id);
 	`
 
 	if _, err := db.Exec(schema); err != nil {

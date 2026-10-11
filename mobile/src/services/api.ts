@@ -21,6 +21,9 @@ import {
   PendingStatus,
   CreatePendingInput,
   UpdatePendingInput,
+  BookingType,
+  BookingAppointment,
+  CreateBookingTypeInput,
 } from '../types';
 
 let FileSystemModule: any = null;
@@ -763,6 +766,38 @@ class ApiService {
     await this.request<void>(`/api/v1/pending/${id}`, {
       method: 'DELETE',
     });
+  }
+
+  // ==========================================
+  // Vito Booking (Sprint 10)
+  // ==========================================
+
+  async getBookingTypes(): Promise<BookingType[]> {
+    return this.request<BookingType[]>('/api/v1/booking/types');
+  }
+
+  async createBookingType(data: CreateBookingTypeInput): Promise<BookingType> {
+    return this.request<BookingType>('/api/v1/booking/types', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateBookingType(id: string, data: Partial<BookingType>): Promise<BookingType> {
+    return this.request<BookingType>(`/api/v1/booking/types/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteBookingType(id: string): Promise<void> {
+    await this.request<void>(`/api/v1/booking/types/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getBookingAppointments(): Promise<BookingAppointment[]> {
+    return this.request<BookingAppointment[]>('/api/v1/booking/appointments');
   }
 }
 

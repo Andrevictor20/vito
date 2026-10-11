@@ -21,6 +21,9 @@ type Config struct {
 	GoogleClientID     string
 	GoogleClientSecret string
 	GoogleRedirectURL  string
+	DubAPIKey          string
+	TurnstileSecretKey string
+	PublicBaseURL      string
 }
 
 // Load carrega a configuração a partir de variáveis de ambiente com fallbacks seguros.
@@ -80,6 +83,9 @@ func Load() *Config {
 		GoogleClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
 		GoogleClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
 		GoogleRedirectURL:  googleRedirectURL,
+		DubAPIKey:          os.Getenv("DUB_API_KEY"),
+		TurnstileSecretKey: os.Getenv("CLOUDFLARE_TURNSTILE_SECRET_KEY"),
+		PublicBaseURL:      os.Getenv("PUBLIC_BASE_URL"),
 	}
 }
 

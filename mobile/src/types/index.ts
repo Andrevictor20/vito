@@ -421,6 +421,49 @@ export interface UpdatePendingInput {
   scheduled_date?: string;
 }
 
+export interface BookingType {
+  id: string;
+  user_id: string;
+  slug: string;
+  title: string;
+  description?: string;
+  duration_minutes: number;
+  buffer_minutes: number;
+  days_of_week: string;
+  start_hour: string;
+  end_hour: string;
+  is_active: boolean;
+  public_url?: string;
+  short_url?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BookingAppointment {
+  id: string;
+  booking_type_id: string;
+  user_id: string;
+  guest_name: string;
+  guest_email: string;
+  guest_notes?: string;
+  start_at: string;
+  end_at: string;
+  status: 'confirmed' | 'cancelled';
+  event_id?: string;
+  created_at: string;
+}
+
+export interface CreateBookingTypeInput {
+  slug: string;
+  title: string;
+  description?: string;
+  duration_minutes?: number;
+  buffer_minutes?: number;
+  days_of_week?: string;
+  start_hour?: string;
+  end_hour?: string;
+}
+
 
 
 

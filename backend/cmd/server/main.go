@@ -47,6 +47,7 @@ func main() {
 	briefingRepo := repository.NewBriefingRepository(db)
 	aiSettingsRepo := repository.NewAISettingsRepository(db)
 	pendingRepo := repository.NewPendingRepository(db)
+	bookingRepo := repository.NewBookingRepositorySQLite(db)
 
 	// 3. Provedores de IA & AI Gateway com Failover
 	var aiProviders []ai.Provider
@@ -144,6 +145,11 @@ func main() {
 	aiSettingsHandler := handler.NewAISettingsHandler(aiSettingsRepo)
 	pendingHandler := handler.NewPendingHandler(pendingSvc)
 
+	dubShortener := service.NewDubShortenerService(cfg.DubAPIKey, cfg.PublicBaseURL)
+	turnstileValidator := service.NewTurnstileValidator(cfg.TurnstileSecretKey)
+	bookingSvc := service.NewBookingService(bookingRepo, eventRepo, userRepo, notifSvc, dubShortener, turnstileValidator, cfg.PublicBaseURL)
+	bookingHandler := handler.NewBookingHandler(bookingSvc)
+
 	// 6. Servidor HTTP
 	srv := server.New(server.Config{
 		AuthHandler:       authHandler,
@@ -157,6 +163,7 @@ func main() {
 		BriefingHandler:   briefingHandler,
 		AISettingsHandler: aiSettingsHandler,
 		PendingHandler:    pendingHandler,
+		BookingHandler:    bookingHandler,
 		AuthSvc:           authSvc,
 	})
 

@@ -25,6 +25,7 @@ import { ProfileModal } from '../components/profile/ProfileModal';
 import { ChatScreen, ChatScreenRef } from './ChatScreen';
 import { TriggersScreen } from './TriggersScreen';
 import { PendingItemsView } from './PendingItemsView';
+import { BookingScreen } from './BookingScreen';
 import { hapticFeedback } from '../theme/motion';
 import { useHomeData } from '../hooks/useHomeData';
 import { useTheme } from '../context/ThemeContext';
@@ -54,6 +55,7 @@ export const HomeScreen: React.FC<{
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const [isChatLoading, setIsChatLoading] = useState(false);
   const [showPendingItems, setShowPendingItems] = useState(false);
+  const [showBookingScreen, setShowBookingScreen] = useState(false);
 
   const chatRef = useRef<ChatScreenRef>(null);
   const pagerRef = useRef<ScrollView>(null);
@@ -104,6 +106,10 @@ export const HomeScreen: React.FC<{
         hasModal,
       });
 
+      if (showBookingScreen) {
+        setShowBookingScreen(false);
+        return true;
+      }
       if (action.type === 'CLOSE_SUBSCREEN') {
         setShowPendingItems(false);
         return true;
@@ -180,6 +186,14 @@ export const HomeScreen: React.FC<{
           setShowPendingItems(false);
           setCreateModalVisible(true);
         }}
+      />
+    );
+  }
+
+  if (showBookingScreen) {
+    return (
+      <BookingScreen
+        onBack={() => setShowBookingScreen(false)}
       />
     );
   }
@@ -369,6 +383,34 @@ export const HomeScreen: React.FC<{
                     ]}
                   >
                     Pendências
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.focusSegmentBtn}
+                  onPress={() => {
+                    hapticFeedback.selection();
+                    setShowBookingScreen(true);
+                  }}
+                  activeOpacity={0.75}
+                  accessibilityRole="button"
+                  accessibilityLabel="Abrir Vito Booking"
+                >
+                  <MaterialIcons
+                    name="link"
+                    size={16}
+                    color={colors.onSurfaceVariant}
+                  />
+                  <Text
+                    style={[
+                      styles.focusSegmentText,
+                      {
+                        color: colors.onSurfaceVariant,
+                        fontWeight: '500',
+                      },
+                    ]}
+                  >
+                    Booking
                   </Text>
                 </TouchableOpacity>
               </View>
