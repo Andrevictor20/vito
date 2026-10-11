@@ -75,3 +75,4 @@ scratch/
 *.wmv
 *.pdf
 *.wasm
+.code-review-graph/

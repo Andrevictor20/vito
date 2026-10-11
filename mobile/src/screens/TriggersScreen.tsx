@@ -19,7 +19,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useTriggers } from '../hooks/useTriggers';
 import { TriggerCard } from '../components/triggers/TriggerCard';
 import { TriggerReportsView } from '../components/triggers/TriggerReportsView';
-import { WeeklySummariesView } from '../components/triggers/WeeklySummariesView';
+import { ExecutiveSummariesHubView } from './ExecutiveSummariesHubView';
 import { EditTriggerModal } from '../components/triggers/EditTriggerModal';
 import { TRIGGER_CATEGORIES, Trigger, TriggerCategory } from '../types';
 import { api } from '../services/api';
@@ -97,7 +97,7 @@ export const TriggersScreen: React.FC = () => {
   };
 
   if (showWeeklySummaries) {
-    return <WeeklySummariesView onBack={() => setShowWeeklySummaries(false)} />;
+    return <ExecutiveSummariesHubView onBack={() => setShowWeeklySummaries(false)} />;
   }
 
   if (reportTrigger) {

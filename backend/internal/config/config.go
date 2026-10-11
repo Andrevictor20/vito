@@ -13,6 +13,7 @@ type Config struct {
 	Environment        string
 	DBPath             string
 	JWTSecret          string
+	DataEncryptionKey  string
 	GeminiAPIKey       string
 	GeminiModel        string
 	OpenRouterAPIKey   string
@@ -56,6 +57,11 @@ func Load() *Config {
 		geminiModel = "gemini-2.5-flash"
 	}
 
+	dataKey := os.Getenv("DATA_ENCRYPTION_KEY")
+	if dataKey == "" {
+		dataKey = jwtSecret
+	}
+
 	googleRedirectURL := os.Getenv("GOOGLE_REDIRECT_URL")
 	if googleRedirectURL == "" {
 		googleRedirectURL = "https://vito.rasppi.cloud/api/v1/auth/google/callback"
@@ -66,6 +72,7 @@ func Load() *Config {
 		Environment:        env,
 		DBPath:             dbPath,
 		JWTSecret:          jwtSecret,
+		DataEncryptionKey:  dataKey,
 		GeminiAPIKey:       geminiKey,
 		GeminiModel:        geminiModel,
 		OpenRouterAPIKey:   os.Getenv("OPENROUTER_API_KEY"),

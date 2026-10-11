@@ -391,6 +391,36 @@ export interface AISettings {
   updated_at: string;
 }
 
+export type PendingStatus = 'inbox' | 'scheduled' | 'done';
+
+export interface PendingItem {
+  id: string;
+  user_id: string;
+  title: string;
+  description?: string;
+  category: string;
+  status: PendingStatus;
+  scheduled_date?: string;
+  nudge_sent_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreatePendingInput {
+  title: string;
+  description?: string;
+  category?: string;
+  scheduled_date?: string;
+}
+
+export interface UpdatePendingInput {
+  title?: string;
+  description?: string;
+  category?: string;
+  status?: PendingStatus;
+  scheduled_date?: string;
+}
+
 
 
 

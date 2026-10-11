@@ -291,9 +291,9 @@ export const Header: React.FC<HeaderProps> = ({
 export const TopAppBar = Header;
 
 const styles = StyleSheet.create({
-  // Top App Bar Compacta: 50dp de altura para maior respiro vertical
+  // Top App Bar Compacta: 44dp de altura executiva para visual moderno
   header: {
-    height: 50,
+    height: 44,
     justifyContent: 'center',
     paddingHorizontal: tokens.spacing.md,
     backgroundColor: tokens.colors.surface,

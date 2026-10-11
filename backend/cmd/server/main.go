@@ -46,6 +46,7 @@ func main() {
 	triggerRepo := repository.NewTriggerRepository(db)
 	briefingRepo := repository.NewBriefingRepository(db)
 	aiSettingsRepo := repository.NewAISettingsRepository(db)
+	pendingRepo := repository.NewPendingRepository(db)
 
 	// 3. Provedores de IA & AI Gateway com Failover
 	var aiProviders []ai.Provider
@@ -72,12 +73,14 @@ func main() {
 	todoSvc := service.NewTodoService(todoRepo)
 	notifSvc := service.NewNotificationService(notifRepo)
 	triggerSvc := service.NewTriggerService(triggerRepo)
+	pendingSvc := service.NewPendingService(pendingRepo)
 	astSvc := service.NewAssistantService(aiGateway, calSvc, todoSvc, memoryRepo, triggerSvc)
 	astSvc.SetUserRepository(userRepo)
 	astSvc.SetAISettingsRepository(aiSettingsRepo)
+	astSvc.SetPendingService(pendingSvc)
 
 	syncRepo := repository.NewCalendarSyncRepository(db)
-	syncSvc := service.NewCalendarSyncService(syncRepo, eventRepo, cfg.JWTSecret)
+	syncSvc := service.NewCalendarSyncService(syncRepo, eventRepo, cfg.DataEncryptionKey)
 	googleCalCfg := calendar.GoogleConfig{
 		ClientID:     cfg.GoogleClientID,
 		ClientSecret: cfg.GoogleClientSecret,
@@ -108,6 +111,11 @@ func main() {
 	morningBriefingWorker.Start()
 	defer morningBriefingWorker.Stop()
 
+	// Worker em segundo plano para lembretes de pendências (nudge diário)
+	pendingNudgeWorker := service.NewPendingNudgeWorker(pendingRepo, userRepo, notifSvc, 1*time.Minute)
+	pendingNudgeWorker.Start()
+	defer pendingNudgeWorker.Stop()
+
 	googleAuthCfg := service.GoogleAuthConfig{
 		ClientID:     cfg.GoogleClientID,
 		ClientSecret: cfg.GoogleClientSecret,
@@ -134,6 +142,7 @@ func main() {
 	triggerHandler := handler.NewTriggerHandler(triggerSvc, triggerWorker)
 	briefingHandler := handler.NewBriefingHandler(briefingRepo)
 	aiSettingsHandler := handler.NewAISettingsHandler(aiSettingsRepo)
+	pendingHandler := handler.NewPendingHandler(pendingSvc)
 
 	// 6. Servidor HTTP
 	srv := server.New(server.Config{
@@ -147,6 +156,7 @@ func main() {
 		TriggerHandler:    triggerHandler,
 		BriefingHandler:   briefingHandler,
 		AISettingsHandler: aiSettingsHandler,
+		PendingHandler:    pendingHandler,
 		AuthSvc:           authSvc,
 	})
 

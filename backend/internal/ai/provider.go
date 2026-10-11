@@ -13,6 +13,8 @@ const (
 	ActionUpdateEvent   IntentAction = "UPDATE_EVENT"
 	ActionDeleteEvent   IntentAction = "DELETE_EVENT"
 	ActionCreateTodo    IntentAction = "CREATE_TODO"
+	ActionCreatePending IntentAction = "CREATE_PENDING_ITEM"
+	ActionConvertPending IntentAction = "CONVERT_PENDING_TO_EVENT"
 	ActionQuerySchedule IntentAction = "QUERY_SCHEDULE"
 	ActionSaveMemory    IntentAction = "SAVE_MEMORY"
 	ActionCreateTrigger IntentAction = "CREATE_TRIGGER"
@@ -79,6 +81,15 @@ type ParsedTrigger struct {
 	DaysOfWeek    string `json:"days_of_week,omitempty"`
 }
 
+// ParsedPending dados extraídos para criação ou agendamento de item na Incubadora de Pendências.
+type ParsedPending struct {
+	ID            string `json:"id,omitempty"`
+	Title         string `json:"title"`
+	Description   string `json:"description,omitempty"`
+	Category      string `json:"category,omitempty"`
+	ScheduledDate string `json:"scheduled_date,omitempty"`
+}
+
 // ParsedIntent resultado normalizado da interpretação do assistente Toki-like.
 type ParsedIntent struct {
 	Action         IntentAction   `json:"action"`
@@ -86,6 +97,7 @@ type ParsedIntent struct {
 	Event          *ParsedEvent   `json:"event,omitempty"`
 	Todo           *ParsedTodo    `json:"todo,omitempty"`
 	Trigger        *ParsedTrigger `json:"trigger,omitempty"`
+	Pending        *ParsedPending `json:"pending,omitempty"`
 	MemoryContent  string         `json:"memory_content,omitempty"`
 	MemoryCategory string         `json:"memory_category,omitempty"`
 	ProviderUsed   string         `json:"provider_used,omitempty"`

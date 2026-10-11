@@ -35,20 +35,24 @@ export const secureStorage = {
         secureStoreSuccess = true;
       } catch (secErr) {
         console.warn(`[secureStorage] Falha ao persistir no SecureStore para '${key}':`, secErr);
+        if (isSensitive) {
+          // Hard-Fail de Segurança: em falha na Keystore/Keychain, PROIBIDO gravar segredos em texto claro no AsyncStorage
+          throw new Error(`[secureStorage] Falha crítica de hardware/segurança: não foi possível gravar '${key}' com criptografia.`);
+        }
       }
 
-      // 2. Apenas utiliza AsyncStorage se NÃO for token sensível OU se o SecureStore falhar
-      if (!isSensitive || !secureStoreSuccess) {
+      // 2. Apenas utiliza AsyncStorage se NÃO for token sensível
+      if (!isSensitive) {
         await AsyncStorage.setItem(key, value).catch(() => {});
-      } else {
-        // Se SecureStore foi bem sucedido, garante que nenhuma cópia residual em texto claro resida no AsyncStorage
+      } else if (secureStoreSuccess) {
+        // Se SecureStore foi bem sucedido, purga qualquer cópia residual prévia em texto claro no AsyncStorage
         await AsyncStorage.removeItem(key).catch(() => {});
       }
     } catch (err) {
       console.warn(`[secureStorage] Erro ao salvar chave segura '${key}':`, err);
+      throw err;
     }
   },
-
 
   async getItem(key: string): Promise<string | null> {
     try {
@@ -59,6 +63,8 @@ export const secureStorage = {
         return webStorage.get(key) || null;
       }
 
+      const isSensitive = key.includes('token') || key.includes('secret') || key.includes('auth');
+
       // 1. Tenta recuperar do SecureStore
       try {
         const options = isIOS ? { keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK } : undefined;
@@ -67,19 +73,20 @@ export const secureStorage = {
           return secureVal;
         }
       } catch (secErr) {
-        console.warn(`[secureStorage] SecureStore indisponível para '${key}', buscando fallback:`, secErr);
+        console.warn(`[secureStorage] SecureStore indisponível para '${key}':`, secErr);
+        if (isSensitive) {
+          // Hard-fail: não aceita fallback inseguro para tokens/segredos
+          return null;
+        }
       }
 
-      // 2. Fallback resiliente no AsyncStorage
+      // 2. Chaves sensíveis NUNCA são lidas do AsyncStorage
+      if (isSensitive) {
+        return null;
+      }
+
       const asyncVal = await AsyncStorage.getItem(key);
-      if (asyncVal) {
-        // Auto-cura: restaura no SecureStore silenciosamente
-        const options = isIOS ? { keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK } : undefined;
-        SecureStore.setItemAsync(key, asyncVal, options).catch(() => {});
-        return asyncVal;
-      }
-
-      return null;
+      return asyncVal;
     } catch (err) {
       console.warn(`[secureStorage] Erro ao recuperar chave segura '${key}':`, err);
       return null;

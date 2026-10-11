@@ -1,6 +1,12 @@
 package crypto_test
 
 import (
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
+	"io"
 	"testing"
 
 	"github.com/andrevmp/vito/backend/internal/crypto"
@@ -99,3 +105,59 @@ func TestEncryptDecrypt_EmptyPlaintext(t *testing.T) {
 		t.Fatalf("esperava string vazia, obteve %q", decrypted)
 	}
 }
+
+func TestDeriveKeyHKDF_DeterminismAndLength(t *testing.T) {
+	secret := "master-secret-input-key-12345678"
+	salt := []byte("vito-random-salt-16b")
+	info := "vito-hkdf-test-info"
+
+	k1, err1 := crypto.DeriveKeyHKDF(secret, salt, info, 32)
+	k2, err2 := crypto.DeriveKeyHKDF(secret, salt, info, 32)
+
+	if err1 != nil || err2 != nil {
+		t.Fatalf("erros na derivação HKDF: %v, %v", err1, err2)
+	}
+
+	if len(k1) != 32 || len(k2) != 32 {
+		t.Fatalf("comprimento esperado 32 bytes, obtido k1=%d, k2=%d", len(k1), len(k2))
+	}
+
+	for i := range k1 {
+		if k1[i] != k2[i] {
+			t.Fatalf("derivação HKDF deve ser determinística para mesma entrada")
+		}
+	}
+}
+
+func TestDecrypt_LegacyCiphertextCompatibility(t *testing.T) {
+	// Cria cifra usando o algoritmo legado diretamente (SHA-256 puro como chave AES)
+	key := "my-legacy-secret-encryption-key"
+	plaintext := "token_legado_armazenado_no_banco"
+
+	hash := sha256.Sum256([]byte(key))
+	block, err := aes.NewCipher(hash[:])
+	if err != nil {
+		t.Fatalf("falha ao criar cifra legada: %v", err)
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		t.Fatalf("falha ao criar GCM legado: %v", err)
+	}
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		t.Fatalf("falha ao ler nonce: %v", err)
+	}
+	legacyCiphertext := gcm.Seal(nonce, nonce, []byte(plaintext), nil)
+	legacyB64 := base64.RawURLEncoding.EncodeToString(legacyCiphertext)
+
+	// crypto.Decrypt deve decifrar com sucesso mesmo sendo legado
+	decrypted, err := crypto.Decrypt(legacyB64, key)
+	if err != nil {
+		t.Fatalf("Decrypt deve ser retrocompatível com cifras legadas: %v", err)
+	}
+
+	if decrypted != plaintext {
+		t.Fatalf("esperado %q, obtido %q", plaintext, decrypted)
+	}
+}
+

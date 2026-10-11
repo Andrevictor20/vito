@@ -9,6 +9,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+
+	"golang.org/x/crypto/hkdf"
 )
 
 var (
@@ -16,19 +18,54 @@ var (
 	ErrInvalidKey       = errors.New("chave de criptografia inválida")
 )
 
-// deriveKey gera uma chave de 32 bytes (AES-256) a partir de qualquer string informada.
-func deriveKey(key string) []byte {
+const hkdfInfoString = "vito-aes-256-gcm-data-encryption"
+
+// deriveKey gera uma chave de 32 bytes (AES-256) usando HKDF-SHA256 (RFC 5869).
+func deriveKey(key string) ([]byte, error) {
+	if key == "" {
+		return nil, ErrInvalidKey
+	}
+	kdf := hkdf.New(sha256.New, []byte(key), nil, []byte(hkdfInfoString))
+	out := make([]byte, 32)
+	if _, err := io.ReadFull(kdf, out); err != nil {
+		return nil, fmt.Errorf("falha ao derivar chave HKDF: %w", err)
+	}
+	return out, nil
+}
+
+// deriveLegacyKey gera a chave legada de 32 bytes via SHA-256 direto (para migração sem downtime).
+func deriveLegacyKey(key string) []byte {
 	hash := sha256.Sum256([]byte(key))
 	return hash[:]
 }
 
-// Encrypt cifra uma string em texto plano usando AES-256-GCM e retorna uma string codificada em Base64 URL-safe.
+// DeriveKeyHKDF deriva explicitamente uma chave de comprimento arbitrário usando HKDF-SHA256 (RFC 5869).
+func DeriveKeyHKDF(secret string, salt []byte, info string, length int) ([]byte, error) {
+	if secret == "" {
+		return nil, ErrInvalidKey
+	}
+	if length <= 0 {
+		length = 32
+	}
+	kdf := hkdf.New(sha256.New, []byte(secret), salt, []byte(info))
+	out := make([]byte, length)
+	if _, err := io.ReadFull(kdf, out); err != nil {
+		return nil, fmt.Errorf("falha ao derivar chave HKDF: %w", err)
+	}
+	return out, nil
+}
+
+// Encrypt cifra uma string em texto plano usando AES-256-GCM e chave derivada via HKDF-SHA256.
 func Encrypt(plaintext, key string) (string, error) {
 	if key == "" {
 		return "", ErrInvalidKey
 	}
 
-	blockKey := deriveKey(key)
+	blockKey, err := deriveKey(key)
+	if err != nil {
+		return "", err
+	}
+
 	block, err := aes.NewCipher(blockKey)
 	if err != nil {
 		return "", fmt.Errorf("falha ao inicializar cifra AES: %w", err)
@@ -48,7 +85,7 @@ func Encrypt(plaintext, key string) (string, error) {
 	return base64.RawURLEncoding.EncodeToString(ciphertext), nil
 }
 
-// Decrypt decifra uma string Base64 cifrada com Encrypt usando AES-256-GCM.
+// Decrypt decifra uma string Base64 cifrada com Encrypt usando AES-256-GCM (suporta HKDF e fallback transparente legado).
 func Decrypt(ciphertextBase64, key string) (string, error) {
 	if key == "" {
 		return "", ErrInvalidKey
@@ -59,15 +96,32 @@ func Decrypt(ciphertextBase64, key string) (string, error) {
 		return "", ErrDecryptionFailed
 	}
 
-	blockKey := deriveKey(key)
+	// 1. Tenta decifrar com a chave HKDF-SHA256 moderna
+	blockKey, err := deriveKey(key)
+	if err == nil {
+		if pt, decErr := decryptWithKey(rawCiphertext, blockKey); decErr == nil {
+			return pt, nil
+		}
+	}
+
+	// 2. Fallback resiliente para chave legada SHA-256 direta (garante zero perda de dados de credenciais existentes)
+	legacyBlockKey := deriveLegacyKey(key)
+	if pt, decErr := decryptWithKey(rawCiphertext, legacyBlockKey); decErr == nil {
+		return pt, nil
+	}
+
+	return "", ErrDecryptionFailed
+}
+
+func decryptWithKey(rawCiphertext, blockKey []byte) (string, error) {
 	block, err := aes.NewCipher(blockKey)
 	if err != nil {
-		return "", fmt.Errorf("falha ao inicializar cifra AES: %w", err)
+		return "", err
 	}
 
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
-		return "", fmt.Errorf("falha ao inicializar modo GCM: %w", err)
+		return "", err
 	}
 
 	nonceSize := gcm.NonceSize()

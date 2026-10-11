@@ -28,6 +28,7 @@ type Server struct {
 	triggerHandler    *handler.TriggerHandler
 	briefingHandler   *handler.BriefingHandler
 	aiSettingsHandler *handler.AISettingsHandler
+	pendingHandler    *handler.PendingHandler
 	authSvc           *service.AuthService
 }
 
@@ -43,6 +44,7 @@ type Config struct {
 	TriggerHandler    *handler.TriggerHandler
 	BriefingHandler   *handler.BriefingHandler
 	AISettingsHandler *handler.AISettingsHandler
+	PendingHandler    *handler.PendingHandler
 	AuthSvc           *service.AuthService
 }
 
@@ -63,6 +65,7 @@ func New(cfg ...Config) *Server {
 		s.triggerHandler = cfg[0].TriggerHandler
 		s.briefingHandler = cfg[0].BriefingHandler
 		s.aiSettingsHandler = cfg[0].AISettingsHandler
+		s.pendingHandler = cfg[0].PendingHandler
 		s.authSvc = cfg[0].AuthSvc
 	}
 
@@ -202,6 +205,18 @@ func (s *Server) registerRoutes() {
 					protected.Route("/users/ai-settings", func(air chi.Router) {
 						air.Get("/", s.aiSettingsHandler.GetSettings)
 						air.Put("/", s.aiSettingsHandler.UpdateSettings)
+					})
+				}
+
+				if s.pendingHandler != nil {
+					protected.Route("/pending", func(pr chi.Router) {
+						pr.Get("/", s.pendingHandler.ListPending)
+						pr.Post("/", s.pendingHandler.CreatePending)
+						pr.Get("/{id}", s.pendingHandler.GetPending)
+						pr.Patch("/{id}", s.pendingHandler.UpdatePending)
+						pr.Post("/{id}/schedule", s.pendingHandler.SchedulePending)
+						pr.Post("/{id}/complete", s.pendingHandler.CompletePending)
+						pr.Delete("/{id}", s.pendingHandler.DeletePending)
 					})
 				}
 			})

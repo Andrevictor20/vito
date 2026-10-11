@@ -1,3 +1,5 @@
+import { TextStyle } from 'react-native';
+
 // Google Material Design 3 (M3 / Material You) Design Tokens
 // Paleta tonal calibrada para Dark Theme Executivo (WCAG AA)
 
@@ -106,6 +108,8 @@ export const lightColors = {
   surfaceBright: '#FFFFFF',
   surfaceSubtle: '#FAFAFA',
   surfaceElevated: '#FFFFFF',
+  surfaceGlass: 'rgba(255, 255, 255, 0.85)',
+  glassBorder: 'rgba(0, 0, 0, 0.06)',
 
   // M3 Outlines & Borders
   outline: '#71717A',
@@ -190,6 +194,9 @@ export const darkColors = {
   surfaceBright: '#27272A',
   surfaceSubtle: '#18181B',
   surfaceElevated: '#27272A',
+
+  surfaceGlass: 'rgba(24, 24, 27, 0.85)',
+  glassBorder: 'rgba(255, 255, 255, 0.08)',
 
   // M3 Outlines & Borders
   outline: '#71717A',
@@ -403,3 +410,7 @@ export const getThemeTokens = (isDark: boolean) => ({
 });
 
 export type ThemeTokens = ReturnType<typeof getThemeTokens>;
+
+export const tabularNumbers: TextStyle = {
+  fontVariant: ['tabular-nums'],
+};

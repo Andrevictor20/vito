@@ -229,7 +229,7 @@ REGRAS DE RESPOSTA OBRIGATÓRIAS:
 Responda EXCLUSIVAMENTE com um objeto JSON válido, sem backticks markdown ou texto extra, no seguinte schema:
 
 {
-  "action": "CREATE_EVENT" | "UPDATE_EVENT" | "DELETE_EVENT" | "CREATE_TODO" | "QUERY_SCHEDULE" | "CREATE_TRIGGER" | "SAVE_MEMORY" | "GENERAL_CHAT",
+  "action": "CREATE_EVENT" | "UPDATE_EVENT" | "DELETE_EVENT" | "CREATE_TODO" | "CREATE_PENDING_ITEM" | "CONVERT_PENDING_TO_EVENT" | "QUERY_SCHEDULE" | "CREATE_TRIGGER" | "SAVE_MEMORY" | "GENERAL_CHAT",
   "message": "Mensagem calorosa, atenciosa, articulada, elegante e executiva do secretário Vito",
   "event": {
     "title": "Título conciso do evento",
@@ -254,6 +254,12 @@ Responda EXCLUSIVAMENTE com um objeto JSON válido, sem backticks markdown ou te
     "frequency": "daily_morning" | "hourly" | "daily_evening" | "immediate",
     "scheduled_time": "HH:MM" (horário local específico se solicitado pelo usuário, ex: "15:30", "08:00", "18:00"; caso contrário ""),
     "days_of_week": "DAILY" | "MON-FRI" | "WEEKDAYS" | "SAT,SUN" (ou vazio se diário)
+  },
+  "pending": {
+    "title": "Título conciso da pendência a incubar",
+    "description": "Detalhes da pendência se houver",
+    "category": "geral" | "trabalho" | "estudos" | "financas" | "saude" | "pessoal",
+    "scheduled_date": "YYYY-MM-DD" (quando o usuário especificar uma data futura ou vazio se for apenas incubar)
   },
   "memory_category": "família" | "preferência" | "trabalho" | "saúde" | "rotina" | "geral",
   "memory_content": "Fato duradouro, preferência, rotina ou aprendizado sobre o usuário para registrar na memória permanente (ou deixe em branco se nada novo foi revelado)"

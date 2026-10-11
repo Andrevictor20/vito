@@ -27,16 +27,18 @@ type AssistantResponse struct {
 	Conflict     *domain.ConflictInfo `json:"conflict,omitempty"`
 	Todo         *domain.Todo         `json:"todo,omitempty"`
 	Trigger      *domain.Trigger      `json:"trigger,omitempty"`
+	Pending      *domain.PendingItem  `json:"pending,omitempty"`
 	ProviderUsed string               `json:"provider_used,omitempty"`
 }
 
 // AssistantService orquestra o parsing de IA com os serviços de calendário, tarefas, memórias e disparadores.
 type AssistantService struct {
-	aiGateway  AIParsingGateway
-	calSvc     *CalendarService
-	todoSvc    *TodoService
+	aiGateway      AIParsingGateway
+	calSvc         *CalendarService
+	todoSvc        *TodoService
 	memoryRepo     domain.MemoryRepository
 	triggerSvc     *TriggerService
+	pendingSvc     *PendingService
 	userRepo       domain.UserRepository
 	aiSettingsRepo domain.AISettingsRepository
 }
@@ -54,6 +56,11 @@ func NewAssistantService(aiGateway AIParsingGateway, calSvc *CalendarService, to
 		memoryRepo: memoryRepo,
 		triggerSvc: ts,
 	}
+}
+
+// SetPendingService injeta o serviço da Incubadora de Pendências.
+func (s *AssistantService) SetPendingService(pendingSvc *PendingService) {
+	s.pendingSvc = pendingSvc
 }
 
 // SetUserRepository configura o repositório de usuários para enriquecimento do perfil.
@@ -348,6 +355,52 @@ func (s *AssistantService) Process(ctx context.Context, userID string, input ai.
 			res.Trigger = trig
 			if res.Message == "" {
 				res.Message = fmt.Sprintf("Pronto! Criei o disparador '%s' na seção de Disparadores e já iniciei a vigília para você.", trig.Title)
+			}
+		}
+
+	case ai.ActionCreatePending:
+		if intent.Pending != nil && s.pendingSvc != nil {
+			item, err := s.pendingSvc.CreatePending(userID, domain.CreatePendingInput{
+				Title:         intent.Pending.Title,
+				Description:   intent.Pending.Description,
+				Category:      intent.Pending.Category,
+				ScheduledDate: intent.Pending.ScheduledDate,
+			})
+			if err != nil {
+				return nil, fmt.Errorf("falha ao criar pendência: %w", err)
+			}
+			res.Pending = item
+			if res.Message == "" {
+				res.Message = fmt.Sprintf("Guardei '%s' na sua Incubadora de Pendências!", item.Title)
+			}
+		}
+
+	case ai.ActionConvertPending:
+		if intent.Event != nil {
+			if intent.Event.StartAt.IsZero() {
+				intent.Event.StartAt = input.Now
+			}
+			if intent.Event.EndAt.IsZero() || intent.Event.EndAt.Before(intent.Event.StartAt) || intent.Event.EndAt.Equal(intent.Event.StartAt) {
+				intent.Event.EndAt = intent.Event.StartAt.Add(1 * time.Hour)
+			}
+			event, conflict, err := s.calSvc.CreateEvent(
+				userID,
+				intent.Event.Title,
+				intent.Event.Description,
+				intent.Event.Location,
+				intent.Event.StartAt,
+				intent.Event.EndAt,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("falha ao agendar evento da pendência: %w", err)
+			}
+			res.Event = event
+			res.Conflict = conflict
+			if intent.Pending != nil && intent.Pending.ID != "" && s.pendingSvc != nil {
+				_, _ = s.pendingSvc.CompletePending(intent.Pending.ID, userID)
+			}
+			if res.Message == "" {
+				res.Message = fmt.Sprintf("Agendei '%s' para %s e atualizei a pendência na sua incubadora!", event.Title, event.StartAt.Format("02/01 às 15:04"))
 			}
 		}
 	}

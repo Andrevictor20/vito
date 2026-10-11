@@ -22,6 +22,8 @@ import { EditEventModal } from '../components/calendar/EditEventModal';
 import { ProfileModal } from '../components/profile/ProfileModal';
 import { ChatScreen, ChatScreenRef } from './ChatScreen';
 import { TriggersScreen } from './TriggersScreen';
+import { PendingItemsView } from './PendingItemsView';
+import { hapticFeedback } from '../theme/motion';
 import { useHomeData } from '../hooks/useHomeData';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
@@ -41,6 +43,7 @@ export const HomeScreen: React.FC<{
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const [isChatLoading, setIsChatLoading] = useState(false);
+  const [showPendingItems, setShowPendingItems] = useState(false);
 
   const chatRef = useRef<ChatScreenRef>(null);
   const tabFadeAnim = useRef(
@@ -104,6 +107,18 @@ export const HomeScreen: React.FC<{
     () => todos.filter((t) => t.status === 'completed'),
     [todos]
   );
+
+  if (showPendingItems) {
+    return (
+      <PendingItemsView
+        onBack={() => setShowPendingItems(false)}
+        onOpenEventCreate={(title) => {
+          setShowPendingItems(false);
+          setCreateModalVisible(true);
+        }}
+      />
+    );
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: colors.surface }]}>
@@ -235,6 +250,34 @@ export const HomeScreen: React.FC<{
                   ]}
                 >
                   Tarefas ({pendingTodos.length})
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.focusSegmentBtn}
+                onPress={() => {
+                  hapticFeedback.selection();
+                  setShowPendingItems(true);
+                }}
+                activeOpacity={0.75}
+                accessibilityRole="button"
+                accessibilityLabel="Abrir Incubadora de Pendências"
+              >
+                <MaterialIcons
+                  name="inbox"
+                  size={16}
+                  color={colors.onSurfaceVariant}
+                />
+                <Text
+                  style={[
+                    styles.focusSegmentText,
+                    {
+                      color: colors.onSurfaceVariant,
+                      fontWeight: '500',
+                    },
+                  ]}
+                >
+                  Incubadora
                 </Text>
               </TouchableOpacity>
             </View>

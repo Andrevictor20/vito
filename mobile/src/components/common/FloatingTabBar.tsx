@@ -3,6 +3,7 @@ import { StyleSheet, View, Text, TouchableOpacity, Platform } from 'react-native
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
+import { hapticFeedback } from '../../theme/motion';
 
 interface FloatingTabBarProps {
   activeTab: 'chat' | 'calendar' | 'triggers';
@@ -19,14 +20,21 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
 
   if (!visible) return null;
 
+  const handleTabPress = (tab: 'chat' | 'calendar' | 'triggers') => {
+    if (tab !== activeTab) {
+      hapticFeedback.selection();
+    }
+    onSelectTab(tab);
+  };
+
   return (
     <View style={styles.floatingWrapper} pointerEvents="box-none">
       <View
         style={[
           styles.dockPill,
           {
-            backgroundColor: isDark ? 'rgba(24, 24, 27, 0.92)' : 'rgba(255, 255, 255, 0.92)',
-            borderColor: colors.outlineVariant,
+            backgroundColor: colors.surfaceGlass || (isDark ? 'rgba(24, 24, 27, 0.88)' : 'rgba(255, 255, 255, 0.88)'),
+            borderColor: colors.glassBorder || colors.outlineVariant,
           },
         ]}
         accessibilityRole="tablist"
@@ -40,7 +48,7 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
               { backgroundColor: isDark ? colors.surfaceContainerHighest : colors.primary },
             ],
           ]}
-          onPress={() => onSelectTab('chat')}
+          onPress={() => handleTabPress('chat')}
           activeOpacity={0.7}
           hitSlop={tokens.hitSlop.sm}
           accessibilityRole="tab"
@@ -63,7 +71,7 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
               { backgroundColor: isDark ? colors.surfaceContainerHighest : colors.primary },
             ],
           ]}
-          onPress={() => onSelectTab('calendar')}
+          onPress={() => handleTabPress('calendar')}
           activeOpacity={0.7}
           hitSlop={tokens.hitSlop.sm}
           accessibilityRole="tab"
@@ -86,7 +94,7 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
               { backgroundColor: isDark ? colors.surfaceContainerHighest : colors.primary },
             ],
           ]}
-          onPress={() => onSelectTab('triggers')}
+          onPress={() => handleTabPress('triggers')}
           activeOpacity={0.7}
           hitSlop={tokens.hitSlop.sm}
           accessibilityRole="tab"

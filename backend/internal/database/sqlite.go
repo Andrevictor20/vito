@@ -221,6 +221,23 @@ func runMigrations(db *sql.DB) error {
 		updated_at DATETIME NOT NULL,
 		FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
 	);
+
+	CREATE TABLE IF NOT EXISTS pending_items (
+		id TEXT PRIMARY KEY,
+		user_id TEXT NOT NULL,
+		title TEXT NOT NULL,
+		description TEXT,
+		category TEXT NOT NULL DEFAULT 'geral',
+		status TEXT NOT NULL DEFAULT 'inbox',
+		scheduled_date TEXT,
+		nudge_sent_at DATETIME,
+		created_at DATETIME NOT NULL,
+		updated_at DATETIME NOT NULL,
+		FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_pending_items_user_status ON pending_items(user_id, status);
+	CREATE INDEX IF NOT EXISTS idx_pending_items_user_date ON pending_items(user_id, scheduled_date);
 	`
 
 	if _, err := db.Exec(schema); err != nil {
