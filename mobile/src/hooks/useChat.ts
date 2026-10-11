@@ -51,52 +51,96 @@ export function useChat(onDataChanged?: () => void, currentUserId?: string) {
 
         if (!isMounted) return;
 
+        let localSessions: ConversationSession[] = [];
         if (storedSessions) {
           const parsed = JSON.parse(storedSessions) as ConversationSession[];
           if (Array.isArray(parsed) && parsed.length > 0) {
+            localSessions = parsed;
             setSessions(parsed);
             const active = parsed.find((s) => s.id === storedActiveId) || parsed[0];
             setActiveSessionId(active.id);
             activeSessionIdRef.current = active.id;
             setMessages(active.messages && active.messages.length > 0 ? active.messages : [INITIAL_MESSAGE]);
-            return;
           }
         }
 
-        // Inicialização da primeira sessão isolada para esta conta
-        let initialMessages = [INITIAL_MESSAGE];
-        if (legacyChat) {
-          try {
-            const parsedLegacy = JSON.parse(legacyChat);
-            if (Array.isArray(parsedLegacy) && parsedLegacy.length > 0) {
-              initialMessages = parsedLegacy;
-            }
-          } catch {}
+        if (localSessions.length === 0) {
+          // Inicialização da primeira sessão isolada para esta conta caso não haja local
+          let initialMessages = [INITIAL_MESSAGE];
+          if (legacyChat) {
+            try {
+              const parsedLegacy = JSON.parse(legacyChat);
+              if (Array.isArray(parsedLegacy) && parsedLegacy.length > 0) {
+                initialMessages = parsedLegacy;
+              }
+            } catch {}
+          }
+
+          const firstUser = initialMessages.find((m) => m.sender === 'user');
+          const title = firstUser
+            ? firstUser.text.length > 28
+              ? firstUser.text.slice(0, 28) + '...'
+              : firstUser.text
+            : 'Conversa Atual';
+
+          const initialSession: ConversationSession = {
+            id: `conv-${Date.now()}`,
+            title,
+            preview: initialMessages[initialMessages.length - 1]?.text || INITIAL_MESSAGE.text,
+            timestamp: new Date().toISOString(),
+            messages: initialMessages,
+          };
+
+          localSessions = [initialSession];
+          if (!isMounted) return;
+          setSessions(localSessions);
+          setActiveSessionId(initialSession.id);
+          activeSessionIdRef.current = initialSession.id;
+          setMessages(initialMessages);
+
+          await AsyncStorage.setItem(sessionsKey, JSON.stringify([initialSession]));
+          await AsyncStorage.setItem(activeIdKey, initialSession.id);
         }
 
-        const firstUser = initialMessages.find((m) => m.sender === 'user');
-        const title = firstUser
-          ? firstUser.text.length > 28
-            ? firstUser.text.slice(0, 28) + '...'
-            : firstUser.text
-          : 'Conversa Atual';
+        // Sincronização em background com o servidor para PC e Celular
+        api.getChatSessions().then(async (remoteSessions) => {
+          if (!isMounted || !Array.isArray(remoteSessions)) return;
 
-        const initialSession: ConversationSession = {
-          id: `conv-${Date.now()}`,
-          title,
-          preview: initialMessages[initialMessages.length - 1]?.text || INITIAL_MESSAGE.text,
-          timestamp: new Date().toISOString(),
-          messages: initialMessages,
-        };
+          const mergedMap = new Map<string, ConversationSession>();
+          // 1. Registra as sessões locais
+          localSessions.forEach((s) => mergedMap.set(s.id, s));
 
-        if (!isMounted) return;
-        setSessions([initialSession]);
-        setActiveSessionId(initialSession.id);
-        activeSessionIdRef.current = initialSession.id;
-        setMessages(initialMessages);
+          // 2. Para cada sessão que só existe localmente, sobe para o servidor
+          for (const localSess of localSessions) {
+            if (localSess.messages && localSess.messages.length > 1) {
+              api.syncChatSession(localSess, localSess.messages).catch(() => {});
+            }
+          }
 
-        await AsyncStorage.setItem(sessionsKey, JSON.stringify([initialSession]));
-        await AsyncStorage.setItem(activeIdKey, initialSession.id);
+          // 3. Para cada sessão remota que não temos localmente, busca o histórico completo
+          for (const rem of remoteSessions) {
+            if (!mergedMap.has(rem.id)) {
+              try {
+                const full = await api.getChatSessionWithMessages(rem.id);
+                if (full && full.session) {
+                  mergedMap.set(rem.id, {
+                    ...full.session,
+                    messages: full.messages || [INITIAL_MESSAGE],
+                  });
+                }
+              } catch {}
+            }
+          }
+
+          const consolidated = Array.from(mergedMap.values()).sort(
+            (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+          );
+
+          if (consolidated.length > 0 && isMounted) {
+            setSessions(consolidated);
+            AsyncStorage.setItem(sessionsKey, JSON.stringify(consolidated)).catch(() => {});
+          }
+        }).catch(() => {});
       } catch (e) {
         console.error('Falha ao restaurar sessões do chat:', e);
       }
@@ -154,6 +198,11 @@ export function useChat(onDataChanged?: () => void, currentUserId?: string) {
 
         AsyncStorage.setItem(keys.sessionsKey, JSON.stringify(finalList)).catch(console.error);
         AsyncStorage.setItem(keys.chatKey, JSON.stringify(newMessages.slice(-100))).catch(console.error);
+
+        const activeTarget = finalList.find((s) => s.id === currentId);
+        if (activeTarget) {
+          api.syncChatSession(activeTarget, newMessages.slice(-100)).catch(() => {});
+        }
         return finalList;
       });
     },
@@ -425,6 +474,7 @@ export function useChat(onDataChanged?: () => void, currentUserId?: string) {
   }, [sessions, keys.activeIdKey, keys.chatKey]);
 
   const deleteConversation = useCallback(async (id: string) => {
+    api.deleteChatSession(id).catch(() => {});
     setSessions((prev) => {
       const remaining = prev.filter((s) => s.id !== id);
       let nextActive = remaining[0];

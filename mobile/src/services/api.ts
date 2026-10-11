@@ -24,6 +24,8 @@ import {
   BookingType,
   BookingAppointment,
   CreateBookingTypeInput,
+  ChatMessage,
+  ConversationSession,
 } from '../types';
 
 let FileSystemModule: any = null;
@@ -806,6 +808,58 @@ class ApiService {
     await this.request<void>(`/api/v1/booking/appointments/${id}`, {
       method: 'DELETE',
     });
+  }
+
+  // Chat Multi-Device Synchronization
+  async getChatSessions(): Promise<ConversationSession[]> {
+    const res = await this.request<any[]>('/api/v1/chat/sessions');
+    return Array.isArray(res) ? res : [];
+  }
+
+  async getChatSessionWithMessages(id: string): Promise<{ session: ConversationSession; messages: ChatMessage[] } | null> {
+    try {
+      return await this.request<{ session: ConversationSession; messages: ChatMessage[] }>(`/api/v1/chat/sessions/${id}`);
+    } catch {
+      return null;
+    }
+  }
+
+  async syncChatSession(session: ConversationSession, messages: ChatMessage[]): Promise<any> {
+    try {
+      return await this.request('/api/v1/chat/sync', {
+        method: 'POST',
+        body: JSON.stringify({
+          session: {
+            id: session.id,
+            title: session.title,
+            preview: session.preview,
+            created_at: session.timestamp,
+            updated_at: new Date().toISOString(),
+          },
+          messages: messages.map((m) => ({
+            id: m.id,
+            session_id: session.id,
+            sender: m.sender,
+            text: m.text,
+            timestamp: m.timestamp,
+            image_uri: m.imageUri,
+            action_performed: m.action_performed,
+          })),
+        }),
+      });
+    } catch {
+      return null;
+    }
+  }
+
+  async deleteChatSession(id: string): Promise<void> {
+    try {
+      await this.request<void>(`/api/v1/chat/sessions/${id}`, {
+        method: 'DELETE',
+      });
+    } catch {
+      // Silencioso
+    }
   }
 }
 

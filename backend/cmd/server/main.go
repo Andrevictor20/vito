@@ -48,6 +48,7 @@ func main() {
 	aiSettingsRepo := repository.NewAISettingsRepository(db)
 	pendingRepo := repository.NewPendingRepository(db)
 	bookingRepo := repository.NewBookingRepositorySQLite(db)
+	chatRepo := repository.NewChatRepository(db)
 
 	// 3. Provedores de IA & AI Gateway com Failover
 	var aiProviders []ai.Provider
@@ -163,6 +164,8 @@ func main() {
 	bookingSvc := service.NewBookingService(bookingRepo, eventRepo, userRepo, notifSvc, dubShortener, turnstileValidator, cfg.PublicBaseURL)
 	astSvc.SetBookingService(bookingSvc)
 	bookingHandler := handler.NewBookingHandler(bookingSvc)
+	chatSvc := service.NewChatService(chatRepo)
+	chatHandler := handler.NewChatHandler(chatSvc)
 
 	// 6. Servidor HTTP
 	srv := server.New(server.Config{
@@ -178,6 +181,7 @@ func main() {
 		AISettingsHandler: aiSettingsHandler,
 		PendingHandler:    pendingHandler,
 		BookingHandler:    bookingHandler,
+		ChatHandler:       chatHandler,
 		AuthSvc:           authSvc,
 	})
 

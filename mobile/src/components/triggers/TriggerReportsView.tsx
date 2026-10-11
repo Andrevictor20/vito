@@ -430,59 +430,30 @@ export const TriggerReportsView: React.FC<TriggerReportsViewProps> = ({
                 )}
               </View>
 
-              {/* Dados Factual da Web se disponível */}
-              {parsed?.data ? (
-                <View
-                  style={[
-                    styles.webDataBox,
-                    {
-                      backgroundColor: isDark
-                        ? 'rgba(255, 255, 255, 0.03)'
-                        : 'rgba(0, 0, 0, 0.02)',
-                      borderColor: isDark
-                        ? 'rgba(255, 255, 255, 0.06)'
-                        : 'rgba(0, 0, 0, 0.05)',
-                    },
-                  ]}
-                >
-                  <MaterialIcons name="travel-explore" size={15} color={colors.primary} />
-                  <Text style={[styles.webDataText, { color: colors.onSurface }]}>
-                    {parsed.data}
+              {/* Relatório Informativo Expandido do Radar */}
+              <View
+                style={[
+                  styles.expandedReportBox,
+                  {
+                    backgroundColor: isDark
+                      ? 'rgba(255, 255, 255, 0.03)'
+                      : 'rgba(0, 0, 0, 0.02)',
+                    borderColor: isDark
+                      ? 'rgba(255, 255, 255, 0.07)'
+                      : 'rgba(0, 0, 0, 0.05)',
+                  },
+                ]}
+              >
+                <View style={styles.reportContentHeader}>
+                  <MaterialIcons name="travel-explore" size={16} color={colors.primary} />
+                  <Text style={[styles.reportContentLabel, { color: colors.primary }]}>
+                    Panorama de Inteligência
                   </Text>
                 </View>
-              ) : null}
-
-              {/* Mensagem / Resumo Executivo da IA */}
-              <Text style={[styles.reportMessage, { color: colors.onSurface }]}>
-                {item.message}
-              </Text>
-
-              {/* Prévia da Notificação se houver */}
-              {parsed?.simulated_notification ? (
-                <View
-                  style={[
-                    styles.notificationPreviewBox,
-                    {
-                      backgroundColor: isDark
-                        ? 'rgba(0, 0, 0, 0.25)'
-                        : '#F8FAFC',
-                      borderColor: isDark
-                        ? 'rgba(255, 255, 255, 0.08)'
-                        : 'rgba(0, 0, 0, 0.06)',
-                    },
-                  ]}
-                >
-                  <View style={styles.notifHeader}>
-                    <MaterialIcons name="radar" size={13} color={colors.primary} />
-                    <Text style={[styles.notifAppTitle, { color: colors.primary }]}>
-                      Vito · Notificação
-                    </Text>
-                  </View>
-                  <Text style={[styles.notifBody, { color: colors.onSurfaceVariant }]}>
-                    {parsed.simulated_notification}
-                  </Text>
-                </View>
-              ) : null}
+                <Text style={[styles.expandedReportText, { color: colors.onSurface }]}>
+                  {parsed?.data || item.message}
+                </Text>
+              </View>
             </View>
           );
         }}
@@ -719,44 +690,28 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 0.3,
   },
-  webDataBox: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-    padding: 10,
+  expandedReportBox: {
+    padding: 14,
     borderRadius: MD3Shapes.medium,
     borderWidth: 1,
+    gap: 10,
+    marginTop: 4,
   },
-  webDataText: {
-    fontSize: 13,
-    fontWeight: '600',
-    lineHeight: 18,
-    flex: 1,
-  },
-  reportMessage: {
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  notificationPreviewBox: {
-    padding: 10,
-    borderRadius: MD3Shapes.medium,
-    borderWidth: 1,
-    gap: 4,
-  },
-  notifHeader: {
+  reportContentHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 6,
   },
-  notifAppTitle: {
-    fontSize: 10,
-    fontWeight: '700',
+  reportContentLabel: {
+    fontSize: 11,
+    fontWeight: '800',
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
   },
-  notifBody: {
-    fontSize: 12,
-    lineHeight: 16,
+  expandedReportText: {
+    fontSize: 14,
+    lineHeight: 22,
+    letterSpacing: -0.1,
   },
   emptyStateCard: {
     padding: 30,

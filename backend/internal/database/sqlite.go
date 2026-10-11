@@ -292,6 +292,35 @@ func runMigrations(db *sql.DB) error {
 	);
 
 	CREATE UNIQUE INDEX IF NOT EXISTS idx_summary_dispatch_uniq ON summary_dispatches(user_id, summary_type, period_key);
+
+	CREATE TABLE IF NOT EXISTS chat_sessions (
+		id TEXT PRIMARY KEY,
+		user_id TEXT NOT NULL,
+		title TEXT NOT NULL,
+		preview TEXT NOT NULL,
+		created_at DATETIME NOT NULL,
+		updated_at DATETIME NOT NULL,
+		FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_chat_sessions_user ON chat_sessions(user_id, updated_at DESC);
+
+	CREATE TABLE IF NOT EXISTS chat_messages (
+		id TEXT PRIMARY KEY,
+		session_id TEXT NOT NULL,
+		user_id TEXT NOT NULL,
+		sender TEXT NOT NULL,
+		text TEXT NOT NULL,
+		timestamp DATETIME NOT NULL,
+		image_uri TEXT,
+		action_performed TEXT,
+		created_at DATETIME NOT NULL,
+		FOREIGN KEY(session_id) REFERENCES chat_sessions(id) ON DELETE CASCADE,
+		FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_chat_messages_session ON chat_messages(session_id, timestamp ASC);
+	CREATE INDEX IF NOT EXISTS idx_chat_messages_user ON chat_messages(user_id);
 	`
 
 	if _, err := db.Exec(schema); err != nil {

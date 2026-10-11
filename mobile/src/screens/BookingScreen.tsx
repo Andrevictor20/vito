@@ -47,9 +47,14 @@ try {
 }
 
 const sanitizeBookingUrl = (raw?: string, slug?: string): string => {
-  const fallback = slug ? `https://cal.link/${slug}` : 'https://cal.link';
-  if (!raw) return fallback;
-  return raw.replace(/https?:\/\/dub\.sh\//g, 'https://cal.link/');
+  const cleanSlug = slug ? slug.toLowerCase().replace(/[^a-z0-9-]/g, '-') : '';
+  const canonicalFallback = cleanSlug ? `https://vito.rasppi.cloud/book/${cleanSlug}` : 'https://vito.rasppi.cloud/book';
+  if (!raw) return canonicalFallback;
+  // Evita URLs artificiais de cal.link ou ferramentas do Dub que redirecionam para a landing page
+  if (raw.includes('dub.co/tools') || raw.includes('cal.link')) {
+    return canonicalFallback;
+  }
+  return raw;
 };
 
 const calculateAutoEndHour = (
@@ -785,7 +790,7 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack }) => {
                     style={[styles.linkPreviewUrl, { color: colors.onSurface }]}
                     numberOfLines={1}
                   >
-                    {`https://cal.link/${newSlug ? newSlug.toLowerCase().replace(/[^a-z0-9-]/g, '-') : 'seu-link'}`}
+                    {`https://vito.rasppi.cloud/book/${newSlug ? newSlug.toLowerCase().replace(/[^a-z0-9-]/g, '-') : 'seu-link'}`}
                   </Text>
                 </View>
               </View>

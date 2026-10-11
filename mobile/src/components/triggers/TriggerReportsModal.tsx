@@ -301,40 +301,30 @@ export const TriggerReportsModal: React.FC<TriggerReportsModalProps> = ({
                 </TouchableOpacity>
               </View>
 
-              {testResult.current_data ? (
-                <View style={styles.testSectionRow}>
-                  <MaterialIcons name="travel-explore" size={15} color={colors.primary} />
-                  <Text style={[styles.testDataText, { color: colors.onSurface }]}>
-                    {testResult.current_data}
+              {/* Panorama de Inteligência Expandido */}
+              <View
+                style={[
+                  styles.testSectionRow,
+                  {
+                    backgroundColor: isDark
+                      ? 'rgba(255, 255, 255, 0.03)'
+                      : 'rgba(0, 0, 0, 0.02)',
+                    borderColor: isDark
+                      ? 'rgba(255, 255, 255, 0.07)'
+                      : 'rgba(0, 0, 0, 0.05)',
+                  },
+                ]}
+              >
+                <View style={styles.testReportHeader}>
+                  <MaterialIcons name="travel-explore" size={16} color={colors.primary} />
+                  <Text style={[styles.testReportLabel, { color: colors.primary }]}>
+                    Panorama de Inteligência
                   </Text>
                 </View>
-              ) : null}
-
-              <Text style={[styles.testSummaryText, { color: colors.onSurfaceVariant }]}>
-                {testResult.summary}
-              </Text>
-
-              {testResult.simulated_notification ? (
-                <View
-                  style={[
-                    styles.pushPreviewBox,
-                    {
-                      backgroundColor: isDark ? 'rgba(0,0,0,0.3)' : '#FFFFFF',
-                      borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
-                    },
-                  ]}
-                >
-                  <View style={styles.pushPreviewHeader}>
-                    <MaterialIcons name="radar" size={13} color={colors.primary} />
-                    <Text style={[styles.pushPreviewAppTitle, { color: colors.primary }]}>
-                      Vito · Notificação Simulada
-                    </Text>
-                  </View>
-                  <Text style={[styles.pushPreviewBody, { color: colors.onSurface }]}>
-                    {testResult.simulated_notification}
-                  </Text>
-                </View>
-              ) : null}
+                <Text style={[styles.testDataText, { color: colors.onSurface }]}>
+                  {testResult.current_data || testResult.summary}
+                </Text>
+              </View>
             </View>
           )}
 
@@ -686,39 +676,25 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
   testSectionRow: {
+    padding: 14,
+    borderRadius: MD3Shapes.medium,
+    borderWidth: 1,
+    gap: 8,
+  },
+  testReportHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
   },
-  testDataText: {
-    fontSize: 13,
-    fontWeight: '600',
-    flex: 1,
-  },
-  testSummaryText: {
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  pushPreviewBox: {
-    padding: 10,
-    borderRadius: MD3Shapes.medium,
-    borderWidth: 1,
-    gap: 4,
-  },
-  pushPreviewHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
-  pushPreviewAppTitle: {
-    fontSize: 10,
-    fontWeight: '700',
+  testReportLabel: {
+    fontSize: 11,
+    fontWeight: '800',
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
   },
-  pushPreviewBody: {
-    fontSize: 12,
-    fontWeight: '500',
-    lineHeight: 16,
+  testDataText: {
+    fontSize: 14,
+    lineHeight: 22,
+    letterSpacing: -0.1,
   },
 });

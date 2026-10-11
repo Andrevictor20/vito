@@ -305,19 +305,24 @@ func (p *GeminiProvider) TestEvaluateTrigger(ctx context.Context, t *domain.Trig
 	}
 
 	nowStr := time.Now().Format("02/01/2006 15:04")
-	promptText := fmt.Sprintf(`Você é o motor de vigília proativa e avaliação de disparadores do assistente executivo Vito.
-Avalie em tempo real a condição deste disparador consultando dados da web se necessário:
+	promptText := fmt.Sprintf(`Você é o motor de inteligência e vigília proativa do assistente executivo Vito.
+Avalie em tempo real este radar de monitoramento consultando dados atualizados da web:
 - TÍTULO: %s
-- CONDIÇÃO / CONSULTA: %s
+- CONSULTA / VIGÍLIA: %s
 - CATEGORIA: %s
 - DATA/HORA DE REFERÊNCIA: %s
 
+Diretrizes de Conteúdo:
+1. "current_data": Desenvolva um RELATÓRIO INFORMATIVO APROFUNDADO E COMPLETO (2 a 4 parágrafos densos e substanciais). Traga todos os fatos concretos apurados, horários, locais, números, estatísticas, retrospecto recente, desdobramentos futuros e contexto relevante. Não seja superficial.
+2. "summary": Manchete factual direta e objetiva em 1 frase sintetizando o fato apurado.
+3. REGRA ANTI-SLOP ESTRITA: NUNCA use metalinguagem de IA (expressamente proibido falar "A condição para o alerta foi atendida", "Identifiquei que", "Conforme monitorado", "A regra foi acionada"). Entregue a informação pura, densa e com alto valor executivo.
+
 Responda ESTRITAMENTE em formato JSON puro (sem marcações markdown extras):
 {
-  "condition_met": boolean (true se a condição para emitir alerta agora foi atendida, false caso contrário),
-  "current_data": string (resumo conciso do valor ou dado factual atual encontrado, ex: "Dólar comercial cotado a R$ 5,42 hoje"),
-  "summary": string (explicação executiva clara de 1 a 2 frases para o usuário se a regra foi atingida ou não e o porquê),
-  "simulated_notification": string (o texto exato da notificação push que o usuário receberá quando a condição for disparada)
+  "condition_met": boolean,
+  "current_data": string,
+  "summary": string,
+  "simulated_notification": string
 }`, t.Title, t.Query, t.Category, nowStr)
 
 	reqBody := geminiRequest{

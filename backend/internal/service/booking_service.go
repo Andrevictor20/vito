@@ -393,9 +393,6 @@ func (s *BookingService) enrichWithLinks(ctx context.Context, userID string, bt 
 			shortURL = short
 		}
 	}
-	if strings.Contains(shortURL, "dub.sh") {
-		shortURL = strings.Replace(shortURL, "dub.sh", "cal.link", 1)
-	}
 
 	return &BookingTypeWithLink{
 		BookingType: *bt,

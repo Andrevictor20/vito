@@ -85,7 +85,7 @@ func Load() *Config {
 		GoogleClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
 		GoogleRedirectURL:  googleRedirectURL,
 		DubAPIKey:          os.Getenv("DUB_API_KEY"),
-		DubDomain:          getEnvOrDefault("DUB_DOMAIN", "cal.link"),
+		DubDomain:          os.Getenv("DUB_DOMAIN"),
 		TurnstileSecretKey: os.Getenv("CLOUDFLARE_TURNSTILE_SECRET_KEY"),
 		PublicBaseURL:      os.Getenv("PUBLIC_BASE_URL"),
 	}

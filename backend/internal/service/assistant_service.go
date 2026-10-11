@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"log"
 	"regexp"
 	"strings"
 	"time"
@@ -465,6 +466,23 @@ func (s *AssistantService) Process(ctx context.Context, userID string, input ai.
 			if eh == "" {
 				eh = "18:00"
 			}
+			// Garante que o fim da janela seja estritamente após o início
+			if startH, startM, errS := parseHour(sh); errS == nil {
+				endH, endM, errE := parseHour(eh)
+				if errE != nil || (endH*60+endM) <= (startH*60+startM) {
+					targetEndMin := startH*60 + startM + dur
+					if targetEndMin > 22*60 {
+						targetEndMin = 22 * 60
+					}
+					if targetEndMin <= startH*60+startM {
+						targetEndMin = startH*60 + startM + 30
+					}
+					if targetEndMin > 23*60+59 {
+						targetEndMin = 23*60 + 59
+					}
+					eh = fmt.Sprintf("%02d:%02d", targetEndMin/60, targetEndMin%60)
+				}
+			}
 			slug := intent.Booking.Slug
 			if slug == "" {
 				slug = strings.ToLower(strings.ReplaceAll(title, " ", "-"))
@@ -486,13 +504,15 @@ func (s *AssistantService) Process(ctx context.Context, userID string, input ai.
 				DaysOfWeek:      "[1,2,3,4,5]",
 			})
 			if err != nil {
-				return nil, fmt.Errorf("falha ao criar link de agendamento: %w", err)
+				log.Printf("⚠️ [AssistantService] Erro ao criar booking type via chat: %v", err)
+				res.Message = fmt.Sprintf("Não consegui gerar o link de agendamento no momento (%v). Você também pode criá-lo pelo menu Vito Booking.", err)
+			} else {
+				linkURL := bt.ShortURL
+				if linkURL == "" || strings.Contains(linkURL, "dub.co/tools") {
+					linkURL = bt.PublicURL
+				}
+				res.Message = fmt.Sprintf("Criei o seu link de agendamento para '%s' (%d min):\n%s", bt.Title, bt.DurationMinutes, linkURL)
 			}
-			linkURL := bt.ShortURL
-			if linkURL == "" {
-				linkURL = bt.PublicURL
-			}
-			res.Message = fmt.Sprintf("Criei o seu link de agendamento para '%s' (%d min):\n%s", bt.Title, bt.DurationMinutes, linkURL)
 		}
 
 	case ai.ActionCancelBookingAppointment:

@@ -30,6 +30,7 @@ type Server struct {
 	aiSettingsHandler *handler.AISettingsHandler
 	pendingHandler    *handler.PendingHandler
 	bookingHandler    *handler.BookingHandler
+	chatHandler       *handler.ChatHandler
 	authSvc           *service.AuthService
 }
 
@@ -47,6 +48,7 @@ type Config struct {
 	AISettingsHandler *handler.AISettingsHandler
 	PendingHandler    *handler.PendingHandler
 	BookingHandler    *handler.BookingHandler
+	ChatHandler       *handler.ChatHandler
 	AuthSvc           *service.AuthService
 }
 
@@ -69,6 +71,7 @@ func New(cfg ...Config) *Server {
 		s.aiSettingsHandler = cfg[0].AISettingsHandler
 		s.pendingHandler = cfg[0].PendingHandler
 		s.bookingHandler = cfg[0].BookingHandler
+		s.chatHandler = cfg[0].ChatHandler
 		s.authSvc = cfg[0].AuthSvc
 	}
 
@@ -241,6 +244,15 @@ func (s *Server) registerRoutes() {
 						br.Delete("/types/{id}", s.bookingHandler.DeleteType)
 						br.Get("/appointments", s.bookingHandler.ListAppointments)
 						br.Delete("/appointments/{id}", s.bookingHandler.DeleteAppointment)
+					})
+				}
+
+				if s.chatHandler != nil {
+					protected.Route("/chat", func(cr chi.Router) {
+						cr.Get("/sessions", s.chatHandler.ListSessions)
+						cr.Get("/sessions/{id}", s.chatHandler.GetSessionMessages)
+						cr.Post("/sync", s.chatHandler.SyncSession)
+						cr.Delete("/sessions/{id}", s.chatHandler.DeleteSession)
 					})
 				}
 			})
