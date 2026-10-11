@@ -85,10 +85,18 @@ func Load() *Config {
 		GoogleClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
 		GoogleRedirectURL:  googleRedirectURL,
 		DubAPIKey:          os.Getenv("DUB_API_KEY"),
-		DubDomain:          os.Getenv("DUB_DOMAIN"),
+		DubDomain:          getEnvOrDefault("DUB_DOMAIN", "cal.link"),
 		TurnstileSecretKey: os.Getenv("CLOUDFLARE_TURNSTILE_SECRET_KEY"),
 		PublicBaseURL:      os.Getenv("PUBLIC_BASE_URL"),
 	}
+}
+
+func getEnvOrDefault(key, fallback string) string {
+	v := os.Getenv(key)
+	if v == "" {
+		return fallback
+	}
+	return v
 }
 
 // Validate verifica a integridade de segurança da configuração, impedindo que segredos fracos sejam usados em produção.

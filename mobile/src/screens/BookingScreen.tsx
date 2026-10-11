@@ -24,6 +24,21 @@ import { hapticFeedback } from '../theme/motion';
 import { api } from '../services/api';
 import { BookingType, BookingAppointment, CreateBookingTypeInput } from '../types';
 
+const TIME_PRESETS = [
+  { label: '09h às 18h', start: '09:00', end: '18:00' },
+  { label: '08h às 12h', start: '08:00', end: '12:00' },
+  { label: '13h às 18h', start: '13:00', end: '18:00' },
+  { label: '08h às 20h', start: '08:00', end: '20:00' },
+];
+
+const AVAILABLE_HOURS = [
+  '07:00', '07:30', '08:00', '08:30', '09:00', '09:30',
+  '10:00', '10:30', '11:00', '11:30', '12:00', '12:30',
+  '13:00', '13:30', '14:00', '14:30', '15:00', '15:30',
+  '16:00', '16:30', '17:00', '17:30', '18:00', '18:30',
+  '19:00', '19:30', '20:00', '20:30', '21:00', '21:30', '22:00',
+];
+
 let ClipboardModule: any = null;
 try {
   ClipboardModule = require('expo-clipboard');
@@ -57,11 +72,16 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack }) => {
   const [newBuffer, setNewBuffer] = useState(10);
   const [newStartHour, setNewStartHour] = useState('09:00');
   const [newEndHour, setNewEndHour] = useState('18:00');
+  const [timePickerTarget, setTimePickerTarget] = useState<'start' | 'end' | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Intercepta botão voltar do hardware no Android
   useEffect(() => {
     const onBackPress = () => {
+      if (timePickerTarget) {
+        setTimePickerTarget(null);
+        return true;
+      }
       if (createModalVisible) {
         setCreateModalVisible(false);
         setEditingType(null);
@@ -72,7 +92,7 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack }) => {
     };
     const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
     return () => subscription.remove();
-  }, [createModalVisible, onBack]);
+  }, [timePickerTarget, createModalVisible, onBack]);
 
   const loadData = useCallback(async () => {
     try {
@@ -452,7 +472,7 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack }) => {
                           style={[styles.urlText, { color: colors.onSurfaceVariant }]}
                           numberOfLines={1}
                         >
-                          {bt.short_url || bt.public_url || `vito.app/book/${bt.slug}`}
+                          {bt.short_url || bt.public_url || `https://cal.link/${bt.slug}`}
                         </Text>
                       </View>
 
@@ -470,9 +490,14 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack }) => {
                           <MaterialIcons
                             name={isCopied ? 'check' : 'content-copy'}
                             size={16}
-                            color="#FFFFFF"
+                            color={isCopied ? '#FFFFFF' : colors.onPrimary}
                           />
-                          <Text style={styles.copyButtonText}>
+                          <Text
+                            style={[
+                              styles.copyButtonText,
+                              { color: isCopied ? '#FFFFFF' : colors.onPrimary },
+                            ]}
+                          >
                             {isCopied ? 'Link Copiado!' : 'Copiar Link'}
                           </Text>
                         </TouchableOpacity>
@@ -482,8 +507,8 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack }) => {
                           onPress={() => handleOpenEdit(bt)}
                           activeOpacity={0.7}
                         >
-                          <MaterialIcons name="edit" size={16} color={colors.primary} />
-                          <Text style={[styles.editButtonText, { color: colors.primary }]}>
+                          <MaterialIcons name="edit" size={16} color={colors.onSurface} />
+                          <Text style={[styles.editButtonText, { color: colors.onSurface }]}>
                             Editar
                           </Text>
                         </TouchableOpacity>
@@ -669,6 +694,30 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack }) => {
                   onChangeText={(val) => setNewSlug(val.toLowerCase())}
                   autoCapitalize="none"
                 />
+
+                {/* Prévia Instantânea do Link Público */}
+                <View
+                  style={[
+                    styles.linkPreviewBox,
+                    {
+                      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)',
+                      borderColor: colors.outlineVariant,
+                    },
+                  ]}
+                >
+                  <View style={styles.linkPreviewHeader}>
+                    <MaterialIcons name="link" size={14} color={colors.primary} />
+                    <Text style={[styles.linkPreviewLabel, { color: colors.onSurfaceVariant }]}>
+                      Prévia do link:
+                    </Text>
+                  </View>
+                  <Text
+                    style={[styles.linkPreviewUrl, { color: colors.onSurface }]}
+                    numberOfLines={1}
+                  >
+                    {`https://cal.link/${newSlug ? newSlug.toLowerCase().replace(/[^a-z0-9-]/g, '-') : 'seu-link'}`}
+                  </Text>
+                </View>
               </View>
 
               <View style={styles.formGroup}>
@@ -741,40 +790,100 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack }) => {
                 </View>
               </View>
 
-              <View style={styles.formRow}>
-                <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
-                  <Text style={[styles.formLabel, { color: colors.onSurface }]}>Início</Text>
-                  <TextInput
-                    style={[
-                      styles.formInput,
-                      {
-                        backgroundColor: colors.surfaceVariant,
-                        color: colors.onSurface,
-                        borderColor: colors.outlineVariant,
-                      },
-                    ]}
-                    value={newStartHour}
-                    onChangeText={setNewStartHour}
-                    placeholder="09:00"
-                    placeholderTextColor={colors.onSurfaceVariant}
-                  />
+              {/* Horários de Atendimento com Presets e Seletores Táteis */}
+              <View style={styles.formGroup}>
+                <Text style={[styles.formLabel, { color: colors.onSurface }]}>Horário de Atendimento</Text>
+
+                {/* Presets Rápidos */}
+                <View style={styles.timePresetsContainer}>
+                  {TIME_PRESETS.map((p) => {
+                    const isSelected = newStartHour === p.start && newEndHour === p.end;
+                    return (
+                      <TouchableOpacity
+                        key={p.label}
+                        style={[
+                          styles.timePresetChip,
+                          {
+                            borderColor: isSelected ? colors.primary : colors.outlineVariant,
+                            backgroundColor: isSelected
+                              ? (isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.06)')
+                              : 'transparent',
+                          },
+                        ]}
+                        onPress={() => {
+                          hapticFeedback.selection();
+                          setNewStartHour(p.start);
+                          setNewEndHour(p.end);
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <Text
+                          style={[
+                            styles.timePresetChipText,
+                            { color: isSelected ? colors.primary : colors.onSurfaceVariant },
+                            isSelected && { fontWeight: '700' },
+                          ]}
+                        >
+                          {p.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
-                <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}>
-                  <Text style={[styles.formLabel, { color: colors.onSurface }]}>Fim</Text>
-                  <TextInput
+
+                {/* Seletores Táteis de Início e Fim */}
+                <View style={styles.timeSelectorsRow}>
+                  <TouchableOpacity
                     style={[
-                      styles.formInput,
+                      styles.timeSelectorButton,
                       {
                         backgroundColor: colors.surfaceVariant,
-                        color: colors.onSurface,
                         borderColor: colors.outlineVariant,
                       },
                     ]}
-                    value={newEndHour}
-                    onChangeText={setNewEndHour}
-                    placeholder="18:00"
-                    placeholderTextColor={colors.onSurfaceVariant}
-                  />
+                    onPress={() => {
+                      hapticFeedback.light();
+                      setTimePickerTarget('start');
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.timeSelectorLabel, { color: colors.onSurfaceVariant }]}>
+                      Início
+                    </Text>
+                    <View style={styles.timeSelectorValueRow}>
+                      <MaterialIcons name="access-time" size={16} color={colors.primary} />
+                      <Text style={[styles.timeSelectorValue, { color: colors.onSurface }, tabularNumbers]}>
+                        {newStartHour}
+                      </Text>
+                      <MaterialIcons name="arrow-drop-down" size={18} color={colors.onSurfaceVariant} />
+                    </View>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.timeSelectorButton,
+                      {
+                        backgroundColor: colors.surfaceVariant,
+                        borderColor: colors.outlineVariant,
+                      },
+                    ]}
+                    onPress={() => {
+                      hapticFeedback.light();
+                      setTimePickerTarget('end');
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.timeSelectorLabel, { color: colors.onSurfaceVariant }]}>
+                      Fim
+                    </Text>
+                    <View style={styles.timeSelectorValueRow}>
+                      <MaterialIcons name="access-time" size={16} color={colors.primary} />
+                      <Text style={[styles.timeSelectorValue, { color: colors.onSurface }, tabularNumbers]}>
+                        {newEndHour}
+                      </Text>
+                      <MaterialIcons name="arrow-drop-down" size={18} color={colors.onSurfaceVariant} />
+                    </View>
+                  </TouchableOpacity>
                 </View>
               </View>
 
@@ -798,6 +907,81 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack }) => {
             </ScrollView>
           </View>
         </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Modal Seletor Rápido de Horário (Início ou Fim) */}
+      <Modal
+        visible={timePickerTarget !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setTimePickerTarget(null)}
+      >
+        <View style={styles.pickerModalOverlay}>
+          <TouchableOpacity
+            style={styles.pickerModalBackdrop}
+            activeOpacity={1}
+            onPress={() => setTimePickerTarget(null)}
+          />
+          <View style={[styles.pickerModalContent, { backgroundColor: colors.surface, borderColor: colors.outlineVariant }]}>
+            <View style={styles.pickerModalHeader}>
+              <View style={styles.pickerModalTitleRow}>
+                <MaterialIcons name="schedule" size={20} color={colors.primary} />
+                <Text style={[styles.pickerModalTitle, { color: colors.onSurface }]}>
+                  {timePickerTarget === 'start' ? 'Horário de Início' : 'Horário de Término'}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setTimePickerTarget(null)}
+                style={styles.modalCloseBtn}
+              >
+                <MaterialIcons name="close" size={20} color={colors.onSurfaceVariant} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              style={styles.pickerScrollView}
+              contentContainerStyle={styles.pickerGrid}
+              showsVerticalScrollIndicator={false}
+            >
+              {AVAILABLE_HOURS.map((hour) => {
+                const isCurrent = (timePickerTarget === 'start' ? newStartHour : newEndHour) === hour;
+                return (
+                  <TouchableOpacity
+                    key={hour}
+                    style={[
+                      styles.hourGridItem,
+                      {
+                        borderColor: isCurrent ? colors.primary : colors.outlineVariant,
+                        backgroundColor: isCurrent ? colors.primary : colors.surfaceVariant,
+                      },
+                    ]}
+                    onPress={() => {
+                      hapticFeedback.selection();
+                      if (timePickerTarget === 'start') {
+                        setNewStartHour(hour);
+                      } else {
+                        setNewEndHour(hour);
+                      }
+                      setTimePickerTarget(null);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.hourGridItemText,
+                        { color: isCurrent ? colors.onPrimary : colors.onSurface },
+                        isCurrent && { fontWeight: '700' },
+                        tabularNumbers,
+                      ]}
+                    >
+                      {hour}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
       </Modal>
     </SafeAreaView>
   );
@@ -1009,7 +1193,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   copyButtonText: {
-    color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '600',
   },
@@ -1182,5 +1365,132 @@ const styles = StyleSheet.create({
   submitModalText: {
     fontSize: 15,
     fontWeight: '700',
+  },
+  linkPreviewBox: {
+    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  linkPreviewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 2,
+  },
+  linkPreviewLabel: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  linkPreviewUrl: {
+    fontSize: 13,
+    fontWeight: '700',
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
+  timePresetsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 10,
+  },
+  timePresetChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  timePresetChipText: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  timeSelectorsRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  timeSelectorButton: {
+    flex: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  timeSelectorLabel: {
+    fontSize: 11,
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  timeSelectorValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  timeSelectorValue: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  pickerModalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  pickerModalBackdrop: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+  },
+  pickerModalContent: {
+    width: '100%',
+    maxWidth: 380,
+    maxHeight: '70%',
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 18,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  pickerModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  pickerModalTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  pickerModalTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  pickerScrollView: {
+    maxHeight: 320,
+  },
+  pickerGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'space-between',
+    paddingBottom: 10,
+  },
+  hourGridItem: {
+    width: '30%',
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  hourGridItemText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
