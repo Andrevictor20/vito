@@ -98,36 +98,46 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <TouchableWithoutFeedback onPress={onClose}>
-        <View style={styles.overlay}>
-          <TouchableWithoutFeedback>
-            <View style={[styles.sheet, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
-              {/* Grab Bar & Top Bar */}
-              <View style={styles.header}>
-                <View style={[styles.grabBar, { backgroundColor: colors.outlineVariant }]} />
-                <View style={styles.titleRow}>
-                  <View style={styles.titleLeft}>
-                    <View style={[styles.titleIconBox, { backgroundColor: colors.surfaceContainerHigh }]}>
-                      <MaterialIcons name="notifications-active" size={20} color={colors.primary} />
-                    </View>
-                    <View>
-                      <Text style={[styles.title, { color: colors.onSurface }]}>Notificações & Alertas</Text>
-                      <Text style={[styles.subtitle, { color: colors.onSurfaceVariant }]}>
-                        Alertas discretos e pontuais
-                      </Text>
-                    </View>
-                  </View>
-                  <TouchableOpacity
-                    style={[styles.closeBtn, { backgroundColor: colors.surfaceContainerHighest, borderColor: colors.outlineVariant }]}
-                    onPress={onClose}
-                    activeOpacity={0.7}
-                  >
-                    <MaterialIcons name="close" size={18} color={colors.onSurface} />
-                  </TouchableOpacity>
+      <View style={styles.overlay}>
+        <TouchableOpacity
+          style={styles.backdrop}
+          onPress={onClose}
+          activeOpacity={1}
+          accessibilityLabel="Fechar modal"
+        />
+        <View style={[styles.sheet, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
+          {/* Grab Bar & Top Bar */}
+          <View style={styles.header}>
+            <View style={[styles.grabBar, { backgroundColor: colors.outlineVariant }]} />
+            <View style={styles.titleRow}>
+              <View style={styles.titleLeft}>
+                <View style={[styles.titleIconBox, { backgroundColor: colors.surfaceContainerHigh }]}>
+                  <MaterialIcons name="notifications-active" size={20} color={colors.primary} />
+                </View>
+                <View>
+                  <Text style={[styles.title, { color: colors.onSurface }]}>Notificações & Alertas</Text>
+                  <Text style={[styles.subtitle, { color: colors.onSurfaceVariant }]}>
+                    Alertas discretos e pontuais
+                  </Text>
                 </View>
               </View>
+              <TouchableOpacity
+                style={[styles.closeBtn, { backgroundColor: colors.surfaceContainerHighest, borderColor: colors.outlineVariant }]}
+                onPress={onClose}
+                activeOpacity={0.7}
+              >
+                <MaterialIcons name="close" size={18} color={colors.onSurface} />
+              </TouchableOpacity>
+            </View>
+          </View>
 
-              <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            contentContainerStyle={styles.content}
+            showsVerticalScrollIndicator={true}
+            bounces={true}
+            nestedScrollEnabled={true}
+            keyboardShouldPersistTaps="handled"
+          >
                 {/* 1. Ativar Notificações */}
                 <View style={[styles.card, { backgroundColor: colors.surfaceContainerHigh, borderColor: colors.outlineVariant }]}>
                   <View style={styles.cardHeader}>
@@ -344,9 +354,7 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
 
               </ScrollView>
             </View>
-          </TouchableWithoutFeedback>
         </View>
-      </TouchableWithoutFeedback>
     </Modal>
   );
 };
@@ -357,12 +365,15 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.65)',
     justifyContent: 'flex-end',
   },
+  backdrop: {
+    flex: 1,
+  },
   sheet: {
     borderTopLeftRadius: MD3Shapes.extraLarge,
     borderTopRightRadius: MD3Shapes.extraLarge,
     borderWidth: 1,
-    maxHeight: '90%',
-    paddingBottom: 24,
+    maxHeight: '92%',
+    overflow: 'hidden',
   },
   header: {
     paddingHorizontal: 20,
@@ -411,7 +422,8 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingTop: 4,
+    paddingBottom: 100,
   },
   card: {
     borderRadius: MD3Shapes.large,
