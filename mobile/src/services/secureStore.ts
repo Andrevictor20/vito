@@ -25,16 +25,30 @@ export const secureStorage = {
         return;
       }
 
-      // 1. Sempre persiste no AsyncStorage primeiro (resiliente contra reboots e limpezas do Keystore)
-      await AsyncStorage.setItem(key, value).catch(() => {});
+      const isSensitive = key.includes('token') || key.includes('secret') || key.includes('auth');
 
-      // 2. Tenta persistência criptografada no SecureStore
+      // 1. Tenta persistência criptografada no SecureStore (Hardware Keystore / Keychain)
       const options = isIOS ? { keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK } : undefined;
-      await SecureStore.setItemAsync(key, value, options);
+      let secureStoreSuccess = false;
+      try {
+        await SecureStore.setItemAsync(key, value, options);
+        secureStoreSuccess = true;
+      } catch (secErr) {
+        console.warn(`[secureStorage] Falha ao persistir no SecureStore para '${key}':`, secErr);
+      }
+
+      // 2. Apenas utiliza AsyncStorage se NÃO for token sensível OU se o SecureStore falhar
+      if (!isSensitive || !secureStoreSuccess) {
+        await AsyncStorage.setItem(key, value).catch(() => {});
+      } else {
+        // Se SecureStore foi bem sucedido, garante que nenhuma cópia residual em texto claro resida no AsyncStorage
+        await AsyncStorage.removeItem(key).catch(() => {});
+      }
     } catch (err) {
       console.warn(`[secureStorage] Erro ao salvar chave segura '${key}':`, err);
     }
   },
+
 
   async getItem(key: string): Promise<string | null> {
     try {

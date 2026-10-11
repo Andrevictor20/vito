@@ -57,6 +57,37 @@ func (h *NotificationHandler) RegisterDeviceToken(w http.ResponseWriter, r *http
 	})
 }
 
+// UnregisterDeviceToken revoga o push token do dispositivo para o usuário autenticado.
+func (h *NotificationHandler) UnregisterDeviceToken(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, `{"error":"não autorizado"}`, http.StatusUnauthorized)
+		return
+	}
+
+	var req registerDeviceTokenRequest
+	token := r.URL.Query().Get("token")
+	if token == "" {
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		token = req.Token
+	}
+
+	if err := h.notifSvc.UnregisterDeviceToken(userID, token); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"status": "unregistered",
+		"token":  token,
+	})
+}
+
+
 // SendTestNotification dispara uma notificação push de teste para o usuário autenticado.
 func (h *NotificationHandler) SendTestNotification(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())

@@ -103,3 +103,52 @@ func TestNotificationHandler_SendTestNotification(t *testing.T) {
 		t.Fatalf("expected 200 OK, got %d: %s", rr.Code, rr.Body.String())
 	}
 }
+
+func TestNotificationHandler_UnregisterDeviceToken(t *testing.T) {
+	repo := &mockTokenRepo{}
+	svc := service.NewNotificationService(repo)
+	h := handler.NewNotificationHandler(svc)
+
+	ctx := context.WithValue(context.Background(), middleware.UserIDKey, "user-test-123")
+
+	// 1. Sucesso via JSON body
+	body, _ := json.Marshal(map[string]string{
+		"token": "ExponentPushToken[to-unregister-xyz]",
+	})
+	req := httptest.NewRequest(http.MethodDelete, "/notifications/device-token", bytes.NewReader(body))
+	req = req.WithContext(ctx)
+	rr := httptest.NewRecorder()
+
+	h.UnregisterDeviceToken(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var res map[string]interface{}
+	if err := json.Unmarshal(rr.Body.Bytes(), &res); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if res["status"] != "unregistered" {
+		t.Errorf("expected status unregistered, got %v", res["status"])
+	}
+
+	// 2. Não autorizado se sem userID no contexto
+	reqUnauth := httptest.NewRequest(http.MethodDelete, "/notifications/device-token", bytes.NewReader(body))
+	rrUnauth := httptest.NewRecorder()
+	h.UnregisterDeviceToken(rrUnauth, reqUnauth)
+	if rrUnauth.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401 Unauthorized, got %d", rrUnauth.Code)
+	}
+
+	// 3. Token vazio -> 400
+	emptyBody, _ := json.Marshal(map[string]string{"token": "   "})
+	reqEmpty := httptest.NewRequest(http.MethodDelete, "/notifications/device-token", bytes.NewReader(emptyBody))
+	reqEmpty = reqEmpty.WithContext(ctx)
+	rrEmpty := httptest.NewRecorder()
+	h.UnregisterDeviceToken(rrEmpty, reqEmpty)
+	if rrEmpty.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 Bad Request, got %d", rrEmpty.Code)
+	}
+}
+

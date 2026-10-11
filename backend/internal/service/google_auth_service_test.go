@@ -44,6 +44,17 @@ func (m *MockUserRepositoryInMemory) GetByEmail(email string) (*domain.User, err
 	return u, nil
 }
 
+func (m *MockUserRepositoryInMemory) IncrementTokenVersion(id string) error {
+	for _, u := range m.users {
+		if u.ID == id {
+			u.TokenVersion++
+			return nil
+		}
+	}
+	return domain.ErrUserNotFound
+}
+
+
 // MockSyncServiceInMemory para registrar integração de calendário
 type MockSyncServiceInMemory struct {
 	connectedProvider string
@@ -103,6 +114,44 @@ func TestGoogleAuthService_StateHMAC(t *testing.T) {
 		t.Error("esperava erro de assinatura adulterada no state, mas passou")
 	}
 }
+
+func TestGoogleAuthService_RedirectSchemeAllowlist(t *testing.T) {
+	cfg := service.GoogleAuthConfig{
+		ClientID:     "mock-client-id",
+		ClientSecret: "mock-client-secret",
+		RedirectURL:  "https://vito.rasppi.cloud/api/v1/auth/google/callback",
+		JWTSecret:    "secret123",
+	}
+	svc := service.NewGoogleAuthService(cfg, nil, nil, nil)
+
+	// 1. Esquema malicioso externo deve sofrer fallback para vito://oauth/callback
+	stateEvil, err := svc.GenerateState("login", "", "https://evil-attacker-site.com/steal-token")
+	if err != nil {
+		t.Fatalf("falha ao gerar state: %v", err)
+	}
+	parsedEvil, err := svc.ValidateState(stateEvil)
+	if err != nil {
+		t.Fatalf("falha ao validar state: %v", err)
+	}
+	if parsedEvil.RedirectScheme != "vito://oauth/callback" {
+		t.Errorf("esperava sanitização para 'vito://oauth/callback', obteve: %s", parsedEvil.RedirectScheme)
+	}
+
+	// 2. Esquema legítimo vito:// deve ser aceito
+	stateLegit, _ := svc.GenerateState("login", "", "vito://custom/path")
+	parsedLegit, _ := svc.ValidateState(stateLegit)
+	if parsedLegit.RedirectScheme != "vito://custom/path" {
+		t.Errorf("esperava 'vito://custom/path', obteve: %s", parsedLegit.RedirectScheme)
+	}
+
+	// 3. Esquema Expo em dev deve ser aceito
+	stateExpo, _ := svc.GenerateState("login", "", "exp://192.168.1.50:8081/--/oauth/callback")
+	parsedExpo, _ := svc.ValidateState(stateExpo)
+	if parsedExpo.RedirectScheme != "exp://192.168.1.50:8081/--/oauth/callback" {
+		t.Errorf("esperava scheme exp:// aceito, obteve: %s", parsedExpo.RedirectScheme)
+	}
+}
+
 
 func TestGoogleAuthService_GetAuthURL(t *testing.T) {
 	cfg := service.GoogleAuthConfig{

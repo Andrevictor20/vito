@@ -17,8 +17,21 @@ func NewDeviceTokenRepository(db *sql.DB) *DeviceTokenRepositorySQLite {
 	return &DeviceTokenRepositorySQLite{db: db}
 }
 
-// Save insere ou atualiza um token de dispositivo garantindo isolamento por user_id.
+// Save insere ou atualiza um token de dispositivo garantindo isolamento por user_id e exclusividade de hardware.
 func (r *DeviceTokenRepositorySQLite) Save(dt *domain.DeviceToken) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// 1. Desassocia o token físico de qualquer conta anterior no mesmo aparelho para prevenir push leakage
+	cleanupQuery := `DELETE FROM device_tokens WHERE token = ? AND user_id != ?`
+	if _, err := tx.Exec(cleanupQuery, dt.Token, dt.UserID); err != nil {
+		return err
+	}
+
+	// 2. Insere ou atualiza para o usuário atual
 	query := `
 		INSERT INTO device_tokens (id, user_id, token, platform, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?)
@@ -32,9 +45,13 @@ func (r *DeviceTokenRepositorySQLite) Save(dt *domain.DeviceToken) error {
 	}
 	dt.UpdatedAt = now
 
-	_, err := r.db.Exec(query, dt.ID, dt.UserID, dt.Token, dt.Platform, dt.CreatedAt, dt.UpdatedAt)
-	return err
+	if _, err := tx.Exec(query, dt.ID, dt.UserID, dt.Token, dt.Platform, dt.CreatedAt, dt.UpdatedAt); err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }
+
 
 // FindByUserID recupera todos os tokens de dispositivo associados a um usuário.
 func (r *DeviceTokenRepositorySQLite) FindByUserID(userID string) ([]domain.DeviceToken, error) {

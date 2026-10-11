@@ -18,6 +18,8 @@ func (m *mockUserRepoForHandler) GetByID(id string) (*domain.User, error) { retu
 func (m *mockUserRepoForHandler) GetByEmail(email string) (*domain.User, error) {
 	return nil, domain.ErrUserNotFound
 }
+func (m *mockUserRepoForHandler) IncrementTokenVersion(id string) error { return nil }
+
 
 func TestGoogleAuthHandler_StartLogin(t *testing.T) {
 	cfg := service.GoogleAuthConfig{

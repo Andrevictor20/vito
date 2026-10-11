@@ -24,13 +24,16 @@ import { ChatScreen, ChatScreenRef } from './ChatScreen';
 import { TriggersScreen } from './TriggersScreen';
 import { useHomeData } from '../hooks/useHomeData';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 import { Event } from '../types';
 
 export const HomeScreen: React.FC<{
   serverUrl: string;
   onToggleServer: () => void;
 }> = ({ serverUrl, onToggleServer }) => {
+  const { user } = useAuth();
   const { colors, isDark } = useTheme();
+
   const [activeTab, setActiveTab] = useState<'chat' | 'calendar' | 'triggers'>('chat');
   const [profileVisible, setProfileVisible] = useState(false);
   const [createModalVisible, setCreateModalVisible] = useState(false);
@@ -82,7 +85,8 @@ export const HomeScreen: React.FC<{
     loadData,
     syncGoogleCalendar,
     syncingGoogle,
-  } = useHomeData();
+  } = useHomeData(user?.id);
+
 
   const completedCount = useMemo(() => {
     return todos.filter((t) => t.status === 'completed').length;

@@ -44,9 +44,11 @@ func runMigrations(db *sql.DB) error {
 		name TEXT NOT NULL,
 		email TEXT UNIQUE NOT NULL,
 		password_hash TEXT NOT NULL,
+		token_version INTEGER DEFAULT 1,
 		created_at DATETIME NOT NULL,
 		updated_at DATETIME NOT NULL
 	);
+
 
 	CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 
@@ -217,7 +219,9 @@ func runMigrations(db *sql.DB) error {
 	_, _ = db.Exec("ALTER TABLE triggers ADD COLUMN scheduled_time TEXT DEFAULT ''")
 	_, _ = db.Exec("ALTER TABLE triggers ADD COLUMN days_of_week TEXT DEFAULT 'DAILY'")
 	_, _ = db.Exec("ALTER TABLE triggers ADD COLUMN last_run_status TEXT DEFAULT ''")
+	_, _ = db.Exec("ALTER TABLE users ADD COLUMN token_version INTEGER DEFAULT 1")
 	_, _ = db.Exec("CREATE INDEX IF NOT EXISTS idx_triggers_worker ON triggers(status, next_check_at)")
 
 	return nil
 }
+

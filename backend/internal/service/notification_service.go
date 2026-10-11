@@ -86,6 +86,16 @@ func (s *NotificationService) GetUserTokens(userID string) ([]domain.DeviceToken
 	return s.tokenRepo.FindByUserID(userID)
 }
 
+// UnregisterDeviceToken remove o token de push do usuário no logout ou desativação.
+func (s *NotificationService) UnregisterDeviceToken(userID, token string) error {
+	trimmedToken := strings.TrimSpace(token)
+	if trimmedToken == "" {
+		return ErrTokenEmpty
+	}
+	return s.tokenRepo.Delete(userID, trimmedToken)
+}
+
+
 // SendPushToUser despacha uma notificação push para todos os dispositivos registrados do usuário.
 func (s *NotificationService) SendPushToUser(userID, title, body, priority string, data map[string]interface{}) (int, error) {
 	tokens, err := s.tokenRepo.FindByUserID(userID)

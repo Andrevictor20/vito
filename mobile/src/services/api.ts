@@ -588,6 +588,14 @@ class ApiService {
     });
   }
 
+  async revokePushToken(token: string): Promise<{ status: string; token: string }> {
+    return this.request<{ status: string; token: string }>('/api/v1/notifications/device-token', {
+      method: 'DELETE',
+      body: JSON.stringify({ token }),
+    });
+  }
+
+
   async testPushNotification(priority: 'default' | 'silent' = 'default', title?: string, body?: string): Promise<{ status: string; dispatched: number }> {
     return this.request<{ status: string; dispatched: number }>('/api/v1/notifications/test', {
       method: 'POST',

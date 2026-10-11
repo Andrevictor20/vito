@@ -230,6 +230,11 @@ export const notificationService = {
     return { granted: true, pushToken, canAskAgain: true };
   },
 
+  async getSavedPushToken(): Promise<string | null> {
+    return secureStorage.getItem(PUSH_TOKEN_SECURE_KEY);
+  },
+
+
   /**
    * Obtém as configurações salvas de notificação.
    */
@@ -476,7 +481,20 @@ export const notificationService = {
     }
   },
 
+  /**
+   * Cancela todas as notificações locais agendadas no dispositivo (utilizado no logout / troca de conta).
+   */
+  async cancelAllUpcomingReminders(): Promise<void> {
+    if (!this.isAvailable()) return;
+    try {
+      await Notifications.cancelAllScheduledNotificationsAsync();
+    } catch (e) {
+      console.warn('[NotificationService] Erro ao cancelar notificações locais:', e);
+    }
+  },
+
   addReceivedListener(callback: (notification: any) => void) {
+
     if (!this.isAvailable()) return { remove: () => {} };
     try {
       return Notifications.addNotificationReceivedListener(callback);

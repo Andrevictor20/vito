@@ -1,9 +1,11 @@
 package config
 
 import (
+	"errors"
 	"os"
 	"strings"
 )
+
 
 // Config armazena as configurações do ambiente do servidor Vito.
 type Config struct {
@@ -73,6 +75,17 @@ func Load() *Config {
 		GoogleRedirectURL:  googleRedirectURL,
 	}
 }
+
+// Validate verifica a integridade de segurança da configuração, impedindo que segredos fracos sejam usados em produção.
+func (c *Config) Validate() error {
+	if strings.EqualFold(c.Environment, "production") {
+		if c.JWTSecret == "vito-development-secret-change-in-production-12345" || len(c.JWTSecret) < 32 {
+			return errors.New("em ambiente de produção (APP_ENV=production), JWT_SECRET deve ser configurado com no mínimo 32 caracteres seguros")
+		}
+	}
+	return nil
+}
+
 
 func loadEnvFile(paths ...string) {
 	for _, p := range paths {

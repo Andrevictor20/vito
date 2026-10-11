@@ -72,11 +72,18 @@ func (h *AssistantHandler) Chat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	r.Body = http.MaxBytesReader(w, r.Body, 15<<20) // 15MB
 	var req assistantChatRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		var maxErr *http.MaxBytesError
+		if errors.As(err, &maxErr) {
+			http.Error(w, `{"error":"payload excede o limite máximo permitido (15MB)"}`, http.StatusRequestEntityTooLarge)
+			return
+		}
 		http.Error(w, `{"error":"payload inválido"}`, http.StatusBadRequest)
 		return
 	}
+
 
 	rawText := req.Text
 	if rawText == "" {
@@ -133,7 +140,10 @@ func (h *AssistantHandler) AudioChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	r.Body = http.MaxBytesReader(w, r.Body, 25<<20) // 25MB
+
 	var fileBytes []byte
+
 	var filename string
 	var mime string
 	var clientTime string
@@ -269,7 +279,10 @@ func (h *AssistantHandler) VisionChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	r.Body = http.MaxBytesReader(w, r.Body, 25<<20) // 25MB
+
 	var imageB64 string
+
 	var mime string
 	var prompt string
 	var clientTime string

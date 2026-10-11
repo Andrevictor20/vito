@@ -62,7 +62,8 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
     startNewConversation,
     switchConversation,
     deleteConversation,
-  } = useChat(onDataChanged);
+  } = useChat(onDataChanged, user?.id);
+
   const [inputText, setInputText] = useState('');
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
   const [selectedImageBase64, setSelectedImageBase64] = useState<string | null>(null);

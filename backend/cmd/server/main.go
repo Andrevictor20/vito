@@ -23,6 +23,10 @@ import (
 
 func main() {
 	cfg := config.Load()
+	if err := cfg.Validate(); err != nil {
+		log.Fatalf("❌ Falha crítica de segurança na configuração: %v", err)
+	}
+
 
 	// 1. Conexão ao SQLite com WAL mode e Migrações
 	log.Printf("📦 [Vito DB] Inicializando banco SQLite em '%s'...", cfg.DBPath)

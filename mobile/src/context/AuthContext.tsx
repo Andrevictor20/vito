@@ -4,6 +4,8 @@ import { secureStorage } from '../services/secureStore';
 import { User } from '../types';
 import { api } from '../services/api';
 import { googleAuthService } from '../services/googleAuthService';
+import { notificationService } from '../services/notificationService';
+
 
 const USER_KEY = '@vito_user';
 
@@ -105,10 +107,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = async () => {
-    await api.setToken(null);
-    await secureStorage.removeItem(USER_KEY);
-    setUser(null);
+    setIsLoading(true);
+    try {
+      // 1. Revoga o push token no backend Go para prevenir push leakage para outro usuário no mesmo hardware
+      try {
+        const pushToken = await notificationService.getSavedPushToken();
+        if (pushToken && api.getToken()) {
+          await api.revokePushToken(pushToken);
+        }
+      } catch (tokErr) {
+        console.warn('[AuthContext] Falha ao revogar push token no logout:', tokErr);
+      }
+
+      // 2. Cancela todos os alarmes locais do SO para não tocar alertas da conta anterior
+      await notificationService.cancelAllUpcomingReminders().catch(() => {});
+
+      // 3. Remove credenciais e chaves do usuário
+      await api.setToken(null);
+      await secureStorage.removeItem(USER_KEY);
+      setUser(null);
+    } finally {
+      setIsLoading(false);
+    }
   };
+
 
 
   return (

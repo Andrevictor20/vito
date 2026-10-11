@@ -87,11 +87,30 @@ func NewGoogleAuthService(
 	}
 }
 
+func isAllowedRedirectScheme(rawScheme string) bool {
+	lower := strings.ToLower(strings.TrimSpace(rawScheme))
+	if lower == "" {
+		return false
+	}
+	if strings.HasPrefix(lower, "vito://") {
+		return true
+	}
+	if strings.HasPrefix(lower, "exp://") {
+		return true
+	}
+	if strings.HasPrefix(lower, "http://localhost:") || strings.HasPrefix(lower, "https://localhost:") ||
+		strings.HasPrefix(lower, "http://127.0.0.1:") || strings.HasPrefix(lower, "https://127.0.0.1:") {
+		return true
+	}
+	return false
+}
+
 // GenerateState gera um token state assinado com HMAC-SHA256 anti-CSRF.
 func (s *GoogleAuthService) GenerateState(mode, userID, redirectScheme string) (string, error) {
-	if redirectScheme == "" {
+	if !isAllowedRedirectScheme(redirectScheme) {
 		redirectScheme = "vito://oauth/callback"
 	}
+
 
 	nonceBytes := make([]byte, 16)
 	if _, err := rand.Read(nonceBytes); err != nil {

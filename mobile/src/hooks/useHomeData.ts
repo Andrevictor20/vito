@@ -6,15 +6,22 @@ import { notificationService } from '../services/notificationService';
 
 import { toLocalDateString, parseSafeDate, isEventOnDate, getEventDays } from '../utils/calendarDateUtils';
 
-const CACHE_EVENTS_KEY = '@vito_cache_events';
-const CACHE_TODOS_KEY = '@vito_cache_todos';
+export const getHomeCacheKeys = (userId?: string) => {
+  const suffix = userId ? `_${userId}` : '';
+  return {
+    eventsKey: `@vito_cache_events${suffix}`,
+    todosKey: `@vito_cache_todos${suffix}`,
+  };
+};
 
-export function useHomeData() {
+export function useHomeData(currentUserId?: string) {
   const [events, setEvents] = useState<Event[]>([]);
   const [todos, setTodos] = useState<Todo[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+
+  const cacheKeys = useMemo(() => getHomeCacheKeys(currentUserId), [currentUserId]);
 
   // Assistant state
   const [assistantLoading, setAssistantLoading] = useState(false);
@@ -22,6 +29,13 @@ export function useHomeData() {
   const [modalVisible, setModalVisible] = useState(false);
 
   const loadData = useCallback(async (isSilent = false) => {
+    if (!currentUserId) {
+      setEvents([]);
+      setTodos([]);
+      setLoading(false);
+      return;
+    }
+
     if (!isSilent) setLoading(true);
     try {
       const [fetchedEvents, fetchedTodos] = await Promise.all([
@@ -30,8 +44,8 @@ export function useHomeData() {
       ]);
       setEvents(fetchedEvents || []);
       setTodos(fetchedTodos || []);
-      AsyncStorage.setItem(CACHE_EVENTS_KEY, JSON.stringify(fetchedEvents || [])).catch(() => {});
-      AsyncStorage.setItem(CACHE_TODOS_KEY, JSON.stringify(fetchedTodos || [])).catch(() => {});
+      AsyncStorage.setItem(cacheKeys.eventsKey, JSON.stringify(fetchedEvents || [])).catch(() => {});
+      AsyncStorage.setItem(cacheKeys.todosKey, JSON.stringify(fetchedTodos || [])).catch(() => {});
       if (fetchedEvents && fetchedEvents.length > 0) {
         notificationService.scheduleAllUpcomingReminders(fetchedEvents).catch(() => {});
       }
@@ -41,11 +55,20 @@ export function useHomeData() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [currentUserId, cacheKeys.eventsKey, cacheKeys.todosKey]);
 
   useEffect(() => {
-    // 1. Hidratação Instantânea de Cache (< 5ms)
-    AsyncStorage.multiGet([CACHE_EVENTS_KEY, CACHE_TODOS_KEY]).then(([eventsEntry, todosEntry]) => {
+    let isMounted = true;
+    if (!currentUserId) {
+      setEvents([]);
+      setTodos([]);
+      setLoading(false);
+      return;
+    }
+
+    // 1. Hidratação Instantânea de Cache (< 5ms) da conta autenticada
+    AsyncStorage.multiGet([cacheKeys.eventsKey, cacheKeys.todosKey]).then(([eventsEntry, todosEntry]) => {
+      if (!isMounted) return;
       let hasCachedData = false;
       if (eventsEntry && eventsEntry[1]) {
         try {
@@ -68,13 +91,19 @@ export function useHomeData() {
       if (hasCachedData) {
         setLoading(false);
       }
-      // 2. Revalidação silenciosa em background (Stale-While-Revalidate)
-      loadData(hasCachedData);
     });
-  }, [loadData]);
+
+    // 2. Sincronização em background
+    loadData(true);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [currentUserId, cacheKeys.eventsKey, cacheKeys.todosKey, loadData]);
 
   const onRefresh = () => {
     setRefreshing(true);
+
     loadData(false);
   };
 
@@ -84,7 +113,7 @@ export function useHomeData() {
       if (res?.event) {
         setEvents((prev) => {
           const next = [...prev, res.event];
-          AsyncStorage.setItem(CACHE_EVENTS_KEY, JSON.stringify(next)).catch(() => {});
+          AsyncStorage.setItem(cacheKeys.eventsKey, JSON.stringify(next)).catch(() => {});
           return next;
         });
         notificationService.scheduleEventDualReminders(res.event).catch(() => {});
@@ -105,7 +134,7 @@ export function useHomeData() {
       if (newTodo) {
         setTodos((prev) => {
           const next = [...prev, newTodo];
-          AsyncStorage.setItem(CACHE_TODOS_KEY, JSON.stringify(next)).catch(() => {});
+          AsyncStorage.setItem(cacheKeys.todosKey, JSON.stringify(next)).catch(() => {});
           return next;
         });
       }
@@ -130,7 +159,7 @@ export function useHomeData() {
         } else {
           next = prev.filter((e) => e.id !== id);
         }
-        AsyncStorage.setItem(CACHE_EVENTS_KEY, JSON.stringify(next)).catch(() => {});
+        AsyncStorage.setItem(cacheKeys.eventsKey, JSON.stringify(next)).catch(() => {});
         return next;
       });
       // Revalida em background para garantir integridade com o backend
@@ -151,7 +180,7 @@ export function useHomeData() {
       } else if (res?.event) {
         setEvents((prev) => {
           const next = prev.map((e) => (e.id === id ? { ...e, ...res.event } : e));
-          AsyncStorage.setItem(CACHE_EVENTS_KEY, JSON.stringify(next)).catch(() => {});
+          AsyncStorage.setItem(cacheKeys.eventsKey, JSON.stringify(next)).catch(() => {});
           return next;
         });
         notificationService.scheduleEventDualReminders(res.event).catch(() => {});
@@ -168,7 +197,7 @@ export function useHomeData() {
       await api.completeTodo(id);
       setTodos((prev) => {
         const next = prev.map((t) => (t.id === id ? { ...t, status: 'completed' as const } : t));
-        AsyncStorage.setItem(CACHE_TODOS_KEY, JSON.stringify(next)).catch(() => {});
+        AsyncStorage.setItem(cacheKeys.todosKey, JSON.stringify(next)).catch(() => {});
         return next;
       });
     } catch (e) {
@@ -181,7 +210,7 @@ export function useHomeData() {
       await api.deleteTodo(id);
       setTodos((prev) => {
         const next = prev.filter((t) => t.id !== id);
-        AsyncStorage.setItem(CACHE_TODOS_KEY, JSON.stringify(next)).catch(() => {});
+        AsyncStorage.setItem(cacheKeys.todosKey, JSON.stringify(next)).catch(() => {});
         return next;
       });
     } catch (e) {
@@ -200,7 +229,7 @@ export function useHomeData() {
           );
           return { ...t, subtasks };
         });
-        AsyncStorage.setItem(CACHE_TODOS_KEY, JSON.stringify(next)).catch(() => {});
+        AsyncStorage.setItem(cacheKeys.todosKey, JSON.stringify(next)).catch(() => {});
         return next;
       });
     } catch (e) {
@@ -217,7 +246,7 @@ export function useHomeData() {
           const subtasks = [...(t.subtasks || []), newSubtask];
           return { ...t, subtasks };
         });
-        AsyncStorage.setItem(CACHE_TODOS_KEY, JSON.stringify(next)).catch(() => {});
+        AsyncStorage.setItem(cacheKeys.todosKey, JSON.stringify(next)).catch(() => {});
         return next;
       });
     } catch (e) {
@@ -234,7 +263,7 @@ export function useHomeData() {
           const subtasks = (t.subtasks || []).filter((st) => st.id !== subtaskId);
           return { ...t, subtasks };
         });
-        AsyncStorage.setItem(CACHE_TODOS_KEY, JSON.stringify(next)).catch(() => {});
+        AsyncStorage.setItem(cacheKeys.todosKey, JSON.stringify(next)).catch(() => {});
         return next;
       });
     } catch (e) {

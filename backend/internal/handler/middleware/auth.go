@@ -44,6 +44,13 @@ func AuthMiddleware(authSvc *service.AuthService) func(http.Handler) http.Handle
 				return
 			}
 
+			// Valida revogação ativa de sessão via TokenVersion (se o token for anterior ao reset)
+			if user.TokenVersion > 0 && claims.TokenVersion > 0 && user.TokenVersion != claims.TokenVersion {
+				http.Error(w, `{"error":"sessão revogada ou expirada. faça login novamente"}`, http.StatusUnauthorized)
+				return
+			}
+
+
 			ctx := context.WithValue(r.Context(), UserIDKey, claims.UserID)
 			ctx = context.WithValue(ctx, UserEmailKey, claims.Email)
 

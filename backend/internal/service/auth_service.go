@@ -15,9 +15,10 @@ import (
 
 // UserClaims representa as informações contidas no payload do JWT.
 type UserClaims struct {
-	UserID string `json:"user_id"`
-	Email  string `json:"email"`
-	Name   string `json:"name"`
+	UserID       string `json:"user_id"`
+	Email        string `json:"email"`
+	Name         string `json:"name"`
+	TokenVersion int    `json:"token_version"`
 	jwt.RegisteredClaims
 }
 
@@ -25,6 +26,24 @@ type UserClaims struct {
 type AuthService struct {
 	userRepo  domain.UserRepository
 	jwtSecret []byte
+}
+
+func validatePassword(password string) error {
+	if len(password) < 8 {
+		return errors.New("a senha deve ter no mínimo 8 caracteres")
+	}
+	var hasLetter, hasDigit bool
+	for _, r := range password {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') {
+			hasLetter = true
+		} else if r >= '0' && r <= '9' {
+			hasDigit = true
+		}
+	}
+	if !hasLetter || !hasDigit {
+		return errors.New("a senha deve conter pelo menos uma letra e um número")
+	}
+	return nil
 }
 
 // NewAuthService instancia o serviço de autenticação.
@@ -43,9 +62,10 @@ func (s *AuthService) Register(name, email, password string) (*domain.User, stri
 	if email == "" {
 		return nil, "", domain.ErrInvalidEmail
 	}
-	if len(password) < 6 {
-		return nil, "", errors.New("a senha deve ter no mínimo 6 caracteres")
+	if err := validatePassword(password); err != nil {
+		return nil, "", err
 	}
+
 
 	existing, _ := s.userRepo.GetByEmail(email)
 	if existing != nil {
@@ -130,10 +150,15 @@ func (s *AuthService) GenerateTokenForUser(user *domain.User) (string, error) {
 }
 
 func (s *AuthService) generateToken(user *domain.User) (string, error) {
+	tokenVersion := user.TokenVersion
+	if tokenVersion <= 0 {
+		tokenVersion = 1
+	}
 	claims := UserClaims{
-		UserID: user.ID,
-		Email:  user.Email,
-		Name:   user.Name,
+		UserID:       user.ID,
+		Email:        user.Email,
+		Name:         user.Name,
+		TokenVersion: tokenVersion,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(30 * 24 * time.Hour)), // 30 dias para uso pessoal
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -145,7 +170,13 @@ func (s *AuthService) generateToken(user *domain.User) (string, error) {
 	return token.SignedString(s.jwtSecret)
 }
 
+// RevokeAllSessions revoga todas as sessões e tokens JWT ativos do usuário incrementando sua versão.
+func (s *AuthService) RevokeAllSessions(userID string) error {
+	return s.userRepo.IncrementTokenVersion(userID)
+}
+
 // GetUserByID recupera o usuário ativo pelo ID para garantir integridade referencial.
 func (s *AuthService) GetUserByID(id string) (*domain.User, error) {
 	return s.userRepo.GetByID(id)
 }
+

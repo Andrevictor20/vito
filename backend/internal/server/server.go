@@ -3,8 +3,10 @@ package server
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
+
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 
@@ -92,11 +94,17 @@ func (s *Server) registerRoutes() {
 	s.router.Get("/privacy", s.handlePrivacyPolicy)
 	s.router.Get("/terms", s.handleTermsOfService)
 
+	authLimiter := middleware.NewRateLimiter(10, 1*time.Minute)
+	aiLimiter := middleware.NewRateLimiter(30, 1*time.Minute)
+
 	s.router.Route("/api/v1", func(r chi.Router) {
-		// Rotas públicas de autenticação
+		// Rotas públicas de autenticação com proteção anti-bruteforce
 		if s.authHandler != nil {
-			r.Post("/auth/register", s.authHandler.Register)
-			r.Post("/auth/login", s.authHandler.Login)
+			r.Group(func(ar chi.Router) {
+				ar.Use(authLimiter)
+				ar.Post("/auth/register", s.authHandler.Register)
+				ar.Post("/auth/login", s.authHandler.Login)
+			})
 		}
 		if s.googleAuthHandler != nil {
 			r.Get("/auth/google/start", s.googleAuthHandler.Start)
@@ -134,17 +142,23 @@ func (s *Server) registerRoutes() {
 				}
 
 				if s.astHandler != nil {
-					protected.Post("/assistant/chat", s.astHandler.Chat)
-					protected.Post("/assistant/audio", s.astHandler.AudioChat)
-					protected.Post("/assistant/vision", s.astHandler.VisionChat)
+					protected.Group(func(air chi.Router) {
+						air.Use(aiLimiter)
+						air.Post("/assistant/chat", s.astHandler.Chat)
+						air.Post("/assistant/audio", s.astHandler.AudioChat)
+						air.Post("/assistant/vision", s.astHandler.VisionChat)
+					})
 				}
+
 
 				if s.notifHandler != nil {
 					protected.Route("/notifications", func(nr chi.Router) {
 						nr.Post("/device-token", s.notifHandler.RegisterDeviceToken)
+						nr.Delete("/device-token", s.notifHandler.UnregisterDeviceToken)
 						nr.Post("/test", s.notifHandler.SendTestNotification)
 					})
 				}
+
 
 				if s.syncHandler != nil {
 					protected.Route("/integrations/calendars", func(ir chi.Router) {
