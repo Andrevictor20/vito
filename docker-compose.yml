@@ -10,7 +10,7 @@ services:
     container_name: vito-backend
     restart: unless-stopped
     ports:
-      - "127.0.0.1:8180:${PORT:-8180}"
+      - "8180:${PORT:-8180}"
     env_file:
       - .env
     environment:
