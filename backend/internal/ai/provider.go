@@ -18,6 +18,8 @@ const (
 	ActionQuerySchedule IntentAction = "QUERY_SCHEDULE"
 	ActionSaveMemory    IntentAction = "SAVE_MEMORY"
 	ActionCreateTrigger IntentAction = "CREATE_TRIGGER"
+	ActionCreateBookingLink IntentAction = "CREATE_BOOKING_LINK"
+	ActionCancelBookingAppointment IntentAction = "CANCEL_BOOKING_APPOINTMENT"
 	ActionGeneralChat   IntentAction = "GENERAL_CHAT"
 	ActionOutOfScope    IntentAction = "OUT_OF_SCOPE"
 )
@@ -41,6 +43,8 @@ type UserInput struct {
 	ActiveSchedule      []string             `json:"active_schedule,omitempty"`      // Próximos compromissos
 	PendingTodos        []string             `json:"pending_todos,omitempty"`        // Tarefas urgentes/pendentes
 	ActiveTriggers      []string             `json:"active_triggers,omitempty"`      // Vigílias / disparadores em andamento
+	ActiveBookings      []string             `json:"active_bookings,omitempty"`      // Links de agendamento do usuário
+	UpcomingAppointments []string             `json:"upcoming_appointments,omitempty"` // Agendamentos recebidos de convidados
 	ConversationHistory []ChatMessageContext `json:"conversation_history,omitempty"` // Histórico recente da conversa multi-turn
 	UserName            string               `json:"user_name,omitempty"`            // Nome do usuário para personalização
 	AutonomyMode        string               `json:"autonomy_mode,omitempty"`        // "assisted" (padrão) | "proactive"
@@ -90,6 +94,18 @@ type ParsedPending struct {
 	ScheduledDate string `json:"scheduled_date,omitempty"`
 }
 
+// ParsedBooking dados extraídos para criação ou cancelamento de link de agendamento/booking.
+type ParsedBooking struct {
+	Title           string `json:"title"`
+	Slug            string `json:"slug,omitempty"`
+	Description     string `json:"description,omitempty"`
+	DurationMinutes int    `json:"duration_minutes,omitempty"`
+	BufferMinutes   int    `json:"buffer_minutes,omitempty"`
+	StartHour       string `json:"start_hour,omitempty"`
+	EndHour         string `json:"end_hour,omitempty"`
+	TargetQuery     string `json:"target_query,omitempty"`
+}
+
 // ParsedIntent resultado normalizado da interpretação do assistente Toki-like.
 type ParsedIntent struct {
 	Action         IntentAction   `json:"action"`
@@ -98,6 +114,7 @@ type ParsedIntent struct {
 	Todo           *ParsedTodo    `json:"todo,omitempty"`
 	Trigger        *ParsedTrigger `json:"trigger,omitempty"`
 	Pending        *ParsedPending `json:"pending,omitempty"`
+	Booking        *ParsedBooking `json:"booking,omitempty"`
 	MemoryContent  string         `json:"memory_content,omitempty"`
 	MemoryCategory string         `json:"memory_category,omitempty"`
 	ProviderUsed   string         `json:"provider_used,omitempty"`

@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -39,6 +40,7 @@ type AssistantService struct {
 	memoryRepo     domain.MemoryRepository
 	triggerSvc     *TriggerService
 	pendingSvc     *PendingService
+	bookingSvc     *BookingService
 	userRepo       domain.UserRepository
 	aiSettingsRepo domain.AISettingsRepository
 }
@@ -56,6 +58,11 @@ func NewAssistantService(aiGateway AIParsingGateway, calSvc *CalendarService, to
 		memoryRepo: memoryRepo,
 		triggerSvc: ts,
 	}
+}
+
+// SetBookingService injeta o serviço de Vito Booking.
+func (s *AssistantService) SetBookingService(bookingSvc *BookingService) {
+	s.bookingSvc = bookingSvc
 }
 
 // SetPendingService injeta o serviço da Incubadora de Pendências.
@@ -167,6 +174,38 @@ func (s *AssistantService) Process(ctx context.Context, userID string, input ai.
 					schedule = fmt.Sprintf("%s às %s", schedule, tr.ScheduledTime)
 				}
 				input.ActiveTriggers = append(input.ActiveTriggers, fmt.Sprintf("[%s - %s] %s (%s)", tr.Category, schedule, tr.Title, tr.Query))
+			}
+		}
+	}
+
+	// Carrega links de agendamento ativos do usuário (Vito Booking)
+	if len(input.ActiveBookings) == 0 && s.bookingSvc != nil {
+		if bts, err := s.bookingSvc.ListBookingTypes(ctx, userID); err == nil && len(bts) > 0 {
+			for _, bt := range bts {
+				if bt.IsActive {
+					url := bt.ShortURL
+					if url == "" {
+						url = bt.PublicURL
+					}
+					input.ActiveBookings = append(input.ActiveBookings, fmt.Sprintf("%s (%d min, %s às %s): %s", bt.Title, bt.DurationMinutes, bt.StartHour, bt.EndHour, url))
+				}
+			}
+		}
+	}
+
+	// Carrega agendamentos recebidos de convidados (Vito Booking)
+	if len(input.UpcomingAppointments) == 0 && s.bookingSvc != nil {
+		from := input.Now.Add(-1 * 24 * time.Hour)
+		to := input.Now.Add(30 * 24 * time.Hour)
+		if appts, err := s.bookingSvc.ListAppointments(ctx, userID, from, to); err == nil && len(appts) > 0 {
+			loc := userLocation(input.Timezone)
+			for _, ap := range appts {
+				if ap.Status != "cancelled" {
+					apStart, apEnd := ap.StartAt.In(loc), ap.EndAt.In(loc)
+					input.UpcomingAppointments = append(input.UpcomingAppointments, fmt.Sprintf("Convidado %s (%s, %s às %s - %s) [ID: %s]",
+						ap.GuestName, ap.GuestEmail, apStart.Format("02/01/2006"), apStart.Format("15:04"), apEnd.Format("15:04"), ap.ID,
+					))
+				}
 			}
 		}
 	}
@@ -401,6 +440,93 @@ func (s *AssistantService) Process(ctx context.Context, userID string, input ai.
 			}
 			if res.Message == "" {
 				res.Message = fmt.Sprintf("Agendei '%s' para %s e atualizei a pendência!", event.Title, event.StartAt.Format("02/01 às 15:04"))
+			}
+		}
+
+	case ai.ActionCreateBookingLink:
+		if intent.Booking != nil && s.bookingSvc != nil {
+			title := intent.Booking.Title
+			if title == "" {
+				title = "Reunião de Alinhamento"
+			}
+			dur := intent.Booking.DurationMinutes
+			if dur <= 0 {
+				dur = 30
+			}
+			buf := intent.Booking.BufferMinutes
+			if buf < 0 {
+				buf = 10
+			}
+			sh := intent.Booking.StartHour
+			if sh == "" {
+				sh = "09:00"
+			}
+			eh := intent.Booking.EndHour
+			if eh == "" {
+				eh = "18:00"
+			}
+			slug := intent.Booking.Slug
+			if slug == "" {
+				slug = strings.ToLower(strings.ReplaceAll(title, " ", "-"))
+				reg := regexp.MustCompile(`[^a-z0-9\-]`)
+				slug = reg.ReplaceAllString(slug, "")
+				if len(slug) > 30 {
+					slug = slug[:30]
+				}
+				slug = fmt.Sprintf("%s-%d", slug, time.Now().Unix()%10000)
+			}
+			bt, err := s.bookingSvc.CreateBookingType(ctx, userID, &domain.BookingType{
+				Title:           title,
+				Slug:            slug,
+				Description:     intent.Booking.Description,
+				DurationMinutes: dur,
+				BufferMinutes:   buf,
+				StartHour:       sh,
+				EndHour:         eh,
+				DaysOfWeek:      "[1,2,3,4,5]",
+			})
+			if err != nil {
+				return nil, fmt.Errorf("falha ao criar link de agendamento: %w", err)
+			}
+			linkURL := bt.ShortURL
+			if linkURL == "" {
+				linkURL = bt.PublicURL
+			}
+			res.Message = fmt.Sprintf("Criei o seu link de agendamento para '%s' (%d min):\n%s", bt.Title, bt.DurationMinutes, linkURL)
+		}
+
+	case ai.ActionCancelBookingAppointment:
+		if intent.Booking != nil && s.bookingSvc != nil {
+			query := strings.TrimSpace(intent.Booking.TargetQuery)
+			if query == "" {
+				query = strings.TrimSpace(intent.Booking.Title)
+			}
+			if query != "" {
+				from := input.Now.Add(-30 * 24 * time.Hour)
+				to := input.Now.Add(90 * 24 * time.Hour)
+				appts, err := s.bookingSvc.ListAppointments(ctx, userID, from, to)
+				if err != nil {
+					return nil, fmt.Errorf("falha ao listar agendamentos: %w", err)
+				}
+				var targetAppt *domain.BookingAppointment
+				qLower := strings.ToLower(query)
+				for i := range appts {
+					a := &appts[i]
+					if a.ID == query ||
+						strings.Contains(strings.ToLower(a.GuestName), qLower) ||
+						strings.Contains(strings.ToLower(a.GuestEmail), qLower) {
+						targetAppt = a
+						break
+					}
+				}
+				if targetAppt != nil {
+					if err := s.bookingSvc.CancelAppointment(ctx, userID, targetAppt.ID); err != nil {
+						return nil, fmt.Errorf("falha ao cancelar agendamento: %w", err)
+					}
+					res.Message = fmt.Sprintf("Cancelei o agendamento de %s e liberei o horário na sua agenda.", targetAppt.GuestName)
+				} else {
+					res.Message = fmt.Sprintf("Não localizei nenhum agendamento correspondente a '%s'.", query)
+				}
 			}
 		}
 	}

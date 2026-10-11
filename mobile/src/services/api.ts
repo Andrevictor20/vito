@@ -801,6 +801,12 @@ class ApiService {
     const res = await this.request<BookingAppointment[]>('/api/v1/booking/appointments');
     return Array.isArray(res) ? res : [];
   }
+
+  async deleteBookingAppointment(id: string): Promise<void> {
+    await this.request<void>(`/api/v1/booking/appointments/${id}`, {
+      method: 'DELETE',
+    });
+  }
 }
 
 export const api = new ApiService();

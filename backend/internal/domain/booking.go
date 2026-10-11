@@ -64,5 +64,6 @@ type BookingRepository interface {
 	CreateAppointment(appt *BookingAppointment) error
 	GetAppointmentByID(id, userID string) (*BookingAppointment, error)
 	ListAppointmentsByUser(userID string, from, to time.Time) ([]BookingAppointment, error)
+	DeleteAppointment(id, userID string) error
 	CheckSlotConflict(userID string, startAt, endAt time.Time, bufferMinutes int) (bool, error)
 }

@@ -74,6 +74,21 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack }) => {
   const [newEndHour, setNewEndHour] = useState('18:00');
   const [timePickerTarget, setTimePickerTarget] = useState<'start' | 'end' | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deletingAppointmentId, setDeletingAppointmentId] = useState<string | null>(null);
+
+  const handleDeleteAppointment = async (appt: BookingAppointment) => {
+    hapticFeedback.medium();
+    try {
+      setDeletingAppointmentId(appt.id);
+      await api.deleteBookingAppointment(appt.id);
+      hapticFeedback.success();
+      setAppointments((prev) => prev.filter((a) => a.id !== appt.id));
+    } catch (err: any) {
+      console.warn('[BookingScreen] Falha ao cancelar agendamento:', err);
+    } finally {
+      setDeletingAppointmentId(null);
+    }
+  };
 
   // Intercepta botão voltar do hardware no Android
   useEffect(() => {
@@ -601,6 +616,26 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack }) => {
                         </Text>
                       </View>
                     ) : null}
+
+                    <View style={styles.apptActionsRow}>
+                      <TouchableOpacity
+                        style={[styles.cancelApptButton, { borderColor: colors.outlineVariant }]}
+                        onPress={() => handleDeleteAppointment(appt)}
+                        disabled={deletingAppointmentId === appt.id}
+                        activeOpacity={0.7}
+                      >
+                        {deletingAppointmentId === appt.id ? (
+                          <ActivityIndicator size="small" color={colors.error} />
+                        ) : (
+                          <>
+                            <MaterialIcons name="event-busy" size={16} color={colors.error} />
+                            <Text style={[styles.cancelApptButtonText, { color: colors.error }]}>
+                              Cancelar e Liberar Horário
+                            </Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 );
               })}
@@ -990,7 +1025,7 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack }) => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    paddingTop: Platform.OS === 'android' ? RNStatusBar.currentHeight : 0,
+    paddingTop: 0,
   },
   header: {
     height: 54,
@@ -1491,6 +1526,27 @@ const styles = StyleSheet.create({
   },
   hourGridItemText: {
     fontSize: 14,
+    fontWeight: '600',
+  },
+  apptActionsRow: {
+    marginTop: 12,
+    paddingTop: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(128,128,128,0.2)',
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  cancelApptButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: MD3Shapes.small,
+    borderWidth: 1,
+  },
+  cancelApptButtonText: {
+    fontSize: 12,
     fontWeight: '600',
   },
 });

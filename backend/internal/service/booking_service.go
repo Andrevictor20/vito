@@ -188,8 +188,9 @@ func (s *BookingService) GetAvailableSlots(ctx context.Context, userIdentifier, 
 		endH, endM = 18, 0
 	}
 
-	slotStart := time.Date(date.Year(), date.Month(), date.Day(), startH, startM, 0, 0, date.Location())
-	dayEnd := time.Date(date.Year(), date.Month(), date.Day(), endH, endM, 0, 0, date.Location())
+	loc := date.Location()
+	slotStart := time.Date(date.Year(), date.Month(), date.Day(), startH, startM, 0, 0, loc)
+	dayEnd := time.Date(date.Year(), date.Month(), date.Day(), endH, endM, 0, 0, loc)
 
 	now := time.Now().UTC()
 	var slots []domain.BookingSlot
@@ -200,7 +201,7 @@ func (s *BookingService) GetAvailableSlots(ctx context.Context, userIdentifier, 
 			break
 		}
 
-		timeLabel := fmt.Sprintf("%02d:%02d", slotStart.Hour(), slotStart.Minute())
+		timeLabel := fmt.Sprintf("%02d:%02d", slotStart.In(loc).Hour(), slotStart.In(loc).Minute())
 		slot := domain.BookingSlot{
 			StartAt:   slotStart.UTC(),
 			EndAt:     slotEnd.UTC(),
@@ -221,6 +222,14 @@ func (s *BookingService) GetAvailableSlots(ctx context.Context, userIdentifier, 
 	}
 
 	return slots, nil
+}
+
+func getHostLocation() *time.Location {
+	loc, err := time.LoadLocation("America/Sao_Paulo")
+	if err != nil {
+		return time.FixedZone("BRT", -3*3600)
+	}
+	return loc
 }
 
 // ReserveAppointment processa a reserva com validação Turnstile, sanitização XSS,
@@ -345,6 +354,18 @@ func (s *BookingService) ListAppointments(ctx context.Context, userID string, fr
 		appts = []domain.BookingAppointment{}
 	}
 	return appts, nil
+}
+
+// CancelAppointment cancela um agendamento e remove o evento associado da agenda pessoal do anfitrião.
+func (s *BookingService) CancelAppointment(ctx context.Context, userID, id string) error {
+	appt, err := s.bookingRepo.GetAppointmentByID(id, userID)
+	if err != nil {
+		return err
+	}
+	if appt.EventID != "" {
+		_ = s.eventRepo.Delete(appt.EventID, userID)
+	}
+	return s.bookingRepo.DeleteAppointment(id, userID)
 }
 
 func (s *BookingService) enrichWithLinks(ctx context.Context, userID string, bt *domain.BookingType) (*BookingTypeWithLink, error) {

@@ -26,6 +26,7 @@ import { ChatScreen, ChatScreenRef } from './ChatScreen';
 import { TriggersScreen } from './TriggersScreen';
 import { PendingItemsView } from './PendingItemsView';
 import { BookingScreen } from './BookingScreen';
+import { ExecutiveSummariesHubView } from './ExecutiveSummariesHubView';
 import { hapticFeedback } from '../theme/motion';
 import { useHomeData } from '../hooks/useHomeData';
 import { useTheme } from '../context/ThemeContext';
@@ -56,6 +57,7 @@ export const HomeScreen: React.FC<{
   const [isChatLoading, setIsChatLoading] = useState(false);
   const [showPendingItems, setShowPendingItems] = useState(false);
   const [showBookingScreen, setShowBookingScreen] = useState(false);
+  const [showSummariesScreen, setShowSummariesScreen] = useState(false);
 
   const chatRef = useRef<ChatScreenRef>(null);
   const pagerRef = useRef<ScrollView>(null);
@@ -108,6 +110,10 @@ export const HomeScreen: React.FC<{
 
       if (showBookingScreen) {
         setShowBookingScreen(false);
+        return true;
+      }
+      if (showSummariesScreen) {
+        setShowSummariesScreen(false);
         return true;
       }
       if (action.type === 'CLOSE_SUBSCREEN') {
@@ -198,6 +204,21 @@ export const HomeScreen: React.FC<{
     );
   }
 
+  if (showSummariesScreen) {
+    return (
+      <ExecutiveSummariesHubView
+        onBack={() => setShowSummariesScreen(false)}
+        onOpenChatWithPrompt={(prompt) => {
+          setShowSummariesScreen(false);
+          handleSelectTab('chat');
+          setTimeout(() => {
+            chatRef.current?.submitExternalPrompt(prompt);
+          }, 250);
+        }}
+      />
+    );
+  }
+
   return (
     <View style={[styles.container, { backgroundColor: colors.surface }]}>
       {/* Top App Bar Persistente M3 com transição suave e contínua */}
@@ -272,13 +293,8 @@ export const HomeScreen: React.FC<{
                 eventDates={eventDates}
               />
 
-              {/* Seletor Segmentado de Foco & Ações Executivas */}
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.focusSegmentedScrollContainer}
-                style={styles.focusSegmentedScrollView}
-              >
+              {/* Seletor Segmentado de Foco (Eventos vs Tarefas - 50% cada) */}
+              <View style={styles.focusSegmentedContainer}>
                 <TouchableOpacity
                   style={[
                     styles.focusSegmentBtn,
@@ -368,10 +384,13 @@ export const HomeScreen: React.FC<{
                     Tarefas ({pendingTodos.length})
                   </Text>
                 </TouchableOpacity>
+              </View>
 
+              {/* Ações Rápidas Executivas: Pendências & Vito Booking (100% visíveis, sem swipe) */}
+              <View style={styles.quickActionsDockRow}>
                 <TouchableOpacity
                   style={[
-                    styles.focusSegmentBtn,
+                    styles.quickActionCard,
                     {
                       backgroundColor: isDark ? colors.surfaceContainerLow : '#F4F4F5',
                       borderColor: colors.outlineVariant,
@@ -388,15 +407,12 @@ export const HomeScreen: React.FC<{
                   <MaterialIcons
                     name="inbox"
                     size={16}
-                    color={colors.onSurfaceVariant}
+                    color={colors.primary}
                   />
                   <Text
                     style={[
-                      styles.focusSegmentText,
-                      {
-                        color: colors.onSurfaceVariant,
-                        fontWeight: '500',
-                      },
+                      styles.quickActionText,
+                      { color: colors.onSurface },
                     ]}
                   >
                     Pendências
@@ -405,7 +421,7 @@ export const HomeScreen: React.FC<{
 
                 <TouchableOpacity
                   style={[
-                    styles.focusSegmentBtn,
+                    styles.quickActionCard,
                     {
                       backgroundColor: isDark ? colors.surfaceContainerLow : '#F4F4F5',
                       borderColor: colors.outlineVariant,
@@ -422,21 +438,18 @@ export const HomeScreen: React.FC<{
                   <MaterialIcons
                     name="link"
                     size={16}
-                    color={colors.onSurfaceVariant}
+                    color={colors.primary}
                   />
                   <Text
                     style={[
-                      styles.focusSegmentText,
-                      {
-                        color: colors.onSurfaceVariant,
-                        fontWeight: '500',
-                      },
+                      styles.quickActionText,
+                      { color: colors.onSurface },
                     ]}
                   >
-                    Booking
+                    Vito Booking
                   </Text>
                 </TouchableOpacity>
-              </ScrollView>
+              </View>
 
               {/* Visualização de Eventos com Foco Dedicado */}
               {homeFocusMode === 'events' ? (
@@ -642,7 +655,7 @@ export const HomeScreen: React.FC<{
 
           {/* Página 2: Disparadores / Radares */}
           <View style={[styles.pageWrapper, { width: containerWidth }]}>
-            <TriggersScreen />
+            <TriggersScreen onOpenExecutiveSummaries={() => setShowSummariesScreen(true)} />
           </View>
         </ScrollView>
 
@@ -824,24 +837,19 @@ const styles = StyleSheet.create({
     fontWeight: tokens.typography.weight.bold,
     letterSpacing: 0.2,
   },
-  focusSegmentedScrollView: {
-    marginTop: tokens.spacing.md,
-    marginBottom: tokens.spacing.md,
-  },
-  focusSegmentedScrollContainer: {
+  focusSegmentedContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
+    marginTop: tokens.spacing.md,
+    marginBottom: tokens.spacing.xs,
     gap: 8,
-    paddingHorizontal: 2,
-    paddingVertical: 4,
   },
   focusSegmentBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: MD3Shapes.full,
+    paddingVertical: 10,
+    borderRadius: MD3Shapes.medium,
     borderWidth: 1,
     gap: 6,
   },
@@ -850,6 +858,25 @@ const styles = StyleSheet.create({
   },
   focusSegmentText: {
     fontSize: tokens.typography.size.labelMedium,
+  },
+  quickActionsDockRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: tokens.spacing.md,
+  },
+  quickActionCard: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    borderRadius: MD3Shapes.small,
+    borderWidth: 1,
+    gap: 6,
+  },
+  quickActionText: {
+    fontSize: tokens.typography.size.labelMedium,
+    fontWeight: '600',
   },
   focusSectionContainer: {
     marginBottom: tokens.spacing.sm,

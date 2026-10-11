@@ -26,7 +26,7 @@ import { EditTriggerModal } from '../components/triggers/EditTriggerModal';
 import { TRIGGER_CATEGORIES, Trigger, TriggerCategory } from '../types';
 import { api } from '../services/api';
 
-export const TriggersScreen: React.FC = () => {
+export const TriggersScreen: React.FC<{ onOpenExecutiveSummaries?: () => void }> = ({ onOpenExecutiveSummaries }) => {
   const { colors, isDark } = useTheme();
   const { user } = useAuth();
   const {
@@ -340,7 +340,13 @@ export const TriggersScreen: React.FC = () => {
 
                 <TouchableOpacity
                   style={[styles.systemRadarActionBtn, { borderTopColor: colors.outlineVariant }]}
-                  onPress={() => setShowWeeklySummaries(true)}
+                  onPress={() => {
+                    if (onOpenExecutiveSummaries) {
+                      onOpenExecutiveSummaries();
+                    } else {
+                      setShowWeeklySummaries(true);
+                    }
+                  }}
                   activeOpacity={0.7}
                 >
                   <MaterialIcons name="insights" size={16} color={colors.primary} />

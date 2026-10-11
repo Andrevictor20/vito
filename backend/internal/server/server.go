@@ -240,6 +240,7 @@ func (s *Server) registerRoutes() {
 						br.Put("/types/{id}", s.bookingHandler.UpdateType)
 						br.Delete("/types/{id}", s.bookingHandler.DeleteType)
 						br.Get("/appointments", s.bookingHandler.ListAppointments)
+						br.Delete("/appointments/{id}", s.bookingHandler.DeleteAppointment)
 					})
 				}
 			})

@@ -151,6 +151,7 @@ func main() {
 	}
 	turnstileValidator := service.NewTurnstileValidator(cfg.TurnstileSecretKey)
 	bookingSvc := service.NewBookingService(bookingRepo, eventRepo, userRepo, notifSvc, dubShortener, turnstileValidator, cfg.PublicBaseURL)
+	astSvc.SetBookingService(bookingSvc)
 	bookingHandler := handler.NewBookingHandler(bookingSvc)
 
 	// 6. Servidor HTTP

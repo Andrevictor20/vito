@@ -257,6 +257,22 @@ func (r *BookingRepositorySQLite) ListAppointmentsByUser(userID string, from, to
 	return list, nil
 }
 
+func (r *BookingRepositorySQLite) DeleteAppointment(id, userID string) error {
+	query := `DELETE FROM booking_appointments WHERE id = ? AND user_id = ?`
+	res, err := r.db.Exec(query, id, userID)
+	if err != nil {
+		return err
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return errors.New("agendamento não encontrado")
+	}
+	return nil
+}
+
 func (r *BookingRepositorySQLite) CheckSlotConflict(userID string, startAt, endAt time.Time, bufferMinutes int) (bool, error) {
 	startBuf := startAt.Add(-time.Duration(bufferMinutes) * time.Minute).UTC()
 	endBuf := endAt.Add(time.Duration(bufferMinutes) * time.Minute).UTC()

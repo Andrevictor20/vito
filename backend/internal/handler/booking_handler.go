@@ -67,9 +67,14 @@ func (h *BookingHandler) GetPublicSlots(w http.ResponseWriter, r *http.Request) 
 	slug := chi.URLParam(r, "slug")
 	dateStr := r.URL.Query().Get("date")
 
-	date := time.Now()
+	loc, err := time.LoadLocation("America/Sao_Paulo")
+	if err != nil {
+		loc = time.FixedZone("BRT", -3*3600)
+	}
+
+	date := time.Now().In(loc)
 	if dateStr != "" {
-		if parsed, err := time.Parse("2006-01-02", dateStr); err == nil {
+		if parsed, err := time.ParseInLocation("2006-01-02", dateStr, loc); err == nil {
 			date = parsed
 		}
 	}
@@ -236,6 +241,23 @@ func (h *BookingHandler) ListAppointments(w http.ResponseWriter, r *http.Request
 		appts = []domain.BookingAppointment{}
 	}
 	_ = json.NewEncoder(w).Encode(appts)
+}
+
+// DeleteAppointment cancela o agendamento recebido e desocupa o horário na agenda do anfitrião.
+func (h *BookingHandler) DeleteAppointment(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok || userID == "" {
+		http.Error(w, "Não autorizado", http.StatusUnauthorized)
+		return
+	}
+
+	id := chi.URLParam(r, "id")
+	if err := h.bookingSvc.CancelAppointment(r.Context(), userID, id); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // bookingPageHTMLTemplate é o HTML5/CSS3 Material Design 3 ultraleve (< 25 KB).

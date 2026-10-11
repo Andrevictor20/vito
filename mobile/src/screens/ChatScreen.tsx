@@ -40,6 +40,7 @@ export interface ChatScreenProps {
 export interface ChatScreenRef {
   openHistory: () => void;
   startNewChat: () => void;
+  submitExternalPrompt: (text: string) => void;
 }
 
 export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
@@ -80,7 +81,12 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
       setSelectedImageBase64(null);
       startNewConversation();
     },
-  }), [startNewConversation]);
+    submitExternalPrompt: (text: string) => {
+      if (text.trim()) {
+        sendMessage(text.trim());
+      }
+    },
+  }), [startNewConversation, sendMessage]);
 
   useEffect(() => {
     onLoadingStateChange?.(loading);
@@ -275,8 +281,8 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
   return (
     <KeyboardAvoidingView
       style={[styles.container, { backgroundColor: colors.surface }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 44 : 0}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 44 : (Platform.OS === 'android' ? 24 : 0)}
     >
       {/* Lista de Mensagens */}
       <FlatList

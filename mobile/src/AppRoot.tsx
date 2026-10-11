@@ -91,7 +91,7 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: tokens.colors.surface,
-    paddingTop: Platform.OS === 'android' ? Math.max((RNStatusBar.currentHeight || 0) + 6, 44) : 0,
+    paddingTop: Platform.OS === 'android' ? (RNStatusBar.currentHeight || 0) : 0,
   },
   loadingContainer: {
     flex: 1,
