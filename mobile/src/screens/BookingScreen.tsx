@@ -46,6 +46,41 @@ try {
   ClipboardModule = null;
 }
 
+const sanitizeBookingUrl = (raw?: string, slug?: string): string => {
+  const fallback = slug ? `https://cal.link/${slug}` : 'https://cal.link';
+  if (!raw) return fallback;
+  return raw.replace(/https?:\/\/dub\.sh\//g, 'https://cal.link/');
+};
+
+const calculateAutoEndHour = (
+  selectedStart: string,
+  currentStart: string,
+  currentEnd: string,
+  durationMin: number = 30
+): string => {
+  const parseMin = (t: string) => {
+    const [h, m] = (t || '09:00').split(':').map(Number);
+    return (h || 0) * 60 + (m || 0);
+  };
+  const startMin = parseMin(selectedStart);
+  const oldStartMin = parseMin(currentStart);
+  const oldEndMin = parseMin(currentEnd);
+  const prevWindow = oldEndMin - oldStartMin;
+
+  // Preserva a amplitude da janela de atendimento anterior
+  let targetEndMin = startMin + (prevWindow > 0 ? prevWindow : 8 * 60);
+  if (targetEndMin > 22 * 60) {
+    targetEndMin = 22 * 60;
+  }
+  if (targetEndMin <= startMin) {
+    targetEndMin = Math.min(22 * 60, startMin + Math.max(durationMin, 30));
+  }
+
+  const endH = Math.floor(targetEndMin / 60);
+  const endM = targetEndMin % 60;
+  return `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+};
+
 interface BookingScreenProps {
   onBack: () => void;
 }
@@ -139,7 +174,7 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack }) => {
   // Copia link para área de transferência
   const handleCopyLink = async (bt: BookingType) => {
     hapticFeedback.medium();
-    const url = bt.short_url || bt.public_url || '';
+    const url = sanitizeBookingUrl(bt.short_url || bt.public_url, bt.slug);
     if (!url) return;
 
     if (ClipboardModule && ClipboardModule.setStringAsync) {
@@ -487,7 +522,7 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack }) => {
                           style={[styles.urlText, { color: colors.onSurfaceVariant }]}
                           numberOfLines={1}
                         >
-                          {bt.short_url || bt.public_url || `https://cal.link/${bt.slug}`}
+                          {sanitizeBookingUrl(bt.short_url || bt.public_url, bt.slug)}
                         </Text>
                       </View>
 
@@ -994,6 +1029,8 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack }) => {
                       hapticFeedback.selection();
                       if (timePickerTarget === 'start') {
                         setNewStartHour(hour);
+                        const autoEnd = calculateAutoEndHour(hour, newStartHour, newEndHour, newDuration);
+                        setNewEndHour(autoEnd);
                       } else {
                         setNewEndHour(hour);
                       }

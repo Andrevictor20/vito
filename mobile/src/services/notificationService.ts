@@ -143,7 +143,62 @@ export const notificationService = {
           lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
         });
 
-        // 3. Canal de Início Imediato / Urgente (Max priority - Pop-up de alta prioridade)
+        // 3. Canal de Compromissos e Agenda
+        await Notifications.setNotificationChannelAsync('vito_events', {
+          name: 'Vito — Compromissos',
+          importance: Notifications.AndroidImportance.HIGH,
+          enableVibrate: true,
+          vibrationPattern: [0, 250, 250, 250],
+          sound: 'default',
+          lightColor: '#3B82F6',
+          lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+        });
+
+        // 4. Canal de Prazos e Tarefas
+        await Notifications.setNotificationChannelAsync('vito_todos', {
+          name: 'Vito — Tarefas e Prazos',
+          importance: Notifications.AndroidImportance.HIGH,
+          enableVibrate: true,
+          vibrationPattern: [0, 250, 250, 250],
+          sound: 'default',
+          lightColor: '#10B981',
+          lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+        });
+
+        // 5. Canal de Radares e Vigílias da Internet
+        await Notifications.setNotificationChannelAsync('vito_radar', {
+          name: 'Vito — Radares',
+          importance: Notifications.AndroidImportance.HIGH,
+          enableVibrate: true,
+          vibrationPattern: [0, 250, 250, 250],
+          sound: 'default',
+          lightColor: '#8B5CF6',
+          lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+        });
+
+        // 6. Canal de Agendamentos (Vito Booking)
+        await Notifications.setNotificationChannelAsync('vito_booking', {
+          name: 'Vito — Agendamentos',
+          importance: Notifications.AndroidImportance.HIGH,
+          enableVibrate: true,
+          vibrationPattern: [0, 250, 250, 250],
+          sound: 'default',
+          lightColor: '#F59E0B',
+          lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+        });
+
+        // 7. Canal de Resumos Executivos (Diário, Semanal e Mensal)
+        await Notifications.setNotificationChannelAsync('vito_summaries', {
+          name: 'Vito — Resumos Executivos',
+          importance: Notifications.AndroidImportance.HIGH,
+          enableVibrate: true,
+          vibrationPattern: [0, 250, 250, 250],
+          sound: 'default',
+          lightColor: '#6366F1',
+          lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+        });
+
+        // 8. Canal de Início Imediato / Urgente (Max priority - Pop-up de alta prioridade)
         await Notifications.setNotificationChannelAsync('vito_urgent', {
           name: 'Vito — Alertas Imediatos',
           importance: Notifications.AndroidImportance.MAX,
@@ -154,7 +209,7 @@ export const notificationService = {
           lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
         });
 
-        // 4. Canal Wake-up Call (Max priority)
+        // 9. Canal Wake-up Call (Max priority)
         await Notifications.setNotificationChannelAsync('vito_wakeup', {
           name: 'Vito — Wake-up Call',
           importance: Notifications.AndroidImportance.MAX,
@@ -305,7 +360,7 @@ export const notificationService = {
   },
 
   /**
-   * Agenda os dois lembretes (antecedência + início exato) para um compromisso.
+   * Agenda os dois lembretes (antecedência + início exato) para um compromisso com suporte adaptativo.
    */
   async scheduleEventDualReminders(event: {
     id: string;
@@ -322,12 +377,14 @@ export const notificationService = {
     if (isNaN(start)) return { advanceId: null, startId: null };
 
     const now = Date.now();
+    const diffMs = start - now;
+    if (diffMs <= 0) return { advanceId: null, startId: null };
+
     const minutesBefore = settings.reminderMinutesBefore || 10;
-    const advanceTime = new Date(start - minutesBefore * 60 * 1000);
-    const startTime = new Date(start);
+    const advanceMs = minutesBefore * 60 * 1000;
 
     const priority: NotificationPriority = settings.defaultPriority;
-    const channelId = priority === 'silent' ? 'vito_silent' : 'vito_default';
+    const channelId = priority === 'silent' ? 'vito_silent' : 'vito_events';
     const startChannelId = priority === 'silent' ? 'vito_silent' : 'vito_urgent';
 
     const emoji = getNotificationContextEmoji(event.title, event.category);
@@ -336,8 +393,10 @@ export const notificationService = {
     let advanceId: string | null = null;
     let startId: string | null = null;
 
-    // 1. Alerta de Antecedência (ex: 10 min antes)
-    if (advanceTime.getTime() > now) {
+    // 1. Alerta de Antecedência
+    if (diffMs > advanceMs) {
+      // Cenário A: Tempo suficiente para agendar no horário prévio padrão
+      const advanceTime = new Date(start - advanceMs);
       try {
         advanceId = await Notifications.scheduleNotificationAsync({
           identifier: `event-reminder-adv-${event.id}`,
@@ -350,6 +409,7 @@ export const notificationService = {
               eventId: event.id,
               type: 'advance',
               priority,
+              channelId,
             },
             ...(Platform.OS === 'android' ? { channelId } : {}),
           },
@@ -361,10 +421,38 @@ export const notificationService = {
       } catch (err) {
         console.warn('[NotificationService] Erro ao agendar alerta de antecedência:', err);
       }
+    } else if (diffMs > 2 * 60 * 1000) {
+      // Cenário B (Em cima da hora: > 2 min e <= minutesBefore):
+      // Dispara alerta adaptativo imediato para que o usuário não perca o aviso
+      const minutesLeft = Math.max(1, Math.round(diffMs / 60000));
+      try {
+        advanceId = await Notifications.scheduleNotificationAsync({
+          identifier: `event-reminder-adv-${event.id}`,
+          content: {
+            title: `⚡ ${title}`,
+            body: `Começa em ${minutesLeft} minutos${event.location ? ' em ' + event.location : ''}!`,
+            sound: priority !== 'silent',
+            priority: Notifications.AndroidNotificationPriority.HIGH,
+            data: {
+              eventId: event.id,
+              type: 'advance',
+              priority,
+              channelId,
+            },
+            ...(Platform.OS === 'android' ? { channelId } : {}),
+          },
+          trigger: {
+            type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+            seconds: 3,
+          },
+        });
+      } catch (err) {
+        console.warn('[NotificationService] Erro ao agendar alerta adaptativo imediato:', err);
+      }
     }
 
     // 2. Alerta do Horário de Início (Começando agora)
-    if (startTime.getTime() > now) {
+    if (diffMs > 0) {
       try {
         startId = await Notifications.scheduleNotificationAsync({
           identifier: `event-reminder-start-${event.id}`,
@@ -377,12 +465,13 @@ export const notificationService = {
               eventId: event.id,
               type: 'start',
               priority,
+              channelId: startChannelId,
             },
             ...(Platform.OS === 'android' ? { channelId: startChannelId } : {}),
           },
           trigger: {
             type: Notifications.SchedulableTriggerInputTypes.DATE,
-            date: startTime,
+            date: new Date(start),
           },
         });
       } catch (err) {
@@ -394,9 +483,124 @@ export const notificationService = {
   },
 
   /**
-   * Reconcilia e agenda lembretes locais nativos (antecedência + início) para todos os compromissos futuros.
+   * Agenda lembretes locais para tarefas com prazo (antecedência + vencimento agora).
    */
-  async scheduleAllUpcomingReminders(events: Array<{ id: string; title: string; start_at: string; category?: string; location?: string }>): Promise<number> {
+  async scheduleTodoReminder(todo: {
+    id: string;
+    title: string;
+    due_date?: string;
+    priority?: string;
+  }): Promise<{ advanceId: string | null; dueId: string | null }> {
+    if (!this.isAvailable() || !todo.due_date) return { advanceId: null, dueId: null };
+    const settings = await this.getSettings();
+    if (!settings.enabled) return { advanceId: null, dueId: null };
+
+    const due = new Date(todo.due_date).getTime();
+    if (isNaN(due)) return { advanceId: null, dueId: null };
+
+    const now = Date.now();
+    const diffMs = due - now;
+    if (diffMs <= 0) return { advanceId: null, dueId: null };
+
+    const emoji = getNotificationContextEmoji(todo.title, 'todo') || '✓';
+    const title = `${emoji} ${todo.title}`;
+    const priority = todo.priority === 'high' ? 'urgent' : settings.defaultPriority;
+    const channelId = 'vito_todos';
+
+    let advanceId: string | null = null;
+    let dueId: string | null = null;
+
+    // Antecedência de 15 min para tarefas
+    const advanceMs = 15 * 60 * 1000;
+    if (diffMs > advanceMs) {
+      const advTime = new Date(due - advanceMs);
+      try {
+        advanceId = await Notifications.scheduleNotificationAsync({
+          identifier: `todo-reminder-adv-${todo.id}`,
+          content: {
+            title,
+            body: 'Prazo em 15 minutos!',
+            sound: priority !== 'silent',
+            priority: Notifications.AndroidNotificationPriority.HIGH,
+            data: { todoId: todo.id, type: 'todo_advance', priority, channelId },
+            ...(Platform.OS === 'android' ? { channelId } : {}),
+          },
+          trigger: {
+            type: Notifications.SchedulableTriggerInputTypes.DATE,
+            date: advTime,
+          },
+        });
+      } catch (e) {
+        console.warn('[NotificationService] Falha ao agendar antecedência da tarefa:', e);
+      }
+    } else if (diffMs > 2 * 60 * 1000) {
+      // Adaptativo imediato se vence em 2 a 15 min
+      const minutesLeft = Math.max(1, Math.round(diffMs / 60000));
+      try {
+        advanceId = await Notifications.scheduleNotificationAsync({
+          identifier: `todo-reminder-adv-${todo.id}`,
+          content: {
+            title: `⏰ ${title}`,
+            body: `Prazo se encerra em ${minutesLeft} minutos!`,
+            sound: priority !== 'silent',
+            priority: Notifications.AndroidNotificationPriority.HIGH,
+            data: { todoId: todo.id, type: 'todo_advance', priority, channelId },
+            ...(Platform.OS === 'android' ? { channelId } : {}),
+          },
+          trigger: {
+            type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+            seconds: 3,
+          },
+        });
+      } catch (e) {
+        console.warn('[NotificationService] Falha ao agendar alerta adaptativo da tarefa:', e);
+      }
+    }
+
+    // Alerta de Prazo Limite
+    if (diffMs > 0) {
+      try {
+        dueId = await Notifications.scheduleNotificationAsync({
+          identifier: `todo-reminder-due-${todo.id}`,
+          content: {
+            title: `⏰ Prazo da Tarefa: ${todo.title}`,
+            body: 'O horário estipulado para esta tarefa chegou.',
+            sound: priority !== 'silent',
+            priority: Notifications.AndroidNotificationPriority.MAX,
+            data: { todoId: todo.id, type: 'todo_due', priority: 'urgent', channelId },
+            ...(Platform.OS === 'android' ? { channelId } : {}),
+          },
+          trigger: {
+            type: Notifications.SchedulableTriggerInputTypes.DATE,
+            date: new Date(due),
+          },
+        });
+      } catch (e) {
+        console.warn('[NotificationService] Falha ao agendar prazo da tarefa:', e);
+      }
+    }
+
+    return { advanceId, dueId };
+  },
+
+  /**
+   * Cancela todos os lembretes vinculados a uma tarefa (antecedência e prazo).
+   */
+  async cancelTodoReminder(todoId: string): Promise<void> {
+    if (!this.isAvailable()) return;
+    await Promise.all([
+      this.cancelNotification(`todo-reminder-adv-${todoId}`),
+      this.cancelNotification(`todo-reminder-due-${todoId}`),
+    ]);
+  },
+
+  /**
+   * Reconcilia e agenda lembretes locais nativos para compromissos e tarefas com data.
+   */
+  async scheduleAllUpcomingReminders(
+    events: Array<{ id: string; title: string; start_at: string; category?: string; location?: string }>,
+    todos?: Array<{ id: string; title: string; due_date?: string; priority?: string; status?: string }>
+  ): Promise<number> {
     if (!this.isAvailable()) return 0;
     const settings = await this.getSettings();
     if (!settings.enabled) return 0;
@@ -405,7 +609,7 @@ export const notificationService = {
     const maxWindow = now + 7 * 24 * 60 * 60 * 1000;
     let scheduledCount = 0;
 
-    for (const event of events) {
+    for (const event of (events || [])) {
       try {
         const start = new Date(event.start_at).getTime();
         if (isNaN(start) || start <= now || start > maxWindow) continue;
@@ -418,6 +622,22 @@ export const notificationService = {
         console.warn('[NotificationService] Falha ao agendar lembrete para evento:', event.id, err);
       }
     }
+
+    for (const todo of (todos || [])) {
+      if (todo.status === 'completed' || !todo.due_date) continue;
+      try {
+        const due = new Date(todo.due_date).getTime();
+        if (isNaN(due) || due <= now || due > maxWindow) continue;
+
+        const res = await this.scheduleTodoReminder(todo);
+        if (res.advanceId || res.dueId) {
+          scheduledCount++;
+        }
+      } catch (err) {
+        console.warn('[NotificationService] Falha ao agendar lembrete para tarefa:', todo.id, err);
+      }
+    }
+
     return scheduledCount;
   },
 

@@ -57,6 +57,11 @@ func (w *ReminderWorker) CheckAndDispatchReminders(now time.Time) (int, error) {
 		log.Printf("[ReminderWorker] Erro ao listar eventos para lembrete prévio: %v", err)
 	} else {
 		for _, event := range advEvents {
+			// Se o evento inicia em menos de 2 minutos, pula antecedência para priorizar o alerta de início exato
+			if event.StartAt.Before(now.Add(2 * time.Minute)) {
+				continue
+			}
+
 			emoji := GetNotificationContextEmoji(event.Title, event.Category)
 			title := event.Title
 			if emoji != "" {

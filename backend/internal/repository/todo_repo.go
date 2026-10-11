@@ -194,3 +194,84 @@ func (r *TodoRepositorySQLite) ListSubtasksByTodo(todoID string) ([]domain.Subta
 	}
 	return subtasks, rows.Err()
 }
+
+// ListUpcomingUnreminded busca tarefas pendentes com prazo próximo e sem lembrete de antecedência enviado.
+func (r *TodoRepositorySQLite) ListUpcomingUnreminded(from, to time.Time) ([]domain.Todo, error) {
+	fromUTC := from.UTC()
+	toUTC := to.UTC()
+
+	query := `
+		SELECT id, user_id, title, status, priority, due_date, COALESCE(event_id, ''), COALESCE(event_title, ''), created_at, updated_at
+		FROM todos
+		WHERE status = 'pending' AND due_date IS NOT NULL AND due_date >= ? AND due_date <= ? AND reminder_sent_at IS NULL
+		ORDER BY due_date ASC
+	`
+	rows, err := r.db.Query(query, fromUTC, toUTC)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var todos []domain.Todo
+	for rows.Next() {
+		var t domain.Todo
+		var rawDue any
+		if err := rows.Scan(&t.ID, &t.UserID, &t.Title, &t.Status, &t.Priority, &rawDue, &t.EventID, &t.EventTitle, &t.CreatedAt, &t.UpdatedAt); err != nil {
+			continue
+		}
+		if rawDue != nil {
+			parsedDue := parseDBTime(rawDue)
+			t.DueDate = &parsedDue
+		}
+		todos = append(todos, t)
+	}
+	return todos, rows.Err()
+}
+
+// ListDueNowUnreminded busca tarefas pendentes com prazo no momento atual e sem lembrete de prazo enviado.
+func (r *TodoRepositorySQLite) ListDueNowUnreminded(from, to time.Time) ([]domain.Todo, error) {
+	fromUTC := from.UTC()
+	toUTC := to.UTC()
+
+	query := `
+		SELECT id, user_id, title, status, priority, due_date, COALESCE(event_id, ''), COALESCE(event_title, ''), created_at, updated_at
+		FROM todos
+		WHERE status = 'pending' AND due_date IS NOT NULL AND due_date >= ? AND due_date <= ? AND start_reminder_sent_at IS NULL
+		ORDER BY due_date ASC
+	`
+	rows, err := r.db.Query(query, fromUTC, toUTC)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var todos []domain.Todo
+	for rows.Next() {
+		var t domain.Todo
+		var rawDue any
+		if err := rows.Scan(&t.ID, &t.UserID, &t.Title, &t.Status, &t.Priority, &rawDue, &t.EventID, &t.EventTitle, &t.CreatedAt, &t.UpdatedAt); err != nil {
+			continue
+		}
+		if rawDue != nil {
+			parsedDue := parseDBTime(rawDue)
+			t.DueDate = &parsedDue
+		}
+		todos = append(todos, t)
+	}
+	return todos, rows.Err()
+}
+
+// MarkReminderSent marca o timestamp do lembrete de antecedência da tarefa.
+func (r *TodoRepositorySQLite) MarkReminderSent(todoID string, sentAt time.Time) error {
+	query := `UPDATE todos SET reminder_sent_at = ? WHERE id = ?`
+	_, err := r.db.Exec(query, sentAt.UTC(), todoID)
+	return err
+}
+
+// MarkDueReminderSent marca o timestamp do lembrete de prazo atingido da tarefa.
+func (r *TodoRepositorySQLite) MarkDueReminderSent(todoID string, sentAt time.Time) error {
+	query := `UPDATE todos SET start_reminder_sent_at = ? WHERE id = ?`
+	_, err := r.db.Exec(query, sentAt.UTC(), todoID)
+	return err
+}
+

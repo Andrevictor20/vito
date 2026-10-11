@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -50,30 +51,45 @@ func (s *DubShortenerService) ShortenLink(ctx context.Context, targetURL, key st
 		return targetURL, nil
 	}
 
-	shortLink, err := s.callDubAPI(ctx, targetURL, key)
+	shortLink, err := s.callDubAPI(ctx, targetURL, key, true)
 	if err == nil && shortLink != "" {
-		return shortLink, nil
+		return s.formatDomain(shortLink), nil
+	}
+
+	// Se falhou e foi tentado com domínio customizado, tenta sem domínio no payload
+	// para o Dub criar sob dub.sh e nós formatamos para o domínio alvo depois
+	if s.domain != "" {
+		if noDomLink, noDomErr := s.callDubAPI(ctx, targetURL, key, false); noDomErr == nil && noDomLink != "" {
+			return s.formatDomain(noDomLink), nil
+		}
 	}
 
 	// Se falhou e foi tentado com key customizado, tenta novamente sem key
 	// para deixar o Dub gerar um slug aleatório exclusivo e evitar conflito (409)
 	if key != "" {
-		if fallbackLink, fallbackErr := s.callDubAPI(ctx, targetURL, ""); fallbackErr == nil && fallbackLink != "" {
-			return fallbackLink, nil
+		if fallbackLink, fallbackErr := s.callDubAPI(ctx, targetURL, "", false); fallbackErr == nil && fallbackLink != "" {
+			return s.formatDomain(fallbackLink), nil
 		}
 	}
 
 	return targetURL, nil
 }
 
-func (s *DubShortenerService) callDubAPI(ctx context.Context, targetURL, key string) (string, error) {
+func (s *DubShortenerService) formatDomain(link string) string {
+	if s.domain != "" && strings.Contains(link, "dub.sh") {
+		return strings.Replace(link, "dub.sh", s.domain, 1)
+	}
+	return link
+}
+
+func (s *DubShortenerService) callDubAPI(ctx context.Context, targetURL, key string, includeDomain bool) (string, error) {
 	payload := map[string]string{
 		"url": targetURL,
 	}
 	if key != "" {
 		payload["key"] = key
 	}
-	if s.domain != "" {
+	if includeDomain && s.domain != "" {
 		payload["domain"] = s.domain
 	}
 

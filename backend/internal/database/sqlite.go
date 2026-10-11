@@ -76,12 +76,15 @@ func runMigrations(db *sql.DB) error {
 		status TEXT NOT NULL DEFAULT 'pending',
 		priority TEXT NOT NULL DEFAULT 'medium',
 		due_date DATETIME,
+		reminder_sent_at DATETIME,
+		start_reminder_sent_at DATETIME,
 		created_at DATETIME NOT NULL,
 		updated_at DATETIME NOT NULL,
 		FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
 	);
 
 	CREATE INDEX IF NOT EXISTS idx_todos_user_status ON todos(user_id, status);
+	CREATE INDEX IF NOT EXISTS idx_todos_due ON todos(status, due_date);
 
 	CREATE TABLE IF NOT EXISTS memories (
 		id TEXT PRIMARY KEY,
@@ -278,6 +281,17 @@ func runMigrations(db *sql.DB) error {
 
 	CREATE INDEX IF NOT EXISTS idx_booking_appts_user_time ON booking_appointments(user_id, start_at, end_at);
 	CREATE INDEX IF NOT EXISTS idx_booking_appts_type ON booking_appointments(booking_type_id);
+
+	CREATE TABLE IF NOT EXISTS summary_dispatches (
+		id TEXT PRIMARY KEY,
+		user_id TEXT NOT NULL,
+		summary_type TEXT NOT NULL,
+		period_key TEXT NOT NULL,
+		dispatched_at DATETIME NOT NULL,
+		FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+	);
+
+	CREATE UNIQUE INDEX IF NOT EXISTS idx_summary_dispatch_uniq ON summary_dispatches(user_id, summary_type, period_key);
 	`
 
 	if _, err := db.Exec(schema); err != nil {
@@ -293,6 +307,8 @@ func runMigrations(db *sql.DB) error {
 	_, _ = db.Exec("ALTER TABLE events ADD COLUMN start_reminder_sent_at DATETIME")
 	_, _ = db.Exec("ALTER TABLE todos ADD COLUMN event_id TEXT")
 	_, _ = db.Exec("ALTER TABLE todos ADD COLUMN event_title TEXT")
+	_, _ = db.Exec("ALTER TABLE todos ADD COLUMN reminder_sent_at DATETIME")
+	_, _ = db.Exec("ALTER TABLE todos ADD COLUMN start_reminder_sent_at DATETIME")
 	_, _ = db.Exec("ALTER TABLE triggers ADD COLUMN scheduled_time TEXT DEFAULT ''")
 	_, _ = db.Exec("ALTER TABLE triggers ADD COLUMN days_of_week TEXT DEFAULT 'DAILY'")
 	_, _ = db.Exec("ALTER TABLE triggers ADD COLUMN last_run_status TEXT DEFAULT ''")

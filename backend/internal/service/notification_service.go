@@ -111,6 +111,22 @@ func (s *NotificationService) SendPushToUser(userID, title, body, priority strin
 	expoPriority := "high"
 	sound := "default"
 
+	// Permite override explícito via data["channelId"]
+	if ch, ok := data["channelId"].(string); ok && ch != "" {
+		channelID = ch
+	} else if dataType, ok := data["type"].(string); ok {
+		switch dataType {
+		case "todo_reminder", "todo_due":
+			channelID = "vito_todos"
+		case "trigger_report":
+			channelID = "vito_radar"
+		case "booking_appointment":
+			channelID = "vito_booking"
+		case "executive_summary", "daily_summary", "weekly_summary", "monthly_summary":
+			channelID = "vito_summaries"
+		}
+	}
+
 	switch priority {
 	case "wakeup":
 		channelID = "vito_wakeup"
@@ -123,6 +139,7 @@ func (s *NotificationService) SendPushToUser(userID, title, body, priority strin
 		sound = ""
 		expoPriority = "normal"
 	}
+
 
 	var messages []PushMessage
 	for _, t := range tokens {

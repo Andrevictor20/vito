@@ -280,9 +280,15 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
 
   return (
     <KeyboardAvoidingView
-      style={[styles.container, { backgroundColor: colors.surface }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 44 : (Platform.OS === 'android' ? 24 : 0)}
+      style={[
+        styles.container,
+        {
+          backgroundColor: colors.surface,
+          paddingBottom: Platform.OS === 'android' ? keyboardHeight : 0,
+        },
+      ]}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 44 : 0}
     >
       {/* Lista de Mensagens */}
       <FlatList

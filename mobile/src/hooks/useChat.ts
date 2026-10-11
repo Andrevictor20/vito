@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ChatMessage, ConversationSession } from '../types';
 import { api } from '../services/api';
+import { notificationService } from '../services/notificationService';
 
 export const getChatStorageKeys = (userId?: string) => {
   const suffix = userId ? `_${userId}` : '';
@@ -199,6 +200,20 @@ export function useChat(onDataChanged?: () => void, currentUserId?: string) {
         setMessages(withVito);
         saveMessages(withVito);
 
+        // Agenda lembretes locais imediatamente para itens criados/atualizados pela IA
+        if (res.event) {
+          notificationService.scheduleEventDualReminders(res.event).catch(() => {});
+        }
+        if (res.todo) {
+          notificationService.scheduleTodoReminder(res.todo).catch(() => {});
+        }
+        if (res.action_performed === 'delete_event' && res.event?.id) {
+          notificationService.cancelEventReminder(res.event.id).catch(() => {});
+        }
+        if (res.action_performed === 'delete_todo' && res.todo?.id) {
+          notificationService.cancelTodoReminder(res.todo.id).catch(() => {});
+        }
+
         // Se criou evento ou tarefa, notifica o listener para atualizar a tela de agenda
         if (res.event || res.todo || res.action_performed !== 'none') {
           onDataChanged?.();
@@ -266,6 +281,20 @@ export function useChat(onDataChanged?: () => void, currentUserId?: string) {
         const withVito = [...messages, updatedUserMsg, vitoMsg];
         setMessages(withVito);
         saveMessages(withVito);
+
+        // Agenda lembretes locais imediatamente para itens criados/atualizados pela IA via áudio
+        if (res.event) {
+          notificationService.scheduleEventDualReminders(res.event).catch(() => {});
+        }
+        if (res.todo) {
+          notificationService.scheduleTodoReminder(res.todo).catch(() => {});
+        }
+        if (res.action_performed === 'delete_event' && res.event?.id) {
+          notificationService.cancelEventReminder(res.event.id).catch(() => {});
+        }
+        if (res.action_performed === 'delete_todo' && res.todo?.id) {
+          notificationService.cancelTodoReminder(res.todo.id).catch(() => {});
+        }
 
         if (res.event || res.todo || res.action_performed !== 'none') {
           onDataChanged?.();

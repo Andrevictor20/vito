@@ -117,6 +117,16 @@ func main() {
 	pendingNudgeWorker.Start()
 	defer pendingNudgeWorker.Stop()
 
+	// Worker em segundo plano para lembretes de tarefas com prazo
+	todoReminderWorker := service.NewTodoReminderWorker(todoRepo, notifSvc, 15*time.Minute)
+	todoReminderWorker.Start()
+	defer todoReminderWorker.Stop()
+
+	// Worker em segundo plano para resumos executivos (diário, semanal e mensal)
+	executiveSummaryWorker := service.NewExecutiveSummaryWorker(db, userRepo, notifSvc, 1*time.Minute)
+	executiveSummaryWorker.Start()
+	defer executiveSummaryWorker.Stop()
+
 	googleAuthCfg := service.GoogleAuthConfig{
 		ClientID:     cfg.GoogleClientID,
 		ClientSecret: cfg.GoogleClientSecret,

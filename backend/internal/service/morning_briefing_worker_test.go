@@ -102,6 +102,18 @@ func (m *mockTodoRepoForBriefing) GetByID(id, userID string) (*domain.Todo, erro
 func (m *mockTodoRepoForBriefing) ListByUser(userID string, status domain.TodoStatus) ([]domain.Todo, error) {
 	return m.todos, nil
 }
+func (m *mockTodoRepoForBriefing) ListUpcomingUnreminded(from, to time.Time) ([]domain.Todo, error) {
+	return nil, nil
+}
+func (m *mockTodoRepoForBriefing) ListDueNowUnreminded(from, to time.Time) ([]domain.Todo, error) {
+	return nil, nil
+}
+func (m *mockTodoRepoForBriefing) MarkReminderSent(todoID string, sentAt time.Time) error {
+	return nil
+}
+func (m *mockTodoRepoForBriefing) MarkDueReminderSent(todoID string, sentAt time.Time) error {
+	return nil
+}
 func (m *mockTodoRepoForBriefing) UpdateStatus(id, userID string, status domain.TodoStatus) error   { return nil }
 func (m *mockTodoRepoForBriefing) Delete(id, userID string) error                                  { return nil }
 func (m *mockTodoRepoForBriefing) AddSubtask(subtask *domain.Subtask) error                        { return nil }

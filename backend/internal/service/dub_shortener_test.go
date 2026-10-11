@@ -138,3 +138,63 @@ func TestDubShortenerService_CustomDomain(t *testing.T) {
 		t.Errorf("esperado link custom domain, obteve %q", link)
 	}
 }
+
+func TestDubShortenerService_ReplacesDubShWithCalLink(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"shortLink": "https://dub.sh/andre-30min",
+		})
+	}))
+	defer server.Close()
+
+	shortener := service.NewDubShortenerService("dub_token_123", "http://localhost:8080")
+	shortener.SetEndpoint(server.URL)
+	shortener.SetDomain("cal.link")
+
+	targetURL := "http://localhost:8080/book/andre/30min"
+	link, err := shortener.ShortenLink(context.Background(), targetURL, "andre-30min")
+	if err != nil {
+		t.Fatalf("não esperava erro: %v", err)
+	}
+	if link != "https://cal.link/andre-30min" {
+		t.Errorf("esperado link https://cal.link/andre-30min, obteve %q", link)
+	}
+}
+
+func TestDubShortenerService_DomainRejectionFallback(t *testing.T) {
+	attempts := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		var req map[string]string
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		if req["domain"] == "cal.link" {
+			// Simula recusa da API do Dub quando o domínio não está cadastrado no workspace
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"error":{"message":"Domain not found in workspace"}}`))
+			return
+		}
+		// Segunda chamada sem domain no payload gera sob dub.sh e o serviço converte para cal.link
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"shortLink": "https://dub.sh/andre-reserva",
+		})
+	}))
+	defer server.Close()
+
+	shortener := service.NewDubShortenerService("dub_token_123", "http://localhost:8080")
+	shortener.SetEndpoint(server.URL)
+	shortener.SetDomain("cal.link")
+
+	targetURL := "http://localhost:8080/book/andre/reserva"
+	link, err := shortener.ShortenLink(context.Background(), targetURL, "andre-reserva")
+	if err != nil {
+		t.Fatalf("não esperava erro: %v", err)
+	}
+	if link != "https://cal.link/andre-reserva" {
+		t.Errorf("esperado link convertido para https://cal.link/andre-reserva, obteve %q", link)
+	}
+	if attempts < 2 {
+		t.Errorf("esperadas pelo menos 2 tentativas com fallback de domínio, obteve %d", attempts)
+	}
+}

@@ -29,17 +29,19 @@ type Subtask struct {
 
 // Todo representa uma pendência/tarefa do usuário.
 type Todo struct {
-	ID         string     `json:"id"`
-	UserID     string     `json:"user_id"`
-	Title      string     `json:"title"`
-	Status     TodoStatus `json:"status"`
-	Priority   string     `json:"priority"` // low, medium, high
-	DueDate    *time.Time `json:"due_date,omitempty"`
-	EventID    string     `json:"event_id,omitempty"`
-	EventTitle string     `json:"event_title,omitempty"`
-	Subtasks   []Subtask  `json:"subtasks,omitempty"`
-	CreatedAt  time.Time  `json:"created_at"`
-	UpdatedAt  time.Time  `json:"updated_at"`
+	ID                  string     `json:"id"`
+	UserID              string     `json:"user_id"`
+	Title               string     `json:"title"`
+	Status              TodoStatus `json:"status"`
+	Priority            string     `json:"priority"` // low, medium, high
+	DueDate             *time.Time `json:"due_date,omitempty"`
+	ReminderSentAt      *time.Time `json:"reminder_sent_at,omitempty"`
+	StartReminderSentAt *time.Time `json:"start_reminder_sent_at,omitempty"`
+	EventID             string     `json:"event_id,omitempty"`
+	EventTitle          string     `json:"event_title,omitempty"`
+	Subtasks            []Subtask  `json:"subtasks,omitempty"`
+	CreatedAt           time.Time  `json:"created_at"`
+	UpdatedAt           time.Time  `json:"updated_at"`
 }
 
 // CreateTodoInput contém os parâmetros para criação flexível de tarefa.
@@ -56,6 +58,10 @@ type TodoRepository interface {
 	Create(todo *Todo) error
 	GetByID(id, userID string) (*Todo, error)
 	ListByUser(userID string, status TodoStatus) ([]Todo, error)
+	ListUpcomingUnreminded(from, to time.Time) ([]Todo, error)
+	ListDueNowUnreminded(from, to time.Time) ([]Todo, error)
+	MarkReminderSent(todoID string, sentAt time.Time) error
+	MarkDueReminderSent(todoID string, sentAt time.Time) error
 	UpdateStatus(id, userID string, status TodoStatus) error
 	Delete(id, userID string) error
 	AddSubtask(subtask *Subtask) error
@@ -63,3 +69,4 @@ type TodoRepository interface {
 	DeleteSubtask(id, todoID string) error
 	ListSubtasksByTodo(todoID string) ([]Subtask, error)
 }
+

@@ -46,8 +46,8 @@ export function useHomeData(currentUserId?: string) {
       setTodos(fetchedTodos || []);
       AsyncStorage.setItem(cacheKeys.eventsKey, JSON.stringify(fetchedEvents || [])).catch(() => {});
       AsyncStorage.setItem(cacheKeys.todosKey, JSON.stringify(fetchedTodos || [])).catch(() => {});
-      if (fetchedEvents && fetchedEvents.length > 0) {
-        notificationService.scheduleAllUpcomingReminders(fetchedEvents).catch(() => {});
+      if ((fetchedEvents && fetchedEvents.length > 0) || (fetchedTodos && fetchedTodos.length > 0)) {
+        notificationService.scheduleAllUpcomingReminders(fetchedEvents || [], fetchedTodos || []).catch(() => {});
       }
     } catch (e) {
       console.error('Falha ao carregar dados:', e);
@@ -137,6 +137,7 @@ export function useHomeData(currentUserId?: string) {
           AsyncStorage.setItem(cacheKeys.todosKey, JSON.stringify(next)).catch(() => {});
           return next;
         });
+        notificationService.scheduleTodoReminder(newTodo).catch(() => {});
       }
       await loadData(true);
       return newTodo;
@@ -195,6 +196,7 @@ export function useHomeData(currentUserId?: string) {
   const handleToggleTodo = async (id: string) => {
     try {
       await api.completeTodo(id);
+      notificationService.cancelTodoReminder(id).catch(() => {});
       setTodos((prev) => {
         const next = prev.map((t) => (t.id === id ? { ...t, status: 'completed' as const } : t));
         AsyncStorage.setItem(cacheKeys.todosKey, JSON.stringify(next)).catch(() => {});
@@ -208,6 +210,7 @@ export function useHomeData(currentUserId?: string) {
   const handleDeleteTodo = async (id: string) => {
     try {
       await api.deleteTodo(id);
+      notificationService.cancelTodoReminder(id).catch(() => {});
       setTodos((prev) => {
         const next = prev.filter((t) => t.id !== id);
         AsyncStorage.setItem(cacheKeys.todosKey, JSON.stringify(next)).catch(() => {});
