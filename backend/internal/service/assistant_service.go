@@ -107,22 +107,23 @@ func (s *AssistantService) Process(ctx context.Context, userID string, input ai.
 		}
 	}
 
-	// Carrega compromissos ativos próximos na agenda (Camada 2 - Próximos 7 dias, até 5)
+	// Carrega compromissos ativos próximos na agenda (Camada 2 - Próximos 14 dias, até 15)
 	if len(input.ActiveSchedule) == 0 && s.calSvc != nil {
 		start := input.Now
-		end := input.Now.Add(7 * 24 * time.Hour)
+		end := input.Now.Add(14 * 24 * time.Hour)
 		if events, err := s.calSvc.ListEvents(userID, start, end); err == nil && len(events) > 0 {
-			limit := 5
+			limit := 15
 			if len(events) < limit {
 				limit = len(events)
 			}
 			loc := userLocation(input.Timezone)
 			for _, ev := range events[:limit] {
-				start, end := ev.StartAt.In(loc), ev.EndAt.In(loc)
-				input.ActiveSchedule = append(input.ActiveSchedule, fmt.Sprintf("%s (%s às %s): %s",
-					start.Format("02/01/2006"),
-					start.Format("15:04"),
-					end.Format("15:04"),
+				evStart, evEnd := ev.StartAt.In(loc), ev.EndAt.In(loc)
+				input.ActiveSchedule = append(input.ActiveSchedule, fmt.Sprintf("%s (%s, das %s às %s): %s",
+					evStart.Format("02/01/2006"),
+					ai.WeekdayPT(evStart.Weekday()),
+					evStart.Format("15:04"),
+					evEnd.Format("15:04"),
 					ev.Title,
 				))
 			}
