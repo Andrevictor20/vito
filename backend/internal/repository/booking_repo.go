@@ -119,6 +119,8 @@ func (r *BookingRepositorySQLite) GetTypeBySlug(userIdentifier, slug string) (*d
 			OR LOWER(u.email) = LOWER(?)
 			OR LOWER(u.email) LIKE LOWER(?) || '@%'
 			OR LOWER(u.name) LIKE LOWER(?) || ' %'
+			OR REPLACE(LOWER(u.name), 'é', 'e') LIKE LOWER(?) || ' %'
+			OR REPLACE(LOWER(u.name), 'é', 'e') = LOWER(?)
 		)
 		  AND bt.slug = ?
 		LIMIT 1
@@ -126,7 +128,7 @@ func (r *BookingRepositorySQLite) GetTypeBySlug(userIdentifier, slug string) (*d
 	cleanID := strings.TrimSpace(userIdentifier)
 	var bt domain.BookingType
 	var rawCreated, rawUpdated any
-	err := r.db.QueryRow(query, cleanID, cleanID, cleanID, cleanID, cleanID, slug).Scan(
+	err := r.db.QueryRow(query, cleanID, cleanID, cleanID, cleanID, cleanID, cleanID, cleanID, slug).Scan(
 		&bt.ID, &bt.UserID, &bt.Slug, &bt.Title, &bt.Description, &bt.DurationMinutes, &bt.BufferMinutes,
 		&bt.DaysOfWeek, &bt.StartHour, &bt.EndHour, &bt.IsActive, &rawCreated, &rawUpdated,
 	)
