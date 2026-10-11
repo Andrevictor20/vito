@@ -3,6 +3,7 @@ package service_test
 import (
 	"context"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -157,18 +158,68 @@ func TestCalendarService_UpdateAndSeries(t *testing.T) {
 }
 
 type mockSyncPusher struct {
+	mu           sync.Mutex
 	pushedEvents []*domain.Event
 	deletedIDs   []string
 }
 
 func (m *mockSyncPusher) PushEvent(ctx context.Context, userID string, event *domain.Event) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.pushedEvents = append(m.pushedEvents, event)
 	return nil
 }
 
 func (m *mockSyncPusher) DeleteEvent(ctx context.Context, userID, eventID string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.deletedIDs = append(m.deletedIDs, eventID)
 	return nil
+}
+
+func (m *mockSyncPusher) getPushedEvents() []*domain.Event {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	cp := make([]*domain.Event, len(m.pushedEvents))
+	copy(cp, m.pushedEvents)
+	return cp
+}
+
+func (m *mockSyncPusher) getDeletedIDs() []string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	cp := make([]string, len(m.deletedIDs))
+	copy(cp, m.deletedIDs)
+	return cp
+}
+
+func (m *mockSyncPusher) reset() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.pushedEvents = nil
+	m.deletedIDs = nil
+}
+
+func (m *mockSyncPusher) waitForEvents(count int, timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if len(m.getPushedEvents()) >= count {
+			return true
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	return len(m.getPushedEvents()) >= count
+}
+
+func (m *mockSyncPusher) waitForDeletes(count int, timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if len(m.getDeletedIDs()) >= count {
+			return true
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	return len(m.getDeletedIDs()) >= count
 }
 
 func TestCalendarService_SyncPusherIntegration(t *testing.T) {
@@ -183,12 +234,11 @@ func TestCalendarService_SyncPusherIntegration(t *testing.T) {
 	}
 
 	// Aguarda processamento assíncrono do pusher
-	time.Sleep(50 * time.Millisecond)
-
-	if len(pusher.pushedEvents) == 0 {
+	if !pusher.waitForEvents(1, 500*time.Millisecond) {
 		t.Fatalf("esperava que PushEvent fosse acionado pelo CalendarService")
 	}
-	if pusher.pushedEvents[0].ID != evt.ID {
+	events := pusher.getPushedEvents()
+	if events[0].ID != evt.ID {
 		t.Errorf("evento empurrado diverge do criado")
 	}
 
@@ -199,8 +249,7 @@ func TestCalendarService_SyncPusherIntegration(t *testing.T) {
 		t.Fatalf("erro ao atualizar evento: %v", err)
 	}
 
-	time.Sleep(50 * time.Millisecond)
-	if len(pusher.pushedEvents) < 2 {
+	if !pusher.waitForEvents(2, 500*time.Millisecond) {
 		t.Fatalf("esperava que UpdateEvent propagasse alteração para o pusher")
 	}
 
@@ -210,9 +259,12 @@ func TestCalendarService_SyncPusherIntegration(t *testing.T) {
 		t.Fatalf("erro ao deletar com opção: %v", err)
 	}
 
-	time.Sleep(50 * time.Millisecond)
-	if len(pusher.deletedIDs) == 0 || pusher.deletedIDs[len(pusher.deletedIDs)-1] != evt.ID {
-		t.Errorf("esperava DeleteEventWithOption propagado para o pusher")
+	if !pusher.waitForDeletes(1, 500*time.Millisecond) {
+		t.Fatalf("esperava DeleteEventWithOption propagado para o pusher")
+	}
+	deletes := pusher.getDeletedIDs()
+	if deletes[len(deletes)-1] != evt.ID {
+		t.Errorf("esperava DeleteEventWithOption propagado para o pusher com id correto")
 	}
 }
 
@@ -281,8 +333,10 @@ func TestCalendarService_UpdateEventTimesByTitle_PropagatesToSyncPusher(t *testi
 		t.Fatalf("erro ao criar evento: %v", err)
 	}
 
-	time.Sleep(50 * time.Millisecond)
-	pusher.pushedEvents = nil // limpa o evento da criação
+	if !pusher.waitForEvents(1, 500*time.Millisecond) {
+		t.Fatalf("esperava 1 evento criado no pusher")
+	}
+	pusher.reset()
 
 	// Reagenda evento para as 17:00
 	newStart := time.Date(2026, 10, 7, 17, 0, 0, 0, time.UTC)
@@ -295,16 +349,15 @@ func TestCalendarService_UpdateEventTimesByTitle_PropagatesToSyncPusher(t *testi
 		t.Fatalf("esperava 1 evento atualizado, obteve %d", count)
 	}
 
-	time.Sleep(100 * time.Millisecond)
-
-	if len(pusher.pushedEvents) == 0 {
+	if !pusher.waitForEvents(1, 500*time.Millisecond) {
 		t.Fatalf("esperava que PushEvent fosse acionado após UpdateEventTimesByTitle")
 	}
-	if pusher.pushedEvents[0].ID != evt.ID {
-		t.Errorf("ID do evento atualizado no pusher (%s) diverge do esperado (%s)", pusher.pushedEvents[0].ID, evt.ID)
+	events := pusher.getPushedEvents()
+	if events[0].ID != evt.ID {
+		t.Errorf("ID do evento atualizado no pusher (%s) diverge do esperado (%s)", events[0].ID, evt.ID)
 	}
-	if !pusher.pushedEvents[0].StartAt.Equal(newStart) {
-		t.Errorf("novo horário no pusher (%v) diverge do horário atualizado (%v)", pusher.pushedEvents[0].StartAt, newStart)
+	if !events[0].StartAt.Equal(newStart) {
+		t.Errorf("novo horário no pusher (%v) diverge do horário atualizado (%v)", events[0].StartAt, newStart)
 	}
 }
 

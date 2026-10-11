@@ -7,7 +7,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "test": "echo \"Ready for mobile tests\" && exit 0"
+    "test": "tsx --test src/utils/pagerNavigation.test.ts"
   },
   "dependencies": {
     "@expo-google-fonts/inter": "^0.4.2",
