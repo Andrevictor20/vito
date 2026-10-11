@@ -212,6 +212,15 @@ func runMigrations(db *sql.DB) error {
 		updated_at DATETIME NOT NULL,
 		FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
 	);
+
+	CREATE TABLE IF NOT EXISTS user_ai_settings (
+		user_id TEXT PRIMARY KEY,
+		autonomy_mode TEXT NOT NULL DEFAULT 'assisted',
+		auto_focus_blocks BOOLEAN NOT NULL DEFAULT 0,
+		created_at DATETIME NOT NULL,
+		updated_at DATETIME NOT NULL,
+		FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+	);
 	`
 
 	if _, err := db.Exec(schema); err != nil {

@@ -15,6 +15,8 @@ import {
   TriggerStatus,
   CreateTriggerInput,
   MorningBriefingSettings,
+  AutonomyMode,
+  AISettings,
 } from '../types';
 
 let FileSystemModule: any = null;
@@ -621,6 +623,23 @@ class ApiService {
 
   async updateBriefingSettings(data: Partial<MorningBriefingSettings>): Promise<MorningBriefingSettings> {
     return this.request<MorningBriefingSettings>('/api/v1/users/briefing', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Autonomia e Configurações de IA (Sprint 8)
+  async getAISettings(): Promise<AISettings> {
+    return this.request<AISettings>('/api/v1/users/ai-settings', {
+      method: 'GET',
+    });
+  }
+
+  async updateAISettings(data: {
+    autonomy_mode?: AutonomyMode;
+    auto_focus_blocks?: boolean;
+  }): Promise<AISettings> {
+    return this.request<AISettings>('/api/v1/users/ai-settings', {
       method: 'PUT',
       body: JSON.stringify(data),
     });

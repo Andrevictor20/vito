@@ -57,6 +57,7 @@ func BuildSystemPromptFromInput(input UserInput) string {
 		input.ActiveTriggers,
 		input.ConversationHistory,
 		input.UserName,
+		input.AutonomyMode,
 	)
 }
 
@@ -75,6 +76,7 @@ func BuildSystemPromptWithFullContext(
 	activeTriggers []string,
 	history []ChatMessageContext,
 	userName string,
+	autonomyMode ...string,
 ) string {
 	if timezone == "" {
 		timezone = "America/Sao_Paulo"
@@ -162,6 +164,31 @@ func BuildSystemPromptWithFullContext(
 		historySection += "(Utilize este histórico para manter a continuidade do diálogo, resolver pronomes como 'ele', 'isso', 'o mesmo', entender confirmações 'sim', 'agende para amanhã', e conectar ideias anteriores com naturalidade.)\n"
 	}
 
+	mode := "assisted"
+	if len(autonomyMode) > 0 && strings.TrimSpace(autonomyMode[0]) != "" {
+		mode = strings.ToLower(strings.TrimSpace(autonomyMode[0]))
+	}
+
+	autonomySection := ""
+	if mode == "proactive" {
+		autonomySection = `
+DIRETRIZ DE NÍVEL DE AUTONOMIA — PROATIVO (SECRETÁRIO EXECUTIVO AUTÔNOMO):
+- O usuário concedeu a você total autonomia para organizar e gerenciar a rotina proativamente!
+- Você tem autorização para tomar a iniciativa! Ao receber pedidos de organização de rotina, blocos de foco ou resolução de conflitos:
+  1. Tome a iniciativa direta: execute os agendamentos, blocos de foco e encaixes na agenda sem hesitar e sem pedir confirmação a cada passo.
+  2. Resolva conflitos menores escolhendo o horário livre mais lógico com inteligência executiva.
+  3. Relate sucintamente as ações realizadas ao final da resposta com segurança e clareza.
+`
+	} else {
+		autonomySection = `
+DIRETRIZ DE NÍVEL DE AUTONOMIA — ASSISTIDO (SECRETÁRIO CONSERVADOR):
+- O usuário prefere validação cuidadosa antes de alterações na rotina!
+- Sempre que houver necessidade de reorganizar a agenda, reagendar eventos ou criar múltiplos blocos:
+  1. Apresente propostas claras e aguarde a confirmação explícita do usuário antes de efetivar mudanças amplas na agenda.
+  2. Nunca assuma decisões sem consentimento prévio quando houver impacto ou dúvida no horário.
+`
+	}
+
 	return fmt.Sprintf(`Você é o Vito, um secretário executivo pessoal com IA de alto nível, refinado, caloroso, proativo e especialista na organização holística da vida e rotina do usuário.
 Você compreende profundamente o ecossistema completo do aplicativo Vito e atua como um verdadeiro braço direito executivo:
 1. AGENDA E CALENDÁRIO DINÂMICO: Agendamento de eventos únicos e séries recorrentes (diárias, semanais, mensais), cálculo rigoroso de horários locais, resolução inteligente de conflitos com sugestão de horários alternativos, reagendamento e cancelamentos.
@@ -177,7 +204,7 @@ DATA E HORA ATUAIS DE REFERÊNCIA (Horário Local do Usuário):
 - Hoje é: %s (%s)
 - Amanhã é: %s (%s)
 - UTC de Referência: %s
-%s%s%s%s%s%s
+%s%s%s%s%s%s%s
 REGRAS DE RESPOSTA OBRIGATÓRIAS:
 Responda EXCLUSIVAMENTE com um objeto JSON válido, sem backticks markdown ou texto extra, no seguinte schema:
 
@@ -252,7 +279,7 @@ DIRETRIZES DE AÇÃO OPERACIONAL:
 		localDateStr, localWeekday,
 		tomorrowDateStr, tomorrowWeekday,
 		now.UTC().Format(time.RFC3339),
-		userSection, memorySection, scheduleSection, todoSection, triggerSection, historySection,
+		userSection, memorySection, scheduleSection, todoSection, triggerSection, historySection, autonomySection,
 		offsetStr, offsetStr, offsetStr,
 		timezone, offsetStr,
 		localDateStr, tomorrowDateStr,

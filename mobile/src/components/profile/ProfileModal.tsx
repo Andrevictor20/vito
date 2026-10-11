@@ -19,6 +19,7 @@ import { ProfileUserCard } from './ProfileUserCard';
 import { ProfileSettingsGroup } from './ProfileSettingsGroup';
 import { NotificationSettingsModal } from '../notifications/NotificationSettingsModal';
 import { CalendarSyncSettingsModal } from './CalendarSyncSettingsModal';
+import { AISettingsModal } from './AISettingsModal';
 
 interface ProfileModalProps {
   visible: boolean;
@@ -39,6 +40,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   const { colors, isDark } = useTheme();
   const [notifModalVisible, setNotifModalVisible] = useState(false);
   const [calendarSyncModalVisible, setCalendarSyncModalVisible] = useState(false);
+  const [aiSettingsModalVisible, setAiSettingsModalVisible] = useState(false);
   const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
   const name = user?.name || 'Andre Victor';
   const email = user?.email || 'andre@vito.ai';
@@ -122,6 +124,13 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 <ProfileSettingsGroup
                   onOpenNotifications={() => setNotifModalVisible(true)}
                   onOpenCalendarSync={() => setCalendarSyncModalVisible(true)}
+                  onOpenAISettings={() => setAiSettingsModalVisible(true)}
+                />
+
+                {/* Modal de Autonomia do Vito M3 */}
+                <AISettingsModal
+                  visible={aiSettingsModalVisible}
+                  onClose={() => setAiSettingsModalVisible(false)}
                 />
 
                 {/* Modal de Configuração de Notificações M3 */}

@@ -41,6 +41,7 @@ type UserInput struct {
 	ActiveTriggers      []string             `json:"active_triggers,omitempty"`      // Vigílias / disparadores em andamento
 	ConversationHistory []ChatMessageContext `json:"conversation_history,omitempty"` // Histórico recente da conversa multi-turn
 	UserName            string               `json:"user_name,omitempty"`            // Nome do usuário para personalização
+	AutonomyMode        string               `json:"autonomy_mode,omitempty"`        // "assisted" (padrão) | "proactive"
 }
 
 // ParsedEvent dados extraídos para criação, atualização ou remoção de evento.

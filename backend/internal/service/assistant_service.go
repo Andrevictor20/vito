@@ -35,9 +35,10 @@ type AssistantService struct {
 	aiGateway  AIParsingGateway
 	calSvc     *CalendarService
 	todoSvc    *TodoService
-	memoryRepo domain.MemoryRepository
-	triggerSvc *TriggerService
-	userRepo   domain.UserRepository
+	memoryRepo     domain.MemoryRepository
+	triggerSvc     *TriggerService
+	userRepo       domain.UserRepository
+	aiSettingsRepo domain.AISettingsRepository
 }
 
 // NewAssistantService instancia o serviço do assistente.
@@ -60,10 +61,22 @@ func (s *AssistantService) SetUserRepository(repo domain.UserRepository) {
 	s.userRepo = repo
 }
 
+// SetAISettingsRepository configura o repositório de preferências de IA e autonomia.
+func (s *AssistantService) SetAISettingsRepository(repo domain.AISettingsRepository) {
+	s.aiSettingsRepo = repo
+}
+
 // Process recebe o input (voz/texto), invoca a IA e aplica a ação no banco de dados.
 func (s *AssistantService) Process(ctx context.Context, userID string, input ai.UserInput) (*AssistantResponse, error) {
 	if input.Now.IsZero() {
 		input.Now = time.Now().UTC()
+	}
+
+	// Carrega preferências de autonomia da IA se não estiverem definidas no input
+	if input.AutonomyMode == "" && s.aiSettingsRepo != nil {
+		if aiSettings, err := s.aiSettingsRepo.GetSettings(userID); err == nil && aiSettings != nil {
+			input.AutonomyMode = string(aiSettings.AutonomyMode)
+		}
 	}
 
 	// Carrega nome do usuário para contextualização e tratamento pessoal

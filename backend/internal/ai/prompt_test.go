@@ -75,3 +75,37 @@ func TestBuildSystemPromptFromInput_EnhancedContextAndDirectives(t *testing.T) {
 		t.Errorf("esperava diretriz anti-emoji preservada")
 	}
 }
+
+func TestBuildSystemPrompt_AutonomyMode_Assisted(t *testing.T) {
+	input := ai.UserInput{
+		Now:          time.Date(2026, 10, 10, 10, 0, 0, 0, time.UTC),
+		Timezone:     "America/Sao_Paulo",
+		AutonomyMode: "assisted",
+	}
+
+	prompt := ai.BuildSystemPromptFromInput(input)
+
+	if !strings.Contains(prompt, "AUTONOMIA") || !strings.Contains(prompt, "ASSISTIDO") {
+		t.Errorf("esperava menção ao nível de autonomia assistido no prompt: %s", prompt)
+	}
+	if !strings.Contains(prompt, "confirmação") {
+		t.Errorf("esperava diretiva de confirmação no modo assistido: %s", prompt)
+	}
+}
+
+func TestBuildSystemPrompt_AutonomyMode_Proactive(t *testing.T) {
+	input := ai.UserInput{
+		Now:          time.Date(2026, 10, 10, 10, 0, 0, 0, time.UTC),
+		Timezone:     "America/Sao_Paulo",
+		AutonomyMode: "proactive",
+	}
+
+	prompt := ai.BuildSystemPromptFromInput(input)
+
+	if !strings.Contains(prompt, "AUTONOMIA") || !strings.Contains(prompt, "PROATIVO") {
+		t.Errorf("esperava menção ao nível de autonomia proativo no prompt: %s", prompt)
+	}
+	if !strings.Contains(prompt, "iniciativa") {
+		t.Errorf("esperava diretiva de iniciativa no modo proativo: %s", prompt)
+	}
+}

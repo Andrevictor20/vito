@@ -8,11 +8,13 @@ import { M3Switch } from '../ui/M3Switch';
 interface ProfileSettingsGroupProps {
   onOpenNotifications?: () => void;
   onOpenCalendarSync?: () => void;
+  onOpenAISettings?: () => void;
 }
 
 export const ProfileSettingsGroup: React.FC<ProfileSettingsGroupProps> = ({
   onOpenNotifications,
   onOpenCalendarSync,
+  onOpenAISettings,
 }) => {
   const { colors, isDark, toggleTheme } = useTheme();
 
@@ -43,6 +45,26 @@ export const ProfileSettingsGroup: React.FC<ProfileSettingsGroupProps> = ({
           value={isDark}
           onValueChange={toggleTheme}
         />
+      </TouchableOpacity>
+
+      <View style={[styles.divider, { backgroundColor: colors.outlineVariant }]} />
+
+      {/* Autonomia do Vito */}
+      <TouchableOpacity
+        style={styles.groupItem}
+        onPress={onOpenAISettings}
+        activeOpacity={0.7}
+      >
+        <View style={styles.itemLeft}>
+          <View style={[styles.itemIconBox, { backgroundColor: colors.surfaceContainerHigh }]}>
+            <MaterialIcons name="psychology" size={18} color={colors.primary} />
+          </View>
+          <View style={styles.itemTextCol}>
+            <Text style={[styles.itemTitle, { color: colors.onSurface }]}>Autonomia do Vito</Text>
+            <Text style={[styles.itemSub, { color: colors.onSurfaceVariant }]}>Modo Assistido ou Proativo</Text>
+          </View>
+        </View>
+        <MaterialIcons name="chevron-right" size={18} color={colors.outline} />
       </TouchableOpacity>
 
       <View style={[styles.divider, { backgroundColor: colors.outlineVariant }]} />

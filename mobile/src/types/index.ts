@@ -381,5 +381,16 @@ export const TRIGGER_CATEGORIES: CategoryMeta[] = [
   },
 ];
 
+export type AutonomyMode = 'assisted' | 'proactive';
+
+export interface AISettings {
+  user_id: string;
+  autonomy_mode: AutonomyMode;
+  auto_focus_blocks: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+
 
 
