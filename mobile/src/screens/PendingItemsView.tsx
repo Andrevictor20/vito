@@ -12,6 +12,7 @@ import {
   Platform,
   SafeAreaView,
   StatusBar as RNStatusBar,
+  BackHandler,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -55,6 +56,21 @@ export const PendingItemsView: React.FC<PendingItemsViewProps> = ({
 
   // Modal de Agendamento Rápido
   const [scheduleModalItem, setScheduleModalItem] = useState<PendingItem | null>(null);
+
+  // Intercepta gesto de voltar do hardware/Android para retornar ou fechar modal
+  useEffect(() => {
+    const onBackPress = () => {
+      if (scheduleModalItem) {
+        setScheduleModalItem(null);
+        return true;
+      }
+      onBack();
+      return true;
+    };
+
+    const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => subscription.remove();
+  }, [scheduleModalItem, onBack]);
 
   const loadData = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);

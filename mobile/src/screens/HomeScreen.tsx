@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   StyleSheet,
   View,
@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   Animated,
   Easing,
+  BackHandler,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens, MD3Shapes } from '../theme/tokens';
@@ -63,6 +64,41 @@ export const HomeScreen: React.FC<{
       loadData(true);
     }
   };
+
+  // Intercepta gesto de voltar do hardware/sistema para navegar para a tela anterior
+  useEffect(() => {
+    const onBackPress = () => {
+      // 1. Se estiver na tela de pendências, volta para a tela inicial
+      if (showPendingItems) {
+        setShowPendingItems(false);
+        return true;
+      }
+      // 2. Se houver algum modal aberto, fecha o modal
+      if (profileVisible) {
+        setProfileVisible(false);
+        return true;
+      }
+      if (createModalVisible) {
+        setCreateModalVisible(false);
+        return true;
+      }
+      if (editModalVisible || editingEvent) {
+        setEditModalVisible(false);
+        setEditingEvent(null);
+        return true;
+      }
+      // 3. Se estiver em outra aba (Agenda ou Radares), volta para a aba principal (Chat)
+      if (activeTab !== 'chat') {
+        handleSelectTab('chat');
+        return true;
+      }
+      // 4. Se já estiver na raiz (Chat sem modais/sub-telas), permite sair do app
+      return false;
+    };
+
+    const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => subscription.remove();
+  }, [showPendingItems, profileVisible, createModalVisible, editModalVisible, editingEvent, activeTab]);
   const {
     events,
     todos,

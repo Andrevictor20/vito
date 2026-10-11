@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   StyleSheet,
   View,
@@ -12,10 +12,12 @@ import {
   Keyboard,
   Modal,
   TouchableWithoutFeedback,
+  BackHandler,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens, MD3Shapes } from '../theme/tokens';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 import { useTriggers } from '../hooks/useTriggers';
 import { TriggerCard } from '../components/triggers/TriggerCard';
 import { TriggerReportsView } from '../components/triggers/TriggerReportsView';
@@ -26,6 +28,7 @@ import { api } from '../services/api';
 
 export const TriggersScreen: React.FC = () => {
   const { colors, isDark } = useTheme();
+  const { user } = useAuth();
   const {
     triggers,
     allTriggers,
@@ -40,13 +43,39 @@ export const TriggersScreen: React.FC = () => {
     handleUpdateTrigger,
     handleRunTrigger,
     stats,
-  } = useTriggers();
+  } = useTriggers(user?.id);
 
   // Modais e navegação
   const [reportTrigger, setReportTrigger] = useState<Trigger | null>(null);
   const [editTrigger, setEditTrigger] = useState<Trigger | null>(null);
   const [showWeeklySummaries, setShowWeeklySummaries] = useState<boolean>(false);
   const [showCategoryPicker, setShowCategoryPicker] = useState<boolean>(false);
+
+  // Intercepta gesto de voltar no Android para retornar à tela anterior sem fechar o app
+  useEffect(() => {
+    const onBackPress = () => {
+      if (showWeeklySummaries) {
+        setShowWeeklySummaries(false);
+        return true;
+      }
+      if (reportTrigger) {
+        setReportTrigger(null);
+        return true;
+      }
+      if (editTrigger) {
+        setEditTrigger(null);
+        return true;
+      }
+      if (showCategoryPicker) {
+        setShowCategoryPicker(false);
+        return true;
+      }
+      return false;
+    };
+
+    const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => subscription.remove();
+  }, [showWeeklySummaries, reportTrigger, editTrigger, showCategoryPicker]);
 
   // Entrada em Linguagem Natural
   const [naturalPrompt, setNaturalPrompt] = useState('');

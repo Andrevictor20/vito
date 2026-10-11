@@ -1,13 +1,38 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '../services/api';
 import { Trigger, TriggerLog, TriggerTestResult, TriggerCategory, TriggerStatus, CreateTriggerInput } from '../types';
 
-export const useTriggers = () => {
+export const useTriggers = (userId?: string) => {
   const [triggers, setTriggers] = useState<Trigger[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<TriggerCategory | 'all'>('all');
   const [error, setError] = useState<string | null>(null);
+
+  const cacheKey = `@vito_triggers_${userId || 'default'}`;
+
+  // 1. Carrega do cache local imediato para render instantâneo
+  useEffect(() => {
+    let isMounted = true;
+    (async () => {
+      try {
+        const cached = await AsyncStorage.getItem(cacheKey);
+        if (cached && isMounted) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setTriggers(parsed);
+            setLoading(false);
+          }
+        }
+      } catch (err) {
+        console.warn('[useTriggers] Falha ao carregar cache local de disparadores:', err);
+      }
+    })();
+    return () => {
+      isMounted = false;
+    };
+  }, [cacheKey]);
 
   const loadTriggers = useCallback(async (isRefresh = false) => {
     if (isRefresh) {
@@ -20,6 +45,8 @@ export const useTriggers = () => {
     try {
       const data = await api.getTriggers();
       setTriggers(data);
+      // Persiste no cache local
+      await AsyncStorage.setItem(cacheKey, JSON.stringify(data)).catch(() => {});
     } catch (err: any) {
       console.error('[useTriggers] Erro ao carregar disparadores:', err);
       setError(err?.message || 'Falha ao sincronizar disparadores');
@@ -27,7 +54,7 @@ export const useTriggers = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [cacheKey]);
 
   useEffect(() => {
     loadTriggers();

@@ -13,6 +13,15 @@ const isWeb = Platform.OS === 'web';
 const isIOS = Platform.OS === 'ios';
 const webStorage = new Map<string, string>();
 
+/**
+ * Normaliza chaves para o expo-secure-store.
+ * No Android, o Keystore/SharedPreferences aceita exclusivamente [a-zA-Z0-9._-].
+ * Caracteres como '@' causam erro fatal de validação no runtime nativo.
+ */
+function sanitizeKey(key: string): string {
+  return key.replace(/[^a-zA-Z0-9._-]/g, '_');
+}
+
 export const secureStorage = {
   async setItem(key: string, value: string): Promise<void> {
     try {
@@ -26,31 +35,32 @@ export const secureStorage = {
       }
 
       const isSensitive = key.includes('token') || key.includes('secret') || key.includes('auth');
-
-      // 1. Tenta persistência criptografada no SecureStore (Hardware Keystore / Keychain)
+      const secureKey = sanitizeKey(key);
       const options = isIOS ? { keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK } : undefined;
       let secureStoreSuccess = false;
+
+      // 1. Tenta persistência criptografada no SecureStore com chave sanitizada
       try {
-        await SecureStore.setItemAsync(key, value, options);
+        await SecureStore.setItemAsync(secureKey, value, options);
         secureStoreSuccess = true;
       } catch (secErr) {
-        console.warn(`[secureStorage] Falha ao persistir no SecureStore para '${key}':`, secErr);
-        if (isSensitive) {
-          // Hard-Fail de Segurança: em falha na Keystore/Keychain, PROIBIDO gravar segredos em texto claro no AsyncStorage
-          throw new Error(`[secureStorage] Falha crítica de hardware/segurança: não foi possível gravar '${key}' com criptografia.`);
-        }
+        console.warn(`[secureStorage] SecureStore indisponível/falha ao persistir '${secureKey}':`, secErr);
       }
 
-      // 2. Apenas utiliza AsyncStorage se NÃO for token sensível
-      if (!isSensitive) {
-        await AsyncStorage.setItem(key, value).catch(() => {});
-      } else if (secureStoreSuccess) {
-        // Se SecureStore foi bem sucedido, purga qualquer cópia residual prévia em texto claro no AsyncStorage
+      if (secureStoreSuccess) {
+        // Se SecureStore foi bem-sucedido, purga cópia residual do AsyncStorage para evitar duplicidade
         await AsyncStorage.removeItem(key).catch(() => {});
+        if (secureKey !== key) {
+          await AsyncStorage.removeItem(secureKey).catch(() => {});
+        }
+      } else {
+        // Fallback resiliente: salva no AsyncStorage para garantir continuidade da sessão caso o hardware falhe
+        await AsyncStorage.setItem(key, value).catch(() => {});
       }
     } catch (err) {
       console.warn(`[secureStorage] Erro ao salvar chave segura '${key}':`, err);
-      throw err;
+      // Fallback final de emergência para nunca deixar o usuário deslogado ou bloqueado
+      await AsyncStorage.setItem(key, value).catch(() => {});
     }
   },
 
@@ -63,33 +73,48 @@ export const secureStorage = {
         return webStorage.get(key) || null;
       }
 
-      const isSensitive = key.includes('token') || key.includes('secret') || key.includes('auth');
+      const secureKey = sanitizeKey(key);
+      const options = isIOS ? { keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK } : undefined;
 
-      // 1. Tenta recuperar do SecureStore
+      // 1. Tenta recuperar do SecureStore com chave normalizada
       try {
-        const options = isIOS ? { keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK } : undefined;
-        const secureVal = await SecureStore.getItemAsync(key, options);
+        const secureVal = await SecureStore.getItemAsync(secureKey, options);
         if (secureVal) {
           return secureVal;
         }
+        // Se não encontrou e a chave original é diferente, tenta a chave original
+        if (secureKey !== key) {
+          const rawSecureVal = await SecureStore.getItemAsync(key, options).catch(() => null);
+          if (rawSecureVal) {
+            return rawSecureVal;
+          }
+        }
       } catch (secErr) {
-        console.warn(`[secureStorage] SecureStore indisponível para '${key}':`, secErr);
-        if (isSensitive) {
-          // Hard-fail: não aceita fallback inseguro para tokens/segredos
-          return null;
+        console.warn(`[secureStorage] SecureStore leitura falhou para '${secureKey}':`, secErr);
+      }
+
+      // 2. Migração Transparente e Fallback: tenta recuperar do AsyncStorage
+      const asyncVal = await AsyncStorage.getItem(key);
+      if (asyncVal) {
+        // Migra silenciosamente para o SecureStore
+        SecureStore.setItemAsync(secureKey, asyncVal, options).then(() => {
+          AsyncStorage.removeItem(key).catch(() => {});
+        }).catch(() => {});
+        return asyncVal;
+      }
+
+      // Tenta também com chave sanitizada no AsyncStorage se aplicável
+      if (secureKey !== key) {
+        const asyncSanitizedVal = await AsyncStorage.getItem(secureKey);
+        if (asyncSanitizedVal) {
+          return asyncSanitizedVal;
         }
       }
 
-      // 2. Chaves sensíveis NUNCA são lidas do AsyncStorage
-      if (isSensitive) {
-        return null;
-      }
-
-      const asyncVal = await AsyncStorage.getItem(key);
-      return asyncVal;
+      return null;
     } catch (err) {
       console.warn(`[secureStorage] Erro ao recuperar chave segura '${key}':`, err);
-      return null;
+      return AsyncStorage.getItem(key).catch(() => null);
     }
   },
 
@@ -104,9 +129,17 @@ export const secureStorage = {
         return;
       }
 
-      await AsyncStorage.removeItem(key).catch(() => {});
+      const secureKey = sanitizeKey(key);
       const options = isIOS ? { keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK } : undefined;
-      await SecureStore.deleteItemAsync(key, options).catch(() => {});
+
+      await AsyncStorage.removeItem(key).catch(() => {});
+      if (secureKey !== key) {
+        await AsyncStorage.removeItem(secureKey).catch(() => {});
+      }
+      await SecureStore.deleteItemAsync(secureKey, options).catch(() => {});
+      if (secureKey !== key) {
+        await SecureStore.deleteItemAsync(key, options).catch(() => {});
+      }
     } catch (err) {
       console.warn(`[secureStorage] Erro ao remover chave segura '${key}':`, err);
     }

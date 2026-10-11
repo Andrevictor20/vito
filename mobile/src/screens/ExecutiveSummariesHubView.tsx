@@ -11,6 +11,7 @@ import {
   Platform,
   StatusBar as RNStatusBar,
   Share,
+  BackHandler,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -42,6 +43,17 @@ export const ExecutiveSummariesHubView: React.FC<ExecutiveSummariesHubViewProps>
   const [todos, setTodos] = useState<Todo[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Intercepta gesto de voltar do hardware/Android para retornar à tela anterior
+  useEffect(() => {
+    const onBackPress = () => {
+      onBack();
+      return true;
+    };
+
+    const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => subscription.remove();
+  }, [onBack]);
 
   const loadData = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
