@@ -146,6 +146,9 @@ func main() {
 	pendingHandler := handler.NewPendingHandler(pendingSvc)
 
 	dubShortener := service.NewDubShortenerService(cfg.DubAPIKey, cfg.PublicBaseURL)
+	if cfg.DubDomain != "" {
+		dubShortener.SetDomain(cfg.DubDomain)
+	}
 	turnstileValidator := service.NewTurnstileValidator(cfg.TurnstileSecretKey)
 	bookingSvc := service.NewBookingService(bookingRepo, eventRepo, userRepo, notifSvc, dubShortener, turnstileValidator, cfg.PublicBaseURL)
 	bookingHandler := handler.NewBookingHandler(bookingSvc)

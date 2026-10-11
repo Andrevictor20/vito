@@ -23,7 +23,6 @@ try {
 import { tokens, MD3Shapes } from '../theme/tokens';
 import { useChat } from '../hooks/useChat';
 import { ChatMessageBubble } from '../components/chat/ChatMessageBubble';
-import { ChatQuotaBanner } from '../components/chat/ChatQuotaBanner';
 import { ChatQuickChips } from '../components/chat/ChatQuickChips';
 import { ChatInputDock } from '../components/chat/ChatInputDock';
 import { ConversationHistoryModal } from '../components/chat/ConversationHistoryModal';
@@ -263,6 +262,16 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
     }
   };
 
+  const handleCancelRecording = async () => {
+    if (!isRecording) return;
+    setIsRecording(false);
+    try {
+      await SafeAudioRecorder.stopRecording();
+    } catch (e) {
+      // ignore
+    }
+  };
+
   return (
     <KeyboardAvoidingView
       style={[styles.container, { backgroundColor: colors.surface }]}
@@ -328,9 +337,6 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
               ? 76
               : 74,
           },
-          Platform.OS === 'android' && keyboardHeight > 0 && {
-            marginBottom: keyboardHeight + 14,
-          },
         ]}
       >
         <ChatInputDock
@@ -340,6 +346,7 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
           loading={loading}
           isRecording={isRecording}
           onPressMic={handleToggleRecording}
+          onCancelRecording={handleCancelRecording}
           onPressAttach={handlePickImage}
           selectedImageUri={selectedImageUri}
           onClearImage={() => {

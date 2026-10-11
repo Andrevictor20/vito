@@ -773,7 +773,8 @@ class ApiService {
   // ==========================================
 
   async getBookingTypes(): Promise<BookingType[]> {
-    return this.request<BookingType[]>('/api/v1/booking/types');
+    const res = await this.request<BookingType[]>('/api/v1/booking/types');
+    return Array.isArray(res) ? res : [];
   }
 
   async createBookingType(data: CreateBookingTypeInput): Promise<BookingType> {
@@ -797,7 +798,8 @@ class ApiService {
   }
 
   async getBookingAppointments(): Promise<BookingAppointment[]> {
-    return this.request<BookingAppointment[]>('/api/v1/booking/appointments');
+    const res = await this.request<BookingAppointment[]>('/api/v1/booking/appointments');
+    return Array.isArray(res) ? res : [];
   }
 }
 

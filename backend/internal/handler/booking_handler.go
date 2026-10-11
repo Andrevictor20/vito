@@ -143,6 +143,9 @@ func (h *BookingHandler) ListTypes(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
+	if types == nil {
+		types = []service.BookingTypeWithLink{}
+	}
 	_ = json.NewEncoder(w).Encode(types)
 }
 
@@ -229,6 +232,9 @@ func (h *BookingHandler) ListAppointments(w http.ResponseWriter, r *http.Request
 	}
 
 	w.Header().Set("Content-Type", "application/json")
+	if appts == nil {
+		appts = []domain.BookingAppointment{}
+	}
 	_ = json.NewEncoder(w).Encode(appts)
 }
 

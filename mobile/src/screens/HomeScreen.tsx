@@ -272,23 +272,27 @@ export const HomeScreen: React.FC<{
                 eventDates={eventDates}
               />
 
-              {/* Seletor Segmentado de Foco: Eventos vs Tarefas */}
-              <View
-                style={[
-                  styles.focusSegmentedContainer,
-                  {
-                    backgroundColor: isDark ? colors.surfaceContainerLow : '#F4F4F5',
-                    borderColor: colors.outlineVariant,
-                  },
-                ]}
+              {/* Seletor Segmentado de Foco & Ações Executivas */}
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.focusSegmentedScrollContainer}
+                style={styles.focusSegmentedScrollView}
               >
                 <TouchableOpacity
                   style={[
                     styles.focusSegmentBtn,
-                    homeFocusMode === 'events' && [
-                      styles.focusSegmentBtnActive,
-                      { backgroundColor: isDark ? colors.surfaceContainerHighest : colors.primary },
-                    ],
+                    {
+                      backgroundColor:
+                        homeFocusMode === 'events'
+                          ? (isDark ? colors.surfaceContainerHighest : colors.primary)
+                          : (isDark ? colors.surfaceContainerLow : '#F4F4F5'),
+                      borderColor:
+                        homeFocusMode === 'events'
+                          ? 'transparent'
+                          : colors.outlineVariant,
+                    },
+                    homeFocusMode === 'events' && styles.focusSegmentBtnActive,
                   ]}
                   onPress={() => setHomeFocusMode('events')}
                   activeOpacity={0.75}
@@ -323,10 +327,17 @@ export const HomeScreen: React.FC<{
                 <TouchableOpacity
                   style={[
                     styles.focusSegmentBtn,
-                    homeFocusMode === 'todos' && [
-                      styles.focusSegmentBtnActive,
-                      { backgroundColor: isDark ? colors.surfaceContainerHighest : colors.primary },
-                    ],
+                    {
+                      backgroundColor:
+                        homeFocusMode === 'todos'
+                          ? (isDark ? colors.surfaceContainerHighest : colors.primary)
+                          : (isDark ? colors.surfaceContainerLow : '#F4F4F5'),
+                      borderColor:
+                        homeFocusMode === 'todos'
+                          ? 'transparent'
+                          : colors.outlineVariant,
+                    },
+                    homeFocusMode === 'todos' && styles.focusSegmentBtnActive,
                   ]}
                   onPress={() => setHomeFocusMode('todos')}
                   activeOpacity={0.75}
@@ -359,7 +370,13 @@ export const HomeScreen: React.FC<{
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={styles.focusSegmentBtn}
+                  style={[
+                    styles.focusSegmentBtn,
+                    {
+                      backgroundColor: isDark ? colors.surfaceContainerLow : '#F4F4F5',
+                      borderColor: colors.outlineVariant,
+                    },
+                  ]}
                   onPress={() => {
                     hapticFeedback.selection();
                     setShowPendingItems(true);
@@ -387,7 +404,13 @@ export const HomeScreen: React.FC<{
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={styles.focusSegmentBtn}
+                  style={[
+                    styles.focusSegmentBtn,
+                    {
+                      backgroundColor: isDark ? colors.surfaceContainerLow : '#F4F4F5',
+                      borderColor: colors.outlineVariant,
+                    },
+                  ]}
                   onPress={() => {
                     hapticFeedback.selection();
                     setShowBookingScreen(true);
@@ -413,7 +436,7 @@ export const HomeScreen: React.FC<{
                     Booking
                   </Text>
                 </TouchableOpacity>
-              </View>
+              </ScrollView>
 
               {/* Visualização de Eventos com Foco Dedicado */}
               {homeFocusMode === 'events' ? (
@@ -801,23 +824,25 @@ const styles = StyleSheet.create({
     fontWeight: tokens.typography.weight.bold,
     letterSpacing: 0.2,
   },
-  focusSegmentedContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: MD3Shapes.full,
-    borderWidth: 1,
-    padding: 3,
+  focusSegmentedScrollView: {
     marginTop: tokens.spacing.md,
     marginBottom: tokens.spacing.md,
-    gap: 4,
+  },
+  focusSegmentedScrollContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 2,
+    paddingVertical: 4,
   },
   focusSegmentBtn: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 8,
+    paddingHorizontal: 14,
     borderRadius: MD3Shapes.full,
+    borderWidth: 1,
     gap: 6,
   },
   focusSegmentBtnActive: {

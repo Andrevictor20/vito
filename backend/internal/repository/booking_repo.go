@@ -157,7 +157,7 @@ func (r *BookingRepositorySQLite) ListTypesByUser(userID string) ([]domain.Booki
 	}
 	defer rows.Close()
 
-	var list []domain.BookingType
+	list := make([]domain.BookingType, 0)
 	for rows.Next() {
 		var bt domain.BookingType
 		var rawCreated, rawUpdated any
@@ -239,7 +239,7 @@ func (r *BookingRepositorySQLite) ListAppointmentsByUser(userID string, from, to
 	}
 	defer rows.Close()
 
-	var list []domain.BookingAppointment
+	list := make([]domain.BookingAppointment, 0)
 	for rows.Next() {
 		var a domain.BookingAppointment
 		var rawStart, rawEnd, rawCreated any

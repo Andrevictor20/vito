@@ -14,6 +14,7 @@ import {
   StatusBar as RNStatusBar,
   BackHandler,
   Share,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -46,8 +47,9 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack }) => {
   // Feedback de cópia por item
   const [copiedSlug, setCopiedSlug] = useState<string | null>(null);
 
-  // Modal de Criação de Link
+  // Modal de Criação / Edição de Link
   const [createModalVisible, setCreateModalVisible] = useState(false);
+  const [editingType, setEditingType] = useState<BookingType | null>(null);
   const [newTitle, setNewTitle] = useState('');
   const [newSlug, setNewSlug] = useState('');
   const [newDescription, setNewDescription] = useState('');
@@ -62,6 +64,7 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack }) => {
     const onBackPress = () => {
       if (createModalVisible) {
         setCreateModalVisible(false);
+        setEditingType(null);
         return true;
       }
       onBack();
@@ -77,10 +80,12 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack }) => {
         api.getBookingTypes().catch(() => []),
         api.getBookingAppointments().catch(() => []),
       ]);
-      setTypes(typesData);
-      setAppointments(apptsData);
+      setTypes(Array.isArray(typesData) ? typesData : []);
+      setAppointments(Array.isArray(apptsData) ? apptsData : []);
     } catch (err) {
       console.error('[BookingScreen] erro ao carregar:', err);
+      setTypes([]);
+      setAppointments([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -148,8 +153,36 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack }) => {
     }
   };
 
-  // Cria novo tipo de agendamento
-  const handleCreateSubmit = async () => {
+  // Abre modal para criação de novo link
+  const handleOpenCreate = () => {
+    hapticFeedback.medium();
+    setEditingType(null);
+    setNewTitle('');
+    setNewSlug('');
+    setNewDescription('');
+    setNewDuration(30);
+    setNewBuffer(10);
+    setNewStartHour('09:00');
+    setNewEndHour('18:00');
+    setCreateModalVisible(true);
+  };
+
+  // Abre modal para edição de link existente
+  const handleOpenEdit = (bt: BookingType) => {
+    hapticFeedback.light();
+    setEditingType(bt);
+    setNewTitle(bt.title);
+    setNewSlug(bt.slug);
+    setNewDescription(bt.description || '');
+    setNewDuration(bt.duration_minutes || 30);
+    setNewBuffer(bt.buffer_minutes ?? 10);
+    setNewStartHour(bt.start_hour || '09:00');
+    setNewEndHour(bt.end_hour || '18:00');
+    setCreateModalVisible(true);
+  };
+
+  // Cria ou atualiza tipo de agendamento
+  const handleModalSubmit = async () => {
     if (!newTitle.trim() || !newSlug.trim()) {
       return;
     }
@@ -164,18 +197,27 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack }) => {
         buffer_minutes: newBuffer,
         start_hour: newStartHour,
         end_hour: newEndHour,
-        days_of_week: '[1,2,3,4,5]',
+        days_of_week: editingType?.days_of_week || '[1,2,3,4,5]',
       };
-      const created = await api.createBookingType(payload);
-      setTypes((prev) => [...prev, created]);
+
+      if (editingType) {
+        const updated = await api.updateBookingType(editingType.id, payload);
+        setTypes((prev) =>
+          (prev || []).map((item) => (item.id === editingType.id ? { ...item, ...updated } : item))
+        );
+      } else {
+        const created = await api.createBookingType(payload);
+        setTypes((prev) => [...(prev || []), created]);
+      }
+
       setCreateModalVisible(false);
-      // Limpa formulário
+      setEditingType(null);
       setNewTitle('');
       setNewSlug('');
       setNewDescription('');
       hapticFeedback.success();
     } catch (err) {
-      console.error('[BookingScreen] erro ao criar link:', err);
+      console.error('[BookingScreen] erro ao salvar link:', err);
     } finally {
       setIsSubmitting(false);
     }
@@ -220,10 +262,7 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack }) => {
         </View>
 
         <TouchableOpacity
-          onPress={() => {
-            hapticFeedback.medium();
-            setCreateModalVisible(true);
-          }}
+          onPress={handleOpenCreate}
           style={[styles.createHeaderBtn, { backgroundColor: colors.primary }]}
           activeOpacity={0.8}
         >
@@ -255,7 +294,7 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack }) => {
               activeTab === 'links' && styles.tabTextActive,
             ]}
           >
-            Links ({types.length})
+            Links ({(types || []).length})
           </Text>
         </TouchableOpacity>
 
@@ -281,7 +320,7 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack }) => {
               activeTab === 'appointments' && styles.tabTextActive,
             ]}
           >
-            Recebidos ({appointments.length})
+            Recebidos ({(appointments || []).length})
           </Text>
         </TouchableOpacity>
       </View>
@@ -304,7 +343,7 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack }) => {
           }
         >
           {activeTab === 'links' ? (
-            types.length === 0 ? (
+            (types || []).length === 0 ? (
               <View style={styles.emptyContainer}>
                 <View style={[styles.emptyIconCircle, { backgroundColor: colors.surfaceVariant }]}>
                   <MaterialIcons name="link-off" size={32} color={colors.onSurfaceVariant} />
@@ -317,10 +356,7 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack }) => {
                 </Text>
                 <TouchableOpacity
                   style={[styles.emptyActionButton, { backgroundColor: colors.primary }]}
-                  onPress={() => {
-                    hapticFeedback.medium();
-                    setCreateModalVisible(true);
-                  }}
+                  onPress={handleOpenCreate}
                   activeOpacity={0.8}
                 >
                   <MaterialIcons name="add" size={20} color={colors.onPrimary} />
@@ -331,7 +367,7 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack }) => {
               </View>
             ) : (
               <View style={styles.cardsList}>
-                {types.map((bt) => {
+                {(types || []).map((bt) => {
                   const isCopied = copiedSlug === bt.slug;
                   return (
                     <View
@@ -442,6 +478,17 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack }) => {
                         </TouchableOpacity>
 
                         <TouchableOpacity
+                          style={[styles.editButton, { borderColor: colors.outlineVariant }]}
+                          onPress={() => handleOpenEdit(bt)}
+                          activeOpacity={0.7}
+                        >
+                          <MaterialIcons name="edit" size={16} color={colors.primary} />
+                          <Text style={[styles.editButtonText, { color: colors.primary }]}>
+                            Editar
+                          </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
                           style={[styles.deleteButton, { borderColor: colors.outlineVariant }]}
                           onPress={() => handleDeleteType(bt.id)}
                           activeOpacity={0.7}
@@ -454,7 +501,7 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack }) => {
                 })}
               </View>
             )
-          ) : appointments.length === 0 ? (
+          ) : (appointments || []).length === 0 ? (
             <View style={styles.emptyContainer}>
               <View style={[styles.emptyIconCircle, { backgroundColor: colors.surfaceVariant }]}>
                 <MaterialIcons name="event-busy" size={32} color={colors.onSurfaceVariant} />
@@ -468,7 +515,7 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack }) => {
             </View>
           ) : (
             <View style={styles.cardsList}>
-              {appointments.map((appt) => {
+              {(appointments || []).map((appt) => {
                 const dateObj = new Date(appt.start_at);
                 const dateFormatted = dateObj.toLocaleDateString('pt-BR', {
                   day: '2-digit',
@@ -537,28 +584,56 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack }) => {
         </ScrollView>
       )}
 
-      {/* Modal de Criação de Link de Booking */}
+      {/* Modal de Criação / Edição de Link de Booking */}
       <Modal
         visible={createModalVisible}
         animationType="slide"
         transparent={true}
-        onRequestClose={() => setCreateModalVisible(false)}
+        onRequestClose={() => {
+          setCreateModalVisible(false);
+          setEditingType(null);
+        }}
       >
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <TouchableOpacity
+            style={styles.modalBackdrop}
+            activeOpacity={1}
+            onPress={() => {
+              setCreateModalVisible(false);
+              setEditingType(null);
+            }}
+          />
           <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
             <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: colors.onSurface }]}>
-                Novo Link de Agendamento
-              </Text>
+              <View style={styles.modalTitleBlock}>
+                <Text style={[styles.modalTitle, { color: colors.onSurface }]}>
+                  {editingType ? 'Editar Link de Agendamento' : 'Novo Link de Agendamento'}
+                </Text>
+                <Text style={[styles.modalSubtitle, { color: colors.onSurfaceVariant }]}>
+                  {editingType
+                    ? 'Ajuste regras, horários e duração do link'
+                    : 'Configure janelas e regras para convidados'}
+                </Text>
+              </View>
               <TouchableOpacity
-                onPress={() => setCreateModalVisible(false)}
+                onPress={() => {
+                  setCreateModalVisible(false);
+                  setEditingType(null);
+                }}
                 style={styles.modalCloseBtn}
               >
                 <MaterialIcons name="close" size={22} color={colors.onSurfaceVariant} />
               </TouchableOpacity>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={styles.modalScrollContent}
+            >
               <View style={styles.formGroup}>
                 <Text style={[styles.formLabel, { color: colors.onSurface }]}>Título da Reunião *</Text>
                 <TextInput
@@ -573,7 +648,7 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack }) => {
                   placeholder="Ex: Reunião de 30 min, Alinhamento"
                   placeholderTextColor={colors.onSurfaceVariant}
                   value={newTitle}
-                  onChangeText={autoGenerateSlug}
+                  onChangeText={editingType ? setNewTitle : autoGenerateSlug}
                 />
               </View>
 
@@ -593,6 +668,24 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack }) => {
                   value={newSlug}
                   onChangeText={(val) => setNewSlug(val.toLowerCase())}
                   autoCapitalize="none"
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={[styles.formLabel, { color: colors.onSurface }]}>Descrição (Opcional)</Text>
+                <TextInput
+                  style={[
+                    styles.formInput,
+                    {
+                      backgroundColor: colors.surfaceVariant,
+                      color: colors.onSurface,
+                      borderColor: colors.outlineVariant,
+                    },
+                  ]}
+                  placeholder="Contexto da reunião ou pauta breve"
+                  placeholderTextColor={colors.onSurfaceVariant}
+                  value={newDescription}
+                  onChangeText={setNewDescription}
                 />
               </View>
 
@@ -690,7 +783,7 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack }) => {
                   styles.submitModalBtn,
                   { backgroundColor: colors.primary, opacity: isSubmitting ? 0.6 : 1 },
                 ]}
-                onPress={handleCreateSubmit}
+                onPress={handleModalSubmit}
                 disabled={isSubmitting}
                 activeOpacity={0.8}
               >
@@ -698,13 +791,13 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack }) => {
                   <ActivityIndicator size="small" color={colors.onPrimary} />
                 ) : (
                   <Text style={[styles.submitModalText, { color: colors.onPrimary }]}>
-                    Salvar e Criar Link
+                    {editingType ? 'Salvar Alterações' : 'Salvar e Criar Link'}
                   </Text>
                 )}
               </TouchableOpacity>
             </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
@@ -984,24 +1077,59 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
+  },
+  modalBackdrop: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
   },
   modalContent: {
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: Platform.OS === 'ios' ? 36 : 16,
     maxHeight: '85%',
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 16,
+  },
+  modalTitleBlock: {
+    flex: 1,
+    marginRight: 8,
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: '700',
+    letterSpacing: -0.3,
+  },
+  modalSubtitle: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  modalScrollContent: {
+    paddingBottom: 40,
+  },
+  editButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    height: 38,
+    borderRadius: 8,
+    borderWidth: 1,
+    justifyContent: 'center',
+  },
+  editButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
   modalCloseBtn: {
     padding: 4,

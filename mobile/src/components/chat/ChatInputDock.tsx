@@ -18,6 +18,7 @@ interface ChatInputDockProps {
   loading?: boolean;
   onPressMic?: () => void;
   isRecording?: boolean;
+  onCancelRecording?: () => void;
   onPressAttach?: () => void;
   selectedImageUri?: string | null;
   onClearImage?: () => void;
@@ -30,12 +31,24 @@ export const ChatInputDock: React.FC<ChatInputDockProps> = ({
   loading = false,
   onPressMic,
   isRecording = false,
+  onCancelRecording,
   onPressAttach,
   selectedImageUri,
   onClearImage,
 }) => {
   const { colors, isDark } = useTheme();
   const canSend = (value.trim().length > 0 || !!selectedImageUri) && !loading;
+
+  // Garante disparo imediato no primeiro toque eliminando duplo clique
+  const isSendingRef = React.useRef(false);
+  const handleTriggerSend = () => {
+    if (isSendingRef.current || !canSend) return;
+    isSendingRef.current = true;
+    onSend();
+    setTimeout(() => {
+      isSendingRef.current = false;
+    }, 400);
+  };
 
   return (
     <View style={styles.dockWrapper}>
@@ -55,25 +68,42 @@ export const ChatInputDock: React.FC<ChatInputDockProps> = ({
       )}
 
       <View style={[styles.capsule, { backgroundColor: colors.surfaceContainerHigh, borderColor: colors.outlineVariant }]}>
+        {/* Botão de Cancelar Gravação (Descartar áudio sem enviar) */}
+        {isRecording && onCancelRecording && (
+          <TouchableOpacity
+            style={[styles.iconButton, { backgroundColor: 'rgba(239, 68, 68, 0.12)' }]}
+            onPress={onCancelRecording}
+            activeOpacity={0.7}
+            hitSlop={tokens.hitSlop.sm}
+            accessibilityLabel="Cancelar gravação de áudio"
+          >
+            <MaterialIcons name="delete-outline" size={20} color={colors.error} />
+          </TouchableOpacity>
+        )}
+
         {/* Botão de Ditado / Microfone Tonal M3 */}
         <TouchableOpacity
           style={[styles.iconButton, isRecording ? styles.micButtonRecording : { backgroundColor: colors.surfaceContainerHighest }]}
           onPress={onPressMic}
           activeOpacity={0.7}
           hitSlop={tokens.hitSlop.sm}
-          accessibilityLabel={isRecording ? 'Parar gravação' : 'Gravar áudio com Vito'}
+          accessibilityLabel={isRecording ? 'Concluir e enviar áudio' : 'Gravar áudio com Vito'}
         >
           <MaterialIcons
-            name={isRecording ? 'stop' : 'mic'}
+            name={isRecording ? 'check' : 'mic'}
             size={20}
-            color={isRecording ? colors.onErrorContainer : colors.primary}
+            color={isRecording ? '#FFFFFF' : colors.primary}
           />
         </TouchableOpacity>
 
         {/* Campo de Entrada de Texto M3 */}
         <TextInput
           style={[styles.input, { color: colors.onSurface }]}
-          placeholder={isRecording ? 'Ouvindo... Toque no botão para concluir' : 'Instrua o Vito ou pergunte algo...'}
+          placeholder={
+            isRecording
+              ? 'Gravando áudio... Conclua ou cancele'
+              : 'Instrua o Vito ou pergunte algo...'
+          }
           placeholderTextColor={isRecording ? colors.error : colors.onSurfaceVariant}
           value={value}
           onChangeText={onChangeText}
@@ -83,8 +113,8 @@ export const ChatInputDock: React.FC<ChatInputDockProps> = ({
           returnKeyType="default"
         />
 
-        {/* Botão de Anexo / Contexto M3 */}
-        {onPressAttach && (
+        {/* Botão de Anexo / Contexto M3 (oculto durante gravação) */}
+        {onPressAttach && !isRecording && (
           <TouchableOpacity
             style={styles.iconButton}
             onPress={onPressAttach}
@@ -104,7 +134,8 @@ export const ChatInputDock: React.FC<ChatInputDockProps> = ({
               ? { backgroundColor: colors.primary }
               : { backgroundColor: colors.surfaceContainerHighest, shadowOpacity: 0, elevation: 0 },
           ]}
-          onPress={onSend}
+          onPress={handleTriggerSend}
+          onPressIn={canSend ? handleTriggerSend : undefined}
           disabled={!canSend}
           activeOpacity={0.8}
           accessibilityLabel="Enviar mensagem"

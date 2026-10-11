@@ -32,24 +32,6 @@ export const ProfileUserCard: React.FC<ProfileUserCardProps> = ({
           </View>
           <Text style={[styles.email, { color: colors.textSecondary }]} numberOfLines={1}>{email}</Text>
         </View>
-
-        <View style={[styles.proBadge, { backgroundColor: colors.surfaceContainerHighest }]}>
-          <Text style={[styles.proBadgeText, { color: colors.onSurface }]}>PRO</Text>
-        </View>
-      </View>
-
-      <View style={[styles.telemetryBox, { backgroundColor: colors.surfaceContainerHigh }]}>
-        <View style={styles.telemetryRow}>
-          <Text style={[styles.telemetryLabel, { color: colors.textSecondary }]}>Cota semanal utilizada</Text>
-          <Text style={[styles.telemetryValue, { color: colors.onSurface }]}>{quotaPercentage}%</Text>
-        </View>
-        <View style={[styles.progressBarTrack, { backgroundColor: colors.surfaceContainerHighest }]}>
-          <View style={[styles.progressBarFill, { width: `${quotaPercentage}%`, backgroundColor: colors.primary }]} />
-        </View>
-        <View style={styles.telemetryFooter}>
-          <Text style={[styles.telemetrySub, { color: colors.textMuted }]}>92.5k / 500k ops</Text>
-          <Text style={[styles.telemetrySub, { color: colors.textMuted }]}>Renova em 4 dias</Text>
-        </View>
       </View>
     </View>
   );

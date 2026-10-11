@@ -132,7 +132,7 @@ func (s *BookingService) ListBookingTypes(ctx context.Context, userID string) ([
 	if err != nil {
 		return nil, err
 	}
-	var enriched []BookingTypeWithLink
+	enriched := make([]BookingTypeWithLink, 0)
 	for i := range types {
 		en, err := s.enrichWithLinks(ctx, userID, &types[i])
 		if err == nil && en != nil {
@@ -337,7 +337,14 @@ func (s *BookingService) ListAppointments(ctx context.Context, userID string, fr
 	if to.IsZero() {
 		to = time.Now().Add(90 * 24 * time.Hour)
 	}
-	return s.bookingRepo.ListAppointmentsByUser(userID, from, to)
+	appts, err := s.bookingRepo.ListAppointmentsByUser(userID, from, to)
+	if err != nil {
+		return nil, err
+	}
+	if appts == nil {
+		appts = []domain.BookingAppointment{}
+	}
+	return appts, nil
 }
 
 func (s *BookingService) enrichWithLinks(ctx context.Context, userID string, bt *domain.BookingType) (*BookingTypeWithLink, error) {
@@ -353,7 +360,11 @@ func (s *BookingService) enrichWithLinks(ctx context.Context, userID string, bt 
 		}
 	}
 
-	publicURL := fmt.Sprintf("%s/book/%s/%s", s.publicBaseURL, username, bt.Slug)
+	baseURL := strings.TrimRight(s.publicBaseURL, "/")
+	if baseURL == "" {
+		baseURL = "https://vito.rasppi.cloud"
+	}
+	publicURL := fmt.Sprintf("%s/book/%s/%s", baseURL, username, bt.Slug)
 	shortURL := publicURL
 	if s.shortener != nil {
 		key := fmt.Sprintf("%s-%s", username, bt.Slug)
