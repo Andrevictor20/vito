@@ -26,6 +26,7 @@ type Server struct {
 	notifHandler      *handler.NotificationHandler
 	syncHandler       *handler.CalendarSyncHandler
 	triggerHandler    *handler.TriggerHandler
+	briefingHandler   *handler.BriefingHandler
 	authSvc           *service.AuthService
 }
 
@@ -39,6 +40,7 @@ type Config struct {
 	NotifHandler      *handler.NotificationHandler
 	SyncHandler       *handler.CalendarSyncHandler
 	TriggerHandler    *handler.TriggerHandler
+	BriefingHandler   *handler.BriefingHandler
 	AuthSvc           *service.AuthService
 }
 
@@ -57,6 +59,7 @@ func New(cfg ...Config) *Server {
 		s.notifHandler = cfg[0].NotifHandler
 		s.syncHandler = cfg[0].SyncHandler
 		s.triggerHandler = cfg[0].TriggerHandler
+		s.briefingHandler = cfg[0].BriefingHandler
 		s.authSvc = cfg[0].AuthSvc
 	}
 
@@ -182,6 +185,13 @@ func (s *Server) registerRoutes() {
 						tr.Post("/{id}/run", s.triggerHandler.RunTrigger)
 						tr.Delete("/{id}", s.triggerHandler.DeleteTrigger)
 						tr.Get("/{id}/logs", s.triggerHandler.ListLogs)
+					})
+				}
+
+				if s.briefingHandler != nil {
+					protected.Route("/users/briefing", func(br chi.Router) {
+						br.Get("/", s.briefingHandler.GetSettings)
+						br.Put("/", s.briefingHandler.UpdateSettings)
 					})
 				}
 			})

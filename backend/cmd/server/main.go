@@ -44,6 +44,7 @@ func main() {
 	memoryRepo := repository.NewMemoryRepository(db)
 	notifRepo := repository.NewDeviceTokenRepository(db)
 	triggerRepo := repository.NewTriggerRepository(db)
+	briefingRepo := repository.NewBriefingRepository(db)
 
 	// 3. Provedores de IA & AI Gateway com Failover
 	var aiProviders []ai.Provider
@@ -100,6 +101,11 @@ func main() {
 	triggerWorker.Start()
 	defer triggerWorker.Stop()
 
+	// Worker em segundo plano para briefing matinal proativo
+	morningBriefingWorker := service.NewMorningBriefingWorker(briefingRepo, eventRepo, todoRepo, userRepo, notifSvc, 1*time.Minute)
+	morningBriefingWorker.Start()
+	defer morningBriefingWorker.Stop()
+
 	googleAuthCfg := service.GoogleAuthConfig{
 		ClientID:     cfg.GoogleClientID,
 		ClientSecret: cfg.GoogleClientSecret,
@@ -124,6 +130,7 @@ func main() {
 	notifHandler := handler.NewNotificationHandler(notifSvc)
 	syncHandler := handler.NewCalendarSyncHandler(syncSvc)
 	triggerHandler := handler.NewTriggerHandler(triggerSvc, triggerWorker)
+	briefingHandler := handler.NewBriefingHandler(briefingRepo)
 
 	// 6. Servidor HTTP
 	srv := server.New(server.Config{
@@ -135,6 +142,7 @@ func main() {
 		NotifHandler:      notifHandler,
 		SyncHandler:       syncHandler,
 		TriggerHandler:    triggerHandler,
+		BriefingHandler:   briefingHandler,
 		AuthSvc:           authSvc,
 	})
 

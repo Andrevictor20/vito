@@ -14,6 +14,7 @@ import {
   TriggerTestResult,
   TriggerStatus,
   CreateTriggerInput,
+  MorningBriefingSettings,
 } from '../types';
 
 let FileSystemModule: any = null;
@@ -248,6 +249,14 @@ class ApiService {
     return this.request<T>(endpoint, {
       ...options,
       method: 'PATCH',
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+  }
+
+  put<T>(endpoint: string, body?: any, options: RequestInit = {}): Promise<T> {
+    return this.request<T>(endpoint, {
+      ...options,
+      method: 'PUT',
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
   }
@@ -600,6 +609,20 @@ class ApiService {
     return this.request<{ status: string; dispatched: number }>('/api/v1/notifications/test', {
       method: 'POST',
       body: JSON.stringify({ priority, title, body }),
+    });
+  }
+
+  // Briefing Matinal Proativo
+  async getBriefingSettings(): Promise<MorningBriefingSettings> {
+    return this.request<MorningBriefingSettings>('/api/v1/users/briefing', {
+      method: 'GET',
+    });
+  }
+
+  async updateBriefingSettings(data: Partial<MorningBriefingSettings>): Promise<MorningBriefingSettings> {
+    return this.request<MorningBriefingSettings>('/api/v1/users/briefing', {
+      method: 'PUT',
+      body: JSON.stringify(data),
     });
   }
 

@@ -201,6 +201,17 @@ func runMigrations(db *sql.DB) error {
 	);
 
 	CREATE INDEX IF NOT EXISTS idx_trigger_logs_trigger ON trigger_logs(trigger_id);
+
+	CREATE TABLE IF NOT EXISTS user_briefing_settings (
+		user_id TEXT PRIMARY KEY,
+		enabled BOOLEAN NOT NULL DEFAULT 1,
+		scheduled_time TEXT NOT NULL DEFAULT '07:30',
+		wakeup_alarm_early BOOLEAN NOT NULL DEFAULT 1,
+		last_sent_date TEXT NOT NULL DEFAULT '',
+		created_at DATETIME NOT NULL,
+		updated_at DATETIME NOT NULL,
+		FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+	);
 	`
 
 	if _, err := db.Exec(schema); err != nil {

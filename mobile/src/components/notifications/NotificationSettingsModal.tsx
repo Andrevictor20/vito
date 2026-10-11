@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   View,
@@ -15,7 +15,8 @@ import { tokens, MD3Shapes } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { useNotifications } from '../../hooks/useNotifications';
 import { notificationService } from '../../services/notificationService';
-import { NotificationPriority } from '../../types';
+import { api } from '../../services/api';
+import { NotificationPriority, MorningBriefingSettings } from '../../types';
 import { M3Switch } from '../ui/M3Switch';
 
 interface NotificationSettingsModalProps {
@@ -36,6 +37,31 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
     updateSettings,
   } = useNotifications();
   const [testingNotif, setTestingNotif] = useState(false);
+  const [briefingSettings, setBriefingSettings] = useState<MorningBriefingSettings>({
+    enabled: true,
+    scheduled_time: '07:30',
+    wakeup_alarm_early: true,
+  });
+
+  useEffect(() => {
+    if (visible) {
+      api.getBriefingSettings()
+        .then((res) => {
+          if (res) setBriefingSettings(res);
+        })
+        .catch(() => {});
+    }
+  }, [visible]);
+
+  const handleUpdateBriefing = async (patch: Partial<MorningBriefingSettings>) => {
+    const updated = { ...briefingSettings, ...patch };
+    setBriefingSettings(updated);
+    try {
+      await api.updateBriefingSettings(patch);
+    } catch (e) {
+      console.warn('[NotificationSettings] Erro ao salvar briefing matinal:', e);
+    }
+  };
 
   const handleToggleEnabled = async (value: boolean) => {
     if (value && !permissionGranted) {
@@ -245,6 +271,75 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
                   <Text style={[styles.dualTriggerText, { color: colors.onSurfaceVariant }]}>
                     O Vito emitirá <Text style={{ fontWeight: '700', color: colors.onSurface }}>dois alertas automáticos</Text>: na antecedência selecionada e no <Text style={{ fontWeight: '700', color: colors.onSurface }}>horário exato de início</Text> do compromisso.
                   </Text>
+                </View>
+
+                {/* 4. Briefing Matinal Proativo */}
+                <Text style={[styles.sectionTitle, { color: colors.onSurface, marginTop: 24 }]}>BRIEFING MATINAL PROATIVO</Text>
+                <View style={[styles.card, { backgroundColor: colors.surfaceContainerHigh, borderColor: colors.outlineVariant }]}>
+                  <View style={styles.cardHeader}>
+                    <View style={styles.cardHeaderLeft}>
+                      <MaterialIcons name="wb-sunny" size={20} color={colors.primary} />
+                      <View>
+                        <Text style={[styles.cardTitle, { color: colors.onSurface }]}>Resumo Matinal</Text>
+                        <Text style={[styles.cardSub, { color: colors.onSurfaceVariant }]}>
+                          Vito prepara sua agenda e tarefas ao acordar
+                        </Text>
+                      </View>
+                    </View>
+                    <M3Switch
+                      value={briefingSettings.enabled}
+                      onValueChange={(val) => handleUpdateBriefing({ enabled: val })}
+                    />
+                  </View>
+
+                  {briefingSettings.enabled && (
+                    <View style={styles.briefingDetails}>
+                      <Text style={[styles.subSectionTitle, { color: colors.onSurfaceVariant }]}>Horário de Envio</Text>
+                      <View style={styles.chipsRowCompact}>
+                        {['06:30', '07:00', '07:30', '08:00', '08:30'].map((timeStr) => {
+                          const isSelected = briefingSettings.scheduled_time === timeStr;
+                          return (
+                            <TouchableOpacity
+                              key={timeStr}
+                              style={[
+                                styles.chip,
+                                { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant },
+                                isSelected && { backgroundColor: colors.primary, borderColor: colors.primary },
+                              ]}
+                              onPress={() => handleUpdateBriefing({ scheduled_time: timeStr })}
+                              activeOpacity={0.7}
+                            >
+                              <Text
+                                style={[
+                                  styles.chipText,
+                                  { color: colors.onSurface },
+                                  isSelected && { color: colors.onPrimary, fontWeight: '700' },
+                                ]}
+                              >
+                                {timeStr}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+
+                      <View style={[styles.briefingSubSwitchRow, { borderTopColor: colors.outlineVariant }]}>
+                        <View style={styles.briefingSubSwitchInfo}>
+                          <MaterialIcons name="alarm" size={18} color={colors.primary} />
+                          <View style={{ flex: 1 }}>
+                            <Text style={[styles.briefingSubSwitchTitle, { color: colors.onSurface }]}>Despertador Inteligente</Text>
+                            <Text style={[styles.briefingSubSwitchDesc, { color: colors.onSurfaceVariant }]}>
+                              Toca som de alta prioridade se houver reunião logo cedo
+                            </Text>
+                          </View>
+                        </View>
+                        <M3Switch
+                          value={briefingSettings.wakeup_alarm_early}
+                          onValueChange={(val) => handleUpdateBriefing({ wakeup_alarm_early: val })}
+                        />
+                      </View>
+                    </View>
+                  )}
                 </View>
 
               </ScrollView>
@@ -467,5 +562,47 @@ const styles = StyleSheet.create({
   testButtonText: {
     fontSize: tokens.typography.size.sm,
     fontWeight: '600',
+  },
+  briefingDetails: {
+    marginTop: 14,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(150, 150, 150, 0.2)',
+  },
+  subSectionTitle: {
+    fontSize: tokens.typography.size.xs,
+    fontWeight: '600',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  chipsRowCompact: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 14,
+  },
+  briefingSubSwitchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 12,
+    borderTopWidth: 1,
+  },
+  briefingSubSwitchInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+    paddingRight: 10,
+  },
+  briefingSubSwitchTitle: {
+    fontSize: tokens.typography.size.sm,
+    fontWeight: '600',
+  },
+  briefingSubSwitchDesc: {
+    fontSize: tokens.typography.size.xs,
+    marginTop: 2,
+    lineHeight: 15,
   },
 });

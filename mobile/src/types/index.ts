@@ -126,6 +126,14 @@ export interface NotificationSettings {
   pushToken?: string;
 }
 
+export interface MorningBriefingSettings {
+  user_id?: string;
+  enabled: boolean;
+  scheduled_time: string; // ex: "07:30"
+  wakeup_alarm_early: boolean;
+  last_sent_date?: string;
+}
+
 export interface ScheduleNotificationParams {
   id?: string;
   eventId?: string;
