@@ -104,20 +104,23 @@ export const HomeScreen: React.FC<{
       const hasModal = profileVisible || createModalVisible || editModalVisible || Boolean(editingEvent);
       const action = determineBackAction({
         activeTab,
-        hasSubScreen: showPendingItems,
+        hasSubScreen: showPendingItems || showBookingScreen || showSummariesScreen,
         hasModal,
       });
 
       if (showBookingScreen) {
         setShowBookingScreen(false);
+        pagerRef.current?.scrollTo({ x: calculateScrollTarget(activeTab, containerWidth), animated: false });
         return true;
       }
       if (showSummariesScreen) {
         setShowSummariesScreen(false);
+        pagerRef.current?.scrollTo({ x: calculateScrollTarget(activeTab, containerWidth), animated: false });
         return true;
       }
-      if (action.type === 'CLOSE_SUBSCREEN') {
+      if (showPendingItems || action.type === 'CLOSE_SUBSCREEN') {
         setShowPendingItems(false);
+        pagerRef.current?.scrollTo({ x: calculateScrollTarget(activeTab, containerWidth), animated: false });
         return true;
       }
       if (action.type === 'CLOSE_MODAL') {
@@ -138,7 +141,7 @@ export const HomeScreen: React.FC<{
 
     const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
     return () => subscription.remove();
-  }, [showPendingItems, profileVisible, createModalVisible, editModalVisible, editingEvent, activeTab, containerWidth]);
+  }, [showPendingItems, showBookingScreen, showSummariesScreen, profileVisible, createModalVisible, editModalVisible, editingEvent, activeTab, containerWidth]);
   const {
     events,
     todos,
@@ -184,41 +187,6 @@ export const HomeScreen: React.FC<{
     [todos]
   );
 
-  if (showPendingItems) {
-    return (
-      <PendingItemsView
-        onBack={() => setShowPendingItems(false)}
-        onOpenEventCreate={(title) => {
-          setShowPendingItems(false);
-          setCreateModalVisible(true);
-        }}
-      />
-    );
-  }
-
-  if (showBookingScreen) {
-    return (
-      <BookingScreen
-        onBack={() => setShowBookingScreen(false)}
-      />
-    );
-  }
-
-  if (showSummariesScreen) {
-    return (
-      <ExecutiveSummariesHubView
-        onBack={() => setShowSummariesScreen(false)}
-        onOpenChatWithPrompt={(prompt) => {
-          setShowSummariesScreen(false);
-          handleSelectTab('chat');
-          setTimeout(() => {
-            chatRef.current?.submitExternalPrompt(prompt);
-          }, 250);
-        }}
-      />
-    );
-  }
-
   return (
     <View style={[styles.container, { backgroundColor: colors.surface }]}>
       {/* Top App Bar Persistente M3 com transição suave e contínua */}
@@ -252,9 +220,10 @@ export const HomeScreen: React.FC<{
             !shouldPreventSwipe({
               isKeyboardOpen,
               hasModal: profileVisible || createModalVisible || editModalVisible || Boolean(editingEvent),
-              hasSubScreen: showPendingItems,
+              hasSubScreen: showPendingItems || showBookingScreen || showSummariesScreen,
             })
           }
+          contentOffset={{ x: calculateScrollTarget(activeTab, containerWidth), y: 0 }}
           onMomentumScrollEnd={handleMomentumScrollEnd}
           style={styles.pagerScrollView}
           contentContainerStyle={styles.pagerContentContainer}
@@ -698,11 +667,56 @@ export const HomeScreen: React.FC<{
         />
       </View>
 
+      {/* Sub-telas de Primeira Classe em Overlay (Preservam a montagem e posição do Pager) */}
+      {showPendingItems && (
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.surface, zIndex: 100 }]}>
+          <PendingItemsView
+            onBack={() => {
+              setShowPendingItems(false);
+              pagerRef.current?.scrollTo({ x: calculateScrollTarget(activeTab, containerWidth), animated: false });
+            }}
+            onOpenEventCreate={(title) => {
+              setShowPendingItems(false);
+              setCreateModalVisible(true);
+            }}
+          />
+        </View>
+      )}
+
+      {showBookingScreen && (
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.surface, zIndex: 100 }]}>
+          <BookingScreen
+            onBack={() => {
+              setShowBookingScreen(false);
+              pagerRef.current?.scrollTo({ x: calculateScrollTarget(activeTab, containerWidth), animated: false });
+            }}
+          />
+        </View>
+      )}
+
+      {showSummariesScreen && (
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.surface, zIndex: 100 }]}>
+          <ExecutiveSummariesHubView
+            onBack={() => {
+              setShowSummariesScreen(false);
+              pagerRef.current?.scrollTo({ x: calculateScrollTarget(activeTab, containerWidth), animated: false });
+            }}
+            onOpenChatWithPrompt={(prompt) => {
+              setShowSummariesScreen(false);
+              handleSelectTab('chat');
+              setTimeout(() => {
+                chatRef.current?.submitExternalPrompt(prompt);
+              }, 250);
+            }}
+          />
+        </View>
+      )}
+
       {/* Bottom M3 Navigation Bar */}
       <FloatingTabBar
         activeTab={activeTab}
         onSelectTab={handleSelectTab}
-        visible={!isKeyboardOpen}
+        visible={!isKeyboardOpen && !showPendingItems && !showBookingScreen && !showSummariesScreen}
       />
 
       <ProfileModal

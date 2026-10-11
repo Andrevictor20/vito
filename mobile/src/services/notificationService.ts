@@ -2,11 +2,16 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { secureStorage } from './secureStore';
 import { api } from './api';
-import { NotificationPriority, NotificationSettings, ScheduleNotificationParams } from '../types';
+import { NotificationPriority, NotificationSettings, ScheduleNotificationParams, Event } from '../types';
+import { isAllDayEvent } from '../utils/calendarDateUtils';
 
 const SETTINGS_STORAGE_KEY = '@vito_notification_settings';
 const PUSH_TOKEN_SECURE_KEY = '@vito_push_token';
 const PROMPTED_ONCE_KEY = '@vito_notification_prompted_once';
+
+// Registro de idempotência em memória para alertas adaptativos em cima da hora
+const notifiedAdaptiveEventIds = new Set<string>();
+const notifiedAdaptiveTodoIds = new Set<string>();
 
 export function getNotificationContextEmoji(title: string, category?: string): string | null {
   const t = title.toLowerCase();
@@ -366,10 +371,18 @@ export const notificationService = {
     id: string;
     title: string;
     start_at: string;
+    end_at?: string;
     category?: string;
     location?: string;
   }): Promise<{ advanceId: string | null; startId: string | null }> {
     if (!this.isAvailable()) return { advanceId: null, startId: null };
+
+    // 0. Eventos de dia inteiro e feriados NÃO possuem alarme pontual de contagem regressiva de início
+    if (isAllDayEvent(event as Event)) {
+      await this.cancelEventReminder(event.id);
+      return { advanceId: null, startId: null };
+    }
+
     const settings = await this.getSettings();
     if (!settings.enabled) return { advanceId: null, startId: null };
 
@@ -423,31 +436,34 @@ export const notificationService = {
       }
     } else if (diffMs > 2 * 60 * 1000) {
       // Cenário B (Em cima da hora: > 2 min e <= minutesBefore):
-      // Dispara alerta adaptativo imediato para que o usuário não perca o aviso
-      const minutesLeft = Math.max(1, Math.round(diffMs / 60000));
-      try {
-        advanceId = await Notifications.scheduleNotificationAsync({
-          identifier: `event-reminder-adv-${event.id}`,
-          content: {
-            title: `⚡ ${title}`,
-            body: `Começa em ${minutesLeft} minutos${event.location ? ' em ' + event.location : ''}!`,
-            sound: priority !== 'silent',
-            priority: Notifications.AndroidNotificationPriority.HIGH,
-            data: {
-              eventId: event.id,
-              type: 'advance',
-              priority,
-              channelId,
+      // Idempotência estrita: se já despachamos o alerta adaptativo para este evento, não reenvia a cada loadData
+      if (!notifiedAdaptiveEventIds.has(event.id)) {
+        notifiedAdaptiveEventIds.add(event.id);
+        const minutesLeft = Math.max(1, Math.round(diffMs / 60000));
+        try {
+          advanceId = await Notifications.scheduleNotificationAsync({
+            identifier: `event-reminder-adv-${event.id}`,
+            content: {
+              title: `⚡ ${title}`,
+              body: `Começa em ${minutesLeft} minutos${event.location ? ' em ' + event.location : ''}!`,
+              sound: priority !== 'silent',
+              priority: Notifications.AndroidNotificationPriority.HIGH,
+              data: {
+                eventId: event.id,
+                type: 'advance',
+                priority,
+                channelId,
+              },
+              ...(Platform.OS === 'android' ? { channelId } : {}),
             },
-            ...(Platform.OS === 'android' ? { channelId } : {}),
-          },
-          trigger: {
-            type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-            seconds: 3,
-          },
-        });
-      } catch (err) {
-        console.warn('[NotificationService] Erro ao agendar alerta adaptativo imediato:', err);
+            trigger: {
+              type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+              seconds: 3,
+            },
+          });
+        } catch (err) {
+          console.warn('[NotificationService] Erro ao agendar alerta adaptativo imediato:', err);
+        }
       }
     }
 
@@ -534,26 +550,29 @@ export const notificationService = {
         console.warn('[NotificationService] Falha ao agendar antecedência da tarefa:', e);
       }
     } else if (diffMs > 2 * 60 * 1000) {
-      // Adaptativo imediato se vence em 2 a 15 min
-      const minutesLeft = Math.max(1, Math.round(diffMs / 60000));
-      try {
-        advanceId = await Notifications.scheduleNotificationAsync({
-          identifier: `todo-reminder-adv-${todo.id}`,
-          content: {
-            title: `⏰ ${title}`,
-            body: `Prazo se encerra em ${minutesLeft} minutos!`,
-            sound: priority !== 'silent',
-            priority: Notifications.AndroidNotificationPriority.HIGH,
-            data: { todoId: todo.id, type: 'todo_advance', priority, channelId },
-            ...(Platform.OS === 'android' ? { channelId } : {}),
-          },
-          trigger: {
-            type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-            seconds: 3,
-          },
-        });
-      } catch (e) {
-        console.warn('[NotificationService] Falha ao agendar alerta adaptativo da tarefa:', e);
+      // Adaptativo imediato se vence em 2 a 15 min com idempotência estrita
+      if (!notifiedAdaptiveTodoIds.has(todo.id)) {
+        notifiedAdaptiveTodoIds.add(todo.id);
+        const minutesLeft = Math.max(1, Math.round(diffMs / 60000));
+        try {
+          advanceId = await Notifications.scheduleNotificationAsync({
+            identifier: `todo-reminder-adv-${todo.id}`,
+            content: {
+              title: `⏰ ${title}`,
+              body: `Prazo se encerra em ${minutesLeft} minutos!`,
+              sound: priority !== 'silent',
+              priority: Notifications.AndroidNotificationPriority.HIGH,
+              data: { todoId: todo.id, type: 'todo_advance', priority, channelId },
+              ...(Platform.OS === 'android' ? { channelId } : {}),
+            },
+            trigger: {
+              type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+              seconds: 3,
+            },
+          });
+        } catch (e) {
+          console.warn('[NotificationService] Falha ao agendar alerta adaptativo da tarefa:', e);
+        }
       }
     }
 
@@ -588,6 +607,7 @@ export const notificationService = {
    */
   async cancelTodoReminder(todoId: string): Promise<void> {
     if (!this.isAvailable()) return;
+    notifiedAdaptiveTodoIds.delete(todoId);
     await Promise.all([
       this.cancelNotification(`todo-reminder-adv-${todoId}`),
       this.cancelNotification(`todo-reminder-due-${todoId}`),
@@ -598,7 +618,7 @@ export const notificationService = {
    * Reconcilia e agenda lembretes locais nativos para compromissos e tarefas com data.
    */
   async scheduleAllUpcomingReminders(
-    events: Array<{ id: string; title: string; start_at: string; category?: string; location?: string }>,
+    events: Array<{ id: string; title: string; start_at: string; end_at?: string; category?: string; location?: string }>,
     todos?: Array<{ id: string; title: string; due_date?: string; priority?: string; status?: string }>
   ): Promise<number> {
     if (!this.isAvailable()) return 0;
@@ -611,6 +631,12 @@ export const notificationService = {
 
     for (const event of (events || [])) {
       try {
+        // Eventos de dia inteiro e feriados NÃO possuem alarme pontual de início / contagem regressiva
+        if (isAllDayEvent(event as Event)) {
+          this.cancelEventReminder(event.id).catch(() => {});
+          continue;
+        }
+
         const start = new Date(event.start_at).getTime();
         if (isNaN(start) || start <= now || start > maxWindow) continue;
 
@@ -646,6 +672,7 @@ export const notificationService = {
    */
   async cancelEventReminder(eventId: string): Promise<void> {
     if (!this.isAvailable()) return;
+    notifiedAdaptiveEventIds.delete(eventId);
     await Promise.all([
       this.cancelNotification(`event-reminder-${eventId}`),
       this.cancelNotification(`event-reminder-adv-${eventId}`),
@@ -706,6 +733,8 @@ export const notificationService = {
    */
   async cancelAllUpcomingReminders(): Promise<void> {
     if (!this.isAvailable()) return;
+    notifiedAdaptiveEventIds.clear();
+    notifiedAdaptiveTodoIds.clear();
     try {
       await Notifications.cancelAllScheduledNotificationsAsync();
     } catch (e) {

@@ -32,18 +32,55 @@ export const createDateKey = (year: number, month: number, day: number): string 
 /**
  * Detecta se o evento é de dia inteiro (ex: 00:00 às 23:59 ou 12:00:00Z sem horário específico).
  */
-export const isAllDayEvent = (event: Event): boolean => {
-  if (!event.start_at) return false;
+export const isAllDayEvent = (event?: Partial<Event> | null): boolean => {
+  if (!event || !event.start_at) return false;
+
+  // 1. Categoria explícita de feriado
+  if (event.category === 'holiday') return true;
+
+  // 2. Se gravado explicitamente com 00:00:00 (início do dia civil em UTC ou local)
+  if (event.start_at.includes('00:00:00') && (!event.end_at || event.end_at.includes('23:59:59') || event.end_at.includes('00:00:00'))) {
+    return true;
+  }
+
   const start = parseSafeDate(event.start_at);
   const end = event.end_at ? parseSafeDate(event.end_at) : start;
   const diffHours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
 
-  // Eventos marcados como 24h ou sem horário de término significativo
-  if (diffHours >= 23 && diffHours <= 25) return true;
-  
-  // Se gravado explicitamente como 00:00:00 UTC até 23:59:59 UTC
-  if (event.start_at.includes('00:00:00') && event.end_at?.includes('23:59:59')) {
-    return true;
+  // 3. Eventos com duração de 23h ou mais (cobre 24h, feriados e multi-dias)
+  if (diffHours >= 23) return true;
+
+  // 4. Reconhecimento contextual de feriados nacionais e religiosos (ex: Nossa Senhora Aparecida)
+  const title = (event.title || '').toLowerCase().trim();
+  const holidayPatterns = [
+    /\bferiado\b/i,
+    /\bnossa senhora( aparecida)?\b/i,
+    /\bdia das crian[cç]as\b/i,
+    /\bano novo\b/i,
+    /\bcarnaval\b/i,
+    /\bquarta-feira de cinzas\b/i,
+    /\bsexta-feira santa\b/i,
+    /\bp[aá]scoa\b/i,
+    /\btiradentes\b/i,
+    /\bdia do trabalh(o|ador)\b/i,
+    /\bcorpus christi\b/i,
+    /\bindepend[eê]ncia( do brasil)?\b/i,
+    /\bfinados\b/i,
+    /\bproclama[cç][aã]o da rep[uú]blica\b/i,
+    /\bconsci[eê]ncia negra\b/i,
+    /\bnatal\b/i,
+    /\bv[eé]spera de natal\b/i,
+    /\bv[eé]spera de ano novo\b/i,
+  ];
+
+  if (holidayPatterns.some((pattern) => pattern.test(title))) {
+    // Se o evento é feriado e não é uma reunião com minutos específicos (ex: 14:30)
+    const startHour = start.getHours();
+    const startMin = start.getMinutes();
+    // 00:00 UTC vira 21:00 no fuso de Brasília com 0 minutos
+    if (diffHours >= 12 || (startMin === 0 && (startHour === 0 || startHour === 21))) {
+      return true;
+    }
   }
 
   return false;

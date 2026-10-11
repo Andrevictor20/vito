@@ -227,3 +227,62 @@ func TestReminderWorker_DualNotification_AdvanceAndStart(t *testing.T) {
 		t.Errorf("esperado 0 novos alertas (deduplicação total), obteve %d", c3)
 	}
 }
+
+func TestReminderWorker_SkipsAllDayEventsAndHolidays(t *testing.T) {
+	var receivedPush []service.PushMessage
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var msgs []service.PushMessage
+		_ = json.NewDecoder(r.Body).Decode(&msgs)
+		receivedPush = append(receivedPush, msgs...)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"data":[{"status":"ok"}]}`))
+	}))
+	defer server.Close()
+
+	tokenRepo := &mockDeviceTokenRepo{
+		tokens: []domain.DeviceToken{
+			{ID: "tok-1", UserID: "user-1", Token: "ExponentPushToken[user1]", Platform: "android"},
+		},
+	}
+	notifSvc := service.NewNotificationService(tokenRepo, server.Client())
+	notifSvc.SetExpoAPIURL(server.URL)
+
+	now := time.Date(2026, 10, 11, 23, 15, 0, 0, time.UTC)
+
+	// Feriado "Nossa Senhora Aparecida" (All-day do Google Calendar iniciando às 00:00 UTC do dia 12)
+	holiday := domain.Event{
+		ID:        "evt-holiday",
+		UserID:    "user-1",
+		Title:     "Nossa Senhora Aparecida",
+		StartAt:   time.Date(2026, 10, 12, 0, 0, 0, 0, time.UTC),
+		EndAt:     time.Date(2026, 10, 12, 23, 59, 59, 0, time.UTC),
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	eventRepo := &mockReminderEventRepo{
+		events: []domain.Event{holiday},
+	}
+
+	worker := service.NewReminderWorker(eventRepo, notifSvc, 60*time.Minute)
+
+	// Executa a checagem 45 min antes da meia-noite (now = 23:15 UTC)
+	count, err := worker.CheckAndDispatchReminders(now)
+	if err != nil {
+		t.Fatalf("esperado nil error, obteve %v", err)
+	}
+
+	if count != 0 {
+		t.Errorf("esperado 0 lembretes para feriado/evento de dia inteiro, obteve %d", count)
+	}
+
+	if len(receivedPush) != 0 {
+		t.Errorf("esperado 0 pushes para feriado, obteve %d", len(receivedPush))
+	}
+
+	// O evento deve ter sido marcado como notificado para não ficar sendo consultado sem parar
+	if holidayFromRepo, _ := eventRepo.GetByID("evt-holiday", "user-1"); holidayFromRepo.ReminderSentAt == nil {
+		t.Errorf("esperava que ReminderSentAt fosse marcado para o evento de dia inteiro")
+	}
+}
+

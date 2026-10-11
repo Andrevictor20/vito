@@ -3,6 +3,7 @@ package service
 import (
 	"fmt"
 	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -44,6 +45,40 @@ func NewReminderWorker(
 	}
 }
 
+// IsAllDayEvent detecta se o evento representa um dia inteiro ou feriado civil (RFC 5545).
+func IsAllDayEvent(event domain.Event) bool {
+	// 1. Duração igual ou superior a 23 horas (dia inteiro, feriado ou múltiplos dias)
+	diff := event.EndAt.Sub(event.StartAt)
+	if diff >= 23*time.Hour {
+		return true
+	}
+	// 2. Início explicitamente à meia-noite e fim próximo às 23:59
+	if event.StartAt.Hour() == 0 && event.StartAt.Minute() == 0 && event.StartAt.Second() == 0 &&
+		event.EndAt.Hour() == 23 && event.EndAt.Minute() == 59 {
+		return true
+	}
+	// 3. Categoria explícita de feriado
+	if event.Category == "holiday" {
+		return true
+	}
+	// 4. Reconhecimento contextual de feriados no título
+	t := strings.ToLower(event.Title)
+	if strings.Contains(t, "feriado") || strings.Contains(t, "nossa senhora") ||
+		strings.Contains(t, "ano novo") || strings.Contains(t, "natal") ||
+		strings.Contains(t, "páscoa") || strings.Contains(t, "pascoa") ||
+		strings.Contains(t, "tiradentes") || strings.Contains(t, "carnaval") ||
+		strings.Contains(t, "independência") || strings.Contains(t, "independencia") ||
+		strings.Contains(t, "finados") || strings.Contains(t, "consciência negra") ||
+		strings.Contains(t, "consciencia negra") || strings.Contains(t, "proclamação da república") ||
+		strings.Contains(t, "proclamacao da republica") || strings.Contains(t, "dia das crianças") ||
+		strings.Contains(t, "dia das criancas") {
+		if diff >= 12*time.Hour || (event.StartAt.Minute() == 0 && (event.StartAt.Hour() == 0 || event.StartAt.Hour() == 21)) {
+			return true
+		}
+	}
+	return false
+}
+
 // CheckAndDispatchReminders busca eventos com alertas pendentes (antecedência e início) e despacha push.
 func (w *ReminderWorker) CheckAndDispatchReminders(now time.Time) (int, error) {
 	fromAdv := now.UTC()
@@ -57,6 +92,12 @@ func (w *ReminderWorker) CheckAndDispatchReminders(now time.Time) (int, error) {
 		log.Printf("[ReminderWorker] Erro ao listar eventos para lembrete prévio: %v", err)
 	} else {
 		for _, event := range advEvents {
+			// Eventos de dia inteiro e feriados não recebem alarme de contagem regressiva
+			if IsAllDayEvent(event) {
+				_ = w.eventRepo.MarkReminderSent(event.ID, now)
+				continue
+			}
+
 			// Se o evento inicia em menos de 2 minutos, pula antecedência para priorizar o alerta de início exato
 			if event.StartAt.Before(now.Add(2 * time.Minute)) {
 				continue
@@ -105,6 +146,11 @@ func (w *ReminderWorker) CheckAndDispatchReminders(now time.Time) (int, error) {
 		log.Printf("[ReminderWorker] Erro ao listar eventos iniciando agora: %v", err)
 	} else {
 		for _, event := range startEvents {
+			// Eventos de dia inteiro e feriados não recebem alarme de início imediato
+			if IsAllDayEvent(event) {
+				_ = w.eventRepo.MarkStartReminderSent(event.ID, now)
+				continue
+			}
 			emoji := GetNotificationContextEmoji(event.Title, event.Category)
 			title := event.Title
 			if emoji != "" {
