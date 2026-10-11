@@ -261,7 +261,7 @@ export const HomeScreen: React.FC<{
                 }}
                 activeOpacity={0.75}
                 accessibilityRole="button"
-                accessibilityLabel="Abrir Incubadora de Pendências"
+                accessibilityLabel="Abrir Pendências"
               >
                 <MaterialIcons
                   name="inbox"
@@ -277,7 +277,7 @@ export const HomeScreen: React.FC<{
                     },
                   ]}
                 >
-                  Incubadora
+                  Pendências
                 </Text>
               </TouchableOpacity>
             </View>

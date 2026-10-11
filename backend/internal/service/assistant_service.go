@@ -371,7 +371,7 @@ func (s *AssistantService) Process(ctx context.Context, userID string, input ai.
 			}
 			res.Pending = item
 			if res.Message == "" {
-				res.Message = fmt.Sprintf("Guardei '%s' na sua Incubadora de Pendências!", item.Title)
+				res.Message = fmt.Sprintf("Guardei '%s' nas suas Pendências!", item.Title)
 			}
 		}
 
@@ -400,7 +400,7 @@ func (s *AssistantService) Process(ctx context.Context, userID string, input ai.
 				_, _ = s.pendingSvc.CompletePending(intent.Pending.ID, userID)
 			}
 			if res.Message == "" {
-				res.Message = fmt.Sprintf("Agendei '%s' para %s e atualizei a pendência na sua incubadora!", event.Title, event.StartAt.Format("02/01 às 15:04"))
+				res.Message = fmt.Sprintf("Agendei '%s' para %s e atualizei a pendência!", event.Title, event.StartAt.Format("02/01 às 15:04"))
 			}
 		}
 	}

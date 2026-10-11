@@ -717,7 +717,7 @@ class ApiService {
   }
 
   // ==========================================
-  // Incubadora de Pendências (Sprint 9)
+  // Pendências (Sprint 9)
   // ==========================================
 
   async getPendingItems(status?: PendingStatus, category?: string): Promise<PendingItem[]> {

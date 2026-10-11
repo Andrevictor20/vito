@@ -196,10 +196,10 @@ export const PendingItemsView: React.FC<PendingItemsViewProps> = ({
 
         <View style={styles.topBarTitleContainer}>
           <Text style={[styles.topBarTitle, { color: colors.onSurface }]}>
-            Incubadora de Pendências
+            Pendências
           </Text>
           <Text style={[styles.topBarSubtitle, { color: colors.textMuted }]}>
-            {counts.inbox} {counts.inbox === 1 ? 'item para incubar' : 'itens para incubar'}
+            {counts.inbox} {counts.inbox === 1 ? 'item pendente' : 'itens pendentes'}
           </Text>
         </View>
 
@@ -235,7 +235,7 @@ export const PendingItemsView: React.FC<PendingItemsViewProps> = ({
           <View style={styles.createInputRow}>
             <TextInput
               style={[styles.input, { color: colors.onSurface }]}
-              placeholder="O que você precisa incubar para depois?"
+              placeholder="O que você quer guardar para resolver depois?"
               placeholderTextColor={colors.textMuted}
               value={newTitle}
               onChangeText={setNewTitle}

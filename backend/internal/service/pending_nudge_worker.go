@@ -76,14 +76,14 @@ func FormatNudgeMessage(userName string, items []domain.PendingItem) (string, st
 		firstName = "você"
 	}
 
-	title := "📥 Incubadora de Pendências"
+	title := "📥 Pendências"
 	count := len(items)
 
 	if count == 1 {
 		return title, fmt.Sprintf("%s, você tem 1 pendência aguardando agendamento: '%s'. Que tal reservar um horário?", firstName, items[0].Title)
 	}
 
-	return title, fmt.Sprintf("%s, você tem %d pendências na sua incubadora paradas há mais de 24h. Que tal agendar no seu dia?", firstName, count)
+	return title, fmt.Sprintf("%s, você tem %d pendências paradas há mais de 24h. Que tal agendar no seu dia?", firstName, count)
 }
 
 // ProcessNudges varre itens sem agendamento e despacha notificações consolidadas por usuário.
