@@ -113,7 +113,31 @@ func TestTriggerRepository_Lifecycle(t *testing.T) {
 		t.Fatalf("esperava 1 log, recebeu %d, err: %v", len(logs), err)
 	}
 
-	// 7. Excluir
+	// 7. DeleteLog e ClearLogs
+	if err := triggerRepo.DeleteLog("log-1", "user-trig-1"); err != nil {
+		t.Fatalf("falha ao deletar log individual: %v", err)
+	}
+	logsAfterDelete, _ := triggerRepo.ListLogsByTrigger("trig-1")
+	if len(logsAfterDelete) != 0 {
+		t.Errorf("esperava 0 logs após DeleteLog, recebeu %d", len(logsAfterDelete))
+	}
+
+	// Criar novo log e testar ClearLogs
+	_ = triggerRepo.CreateLog(&domain.TriggerLog{
+		ID:          "log-2",
+		TriggerID:   "trig-1",
+		TriggeredAt: now,
+		Message:     "Log teste 2",
+	})
+	if err := triggerRepo.ClearLogs("trig-1", "user-trig-1"); err != nil {
+		t.Fatalf("falha ao limpar logs: %v", err)
+	}
+	logsAfterClear, _ := triggerRepo.ListLogsByTrigger("trig-1")
+	if len(logsAfterClear) != 0 {
+		t.Errorf("esperava 0 logs após ClearLogs, recebeu %d", len(logsAfterClear))
+	}
+
+	// 8. Excluir trigger
 	if err := triggerRepo.Delete("trig-1", "user-trig-1"); err != nil {
 		t.Fatalf("falha ao deletar trigger: %v", err)
 	}

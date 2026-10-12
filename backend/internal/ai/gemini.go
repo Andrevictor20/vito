@@ -329,13 +329,20 @@ Responda ESTRITAMENTE em formato JSON puro (sem marcações markdown extras):
   "simulated_notification": string
 }`, t.Title, t.Query, t.Category, nowStr)
 
-	// Modelos prioritários com fallback
+	// Modelos prioritários com fallback resiliente para Grounding e geração
 	modelsToTry := []string{p.model}
-	if p.model != "gemini-flash-latest" {
-		modelsToTry = append(modelsToTry, "gemini-flash-latest")
-	}
-	if p.model != "gemini-2.5-flash" {
-		modelsToTry = append(modelsToTry, "gemini-2.5-flash")
+	candidates := []string{"gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-flash-latest"}
+	for _, cand := range candidates {
+		found := false
+		for _, m := range modelsToTry {
+			if m == cand {
+				found = true
+				break
+			}
+		}
+		if !found {
+			modelsToTry = append(modelsToTry, cand)
+		}
 	}
 
 	var rawText string

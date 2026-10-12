@@ -312,22 +312,22 @@ export const TriggersScreen: React.FC<{ onOpenExecutiveSummaries?: () => void }>
                   styles.systemRadarCard,
                   {
                     backgroundColor: isDark ? colors.surfaceContainer : colors.surfaceContainerLow,
-                    borderColor: colors.outlineVariant,
+                    borderColor: isDark ? 'rgba(56, 189, 248, 0.25)' : 'rgba(14, 165, 233, 0.2)',
                   },
                 ]}
               >
                 <View style={styles.systemRadarHeader}>
                   <View style={styles.systemRadarBadgeRow}>
-                    <View style={[styles.systemCategoryBadge, { backgroundColor: isDark ? 'rgba(56, 189, 248, 0.15)' : '#E0F2FE' }]}>
+                    <View style={[styles.systemCategoryBadge, { backgroundColor: isDark ? 'rgba(56, 189, 248, 0.14)' : '#E0F2FE' }]}>
                       <MaterialIcons name="auto-awesome" size={13} color={colors.accents.sky} />
                       <Text style={[styles.systemCategoryText, { color: colors.accents.sky }]}>
-                        RADAR DO VITO
+                        INTELIGÊNCIA PROATIVA
                       </Text>
                     </View>
-                    <View style={[styles.systemTimePill, { backgroundColor: colors.surfaceContainerHighest }]}>
-                      <MaterialIcons name="schedule" size={12} color={colors.onSurfaceVariant} />
+                    <View style={[styles.systemTimePill, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.04)' }]}>
+                      <MaterialIcons name="event-repeat" size={12} color={colors.onSurfaceVariant} />
                       <Text style={[styles.systemTimeText, { color: colors.onSurfaceVariant }]}>
-                        Semanal aos domingos
+                        Todo domingo · 19:00
                       </Text>
                     </View>
                   </View>
@@ -336,14 +336,36 @@ export const TriggersScreen: React.FC<{ onOpenExecutiveSummaries?: () => void }>
                 </View>
 
                 <Text style={[styles.systemRadarTitle, { color: colors.onSurface }]}>
-                  Resumo Semanal & Otimização de Tempo
+                  Balanço Semanal & Diagnóstico de Tempo
                 </Text>
                 <Text style={[styles.systemRadarDesc, { color: colors.onSurfaceVariant }]}>
-                  O Vito analisa seu ritmo semanal e sugere estratégias práticas para otimizar suas horas.
+                  O Vito consolida seus compromissos, tarefas concluídas e identifica gargalos na sua rotina para planejar a próxima semana com precisão.
                 </Text>
 
+                {/* Destaques de inteligência */}
+                <View style={styles.systemRadarTagsRow}>
+                  <View style={[styles.systemRadarTag, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)' }]}>
+                    <MaterialIcons name="bolt" size={12} color={isDark ? '#FBBF24' : '#D97706'} />
+                    <Text style={[styles.systemRadarTagText, { color: colors.onSurfaceVariant }]}>Foco & Eficiência</Text>
+                  </View>
+                  <View style={[styles.systemRadarTag, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)' }]}>
+                    <MaterialIcons name="schedule" size={12} color={colors.accents.sky} />
+                    <Text style={[styles.systemRadarTagText, { color: colors.onSurfaceVariant }]}>Carga Horária</Text>
+                  </View>
+                  <View style={[styles.systemRadarTag, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)' }]}>
+                    <MaterialIcons name="flag" size={12} color={isDark ? '#34D399' : '#059669'} />
+                    <Text style={[styles.systemRadarTagText, { color: colors.onSurfaceVariant }]}>Plano de Ação</Text>
+                  </View>
+                </View>
+
                 <TouchableOpacity
-                  style={[styles.systemRadarActionBtn, { borderTopColor: colors.outlineVariant }]}
+                  style={[
+                    styles.systemRadarActionBtn,
+                    {
+                      backgroundColor: isDark ? 'rgba(56, 189, 248, 0.1)' : '#F0F9FF',
+                      borderColor: isDark ? 'rgba(56, 189, 248, 0.2)' : 'rgba(14, 165, 233, 0.15)',
+                    },
+                  ]}
                   onPress={() => {
                     if (onOpenExecutiveSummaries) {
                       onOpenExecutiveSummaries();
@@ -353,11 +375,13 @@ export const TriggersScreen: React.FC<{ onOpenExecutiveSummaries?: () => void }>
                   }}
                   activeOpacity={0.7}
                 >
-                  <MaterialIcons name="insights" size={16} color={colors.primary} />
-                  <Text style={[styles.systemRadarActionText, { color: colors.primary }]}>
-                    Ver resumos e dicas da IA
-                  </Text>
-                  <MaterialIcons name="chevron-right" size={18} color={colors.primary} />
+                  <View style={styles.systemRadarActionLeft}>
+                    <MaterialIcons name="insights" size={16} color={colors.accents.sky} />
+                    <Text style={[styles.systemRadarActionText, { color: isDark ? '#E0F2FE' : '#0369A1' }]}>
+                      Acessar Raio-X Semanal
+                    </Text>
+                  </View>
+                  <MaterialIcons name="arrow-forward" size={16} color={colors.accents.sky} />
                 </TouchableOpacity>
               </View>
             ) : null
@@ -784,20 +808,45 @@ const styles = StyleSheet.create({
   systemRadarDesc: {
     fontSize: 13,
     lineHeight: 18,
+    marginBottom: 10,
+  },
+  systemRadarTagsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexWrap: 'wrap',
     marginBottom: 12,
+  },
+  systemRadarTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: MD3Shapes.full,
+  },
+  systemRadarTagText: {
+    fontSize: 11,
+    fontWeight: '600',
   },
   systemRadarActionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 10,
-    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: MD3Shapes.full,
+    borderWidth: 1,
+  },
+  systemRadarActionLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   systemRadarActionText: {
-    fontSize: 13,
-    fontWeight: '600',
-    flex: 1,
-    marginLeft: 6,
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
   centerContainer: {
     flex: 1,

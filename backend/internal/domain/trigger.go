@@ -136,4 +136,6 @@ type TriggerRepository interface {
 	Delete(id, userID string) error
 	CreateLog(log *TriggerLog) error
 	ListLogsByTrigger(triggerID string) ([]TriggerLog, error)
+	DeleteLog(logID, userID string) error
+	ClearLogs(triggerID, userID string) error
 }

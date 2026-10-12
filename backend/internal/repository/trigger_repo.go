@@ -361,3 +361,31 @@ func (r *TriggerRepositorySQLite) ListLogsByTrigger(triggerID string) ([]domain.
 
 	return logs, rows.Err()
 }
+
+func (r *TriggerRepositorySQLite) DeleteLog(id, userID string) error {
+	query := `
+		DELETE FROM trigger_logs
+		WHERE id = ? AND trigger_id IN (SELECT id FROM triggers WHERE user_id = ?)
+	`
+	res, err := r.db.Exec(query, id, userID)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return domain.ErrTriggerNotFound
+	}
+	return nil
+}
+
+func (r *TriggerRepositorySQLite) ClearLogs(triggerID, userID string) error {
+	query := `
+		DELETE FROM trigger_logs
+		WHERE trigger_id = ? AND trigger_id IN (SELECT id FROM triggers WHERE user_id = ?)
+	`
+	_, err := r.db.Exec(query, triggerID, userID)
+	return err
+}

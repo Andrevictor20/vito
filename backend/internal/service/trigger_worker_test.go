@@ -126,6 +126,27 @@ func (m *mockTriggerRepo) ListLogsByTrigger(triggerID string) ([]domain.TriggerL
 	return res, nil
 }
 
+func (m *mockTriggerRepo) DeleteLog(id, userID string) error {
+	for i, l := range m.logs {
+		if l.ID == id {
+			m.logs = append(m.logs[:i], m.logs[i+1:]...)
+			return nil
+		}
+	}
+	return domain.ErrTriggerNotFound
+}
+
+func (m *mockTriggerRepo) ClearLogs(triggerID, userID string) error {
+	var remaining []domain.TriggerLog
+	for _, l := range m.logs {
+		if l.TriggerID != triggerID {
+			remaining = append(remaining, l)
+		}
+	}
+	m.logs = remaining
+	return nil
+}
+
 type mockEvaluator struct {
 	calledWith []string
 }

@@ -8,6 +8,8 @@ import {
   ActivityIndicator,
   RefreshControl,
   ScrollView,
+  Alert,
+  Platform,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens, MD3Shapes } from '../../theme/tokens';
@@ -92,6 +94,54 @@ export const TriggerReportsView: React.FC<TriggerReportsViewProps> = ({
       setErrorMessage(err?.message || 'Falha ao executar verificação imediata.');
     } finally {
       setRunningNow(false);
+    }
+  };
+
+  const handleDeleteLog = (logId: string) => {
+    const doDelete = async () => {
+      try {
+        await api.deleteTriggerLog(trigger.id, logId);
+        setLogs((prev) => prev.filter((l) => l.id !== logId));
+      } catch (err: any) {
+        Alert.alert('Erro', err?.message || 'Falha ao excluir relatório.');
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && window.confirm && window.confirm('Deseja excluir este relatório?')) {
+        doDelete();
+      }
+    } else {
+      Alert.alert('Excluir Relatório', 'Deseja remover este relatório do histórico?', [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Excluir', style: 'destructive', onPress: doDelete },
+      ]);
+    }
+  };
+
+  const handleClearLogs = () => {
+    const doClear = async () => {
+      try {
+        await api.clearTriggerLogs(trigger.id);
+        setLogs([]);
+      } catch (err: any) {
+        Alert.alert('Erro', err?.message || 'Falha ao limpar histórico.');
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && window.confirm && window.confirm('Deseja excluir todos os relatórios anteriores deste radar?')) {
+        doClear();
+      }
+    } else {
+      Alert.alert(
+        'Limpar Histórico',
+        'Deseja excluir todos os relatórios anteriores deste radar?',
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          { text: 'Limpar Todos', style: 'destructive', onPress: doClear },
+        ]
+      );
     }
   };
 
@@ -344,9 +394,23 @@ export const TriggerReportsView: React.FC<TriggerReportsViewProps> = ({
                 </View>
               </View>
 
-              {loading && !refreshing && (
-                <ActivityIndicator size="small" color={colors.primary} />
-              )}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                {logs.length > 0 && (
+                  <TouchableOpacity
+                    style={styles.clearAllBtn}
+                    onPress={handleClearLogs}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <MaterialIcons name="delete-sweep" size={16} color={isDark ? '#F87171' : '#DC2626'} />
+                    <Text style={[styles.clearAllBtnText, { color: isDark ? '#F87171' : '#DC2626' }]}>
+                      Limpar
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                {loading && !refreshing && (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                )}
+              </View>
             </View>
           </View>
         }
@@ -374,60 +438,70 @@ export const TriggerReportsView: React.FC<TriggerReportsViewProps> = ({
                   </Text>
                 </View>
 
-                {hasCondition ? (
-                  <View
-                    style={[
-                      styles.conditionBadge,
-                      {
-                        backgroundColor: conditionMet
-                          ? isDark
-                            ? 'rgba(239, 68, 68, 0.2)'
-                            : '#FEE2E2'
-                          : isDark
-                          ? 'rgba(16, 185, 129, 0.2)'
-                          : '#DCFCE7',
-                      },
-                    ]}
-                  >
-                    <MaterialIcons
-                      name={conditionMet ? 'notifications-active' : 'check-circle'}
-                      size={13}
-                      color={conditionMet ? '#EF4444' : '#10B981'}
-                    />
-                    <Text
+                <View style={styles.headerRightActions}>
+                  {hasCondition ? (
+                    <View
                       style={[
-                        styles.conditionBadgeText,
+                        styles.conditionBadge,
                         {
-                          color: conditionMet
+                          backgroundColor: conditionMet
                             ? isDark
-                              ? '#FCA5A5'
-                              : '#B91C1C'
+                              ? 'rgba(239, 68, 68, 0.2)'
+                              : '#FEE2E2'
                             : isDark
-                            ? '#6EE7B7'
-                            : '#047857',
+                            ? 'rgba(16, 185, 129, 0.2)'
+                            : '#DCFCE7',
                         },
                       ]}
                     >
-                      {conditionMet ? 'CONDIÇÃO ATENDIDA' : 'CONDIÇÃO NÃO ATENDIDA'}
-                    </Text>
-                  </View>
-                ) : (
-                  <View
-                    style={[
-                      styles.conditionBadge,
-                      {
-                        backgroundColor: isDark
-                          ? 'rgba(59, 130, 246, 0.15)'
-                          : '#EFF6FF',
-                      },
-                    ]}
+                      <MaterialIcons
+                        name={conditionMet ? 'notifications-active' : 'check-circle'}
+                        size={13}
+                        color={conditionMet ? '#EF4444' : '#10B981'}
+                      />
+                      <Text
+                        style={[
+                          styles.conditionBadgeText,
+                          {
+                            color: conditionMet
+                              ? isDark
+                                ? '#FCA5A5'
+                                : '#B91C1C'
+                              : isDark
+                              ? '#6EE7B7'
+                              : '#047857',
+                          },
+                        ]}
+                      >
+                        {conditionMet ? 'CONDIÇÃO ATENDIDA' : 'CONDIÇÃO NÃO ATENDIDA'}
+                      </Text>
+                    </View>
+                  ) : (
+                    <View
+                      style={[
+                        styles.conditionBadge,
+                        {
+                          backgroundColor: isDark
+                            ? 'rgba(59, 130, 246, 0.15)'
+                            : '#EFF6FF',
+                        },
+                      ]}
+                    >
+                      <MaterialIcons name="check" size={13} color="#3B82F6" />
+                      <Text style={[styles.conditionBadgeText, { color: '#3B82F6' }]}>
+                        VERIFICADO
+                      </Text>
+                    </View>
+                  )}
+
+                  <TouchableOpacity
+                    style={styles.deleteLogBtn}
+                    onPress={() => handleDeleteLog(item.id)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   >
-                    <MaterialIcons name="check" size={13} color="#3B82F6" />
-                    <Text style={[styles.conditionBadgeText, { color: '#3B82F6' }]}>
-                      VERIFICADO
-                    </Text>
-                  </View>
-                )}
+                    <MaterialIcons name="delete-outline" size={16} color={colors.onSurfaceVariant} />
+                  </TouchableOpacity>
+                </View>
               </View>
 
               {/* Relatório Informativo Expandido do Radar */}
@@ -657,6 +731,19 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
+  clearAllBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: MD3Shapes.full,
+    backgroundColor: 'rgba(239, 68, 68, 0.08)',
+  },
+  clearAllBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
   reportCard: {
     padding: 16,
     borderRadius: MD3Shapes.large,
@@ -667,6 +754,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  headerRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  deleteLogBtn: {
+    padding: 4,
+    borderRadius: MD3Shapes.full,
   },
   reportTimeRow: {
     flexDirection: 'row',

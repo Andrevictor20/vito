@@ -60,7 +60,10 @@ func NewAITriggerEvaluator(fn func(ctx context.Context, t *domain.Trigger) (*dom
 func (e *AITriggerEvaluator) Evaluate(ctx context.Context, t *domain.Trigger) (string, string, error) {
 	if e.evaluateFn != nil {
 		res, err := e.evaluateFn(ctx, t)
-		if err == nil && res != nil {
+		if err != nil {
+			return "", "", err
+		}
+		if res != nil {
 			payloadObj := map[string]interface{}{
 				"status":                 "evaluated",
 				"condition_met":          res.ConditionMet,
@@ -243,15 +246,14 @@ func (w *TriggerWorker) RunTriggerNow(id, userID string) (*domain.TriggerLog, er
 	now := time.Now().UTC()
 	loc := time.FixedZone("BRT", -3*3600)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
 
 	summary, payload, evalErr := w.evaluator.Evaluate(ctx, t)
-	runStatus := "success"
 	if evalErr != nil {
-		summary = fmt.Sprintf("Tentativa de verificação manual de '%s' não obteve novos dados.", t.Title)
-		runStatus = "warning"
+		return nil, fmt.Errorf("falha ao consultar informações atualizadas na web: %w", evalErr)
 	}
+	runStatus := "success"
 
 	logEntry := &domain.TriggerLog{
 		ID:          uuid.New().String(),

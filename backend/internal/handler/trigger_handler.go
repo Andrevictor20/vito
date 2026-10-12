@@ -300,6 +300,38 @@ func (h *TriggerHandler) ListLogs(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(logs)
 }
 
+func (h *TriggerHandler) DeleteLog(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, `{"error":"não autorizado"}`, http.StatusUnauthorized)
+		return
+	}
+
+	logID := chi.URLParam(r, "logId")
+	if err := h.triggerSvc.DeleteTriggerLog(logID, userID); err != nil {
+		http.Error(w, `{"error":"falha ao excluir relatório"}`, http.StatusBadRequest)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *TriggerHandler) ClearLogs(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, `{"error":"não autorizado"}`, http.StatusUnauthorized)
+		return
+	}
+
+	id := chi.URLParam(r, "id")
+	if err := h.triggerSvc.ClearTriggerLogs(id, userID); err != nil {
+		http.Error(w, `{"error":"falha ao limpar relatórios"}`, http.StatusBadRequest)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 type parsePromptRequest struct {
 	Prompt string `json:"prompt"`
 }

@@ -207,6 +207,8 @@ func (s *Server) registerRoutes() {
 						tr.Post("/{id}/run", s.triggerHandler.RunTrigger)
 						tr.Delete("/{id}", s.triggerHandler.DeleteTrigger)
 						tr.Get("/{id}/logs", s.triggerHandler.ListLogs)
+						tr.Delete("/{id}/logs/{logId}", s.triggerHandler.DeleteLog)
+						tr.Delete("/{id}/logs", s.triggerHandler.ClearLogs)
 					})
 				}
 

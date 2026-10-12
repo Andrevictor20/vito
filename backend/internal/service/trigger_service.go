@@ -349,3 +349,16 @@ func (s *TriggerService) ListTriggerLogs(triggerID, userID string) ([]domain.Tri
 	}
 	return s.repo.ListLogsByTrigger(triggerID)
 }
+
+// DeleteTriggerLog remove um registro específico de log garantindo posse do usuário.
+func (s *TriggerService) DeleteTriggerLog(logID, userID string) error {
+	return s.repo.DeleteLog(logID, userID)
+}
+
+// ClearTriggerLogs remove todo o histórico de logs de um disparador pertencente ao usuário.
+func (s *TriggerService) ClearTriggerLogs(triggerID, userID string) error {
+	if _, err := s.repo.GetByID(triggerID, userID); err != nil {
+		return err
+	}
+	return s.repo.ClearLogs(triggerID, userID)
+}

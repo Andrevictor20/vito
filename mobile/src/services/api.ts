@@ -725,6 +725,18 @@ class ApiService {
     });
   }
 
+  async deleteTriggerLog(triggerId: string, logId: string): Promise<void> {
+    await this.request<void>(`/api/v1/triggers/${triggerId}/logs/${logId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async clearTriggerLogs(triggerId: string): Promise<void> {
+    await this.request<void>(`/api/v1/triggers/${triggerId}/logs`, {
+      method: 'DELETE',
+    });
+  }
+
   async parseTriggerPrompt(prompt: string): Promise<{
     category: TriggerCategory;
     suggested_title: string;
