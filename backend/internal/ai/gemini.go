@@ -325,52 +325,123 @@ Responda ESTRITAMENTE em formato JSON puro (sem marcações markdown extras):
   "simulated_notification": string
 }`, t.Title, t.Query, t.Category, nowStr)
 
-	reqBody := geminiRequest{
-		Contents: []geminiContent{
-			{Role: "user", Parts: []geminiPart{{Text: promptText}}},
-		},
-		Tools: []geminiTool{
-			{GoogleSearch: &geminiGoogleSearch{}},
-		},
+	// Modelos prioritários com fallback
+	modelsToTry := []string{p.model}
+	if p.model != "gemini-flash-latest" {
+		modelsToTry = append(modelsToTry, "gemini-flash-latest")
+	}
+	if p.model != "gemini-2.5-flash" {
+		modelsToTry = append(modelsToTry, "gemini-2.5-flash")
 	}
 
-	jsonBytes, err := json.Marshal(reqBody)
-	if err != nil {
-		return nil, err
+	var rawText string
+	var lastErr error
+
+	// 1. Tentar com busca na web (Grounding Google Search)
+	for _, m := range modelsToTry {
+		reqBody := geminiRequest{
+			Contents: []geminiContent{
+				{Role: "user", Parts: []geminiPart{{Text: promptText}}},
+			},
+			Tools: []geminiTool{
+				{GoogleSearch: &geminiGoogleSearch{}},
+			},
+		}
+
+		jsonBytes, err := json.Marshal(reqBody)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+
+		url := fmt.Sprintf("%s/v1beta/models/%s:generateContent?key=%s", base, m, p.apiKey)
+		req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonBytes))
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := p.httpClient.Do(req)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+
+		bodyBytes, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err != nil {
+			lastErr = err
+			continue
+		}
+
+		if resp.StatusCode == http.StatusOK {
+			var geminiResp geminiResponse
+			if err := json.Unmarshal(bodyBytes, &geminiResp); err == nil && len(geminiResp.Candidates) > 0 && len(geminiResp.Candidates[0].Content.Parts) > 0 {
+				rawText = strings.TrimSpace(geminiResp.Candidates[0].Content.Parts[0].Text)
+				if rawText != "" {
+					break
+				}
+			}
+		} else {
+			lastErr = fmt.Errorf("gemini search api status %d: %s", resp.StatusCode, string(bodyBytes))
+		}
 	}
 
-	url := fmt.Sprintf("%s/v1beta/models/%s:generateContent?key=%s", base, p.model, p.apiKey)
-	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonBytes))
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Content-Type", "application/json")
+	// 2. Fallback resiliente: se a cota do Google Search estiver esgotada (429) ou indisponível,
+	// efetua a síntese inteligente sem a tool de busca para não travar a vigília em fallback estático
+	if rawText == "" {
+		for _, m := range modelsToTry {
+			reqBody := geminiRequest{
+				Contents: []geminiContent{
+					{Role: "user", Parts: []geminiPart{{Text: promptText}}},
+				},
+			}
 
-	resp, err := p.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
+			jsonBytes, err := json.Marshal(reqBody)
+			if err != nil {
+				lastErr = err
+				continue
+			}
 
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
+			url := fmt.Sprintf("%s/v1beta/models/%s:generateContent?key=%s", base, m, p.apiKey)
+			req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonBytes))
+			if err != nil {
+				lastErr = err
+				continue
+			}
+			req.Header.Set("Content-Type", "application/json")
+
+			resp, err := p.httpClient.Do(req)
+			if err != nil {
+				lastErr = err
+				continue
+			}
+
+			bodyBytes, err := io.ReadAll(resp.Body)
+			resp.Body.Close()
+			if err != nil {
+				lastErr = err
+				continue
+			}
+
+			if resp.StatusCode == http.StatusOK {
+				var geminiResp geminiResponse
+				if err := json.Unmarshal(bodyBytes, &geminiResp); err == nil && len(geminiResp.Candidates) > 0 && len(geminiResp.Candidates[0].Content.Parts) > 0 {
+					rawText = strings.TrimSpace(geminiResp.Candidates[0].Content.Parts[0].Text)
+					if rawText != "" {
+						break
+					}
+				}
+			} else {
+				lastErr = fmt.Errorf("gemini fallback api status %d: %s", resp.StatusCode, string(bodyBytes))
+			}
+		}
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("gemini api error (status %d): %s", resp.StatusCode, string(bodyBytes))
+	if rawText == "" {
+		return nil, fmt.Errorf("falha ao avaliar vigília com gemini: %w", lastErr)
 	}
-
-	var geminiResp geminiResponse
-	if err := json.Unmarshal(bodyBytes, &geminiResp); err != nil {
-		return nil, err
-	}
-
-	if len(geminiResp.Candidates) == 0 || len(geminiResp.Candidates[0].Content.Parts) == 0 {
-		return nil, errors.New("resposta vazia retornada pelo gemini")
-	}
-
-	rawText := strings.TrimSpace(geminiResp.Candidates[0].Content.Parts[0].Text)
 
 	type testEvalResult struct {
 		ConditionMet          bool   `json:"condition_met"`

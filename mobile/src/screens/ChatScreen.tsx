@@ -305,7 +305,7 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
         contentContainerStyle={[
           styles.messagesList,
           messages.length === 0 && styles.emptyMessagesList,
-          { paddingBottom: isKeyboardOpen ? 18 : 12 },
+          { paddingBottom: isKeyboardOpen ? 28 : 12 },
         ]}
         keyboardShouldPersistTaps="handled"
         ListEmptyComponent={
@@ -344,7 +344,7 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
           styles.dockContainer,
           {
             paddingBottom: isKeyboardOpen
-              ? 16
+              ? 28
               : Platform.OS === 'ios'
               ? 76
               : 74,
