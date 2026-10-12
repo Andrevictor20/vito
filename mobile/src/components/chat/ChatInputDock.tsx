@@ -16,6 +16,7 @@ interface ChatInputDockProps {
   onChangeText: (text: string) => void;
   onSend: () => void;
   loading?: boolean;
+  onStop?: () => void;
   onPressMic?: () => void;
   isRecording?: boolean;
   onCancelRecording?: () => void;
@@ -29,6 +30,7 @@ export const ChatInputDock: React.FC<ChatInputDockProps> = ({
   onChangeText,
   onSend,
   loading = false,
+  onStop,
   onPressMic,
   isRecording = false,
   onCancelRecording,
@@ -113,6 +115,18 @@ export const ChatInputDock: React.FC<ChatInputDockProps> = ({
           returnKeyType="default"
         />
 
+        {/* Botão de Limpar / Descartar Digitação */}
+        {value.length > 0 && !loading && (
+          <TouchableOpacity
+            style={[styles.iconButton, { width: 32, height: 32 }]}
+            onPress={() => onChangeText('')}
+            hitSlop={tokens.hitSlop.sm}
+            accessibilityLabel="Limpar texto digitado"
+          >
+            <MaterialIcons name="close" size={18} color={colors.onSurfaceVariant} />
+          </TouchableOpacity>
+        )}
+
         {/* Botão de Anexo / Contexto M3 (oculto durante gravação) */}
         {onPressAttach && !isRecording && (
           <TouchableOpacity
@@ -126,30 +140,40 @@ export const ChatInputDock: React.FC<ChatInputDockProps> = ({
           </TouchableOpacity>
         )}
 
-        {/* Botão Primário de Envio M3 (Filled Circle) */}
-        <TouchableOpacity
-          style={[
-            styles.sendButton,
-            canSend
-              ? { backgroundColor: colors.primary }
-              : { backgroundColor: colors.surfaceContainerHighest, shadowOpacity: 0, elevation: 0 },
-          ]}
-          onPress={handleTriggerSend}
-          onPressIn={canSend ? handleTriggerSend : undefined}
-          disabled={!canSend}
-          activeOpacity={0.8}
-          accessibilityLabel="Enviar mensagem"
-        >
-          {loading ? (
-            <ActivityIndicator size="small" color={colors.onPrimary} />
-          ) : (
+        {/* Botão Primário: Interromper (Stop) durante loading OU Envio M3 */}
+        {loading ? (
+          <TouchableOpacity
+            style={[
+              styles.sendButton,
+              { backgroundColor: colors.error || '#EF4444' },
+            ]}
+            onPress={onStop}
+            activeOpacity={0.8}
+            accessibilityLabel="Interromper geração de resposta"
+          >
+            <MaterialIcons name="stop" size={20} color="#FFFFFF" />
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={[
+              styles.sendButton,
+              canSend
+                ? { backgroundColor: colors.primary }
+                : { backgroundColor: colors.surfaceContainerHighest, shadowOpacity: 0, elevation: 0 },
+            ]}
+            onPress={handleTriggerSend}
+            onPressIn={canSend ? handleTriggerSend : undefined}
+            disabled={!canSend}
+            activeOpacity={0.8}
+            accessibilityLabel="Enviar mensagem"
+          >
             <MaterialIcons
               name="arrow-upward"
               size={20}
               color={canSend ? colors.onPrimary : colors.outline}
             />
-          )}
-        </TouchableOpacity>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );

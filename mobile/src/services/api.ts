@@ -129,6 +129,7 @@ export interface ChatHistoryItem {
 export interface AssistantChatOptions {
   timezone?: string;
   history?: ChatHistoryItem[];
+  signal?: AbortSignal;
 }
 
 class ApiService {
@@ -203,6 +204,16 @@ class ApiService {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
+    let externalAbortHandler: (() => void) | null = null;
+    if (options.signal) {
+      if (options.signal.aborted) {
+        controller.abort();
+      } else {
+        externalAbortHandler = () => controller.abort();
+        options.signal.addEventListener('abort', externalAbortHandler, { once: true });
+      }
+    }
+
     try {
       const res = await fetch(`${this.baseUrl}${endpoint}`, {
         ...options,
@@ -234,6 +245,11 @@ class ApiService {
 
       return data as T;
     } catch (err: any) {
+      if (options.signal?.aborted) {
+        const userErr = new Error('USER_CANCELLED');
+        userErr.name = 'AbortError';
+        throw userErr;
+      }
       if (err.name === 'AbortError') {
         const seconds = Math.round(timeoutMs / 1000);
         throw new Error(`Tempo limite esgotado (${seconds}s) ao conectar no servidor (${this.baseUrl}).`);
@@ -241,6 +257,9 @@ class ApiService {
       throw err;
     } finally {
       clearTimeout(timeoutId);
+      if (externalAbortHandler && options.signal) {
+        options.signal.removeEventListener('abort', externalAbortHandler);
+      }
     }
   }
 
@@ -427,6 +446,7 @@ class ApiService {
     const currentLocalTime = this.getCurrentLocalTimeISO();
     return this.request<AssistantChatResponse>('/api/v1/assistant/chat', {
       method: 'POST',
+      signal: opts.signal,
       body: JSON.stringify({
         prompt,
         timezone: tz,

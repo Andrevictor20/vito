@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ChatMessage, ConversationSession } from '../types';
 import { api } from '../services/api';
 import { notificationService } from '../services/notificationService';
+import { isAbortError } from '../utils/chatActions';
 
 export const getChatStorageKeys = (userId?: string) => {
   const suffix = userId ? `_${userId}` : '';
@@ -26,6 +27,15 @@ export function useChat(onDataChanged?: () => void, currentUserId?: string) {
   const [messages, setMessages] = useState<ChatMessage[]>([INITIAL_MESSAGE]);
   const [loading, setLoading] = useState(false);
   const activeSessionIdRef = useRef<string>('');
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  const stopGeneration = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setLoading(false);
+  }, []);
 
   const keys = getChatStorageKeys(currentUserId);
 
@@ -227,12 +237,18 @@ export function useChat(onDataChanged?: () => void, currentUserId?: string) {
       saveMessages(withUser);
       setLoading(true);
 
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+
       try {
         const recentHistory = messages.slice(-6).map((m) => ({
           sender: m.sender === 'user' ? ('user' as const) : ('vito' as const),
           text: m.text,
         }));
-        const res = await api.assistantChat(text.trim(), { history: recentHistory });
+        const res = await api.assistantChat(text.trim(), {
+          history: recentHistory,
+          signal: controller.signal,
+        });
         const vitoMsg: ChatMessage = {
           id: `vito-${Date.now()}`,
           sender: 'vito',
@@ -268,6 +284,20 @@ export function useChat(onDataChanged?: () => void, currentUserId?: string) {
           onDataChanged?.();
         }
       } catch (err: unknown) {
+        if (isAbortError(err)) {
+          // Geração intencionalmente cancelada pelo usuário
+          const stoppedMsg: ChatMessage = {
+            id: `stop-${Date.now()}`,
+            sender: 'vito',
+            text: '⏹️ *(Geração interrompida)*',
+            timestamp: new Date().toISOString(),
+          };
+          const withStopped = [...withUser, stoppedMsg];
+          setMessages(withStopped);
+          saveMessages(withStopped);
+          return;
+        }
+
         console.warn('[useChat] falha no assistente:', err);
         const errorMsg: ChatMessage = {
           id: `err-${Date.now()}`,
@@ -279,6 +309,9 @@ export function useChat(onDataChanged?: () => void, currentUserId?: string) {
         setMessages(withError);
         saveMessages(withError);
       } finally {
+        if (abortControllerRef.current === controller) {
+          abortControllerRef.current = null;
+        }
         setLoading(false);
       }
     },
@@ -510,6 +543,7 @@ export function useChat(onDataChanged?: () => void, currentUserId?: string) {
     sessions: sessionsWithActive,
     activeSessionId,
     sendMessage,
+    stopGeneration,
     sendAudio,
     sendImage,
     clearHistory,

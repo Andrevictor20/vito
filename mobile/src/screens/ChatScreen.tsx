@@ -27,6 +27,7 @@ import { ChatQuickChips } from '../components/chat/ChatQuickChips';
 import { ChatInputDock } from '../components/chat/ChatInputDock';
 import { ConversationHistoryModal } from '../components/chat/ConversationHistoryModal';
 import { VitoMascot } from '../components/common/VitoMascot';
+import { prepareEditDraft } from '../utils/chatActions';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { SafeAudioRecorder } from '../services/audioRecorder';
@@ -56,6 +57,7 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
     loading,
     sessions,
     sendMessage,
+    stopGeneration,
     sendAudio,
     sendImage,
     clearHistory,
@@ -225,6 +227,13 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
     sendMessage(prompt);
   };
 
+  const handleEditMessage = (text: string) => {
+    setInputText(prepareEditDraft(inputText, text));
+    setTimeout(() => {
+      flatListRef.current?.scrollToEnd({ animated: true });
+    }, 100);
+  };
+
   const handleSelectSlot = (slot: import('../types').TimeSlot, msg: import('../types').ChatMessage) => {
     if (loading) return;
     const title = msg.event?.title || msg.conflict?.conflicting_title;
@@ -300,6 +309,7 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
           <ChatMessageBubble
             message={item}
             onSelectSlot={handleSelectSlot}
+            onEditMessage={handleEditMessage}
           />
         )}
         contentContainerStyle={[
@@ -356,6 +366,7 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
           onChangeText={setInputText}
           onSend={handleSend}
           loading={loading}
+          onStop={stopGeneration}
           isRecording={isRecording}
           onPressMic={handleToggleRecording}
           onCancelRecording={handleCancelRecording}

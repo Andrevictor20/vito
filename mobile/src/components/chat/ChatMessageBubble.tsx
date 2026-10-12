@@ -1,6 +1,7 @@
 import React from 'react';
-import { StyleSheet, View, Text, Image } from 'react-native';
+import { StyleSheet, View, Text, Image, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
 import { tokens, MD3Shapes } from '../../theme/tokens';
 import { ChatMessage } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
@@ -8,6 +9,7 @@ import { EventInlineCard } from './cards/EventInlineCard';
 import { ConflictInlineCard } from './cards/ConflictInlineCard';
 import { TodoInlineCard } from './cards/TodoInlineCard';
 import { VitoMascot } from '../common/VitoMascot';
+import { preparePlainTextForCopy } from '../../utils/chatActions';
 
 const renderInlineFormatted = (raw: string, textColor: string) => {
   if (!raw) return null;
@@ -104,11 +106,30 @@ const FormattedChatMessageText: React.FC<FormattedChatMessageTextProps> = ({
 interface ChatMessageBubbleProps {
   message: ChatMessage;
   onSelectSlot?: (slot: import('../../types').TimeSlot, message: ChatMessage) => void;
+  onEditMessage?: (text: string) => void;
 }
 
-export const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({ message, onSelectSlot }) => {
+export const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
+  message,
+  onSelectSlot,
+  onEditMessage,
+}) => {
   const { colors, isDark } = useTheme();
+  const [copied, setCopied] = React.useState(false);
   const isUser = message.sender === 'user';
+
+  const handleCopy = async () => {
+    try {
+      const textToCopy = preparePlainTextForCopy(message.text);
+      await Clipboard.setStringAsync(textToCopy);
+      setCopied(true);
+      setTimeout(() => {
+        setCopied(false);
+      }, 2000);
+    } catch (e) {
+      console.warn('[ChatMessageBubble] Falha ao copiar texto:', e);
+    }
+  };
 
   return (
     <View style={[styles.messageRow, isUser ? styles.messageRowUser : styles.messageRowVito]}>
@@ -203,6 +224,59 @@ export const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({ message, o
         )}
 
         <View style={styles.metaRow}>
+          {/* Botão Copiar Resposta do Vito */}
+          {!isUser && (
+            <TouchableOpacity
+              style={[
+                styles.actionButton,
+                copied && { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5' },
+              ]}
+              onPress={handleCopy}
+              hitSlop={tokens.hitSlop.sm}
+              activeOpacity={0.7}
+              accessibilityLabel="Copiar resposta do Vito"
+            >
+              <MaterialIcons
+                name={copied ? 'check' : 'content-copy'}
+                size={13}
+                color={copied ? '#10B981' : colors.onSurfaceVariant}
+              />
+              <Text
+                style={[
+                  styles.actionButtonText,
+                  { color: copied ? '#10B981' : colors.onSurfaceVariant },
+                ]}
+              >
+                {copied ? 'Copiado' : 'Copiar'}
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Botão Editar Mensagem do Usuário */}
+          {isUser && onEditMessage && (
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => onEditMessage(message.text)}
+              hitSlop={tokens.hitSlop.sm}
+              activeOpacity={0.7}
+              accessibilityLabel="Editar e reenviar mensagem"
+            >
+              <MaterialIcons
+                name="edit"
+                size={13}
+                color={isDark ? '#A1A1AA' : 'rgba(255,255,255,0.75)'}
+              />
+              <Text
+                style={[
+                  styles.actionButtonText,
+                  { color: isDark ? '#A1A1AA' : 'rgba(255,255,255,0.75)' },
+                ]}
+              >
+                Editar
+              </Text>
+            </TouchableOpacity>
+          )}
+
           <Text
             style={[
               styles.timestamp,
@@ -278,6 +352,19 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     marginTop: tokens.spacing.xs,
     gap: 4,
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    marginRight: 4,
+  },
+  actionButtonText: {
+    fontSize: 11,
+    fontWeight: '600',
   },
   timestamp: {
     fontSize: tokens.typography.size.labelSmall,
