@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ChatMessage, ConversationSession } from '../types';
 import { api } from '../services/api';
 import { notificationService } from '../services/notificationService';
+import { dataSync } from '../services/dataSync';
 import { isAbortError, truncateMessagesForEdit } from '../utils/chatActions';
 
 export const getChatStorageKeys = (userId?: string) => {
@@ -308,10 +309,13 @@ export function useChat(onDataChanged?: () => void, currentUserId?: string) {
           notificationService.cancelTodoReminder(res.todo.id).catch(() => {});
         }
 
-        // Se criou evento ou tarefa, notifica o listener para atualizar a tela de agenda
-        if (res.event || res.todo || res.action_performed !== 'none') {
-          onDataChanged?.();
-        }
+        // Sincroniza e notifica telas imediatamente (Agenda, Radares, etc.)
+        if (res.event) dataSync.notify('refresh_events');
+        if (res.todo) dataSync.notify('refresh_events');
+        if (res.trigger) dataSync.notify('refresh_triggers');
+        if (res.booking) dataSync.notify('refresh_bookings');
+        dataSync.notify('refresh_all');
+        onDataChanged?.();
       } catch (err: unknown) {
         if (isUserStoppedRef.current && isAbortError(err)) {
           // Geração intencionalmente cancelada pelo usuário
@@ -404,9 +408,12 @@ export function useChat(onDataChanged?: () => void, currentUserId?: string) {
         if (res.action_performed === 'delete_todo' && res.todo?.id) {
           notificationService.cancelTodoReminder(res.todo.id).catch(() => {});
         }
-        if (res.event || res.todo || res.action_performed !== 'none') {
-          onDataChanged?.();
-        }
+        if (res.event) dataSync.notify('refresh_events');
+        if (res.todo) dataSync.notify('refresh_events');
+        if (res.trigger) dataSync.notify('refresh_triggers');
+        if (res.booking) dataSync.notify('refresh_bookings');
+        dataSync.notify('refresh_all');
+        onDataChanged?.();
       } catch (err: unknown) {
         if (isUserStoppedRef.current && isAbortError(err)) {
           const stoppedMsg: ChatMessage = {
@@ -502,9 +509,12 @@ export function useChat(onDataChanged?: () => void, currentUserId?: string) {
           notificationService.cancelTodoReminder(res.todo.id).catch(() => {});
         }
 
-        if (res.event || res.todo || res.action_performed !== 'none') {
-          onDataChanged?.();
-        }
+        if (res.event) dataSync.notify('refresh_events');
+        if (res.todo) dataSync.notify('refresh_events');
+        if (res.trigger) dataSync.notify('refresh_triggers');
+        if (res.booking) dataSync.notify('refresh_bookings');
+        dataSync.notify('refresh_all');
+        onDataChanged?.();
       } catch (err: unknown) {
         console.warn('[useChat] falha no assistente:', err);
         const errMsg = err instanceof Error ? err.message : '';
@@ -563,9 +573,11 @@ export function useChat(onDataChanged?: () => void, currentUserId?: string) {
         setMessages(withVito);
         saveMessages(withVito);
 
-        if (res.event || res.todo || res.action_performed !== 'none') {
-          onDataChanged?.();
-        }
+        if (res.event || res.todo) dataSync.notify('refresh_events');
+        if (res.trigger) dataSync.notify('refresh_triggers');
+        if (res.booking) dataSync.notify('refresh_bookings');
+        dataSync.notify('refresh_all');
+        onDataChanged?.();
       } catch (err: unknown) {
         console.warn('[useChat] falha no assistente:', err);
         const errMsg = err instanceof Error ? err.message : '';

@@ -80,6 +80,45 @@ func TestEventRepository_CreateAndCheckConflict(t *testing.T) {
 	}
 }
 
+func TestEventRepository_CheckConflict_IgnoresHolidays(t *testing.T) {
+	eventRepo, _, _ := setupCalendarTestDB(t)
+
+	day := time.Date(2026, 10, 12, 0, 0, 0, 0, time.UTC)
+	cases := []struct {
+		name, title, category string
+		end                   time.Time
+	}{
+		{"categoria holiday", "Nossa Senhora Aparecida", "holiday", day.Add(23*time.Hour + 59*time.Minute)},
+		{"categoria errada do Google mas dia inteiro", "Nossa Senhora Aparecida", "leisure", day.Add(23*time.Hour + 59*time.Minute)},
+		{"termo de feriado com categoria errada", "Feriado Nacional", "general", day.Add(10 * time.Hour)},
+	}
+	for i, tc := range cases {
+		id := "hol-" + string(rune('a'+i))
+		if err := eventRepo.Create(&domain.Event{
+			ID: id, UserID: "user-cal-1", Title: tc.title, Category: tc.category,
+			StartAt: day, EndAt: tc.end, CreatedAt: day, UpdatedAt: day,
+		}); err != nil {
+			t.Fatalf("%s: create: %v", tc.name, err)
+		}
+	}
+
+	c, err := eventRepo.CheckConflict("user-cal-1", day.Add(19*time.Hour), day.Add(20*time.Hour), "")
+	if err != nil {
+		t.Fatalf("check conflict: %v", err)
+	}
+	if c.HasConflict {
+		t.Errorf("feriado não deve gerar conflito, mas conflitou com %q", c.ConflictingTitle)
+	}
+
+	c, err = eventRepo.CheckConflict("user-cal-1", day.Add(1*time.Hour), day.Add(2*time.Hour), "")
+	if err != nil {
+		t.Fatalf("check conflict: %v", err)
+	}
+	if c.HasConflict {
+		t.Errorf("feriado de dia/termo não deve conflitar, mas conflitou com %q", c.ConflictingTitle)
+	}
+}
+
 func TestEventRepository_ListByUser(t *testing.T) {
 	eventRepo, _, _ := setupCalendarTestDB(t)
 

@@ -179,35 +179,73 @@ func (r *EventRepositorySQLite) ListByUser(userID string, from, to time.Time) ([
 }
 
 // CheckConflict verifica se há choque de horários (start_at < existing.end_at AND end_at > existing.start_at).
+// Feriados, eventos de dia inteiro (>= 20h) e celebrações nunca bloqueiam a criação de compromissos.
 func (r *EventRepositorySQLite) CheckConflict(userID string, startAt, endAt time.Time, excludeEventID string) (*domain.ConflictInfo, error) {
 	startAtUTC := startAt.UTC()
 	endAtUTC := endAt.UTC()
 
 	query := `
-		SELECT id, title
+		SELECT id, title, category, start_at, end_at, description
 		FROM events
 		WHERE user_id = ? 
 		  AND id != ?
-		  AND category != 'holiday'
+		  AND LOWER(category) NOT IN ('holiday', 'feriado')
 		  AND start_at < ? 
 		  AND end_at > ?
-		LIMIT 1
 	`
-	var conflictID, title string
-	err := r.db.QueryRow(query, userID, excludeEventID, endAtUTC, startAtUTC).Scan(&conflictID, &title)
+	rows, err := r.db.Query(query, userID, excludeEventID, endAtUTC, startAtUTC)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return &domain.ConflictInfo{HasConflict: false}, nil
-		}
 		return nil, err
 	}
+	defer rows.Close()
 
-	return &domain.ConflictInfo{
-		HasConflict:      true,
-		ConflictingID:    conflictID,
-		ConflictingTitle: title,
-		Message:          fmt.Sprintf("Conflito detectado com o evento '%s'", title),
-	}, nil
+	holidayKeywords := []string{
+		"feriado", "nossa senhora", "aparecida", "ano novo", "confraternização", "carnaval",
+		"quarta-feira de cinzas", "quarta de cinzas", "sexta-feira santa", "paixão de cristo",
+		"páscoa", "pascoa", "tiradentes", "dia do trabalho", "dia do trabalhador",
+		"corpus christi", "independência", "independencia", "finados", "proclamação da república",
+		"proclamacao da republica", "consciência negra", "consciencia negra", "natal",
+		"dia das mães", "dia dos pais", "dia das crianças", "holiday", "réveillon", "reveillon",
+	}
+
+	for rows.Next() {
+		var conflictID, title, category, rawStart, rawEnd, desc string
+		if err := rows.Scan(&conflictID, &title, &category, &rawStart, &rawEnd, &desc); err != nil {
+			return nil, err
+		}
+
+		catLower := strings.ToLower(category)
+		if catLower == "holiday" || catLower == "feriado" {
+			continue
+		}
+
+		evStart := parseDBTime(rawStart)
+		evEnd := parseDBTime(rawEnd)
+		if evEnd.Sub(evStart) >= 20*time.Hour {
+			continue
+		}
+
+		combined := strings.ToLower(title + " " + desc)
+		isHoliday := false
+		for _, kw := range holidayKeywords {
+			if strings.Contains(combined, kw) {
+				isHoliday = true
+				break
+			}
+		}
+		if isHoliday {
+			continue
+		}
+
+		return &domain.ConflictInfo{
+			HasConflict:      true,
+			ConflictingID:    conflictID,
+			ConflictingTitle: title,
+			Message:          fmt.Sprintf("Conflito detectado com o evento '%s'", title),
+		}, nil
+	}
+
+	return &domain.ConflictInfo{HasConflict: false}, nil
 }
 
 func (r *EventRepositorySQLite) Delete(id, userID string) error {

@@ -286,8 +286,12 @@ func (s *CalendarSyncService) SyncIntegration(ctx context.Context, userID, provi
 
 		cat := item.Category
 		col := item.Color
-		if cat == "" || col == "" {
-			cat, col = ClassifyEvent(item.Title, item.Description)
+		inferredCat, inferredCol := ClassifyEvent(item.Title, item.Description)
+		if inferredCat == "holiday" {
+			cat = inferredCat
+			col = inferredCol
+		} else if cat == "" || col == "" {
+			cat, col = inferredCat, inferredCol
 		}
 
 		if err == nil && mapping != nil {

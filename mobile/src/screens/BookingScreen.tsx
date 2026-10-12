@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { dataSync } from '../services/dataSync';
 import {
   StyleSheet,
   View,
@@ -166,6 +167,8 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack }) => {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useEffect(() => dataSync.subscribe('refresh_bookings', () => { loadData(); }), [loadData]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);

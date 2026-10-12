@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Event, Todo, AssistantChatResponse } from '../types';
 import { api } from '../services/api';
 import { notificationService } from '../services/notificationService';
+import { dataSync } from '../services/dataSync';
 
 import { toLocalDateString, parseSafeDate, isEventOnDate, getEventDays } from '../utils/calendarDateUtils';
 
@@ -100,6 +101,13 @@ export function useHomeData(currentUserId?: string) {
       isMounted = false;
     };
   }, [currentUserId, cacheKeys.eventsKey, cacheKeys.todosKey, loadData]);
+
+  useEffect(() => {
+    const unsub = dataSync.subscribe('refresh_events', () => {
+      loadData(true);
+    });
+    return unsub;
+  }, [loadData]);
 
   const onRefresh = () => {
     setRefreshing(true);

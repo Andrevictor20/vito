@@ -89,6 +89,7 @@ export interface AssistantChatResponse {
   event?: Event;
   todo?: Todo;
   trigger?: Trigger;
+  booking?: { id: string; title: string; slug?: string };
   conflict?: ConflictInfo;
   provider_used?: string;
 }

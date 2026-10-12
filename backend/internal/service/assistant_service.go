@@ -30,6 +30,7 @@ type AssistantResponse struct {
 	Todo         *domain.Todo         `json:"todo,omitempty"`
 	Trigger      *domain.Trigger      `json:"trigger,omitempty"`
 	Pending      *domain.PendingItem  `json:"pending,omitempty"`
+	Booking      *domain.BookingType  `json:"booking,omitempty"`
 	ProviderUsed string               `json:"provider_used,omitempty"`
 }
 
@@ -510,6 +511,7 @@ func (s *AssistantService) Process(ctx context.Context, userID string, input ai.
 				log.Printf("⚠️ [AssistantService] Erro ao criar booking type via chat: %v", err)
 				res.Message = fmt.Sprintf("Não consegui gerar o link de agendamento no momento (%v). Você também pode criá-lo pelo menu Vito Booking.", err)
 			} else {
+				res.Booking = &bt.BookingType
 				linkURL := bt.ShortURL
 				if linkURL == "" {
 					linkURL = bt.PublicURL

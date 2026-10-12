@@ -29,6 +29,7 @@ import { BookingScreen } from './BookingScreen';
 import { ExecutiveSummariesHubView } from './ExecutiveSummariesHubView';
 import { hapticFeedback } from '../theme/motion';
 import { useHomeData } from '../hooks/useHomeData';
+import { dataSync } from '../services/dataSync';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { Event } from '../types';
@@ -73,6 +74,8 @@ export const HomeScreen: React.FC<{
     pagerRef.current?.scrollTo({ x: targetX, animated: true });
     if (tab === 'calendar') {
       loadData(true);
+    } else if (tab === 'triggers') {
+      dataSync.notify('refresh_triggers');
     }
   };
 
@@ -86,6 +89,8 @@ export const HomeScreen: React.FC<{
       setActiveTab(newTab);
       if (newTab === 'calendar') {
         loadData(true);
+      } else if (newTab === 'triggers') {
+        dataSync.notify('refresh_triggers');
       }
     }
   };

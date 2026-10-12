@@ -3,6 +3,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '../services/api';
 import { Trigger, TriggerLog, TriggerTestResult, TriggerCategory, TriggerStatus, CreateTriggerInput } from '../types';
 
+import { dataSync } from '../services/dataSync';
+
 export const useTriggers = (userId?: string) => {
   const [triggers, setTriggers] = useState<Trigger[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,6 +60,13 @@ export const useTriggers = (userId?: string) => {
 
   useEffect(() => {
     loadTriggers();
+  }, [loadTriggers]);
+
+  useEffect(() => {
+    const unsub = dataSync.subscribe('refresh_triggers', () => {
+      loadTriggers(true);
+    });
+    return unsub;
   }, [loadTriggers]);
 
   const onRefresh = useCallback(() => {
