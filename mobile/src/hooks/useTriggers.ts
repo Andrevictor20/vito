@@ -67,6 +67,22 @@ export const useTriggers = (userId?: string) => {
   const handleCreateTrigger = useCallback(async (input: CreateTriggerInput): Promise<Trigger> => {
     const created = await api.createTrigger(input);
     setTriggers((prev) => [created, ...prev]);
+
+    // Dispara a verificação imediata para já trazer notícias reais atualizadas no momento da criação
+    api.runTrigger(created.id)
+      .then((log) => {
+        setTriggers((prev) =>
+          prev.map((t) =>
+            t.id === created.id
+              ? { ...t, current_value: log.message, last_run_status: 'success' }
+              : t
+          )
+        );
+      })
+      .catch((runErr) => {
+        console.warn('[useTriggers] Pesquisa inicial do radar:', runErr);
+      });
+
     return created;
   }, []);
 
@@ -99,6 +115,10 @@ export const useTriggers = (userId?: string) => {
       await api.deleteTrigger(id);
     } catch (err: any) {
       console.error('[useTriggers] Falha ao deletar disparador:', err);
+      // Se o radar já não existe mais no backend (404), mantém a exclusão otimista com sucesso
+      if (err?.message?.includes('404')) {
+        return;
+      }
       loadTriggers();
       throw err;
     }

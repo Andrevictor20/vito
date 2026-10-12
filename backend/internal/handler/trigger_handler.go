@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -74,6 +75,14 @@ func (h *TriggerHandler) CreateTrigger(w http.ResponseWriter, r *http.Request) {
 		}
 		http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusBadRequest)
 		return
+	}
+
+	// Executa imediatamente a pesquisa inicial para já entregar fatos e notícias reais atualizadas
+	if h.triggerWorker != nil {
+		if logEntry, errRun := h.triggerWorker.RunTriggerNow(trigger.ID, userID); errRun == nil && logEntry != nil {
+			trigger.CurrentValue = logEntry.Message
+			trigger.LastRunStatus = "success"
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -271,6 +280,10 @@ func (h *TriggerHandler) DeleteTrigger(w http.ResponseWriter, r *http.Request) {
 
 	id := chi.URLParam(r, "id")
 	if err := h.triggerSvc.DeleteTrigger(id, userID); err != nil {
+		if errors.Is(err, domain.ErrTriggerNotFound) {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
 		http.Error(w, `{"error":"falha ao excluir disparador"}`, http.StatusBadRequest)
 		return
 	}
@@ -309,6 +322,10 @@ func (h *TriggerHandler) DeleteLog(w http.ResponseWriter, r *http.Request) {
 
 	logID := chi.URLParam(r, "logId")
 	if err := h.triggerSvc.DeleteTriggerLog(logID, userID); err != nil {
+		if errors.Is(err, domain.ErrTriggerNotFound) {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
 		http.Error(w, `{"error":"falha ao excluir relatório"}`, http.StatusBadRequest)
 		return
 	}
@@ -325,6 +342,10 @@ func (h *TriggerHandler) ClearLogs(w http.ResponseWriter, r *http.Request) {
 
 	id := chi.URLParam(r, "id")
 	if err := h.triggerSvc.ClearTriggerLogs(id, userID); err != nil {
+		if errors.Is(err, domain.ErrTriggerNotFound) {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
 		http.Error(w, `{"error":"falha ao limpar relatórios"}`, http.StatusBadRequest)
 		return
 	}

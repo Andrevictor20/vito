@@ -150,6 +150,10 @@ export const TriggersScreen: React.FC<{ onOpenExecutiveSummaries?: () => void }>
                 : prev
             );
           }}
+          onDeleteRadar={async (id) => {
+            await handleDeleteTrigger(id);
+            setReportTrigger(null);
+          }}
         />
 
         {/* Modal de Edição sobre a página dedicada de relatórios */}

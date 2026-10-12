@@ -24,8 +24,8 @@ type DefaultTriggerEvaluator struct{}
 
 func (e *DefaultTriggerEvaluator) Evaluate(ctx context.Context, t *domain.Trigger) (string, string, error) {
 	timeStr := time.Now().Format("02/01/2006 às 15:04")
-	summary := fmt.Sprintf("Vigília ativa de '%s' atualizada em %s. Consulta: '%s'. Condições monitoradas e sem anomalias críticas.", t.Title, timeStr, t.Query)
-	payload := fmt.Sprintf(`{"status":"checked","query":"%s","checked_at":"%s"}`, t.Query, time.Now().UTC().Format(time.RFC3339))
+	summary := fmt.Sprintf("Pesquisa inicial agendada para '%s' em %s.", t.Title, timeStr)
+	payload := fmt.Sprintf(`{"status":"pending","query":"%s","data":"Aguardando sincronização de notícias em tempo real.","checked_at":"%s"}`, t.Query, time.Now().UTC().Format(time.RFC3339))
 	return summary, payload, nil
 }
 
@@ -194,7 +194,8 @@ func (w *TriggerWorker) CheckAndEvaluateTriggers(now time.Time) (int, error) {
 		runStatus := "success"
 		if evalErr != nil {
 			log.Printf("[TriggerWorker] Erro ao avaliar disparador %s ('%s'): %v", t.ID, t.Title, evalErr)
-			summary = fmt.Sprintf("Aviso de vigília: tentativa de verificação de '%s' falhou temporariamente.", t.Title)
+			summary = fmt.Sprintf("Aviso: Não foi possível obter novas notícias para '%s' no momento devido a uma oscilação na busca.", t.Title)
+			payload = fmt.Sprintf(`{"status":"failed","query":"%s","data":"Oscilação temporária ao coletar notícias da web.","checked_at":"%s"}`, t.Query, time.Now().UTC().Format(time.RFC3339))
 			runStatus = "failed"
 		}
 

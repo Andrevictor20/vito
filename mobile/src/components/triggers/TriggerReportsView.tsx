@@ -23,6 +23,7 @@ interface TriggerReportsViewProps {
   onEdit: (trigger: Trigger) => void;
   onRunNow: (id: string) => Promise<TriggerLog>;
   onToggle?: (id: string) => Promise<void>;
+  onDeleteRadar?: (id: string) => Promise<void> | void;
 }
 
 interface ParsedReportPayload {
@@ -39,6 +40,7 @@ export const TriggerReportsView: React.FC<TriggerReportsViewProps> = ({
   onEdit,
   onRunNow,
   onToggle,
+  onDeleteRadar,
 }) => {
   const { colors, isDark } = useTheme();
 
@@ -97,13 +99,47 @@ export const TriggerReportsView: React.FC<TriggerReportsViewProps> = ({
     }
   };
 
-  const handleDeleteLog = (logId: string) => {
+  const handleDeleteTriggerSelf = () => {
+    if (!onDeleteRadar) return;
+
     const doDelete = async () => {
       try {
-        await api.deleteTriggerLog(trigger.id, logId);
-        setLogs((prev) => prev.filter((l) => l.id !== logId));
+        await onDeleteRadar(trigger.id);
+        onBack();
       } catch (err: any) {
-        Alert.alert('Erro', err?.message || 'Falha ao excluir relatório.');
+        console.warn('[TriggerReportsView] Erro ao excluir radar:', err);
+        onBack();
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      const confirmed =
+        typeof window !== 'undefined'
+          ? window.confirm(`Deseja excluir o radar "${trigger.title}" e todo o histórico?`)
+          : true;
+      if (confirmed) {
+        doDelete();
+      }
+      return;
+    }
+
+    Alert.alert(
+      'Excluir Radar',
+      `Deseja parar de monitorar e excluir o radar "${trigger.title}" e todo o histórico?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Excluir', style: 'destructive', onPress: doDelete },
+      ]
+    );
+  };
+
+  const handleDeleteLog = (logId: string) => {
+    const doDelete = async () => {
+      setLogs((prev) => prev.filter((l) => l.id !== logId));
+      try {
+        await api.deleteTriggerLog(trigger.id, logId);
+      } catch (err: any) {
+        console.warn('[TriggerReportsView] Erro ao excluir relatório no servidor:', err);
       }
     };
 
@@ -121,11 +157,11 @@ export const TriggerReportsView: React.FC<TriggerReportsViewProps> = ({
 
   const handleClearLogs = () => {
     const doClear = async () => {
+      setLogs([]);
       try {
         await api.clearTriggerLogs(trigger.id);
-        setLogs([]);
       } catch (err: any) {
-        Alert.alert('Erro', err?.message || 'Falha ao limpar histórico.');
+        console.warn('[TriggerReportsView] Erro ao limpar histórico no servidor:', err);
       }
     };
 
@@ -251,6 +287,21 @@ export const TriggerReportsView: React.FC<TriggerReportsViewProps> = ({
           >
             <MaterialIcons name="edit" size={18} color={colors.onSurface} />
           </TouchableOpacity>
+
+          {onDeleteRadar && (
+            <TouchableOpacity
+              style={[
+                styles.editIconButton,
+                {
+                  backgroundColor: isDark ? 'rgba(239, 68, 68, 0.12)' : 'rgba(239, 68, 68, 0.08)',
+                },
+              ]}
+              onPress={handleDeleteTriggerSelf}
+              accessibilityLabel="Excluir radar"
+            >
+              <MaterialIcons name="delete-outline" size={18} color="#EF4444" />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
