@@ -10,6 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens, MD3Shapes } from '../../theme/tokens';
@@ -30,6 +31,7 @@ interface EditTriggerModalProps {
       status?: TriggerStatus;
     }
   ) => Promise<void>;
+  onDelete?: (id: string) => Promise<void> | void;
 }
 
 export const EditTriggerModal: React.FC<EditTriggerModalProps> = ({
@@ -37,6 +39,7 @@ export const EditTriggerModal: React.FC<EditTriggerModalProps> = ({
   trigger,
   onClose,
   onSave,
+  onDelete,
 }) => {
   const { colors, isDark } = useTheme();
 
@@ -87,6 +90,35 @@ export const EditTriggerModal: React.FC<EditTriggerModalProps> = ({
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleDelete = () => {
+    if (!trigger || !onDelete) return;
+
+    if (Platform.OS === 'web') {
+      const confirmed = typeof window !== 'undefined' ? window.confirm(`Deseja parar de acompanhar "${trigger.title}"?`) : true;
+      if (confirmed) {
+        onDelete(trigger.id);
+        onClose();
+      }
+      return;
+    }
+
+    Alert.alert(
+      'Remover radar',
+      `Deseja parar de acompanhar "${trigger.title}"?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Remover',
+          style: 'destructive',
+          onPress: () => {
+            onDelete(trigger.id);
+            onClose();
+          },
+        },
+      ]
+    );
   };
 
   const FREQUENCIES: { id: TriggerFrequency; label: string; icon: string }[] = [
@@ -319,33 +351,50 @@ export const EditTriggerModal: React.FC<EditTriggerModalProps> = ({
 
           {/* Footer Actions */}
           <View style={styles.footer}>
-            <TouchableOpacity
-              style={[
-                styles.cancelButton,
-                {
-                  backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-                },
-              ]}
-              onPress={onClose}
-              disabled={saving}
-            >
-              <Text style={[styles.cancelButtonText, { color: colors.onSurface }]}>Cancelar</Text>
-            </TouchableOpacity>
+            {onDelete ? (
+              <TouchableOpacity
+                style={[
+                  styles.deleteButton,
+                  { backgroundColor: isDark ? 'rgba(239, 68, 68, 0.12)' : '#FEF2F2' },
+                ]}
+                onPress={handleDelete}
+                disabled={saving}
+                accessibilityLabel="Remover este radar"
+              >
+                <MaterialIcons name="delete-outline" size={17} color="#EF4444" />
+                <Text style={styles.deleteButtonText}>Excluir</Text>
+              </TouchableOpacity>
+            ) : <View />}
 
-            <TouchableOpacity
-              style={[styles.saveButton, { backgroundColor: colors.primary }]}
-              onPress={handleSave}
-              disabled={saving}
-            >
-              {saving ? (
-                <ActivityIndicator size="small" color={colors.onPrimary} />
-              ) : (
-                <>
-                  <MaterialIcons name="check" size={18} color={colors.onPrimary} />
-                  <Text style={[styles.saveButtonText, { color: colors.onPrimary }]}>Salvar Alterações</Text>
-                </>
-              )}
-            </TouchableOpacity>
+            <View style={styles.footerRight}>
+              <TouchableOpacity
+                style={[
+                  styles.cancelButton,
+                  {
+                    backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+                  },
+                ]}
+                onPress={onClose}
+                disabled={saving}
+              >
+                <Text style={[styles.cancelButtonText, { color: colors.onSurface }]}>Cancelar</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.saveButton, { backgroundColor: colors.primary }]}
+                onPress={handleSave}
+                disabled={saving}
+              >
+                {saving ? (
+                  <ActivityIndicator size="small" color={colors.onPrimary} />
+                ) : (
+                  <>
+                    <MaterialIcons name="check" size={18} color={colors.onPrimary} />
+                    <Text style={[styles.saveButtonText, { color: colors.onPrimary }]}>Salvar Alterações</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -497,12 +546,31 @@ const styles = StyleSheet.create({
   },
   footer: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     gap: 12,
     marginTop: 16,
     paddingTop: 12,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: 'rgba(150, 150, 150, 0.2)',
+  },
+  footerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  deleteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: MD3Shapes.full,
+  },
+  deleteButtonText: {
+    color: '#EF4444',
+    fontSize: 14,
+    fontWeight: '600',
   },
   cancelButton: {
     paddingVertical: 10,

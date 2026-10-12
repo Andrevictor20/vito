@@ -30,6 +30,28 @@ export function prepareEditDraft(currentInput: string, messageToEdit: string): s
 }
 
 /**
+ * Trunca a lista de mensagens no ponto da mensagem editada (estilo ChatGPT/Gemini/Claude),
+ * descartando todas as respostas e mensagens subsequentes e atualizando o texto da mensagem editada.
+ */
+export function truncateMessagesForEdit<T extends { id: string; text: string }>(
+  messages: T[],
+  messageIdToEdit: string,
+  newText: string
+): T[] {
+  const index = messages.findIndex((m) => m.id === messageIdToEdit);
+  if (index === -1) {
+    return messages;
+  }
+
+  const updatedTarget: T = {
+    ...messages[index],
+    text: newText.trim(),
+  };
+
+  return [...messages.slice(0, index), updatedTarget];
+}
+
+/**
  * Detecta se o erro capturado foi um cancelamento intencional da requisição pelo usuário.
  */
 export function isAbortError(err: unknown): boolean {
@@ -42,3 +64,4 @@ export function isAbortError(err: unknown): boolean {
   }
   return false;
 }
+

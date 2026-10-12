@@ -57,6 +57,7 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
     loading,
     sessions,
     sendMessage,
+    editAndResendMessage,
     stopGeneration,
     sendAudio,
     sendImage,
@@ -310,6 +311,8 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
             message={item}
             onSelectSlot={handleSelectSlot}
             onEditMessage={handleEditMessage}
+            onSaveEdit={(messageId, newText) => editAndResendMessage(messageId, newText)}
+            disabled={loading}
           />
         )}
         contentContainerStyle={[

@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ChatMessage, ConversationSession } from '../types';
 import { api } from '../services/api';
 import { notificationService } from '../services/notificationService';
-import { isAbortError } from '../utils/chatActions';
+import { isAbortError, truncateMessagesForEdit } from '../utils/chatActions';
 
 export const getChatStorageKeys = (userId?: string) => {
   const suffix = userId ? `_${userId}` : '';
@@ -28,8 +28,10 @@ export function useChat(onDataChanged?: () => void, currentUserId?: string) {
   const [loading, setLoading] = useState(false);
   const activeSessionIdRef = useRef<string>('');
   const abortControllerRef = useRef<AbortController | null>(null);
+  const isUserStoppedRef = useRef<boolean>(false);
 
   const stopGeneration = useCallback(() => {
+    isUserStoppedRef.current = true;
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
@@ -239,6 +241,7 @@ export function useChat(onDataChanged?: () => void, currentUserId?: string) {
 
       const controller = new AbortController();
       abortControllerRef.current = controller;
+      isUserStoppedRef.current = false;
 
       try {
         const recentHistory = messages.slice(-6).map((m) => ({
@@ -284,7 +287,7 @@ export function useChat(onDataChanged?: () => void, currentUserId?: string) {
           onDataChanged?.();
         }
       } catch (err: unknown) {
-        if (isAbortError(err)) {
+        if (isUserStoppedRef.current && isAbortError(err)) {
           // Geração intencionalmente cancelada pelo usuário
           const stoppedMsg: ChatMessage = {
             id: `stop-${Date.now()}`,
@@ -312,6 +315,101 @@ export function useChat(onDataChanged?: () => void, currentUserId?: string) {
         if (abortControllerRef.current === controller) {
           abortControllerRef.current = null;
         }
+        isUserStoppedRef.current = false;
+        setLoading(false);
+      }
+    },
+    [messages, loading, onDataChanged, saveMessages]
+  );
+
+  const editAndResendMessage = useCallback(
+    async (messageId: string, newText: string) => {
+      if (!newText.trim() || loading) return;
+
+      const targetIdx = messages.findIndex((m) => m.id === messageId);
+      if (targetIdx === -1) return;
+
+      const truncatedList = truncateMessagesForEdit(messages, messageId, newText);
+      setMessages(truncatedList);
+      saveMessages(truncatedList);
+      setLoading(true);
+
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+      isUserStoppedRef.current = false;
+
+      try {
+        const previousSlice = messages.slice(0, targetIdx);
+        const recentHistory = previousSlice.slice(-6).map((m) => ({
+          sender: m.sender === 'user' ? ('user' as const) : ('vito' as const),
+          text: m.text,
+        }));
+
+        const res = await api.assistantChat(newText.trim(), {
+          history: recentHistory,
+          signal: controller.signal,
+        });
+
+        const vitoMsg: ChatMessage = {
+          id: `vito-${Date.now()}`,
+          sender: 'vito',
+          text: res.reply || res.message || 'Instrução processada com sucesso.',
+          timestamp: new Date().toISOString(),
+          action_performed: res.action_performed,
+          event: res.event,
+          todo: res.todo,
+          trigger: res.trigger,
+          conflict: res.conflict,
+        };
+
+        const withVito = [...truncatedList, vitoMsg];
+        setMessages(withVito);
+        saveMessages(withVito);
+
+        if (res.event) {
+          notificationService.scheduleEventDualReminders(res.event).catch(() => {});
+        }
+        if (res.todo) {
+          notificationService.scheduleTodoReminder(res.todo).catch(() => {});
+        }
+        if (res.action_performed === 'delete_event' && res.event?.id) {
+          notificationService.cancelEventReminder(res.event.id).catch(() => {});
+        }
+        if (res.action_performed === 'delete_todo' && res.todo?.id) {
+          notificationService.cancelTodoReminder(res.todo.id).catch(() => {});
+        }
+        if (res.event || res.todo || res.action_performed !== 'none') {
+          onDataChanged?.();
+        }
+      } catch (err: unknown) {
+        if (isUserStoppedRef.current && isAbortError(err)) {
+          const stoppedMsg: ChatMessage = {
+            id: `stop-${Date.now()}`,
+            sender: 'vito',
+            text: '⏹️ *(Geração interrompida)*',
+            timestamp: new Date().toISOString(),
+          };
+          const withStopped = [...truncatedList, stoppedMsg];
+          setMessages(withStopped);
+          saveMessages(withStopped);
+          return;
+        }
+
+        console.warn('[useChat] falha na re-geração após edição:', err);
+        const errorMsg: ChatMessage = {
+          id: `err-${Date.now()}`,
+          sender: 'vito',
+          text: 'Não consegui processar seu pedido agora. Pode tentar de novo em instantes?',
+          timestamp: new Date().toISOString(),
+        };
+        const withError = [...truncatedList, errorMsg];
+        setMessages(withError);
+        saveMessages(withError);
+      } finally {
+        if (abortControllerRef.current === controller) {
+          abortControllerRef.current = null;
+        }
+        isUserStoppedRef.current = false;
         setLoading(false);
       }
     },
@@ -543,6 +641,7 @@ export function useChat(onDataChanged?: () => void, currentUserId?: string) {
     sessions: sessionsWithActive,
     activeSessionId,
     sendMessage,
+    editAndResendMessage,
     stopGeneration,
     sendAudio,
     sendImage,

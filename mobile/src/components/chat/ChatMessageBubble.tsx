@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, View, Text, Image, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, Text, Image, TouchableOpacity, TextInput } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { tokens, MD3Shapes } from '../../theme/tokens';
@@ -107,16 +107,48 @@ interface ChatMessageBubbleProps {
   message: ChatMessage;
   onSelectSlot?: (slot: import('../../types').TimeSlot, message: ChatMessage) => void;
   onEditMessage?: (text: string) => void;
+  onSaveEdit?: (messageId: string, newText: string) => void;
+  disabled?: boolean;
 }
 
 export const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
   message,
   onSelectSlot,
   onEditMessage,
+  onSaveEdit,
+  disabled = false,
 }) => {
   const { colors, isDark } = useTheme();
   const [copied, setCopied] = React.useState(false);
+  const [isEditing, setIsEditing] = React.useState(false);
+  const [draftText, setDraftText] = React.useState(message.text);
   const isUser = message.sender === 'user';
+
+  React.useEffect(() => {
+    setDraftText(message.text);
+  }, [message.text]);
+
+  const handleStartEdit = () => {
+    if (disabled) return;
+    setDraftText(message.text);
+    setIsEditing(true);
+  };
+
+  const handleCancelEdit = () => {
+    setDraftText(message.text);
+    setIsEditing(false);
+  };
+
+  const handleConfirmEdit = () => {
+    const trimmed = draftText.trim();
+    if (!trimmed) return;
+    setIsEditing(false);
+    if (onSaveEdit) {
+      onSaveEdit(message.id, trimmed);
+    } else if (onEditMessage) {
+      onEditMessage(trimmed);
+    }
+  };
 
   const handleCopy = async () => {
     try {
@@ -164,26 +196,84 @@ export const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
         {message.imageUri && (
           <Image source={{ uri: message.imageUri }} style={styles.imageAttachment} resizeMode="cover" />
         )}
-        <View style={message.id.includes('audio') ? styles.voiceTextRow : undefined}>
-          {message.id.includes('audio') && (
-            <MaterialIcons
-              name="mic"
-              size={16}
-              color={isUser ? (isDark ? '#FAFAFA' : '#FFFFFF') : colors.primary}
-              style={{ marginRight: 6, marginTop: 2 }}
+        {isUser && isEditing ? (
+          <View style={styles.inlineEditContainer}>
+            <TextInput
+              style={[
+                styles.inlineEditInput,
+                {
+                  color: isDark ? '#FAFAFA' : '#FFFFFF',
+                  borderColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.4)',
+                },
+              ]}
+              value={draftText}
+              onChangeText={setDraftText}
+              multiline
+              autoFocus
+              maxLength={1000}
+              placeholderTextColor={isDark ? '#A1A1AA' : '#E0E7FF'}
             />
-          )}
-          <FormattedChatMessageText
-            text={message.text}
-            isUser={isUser}
-            textColor={isUser ? (isDark ? '#FAFAFA' : '#FFFFFF') : colors.onSurface}
-            style={[
-              styles.messageText,
-              message.id.includes('audio') && { flexShrink: 1 },
-              isUser ? styles.messageTextUser : styles.messageTextVito,
-            ]}
-          />
-        </View>
+            <View style={styles.inlineEditActions}>
+              <TouchableOpacity
+                style={[styles.inlineEditButton, styles.inlineEditCancelButton]}
+                onPress={handleCancelEdit}
+                activeOpacity={0.7}
+                accessibilityLabel="Cancelar edição"
+              >
+                <MaterialIcons name="close" size={14} color={isDark ? '#A1A1AA' : '#E0E7FF'} />
+                <Text style={[styles.inlineEditButtonText, { color: isDark ? '#A1A1AA' : '#E0E7FF' }]}>
+                  Cancelar
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.inlineEditButton,
+                  styles.inlineEditSaveButton,
+                  { backgroundColor: isDark ? colors.primary : '#FFFFFF' },
+                ]}
+                onPress={handleConfirmEdit}
+                activeOpacity={0.7}
+                accessibilityLabel="Salvar e reenviar mensagem"
+              >
+                <MaterialIcons
+                  name="send"
+                  size={14}
+                  color={isDark ? colors.onPrimary : colors.primary}
+                />
+                <Text
+                  style={[
+                    styles.inlineEditButtonText,
+                    { color: isDark ? colors.onPrimary : colors.primary, fontWeight: '700' },
+                  ]}
+                >
+                  Salvar e Enviar
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : (
+          <View style={message.id.includes('audio') ? styles.voiceTextRow : undefined}>
+            {message.id.includes('audio') && (
+              <MaterialIcons
+                name="mic"
+                size={16}
+                color={isUser ? (isDark ? '#FAFAFA' : '#FFFFFF') : colors.primary}
+                style={{ marginRight: 6, marginTop: 2 }}
+              />
+            )}
+            <FormattedChatMessageText
+              text={message.text}
+              isUser={isUser}
+              textColor={isUser ? (isDark ? '#FAFAFA' : '#FFFFFF') : colors.onSurface}
+              style={[
+                styles.messageText,
+                message.id.includes('audio') && { flexShrink: 1 },
+                isUser ? styles.messageTextUser : styles.messageTextVito,
+              ]}
+            />
+          </View>
+        )}
 
         {/* Cards Estruturados Modulares */}
         {message.event && <EventInlineCard event={message.event} />}
@@ -253,10 +343,11 @@ export const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
           )}
 
           {/* Botão Editar Mensagem do Usuário */}
-          {isUser && onEditMessage && (
+          {isUser && (onSaveEdit || onEditMessage) && !isEditing && (
             <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => onEditMessage(message.text)}
+              style={[styles.actionButton, disabled && { opacity: 0.5 }]}
+              onPress={handleStartEdit}
+              disabled={disabled}
               hitSlop={tokens.hitSlop.sm}
               activeOpacity={0.7}
               accessibilityLabel="Editar e reenviar mensagem"
@@ -416,5 +507,49 @@ const styles = StyleSheet.create({
   },
   normalLine: {
     lineHeight: 20,
+  },
+  inlineEditContainer: {
+    width: '100%',
+    minWidth: 220,
+    marginTop: 2,
+    marginBottom: 4,
+  },
+  inlineEditInput: {
+    borderWidth: 1,
+    borderRadius: MD3Shapes.medium,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 15,
+    lineHeight: 22,
+    textAlignVertical: 'top',
+    minHeight: 56,
+  },
+  inlineEditActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 8,
+  },
+  inlineEditButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: MD3Shapes.full,
+    gap: 4,
+  },
+  inlineEditCancelButton: {
+    backgroundColor: 'rgba(0, 0, 0, 0.15)',
+  },
+  inlineEditSaveButton: {
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
+  },
+  inlineEditButtonText: {
+    fontSize: 12,
   },
 });

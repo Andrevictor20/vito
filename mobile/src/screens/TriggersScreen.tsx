@@ -157,6 +157,10 @@ export const TriggersScreen: React.FC<{ onOpenExecutiveSummaries?: () => void }>
           visible={editTrigger !== null}
           trigger={editTrigger}
           onClose={() => setEditTrigger(null)}
+          onDelete={async (id) => {
+            await handleDeleteTrigger(id);
+            setReportTrigger(null);
+          }}
           onSave={async (id, updates) => {
             const updated = await handleUpdateTrigger(id, updates);
             if (reportTrigger && reportTrigger.id === id) {
@@ -470,6 +474,7 @@ export const TriggersScreen: React.FC<{ onOpenExecutiveSummaries?: () => void }>
         visible={editTrigger !== null}
         trigger={editTrigger}
         onClose={() => setEditTrigger(null)}
+        onDelete={handleDeleteTrigger}
         onSave={async (id, updates) => {
           await handleUpdateTrigger(id, updates);
         }}

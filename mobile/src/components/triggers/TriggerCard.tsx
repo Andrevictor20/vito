@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, Alert } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, Alert, Platform } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens, MD3Shapes } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
@@ -39,6 +39,14 @@ export const TriggerCard: React.FC<TriggerCardProps> = ({
   const categoryBg = isDark ? categoryMeta.bgDark : categoryMeta.bgLight;
 
   const handleDeletePress = () => {
+    if (Platform.OS === 'web') {
+      const confirmed = typeof window !== 'undefined' ? window.confirm(`Deseja parar de acompanhar "${trigger.title}"?`) : true;
+      if (confirmed) {
+        onDelete(trigger.id);
+      }
+      return;
+    }
+
     Alert.alert(
       'Remover radar',
       `Deseja parar de acompanhar "${trigger.title}"?`,

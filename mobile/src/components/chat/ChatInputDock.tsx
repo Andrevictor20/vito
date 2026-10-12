@@ -41,8 +41,16 @@ export const ChatInputDock: React.FC<ChatInputDockProps> = ({
   const { colors, isDark } = useTheme();
   const canSend = (value.trim().length > 0 || !!selectedImageUri) && !loading;
 
-  // Garante disparo imediato no primeiro toque eliminando duplo clique
+  // Garante disparo confiável sem eventos duplicados
   const isSendingRef = React.useRef(false);
+  const stopReadyTimestampRef = React.useRef(0);
+
+  React.useEffect(() => {
+    if (loading) {
+      stopReadyTimestampRef.current = Date.now() + 600;
+    }
+  }, [loading]);
+
   const handleTriggerSend = () => {
     if (isSendingRef.current || !canSend) return;
     isSendingRef.current = true;
@@ -50,6 +58,12 @@ export const ChatInputDock: React.FC<ChatInputDockProps> = ({
     setTimeout(() => {
       isSendingRef.current = false;
     }, 400);
+  };
+
+  const handleStop = () => {
+    // Ignora cliques residuais que soltaram no mesmo momento da transição de estado
+    if (Date.now() < stopReadyTimestampRef.current) return;
+    onStop?.();
   };
 
   return (
@@ -147,7 +161,7 @@ export const ChatInputDock: React.FC<ChatInputDockProps> = ({
               styles.sendButton,
               { backgroundColor: colors.error || '#EF4444' },
             ]}
-            onPress={onStop}
+            onPress={handleStop}
             activeOpacity={0.8}
             accessibilityLabel="Interromper geração de resposta"
           >
@@ -162,7 +176,6 @@ export const ChatInputDock: React.FC<ChatInputDockProps> = ({
                 : { backgroundColor: colors.surfaceContainerHighest, shadowOpacity: 0, elevation: 0 },
             ]}
             onPress={handleTriggerSend}
-            onPressIn={canSend ? handleTriggerSend : undefined}
             disabled={!canSend}
             activeOpacity={0.8}
             accessibilityLabel="Enviar mensagem"
