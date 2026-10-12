@@ -21,8 +21,8 @@ type Config struct {
 	GoogleClientID     string
 	GoogleClientSecret string
 	GoogleRedirectURL  string
-	DubAPIKey          string
-	DubDomain          string
+	ShortIoAPIKey      string
+	ShortIoDomain      string
 	TurnstileSecretKey string
 	PublicBaseURL      string
 }
@@ -71,6 +71,16 @@ func Load() *Config {
 		googleRedirectURL = "https://vito.rasppi.cloud/api/v1/auth/google/callback"
 	}
 
+	shortIoKey := os.Getenv("SHORTIO_API_KEY")
+	if shortIoKey == "" {
+		shortIoKey = os.Getenv("SHORT_IO_API_KEY")
+	}
+
+	shortIoDomain := os.Getenv("SHORTIO_DOMAIN")
+	if shortIoDomain == "" {
+		shortIoDomain = os.Getenv("SHORT_IO_DOMAIN")
+	}
+
 	return &Config{
 		Port:               port,
 		Environment:        env,
@@ -84,8 +94,8 @@ func Load() *Config {
 		GoogleClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
 		GoogleClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
 		GoogleRedirectURL:  googleRedirectURL,
-		DubAPIKey:          os.Getenv("DUB_API_KEY"),
-		DubDomain:          os.Getenv("DUB_DOMAIN"),
+		ShortIoAPIKey:      shortIoKey,
+		ShortIoDomain:      shortIoDomain,
 		TurnstileSecretKey: os.Getenv("CLOUDFLARE_TURNSTILE_SECRET_KEY"),
 		PublicBaseURL:      os.Getenv("PUBLIC_BASE_URL"),
 	}

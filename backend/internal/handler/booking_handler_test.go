@@ -56,7 +56,7 @@ func setupBookingHandlerTest(t *testing.T) (*chi.Mux, *domain.User, *domain.Book
 	}
 	_ = bookingRepo.CreateType(bt)
 
-	shortener := service.NewDubShortenerService("", "http://localhost:8080")
+	shortener := service.NewShortIoShortenerService("", "", "http://localhost:8080")
 	turnstile := service.NewTurnstileValidator("") // bypass em teste
 
 	bookingSvc := service.NewBookingService(

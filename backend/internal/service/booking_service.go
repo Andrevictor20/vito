@@ -40,7 +40,7 @@ type BookingService struct {
 	eventRepo       domain.EventRepository
 	userRepo        domain.UserRepository
 	notificationSvc *NotificationService
-	shortener       *DubShortenerService
+	shortener       LinkShortener
 	turnstile       *TurnstileValidator
 	publicBaseURL   string
 	sanitizer       *bluemonday.Policy
@@ -53,7 +53,7 @@ func NewBookingService(
 	eventRepo domain.EventRepository,
 	userRepo domain.UserRepository,
 	notificationSvc *NotificationService,
-	shortener *DubShortenerService,
+	shortener LinkShortener,
 	turnstile *TurnstileValidator,
 	publicBaseURL string,
 ) *BookingService {

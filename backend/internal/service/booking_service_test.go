@@ -46,7 +46,7 @@ func setupBookingTest(t *testing.T) *bookingTestContext {
 		t.Fatalf("erro ao criar usuário: %v", err)
 	}
 
-	shortener := service.NewDubShortenerService("", "http://localhost:8080")
+	shortener := service.NewShortIoShortenerService("", "", "http://localhost:8080")
 	turnstile := service.NewTurnstileValidator("") // bypass em teste
 
 	bookingSvc := service.NewBookingService(

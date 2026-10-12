@@ -156,12 +156,9 @@ func main() {
 	aiSettingsHandler := handler.NewAISettingsHandler(aiSettingsRepo)
 	pendingHandler := handler.NewPendingHandler(pendingSvc)
 
-	dubShortener := service.NewDubShortenerService(cfg.DubAPIKey, cfg.PublicBaseURL)
-	if cfg.DubDomain != "" {
-		dubShortener.SetDomain(cfg.DubDomain)
-	}
+	linkShortener := service.NewShortIoShortenerService(cfg.ShortIoAPIKey, cfg.ShortIoDomain, cfg.PublicBaseURL)
 	turnstileValidator := service.NewTurnstileValidator(cfg.TurnstileSecretKey)
-	bookingSvc := service.NewBookingService(bookingRepo, eventRepo, userRepo, notifSvc, dubShortener, turnstileValidator, cfg.PublicBaseURL)
+	bookingSvc := service.NewBookingService(bookingRepo, eventRepo, userRepo, notifSvc, linkShortener, turnstileValidator, cfg.PublicBaseURL)
 	astSvc.SetBookingService(bookingSvc)
 	bookingHandler := handler.NewBookingHandler(bookingSvc)
 	chatSvc := service.NewChatService(chatRepo)

@@ -49,11 +49,7 @@ try {
 const sanitizeBookingUrl = (raw?: string, slug?: string): string => {
   const cleanSlug = slug ? slug.toLowerCase().replace(/[^a-z0-9-]/g, '-') : '';
   const canonicalFallback = cleanSlug ? `https://vito.rasppi.cloud/book/${cleanSlug}` : 'https://vito.rasppi.cloud/book';
-  if (!raw) return canonicalFallback;
-  // Evita URLs artificiais de cal.link ou ferramentas do Dub que redirecionam para a landing page
-  if (raw.includes('dub.co/tools') || raw.includes('cal.link')) {
-    return canonicalFallback;
-  }
+  if (!raw || !raw.trim()) return canonicalFallback;
   return raw;
 };
 

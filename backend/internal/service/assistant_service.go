@@ -508,7 +508,7 @@ func (s *AssistantService) Process(ctx context.Context, userID string, input ai.
 				res.Message = fmt.Sprintf("Não consegui gerar o link de agendamento no momento (%v). Você também pode criá-lo pelo menu Vito Booking.", err)
 			} else {
 				linkURL := bt.ShortURL
-				if linkURL == "" || strings.Contains(linkURL, "dub.co/tools") {
+				if linkURL == "" {
 					linkURL = bt.PublicURL
 				}
 				res.Message = fmt.Sprintf("Criei o seu link de agendamento para '%s' (%d min):\n%s", bt.Title, bt.DurationMinutes, linkURL)
