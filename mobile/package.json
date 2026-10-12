@@ -7,7 +7,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "test": "tsx --test src/utils/pagerNavigation.test.ts src/utils/calendarDateUtils.test.ts src/utils/chatActions.test.ts"
+    "test": "tsx --test src/utils/pagerNavigation.test.ts src/utils/calendarDateUtils.test.ts src/utils/chatActions.test.ts src/utils/notificationReconcile.test.ts"
   },
   "dependencies": {
     "@expo-google-fonts/inter": "^0.4.2",

@@ -9,6 +9,20 @@ import (
 	"github.com/andrevmp/vito/backend/internal/domain"
 )
 
+func parseBookingDBTime(v any) time.Time {
+	switch t := v.(type) {
+	case time.Time:
+		return t.UTC()
+	case string:
+		for _, layout := range []string{time.RFC3339, "2006-01-02 15:04:05", "2006-01-02T15:04:05Z07:00", "2006-01-02 15:04:05.999999999-07:00"} {
+			if parsed, err := time.Parse(layout, t); err == nil {
+				return parsed.UTC()
+			}
+		}
+	}
+	return time.Time{}
+}
+
 // BookingRepositorySQLite implementa domain.BookingRepository sobre SQLite.
 type BookingRepositorySQLite struct {
 	db *sql.DB
@@ -277,19 +291,41 @@ func (r *BookingRepositorySQLite) CheckSlotConflict(userID string, startAt, endA
 	startBuf := startAt.Add(-time.Duration(bufferMinutes) * time.Minute).UTC()
 	endBuf := endAt.Add(time.Duration(bufferMinutes) * time.Minute).UTC()
 
-	// 1. Checa conflito na tabela de eventos da agenda pessoal
+	// 1. Checa conflito na agenda pessoal IGNORANDO feriados e all-day (>=20h).
+	// Feriados (inclusive importados do Google) nunca bloqueiam booking — decisão P2.
 	eventQuery := `
-		SELECT COUNT(*) FROM events
+		SELECT id, title, category, start_at, end_at, description
+		FROM events
 		WHERE user_id = ?
 		  AND start_at < ?
 		  AND end_at > ?
+		  AND LOWER(COALESCE(category,'')) NOT IN ('holiday','feriado')
 	`
-	var eventCount int
-	if err := r.db.QueryRow(eventQuery, userID, endBuf, startBuf).Scan(&eventCount); err != nil {
+	rows, err := r.db.Query(eventQuery, userID, endBuf, startBuf)
+	if err != nil {
 		return false, err
 	}
-	if eventCount > 0 {
+	defer rows.Close()
+	for rows.Next() {
+		var cid, title, category, rawStart, rawEnd, desc string
+		if err := rows.Scan(&cid, &title, &category, &rawStart, &rawEnd, &desc); err != nil {
+			continue
+		}
+		combined := strings.ToLower(title + " " + desc)
+		if strings.Contains(combined, "feriado") || strings.Contains(combined, "holiday") ||
+			strings.Contains(combined, "natal") || strings.Contains(combined, "ano novo") ||
+			strings.Contains(combined, "carnaval") || strings.Contains(combined, "tiradentes") {
+			continue
+		}
+		startEv := parseBookingDBTime(rawStart)
+		endEv := parseBookingDBTime(rawEnd)
+		if endEv.Sub(startEv) >= 20*time.Hour {
+			continue
+		}
 		return true, nil
+	}
+	if err := rows.Err(); err != nil {
+		return false, err
 	}
 
 	// 2. Checa conflito na tabela de agendamentos de booking ativos

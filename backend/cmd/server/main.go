@@ -162,6 +162,7 @@ func main() {
 	linkShortener := service.NewShortIoShortenerService(cfg.ShortIoAPIKey, cfg.ShortIoDomain, cfg.PublicBaseURL)
 	turnstileValidator := service.NewTurnstileValidator(cfg.TurnstileSecretKey)
 	bookingSvc := service.NewBookingService(bookingRepo, eventRepo, userRepo, notifSvc, linkShortener, turnstileValidator, cfg.PublicBaseURL)
+	bookingSvc.SetSyncPusher(syncSvc)
 	astSvc.SetBookingService(bookingSvc)
 	bookingHandler := handler.NewBookingHandler(bookingSvc)
 	chatSvc := service.NewChatService(chatRepo)

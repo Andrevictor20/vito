@@ -47,6 +47,8 @@ export function useHomeData(currentUserId?: string) {
       setTodos(fetchedTodos || []);
       AsyncStorage.setItem(cacheKeys.eventsKey, JSON.stringify(fetchedEvents || [])).catch(() => {});
       AsyncStorage.setItem(cacheKeys.todosKey, JSON.stringify(fetchedTodos || [])).catch(() => {});
+      // Purga órfãos primeiro (série deletada / Google inbound / outro device), depois reagenda.
+      notificationService.reconcileOrphanReminders(fetchedEvents || [], fetchedTodos || []).catch(() => {});
       if ((fetchedEvents && fetchedEvents.length > 0) || (fetchedTodos && fetchedTodos.length > 0)) {
         notificationService.scheduleAllUpcomingReminders(fetchedEvents || [], fetchedTodos || []).catch(() => {});
       }
@@ -158,8 +160,17 @@ export function useHomeData(currentUserId?: string) {
   const handleDeleteEvent = async (id: string, allSeries: boolean = false) => {
     try {
       const targetEvent = events.find((e) => e.id === id);
+      // Coleta TODOS os ids da série antes de apagar para purge total de notificações.
+      let seriesIds: string[] = [id];
+      if (allSeries && targetEvent) {
+        const targetTitle = targetEvent.title.trim().toLowerCase();
+        seriesIds = events
+          .filter((e) => e.title.trim().toLowerCase() === targetTitle || e.id === id)
+          .map((e) => e.id);
+        if (seriesIds.length === 0) seriesIds = [id];
+      }
       await api.deleteEvent(id, allSeries);
-      notificationService.cancelEventReminder(id).catch(() => {});
+      notificationService.cancelEventReminders(seriesIds).catch(() => {});
       setEvents((prev) => {
         let next: Event[];
         if (allSeries && targetEvent) {
@@ -169,6 +180,8 @@ export function useHomeData(currentUserId?: string) {
           next = prev.filter((e) => e.id !== id);
         }
         AsyncStorage.setItem(cacheKeys.eventsKey, JSON.stringify(next)).catch(() => {});
+        // Reconcilia órfãos com a lista resultante para garantir zero fantasma.
+        notificationService.reconcileOrphanReminders(next, todos).catch(() => {});
         return next;
       });
       // Revalida em background para garantir integridade com o backend

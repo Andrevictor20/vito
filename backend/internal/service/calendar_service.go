@@ -181,15 +181,31 @@ func (s *CalendarService) DeleteEvent(id, userID string) error {
 }
 
 // DeleteEventWithOption remove um evento individual ou toda a série recorrente.
+// Com allSeries=true apaga TUDO (backend + Google + mappings) para não restar notificação órfã.
 func (s *CalendarService) DeleteEventWithOption(id, userID string, allSeries bool) (int, error) {
+	if allSeries {
+		// Lista IDs da série ANTES de apagar para propagar cada um ao Google.
+		orig, err := s.eventRepo.GetByID(id, userID)
+		if err != nil {
+			return 0, err
+		}
+		from := time.Now().Add(-60 * 24 * time.Hour)
+		to := time.Now().Add(180 * 24 * time.Hour)
+		if events, listErr := s.eventRepo.ListByUser(userID, from, to); listErr == nil && s.syncPusher != nil {
+			for _, ev := range events {
+				if strings.EqualFold(strings.TrimSpace(ev.Title), strings.TrimSpace(orig.Title)) {
+					ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+					_ = s.syncPusher.DeleteEvent(ctx, userID, ev.ID)
+					cancel()
+				}
+			}
+		}
+		return s.eventRepo.DeleteSeries(id, userID)
+	}
 	if s.syncPusher != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		_ = s.syncPusher.DeleteEvent(ctx, userID, id)
 		cancel()
-	}
-
-	if allSeries {
-		return s.eventRepo.DeleteSeries(id, userID)
 	}
 	err := s.eventRepo.Delete(id, userID)
 	if err != nil {

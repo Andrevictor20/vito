@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
 	"sync"
@@ -15,6 +16,13 @@ import (
 
 	"github.com/andrevmp/vito/backend/internal/domain"
 )
+
+// BookingSyncPusher propaga eventos de booking para agendas remotas (Google/Apple).
+// Implementado por CalendarSyncService; interface local evita ciclo de import.
+type BookingSyncPusher interface {
+	PushEvent(ctx context.Context, userID string, event *domain.Event) error
+	DeleteEvent(ctx context.Context, userID, eventID string) error
+}
 
 // ReserveRequest contém os dados da reserva submetida por um convidado.
 type ReserveRequest struct {
@@ -44,7 +52,13 @@ type BookingService struct {
 	turnstile       *TurnstileValidator
 	publicBaseURL   string
 	sanitizer       *bluemonday.Policy
+	syncPusher      BookingSyncPusher
 	lockMu          sync.Mutex
+}
+
+// SetSyncPusher registra o propagador para sync total bidirecional com Google/Apple.
+func (s *BookingService) SetSyncPusher(pusher BookingSyncPusher) {
+	s.syncPusher = pusher
 }
 
 // NewBookingService instancia o serviço de booking.
@@ -90,7 +104,7 @@ func (s *BookingService) CreateBookingType(ctx context.Context, userID string, b
 		bt.EndHour = "18:00"
 	}
 	if bt.DaysOfWeek == "" {
-		bt.DaysOfWeek = "[1,2,3,4,5]"
+		bt.DaysOfWeek = "[1,2,3,4,5,6,7]"
 	}
 	if bt.ID == "" {
 		bt.ID = uuid.New().String()
@@ -296,6 +310,18 @@ func (s *BookingService) ReserveAppointment(ctx context.Context, userIdentifier,
 		return nil, fmt.Errorf("falha ao sincronizar com agenda do anfitrião: %w", err)
 	}
 
+	// 4b. Sync total bidirecional: propaga imediatamente para Google/Apple (fire-and-forget).
+	if s.syncPusher != nil {
+		evCopy := *event
+		go func(evt *domain.Event) {
+			pctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			if err := s.syncPusher.PushEvent(pctx, bt.UserID, evt); err != nil {
+				log.Printf("[BookingService] Falha ao propagar reserva '%s' para agenda remota: %v", evt.Title, err)
+			}
+		}(&evCopy)
+	}
+
 	// 5. Criação do Agendamento
 	appt := &domain.BookingAppointment{
 		ID:            uuid.New().String(),
@@ -355,6 +381,11 @@ func (s *BookingService) CancelAppointment(ctx context.Context, userID, id strin
 		return err
 	}
 	if appt.EventID != "" {
+		if s.syncPusher != nil {
+			pctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			_ = s.syncPusher.DeleteEvent(pctx, userID, appt.EventID)
+			cancel()
+		}
 		_ = s.eventRepo.Delete(appt.EventID, userID)
 	}
 	return s.bookingRepo.DeleteAppointment(id, userID)

@@ -363,10 +363,11 @@ func (s *CalendarSyncService) SyncIntegration(ctx context.Context, userID, provi
 		}
 	}
 
-	// 2.1 Outbound Sync: propaga eventos locais do Vito sem mapeamento no Google
+	// 2.1 Outbound Sync: propaga eventos locais do Vito sem mapeamento no Google.
+	// Fontes locais sincronizáveis: "" (legado), "vito" e "vito_booking" (sync total).
 	localEvents, _ := s.eventRepo.ListByUser(userID, from, to)
 	for _, le := range localEvents {
-		if le.Source != "" && le.Source != "vito" {
+		if le.Source != "" && le.Source != "vito" && le.Source != "vito_booking" {
 			continue // evento importado de outro provedor externo
 		}
 		existingMap, _ := s.syncRepo.GetMappingByEventID(le.ID, providerName)

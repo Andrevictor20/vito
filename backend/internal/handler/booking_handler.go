@@ -393,7 +393,7 @@ const bookingPageHTMLTemplate = `<!DOCTYPE html>
       for (let i = 0; i < 14; i++) {
         const d = new Date(today);
         d.setDate(today.getDate() + i);
-        if (d.getDay() === 0 || d.getDay() === 6) continue; // Pula finais de semana
+        // 7 dias por decisão P2: booking vale sábado, domingo e feriados; backend filtra via DaysOfWeek.
         const btn = document.createElement('button');
         btn.className = 'date-btn' + (i === 0 ? ' active' : '');
         btn.innerHTML = '<span class="weekday">' + d.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '') + '</span><span class="day">' + d.getDate() + '</span>';

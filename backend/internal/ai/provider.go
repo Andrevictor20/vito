@@ -106,6 +106,7 @@ type ParsedBooking struct {
 	BufferMinutes   int    `json:"buffer_minutes,omitempty"`
 	StartHour       string `json:"start_hour,omitempty"`
 	EndHour         string `json:"end_hour,omitempty"`
+	DaysOfWeek      string `json:"days_of_week,omitempty"`
 	TargetQuery     string `json:"target_query,omitempty"`
 }
 

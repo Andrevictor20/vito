@@ -217,6 +217,23 @@ func (s *AssistantService) Process(ctx context.Context, userID string, input ai.
 		return nil, fmt.Errorf("falha ao interpretar comando com IA: %w", err)
 	}
 
+	// Coerção resiliente: se o texto pede booking por sinônimo mas a IA retornou CREATE_EVENT,
+	// corrige para CREATE_BOOKING_LINK para criação direta sem fricção.
+	if intent.Action == ai.ActionCreateEvent && intent.Event != nil && s.bookingSvc != nil {
+		if isBookingIntentText(input.Text) {
+			intent.Action = ai.ActionCreateBookingLink
+			if intent.Booking == nil {
+				intent.Booking = &ai.ParsedBooking{}
+			}
+			if intent.Booking.Title == "" {
+				intent.Booking.Title = intent.Event.Title
+			}
+			if intent.Booking.Description == "" {
+				intent.Booking.Description = intent.Event.Description
+			}
+		}
+	}
+
 	// Aprendizado contínuo autônomo: se a IA captou um fato/preferência/rotina, grava de forma perene no SQLite
 	if s.memoryRepo != nil && strings.TrimSpace(intent.MemoryContent) != "" {
 		s.persistLearnedMemory(userID, intent.MemoryCategory, intent.MemoryContent)
@@ -497,6 +514,10 @@ func (s *AssistantService) Process(ctx context.Context, userID string, input ai.
 				}
 				slug = fmt.Sprintf("%s-%d", slug, time.Now().Unix()%10000)
 			}
+			dow := strings.TrimSpace(intent.Booking.DaysOfWeek)
+			if dow == "" {
+				dow = inferBookingDaysOfWeek(input.Text)
+			}
 			bt, err := s.bookingSvc.CreateBookingType(ctx, userID, &domain.BookingType{
 				Title:           title,
 				Slug:            slug,
@@ -505,7 +526,7 @@ func (s *AssistantService) Process(ctx context.Context, userID string, input ai.
 				BufferMinutes:   buf,
 				StartHour:       sh,
 				EndHour:         eh,
-				DaysOfWeek:      "[1,2,3,4,5]",
+				DaysOfWeek:      dow,
 			})
 			if err != nil {
 				log.Printf("⚠️ [AssistantService] Erro ao criar booking type via chat: %v", err)
@@ -596,4 +617,43 @@ func userLocation(timezone string) *time.Location {
 		}
 	}
 	return time.FixedZone("BRT", -3*3600)
+}
+
+// isBookingIntentText detecta pedido de link de agendamento por sinônimos diretos.
+func isBookingIntentText(text string) bool {
+	t := strings.ToLower(text)
+	syns := []string{
+		"booking", "link de agendamento", "link para agendar", "link de marcacao",
+		"link de marcação", "disponibilizar horário", "disponibilizar horario",
+		"disponibilize horário", "disponibilize horario", "agenda aberta",
+		"marquem comigo", "marque comigo", "deixe marcarem", "horário comercial",
+		"horario comercial", "janela de atendimento", "criar agenda de",
+	}
+	for _, s := range syns {
+		if strings.Contains(t, s) {
+			return true
+		}
+	}
+	return false
+}
+
+// ExportedIsBookingIntentText expõe isBookingIntentText para testes de regressão.
+func ExportedIsBookingIntentText(text string) bool { return isBookingIntentText(text) }
+
+// ExportedInferBookingDays expõe inferBookingDaysOfWeek para testes de regressão.
+func ExportedInferBookingDays(text string) string { return inferBookingDaysOfWeek(text) }
+
+// inferBookingDaysOfWeek deriva a janela semanal; default 7 dias (inclui fds e feriados).
+func inferBookingDaysOfWeek(text string) string {
+	t := strings.ToLower(text)
+	if strings.Contains(t, "só fim de semana") || strings.Contains(t, "so fim de semana") ||
+		strings.Contains(t, "apenas fim de semana") || strings.Contains(t, "somente fim de semana") {
+		return "[6,7]"
+	}
+	if strings.Contains(t, "só dias úteis") || strings.Contains(t, "so dias uteis") ||
+		strings.Contains(t, "apenas dias úteis") || strings.Contains(t, "dias uteis") ||
+		strings.Contains(t, "segunda a sexta") || strings.Contains(t, "seg a sex") {
+		return "[1,2,3,4,5]"
+	}
+	return "[1,2,3,4,5,6,7]"
 }

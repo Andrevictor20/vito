@@ -4,6 +4,7 @@ import { secureStorage } from './secureStore';
 import { api } from './api';
 import { NotificationPriority, NotificationSettings, ScheduleNotificationParams, Event } from '../types';
 import { isAllDayEvent } from '../utils/calendarDateUtils';
+import { findOrphanNotificationIds } from '../utils/notificationReconcile';
 
 const SETTINGS_STORAGE_KEY = '@vito_notification_settings';
 const PUSH_TOKEN_SECURE_KEY = '@vito_push_token';
@@ -12,6 +13,8 @@ const PROMPTED_ONCE_KEY = '@vito_notification_prompted_once';
 // Registro de idempotência em memória para alertas adaptativos em cima da hora
 const notifiedAdaptiveEventIds = new Set<string>();
 const notifiedAdaptiveTodoIds = new Set<string>();
+
+export { findOrphanNotificationIds };
 
 export function getNotificationContextEmoji(title: string, category?: string): string | null {
   const t = title.toLowerCase();
@@ -678,6 +681,53 @@ export const notificationService = {
       this.cancelNotification(`event-reminder-adv-${eventId}`),
       this.cancelNotification(`event-reminder-start-${eventId}`),
     ]);
+  },
+
+  /**
+   * Purga órfãos: cancela agendados locais cujo eventId/todoId não existe mais no backend.
+   * Cobre série excluída (N ids), delete via chat/outro device e cancel via Google inbound.
+   */
+  async reconcileOrphanReminders(
+    fetchedEvents: Array<{ id: string }>,
+    fetchedTodos?: Array<{ id: string; status?: string }>,
+  ): Promise<number> {
+    if (!this.isAvailable()) return 0;
+    try {
+      const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+      if (!Array.isArray(scheduled) || scheduled.length === 0) return 0;
+      const validEvents = new Set((fetchedEvents || []).map((e) => e.id));
+      const validTodos = new Set(
+        (fetchedTodos || []).filter((t) => t.status !== 'completed').map((t) => t.id),
+      );
+      const orphans = findOrphanNotificationIds(scheduled as any, validEvents, validTodos);
+      const orphanSet = new Set(orphans);
+      let purged = 0;
+      for (const n of scheduled) {
+        const data: any = (n as any)?.content?.data || {};
+        const eventId: string | undefined = data.eventId;
+        const todoId: string | undefined = data.todoId;
+        const identifier: string | undefined = (n as any)?.identifier;
+        if (identifier && orphanSet.has(identifier)) {
+          try {
+            await Notifications.cancelScheduledNotificationAsync(identifier);
+            if (eventId) notifiedAdaptiveEventIds.delete(eventId);
+            if (todoId) notifiedAdaptiveTodoIds.delete(todoId);
+            purged++;
+          } catch {}
+        }
+      }
+      return purged;
+    } catch {
+      return 0;
+    }
+  },
+
+  /**
+   * Cancela em lote (série): garante que nenhum id da série volte a notificar.
+   */
+  async cancelEventReminders(eventIds: string[]): Promise<void> {
+    if (!this.isAvailable() || !Array.isArray(eventIds)) return;
+    await Promise.all(eventIds.map((id) => this.cancelEventReminder(id)));
   },
 
   /**
