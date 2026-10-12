@@ -178,15 +178,40 @@ func (p *OpenAICompatProvider) EvaluateTrigger(ctx context.Context, t *domain.Tr
 		return nil, errors.New("chave de api não configurada para " + p.providerName)
 	}
 
-	systemPrompt := `Você é o Vito, assistente de inteligência autônoma e monitoramento executivo do usuário.
-Sua missão é avaliar uma vigília/radar cadastrado pelo usuário e trazer as NOTÍCIAS MAIS RECENTES sobre o tema (estilo Google Notícias), nunca um panorama genérico.
+	now := time.Now()
+	nowStr := now.Format("02/01/2006 às 15:04")
+	currentMonthYear := now.Format("01/2006")
+
+	var realtimeFeed string
+	searchQuery := t.Query
+	if strings.TrimSpace(searchQuery) == "" {
+		searchQuery = t.Title
+	}
+	if items, err := FetchGoogleNews(ctx, searchQuery, 6, p.httpClient); err == nil && len(items) > 0 {
+		realtimeFeed = FormatNewsFeed(items)
+	} else if items, err := FetchGoogleNews(ctx, t.Title, 6, p.httpClient); err == nil && len(items) > 0 {
+		realtimeFeed = FormatNewsFeed(items)
+	}
+
+	realtimeBlock := ""
+	if realtimeFeed != "" {
+		realtimeBlock = fmt.Sprintf("\nNOTÍCIAS FACTUAIS COLETADAS EM TEMPO REAL NA WEB (GOOGLE NOTÍCIAS):\n%s\n", realtimeFeed)
+	}
+
+	systemPrompt := fmt.Sprintf(`Você é o Vito, assistente de inteligência autônoma e monitoramento executivo do usuário.
+Sua missão é avaliar uma vigília/radar cadastrado pelo usuário e trazer as NOTÍCIAS MAIS RECENTES sobre o tema (estilo Google Notícias), nunca um panorama genérico ou histórico.
+DATA ATUAL DO SISTEMA: %s (Mês/Ano: %s).
+ATENÇÃO CRÍTICA À ATUALIDADE:
+- As notícias do radar DEVEM ser estritamente deste mês (%s) ou dos últimos dias.
+- NUNCA traga notícias antigas de meses anteriores (como maio, junho, etc.).
+- Se houver notícias reais fornecidas no prompt do usuário, baseie sua resposta ('current_data' e 'summary') OBRIGATORIAMENTE nelas.
 Responda EXCLUSIVAMENTE em formato JSON puro, sem markdown delimitador nem explicações fora do JSON:
 {
   "condition_met": true,
   "current_data": "3 a 6 linhas no formato '— DD/MM · Manchete curta: detalhe concreto (placar, número, decisão)', da mais recente para a mais antiga; opcionalmente uma última linha 'Próximo: DD/MM HH:MM · evento'. Sem introduções institucionais, sem calendário completo, máximo ~120 palavras",
   "summary": "manchete da notícia mais importante e recente em 1 frase",
   "simulated_notification": "título curto e impactante da notificação de alerta"
-}`
+}`, nowStr, currentMonthYear, currentMonthYear)
 
 	userPrompt := fmt.Sprintf(`Avalie esta vigília/radar do usuário:
 - Título: %s
@@ -194,9 +219,10 @@ Responda EXCLUSIVAMENTE em formato JSON puro, sem markdown delimitador nem expli
 - Consulta/Busca: %s
 - Condição/Alvo: %s
 - Tipo de Condição: %s
-
-Analise o cenário, verifique se a condição foi atingida ou se há fatos relevantes atualizados e elabore o relatório executivo completo em JSON puro.`,
-		t.Title, t.Category, t.Query, t.TargetValue, t.ConditionType,
+- Data de Referência: %s
+%s
+Analise o cenário, verifique se a condição foi atingida ou se há fatos relevantes atualizados e elabore o relatório executivo completo em JSON puro baseado nos fatos mais recentes.`,
+		t.Title, t.Category, t.Query, t.TargetValue, t.ConditionType, nowStr, realtimeBlock,
 	)
 
 	reqBody := openAIChatRequest{

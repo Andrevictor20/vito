@@ -304,13 +304,37 @@ func (p *GeminiProvider) TestEvaluateTrigger(ctx context.Context, t *domain.Trig
 		base = "https://generativelanguage.googleapis.com"
 	}
 
-	nowStr := time.Now().Format("02/01/2006 15:04")
+	now := time.Now()
+	nowStr := now.Format("02/01/2006 às 15:04")
+	currentMonthYear := now.Format("01/2006")
+
+	var realtimeFeed string
+	searchQuery := t.Query
+	if strings.TrimSpace(searchQuery) == "" {
+		searchQuery = t.Title
+	}
+	if items, err := FetchGoogleNews(ctx, searchQuery, 6, p.httpClient); err == nil && len(items) > 0 {
+		realtimeFeed = FormatNewsFeed(items)
+	} else if items, err := FetchGoogleNews(ctx, t.Title, 6, p.httpClient); err == nil && len(items) > 0 {
+		realtimeFeed = FormatNewsFeed(items)
+	}
+
+	realtimeBlock := ""
+	if realtimeFeed != "" {
+		realtimeBlock = fmt.Sprintf("\nNOTÍCIAS FACTUAIS COLETADAS EM TEMPO REAL NA WEB (GOOGLE NOTÍCIAS):\n%s\n", realtimeFeed)
+	}
+
 	promptText := fmt.Sprintf(`Você é o motor de inteligência e vigília proativa do assistente executivo Vito.
 Avalie em tempo real este radar de monitoramento consultando dados atualizados da web:
 - TÍTULO: %s
 - CONSULTA / VIGÍLIA: %s
 - CATEGORIA: %s
-- DATA/HORA DE REFERÊNCIA: %s
+- DATA/HORA DE REFERÊNCIA: %s (Mês/Ano Atual: %s)
+%s
+DIRETRIZES DE ATUALIDADE E RIGOR TEMPORAL:
+1. ATENÇÃO MÁXIMA AO CALENDÁRIO: Estamos em %s. As notícias DEVEM ser deste mês corrente ou das últimas horas/dias.
+2. É TERMINANTEMENTE PROIBIDO trazer notícias de meses passados (como maio, junho, etc.). Se buscar na web, restrinja expressamente as buscas a notícias recentes do mês atual (%s).
+3. Se houver notícias coletadas em tempo real fornecidas acima, utilize-as OBRIGATORIAMENTE como a principal fonte factual para o "current_data" e "summary".
 
 Diretrizes de Conteúdo (estilo Google Notícias — o que ACONTECEU de novo, não um panorama):
 1. "current_data": Feed de notícias recentes, do mais novo para o mais antigo. Formato OBRIGATÓRIO, 3 a 6 itens, um por linha:
@@ -327,7 +351,7 @@ Responda ESTRITAMENTE em formato JSON puro (sem marcações markdown extras):
   "current_data": string,
   "summary": string,
   "simulated_notification": string
-}`, t.Title, t.Query, t.Category, nowStr)
+}`, t.Title, t.Query, t.Category, nowStr, currentMonthYear, realtimeBlock, currentMonthYear, currentMonthYear)
 
 	// Modelos prioritários com fallback resiliente para Grounding e geração
 	modelsToTry := []string{p.model}

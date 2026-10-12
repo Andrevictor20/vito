@@ -67,13 +67,39 @@ export function useChat(onDataChanged?: () => void, currentUserId?: string) {
         if (storedSessions) {
           const parsed = JSON.parse(storedSessions) as ConversationSession[];
           if (Array.isArray(parsed) && parsed.length > 0) {
-            localSessions = parsed;
-            setSessions(parsed);
-            const active = parsed.find((s) => s.id === storedActiveId) || parsed[0];
-            setActiveSessionId(active.id);
-            activeSessionIdRef.current = active.id;
-            const cleanMsgs = (active.messages || []).filter((m) => m.id !== 'msg-initial');
-            setMessages(cleanMsgs);
+            // Regra: Ao abrir o app, SEMPRE abrir em uma nova conversa limpa
+            // Se a primeira conversa já for uma conversa vazia sem mensagens, reutiliza-a
+            const firstSession = parsed[0];
+            const hasCleanEmptySession = firstSession && (!firstSession.messages || firstSession.messages.length === 0);
+
+            if (hasCleanEmptySession) {
+              localSessions = parsed;
+              setSessions(parsed);
+              setActiveSessionId(firstSession.id);
+              activeSessionIdRef.current = firstSession.id;
+              setMessages([]);
+            } else {
+              const newId = `conv-${Date.now()}`;
+              const newSession: ConversationSession = {
+                id: newId,
+                title: 'Nova Conversa',
+                preview: 'Nova conversa',
+                timestamp: new Date().toISOString(),
+                messages: [],
+              };
+              const filtered = parsed.filter(
+                (s) => (s.messages || []).length > 0 || (s.title !== 'Nova Conversa' && s.title !== 'Conversa Atual')
+              );
+              localSessions = [newSession, ...filtered];
+              setSessions(localSessions);
+              setActiveSessionId(newId);
+              activeSessionIdRef.current = newId;
+              setMessages([]);
+
+              await AsyncStorage.setItem(sessionsKey, JSON.stringify(localSessions));
+              await AsyncStorage.setItem(activeIdKey, newId);
+              await AsyncStorage.setItem(chatKey, JSON.stringify([]));
+            }
           }
         }
 
