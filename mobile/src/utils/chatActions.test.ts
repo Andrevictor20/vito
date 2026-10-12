@@ -1,11 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  preparePlainTextForCopy,
-  prepareEditDraft,
-  isAbortError,
-  truncateMessagesForEdit,
-} from './chatActions';
+// @ts-ignore
+import { preparePlainTextForCopy, prepareEditDraft, isAbortError, truncateMessagesForEdit } from './chatActions';
 
 describe('Chat Modern Actions (TDD - AC-01 a AC-04)', () => {
   describe('AC-01: preparePlainTextForCopy', () => {
