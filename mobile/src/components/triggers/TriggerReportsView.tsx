@@ -445,9 +445,9 @@ export const TriggerReportsView: React.FC<TriggerReportsViewProps> = ({
                 ]}
               >
                 <View style={styles.reportContentHeader}>
-                  <MaterialIcons name="travel-explore" size={16} color={colors.primary} />
+                  <MaterialIcons name="newspaper" size={16} color={colors.primary} />
                   <Text style={[styles.reportContentLabel, { color: colors.primary }]}>
-                    Panorama de Inteligência
+                    Radar de Notícias & Fatos
                   </Text>
                 </View>
                 <Text style={[styles.expandedReportText, { color: colors.onSurface }]}>

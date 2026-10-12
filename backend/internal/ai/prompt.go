@@ -29,16 +29,17 @@ func WeekdayPT(wd time.Weekday) string {
 	}
 }
 
-// BuildCalendarReferenceTable gera a tabela com a relação exata de datas e dias da semana para os próximos 14 dias.
+// BuildCalendarReferenceTable gera a tabela com a relação exata de datas e dias da semana para os próximos 31 dias.
 func BuildCalendarReferenceTable(nowLocal time.Time) string {
 	var sb strings.Builder
-	sb.WriteString("\nCALENDÁRIO OFICIAL DE REFERÊNCIA (PRÓXIMOS 14 DIAS — RELAÇÃO EXATA DATA E DIA DA SEMANA):\n")
-	for i := 0; i < 14; i++ {
+	sb.WriteString("\nCALENDÁRIO OFICIAL DE REFERÊNCIA (PRÓXIMOS 31 DIAS — RELAÇÃO EXATA DATA E DIA DA SEMANA):\n")
+	for i := 0; i < 31; i++ {
 		d := nowLocal.AddDate(0, 0, i)
 		label := fmt.Sprintf("+%d dias", i)
-		if i == 0 {
+		switch i {
+		case 0:
 			label = "Hoje"
-		} else if i == 1 {
+		case 1:
 			label = "Amanhã"
 		}
 		sb.WriteString(fmt.Sprintf("- %s (%s, %s)\n", d.Format("2006-01-02"), WeekdayPT(d.Weekday()), label))
@@ -293,6 +294,7 @@ Responda EXCLUSIVAMENTE com um objeto JSON válido, sem backticks markdown ou te
     "start_at": "YYYY-MM-DDTHH:MM:SS" (horário LOCAL do usuário, SEM offset e SEM "Z"; fuso %s aplicado pelo sistema; use "" se não se aplicar),
     "end_at": "YYYY-MM-DDTHH:MM:SS" (horário LOCAL do usuário, SEM offset e SEM "Z"; fuso %s aplicado pelo sistema; use "" se não se aplicar),
     "recurrence": "WEEKLY" | "DAILY" | "MONTHLY" (ou vazio se não for recorrente),
+    "recurrence_until": "YYYY-MM-DD" (último dia da série, inclusivo; use "" se o usuário não definiu data final),
     "target_query": "Termo de busca para identificar o evento ao editar ou excluir"
   },
   "todo": {
@@ -356,6 +358,15 @@ DIRETRIZES DE AÇÃO OPERACIONAL:
        - "hoje": utilize a data %s
        - "amanhã": utilize a data %s
      * Se o horário de término não for especificado, assuma 1 hora de duração padrão a partir do início.
+     * Datas explícitas: "dia 20" = dia 20 do mês corrente (ou do próximo mês se o dia 20 já passou); "20/11" = 20 de novembro; "sexta" = próxima sexta-feira da tabela de referência. Confira SEMPRE o dia da semana na tabela antes de emitir a data.
+   - EVENTOS EM INTERVALO DE DATAS ("do dia X até o dia Y", "de 15 a 20", "de segunda a sexta desta semana"):
+     * Se houver um horário diário (ex: "de 15 a 20 de outubro, das 9h às 12h"): use "recurrence": "DAILY", "start_at" = dia X no horário inicial, "end_at" = dia X no horário final (MESMO dia) e "recurrence_until" = dia Y.
+     * Se for um bloco contínuo sem horário diário (ex: "viagem de 15 a 20", "congresso do dia 3 ao dia 5"): NÃO use recorrência; "start_at" = dia X (hora informada ou 00:00) e "end_at" = dia Y (hora informada ou 23:59).
+     * Recorrência semanal com fim (ex: "toda terça até dezembro"): "recurrence": "WEEKLY" e "recurrence_until" com a data final.
+     * Na "message", confirme explicitamente o intervalo: data inicial, data final e horários (ex: "Agendei de 15/10 (qui) a 20/10 (ter), das 09:00 às 12:00.").
+   - DIRETRIZ DE FERIADOS E CONFLITOS DE AGENDA:
+     * FERIADOS E DATAS COMEMORATIVAS: Feriados nacionais, religiosos ou datas comemorativas (mesmo que listados no Google) NÃO representam bloqueio de agenda e NUNCA devem impedir ou gerar conflito ao marcar um evento. O usuário pode normalmente agendar reuniões, almoços ou tarefas em dias de feriado.
+     * CONFLITOS REAIS: Choque de horários ocorre exclusivamente entre compromissos pessoais ou profissionais reais do usuário. Ao consultar agenda ou identificar conflito, aponte com perspicácia o evento concorrente e proponha proativamente alternativas imediatas (horários livres próximos ou remanejar o evento anterior).
    - CRIAÇÃO DE EVENTOS E RECORRÊNCIA:
      - Sempre que o usuário mencionar uma data, horário, reunião, consulta, aula, treino ou compromisso:
        - Use "action": "CREATE_EVENT".

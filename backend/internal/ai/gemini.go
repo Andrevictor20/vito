@@ -312,10 +312,14 @@ Avalie em tempo real este radar de monitoramento consultando dados atualizados d
 - CATEGORIA: %s
 - DATA/HORA DE REFERÊNCIA: %s
 
-Diretrizes de Conteúdo:
-1. "current_data": Desenvolva um RELATÓRIO INFORMATIVO APROFUNDADO E COMPLETO (2 a 4 parágrafos densos e substanciais). Traga todos os fatos concretos apurados, horários, locais, números, estatísticas, retrospecto recente, desdobramentos futuros e contexto relevante. Não seja superficial.
-2. "summary": Manchete factual direta e objetiva em 1 frase sintetizando o fato apurado.
-3. REGRA ANTI-SLOP ESTRITA: NUNCA use metalinguagem de IA (expressamente proibido falar "A condição para o alerta foi atendida", "Identifiquei que", "Conforme monitorado", "A regra foi acionada"). Entregue a informação pura, densa e com alto valor executivo.
+Diretrizes de Conteúdo (estilo Google Notícias — o que ACONTECEU de novo, não um panorama):
+1. "current_data": Feed de notícias recentes, do mais novo para o mais antigo. Formato OBRIGATÓRIO, 3 a 6 itens, um por linha:
+   "— DD/MM · Manchete factual curta: detalhe concreto em 1 frase (placar, número, decisão, nome)."
+   * Priorize o que ocorreu nos últimos 7 dias: resultados de jogos com placar e competição, anúncios, mudanças de preço, decisões.
+   * Ao final, opcionalmente 1 linha "Próximo: DD/MM HH:MM · evento" com o próximo compromisso relevante (apenas o próximo, nunca a agenda inteira).
+   * PROIBIDO: introduções institucionais ("O Clube X, equipe de..."), contexto histórico, tabelas completas, listas de calendário futuro, parágrafos longos. Máximo ~120 palavras.
+2. "summary": Manchete da notícia mais importante e recente em 1 frase (ex: "Flamengo vence o Bahia por 2 a 1 e mantém a liderança do Brasileirão").
+3. REGRA ANTI-SLOP ESTRITA: NUNCA use metalinguagem de IA (expressamente proibido falar "A condição para o alerta foi atendida", "Identifiquei que", "Conforme monitorado", "A regra foi acionada"). Entregue apenas fatos com data.
 
 Responda ESTRITAMENTE em formato JSON puro (sem marcações markdown extras):
 {

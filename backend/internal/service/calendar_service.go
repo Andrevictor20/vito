@@ -103,6 +103,10 @@ func (s *CalendarService) FindAlternativeSlots(userID string, requestedStart, re
 
 	hasOverlap := func(start, end time.Time) bool {
 		for _, e := range events {
+			// Feriados e eventos de dia inteiro (>= 20h) não bloqueiam horários específicos
+			if e.Category == "holiday" || e.EndAt.Sub(e.StartAt) >= 20*time.Hour {
+				continue
+			}
 			if start.Before(e.EndAt) && end.After(e.StartAt) {
 				return true
 			}
@@ -169,11 +173,9 @@ func (s *CalendarService) ListEvents(userID string, from, to time.Time) ([]domai
 // DeleteEvent remove um evento pertencente ao usuário.
 func (s *CalendarService) DeleteEvent(id, userID string) error {
 	if s.syncPusher != nil {
-		go func(eventID string) {
-			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-			defer cancel()
-			_ = s.syncPusher.DeleteEvent(ctx, userID, eventID)
-		}(id)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		_ = s.syncPusher.DeleteEvent(ctx, userID, id)
+		cancel()
 	}
 	return s.eventRepo.Delete(id, userID)
 }
@@ -181,11 +183,9 @@ func (s *CalendarService) DeleteEvent(id, userID string) error {
 // DeleteEventWithOption remove um evento individual ou toda a série recorrente.
 func (s *CalendarService) DeleteEventWithOption(id, userID string, allSeries bool) (int, error) {
 	if s.syncPusher != nil {
-		go func(eventID string) {
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-			defer cancel()
-			_ = s.syncPusher.DeleteEvent(ctx, userID, eventID)
-		}(id)
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		_ = s.syncPusher.DeleteEvent(ctx, userID, id)
+		cancel()
 	}
 
 	if allSeries {
@@ -250,12 +250,9 @@ func (s *CalendarService) DeleteEventsByTitle(userID, titleQuery string) (int, e
 			cleanQuery := strings.ToLower(strings.TrimSpace(titleQuery))
 			for _, ev := range events {
 				if strings.Contains(strings.ToLower(ev.Title), cleanQuery) {
-					evID := ev.ID
-					go func(id string) {
-						ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-						defer cancel()
-						_ = s.syncPusher.DeleteEvent(ctx, userID, id)
-					}(evID)
+					ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+					_ = s.syncPusher.DeleteEvent(ctx, userID, ev.ID)
+					cancel()
 				}
 			}
 		}

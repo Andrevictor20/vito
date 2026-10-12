@@ -71,6 +71,22 @@ func ComputeContentHash(title, description, location string, startAt, endAt time
 func ClassifyEvent(title, description string) (string, string) {
 	text := strings.ToLower(title + " " + description)
 
+	// Feriados e Datas Comemorativas (#F59E0B)
+	holidayTerms := []string{
+		"feriado", "nossa senhora", "aparecida", "ano novo", "confraternização", "carnaval",
+		"quarta-feira de cinzas", "quarta de cinzas", "sexta-feira santa", "paixão de cristo",
+		"páscoa", "pascoa", "tiradentes", "dia do trabalho", "dia do trabalhador",
+		"corpus christi", "independência", "independencia", "finados", "proclamação da república",
+		"proclamacao da republica", "consciência negra", "consciencia negra", "natal",
+		"véspera de natal", "vespera de natal", "véspera de ano novo", "vespera de ano novo",
+		"dia das mães", "dia dos pais", "dia das crianças", "holiday", "réveillon", "reveillon",
+	}
+	for _, term := range holidayTerms {
+		if strings.Contains(text, term) {
+			return "holiday", "#F59E0B"
+		}
+	}
+
 	// Trabalho / Reuniões (#38BDF8)
 	workTerms := []string{"reunião", "reuniao", "daily", "align", "alinhamento", "1:1", "review", "sprint", "meet", "call", "apresentação", "apresentacao", "entrevista", "cliente", "projeto", "demo", "deploy"}
 	for _, term := range workTerms {

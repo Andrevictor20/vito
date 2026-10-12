@@ -224,14 +224,6 @@ func (s *BookingService) GetAvailableSlots(ctx context.Context, userIdentifier, 
 	return slots, nil
 }
 
-func getHostLocation() *time.Location {
-	loc, err := time.LoadLocation("America/Sao_Paulo")
-	if err != nil {
-		return time.FixedZone("BRT", -3*3600)
-	}
-	return loc
-}
-
 // ReserveAppointment processa a reserva com validação Turnstile, sanitização XSS,
 // lock atômico serializável contra double-booking e push prioritário.
 func (s *BookingService) ReserveAppointment(ctx context.Context, userIdentifier, slug string, req ReserveRequest, remoteIP string) (*domain.BookingAppointment, error) {

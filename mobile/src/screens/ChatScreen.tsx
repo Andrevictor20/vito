@@ -324,13 +324,10 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
         ListEmptyComponent={
           <View style={styles.emptyWelcomeContainer}>
             <View style={styles.emptyMascotWrapper}>
-              <VitoMascot size={64} state={loading ? 'thinking' : 'idle'} />
+              <VitoMascot size={72} state={loading ? 'thinking' : 'idle'} animated={true} />
             </View>
             <Text style={[styles.emptyWelcomeTitle, { color: colors.onSurface }]}>
-              Olá, {firstName}
-            </Text>
-            <Text style={[styles.emptyWelcomeSubtitle, { color: colors.onSurfaceVariant }]}>
-              Sou seu secretário executivo com IA. Como posso organizar sua rotina, compromissos ou tarefas hoje?
+              {firstName && firstName !== 'Usuário' ? `Vamos lá, ${firstName}` : 'Como posso ajudar hoje?'}
             </Text>
           </View>
         }

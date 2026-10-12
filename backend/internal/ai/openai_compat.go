@@ -179,12 +179,12 @@ func (p *OpenAICompatProvider) EvaluateTrigger(ctx context.Context, t *domain.Tr
 	}
 
 	systemPrompt := `Você é o Vito, assistente de inteligência autônoma e monitoramento executivo do usuário.
-Sua missão é avaliar uma vigília/radar cadastrado pelo usuário e verificar as informações mais recentes sobre o tema.
+Sua missão é avaliar uma vigília/radar cadastrado pelo usuário e trazer as NOTÍCIAS MAIS RECENTES sobre o tema (estilo Google Notícias), nunca um panorama genérico.
 Responda EXCLUSIVAMENTE em formato JSON puro, sem markdown delimitador nem explicações fora do JSON:
 {
   "condition_met": true,
-  "current_data": "fatos, números e dados apurados",
-  "summary": "relatório de inteligência aprofundado, analítico e contextualizado de 2 a 4 parágrafos densos e informativos com fatos, números e contexto",
+  "current_data": "3 a 6 linhas no formato '— DD/MM · Manchete curta: detalhe concreto (placar, número, decisão)', da mais recente para a mais antiga; opcionalmente uma última linha 'Próximo: DD/MM HH:MM · evento'. Sem introduções institucionais, sem calendário completo, máximo ~120 palavras",
+  "summary": "manchete da notícia mais importante e recente em 1 frase",
   "simulated_notification": "título curto e impactante da notificação de alerta"
 }`
 

@@ -4,6 +4,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { tokens, MD3Shapes } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { Event } from '../../types';
+import { isAllDayEvent } from '../../utils/calendarDateUtils';
 
 interface EventCardProps {
   event: Event;
@@ -29,12 +30,32 @@ export const EventCard: React.FC<EventCardProps> = ({
     }
   };
 
+  const isAllDay = isAllDayEvent(event);
   const startTime = formatTime(event.start_at);
   const endTime = event.end_at ? formatTime(event.end_at) : '';
-  const timeDisplay = endTime ? `${startTime} – ${endTime}` : startTime;
+  const timeDisplay = isAllDay ? 'Dia Inteiro' : (endTime ? `${startTime} – ${endTime}` : startTime);
 
   // Inferir categoria e cores semânticas M3 para a tag
   const getCategory = () => {
+    const text = `${event.title} ${event.description || ''}`.toLowerCase();
+    const isHoliday = event.category === 'holiday' || (isAllDay && (
+      text.includes('feriado') || text.includes('nossa senhora') || text.includes('aparecida') ||
+      text.includes('tiradentes') || text.includes('páscoa') || text.includes('pascoa') ||
+      text.includes('natal') || text.includes('ano novo') || text.includes('trabalho') ||
+      text.includes('independência') || text.includes('independencia') || text.includes('finados') ||
+      text.includes('república') || text.includes('republica') || text.includes('consciência') ||
+      text.includes('consciencia') || text.includes('carnaval') || text.includes('corpus christi')
+    ));
+
+    if (isHoliday) {
+      return {
+        label: 'FERIADO',
+        bg: isDark ? 'rgba(245, 158, 11, 0.18)' : 'rgba(245, 158, 11, 0.12)',
+        text: '#F59E0B',
+        border: 'rgba(245, 158, 11, 0.4)',
+      };
+    }
+
     if (event.category) {
       const catColorMap: Record<string, { label: string; color: string; container: string }> = {
         work: { label: 'TRABALHO', color: colors.accents.sky, container: colors.accents.skyContainer },
@@ -63,7 +84,6 @@ export const EventCard: React.FC<EventCardProps> = ({
       };
     }
 
-    const text = `${event.title} ${event.description || ''}`.toLowerCase();
     if (text.includes('anivers') || text.includes('niver')) {
       return { label: 'ANIVERSÁRIO', bg: colors.categoryBirthdayBg, text: colors.categoryBirthdayText, border: colors.categoryBirthdayText + '33' };
     }

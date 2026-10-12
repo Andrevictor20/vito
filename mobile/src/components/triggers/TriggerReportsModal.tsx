@@ -316,9 +316,9 @@ export const TriggerReportsModal: React.FC<TriggerReportsModalProps> = ({
                 ]}
               >
                 <View style={styles.testReportHeader}>
-                  <MaterialIcons name="travel-explore" size={16} color={colors.primary} />
+                  <MaterialIcons name="newspaper" size={16} color={colors.primary} />
                   <Text style={[styles.testReportLabel, { color: colors.primary }]}>
-                    Panorama de Inteligência
+                    Radar de Notícias & Fatos
                   </Text>
                 </View>
                 <Text style={[styles.testDataText, { color: colors.onSurface }]}>

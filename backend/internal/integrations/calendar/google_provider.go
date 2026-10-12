@@ -518,6 +518,23 @@ func (p *GoogleProvider) DeleteEvent(ctx context.Context, credentials, calendarI
 	if resp.StatusCode == http.StatusNoContent || resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusGone {
 		return nil
 	}
+	if resp.StatusCode == http.StatusUnauthorized {
+		newCreds, refErr := p.RefreshToken(ctx, credentials)
+		if refErr == nil && newCreds != "" {
+			newToken := extractAccessToken(newCreds)
+			retryReq, rErr := http.NewRequestWithContext(ctx, http.MethodDelete, reqURL, nil)
+			if rErr == nil {
+				retryReq.Header.Set("Authorization", "Bearer "+newToken)
+				retryResp, doErr := p.cfg.HTTPClient.Do(retryReq)
+				if doErr == nil {
+					defer retryResp.Body.Close()
+					if retryResp.StatusCode == http.StatusNoContent || retryResp.StatusCode == http.StatusNotFound || retryResp.StatusCode == http.StatusGone || retryResp.StatusCode == http.StatusOK {
+						return nil
+					}
+				}
+			}
+		}
+	}
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("falha ao deletar evento no Google (status %d): %s", resp.StatusCode, string(respBody))

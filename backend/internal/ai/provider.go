@@ -59,8 +59,9 @@ type ParsedEvent struct {
 	Location    string    `json:"location,omitempty"`
 	StartAt     time.Time `json:"start_at"`
 	EndAt       time.Time `json:"end_at"`
-	Recurrence  string    `json:"recurrence,omitempty"`   // "WEEKLY", "DAILY", "MONTHLY"
-	TargetQuery string    `json:"target_query,omitempty"` // termo para busca ao atualizar/excluir (ex: "aula de inglês")
+	Recurrence      string    `json:"recurrence,omitempty"`       // "WEEKLY", "DAILY", "MONTHLY"
+	RecurrenceUntil string    `json:"recurrence_until,omitempty"` // "YYYY-MM-DD" inclusiva: último dia da série
+	TargetQuery     string    `json:"target_query,omitempty"`     // termo para busca ao atualizar/excluir (ex: "aula de inglês")
 
 	startWallClock bool
 	endWallClock   bool

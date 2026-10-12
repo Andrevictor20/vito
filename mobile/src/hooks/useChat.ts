@@ -24,7 +24,7 @@ const INITIAL_MESSAGE: ChatMessage = {
 export function useChat(onDataChanged?: () => void, currentUserId?: string) {
   const [sessions, setSessions] = useState<ConversationSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string>('');
-  const [messages, setMessages] = useState<ChatMessage[]>([INITIAL_MESSAGE]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const activeSessionIdRef = useRef<string>('');
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -51,7 +51,7 @@ export function useChat(onDataChanged?: () => void, currentUserId?: string) {
       setSessions([]);
       setActiveSessionId('');
       activeSessionIdRef.current = '';
-      setMessages([INITIAL_MESSAGE]);
+      setMessages([]);
       return;
     }
 
@@ -72,18 +72,18 @@ export function useChat(onDataChanged?: () => void, currentUserId?: string) {
             const active = parsed.find((s) => s.id === storedActiveId) || parsed[0];
             setActiveSessionId(active.id);
             activeSessionIdRef.current = active.id;
-            setMessages(active.messages && active.messages.length > 0 ? active.messages : [INITIAL_MESSAGE]);
+            const cleanMsgs = (active.messages || []).filter((m) => m.id !== 'msg-initial');
+            setMessages(cleanMsgs);
           }
         }
 
         if (localSessions.length === 0) {
-          // Inicialização da primeira sessão isolada para esta conta caso não haja local
-          let initialMessages = [INITIAL_MESSAGE];
+          let initialMessages: ChatMessage[] = [];
           if (legacyChat) {
             try {
               const parsedLegacy = JSON.parse(legacyChat);
               if (Array.isArray(parsedLegacy) && parsedLegacy.length > 0) {
-                initialMessages = parsedLegacy;
+                initialMessages = parsedLegacy.filter((m) => m.id !== 'msg-initial');
               }
             } catch {}
           }
@@ -93,12 +93,12 @@ export function useChat(onDataChanged?: () => void, currentUserId?: string) {
             ? firstUser.text.length > 28
               ? firstUser.text.slice(0, 28) + '...'
               : firstUser.text
-            : 'Conversa Atual';
+            : 'Nova Conversa';
 
           const initialSession: ConversationSession = {
             id: `conv-${Date.now()}`,
             title,
-            preview: initialMessages[initialMessages.length - 1]?.text || INITIAL_MESSAGE.text,
+            preview: initialMessages[initialMessages.length - 1]?.text || 'Nova conversa',
             timestamp: new Date().toISOString(),
             messages: initialMessages,
           };
@@ -564,9 +564,8 @@ export function useChat(onDataChanged?: () => void, currentUserId?: string) {
   );
 
   const clearHistory = useCallback(async () => {
-    const reset = [INITIAL_MESSAGE];
-    setMessages(reset);
-    await saveMessages(reset);
+    setMessages([]);
+    await saveMessages([]);
   }, [saveMessages]);
 
   const startNewConversation = useCallback(async () => {
@@ -574,21 +573,21 @@ export function useChat(onDataChanged?: () => void, currentUserId?: string) {
     const newSession: ConversationSession = {
       id: newId,
       title: 'Nova Conversa',
-      preview: INITIAL_MESSAGE.text,
+      preview: 'Nova conversa',
       timestamp: new Date().toISOString(),
-      messages: [INITIAL_MESSAGE],
+      messages: [],
     };
 
     activeSessionIdRef.current = newId;
     setActiveSessionId(newId);
-    setMessages([INITIAL_MESSAGE]);
+    setMessages([]);
 
     setSessions((prev) => {
-      const filtered = prev.filter((s) => s.messages.length > 1 || (s.title !== 'Nova Conversa' && s.title !== 'Conversa Atual'));
+      const filtered = prev.filter((s) => s.messages.length > 0 || (s.title !== 'Nova Conversa' && s.title !== 'Conversa Atual'));
       const next = [newSession, ...filtered];
       AsyncStorage.setItem(keys.sessionsKey, JSON.stringify(next)).catch(console.error);
       AsyncStorage.setItem(keys.activeIdKey, newId).catch(console.error);
-      AsyncStorage.setItem(keys.chatKey, JSON.stringify([INITIAL_MESSAGE])).catch(console.error);
+      AsyncStorage.setItem(keys.chatKey, JSON.stringify([])).catch(console.error);
       return next;
     });
   }, [keys.sessionsKey, keys.activeIdKey, keys.chatKey]);
@@ -598,7 +597,7 @@ export function useChat(onDataChanged?: () => void, currentUserId?: string) {
     if (!target) return;
     activeSessionIdRef.current = id;
     setActiveSessionId(id);
-    const msgs = target.messages && target.messages.length > 0 ? target.messages : [INITIAL_MESSAGE];
+    const msgs = (target.messages || []).filter((m) => m.id !== 'msg-initial');
     setMessages(msgs);
     await AsyncStorage.setItem(keys.activeIdKey, id);
     await AsyncStorage.setItem(keys.chatKey, JSON.stringify(msgs));
@@ -612,16 +611,16 @@ export function useChat(onDataChanged?: () => void, currentUserId?: string) {
       if (!nextActive) {
         nextActive = {
           id: `conv-${Date.now()}`,
-          title: 'Conversa Atual',
-          preview: INITIAL_MESSAGE.text,
+          title: 'Nova Conversa',
+          preview: 'Nova conversa',
           timestamp: new Date().toISOString(),
-          messages: [INITIAL_MESSAGE],
+          messages: [],
         };
         remaining.push(nextActive);
       }
       activeSessionIdRef.current = nextActive.id;
       setActiveSessionId(nextActive.id);
-      setMessages(nextActive.messages);
+      setMessages((nextActive.messages || []).filter((m) => m.id !== 'msg-initial'));
       AsyncStorage.setItem(keys.sessionsKey, JSON.stringify(remaining)).catch(console.error);
       AsyncStorage.setItem(keys.activeIdKey, nextActive.id).catch(console.error);
       AsyncStorage.setItem(keys.chatKey, JSON.stringify(nextActive.messages)).catch(console.error);

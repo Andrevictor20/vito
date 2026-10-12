@@ -100,6 +100,9 @@ func TestClassifyEvent(t *testing.T) {
 		{"Consulta com Cardiologista", "Levar exames", "health"},
 		{"Pagar fatura Nubank", "Vencimento hoje", "finance"},
 		{"Aula de Arquitetura de Software", "Faculdade", "study"},
+		{"Nossa Senhora Aparecida", "Feriado Nacional", "holiday"},
+		{"Tiradentes", "Feriado", "holiday"},
+		{"Natal", "Celebração", "holiday"},
 		{"Churrasco de Aniversário", "Na casa do Pedro", "leisure"},
 		{"Almoço com a Família", "Comprar sobremesa", "personal"},
 		{"Lembrete genérico", "Sem contexto", "general"},
@@ -113,6 +116,43 @@ func TestClassifyEvent(t *testing.T) {
 		if col == "" {
 			t.Errorf("ClassifyEvent(%q, %q) returned empty color", c.title, c.desc)
 		}
+	}
+}
+
+func TestCalendarService_HolidaysDoNotConflict(t *testing.T) {
+	calSvc, _ := setupCalendarService(t)
+	holidayDate := time.Date(2026, 10, 12, 0, 0, 0, 0, time.UTC)
+
+	// Feriado registrado de dia inteiro (00:00 às 23:59:59)
+	_, _, err := calSvc.CreateEvent(
+		"user-cal-svc-1",
+		"Nossa Senhora Aparecida / Feriado Nacional",
+		"Feriado civil e religioso",
+		"Brasil",
+		holidayDate,
+		holidayDate.Add(23*time.Hour+59*time.Minute),
+	)
+	if err != nil {
+		t.Fatalf("falha ao criar feriado: %v", err)
+	}
+
+	// Usuário agenda almoço às 12:00 no dia do feriado
+	lunchStart := time.Date(2026, 10, 12, 12, 0, 0, 0, time.UTC)
+	lunchEnd := lunchStart.Add(2 * time.Hour)
+	_, conflict, err := calSvc.CreateEvent(
+		"user-cal-svc-1",
+		"Almoço com Família",
+		"Restaurante",
+		"Centro",
+		lunchStart,
+		lunchEnd,
+	)
+	if err != nil {
+		t.Fatalf("falha ao agendar almoço no feriado: %v", err)
+	}
+
+	if conflict != nil && conflict.HasConflict {
+		t.Errorf("feriado não deveria gerar conflito com o almoço, mas gerou conflito com: %s", conflict.ConflictingTitle)
 	}
 }
 

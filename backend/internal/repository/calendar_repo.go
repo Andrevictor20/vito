@@ -188,6 +188,7 @@ func (r *EventRepositorySQLite) CheckConflict(userID string, startAt, endAt time
 		FROM events
 		WHERE user_id = ? 
 		  AND id != ?
+		  AND category != 'holiday'
 		  AND start_at < ? 
 		  AND end_at > ?
 		LIMIT 1

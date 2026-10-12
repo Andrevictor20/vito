@@ -239,6 +239,7 @@ func (s *AssistantService) Process(ctx context.Context, userID string, input ai.
 				intent.Event.EndAt = intent.Event.StartAt.Add(1 * time.Hour)
 			}
 			if intent.Event.Recurrence != "" {
+				count := occurrencesUntil(intent.Event.StartAt, intent.Event.RecurrenceUntil, intent.Event.Recurrence, 8)
 				events, err := s.calSvc.CreateRecurringEvents(
 					userID,
 					intent.Event.Title,
@@ -247,7 +248,7 @@ func (s *AssistantService) Process(ctx context.Context, userID string, input ai.
 					intent.Event.StartAt,
 					intent.Event.EndAt,
 					intent.Event.Recurrence,
-					8,
+					count,
 				)
 				if err != nil {
 					return nil, fmt.Errorf("falha ao criar série recorrente de eventos: %w", err)
@@ -274,13 +275,15 @@ func (s *AssistantService) Process(ctx context.Context, userID string, input ai.
 				res.Event = event
 				res.Conflict = conflict
 				if conflict != nil && conflict.HasConflict {
-					res.Message += fmt.Sprintf(" ⚠️ Atenção: você já tem '%s' agendado nesse horário!", conflict.ConflictingTitle)
+					res.Message += fmt.Sprintf("\n\n⚠️ Conflito de agenda: você já tem '%s' nesse mesmo horário.", conflict.ConflictingTitle)
 					if len(conflict.SuggestedSlots) > 0 {
 						var slotLabels []string
 						for _, sl := range conflict.SuggestedSlots {
 							slotLabels = append(slotLabels, sl.Label)
 						}
-						res.Message += fmt.Sprintf(" Que tal agendar para %s?", strings.Join(slotLabels, " ou "))
+						res.Message += fmt.Sprintf(" Para evitar o choque, sugiro remanejar para %s. Deseja que eu agende em algum desses horários ou prefere remarcar o compromisso anterior?", strings.Join(slotLabels, " ou "))
+					} else {
+						res.Message += " Deseja que eu procure outro horário livre para você ou prefere que eu altere o compromisso anterior?"
 					}
 				}
 			}
