@@ -5,6 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strings"
+
+	"github.com/andrevmp/vito/backend/internal/domain"
 )
 
 // Gateway orquestra múltiplos provedores de IA aplicando failover em cascata.
@@ -74,3 +77,46 @@ func (g *Gateway) ParseIntent(ctx context.Context, input UserInput) (*ParsedInte
 
 	return nil, fmt.Errorf("todos os provedores de IA falharam (último erro: %w)", lastErr)
 }
+
+// EvaluateTrigger avalia um radar/vigília percorrendo os provedores com failover em cascata.
+func (g *Gateway) EvaluateTrigger(ctx context.Context, t *domain.Trigger) (*domain.TriggerTestResult, error) {
+	if len(g.providers) == 0 {
+		return nil, errors.New("nenhum provedor configurado no gateway")
+	}
+
+	var lastErr error
+	for _, p := range g.providers {
+		if ep, ok := p.(TriggerEvaluatorProvider); ok {
+			res, err := ep.EvaluateTrigger(ctx, t)
+			if err == nil && res != nil {
+				return res, nil
+			}
+			lastErr = err
+			log.Printf("⚠️ [AI Gateway] Avaliação de vigília falhou no provedor '%s': %v. Tentando próximo da cascata...", p.Name(), err)
+		}
+	}
+
+	return nil, fmt.Errorf("todos os provedores falharam na avaliação do radar (último erro: %w)", lastErr)
+}
+
+// GenerateText sintetiza resumos executivos ou textos percorrendo os provedores com failover em cascata.
+func (g *Gateway) GenerateText(ctx context.Context, systemPrompt, userPrompt string) (string, error) {
+	if len(g.providers) == 0 {
+		return "", errors.New("nenhum provedor configurado no gateway")
+	}
+
+	var lastErr error
+	for _, p := range g.providers {
+		if tg, ok := p.(TextGeneratorProvider); ok {
+			text, err := tg.GenerateText(ctx, systemPrompt, userPrompt)
+			if err == nil && strings.TrimSpace(text) != "" {
+				return text, nil
+			}
+			lastErr = err
+			log.Printf("⚠️ [AI Gateway] Síntese de texto falhou no provedor '%s': %v. Tentando próximo da cascata...", p.Name(), err)
+		}
+	}
+
+	return "", fmt.Errorf("todos os provedores falharam na síntese de texto (último erro: %w)", lastErr)
+}
+

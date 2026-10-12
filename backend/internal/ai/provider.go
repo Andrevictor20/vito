@@ -3,6 +3,8 @@ package ai
 import (
 	"context"
 	"time"
+
+	"github.com/andrevmp/vito/backend/internal/domain"
 )
 
 // IntentAction define o tipo de ação interpretada pela IA.
@@ -135,3 +137,14 @@ type VisionCapable interface {
 type AudioCapable interface {
 	SupportsAudio() bool
 }
+
+// TriggerEvaluatorProvider define a capacidade do provedor avaliar radares e vigílias.
+type TriggerEvaluatorProvider interface {
+	EvaluateTrigger(ctx context.Context, t *domain.Trigger) (*domain.TriggerTestResult, error)
+}
+
+// TextGeneratorProvider define a capacidade do provedor sintetizar resumos e textos executivos.
+type TextGeneratorProvider interface {
+	GenerateText(ctx context.Context, systemPrompt, userPrompt string) (string, error)
+}
+

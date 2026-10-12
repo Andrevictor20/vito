@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"strings"
@@ -10,6 +11,11 @@ import (
 	"github.com/andrevmp/vito/backend/internal/domain"
 )
 
+// TextGenerator define a interface para síntese executiva por IA.
+type TextGenerator interface {
+	GenerateText(ctx context.Context, systemPrompt, userPrompt string) (string, error)
+}
+
 // MorningBriefingWorker orquestra a geração e o despacho proativo do resumo matinal diário.
 type MorningBriefingWorker struct {
 	briefingRepo  domain.BriefingRepository
@@ -17,6 +23,7 @@ type MorningBriefingWorker struct {
 	todoRepo      domain.TodoRepository
 	userRepo      domain.UserRepository
 	notifSvc      *NotificationService
+	textGen       TextGenerator
 	checkInterval time.Duration
 	stopCh        chan struct{}
 	wg            sync.WaitGroup
@@ -61,6 +68,13 @@ func (w *MorningBriefingWorker) SetLocation(loc *time.Location) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	w.location = loc
+}
+
+// SetTextGenerator define um gerador de texto IA opcional para enriquecer os briefings com inteligência executiva.
+func (w *MorningBriefingWorker) SetTextGenerator(tg TextGenerator) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.textGen = tg
 }
 
 // FormatBriefingMessage formata o título e o corpo da notificação de forma executiva, clara e amigável.
@@ -154,6 +168,19 @@ func (w *MorningBriefingWorker) ProcessBriefings(now time.Time) (int, error) {
 		}
 
 		title, body := FormatBriefingMessage(userName, events, todos, loc)
+
+		w.mu.Lock()
+		tg := w.textGen
+		w.mu.Unlock()
+		if tg != nil {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			sysPrompt := "Você é o Vito, assistente executivo pessoal. Elabore um briefing matinal conciso (máximo 2 frases), elegante, motivador e executivo para o usuário iniciar o dia com clareza total. Sem emojis, direto ao ponto."
+			usrPrompt := fmt.Sprintf("Usuário: %s. Compromissos: %d. Tarefas pendentes: %d. Base: %s", userName, len(events), len(todos), body)
+			if aiBody, err := tg.GenerateText(ctx, sysPrompt, usrPrompt); err == nil && strings.TrimSpace(aiBody) != "" {
+				body = strings.TrimSpace(aiBody)
+			}
+			cancel()
+		}
 
 		priority := "default"
 		// Se configurado alarme antecipado e o primeiro evento ocorrer em até 45 minutos do briefing

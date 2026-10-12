@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/andrevmp/vito/backend/internal/ai"
+	"github.com/andrevmp/vito/backend/internal/domain"
 )
 
 // MockProvider implementa ai.Provider para testes de failover.
@@ -97,3 +98,97 @@ func TestGateway_MultimodalImageRouting(t *testing.T) {
 		t.Errorf("Esperava provedor 'Gemini Vision' para requisição com imagem, mas obteve '%s'", res.ProviderUsed)
 	}
 }
+
+type MockTriggerEvaluatorProvider struct {
+	MockProvider
+	shouldEvalError bool
+	result          *domain.TriggerTestResult
+}
+
+func (m *MockTriggerEvaluatorProvider) EvaluateTrigger(ctx context.Context, t *domain.Trigger) (*domain.TriggerTestResult, error) {
+	if m.shouldEvalError {
+		return nil, errors.New("eval trigger failed")
+	}
+	return m.result, nil
+}
+
+type MockTextGeneratorProvider struct {
+	MockProvider
+	shouldGenError bool
+	generatedText  string
+}
+
+func (m *MockTextGeneratorProvider) GenerateText(ctx context.Context, systemPrompt, userPrompt string) (string, error) {
+	if m.shouldGenError {
+		return "", errors.New("generate text failed")
+	}
+	return m.generatedText, nil
+}
+
+func TestGateway_EvaluateTrigger_Cascade(t *testing.T) {
+	trig := &domain.Trigger{
+		ID:    "trig-123",
+		Title: "Jogos do Flamengo",
+		Query: "Resultados recentes",
+	}
+
+	expectedResult := &domain.TriggerTestResult{
+		TriggerID:    trig.ID,
+		Title:        trig.Title,
+		ConditionMet: true,
+		Summary:      "Flamengo venceu última partida",
+		CurrentData:  "Panorama detalhado do confronto",
+	}
+
+	// P1 (ex: Gemini) falha na avaliação
+	p1 := &MockTriggerEvaluatorProvider{
+		MockProvider:    MockProvider{name: "Gemini Pro"},
+		shouldEvalError: true,
+	}
+
+	// P2 (ex: Groq) assume a avaliação e tem sucesso
+	p2 := &MockTriggerEvaluatorProvider{
+		MockProvider:    MockProvider{name: "Groq Qwen"},
+		shouldEvalError: false,
+		result:          expectedResult,
+	}
+
+	gw := ai.NewGateway(p1, p2)
+	res, err := gw.EvaluateTrigger(context.Background(), trig)
+	if err != nil {
+		t.Fatalf("Esperava sucesso na cascata de vigília, mas obteve erro: %v", err)
+	}
+
+	if res.Summary != expectedResult.Summary {
+		t.Errorf("Esperava summary '%s', obteve '%s'", expectedResult.Summary, res.Summary)
+	}
+	if res.CurrentData != expectedResult.CurrentData {
+		t.Errorf("Esperava currentData '%s', obteve '%s'", expectedResult.CurrentData, res.CurrentData)
+	}
+}
+
+func TestGateway_GenerateText_Cascade(t *testing.T) {
+	// P1 falha
+	p1 := &MockTextGeneratorProvider{
+		MockProvider:   MockProvider{name: "Gemini"},
+		shouldGenError: true,
+	}
+
+	// P2 tem sucesso
+	p2 := &MockTextGeneratorProvider{
+		MockProvider:   MockProvider{name: "Groq"},
+		shouldGenError: false,
+		generatedText:  "Síntese executiva diária gerada com sucesso",
+	}
+
+	gw := ai.NewGateway(p1, p2)
+	text, err := gw.GenerateText(context.Background(), "System prompt", "User prompt")
+	if err != nil {
+		t.Fatalf("Esperava sucesso na geração de texto, mas obteve erro: %v", err)
+	}
+
+	if text != "Síntese executiva diária gerada com sucesso" {
+		t.Errorf("Texto gerado inesperado: %s", text)
+	}
+}
+

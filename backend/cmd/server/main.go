@@ -64,7 +64,7 @@ func main() {
 	}
 	if cfg.OpenRouterAPIKey != "" {
 		log.Println("🤖 [AI Provider] OpenRouter ativado como fallback.")
-		aiProviders = append(aiProviders, ai.NewOpenRouterProvider(cfg.OpenRouterAPIKey, "openrouter/auto"))
+		aiProviders = append(aiProviders, ai.NewOpenRouterProvider(cfg.OpenRouterAPIKey, "nvidia/nemotron-3.5-lightning:free"))
 	}
 
 	aiGateway := ai.NewGateway(aiProviders...)
@@ -97,19 +97,22 @@ func main() {
 	reminderWorker.Start()
 	defer reminderWorker.Stop()
 
-	// Worker em segundo plano para vigília autônoma de disparadores
+	// Worker em segundo plano para vigília autônoma de disparadores com cascata completa de IA (Gemini -> Groq -> OpenRouter)
 	var triggerEvaluator service.TriggerEvaluator = &service.DefaultTriggerEvaluator{}
-	if geminiProv != nil {
+	if len(aiProviders) > 0 {
 		triggerEvaluator = service.NewAITriggerEvaluator(func(ctx context.Context, t *domain.Trigger) (*domain.TriggerTestResult, error) {
-			return geminiProv.TestEvaluateTrigger(ctx, t)
+			return aiGateway.EvaluateTrigger(ctx, t)
 		})
 	}
 	triggerWorker := service.NewTriggerWorker(triggerRepo, notifSvc, triggerEvaluator, 1*time.Minute)
 	triggerWorker.Start()
 	defer triggerWorker.Stop()
 
-	// Worker em segundo plano para briefing matinal proativo
+	// Worker em segundo plano para briefing matinal proativo com síntese de IA em cascata
 	morningBriefingWorker := service.NewMorningBriefingWorker(briefingRepo, eventRepo, todoRepo, userRepo, notifSvc, 1*time.Minute)
+	if len(aiProviders) > 0 {
+		morningBriefingWorker.SetTextGenerator(aiGateway)
+	}
 	morningBriefingWorker.Start()
 	defer morningBriefingWorker.Stop()
 

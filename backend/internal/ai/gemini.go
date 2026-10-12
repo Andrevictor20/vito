@@ -482,3 +482,76 @@ Responda ESTRITAMENTE em formato JSON puro (sem marcações markdown extras):
 		TestedAt:              time.Now().UTC(),
 	}, nil
 }
+
+// EvaluateTrigger implementa TriggerEvaluatorProvider para o Gemini.
+func (p *GeminiProvider) EvaluateTrigger(ctx context.Context, t *domain.Trigger) (*domain.TriggerTestResult, error) {
+	return p.TestEvaluateTrigger(ctx, t)
+}
+
+// GenerateText implementa TextGeneratorProvider para o Gemini.
+func (p *GeminiProvider) GenerateText(ctx context.Context, systemPrompt, userPrompt string) (string, error) {
+	if p.apiKey == "" {
+		return "", errors.New("chave de api do gemini não configurada")
+	}
+
+	base := p.baseURL
+	if base == "" {
+		base = "https://generativelanguage.googleapis.com"
+	}
+
+	reqBody := geminiRequest{
+		SystemInstruction: &geminiContent{
+			Role:  "system",
+			Parts: []geminiPart{{Text: systemPrompt}},
+		},
+		Contents: []geminiContent{
+			{Role: "user", Parts: []geminiPart{{Text: userPrompt}}},
+		},
+	}
+
+	jsonBytes, err := json.Marshal(reqBody)
+	if err != nil {
+		return "", err
+	}
+
+	modelsToTry := []string{p.model, "gemini-flash-latest", "gemini-2.5-flash"}
+	var lastErr error
+
+	for _, m := range modelsToTry {
+		url := fmt.Sprintf("%s/v1beta/models/%s:generateContent?key=%s", base, m, p.apiKey)
+		req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonBytes))
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := p.httpClient.Do(req)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+
+		bodyBytes, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err != nil {
+			lastErr = err
+			continue
+		}
+
+		if resp.StatusCode == http.StatusOK {
+			var geminiResp geminiResponse
+			if err := json.Unmarshal(bodyBytes, &geminiResp); err == nil && len(geminiResp.Candidates) > 0 && len(geminiResp.Candidates[0].Content.Parts) > 0 {
+				txt := strings.TrimSpace(geminiResp.Candidates[0].Content.Parts[0].Text)
+				if txt != "" {
+					return txt, nil
+				}
+			}
+		} else {
+			lastErr = fmt.Errorf("gemini api error (status %d): %s", resp.StatusCode, string(bodyBytes))
+		}
+	}
+
+	return "", fmt.Errorf("gemini falhou em sintetizar texto: %w", lastErr)
+}
+
