@@ -268,8 +268,9 @@ func (h *AssistantHandler) AudioChat(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(responseMap)
 }
 
-// assistantFriendlyError evita vazar detalhes internos (stack de provedores/JSON bruto) no chat.
-const assistantFriendlyError = "Não consegui processar seu pedido agora. Pode tentar de novo em instantes?"
+// assistantFriendlyError evita vazar detalhes internos (stack de provedores/JSON bruto) no chat,
+// mas explica que nada foi criado/apagado e orienta a reformular com detalhes.
+const assistantFriendlyError = "Não consegui processar agora por instabilidade na IA ou na rede. Nada foi criado ou apagado. Tente de novo em instantes com mais detalhes (ex: 'Criar evento Dentista amanhã às 14h')."
 
 // VisionChat processa upload de imagem (recibos, fotos de documentos ou anotações) via multipart/form-data ou JSON com image_b64.
 func (h *AssistantHandler) VisionChat(w http.ResponseWriter, r *http.Request) {

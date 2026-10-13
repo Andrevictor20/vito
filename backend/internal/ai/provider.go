@@ -23,6 +23,7 @@ const (
 	ActionCreateBookingLink IntentAction = "CREATE_BOOKING_LINK"
 	ActionCancelBookingAppointment IntentAction = "CANCEL_BOOKING_APPOINTMENT"
 	ActionGeneralChat   IntentAction = "GENERAL_CHAT"
+	ActionNeedsClarification IntentAction = "NEEDS_CLARIFICATION"
 	ActionOutOfScope    IntentAction = "OUT_OF_SCOPE"
 )
 

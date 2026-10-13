@@ -89,7 +89,8 @@ export interface AssistantChatResponse {
   event?: Event;
   todo?: Todo;
   trigger?: Trigger;
-  booking?: { id: string; title: string; slug?: string };
+  pending?: PendingItem;
+  booking?: { id: string; title: string; slug?: string; public_url?: string; short_url?: string };
   conflict?: ConflictInfo;
   provider_used?: string;
 }
@@ -104,6 +105,8 @@ export interface ChatMessage {
   event?: Event;
   todo?: Todo;
   trigger?: Trigger;
+  pending?: PendingItem;
+  booking?: { id: string; title: string; slug?: string };
   conflict?: ConflictInfo;
 }
 

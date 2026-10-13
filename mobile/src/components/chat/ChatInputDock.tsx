@@ -41,9 +41,20 @@ export const ChatInputDock: React.FC<ChatInputDockProps> = ({
   const { colors, isDark } = useTheme();
   const canSend = (value.trim().length > 0 || !!selectedImageUri) && !loading;
 
-  // Garante disparo confiável sem eventos duplicados
+  // Garante disparo confiável sem eventos duplicados.
+  // Refs espelham o estado atual para que onPressIn (disparado antes do blur do
+  // teclado / salto de layout no Android) nunca use closure obsoleta — causa raiz
+  // do "preciso clicar 2 vezes para enviar".
   const isSendingRef = React.useRef(false);
   const stopReadyTimestampRef = React.useRef(0);
+  const canSendRef = React.useRef(canSend);
+  const onSendRef = React.useRef(onSend);
+  React.useEffect(() => {
+    canSendRef.current = canSend;
+  }, [canSend]);
+  React.useEffect(() => {
+    onSendRef.current = onSend;
+  }, [onSend]);
 
   React.useEffect(() => {
     if (loading) {
@@ -52,9 +63,9 @@ export const ChatInputDock: React.FC<ChatInputDockProps> = ({
   }, [loading]);
 
   const handleTriggerSend = () => {
-    if (isSendingRef.current || !canSend) return;
+    if (isSendingRef.current || !canSendRef.current) return;
     isSendingRef.current = true;
-    onSend();
+    onSendRef.current?.();
     setTimeout(() => {
       isSendingRef.current = false;
     }, 400);
@@ -161,8 +172,12 @@ export const ChatInputDock: React.FC<ChatInputDockProps> = ({
               styles.sendButton,
               { backgroundColor: colors.error || '#EF4444' },
             ]}
+            onPressIn={handleStop}
             onPress={handleStop}
+            delayPressIn={0}
             activeOpacity={0.8}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            pressRetentionOffset={{ top: 12, bottom: 12, left: 12, right: 12 }}
             accessibilityLabel="Interromper geração de resposta"
           >
             <MaterialIcons name="stop" size={20} color="#FFFFFF" />
@@ -175,9 +190,13 @@ export const ChatInputDock: React.FC<ChatInputDockProps> = ({
                 ? { backgroundColor: colors.primary }
                 : { backgroundColor: colors.surfaceContainerHighest, shadowOpacity: 0, elevation: 0 },
             ]}
+            onPressIn={handleTriggerSend}
             onPress={handleTriggerSend}
+            delayPressIn={0}
             disabled={!canSend}
             activeOpacity={0.8}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            pressRetentionOffset={{ top: 12, bottom: 12, left: 12, right: 12 }}
             accessibilityLabel="Enviar mensagem"
           >
             <MaterialIcons

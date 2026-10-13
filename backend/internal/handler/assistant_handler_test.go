@@ -135,6 +135,7 @@ func TestAssistantHandler_VisionChat(t *testing.T) {
 		intent: &ai.ParsedIntent{
 			Action:       ai.ActionCreateTodo,
 			Message:      "Recibo processado com sucesso!",
+			Todo:         &ai.ParsedTodo{Title: "Pagar conta de luz", Priority: "medium"},
 			ProviderUsed: "Gemini Vision",
 		},
 	}
@@ -233,10 +234,16 @@ func TestAssistantHandler_Chat_CurrentLocalTime(t *testing.T) {
 
 func TestAssistantHandler_AudioChat_JSON(t *testing.T) {
 	mockTrans := &mockTranscriber{text: "Reunião de alinhamento amanhã"}
+	now := time.Now().Add(24 * time.Hour)
 	mockAI := &mockAIGateway{
 		intent: &ai.ParsedIntent{
-			Action:       ai.ActionCreateEvent,
-			Message:      "Reunião agendada!",
+			Action:  ai.ActionCreateEvent,
+			Message: "Reunião agendada!",
+			Event: &ai.ParsedEvent{
+				Title:   "Reunião de alinhamento",
+				StartAt: now,
+				EndAt:   now.Add(1 * time.Hour),
+			},
 			ProviderUsed: "MockAI",
 		},
 	}
@@ -282,10 +289,16 @@ func TestAssistantHandler_AudioChat_JSON(t *testing.T) {
 }
 
 func TestAssistantHandler_VisionChat_JSON(t *testing.T) {
+	now := time.Now().Add(24 * time.Hour)
 	mockAI := &mockAIGateway{
 		intent: &ai.ParsedIntent{
-			Action:       ai.ActionCreateEvent,
-			Message:      "Evento extraído da imagem!",
+			Action:  ai.ActionCreateEvent,
+			Message: "Evento extraído da imagem!",
+			Event: &ai.ParsedEvent{
+				Title:   "Aniversário no convite",
+				StartAt: now,
+				EndAt:   now.Add(2 * time.Hour),
+			},
 			ProviderUsed: "MockAI",
 		},
 	}

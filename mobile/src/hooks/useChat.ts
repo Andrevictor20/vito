@@ -288,6 +288,8 @@ export function useChat(onDataChanged?: () => void, currentUserId?: string) {
           event: res.event,
           todo: res.todo,
           trigger: res.trigger,
+          pending: (res as any).pending,
+          booking: res.booking as any,
           conflict: res.conflict,
         };
 
@@ -332,10 +334,20 @@ export function useChat(onDataChanged?: () => void, currentUserId?: string) {
         }
 
         console.warn('[useChat] falha no assistente:', err);
+        // Superfície o motivo real vindo do servidor (ex: validação da IA) em vez
+        // de esconder tudo atrás de um genérico — nada foi criado nesse caminho.
+        const serverMsg = err instanceof Error ? err.message : '';
+        const friendlyFallback =
+          'Não consegui processar agora por instabilidade na IA ou na rede. Nada foi criado ou apagado. Tente de novo em instantes com mais detalhes (ex: criar evento Dentista amanhã às 14h).';
         const errorMsg: ChatMessage = {
           id: `err-${Date.now()}`,
           sender: 'vito',
-          text: 'Não consegui processar seu pedido agora. Pode tentar de novo em instantes?',
+          text:
+            serverMsg && serverMsg !== 'USER_CANCELLED' && !serverMsg.includes('Tempo limite esgotado')
+              ? serverMsg
+              : serverMsg.includes('Tempo limite')
+                ? 'O servidor demorou a responder (60s). Verifique sua conexão — nada foi criado. Tente de novo com uma frase mais completa.'
+                : friendlyFallback,
           timestamp: new Date().toISOString(),
         };
         const withError = [...withUser, errorMsg];
@@ -389,6 +401,8 @@ export function useChat(onDataChanged?: () => void, currentUserId?: string) {
           event: res.event,
           todo: res.todo,
           trigger: res.trigger,
+          pending: (res as any).pending,
+          booking: res.booking as any,
           conflict: res.conflict,
         };
 
@@ -488,6 +502,8 @@ export function useChat(onDataChanged?: () => void, currentUserId?: string) {
           event: res.event,
           todo: res.todo,
           trigger: res.trigger,
+          pending: (res as any).pending,
+          booking: res.booking as any,
           conflict: res.conflict,
         };
 
@@ -566,6 +582,8 @@ export function useChat(onDataChanged?: () => void, currentUserId?: string) {
           event: res.event,
           todo: res.todo,
           trigger: res.trigger,
+          pending: (res as any).pending,
+          booking: res.booking as any,
           conflict: res.conflict,
         };
 
