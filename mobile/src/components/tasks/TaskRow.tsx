@@ -247,8 +247,10 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   title: {
-    fontSize: 15,
-    fontWeight: '500',
+    fontSize: 16,
+    fontWeight: '700',
+    lineHeight: 21,
+    letterSpacing: -0.1,
   },
   struck: {
     textDecorationLine: 'line-through',
@@ -260,16 +262,19 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   badge: {
-    borderRadius: 8,
+    borderRadius: 9999,
     paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingVertical: 4,
   },
   badgeText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
   },
   dateText: {
     fontSize: 12,
+    fontWeight: '500',
   },
   subCount: {
     fontSize: 12,

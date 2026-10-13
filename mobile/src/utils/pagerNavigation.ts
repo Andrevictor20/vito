@@ -1,6 +1,6 @@
-export type MainTabType = 'chat' | 'calendar' | 'tasks' | 'triggers' | 'booking';
+export type MainTabType = 'chat' | 'calendar' | 'tasks' | 'triggers' | 'booking' | 'profile';
 
-export const TAB_ORDER: readonly MainTabType[] = ['chat', 'calendar', 'tasks', 'triggers', 'booking'] as const;
+export const TAB_ORDER: readonly MainTabType[] = ['chat', 'calendar', 'tasks', 'triggers', 'booking', 'profile'] as const;
 
 /**
  * Retorna o índice numérico correspondente à aba informada.

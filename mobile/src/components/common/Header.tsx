@@ -1,23 +1,15 @@
-import React, { useRef, useEffect } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, Animated, Easing } from 'react-native';
+import React from 'react';
+import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens, MD3Shapes } from '../../theme/tokens';
-import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-import { VitoMascot } from './VitoMascot';
 import { MainTabType } from '../../utils/pagerNavigation';
 
 export interface HeaderProps {
   title?: string;
   subtitle?: string;
-  showMascot?: boolean;
-  mascotSize?: number;
-  mascotState?: 'idle' | 'thinking';
-  showStatusDot?: boolean;
-  statusColor?: string;
-  contextualActions?: React.ReactNode;
   showDivider?: boolean;
-  onPressProfile?: () => void;
+  contextualActions?: React.ReactNode;
   onPressTitle?: () => void;
   activeTab?: MainTabType;
   onPressHistory?: () => void;
@@ -51,189 +43,39 @@ export const HeaderIconButton: React.FC<HeaderIconButtonProps> = ({
       activeOpacity={0.7}
       hitSlop={tokens.hitSlop.sm}
       accessibilityLabel={accessibilityLabel}
+      accessibilityRole="button"
     >
       <MaterialIcons name={icon} size={size} color={colors.onSurface} />
     </TouchableOpacity>
   );
 };
 
+const TAB_TITLES: Record<MainTabType, { title: string; subtitle: string }> = {
+  chat: { title: 'Vito', subtitle: 'Assistente Executivo' },
+  calendar: { title: 'Agenda', subtitle: 'Compromissos' },
+  tasks: { title: 'Tarefas', subtitle: 'Tarefas e Pendências' },
+  triggers: { title: 'Radares', subtitle: 'Radar do Vito' },
+  booking: { title: 'Vito Booking', subtitle: 'Links de Agendamento' },
+  profile: { title: 'Perfil', subtitle: 'Conta e ajustes' },
+};
+
 export const Header: React.FC<HeaderProps> = ({
-  title = 'Agenda',
-  subtitle = 'Compromissos',
-  showMascot = true,
-  mascotSize = 28,
-  mascotState = 'idle',
-  showStatusDot = false,
-  statusColor,
-  contextualActions,
+  title,
+  subtitle,
   showDivider = true,
-  onPressProfile,
+  contextualActions,
   onPressTitle,
   activeTab,
   onPressHistory,
   onPressNewChat,
 }) => {
-  const { user } = useAuth();
-  const { colors, isDark, toggleTheme } = useTheme();
+  const { colors } = useTheme();
 
-  const firstName = user?.name ? user.name.split(' ')[0] : 'Usuário';
-  const effectiveStatusColor = statusColor || colors.statusOnline;
+  const resolved = activeTab ? TAB_TITLES[activeTab] : undefined;
+  const displayTitle = title ?? resolved?.title ?? 'Agenda';
+  const displaySubtitle = subtitle ?? resolved?.subtitle;
 
-  const tabToValue = (tab: MainTabType): number => {
-    switch (tab) {
-      case 'calendar': return 0;
-      case 'chat': return 1;
-      case 'triggers': return 2;
-      case 'tasks': return 3;
-      case 'booking': return 4;
-    }
-  };
-
-  const tabTransition = useRef(new Animated.Value(activeTab ? tabToValue(activeTab) : 0)).current;
-
-  useEffect(() => {
-    if (activeTab) {
-      const targetVal = tabToValue(activeTab);
-      Animated.timing(tabTransition, {
-        toValue: targetVal,
-        duration: 220,
-        easing: Easing.bezier(0.2, 0, 0, 1),
-        useNativeDriver: true,
-      }).start();
-    }
-  }, [activeTab]);
-
-  const calendarOpacity = tabTransition.interpolate({ inputRange: [0, 0.5, 1, 2, 3, 4], outputRange: [1, 0, 0, 0, 0, 0] });
-  const calendarTranslateY = tabTransition.interpolate({ inputRange: [0, 1, 2, 3, 4], outputRange: [0, -4, -4, -4, -4] });
-  const chatOpacity = tabTransition.interpolate({ inputRange: [0, 0.5, 1, 1.5, 2, 3, 4], outputRange: [0, 0, 1, 0, 0, 0, 0] });
-  const chatTranslateY = tabTransition.interpolate({ inputRange: [0, 1, 2, 3, 4], outputRange: [4, 0, -4, -4, -4] });
-  const triggersOpacity = tabTransition.interpolate({ inputRange: [0, 1, 1.5, 2, 2.5, 3, 4], outputRange: [0, 0, 0, 1, 0, 0, 0] });
-  const triggersTranslateY = tabTransition.interpolate({ inputRange: [0, 1, 2, 3, 4], outputRange: [4, 4, 0, 4, 4] });
-  const tasksOpacity = tabTransition.interpolate({ inputRange: [0, 1, 2, 2.5, 3, 3.5, 4], outputRange: [0, 0, 0, 0, 1, 0, 0] });
-  const tasksTranslateY = tabTransition.interpolate({ inputRange: [0, 1, 2, 3, 4], outputRange: [4, 4, 4, 0, 4] });
-  const bookingOpacity = tabTransition.interpolate({ inputRange: [0, 1, 2, 3, 3.5, 4], outputRange: [0, 0, 0, 0, 0, 1] });
-  const bookingTranslateY = tabTransition.interpolate({ inputRange: [0, 1, 2, 3, 4], outputRange: [4, 4, 4, 4, 0] });
-
-  const titleContent = activeTab ? (
-    <View style={[styles.titleColumn, { minWidth: activeTab === 'chat' ? 115 : 150 }]}>
-      {/* Camada Calendário */}
-      <Animated.View
-        style={[
-          styles.titleCrossfadeLayer,
-          {
-            opacity: calendarOpacity,
-            transform: [{ translateY: calendarTranslateY }],
-          },
-        ]}
-        pointerEvents={activeTab === 'calendar' ? 'auto' : 'none'}
-      >
-        <Text style={[styles.brand, { color: colors.onSurface }]} numberOfLines={1}>
-          Agenda
-        </Text>
-        <Text style={[styles.brandSubtitle, { color: colors.textMuted }]} numberOfLines={1}>
-          Compromissos
-        </Text>
-      </Animated.View>
-
-      {/* Camada Chat / Vito */}
-      <Animated.View
-        style={[
-          styles.titleCrossfadeLayer,
-          {
-            opacity: chatOpacity,
-            transform: [{ translateY: chatTranslateY }],
-          },
-        ]}
-        pointerEvents={activeTab === 'chat' ? 'auto' : 'none'}
-      >
-        <View style={styles.titleRow}>
-          <Text style={[styles.brand, { color: colors.onSurface }]} numberOfLines={1}>
-            Vito
-          </Text>
-          <View style={[styles.statusDot, { backgroundColor: effectiveStatusColor }]} />
-        </View>
-        <Text style={[styles.brandSubtitle, { color: colors.textMuted }]} numberOfLines={1}>
-          Assistente Executivo
-        </Text>
-      </Animated.View>
-
-      {/* Camada Disparadores */}
-      <Animated.View
-        style={[
-          styles.titleCrossfadeLayer,
-          {
-            opacity: triggersOpacity,
-            transform: [{ translateY: triggersTranslateY }],
-          },
-        ]}
-        pointerEvents={activeTab === 'triggers' ? 'auto' : 'none'}
-      >
-        <View style={styles.titleRow}>
-          <Text style={[styles.brand, { color: colors.onSurface }]} numberOfLines={1}>
-            Radares
-          </Text>
-          <View style={[styles.statusDot, { backgroundColor: '#10B981' }]} />
-        </View>
-        <Text style={[styles.brandSubtitle, { color: colors.textMuted }]} numberOfLines={1}>
-          Radar do Vito
-        </Text>
-      </Animated.View>
-
-      {/* Camada Tarefas */}
-      <Animated.View
-        style={[
-          styles.titleCrossfadeLayer,
-          {
-            opacity: tasksOpacity,
-            transform: [{ translateY: tasksTranslateY }],
-          },
-        ]}
-        pointerEvents={activeTab === 'tasks' ? 'auto' : 'none'}
-      >
-        <Text style={[styles.brand, { color: colors.onSurface }]} numberOfLines={1}>
-          Tarefas
-        </Text>
-        <Text style={[styles.brandSubtitle, { color: colors.textMuted }]} numberOfLines={1}>
-          Tarefas e Pendências
-        </Text>
-      </Animated.View>
-
-      {/* Camada Vito Booking */}
-      <Animated.View
-        style={[
-          styles.titleCrossfadeLayer,
-          {
-            opacity: bookingOpacity,
-            transform: [{ translateY: bookingTranslateY }],
-          },
-        ]}
-        pointerEvents={activeTab === 'booking' ? 'auto' : 'none'}
-      >
-        <Text style={[styles.brand, { color: colors.onSurface }]} numberOfLines={1}>
-          Vito Booking
-        </Text>
-        <Text style={[styles.brandSubtitle, { color: colors.textMuted }]} numberOfLines={1}>
-          Links de Agendamento
-        </Text>
-      </Animated.View>
-    </View>
-  ) : (
-    <View style={styles.titleColumn}>
-      <View style={styles.titleRow}>
-        <Text style={[styles.brand, { color: colors.onSurface }]} numberOfLines={1}>
-          {title}
-        </Text>
-        {showStatusDot && (
-          <View style={[styles.statusDot, { backgroundColor: effectiveStatusColor }]} />
-        )}
-      </View>
-      {subtitle ? (
-        <Text style={[styles.brandSubtitle, { color: colors.textMuted }]} numberOfLines={1}>
-          {subtitle}
-        </Text>
-      ) : null}
-    </View>
-  );
+  const isChat = activeTab === 'chat';
 
   return (
     <View
@@ -245,36 +87,36 @@ export const Header: React.FC<HeaderProps> = ({
           borderBottomWidth: showDivider ? 1 : 0,
         },
       ]}
+      accessibilityRole="header"
     >
       <View style={styles.topRow}>
-        <View style={styles.brandRow}>
-          {showMascot && (
-            <VitoMascot size={mascotSize} state={mascotState} />
-          )}
-          {onPressTitle ? (
-            <TouchableOpacity onPress={onPressTitle} activeOpacity={0.7}>
-              {titleContent}
-            </TouchableOpacity>
-          ) : (
-            titleContent
-          )}
-        </View>
+        {onPressTitle ? (
+          <TouchableOpacity onPress={onPressTitle} activeOpacity={0.7} accessibilityRole="button">
+            <Text style={[styles.title, { color: colors.onSurface }]} numberOfLines={1}>
+              {displayTitle}
+            </Text>
+            {displaySubtitle ? (
+              <Text style={[styles.subtitle, { color: colors.textMuted }]} numberOfLines={1}>
+                {displaySubtitle}
+              </Text>
+            ) : null}
+          </TouchableOpacity>
+        ) : (
+          <View>
+            <Text style={[styles.title, { color: colors.onSurface }]} numberOfLines={1}>
+              {displayTitle}
+            </Text>
+            {displaySubtitle ? (
+              <Text style={[styles.subtitle, { color: colors.textMuted }]} numberOfLines={1}>
+                {displaySubtitle}
+              </Text>
+            ) : null}
+          </View>
+        )}
 
         <View style={styles.actionsRow}>
-          {((activeTab === 'chat' || !activeTab) && (onPressNewChat || onPressHistory)) ? (
-            <Animated.View
-              style={[
-                styles.chatActionsGroup,
-                activeTab ? {
-                  opacity: tabTransition.interpolate({ inputRange: [0, 1], outputRange: [0, 1] }),
-                  transform: [
-                    { scale: tabTransition.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1] }) },
-                    { translateX: tabTransition.interpolate({ inputRange: [0, 1], outputRange: [6, 0] }) },
-                  ],
-                } : undefined,
-              ]}
-              pointerEvents={activeTab === 'chat' || !activeTab ? 'auto' : 'none'}
-            >
+          {isChat && (onPressNewChat || onPressHistory) ? (
+            <View style={styles.chatActionsGroup}>
               {onPressNewChat && (
                 <HeaderIconButton
                   icon="add"
@@ -291,49 +133,9 @@ export const Header: React.FC<HeaderProps> = ({
                   size={20}
                 />
               )}
-            </Animated.View>
+            </View>
           ) : (
             contextualActions
-          )}
-
-          <TouchableOpacity
-            style={[
-              styles.actionBtn,
-              {
-                backgroundColor: colors.surfaceContainerLow,
-                borderColor: colors.outlineVariant,
-              },
-            ]}
-            onPress={toggleTheme}
-            activeOpacity={0.7}
-            hitSlop={tokens.hitSlop.sm}
-            accessibilityLabel={isDark ? 'Mudar para tema claro' : 'Mudar para tema escuro'}
-          >
-            <MaterialIcons
-              name={isDark ? 'light-mode' : 'dark-mode'}
-              size={18}
-              color={colors.onSurface}
-            />
-          </TouchableOpacity>
-
-          {user && (
-            <TouchableOpacity
-              style={[
-                styles.userAvatar,
-                {
-                  backgroundColor: colors.surfaceContainerHighest,
-                  borderColor: colors.outlineVariant,
-                },
-              ]}
-              onPress={onPressProfile}
-              activeOpacity={0.75}
-              accessibilityLabel="Perfil e Configurações"
-              hitSlop={tokens.hitSlop.sm}
-            >
-              <Text style={[styles.avatarText, { color: colors.onSurface }]}>
-                {firstName.charAt(0).toUpperCase()}
-              </Text>
-            </TouchableOpacity>
           )}
         </View>
       </View>
@@ -344,66 +146,36 @@ export const Header: React.FC<HeaderProps> = ({
 export const TopAppBar = Header;
 
 const styles = StyleSheet.create({
-  // Top App Bar Compacta: 44dp de altura executiva para visual moderno
   header: {
-    height: 44,
+    minHeight: 44,
     justifyContent: 'center',
     paddingHorizontal: tokens.spacing.md,
-    backgroundColor: tokens.colors.surface,
+    paddingVertical: tokens.spacing.xs,
   },
   topRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: tokens.spacing.sm,
   },
-  brandRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flexShrink: 1,
+  title: {
+    fontSize: 22,
+    lineHeight: 28,
+    fontWeight: '800',
+    letterSpacing: -0.4,
   },
-  titleColumn: {
-    minHeight: 38,
-    justifyContent: 'center',
-    position: 'relative',
-    minWidth: 145,
-  },
-  titleCrossfadeLayer: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    right: 0,
-    justifyContent: 'center',
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
-  brand: {
-    fontSize: 16,
-    lineHeight: 20,
-    fontWeight: '700',
-    letterSpacing: -0.3,
-  },
-  brandSubtitle: {
-    fontSize: 10,
-    lineHeight: 13,
+  subtitle: {
+    fontSize: 12,
+    lineHeight: 16,
     fontWeight: '500',
     letterSpacing: 0.1,
-    marginTop: 0,
-    paddingBottom: 1,
-  },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    marginTop: 1,
   },
   actionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
+    flexShrink: 0,
   },
   chatActionsGroup: {
     flexDirection: 'row',
@@ -411,23 +183,11 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   actionBtn: {
-    width: 32,
-    height: 32,
+    width: 36,
+    height: 36,
     borderRadius: MD3Shapes.full,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  userAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: MD3Shapes.full,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    fontWeight: '700',
-    fontSize: 12,
   },
 });

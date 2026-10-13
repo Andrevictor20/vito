@@ -83,8 +83,8 @@ export const TriggerCard: React.FC<TriggerCardProps> = ({
       style={[
         styles.card,
         {
-          backgroundColor: isDark ? colors.surfaceContainerLow : '#FFFFFF',
-          borderColor: isDark ? colors.outlineVariant : 'rgba(0,0,0,0.06)',
+          backgroundColor: colors.surfaceContainer,
+          borderColor: colors.outlineVariant,
           opacity: isActive ? 1 : 0.75,
         },
       ]}
@@ -170,9 +170,9 @@ export const TriggerCard: React.FC<TriggerCardProps> = ({
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: MD3Shapes.large,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    borderRadius: MD3Shapes.largeIncreased,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     marginBottom: 8,
     borderWidth: 1,
     shadowColor: '#000',
@@ -200,9 +200,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   title: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '700',
-    letterSpacing: -0.2,
+    letterSpacing: -0.1,
+    lineHeight: 21,
     marginBottom: 2,
   },
   metaRow: {
@@ -214,14 +215,14 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     textTransform: 'uppercase',
-    letterSpacing: 0.3,
+    letterSpacing: 0.8,
   },
   metaDot: {
     fontSize: 10,
     opacity: 0.6,
   },
   timeText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '500',
   },
   actionsRight: {

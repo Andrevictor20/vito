@@ -20,7 +20,7 @@ import { ExecutiveMonthCalendarCard } from '../components/home/ExecutiveMonthCal
 import { EventCard } from '../components/calendar/EventCard';
 import { CreateItemModal } from '../components/calendar/CreateItemModal';
 import { EditEventModal } from '../components/calendar/EditEventModal';
-import { ProfileModal } from '../components/profile/ProfileModal';
+import { ProfileScreen } from './ProfileScreen';
 import { ChatScreen, ChatScreenRef } from './ChatScreen';
 import { TriggersScreen } from './TriggersScreen';
 import { TasksScreen } from './TasksScreen';
@@ -49,7 +49,6 @@ export const HomeScreen: React.FC<{
   const { colors, isDark } = useTheme();
 
   const [activeTab, setActiveTab] = useState<MainTabType>('chat');
-  const [profileVisible, setProfileVisible] = useState(false);
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [editModalVisible, setEditModalVisible] = useState(false);
@@ -108,7 +107,7 @@ export const HomeScreen: React.FC<{
   // Intercepta gesto de voltar do hardware/sistema para navegar hierarquicamente
   useEffect(() => {
     const onBackPress = () => {
-      const hasModal = profileVisible || createModalVisible || editModalVisible || Boolean(editingEvent);
+      const hasModal = createModalVisible || editModalVisible || Boolean(editingEvent);
       const action = determineBackAction({
         activeTab,
         hasSubScreen: showSummariesScreen,
@@ -121,7 +120,6 @@ export const HomeScreen: React.FC<{
         return true;
       }
       if (action.type === 'CLOSE_MODAL') {
-        if (profileVisible) setProfileVisible(false);
         if (createModalVisible) setCreateModalVisible(false);
         if (editModalVisible || editingEvent) {
           setEditModalVisible(false);
@@ -138,7 +136,7 @@ export const HomeScreen: React.FC<{
 
     const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
     return () => subscription.remove();
-  }, [showSummariesScreen, profileVisible, createModalVisible, editModalVisible, editingEvent, activeTab, containerWidth]);
+  }, [showSummariesScreen, createModalVisible, editModalVisible, editingEvent, activeTab, containerWidth]);
   const {
     events,
     todos,
@@ -182,13 +180,11 @@ export const HomeScreen: React.FC<{
 
   return (
     <View style={[styles.container, { backgroundColor: colors.surface }]}>
-      {/* Top App Bar Persistente M3 com transição suave e contínua */}
+      {/* Page Title enxuto M3: só título por página + ações contextuais do Chat */}
       <Header
         activeTab={activeTab}
-        onPressProfile={() => setProfileVisible(true)}
         onPressNewChat={() => chatRef.current?.startNewChat()}
         onPressHistory={() => chatRef.current?.openHistory()}
-        mascotState={activeTab === 'chat' && isChatLoading ? 'thinking' : 'idle'}
       />
 
       <View
@@ -212,7 +208,7 @@ export const HomeScreen: React.FC<{
             scrollEnabled={
               !shouldPreventSwipe({
                 isKeyboardOpen,
-                hasModal: profileVisible || createModalVisible || editModalVisible || Boolean(editingEvent),
+                hasModal: createModalVisible || editModalVisible || Boolean(editingEvent),
                 hasSubScreen: showSummariesScreen,
               })
             }
@@ -390,6 +386,11 @@ export const HomeScreen: React.FC<{
           <View style={[styles.pageWrapper, { width: containerWidth }]}>
             <BookingScreen />
           </View>
+
+          {/* Página 5: Perfil e Configurações */}
+          <View style={[styles.pageWrapper, { width: containerWidth }]}>
+            <ProfileScreen refreshing={refreshing} onRefresh={onRefresh} onDataChanged={loadData} />
+          </View>
         </ScrollView>
 
         <CreateItemModal
@@ -457,14 +458,6 @@ export const HomeScreen: React.FC<{
         onSelectTab={handleSelectTab}
         visible={!isKeyboardOpen && !showSummariesScreen}
       />
-
-      <ProfileModal
-        visible={profileVisible}
-        onClose={() => setProfileVisible(false)}
-        serverUrl={serverUrl}
-        onToggleServer={onToggleServer}
-        onDataChanged={loadData}
-      />
     </View>
   );
 };
@@ -528,7 +521,7 @@ const styles = StyleSheet.create({
   },
   checklistCard: {
     backgroundColor: tokens.colors.surfaceContainerLow,
-    borderRadius: MD3Shapes.large,
+    borderRadius: MD3Shapes.largeIncreased,
     paddingHorizontal: tokens.spacing.md,
     paddingVertical: tokens.spacing.xs,
     marginBottom: tokens.spacing.md,
@@ -537,7 +530,7 @@ const styles = StyleSheet.create({
     backgroundColor: tokens.colors.surfaceContainer,
     borderWidth: 1,
     borderColor: tokens.colors.outlineVariant,
-    borderRadius: MD3Shapes.large,
+    borderRadius: MD3Shapes.largeIncreased,
     padding: tokens.spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
@@ -581,7 +574,7 @@ const styles = StyleSheet.create({
     gap: 8,
     backgroundColor: tokens.colors.primary,
     paddingVertical: 14,
-    borderRadius: MD3Shapes.large,
+    borderRadius: MD3Shapes.full,
     ...tokens.shadows.level3,
   },
   createFabText: {

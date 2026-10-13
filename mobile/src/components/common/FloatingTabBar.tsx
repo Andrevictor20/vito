@@ -154,6 +154,29 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
             color={activeTab === 'booking' ? (isDark ? colors.onSurface : colors.onPrimary) : colors.onSurfaceVariant}
           />
         </TouchableOpacity>
+
+        {/* Item 6: Perfil e Configurações */}
+        <TouchableOpacity
+          style={[
+            styles.tabButton,
+            activeTab === 'profile' && [
+              styles.tabButtonActive,
+              { backgroundColor: isDark ? colors.surfaceContainerHighest : colors.primary },
+            ],
+          ]}
+          onPress={() => handleTabPress('profile')}
+          activeOpacity={0.7}
+          hitSlop={tokens.hitSlop.sm}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: activeTab === 'profile' }}
+          accessibilityLabel="Aba Perfil e Configurações"
+        >
+          <MaterialIcons
+            name={activeTab === 'profile' ? 'person' : 'person-outline'}
+            size={20}
+            color={activeTab === 'profile' ? (isDark ? colors.onSurface : colors.onPrimary) : colors.onSurfaceVariant}
+          />
+        </TouchableOpacity>
       </View>
     </View>
   );

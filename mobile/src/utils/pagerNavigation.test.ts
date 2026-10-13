@@ -12,8 +12,8 @@ import {
 
 describe('Pager Navigation Unit Tests (TDD)', () => {
   describe('Tab Ordering & Index Mapping', () => {
-    test('TAB_ORDER matches [chat, calendar, tasks, triggers, booking]', () => {
-      assert.deepEqual(TAB_ORDER, ['chat', 'calendar', 'tasks', 'triggers', 'booking']);
+    test('TAB_ORDER matches [chat, calendar, tasks, triggers, booking, profile]', () => {
+      assert.deepEqual(TAB_ORDER, ['chat', 'calendar', 'tasks', 'triggers', 'booking', 'profile']);
     });
 
     test('getIndexForTab returns correct index for each tab', () => {
@@ -22,6 +22,7 @@ describe('Pager Navigation Unit Tests (TDD)', () => {
       assert.equal(getIndexForTab('tasks'), 2);
       assert.equal(getIndexForTab('triggers'), 3);
       assert.equal(getIndexForTab('booking'), 4);
+      assert.equal(getIndexForTab('profile'), 5);
     });
 
     test('getTabForIndex returns correct tab identifier', () => {
@@ -30,11 +31,12 @@ describe('Pager Navigation Unit Tests (TDD)', () => {
       assert.equal(getTabForIndex(2), 'tasks');
       assert.equal(getTabForIndex(3), 'triggers');
       assert.equal(getTabForIndex(4), 'booking');
+      assert.equal(getTabForIndex(5), 'profile');
     });
 
     test('getTabForIndex clamps out-of-bounds indices', () => {
       assert.equal(getTabForIndex(-1), 'chat');
-      assert.equal(getTabForIndex(99), 'booking');
+      assert.equal(getTabForIndex(99), 'profile');
     });
   });
 
@@ -55,7 +57,7 @@ describe('Pager Navigation Unit Tests (TDD)', () => {
     test('calculatePageIndex clamps negative and excessive offsets', () => {
       const screenWidth = 375;
       assert.equal(calculatePageIndex(-50, screenWidth), 0);
-      assert.equal(calculatePageIndex(2500, screenWidth), 4);
+      assert.equal(calculatePageIndex(2500, screenWidth), 5);
     });
 
     test('calculateScrollTarget returns exact offset X in pixels', () => {
@@ -65,6 +67,7 @@ describe('Pager Navigation Unit Tests (TDD)', () => {
       assert.equal(calculateScrollTarget('tasks', width), 780);
       assert.equal(calculateScrollTarget('triggers', width), 1170);
       assert.equal(calculateScrollTarget('booking', width), 1560);
+      assert.equal(calculateScrollTarget('profile', width), 1950);
     });
   });
 
@@ -104,8 +107,8 @@ describe('Pager Navigation Unit Tests (TDD)', () => {
       assert.equal(action.handled, true);
     });
 
-    test('returns to chat tab when in calendar, tasks, triggers or booking', () => {
-      for (const tab of ['calendar', 'tasks', 'triggers', 'booking'] as const) {
+    test('returns to chat tab when in calendar, tasks, triggers, booking or profile', () => {
+      for (const tab of ['calendar', 'tasks', 'triggers', 'booking', 'profile'] as const) {
         const action = determineBackAction({
           activeTab: tab,
           hasSubScreen: false,

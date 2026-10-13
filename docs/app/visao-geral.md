@@ -3,7 +3,7 @@
 O Vito é o secretário executivo no bolso: agenda, tarefas, pendências,
 vigílias (radares) e links de agendamento, tudo operável por chat ou pelas telas.
 
-## As 5 abas (nesta ordem)
+## As 6 abas (nesta ordem)
 
 1. **Chat** — conversa com o Vito. Dá para criar, consultar, reagendar e cancelar
    tudo por linguagem natural, além de enviar áudio e fotos (convites, recibos).
@@ -15,6 +15,9 @@ vigílias (radares) e links de agendamento, tudo operável por chat ou pelas tel
 4. **Radares** — vigílias e monitoramentos (ações, voos, jogos, preços, notícias).
 5. **Booking** — links de agendamento (Vito Booking): você abre janelas de horário
    e convidados marcam com você. Vale 7 dias por padrão, incluindo fins de semana.
+6. **Perfil** — conta e ajustes: tema claro/escuro, IA, notificações, sync Google,
+   buscar atualizações OTA, trocar/sair. O topo de cada página mostra só o título;
+   tema e perfil ficam apenas aqui, não no topo.
 
 ## Regras de resposta sobre o app
 

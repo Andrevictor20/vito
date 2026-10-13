@@ -326,7 +326,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   checklistCard: {
-    borderRadius: 16,
+    borderRadius: 20,
     overflow: 'hidden',
   },
   errorCard: {
@@ -346,7 +346,7 @@ const styles = StyleSheet.create({
   emptyCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 16,
+    borderRadius: 20,
     borderWidth: 1,
     padding: tokens.spacing.md,
     gap: 12,
@@ -362,8 +362,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   emptyTitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
+    lineHeight: 21,
   },
   emptySub: {
     fontSize: 12,
@@ -397,7 +398,7 @@ const styles = StyleSheet.create({
   createFab: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 20,
+    borderRadius: 9999,
     paddingHorizontal: 20,
     paddingVertical: 12,
     gap: 8,
