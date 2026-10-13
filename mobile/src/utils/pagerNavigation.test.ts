@@ -12,25 +12,29 @@ import {
 
 describe('Pager Navigation Unit Tests (TDD)', () => {
   describe('Tab Ordering & Index Mapping', () => {
-    test('TAB_ORDER matches [chat, calendar, triggers]', () => {
-      assert.deepEqual(TAB_ORDER, ['chat', 'calendar', 'triggers']);
+    test('TAB_ORDER matches [chat, calendar, tasks, triggers, booking]', () => {
+      assert.deepEqual(TAB_ORDER, ['chat', 'calendar', 'tasks', 'triggers', 'booking']);
     });
 
     test('getIndexForTab returns correct index for each tab', () => {
       assert.equal(getIndexForTab('chat'), 0);
       assert.equal(getIndexForTab('calendar'), 1);
-      assert.equal(getIndexForTab('triggers'), 2);
+      assert.equal(getIndexForTab('tasks'), 2);
+      assert.equal(getIndexForTab('triggers'), 3);
+      assert.equal(getIndexForTab('booking'), 4);
     });
 
     test('getTabForIndex returns correct tab identifier', () => {
       assert.equal(getTabForIndex(0), 'chat');
       assert.equal(getTabForIndex(1), 'calendar');
-      assert.equal(getTabForIndex(2), 'triggers');
+      assert.equal(getTabForIndex(2), 'tasks');
+      assert.equal(getTabForIndex(3), 'triggers');
+      assert.equal(getTabForIndex(4), 'booking');
     });
 
     test('getTabForIndex clamps out-of-bounds indices', () => {
       assert.equal(getTabForIndex(-1), 'chat');
-      assert.equal(getTabForIndex(99), 'triggers');
+      assert.equal(getTabForIndex(99), 'booking');
     });
   });
 
@@ -44,19 +48,23 @@ describe('Pager Navigation Unit Tests (TDD)', () => {
       assert.equal(calculatePageIndex(590, screenWidth), 1);
       assert.equal(calculatePageIndex(610, screenWidth), 2);
       assert.equal(calculatePageIndex(800, screenWidth), 2);
+      assert.equal(calculatePageIndex(1190, screenWidth), 3);
+      assert.equal(calculatePageIndex(1600, screenWidth), 4);
     });
 
     test('calculatePageIndex clamps negative and excessive offsets', () => {
       const screenWidth = 375;
       assert.equal(calculatePageIndex(-50, screenWidth), 0);
-      assert.equal(calculatePageIndex(1500, screenWidth), 2);
+      assert.equal(calculatePageIndex(2500, screenWidth), 4);
     });
 
     test('calculateScrollTarget returns exact offset X in pixels', () => {
       const width = 390;
       assert.equal(calculateScrollTarget('chat', width), 0);
       assert.equal(calculateScrollTarget('calendar', width), 390);
-      assert.equal(calculateScrollTarget('triggers', width), 780);
+      assert.equal(calculateScrollTarget('tasks', width), 780);
+      assert.equal(calculateScrollTarget('triggers', width), 1170);
+      assert.equal(calculateScrollTarget('booking', width), 1560);
     });
   });
 
@@ -96,24 +104,17 @@ describe('Pager Navigation Unit Tests (TDD)', () => {
       assert.equal(action.handled, true);
     });
 
-    test('returns to chat tab when in calendar or triggers', () => {
-      const actionFromCalendar = determineBackAction({
-        activeTab: 'calendar',
-        hasSubScreen: false,
-        hasModal: false,
-      });
-      assert.equal(actionFromCalendar.type, 'NAVIGATE_TO_TAB');
-      assert.equal(actionFromCalendar.targetTab, 'chat');
-      assert.equal(actionFromCalendar.handled, true);
-
-      const actionFromTriggers = determineBackAction({
-        activeTab: 'triggers',
-        hasSubScreen: false,
-        hasModal: false,
-      });
-      assert.equal(actionFromTriggers.type, 'NAVIGATE_TO_TAB');
-      assert.equal(actionFromTriggers.targetTab, 'chat');
-      assert.equal(actionFromTriggers.handled, true);
+    test('returns to chat tab when in calendar, tasks, triggers or booking', () => {
+      for (const tab of ['calendar', 'tasks', 'triggers', 'booking'] as const) {
+        const action = determineBackAction({
+          activeTab: tab,
+          hasSubScreen: false,
+          hasModal: false,
+        });
+        assert.equal(action.type, 'NAVIGATE_TO_TAB');
+        assert.equal((action as { targetTab: string }).targetTab, 'chat');
+        assert.equal(action.handled, true);
+      }
     });
 
     test('allows app exit when already on chat without modals', () => {

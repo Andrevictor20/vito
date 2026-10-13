@@ -4,10 +4,11 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { tokens } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { hapticFeedback } from '../../theme/motion';
+import { MainTabType } from '../../utils/pagerNavigation';
 
 interface FloatingTabBarProps {
-  activeTab: 'chat' | 'calendar' | 'triggers';
-  onSelectTab: (tab: 'chat' | 'calendar' | 'triggers') => void;
+  activeTab: MainTabType;
+  onSelectTab: (tab: MainTabType) => void;
   visible?: boolean;
 }
 
@@ -20,7 +21,7 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
 
   if (!visible) return null;
 
-  const handleTabPress = (tab: 'chat' | 'calendar' | 'triggers') => {
+  const handleTabPress = (tab: MainTabType) => {
     if (tab !== activeTab) {
       hapticFeedback.selection();
     }
@@ -85,7 +86,30 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
           />
         </TouchableOpacity>
 
-        {/* Item 3: Radares */}
+        {/* Item 3: Tarefas e Pendências */}
+        <TouchableOpacity
+          style={[
+            styles.tabButton,
+            activeTab === 'tasks' && [
+              styles.tabButtonActive,
+              { backgroundColor: isDark ? colors.surfaceContainerHighest : colors.primary },
+            ],
+          ]}
+          onPress={() => handleTabPress('tasks')}
+          activeOpacity={0.7}
+          hitSlop={tokens.hitSlop.sm}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: activeTab === 'tasks' }}
+          accessibilityLabel="Aba Tarefas e Pendências"
+        >
+          <MaterialIcons
+            name={activeTab === 'tasks' ? 'task-alt' : 'checklist'}
+            size={20}
+            color={activeTab === 'tasks' ? (isDark ? colors.onSurface : colors.onPrimary) : colors.onSurfaceVariant}
+          />
+        </TouchableOpacity>
+
+        {/* Item 4: Radares */}
         <TouchableOpacity
           style={[
             styles.tabButton,
@@ -105,6 +129,29 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
             name={activeTab === 'triggers' ? 'radar' : 'track-changes'}
             size={20}
             color={activeTab === 'triggers' ? (isDark ? colors.onSurface : colors.onPrimary) : colors.onSurfaceVariant}
+          />
+        </TouchableOpacity>
+
+        {/* Item 5: Vito Booking */}
+        <TouchableOpacity
+          style={[
+            styles.tabButton,
+            activeTab === 'booking' && [
+              styles.tabButtonActive,
+              { backgroundColor: isDark ? colors.surfaceContainerHighest : colors.primary },
+            ],
+          ]}
+          onPress={() => handleTabPress('booking')}
+          activeOpacity={0.7}
+          hitSlop={tokens.hitSlop.sm}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: activeTab === 'booking' }}
+          accessibilityLabel="Aba Vito Booking"
+        >
+          <MaterialIcons
+            name={activeTab === 'booking' ? 'event-available' : 'link'}
+            size={20}
+            color={activeTab === 'booking' ? (isDark ? colors.onSurface : colors.onPrimary) : colors.onSurfaceVariant}
           />
         </TouchableOpacity>
       </View>

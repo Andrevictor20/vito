@@ -21,6 +21,7 @@ interface CreateItemModalProps {
   events?: import('../../types').Event[];
   onSaveEvent?: (title: string, priority?: NotificationPriority) => void;
   onSaveTodo?: (title: string, priority: 'low' | 'medium' | 'high', eventId?: string, eventTitle?: string) => void;
+  fixedTab?: 'event' | 'todo';
 }
 
 export const CreateItemModal: React.FC<CreateItemModalProps> = ({
@@ -30,9 +31,11 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
   events,
   onSaveEvent,
   onSaveTodo,
+  fixedTab,
 }) => {
   const { colors, isDark } = useTheme();
-  const [tab, setTab] = useState<'event' | 'todo'>('event');
+  const [tabState, setTab] = useState<'event' | 'todo'>('event');
+  const tab = fixedTab ?? tabState;
   const [title, setTitle] = useState('');
   const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium');
   const [notifPriority, setNotifPriority] = useState<NotificationPriority>('default');
@@ -62,8 +65,9 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
         <View style={styles.overlay}>
           <TouchableWithoutFeedback>
             <View style={[styles.card, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
-              {/* Header com Segmented Tabs */}
+              {/* Header com Segmented Tabs (oculto quando a aba é fixa por página) */}
               <View style={styles.header}>
+                {!fixedTab && (
                 <View style={[styles.segmentedGroup, { backgroundColor: colors.surfaceContainerLowest, borderColor: colors.outlineVariant, borderWidth: 1 }]}>
                   <TouchableOpacity
                     style={[
@@ -111,6 +115,7 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
                     </Text>
                   </TouchableOpacity>
                 </View>
+                )}
 
                 <TouchableOpacity onPress={onClose} hitSlop={tokens.hitSlop.sm} accessibilityLabel="Fechar">
                   <MaterialIcons name="close" size={18} color={colors.onSurfaceVariant} />

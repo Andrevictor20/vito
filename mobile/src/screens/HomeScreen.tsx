@@ -18,13 +18,12 @@ import { FloatingTabBar } from '../components/common/FloatingTabBar';
 import { Header } from '../components/common/Header';
 import { ExecutiveMonthCalendarCard } from '../components/home/ExecutiveMonthCalendarCard';
 import { EventCard } from '../components/calendar/EventCard';
-import { TodoItem } from '../components/todos/TodoItem';
 import { CreateItemModal } from '../components/calendar/CreateItemModal';
 import { EditEventModal } from '../components/calendar/EditEventModal';
 import { ProfileModal } from '../components/profile/ProfileModal';
 import { ChatScreen, ChatScreenRef } from './ChatScreen';
 import { TriggersScreen } from './TriggersScreen';
-import { PendingItemsView } from './PendingItemsView';
+import { TasksScreen } from './TasksScreen';
 import { BookingScreen } from './BookingScreen';
 import { ExecutiveSummariesHubView } from './ExecutiveSummariesHubView';
 import { hapticFeedback } from '../theme/motion';
@@ -56,9 +55,8 @@ export const HomeScreen: React.FC<{
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const [isChatLoading, setIsChatLoading] = useState(false);
-  const [showPendingItems, setShowPendingItems] = useState(false);
-  const [showBookingScreen, setShowBookingScreen] = useState(false);
   const [showSummariesScreen, setShowSummariesScreen] = useState(false);
+  const [createTab, setCreateTab] = useState<'event' | 'todo'>('event');
 
   const chatRef = useRef<ChatScreenRef>(null);
   const pagerRef = useRef<ScrollView>(null);
@@ -72,10 +70,12 @@ export const HomeScreen: React.FC<{
     isProgrammaticScroll.current = true;
     const targetX = calculateScrollTarget(tab, containerWidth);
     pagerRef.current?.scrollTo({ x: targetX, animated: true });
-    if (tab === 'calendar') {
+    if (tab === 'calendar' || tab === 'tasks') {
       loadData(true);
     } else if (tab === 'triggers') {
       dataSync.notify('refresh_triggers');
+    } else if (tab === 'booking') {
+      dataSync.notify('refresh_bookings');
     }
   };
 
@@ -87,10 +87,12 @@ export const HomeScreen: React.FC<{
     if (newTab !== activeTab) {
       hapticFeedback.selection();
       setActiveTab(newTab);
-      if (newTab === 'calendar') {
+      if (newTab === 'calendar' || newTab === 'tasks') {
         loadData(true);
       } else if (newTab === 'triggers') {
         dataSync.notify('refresh_triggers');
+      } else if (newTab === 'booking') {
+        dataSync.notify('refresh_bookings');
       }
     }
   };
@@ -109,22 +111,12 @@ export const HomeScreen: React.FC<{
       const hasModal = profileVisible || createModalVisible || editModalVisible || Boolean(editingEvent);
       const action = determineBackAction({
         activeTab,
-        hasSubScreen: showPendingItems || showBookingScreen || showSummariesScreen,
+        hasSubScreen: showSummariesScreen,
         hasModal,
       });
 
-      if (showBookingScreen) {
-        setShowBookingScreen(false);
-        pagerRef.current?.scrollTo({ x: calculateScrollTarget(activeTab, containerWidth), animated: false });
-        return true;
-      }
       if (showSummariesScreen) {
         setShowSummariesScreen(false);
-        pagerRef.current?.scrollTo({ x: calculateScrollTarget(activeTab, containerWidth), animated: false });
-        return true;
-      }
-      if (showPendingItems || action.type === 'CLOSE_SUBSCREEN') {
-        setShowPendingItems(false);
         pagerRef.current?.scrollTo({ x: calculateScrollTarget(activeTab, containerWidth), animated: false });
         return true;
       }
@@ -146,7 +138,7 @@ export const HomeScreen: React.FC<{
 
     const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
     return () => subscription.remove();
-  }, [showPendingItems, showBookingScreen, showSummariesScreen, profileVisible, createModalVisible, editModalVisible, editingEvent, activeTab, containerWidth]);
+  }, [showSummariesScreen, profileVisible, createModalVisible, editModalVisible, editingEvent, activeTab, containerWidth]);
   const {
     events,
     todos,
@@ -178,10 +170,6 @@ export const HomeScreen: React.FC<{
   const completedCount = useMemo(() => {
     return todos.filter((t) => t.status === 'completed').length;
   }, [todos]);
-
-  // Modo de foco dedicado: 'events' vs 'todos' para eliminar rolagem infinita dupla
-  const [homeFocusMode, setHomeFocusMode] = useState<'events' | 'todos'>('events');
-  const [showCompletedTodos, setShowCompletedTodos] = useState(false);
 
   const pendingTodos = useMemo(
     () => todos.filter((t) => t.status !== 'completed'),
@@ -221,13 +209,13 @@ export const HomeScreen: React.FC<{
           scrollEventThrottle={16}
           nestedScrollEnabled={true}
           directionalLockEnabled={true}
-          scrollEnabled={
-            !shouldPreventSwipe({
-              isKeyboardOpen,
-              hasModal: profileVisible || createModalVisible || editModalVisible || Boolean(editingEvent),
-              hasSubScreen: showPendingItems || showBookingScreen || showSummariesScreen,
-            })
-          }
+            scrollEnabled={
+              !shouldPreventSwipe({
+                isKeyboardOpen,
+                hasModal: profileVisible || createModalVisible || editModalVisible || Boolean(editingEvent),
+                hasSubScreen: showSummariesScreen,
+              })
+            }
           contentOffset={{ x: calculateScrollTarget(activeTab, containerWidth), y: 0 }}
           onMomentumScrollEnd={handleMomentumScrollEnd}
           style={styles.pagerScrollView}
@@ -267,166 +255,8 @@ export const HomeScreen: React.FC<{
                 eventDates={eventDates}
               />
 
-              {/* Seletor Segmentado de Foco (Eventos vs Tarefas - 50% cada) */}
-              <View style={styles.focusSegmentedContainer}>
-                <TouchableOpacity
-                  style={[
-                    styles.focusSegmentBtn,
-                    {
-                      backgroundColor:
-                        homeFocusMode === 'events'
-                          ? (isDark ? colors.surfaceContainerHighest : colors.primary)
-                          : (isDark ? colors.surfaceContainerLow : '#F4F4F5'),
-                      borderColor:
-                        homeFocusMode === 'events'
-                          ? 'transparent'
-                          : colors.outlineVariant,
-                    },
-                    homeFocusMode === 'events' && styles.focusSegmentBtnActive,
-                  ]}
-                  onPress={() => setHomeFocusMode('events')}
-                  activeOpacity={0.75}
-                  accessibilityRole="tab"
-                  accessibilityState={{ selected: homeFocusMode === 'events' }}
-                >
-                  <MaterialIcons
-                    name="event"
-                    size={16}
-                    color={
-                      homeFocusMode === 'events'
-                        ? (isDark ? colors.onSurface : colors.onPrimary)
-                        : colors.onSurfaceVariant
-                    }
-                  />
-                  <Text
-                    style={[
-                      styles.focusSegmentText,
-                      {
-                        color:
-                          homeFocusMode === 'events'
-                            ? (isDark ? colors.onSurface : colors.onPrimary)
-                            : colors.onSurfaceVariant,
-                        fontWeight: homeFocusMode === 'events' ? '700' : '500',
-                      },
-                    ]}
-                  >
-                    Eventos ({dayEvents.length})
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.focusSegmentBtn,
-                    {
-                      backgroundColor:
-                        homeFocusMode === 'todos'
-                          ? (isDark ? colors.surfaceContainerHighest : colors.primary)
-                          : (isDark ? colors.surfaceContainerLow : '#F4F4F5'),
-                      borderColor:
-                        homeFocusMode === 'todos'
-                          ? 'transparent'
-                          : colors.outlineVariant,
-                    },
-                    homeFocusMode === 'todos' && styles.focusSegmentBtnActive,
-                  ]}
-                  onPress={() => setHomeFocusMode('todos')}
-                  activeOpacity={0.75}
-                  accessibilityRole="tab"
-                  accessibilityState={{ selected: homeFocusMode === 'todos' }}
-                >
-                  <MaterialIcons
-                    name="check-circle-outline"
-                    size={16}
-                    color={
-                      homeFocusMode === 'todos'
-                        ? (isDark ? colors.onSurface : colors.onPrimary)
-                        : colors.onSurfaceVariant
-                    }
-                  />
-                  <Text
-                    style={[
-                      styles.focusSegmentText,
-                      {
-                        color:
-                          homeFocusMode === 'todos'
-                            ? (isDark ? colors.onSurface : colors.onPrimary)
-                            : colors.onSurfaceVariant,
-                        fontWeight: homeFocusMode === 'todos' ? '700' : '500',
-                      },
-                    ]}
-                  >
-                    Tarefas ({pendingTodos.length})
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Ações Rápidas Executivas: Pendências & Vito Booking (100% visíveis, sem swipe) */}
-              <View style={styles.quickActionsDockRow}>
-                <TouchableOpacity
-                  style={[
-                    styles.quickActionCard,
-                    {
-                      backgroundColor: isDark ? colors.surfaceContainerLow : '#F4F4F5',
-                      borderColor: colors.outlineVariant,
-                    },
-                  ]}
-                  onPress={() => {
-                    hapticFeedback.selection();
-                    setShowPendingItems(true);
-                  }}
-                  activeOpacity={0.75}
-                  accessibilityRole="button"
-                  accessibilityLabel="Abrir Pendências"
-                >
-                  <MaterialIcons
-                    name="inbox"
-                    size={16}
-                    color={colors.primary}
-                  />
-                  <Text
-                    style={[
-                      styles.quickActionText,
-                      { color: colors.onSurface },
-                    ]}
-                  >
-                    Pendências
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.quickActionCard,
-                    {
-                      backgroundColor: isDark ? colors.surfaceContainerLow : '#F4F4F5',
-                      borderColor: colors.outlineVariant,
-                    },
-                  ]}
-                  onPress={() => {
-                    hapticFeedback.selection();
-                    setShowBookingScreen(true);
-                  }}
-                  activeOpacity={0.75}
-                  accessibilityRole="button"
-                  accessibilityLabel="Abrir Vito Booking"
-                >
-                  <MaterialIcons
-                    name="link"
-                    size={16}
-                    color={colors.primary}
-                  />
-                  <Text
-                    style={[
-                      styles.quickActionText,
-                      { color: colors.onSurface },
-                    ]}
-                  >
-                    Vito Booking
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Visualização de Eventos com Foco Dedicado */}
-              {homeFocusMode === 'events' ? (
+              {/* Eventos do dia */}
+              {(
                 <View style={styles.focusSectionContainer}>
                   <View style={styles.sectionHeader}>
                     <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>
@@ -508,128 +338,60 @@ export const HomeScreen: React.FC<{
                     ))
                   )}
                 </View>
-              ) : (
-                /* Visualização de Tarefas com Foco Dedicado e Gaveta de Concluídas */
-                <View style={styles.focusSectionContainer}>
-                  <View style={styles.sectionHeader}>
-                    <View>
-                      <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>Tarefas e Pendências</Text>
-                      <Text style={[styles.checklistSubtitle, { color: colors.textMuted }]}>
-                        {completedCount}/{todos.length} concluídas
-                      </Text>
-                    </View>
-                  </View>
-
-                  {loading && todos.length === 0 ? (
-                    <ActivityIndicator color={colors.primary} style={{ marginVertical: 20 }} />
-                  ) : pendingTodos.length === 0 ? (
-                    <View style={[styles.emptyCard, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
-                      <View style={[styles.emptyIconContainer, { backgroundColor: 'rgba(52, 211, 153, 0.15)' }]}>
-                        <MaterialIcons name="done-all" size={20} color={colors.success} />
-                      </View>
-                      <View style={styles.emptyContent}>
-                        <Text style={[styles.emptyTitle, { color: colors.onSurface }]}>Tudo em Dia</Text>
-                        <Text style={[styles.emptySub, { color: colors.onSurfaceVariant }]}>Nenhuma tarefa pendente no momento.</Text>
-                      </View>
-                    </View>
-                  ) : (
-                    <View style={[styles.checklistCard, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant, borderWidth: 1 }]}>
-                      {pendingTodos.map((t, idx) => (
-                        <TodoItem
-                          key={t.id}
-                          todo={t}
-                          onToggle={handleToggleTodo}
-                          onDelete={handleDeleteTodo}
-                          onToggleSubtask={handleToggleSubtask}
-                          onAddSubtask={handleAddSubtask}
-                          onDeleteSubtask={handleDeleteSubtask}
-                          isLast={idx === pendingTodos.length - 1}
-                          grouped
-                        />
-                      ))}
-                    </View>
-                  )}
-
-                  {/* Gaveta Colapsável de Concluídas */}
-                  {completedTodosList.length > 0 && (
-                    <View style={styles.completedSectionWrapper}>
-                      <TouchableOpacity
-                        style={[
-                          styles.completedSectionToggle,
-                          {
-                            backgroundColor: isDark ? colors.surfaceContainerLow : '#F4F4F5',
-                            borderColor: colors.outlineVariant,
-                          },
-                        ]}
-                        onPress={() => setShowCompletedTodos(!showCompletedTodos)}
-                        activeOpacity={0.7}
-                        accessibilityRole="button"
-                        accessibilityLabel="Alternar visualização de tarefas concluídas"
-                      >
-                        <View style={styles.completedToggleLeft}>
-                          <MaterialIcons name="done-all" size={16} color={colors.accents.emerald} />
-                          <Text style={[styles.completedToggleText, { color: colors.onSurfaceVariant }]}>
-                            Concluídas ({completedTodosList.length})
-                          </Text>
-                        </View>
-                        <MaterialIcons
-                          name={showCompletedTodos ? 'expand-less' : 'expand-more'}
-                          size={20}
-                          color={colors.onSurfaceVariant}
-                        />
-                      </TouchableOpacity>
-
-                      {showCompletedTodos && (
-                        <View
-                          style={[
-                            styles.checklistCard,
-                            {
-                              backgroundColor: colors.surfaceContainer,
-                              borderColor: colors.outlineVariant,
-                              borderWidth: 1,
-                              marginTop: 8,
-                              opacity: 0.85,
-                            },
-                          ]}
-                        >
-                          {completedTodosList.map((t, idx) => (
-                            <TodoItem
-                              key={t.id}
-                              todo={t}
-                              onToggle={handleToggleTodo}
-                              onDelete={handleDeleteTodo}
-                              onToggleSubtask={handleToggleSubtask}
-                              onAddSubtask={handleAddSubtask}
-                              onDeleteSubtask={handleDeleteSubtask}
-                              isLast={idx === completedTodosList.length - 1}
-                              grouped
-                            />
-                          ))}
-                        </View>
-                      )}
-                    </View>
-                  )}
-                </View>
               )}
 
-              {/* Botão de Criação Rápida */}
+              {/* Botão de Criação Rápida de Evento */}
               <View style={styles.createBtnWrapper}>
                 <TouchableOpacity
                   style={[styles.createFab, { backgroundColor: colors.primary }]}
-                  onPress={() => setCreateModalVisible(true)}
+                  onPress={() => {
+                    setCreateTab('event');
+                    setCreateModalVisible(true);
+                  }}
                   activeOpacity={0.85}
-                  accessibilityLabel="Criar nova tarefa ou evento"
+                  accessibilityLabel="Criar novo evento"
                 >
                   <MaterialIcons name="add" size={22} color={colors.onPrimary} />
-                  <Text style={[styles.createFabText, { color: colors.onPrimary }]}>Nova Tarefa ou Evento</Text>
+                  <Text style={[styles.createFabText, { color: colors.onPrimary }]}>Novo Evento</Text>
                 </TouchableOpacity>
               </View>
             </ScrollView>
           </View>
 
-          {/* Página 2: Disparadores / Radares */}
+          {/* Página 2: Tarefas e Pendências */}
+          <View style={[styles.pageWrapper, { width: containerWidth }]}>
+            <TasksScreen
+              todos={todos}
+              pendingTodos={pendingTodos}
+              completedTodosList={completedTodosList}
+              completedCount={completedCount}
+              loading={loading}
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              onToggleTodo={handleToggleTodo}
+              onDeleteTodo={handleDeleteTodo}
+              onToggleSubtask={handleToggleSubtask}
+              onAddSubtask={handleAddSubtask}
+              onDeleteSubtask={handleDeleteSubtask}
+              onCreateTodo={() => {
+                setCreateTab('todo');
+                setCreateModalVisible(true);
+              }}
+              onOpenEventCreate={() => {
+                setCreateTab('event');
+                setCreateModalVisible(true);
+              }}
+            />
+          </View>
+
+          {/* Página 3: Disparadores / Radares */}
           <View style={[styles.pageWrapper, { width: containerWidth }]}>
             <TriggersScreen onOpenExecutiveSummaries={() => setShowSummariesScreen(true)} />
+          </View>
+
+          {/* Página 4: Vito Booking */}
+          <View style={[styles.pageWrapper, { width: containerWidth }]}>
+            <BookingScreen />
           </View>
         </ScrollView>
 
@@ -638,6 +400,7 @@ export const HomeScreen: React.FC<{
           onClose={() => setCreateModalVisible(false)}
           selectedDate={selectedDate}
           events={events}
+          fixedTab={createTab}
           onSaveEvent={async (title) => {
             const start = new Date(selectedDate);
             start.setHours(9, 0, 0, 0);
@@ -672,33 +435,7 @@ export const HomeScreen: React.FC<{
         />
       </View>
 
-      {/* Sub-telas de Primeira Classe em Overlay (Preservam a montagem e posição do Pager) */}
-      {showPendingItems && (
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.surface, zIndex: 100 }]}>
-          <PendingItemsView
-            onBack={() => {
-              setShowPendingItems(false);
-              pagerRef.current?.scrollTo({ x: calculateScrollTarget(activeTab, containerWidth), animated: false });
-            }}
-            onOpenEventCreate={(title) => {
-              setShowPendingItems(false);
-              setCreateModalVisible(true);
-            }}
-          />
-        </View>
-      )}
-
-      {showBookingScreen && (
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.surface, zIndex: 100 }]}>
-          <BookingScreen
-            onBack={() => {
-              setShowBookingScreen(false);
-              pagerRef.current?.scrollTo({ x: calculateScrollTarget(activeTab, containerWidth), animated: false });
-            }}
-          />
-        </View>
-      )}
-
+      {/* Sub-tela de Resumos em Overlay (preserva a montagem e posição do Pager) */}
       {showSummariesScreen && (
         <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.surface, zIndex: 100 }]}>
           <ExecutiveSummariesHubView
@@ -721,7 +458,7 @@ export const HomeScreen: React.FC<{
       <FloatingTabBar
         activeTab={activeTab}
         onSelectTab={handleSelectTab}
-        visible={!isKeyboardOpen && !showPendingItems && !showBookingScreen && !showSummariesScreen}
+        visible={!isKeyboardOpen && !showSummariesScreen}
       />
 
       <ProfileModal

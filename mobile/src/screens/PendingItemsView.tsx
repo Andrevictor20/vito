@@ -23,7 +23,7 @@ import { api } from '../services/api';
 import { PendingItem, PendingStatus } from '../types';
 
 interface PendingItemsViewProps {
-  onBack: () => void;
+  onBack?: () => void;
   onOpenEventCreate?: (title: string, date?: string) => void;
 }
 
@@ -57,15 +57,19 @@ export const PendingItemsView: React.FC<PendingItemsViewProps> = ({
   // Modal de Agendamento Rápido
   const [scheduleModalItem, setScheduleModalItem] = useState<PendingItem | null>(null);
 
-  // Intercepta gesto de voltar do hardware/Android para retornar ou fechar modal
+  // Intercepta gesto de voltar do hardware/Android para retornar ou fechar modal.
+  // Em modo aba (sem onBack), devolve false para o handler do HomeScreen assumir.
   useEffect(() => {
     const onBackPress = () => {
       if (scheduleModalItem) {
         setScheduleModalItem(null);
         return true;
       }
-      onBack();
-      return true;
+      if (onBack) {
+        onBack();
+        return true;
+      }
+      return false;
     };
 
     const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
@@ -199,16 +203,18 @@ export const PendingItemsView: React.FC<PendingItemsViewProps> = ({
 
       {/* TopBar Executiva */}
       <View style={[styles.topBar, { borderBottomColor: colors.outlineVariant }]}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => {
-            hapticFeedback.selection();
-            onBack();
-          }}
-          hitSlop={tokens.hitSlop.md}
-        >
-          <MaterialIcons name="arrow-back" size={22} color={colors.onSurface} />
-        </TouchableOpacity>
+        {onBack && (
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => {
+              hapticFeedback.selection();
+              onBack();
+            }}
+            hitSlop={tokens.hitSlop.md}
+          >
+            <MaterialIcons name="arrow-back" size={22} color={colors.onSurface} />
+          </TouchableOpacity>
+        )}
 
         <View style={styles.topBarTitleContainer}>
           <Text style={[styles.topBarTitle, { color: colors.onSurface }]}>

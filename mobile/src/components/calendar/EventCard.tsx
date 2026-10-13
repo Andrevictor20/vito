@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { tokens, MD3Shapes } from '../../theme/tokens';
+import { tokens, MD3Shapes, tabularNumbers } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { Event } from '../../types';
 import { isAllDayEvent } from '../../utils/calendarDateUtils';
@@ -35,6 +35,17 @@ export const EventCard: React.FC<EventCardProps> = ({
   const endTime = event.end_at ? formatTime(event.end_at) : '';
   const timeDisplay = isAllDay ? 'Dia Inteiro' : (endTime ? `${startTime} – ${endTime}` : startTime);
 
+  let dayNum = '';
+  let monthShort = '';
+  try {
+    const startDate = new Date(event.start_at);
+    dayNum = startDate.toLocaleDateString('pt-BR', { day: '2-digit' });
+    monthShort = startDate.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
+  } catch {
+    dayNum = '';
+    monthShort = '';
+  }
+
   // Inferir categoria e cores semânticas M3 para a tag
   const getCategory = () => {
     const text = `${event.title} ${event.description || ''}`.toLowerCase();
@@ -51,7 +62,7 @@ export const EventCard: React.FC<EventCardProps> = ({
       return {
         label: 'FERIADO',
         bg: isDark ? 'rgba(245, 158, 11, 0.18)' : 'rgba(245, 158, 11, 0.12)',
-        text: '#F59E0B',
+        text: isDark ? '#FBBF24' : '#F59E0B',
         border: 'rgba(245, 158, 11, 0.4)',
       };
     }
@@ -98,6 +109,9 @@ export const EventCard: React.FC<EventCardProps> = ({
 
   const category = getCategory();
   const accentBarColor = event.color || (category.text !== colors.onSecondaryContainer ? category.text : colors.primary);
+  const isHolidayCard = category.label === 'FERIADO';
+  const isGoogle = event.source === 'google';
+  const isRecurring = event.is_recurring || !!event.recurrence;
 
   const handleDeletePress = () => {
     if (onRequestDelete) {
@@ -111,6 +125,8 @@ export const EventCard: React.FC<EventCardProps> = ({
     <TouchableOpacity
       activeOpacity={onPress ? 0.85 : 1}
       onPress={onPress ? () => onPress(event) : undefined}
+      accessibilityRole={onPress ? 'button' : undefined}
+      accessibilityLabel={onPress ? `Abrir detalhes de ${event.title}` : event.title}
       style={[
         styles.card,
         {
@@ -122,103 +138,141 @@ export const EventCard: React.FC<EventCardProps> = ({
         },
       ]}
     >
-      {/* Top Row: Categoria + Origem + Ações */}
-      <View style={styles.topRow}>
-        <View style={styles.badgeGroup}>
+      {/* Badge de data */}
+      <View style={[styles.dateBadge, { backgroundColor: colors.surfaceContainerHighest, borderColor: colors.outlineVariant }]}>
+        <Text style={[styles.dateDay, tabularNumbers, { color: isHolidayCard ? category.text : colors.onSurface }]}>
+          {dayNum}
+        </Text>
+        <Text style={[styles.dateMonth, { color: colors.onSurfaceVariant }]}>
+          {monthShort}
+        </Text>
+      </View>
+
+      {/* Conteúdo principal */}
+      <View style={styles.main}>
+        <View style={styles.pillRow}>
           <View style={[styles.categoryBadge, { backgroundColor: category.bg, borderColor: category.border, borderWidth: 1 }]}>
             <Text style={[styles.categoryText, { color: category.text }]}>{category.label}</Text>
           </View>
-          {event.source === 'google' && (
-            <View style={[styles.sourceBadge, { backgroundColor: isDark ? '#EA433522' : '#EA433515' }]}>
+          {isGoogle && (
+            <View style={styles.inlineIndicator}>
               <MaterialIcons name="event" size={11} color="#EA4335" />
-              <Text style={styles.sourceText}>Google</Text>
+              <Text style={[styles.inlineIndicatorText, { color: '#EA4335' }]}>Google</Text>
             </View>
           )}
-          {(event.is_recurring || !!event.recurrence) && (
-            <View style={[styles.sourceBadge, { backgroundColor: isDark ? '#1E293B' : '#E0F2FE', borderColor: colors.primary, borderWidth: 1 }]}>
-              <MaterialIcons name="repeat" size={11} color={colors.primary} />
-              <Text style={[styles.sourceText, { color: colors.primary, fontWeight: '700' }]}>Recorrente</Text>
+          {isRecurring && (
+            <View style={styles.inlineIndicator}>
+              <MaterialIcons name="repeat" size={11} color={colors.onSurfaceVariant} />
+              <Text style={[styles.inlineIndicatorText, { color: colors.onSurfaceVariant }]}>Recorrente</Text>
             </View>
           )}
+          <View style={styles.pillSpacer} />
+          <TouchableOpacity
+            style={styles.deleteButton}
+            onPress={handleDeletePress}
+            hitSlop={tokens.hitSlop.sm}
+            accessibilityLabel="Excluir compromisso"
+          >
+            <MaterialIcons name="close" size={15} color={colors.onSurfaceVariant} />
+          </TouchableOpacity>
         </View>
 
-        <TouchableOpacity
-          style={styles.deleteButton}
-          onPress={handleDeletePress}
-          hitSlop={tokens.hitSlop.sm}
-          accessibilityLabel="Excluir compromisso"
-        >
-          <MaterialIcons name="close" size={16} color={colors.onSurfaceVariant} />
-        </TouchableOpacity>
+        <Text style={[styles.title, { color: colors.onSurface }]} numberOfLines={2}>
+          {event.title}
+        </Text>
+
+        <View style={styles.metaColumn}>
+          {startTime || isAllDay ? (
+            <View style={styles.metaItem}>
+              <MaterialIcons name="schedule" size={13} color={colors.onSurfaceVariant} />
+              <Text style={[styles.metaText, tabularNumbers, { color: colors.onSurfaceVariant }]}>{timeDisplay}</Text>
+            </View>
+          ) : null}
+
+          {event.location ? (
+            <View style={styles.metaItem}>
+              <MaterialIcons name="place" size={13} color={colors.onSurfaceVariant} />
+              <Text style={[styles.metaText, { color: colors.onSurfaceVariant }]} numberOfLines={1}>
+                {event.location}
+              </Text>
+            </View>
+          ) : null}
+        </View>
       </View>
 
-      {/* Título do Evento */}
-      <Text style={[styles.title, { color: colors.onSurface }]} numberOfLines={2}>
-        {event.title}
-      </Text>
-
-      {/* Metadados: Horário e Local */}
-      <View style={styles.metaRow}>
-        {startTime ? (
-          <View style={styles.metaItem}>
-            <MaterialIcons name="schedule" size={15} color={colors.onSurfaceVariant} />
-            <Text style={[styles.metaText, { color: colors.onSurfaceVariant }]}>{timeDisplay}</Text>
-          </View>
-        ) : null}
-
-        {event.location ? (
-          <View style={styles.metaItem}>
-            <MaterialIcons name="place" size={15} color={colors.onSurfaceVariant} />
-            <Text style={[styles.metaText, { color: colors.onSurfaceVariant }]} numberOfLines={1}>
-              {event.location}
-            </Text>
-          </View>
-        ) : null}
-      </View>
+      {/* Chevron de navegação */}
+      {onPress && !isHolidayCard ? (
+        <View style={styles.chevron}>
+          <MaterialIcons name="chevron-right" size={18} color={colors.onSurfaceVariant} />
+        </View>
+      ) : null}
     </TouchableOpacity>
   );
 };
 
 const styles = StyleSheet.create({
   card: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
     backgroundColor: tokens.colors.surfaceContainer,
     borderRadius: MD3Shapes.largeIncreased,
-    padding: tokens.spacing.md,
+    padding: tokens.spacing.sm + 4,
     marginBottom: tokens.spacing.sm,
+    gap: tokens.spacing.sm + 4,
   },
-  topRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  dateBadge: {
+    width: 46,
+    borderWidth: 1,
+    borderRadius: 12,
     alignItems: 'center',
-    marginBottom: tokens.spacing.sm,
+    paddingVertical: 6,
+    flexShrink: 0,
   },
-  badgeGroup: {
+  dateDay: {
+    fontSize: 17,
+    fontWeight: tokens.typography.weight.bold,
+    lineHeight: 20,
+  },
+  dateMonth: {
+    fontSize: 9,
+    fontWeight: tokens.typography.weight.bold,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginTop: 1,
+  },
+  main: {
+    flex: 1,
+    minWidth: 0,
+  },
+  pillRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    marginBottom: 4,
   },
   categoryBadge: {
-    paddingHorizontal: tokens.spacing.sm + 2,
-    paddingVertical: 3,
+    paddingHorizontal: tokens.spacing.sm,
+    paddingVertical: 4,
     borderRadius: MD3Shapes.full,
   },
   categoryText: {
     fontSize: 10,
     fontWeight: tokens.typography.weight.bold,
-    letterSpacing: 0.5,
+    letterSpacing: 0.8,
   },
-  sourceBadge: {
+  inlineIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: MD3Shapes.full,
   },
-  sourceText: {
+  inlineIndicatorText: {
     fontSize: 10,
-    fontWeight: tokens.typography.weight.medium,
-    color: '#EA4335',
+    fontWeight: tokens.typography.weight.bold,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+  },
+  pillSpacer: {
+    flex: 1,
   },
   deleteButton: {
     padding: tokens.spacing.xs,
@@ -227,23 +281,25 @@ const styles = StyleSheet.create({
     fontSize: tokens.typography.size.titleMedium,
     fontWeight: tokens.typography.weight.bold,
     color: tokens.colors.onSurface,
-    lineHeight: 22,
-    marginBottom: tokens.spacing.md,
+    lineHeight: 21,
   },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: tokens.spacing.md,
+  metaColumn: {
+    marginTop: 4,
+    gap: 2,
   },
   metaItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
   },
   metaText: {
     fontSize: tokens.typography.size.labelMedium,
     color: tokens.colors.textSecondary,
     fontWeight: tokens.typography.weight.medium,
+    flexShrink: 1,
+  },
+  chevron: {
+    alignSelf: 'center',
+    flexShrink: 0,
   },
 });

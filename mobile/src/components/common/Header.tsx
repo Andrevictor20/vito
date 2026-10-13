@@ -5,6 +5,7 @@ import { tokens, MD3Shapes } from '../../theme/tokens';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { VitoMascot } from './VitoMascot';
+import { MainTabType } from '../../utils/pagerNavigation';
 
 export interface HeaderProps {
   title?: string;
@@ -18,7 +19,7 @@ export interface HeaderProps {
   showDivider?: boolean;
   onPressProfile?: () => void;
   onPressTitle?: () => void;
-  activeTab?: 'calendar' | 'chat' | 'triggers';
+  activeTab?: MainTabType;
   onPressHistory?: () => void;
   onPressNewChat?: () => void;
 }
@@ -57,8 +58,8 @@ export const HeaderIconButton: React.FC<HeaderIconButtonProps> = ({
 };
 
 export const Header: React.FC<HeaderProps> = ({
-  title = 'Agenda & Tarefas',
-  subtitle = 'Organização Pessoal',
+  title = 'Agenda',
+  subtitle = 'Compromissos',
   showMascot = true,
   mascotSize = 28,
   mascotState = 'idle',
@@ -78,11 +79,21 @@ export const Header: React.FC<HeaderProps> = ({
   const firstName = user?.name ? user.name.split(' ')[0] : 'Usuário';
   const effectiveStatusColor = statusColor || colors.statusOnline;
 
-  const tabTransition = useRef(new Animated.Value(activeTab === 'chat' ? 1 : activeTab === 'triggers' ? 2 : 0)).current;
+  const tabToValue = (tab: MainTabType): number => {
+    switch (tab) {
+      case 'calendar': return 0;
+      case 'chat': return 1;
+      case 'triggers': return 2;
+      case 'tasks': return 3;
+      case 'booking': return 4;
+    }
+  };
+
+  const tabTransition = useRef(new Animated.Value(activeTab ? tabToValue(activeTab) : 0)).current;
 
   useEffect(() => {
     if (activeTab) {
-      const targetVal = activeTab === 'chat' ? 1 : activeTab === 'triggers' ? 2 : 0;
+      const targetVal = tabToValue(activeTab);
       Animated.timing(tabTransition, {
         toValue: targetVal,
         duration: 220,
@@ -92,12 +103,16 @@ export const Header: React.FC<HeaderProps> = ({
     }
   }, [activeTab]);
 
-  const calendarOpacity = tabTransition.interpolate({ inputRange: [0, 0.5, 1, 2], outputRange: [1, 0, 0, 0] });
-  const calendarTranslateY = tabTransition.interpolate({ inputRange: [0, 1, 2], outputRange: [0, -4, -4] });
-  const chatOpacity = tabTransition.interpolate({ inputRange: [0, 0.5, 1, 1.5, 2], outputRange: [0, 0, 1, 0, 0] });
-  const chatTranslateY = tabTransition.interpolate({ inputRange: [0, 1, 2], outputRange: [4, 0, -4] });
-  const triggersOpacity = tabTransition.interpolate({ inputRange: [0, 1, 1.5, 2], outputRange: [0, 0, 0, 1] });
-  const triggersTranslateY = tabTransition.interpolate({ inputRange: [0, 1, 2], outputRange: [4, 4, 0] });
+  const calendarOpacity = tabTransition.interpolate({ inputRange: [0, 0.5, 1, 2, 3, 4], outputRange: [1, 0, 0, 0, 0, 0] });
+  const calendarTranslateY = tabTransition.interpolate({ inputRange: [0, 1, 2, 3, 4], outputRange: [0, -4, -4, -4, -4] });
+  const chatOpacity = tabTransition.interpolate({ inputRange: [0, 0.5, 1, 1.5, 2, 3, 4], outputRange: [0, 0, 1, 0, 0, 0, 0] });
+  const chatTranslateY = tabTransition.interpolate({ inputRange: [0, 1, 2, 3, 4], outputRange: [4, 0, -4, -4, -4] });
+  const triggersOpacity = tabTransition.interpolate({ inputRange: [0, 1, 1.5, 2, 2.5, 3, 4], outputRange: [0, 0, 0, 1, 0, 0, 0] });
+  const triggersTranslateY = tabTransition.interpolate({ inputRange: [0, 1, 2, 3, 4], outputRange: [4, 4, 0, 4, 4] });
+  const tasksOpacity = tabTransition.interpolate({ inputRange: [0, 1, 2, 2.5, 3, 3.5, 4], outputRange: [0, 0, 0, 0, 1, 0, 0] });
+  const tasksTranslateY = tabTransition.interpolate({ inputRange: [0, 1, 2, 3, 4], outputRange: [4, 4, 4, 0, 4] });
+  const bookingOpacity = tabTransition.interpolate({ inputRange: [0, 1, 2, 3, 3.5, 4], outputRange: [0, 0, 0, 0, 0, 1] });
+  const bookingTranslateY = tabTransition.interpolate({ inputRange: [0, 1, 2, 3, 4], outputRange: [4, 4, 4, 4, 0] });
 
   const titleContent = activeTab ? (
     <View style={[styles.titleColumn, { minWidth: activeTab === 'chat' ? 115 : 150 }]}>
@@ -113,10 +128,10 @@ export const Header: React.FC<HeaderProps> = ({
         pointerEvents={activeTab === 'calendar' ? 'auto' : 'none'}
       >
         <Text style={[styles.brand, { color: colors.onSurface }]} numberOfLines={1}>
-          Agenda & Tarefas
+          Agenda
         </Text>
         <Text style={[styles.brandSubtitle, { color: colors.textMuted }]} numberOfLines={1}>
-          Organização Pessoal
+          Compromissos
         </Text>
       </Animated.View>
 
@@ -161,6 +176,44 @@ export const Header: React.FC<HeaderProps> = ({
         </View>
         <Text style={[styles.brandSubtitle, { color: colors.textMuted }]} numberOfLines={1}>
           Radar do Vito
+        </Text>
+      </Animated.View>
+
+      {/* Camada Tarefas */}
+      <Animated.View
+        style={[
+          styles.titleCrossfadeLayer,
+          {
+            opacity: tasksOpacity,
+            transform: [{ translateY: tasksTranslateY }],
+          },
+        ]}
+        pointerEvents={activeTab === 'tasks' ? 'auto' : 'none'}
+      >
+        <Text style={[styles.brand, { color: colors.onSurface }]} numberOfLines={1}>
+          Tarefas
+        </Text>
+        <Text style={[styles.brandSubtitle, { color: colors.textMuted }]} numberOfLines={1}>
+          Tarefas e Pendências
+        </Text>
+      </Animated.View>
+
+      {/* Camada Vito Booking */}
+      <Animated.View
+        style={[
+          styles.titleCrossfadeLayer,
+          {
+            opacity: bookingOpacity,
+            transform: [{ translateY: bookingTranslateY }],
+          },
+        ]}
+        pointerEvents={activeTab === 'booking' ? 'auto' : 'none'}
+      >
+        <Text style={[styles.brand, { color: colors.onSurface }]} numberOfLines={1}>
+          Vito Booking
+        </Text>
+        <Text style={[styles.brandSubtitle, { color: colors.textMuted }]} numberOfLines={1}>
+          Links de Agendamento
         </Text>
       </Animated.View>
     </View>

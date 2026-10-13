@@ -84,7 +84,7 @@ const calculateAutoEndHour = (
 };
 
 interface BookingScreenProps {
-  onBack: () => void;
+  onBack?: () => void;
 }
 
 export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack }) => {
@@ -127,7 +127,8 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack }) => {
     }
   };
 
-  // Intercepta botão voltar do hardware no Android
+  // Intercepta botão voltar do hardware no Android.
+  // Em modo aba (sem onBack), devolve false para o handler do HomeScreen assumir.
   useEffect(() => {
     const onBackPress = () => {
       if (timePickerTarget) {
@@ -139,8 +140,11 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack }) => {
         setEditingType(null);
         return true;
       }
-      onBack();
-      return true;
+      if (onBack) {
+        onBack();
+        return true;
+      }
+      return false;
     };
     const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
     return () => subscription.remove();
@@ -315,16 +319,18 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack }) => {
 
       {/* Header Fixo 50dp */}
       <View style={[styles.header, { borderBottomColor: colors.outlineVariant }]}>
-        <TouchableOpacity
-          onPress={() => {
-            hapticFeedback.light();
-            onBack();
-          }}
-          style={styles.backButton}
-          activeOpacity={0.7}
-        >
-          <MaterialIcons name="arrow-back" size={24} color={colors.onSurface} />
-        </TouchableOpacity>
+        {onBack && (
+          <TouchableOpacity
+            onPress={() => {
+              hapticFeedback.light();
+              onBack();
+            }}
+            style={styles.backButton}
+            activeOpacity={0.7}
+          >
+            <MaterialIcons name="arrow-back" size={24} color={colors.onSurface} />
+          </TouchableOpacity>
+        )}
 
         <View style={styles.headerTitleContainer}>
           <Text style={[styles.headerTitle, { color: colors.onSurface }]} numberOfLines={1}>
