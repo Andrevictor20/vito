@@ -25,6 +25,7 @@ interface TaskRowProps {
   row: UnifiedRow;
   onToggle: () => void;
   onDelete: () => void;
+  onEdit?: () => void;
   onSchedule?: (dateStr: string) => void;
   onReminder?: () => void;
   subtasks?: Subtask[];
@@ -40,6 +41,7 @@ export const TaskRow: React.FC<TaskRowProps> = ({
   row,
   onToggle,
   onDelete,
+  onEdit,
   onSchedule,
   onReminder,
   subtasks,
@@ -210,6 +212,16 @@ export const TaskRow: React.FC<TaskRowProps> = ({
               size={20}
               color={hasReminder ? colors.primary : colors.onSurfaceVariant}
             />
+          </TouchableOpacity>
+        )}
+        {onEdit && !row.done && (
+          <TouchableOpacity
+            onPress={onEdit}
+            hitSlop={tokens.hitSlop.sm}
+            activeOpacity={0.7}
+            accessibilityLabel="Editar item"
+          >
+            <MaterialIcons name="edit" size={20} color={colors.onSurfaceVariant} />
           </TouchableOpacity>
         )}
         <TouchableOpacity

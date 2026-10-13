@@ -42,7 +42,6 @@ export const TriggersScreen: React.FC<{ onOpenExecutiveSummaries?: () => void }>
     handleDeleteTrigger,
     handleUpdateTrigger,
     handleRunTrigger,
-    stats,
   } = useTriggers(user?.id);
 
   // Modais e navegação
@@ -178,30 +177,7 @@ export const TriggersScreen: React.FC<{ onOpenExecutiveSummaries?: () => void }>
 
   return (
     <View style={[styles.container, { backgroundColor: colors.surface }]}>
-      {/* 1. Header Minimalista */}
-      <View style={styles.minimalHeader}>
-        <View style={styles.titleArea}>
-          <Text style={[styles.headerTitle, { color: colors.onSurface }]}>
-            Radares do Vito
-          </Text>
-          <View
-            style={[
-              styles.activeBadge,
-              { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5' },
-            ]}
-          >
-            <View style={[styles.activeDot, { backgroundColor: '#10B981' }]} />
-            <Text style={[styles.activeBadgeText, { color: '#10B981' }]}>
-              {stats.active} {stats.active === 1 ? 'ativo' : 'ativos'}
-            </Text>
-          </View>
-        </View>
-        <Text style={[styles.headerSubtitle, { color: colors.onSurfaceVariant }]}>
-          O Vito fica de olho na internet por você e avisa na hora certa.
-        </Text>
-      </View>
-
-      {/* 2. Barra de Criação por Linguagem Natural */}
+      {/* 1. Barra de Criação por Linguagem Natural (o Header global já titula "Radares") */}
       <View style={styles.inputSection}>
         <View
           style={[
@@ -653,42 +629,6 @@ export const TriggersScreen: React.FC<{ onOpenExecutiveSummaries?: () => void }>
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  minimalHeader: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 8,
-  },
-  titleArea: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 4,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    letterSpacing: -0.3,
-  },
-  activeBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: MD3Shapes.full,
-    gap: 5,
-  },
-  activeDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  activeBadgeText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  headerSubtitle: {
-    fontSize: 13,
   },
   inputSection: {
     paddingHorizontal: 16,

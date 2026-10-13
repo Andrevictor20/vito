@@ -379,6 +379,13 @@ class ApiService {
     return this.request<void>(`/api/v1/todos/${id}`, { method: 'DELETE' });
   }
 
+  async updateTodo(id: string, data: { title?: string; priority?: string; due_date?: string; remind_at?: string; remind_repeat?: string; remind_advance_minutes?: number }): Promise<Todo> {
+    return this.request<Todo>(`/api/v1/todos/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
   async addSubtask(todoId: string, title: string): Promise<import('../types').Subtask> {
     return this.request<import('../types').Subtask>(`/api/v1/todos/${todoId}/subtasks`, {
       method: 'POST',

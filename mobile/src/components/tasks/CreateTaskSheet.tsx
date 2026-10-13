@@ -14,7 +14,8 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { tokens } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { hapticFeedback } from '../../theme/motion';
-import { parseReminderInput } from '../../utils/reminderInput';
+import { DateTimePicker } from './DateTimePicker';
+import { toLocalISO, todayISO } from '../../utils/dateTimePicker';
 import type { RepeatOption } from '../pending/ReminderSheet';
 
 export type NewItemKind = 'todo' | 'pending';
@@ -67,11 +68,11 @@ export const CreateTaskSheet: React.FC<CreateTaskSheetProps> = ({
   const { colors } = useTheme();
   const [kind, setKind] = useState<NewItemKind>('todo');
   const [title, setTitle] = useState('');
-  const [date, setDate] = useState('');
+  const [dateISO, setDateISO] = useState<string | null>(null);
   const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium');
   const [category, setCategory] = useState('geral');
   const [useReminder, setUseReminder] = useState(false);
-  const [remTime, setRemTime] = useState('');
+  const [remTime, setRemTime] = useState('09:00');
   const [repeat, setRepeat] = useState<RepeatOption>('none');
   const [advance, setAdvance] = useState(0);
   const [localError, setLocalError] = useState<string | null>(null);
@@ -80,11 +81,11 @@ export const CreateTaskSheet: React.FC<CreateTaskSheetProps> = ({
     if (visible) {
       setKind('todo');
       setTitle('');
-      setDate('');
+      setDateISO(null);
       setPriority('medium');
       setCategory('geral');
       setUseReminder(false);
-      setRemTime('');
+      setRemTime('09:00');
       setRepeat('none');
       setAdvance(0);
       setLocalError(null);
@@ -103,12 +104,6 @@ export const CreateTaskSheet: React.FC<CreateTaskSheetProps> = ({
     { color: active ? colors.onPrimary : colors.onSurfaceVariant },
   ];
 
-  const toISODate = (d: string): string | null => {
-    const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(d.trim());
-    if (!m) return null;
-    return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
-  };
-
   const handleSave = () => {
     const trimmed = title.trim();
     if (!trimmed) {
@@ -117,21 +112,20 @@ export const CreateTaskSheet: React.FC<CreateTaskSheetProps> = ({
     }
     const payload: NewItemPayload = { kind, title: trimmed };
 
-    if (date.trim()) {
+    if (dateISO) {
       if (kind === 'todo') {
-        const iso = parseReminderInput(date, '09:00');
-        if (!iso) {
-          setLocalError('Data inválida ou no passado (DD/MM/AAAA).');
+        if (dateISO < todayISO()) {
+          setLocalError('O prazo não pode ser no passado.');
           return;
         }
-        payload.dateISO = iso;
+        const due = toLocalISO(dateISO, '09:00');
+        if (!due) {
+          setLocalError('Data inválida.');
+          return;
+        }
+        payload.dateISO = due;
       } else {
-        const only = toISODate(date);
-        if (!only) {
-          setLocalError('Data inválida (DD/MM/AAAA).');
-          return;
-        }
-        payload.dateOnly = only;
+        payload.dateOnly = dateISO;
       }
     }
 
@@ -139,14 +133,13 @@ export const CreateTaskSheet: React.FC<CreateTaskSheetProps> = ({
     else payload.category = category;
 
     if (useReminder) {
-      const base = kind === 'todo' ? date : date;
-      if (!base.trim() && !remTime.trim()) {
-        setLocalError('Para lembrar, informe data e hora.');
+      if (!dateISO) {
+        setLocalError('Para lembrar, escolha a data.');
         return;
       }
-      const iso = parseReminderInput(base.trim() || new Date().toLocaleDateString('pt-BR'), remTime);
-      if (!iso) {
-        setLocalError('Lembrete precisa de data futura e hora HH:MM.');
+      const iso = toLocalISO(dateISO, remTime);
+      if (!iso || new Date(iso).getTime() <= Date.now()) {
+        setLocalError('Lembrete precisa de data e hora futuras.');
         return;
       }
       payload.remind_at = iso;
@@ -160,7 +153,11 @@ export const CreateTaskSheet: React.FC<CreateTaskSheetProps> = ({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.overlay}>
+      <KeyboardAvoidingView
+        behavior="padding"
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 44 : 0}
+        style={styles.overlay}
+      >
         <View style={[styles.sheet, { backgroundColor: colors.surfaceContainer }]}>
           <View style={styles.handle} />
           <View style={styles.headerRow}>
@@ -170,7 +167,11 @@ export const CreateTaskSheet: React.FC<CreateTaskSheetProps> = ({
             </TouchableOpacity>
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.scrollContent}
+          >
             <View style={styles.typeRow}>
               {(['todo', 'pending'] as NewItemKind[]).map((k) => (
                 <TouchableOpacity
@@ -205,15 +206,12 @@ export const CreateTaskSheet: React.FC<CreateTaskSheetProps> = ({
             <Text style={[styles.label, { color: colors.onSurfaceVariant }]}>
               {kind === 'todo' ? 'Prazo (opcional)' : 'Data (opcional)'}
             </Text>
-            <TextInput
-              style={[styles.input, { color: colors.onSurface, borderColor: colors.outlineVariant }]}
-              placeholder="DD/MM/AAAA"
-              placeholderTextColor={colors.onSurfaceVariant}
-              value={date}
-              onChangeText={setDate}
-              keyboardType="numbers-and-punctuation"
-              maxLength={10}
-              accessibilityLabel="Data do item"
+            <DateTimePicker
+              dateISO={dateISO}
+              time={remTime}
+              onChangeDate={setDateISO}
+              onChangeTime={setRemTime}
+              showTime={useReminder}
             />
 
             <Text style={[styles.label, { color: colors.onSurfaceVariant }]}>
@@ -261,16 +259,6 @@ export const CreateTaskSheet: React.FC<CreateTaskSheetProps> = ({
 
             {useReminder && (
               <>
-                <TextInput
-                  style={[styles.input, { color: colors.onSurface, borderColor: colors.outlineVariant }]}
-                  placeholder="Hora HH:MM"
-                  placeholderTextColor={colors.onSurfaceVariant}
-                  value={remTime}
-                  onChangeText={setRemTime}
-                  keyboardType="numbers-and-punctuation"
-                  maxLength={5}
-                  accessibilityLabel="Hora do lembrete"
-                />
                 <Text style={[styles.label, { color: colors.onSurfaceVariant }]}>Repetir</Text>
                 <View style={styles.row}>
                   {REPEATS.map((r) => (
@@ -317,6 +305,9 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-end',
     backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  scrollContent: {
+    paddingBottom: 24,
   },
   sheet: {
     borderTopLeftRadius: 24,
@@ -375,13 +366,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: 8,
     marginBottom: 4,
-  },
-  input: {
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 15,
   },
   row: {
     flexDirection: 'row',

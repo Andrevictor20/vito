@@ -111,5 +111,24 @@ export function usePendingItems(onScheduled?: (title: string, dateStr: string) =
     [onScheduled],
   );
 
-  return { items, loading, refreshing, error, refresh, retry: () => load(), create, toggleComplete, remove, schedule, updateReminder };
+  /** Edição completa da pendência (título, categoria, data e lembrete). */
+  const updateItem = useCallback(
+    async (
+      item: PendingItem,
+      data: { title?: string; category?: string; scheduled_date?: string; remind_at?: string; remind_repeat?: 'none' | 'daily' | 'weekly'; remind_advance_minutes?: number },
+    ) => {
+      hapticFeedback.medium();
+      const updated = await api.updatePendingItem(item.id, data);
+      setItems((prev) => prev.map((i) => (i.id === item.id ? updated : i)));
+      await notificationService.cancelPendingReminder(item.id).catch(() => {});
+      if (updated.status !== 'done' && updated.remind_at) {
+        await notificationService.schedulePendingReminder(updated).catch(() => {});
+      }
+      hapticFeedback.success();
+      return updated;
+    },
+    [],
+  );
+
+  return { items, loading, refreshing, error, refresh, retry: () => load(), create, toggleComplete, remove, schedule, updateReminder, updateItem };
 }

@@ -12,8 +12,13 @@ export interface HeaderProps {
   contextualActions?: React.ReactNode;
   onPressTitle?: () => void;
   activeTab?: MainTabType;
-  onPressHistory?: () => void;
   onPressNewChat?: () => void;
+  /** Abre a gaveta lateral (hamburger à esquerda). */
+  onPressMenu?: () => void;
+  /** Oculta título/subtítulo (visual clean, ex. chat). */
+  hideTitle?: boolean;
+  /** Alinhamento do título. Default 'center'. */
+  align?: 'left' | 'center';
 }
 
 export interface HeaderIconButtonProps {
@@ -66,16 +71,45 @@ export const Header: React.FC<HeaderProps> = ({
   contextualActions,
   onPressTitle,
   activeTab,
-  onPressHistory,
+  onPressMenu,
+  hideTitle = false,
+  align = 'center',
   onPressNewChat,
 }) => {
   const { colors } = useTheme();
 
   const resolved = activeTab ? TAB_TITLES[activeTab] : undefined;
-  const displayTitle = title ?? resolved?.title ?? 'Agenda';
-  const displaySubtitle = subtitle ?? resolved?.subtitle;
+  const displayTitle = hideTitle ? null : title ?? resolved?.title ?? 'Agenda';
+  const displaySubtitle = hideTitle ? null : subtitle ?? resolved?.subtitle;
 
   const isChat = activeTab === 'chat';
+  const centered = align === 'center';
+
+  const titleBlock = displayTitle ? (
+    onPressTitle ? (
+      <TouchableOpacity onPress={onPressTitle} activeOpacity={0.7} accessibilityRole="button">
+        <Text style={[styles.title, centered && styles.titleCenter, { color: colors.onSurface }]} numberOfLines={1}>
+          {displayTitle}
+        </Text>
+        {displaySubtitle ? (
+          <Text style={[styles.subtitle, centered && styles.titleCenter, { color: colors.textMuted }]} numberOfLines={1}>
+            {displaySubtitle}
+          </Text>
+        ) : null}
+      </TouchableOpacity>
+    ) : (
+      <View>
+        <Text style={[styles.title, centered && styles.titleCenter, { color: colors.onSurface }]} numberOfLines={1}>
+          {displayTitle}
+        </Text>
+        {displaySubtitle ? (
+          <Text style={[styles.subtitle, centered && styles.titleCenter, { color: colors.textMuted }]} numberOfLines={1}>
+            {displaySubtitle}
+          </Text>
+        ) : null}
+      </View>
+    )
+  ) : null;
 
   return (
     <View
@@ -90,50 +124,27 @@ export const Header: React.FC<HeaderProps> = ({
       accessibilityRole="header"
     >
       <View style={styles.topRow}>
-        {onPressTitle ? (
-          <TouchableOpacity onPress={onPressTitle} activeOpacity={0.7} accessibilityRole="button">
-            <Text style={[styles.title, { color: colors.onSurface }]} numberOfLines={1}>
-              {displayTitle}
-            </Text>
-            {displaySubtitle ? (
-              <Text style={[styles.subtitle, { color: colors.textMuted }]} numberOfLines={1}>
-                {displaySubtitle}
-              </Text>
-            ) : null}
-          </TouchableOpacity>
-        ) : (
-          <View>
-            <Text style={[styles.title, { color: colors.onSurface }]} numberOfLines={1}>
-              {displayTitle}
-            </Text>
-            {displaySubtitle ? (
-              <Text style={[styles.subtitle, { color: colors.textMuted }]} numberOfLines={1}>
-                {displaySubtitle}
-              </Text>
-            ) : null}
-          </View>
-        )}
+        <View style={styles.sideSlot}>
+          {onPressMenu ? (
+            <HeaderIconButton
+              icon="menu"
+              onPress={onPressMenu}
+              accessibilityLabel="Abrir histórico de conversas"
+              size={22}
+            />
+          ) : null}
+        </View>
 
-        <View style={styles.actionsRow}>
-          {isChat && (onPressNewChat || onPressHistory) ? (
-            <View style={styles.chatActionsGroup}>
-              {onPressNewChat && (
-                <HeaderIconButton
-                  icon="add"
-                  onPress={onPressNewChat}
-                  accessibilityLabel="Nova conversa"
-                  size={20}
-                />
-              )}
-              {onPressHistory && (
-                <HeaderIconButton
-                  icon="history"
-                  onPress={onPressHistory}
-                  accessibilityLabel="Mensagens anteriores e histórico"
-                  size={20}
-                />
-              )}
-            </View>
+        <View style={styles.titleSlot}>{titleBlock}</View>
+
+        <View style={[styles.actionsRow, styles.sideSlotRight]}>
+          {isChat && onPressNewChat ? (
+            <HeaderIconButton
+              icon="add"
+              onPress={onPressNewChat}
+              accessibilityLabel="Nova conversa"
+              size={20}
+            />
           ) : (
             contextualActions
           )}
@@ -154,9 +165,20 @@ const styles = StyleSheet.create({
   },
   topRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     gap: tokens.spacing.sm,
+  },
+  sideSlot: {
+    width: 40,
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+  },
+  titleSlot: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  titleCenter: {
+    textAlign: 'center',
   },
   title: {
     fontSize: 22,
@@ -174,13 +196,12 @@ const styles = StyleSheet.create({
   actionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'flex-end',
     gap: 5,
     flexShrink: 0,
   },
-  chatActionsGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
+  sideSlotRight: {
+    minWidth: 40,
   },
   actionBtn: {
     width: 36,

@@ -14,6 +14,7 @@ import { useTheme } from '../context/ThemeContext';
 import { Todo, PendingItem } from '../types';
 import { TaskRow } from '../components/tasks/TaskRow';
 import { CreateTaskSheet, NewItemPayload } from '../components/tasks/CreateTaskSheet';
+import { EditTaskSheet, EditTarget, EditItemPayload } from '../components/tasks/EditTaskSheet';
 import { ReminderSheet, RepeatOption } from '../components/pending/ReminderSheet';
 import { usePendingItems } from '../hooks/usePendingItems';
 import { toUnifiedRows, sortUnifiedRows } from '../utils/unifiedTasks';
@@ -39,6 +40,14 @@ interface TasksScreenProps {
     remind_repeat?: string;
     remind_advance_minutes?: number;
   }) => Promise<any>;
+  onUpdateTodoFull: (id: string, input: {
+    title?: string;
+    priority?: string;
+    due_date?: string;
+    remind_at?: string;
+    remind_repeat?: string;
+    remind_advance_minutes?: number;
+  }) => Promise<any>;
   onOpenEventCreate?: (title: string, date?: string) => void;
 }
 
@@ -56,6 +65,7 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
   onAddSubtask,
   onDeleteSubtask,
   onSaveTodoFull,
+  onUpdateTodoFull,
   onOpenEventCreate,
 }) => {
   const { colors, isDark } = useTheme();
@@ -66,6 +76,9 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
   const [createVisible, setCreateVisible] = useState(false);
   const [createSaving, setCreateSaving] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
 
   const pending = usePendingItems(onOpenEventCreate);
 
@@ -86,6 +99,7 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
           row={row}
           onToggle={() => onToggleTodo(t.id)}
           onDelete={() => onDeleteTodo(t.id)}
+          onEdit={() => setEditTarget({ kind: 'todo', todo: t })}
           onReminder={undefined}
           subtasks={t.subtasks}
           onToggleSubtask={(sid) => onToggleSubtask(t.id, sid)}
@@ -102,6 +116,7 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
           row={row}
           onToggle={() => pending.toggleComplete(p)}
           onDelete={() => pending.remove(p.id)}
+          onEdit={() => setEditTarget({ kind: 'pending', pending: p })}
           onSchedule={(dateStr) => pending.schedule(p, dateStr)}
           onReminder={() => setReminderItem(p)}
         />
@@ -137,6 +152,54 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
       setCreateError('Não foi possível criar. Tente de novo.');
     } finally {
       setCreateSaving(false);
+    }
+  };
+
+  const handleSaveEdit = async (id: string, kind: 'todo' | 'pending', payload: EditItemPayload) => {
+    setEditSaving(true);
+    setEditError(null);
+    try {
+      if (kind === 'todo') {
+        await onUpdateTodoFull(id, {
+          title: payload.title,
+          priority: payload.priority,
+          due_date: payload.dateISO,
+          remind_at: payload.remind_at,
+          remind_repeat: payload.remind_repeat,
+          remind_advance_minutes: payload.remind_advance_minutes,
+        });
+      } else {
+        const full = editTarget?.kind === 'pending' && editTarget.pending
+          ? editTarget.pending
+          : ({ id } as PendingItem);
+        await pending.updateItem(
+          full,
+          {
+            title: payload.title,
+            category: payload.category,
+            scheduled_date: payload.dateOnly,
+            remind_at: payload.remind_at,
+            remind_repeat: payload.remind_repeat,
+            remind_advance_minutes: payload.remind_advance_minutes,
+          },
+        );
+      }
+      setEditTarget(null);
+    } catch (err) {
+      console.warn('[TasksScreen] Falha ao editar item:', err);
+      setEditError('Não foi possível salvar. Tente de novo.');
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const handleDeleteFromEdit = async (id: string, kind: 'todo' | 'pending') => {
+    try {
+      if (kind === 'todo') onDeleteTodo(id);
+      else await pending.remove(id);
+      setEditTarget(null);
+    } catch (err) {
+      setEditError('Não foi possível excluir. Tente de novo.');
     }
   };
 
@@ -301,6 +364,15 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
         onClose={() => setReminderItem(null)}
         onSave={handleSaveReminder}
         onClear={handleClearReminder}
+      />
+
+      <EditTaskSheet
+        target={editTarget}
+        saving={editSaving}
+        error={editError}
+        onClose={() => setEditTarget(null)}
+        onSave={handleSaveEdit}
+        onDelete={handleDeleteFromEdit}
       />
     </View>
   );

@@ -25,10 +25,11 @@ import { useChat } from '../hooks/useChat';
 import { ChatMessageBubble } from '../components/chat/ChatMessageBubble';
 import { ChatQuickChips } from '../components/chat/ChatQuickChips';
 import { ChatInputDock } from '../components/chat/ChatInputDock';
-import { ConversationHistoryModal } from '../components/chat/ConversationHistoryModal';
+import { ChatHistoryDrawer } from '../components/chat/ChatHistoryDrawer';
 import { VitoMascot } from '../components/common/VitoMascot';
 import { prepareEditDraft } from '../utils/chatActions';
 import { pickWelcomeGreeting } from '../utils/chatGreetings';
+import { resolveKeyboardHeight } from '../utils/keyboardHeight';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { SafeAudioRecorder } from '../services/audioRecorder';
@@ -77,6 +78,9 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const flatListRef = useRef<FlatList>(null);
   const inputRef = useRef<any>(null);
+  // Espelhos p/ o listener de teclado decidir sem re-subscrever (zona morta).
+  const keyboardOpenRef = useRef(false);
+  const keyboardHeightRef = useRef(0);
 
   // Boas-vindas sorteadas por período do dia, uma por montagem da tela
   // (cada abertura do app). Estável durante a sessão via useMemo.
@@ -112,7 +116,14 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
 
     const onShow = (e: KeyboardEvent) => {
       const h = e?.endCoordinates?.height || 0;
-      setKeyboardHeight(h);
+      // Zona morta: ignora re-disparos com variação pequena (faixa de
+      // sugestões do Gboard) — cada setState move o dock e cancela o toque
+      // em voo, o que causava o "1º toque só fecha o teclado".
+      const resolved = resolveKeyboardHeight(keyboardHeightRef.current, keyboardOpenRef.current, h);
+      if (resolved === null) return;
+      keyboardHeightRef.current = resolved;
+      keyboardOpenRef.current = true;
+      setKeyboardHeight(resolved);
       setIsKeyboardOpen(true);
       if (onKeyboardStateChange) onKeyboardStateChange(true);
       setTimeout(() => {
@@ -121,6 +132,8 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
     };
 
     const onHide = () => {
+      keyboardHeightRef.current = 0;
+      keyboardOpenRef.current = false;
       setKeyboardHeight(0);
       setIsKeyboardOpen(false);
       if (onKeyboardStateChange) onKeyboardStateChange(false);
@@ -394,7 +407,7 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
           }}
         />
       </View>
-      <ConversationHistoryModal
+      <ChatHistoryDrawer
         visible={historyVisible}
         onClose={() => setHistoryVisible(false)}
         onNewChat={startNewConversation}

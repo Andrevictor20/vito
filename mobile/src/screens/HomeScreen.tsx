@@ -152,6 +152,7 @@ export const HomeScreen: React.FC<{
     handleCreateEvent,
     handleUpdateEvent,
     handleCreateTodo,
+    handleUpdateTodo,
     handleDeleteEvent,
     handleToggleTodo,
     handleDeleteTodo,
@@ -180,11 +181,12 @@ export const HomeScreen: React.FC<{
 
   return (
     <View style={[styles.container, { backgroundColor: colors.surface }]}>
-      {/* Page Title enxuto M3: só título por página + ações contextuais do Chat */}
+      {/* Page Title enxuto M3: título centralizado + hamburger do chat à esquerda */}
       <Header
         activeTab={activeTab}
         onPressNewChat={() => chatRef.current?.startNewChat()}
-        onPressHistory={() => chatRef.current?.openHistory()}
+        onPressMenu={activeTab === 'chat' ? () => chatRef.current?.openHistory() : undefined}
+        hideTitle={activeTab === 'chat'}
       />
 
       <View
@@ -370,6 +372,7 @@ export const HomeScreen: React.FC<{
               onAddSubtask={handleAddSubtask}
               onDeleteSubtask={handleDeleteSubtask}
               onSaveTodoFull={handleCreateTodo}
+              onUpdateTodoFull={handleUpdateTodo}
               onOpenEventCreate={() => {
                 setCreateTab('event');
                 setCreateModalVisible(true);

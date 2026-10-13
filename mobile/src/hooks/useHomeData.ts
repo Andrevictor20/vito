@@ -160,6 +160,31 @@ export function useHomeData(currentUserId?: string) {
     }
   };
 
+  const handleUpdateTodo = async (id: string, todoData: { title?: string; priority?: string; due_date?: string; remind_at?: string; remind_repeat?: string; remind_advance_minutes?: number }) => {
+    try {
+      const updated = await api.updateTodo(id, todoData);
+      if (updated) {
+        setTodos((prev) => {
+          const next = prev.map((t) => (t.id === id ? { ...t, ...updated } : t));
+          AsyncStorage.setItem(cacheKeys.todosKey, JSON.stringify(next)).catch(() => {});
+          return next;
+        });
+        notificationService.cancelTodoReminder(id).catch(() => {});
+        if (updated.status !== 'completed') {
+          notificationService.scheduleTodoReminder(updated).catch(() => {});
+          if (updated.remind_at) {
+            notificationService.schedulePendingReminder(updated as any).catch(() => {});
+          }
+        }
+      }
+      await loadData(true);
+      return updated;
+    } catch (e) {
+      console.error('Erro ao atualizar tarefa diretamente:', e);
+      throw e;
+    }
+  };
+
   const handleDeleteEvent = async (id: string, allSeries: boolean = false) => {
     try {
       const targetEvent = events.find((e) => e.id === id);
@@ -440,6 +465,7 @@ export function useHomeData(currentUserId?: string) {
     handleCreateEvent,
     handleUpdateEvent,
     handleCreateTodo,
+    handleUpdateTodo,
     handleDeleteEvent,
     handleToggleTodo,
     handleDeleteTodo,
