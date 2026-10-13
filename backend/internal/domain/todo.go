@@ -35,6 +35,9 @@ type Todo struct {
 	Status              TodoStatus `json:"status"`
 	Priority            string     `json:"priority"` // low, medium, high
 	DueDate             *time.Time `json:"due_date,omitempty"`
+	RemindAt            *time.Time `json:"remind_at,omitempty"`
+	RemindRepeat        string     `json:"remind_repeat,omitempty"` // none, daily, weekly
+	RemindAdvance       int        `json:"remind_advance_minutes,omitempty"`
 	ReminderSentAt      *time.Time `json:"reminder_sent_at,omitempty"`
 	StartReminderSentAt *time.Time `json:"start_reminder_sent_at,omitempty"`
 	EventID             string     `json:"event_id,omitempty"`
@@ -46,11 +49,14 @@ type Todo struct {
 
 // CreateTodoInput contém os parâmetros para criação flexível de tarefa.
 type CreateTodoInput struct {
-	Title      string     `json:"title"`
-	Priority   string     `json:"priority,omitempty"`
-	DueDate    *time.Time `json:"due_date,omitempty"`
-	EventID    string     `json:"event_id,omitempty"`
-	EventTitle string     `json:"event_title,omitempty"`
+	Title         string     `json:"title"`
+	Priority      string     `json:"priority,omitempty"`
+	DueDate       *time.Time `json:"due_date,omitempty"`
+	RemindAt      *time.Time `json:"remind_at,omitempty"`
+	RemindRepeat  string     `json:"remind_repeat,omitempty"`
+	RemindAdvance int        `json:"remind_advance_minutes,omitempty"`
+	EventID       string     `json:"event_id,omitempty"`
+	EventTitle    string     `json:"event_title,omitempty"`
 }
 
 // TodoRepository define o contrato de persistência para pendências e subtarefas.

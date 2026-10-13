@@ -70,11 +70,15 @@ type ParsedEvent struct {
 
 // ParsedTodo dados extraídos para criação de to-do.
 type ParsedTodo struct {
-	Title    string     `json:"title"`
-	Priority string     `json:"priority"` // low, medium, high
-	DueDate  *time.Time `json:"due_date,omitempty"`
+	Title         string     `json:"title"`
+	Priority      string     `json:"priority"` // low, medium, high
+	DueDate       *time.Time `json:"due_date,omitempty"`
+	RemindAt      *time.Time `json:"remind_at,omitempty"`
+	RemindRepeat  string     `json:"remind_repeat,omitempty"` // none, daily, weekly
+	RemindAdvance int        `json:"remind_advance_minutes,omitempty"`
 
-	dueWallClock bool
+	dueWallClock    bool
+	remindWallClock bool
 }
 
 // ParsedTrigger dados extraídos para criação de disparador / monitoramento contínuo.
@@ -91,11 +95,16 @@ type ParsedTrigger struct {
 
 // ParsedPending dados extraídos para criação ou agendamento de item na Incubadora de Pendências.
 type ParsedPending struct {
-	ID            string `json:"id,omitempty"`
-	Title         string `json:"title"`
-	Description   string `json:"description,omitempty"`
-	Category      string `json:"category,omitempty"`
-	ScheduledDate string `json:"scheduled_date,omitempty"`
+	ID            string     `json:"id,omitempty"`
+	Title         string     `json:"title"`
+	Description   string     `json:"description,omitempty"`
+	Category      string     `json:"category,omitempty"`
+	ScheduledDate string     `json:"scheduled_date,omitempty"`
+	RemindAt      *time.Time `json:"remind_at,omitempty"`
+	RemindRepeat  string     `json:"remind_repeat,omitempty"` // none, daily, weekly
+	RemindAdvance int        `json:"remind_advance_minutes,omitempty"`
+
+	remindWallClock bool
 }
 
 // ParsedBooking dados extraídos para criação ou cancelamento de link de agendamento/booking.

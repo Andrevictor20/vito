@@ -31,6 +31,8 @@ type AssistantResponse struct {
 	Trigger      *domain.Trigger      `json:"trigger,omitempty"`
 	Pending      *domain.PendingItem  `json:"pending,omitempty"`
 	Booking      *domain.BookingType  `json:"booking,omitempty"`
+	BookingURL   string               `json:"booking_url,omitempty"`
+	BookingShort string               `json:"booking_short_url,omitempty"`
 	ProviderUsed string               `json:"provider_used,omitempty"`
 }
 
@@ -438,11 +440,16 @@ func (s *AssistantService) Process(ctx context.Context, userID string, input ai.
 			res.Reply = res.Message
 			return res, nil
 		}
-		todo, err := s.todoSvc.CreateTodo(
+		todo, err := s.todoSvc.CreateTodoWithOptions(
 			userID,
-			intent.Todo.Title,
-			intent.Todo.Priority,
-			intent.Todo.DueDate,
+			domain.CreateTodoInput{
+				Title:         intent.Todo.Title,
+				Priority:      intent.Todo.Priority,
+				DueDate:       intent.Todo.DueDate,
+				RemindAt:      intent.Todo.RemindAt,
+				RemindRepeat:  intent.Todo.RemindRepeat,
+				RemindAdvance: intent.Todo.RemindAdvance,
+			},
 		)
 		if err != nil {
 			log.Printf("⚠️ [AssistantService] Falha ao criar tarefa (user=%s, title=%q): %v", userID, intent.Todo.Title, err)
@@ -561,6 +568,9 @@ func (s *AssistantService) Process(ctx context.Context, userID string, input ai.
 				Description:   intent.Pending.Description,
 				Category:      intent.Pending.Category,
 				ScheduledDate: intent.Pending.ScheduledDate,
+				RemindAt:      intent.Pending.RemindAt,
+				RemindRepeat:  intent.Pending.RemindRepeat,
+				RemindAdvance: intent.Pending.RemindAdvance,
 			})
 			if err != nil {
 				log.Printf("⚠️ [AssistantService] Falha ao criar pendência (user=%s, title=%q): %v", userID, intent.Pending.Title, err)
@@ -704,6 +714,8 @@ func (s *AssistantService) Process(ctx context.Context, userID string, input ai.
 				if linkURL == "" {
 					linkURL = bt.PublicURL
 				}
+				res.BookingURL = bt.PublicURL
+				res.BookingShort = bt.ShortURL
 				res.Message = fmt.Sprintf("Criei o seu link de agendamento para '%s' (%d min):\n%s", bt.Title, bt.DurationMinutes, linkURL)
 				res.Reply = res.Message
 			}

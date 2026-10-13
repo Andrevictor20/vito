@@ -23,8 +23,8 @@ func NewPendingRepository(db *sql.DB) *PendingRepositorySQLite {
 func (r *PendingRepositorySQLite) Create(item *domain.PendingItem) error {
 	query := `
 		INSERT INTO pending_items (
-			id, user_id, title, description, category, status, scheduled_date, nudge_sent_at, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			id, user_id, title, description, category, status, scheduled_date, remind_at, remind_repeat, remind_advance, nudge_sent_at, created_at, updated_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	_, err := r.db.Exec(
 		query,
@@ -35,6 +35,9 @@ func (r *PendingRepositorySQLite) Create(item *domain.PendingItem) error {
 		item.Category,
 		item.Status,
 		item.ScheduledDate,
+		item.RemindAt,
+		item.RemindRepeat,
+		item.RemindAdvance,
 		item.NudgeSentAt,
 		item.CreatedAt,
 		item.UpdatedAt,
@@ -44,7 +47,7 @@ func (r *PendingRepositorySQLite) Create(item *domain.PendingItem) error {
 
 func (r *PendingRepositorySQLite) GetByID(id, userID string) (*domain.PendingItem, error) {
 	query := `
-		SELECT id, user_id, title, COALESCE(description, ''), category, status, COALESCE(scheduled_date, ''), nudge_sent_at, created_at, updated_at
+		SELECT id, user_id, title, COALESCE(description, ''), category, status, COALESCE(scheduled_date, ''), remind_at, COALESCE(remind_repeat, 'none'), COALESCE(remind_advance, 0), nudge_sent_at, created_at, updated_at
 		FROM pending_items
 		WHERE id = ? AND user_id = ?
 	`
@@ -57,6 +60,9 @@ func (r *PendingRepositorySQLite) GetByID(id, userID string) (*domain.PendingIte
 		&item.Category,
 		&item.Status,
 		&item.ScheduledDate,
+		&item.RemindAt,
+		&item.RemindRepeat,
+		&item.RemindAdvance,
 		&item.NudgeSentAt,
 		&item.CreatedAt,
 		&item.UpdatedAt,
@@ -88,7 +94,7 @@ func (r *PendingRepositorySQLite) ListByUser(userID string, status *domain.Pendi
 	}
 
 	query := fmt.Sprintf(`
-		SELECT id, user_id, title, COALESCE(description, ''), category, status, COALESCE(scheduled_date, ''), nudge_sent_at, created_at, updated_at
+		SELECT id, user_id, title, COALESCE(description, ''), category, status, COALESCE(scheduled_date, ''), remind_at, COALESCE(remind_repeat, 'none'), COALESCE(remind_advance, 0), nudge_sent_at, created_at, updated_at
 		FROM pending_items
 		WHERE %s
 		ORDER BY created_at DESC
@@ -111,6 +117,9 @@ func (r *PendingRepositorySQLite) ListByUser(userID string, status *domain.Pendi
 			&item.Category,
 			&item.Status,
 			&item.ScheduledDate,
+			&item.RemindAt,
+			&item.RemindRepeat,
+			&item.RemindAdvance,
 			&item.NudgeSentAt,
 			&item.CreatedAt,
 			&item.UpdatedAt,
@@ -126,7 +135,7 @@ func (r *PendingRepositorySQLite) ListByUser(userID string, status *domain.Pendi
 func (r *PendingRepositorySQLite) Update(item *domain.PendingItem) error {
 	query := `
 		UPDATE pending_items
-		SET title = ?, description = ?, category = ?, status = ?, scheduled_date = ?, nudge_sent_at = ?, updated_at = ?
+		SET title = ?, description = ?, category = ?, status = ?, scheduled_date = ?, remind_at = ?, remind_repeat = ?, remind_advance = ?, nudge_sent_at = ?, updated_at = ?
 		WHERE id = ? AND user_id = ?
 	`
 	item.UpdatedAt = time.Now().UTC()
@@ -137,6 +146,9 @@ func (r *PendingRepositorySQLite) Update(item *domain.PendingItem) error {
 		item.Category,
 		item.Status,
 		item.ScheduledDate,
+		item.RemindAt,
+		item.RemindRepeat,
+		item.RemindAdvance,
 		item.NudgeSentAt,
 		item.UpdatedAt,
 		item.ID,
@@ -173,7 +185,7 @@ func (r *PendingRepositorySQLite) Delete(id, userID string) error {
 
 func (r *PendingRepositorySQLite) ListUnscheduledDueForNudge(cutoff time.Time) ([]domain.PendingItem, error) {
 	query := `
-		SELECT id, user_id, title, COALESCE(description, ''), category, status, COALESCE(scheduled_date, ''), nudge_sent_at, created_at, updated_at
+		SELECT id, user_id, title, COALESCE(description, ''), category, status, COALESCE(scheduled_date, ''), remind_at, COALESCE(remind_repeat, 'none'), COALESCE(remind_advance, 0), nudge_sent_at, created_at, updated_at
 		FROM pending_items
 		WHERE status = 'inbox' 
 		  AND created_at <= ?
@@ -199,6 +211,54 @@ func (r *PendingRepositorySQLite) ListUnscheduledDueForNudge(cutoff time.Time) (
 			&item.Category,
 			&item.Status,
 			&item.ScheduledDate,
+			&item.RemindAt,
+			&item.RemindRepeat,
+			&item.RemindAdvance,
+			&item.NudgeSentAt,
+			&item.CreatedAt,
+			&item.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+
+	return items, rows.Err()
+}
+
+// ListScheduledDueForNudge busca pendências agendadas para hoje ou atrasadas
+// que ainda não receberam nudge hoje (digest das 17:30 inclui os dois grupos).
+func (r *PendingRepositorySQLite) ListScheduledDueForNudge(today string, since time.Time) ([]domain.PendingItem, error) {
+	query := `
+		SELECT id, user_id, title, COALESCE(description, ''), category, status, COALESCE(scheduled_date, ''), remind_at, COALESCE(remind_repeat, 'none'), COALESCE(remind_advance, 0), nudge_sent_at, created_at, updated_at
+		FROM pending_items
+		WHERE status = 'scheduled'
+		  AND scheduled_date <> ''
+		  AND scheduled_date <= ?
+		  AND (nudge_sent_at IS NULL OR nudge_sent_at <= ?)
+		ORDER BY scheduled_date ASC
+	`
+	todayStart := since.UTC().Truncate(24 * time.Hour)
+	rows, err := r.db.Query(query, today, todayStart)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var items []domain.PendingItem
+	for rows.Next() {
+		var item domain.PendingItem
+		if err := rows.Scan(
+			&item.ID,
+			&item.UserID,
+			&item.Title,
+			&item.Description,
+			&item.Category,
+			&item.Status,
+			&item.ScheduledDate,
+			&item.RemindAt,
+			&item.RemindRepeat,
+			&item.RemindAdvance,
 			&item.NudgeSentAt,
 			&item.CreatedAt,
 			&item.UpdatedAt,

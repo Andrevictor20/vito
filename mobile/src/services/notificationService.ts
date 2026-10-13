@@ -618,6 +618,92 @@ export const notificationService = {
   },
 
   /**
+   * Agenda lembrete local personalizado de pendência (data/hora + repetição + aviso prévio).
+   */
+  async schedulePendingReminder(pending: {
+    id: string;
+    title: string;
+    remind_at?: string;
+    remind_repeat?: 'none' | 'daily' | 'weekly';
+    remind_advance_minutes?: number;
+  }): Promise<{ mainId: string | null; advanceId: string | null }> {
+    if (!this.isAvailable() || !pending.remind_at) return { mainId: null, advanceId: null };
+    const settings = await this.getSettings();
+    if (!settings.enabled) return { mainId: null, advanceId: null };
+
+    const at = new Date(pending.remind_at).getTime();
+    if (isNaN(at) || at <= Date.now()) return { mainId: null, advanceId: null };
+
+    const channelId = 'vito_todos';
+    const emoji = getNotificationContextEmoji(pending.title, 'todo') || '📌';
+    const atDate = new Date(at);
+    const repeatMode = pending.remind_repeat === 'daily' ? 'daily' : pending.remind_repeat === 'weekly' ? 'weekly' : 'once';
+    // Repetição usa gatilho de calendário (DATE não repete no expo-notifications).
+    const trigger: any = repeatMode === 'once'
+      ? { type: Notifications.SchedulableTriggerInputTypes.DATE, date: atDate }
+      : repeatMode === 'daily'
+        ? { type: Notifications.SchedulableTriggerInputTypes.CALENDAR, hour: atDate.getHours(), minute: atDate.getMinutes(), repeats: true }
+        : { type: Notifications.SchedulableTriggerInputTypes.CALENDAR, weekday: atDate.getDay() + 1, hour: atDate.getHours(), minute: atDate.getMinutes(), repeats: true };
+    let mainId: string | null = null;
+    let advanceId: string | null = null;
+
+    try {
+      const res: any = await Notifications.scheduleNotificationAsync({
+        identifier: `pending-reminder-${pending.id}`,
+        content: {
+          title: `${emoji} ${pending.title}`,
+          body: repeatMode === 'once' ? 'Hora de resolver esta pendência.' : 'Lembrete de pendência (repete).',
+          sound: true,
+          priority: Notifications.AndroidNotificationPriority.HIGH,
+          data: { pendingId: pending.id, type: 'pending_reminder', channelId },
+          ...(Platform.OS === 'android' ? { channelId } : {}),
+        },
+        trigger,
+      });
+      mainId = typeof res === 'string' ? res : `pending-reminder-${pending.id}`;
+    } catch (e) {
+      console.warn('[NotificationService] Falha ao agendar lembrete de pendência:', e);
+    }
+
+    const advanceMin = pending.remind_advance_minutes || 0;
+    if (advanceMin > 0 && at - advanceMin * 60000 > Date.now()) {
+      try {
+        const res: any = await Notifications.scheduleNotificationAsync({
+          identifier: `pending-reminder-adv-${pending.id}`,
+          content: {
+            title: `${emoji} ${pending.title}`,
+            body: `Em ${advanceMin} minutos: hora de resolver.`,
+            sound: true,
+            priority: Notifications.AndroidNotificationPriority.HIGH,
+            data: { pendingId: pending.id, type: 'pending_reminder_advance', channelId },
+            ...(Platform.OS === 'android' ? { channelId } : {}),
+          },
+          trigger: {
+            type: Notifications.SchedulableTriggerInputTypes.DATE,
+            date: new Date(at - advanceMin * 60000),
+          },
+        });
+        advanceId = typeof res === 'string' ? res : `pending-reminder-adv-${pending.id}`;
+      } catch (e) {
+        console.warn('[NotificationService] Falha ao agendar aviso prévio de pendência:', e);
+      }
+    }
+
+    return { mainId, advanceId };
+  },
+
+  /**
+   * Cancela os lembretes personalizados de uma pendência.
+   */
+  async cancelPendingReminder(pendingId: string): Promise<void> {
+    if (!this.isAvailable()) return;
+    await Promise.all([
+      this.cancelNotification(`pending-reminder-${pendingId}`),
+      this.cancelNotification(`pending-reminder-adv-${pendingId}`),
+    ]);
+  },
+
+  /**
    * Reconcilia e agenda lembretes locais nativos para compromissos e tarefas com data.
    */
   async scheduleAllUpcomingReminders(

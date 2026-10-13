@@ -356,7 +356,7 @@ class ApiService {
     return res || [];
   }
 
-  async createTodo(todo: { title: string; priority?: string; due_date?: string; event_id?: string; event_title?: string }): Promise<Todo> {
+  async createTodo(todo: { title: string; priority?: string; due_date?: string; remind_at?: string; remind_repeat?: string; remind_advance_minutes?: number; event_id?: string; event_title?: string }): Promise<Todo> {
     return this.request<Todo>('/api/v1/todos', {
       method: 'POST',
       body: JSON.stringify(todo),

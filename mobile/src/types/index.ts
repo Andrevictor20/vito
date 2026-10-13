@@ -55,6 +55,9 @@ export interface Todo {
   priority: 'low' | 'medium' | 'high';
   status: 'pending' | 'completed';
   due_date?: string;
+  remind_at?: string;
+  remind_repeat?: 'none' | 'daily' | 'weekly';
+  remind_advance_minutes?: number;
   event_id?: string;
   event_title?: string;
   subtasks?: Subtask[];
@@ -79,6 +82,18 @@ export interface ParsedIntent {
   reply_message: string;
 }
 
+export interface ChatBooking {
+  id: string;
+  title: string;
+  slug?: string;
+  duration_minutes?: number;
+  start_hour?: string;
+  end_hour?: string;
+  days_of_week?: string;
+  public_url?: string;
+  short_url?: string;
+}
+
 export interface AssistantChatResponse {
   action?: string;
   intent: string;
@@ -90,7 +105,9 @@ export interface AssistantChatResponse {
   todo?: Todo;
   trigger?: Trigger;
   pending?: PendingItem;
-  booking?: { id: string; title: string; slug?: string; public_url?: string; short_url?: string };
+  booking?: ChatBooking;
+  booking_url?: string;
+  booking_short_url?: string;
   conflict?: ConflictInfo;
   provider_used?: string;
 }
@@ -106,7 +123,7 @@ export interface ChatMessage {
   todo?: Todo;
   trigger?: Trigger;
   pending?: PendingItem;
-  booking?: { id: string; title: string; slug?: string };
+  booking?: ChatBooking;
   conflict?: ConflictInfo;
 }
 
@@ -405,6 +422,9 @@ export interface PendingItem {
   category: string;
   status: PendingStatus;
   scheduled_date?: string;
+  remind_at?: string;
+  remind_repeat?: 'none' | 'daily' | 'weekly';
+  remind_advance_minutes?: number;
   nudge_sent_at?: string;
   created_at: string;
   updated_at: string;
@@ -415,6 +435,9 @@ export interface CreatePendingInput {
   description?: string;
   category?: string;
   scheduled_date?: string;
+  remind_at?: string;
+  remind_repeat?: 'none' | 'daily' | 'weekly';
+  remind_advance_minutes?: number;
 }
 
 export interface UpdatePendingInput {
@@ -423,6 +446,9 @@ export interface UpdatePendingInput {
   category?: string;
   status?: PendingStatus;
   scheduled_date?: string;
+  remind_at?: string | null;
+  remind_repeat?: 'none' | 'daily' | 'weekly';
+  remind_advance_minutes?: number;
 }
 
 export interface BookingType {

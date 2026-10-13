@@ -67,7 +67,8 @@ func (w *PendingNudgeWorker) SetTargetTime(t string) {
 }
 
 // FormatNudgeMessage formata a notificação de incentivo a agendamento de pendências.
-func FormatNudgeMessage(userName string, items []domain.PendingItem) (string, string) {
+// scheduled informa quantas estão agendadas para hoje/atrasadas (digest inclui os dois grupos).
+func FormatNudgeMessage(userName string, items []domain.PendingItem, scheduled int) (string, string) {
 	firstName := strings.TrimSpace(userName)
 	if parts := strings.Fields(firstName); len(parts) > 0 {
 		firstName = parts[0]
@@ -81,6 +82,10 @@ func FormatNudgeMessage(userName string, items []domain.PendingItem) (string, st
 
 	if count == 1 {
 		return title, fmt.Sprintf("%s, você tem 1 pendência aguardando agendamento: '%s'. Que tal reservar um horário?", firstName, items[0].Title)
+	}
+
+	if scheduled > 0 {
+		return title, fmt.Sprintf("%s, você tem %d pendências (%d agendada(s) para hoje ou atrasadas). Que tal revisar seu dia?", firstName, count, scheduled)
 	}
 
 	return title, fmt.Sprintf("%s, você tem %d pendências paradas há mais de 24h. Que tal agendar no seu dia?", firstName, count)
@@ -107,14 +112,22 @@ func (w *PendingNudgeWorker) ProcessNudges(now time.Time) (int, error) {
 		return 0, fmt.Errorf("falha ao listar pendências para nudge: %w", err)
 	}
 
-	if len(dueItems) == 0 {
-		return 0, nil
+	// Digest inclui também agendadas para hoje/atrasadas sem nudge hoje.
+	todayStr := userNow.Format("2006-01-02")
+	scheduledDue, err := w.pendingRepo.ListScheduledDueForNudge(todayStr, now.UTC())
+	if err != nil {
+		return 0, fmt.Errorf("falha ao listar agendadas para nudge: %w", err)
 	}
 
 	// Agrupa pendências por usuário para evitar notificações repetidas
 	userItemsMap := make(map[string][]domain.PendingItem)
+	scheduledCount := make(map[string]int)
 	for _, item := range dueItems {
 		userItemsMap[item.UserID] = append(userItemsMap[item.UserID], item)
+	}
+	for _, item := range scheduledDue {
+		userItemsMap[item.UserID] = append(userItemsMap[item.UserID], item)
+		scheduledCount[item.UserID]++
 	}
 
 	dispatchedUsers := 0
@@ -127,7 +140,7 @@ func (w *PendingNudgeWorker) ProcessNudges(now time.Time) (int, error) {
 			}
 		}
 
-		title, body := FormatNudgeMessage(userName, items)
+		title, body := FormatNudgeMessage(userName, items, scheduledCount[userID])
 		data := map[string]interface{}{
 			"type":       "pending_nudge",
 			"itemsCount": len(items),

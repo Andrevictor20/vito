@@ -1,10 +1,21 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ChatMessage, ConversationSession } from '../types';
+import { AssistantChatResponse, ChatBooking, ChatMessage, ConversationSession } from '../types';
 import { api } from '../services/api';
 import { notificationService } from '../services/notificationService';
 import { dataSync } from '../services/dataSync';
 import { isAbortError, truncateMessagesForEdit } from '../utils/chatActions';
+
+// Normaliza o booking da resposta do chat para o card: mescla o objeto
+// booking com as URLs top-level (booking_url / booking_short_url).
+export const toChatBooking = (res: AssistantChatResponse): ChatBooking | undefined => {
+  if (!res.booking) return undefined;
+  return {
+    ...res.booking,
+    public_url: res.booking.public_url || (res as any).booking_url || undefined,
+    short_url: res.booking.short_url || (res as any).booking_short_url || undefined,
+  };
+};
 
 export const getChatStorageKeys = (userId?: string) => {
   const suffix = userId ? `_${userId}` : '';
@@ -289,7 +300,7 @@ export function useChat(onDataChanged?: () => void, currentUserId?: string) {
           todo: res.todo,
           trigger: res.trigger,
           pending: (res as any).pending,
-          booking: res.booking as any,
+          booking: toChatBooking(res),
           conflict: res.conflict,
         };
 
@@ -303,6 +314,10 @@ export function useChat(onDataChanged?: () => void, currentUserId?: string) {
         }
         if (res.todo) {
           notificationService.scheduleTodoReminder(res.todo).catch(() => {});
+        }
+        if ((res as any).pending) {
+          notificationService.schedulePendingReminder((res as any).pending).catch(() => {});
+          dataSync.notify('refresh_pending');
         }
         if (res.action_performed === 'delete_event' && res.event?.id) {
           notificationService.cancelEventReminder(res.event.id).catch(() => {});
@@ -402,7 +417,7 @@ export function useChat(onDataChanged?: () => void, currentUserId?: string) {
           todo: res.todo,
           trigger: res.trigger,
           pending: (res as any).pending,
-          booking: res.booking as any,
+          booking: toChatBooking(res),
           conflict: res.conflict,
         };
 
@@ -415,6 +430,10 @@ export function useChat(onDataChanged?: () => void, currentUserId?: string) {
         }
         if (res.todo) {
           notificationService.scheduleTodoReminder(res.todo).catch(() => {});
+        }
+        if ((res as any).pending) {
+          notificationService.schedulePendingReminder((res as any).pending).catch(() => {});
+          dataSync.notify('refresh_pending');
         }
         if (res.action_performed === 'delete_event' && res.event?.id) {
           notificationService.cancelEventReminder(res.event.id).catch(() => {});
@@ -503,7 +522,7 @@ export function useChat(onDataChanged?: () => void, currentUserId?: string) {
           todo: res.todo,
           trigger: res.trigger,
           pending: (res as any).pending,
-          booking: res.booking as any,
+          booking: toChatBooking(res),
           conflict: res.conflict,
         };
 
@@ -517,6 +536,10 @@ export function useChat(onDataChanged?: () => void, currentUserId?: string) {
         }
         if (res.todo) {
           notificationService.scheduleTodoReminder(res.todo).catch(() => {});
+        }
+        if ((res as any).pending) {
+          notificationService.schedulePendingReminder((res as any).pending).catch(() => {});
+          dataSync.notify('refresh_pending');
         }
         if (res.action_performed === 'delete_event' && res.event?.id) {
           notificationService.cancelEventReminder(res.event.id).catch(() => {});
@@ -583,7 +606,7 @@ export function useChat(onDataChanged?: () => void, currentUserId?: string) {
           todo: res.todo,
           trigger: res.trigger,
           pending: (res as any).pending,
-          booking: res.booking as any,
+          booking: toChatBooking(res),
           conflict: res.conflict,
         };
 

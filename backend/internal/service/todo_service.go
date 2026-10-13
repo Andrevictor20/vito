@@ -56,16 +56,19 @@ func (s *TodoService) CreateTodoWithOptions(userID string, input domain.CreateTo
 
 	now := time.Now().UTC()
 	todo := &domain.Todo{
-		ID:         uuid.New().String(),
-		UserID:     userID,
-		Title:      input.Title,
-		Status:     domain.TodoStatusPending,
-		Priority:   input.Priority,
-		DueDate:    input.DueDate,
-		EventID:    input.EventID,
-		EventTitle: input.EventTitle,
-		CreatedAt:  now,
-		UpdatedAt:  now,
+		ID:            uuid.New().String(),
+		UserID:        userID,
+		Title:         input.Title,
+		Status:        domain.TodoStatusPending,
+		Priority:      input.Priority,
+		DueDate:       input.DueDate,
+		RemindAt:      input.RemindAt,
+		RemindRepeat:  input.RemindRepeat,
+		RemindAdvance: input.RemindAdvance,
+		EventID:       input.EventID,
+		EventTitle:    input.EventTitle,
+		CreatedAt:     now,
+		UpdatedAt:     now,
 	}
 
 	if err := s.todoRepo.Create(todo); err != nil {

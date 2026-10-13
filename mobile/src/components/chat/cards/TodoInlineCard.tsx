@@ -4,6 +4,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { tokens, MD3Shapes } from '../../../theme/tokens';
 import { useTheme } from '../../../context/ThemeContext';
 import { Todo } from '../../../types';
+import { formatTodoDue } from '../../../utils/chatCards';
 
 interface TodoInlineCardProps {
   todo: Todo;
@@ -66,7 +67,7 @@ export const TodoInlineCard: React.FC<TodoInlineCardProps> = ({ todo, onToggle }
             {todo.title}
           </Text>
           <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-            {completed ? 'Concluída com sucesso' : 'Prazo estimado: hoje'}
+            {completed ? 'Concluída com sucesso' : formatTodoDue(todo.due_date)}
           </Text>
         </View>
       </View>

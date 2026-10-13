@@ -20,22 +20,22 @@ func NewTodoRepository(db *sql.DB) *TodoRepositorySQLite {
 
 func (r *TodoRepositorySQLite) Create(t *domain.Todo) error {
 	query := `
-		INSERT INTO todos (id, user_id, title, status, priority, due_date, event_id, event_title, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO todos (id, user_id, title, status, priority, due_date, remind_at, remind_repeat, remind_advance, event_id, event_title, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
-	_, err := r.db.Exec(query, t.ID, t.UserID, t.Title, t.Status, t.Priority, t.DueDate, t.EventID, t.EventTitle, t.CreatedAt, t.UpdatedAt)
+	_, err := r.db.Exec(query, t.ID, t.UserID, t.Title, t.Status, t.Priority, t.DueDate, t.RemindAt, t.RemindRepeat, t.RemindAdvance, t.EventID, t.EventTitle, t.CreatedAt, t.UpdatedAt)
 	return err
 }
 
 func (r *TodoRepositorySQLite) GetByID(id, userID string) (*domain.Todo, error) {
 	query := `
-		SELECT id, user_id, title, status, priority, due_date, COALESCE(event_id, ''), COALESCE(event_title, ''), created_at, updated_at
+		SELECT id, user_id, title, status, priority, due_date, remind_at, COALESCE(remind_repeat, 'none'), COALESCE(remind_advance, 0), COALESCE(event_id, ''), COALESCE(event_title, ''), created_at, updated_at
 		FROM todos
 		WHERE id = ? AND user_id = ?
 	`
 	var t domain.Todo
 	err := r.db.QueryRow(query, id, userID).Scan(
-		&t.ID, &t.UserID, &t.Title, &t.Status, &t.Priority, &t.DueDate, &t.EventID, &t.EventTitle, &t.CreatedAt, &t.UpdatedAt,
+		&t.ID, &t.UserID, &t.Title, &t.Status, &t.Priority, &t.DueDate, &t.RemindAt, &t.RemindRepeat, &t.RemindAdvance, &t.EventID, &t.EventTitle, &t.CreatedAt, &t.UpdatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -53,7 +53,7 @@ func (r *TodoRepositorySQLite) ListByUser(userID string, status domain.TodoStatu
 
 	if status != "" {
 		query = `
-			SELECT id, user_id, title, status, priority, due_date, COALESCE(event_id, ''), COALESCE(event_title, ''), created_at, updated_at
+			SELECT id, user_id, title, status, priority, due_date, remind_at, COALESCE(remind_repeat, 'none'), COALESCE(remind_advance, 0), COALESCE(event_id, ''), COALESCE(event_title, ''), created_at, updated_at
 			FROM todos
 			WHERE user_id = ? AND status = ?
 			ORDER BY created_at DESC
@@ -61,7 +61,7 @@ func (r *TodoRepositorySQLite) ListByUser(userID string, status domain.TodoStatu
 		args = []interface{}{userID, status}
 	} else {
 		query = `
-			SELECT id, user_id, title, status, priority, due_date, COALESCE(event_id, ''), COALESCE(event_title, ''), created_at, updated_at
+			SELECT id, user_id, title, status, priority, due_date, remind_at, COALESCE(remind_repeat, 'none'), COALESCE(remind_advance, 0), COALESCE(event_id, ''), COALESCE(event_title, ''), created_at, updated_at
 			FROM todos
 			WHERE user_id = ?
 			ORDER BY created_at DESC
@@ -78,7 +78,7 @@ func (r *TodoRepositorySQLite) ListByUser(userID string, status domain.TodoStatu
 	var todos []domain.Todo
 	for rows.Next() {
 		var t domain.Todo
-		if err := rows.Scan(&t.ID, &t.UserID, &t.Title, &t.Status, &t.Priority, &t.DueDate, &t.EventID, &t.EventTitle, &t.CreatedAt, &t.UpdatedAt); err != nil {
+		if err := rows.Scan(&t.ID, &t.UserID, &t.Title, &t.Status, &t.Priority, &t.DueDate, &t.RemindAt, &t.RemindRepeat, &t.RemindAdvance, &t.EventID, &t.EventTitle, &t.CreatedAt, &t.UpdatedAt); err != nil {
 			return nil, err
 		}
 		todos = append(todos, t)

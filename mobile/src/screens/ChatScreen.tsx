@@ -28,6 +28,7 @@ import { ChatInputDock } from '../components/chat/ChatInputDock';
 import { ConversationHistoryModal } from '../components/chat/ConversationHistoryModal';
 import { VitoMascot } from '../components/common/VitoMascot';
 import { prepareEditDraft } from '../utils/chatActions';
+import { pickWelcomeGreeting } from '../utils/chatGreetings';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { SafeAudioRecorder } from '../services/audioRecorder';
@@ -75,6 +76,15 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
   const [isRecording, setIsRecording] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const flatListRef = useRef<FlatList>(null);
+  const inputRef = useRef<any>(null);
+
+  // Boas-vindas sorteadas por período do dia, uma por montagem da tela
+  // (cada abertura do app). Estável durante a sessão via useMemo.
+  const welcomeGreeting = React.useMemo(
+    () => pickWelcomeGreeting(firstName, new Date().getHours()),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
 
   useImperativeHandle(ref, () => ({
     openHistory: () => setHistoryVisible(true),
@@ -221,6 +231,8 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
       setInputText('');
       sendMessage(text);
     }
+    // Mantém teclado aberto e foco para a próxima mensagem (1 toque sempre).
+    requestAnimationFrame(() => inputRef.current?.focus?.());
   };
 
   const handleQuickPrompt = (prompt: string) => {
@@ -327,7 +339,10 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
               <VitoMascot size={72} state={loading ? 'thinking' : 'idle'} animated={true} />
             </View>
             <Text style={[styles.emptyWelcomeTitle, { color: colors.onSurface }]}>
-              {firstName && firstName !== 'Usuário' ? `Vamos lá, ${firstName}` : 'Como posso ajudar hoje?'}
+              {welcomeGreeting}
+            </Text>
+            <Text style={[styles.emptyWelcomeSubtitle, { color: colors.onSurfaceVariant }]}>
+              Toque numa sugestão abaixo ou me diga o que precisa
             </Text>
           </View>
         }
@@ -367,6 +382,7 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
           onSend={handleSend}
           loading={loading}
           onStop={stopGeneration}
+          inputRef={inputRef}
           isRecording={isRecording}
           onPressMic={handleToggleRecording}
           onCancelRecording={handleCancelRecording}

@@ -3,6 +3,7 @@ package service_test
 import (
 	"context"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -171,5 +172,63 @@ func TestAssistantService_FailureReturnsFriendlyMessageNotError(t *testing.T) {
 	}
 	if resp.Message == "" {
 		t.Errorf("expected mensagem explicando a falha, got empty")
+	}
+}
+
+func TestAssistantService_BookingCreationExposesLinkURLs(t *testing.T) {
+	now := time.Now().UTC()
+	tmpDir := t.TempDir()
+	db, err := database.Open(filepath.Join(tmpDir, "clarify-booking.db"))
+	if err != nil {
+		t.Fatalf("failed to open test db: %v", err)
+	}
+	t.Cleanup(func() { db.Close() })
+
+	userRepo := repository.NewUserRepository(db)
+	eventRepo := repository.NewEventRepository(db)
+	todoRepo := repository.NewTodoRepository(db)
+	memoryRepo := repository.NewMemoryRepository(db)
+	bookingRepo := repository.NewBookingRepositorySQLite(db)
+
+	userID := "user-clarify-booking"
+	_ = userRepo.Create(&domain.User{
+		ID:           userID,
+		Name:         "André",
+		Email:        "booking@local",
+		PasswordHash: "hash",
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	})
+
+	calSvc := service.NewCalendarService(eventRepo)
+	todoSvc := service.NewTodoService(todoRepo)
+	bookingSvc := service.NewBookingService(bookingRepo, eventRepo, userRepo, nil, nil, nil, "https://vito.rasppi.cloud")
+
+	mockAI := &mockAIGateway{intent: &ai.ParsedIntent{
+		Action:  ai.ActionCreateBookingLink,
+		Message: "",
+		Booking: &ai.ParsedBooking{Title: "Café rápido", DurationMinutes: 30, StartHour: "09:00", EndHour: "18:00"},
+	}}
+	astSvc := service.NewAssistantService(mockAI, calSvc, todoSvc, memoryRepo)
+	astSvc.SetBookingService(bookingSvc)
+
+	resp, err := astSvc.Process(context.Background(), userID, ai.UserInput{
+		Text: "crie um booking Café rápido 30 min das 09:00 às 18:00 todos os dias",
+		Now:  now,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.Booking == nil {
+		t.Fatalf("expected booking retornado, got nil (msg=%q)", resp.Message)
+	}
+	if resp.BookingURL == "" {
+		t.Errorf("expected booking_url preenchida para o card no chat, got empty")
+	}
+	if !strings.Contains(resp.BookingURL, "/book/") {
+		t.Errorf("expected booking_url com /book/, got %q", resp.BookingURL)
+	}
+	if resp.BookingShort == "" {
+		t.Errorf("expected booking_short_url preenchida, got empty")
 	}
 }

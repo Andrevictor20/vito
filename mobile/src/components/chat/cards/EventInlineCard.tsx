@@ -4,6 +4,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { tokens, MD3Shapes } from '../../../theme/tokens';
 import { useTheme } from '../../../context/ThemeContext';
 import { Event } from '../../../types';
+import { formatEventDuration, formatRecurrenceLabel } from '../../../utils/chatCards';
 
 interface EventInlineCardProps {
   event: Event;
@@ -22,6 +23,10 @@ export const EventInlineCard: React.FC<EventInlineCardProps> = ({ event, onPress
   });
   const startTime = startDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   const endTime = endDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  const duration = formatEventDuration(event.start_at, event.end_at);
+  const recurrenceLabel = formatRecurrenceLabel(event.recurrence);
+  const dayNumber = startDate.getDate().toString().padStart(2, '0');
+  const monthShort = startDate.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
 
   return (
     <View style={[styles.card, { backgroundColor: colors.surfaceContainerHigh, borderColor: colors.outlineVariant }]}>
@@ -30,13 +35,14 @@ export const EventInlineCard: React.FC<EventInlineCardProps> = ({ event, onPress
       {/* Header do Card */}
       <View style={styles.topRow}>
         <View style={styles.headerLeft}>
-          <View style={[styles.iconBox, { backgroundColor: colors.surfaceContainerHighest }]}>
-            <MaterialIcons name="event-available" size={18} color={event.color || colors.primary} />
+          <View style={[styles.dateBadge, { backgroundColor: colors.surfaceContainerHighest }]}>
+            <Text style={[styles.dateBadgeDay, { color: event.color || colors.primary }]}>{dayNumber}</Text>
+            <Text style={[styles.dateBadgeMonth, { color: colors.onSurfaceVariant }]}>{monthShort}</Text>
           </View>
           <View style={styles.titleCol}>
             <Text style={[styles.title, { color: colors.onSurface }]} numberOfLines={1}>{event.title}</Text>
             <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-              {formattedDate} • Salvo na Agenda
+              {formattedDate}{duration ? ` • ${duration}` : ''} • Salvo na Agenda
             </Text>
           </View>
         </View>
@@ -46,6 +52,12 @@ export const EventInlineCard: React.FC<EventInlineCardProps> = ({ event, onPress
           <Text style={[styles.statusText, { color: colors.success }]}>Confirmado</Text>
         </View>
       </View>
+
+      {event.description ? (
+        <Text style={[styles.description, { color: colors.onSurfaceVariant }]} numberOfLines={2}>
+          {event.description}
+        </Text>
+      ) : null}
 
       {/* Grid de Detalhes de Horário e Local */}
       <View style={styles.detailsGrid}>
@@ -58,11 +70,18 @@ export const EventInlineCard: React.FC<EventInlineCardProps> = ({ event, onPress
             <MaterialIcons name="place" size={14} color={colors.onSurfaceVariant} />
             <Text style={[styles.detailText, { color: colors.onSurfaceVariant }]} numberOfLines={1}>{event.location}</Text>
           </View>
-        ) : (
+        ) : recurrenceLabel ? (
           <View style={styles.detailItem}>
             <MaterialIcons name="sync" size={14} color={colors.onSurfaceVariant} />
             <Text style={[styles.detailText, { color: colors.onSurfaceVariant }]} numberOfLines={1}>
-              {event.recurrence ? `Repete: ${event.recurrence.toLowerCase()}` : 'Google Agenda'}
+              {recurrenceLabel}
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.detailItem}>
+            <MaterialIcons name="check-circle" size={14} color={colors.onSurfaceVariant} />
+            <Text style={[styles.detailText, { color: colors.onSurfaceVariant }]} numberOfLines={1}>
+              Evento único
             </Text>
           </View>
         )}
@@ -124,6 +143,30 @@ const styles = StyleSheet.create({
     backgroundColor: tokens.colors.surfaceContainerHighest,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  dateBadge: {
+    width: 40,
+    height: 44,
+    borderRadius: MD3Shapes.small,
+    backgroundColor: tokens.colors.surfaceContainerHighest,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 2,
+  },
+  dateBadgeDay: {
+    fontSize: 17,
+    fontWeight: tokens.typography.weight.bold,
+    lineHeight: 20,
+  },
+  dateBadgeMonth: {
+    fontSize: 10,
+    fontWeight: tokens.typography.weight.semibold,
+    textTransform: 'uppercase',
+    lineHeight: 12,
+  },
+  description: {
+    fontSize: tokens.typography.size.bodySmall,
+    lineHeight: 18,
   },
   titleCol: {
     flex: 1,

@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -22,10 +23,13 @@ func NewPendingHandler(svc *service.PendingService) *PendingHandler {
 }
 
 type createPendingRequest struct {
-	Title         string `json:"title"`
-	Description   string `json:"description,omitempty"`
-	Category      string `json:"category,omitempty"`
-	ScheduledDate string `json:"scheduled_date,omitempty"`
+	Title         string     `json:"title"`
+	Description   string     `json:"description,omitempty"`
+	Category      string     `json:"category,omitempty"`
+	ScheduledDate string     `json:"scheduled_date,omitempty"`
+	RemindAt      *time.Time `json:"remind_at,omitempty"`
+	RemindRepeat  string     `json:"remind_repeat,omitempty"`
+	RemindAdvance int        `json:"remind_advance_minutes,omitempty"`
 }
 
 type updatePendingRequest struct {
@@ -34,6 +38,9 @@ type updatePendingRequest struct {
 	Category      *string               `json:"category,omitempty"`
 	Status        *domain.PendingStatus `json:"status,omitempty"`
 	ScheduledDate *string               `json:"scheduled_date,omitempty"`
+	RemindAt      *time.Time            `json:"remind_at,omitempty"`
+	RemindRepeat  *string               `json:"remind_repeat,omitempty"`
+	RemindAdvance *int                  `json:"remind_advance_minutes,omitempty"`
 }
 
 type schedulePendingRequest struct {
@@ -58,6 +65,9 @@ func (h *PendingHandler) CreatePending(w http.ResponseWriter, r *http.Request) {
 		Description:   req.Description,
 		Category:      req.Category,
 		ScheduledDate: req.ScheduledDate,
+		RemindAt:      req.RemindAt,
+		RemindRepeat:  req.RemindRepeat,
+		RemindAdvance: req.RemindAdvance,
 	})
 	if err != nil {
 		http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusBadRequest)
@@ -149,6 +159,9 @@ func (h *PendingHandler) UpdatePending(w http.ResponseWriter, r *http.Request) {
 		Category:      req.Category,
 		Status:        req.Status,
 		ScheduledDate: req.ScheduledDate,
+		RemindAt:      req.RemindAt,
+		RemindRepeat:  req.RemindRepeat,
+		RemindAdvance: req.RemindAdvance,
 	})
 	if err != nil {
 		if err == domain.ErrPendingItemNotFound {

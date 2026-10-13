@@ -26,6 +26,9 @@ type PendingItem struct {
 	Category      string        `json:"category"`
 	Status        PendingStatus `json:"status"`
 	ScheduledDate string        `json:"scheduled_date,omitempty"` // YYYY-MM-DD
+	RemindAt      *time.Time    `json:"remind_at,omitempty"`
+	RemindRepeat  string        `json:"remind_repeat,omitempty"` // none, daily, weekly
+	RemindAdvance int           `json:"remind_advance_minutes,omitempty"`
 	NudgeSentAt   *time.Time    `json:"nudge_sent_at,omitempty"`
 	CreatedAt     time.Time     `json:"created_at"`
 	UpdatedAt     time.Time     `json:"updated_at"`
@@ -33,10 +36,13 @@ type PendingItem struct {
 
 // CreatePendingInput parâmetros para criação de uma pendência.
 type CreatePendingInput struct {
-	Title         string `json:"title"`
-	Description   string `json:"description,omitempty"`
-	Category      string `json:"category,omitempty"`
-	ScheduledDate string `json:"scheduled_date,omitempty"`
+	Title         string     `json:"title"`
+	Description   string     `json:"description,omitempty"`
+	Category      string     `json:"category,omitempty"`
+	ScheduledDate string     `json:"scheduled_date,omitempty"`
+	RemindAt      *time.Time `json:"remind_at,omitempty"`
+	RemindRepeat  string     `json:"remind_repeat,omitempty"`
+	RemindAdvance int        `json:"remind_advance_minutes,omitempty"`
 }
 
 // UpdatePendingInput parâmetros para edição de uma pendência.
@@ -46,6 +52,9 @@ type UpdatePendingInput struct {
 	Category      *string        `json:"category,omitempty"`
 	Status        *PendingStatus `json:"status,omitempty"`
 	ScheduledDate *string        `json:"scheduled_date,omitempty"`
+	RemindAt      *time.Time     `json:"remind_at,omitempty"`
+	RemindRepeat  *string        `json:"remind_repeat,omitempty"`
+	RemindAdvance *int           `json:"remind_advance_minutes,omitempty"`
 }
 
 // PendingRepository define o contrato de persistência seguro da Incubadora de Pendências.
@@ -56,5 +65,6 @@ type PendingRepository interface {
 	Update(item *PendingItem) error
 	Delete(id, userID string) error
 	ListUnscheduledDueForNudge(cutoff time.Time) ([]PendingItem, error)
+	ListScheduledDueForNudge(today string, since time.Time) ([]PendingItem, error)
 	MarkNudgeSent(id string, sentAt time.Time) error
 }

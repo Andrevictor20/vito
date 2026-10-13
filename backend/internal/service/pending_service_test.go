@@ -79,6 +79,21 @@ func (m *mockPendingRepo) MarkNudgeSent(id string, sentAt time.Time) error {
 	return nil
 }
 
+func (m *mockPendingRepo) ListScheduledDueForNudge(today string, since time.Time) ([]domain.PendingItem, error) {
+	dayStart := since.UTC().Truncate(24 * time.Hour)
+	var res []domain.PendingItem
+	for _, item := range m.items {
+		if item.Status != domain.PendingStatusScheduled || item.ScheduledDate == "" || item.ScheduledDate > today {
+			continue
+		}
+		if item.NudgeSentAt != nil && !item.NudgeSentAt.Before(dayStart) {
+			continue
+		}
+		res = append(res, *item)
+	}
+	return res, nil
+}
+
 func TestPendingService_CreateAndLifecycle(t *testing.T) {
 	repo := newMockPendingRepo()
 	svc := service.NewPendingService(repo)

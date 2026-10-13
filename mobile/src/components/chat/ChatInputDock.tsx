@@ -10,6 +10,7 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens, MD3Shapes } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
+import { shouldTriggerSend } from '../../utils/chatSendGuard';
 
 interface ChatInputDockProps {
   value: string;
@@ -23,6 +24,8 @@ interface ChatInputDockProps {
   onPressAttach?: () => void;
   selectedImageUri?: string | null;
   onClearImage?: () => void;
+  inputRef?: React.RefObject<any>;
+  onRefusedSend?: (reason: 'empty' | 'loading' | 'debounced') => void;
 }
 
 export const ChatInputDock: React.FC<ChatInputDockProps> = ({
@@ -37,44 +40,31 @@ export const ChatInputDock: React.FC<ChatInputDockProps> = ({
   onPressAttach,
   selectedImageUri,
   onClearImage,
+  inputRef,
+  onRefusedSend,
 }) => {
   const { colors, isDark } = useTheme();
   const canSend = (value.trim().length > 0 || !!selectedImageUri) && !loading;
 
-  // Garante disparo confiável sem eventos duplicados.
-  // Refs espelham o estado atual para que onPressIn (disparado antes do blur do
-  // teclado / salto de layout no Android) nunca use closure obsoleta — causa raiz
-  // do "preciso clicar 2 vezes para enviar".
-  const isSendingRef = React.useRef(false);
-  const stopReadyTimestampRef = React.useRef(0);
-  const canSendRef = React.useRef(canSend);
-  const onSendRef = React.useRef(onSend);
-  React.useEffect(() => {
-    canSendRef.current = canSend;
-  }, [canSend]);
-  React.useEffect(() => {
-    onSendRef.current = onSend;
-  }, [onSend]);
-
-  React.useEffect(() => {
-    if (loading) {
-      stopReadyTimestampRef.current = Date.now() + 600;
-    }
-  }, [loading]);
+  // Disparo único por toque: onPress exclusivo (sem onPressIn duplicado) com
+  // guarda pura por timestamp. Layout estável: o botão limpar ocupa espaço
+  // fixo sempre (só alterna opacidade), então o botão enviar nunca se move
+  // entre toques — causa raiz do "1º toque só fecha o teclado".
+  const lastSentAtRef = React.useRef(0);
 
   const handleTriggerSend = () => {
-    if (isSendingRef.current || !canSendRef.current) return;
-    isSendingRef.current = true;
-    onSendRef.current?.();
-    setTimeout(() => {
-      isSendingRef.current = false;
-    }, 400);
-  };
-
-  const handleStop = () => {
-    // Ignora cliques residuais que soltaram no mesmo momento da transição de estado
-    if (Date.now() < stopReadyTimestampRef.current) return;
-    onStop?.();
+    const decision = shouldTriggerSend({
+      hasContent: value.trim().length > 0 || !!selectedImageUri,
+      loading,
+      now: Date.now(),
+      lastSentAt: lastSentAtRef.current,
+    });
+    if (!decision.allowed) {
+      onRefusedSend?.(decision.reason!);
+      return;
+    }
+    lastSentAtRef.current = decision.sentAt;
+    onSend();
   };
 
   return (
@@ -125,6 +115,7 @@ export const ChatInputDock: React.FC<ChatInputDockProps> = ({
 
         {/* Campo de Entrada de Texto M3 */}
         <TextInput
+          ref={inputRef}
           style={[styles.input, { color: colors.onSurface }]}
           placeholder={
             isRecording
@@ -140,17 +131,17 @@ export const ChatInputDock: React.FC<ChatInputDockProps> = ({
           returnKeyType="default"
         />
 
-        {/* Botão de Limpar / Descartar Digitação */}
-        {value.length > 0 && !loading && (
-          <TouchableOpacity
-            style={[styles.iconButton, { width: 32, height: 32 }]}
-            onPress={() => onChangeText('')}
-            hitSlop={tokens.hitSlop.sm}
-            accessibilityLabel="Limpar texto digitado"
-          >
-            <MaterialIcons name="close" size={18} color={colors.onSurfaceVariant} />
-          </TouchableOpacity>
-        )}
+        {/* Botão de Limpar: espaço fixo sempre reservado (só opacidade alterna)
+            para o botão enviar nunca se deslocar entre toques. */}
+        <TouchableOpacity
+          style={[styles.iconButton, styles.clearButtonSlot, { opacity: value.length > 0 && !loading ? 1 : 0 }]}
+          onPress={() => onChangeText('')}
+          disabled={!(value.length > 0 && !loading)}
+          hitSlop={tokens.hitSlop.sm}
+          accessibilityLabel="Limpar texto digitado"
+        >
+          <MaterialIcons name="close" size={18} color={colors.onSurfaceVariant} />
+        </TouchableOpacity>
 
         {/* Botão de Anexo / Contexto M3 (oculto durante gravação) */}
         {onPressAttach && !isRecording && (
@@ -165,16 +156,15 @@ export const ChatInputDock: React.FC<ChatInputDockProps> = ({
           </TouchableOpacity>
         )}
 
-        {/* Botão Primário: Interromper (Stop) durante loading OU Envio M3 */}
+        {/* Botão Primário: Interromper (Stop) durante loading OU Envio M3.
+            Disparo exclusivo via onPress — sem onPressIn duplicado. */}
         {loading ? (
           <TouchableOpacity
             style={[
               styles.sendButton,
               { backgroundColor: colors.error || '#EF4444' },
             ]}
-            onPressIn={handleStop}
-            onPress={handleStop}
-            delayPressIn={0}
+            onPress={() => onStop?.()}
             activeOpacity={0.8}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             pressRetentionOffset={{ top: 12, bottom: 12, left: 12, right: 12 }}
@@ -190,10 +180,7 @@ export const ChatInputDock: React.FC<ChatInputDockProps> = ({
                 ? { backgroundColor: colors.primary }
                 : { backgroundColor: colors.surfaceContainerHighest, shadowOpacity: 0, elevation: 0 },
             ]}
-            onPressIn={handleTriggerSend}
             onPress={handleTriggerSend}
-            delayPressIn={0}
-            disabled={!canSend}
             activeOpacity={0.8}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             pressRetentionOffset={{ top: 12, bottom: 12, left: 12, right: 12 }}
@@ -264,6 +251,10 @@ const styles = StyleSheet.create({
     borderRadius: MD3Shapes.full,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  clearButtonSlot: {
+    width: 32,
+    height: 32,
   },
   micButtonIdle: {
     backgroundColor: tokens.colors.surfaceContainerHighest,

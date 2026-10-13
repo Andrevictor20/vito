@@ -75,6 +75,10 @@ func (m *mockPendingRepoForHandler) ListUnscheduledDueForNudge(cutoff time.Time)
 	return nil, nil
 }
 
+func (m *mockPendingRepoForHandler) ListScheduledDueForNudge(today string, since time.Time) ([]domain.PendingItem, error) {
+	return nil, nil
+}
+
 func (m *mockPendingRepoForHandler) MarkNudgeSent(id string, sentAt time.Time) error {
 	return nil
 }

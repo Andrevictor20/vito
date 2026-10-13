@@ -32,7 +32,7 @@ func TestPendingNudgeWorker_FormatNudgeMessage(t *testing.T) {
 	singleItem := []domain.PendingItem{
 		{Title: "Renovar CNH"},
 	}
-	title, body := service.FormatNudgeMessage("André Victor", singleItem)
+	title, body := service.FormatNudgeMessage("André Victor", singleItem, 0)
 	if title != "📥 Pendências" {
 		t.Fatalf("título inesperado: %s", title)
 	}
@@ -45,7 +45,7 @@ func TestPendingNudgeWorker_FormatNudgeMessage(t *testing.T) {
 		{Title: "Item 2"},
 		{Title: "Item 3"},
 	}
-	_, bodyMulti := service.FormatNudgeMessage("Carlos", multipleItems)
+	_, bodyMulti := service.FormatNudgeMessage("Carlos", multipleItems, 0)
 	if bodyMulti != "Carlos, você tem 3 pendências paradas há mais de 24h. Que tal agendar no seu dia?" {
 		t.Fatalf("corpo inesperado para múltiplos itens: %s", bodyMulti)
 	}

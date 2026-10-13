@@ -48,6 +48,9 @@ func (s *PendingService) CreatePending(userID string, input domain.CreatePending
 		Category:      category,
 		Status:        status,
 		ScheduledDate: strings.TrimSpace(input.ScheduledDate),
+		RemindAt:      input.RemindAt,
+		RemindRepeat:  strings.TrimSpace(input.RemindRepeat),
+		RemindAdvance: input.RemindAdvance,
 		CreatedAt:     now,
 		UpdatedAt:     now,
 	}
@@ -101,6 +104,18 @@ func (s *PendingService) UpdatePending(id, userID string, input domain.UpdatePen
 		if item.ScheduledDate != "" && item.Status == domain.PendingStatusInbox {
 			item.Status = domain.PendingStatusScheduled
 		}
+	}
+
+	if input.RemindAt != nil {
+		item.RemindAt = input.RemindAt
+	}
+
+	if input.RemindRepeat != nil {
+		item.RemindRepeat = strings.TrimSpace(*input.RemindRepeat)
+	}
+
+	if input.RemindAdvance != nil {
+		item.RemindAdvance = *input.RemindAdvance
 	}
 
 	if err := s.repo.Update(item); err != nil {

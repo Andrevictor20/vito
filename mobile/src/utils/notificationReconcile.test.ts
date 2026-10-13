@@ -29,4 +29,13 @@ describe('Purge série e órfãos (P3)', () => {
     const orphans = findOrphanNotificationIds(scheduled, new Set([]), new Set(['t1']));
     assert.deepEqual(orphans, ['todo-reminder-due-t2']);
   });
+
+  it('purga lembrete de pendência concluída/excluída (W2)', () => {
+    const scheduled = [
+      { identifier: 'pending-reminder-p1', content: { data: { pendingId: 'p1' } } },
+      { identifier: 'pending-reminder-p2', content: { data: { pendingId: 'p2' } } },
+    ];
+    const orphans = findOrphanNotificationIds(scheduled, new Set([]), new Set([]), new Set(['p1']));
+    assert.deepEqual(orphans, ['pending-reminder-p2']);
+  });
 });

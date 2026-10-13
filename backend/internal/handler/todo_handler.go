@@ -21,11 +21,14 @@ func NewTodoHandler(todoSvc *service.TodoService) *TodoHandler {
 }
 
 type createTodoRequest struct {
-	Title      string     `json:"title"`
-	Priority   string     `json:"priority"`
-	DueDate    *time.Time `json:"due_date,omitempty"`
-	EventID    string     `json:"event_id,omitempty"`
-	EventTitle string     `json:"event_title,omitempty"`
+	Title         string     `json:"title"`
+	Priority      string     `json:"priority"`
+	DueDate       *time.Time `json:"due_date,omitempty"`
+	RemindAt      *time.Time `json:"remind_at,omitempty"`
+	RemindRepeat  string     `json:"remind_repeat,omitempty"`
+	RemindAdvance int        `json:"remind_advance_minutes,omitempty"`
+	EventID       string     `json:"event_id,omitempty"`
+	EventTitle    string     `json:"event_title,omitempty"`
 }
 
 func (h *TodoHandler) CreateTodo(w http.ResponseWriter, r *http.Request) {
@@ -42,11 +45,14 @@ func (h *TodoHandler) CreateTodo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	todo, err := h.todoSvc.CreateTodoWithOptions(userID, domain.CreateTodoInput{
-		Title:      req.Title,
-		Priority:   req.Priority,
-		DueDate:    req.DueDate,
-		EventID:    req.EventID,
-		EventTitle: req.EventTitle,
+		Title:         req.Title,
+		Priority:      req.Priority,
+		DueDate:       req.DueDate,
+		RemindAt:      req.RemindAt,
+		RemindRepeat:  req.RemindRepeat,
+		RemindAdvance: req.RemindAdvance,
+		EventID:       req.EventID,
+		EventTitle:    req.EventTitle,
 	})
 	if err != nil {
 		http.Error(w, `{"error":"falha ao criar tarefa: `+err.Error()+`"}`, http.StatusBadRequest)

@@ -8,6 +8,9 @@ import { useTheme } from '../../context/ThemeContext';
 import { EventInlineCard } from './cards/EventInlineCard';
 import { ConflictInlineCard } from './cards/ConflictInlineCard';
 import { TodoInlineCard } from './cards/TodoInlineCard';
+import { PendingInlineCard } from './cards/PendingInlineCard';
+import { TriggerInlineCard } from './cards/TriggerInlineCard';
+import { BookingInlineCard } from './cards/BookingInlineCard';
 import { VitoMascot } from '../common/VitoMascot';
 import { preparePlainTextForCopy } from '../../utils/chatActions';
 
@@ -284,34 +287,9 @@ export const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
           />
         )}
         {message.todo && <TodoInlineCard todo={message.todo} />}
-        {message.trigger && (
-          <View
-            style={{
-              marginTop: 8,
-              padding: 10,
-              borderRadius: 12,
-              backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-              borderWidth: 1,
-              borderColor: isDark ? colors.outlineVariant : 'rgba(0,0,0,0.08)',
-            }}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-              <MaterialIcons name="track-changes" size={16} color="#10B981" style={{ marginRight: 6 }} />
-              <Text style={{ fontSize: 13, fontWeight: '700', color: colors.onSurface, flex: 1 }}>
-                {message.trigger.title}
-              </Text>
-            </View>
-            <Text style={{ fontSize: 12, color: colors.onSurfaceVariant }} numberOfLines={2}>
-              {message.trigger.query}
-            </Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
-              <MaterialIcons name="radar" size={13} color="#10B981" style={{ marginRight: 4 }} />
-              <Text style={{ fontSize: 11, fontWeight: '600', color: '#10B981' }}>
-                Radar Ativo no Vito
-              </Text>
-            </View>
-          </View>
-        )}
+        {message.pending && <PendingInlineCard pending={message.pending} />}
+        {message.trigger && <TriggerInlineCard trigger={message.trigger} />}
+        {message.booking && <BookingInlineCard booking={message.booking} />}
 
         <View style={styles.metaRow}>
           {/* Botão Copiar Resposta do Vito */}

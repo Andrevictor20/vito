@@ -64,7 +64,8 @@ func (td *ParsedTodo) UnmarshalJSON(data []byte) error {
 	type alias ParsedTodo
 	aux := struct {
 		*alias
-		DueDate *string `json:"due_date"`
+		DueDate  *string `json:"due_date"`
+		RemindAt *string `json:"remind_at"`
 	}{alias: (*alias)(td)}
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return err
@@ -80,6 +81,42 @@ func (td *ParsedTodo) UnmarshalJSON(data []byte) error {
 	if !parsed.IsZero() {
 		td.DueDate = &parsed
 		td.dueWallClock = wall
+	}
+	td.RemindAt = nil
+	if aux.RemindAt != nil {
+		rparsed, rwall, err := parseFlexTime(*aux.RemindAt)
+		if err != nil {
+			return fmt.Errorf("remind_at: %w", err)
+		}
+		if !rparsed.IsZero() {
+			td.RemindAt = &rparsed
+			td.remindWallClock = rwall
+		}
+	}
+	return nil
+}
+
+// UnmarshalJSON de ParsedPending ancora remind_at flexível no fuso do usuário.
+func (p *ParsedPending) UnmarshalJSON(data []byte) error {
+	type alias ParsedPending
+	aux := struct {
+		*alias
+		RemindAt *string `json:"remind_at"`
+	}{alias: (*alias)(p)}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	p.RemindAt = nil
+	if aux.RemindAt == nil {
+		return nil
+	}
+	parsed, wall, err := parseFlexTime(*aux.RemindAt)
+	if err != nil {
+		return fmt.Errorf("remind_at: %w", err)
+	}
+	if !parsed.IsZero() {
+		p.RemindAt = &parsed
+		p.remindWallClock = wall
 	}
 	return nil
 }
@@ -107,5 +144,15 @@ func (p *ParsedIntent) LocalizeTimes(timezone string) {
 		local := toWallClock(*td.DueDate, loc)
 		td.DueDate = &local
 		td.dueWallClock = false
+	}
+	if td := p.Todo; td != nil && td.RemindAt != nil && td.remindWallClock {
+		local := toWallClock(*td.RemindAt, loc)
+		td.RemindAt = &local
+		td.remindWallClock = false
+	}
+	if pp := p.Pending; pp != nil && pp.RemindAt != nil && pp.remindWallClock {
+		local := toWallClock(*pp.RemindAt, loc)
+		pp.RemindAt = &local
+		pp.remindWallClock = false
 	}
 }
