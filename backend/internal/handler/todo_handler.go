@@ -86,6 +86,59 @@ func (h *TodoHandler) ListTodos(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(todos)
 }
 
+type updateTodoRequest struct {
+	Title         *string    `json:"title,omitempty"`
+	Priority      *string    `json:"priority,omitempty"`
+	DueDate       *time.Time `json:"due_date,omitempty"`
+	RemindAt      *time.Time `json:"remind_at,omitempty"`
+	RemindRepeat  *string    `json:"remind_repeat,omitempty"`
+	RemindAdvance *int       `json:"remind_advance_minutes,omitempty"`
+}
+
+// UpdateTodo aplica a edição completa de uma tarefa.
+func (h *TodoHandler) UpdateTodo(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, `{"error":"não autorizado"}`, http.StatusUnauthorized)
+		return
+	}
+
+	todoID := chi.URLParam(r, "id")
+	if todoID == "" {
+		todoID = r.PathValue("id")
+	}
+	if todoID == "" {
+		http.Error(w, `{"error":"id ausente"}`, http.StatusBadRequest)
+		return
+	}
+
+	var req updateTodoRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error":"payload inválido"}`, http.StatusBadRequest)
+		return
+	}
+
+	todo, err := h.todoSvc.UpdateTodo(todoID, userID, domain.UpdateTodoInput{
+		Title:         req.Title,
+		Priority:      req.Priority,
+		DueDate:       req.DueDate,
+		RemindAt:      req.RemindAt,
+		RemindRepeat:  req.RemindRepeat,
+		RemindAdvance: req.RemindAdvance,
+	})
+	if err != nil {
+		if err == domain.ErrTodoNotFound {
+			http.Error(w, `{"error":"tarefa não encontrada"}`, http.StatusNotFound)
+			return
+		}
+		http.Error(w, `{"error":"falha ao atualizar tarefa: `+err.Error()+`"}`, http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(todo)
+}
+
 func (h *TodoHandler) CompleteTodo(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {

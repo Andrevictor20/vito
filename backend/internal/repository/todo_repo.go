@@ -107,6 +107,23 @@ func (r *TodoRepositorySQLite) UpdateStatus(id, userID string, status domain.Tod
 	return nil
 }
 
+// Update persiste a edição completa de uma tarefa.
+func (r *TodoRepositorySQLite) Update(t *domain.Todo) error {
+	query := `UPDATE todos SET title = ?, priority = ?, due_date = ?, remind_at = ?, remind_repeat = ?, remind_advance = ?, updated_at = ? WHERE id = ? AND user_id = ?`
+	res, err := r.db.Exec(query, t.Title, t.Priority, t.DueDate, t.RemindAt, t.RemindRepeat, t.RemindAdvance, time.Now().UTC(), t.ID, t.UserID)
+	if err != nil {
+		return err
+	}
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return domain.ErrTodoNotFound
+	}
+	return nil
+}
+
 func (r *TodoRepositorySQLite) Delete(id, userID string) error {
 	query := `DELETE FROM todos WHERE id = ? AND user_id = ?`
 	res, err := r.db.Exec(query, id, userID)
@@ -274,4 +291,3 @@ func (r *TodoRepositorySQLite) MarkDueReminderSent(todoID string, sentAt time.Ti
 	_, err := r.db.Exec(query, sentAt.UTC(), todoID)
 	return err
 }
-

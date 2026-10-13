@@ -158,6 +158,7 @@ func (s *Server) registerRoutes() {
 					protected.Route("/todos", func(tr chi.Router) {
 						tr.Post("/", s.todoHandler.CreateTodo)
 						tr.Get("/", s.todoHandler.ListTodos)
+						tr.Patch("/{id}", s.todoHandler.UpdateTodo)
 						tr.Patch("/{id}/complete", s.todoHandler.CompleteTodo)
 						tr.Patch("/{id}/reopen", s.todoHandler.ReopenTodo)
 						tr.Delete("/{id}", s.todoHandler.DeleteTodo)

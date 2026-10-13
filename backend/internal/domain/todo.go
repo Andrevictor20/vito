@@ -59,6 +59,16 @@ type CreateTodoInput struct {
 	EventTitle    string     `json:"event_title,omitempty"`
 }
 
+// UpdateTodoInput parâmetros para edição de uma tarefa.
+type UpdateTodoInput struct {
+	Title         *string    `json:"title,omitempty"`
+	Priority      *string    `json:"priority,omitempty"`
+	DueDate       *time.Time `json:"due_date,omitempty"`
+	RemindAt      *time.Time `json:"remind_at,omitempty"`
+	RemindRepeat  *string    `json:"remind_repeat,omitempty"`
+	RemindAdvance *int       `json:"remind_advance_minutes,omitempty"`
+}
+
 // TodoRepository define o contrato de persistência para pendências e subtarefas.
 type TodoRepository interface {
 	Create(todo *Todo) error
@@ -69,6 +79,7 @@ type TodoRepository interface {
 	MarkReminderSent(todoID string, sentAt time.Time) error
 	MarkDueReminderSent(todoID string, sentAt time.Time) error
 	UpdateStatus(id, userID string, status TodoStatus) error
+	Update(todo *Todo) error
 	Delete(id, userID string) error
 	AddSubtask(subtask *Subtask) error
 	ToggleSubtask(id, todoID string) (*Subtask, error)

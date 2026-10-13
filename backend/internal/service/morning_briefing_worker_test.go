@@ -115,6 +115,7 @@ func (m *mockTodoRepoForBriefing) MarkDueReminderSent(todoID string, sentAt time
 	return nil
 }
 func (m *mockTodoRepoForBriefing) UpdateStatus(id, userID string, status domain.TodoStatus) error   { return nil }
+func (m *mockTodoRepoForBriefing) Update(todo *domain.Todo) error                                     { return nil }
 func (m *mockTodoRepoForBriefing) Delete(id, userID string) error                                  { return nil }
 func (m *mockTodoRepoForBriefing) AddSubtask(subtask *domain.Subtask) error                        { return nil }
 func (m *mockTodoRepoForBriefing) ToggleSubtask(id, todoID string) (*domain.Subtask, error)        { return nil, nil }

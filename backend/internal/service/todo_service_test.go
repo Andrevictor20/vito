@@ -148,3 +148,69 @@ func TestTodoService_HeuristicPriority(t *testing.T) {
 func timePtr(t time.Time) *time.Time {
 	return &t
 }
+
+func strPtr(s string) *string {
+	return &s
+}
+
+func intPtr(i int) *int {
+	return &i
+}
+
+func TestTodoService_UpdateTodo(t *testing.T) {
+	todoSvc, _ := setupTodoService(t)
+
+	due := time.Now().Add(48 * time.Hour).UTC().Truncate(time.Second)
+	rem := time.Now().Add(24 * time.Hour).UTC().Truncate(time.Second)
+	todo, err := todoSvc.CreateTodoWithOptions("user-todo-svc-1", domain.CreateTodoInput{
+		Title:    "Título original",
+		Priority: "low",
+		DueDate:  &due,
+	})
+	if err != nil {
+		t.Fatalf("falha ao criar tarefa: %v", err)
+	}
+
+	newTitle := "Título editado"
+	newPriority := "high"
+	newDue := time.Now().Add(72 * time.Hour).UTC().Truncate(time.Second)
+	newRepeat := "daily"
+	newAdvance := 30
+	updated, err := todoSvc.UpdateTodo(todo.ID, "user-todo-svc-1", domain.UpdateTodoInput{
+		Title:         &newTitle,
+		Priority:      &newPriority,
+		DueDate:       &newDue,
+		RemindAt:      &rem,
+		RemindRepeat:  &newRepeat,
+		RemindAdvance: &newAdvance,
+	})
+	if err != nil {
+		t.Fatalf("falha ao atualizar tarefa: %v", err)
+	}
+	if updated.Title != newTitle {
+		t.Errorf("esperava título %q, obteve %q", newTitle, updated.Title)
+	}
+	if updated.Priority != newPriority {
+		t.Errorf("esperava prioridade %q, obteve %q", newPriority, updated.Priority)
+	}
+	if updated.DueDate == nil || !updated.DueDate.Equal(newDue) {
+		t.Errorf("prazo não atualizado: %+v", updated.DueDate)
+	}
+	if updated.RemindAt == nil || !updated.RemindAt.Equal(rem) {
+		t.Errorf("lembrete não atualizado: %+v", updated.RemindAt)
+	}
+	if updated.RemindRepeat != newRepeat || updated.RemindAdvance != newAdvance {
+		t.Errorf("repetição/aviso não atualizados: %+v", updated)
+	}
+
+	// Título vazio deve ser rejeitado.
+	empty := "   "
+	if _, err := todoSvc.UpdateTodo(todo.ID, "user-todo-svc-1", domain.UpdateTodoInput{Title: &empty}); err == nil {
+		t.Errorf("esperava erro ao atualizar com título vazio")
+	}
+
+	// Tarefa inexistente deve retornar ErrTodoNotFound.
+	if _, err := todoSvc.UpdateTodo("inexistente", "user-todo-svc-1", domain.UpdateTodoInput{Title: &newTitle}); err == nil {
+		t.Errorf("esperava erro ao atualizar tarefa inexistente")
+	}
+}

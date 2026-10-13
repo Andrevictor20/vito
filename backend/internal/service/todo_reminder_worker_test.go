@@ -79,6 +79,15 @@ func (m *mockReminderTodoRepo) UpdateStatus(id, userID string, status domain.Tod
 	}
 	return domain.ErrTodoNotFound
 }
+func (m *mockReminderTodoRepo) Update(t *domain.Todo) error {
+	for i, e := range m.todos {
+		if e.ID == t.ID && e.UserID == t.UserID {
+			m.todos[i] = *t
+			return nil
+		}
+	}
+	return domain.ErrTodoNotFound
+}
 func (m *mockReminderTodoRepo) Delete(id, userID string) error {
 	return nil
 }

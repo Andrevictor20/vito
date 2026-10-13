@@ -136,6 +136,53 @@ func (s *TodoService) CompleteTodo(id, userID string) error {
 	return s.todoRepo.UpdateStatus(id, userID, domain.TodoStatusCompleted)
 }
 
+// UpdateTodo aplica a edição completa de uma tarefa (título, prioridade, prazo e lembrete).
+func (s *TodoService) UpdateTodo(id, userID string, input domain.UpdateTodoInput) (*domain.Todo, error) {
+	todo, err := s.todoRepo.GetByID(id, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	if input.Title != nil {
+		trimmed := strings.TrimSpace(*input.Title)
+		if trimmed == "" {
+			return nil, errors.New("o título da tarefa é obrigatório")
+		}
+		todo.Title = trimmed
+	}
+
+	if input.Priority != nil {
+		switch *input.Priority {
+		case "low", "medium", "high":
+			todo.Priority = *input.Priority
+		default:
+			return nil, errors.New("prioridade inválida")
+		}
+	}
+
+	if input.DueDate != nil {
+		todo.DueDate = input.DueDate
+	}
+
+	if input.RemindAt != nil {
+		todo.RemindAt = input.RemindAt
+	}
+
+	if input.RemindRepeat != nil {
+		todo.RemindRepeat = strings.TrimSpace(*input.RemindRepeat)
+	}
+
+	if input.RemindAdvance != nil {
+		todo.RemindAdvance = *input.RemindAdvance
+	}
+
+	if err := s.todoRepo.Update(todo); err != nil {
+		return nil, err
+	}
+
+	return todo, nil
+}
+
 // ReopenTodo desfaz a conclusão: tarefa concluída volta a pendente.
 func (s *TodoService) ReopenTodo(id, userID string) error {
 	return s.todoRepo.UpdateStatus(id, userID, domain.TodoStatusPending)
