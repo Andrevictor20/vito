@@ -159,6 +159,7 @@ func (s *Server) registerRoutes() {
 						tr.Post("/", s.todoHandler.CreateTodo)
 						tr.Get("/", s.todoHandler.ListTodos)
 						tr.Patch("/{id}/complete", s.todoHandler.CompleteTodo)
+						tr.Patch("/{id}/reopen", s.todoHandler.ReopenTodo)
 						tr.Delete("/{id}", s.todoHandler.DeleteTodo)
 						tr.Post("/{id}/subtasks", s.todoHandler.AddSubtask)
 						tr.Patch("/{id}/subtasks/{subtaskId}/toggle", s.todoHandler.ToggleSubtask)

@@ -373,10 +373,7 @@ export const HomeScreen: React.FC<{
               onToggleSubtask={handleToggleSubtask}
               onAddSubtask={handleAddSubtask}
               onDeleteSubtask={handleDeleteSubtask}
-              onCreateTodo={() => {
-                setCreateTab('todo');
-                setCreateModalVisible(true);
-              }}
+              onSaveTodoFull={handleCreateTodo}
               onOpenEventCreate={() => {
                 setCreateTab('event');
                 setCreateModalVisible(true);

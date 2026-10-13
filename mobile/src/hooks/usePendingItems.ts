@@ -42,15 +42,25 @@ export function usePendingItems(onScheduled?: (title: string, dateStr: string) =
     load(true);
   }, [load]);
 
-  const create = useCallback(async (title: string, category = 'geral') => {
-    const trimmed = title.trim();
-    if (!trimmed) return null;
-    hapticFeedback.medium();
-    const created = await api.createPendingItem({ title: trimmed, category });
-    setItems((prev) => [created, ...prev]);
-    hapticFeedback.success();
-    return created;
-  }, []);
+  const create = useCallback(
+    async (
+      title: string,
+      category = 'geral',
+      extra?: { scheduled_date?: string; remind_at?: string; remind_repeat?: 'none' | 'daily' | 'weekly'; remind_advance_minutes?: number },
+    ) => {
+      const trimmed = title.trim();
+      if (!trimmed) return null;
+      hapticFeedback.medium();
+      const created = await api.createPendingItem({ title: trimmed, category, ...(extra || {}) });
+      setItems((prev) => [created, ...prev]);
+      if (created.status !== 'done' && created.remind_at) {
+        await notificationService.schedulePendingReminder(created).catch(() => {});
+      }
+      hapticFeedback.success();
+      return created;
+    },
+    [],
+  );
 
   const toggleComplete = useCallback(async (item: PendingItem) => {
     hapticFeedback.medium();

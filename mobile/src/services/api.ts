@@ -369,6 +369,12 @@ class ApiService {
     });
   }
 
+  async reopenTodo(id: string): Promise<{ status: string }> {
+    return this.request<{ status: string }>(`/api/v1/todos/${id}/reopen`, {
+      method: 'PATCH',
+    });
+  }
+
   async deleteTodo(id: string): Promise<void> {
     return this.request<void>(`/api/v1/todos/${id}`, { method: 'DELETE' });
   }

@@ -317,38 +317,8 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack }) => {
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.surface }]}>
       <StatusBar style={isDark ? 'light' : 'dark'} />
 
-      {/* Header Fixo 50dp */}
-      <View style={[styles.header, { borderBottomColor: colors.outlineVariant }]}>
-        {onBack && (
-          <TouchableOpacity
-            onPress={() => {
-              hapticFeedback.light();
-              onBack();
-            }}
-            style={styles.backButton}
-            activeOpacity={0.7}
-          >
-            <MaterialIcons name="arrow-back" size={24} color={colors.onSurface} />
-          </TouchableOpacity>
-        )}
-
-        <View style={styles.headerTitleContainer}>
-          <Text style={[styles.headerTitle, { color: colors.onSurface }]} numberOfLines={1}>
-            Vito Booking
-          </Text>
-          <Text style={[styles.headerSubtitle, { color: colors.onSurfaceVariant }]}>
-            Links de Agendamento Executivos
-          </Text>
-        </View>
-
-        <TouchableOpacity
-          onPress={handleOpenCreate}
-          style={[styles.createHeaderBtn, { backgroundColor: colors.primary }]}
-          activeOpacity={0.8}
-        >
-          <MaterialIcons name="add" size={20} color={colors.onPrimary} />
-        </TouchableOpacity>
-      </View>
+      {/* Sem header interno em modo aba: o Header global já titula
+          "Vito Booking". Evita título e botão criar duplicados. */}
 
       {/* Segmented Tabs (Links vs Agendamentos) */}
       <View style={[styles.tabsContainer, { backgroundColor: colors.surfaceVariant }]}>
@@ -1065,6 +1035,18 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack }) => {
           </View>
         </View>
       </Modal>
+
+      {/* FAB único de criação: só com links existentes (no vazio, o CTA "Criar Primeiro Link" é a entrada) */}
+      {(types || []).length > 0 && (
+        <TouchableOpacity
+          onPress={handleOpenCreate}
+          style={[styles.fab, { backgroundColor: colors.primary }]}
+          activeOpacity={0.85}
+          accessibilityLabel="Criar novo link de agendamento"
+        >
+          <MaterialIcons name="add" size={24} color={colors.onPrimary} />
+        </TouchableOpacity>
+      )}
     </SafeAreaView>
   );
 };
@@ -1124,6 +1106,21 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingVertical: 8,
     borderRadius: 8,
+  },
+  fab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 28,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
   },
   tabButtonActive: {
     shadowColor: '#000',

@@ -3,7 +3,6 @@ import {
   StyleSheet,
   View,
   Text,
-  TextInput,
   ScrollView,
   RefreshControl,
   ActivityIndicator,
@@ -12,12 +11,12 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens } from '../theme/tokens';
 import { useTheme } from '../context/ThemeContext';
-import { hapticFeedback } from '../theme/motion';
 import { Todo, PendingItem } from '../types';
-import { TodoItem } from '../components/todos/TodoItem';
+import { TaskRow } from '../components/tasks/TaskRow';
+import { CreateTaskSheet, NewItemPayload } from '../components/tasks/CreateTaskSheet';
 import { ReminderSheet, RepeatOption } from '../components/pending/ReminderSheet';
 import { usePendingItems } from '../hooks/usePendingItems';
-import { toUnifiedRows, sortUnifiedRows, UnifiedRow } from '../utils/unifiedTasks';
+import { toUnifiedRows, sortUnifiedRows } from '../utils/unifiedTasks';
 
 interface TasksScreenProps {
   todos: Todo[];
@@ -32,116 +31,16 @@ interface TasksScreenProps {
   onToggleSubtask: (todoId: string, subtaskId: string) => void;
   onAddSubtask: (todoId: string, title: string) => void;
   onDeleteSubtask: (todoId: string, subtaskId: string) => void;
-  onCreateTodo: () => void;
+  onSaveTodoFull: (input: {
+    title: string;
+    priority?: string;
+    due_date?: string;
+    remind_at?: string;
+    remind_repeat?: string;
+    remind_advance_minutes?: number;
+  }) => Promise<any>;
   onOpenEventCreate?: (title: string, date?: string) => void;
 }
-
-const isoDay = (offset: number) => {
-  const d = new Date();
-  d.setDate(d.getDate() + offset);
-  return d.toISOString().split('T')[0];
-};
-
-const formatShortDate = (row: UnifiedRow): string | null => {
-  const src = row.sourceTodo?.due_date || row.sourcePending?.scheduled_date;
-  if (!src) return null;
-  const d = new Date(src.length === 10 ? `${src}T12:00:00` : src);
-  if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
-};
-
-const PendingRow: React.FC<{
-  row: UnifiedRow;
-  onToggle: (item: PendingItem) => void;
-  onDelete: (id: string) => void;
-  onSchedule: (item: PendingItem, dateStr: string) => void;
-  onReminder: (item: PendingItem) => void;
-}> = ({ row, onToggle, onDelete, onSchedule, onReminder }) => {
-  const { colors } = useTheme();
-  const item = row.sourcePending!;
-  const dateLabel = formatShortDate(row);
-  const scheduled = item.status === 'scheduled';
-
-  return (
-    <View style={[styles.pendingRow, row.overdue && { backgroundColor: colors.errorContainer }]}>
-      <TouchableOpacity
-        style={[
-          styles.checkCircle,
-          { borderColor: row.done ? colors.primary : colors.outline },
-          row.done && { backgroundColor: colors.primary, borderColor: colors.primary },
-        ]}
-        onPress={() => onToggle(item)}
-        activeOpacity={0.7}
-        accessibilityRole="checkbox"
-        accessibilityState={{ checked: row.done }}
-        accessibilityLabel={row.done ? 'Reabrir pendência' : 'Concluir pendência'}
-      >
-        {row.done && <MaterialIcons name="check" size={16} color={colors.onPrimary} />}
-      </TouchableOpacity>
-
-      <View style={styles.pendingBody}>
-        <Text
-          style={[styles.pendingTitle, { color: colors.onSurface }, row.done && styles.struck]}
-          numberOfLines={2}
-        >
-          {row.title}
-        </Text>
-        <View style={styles.pendingMeta}>
-          <View style={[styles.badge, { backgroundColor: colors.tertiaryContainer }]}>
-            <Text style={[styles.badgeText, { color: colors.onTertiaryContainer }]}>Pendência</Text>
-          </View>
-          {dateLabel && (
-            <Text style={[styles.dateText, { color: row.overdue ? colors.error : colors.onSurfaceVariant }]}>
-              {row.overdue ? `Atrasada · ${dateLabel}` : dateLabel}
-            </Text>
-          )}
-          {!dateLabel && <Text style={[styles.dateText, { color: colors.onSurfaceVariant }]}>Sem data</Text>}
-        </View>
-        {!row.done && !scheduled && (
-          <View style={styles.quickSchedule}>
-            <TouchableOpacity
-              style={[styles.schedChip, { borderColor: colors.outlineVariant }]}
-              onPress={() => onSchedule(item, isoDay(0))}
-              activeOpacity={0.7}
-              accessibilityLabel="Agendar para hoje"
-            >
-              <Text style={[styles.schedChipText, { color: colors.primary }]}>Hoje</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.schedChip, { borderColor: colors.outlineVariant }]}
-              onPress={() => onSchedule(item, isoDay(1))}
-              activeOpacity={0.7}
-              accessibilityLabel="Agendar para amanhã"
-            >
-              <Text style={[styles.schedChipText, { color: colors.primary }]}>Amanhã</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-      </View>
-
-      <TouchableOpacity
-        onPress={() => onReminder(item)}
-        hitSlop={tokens.hitSlop.sm}
-        activeOpacity={0.7}
-        accessibilityLabel={item.remind_at ? 'Editar lembrete' : 'Configurar lembrete'}
-      >
-        <MaterialIcons
-          name={item.remind_at ? 'notifications-active' : 'notifications-none'}
-          size={20}
-          color={item.remind_at ? colors.primary : colors.onSurfaceVariant}
-        />
-      </TouchableOpacity>
-      <TouchableOpacity
-        onPress={() => onDelete(item.id)}
-        hitSlop={tokens.hitSlop.sm}
-        activeOpacity={0.7}
-        accessibilityLabel="Excluir pendência"
-      >
-        <MaterialIcons name="delete-outline" size={20} color={colors.onSurfaceVariant} />
-      </TouchableOpacity>
-    </View>
-  );
-};
 
 export const TasksScreen: React.FC<TasksScreenProps> = ({
   todos,
@@ -156,15 +55,17 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
   onToggleSubtask,
   onAddSubtask,
   onDeleteSubtask,
-  onCreateTodo,
+  onSaveTodoFull,
   onOpenEventCreate,
 }) => {
   const { colors, isDark } = useTheme();
   const [showCompleted, setShowCompleted] = useState(false);
-  const [quickTitle, setQuickTitle] = useState('');
   const [reminderItem, setReminderItem] = useState<PendingItem | null>(null);
   const [reminderSaving, setReminderSaving] = useState(false);
   const [reminderError, setReminderError] = useState<string | null>(null);
+  const [createVisible, setCreateVisible] = useState(false);
+  const [createSaving, setCreateSaving] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   const pending = usePendingItems(onOpenEventCreate);
 
@@ -176,10 +77,67 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
   const doneRows = useMemo(() => rows.filter((r) => r.done), [rows]);
   const overdueCount = useMemo(() => activeRows.filter((r) => r.overdue).length, [activeRows]);
 
-  const handleQuickAdd = async () => {
-    if (!quickTitle.trim()) return;
-    const created = await pending.create(quickTitle);
-    if (created) setQuickTitle('');
+  const renderRow = (row: (typeof activeRows)[number]) => {
+    if (row.kind === 'todo' && row.sourceTodo) {
+      const t = row.sourceTodo;
+      return (
+        <TaskRow
+          key={`todo-${row.id}`}
+          row={row}
+          onToggle={() => onToggleTodo(t.id)}
+          onDelete={() => onDeleteTodo(t.id)}
+          onReminder={undefined}
+          subtasks={t.subtasks}
+          onToggleSubtask={(sid) => onToggleSubtask(t.id, sid)}
+          onAddSubtask={(title) => onAddSubtask(t.id, title)}
+          onDeleteSubtask={(sid) => onDeleteSubtask(t.id, sid)}
+        />
+      );
+    }
+    if (row.sourcePending) {
+      const p = row.sourcePending;
+      return (
+        <TaskRow
+          key={`pending-${row.id}`}
+          row={row}
+          onToggle={() => pending.toggleComplete(p)}
+          onDelete={() => pending.remove(p.id)}
+          onSchedule={(dateStr) => pending.schedule(p, dateStr)}
+          onReminder={() => setReminderItem(p)}
+        />
+      );
+    }
+    return null;
+  };
+
+  const handleSaveNew = async (payload: NewItemPayload) => {
+    setCreateSaving(true);
+    setCreateError(null);
+    try {
+      if (payload.kind === 'todo') {
+        await onSaveTodoFull({
+          title: payload.title,
+          priority: payload.priority,
+          due_date: payload.dateISO,
+          remind_at: payload.remind_at,
+          remind_repeat: payload.remind_repeat,
+          remind_advance_minutes: payload.remind_advance_minutes,
+        });
+      } else {
+        await pending.create(payload.title, payload.category || 'geral', {
+          scheduled_date: payload.dateOnly,
+          remind_at: payload.remind_at,
+          remind_repeat: payload.remind_repeat,
+          remind_advance_minutes: payload.remind_advance_minutes,
+        });
+      }
+      setCreateVisible(false);
+    } catch (err) {
+      console.warn('[TasksScreen] Falha ao criar item:', err);
+      setCreateError('Não foi possível criar. Tente de novo.');
+    } finally {
+      setCreateSaving(false);
+    }
   };
 
   const handleSaveReminder = async (reminder: { remind_at: string; remind_repeat: RepeatOption; remind_advance_minutes: number }) => {
@@ -190,7 +148,6 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
       await pending.updateReminder(reminderItem, reminder);
       setReminderItem(null);
     } catch (err) {
-      console.warn('[TasksScreen] Falha ao salvar lembrete:', err);
       setReminderError('Não foi possível salvar o lembrete. Tente de novo.');
     } finally {
       setReminderSaving(false);
@@ -229,9 +186,8 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
           />
         }
       >
-        {/* Cabeçalho da página única */}
+        {/* Linha de contexto (o Header global já titula a página) */}
         <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>Tarefas e Pendências</Text>
           <Text style={[styles.checklistSubtitle, { color: colors.textMuted }]}>
             {activeRows.length} {activeRows.length === 1 ? 'ativa' : 'ativas'}
             {overdueCount > 0 ? ` · ${overdueCount} atrasada${overdueCount === 1 ? '' : 's'}` : ''}
@@ -239,32 +195,10 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
           </Text>
         </View>
 
-        {/* Criação rápida de pendência */}
-        <View style={[styles.quickCard, { backgroundColor: colors.surfaceContainerLow, borderColor: colors.outlineVariant }]}>
-          <TextInput
-            style={[styles.quickInput, { color: colors.onSurface }]}
-            placeholder="Guardar algo para resolver depois..."
-            placeholderTextColor={colors.onSurfaceVariant}
-            value={quickTitle}
-            onChangeText={setQuickTitle}
-            onSubmitEditing={handleQuickAdd}
-            returnKeyType="done"
-            accessibilityLabel="Criar pendência rápida"
-          />
-          <TouchableOpacity
-            style={[styles.quickAdd, { backgroundColor: colors.primary }]}
-            onPress={handleQuickAdd}
-            activeOpacity={0.8}
-            accessibilityLabel="Adicionar pendência"
-          >
-            <MaterialIcons name="add" size={20} color={colors.onPrimary} />
-          </TouchableOpacity>
-        </View>
-
         {pending.error && (
           <View style={[styles.errorCard, { backgroundColor: colors.errorContainer, borderColor: colors.error }]}>
             <Text style={[styles.errorText, { color: colors.onErrorContainer }]}>{pending.error}</Text>
-            <TouchableOpacity onPress={pending.retry} activeOpacity={0.7} accessibilityLabel="Tentar carregar pendências de novo">
+            <TouchableOpacity onPress={pending.retry} activeOpacity={0.7} accessibilityLabel="Tentar carregar de novo">
               <Text style={[styles.retryText, { color: colors.error }]}>Tentar de novo</Text>
             </TouchableOpacity>
           </View>
@@ -286,33 +220,10 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
           </View>
         ) : (
           <View style={[styles.checklistCard, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant, borderWidth: 1 }]}>
-            {activeRows.map((row) =>
-              row.kind === 'todo' && row.sourceTodo ? (
-                <TodoItem
-                  key={`todo-${row.id}`}
-                  todo={row.sourceTodo}
-                  onToggle={onToggleTodo}
-                  onDelete={onDeleteTodo}
-                  onToggleSubtask={onToggleSubtask}
-                  onAddSubtask={onAddSubtask}
-                  onDeleteSubtask={onDeleteSubtask}
-                  grouped
-                />
-              ) : row.sourcePending ? (
-                <PendingRow
-                  key={`pending-${row.id}`}
-                  row={row}
-                  onToggle={pending.toggleComplete}
-                  onDelete={pending.remove}
-                  onSchedule={pending.schedule}
-                  onReminder={setReminderItem}
-                />
-              ) : null,
-            )}
+            {activeRows.map(renderRow)}
           </View>
         )}
 
-        {/* Gaveta de concluídas (tarefas + pendências) */}
         {doneRows.length > 0 && (
           <View style={styles.completedSectionWrapper}>
             <TouchableOpacity
@@ -326,7 +237,7 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
               onPress={() => setShowCompleted(!showCompleted)}
               activeOpacity={0.7}
               accessibilityRole="button"
-              accessibilityLabel="Alternar visualização de concluídas"
+              accessibilityLabel="Alternar concluídas (toque para reabrir)"
             >
               <View style={styles.completedToggleLeft}>
                 <MaterialIcons name="done-all" size={16} color={colors.accents.emerald} />
@@ -354,50 +265,33 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
                   },
                 ]}
               >
-                {doneRows.map((row) =>
-                  row.kind === 'todo' && row.sourceTodo ? (
-                    <TodoItem
-                      key={`todo-${row.id}`}
-                      todo={row.sourceTodo}
-                      onToggle={onToggleTodo}
-                      onDelete={onDeleteTodo}
-                      onToggleSubtask={onToggleSubtask}
-                      onAddSubtask={onAddSubtask}
-                      onDeleteSubtask={onDeleteSubtask}
-                      grouped
-                    />
-                  ) : row.sourcePending ? (
-                    <PendingRow
-                      key={`pending-${row.id}`}
-                      row={row}
-                      onToggle={pending.toggleComplete}
-                      onDelete={pending.remove}
-                      onSchedule={pending.schedule}
-                      onReminder={setReminderItem}
-                    />
-                  ) : null,
-                )}
+                {doneRows.map(renderRow)}
               </View>
             )}
           </View>
         )}
 
-        {/* Criação de tarefa completa (modal com prioridade) */}
+        {/* Entrada única de criação */}
         <View style={styles.createBtnWrapper}>
           <TouchableOpacity
             style={[styles.createFab, { backgroundColor: colors.primary }]}
-            onPress={() => {
-              hapticFeedback.medium();
-              onCreateTodo();
-            }}
+            onPress={() => setCreateVisible(true)}
             activeOpacity={0.85}
-            accessibilityLabel="Criar nova tarefa"
+            accessibilityLabel="Criar tarefa ou pendência"
           >
             <MaterialIcons name="add" size={22} color={colors.onPrimary} />
-            <Text style={[styles.createFabText, { color: colors.onPrimary }]}>Nova Tarefa</Text>
+            <Text style={[styles.createFabText, { color: colors.onPrimary }]}>Novo item</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      <CreateTaskSheet
+        visible={createVisible}
+        saving={createSaving}
+        error={createError}
+        onClose={() => setCreateVisible(false)}
+        onSave={handleSaveNew}
+      />
 
       <ReminderSheet
         visible={!!reminderItem}
@@ -427,99 +321,13 @@ const styles = StyleSheet.create({
     marginTop: tokens.spacing.sm,
     marginBottom: tokens.spacing.sm,
   },
-  sectionTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-  },
   checklistSubtitle: {
     fontSize: 12,
     marginTop: 2,
   },
-  quickCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 16,
-    borderWidth: 1,
-    paddingLeft: tokens.spacing.md,
-    paddingRight: 8,
-    paddingVertical: 8,
-    marginBottom: tokens.spacing.sm,
-    gap: 8,
-  },
-  quickInput: {
-    flex: 1,
-    fontSize: 14,
-    paddingVertical: 8,
-  },
-  quickAdd: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   checklistCard: {
     borderRadius: 16,
     overflow: 'hidden',
-  },
-  pendingRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    gap: 12,
-  },
-  checkCircle: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 2,
-  },
-  pendingBody: {
-    flex: 1,
-    gap: 6,
-  },
-  pendingTitle: {
-    fontSize: 15,
-    fontWeight: '500',
-  },
-  struck: {
-    textDecorationLine: 'line-through',
-    opacity: 0.6,
-  },
-  pendingMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  badge: {
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-  },
-  badgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  dateText: {
-    fontSize: 12,
-  },
-  quickSchedule: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  schedChip: {
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  schedChipText: {
-    fontSize: 12,
-    fontWeight: '700',
   },
   errorCard: {
     borderRadius: 12,

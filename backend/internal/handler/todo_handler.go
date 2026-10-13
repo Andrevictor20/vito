@@ -115,6 +115,36 @@ func (h *TodoHandler) CompleteTodo(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(map[string]string{"status": "completed"})
 }
 
+// ReopenTodo desfaz a conclusão de uma tarefa (volta a pendente).
+func (h *TodoHandler) ReopenTodo(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, `{"error":"não autorizado"}`, http.StatusUnauthorized)
+		return
+	}
+
+	todoID := chi.URLParam(r, "id")
+	if todoID == "" {
+		todoID = r.PathValue("id")
+	}
+	if todoID == "" {
+		http.Error(w, `{"error":"id ausente"}`, http.StatusBadRequest)
+		return
+	}
+
+	if err := h.todoSvc.ReopenTodo(todoID, userID); err != nil {
+		if err == domain.ErrTodoNotFound {
+			http.Error(w, `{"error":"tarefa não encontrada"}`, http.StatusNotFound)
+			return
+		}
+		http.Error(w, `{"error":"falha ao reabrir tarefa"}`, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "pending"})
+}
+
 func (h *TodoHandler) DeleteTodo(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {

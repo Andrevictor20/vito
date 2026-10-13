@@ -136,6 +136,11 @@ func (s *TodoService) CompleteTodo(id, userID string) error {
 	return s.todoRepo.UpdateStatus(id, userID, domain.TodoStatusCompleted)
 }
 
+// ReopenTodo desfaz a conclusão: tarefa concluída volta a pendente.
+func (s *TodoService) ReopenTodo(id, userID string) error {
+	return s.todoRepo.UpdateStatus(id, userID, domain.TodoStatusPending)
+}
+
 // ListTodos retorna tarefas filtradas pelo status do usuário autenticado.
 func (s *TodoService) ListTodos(userID string, status domain.TodoStatus) ([]domain.Todo, error) {
 	return s.todoRepo.ListByUser(userID, status)

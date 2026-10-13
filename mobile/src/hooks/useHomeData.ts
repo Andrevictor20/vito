@@ -138,7 +138,7 @@ export function useHomeData(currentUserId?: string) {
     }
   };
 
-  const handleCreateTodo = async (todoData: { title: string; priority?: string; due_date?: string; event_id?: string; event_title?: string }) => {
+  const handleCreateTodo = async (todoData: { title: string; priority?: string; due_date?: string; remind_at?: string; remind_repeat?: string; remind_advance_minutes?: number; event_id?: string; event_title?: string }) => {
     try {
       const newTodo = await api.createTodo(todoData);
       if (newTodo) {
@@ -148,6 +148,9 @@ export function useHomeData(currentUserId?: string) {
           return next;
         });
         notificationService.scheduleTodoReminder(newTodo).catch(() => {});
+        if ((newTodo as any).remind_at) {
+          notificationService.schedulePendingReminder(newTodo as any).catch(() => {});
+        }
       }
       await loadData(true);
       return newTodo;
@@ -215,16 +218,24 @@ export function useHomeData(currentUserId?: string) {
   };
 
   const handleToggleTodo = async (id: string) => {
+    const current = todos.find((t) => t.id === id);
+    const reopening = current?.status === 'completed';
     try {
-      await api.completeTodo(id);
-      notificationService.cancelTodoReminder(id).catch(() => {});
+      if (reopening) {
+        await api.reopenTodo(id);
+      } else {
+        await api.completeTodo(id);
+        notificationService.cancelTodoReminder(id).catch(() => {});
+      }
       setTodos((prev) => {
-        const next = prev.map((t) => (t.id === id ? { ...t, status: 'completed' as const } : t));
+        const next = prev.map((t) =>
+          t.id === id ? { ...t, status: reopening ? ('pending' as const) : ('completed' as const) } : t,
+        );
         AsyncStorage.setItem(cacheKeys.todosKey, JSON.stringify(next)).catch(() => {});
         return next;
       });
     } catch (e) {
-      console.error('Erro ao completar tarefa:', e);
+      console.error('Erro ao alternar tarefa:', e);
     }
   };
 
