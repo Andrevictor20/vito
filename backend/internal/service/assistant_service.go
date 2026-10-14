@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"regexp"
 	"strings"
 	"time"
 
@@ -12,6 +11,7 @@ import (
 
 	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/domain"
+	"github.com/andrevmp/vito/backend/internal/service/assistant"
 )
 
 // AIParsingGateway contrato para desacoplar a IA do serviço.
@@ -116,9 +116,10 @@ func (s *AssistantService) Process(ctx context.Context, userID string, input ai.
 		}, nil
 	}
 
-	// Carrega memórias de longo prazo se ainda não informadas (Camada 3)
+	// Memória episódica sob demanda: top relevantes (similaridade+importância+recência).
+	// O reforço por uso acontece dentro do SearchRelevant (§8.3).
 	if len(input.ContextMemories) == 0 && s.memoryRepo != nil {
-		if mems, err := s.memoryRepo.ListByUser(userID, 15); err == nil && len(mems) > 0 {
+		if mems, err := s.memoryRepo.SearchRelevant(userID, input.Text, 8); err == nil && len(mems) > 0 {
 			for _, m := range mems {
 				input.ContextMemories = append(input.ContextMemories, fmt.Sprintf("[%s] %s", m.Category, m.Content))
 			}
@@ -134,17 +135,10 @@ func (s *AssistantService) Process(ctx context.Context, userID string, input ai.
 			if len(events) < limit {
 				limit = len(events)
 			}
-			loc := userLocation(input.Timezone)
-			for _, ev := range events[:limit] {
-				evStart, evEnd := ev.StartAt.In(loc), ev.EndAt.In(loc)
-				input.ActiveSchedule = append(input.ActiveSchedule, fmt.Sprintf("%s (%s, das %s às %s): %s",
-					evStart.Format("02/01/2006"),
-					ai.WeekdayPT(evStart.Weekday()),
-					evStart.Format("15:04"),
-					evEnd.Format("15:04"),
-					ev.Title,
-				))
-			}
+		loc := userLocation(input.Timezone)
+		for _, ev := range events[:limit] {
+			input.ActiveSchedule = append(input.ActiveSchedule, assistant.FormatScheduleLine(ev, loc))
+		}
 		}
 	}
 
@@ -155,13 +149,9 @@ func (s *AssistantService) Process(ctx context.Context, userID string, input ai.
 			if len(todos) < limit {
 				limit = len(todos)
 			}
-			for _, td := range todos[:limit] {
-				dueStr := "Sem prazo"
-				if td.DueDate != nil {
-					dueStr = td.DueDate.In(userLocation(input.Timezone)).Format("02/01 15:04")
-				}
-				input.PendingTodos = append(input.PendingTodos, fmt.Sprintf("[%s - %s] %s", td.Priority, dueStr, td.Title))
-			}
+		for _, td := range todos[:limit] {
+			input.PendingTodos = append(input.PendingTodos, assistant.FormatTodoLine(td, userLocation(input.Timezone)))
+		}
 		}
 	}
 
@@ -172,13 +162,9 @@ func (s *AssistantService) Process(ctx context.Context, userID string, input ai.
 			if len(trigs) < limit {
 				limit = len(trigs)
 			}
-			for _, tr := range trigs[:limit] {
-				schedule := string(tr.Frequency)
-				if tr.ScheduledTime != "" {
-					schedule = fmt.Sprintf("%s às %s", schedule, tr.ScheduledTime)
-				}
-				input.ActiveTriggers = append(input.ActiveTriggers, fmt.Sprintf("[%s - %s] %s (%s)", tr.Category, schedule, tr.Title, tr.Query))
-			}
+		for _, tr := range trigs[:limit] {
+			input.ActiveTriggers = append(input.ActiveTriggers, assistant.FormatTriggerLine(tr))
+		}
 		}
 	}
 
@@ -191,7 +177,7 @@ func (s *AssistantService) Process(ctx context.Context, userID string, input ai.
 					if url == "" {
 						url = bt.PublicURL
 					}
-					input.ActiveBookings = append(input.ActiveBookings, fmt.Sprintf("%s (%d min, %s às %s): %s", bt.Title, bt.DurationMinutes, bt.StartHour, bt.EndHour, url))
+					input.ActiveBookings = append(input.ActiveBookings, assistant.FormatBookingLine(bt.Title, bt.DurationMinutes, bt.StartHour, bt.EndHour, url))
 				}
 			}
 		}
@@ -682,12 +668,7 @@ func (s *AssistantService) Process(ctx context.Context, userID string, input ai.
 			}
 			slug := intent.Booking.Slug
 			if slug == "" {
-				slug = strings.ToLower(strings.ReplaceAll(title, " ", "-"))
-				reg := regexp.MustCompile(`[^a-z0-9\-]`)
-				slug = reg.ReplaceAllString(slug, "")
-				if len(slug) > 30 {
-					slug = slug[:30]
-				}
+				slug = assistant.SlugifyBookingTitle(title)
 				slug = fmt.Sprintf("%s-%d", slug, time.Now().Unix()%10000)
 			}
 			dow := strings.TrimSpace(intent.Booking.DaysOfWeek)
@@ -797,26 +778,40 @@ func (s *AssistantService) persistLearnedMemory(userID, category, content string
 		category = "geral"
 	}
 
-	// Evita duplicar memória idêntica recente
-	if mems, err := s.memoryRepo.ListByUser(userID, 25); err == nil {
+	// Consolidação em tempo real (§8.4 ciclo 1): ADD | SUPERSEDE | NOOP.
+	newID := uuid.New().String()
+	if mems, err := s.memoryRepo.SearchRelevant(userID, content, 5); err == nil {
 		contentLower := strings.ToLower(content)
 		for _, m := range mems {
-			if strings.ToLower(strings.TrimSpace(m.Content)) == contentLower {
+			existing := strings.ToLower(strings.TrimSpace(m.Content))
+			if existing == contentLower {
+				// NOOP: fato conhecido, só reforça a confiança.
+				_ = s.memoryRepo.Reinforce(m.ID, userID)
 				return
+			}
+			if sameTopic(existing, contentLower) {
+				// UPDATE/SUPERSEDE: hábito mudou, preserva histórico sem poluir o prompt.
+				_ = s.memoryRepo.Supersede(m.ID, userID, newID)
+				break
 			}
 		}
 	}
 
 	mem := &domain.Memory{
-		ID:        uuid.New().String(),
-		UserID:    userID,
-		Category:  category,
-		Content:   content,
-		CreatedAt: time.Now().UTC(),
-		UpdatedAt: time.Now().UTC(),
+		ID:         newID,
+		UserID:     userID,
+		Category:   category,
+		Content:    content,
+		Importance: 3,
+		Confidence: 1.0,
+		CreatedAt:  time.Now().UTC(),
+		UpdatedAt:  time.Now().UTC(),
 	}
 	_ = s.memoryRepo.Create(mem)
 }
+
+// sameTopic delega ao subpacote assistant (BACK-01).
+func sameTopic(a, b string) bool { return assistant.SameTopic(a, b) }
 
 func userLocation(timezone string) *time.Location {
 	if timezone != "" {
@@ -830,10 +825,7 @@ func userLocation(timezone string) *time.Location {
 // clarificationResponse monta uma resposta de pergunta sem tocar no banco.
 // O mobile exibe Message/Reply como bolha do Vito e o histórico mantém o contexto.
 func clarificationResponse(intent *ai.ParsedIntent, question string) *AssistantResponse {
-	msg := strings.TrimSpace(question)
-	if msg == "" {
-		msg = "Pode me dar mais detalhes? Ex: nome, data e horário."
-	}
+	msg := assistant.ClarificationMessage(question)
 	provider := ""
 	if intent != nil {
 		provider = intent.ProviderUsed
@@ -849,87 +841,15 @@ func clarificationResponse(intent *ai.ParsedIntent, question string) *AssistantR
 
 // defaultMessageFor evita bolhas vazias quando a IA retorna action sem message.
 func defaultMessageFor(action ai.IntentAction) string {
-	switch action {
-	case ai.ActionCreateEvent:
-		return "Para agendar, me diga o nome do evento, o dia e o horário (ex: 'Dentista amanhã às 14h'). Se não souber o horário, sugiro 09:00, 14:00 ou 19:00."
-	case ai.ActionCreateTodo:
-		return "O que devo lembrar para você? Me diga a tarefa e o prazo (ex: 'Comprar café até sexta')."
-	case ai.ActionCreateTrigger:
-		return "Sobre o que quer criar a vigília? Me diga o tema e o horário (ex: 'PETR3 todo dia às 08:30')."
-	case ai.ActionCreateBookingLink:
-		return "Para gerar seu link de agendamento, me diga o nome, a duração e a janela de atendimento (ex: 'Café rápido, 30 min, 09:00 às 18:00')."
-	case ai.ActionCreatePending:
-		return "O que devo guardar nas Pendências? Me diga o título e, se quiser, uma data futura."
-	case ai.ActionDeleteEvent:
-		return "Qual compromisso devo excluir? Me diga o nome (ex: 'exclua a aula de inglês')."
-	case ai.ActionUpdateEvent:
-		return "Qual compromisso devo reagendar e para quando? Ex: 'mude a aula de inglês para as 9h'."
-	default:
-		return "Pode me dar mais detalhes para eu ajudar? Ex: 'Criar evento Dentista amanhã às 14h'."
-	}
+	return assistant.DefaultMessageFor(action)
 }
 
 // isVagueBookingRequest detecta pedido de booking sem nenhum detalhe útil.
 // Evita criar "Reunião de Alinhamento" silenciosamente quando o usuário só disse "crie um booking".
-func isVagueBookingRequest(text string) bool {
-	t := strings.ToLower(strings.TrimSpace(text))
-	if t == "" {
-		return true
-	}
-	// Se há horários, duração, dias ou nome específico, não é vago.
-	detailHints := []string{
-		"19h", "20h", "09:00", "09h", "14h", "15h", "18h", ":", "30 min", "30min",
-		"15 min", "45 min", "60 min", "min", "segunda", "terça", "quarta", "quinta",
-		"sexta", "sábado", "sabado", "domingo", "amanhã", "amanha", "hoje",
-		"dias úteis", "dias uteis", "fim de semana", "reunião de", "reuniao de",
-		"café", "cafe", "alinhamento", "consulta", "aula", "treino", "dentista",
-		"19", "20", "09", "14", "15", "18", "/", "-",
-	}
-	for _, h := range detailHints {
-		if strings.Contains(t, h) {
-			// Garante que não é só o verbo + hint genérica; exige algum conteúdo além do verbo.
-			letters := 0
-			for _, r := range t {
-				if (r >= 'a' && r <= 'z') || (r >= 'à' && r <= 'ÿ') {
-					letters++
-				}
-			}
-			if letters > 25 {
-				return false
-			}
-		}
-	}
-	// Pedidos curtos e genéricos são vagos.
-	vaguePhrases := []string{
-		"crie um booking", "criar booking", "quero criar um booking", "quero um booking",
-		"crie um link", "criar link", "link de agendamento", "crie booking",
-		"quero criar", "crie um evento", "quero criar um evento",
-	}
-	for _, p := range vaguePhrases {
-		if strings.Contains(t, p) && len(t) < 60 {
-			return true
-		}
-	}
-	return len(t) < 20
-}
+func isVagueBookingRequest(text string) bool { return assistant.IsVagueBookingRequest(text) }
 
 // isBookingIntentText detecta pedido de link de agendamento por sinônimos diretos.
-func isBookingIntentText(text string) bool {
-	t := strings.ToLower(text)
-	syns := []string{
-		"booking", "link de agendamento", "link para agendar", "link de marcacao",
-		"link de marcação", "disponibilizar horário", "disponibilizar horario",
-		"disponibilize horário", "disponibilize horario", "agenda aberta",
-		"marquem comigo", "marque comigo", "deixe marcarem", "horário comercial",
-		"horario comercial", "janela de atendimento", "criar agenda de",
-	}
-	for _, s := range syns {
-		if strings.Contains(t, s) {
-			return true
-		}
-	}
-	return false
-}
+func isBookingIntentText(text string) bool { return assistant.IsBookingIntentText(text) }
 
 // ExportedIsBookingIntentText expõe isBookingIntentText para testes de regressão.
 func ExportedIsBookingIntentText(text string) bool { return isBookingIntentText(text) }
@@ -938,16 +858,4 @@ func ExportedIsBookingIntentText(text string) bool { return isBookingIntentText(
 func ExportedInferBookingDays(text string) string { return inferBookingDaysOfWeek(text) }
 
 // inferBookingDaysOfWeek deriva a janela semanal; default 7 dias (inclui fds e feriados).
-func inferBookingDaysOfWeek(text string) string {
-	t := strings.ToLower(text)
-	if strings.Contains(t, "só fim de semana") || strings.Contains(t, "so fim de semana") ||
-		strings.Contains(t, "apenas fim de semana") || strings.Contains(t, "somente fim de semana") {
-		return "[6,7]"
-	}
-	if strings.Contains(t, "só dias úteis") || strings.Contains(t, "so dias uteis") ||
-		strings.Contains(t, "apenas dias úteis") || strings.Contains(t, "dias uteis") ||
-		strings.Contains(t, "segunda a sexta") || strings.Contains(t, "seg a sex") {
-		return "[1,2,3,4,5]"
-	}
-	return "[1,2,3,4,5,6,7]"
-}
+func inferBookingDaysOfWeek(text string) string { return assistant.InferBookingDaysOfWeek(text) }

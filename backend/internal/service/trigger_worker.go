@@ -43,6 +43,8 @@ func (e *DefaultTriggerEvaluator) TestEvaluate(ctx context.Context, t *domain.Tr
 		CurrentData:           currentData,
 		Summary:               summary,
 		SimulatedNotification: simulatedNotif,
+		Confidence:            90,
+		WhyRelevant:           "Avaliação padrão sem IA: monitoramento ativo e fontes disponíveis; nenhuma condição relevante detectada no momento.",
 		TestedAt:              time.Now().UTC(),
 	}, nil
 }
@@ -69,6 +71,8 @@ func (e *AITriggerEvaluator) Evaluate(ctx context.Context, t *domain.Trigger) (s
 				"condition_met":          res.ConditionMet,
 				"data":                   res.CurrentData,
 				"simulated_notification": res.SimulatedNotification,
+				"confidence":             res.Confidence,
+				"why_relevant":           res.WhyRelevant,
 				"tested_at":              res.TestedAt.Format(time.RFC3339),
 			}
 			payloadBytes, errMarshal := json.Marshal(payloadObj)
@@ -100,6 +104,14 @@ type TriggerWorker struct {
 	wg            sync.WaitGroup
 	running       bool
 	mu            sync.Mutex
+	// deltaFetcher retorna os hashes dos fatos atuais; nil desliga o delta gate.
+	// Na volta: (hashesNovos, todosHashes, erro).
+	deltaFetcher func(ctx context.Context, t *domain.Trigger) (fresh []string, all []string, err error)
+}
+
+// SetDeltaFetcher instala o portão de deduplicação pré-IA (§9.3).
+func (w *TriggerWorker) SetDeltaFetcher(fn func(ctx context.Context, t *domain.Trigger) (fresh []string, all []string, err error)) {
+	w.deltaFetcher = fn
 }
 
 // NewTriggerWorker instancia o worker de avaliação autônoma de disparadores.
@@ -188,6 +200,22 @@ func (w *TriggerWorker) CheckAndEvaluateTriggers(now time.Time) (int, error) {
 
 	for _, t := range dueTriggers {
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		// Portão de deduplicação pré-IA: sem fatos novos, só atualiza a
+		// próxima checagem — economiza a chamada de IA (§9.3).
+		if w.deltaFetcher != nil {
+			fetchCtx, fetchCancel := context.WithTimeout(context.Background(), 15*time.Second)
+			fresh, all, fetchErr := w.deltaFetcher(fetchCtx, &t)
+			fetchCancel()
+			if fetchErr == nil {
+				if len(fresh) == 0 {
+					nextCheck := CalculateNextCheck(t.ScheduledTime, t.Frequency, now, loc)
+					_ = w.triggerRepo.UpdateRunResult(t.ID, t.CurrentValue, t.Status, "skipped", now.UTC(), &nextCheck)
+					cancel()
+					continue
+				}
+				_ = w.triggerRepo.SetSeenHashes(t.ID, all)
+			}
+		}
 		summary, payload, evalErr := w.evaluator.Evaluate(ctx, &t)
 		cancel()
 
@@ -197,6 +225,10 @@ func (w *TriggerWorker) CheckAndEvaluateTriggers(now time.Time) (int, error) {
 			summary = fmt.Sprintf("Aviso: Não foi possível obter novas notícias para '%s' no momento devido a uma oscilação na busca.", t.Title)
 			payload = fmt.Sprintf(`{"status":"failed","query":"%s","data":"Oscilação temporária ao coletar notícias da web.","checked_at":"%s"}`, t.Query, time.Now().UTC().Format(time.RFC3339))
 			runStatus = "failed"
+			// Persiste o erro para visibilidade honesta no app (bug §8.7/11).
+			_ = w.triggerRepo.UpdateLastError(t.ID, evalErr.Error())
+		} else {
+			_ = w.triggerRepo.UpdateLastError(t.ID, "")
 		}
 
 		// 1. Grava relatório em trigger_logs
@@ -216,9 +248,10 @@ func (w *TriggerWorker) CheckAndEvaluateTriggers(now time.Time) (int, error) {
 		if w.notifSvc != nil && t.UserID != "" {
 			pushTitle := fmt.Sprintf("Vigília: %s", t.Title)
 			pushData := map[string]interface{}{
-				"triggerId": t.ID,
-				"logId":     logEntry.ID,
-				"type":      "trigger_report",
+				"type":         "RADAR_TRIGGERED",
+				"triggerId":    t.ID,
+				"logId":        logEntry.ID,
+				"currentValue": summary,
 			}
 			_, _ = w.notifSvc.SendPushToUser(t.UserID, pushTitle, summary, "default", pushData)
 		}
@@ -296,9 +329,13 @@ func (w *TriggerWorker) TestTrigger(id, userID string) (*domain.TriggerTestResul
 			CurrentData:           fmt.Sprintf("Verificação em %s", timeStr),
 			Summary:               fmt.Sprintf("Vigília '%s' testada com sucesso.", t.Title),
 			SimulatedNotification: fmt.Sprintf("Alerta Vito: Notificação de '%s'.", t.Title),
+			Confidence:            0,
+			WhyRelevant:           "",
 			TestedAt:              time.Now().UTC(),
 		}, nil
 	}
 
+	// Lote C §9: exige confidence>=75 e why_relevant não vazio.
+	res.EnforceConfidenceGate()
 	return res, nil
 }

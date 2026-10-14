@@ -15,7 +15,7 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens, MD3Shapes } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
-import { Trigger, TriggerFrequency, TriggerStatus } from '../../types';
+import { Trigger, TriggerFrequency, TriggerStatus, VitoIconName } from '../../types';
 
 interface EditTriggerModalProps {
   visible: boolean;
@@ -121,7 +121,7 @@ export const EditTriggerModal: React.FC<EditTriggerModalProps> = ({
     );
   };
 
-  const FREQUENCIES: { id: TriggerFrequency; label: string; icon: string }[] = [
+  const FREQUENCIES: { id: TriggerFrequency; label: string; icon: VitoIconName }[] = [
     { id: 'daily_morning', label: 'Diário pela manhã (08:30)', icon: 'wb-sunny' },
     { id: 'daily_evening', label: 'Diário no fim do dia (18:00)', icon: 'nights-stay' },
     { id: 'hourly', label: 'A cada hora', icon: 'schedule' },
@@ -270,7 +270,7 @@ export const EditTriggerModal: React.FC<EditTriggerModalProps> = ({
                     onPress={() => setFrequency(f.id)}
                   >
                     <MaterialIcons
-                      name={f.icon as any}
+                      name={f.icon}
                       size={18}
                       color={isSelected ? '#10B981' : colors.onSurfaceVariant}
                     />

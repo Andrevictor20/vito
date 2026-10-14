@@ -68,7 +68,7 @@ func BuildSystemPrompt(now time.Time, timezone string, memories ...string) strin
 
 // BuildSystemPromptFromInput gera o prompt enriquecido com todas as camadas de contexto a partir de UserInput.
 func BuildSystemPromptFromInput(input UserInput) string {
-	return BuildSystemPromptWithBookingContext(
+	base := BuildSystemPromptWithBookingContext(
 		input.Now,
 		input.Timezone,
 		input.ContextMemories,
@@ -81,6 +81,12 @@ func BuildSystemPromptFromInput(input UserInput) string {
 		input.UserName,
 		input.AutonomyMode,
 	)
+	// §8.5–8.6: blocos cognitivos opcionais (retrocompatível: vazios = sem bloco).
+	extra := CoreProfileBlock(input.CoreProfile) + BuildAppStateBlock(input.AppStateFlags) + ManualModuleFor(input.Text) + CoTInstruction()
+	if extra == CoTInstruction() {
+		return base + extra
+	}
+	return base + extra
 }
 
 // BuildSystemPromptWithContext constrói o prompt mantendo compatibilidade com assinaturas anteriores.
@@ -285,6 +291,8 @@ REGRAS DE RESPOSTA OBRIGATÓRIAS:
 Responda EXCLUSIVAMENTE com um objeto JSON válido, sem backticks markdown ou texto extra, no seguinte schema:
 
 {
+  "thought": "1. Verificar fuso/data atual; 2. Checar memórias relevantes; 3. Verificar conflitos; 4. Definir ação",
+  "context_used": ["[categoria] trecho usado"],
   "action": "CREATE_EVENT" | "UPDATE_EVENT" | "DELETE_EVENT" | "CREATE_TODO" | "CREATE_PENDING_ITEM" | "CONVERT_PENDING_TO_EVENT" | "QUERY_SCHEDULE" | "CREATE_TRIGGER" | "CREATE_BOOKING_LINK" | "CANCEL_BOOKING_APPOINTMENT" | "SAVE_MEMORY" | "NEEDS_CLARIFICATION" | "GENERAL_CHAT",
   "message": "Mensagem calorosa, atenciosa, articulada, elegante e executiva do secretário Vito",
   "event": {

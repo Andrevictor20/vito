@@ -1,30 +1,56 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
-import { M3Switch } from '../ui/M3Switch';
+import type { AutonomyMode } from '../../types';
 
 interface ProfileSettingsGroupProps {
   onOpenNotifications?: () => void;
   onOpenCalendarSync?: () => void;
   onOpenAISettings?: () => void;
+  /** Modo de autonomia atual (para o status da linha). */
+  autonomyMode?: AutonomyMode;
+  /** Permissão de notificação concedida (null = desconhecido). */
+  notifActive?: boolean | null;
+  /** Nº de calendários conectados (null = desconhecido). */
+  calendarsActive?: number | null;
 }
+
+const StatusValue: React.FC<{ label: string }> = ({ label }) => {
+  const { colors } = useTheme();
+  return (
+    <Text style={[styles.statusText, { color: colors.onSurfaceVariant }]} numberOfLines={1}>
+      {label}
+    </Text>
+  );
+};
+
+const RowChevron: React.FC = () => {
+  const { colors } = useTheme();
+  return <MaterialIcons name="chevron-right" size={20} color={colors.outline} />;
+};
 
 export const ProfileSettingsGroup: React.FC<ProfileSettingsGroupProps> = ({
   onOpenNotifications,
   onOpenCalendarSync,
   onOpenAISettings,
+  autonomyMode = 'assisted',
+  notifActive = null,
+  calendarsActive = null,
 }) => {
   const { colors, isDark, toggleTheme } = useTheme();
+  const proactive = autonomyMode === 'proactive';
 
   return (
     <View style={[styles.groupCard, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
-      {/* Alternador de Tema M3 */}
+      {/* Tema da Interface: toque alterna claro/escuro */}
       <TouchableOpacity
         style={styles.groupItem}
         onPress={toggleTheme}
         activeOpacity={0.7}
+        accessibilityLabel="Alternar tema da interface"
+        accessibilityRole="button"
       >
         <View style={styles.itemLeft}>
           <View style={[styles.itemIconBox, { backgroundColor: colors.surfaceContainerHigh }]}>
@@ -36,15 +62,15 @@ export const ProfileSettingsGroup: React.FC<ProfileSettingsGroupProps> = ({
           </View>
           <View style={styles.itemTextCol}>
             <Text style={[styles.itemTitle, { color: colors.onSurface }]}>Tema da Interface</Text>
-            <Text style={[styles.itemSub, { color: colors.textSecondary }]}>
-              {isDark ? 'Tema Escuro (M3 Dark)' : 'Tema Claro (M3 Light)'}
+            <Text style={[styles.itemSub, { color: colors.textSecondary }]} numberOfLines={1}>
+              {isDark ? 'Modo Escuro (M3 Dark)' : 'Modo Claro (Editorial Clean)'}
             </Text>
           </View>
         </View>
-        <M3Switch
-          value={isDark}
-          onValueChange={toggleTheme}
-        />
+        <View style={styles.itemRight}>
+          <StatusValue label={isDark ? 'Escuro' : 'Claro'} />
+          <RowChevron />
+        </View>
       </TouchableOpacity>
 
       <View style={[styles.divider, { backgroundColor: colors.outlineVariant }]} />
@@ -54,17 +80,24 @@ export const ProfileSettingsGroup: React.FC<ProfileSettingsGroupProps> = ({
         style={styles.groupItem}
         onPress={onOpenAISettings}
         activeOpacity={0.7}
+        accessibilityLabel="Abrir autonomia do Vito"
+        accessibilityRole="button"
       >
         <View style={styles.itemLeft}>
           <View style={[styles.itemIconBox, { backgroundColor: colors.surfaceContainerHigh }]}>
-            <MaterialIcons name="psychology" size={18} color={colors.primary} />
+            <MaterialIcons name="tune" size={18} color={colors.primary} />
           </View>
           <View style={styles.itemTextCol}>
             <Text style={[styles.itemTitle, { color: colors.onSurface }]}>Autonomia do Vito</Text>
-            <Text style={[styles.itemSub, { color: colors.onSurfaceVariant }]}>Modo Assistido ou Proativo</Text>
+            <Text style={[styles.itemSub, { color: colors.onSurfaceVariant }]} numberOfLines={1}>
+              {proactive ? 'Proativo em radares e sugestões' : 'Modo Assistido ou Proativo'}
+            </Text>
           </View>
         </View>
-        <MaterialIcons name="chevron-right" size={18} color={colors.outline} />
+        <View style={styles.itemRight}>
+          <StatusValue label={proactive ? 'Nível Alto' : 'Assistido'} />
+          <RowChevron />
+        </View>
       </TouchableOpacity>
 
       <View style={[styles.divider, { backgroundColor: colors.outlineVariant }]} />
@@ -74,17 +107,24 @@ export const ProfileSettingsGroup: React.FC<ProfileSettingsGroupProps> = ({
         style={styles.groupItem}
         onPress={onOpenNotifications}
         activeOpacity={0.7}
+        accessibilityLabel="Abrir notificações"
+        accessibilityRole="button"
       >
         <View style={styles.itemLeft}>
           <View style={[styles.itemIconBox, { backgroundColor: colors.surfaceContainerHigh }]}>
-            <MaterialIcons name="notifications-active" size={18} color={colors.primary} />
+            <MaterialIcons name="notifications-none" size={18} color={colors.primary} />
           </View>
           <View style={styles.itemTextCol}>
             <Text style={[styles.itemTitle, { color: colors.onSurface }]}>Notificações</Text>
-            <Text style={[styles.itemSub, { color: colors.onSurfaceVariant }]}>Lembretes e avisos</Text>
+            <Text style={[styles.itemSub, { color: colors.onSurfaceVariant }]} numberOfLines={1}>
+              Resumos às 08:30 e alertas críticos
+            </Text>
           </View>
         </View>
-        <MaterialIcons name="chevron-right" size={18} color={colors.outline} />
+        <View style={styles.itemRight}>
+          <StatusValue label={notifActive === null ? '—' : notifActive ? 'Ativas' : 'Off'} />
+          <RowChevron />
+        </View>
       </TouchableOpacity>
 
       <View style={[styles.divider, { backgroundColor: colors.outlineVariant }]} />
@@ -94,17 +134,32 @@ export const ProfileSettingsGroup: React.FC<ProfileSettingsGroupProps> = ({
         style={styles.groupItem}
         onPress={onOpenCalendarSync}
         activeOpacity={0.7}
+        accessibilityLabel="Abrir sincronização de calendários"
+        accessibilityRole="button"
       >
         <View style={styles.itemLeft}>
           <View style={[styles.itemIconBox, { backgroundColor: colors.surfaceContainerHigh }]}>
             <MaterialIcons name="calendar-today" size={18} color={colors.primary} />
           </View>
           <View style={styles.itemTextCol}>
-            <Text style={[styles.itemTitle, { color: colors.onSurface }]}>Sincronização de Calendários</Text>
-            <Text style={[styles.itemSub, { color: colors.onSurfaceVariant }]}>Google Calendar</Text>
+            <Text style={[styles.itemTitle, { color: colors.onSurface }]} numberOfLines={1}>Sincronização de Calendários</Text>
+            <Text style={[styles.itemSub, { color: colors.onSurfaceVariant }]} numberOfLines={1}>
+              Google Calendar e calendário local
+            </Text>
           </View>
         </View>
-        <MaterialIcons name="chevron-right" size={18} color={colors.outline} />
+        <View style={styles.itemRight}>
+          <StatusValue
+            label={
+              calendarsActive === null
+                ? '—'
+                : calendarsActive === 0
+                ? 'Off'
+                : `${calendarsActive} ativo${calendarsActive === 1 ? '' : 's'}`
+            }
+          />
+          <RowChevron />
+        </View>
       </TouchableOpacity>
     </View>
   );
@@ -143,13 +198,25 @@ const styles = StyleSheet.create({
   },
   itemTitle: {
     color: tokens.colors.textPrimary,
-    fontSize: tokens.typography.size.sm,
-    fontWeight: tokens.typography.weight.medium,
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: -0.1,
   },
   itemSub: {
     color: tokens.colors.textSecondary,
     fontSize: tokens.typography.size.xs,
     marginTop: 1,
+  },
+  itemRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    flexShrink: 0,
+    marginLeft: 8,
+  },
+  statusText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
   divider: {
     height: 1,

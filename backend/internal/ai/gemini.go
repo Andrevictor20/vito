@@ -350,7 +350,9 @@ Responda ESTRITAMENTE em formato JSON puro (sem marcações markdown extras):
   "condition_met": boolean,
   "current_data": string,
   "summary": string,
-  "simulated_notification": string
+  "simulated_notification": string,
+  "confidence": number (0-100, quão confiante você está de que há fato novo e relevante),
+  "why_relevant": string (1 frase explicando por que é relevante para a vigília; vazio se irrelevante)
 }`, t.Title, t.Query, t.Category, nowStr, currentMonthYear, realtimeBlock, currentMonthYear, currentMonthYear)
 
 	// Modelos prioritários com fallback resiliente para Grounding e geração
@@ -483,6 +485,8 @@ Responda ESTRITAMENTE em formato JSON puro (sem marcações markdown extras):
 		CurrentData           string `json:"current_data"`
 		Summary               string `json:"summary"`
 		SimulatedNotification string `json:"simulated_notification"`
+		Confidence            int    `json:"confidence"`
+		WhyRelevant           string `json:"why_relevant"`
 	}
 
 	var eval testEvalResult
@@ -502,11 +506,13 @@ Responda ESTRITAMENTE em formato JSON puro (sem marcações markdown extras):
 			CurrentData:           rawText,
 			Summary:               "Consulta realizada com sucesso. Condições avaliadas.",
 			SimulatedNotification: fmt.Sprintf("Alerta Vito: Vigília de '%s' atualizada.", t.Title),
+			Confidence:            0,
+			WhyRelevant:           "",
 			TestedAt:              time.Now().UTC(),
 		}, nil
 	}
 
-	return &domain.TriggerTestResult{
+	res := &domain.TriggerTestResult{
 		TriggerID:             t.ID,
 		Title:                 t.Title,
 		Query:                 t.Query,
@@ -514,8 +520,12 @@ Responda ESTRITAMENTE em formato JSON puro (sem marcações markdown extras):
 		CurrentData:           eval.CurrentData,
 		Summary:               eval.Summary,
 		SimulatedNotification: eval.SimulatedNotification,
+		Confidence:            eval.Confidence,
+		WhyRelevant:           eval.WhyRelevant,
 		TestedAt:              time.Now().UTC(),
-	}, nil
+	}
+	res.EnforceConfidenceGate()
+	return res, nil
 }
 
 // EvaluateTrigger implementa TriggerEvaluatorProvider para o Gemini.

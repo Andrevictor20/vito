@@ -1,3 +1,7 @@
+import type { MaterialIcons } from '@expo/vector-icons';
+
+export type VitoIconName = keyof typeof MaterialIcons.glyphMap;
+
 export interface User {
   id: string;
   name: string;
@@ -262,7 +266,7 @@ export interface UpdateTriggerInput {
 export interface CategoryMeta {
   id: TriggerCategory;
   label: string;
-  icon: string; // MaterialIcons name
+  icon: VitoIconName;
   colorLight: string;
   colorDark: string;
   bgLight: string;

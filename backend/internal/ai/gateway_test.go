@@ -138,6 +138,8 @@ func TestGateway_EvaluateTrigger_Cascade(t *testing.T) {
 		ConditionMet: true,
 		Summary:      "Flamengo venceu última partida",
 		CurrentData:  "Panorama detalhado do confronto",
+		Confidence:   90,
+		WhyRelevant:  "Resultado recente e relevante para a vigília do Flamengo.",
 	}
 
 	// P1 (ex: Gemini) falha na avaliação
@@ -192,3 +194,49 @@ func TestGateway_GenerateText_Cascade(t *testing.T) {
 	}
 }
 
+
+func TestGateway_EmptyIntentFallsThrough(t *testing.T) {
+	// Bug §8.7/9: struct vazia com err == nil NÃO pode interromper a cascata.
+	pEmpty := &MockProvider{name: "P-vazio", shouldError: false, intent: &ai.ParsedIntent{}}
+	pGood := &MockProvider{
+		name:        "P-bom",
+		shouldError: false,
+		intent:      &ai.ParsedIntent{Action: ai.ActionCreateTodo, Message: "Tarefa criada!"},
+	}
+
+	gw := ai.NewGateway(pEmpty, pGood)
+	res, err := gw.ParseIntent(context.Background(), ai.UserInput{Text: "criar tarefa teste"})
+	if err != nil {
+		t.Fatalf("cascata deveria pular resposta vazia, erro: %v", err)
+	}
+	if res.ProviderUsed != "P-bom" {
+		t.Errorf("esperava provedor P-bom, veio %s", res.ProviderUsed)
+	}
+}
+
+func TestGateway_EmptyIntentAllEmptyFails(t *testing.T) {
+	gw := ai.NewGateway(
+		&MockProvider{name: "P1", shouldError: false, intent: &ai.ParsedIntent{}},
+		&MockProvider{name: "P2", shouldError: false, intent: &ai.ParsedIntent{}},
+	)
+	if _, err := gw.ParseIntent(context.Background(), ai.UserInput{Text: "oi"}); err == nil {
+		t.Error("todos vazios deveriam resultar em erro")
+	}
+}
+
+func TestGateway_CancelledParentContextStillFallsThrough(t *testing.T) {
+	// Bug §8.7/10: ctx expirado do provedor anterior não pode matar os próximos.
+	ctx, cancel := context.WithTimeout(context.Background(), time.Nanosecond)
+	defer cancel()
+	time.Sleep(5 * time.Millisecond)
+
+	pGood := &MockProvider{
+		name:        "P-bom",
+		shouldError: false,
+		intent:      &ai.ParsedIntent{Action: ai.ActionCreateTodo, Message: "ok"},
+	}
+	gw := ai.NewGateway(pGood)
+	if _, err := gw.ParseIntent(ctx, ai.UserInput{Text: "teste"}); err != nil {
+		t.Fatalf("sub-contexto por tentativa deveria isolar o cancelamento: %v", err)
+	}
+}

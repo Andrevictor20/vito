@@ -15,14 +15,14 @@ export const ProfileUserCard: React.FC<ProfileUserCardProps> = ({
   email,
   quotaPercentage = 18.5,
 }) => {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
   const initials = (name || 'UV').slice(0, 2).toUpperCase();
 
   return (
     <View style={[styles.card, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
       <View style={styles.topRow}>
-        <View style={[styles.avatar, { backgroundColor: isDark ? colors.surfaceContainerHighest : colors.primary, borderWidth: 1, borderColor: colors.outlineVariant }]}>
-          <Text style={[styles.avatarText, { color: isDark ? colors.onSurface : colors.onPrimary }]}>{initials}</Text>
+        <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
+          <Text style={[styles.avatarText, { color: colors.onPrimary }]}>{initials}</Text>
         </View>
 
         <View style={styles.infoCol}>
@@ -30,7 +30,11 @@ export const ProfileUserCard: React.FC<ProfileUserCardProps> = ({
             <Text style={[styles.name, { color: colors.onSurface }]} numberOfLines={1}>{name.toUpperCase()}</Text>
             <MaterialIcons name="check-circle" size={14} color={colors.primary} />
           </View>
-          <Text style={[styles.email, { color: colors.textSecondary }]} numberOfLines={1}>{email}</Text>
+          <Text style={[styles.email, { color: colors.textSecondary }]} numberOfLines={1} ellipsizeMode="middle">{email}</Text>
+        </View>
+
+        <View style={[styles.proBadge, { backgroundColor: colors.primaryContainer, borderColor: colors.outlineVariant }]}>
+          <Text style={[styles.proBadgeText, { color: colors.primary }]}>PRO AI</Text>
         </View>
       </View>
     </View>
@@ -85,17 +89,15 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   proBadge: {
-    backgroundColor: tokens.colors.primaryLight,
     paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingVertical: 4,
     borderRadius: tokens.radii.full,
     borderWidth: 1,
-    borderColor: 'rgba(173, 198, 255, 0.3)',
   },
   proBadgeText: {
-    color: tokens.colors.primary,
     fontSize: 10,
     fontWeight: tokens.typography.weight.bold,
+    letterSpacing: 0.4,
   },
   telemetryBox: {
     backgroundColor: tokens.colors.surfaceContainerLow,

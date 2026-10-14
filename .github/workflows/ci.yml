@@ -93,3 +93,33 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # §11.3: deploy automático no Raspberry Pi via self-hosted runner (arm64).
+  # Pré-requisito no Pi (uma vez):
+  #   1. Instalar o runner: Settings > Actions > Runners > New self-hosted runner
+  #      (labels: self-hosted, linux, arm64) em ~/actions-runner e rodar ./run.sh
+  #      (ou instalar como serviço com sudo ./svc.sh install && sudo ./svc.sh start).
+  #   2. Garantir ~/vito com o remote origin, docker + compose plugin e o .env
+  #      com JWT_SECRET, DATA_ENCRYPTION_KEY e SHORTIO_API_KEY preenchidos.
+  deploy:
+    name: Auto-Deploy on Raspberry Pi 4
+    needs: docker-publish
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: [self-hosted, linux, arm64]
+    steps:
+      - name: Log in to GitHub Container Registry on Pi
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Sync docker-compose and Recreate Container
+        run: |
+          cd ~/vito
+          git fetch origin main
+          git reset --hard origin/main
+          docker compose -f docker-compose.yml -f docker-compose.prod.yml pull backend
+          docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --force-recreate --remove-orphans backend
+          docker image prune -f
+
+      - name: Verify Backend Healthcheck
+        run: |
+          sleep 5
+          wget -qO- http://localhost:8180/healthz

@@ -1,15 +1,51 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, ActivityIndicator, Platform, StatusBar as RNStatusBar } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { NavigationContainer, NavigatorScreenParams, type LinkingOptions } from '@react-navigation/native';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from './services/queryClient';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
-import { AuthScreen } from './screens/AuthScreen';
-import { HomeScreen } from './screens/HomeScreen';
+import { RootNavigator } from './navigation/RootNavigator';
+import { navigationRef } from './navigation/navigationRef';
 import { tokens } from './theme/tokens';
 import { api, DEFAULT_SERVER_URL, CLOUDFLARE_SERVER_URL, PI_SERVER_URL, isCloudServer } from './services/api';
 import { notificationService } from './services/notificationService';
 import { UpdateBanner } from './components/common/UpdateBanner';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
+
+export type MainTabParamList = {
+  chat: undefined;
+  calendar: undefined;
+  tasks: undefined;
+  triggers: undefined;
+  booking: undefined;
+  profile: undefined;
+};
+
+export type RootStackParamList = {
+  auth: undefined;
+  main: NavigatorScreenParams<MainTabParamList>;
+};
+
+const linking: LinkingOptions<RootStackParamList> = {
+  prefixes: ['vito://', 'https://vito.rasppi.cloud'],
+  config: {
+    screens: {
+      auth: 'auth',
+      main: {
+        screens: {
+          chat: 'chat',
+          calendar: 'agenda',
+          tasks: 'tarefas',
+          triggers: 'radares',
+          booking: 'booking',
+          profile: 'perfil',
+        },
+      },
+    },
+  },
+};
 
 const MainNavigator: React.FC = () => {
   const { user, isInitialLoading } = useAuth();
@@ -49,11 +85,9 @@ const MainNavigator: React.FC = () => {
     <View style={[styles.safeArea, { backgroundColor: colors.surface }]}>
       <StatusBar style={isDark ? 'light' : 'dark'} />
       <UpdateBanner />
-      {user ? (
-        <HomeScreen serverUrl={serverUrl} onToggleServer={toggleServer} />
-      ) : (
-        <AuthScreen serverUrl={serverUrl} onToggleServer={toggleServer} />
-      )}
+      <NavigationContainer linking={linking} ref={navigationRef}>
+        <RootNavigator serverUrl={serverUrl} onToggleServer={toggleServer} />
+      </NavigationContainer>
     </View>
   );
 };
@@ -78,11 +112,13 @@ export const AppRoot: React.FC = () => {
 
   return (
     <ErrorBoundary>
-      <ThemeProvider>
-        <AuthProvider>
-          <MainNavigator />
-        </AuthProvider>
-      </ThemeProvider>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider>
+          <AuthProvider>
+            <MainNavigator />
+          </AuthProvider>
+        </ThemeProvider>
+      </QueryClientProvider>
     </ErrorBoundary>
   );
 };

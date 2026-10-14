@@ -98,22 +98,22 @@ export const lightColors = {
   surfaceVariant: '#F4F4F5',
   onSurfaceVariant: '#52525B',
 
-  // M3 Surface Containers
+  // M3 Surface Containers — light: canvas #F8F9FA, card #FFFFFF
   surfaceContainerLowest: '#FFFFFF',
-  surfaceContainerLow: '#FAFAFA',
+  surfaceContainerLow: '#FFFFFF',
   surfaceContainer: '#F4F4F5',
-  surfaceContainerHigh: '#E4E4E7',
-  surfaceContainerHighest: '#D4D4D8',
-  surfaceDim: '#F4F4F5',
+  surfaceContainerHigh: '#F4F4F5',
+  surfaceContainerHighest: '#E4E4E7',
+  surfaceDim: '#F8F9FA',
   surfaceBright: '#FFFFFF',
-  surfaceSubtle: '#FAFAFA',
+  surfaceSubtle: '#F8F9FA',
   surfaceElevated: '#FFFFFF',
   surfaceGlass: 'rgba(255, 255, 255, 0.85)',
   glassBorder: 'rgba(0, 0, 0, 0.06)',
 
-  // M3 Outlines & Borders
+  // M3 Outlines & Borders — card borda #EAECEF
   outline: '#71717A',
-  outlineVariant: '#E4E4E7',
+  outlineVariant: '#EAECEF',
 
   // M3 Error
   error: '#EF4444',
@@ -125,8 +125,8 @@ export const lightColors = {
   dangerLight: 'rgba(239, 68, 68, 0.12)',
 
   // Custom Premium Utilities
-  bg: '#FFFFFF', // alias to surface
-  canvas: '#FAFAFA',
+  bg: '#F8F9FA', // canvas claro
+  canvas: '#F8F9FA',
   success: '#10B981',
   onSuccess: '#FFFFFF',
   successContainer: '#D1FAE5',
@@ -148,8 +148,8 @@ export const lightColors = {
   textPrimary: '#09090B',
   textSecondary: '#52525B',
   textMuted: '#A1A1AA',
-  surfaceBorder: '#E4E4E7',
-  structuralBorder: '#D4D4D8',
+  surfaceBorder: '#EAECEF',
+  structuralBorder: '#EAECEF',
   accent: '#18181B',
   accentLight: 'rgba(24, 24, 27, 0.08)',
 };
@@ -178,29 +178,29 @@ export const darkColors = {
   tertiaryContainer: '#27272A',
   onTertiaryContainer: '#FAFAFA',
 
-  // M3 Surface
-  surface: '#09090B', // Zinc 950
+  // M3 Surface — dark OLED: fundo #0B0D10, surface #14171C, elevated #1C2026
+  surface: '#14171C',
   onSurface: '#FAFAFA',
-  surfaceVariant: '#18181B', // Zinc 900
+  surfaceVariant: '#14171C', // Zinc 900
   onSurfaceVariant: '#A1A1AA',
 
-  // M3 Surface Containers
-  surfaceContainerLowest: '#000000',
-  surfaceContainerLow: '#09090B',
-  surfaceContainer: '#18181B',
-  surfaceContainerHigh: '#27272A',
-  surfaceContainerHighest: '#3F3F46',
-  surfaceDim: '#09090B',
-  surfaceBright: '#27272A',
-  surfaceSubtle: '#18181B',
-  surfaceElevated: '#27272A',
+  // M3 Surface Containers — OLED
+  surfaceContainerLowest: '#0B0D10',
+  surfaceContainerLow: '#14171C',
+  surfaceContainer: '#14171C',
+  surfaceContainerHigh: '#1C2026',
+  surfaceContainerHighest: '#1C2026',
+  surfaceDim: '#0B0D10',
+  surfaceBright: '#1C2026',
+  surfaceSubtle: '#14171C',
+  surfaceElevated: '#1C2026',
 
   surfaceGlass: 'rgba(24, 24, 27, 0.85)',
   glassBorder: 'rgba(255, 255, 255, 0.08)',
 
-  // M3 Outlines & Borders
+  // M3 Outlines & Borders — dark borda #262B33
   outline: '#71717A',
-  outlineVariant: '#27272A',
+  outlineVariant: '#262B33',
 
   // M3 Error
   error: '#F87171',
@@ -212,8 +212,8 @@ export const darkColors = {
   dangerLight: 'rgba(248, 113, 113, 0.16)',
 
   // Custom Premium Utilities
-  bg: '#09090B',
-  canvas: '#000000',
+  bg: '#0B0D10',
+  canvas: '#0B0D10',
   success: '#34D399',
   onSuccess: '#064E3B',
   successContainer: '#065F46',
@@ -233,8 +233,8 @@ export const darkColors = {
   textPrimary: '#FAFAFA',
   textSecondary: '#A1A1AA',
   textMuted: '#52525B',
-  surfaceBorder: '#27272A',
-  structuralBorder: '#3F3F46',
+  surfaceBorder: '#262B33',
+  structuralBorder: '#262B33',
   accent: '#FAFAFA',
   accentLight: 'rgba(250, 250, 250, 0.12)',
 };
@@ -311,13 +311,13 @@ export const tokens = {
     },
   },
 
-  // 3. Escala de Shapes do Material 3
+  // 3. Escala de Shapes do Material 3 — Design System: sm8/md14/lg20/full
   radii: {
     none: MD3Shapes.none,
     xs: MD3Shapes.extraSmall,
-    sm: MD3Shapes.small,
-    md: MD3Shapes.medium,
-    lg: MD3Shapes.large,
+    sm: 8,
+    md: 14,
+    lg: 20,
     xl: MD3Shapes.extraLarge,
     full: MD3Shapes.full,
     // Aliases explícitos M3
@@ -349,8 +349,8 @@ export const tokens = {
     level1: {
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.15,
-      shadowRadius: 3,
+      shadowOpacity: 0.04,
+      shadowRadius: 8,
       elevation: 1,
     },
     level2: {

@@ -64,7 +64,7 @@ func (h *ChatHandler) GetSessionMessages(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	if res == nil {
-		http.Error(w, `{"error":"conversa não encontrada"}`, http.StatusNotFound)
+		respondError(w, domain.ErrChatSessionNotFound)
 		return
 	}
 

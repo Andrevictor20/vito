@@ -26,13 +26,20 @@ func respondError(w http.ResponseWriter, err error) {
 		errors.Is(err, domain.ErrSubtaskNotFound),
 		errors.Is(err, domain.ErrEventNotFound),
 		errors.Is(err, domain.ErrMemoryNotFound),
-		errors.Is(err, domain.ErrPendingItemNotFound):
+		errors.Is(err, domain.ErrPendingItemNotFound),
+		errors.Is(err, domain.ErrTriggerNotFound),
+		errors.Is(err, domain.ErrChatSessionNotFound),
+		errors.Is(err, domain.ErrIntegrationNotFound):
 		w.WriteHeader(http.StatusNotFound)
 		_ = json.NewEncoder(w).Encode(apiError{Error: apiErrorBody{Code: "not_found", Message: err.Error()}})
-	case errors.Is(err, domain.ErrConflict):
+	case errors.Is(err, domain.ErrConflict),
+		errors.Is(err, domain.ErrScheduleConflict),
+		errors.Is(err, domain.ErrBookingTypeSlugExists),
+		errors.Is(err, domain.ErrUserAlreadyExists):
 		w.WriteHeader(http.StatusConflict)
 		_ = json.NewEncoder(w).Encode(apiError{Error: apiErrorBody{Code: "conflict", Message: err.Error()}})
-	case errors.Is(err, domain.ErrValidation):
+	case errors.Is(err, domain.ErrValidation),
+		errors.Is(err, domain.ErrInvalidAutonomyMode):
 		w.WriteHeader(http.StatusUnprocessableEntity)
 		_ = json.NewEncoder(w).Encode(apiError{Error: apiErrorBody{Code: "validation", Message: err.Error()}})
 	default:

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens } from '../../theme/tokens';
@@ -43,8 +43,24 @@ export const DateTimePicker: React.FC<DateTimePickerProps> = ({
   const initial = parseISODate(dateISO || today) || { year: 2026, month: 1, day: 1 };
   const [viewYear, setViewYear] = useState(initial.year);
   const [viewMonth, setViewMonth] = useState(initial.month);
+  // Calendário retrátil: collapsed por padrão, expande ao tocar na data.
+  const [calendarExpanded, setCalendarExpanded] = useState(false);
   const slots = useMemo(() => buildTimeSlots(30), []);
   const grid = useMemo(() => buildMonthGrid(viewYear, viewMonth), [viewYear, viewMonth]);
+  const hourStripRef = useRef<ScrollView>(null);
+
+  // Auto-scroll da faixa de hora para o horário selecionado.
+  useEffect(() => {
+    const idx = slots.indexOf(time);
+    if (idx >= 0 && hourStripRef.current) {
+      const x = Math.max(0, idx * 76 - 80);
+      // Timeout curto garante layout medido antes do scroll.
+      const t = setTimeout(() => {
+        hourStripRef.current?.scrollTo({ x, animated: true });
+      }, 60);
+      return () => clearTimeout(t);
+    }
+  }, [time, slots, calendarExpanded]);
 
   const shiftMonth = (delta: number) => {
     hapticFeedback.selection();
@@ -97,6 +113,33 @@ export const DateTimePicker: React.FC<DateTimePickerProps> = ({
         )}
       </View>
 
+      <TouchableOpacity
+        style={[styles.dateToggle, { borderColor: colors.outlineVariant }]}
+        onPress={() => {
+          hapticFeedback.selection();
+          setCalendarExpanded((v) => !v);
+        }}
+        activeOpacity={0.7}
+        accessibilityLabel={calendarExpanded ? 'Recolher calendário' : 'Expandir calendário'}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: calendarExpanded }}
+      >
+        <MaterialIcons name="calendar-month" size={18} color={colors.primary} />
+        <Text style={[styles.dateToggleText, { color: colors.onSurface }]}>
+          {dateISO ? shortLabel(dateISO) : 'Escolher data'}
+        </Text>
+        <Text style={[styles.monthLabelInline, { color: colors.onSurfaceVariant }]}>
+          {monthLabelPt(viewYear, viewMonth)}
+        </Text>
+        <MaterialIcons
+          name={calendarExpanded ? 'expand-less' : 'expand-more'}
+          size={20}
+          color={colors.onSurfaceVariant}
+        />
+      </TouchableOpacity>
+
+      {calendarExpanded && (
+        <>
       <View style={styles.monthNav}>
         <TouchableOpacity onPress={() => shiftMonth(-1)} hitSlop={tokens.hitSlop.sm} accessibilityLabel="Mês anterior">
           <MaterialIcons name="chevron-left" size={22} color={colors.onSurface} />
@@ -145,11 +188,18 @@ export const DateTimePicker: React.FC<DateTimePickerProps> = ({
           })}
         </View>
       ))}
+        </>
+      )}
 
       {showTime && (
         <>
           <Text style={[styles.timeLabel, { color: colors.onSurfaceVariant }]}>Hora · {time || '--:--'}</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.slotStrip}>
+          <ScrollView
+            ref={hourStripRef}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.slotStrip}
+          >
             {slots.map((s) => {
               const selected = time === s;
               return (
@@ -217,7 +267,26 @@ const styles = StyleSheet.create({
   monthLabel: {
     fontSize: 14,
     fontWeight: '700',
-    textTransform: 'capitalize',
+  },
+  dateToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 8,
+  },
+  dateToggleText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  monthLabelInline: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 'auto',
+    marginRight: 2,
   },
   dowRow: {
     flexDirection: 'row',
@@ -252,7 +321,8 @@ const styles = StyleSheet.create({
   },
   slotStrip: {
     gap: 8,
-    paddingRight: 4,
+    paddingHorizontal: 16,
+    paddingRight: 20,
   },
   slot: {
     borderWidth: 1,

@@ -10,8 +10,9 @@ import (
 )
 
 type mockTriggerRepo struct {
-	triggers []domain.Trigger
-	logs     []domain.TriggerLog
+	triggers   []domain.Trigger
+	logs       []domain.TriggerLog
+	seenHashes map[string][]string
 }
 
 func (m *mockTriggerRepo) Create(t *domain.Trigger) error {
@@ -101,6 +102,31 @@ func (m *mockTriggerRepo) UpdateRunResult(id string, currentValue string, status
 	return domain.ErrTriggerNotFound
 }
 
+func (m *mockTriggerRepo) UpdateLastError(id string, errMsg string) error {
+	for i, trig := range m.triggers {
+		if trig.ID == id {
+			m.triggers[i].LastError = errMsg
+			return nil
+		}
+	}
+	return domain.ErrTriggerNotFound
+}
+
+func (m *mockTriggerRepo) GetSeenHashes(id string) ([]string, error) {
+	if m.seenHashes == nil {
+		return nil, nil
+	}
+	return m.seenHashes[id], nil
+}
+
+func (m *mockTriggerRepo) SetSeenHashes(id string, hashes []string) error {
+	if m.seenHashes == nil {
+		m.seenHashes = map[string][]string{}
+	}
+	m.seenHashes[id] = hashes
+	return nil
+}
+
 func (m *mockTriggerRepo) Delete(id, userID string) error {
 	for i, trig := range m.triggers {
 		if trig.ID == id && trig.UserID == userID {
@@ -166,6 +192,8 @@ func (e *mockEvaluator) TestEvaluate(ctx context.Context, t *domain.Trigger) (*d
 		CurrentData:           "Cotação simulada R$ 5,65",
 		Summary:               "Condição atingida com sucesso.",
 		SimulatedNotification: "Alerta de teste: " + t.Title,
+		Confidence:            90,
+		WhyRelevant:           "Cotação atualizada e relevante para a vigília monitorada.",
 		TestedAt:              time.Now().UTC(),
 	}, nil
 }
@@ -314,3 +342,56 @@ func TestTriggerWorker_TestTrigger(t *testing.T) {
 		t.Errorf("resultado inesperado: %+v", res)
 	}
 }
+
+func TestTriggerWorker_DeltaGateSkipsWithoutFresh(t *testing.T) {
+	now := time.Date(2026, 10, 10, 14, 0, 0, 0, time.UTC)
+	dueTime := now.Add(-5 * time.Minute)
+
+	repo := &mockTriggerRepo{
+		triggers: []domain.Trigger{
+			{
+				ID: userIDTrig(), UserID: "user-1", Title: "Radar", Query: "x",
+				Status: domain.TriggerStatusActive, NextCheckAt: &dueTime,
+			},
+		},
+		seenHashes: map[string][]string{},
+	}
+	eval := &mockEvaluator{}
+	worker := service.NewTriggerWorker(repo, nil, eval)
+	// Nada novo: IA não deve ser chamada.
+	worker.SetDeltaFetcher(func(ctx context.Context, tr *domain.Trigger) ([]string, []string, error) {
+		return nil, []string{"h1"}, nil
+	})
+
+	count, err := worker.CheckAndEvaluateTriggers(now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(eval.calledWith) != 0 {
+		t.Fatalf("delta gate deveria pular a IA, chamadas: %v", eval.calledWith)
+	}
+	if count != 0 {
+		t.Fatalf("pulados não contam como avaliados, veio %d", count)
+	}
+
+	// Fato novo: IA chamada e hashes persistidos (rearma o vencimento).
+	repo.triggers[0].NextCheckAt = &dueTime
+	worker.SetDeltaFetcher(func(ctx context.Context, tr *domain.Trigger) ([]string, []string, error) {
+		return []string{"h2"}, []string{"h1", "h2"}, nil
+	})
+	count, err = worker.CheckAndEvaluateTriggers(now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(eval.calledWith) != 1 {
+		t.Fatalf("IA deveria ser chamada 1 vez, veio %v", eval.calledWith)
+	}
+	if count != 1 {
+		t.Fatalf("esperava 1 avaliado, veio %d", count)
+	}
+	if len(repo.seenHashes[userIDTrig()]) != 2 {
+		t.Fatalf("hashes deveriam ser persistidos: %v", repo.seenHashes)
+	}
+}
+
+func userIDTrig() string { return "trig-gate" }

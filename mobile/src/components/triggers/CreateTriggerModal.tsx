@@ -306,7 +306,7 @@ export const CreateTriggerModal: React.FC<CreateTriggerModalProps> = ({
                         }}
                       >
                         <MaterialIcons
-                          name={cat.icon as any}
+                          name={cat.icon}
                           size={18}
                           color={isSelected ? catColor : isDark ? '#A1A1AA' : '#71717A'}
                         />

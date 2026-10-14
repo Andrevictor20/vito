@@ -148,8 +148,8 @@ export function useHomeData(currentUserId?: string) {
           return next;
         });
         notificationService.scheduleTodoReminder(newTodo).catch(() => {});
-        if ((newTodo as any).remind_at) {
-          notificationService.schedulePendingReminder(newTodo as any).catch(() => {});
+        if (newTodo.remind_at) {
+          notificationService.schedulePendingReminder(newTodo).catch(() => {});
         }
       }
       await loadData(true);
@@ -173,7 +173,7 @@ export function useHomeData(currentUserId?: string) {
         if (updated.status !== 'completed') {
           notificationService.scheduleTodoReminder(updated).catch(() => {});
           if (updated.remind_at) {
-            notificationService.schedulePendingReminder(updated as any).catch(() => {});
+            notificationService.schedulePendingReminder(updated).catch(() => {});
           }
         }
       }

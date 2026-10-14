@@ -8,11 +8,8 @@ import {
   ActivityIndicator,
   RefreshControl,
   SafeAreaView,
-  Platform,
-  StatusBar as RNStatusBar,
   Share,
   BackHandler,
-  Modal,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -25,6 +22,8 @@ import {
   calculateWeeklySummaries,
   WeeklySummaryItem,
 } from '../utils/weeklySummaryCalculator';
+import { isAllDayEvent } from '../utils/calendarDateUtils';
+import { BottomSheetModal } from '../components/ui/BottomSheetModal';
 
 interface ExecutiveSummariesHubViewProps {
   onBack: () => void;
@@ -32,6 +31,45 @@ interface ExecutiveSummariesHubViewProps {
 }
 
 type SummaryHorizon = 'daily' | 'weekly' | 'monthly';
+
+/**
+ * Marcador visual de feriado/all-day — APENAS rotulagem.
+ * Não altera nenhuma soma: a exclusão de 0h segue no calculator + memos abaixo.
+ */
+function isHolidayLikeEvent(e: Event): boolean {
+  if (isAllDayEvent(e)) return true;
+  const cat = (e.category || '').toLowerCase();
+  if (cat === 'holiday' || cat === 'feriado') return true;
+  try {
+    const s = new Date(e.start_at).getTime();
+    const end = new Date(e.end_at).getTime();
+    if (end > s && (end - s) / (1000 * 60 * 60) >= 23) return true;
+  } catch {}
+  return false;
+}
+
+/** Índices Seg(0)..Dom(6) com feriado/all-day na semana — só para o rótulo "Feriado". */
+function getHolidayDayIndices(week: WeeklySummaryItem, allEvents: Event[]): Set<number> {
+  const set = new Set<number>();
+  allEvents.forEach((e) => {
+    if (!isHolidayLikeEvent(e)) return;
+    try {
+      const d = new Date(e.start_at);
+      if (d >= week.weekStart && d <= week.weekEnd) {
+        const jsDay = d.getDay();
+        set.add(jsDay === 0 ? 6 : jsDay - 1);
+      }
+    } catch {}
+  });
+  return set;
+}
+
+function formatRaioXSubtitle(week: WeeklySummaryItem, hasHoliday: boolean): string {
+  const s = week.weekStart.getDate();
+  const e = week.weekEnd.getDate();
+  const hoursLabel = String(week.hours).replace('.', ',');
+  return `${s} a ${e} · ${hoursLabel}h reais${hasHoliday ? ' (Feriado isolado)' : ''}`;
+}
 
 export const ExecutiveSummariesHubView: React.FC<ExecutiveSummariesHubViewProps> = ({
   onBack,
@@ -98,6 +136,7 @@ export const ExecutiveSummariesHubView: React.FC<ExecutiveSummariesHubViewProps>
   }, [events, todos]);
 
   // Cálculos do Horizonte Diário
+  // Exclui all_day / FERIADO / 24h da soma de horas: isAllDay + categoria feriado + duração >= 23h.
   const todayMetrics = useMemo(() => {
     const todayStr = new Date().toISOString().split('T')[0];
     const todayEvents = events.filter((e) => e.start_at.startsWith(todayStr));
@@ -106,8 +145,14 @@ export const ExecutiveSummariesHubView: React.FC<ExecutiveSummariesHubViewProps>
 
     let totalMinutes = 0;
     todayEvents.forEach((e) => {
+      // Feriados e dias inteiros valem 0h de carga (não é trabalho).
+      if (isAllDayEvent(e)) return;
       const s = new Date(e.start_at).getTime();
       const end = new Date(e.end_at).getTime();
+      // Exclui eventos de 24h / >= 23h mesmo se o classificador falhar.
+      if (end > s && (end - s) / (1000 * 60 * 60) >= 23) return;
+      const cat = (e.category || '').toLowerCase();
+      if (cat === 'holiday' || cat === 'feriado') return;
       if (end > s) {
         totalMinutes += Math.round((end - s) / (1000 * 60));
       }
@@ -151,8 +196,14 @@ export const ExecutiveSummariesHubView: React.FC<ExecutiveSummariesHubViewProps>
     let personalMinutes = 0;
 
     monthEvents.forEach((e) => {
+      // Feriados e dias inteiros valem 0h de carga.
+      if (isAllDayEvent(e)) return;
       const s = new Date(e.start_at).getTime();
       const end = new Date(e.end_at).getTime();
+      // Exclui all_day / FERIADO / 24h (>= 23h) da soma de horas.
+      if (end > s && (end - s) / (1000 * 60 * 60) >= 23) return;
+      const catCheck = (e.category || '').toLowerCase();
+      if (catCheck === 'holiday' || catCheck === 'feriado') return;
       const dur = end > s ? Math.round((end - s) / (1000 * 60)) : 60;
       totalMonthMinutes += dur;
 
@@ -190,21 +241,75 @@ export const ExecutiveSummariesHubView: React.FC<ExecutiveSummariesHubViewProps>
       return 'Sua agenda e lista de tarefas estão totalmente livres hoje. Momento propício para descanso, planejamento estratégico ou adiantar projetos de longo prazo.';
     }
     if (eventsCount === 0) {
-      return `Dia sem compromissos fixos agendados. Você possui ${openTodos} tarefa(s) pendente(s) — oportunidade excelente para blocos de foco contínuo e resolução profunda de prioridades.`;
+      const pendentes = openTodos === 1 ? '1 tarefa pendente' : `${openTodos} tarefas pendentes`;
+      return `Dia sem compromissos fixos agendados. Você possui ${pendentes} — oportunidade excelente para blocos de foco contínuo e resolução profunda de prioridades.`;
     }
     if (committed >= 5) {
       return `Dia de alta intensidade executiva com ${committed}h em compromissos. Recomendo proteger os ${free}h livres para intervalos de recuperação cognitiva e manter o foco nas entregas essenciais.`;
     }
-    return `Ritmo equilibrado hoje: ${eventsCount} compromisso(s) (${committed}h) e ${free}h livres para execução. Sugiro direcionar energia para concluir as ${openTodos} tarefa(s) prioritárias antes do fim do dia.`;
+    const compromissos = eventsCount === 1 ? '1 compromisso' : `${eventsCount} compromissos`;
+    const prioritarias = openTodos === 1 ? '1 tarefa prioritária' : `${openTodos} tarefas prioritárias`;
+    return `Ritmo equilibrado hoje: ${compromissos} (${committed}h) e ${free}h livres para execução. Sugiro direcionar energia para concluir as ${prioritarias} antes do fim do dia.`;
   }, [todayMetrics]);
+
+  // Rotulagem do Raio-X selecionado (não altera cálculos — só legenda/subtítulo).
+  const selectedWeekHolidays = useMemo(() => {
+    if (!selectedWeekModal) return new Set<number>();
+    return getHolidayDayIndices(selectedWeekModal, events);
+  }, [selectedWeekModal, events]);
+
+  const selectedWeekSubtitle = useMemo(() => {
+    if (!selectedWeekModal) return '';
+    return formatRaioXSubtitle(selectedWeekModal, selectedWeekHolidays.size > 0);
+  }, [selectedWeekModal, selectedWeekHolidays]);
+
+  const monthlyModalSubtitle = useMemo(() => {
+    const monthName = new Date().toLocaleDateString('pt-BR', { month: 'long' });
+    return `${monthName} · ${monthlyMetrics.totalHours}h reais`;
+  }, [monthlyMetrics.totalHours]);
+
+  const monthlyTips = useMemo(
+    () => [
+      {
+        category: 'Foco trimestral',
+        text: 'Defina 3 grandes metas trimestrais e concentre as tarefas da primeira semana nelas.',
+      },
+      {
+        category: 'Proteção de agenda',
+        text: 'Reserve ao menos 2 manhãs sem reuniões externas para trabalho focado e estratégico.',
+      },
+      {
+        category: 'Revisão semanal',
+        text: 'Revise o Raio-X toda sexta e reagende o que não teve avanço para a semana seguinte.',
+      },
+    ],
+    []
+  );
 
   const handleShare = async () => {
     hapticFeedback.medium();
     try {
-      const message = `📊 Síntese Executiva do Vito:\n• Compromissos hoje: ${todayMetrics.eventsCount} (${todayMetrics.committedHours}h)\n• Tarefas concluídas: ${todayMetrics.completedTodos}/${todayMetrics.totalTodos}\n• Taxa de conclusão mensal: ${monthlyMetrics.completionRate}%`;
+      const message = `Síntese Executiva do Vito:\n• Compromissos hoje: ${todayMetrics.eventsCount} (${todayMetrics.committedHours}h)\n• Tarefas concluídas: ${todayMetrics.completedTodos}/${todayMetrics.totalTodos}\n• Taxa de conclusão mensal: ${monthlyMetrics.completionRate}%`;
       await Share.share({ message });
     } catch {}
   };
+
+  const openWeekInChat = () => {
+    const p = selectedWeekModal?.period;
+    setSelectedWeekModal(null);
+    if (onOpenChatWithPrompt && p) {
+      onOpenChatWithPrompt(`Vito, vamos analisar minha semana de ${p} e ajustar o planejamento.`);
+    }
+  };
+
+  const openMonthInChat = () => {
+    setShowMonthlyModal(false);
+    if (onOpenChatWithPrompt) {
+      onOpenChatWithPrompt('Vito, vamos fazer um plano executivo para o próximo mês.');
+    }
+  };
+
+  const hasFreeWindow = (parseFloat(todayMetrics.freeHours) || 0) > 0;
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.surface }]}>
@@ -257,9 +362,14 @@ export const ExecutiveSummariesHubView: React.FC<ExecutiveSummariesHubViewProps>
             {(['daily', 'weekly', 'monthly'] as SummaryHorizon[]).map((h) => {
               const isActive = horizon === h;
               const labels: Record<SummaryHorizon, string> = {
-                daily: '☀️ Diário',
-                weekly: '📊 Semanal',
-                monthly: '🗓️ Mensal',
+                daily: 'Diário',
+                weekly: 'Semanal',
+                monthly: 'Mensal',
+              };
+              const icons: Record<SummaryHorizon, 'wb-sunny' | 'bar-chart' | 'calendar-month'> = {
+                daily: 'wb-sunny',
+                weekly: 'bar-chart',
+                monthly: 'calendar-month',
               };
 
               return (
@@ -278,21 +388,28 @@ export const ExecutiveSummariesHubView: React.FC<ExecutiveSummariesHubViewProps>
                   }}
                   activeOpacity={0.7}
                 >
-                  <Text
-                    style={[
-                      styles.horizonLabel,
-                      {
-                        color: isActive
-                          ? isDark
-                            ? colors.onSurface
-                            : colors.onPrimary
-                          : colors.onSurfaceVariant,
-                        fontWeight: isActive ? '600' : '500',
-                      },
-                    ]}
-                  >
-                    {labels[h]}
-                  </Text>
+                  <View style={styles.horizonTabInner}>
+                    <MaterialIcons
+                      name={icons[h]}
+                      size={14}
+                      color={isActive ? (isDark ? colors.onSurface : colors.onPrimary) : colors.onSurfaceVariant}
+                    />
+                    <Text
+                      style={[
+                        styles.horizonLabel,
+                        {
+                          color: isActive
+                            ? isDark
+                              ? colors.onSurface
+                              : colors.onPrimary
+                            : colors.onSurfaceVariant,
+                          fontWeight: isActive ? '600' : '500',
+                        },
+                      ]}
+                    >
+                      {labels[h]}
+                    </Text>
+                  </View>
                 </TouchableOpacity>
               );
             })}
@@ -305,16 +422,16 @@ export const ExecutiveSummariesHubView: React.FC<ExecutiveSummariesHubViewProps>
           </View>
         ) : horizon === 'daily' ? (
           /* ==========================================
-             BENTO GRID DIÁRIO
+             BENTO DIÁRIO SIMPLIFICADO
              ========================================== */
           <View style={styles.bentoGrid}>
-            {/* Card Hero: Carga de Hoje */}
+            {/* Hero: 2 números */}
             <View
               style={[
                 styles.bentoCard,
                 styles.bentoCardSpan2,
                 {
-                  backgroundColor: colors.surfaceContainerLow,
+                  backgroundColor: colors.surfaceContainer,
                   borderColor: colors.outlineVariant,
                 },
               ]}
@@ -325,34 +442,47 @@ export const ExecutiveSummariesHubView: React.FC<ExecutiveSummariesHubViewProps>
               </View>
 
               <View style={styles.heroNumbersRow}>
-                <View>
+                <View style={styles.heroNumberBlock}>
                   <Text style={[styles.heroBigNumber, tabularNumbers, { color: colors.onSurface }]}>
                     {todayMetrics.committedHours}h
                   </Text>
                   <Text style={[styles.heroLabel, { color: colors.textMuted }]}>
-                    Comprometidas hoje
+                    Comprometidas
                   </Text>
                 </View>
 
                 <View style={styles.heroDivider} />
 
-                <View>
+                <View style={styles.heroNumberBlock}>
                   <Text style={[styles.heroBigNumber, tabularNumbers, { color: colors.primary }]}>
                     {todayMetrics.freeHours}h
                   </Text>
                   <Text style={[styles.heroLabel, { color: colors.textMuted }]}>
-                    Blocos livres estimados
+                    Blocos livres
                   </Text>
+                  {hasFreeWindow && (
+                    <View
+                      style={[
+                        styles.focusBadge,
+                        { backgroundColor: colors.surfaceContainerHighest },
+                      ]}
+                    >
+                      <MaterialIcons name="center-focus-strong" size={12} color={colors.primary} />
+                      <Text style={[styles.focusBadgeText, { color: colors.primary }]}>
+                        JANELA FOCO LIVRE
+                      </Text>
+                    </View>
+                  )}
                 </View>
               </View>
             </View>
 
-            {/* Card 2: Compromissos Hoje */}
+            {/* Card: Agenda */}
             <View
               style={[
                 styles.bentoCard,
                 {
-                  backgroundColor: colors.surfaceContainerLow,
+                  backgroundColor: colors.surfaceContainer,
                   borderColor: colors.outlineVariant,
                 },
               ]}
@@ -369,12 +499,12 @@ export const ExecutiveSummariesHubView: React.FC<ExecutiveSummariesHubViewProps>
               </Text>
             </View>
 
-            {/* Card 3: Checklist Hoje */}
+            {/* Card: Tarefas */}
             <View
               style={[
                 styles.bentoCard,
                 {
-                  backgroundColor: colors.surfaceContainerLow,
+                  backgroundColor: colors.surfaceContainer,
                   borderColor: colors.outlineVariant,
                 },
               ]}
@@ -391,14 +521,13 @@ export const ExecutiveSummariesHubView: React.FC<ExecutiveSummariesHubViewProps>
               </Text>
             </View>
 
-            {/* Card Síntese Executiva do Vito (Exibição Direta e Proativa) */}
+            {/* Card: Síntese executiva (leitura — CTA vive no Raio-X) */}
             <View
               style={[
                 styles.bentoCard,
                 styles.bentoCardSpan2,
-                styles.aiDirectSynthesisCard,
                 {
-                  backgroundColor: colors.surfaceContainerLow,
+                  backgroundColor: colors.surfaceContainer,
                   borderColor: colors.outlineVariant,
                 },
               ]}
@@ -406,37 +535,18 @@ export const ExecutiveSummariesHubView: React.FC<ExecutiveSummariesHubViewProps>
               <View style={styles.bentoHeader}>
                 <View style={styles.synthesisHeaderBadge}>
                   <MaterialIcons name="auto-awesome" size={15} color={colors.primary} />
-                  <Text style={[styles.bentoTag, { color: colors.primary }]}>SÍNTESE EXECUTIVA DO VITO</Text>
+                  <Text style={[styles.bentoTag, { color: colors.primary }]}>SÍNTESE EXECUTIVA</Text>
                 </View>
-                <TouchableOpacity
-                  onPress={() => {
-                    hapticFeedback.selection();
-                    if (onOpenChatWithPrompt) {
-                      onOpenChatWithPrompt('Vito, aprofunde a análise executiva do meu dia de hoje e sugira melhorias na rotina.');
-                    }
-                  }}
-                  hitSlop={tokens.hitSlop.sm}
-                  accessibilityLabel="Abrir análise no chat"
-                >
-                  <MaterialIcons name="chat" size={16} color={colors.primary} />
-                </TouchableOpacity>
               </View>
 
               <Text style={[styles.synthesisBodyText, { color: colors.onSurface }]}>
                 {dailySynthesisText}
               </Text>
-
-              <View style={[styles.synthesisFooterNote, { borderTopColor: colors.outlineVariant }]}>
-                <MaterialIcons name="lightbulb-outline" size={14} color={colors.textMuted} />
-                <Text style={[styles.synthesisFooterText, { color: colors.textMuted }]}>
-                  Análise gerada em tempo real sobre sua carga e pendências.
-                </Text>
-              </View>
             </View>
           </View>
         ) : horizon === 'weekly' ? (
           /* ==========================================
-             HORIZONTE SEMANAL (4 SEMANAS COM RAIO-X)
+             SEMANAL SIMPLIFICADO — CICLO ATUAL + RAIO-X
              ========================================== */
           <View style={styles.weeklyList}>
             {weeklySummaries.map((item) => (
@@ -445,7 +555,7 @@ export const ExecutiveSummariesHubView: React.FC<ExecutiveSummariesHubViewProps>
                 style={[
                   styles.weeklyCard,
                   {
-                    backgroundColor: colors.surfaceContainerLow,
+                    backgroundColor: colors.surfaceContainer,
                     borderColor: colors.outlineVariant,
                   },
                 ]}
@@ -457,7 +567,7 @@ export const ExecutiveSummariesHubView: React.FC<ExecutiveSummariesHubViewProps>
               >
                 <View style={styles.weeklyCardHeader}>
                   <Text style={[styles.weeklyRange, { color: colors.onSurface }]}>
-                    {item.period}
+                    {item.isCurrentWeek ? `Ciclo Atual · ${item.period}` : item.period}
                   </Text>
                   {item.isCurrentWeek && (
                     <View
@@ -477,7 +587,6 @@ export const ExecutiveSummariesHubView: React.FC<ExecutiveSummariesHubViewProps>
                   {item.title}
                 </Text>
 
-                {/* Insight Narrativo da IA */}
                 <View style={[styles.cardAiSnippet, { backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)' }]}>
                   <View style={styles.snippetHeaderRow}>
                     <MaterialIcons name="auto-awesome" size={13} color={colors.primary} />
@@ -513,7 +622,7 @@ export const ExecutiveSummariesHubView: React.FC<ExecutiveSummariesHubViewProps>
 
                 <View style={[styles.cardClickHintRow, { borderTopColor: colors.outlineVariant }]}>
                   <Text style={[styles.cardClickHintText, { color: colors.primary }]}>
-                    Toque para abrir Raio-X detalhado
+                    Toque para abrir o Raio-X
                   </Text>
                   <MaterialIcons name="chevron-right" size={16} color={colors.primary} />
                 </View>
@@ -522,16 +631,15 @@ export const ExecutiveSummariesHubView: React.FC<ExecutiveSummariesHubViewProps>
           </View>
         ) : (
           /* ==========================================
-             BENTO GRID MENSAL COM RAIO-X
+             MENSAL SIMPLIFICADO — EFICÁCIA + DIAGNÓSTICO
              ========================================== */
           <View style={styles.bentoGrid}>
-            {/* Card Hero: Taxa de Conclusão */}
             <TouchableOpacity
               style={[
                 styles.bentoCard,
                 styles.bentoCardSpan2,
                 {
-                  backgroundColor: colors.surfaceContainerLow,
+                  backgroundColor: colors.surfaceContainer,
                   borderColor: colors.outlineVariant,
                 },
               ]}
@@ -547,43 +655,41 @@ export const ExecutiveSummariesHubView: React.FC<ExecutiveSummariesHubViewProps>
               </View>
 
               <View style={styles.heroNumbersRow}>
-                <View>
+                <View style={styles.heroNumberBlock}>
                   <Text style={[styles.heroBigNumber, tabularNumbers, { color: colors.onSurface }]}>
                     {monthlyMetrics.completionRate}%
                   </Text>
                   <Text style={[styles.heroLabel, { color: colors.textMuted }]}>
-                    Taxa de resolução de tarefas
+                    Taxa de resolução
                   </Text>
                 </View>
 
                 <View style={styles.heroDivider} />
 
-                <View>
+                <View style={styles.heroNumberBlock}>
                   <Text style={[styles.heroBigNumber, tabularNumbers, { color: colors.primary }]}>
                     {monthlyMetrics.totalHours}h
                   </Text>
                   <Text style={[styles.heroLabel, { color: colors.textMuted }]}>
-                    Investidas em compromissos
+                    Em compromissos
                   </Text>
                 </View>
               </View>
 
               <View style={[styles.cardClickHintRow, { borderTopColor: colors.outlineVariant }]}>
                 <Text style={[styles.cardClickHintText, { color: colors.primary }]}>
-                  Toque para ver Raio-X mensal completo
+                  Toque para abrir o Raio-X
                 </Text>
                 <MaterialIcons name="chevron-right" size={16} color={colors.primary} />
               </View>
             </TouchableOpacity>
 
-            {/* Card Análise Mensal da IA */}
             <View
               style={[
                 styles.bentoCard,
                 styles.bentoCardSpan2,
-                styles.aiDirectSynthesisCard,
                 {
-                  backgroundColor: colors.surfaceContainerLow,
+                  backgroundColor: colors.surfaceContainer,
                   borderColor: colors.outlineVariant,
                 },
               ]}
@@ -591,30 +697,29 @@ export const ExecutiveSummariesHubView: React.FC<ExecutiveSummariesHubViewProps>
               <View style={styles.bentoHeader}>
                 <View style={styles.synthesisHeaderBadge}>
                   <MaterialIcons name="auto-awesome" size={15} color={colors.primary} />
-                  <Text style={[styles.bentoTag, { color: colors.primary }]}>DIAGNÓSTICO MENSAL DA IA</Text>
+                  <Text style={[styles.bentoTag, { color: colors.primary }]}>DIAGNÓSTICO</Text>
                 </View>
               </View>
               <Text style={[styles.synthesisBodyText, { color: colors.onSurface }]}>
                 {monthlyMetrics.completionRate >= 70
-                  ? `Desempenho executivo consistente neste mês com ${monthlyMetrics.completionRate}% de tarefas concluídas e ${monthlyMetrics.totalHours}h dedicadas. O equilíbrio está em ${monthlyMetrics.workRatio}% trabalho e ${monthlyMetrics.personalRatio}% pessoal.`
-                  : `Atenção aos gargalos: taxa de conclusão de ${monthlyMetrics.completionRate}% neste mês. Recomenda-se reagendar tarefas secundárias e focar nos 3 objetivos principais de maior impacto.`}
+                  ? `Desempenho consistente com ${monthlyMetrics.completionRate}% de tarefas concluídas e ${monthlyMetrics.totalHours}h dedicadas. Equilíbrio em ${monthlyMetrics.workRatio}% trabalho e ${monthlyMetrics.personalRatio}% pessoal.`
+                  : `Atenção aos gargalos: conclusão de ${monthlyMetrics.completionRate}% no mês. Recomenda-se reagendar tarefas secundárias e focar nos 3 objetivos de maior impacto.`}
               </Text>
             </View>
 
-            {/* Card Equilíbrio */}
             <View
               style={[
                 styles.bentoCard,
                 styles.bentoCardSpan2,
                 {
-                  backgroundColor: colors.surfaceContainerLow,
+                  backgroundColor: colors.surfaceContainer,
                   borderColor: colors.outlineVariant,
                 },
               ]}
             >
               <View style={styles.bentoHeader}>
                 <Text style={[styles.bentoTag, { color: colors.primary }]}>
-                  EQUILÍBRIO TRABALHO VS PESSOAL
+                  TRABALHO / PESSOAL
                 </Text>
                 <MaterialIcons name="pie-chart-outline" size={16} color={colors.textMuted} />
               </View>
@@ -641,12 +746,18 @@ export const ExecutiveSummariesHubView: React.FC<ExecutiveSummariesHubViewProps>
               </View>
 
               <View style={styles.balanceLegendRow}>
-                <Text style={[styles.balanceLegendText, tabularNumbers, { color: colors.onSurface }]}>
-                  💼 Trabalho: {monthlyMetrics.workRatio}%
-                </Text>
-                <Text style={[styles.balanceLegendText, tabularNumbers, { color: colors.textMuted }]}>
-                  🌿 Pessoal: {monthlyMetrics.personalRatio}%
-                </Text>
+                <View style={styles.balanceLegendItem}>
+                  <MaterialIcons name="work-outline" size={13} color={colors.onSurface} />
+                  <Text style={[styles.balanceLegendText, tabularNumbers, { color: colors.onSurface }]}>
+                    Trabalho: {monthlyMetrics.workRatio}%
+                  </Text>
+                </View>
+                <View style={styles.balanceLegendItem}>
+                  <MaterialIcons name="spa" size={13} color={colors.textMuted} />
+                  <Text style={[styles.balanceLegendText, tabularNumbers, { color: colors.textMuted }]}>
+                    Pessoal: {monthlyMetrics.personalRatio}%
+                  </Text>
+                </View>
               </View>
             </View>
           </View>
@@ -654,287 +765,233 @@ export const ExecutiveSummariesHubView: React.FC<ExecutiveSummariesHubViewProps>
       </ScrollView>
 
       {/* ==========================================
-          MODAL RAIO-X SEMANAL
+          RAIO-X SEMANAL EM BOTTOM SHEET
           ========================================== */}
-      <Modal
+      <BottomSheetModal
         visible={Boolean(selectedWeekModal)}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setSelectedWeekModal(null)}
+        onClose={() => setSelectedWeekModal(null)}
+        title={selectedWeekModal ? `Raio-X · ${selectedWeekModal.period}` : 'Raio-X'}
+        subtitle={selectedWeekSubtitle}
       >
-        <View style={styles.modalBackdrop}>
+        <ScrollView
+          style={styles.modalScroll}
+          contentContainerStyle={styles.modalScrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={[styles.truthBadge, { backgroundColor: colors.surfaceContainerHighest }]}>
+            <MaterialIcons name="verified" size={13} color={colors.primary} />
+            <Text style={[styles.truthBadgeText, { color: colors.primary }]}>
+              SEM DISTORÇÃO 24H
+            </Text>
+          </View>
+
           <View
             style={[
-              styles.modalContentCard,
-              { backgroundColor: colors.surface, borderColor: colors.outlineVariant },
+              styles.modalNarrativeBox,
+              {
+                backgroundColor: colors.surfaceContainer,
+                borderColor: colors.outlineVariant,
+              },
             ]}
           >
-            <View style={[styles.modalHeaderRow, { borderBottomColor: colors.outlineVariant }]}>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.modalTitle, { color: colors.onSurface }]}>
-                  {selectedWeekModal?.period}
-                </Text>
-                <Text style={[styles.modalSubtitle, { color: colors.textMuted }]}>
-                  {selectedWeekModal?.title}
-                </Text>
-              </View>
-              <TouchableOpacity
-                onPress={() => setSelectedWeekModal(null)}
-                hitSlop={tokens.hitSlop.md}
-              >
-                <MaterialIcons name="close" size={22} color={colors.onSurface} />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={styles.modalScroll} contentContainerStyle={styles.modalScrollContent}>
-              {/* Diagnóstico da IA */}
-              <View
-                style={[
-                  styles.modalNarrativeBox,
-                  {
-                    backgroundColor: colors.surfaceContainerLow,
-                    borderColor: colors.outlineVariant,
-                  },
-                ]}
-              >
-                <View style={styles.synthesisHeaderBadge}>
-                  <MaterialIcons name="auto-awesome" size={15} color={colors.primary} />
-                  <Text style={[styles.bentoTag, { color: colors.primary }]}>
-                    DIAGNÓSTICO EXECUTIVO DA SEMANA
-                  </Text>
-                </View>
-                <Text style={[styles.modalNarrativeText, { color: colors.onSurface }]}>
-                  {selectedWeekModal?.narrative}
-                </Text>
-              </View>
-
-              {/* Distribuição por Dia e Pico */}
-              <Text style={[styles.modalSectionHeading, { color: colors.onSurface }]}>
-                Distribuição por Dia da Semana
+            <View style={styles.synthesisHeaderBadge}>
+              <MaterialIcons name="auto-awesome" size={15} color={colors.primary} />
+              <Text style={[styles.bentoTag, { color: colors.primary }]}>
+                DIAGNÓSTICO DA SEMANA
               </Text>
-              <View style={styles.dailyBarsRow}>
-                {(selectedWeekModal?.dailyActivity || []).map((day) => (
-                  <View key={day.dateStr} style={styles.dailyBarCol}>
-                    <Text
-                      style={[
-                        styles.dailyBarVal,
-                        tabularNumbers,
-                        { color: day.isPeak ? colors.primary : colors.textMuted },
-                      ]}
-                    >
-                      {day.hours}h
+            </View>
+            <Text style={[styles.modalNarrativeText, { color: colors.onSurface }]}>
+              {selectedWeekModal?.narrative}
+            </Text>
+          </View>
+
+          <Text style={[styles.modalSectionHeading, { color: colors.onSurface }]}>
+            Distribuição Seg–Dom
+          </Text>
+          <View style={styles.dailyBarsRow}>
+            {(selectedWeekModal?.dailyActivity || []).map((day, idx) => {
+              const isHoliday = selectedWeekHolidays.has(idx);
+              return (
+                <View key={day.dateStr} style={styles.dailyBarCol}>
+                  <Text
+                    style={[
+                      styles.dailyBarVal,
+                      tabularNumbers,
+                      { color: day.isPeak ? colors.primary : colors.textMuted },
+                    ]}
+                  >
+                    {day.hours}h
+                  </Text>
+                  <View
+                    style={[
+                      styles.dailyBarPill,
+                      {
+                        height: Math.max(14, Math.min(65, day.hours * 8)),
+                        backgroundColor: day.isPeak
+                          ? colors.primary
+                          : colors.surfaceContainerHighest,
+                      },
+                    ]}
+                  />
+                  <Text
+                    style={[
+                      styles.dailyBarDay,
+                      {
+                        color: day.isPeak ? colors.primary : colors.onSurfaceVariant,
+                        fontWeight: day.isPeak ? '700' : '500',
+                      },
+                    ]}
+                  >
+                    {day.dayLabel}
+                  </Text>
+                  {isHoliday && (
+                    <Text style={[styles.holidayLabel, { color: colors.primary }]}>Feriado</Text>
+                  )}
+                </View>
+              );
+            })}
+          </View>
+
+          {(selectedWeekModal?.tips || []).length > 0 && (
+            <>
+              <Text style={[styles.modalSectionHeading, { color: colors.onSurface, marginTop: 16 }]}>
+                Recomendações do Vito
+              </Text>
+              <View style={styles.tipsList}>
+                {selectedWeekModal?.tips.map((tip, i) => (
+                  <View
+                    key={i}
+                    style={[
+                      styles.tipCard,
+                      {
+                        backgroundColor: colors.surfaceContainer,
+                        borderColor: colors.outlineVariant,
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.tipNumber, tabularNumbers, { color: colors.primary }]}>
+                      {String(i + 1).padStart(2, '0')}
                     </Text>
-                    <View
-                      style={[
-                        styles.dailyBarPill,
-                        {
-                          height: Math.max(14, Math.min(65, day.hours * 8)),
-                          backgroundColor: day.isPeak
-                            ? colors.primary
-                            : colors.surfaceContainerHighest,
-                        },
-                      ]}
-                    />
-                    <Text
-                      style={[
-                        styles.dailyBarDay,
-                        {
-                          color: day.isPeak ? colors.primary : colors.onSurfaceVariant,
-                          fontWeight: day.isPeak ? '700' : '500',
-                        },
-                      ]}
-                    >
-                      {day.dayShort}
-                    </Text>
-                    {day.isPeak && (
-                      <Text style={[styles.peakBadge, { color: colors.primary }]}>Pico</Text>
-                    )}
+                    <View style={styles.tipBody}>
+                      <Text style={[styles.tipTitle, { color: colors.onSurface }]}>
+                        {tip.category}
+                      </Text>
+                      <Text
+                        style={[styles.tipText, { color: colors.onSurfaceVariant }]}
+                        numberOfLines={2}
+                      >
+                        {tip.text}
+                      </Text>
+                    </View>
                   </View>
                 ))}
               </View>
+            </>
+          )}
 
-              {/* Categorias */}
-              {(selectedWeekModal?.categories || []).length > 0 && (
-                <>
-                  <Text style={[styles.modalSectionHeading, { color: colors.onSurface, marginTop: 16 }]}>
-                    Divisão por Categoria
-                  </Text>
-                  <View style={styles.categoriesList}>
-                    {selectedWeekModal?.categories.map((cat) => (
-                      <View key={cat.name} style={styles.categoryRow}>
-                        <View style={styles.catLeft}>
-                          <View style={[styles.catDot, { backgroundColor: cat.color || colors.primary }]} />
-                          <Text style={[styles.catName, { color: colors.onSurface }]}>{cat.name}</Text>
-                        </View>
-                        <Text style={[styles.catPercent, tabularNumbers, { color: colors.textMuted }]}>
-                          {cat.hours}h ({cat.percentage}%)
-                        </Text>
-                      </View>
-                    ))}
-                  </View>
-                </>
-              )}
-
-              {/* Dicas da IA */}
-              {(selectedWeekModal?.tips || []).length > 0 && (
-                <>
-                  <Text style={[styles.modalSectionHeading, { color: colors.onSurface, marginTop: 16 }]}>
-                    Recomendações Práticas do Vito
-                  </Text>
-                  <View style={styles.tipsList}>
-                    {selectedWeekModal?.tips.map((tip, i) => (
-                      <View
-                        key={i}
-                        style={[
-                          styles.tipCard,
-                          {
-                            backgroundColor: colors.surfaceContainerLow,
-                            borderColor: colors.outlineVariant,
-                          },
-                        ]}
-                      >
-                        <MaterialIcons name="lightbulb-outline" size={16} color={colors.primary} />
-                        <Text style={[styles.tipText, { color: colors.onSurface }]}>
-                          {tip.text}
-                        </Text>
-                      </View>
-                    ))}
-                  </View>
-                </>
-              )}
-            </ScrollView>
-
-            <View style={[styles.modalFooter, { borderTopColor: colors.outlineVariant }]}>
-              <TouchableOpacity
-                style={[styles.modalChatButton, { backgroundColor: colors.primary }]}
-                onPress={() => {
-                  const p = selectedWeekModal?.period;
-                  setSelectedWeekModal(null);
-                  if (onOpenChatWithPrompt && p) {
-                    onOpenChatWithPrompt(`Vito, vamos analisar minha semana de ${p} e ajustar o planejamento.`);
-                  }
-                }}
-                activeOpacity={0.8}
-              >
-                <MaterialIcons name="chat" size={18} color={colors.onPrimary} />
-                <Text style={[styles.modalChatButtonText, { color: colors.onPrimary }]}>
-                  Discutir esta semana no chat com o Vito
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+          <TouchableOpacity
+            style={[styles.modalChatButton, { backgroundColor: colors.primary }]}
+            onPress={openWeekInChat}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Discutir no chat"
+          >
+            <MaterialIcons name="chat" size={18} color={colors.onPrimary} />
+            <Text style={[styles.modalChatButtonText, { color: colors.onPrimary }]}>
+              Discutir no chat
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </BottomSheetModal>
 
       {/* ==========================================
-          MODAL RAIO-X MENSAL
+          RAIO-X MENSAL EM BOTTOM SHEET
           ========================================== */}
-      <Modal
+      <BottomSheetModal
         visible={showMonthlyModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowMonthlyModal(false)}
+        onClose={() => setShowMonthlyModal(false)}
+        title="Raio-X mensal"
+        subtitle={monthlyModalSubtitle}
       >
-        <View style={styles.modalBackdrop}>
+        <ScrollView
+          style={styles.modalScroll}
+          contentContainerStyle={styles.modalScrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={[styles.truthBadge, { backgroundColor: colors.surfaceContainerHighest }]}>
+            <MaterialIcons name="verified" size={13} color={colors.primary} />
+            <Text style={[styles.truthBadgeText, { color: colors.primary }]}>
+              SEM DISTORÇÃO 24H
+            </Text>
+          </View>
+
           <View
             style={[
-              styles.modalContentCard,
-              { backgroundColor: colors.surface, borderColor: colors.outlineVariant },
+              styles.modalNarrativeBox,
+              {
+                backgroundColor: colors.surfaceContainer,
+                borderColor: colors.outlineVariant,
+              },
             ]}
           >
-            <View style={[styles.modalHeaderRow, { borderBottomColor: colors.outlineVariant }]}>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.modalTitle, { color: colors.onSurface }]}>
-                  Raio-X Executivo Mensal
-                </Text>
-                <Text style={[styles.modalSubtitle, { color: colors.textMuted }]}>
-                  Visão Holística de Produtividade & Equilíbrio
-                </Text>
-              </View>
-              <TouchableOpacity
-                onPress={() => setShowMonthlyModal(false)}
-                hitSlop={tokens.hitSlop.md}
-              >
-                <MaterialIcons name="close" size={22} color={colors.onSurface} />
-              </TouchableOpacity>
+            <View style={styles.synthesisHeaderBadge}>
+              <MaterialIcons name="auto-awesome" size={15} color={colors.primary} />
+              <Text style={[styles.bentoTag, { color: colors.primary }]}>
+                DIAGNÓSTICO DO MÊS
+              </Text>
             </View>
+            <Text style={[styles.modalNarrativeText, { color: colors.onSurface }]}>
+              Neste ciclo você registrou {monthlyMetrics.totalHours} horas reais em compromissos, com taxa de resolução em {monthlyMetrics.completionRate}%. Foco dividido em {monthlyMetrics.workRatio}% trabalho e {monthlyMetrics.personalRatio}% pessoal.
+            </Text>
+          </View>
 
-            <ScrollView style={styles.modalScroll} contentContainerStyle={styles.modalScrollContent}>
+          <Text style={[styles.modalSectionHeading, { color: colors.onSurface, marginTop: 16 }]}>
+            Recomendações do Vito
+          </Text>
+          <View style={styles.tipsList}>
+            {monthlyTips.map((tip, i) => (
               <View
+                key={tip.category}
                 style={[
-                  styles.modalNarrativeBox,
+                  styles.tipCard,
                   {
-                    backgroundColor: colors.surfaceContainerLow,
+                    backgroundColor: colors.surfaceContainer,
                     borderColor: colors.outlineVariant,
                   },
                 ]}
               >
-                <View style={styles.synthesisHeaderBadge}>
-                  <MaterialIcons name="auto-awesome" size={15} color={colors.primary} />
-                  <Text style={[styles.bentoTag, { color: colors.primary }]}>
-                    SÍNTESE MENSAL DO ASSISTENTE
-                  </Text>
-                </View>
-                <Text style={[styles.modalNarrativeText, { color: colors.onSurface }]}>
-                  Neste ciclo você registrou {monthlyMetrics.totalHours} horas dedicadas a compromissos, mantendo taxa de resolução de tarefas em {monthlyMetrics.completionRate}%. A proporção de foco foi {monthlyMetrics.workRatio}% voltada ao trabalho e {monthlyMetrics.personalRatio}% a assuntos pessoais e descanso.
+                <Text style={[styles.tipNumber, tabularNumbers, { color: colors.primary }]}>
+                  {String(i + 1).padStart(2, '0')}
                 </Text>
-              </View>
-
-              <Text style={[styles.modalSectionHeading, { color: colors.onSurface, marginTop: 16 }]}>
-                Recomendações Estratégicas para o Próximo Mês
-              </Text>
-              <View style={styles.tipsList}>
-                <View
-                  style={[
-                    styles.tipCard,
-                    {
-                      backgroundColor: colors.surfaceContainerLow,
-                      borderColor: colors.outlineVariant,
-                    },
-                  ]}
-                >
-                  <MaterialIcons name="flag" size={16} color={colors.primary} />
-                  <Text style={[styles.tipText, { color: colors.onSurface }]}>
-                    Defina 3 grandes metas trimestrais e concentre as tarefas da primeira semana nelas.
+                <View style={styles.tipBody}>
+                  <Text style={[styles.tipTitle, { color: colors.onSurface }]}>
+                    {tip.category}
                   </Text>
-                </View>
-                <View
-                  style={[
-                    styles.tipCard,
-                    {
-                      backgroundColor: colors.surfaceContainerLow,
-                      borderColor: colors.outlineVariant,
-                    },
-                  ]}
-                >
-                  <MaterialIcons name="timer" size={16} color={colors.primary} />
-                  <Text style={[styles.tipText, { color: colors.onSurface }]}>
-                    Reserve ao menos 2 manhãs sem reuniões externas para trabalho focado e projetos estratégicos.
+                  <Text
+                    style={[styles.tipText, { color: colors.onSurfaceVariant }]}
+                    numberOfLines={2}
+                  >
+                    {tip.text}
                   </Text>
                 </View>
               </View>
-            </ScrollView>
-
-            <View style={[styles.modalFooter, { borderTopColor: colors.outlineVariant }]}>
-              <TouchableOpacity
-                style={[styles.modalChatButton, { backgroundColor: colors.primary }]}
-                onPress={() => {
-                  setShowMonthlyModal(false);
-                  if (onOpenChatWithPrompt) {
-                    onOpenChatWithPrompt('Vito, vamos fazer um plano executivo para o próximo mês.');
-                  }
-                }}
-                activeOpacity={0.8}
-              >
-                <MaterialIcons name="chat" size={18} color={colors.onPrimary} />
-                <Text style={[styles.modalChatButtonText, { color: colors.onPrimary }]}>
-                  Montar plano mensal com o Vito
-                </Text>
-              </TouchableOpacity>
-            </View>
+            ))}
           </View>
-        </View>
-      </Modal>
+
+          <TouchableOpacity
+            style={[styles.modalChatButton, { backgroundColor: colors.primary }]}
+            onPress={openMonthInChat}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Discutir no chat"
+          >
+            <MaterialIcons name="chat" size={18} color={colors.onPrimary} />
+            <Text style={[styles.modalChatButtonText, { color: colors.onPrimary }]}>
+              Discutir no chat
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </BottomSheetModal>
     </SafeAreaView>
   );
 };
@@ -998,6 +1055,11 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 1,
   },
+  horizonTabInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   horizonLabel: {
     fontSize: 13,
   },
@@ -1012,7 +1074,7 @@ const styles = StyleSheet.create({
   },
   bentoCard: {
     width: '48.5%',
-    borderRadius: MD3Shapes.medium,
+    borderRadius: tokens.radii.lg,
     borderWidth: 1,
     padding: tokens.spacing.md,
     gap: 6,
@@ -1040,9 +1102,14 @@ const styles = StyleSheet.create({
   },
   heroNumbersRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-around',
     paddingVertical: 8,
+  },
+  heroNumberBlock: {
+    alignItems: 'center',
+    flex: 1,
+    gap: 2,
   },
   heroBigNumber: {
     fontSize: 28,
@@ -1051,46 +1118,33 @@ const styles = StyleSheet.create({
   heroLabel: {
     fontSize: 12,
     marginTop: 2,
+    textAlign: 'center',
   },
   heroDivider: {
     width: 1,
     height: 36,
     backgroundColor: 'rgba(128,128,128,0.2)',
+    marginTop: 8,
   },
-  aiActionCard: {
+  focusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: MD3Shapes.full,
+    marginTop: 6,
   },
-  aiActionLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-  },
-  aiIconBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: MD3Shapes.small,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  aiActionText: {
-    flex: 1,
-    gap: 2,
-  },
-  aiActionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  aiActionSubtitle: {
-    fontSize: 12,
+  focusBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.4,
   },
   weeklyList: {
     gap: 10,
   },
   weeklyCard: {
-    borderRadius: MD3Shapes.medium,
+    borderRadius: tokens.radii.lg,
     borderWidth: 1,
     padding: tokens.spacing.md,
     gap: 8,
@@ -1099,10 +1153,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 8,
   },
   weeklyRange: {
     fontSize: 15,
     fontWeight: '600',
+    flex: 1,
   },
   currentBadge: {
     paddingHorizontal: 8,
@@ -1148,13 +1204,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
+  balanceLegendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
   balanceLegendText: {
     fontSize: 12,
     fontWeight: '500',
-  },
-  aiDirectSynthesisCard: {
-    padding: tokens.spacing.md,
-    gap: 8,
   },
   synthesisHeaderBadge: {
     flexDirection: 'row',
@@ -1165,17 +1222,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
     fontWeight: '400',
-  },
-  synthesisFooterNote: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingTop: 8,
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  synthesisFooterText: {
-    fontSize: 11,
-    flex: 1,
   },
   cardAiSnippet: {
     padding: 8,
@@ -1209,44 +1255,31 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
-    justifyContent: 'flex-end',
-  },
-  modalContentCard: {
-    maxHeight: '85%',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    borderWidth: 1,
-    paddingHorizontal: tokens.spacing.md,
-    paddingTop: tokens.spacing.md,
-    paddingBottom: Platform.OS === 'ios' ? 34 : 20,
-  },
-  modalHeaderRow: {
+  truthBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingBottom: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    alignSelf: 'flex-start',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: MD3Shapes.full,
+    marginBottom: 10,
   },
-  modalTitle: {
-    fontSize: 18,
+  truthBadgeText: {
+    fontSize: 10,
     fontWeight: '700',
-  },
-  modalSubtitle: {
-    fontSize: 13,
-    marginTop: 2,
+    letterSpacing: 0.5,
   },
   modalScroll: {
-    marginTop: 10,
+    marginTop: 2,
   },
   modalScrollContent: {
-    paddingBottom: 20,
+    paddingBottom: 16,
+    gap: 2,
   },
   modalNarrativeBox: {
     padding: tokens.spacing.md,
-    borderRadius: MD3Shapes.medium,
+    borderRadius: tokens.radii.lg,
     borderWidth: 1,
     gap: 8,
     marginBottom: 12,
@@ -1270,6 +1303,7 @@ const styles = StyleSheet.create({
   dailyBarCol: {
     alignItems: 'center',
     gap: 4,
+    flex: 1,
   },
   dailyBarVal: {
     fontSize: 10,
@@ -1282,37 +1316,13 @@ const styles = StyleSheet.create({
     fontSize: 11,
     marginTop: 2,
   },
-  peakBadge: {
+  holidayLabel: {
     fontSize: 9,
     fontWeight: '700',
   },
-  categoriesList: {
-    gap: 8,
-  },
-  categoryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  catLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  catDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  catName: {
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  catPercent: {
-    fontSize: 12,
-  },
   tipsList: {
     gap: 8,
+    marginBottom: 14,
   },
   tipCard: {
     flexDirection: 'row',
@@ -1322,14 +1332,22 @@ const styles = StyleSheet.create({
     borderRadius: MD3Shapes.small,
     borderWidth: 1,
   },
+  tipNumber: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  tipBody: {
+    flex: 1,
+    gap: 2,
+  },
+  tipTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
   tipText: {
     fontSize: 13,
     lineHeight: 18,
     flex: 1,
-  },
-  modalFooter: {
-    paddingTop: 12,
-    borderTopWidth: StyleSheet.hairlineWidth,
   },
   modalChatButton: {
     flexDirection: 'row',
@@ -1337,7 +1355,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     paddingVertical: 12,
-    borderRadius: MD3Shapes.medium,
+    borderRadius: tokens.radii.lg,
   },
   modalChatButtonText: {
     fontSize: 14,

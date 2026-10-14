@@ -210,7 +210,9 @@ Responda EXCLUSIVAMENTE em formato JSON puro, sem markdown delimitador nem expli
   "condition_met": true,
   "current_data": "3 a 6 linhas no formato '— DD/MM · Manchete curta: detalhe concreto (placar, número, decisão)', da mais recente para a mais antiga; opcionalmente uma última linha 'Próximo: DD/MM HH:MM · evento'. Sem introduções institucionais, sem calendário completo, máximo ~120 palavras",
   "summary": "manchete da notícia mais importante e recente em 1 frase",
-  "simulated_notification": "título curto e impactante da notificação de alerta"
+  "simulated_notification": "título curto e impactante da notificação de alerta",
+  "confidence": 0-100,
+  "why_relevant": "1 frase explicando por que é relevante para a vigília; vazio se irrelevante"
 }`, nowStr, currentMonthYear, currentMonthYear)
 
 	userPrompt := fmt.Sprintf(`Avalie esta vigília/radar do usuário:
@@ -282,6 +284,8 @@ Analise o cenário, verifique se a condição foi atingida ou se há fatos relev
 		CurrentData           string `json:"current_data"`
 		Summary               string `json:"summary"`
 		SimulatedNotification string `json:"simulated_notification"`
+		Confidence            int    `json:"confidence"`
+		WhyRelevant           string `json:"why_relevant"`
 	}
 
 	cleanJSON := rawText
@@ -301,11 +305,13 @@ Analise o cenário, verifique se a condição foi atingida ou se há fatos relev
 			CurrentData:           rawText,
 			Summary:               "Consulta realizada com sucesso. Condições avaliadas.",
 			SimulatedNotification: fmt.Sprintf("Alerta Vito: Vigília de '%s' atualizada.", t.Title),
+			Confidence:            0,
+			WhyRelevant:           "",
 			TestedAt:              time.Now().UTC(),
 		}, nil
 	}
 
-	return &domain.TriggerTestResult{
+	res := &domain.TriggerTestResult{
 		TriggerID:             t.ID,
 		Title:                 t.Title,
 		Query:                 t.Query,
@@ -313,8 +319,12 @@ Analise o cenário, verifique se a condição foi atingida ou se há fatos relev
 		CurrentData:           eval.CurrentData,
 		Summary:               eval.Summary,
 		SimulatedNotification: eval.SimulatedNotification,
+		Confidence:            eval.Confidence,
+		WhyRelevant:           eval.WhyRelevant,
 		TestedAt:              time.Now().UTC(),
-	}, nil
+	}
+	res.EnforceConfidenceGate()
+	return res, nil
 }
 
 // GenerateText sintetiza textos e resumos executivos via OpenAICompatProvider.

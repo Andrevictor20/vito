@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   StyleSheet,
   View,
@@ -7,15 +7,21 @@ import {
   FlatList,
   ActivityIndicator,
   RefreshControl,
-  ScrollView,
   Alert,
   Platform,
+  Linking,
+  Modal,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { tokens, MD3Shapes } from '../../theme/tokens';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { tokens } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { Trigger, TriggerLog, TRIGGER_CATEGORIES } from '../../types';
 import { api } from '../../services/api';
+import { chatPromptBus } from '../../services/dataSync';
+import { navigateToTab } from '../../navigation/navigationRef';
+import { M3Switch } from '../ui/M3Switch';
 
 interface TriggerReportsViewProps {
   trigger: Trigger;
@@ -32,6 +38,10 @@ interface ParsedReportPayload {
   data?: string;
   simulated_notification?: string;
   tested_at?: string;
+  confidence?: number;
+  why_relevant?: string;
+  summary?: string;
+  last_error?: string;
 }
 
 export const TriggerReportsView: React.FC<TriggerReportsViewProps> = ({
@@ -42,13 +52,16 @@ export const TriggerReportsView: React.FC<TriggerReportsViewProps> = ({
   onToggle,
   onDeleteRadar,
 }) => {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
 
   const [logs, setLogs] = useState<TriggerLog[]>([]);
   const [loading, setLoading] = useState(false);
   const [runningNow, setRunningNow] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [topMenuVisible, setTopMenuVisible] = useState(false);
+  const [activeCardId, setActiveCardId] = useState<string | null>(null);
 
   const fetchLogs = useCallback(async (isRefresh = false) => {
     if (isRefresh) {
@@ -84,7 +97,16 @@ export const TriggerReportsView: React.FC<TriggerReportsViewProps> = ({
     placeholder: '',
   };
 
-  const catColor = isDark ? categoryMeta.colorDark : categoryMeta.colorLight;
+  const frequencyLabel =
+    trigger.frequency === 'hourly'
+      ? 'De hora em hora'
+      : trigger.frequency === 'daily_morning'
+      ? `Diário às ${trigger.scheduled_time || '08:30'}`
+      : trigger.frequency === 'daily_evening'
+      ? `Diário às ${trigger.scheduled_time || '18:00'}`
+      : trigger.frequency === 'immediate'
+      ? 'Em tempo real'
+      : `Diário às ${trigger.scheduled_time || '08:30'}`;
 
   const handleRunPress = async () => {
     setRunningNow(true);
@@ -96,6 +118,14 @@ export const TriggerReportsView: React.FC<TriggerReportsViewProps> = ({
       setErrorMessage(err?.message || 'Falha ao executar verificação imediata.');
     } finally {
       setRunningNow(false);
+    }
+  };
+
+  const handleRetry = () => {
+    if (logs.length === 0 && !runningNow) {
+      fetchLogs();
+    } else {
+      handleRunPress();
     }
   };
 
@@ -136,6 +166,7 @@ export const TriggerReportsView: React.FC<TriggerReportsViewProps> = ({
   const handleDeleteLog = (logId: string) => {
     const doDelete = async () => {
       setLogs((prev) => prev.filter((l) => l.id !== logId));
+      setActiveCardId(null);
       try {
         await api.deleteTriggerLog(trigger.id, logId);
       } catch (err: any) {
@@ -158,6 +189,7 @@ export const TriggerReportsView: React.FC<TriggerReportsViewProps> = ({
   const handleClearLogs = () => {
     const doClear = async () => {
       setLogs([]);
+      setTopMenuVisible(false);
       try {
         await api.clearTriggerLogs(trigger.id);
       } catch (err: any) {
@@ -201,6 +233,27 @@ export const TriggerReportsView: React.FC<TriggerReportsViewProps> = ({
     }
   };
 
+  const formatRelativePt = (dateStr?: string): string => {
+    if (!dateStr) return 'sem verificações ainda';
+    try {
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return dateStr;
+      const diffMs = Date.now() - date.getTime();
+      if (diffMs < 0) return formatTimestamp(dateStr);
+      const minutes = Math.floor(diffMs / 60000);
+      if (minutes < 1) return 'agora mesmo';
+      if (minutes < 60) return `há ${minutes} min`;
+      const hours = Math.floor(minutes / 60);
+      if (hours < 24) return `há ${hours} h`;
+      const days = Math.floor(hours / 24);
+      if (days === 1) return 'há 1 dia';
+      if (days < 7) return `há ${days} dias`;
+      return formatTimestamp(dateStr);
+    } catch {
+      return dateStr;
+    }
+  };
+
   const parsePayload = (payloadStr?: string): ParsedReportPayload | null => {
     if (!payloadStr) return null;
     try {
@@ -210,105 +263,158 @@ export const TriggerReportsView: React.FC<TriggerReportsViewProps> = ({
     }
   };
 
+  // Badge honesto: coleta que falhou nunca exibe VERIFICADO.
+  // Cobre last_error != null (backend), payload.status failed e padrões de erro na mensagem.
+  const isCollectionFailure = (message?: string): boolean => {
+    if (!message) return false;
+    return /oscila|falha|erro|tempor[aá]ria|indispon|timeout|expir/i.test(message);
+  };
+
+  const hasCollectionError = (item: TriggerLog, parsed: ParsedReportPayload | null): boolean => {
+    const raw = item as unknown as Record<string, unknown>;
+    const trig = trigger as unknown as Record<string, unknown>;
+    if (raw?.last_error != null && String(raw.last_error).trim() !== '') return true;
+    if (trig?.last_error != null && String(trig.last_error).trim() !== '') return true;
+    const p = parsed as unknown as Record<string, unknown> | null;
+    if (p?.last_error != null && String(p.last_error).trim() !== '') return true;
+    if (parsed?.status === 'failed') return true;
+    if (trigger.last_run_status === 'failed') return true;
+    if (isCollectionFailure(item.message)) return true;
+    if (parsed?.data && isCollectionFailure(parsed.data)) return true;
+    return false;
+  };
+
+  // Primeiro fato do relatório (para os botões de ação).
+  const firstNewsText = (text?: string): string => {
+    const items = splitNewsItems(text);
+    return (items[0] || text || '').slice(0, 220);
+  };
+
+  // Quebra o bloco corrido de notícias em mini-cards (separador " — ").
+  const splitNewsItems = (text?: string): string[] => {
+    if (!text) return [];
+    return text
+      .split(/\s+[—–-]\s+/)
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+  };
+
+  const extractUrl = (text: string): string | null => {
+    const m = text.match(/https?:\/\/[^\s)]+/);
+    return m ? m[0].replace(/[.,;!?]+$/, '') : null;
+  };
+
+  const extractConfidence = (parsed: ParsedReportPayload | null): number | null => {
+    if (!parsed) return null;
+    if (typeof parsed.confidence === 'number' && Number.isFinite(parsed.confidence)) {
+      return Math.round(parsed.confidence);
+    }
+    const raw = (parsed as unknown as Record<string, unknown>).confidence;
+    if (typeof raw === 'string' && /^\d{1,3}$/.test(raw.trim())) {
+      return Math.round(Number(raw));
+    }
+    return null;
+  };
+
+  const latestLog = logs.length > 0 ? logs[0] : null;
+  const latestParsed = useMemo(
+    () => (latestLog ? parsePayload(latestLog.payload) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [latestLog?.id, latestLog?.payload]
+  );
+  const heroHasError = latestLog
+    ? hasCollectionError(latestLog, latestParsed)
+    : trigger.last_run_status === 'failed' ||
+      ((trigger as unknown as Record<string, unknown>).last_error != null &&
+        String((trigger as unknown as Record<string, unknown>).last_error).trim() !== '');
+  const lastCheckSource =
+    latestLog?.triggered_at || trigger.last_checked_at || trigger.updated_at || undefined;
+  const lastCheckLabel = lastCheckSource
+    ? `Última verificação ${formatRelativePt(lastCheckSource)}`
+    : 'Nenhuma verificação ainda';
+
+  const activeLog = activeCardId ? logs.find((l) => l.id === activeCardId) || null : null;
+  const activeParsed = activeLog ? parsePayload(activeLog.payload) : null;
+  const activeUrl = activeLog ? extractUrl(activeParsed?.data || activeLog.message || '') : null;
+
+  const runCardAction = (kind: 'chat' | 'task' | 'schedule') => {
+    if (!activeLog) return;
+    const snippet = firstNewsText(activeParsed?.data || activeLog.message);
+    const prompt =
+      kind === 'chat'
+        ? `Vito, me explique esta notícia do radar "${trigger.title}": ${snippet}`
+        : kind === 'task'
+        ? `Crie uma tarefa a partir deste alerta do radar "${trigger.title}": ${snippet}`
+        : `Agende um compromisso relacionado a este alerta do radar "${trigger.title}": ${snippet}`;
+    setActiveCardId(null);
+    chatPromptBus.notify(prompt);
+    navigateToTab('chat');
+  };
+
+  const isActive = trigger.status === 'active';
+
   return (
     <View style={[styles.container, { backgroundColor: colors.surface }]}>
-      {/* Top Bar da Página Dedicada */}
+      {/* Topo em linha única: [← Voltar + título/meta] ...... [Switch + ⋯] */}
       <View
         style={[
           styles.topBar,
           {
-            backgroundColor: isDark ? colors.surfaceContainerLow : '#FFFFFF',
-            borderBottomColor: isDark ? colors.outlineVariant : 'rgba(0,0,0,0.06)',
+            backgroundColor: colors.surfaceContainerLow,
+            borderBottomColor: colors.outlineVariant,
           },
         ]}
       >
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={onBack}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <MaterialIcons name="arrow-back" size={22} color={colors.onSurface} />
-          <Text style={[styles.backButtonText, { color: colors.onSurface }]}>Radares</Text>
-        </TouchableOpacity>
-
-        <View style={styles.topBarActions}>
-          {onToggle && (
-            <TouchableOpacity
-              style={[
-                styles.statusPill,
-                {
-                  backgroundColor:
-                    trigger.status === 'active'
-                      ? isDark
-                        ? 'rgba(16, 185, 129, 0.15)'
-                        : '#DCFCE7'
-                      : isDark
-                      ? 'rgba(255, 255, 255, 0.08)'
-                      : 'rgba(0, 0, 0, 0.05)',
-                },
-              ]}
-              onPress={() => onToggle(trigger.id)}
-            >
-              <View
-                style={[
-                  styles.statusDot,
-                  {
-                    backgroundColor:
-                      trigger.status === 'active' ? colors.success : colors.textMuted,
-                  },
-                ]}
-              />
-              <Text
-                style={[
-                  styles.statusPillText,
-                  {
-                    color:
-                      trigger.status === 'active'
-                        ? isDark
-                          ? '#6EE7B7'
-                          : '#047857'
-                        : colors.textMuted,
-                  },
-                ]}
-              >
-                {trigger.status === 'active' ? 'Ativo' : 'Pausado'}
-              </Text>
-            </TouchableOpacity>
-          )}
-
+        <View style={styles.topLeft}>
           <TouchableOpacity
-            style={[
-              styles.editIconButton,
-              {
-                backgroundColor: isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.04)',
-              },
-            ]}
-            onPress={() => onEdit(trigger)}
+            style={styles.backButton}
+            onPress={onBack}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityRole="button"
+            accessibilityLabel="Voltar"
           >
-            <MaterialIcons name="edit" size={18} color={colors.onSurface} />
+            <MaterialIcons name="arrow-back" size={22} color={colors.onSurface} />
           </TouchableOpacity>
 
-          {onDeleteRadar && (
-            <TouchableOpacity
-              style={[
-                styles.editIconButton,
-                {
-                  backgroundColor: isDark ? 'rgba(239, 68, 68, 0.12)' : 'rgba(239, 68, 68, 0.08)',
-                },
-              ]}
-              onPress={handleDeleteTriggerSelf}
-              accessibilityLabel="Excluir radar"
+          <View style={styles.titleBlock}>
+            <Text
+              style={[styles.topTitle, { color: colors.onSurface }]}
+              numberOfLines={2}
+              ellipsizeMode="tail"
             >
-              <MaterialIcons name="delete-outline" size={18} color="#EF4444" />
-            </TouchableOpacity>
+              {trigger.title}
+            </Text>
+            <Text
+              style={[styles.topMeta, { color: colors.onSurfaceVariant }]}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {`${categoryMeta.label} • ${frequencyLabel}`}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.topRight}>
+          {onToggle && (
+            <View style={styles.switchHitArea}>
+              <M3Switch value={isActive} onValueChange={() => { void onToggle(trigger.id); }} />
+            </View>
           )}
+          <TouchableOpacity
+            style={[styles.moreButton, { borderColor: colors.outlineVariant }]}
+            onPress={() => setTopMenuVisible(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Opções do radar"
+          >
+            <MaterialIcons name="more-vert" size={22} color={colors.onSurface} />
+          </TouchableOpacity>
         </View>
       </View>
 
       <FlatList
         data={logs}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 100 + insets.bottom }]}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -318,106 +424,106 @@ export const TriggerReportsView: React.FC<TriggerReportsViewProps> = ({
         }
         ListHeaderComponent={
           <View style={styles.headerSection}>
-            {/* Hero Card Dedicado do Disparador */}
+            {/* Hero compacto */}
             <View
               style={[
                 styles.heroCard,
                 {
-                  backgroundColor: isDark ? colors.surfaceContainer : '#FFFFFF',
-                  borderColor: isDark ? colors.outlineVariant : 'rgba(0,0,0,0.06)',
+                  backgroundColor: colors.surfaceContainer,
+                  borderColor: colors.outlineVariant,
                 },
               ]}
             >
-              <View style={styles.categoryBadgeRow}>
-                <View
-                  style={[
-                    styles.categoryTag,
-                    {
-                      backgroundColor: isDark ? categoryMeta.bgDark : categoryMeta.bgLight,
-                    },
-                  ]}
-                >
-                  <MaterialIcons name={categoryMeta.icon as any} size={14} color={catColor} />
-                  <Text style={[styles.categoryTagText, { color: catColor }]}>
+              <View style={styles.statusRow}>
+                <Text style={[styles.statusText, { color: colors.onSurfaceVariant }]} numberOfLines={1}>
+                  {lastCheckLabel}
+                </Text>
+                {heroHasError ? (
+                  <View
+                    style={[styles.statusBadge, { backgroundColor: colors.errorContainer }]}
+                    accessibilityLabel="Falha na coleta"
+                  >
+                    <MaterialIcons name="warning-amber" size={13} color={colors.onErrorContainer} />
+                    <Text style={[styles.statusBadgeText, { color: colors.onErrorContainer }]}>
+                      Falha na coleta
+                    </Text>
+                  </View>
+                ) : (
+                  <View
+                    style={[styles.statusBadge, { backgroundColor: colors.successContainer }]}
+                    accessibilityLabel="Monitorando"
+                  >
+                    <MaterialIcons name="check" size={13} color={colors.onSuccessContainer} />
+                    <Text style={[styles.statusBadgeText, { color: colors.onSuccessContainer }]}>
+                      MONITORANDO
+                    </Text>
+                  </View>
+                )}
+              </View>
+
+              <View style={styles.pillsRow}>
+                <View style={[styles.pill, { backgroundColor: colors.surfaceContainerHighest }]}>
+                  <MaterialIcons name={categoryMeta.icon as 'track-changes'} size={13} color={colors.onSurfaceVariant} />
+                  <Text style={[styles.pillText, { color: colors.onSurfaceVariant }]} numberOfLines={1}>
                     {categoryMeta.label}
                   </Text>
                 </View>
-
-                {trigger.scheduled_time ? (
-                  <View
-                    style={[
-                      styles.metaPill,
-                      {
-                        backgroundColor: isDark
-                          ? 'rgba(255, 255, 255, 0.06)'
-                          : 'rgba(0, 0, 0, 0.04)',
-                      },
-                    ]}
-                  >
-                    <MaterialIcons name="schedule" size={13} color={colors.onSurfaceVariant} />
-                    <Text style={[styles.metaPillText, { color: colors.onSurfaceVariant }]}>
-                      {trigger.scheduled_time}
-                    </Text>
-                  </View>
-                ) : null}
-
-                <View
-                  style={[
-                    styles.metaPill,
-                    {
-                      backgroundColor: isDark
-                        ? 'rgba(255, 255, 255, 0.06)'
-                        : 'rgba(0, 0, 0, 0.04)',
-                    },
-                  ]}
-                >
-                  <MaterialIcons name="repeat" size={13} color={colors.onSurfaceVariant} />
-                  <Text style={[styles.metaPillText, { color: colors.onSurfaceVariant }]}>
-                    {trigger.frequency === 'hourly'
-                      ? 'De hora em hora'
-                      : trigger.frequency === 'daily_morning'
-                      ? 'Diário (Manhã)'
-                      : trigger.frequency === 'daily_evening'
-                      ? 'Diário (Noite)'
-                      : 'Alerta frequente'}
+                <View style={[styles.pill, { backgroundColor: colors.surfaceContainerHighest }]}>
+                  <MaterialIcons name="schedule" size={13} color={colors.onSurfaceVariant} />
+                  <Text style={[styles.pillText, { color: colors.onSurfaceVariant }]} numberOfLines={1}>
+                    {trigger.scheduled_time || frequencyLabel}
                   </Text>
                 </View>
               </View>
 
-              <Text style={[styles.heroTitle, { color: colors.onSurface }]}>{trigger.title}</Text>
-              <Text style={[styles.heroQuery, { color: colors.onSurfaceVariant }]}>
+              <Text
+                style={[styles.heroQuery, { color: colors.onSurfaceVariant }]}
+                numberOfLines={2}
+                ellipsizeMode="tail"
+              >
                 {trigger.query}
               </Text>
 
-              {/* Botão Único de Verificação Imediata */}
-              <View style={styles.actionRow}>
-                <TouchableOpacity
-                  style={[
-                    styles.runPrimaryButton,
-                    { backgroundColor: colors.primary },
-                    runningNow && { opacity: 0.75 },
-                  ]}
-                  onPress={handleRunPress}
-                  disabled={runningNow}
-                >
-                  {runningNow ? (
-                    <>
-                      <ActivityIndicator size="small" color={colors.onPrimary} />
-                      <Text style={[styles.runPrimaryButtonText, { color: colors.onPrimary }]}>Pesquisando e avaliando...</Text>
-                    </>
-                  ) : (
-                    <>
-                      <MaterialIcons name="play-arrow" size={20} color={colors.onPrimary} />
-                      <Text style={[styles.runPrimaryButtonText, { color: colors.onPrimary }]}>Verificar Agora</Text>
-                    </>
-                  )}
-                </TouchableOpacity>
-              </View>
+              <TouchableOpacity
+                style={[styles.runPrimaryButton, { backgroundColor: colors.primary }, runningNow && { opacity: 0.75 }]}
+                onPress={handleRunPress}
+                disabled={runningNow}
+                accessibilityRole="button"
+                accessibilityLabel={runningNow ? 'Pesquisando notícias' : 'Verificar agora'}
+              >
+                {runningNow ? (
+                  <>
+                    <ActivityIndicator size="small" color={colors.onPrimary} />
+                    <Text style={[styles.runPrimaryButtonText, { color: colors.onPrimary }]}>
+                      Pesquisando…
+                    </Text>
+                  </>
+                ) : (
+                  <>
+                    <MaterialIcons name="play-arrow" size={20} color={colors.onPrimary} />
+                    <Text style={[styles.runPrimaryButtonText, { color: colors.onPrimary }]}>
+                      Verificar Agora
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
 
               {errorMessage && (
-                <View style={styles.errorBox}>
-                  <MaterialIcons name="error-outline" size={16} color="#EF4444" />
-                  <Text style={styles.errorText}>{errorMessage}</Text>
+                <View style={[styles.errorBox, { backgroundColor: colors.errorContainer }]}>
+                  <MaterialIcons name="error-outline" size={16} color={colors.error} />
+                  <Text style={[styles.errorText, { color: colors.onErrorContainer }]} numberOfLines={3}>
+                    {errorMessage}
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.errorRetryBtn}
+                    onPress={handleRetry}
+                    accessibilityRole="button"
+                    accessibilityLabel="Tentar novamente"
+                  >
+                    <Text style={[styles.errorRetryText, { color: colors.error }]}>
+                      Repetir
+                    </Text>
+                  </TouchableOpacity>
                 </View>
               )}
             </View>
@@ -429,155 +535,84 @@ export const TriggerReportsView: React.FC<TriggerReportsViewProps> = ({
                 <Text style={[styles.historyTitle, { color: colors.onSurface }]}>
                   Histórico de Relatórios
                 </Text>
-                <View
-                  style={[
-                    styles.countBadge,
-                    {
-                      backgroundColor: isDark
-                        ? 'rgba(255, 255, 255, 0.08)'
-                        : 'rgba(0, 0, 0, 0.05)',
-                    },
-                  ]}
-                >
+                <View style={[styles.countBadge, { backgroundColor: colors.surfaceContainerHighest }]}>
                   <Text style={[styles.countBadgeText, { color: colors.onSurfaceVariant }]}>
                     {logs.length}
                   </Text>
                 </View>
               </View>
-
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                {logs.length > 0 && (
-                  <TouchableOpacity
-                    style={styles.clearAllBtn}
-                    onPress={handleClearLogs}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  >
-                    <MaterialIcons name="delete-sweep" size={16} color={isDark ? '#F87171' : '#DC2626'} />
-                    <Text style={[styles.clearAllBtnText, { color: isDark ? '#F87171' : '#DC2626' }]}>
-                      Limpar
-                    </Text>
-                  </TouchableOpacity>
-                )}
-                {loading && !refreshing && (
-                  <ActivityIndicator size="small" color={colors.primary} />
-                )}
-              </View>
+              {loading && !refreshing && (
+                <ActivityIndicator size="small" color={colors.primary} />
+              )}
             </View>
           </View>
         }
         renderItem={({ item }) => {
           const parsed = parsePayload(item.payload);
-          const hasCondition = parsed && typeof parsed.condition_met === 'boolean';
-          const conditionMet = parsed?.condition_met;
+          const failed = hasCollectionError(item, parsed);
+          const url = extractUrl(parsed?.data || item.message || '');
+          const title = (firstNewsText(item.message || parsed?.data || '').trim() || 'Relatório do radar');
+          const why = (parsed?.why_relevant || '').trim();
+          const confidence = extractConfidence(parsed);
+          const relative = formatRelativePt(item.triggered_at);
 
           return (
             <View
               style={[
                 styles.reportCard,
                 {
-                  backgroundColor: isDark ? colors.surfaceContainer : '#FFFFFF',
-                  borderColor: isDark ? colors.outlineVariant : 'rgba(0,0,0,0.06)',
+                  backgroundColor: colors.surfaceContainer,
+                  borderColor: colors.outlineVariant,
                 },
               ]}
             >
-              {/* Header do Card de Relatório */}
-              <View style={styles.reportCardHeader}>
-                <View style={styles.reportTimeRow}>
-                  <MaterialIcons name="access-time" size={14} color={colors.onSurfaceVariant} />
-                  <Text style={[styles.reportDateText, { color: colors.onSurfaceVariant }]}>
-                    {formatTimestamp(item.triggered_at)}
-                  </Text>
-                </View>
-
-                <View style={styles.headerRightActions}>
-                  {hasCondition ? (
-                    <View
-                      style={[
-                        styles.conditionBadge,
-                        {
-                          backgroundColor: conditionMet
-                            ? isDark
-                              ? 'rgba(239, 68, 68, 0.2)'
-                              : '#FEE2E2'
-                            : isDark
-                            ? 'rgba(16, 185, 129, 0.2)'
-                            : '#DCFCE7',
-                        },
-                      ]}
-                    >
-                      <MaterialIcons
-                        name={conditionMet ? 'notifications-active' : 'check-circle'}
-                        size={13}
-                        color={conditionMet ? '#EF4444' : '#10B981'}
-                      />
-                      <Text
-                        style={[
-                          styles.conditionBadgeText,
-                          {
-                            color: conditionMet
-                              ? isDark
-                                ? '#FCA5A5'
-                                : '#B91C1C'
-                              : isDark
-                              ? '#6EE7B7'
-                              : '#047857',
-                          },
-                        ]}
-                      >
-                        {conditionMet ? 'CONDIÇÃO ATENDIDA' : 'CONDIÇÃO NÃO ATENDIDA'}
+              <View style={styles.cardRow}>
+                <TouchableOpacity
+                  style={styles.cardMain}
+                  onPress={() => {
+                    if (url) {
+                      Linking.openURL(url).catch(() => {});
+                    }
+                  }}
+                  disabled={!url}
+                  activeOpacity={url ? 0.7 : 1}
+                  accessibilityRole={url ? 'link' : 'text'}
+                  accessibilityLabel={url ? `Abrir notícia: ${title.slice(0, 80)}` : `Relatório: ${title.slice(0, 80)}`}
+                >
+                  <View style={styles.cardTextCol}>
+                    <Text style={[styles.cardTitle, { color: colors.onSurface }]} numberOfLines={2} ellipsizeMode="tail">
+                      {title}
+                    </Text>
+                    {why ? (
+                      <Text style={[styles.cardWhy, { color: colors.onSurfaceVariant }]} numberOfLines={2} ellipsizeMode="tail">
+                        {why}
                       </Text>
-                    </View>
-                  ) : (
-                    <View
-                      style={[
-                        styles.conditionBadge,
-                        {
-                          backgroundColor: isDark
-                            ? 'rgba(59, 130, 246, 0.15)'
-                            : '#EFF6FF',
-                        },
-                      ]}
-                    >
-                      <MaterialIcons name="check" size={13} color="#3B82F6" />
-                      <Text style={[styles.conditionBadgeText, { color: '#3B82F6' }]}>
-                        VERIFICADO
+                    ) : null}
+                    <View style={styles.cardMetaRow}>
+                      <Text style={[styles.cardMetaText, { color: colors.onSurfaceVariant }]} numberOfLines={1}>
+                        {relative}
+                        {confidence != null ? ` • ${confidence}%` : ''}
                       </Text>
+                      {failed ? (
+                        <Text style={[styles.cardFailText, { color: colors.error }]} numberOfLines={1}>
+                          {' • ⚠️ Falha na coleta'}
+                        </Text>
+                      ) : null}
                     </View>
-                  )}
+                  </View>
+                  {url ? (
+                    <MaterialIcons name="chevron-right" size={22} color={colors.onSurfaceVariant} />
+                  ) : null}
+                </TouchableOpacity>
 
-                  <TouchableOpacity
-                    style={styles.deleteLogBtn}
-                    onPress={() => handleDeleteLog(item.id)}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  >
-                    <MaterialIcons name="delete-outline" size={16} color={colors.onSurfaceVariant} />
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {/* Relatório Informativo Expandido do Radar */}
-              <View
-                style={[
-                  styles.expandedReportBox,
-                  {
-                    backgroundColor: isDark
-                      ? 'rgba(255, 255, 255, 0.03)'
-                      : 'rgba(0, 0, 0, 0.02)',
-                    borderColor: isDark
-                      ? 'rgba(255, 255, 255, 0.07)'
-                      : 'rgba(0, 0, 0, 0.05)',
-                  },
-                ]}
-              >
-                <View style={styles.reportContentHeader}>
-                  <MaterialIcons name="newspaper" size={16} color={colors.primary} />
-                  <Text style={[styles.reportContentLabel, { color: colors.primary }]}>
-                    Radar de Notícias & Fatos
-                  </Text>
-                </View>
-                <Text style={[styles.expandedReportText, { color: colors.onSurface }]}>
-                  {parsed?.data || item.message}
-                </Text>
+                <TouchableOpacity
+                  style={styles.cardMoreBtn}
+                  onPress={() => setActiveCardId(item.id)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Opções do relatório de ${relative}`}
+                >
+                  <MaterialIcons name="more-vert" size={20} color={colors.onSurfaceVariant} />
+                </TouchableOpacity>
               </View>
             </View>
           );
@@ -588,21 +623,12 @@ export const TriggerReportsView: React.FC<TriggerReportsViewProps> = ({
               style={[
                 styles.emptyStateCard,
                 {
-                  backgroundColor: isDark ? colors.surfaceContainerLow : '#FFFFFF',
-                  borderColor: isDark ? colors.outlineVariant : 'rgba(0,0,0,0.06)',
+                  backgroundColor: colors.surfaceContainerLow,
+                  borderColor: colors.outlineVariant,
                 },
               ]}
             >
-              <View
-                style={[
-                  styles.emptyIconCircle,
-                  {
-                    backgroundColor: isDark
-                      ? 'rgba(255, 255, 255, 0.05)'
-                      : 'rgba(0, 0, 0, 0.03)',
-                  },
-                ]}
-              >
+              <View style={[styles.emptyIconCircle, { backgroundColor: colors.surfaceContainerHighest }]}>
                 <MaterialIcons name="radar" size={28} color={colors.onSurfaceVariant} />
               </View>
               <Text style={[styles.emptyTitle, { color: colors.onSurface }]}>
@@ -616,6 +642,143 @@ export const TriggerReportsView: React.FC<TriggerReportsViewProps> = ({
           ) : null
         }
       />
+
+      {/* Menu ⋯ do radar (BottomSheet): Editar / Limpar histórico / Excluir */}
+      <Modal
+        visible={topMenuVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setTopMenuVisible(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setTopMenuVisible(false)}>
+          <View style={styles.sheetOverlay} />
+        </TouchableWithoutFeedback>
+        <View style={[styles.sheet, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
+          <View style={[styles.sheetHandle, { backgroundColor: colors.outlineVariant }]} />
+          <Text style={[styles.sheetTitle, { color: colors.onSurface }]}>Opções do radar</Text>
+          <TouchableOpacity
+            style={styles.sheetRow}
+            onPress={() => {
+              setTopMenuVisible(false);
+              onEdit(trigger);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Editar radar"
+          >
+            <MaterialIcons name="edit" size={20} color={colors.onSurface} />
+            <Text style={[styles.sheetRowText, { color: colors.onSurface }]}>Editar</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.sheetRow}
+            onPress={handleClearLogs}
+            accessibilityRole="button"
+            accessibilityLabel="Limpar histórico"
+          >
+            <MaterialIcons name="delete-sweep" size={20} color={colors.onSurface} />
+            <Text style={[styles.sheetRowText, { color: colors.onSurface }]}>Limpar histórico</Text>
+          </TouchableOpacity>
+          {onDeleteRadar && (
+            <TouchableOpacity
+              style={styles.sheetRow}
+              onPress={() => {
+                setTopMenuVisible(false);
+                handleDeleteTriggerSelf();
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Excluir radar"
+            >
+              <MaterialIcons name="delete-outline" size={20} color={colors.error} />
+              <Text style={[styles.sheetRowText, { color: colors.error }]}>Excluir</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            style={styles.sheetRow}
+            onPress={() => setTopMenuVisible(false)}
+            accessibilityRole="button"
+            accessibilityLabel="Fechar menu"
+          >
+            <MaterialIcons name="close" size={20} color={colors.onSurfaceVariant} />
+            <Text style={[styles.sheetRowText, { color: colors.onSurfaceVariant }]}>Cancelar</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
+
+      {/* Menu ⋯ por card: Conversar / Criar tarefa / Agendar / Abrir / Excluir */}
+      <Modal
+        visible={activeCardId != null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setActiveCardId(null)}
+      >
+        <TouchableWithoutFeedback onPress={() => setActiveCardId(null)}>
+          <View style={styles.sheetOverlay} />
+        </TouchableWithoutFeedback>
+        <View style={[styles.sheet, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
+          <View style={[styles.sheetHandle, { backgroundColor: colors.outlineVariant }]} />
+          <Text style={[styles.sheetTitle, { color: colors.onSurface }]}>Ações do relatório</Text>
+          <TouchableOpacity
+            style={styles.sheetRow}
+            onPress={() => runCardAction('chat')}
+            accessibilityRole="button"
+            accessibilityLabel="Conversar sobre este alerta"
+          >
+            <MaterialIcons name="chat" size={20} color={colors.primary} />
+            <Text style={[styles.sheetRowText, { color: colors.onSurface }]}>Conversar</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.sheetRow}
+            onPress={() => runCardAction('task')}
+            accessibilityRole="button"
+            accessibilityLabel="Criar tarefa a partir deste alerta"
+          >
+            <MaterialIcons name="add-task" size={20} color={colors.primary} />
+            <Text style={[styles.sheetRowText, { color: colors.onSurface }]}>Criar tarefa</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.sheetRow}
+            onPress={() => runCardAction('schedule')}
+            accessibilityRole="button"
+            accessibilityLabel="Agendar a partir deste alerta"
+          >
+            <MaterialIcons name="event" size={20} color={colors.primary} />
+            <Text style={[styles.sheetRowText, { color: colors.onSurface }]}>Agendar</Text>
+          </TouchableOpacity>
+          {activeUrl ? (
+            <TouchableOpacity
+              style={styles.sheetRow}
+              onPress={() => {
+                setActiveCardId(null);
+                Linking.openURL(activeUrl).catch(() => {});
+              }}
+              accessibilityRole="link"
+              accessibilityLabel="Abrir link da notícia"
+            >
+              <MaterialIcons name="open-in-new" size={20} color={colors.primary} />
+              <Text style={[styles.sheetRowText, { color: colors.onSurface }]}>Abrir link</Text>
+            </TouchableOpacity>
+          ) : null}
+          <TouchableOpacity
+            style={styles.sheetRow}
+            onPress={() => {
+              if (activeCardId) handleDeleteLog(activeCardId);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Excluir relatório"
+          >
+            <MaterialIcons name="delete-outline" size={20} color={colors.error} />
+            <Text style={[styles.sheetRowText, { color: colors.error }]}>Excluir relatório</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.sheetRow}
+            onPress={() => setActiveCardId(null)}
+            accessibilityRole="button"
+            accessibilityLabel="Fechar menu"
+          >
+            <MaterialIcons name="close" size={20} color={colors.onSurfaceVariant} />
+            <Text style={[styles.sheetRowText, { color: colors.onSurfaceVariant }]}>Cancelar</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -628,144 +791,166 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: tokens.spacing.lg,
+    paddingVertical: tokens.spacing.sm,
     borderBottomWidth: StyleSheet.hairlineWidth,
+    minHeight: 64,
+  },
+  topLeft: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: tokens.spacing.sm,
   },
   backButton: {
-    flexDirection: 'row',
+    minWidth: 48,
+    minHeight: 48,
     alignItems: 'center',
-    gap: 6,
+    justifyContent: 'center',
+    marginLeft: -12,
   },
-  backButtonText: {
+  titleBlock: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  topTitle: {
     fontSize: 16,
     fontWeight: '700',
+    letterSpacing: -0.1,
+    lineHeight: 21,
   },
-  topBarActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  statusPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: MD3Shapes.full,
-  },
-  statusDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-  },
-  statusPillText: {
+  topMeta: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '500',
+    marginTop: 2,
   },
-  editIconButton: {
-    width: 34,
-    height: 34,
-    borderRadius: MD3Shapes.full,
+  topRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.spacing.sm,
+  },
+  switchHitArea: {
+    minHeight: 48,
+    justifyContent: 'center',
+  },
+  moreButton: {
+    width: 48,
+    height: 48,
+    borderRadius: tokens.radii.full,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   scrollContent: {
-    padding: 16,
-    paddingBottom: 40,
-    gap: 12,
+    padding: tokens.spacing.lg,
+    gap: tokens.spacing.md,
   },
   headerSection: {
-    gap: 16,
-    marginBottom: 4,
+    gap: tokens.spacing.lg,
+    marginBottom: tokens.spacing.xs,
   },
   heroCard: {
-    padding: 18,
-    borderRadius: MD3Shapes.large,
+    padding: tokens.spacing.lg,
+    borderRadius: tokens.radii.lg,
     borderWidth: 1,
-    gap: 12,
+    gap: tokens.spacing.md,
   },
-  categoryBadgeRow: {
+  statusRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 8,
+    justifyContent: 'space-between',
+    gap: tokens.spacing.sm,
   },
-  categoryTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: MD3Shapes.full,
-  },
-  categoryTagText: {
+  statusText: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '600',
+    flex: 1,
   },
-  metaPill: {
+  statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: MD3Shapes.full,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: tokens.radii.full,
   },
-  metaPillText: {
+  statusBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  pillsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: tokens.spacing.sm,
+  },
+  pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: tokens.radii.full,
+    maxWidth: '100%',
+  },
+  pillText: {
     fontSize: 12,
     fontWeight: '600',
   },
-  heroTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    letterSpacing: -0.3,
-    lineHeight: 26,
-  },
   heroQuery: {
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  actionRow: {
-    marginTop: 4,
+    fontSize: 13,
+    lineHeight: 19,
   },
   runPrimaryButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 12,
-    borderRadius: MD3Shapes.full,
+    gap: tokens.spacing.sm,
+    minHeight: 48,
+    paddingVertical: tokens.spacing.md,
+    paddingHorizontal: tokens.spacing.lg,
+    borderRadius: tokens.radii.full,
   },
   runPrimaryButtonText: {
-    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '700',
   },
   errorBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-    padding: 10,
-    borderRadius: MD3Shapes.medium,
-    gap: 8,
+    padding: tokens.spacing.md,
+    borderRadius: tokens.radii.md,
+    gap: tokens.spacing.sm,
   },
   errorText: {
-    color: '#EF4444',
     fontSize: 12,
     fontWeight: '600',
     flex: 1,
+  },
+  errorRetryBtn: {
+    minHeight: 48,
+    minWidth: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: tokens.spacing.md,
+  },
+  errorRetryText: {
+    fontSize: 13,
+    fontWeight: '800',
   },
   historySectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 4,
-    marginTop: 6,
+    paddingHorizontal: tokens.spacing.xs,
+    marginTop: tokens.spacing.sm,
+    minHeight: 32,
   },
   historyTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: tokens.spacing.sm,
   },
   historyTitle: {
     fontSize: 14,
@@ -776,98 +961,70 @@ const styles = StyleSheet.create({
   countBadge: {
     paddingHorizontal: 7,
     paddingVertical: 2,
-    borderRadius: MD3Shapes.full,
+    borderRadius: tokens.radii.full,
   },
   countBadgeText: {
     fontSize: 12,
     fontWeight: '700',
   },
-  clearAllBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: MD3Shapes.full,
-    backgroundColor: 'rgba(239, 68, 68, 0.08)',
-  },
-  clearAllBtnText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
   reportCard: {
-    padding: 16,
-    borderRadius: MD3Shapes.large,
+    padding: tokens.spacing.lg,
+    borderRadius: tokens.radii.lg,
     borderWidth: 1,
-    gap: 10,
   },
-  reportCardHeader: {
+  cardRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
   },
-  headerRightActions: {
+  cardMain: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    minHeight: 48,
+    gap: tokens.spacing.sm,
   },
-  deleteLogBtn: {
-    padding: 4,
-    borderRadius: MD3Shapes.full,
+  cardTextCol: {
+    flex: 1,
+    gap: 4,
   },
-  reportTimeRow: {
+  cardTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 19,
+  },
+  cardWhy: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  cardMetaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    flexWrap: 'wrap',
+    marginTop: 2,
   },
-  reportDateText: {
+  cardMetaText: {
     fontSize: 12,
     fontWeight: '600',
   },
-  conditionBadge: {
-    flexDirection: 'row',
+  cardFailText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  cardMoreBtn: {
+    width: 48,
+    minHeight: 48,
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: MD3Shapes.full,
-  },
-  conditionBadgeText: {
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.3,
-  },
-  expandedReportBox: {
-    padding: 14,
-    borderRadius: MD3Shapes.medium,
-    borderWidth: 1,
-    gap: 10,
-    marginTop: 4,
-  },
-  reportContentHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  reportContentLabel: {
-    fontSize: 11,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-  },
-  expandedReportText: {
-    fontSize: 14,
-    lineHeight: 22,
-    letterSpacing: -0.1,
+    justifyContent: 'center',
+    marginRight: -12,
   },
   emptyStateCard: {
     padding: 30,
-    borderRadius: MD3Shapes.large,
+    borderRadius: tokens.radii.lg,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    marginTop: 10,
+    gap: tokens.spacing.sm,
+    marginTop: tokens.spacing.md,
   },
   emptyIconCircle: {
     width: 48,
@@ -875,7 +1032,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 4,
+    marginBottom: tokens.spacing.xs,
   },
   emptyTitle: {
     fontSize: 15,
@@ -887,5 +1044,41 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 18,
     maxWidth: 300,
+  },
+  sheetOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  sheet: {
+    borderTopLeftRadius: tokens.radii.lg,
+    borderTopRightRadius: tokens.radii.lg,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    paddingHorizontal: tokens.spacing.lg,
+    paddingTop: tokens.spacing.sm,
+    paddingBottom: tokens.spacing.xl,
+  },
+  sheetHandle: {
+    alignSelf: 'center',
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    marginBottom: tokens.spacing.sm,
+  },
+  sheetTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    marginBottom: tokens.spacing.sm,
+  },
+  sheetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.spacing.md,
+    minHeight: 48,
+    paddingVertical: tokens.spacing.sm,
+  },
+  sheetRowText: {
+    fontSize: 15,
+    fontWeight: '600',
   },
 });

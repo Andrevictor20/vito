@@ -75,6 +75,23 @@ func (r *UserRepositorySQLite) GetByEmail(email string) (*domain.User, error) {
 }
 
 // IncrementTokenVersion incrementa a versão de token do usuário, revogando instantaneamente todas as sessões ativas.
+// ListIDs retorna todos os IDs (uso do BehavioralWorker; fora da interface).
+func (r *UserRepositorySQLite) ListIDs() ([]string, error) {
+	rows, err := r.db.Query(`SELECT id FROM users`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err == nil {
+			ids = append(ids, id)
+		}
+	}
+	return ids, rows.Err()
+}
+
 func (r *UserRepositorySQLite) IncrementTokenVersion(id string) error {
 	query := `UPDATE users SET token_version = token_version + 1 WHERE id = ?`
 	res, err := r.db.Exec(query, id)

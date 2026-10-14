@@ -51,8 +51,8 @@ describe('dateTimePicker', () => {
   });
 
   it('monthLabelPt sem depender de ICU', () => {
-    assert.equal(monthLabelPt(2026, 10), 'outubro de 2026');
-    assert.equal(monthLabelPt(2026, 1), 'janeiro de 2026');
+    assert.equal(monthLabelPt(2026, 10), 'Outubro de 2026');
+    assert.equal(monthLabelPt(2026, 1), 'Janeiro de 2026');
   });
 
   it('buildTimeSlots gera 48 slots de 30min', () => {

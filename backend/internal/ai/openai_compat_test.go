@@ -18,7 +18,7 @@ func TestOpenAICompatProvider_EvaluateTrigger(t *testing.T) {
 			"choices": [
 				{
 					"message": {
-						"content": "{\"condition_met\":true,\"current_data\":\"Taxa Selic mantida em 10.5%\",\"summary\":\"O Copom manteve a taxa Selic conforme o esperado pelo mercado.\",\"simulated_notification\":\"Alerta Vito: Decisão do Copom sobre taxa Selic.\"}"
+						"content": "{\"condition_met\":true,\"current_data\":\"Taxa Selic mantida em 10.5%\",\"summary\":\"O Copom manteve a taxa Selic conforme o esperado pelo mercado.\",\"simulated_notification\":\"Alerta Vito: Decisão do Copom sobre taxa Selic.\",\"confidence\":90,\"why_relevant\":\"Decisão atual do Copom diretamente ligada à vigília da Selic.\"}"
 					}
 				}
 			]

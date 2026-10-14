@@ -59,8 +59,8 @@ const TAB_TITLES: Record<MainTabType, { title: string; subtitle: string }> = {
   chat: { title: 'Vito', subtitle: '' },
   calendar: { title: 'Agenda', subtitle: '' },
   tasks: { title: 'Tarefas', subtitle: '' },
-  triggers: { title: 'Radares', subtitle: '' },
-  booking: { title: 'Vito Booking', subtitle: '' },
+  triggers: { title: 'Radares', subtitle: 'Monitoramento inteligente em tempo real' },
+  booking: { title: 'Vito Booking', subtitle: 'Links públicos de agendamento' },
   profile: { title: 'Perfil', subtitle: '' },
 };
 
@@ -80,8 +80,10 @@ export const Header: React.FC<HeaderProps> = ({
 
   const resolved = activeTab ? TAB_TITLES[activeTab] : undefined;
   const displayTitle = hideTitle ? null : title ?? resolved?.title ?? 'Agenda';
-  // Subtítulo removido por decisão de design (visual contínuo e clean).
-  const displaySubtitle: string | null = null;
+  // Subtítulo editorial: prop tem prioridade, senão o padrão da aba.
+  const displaySubtitle: string | null = hideTitle
+    ? null
+    : (subtitle ?? resolved?.subtitle ?? null) || null;
 
   const isChat = activeTab === 'chat';
   const centered = align === 'center';
@@ -89,22 +91,22 @@ export const Header: React.FC<HeaderProps> = ({
   const titleBlock = displayTitle ? (
     onPressTitle ? (
       <TouchableOpacity onPress={onPressTitle} activeOpacity={0.7} accessibilityRole="button">
-        <Text style={[styles.title, centered && styles.titleCenter, { color: colors.onSurface }]} numberOfLines={1}>
+        <Text style={[styles.title, !centered && styles.titleLeft, { color: colors.onSurface }]} numberOfLines={1}>
           {displayTitle}
         </Text>
         {displaySubtitle ? (
-          <Text style={[styles.subtitle, centered && styles.titleCenter, { color: colors.textMuted }]} numberOfLines={1}>
+          <Text style={[styles.subtitle, !centered && styles.subtitleLeft, { color: colors.textMuted }]} numberOfLines={2}>
             {displaySubtitle}
           </Text>
         ) : null}
       </TouchableOpacity>
     ) : (
       <View>
-        <Text style={[styles.title, centered && styles.titleCenter, { color: colors.onSurface }]} numberOfLines={1}>
+        <Text style={[styles.title, !centered && styles.titleLeft, { color: colors.onSurface }]} numberOfLines={1}>
           {displayTitle}
         </Text>
         {displaySubtitle ? (
-          <Text style={[styles.subtitle, centered && styles.titleCenter, { color: colors.textMuted }]} numberOfLines={1}>
+          <Text style={[styles.subtitle, !centered && styles.subtitleLeft, { color: colors.textMuted }]} numberOfLines={2}>
             {displaySubtitle}
           </Text>
         ) : null}
@@ -157,12 +159,63 @@ export const Header: React.FC<HeaderProps> = ({
 
 export const TopAppBar = Header;
 
+/** Pill de ação do header editorial (sólida primária ou ghost discreta). */
+export interface HeaderPillProps {
+  label: string;
+  onPress: () => void;
+  accessibilityLabel: string;
+  variant?: 'solid' | 'ghost';
+  icon?: keyof typeof MaterialIcons.glyphMap;
+}
+
+export const HeaderPill: React.FC<HeaderPillProps> = ({
+  label,
+  onPress,
+  accessibilityLabel,
+  variant = 'solid',
+  icon = 'add',
+}) => {
+  const { colors } = useTheme();
+  const ghost = variant === 'ghost';
+  return (
+    <TouchableOpacity
+      style={[
+        styles.pill,
+        ghost
+          ? { backgroundColor: colors.surfaceContainerLow, borderColor: colors.outlineVariant, borderWidth: 1 }
+          : { backgroundColor: colors.primary },
+      ]}
+      onPress={onPress}
+      activeOpacity={0.8}
+      hitSlop={tokens.hitSlop.md}
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole="button"
+    >
+      <MaterialIcons
+        name={icon}
+        size={16}
+        color={ghost ? colors.onSurface : colors.onPrimary}
+      />
+      <Text
+        style={[
+          styles.pillText,
+          { color: ghost ? colors.onSurface : colors.onPrimary },
+        ]}
+        numberOfLines={1}
+      >
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+};
+
 const styles = StyleSheet.create({
   header: {
-    minHeight: 40,
+    minHeight: 52,
     justifyContent: 'center',
     paddingHorizontal: tokens.spacing.md,
-    paddingVertical: 2,
+    paddingTop: 12,
+    paddingBottom: 8,
   },
   topRow: {
     flexDirection: 'row',
@@ -187,12 +240,26 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: -0.2,
   },
+  titleLeft: {
+    fontSize: 27,
+    lineHeight: 32,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+  },
   subtitle: {
     fontSize: 11,
     lineHeight: 14,
     fontWeight: '500',
     letterSpacing: 0.1,
     marginTop: 0,
+  },
+  subtitleLeft: {
+    fontSize: 13,
+    lineHeight: 17,
+    fontWeight: '500',
+    letterSpacing: 0,
+    marginTop: 2,
+    textAlign: 'left',
   },
   actionsRow: {
     flexDirection: 'row',
@@ -211,5 +278,20 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: MD3Shapes.full,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    gap: 4,
+    minHeight: 40,
+    maxWidth: 150,
+  },
+  pillText: {
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: -0.1,
   },
 });

@@ -21,8 +21,10 @@ import { StatusBar } from 'expo-status-bar';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens, MD3Shapes, tabularNumbers } from '../theme/tokens';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 import { hapticFeedback } from '../theme/motion';
 import { api } from '../services/api';
+import { SelectableChip } from '../components/ui/SelectableChip';
 import { BookingType, BookingAppointment, CreateBookingTypeInput } from '../types';
 
 const TIME_PRESETS = [
@@ -52,6 +54,15 @@ const sanitizeBookingUrl = (raw?: string, slug?: string): string => {
   const canonicalFallback = cleanSlug ? `https://vito.rasppi.cloud/book/${cleanSlug}` : 'https://vito.rasppi.cloud/book';
   if (!raw || !raw.trim()) return canonicalFallback;
   return raw;
+};
+
+/** Extrai o {username} de uma public_url canônica (.../book/{username}/{slug}). */
+const extractBookingUsername = (types: BookingType[]): string => {
+  for (const t of types || []) {
+    const m = (t.public_url || '').match(/\/book\/([^/]+)\//);
+    if (m) return m[1];
+  }
+  return 'seu-usuario';
 };
 
 const calculateAutoEndHour = (
@@ -85,10 +96,25 @@ const calculateAutoEndHour = (
 
 interface BookingScreenProps {
   onBack?: () => void;
+  /** Sinal do Header (+ Novo Link): incrementa para abrir o modal em criação. */
+  createRequestId?: number;
 }
 
-export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack }) => {
+export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack, createRequestId }) => {
   const { colors, isDark } = useTheme();
+  const { user: authUser } = useAuth();
+  const firstCreateRender = React.useRef(true);
+  // CTA do Header (+ Novo Link): abre o modal em modo criação.
+  React.useEffect(() => {
+    if (firstCreateRender.current) {
+      firstCreateRender.current = false;
+      return;
+    }
+    if ((createRequestId ?? 0) > 0) {
+      setCreateModalVisible(true);
+      setEditingType(null);
+    }
+  }, [createRequestId]);
 
   const [types, setTypes] = useState<BookingType[]>([]);
   const [appointments, setAppointments] = useState<BookingAppointment[]>([]);
@@ -112,6 +138,13 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack }) => {
   const [timePickerTarget, setTimePickerTarget] = useState<'start' | 'end' | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deletingAppointmentId, setDeletingAppointmentId] = useState<string | null>(null);
+
+  // Username canônico para a prévia da URL pública — via AuthContext, fallback "seu-usuario".
+  const bookingUsername: string =
+    ((authUser as unknown as Record<string, unknown> | null)?.username as string) ||
+    (authUser?.email ? authUser.email.split('@')[0].toLowerCase().replace(/[^a-z0-9-]/g, '-') : '') ||
+    extractBookingUsername(types) ||
+    'seu-usuario';
 
   const handleDeleteAppointment = async (appt: BookingAppointment) => {
     hapticFeedback.medium();
@@ -766,7 +799,7 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack }) => {
                     style={[styles.linkPreviewUrl, { color: colors.onSurface }]}
                     numberOfLines={1}
                   >
-                    {`https://vito.rasppi.cloud/book/${newSlug ? newSlug.toLowerCase().replace(/[^a-z0-9-]/g, '-') : 'seu-link'}`}
+                    {`https://vito.rasppi.cloud/book/${bookingUsername}/${newSlug ? newSlug.toLowerCase().replace(/[^a-z0-9-]/g, '-') : 'seu-link'}`}
                   </Text>
                 </View>
               </View>
@@ -793,24 +826,13 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack }) => {
                 <Text style={[styles.formLabel, { color: colors.onSurface }]}>Duração (minutos)</Text>
                 <View style={styles.pillSelectorRow}>
                   {[15, 30, 45, 60].map((dur) => (
-                    <TouchableOpacity
+                    <SelectableChip
                       key={dur}
-                      style={[
-                        styles.pillOption,
-                        newDuration === dur && [styles.pillOptionActive, { backgroundColor: colors.primary }],
-                        { borderColor: colors.outlineVariant },
-                      ]}
+                      label={`${dur} min`}
+                      selected={newDuration === dur}
                       onPress={() => setNewDuration(dur)}
-                    >
-                      <Text
-                        style={[
-                          styles.pillOptionText,
-                          { color: newDuration === dur ? colors.onPrimary : colors.onSurface },
-                        ]}
-                      >
-                        {dur} min
-                      </Text>
-                    </TouchableOpacity>
+                      accessibilityLabel={`Duração ${dur} minutos`}
+                    />
                   ))}
                 </View>
               </View>
@@ -819,24 +841,13 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack }) => {
                 <Text style={[styles.formLabel, { color: colors.onSurface }]}>Buffer de Respiro (minutos)</Text>
                 <View style={styles.pillSelectorRow}>
                   {[0, 10, 15, 20].map((buf) => (
-                    <TouchableOpacity
+                    <SelectableChip
                       key={buf}
-                      style={[
-                        styles.pillOption,
-                        newBuffer === buf && [styles.pillOptionActive, { backgroundColor: colors.primary }],
-                        { borderColor: colors.outlineVariant },
-                      ]}
+                      label={buf === 0 ? 'Sem buffer' : `${buf} min`}
+                      selected={newBuffer === buf}
                       onPress={() => setNewBuffer(buf)}
-                    >
-                      <Text
-                        style={[
-                          styles.pillOptionText,
-                          { color: newBuffer === buf ? colors.onPrimary : colors.onSurface },
-                        ]}
-                      >
-                        {buf === 0 ? 'Sem buffer' : `${buf} min`}
-                      </Text>
-                    </TouchableOpacity>
+                      accessibilityLabel={buf === 0 ? 'Sem buffer' : `Buffer ${buf} minutos`}
+                    />
                   ))}
                 </View>
               </View>
@@ -845,39 +856,21 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack }) => {
               <View style={styles.formGroup}>
                 <Text style={[styles.formLabel, { color: colors.onSurface }]}>Horário de Atendimento</Text>
 
-                {/* Presets Rápidos */}
+                {/* Presets Rápidos — SelectableChip único */}
                 <View style={styles.timePresetsContainer}>
                   {TIME_PRESETS.map((p) => {
                     const isSelected = newStartHour === p.start && newEndHour === p.end;
                     return (
-                      <TouchableOpacity
+                      <SelectableChip
                         key={p.label}
-                        style={[
-                          styles.timePresetChip,
-                          {
-                            borderColor: isSelected ? colors.primary : colors.outlineVariant,
-                            backgroundColor: isSelected
-                              ? (isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.06)')
-                              : 'transparent',
-                          },
-                        ]}
+                        label={p.label}
+                        selected={isSelected}
                         onPress={() => {
-                          hapticFeedback.selection();
                           setNewStartHour(p.start);
                           setNewEndHour(p.end);
                         }}
-                        activeOpacity={0.7}
-                      >
-                        <Text
-                          style={[
-                            styles.timePresetChipText,
-                            { color: isSelected ? colors.primary : colors.onSurfaceVariant },
-                            isSelected && { fontWeight: '700' },
-                          ]}
-                        >
-                          {p.label}
-                        </Text>
-                      </TouchableOpacity>
+                        accessibilityLabel={`Horário ${p.label}`}
+                      />
                     );
                   })}
                 </View>

@@ -13,8 +13,11 @@ import {
   StatusBar as RNStatusBar,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { tokens, MD3Shapes } from '../../theme/tokens';
 import { ConversationSession } from '../../types';
+import { humanizePreview } from '../../utils/chatPreview';
+import { formatGroupTimestamp, groupSessionsByDate } from '../../utils/chatHistoryGrouping';
 import { useTheme } from '../../context/ThemeContext';
 
 interface ChatHistoryDrawerProps {
@@ -24,24 +27,8 @@ interface ChatHistoryDrawerProps {
   conversations: ConversationSession[];
   onSelectConversation: (id: string) => void;
   onDeleteConversation?: (id: string) => void;
-}
-
-function formatRelativeTime(dateStr: string): string {
-  try {
-    const d = new Date(dateStr);
-    const now = new Date();
-    const isToday =
-      d.getDate() === now.getDate() &&
-      d.getMonth() === now.getMonth() &&
-      d.getFullYear() === now.getFullYear();
-
-    if (isToday) {
-      return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-    }
-    return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).replace('.', '');
-  } catch {
-    return 'Recente';
-  }
+  pendingCount?: number;
+  onRetrySync?: () => void;
 }
 
 const PANEL_WIDTH = Math.min(Dimensions.get('window').width * 0.84, 340);
@@ -54,9 +41,14 @@ export const ChatHistoryDrawer: React.FC<ChatHistoryDrawerProps> = ({
   conversations,
   onSelectConversation,
   onDeleteConversation,
+  pendingCount,
+  onRetrySync,
 }) => {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const slide = useRef(new Animated.Value(-PANEL_WIDTH)).current;
+  const groups = groupSessionsByDate(conversations);
+  const showPending = (pendingCount ?? 0) > 0;
 
   useEffect(() => {
     Animated.timing(slide, {
@@ -97,7 +89,7 @@ export const ChatHistoryDrawer: React.FC<ChatHistoryDrawerProps> = ({
                 onPress={onClose}
                 activeOpacity={0.7}
                 accessibilityLabel="Fechar histórico"
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                hitSlop={tokens.hitSlop.md}
               >
                 <MaterialIcons name="menu" size={22} color={colors.onSurface} />
               </TouchableOpacity>
@@ -113,7 +105,33 @@ export const ChatHistoryDrawer: React.FC<ChatHistoryDrawerProps> = ({
             <ScrollView
               contentContainerStyle={styles.listContent}
               showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
             >
+              {showPending && (
+                <View
+                  style={[styles.pendingCard, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}
+                  accessibilityRole="alert"
+                  accessibilityLabel={`Sincronização pendente, ${pendingCount} conversas`}
+                >
+                  <MaterialIcons name="sync-problem" size={20} color={colors.onSurface} />
+                  <Text style={[styles.pendingText, { color: colors.onSurface }]}>
+                    Sincronização pendente ({pendingCount})
+                  </Text>
+                  {onRetrySync && (
+                    <TouchableOpacity
+                      style={[styles.retryBtn, { backgroundColor: colors.surfaceContainerHighest }]}
+                      onPress={onRetrySync}
+                      activeOpacity={0.75}
+                      accessibilityLabel="Reenviar sincronização pendente"
+                      accessibilityRole="button"
+                      hitSlop={tokens.hitSlop.md}
+                    >
+                      <MaterialIcons name="refresh" size={18} color={colors.onSurface} />
+                      <Text style={[styles.retryText, { color: colors.onSurface }]}>Reenviar</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
               {conversations.length === 0 ? (
                 <View style={styles.emptyContainer}>
                   <View style={[styles.emptyIconBox, { backgroundColor: colors.surfaceContainer }]}>
@@ -127,86 +145,97 @@ export const ChatHistoryDrawer: React.FC<ChatHistoryDrawerProps> = ({
                   </Text>
                 </View>
               ) : (
-                conversations.map((conv) => {
-                  const isActive = !!conv.active;
-                  return (
-                    <TouchableOpacity
-                      key={conv.id}
-                      style={[
-                        styles.convCard,
-                        {
-                          backgroundColor: isActive
-                            ? isDark
-                              ? colors.surfaceContainerHighest
-                              : '#F4F4F5'
-                            : colors.surfaceContainerLow,
-                          borderColor: isActive ? colors.primary : colors.outlineVariant,
-                        },
-                      ]}
-                      onPress={() => {
-                        onSelectConversation(conv.id);
-                        onClose();
-                      }}
-                      activeOpacity={0.75}
+                groups.map((group) => (
+                  <View key={group.key}>
+                    <Text
+                      style={[styles.groupHeader, { color: colors.textMuted }]}
+                      accessibilityRole="header"
                     >
-                      <View
-                        style={[
-                          styles.convIcon,
-                          {
-                            backgroundColor: isActive ? colors.primary : colors.surfaceContainerHighest,
-                          },
-                        ]}
-                      >
-                        <MaterialIcons
-                          name="chat-bubble-outline"
-                          size={18}
-                          color={isActive ? colors.onPrimary : colors.textPrimary}
-                        />
-                      </View>
-
-                      <View style={styles.convDetails}>
-                        <View style={styles.convTitleRow}>
-                          <Text
+                      {group.title}
+                    </Text>
+                    {group.sessions.map((conv) => {
+                      const isActive = !!conv.active;
+                      return (
+                        <TouchableOpacity
+                          key={conv.id}
+                          style={[
+                            styles.convCard,
+                            {
+                              backgroundColor: isActive
+                                ? colors.surfaceContainerHighest
+                                : colors.surfaceContainerLow,
+                              borderColor: isActive ? colors.primary : colors.outlineVariant,
+                            },
+                          ]}
+                          onPress={() => {
+                            onSelectConversation(conv.id);
+                            onClose();
+                          }}
+                          activeOpacity={0.75}
+                          accessibilityLabel={`Abrir conversa ${conv.title || 'Conversa'}`}
+                          hitSlop={tokens.hitSlop.sm}
+                        >
+                          <View
                             style={[
-                              styles.convTitle,
+                              styles.convIcon,
                               {
-                                color: colors.onSurface,
-                                fontWeight: isActive ? '700' : '600',
+                                backgroundColor: isActive ? colors.primary : colors.surfaceContainerHighest,
                               },
                             ]}
-                            numberOfLines={1}
                           >
-                            {conv.title || 'Conversa'}
-                          </Text>
-                          <Text style={[styles.convTime, { color: colors.textMuted }]}>
-                            {formatRelativeTime(conv.timestamp)}
-                          </Text>
-                        </View>
-                        <Text
-                          style={[styles.convPreview, { color: colors.textSecondary }]}
-                          numberOfLines={1}
-                        >
-                          {conv.preview || 'Sem mensagens'}
-                        </Text>
-                      </View>
+                            <MaterialIcons
+                              name="chat-bubble-outline"
+                              size={18}
+                              color={isActive ? colors.onPrimary : colors.textPrimary}
+                            />
+                          </View>
 
-                      {onDeleteConversation && conversations.length > 1 && (
-                        <TouchableOpacity
-                          style={styles.deleteBtn}
-                          onPress={() => onDeleteConversation(conv.id)}
-                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                          accessibilityLabel="Excluir conversa"
-                        >
-                          <MaterialIcons name="delete-outline" size={18} color={colors.outline} />
+                          <View style={styles.convDetails}>
+                            <View style={styles.convTitleRow}>
+                              <Text
+                                style={[
+                                  styles.convTitle,
+                                  {
+                                    color: colors.onSurface,
+                                    fontWeight: '700',
+                                  },
+                                ]}
+                                numberOfLines={1}
+                              >
+                                {conv.title || 'Conversa'}
+                              </Text>
+                              <Text style={[styles.convTime, { color: colors.textMuted }]}>
+                                {formatGroupTimestamp(conv.timestamp)}
+                              </Text>
+                            </View>
+                            <Text
+                              style={[styles.convPreview, { color: colors.textSecondary }]}
+                              numberOfLines={1}
+                            >
+                              {humanizePreview(conv.preview)}
+                            </Text>
+                          </View>
+
+                          {onDeleteConversation && conversations.length > 1 && (
+                            <TouchableOpacity
+                              style={styles.deleteBtn}
+                              onPress={() => onDeleteConversation(conv.id)}
+                              hitSlop={tokens.hitSlop.md}
+                              accessibilityLabel="Excluir conversa"
+                              accessibilityRole="button"
+                            >
+                              <MaterialIcons name="delete-outline" size={18} color={colors.outline} />
+                            </TouchableOpacity>
+                          )}
                         </TouchableOpacity>
-                      )}
-                    </TouchableOpacity>
-                  );
-                })
+                      );
+                    })}
+                  </View>
+                ))
               )}
             </ScrollView>
 
-            <View style={[styles.footer, { borderTopColor: colors.outlineVariant }]}>
+            <View style={[styles.footer, { borderTopColor: colors.outlineVariant, paddingBottom: Math.max(insets.bottom, 0) + tokens.spacing.md }]}>
               <TouchableOpacity
                 style={[styles.newChatBtn, { backgroundColor: colors.primary }]}
                 onPress={() => {
@@ -215,6 +244,8 @@ export const ChatHistoryDrawer: React.FC<ChatHistoryDrawerProps> = ({
                 }}
                 activeOpacity={0.85}
                 accessibilityLabel="Iniciar nova conversa"
+                accessibilityRole="button"
+                hitSlop={tokens.hitSlop.sm}
               >
                 <MaterialIcons name="add" size={20} color={colors.onPrimary} />
                 <Text style={[styles.newChatBtnText, { color: colors.onPrimary }]}>
@@ -287,6 +318,44 @@ const styles = StyleSheet.create({
     padding: tokens.spacing.md,
     gap: tokens.spacing.sm,
   },
+  pendingCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.spacing.sm,
+    padding: tokens.spacing.md,
+    borderRadius: MD3Shapes.large,
+    borderWidth: 1,
+    marginBottom: tokens.spacing.sm,
+    minHeight: 48,
+  },
+  pendingText: {
+    flex: 1,
+    fontSize: tokens.typography.size.bodyMedium,
+    fontWeight: tokens.typography.weight.semibold,
+  },
+  retryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    minWidth: 48,
+    minHeight: 48,
+    justifyContent: 'center',
+    paddingHorizontal: tokens.spacing.md,
+    borderRadius: MD3Shapes.full,
+  },
+  retryText: {
+    fontSize: tokens.typography.size.labelLarge,
+    fontWeight: tokens.typography.weight.bold,
+  },
+  groupHeader: {
+    fontSize: tokens.typography.size.labelMedium,
+    fontWeight: tokens.typography.weight.bold,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginTop: tokens.spacing.sm,
+    marginBottom: tokens.spacing.xs,
+    paddingHorizontal: tokens.spacing.xs,
+  },
   convCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -295,6 +364,8 @@ const styles = StyleSheet.create({
     borderRadius: MD3Shapes.large,
     borderWidth: 1,
     backgroundColor: tokens.colors.surfaceContainerLow,
+    minHeight: 48,
+    marginBottom: tokens.spacing.sm,
   },
   convIcon: {
     width: 40,
@@ -313,8 +384,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   convTitle: {
-    fontSize: tokens.typography.size.bodyMedium,
-    fontWeight: tokens.typography.weight.bold,
+    fontSize: 15,
+    fontWeight: '700',
     color: tokens.colors.onSurface,
     flex: 1,
     marginRight: tokens.spacing.xs,
@@ -330,6 +401,8 @@ const styles = StyleSheet.create({
   },
   footer: {
     padding: tokens.spacing.md,
+    // Folga da barra de gestos do Android (o botão invadia a gesture bar).
+    paddingBottom: Platform.OS === 'android' ? tokens.spacing.md + 12 : tokens.spacing.md,
     borderTopWidth: 1,
     borderTopColor: tokens.colors.outlineVariant,
   },
@@ -341,6 +414,7 @@ const styles = StyleSheet.create({
     backgroundColor: tokens.colors.primary,
     borderRadius: MD3Shapes.full,
     paddingVertical: 14,
+    minHeight: 48,
     ...tokens.shadows.level2,
   },
   newChatBtnText: {
@@ -374,7 +448,10 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   deleteBtn: {
-    padding: 6,
+    minWidth: 48,
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginLeft: 4,
   },
 });

@@ -9,6 +9,7 @@ import {
   TextInput,
   ActivityIndicator,
   Alert,
+  Platform,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
@@ -133,7 +134,7 @@ export const CalendarSyncSettingsModal: React.FC<CalendarSyncSettingsModalProps>
   const formatLastSync = (dateStr?: string) => {
     if (!dateStr) return 'Nunca sincronizado';
     const date = new Date(dateStr);
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' de ' + date.toLocaleDateString();
+    return date.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   };
 
   return (
@@ -296,16 +297,20 @@ export const CalendarSyncSettingsModal: React.FC<CalendarSyncSettingsModalProps>
               <View style={styles.cardHeader}>
                 <View style={styles.cardHeaderLeft}>
                   <View style={[styles.providerIconBox, { backgroundColor: isDark ? '#FFFFFF15' : '#00000010' }]}>
-                    <MaterialIcons name="apple" size={22} color={colors.onSurface} />
+                    <MaterialIcons
+                      name={Platform.OS === 'ios' ? 'apple' : 'smartphone'}
+                      size={22}
+                      color={colors.onSurface}
+                    />
                   </View>
                   <View>
                     <Text style={[styles.cardTitle, { color: colors.onSurface }]}>
-                      Apple Calendar
+                      {Platform.OS === 'ios' ? 'Apple Calendar' : 'Calendário do aparelho'}
                     </Text>
                     <Text style={[styles.cardSub, { color: colors.onSurfaceVariant }]}>
                       {appleNativeInteg
-                        ? 'Calendário Nativo iOS Ativo'
-                        : 'Sincronização local via EventKit no iOS'}
+                        ? (Platform.OS === 'ios' ? 'Calendário Nativo iOS Ativo' : 'Calendário local Android ativo')
+                        : (Platform.OS === 'ios' ? 'Sincronização local via EventKit no iOS' : 'Sincronização local no Android')}
                     </Text>
                   </View>
                 </View>
@@ -331,7 +336,9 @@ export const CalendarSyncSettingsModal: React.FC<CalendarSyncSettingsModalProps>
                       Sync Nativo do Dispositivo
                     </Text>
                     <Text style={[styles.optionDesc, { color: colors.onSurfaceVariant }]}>
-                      Sincroniza sem digitar senhas usando o EventKit local
+                      {Platform.OS === 'ios'
+                        ? 'Sincroniza sem digitar senhas usando o EventKit local'
+                        : 'Sincroniza sem digitar senhas usando o calendário local'}
                     </Text>
                   </View>
                 </View>

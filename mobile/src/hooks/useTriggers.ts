@@ -1,20 +1,23 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../services/api';
 import { Trigger, TriggerLog, TriggerTestResult, TriggerCategory, TriggerStatus, CreateTriggerInput } from '../types';
 
 import { dataSync } from '../services/dataSync';
+import { queryKeys } from '../services/queryClient';
 
 export const useTriggers = (userId?: string) => {
-  const [triggers, setTriggers] = useState<Trigger[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const queryClient = useQueryClient();
   const [selectedCategory, setSelectedCategory] = useState<TriggerCategory | 'all'>('all');
   const [error, setError] = useState<string | null>(null);
 
   const cacheKey = `@vito_triggers_${userId || 'default'}`;
 
-  // 1. Carrega do cache local imediato para render instantâneo
+  // Leitura via React Query (MOB-04 gradual): cache-first com AsyncStorage,
+  // retry/em states nativos e invalidação automática via dataSync.
+  const [cachedInitial, setCachedInitial] = useState<Trigger[] | undefined>(undefined);
   useEffect(() => {
     let isMounted = true;
     (async () => {
@@ -23,8 +26,7 @@ export const useTriggers = (userId?: string) => {
         if (cached && isMounted) {
           const parsed = JSON.parse(cached);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            setTriggers(parsed);
-            setLoading(false);
+            setCachedInitial(parsed);
           }
         }
       } catch (err) {
@@ -36,42 +38,57 @@ export const useTriggers = (userId?: string) => {
     };
   }, [cacheKey]);
 
-  const loadTriggers = useCallback(async (isRefresh = false) => {
-    if (isRefresh) {
-      setRefreshing(true);
-    } else {
-      setLoading(true);
-    }
-    setError(null);
+  const query = useQuery({
+    queryKey: queryKeys.triggers(userId),
+    queryFn: async (): Promise<Trigger[]> => {
+      try {
+        const data = await api.getTriggers();
+        setError(null);
+        await AsyncStorage.setItem(cacheKey, JSON.stringify(data)).catch(() => {});
+        return data;
+      } catch (err: any) {
+        setError(err?.message || 'Falha ao sincronizar disparadores');
+        throw err;
+      }
+    },
+    initialData: cachedInitial,
+    initialDataUpdatedAt: cachedInitial ? Date.now() : undefined,
+  });
 
-    try {
-      const data = await api.getTriggers();
-      setTriggers(data);
-      // Persiste no cache local
-      await AsyncStorage.setItem(cacheKey, JSON.stringify(data)).catch(() => {});
-    } catch (err: any) {
-      console.error('[useTriggers] Erro ao carregar disparadores:', err);
-      setError(err?.message || 'Falha ao sincronizar disparadores');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [cacheKey]);
+  const triggers = useMemo(() => query.data || [], [query.data]);
+  const loading = query.isLoading && triggers.length === 0;
+  const refreshing = query.isRefetching;
 
-  useEffect(() => {
-    loadTriggers();
-  }, [loadTriggers]);
+  const loadTriggers = useCallback(async (_isRefresh = false) => {
+    await query.refetch();
+  }, [query]);
 
   useEffect(() => {
     const unsub = dataSync.subscribe('refresh_triggers', () => {
-      loadTriggers(true);
+      query.refetch().catch(() => {});
     });
     return unsub;
-  }, [loadTriggers]);
+  }, [query]);
+
+  // Auto-refresh silencioso ao voltar para o app (§9.4).
+  const appState = useRef(AppState.currentState);
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (next) => {
+      if (appState.current.match(/inactive|background/) && next === 'active') {
+        query.refetch({ cancelRefetch: false }).catch(() => {});
+      }
+      appState.current = next;
+    });
+    return () => sub.remove();
+  }, [query]);
 
   const onRefresh = useCallback(() => {
     loadTriggers(true);
   }, [loadTriggers]);
+
+  const setTriggers = useCallback((updater: (prev: Trigger[]) => Trigger[]) => {
+    queryClient.setQueryData<Trigger[]>(queryKeys.triggers(userId), (old) => updater(old || []));
+  }, [queryClient, userId]);
 
   const handleCreateTrigger = useCallback(async (input: CreateTriggerInput): Promise<Trigger> => {
     const created = await api.createTrigger(input);
@@ -90,10 +107,13 @@ export const useTriggers = (userId?: string) => {
       })
       .catch((runErr) => {
         console.warn('[useTriggers] Pesquisa inicial do radar:', runErr);
+      })
+      .finally(() => {
+        queryClient.invalidateQueries({ queryKey: queryKeys.triggers(userId) }).catch(() => {});
       });
 
     return created;
-  }, []);
+  }, [queryClient, setTriggers, userId]);
 
   const handleToggleTrigger = useCallback(async (id: string): Promise<void> => {
     // Optimistic UI update
@@ -115,8 +135,10 @@ export const useTriggers = (userId?: string) => {
       // Reverter em caso de falha
       loadTriggers();
       throw err;
+    } finally {
+      queryClient.invalidateQueries({ queryKey: queryKeys.triggers(userId) }).catch(() => {});
     }
-  }, [loadTriggers]);
+  }, [loadTriggers, queryClient, setTriggers, userId]);
 
   const handleDeleteTrigger = useCallback(async (id: string): Promise<void> => {
     setTriggers((prev) => prev.filter((t) => t.id !== id));
@@ -130,8 +152,10 @@ export const useTriggers = (userId?: string) => {
       }
       loadTriggers();
       throw err;
+    } finally {
+      queryClient.invalidateQueries({ queryKey: queryKeys.triggers(userId) }).catch(() => {});
     }
-  }, [loadTriggers]);
+  }, [loadTriggers, queryClient, setTriggers, userId]);
 
   const handleUpdateTrigger = useCallback(
     async (
@@ -140,9 +164,10 @@ export const useTriggers = (userId?: string) => {
     ): Promise<Trigger> => {
       const updated = await api.updateTrigger(id, input);
       setTriggers((prev) => prev.map((t) => (t.id === id ? updated : t)));
+      queryClient.invalidateQueries({ queryKey: queryKeys.triggers(userId) }).catch(() => {});
       return updated;
     },
-    []
+    [queryClient, setTriggers, userId]
   );
 
   const handleRunTrigger = useCallback(
@@ -153,7 +178,7 @@ export const useTriggers = (userId?: string) => {
       );
       return log;
     },
-    []
+    [setTriggers]
   );
 
   const handleTestTrigger = useCallback(

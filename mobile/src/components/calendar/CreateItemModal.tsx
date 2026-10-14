@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   View,
@@ -6,11 +6,15 @@ import {
   Modal,
   TextInput,
   TouchableOpacity,
-  TouchableWithoutFeedback,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import DateTimePickerNative from '@react-native-community/datetimepicker';
 import { tokens } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
+import { hapticFeedback } from '../../theme/motion';
 
 import { NotificationPriority } from '../../types';
 
@@ -19,10 +23,19 @@ interface CreateItemModalProps {
   onClose: () => void;
   selectedDate: Date;
   events?: import('../../types').Event[];
-  onSaveEvent?: (title: string, priority?: NotificationPriority) => void;
+  onSaveEvent?: (title: string, priority?: NotificationPriority, startISO?: string, endISO?: string) => void;
   onSaveTodo?: (title: string, priority: 'low' | 'medium' | 'high', eventId?: string, eventTitle?: string) => void;
   fixedTab?: 'event' | 'todo';
 }
+
+const pad = (n: number) => String(n).padStart(2, '0');
+
+const atTime = (base: Date, hhmm: string): Date => {
+  const [h, m] = hhmm.split(':').map(Number);
+  const d = new Date(base);
+  d.setHours(h || 9, m || 0, 0, 0);
+  return d;
+};
 
 export const CreateItemModal: React.FC<CreateItemModalProps> = ({
   visible,
@@ -33,23 +46,50 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
   onSaveTodo,
   fixedTab,
 }) => {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
   const [tabState, setTab] = useState<'event' | 'todo'>('event');
   const tab = fixedTab ?? tabState;
   const [title, setTitle] = useState('');
   const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium');
   const [notifPriority, setNotifPriority] = useState<NotificationPriority>('default');
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [startTime, setStartTime] = useState('09:00');
+  const [endTime, setEndTime] = useState('10:00');
+  const [timeTarget, setTimeTarget] = useState<'start' | 'end' | null>(null);
+
+  useEffect(() => {
+    if (visible) {
+      setTitle('');
+      setSelectedEventId(null);
+      setStartTime('09:00');
+      setEndTime('10:00');
+      setTimeTarget(null);
+    }
+  }, [visible]);
 
   const formattedDate = selectedDate.toLocaleDateString('pt-BR', {
     day: '2-digit',
     month: 'long',
   });
 
+  const timeValue = (hhmm: string) => {
+    const [h, m] = hhmm.split(':').map(Number);
+    const d = new Date();
+    d.setHours(h || 9, m || 0, 0, 0);
+    return d;
+  };
+
   const handleSave = () => {
     if (!title.trim()) return;
     if (tab === 'event' && onSaveEvent) {
-      onSaveEvent(title.trim(), notifPriority);
+      const start = atTime(selectedDate, startTime).toISOString();
+      let end = atTime(selectedDate, endTime).toISOString();
+      if (end <= start) {
+        const fixed = atTime(selectedDate, startTime);
+        fixed.setHours(fixed.getHours() + 1);
+        end = fixed.toISOString();
+      }
+      onSaveEvent(title.trim(), notifPriority, start, end);
     } else if (tab === 'todo' && onSaveTodo) {
       const linkedEvent = events?.find((e) => e.id === selectedEventId);
       onSaveTodo(title.trim(), priority, linkedEvent?.id, linkedEvent?.title);
@@ -61,258 +101,230 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <TouchableWithoutFeedback onPress={onClose}>
-        <View style={styles.overlay}>
-          <TouchableWithoutFeedback>
-            <View style={[styles.card, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
-              {/* Header com Segmented Tabs (oculto quando a aba é fixa por página) */}
-              <View style={styles.header}>
-                {!fixedTab && (
-                <View style={[styles.segmentedGroup, { backgroundColor: colors.surfaceContainerLowest, borderColor: colors.outlineVariant, borderWidth: 1 }]}>
-                  <TouchableOpacity
-                    style={[
-                      styles.segmentBtn,
-                      tab === 'event' && [styles.segmentBtnActive, { backgroundColor: colors.surfaceContainerHighest }],
-                    ]}
-                    onPress={() => setTab('event')}
-                  >
-                    <MaterialIcons
-                      name="event"
-                      size={15}
-                      color={tab === 'event' ? colors.primary : colors.textSecondary}
-                    />
-                    <Text
-                      style={[
-                        styles.segmentText,
-                        { color: tab === 'event' ? colors.onSurface : colors.textSecondary },
-                        tab === 'event' && styles.segmentTextActive,
-                      ]}
-                    >
-                      Compromisso
-                    </Text>
-                  </TouchableOpacity>
+      <KeyboardAvoidingView
+        behavior="padding"
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 44 : 0}
+        style={styles.overlay}
+      >
+        <View style={[styles.sheet, { backgroundColor: colors.surfaceContainer }]}>
+          <View style={styles.handle} />
+          <View style={styles.headerRow}>
+            <View>
+              <Text style={[styles.title, { color: colors.onSurface }]}>
+                {tab === 'event' ? 'Novo compromisso' : 'Nova tarefa'}
+              </Text>
+              <Text style={[styles.subtitle, { color: colors.onSurfaceVariant }]}>
+                {formattedDate} · {startTime}–{endTime}
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.closeBtn, { backgroundColor: colors.surfaceContainerHighest }]}
+              onPress={onClose}
+              hitSlop={tokens.hitSlop.sm}
+              accessibilityLabel="Fechar"
+              accessibilityRole="button"
+            >
+              <MaterialIcons name="close" size={18} color={colors.onSurfaceVariant} />
+            </TouchableOpacity>
+          </View>
 
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.scrollContent}
+          >
+            {!fixedTab && (
+              <View style={styles.typeRow}>
+                {(['event', 'todo'] as const).map((k) => (
                   <TouchableOpacity
-                    style={[
-                      styles.segmentBtn,
-                      tab === 'todo' && [styles.segmentBtnActive, { backgroundColor: colors.surfaceContainerHighest }],
-                    ]}
-                    onPress={() => setTab('todo')}
+                    key={k}
+                    style={[styles.typeBtn, tab === k && { backgroundColor: colors.primary }]}
+                    onPress={() => {
+                      hapticFeedback.selection();
+                      setTab(k);
+                    }}
+                    activeOpacity={0.8}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: tab === k }}
                   >
-                    <MaterialIcons
-                      name="check-circle"
-                      size={15}
-                      color={tab === 'todo' ? colors.primary : colors.textSecondary}
-                    />
-                    <Text
-                      style={[
-                        styles.segmentText,
-                        { color: tab === 'todo' ? colors.onSurface : colors.textSecondary },
-                        tab === 'todo' && styles.segmentTextActive,
-                      ]}
-                    >
-                      Tarefa
+                    <Text style={[styles.typeText, { color: tab === k ? colors.onPrimary : colors.onSurfaceVariant }]}>
+                      {k === 'event' ? 'Compromisso' : 'Tarefa'}
                     </Text>
                   </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
+            <TextInput
+              style={[styles.titleInput, { color: colors.onSurface, borderColor: colors.outlineVariant }]}
+              placeholder={tab === 'event' ? 'Título da reunião ou evento...' : 'Título da tarefa ou lembrete...'}
+              placeholderTextColor={colors.onSurfaceVariant}
+              value={title}
+              onChangeText={setTitle}
+              maxLength={140}
+              accessibilityLabel={tab === 'event' ? 'Título do compromisso' : 'Título da tarefa'}
+            />
+
+            {tab === 'event' && (
+              <>
+                <Text style={[styles.label, { color: colors.onSurfaceVariant }]}>Horário</Text>
+                <View style={styles.row}>
+                  {(['start', 'end'] as const).map((which) => (
+                    <TouchableOpacity
+                      key={which}
+                      style={[styles.timeBtn, { borderColor: colors.outlineVariant }]}
+                      onPress={() => {
+                        hapticFeedback.selection();
+                        setTimeTarget(which);
+                      }}
+                      activeOpacity={0.8}
+                      accessibilityLabel={which === 'start' ? 'Hora de início' : 'Hora de término'}
+                    >
+                      <MaterialIcons name="access-time" size={16} color={colors.primary} />
+                      <Text style={[styles.timeBtnText, { color: colors.onSurface }]}>
+                        {which === 'start' ? `Início ${startTime}` : `Fim ${endTime}`}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
                 </View>
+                {timeTarget && (
+                  <DateTimePickerNative
+                    value={timeValue(timeTarget === 'start' ? startTime : endTime)}
+                    mode="time"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'clock'}
+                    is24Hour
+                    onChange={(_, d) => {
+                      if (Platform.OS === 'android') setTimeTarget(null);
+                      if (d) {
+                        const v = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+                        if (timeTarget === 'start') {
+                          setStartTime(v);
+                          if (v >= endTime) {
+                            const [h, m] = v.split(':').map(Number);
+                            const e = new Date();
+                            e.setHours(h, m + 60, 0, 0);
+                            setEndTime(`${pad(e.getHours())}:${pad(e.getMinutes())}`);
+                          }
+                        } else {
+                          setEndTime(v);
+                        }
+                      }
+                    }}
+                  />
+                )}
+                {Platform.OS === 'ios' && timeTarget && (
+                  <TouchableOpacity
+                    style={[styles.doneBtn, { backgroundColor: colors.primary }]}
+                    onPress={() => setTimeTarget(null)}
+                    accessibilityLabel="Confirmar hora"
+                  >
+                    <Text style={[styles.doneText, { color: colors.onPrimary }]}>OK</Text>
+                  </TouchableOpacity>
                 )}
 
-                <TouchableOpacity onPress={onClose} hitSlop={tokens.hitSlop.sm} accessibilityLabel="Fechar">
-                  <MaterialIcons name="close" size={18} color={colors.onSurfaceVariant} />
-                </TouchableOpacity>
-              </View>
-
-              <Text style={[styles.dateLabel, { color: colors.textMuted }]}>Data selecionada: {formattedDate}</Text>
-
-              {/* Input de Título */}
-              <TextInput
-                style={[
-                  styles.input,
-                  {
-                    backgroundColor: colors.surfaceContainerLow,
-                    borderColor: colors.outlineVariant,
-                    color: colors.onSurface,
-                  },
-                ]}
-                placeholder={tab === 'event' ? 'Título da reunião ou evento...' : 'Título da tarefa ou lembrete...'}
-                placeholderTextColor={colors.textMuted}
-                value={title}
-                onChangeText={setTitle}
-                autoFocus
-              />
-
-              {/* Seletor de Prioridade de Alerta (para eventos) */}
-              {tab === 'event' && (
-                <View style={styles.priorityRow}>
-                  <Text style={[styles.priorityLabel, { color: colors.textSecondary }]}>Alerta:</Text>
+                <Text style={[styles.label, { color: colors.onSurfaceVariant }]}>Alerta</Text>
+                <View style={styles.row}>
                   {(
                     [
-                      { key: 'silent', label: 'Silencioso', icon: 'notifications-off' as const },
-                      { key: 'default', label: 'Padrão', icon: 'notifications' as const },
+                      { key: 'silent', label: 'Silencioso' },
+                      { key: 'default', label: 'Padrão' },
                     ] as const
                   ).map((opt) => {
-                    const isSelected = notifPriority === opt.key;
+                    const active = notifPriority === opt.key;
                     return (
                       <TouchableOpacity
                         key={opt.key}
-                        style={[
-                          styles.priorityChip,
-                          {
-                            backgroundColor: isSelected
-                              ? colors.primaryContainer
-                              : colors.surfaceContainerLow,
-                            borderColor: isSelected ? colors.primary : colors.outlineVariant,
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            gap: 4,
-                          },
-                        ]}
+                        style={[styles.chip, active && { backgroundColor: colors.primary, borderColor: colors.primary }, { borderColor: colors.outlineVariant }]}
                         onPress={() => setNotifPriority(opt.key)}
+                        activeOpacity={0.8}
+                        accessibilityLabel={`Alerta ${opt.label}`}
                       >
-                        <MaterialIcons
-                          name={opt.icon}
-                          size={14}
-                          color={isSelected ? colors.onPrimaryContainer : colors.textSecondary}
-                        />
-                        <Text
-                          style={[
-                            styles.priorityChipText,
-                            {
-                              color: isSelected ? colors.onPrimaryContainer : colors.textSecondary,
-                              fontWeight: isSelected ? '700' : '500',
-                            },
-                          ]}
-                        >
+                        <Text style={[styles.chipText, { color: active ? colors.onPrimary : colors.onSurfaceVariant }]}>
                           {opt.label}
                         </Text>
                       </TouchableOpacity>
                     );
                   })}
                 </View>
-              )}
+              </>
+            )}
 
-              {/* Seletor de Prioridade (apenas para tarefas) */}
-              {tab === 'todo' && (
-                <View style={styles.priorityRow}>
-                  <Text style={[styles.priorityLabel, { color: colors.textSecondary }]}>Prioridade:</Text>
+            {tab === 'todo' && (
+              <>
+                <Text style={[styles.label, { color: colors.onSurfaceVariant }]}>Prioridade</Text>
+                <View style={styles.row}>
                   {(['low', 'medium', 'high'] as const).map((p) => {
-                    const isSelected = priority === p;
+                    const active = priority === p;
                     return (
                       <TouchableOpacity
                         key={p}
-                        style={[
-                          styles.priorityChip,
-                          {
-                            backgroundColor: isSelected
-                              ? colors.primaryContainer
-                              : colors.surfaceContainerLow,
-                            borderColor: isSelected ? colors.primary : colors.outlineVariant,
-                          },
-                        ]}
+                        style={[styles.chip, active && { backgroundColor: colors.primary, borderColor: colors.primary }, { borderColor: colors.outlineVariant }]}
                         onPress={() => setPriority(p)}
+                        activeOpacity={0.8}
+                        accessibilityLabel={`Prioridade ${p}`}
                       >
-                        <Text
-                          style={[
-                            styles.priorityChipText,
-                            {
-                              color: isSelected ? colors.onPrimaryContainer : colors.textSecondary,
-                              fontWeight: isSelected ? '700' : '500',
-                            },
-                          ]}
-                        >
+                        <Text style={[styles.chipText, { color: active ? colors.onPrimary : colors.onSurfaceVariant }]}>
                           {p === 'low' ? 'Baixa' : p === 'medium' ? 'Média' : 'Alta'}
                         </Text>
                       </TouchableOpacity>
                     );
                   })}
                 </View>
-              )}
 
-              {/* Seletor de Vínculo com Evento (apenas para tarefas) */}
-              {tab === 'todo' && events && events.length > 0 && (
-                <View style={styles.eventLinkSection}>
-                  <Text style={[styles.priorityLabel, { color: colors.textSecondary }]}>
-                    Vincular a compromisso:
-                  </Text>
-                  <View style={styles.eventChipsWrap}>
-                    <TouchableOpacity
-                      style={[
-                        styles.eventLinkChip,
-                        {
-                          backgroundColor: selectedEventId === null ? colors.primaryContainer : colors.surfaceContainerLow,
-                          borderColor: selectedEventId === null ? colors.primary : colors.outlineVariant,
-                        },
-                      ]}
-                      onPress={() => setSelectedEventId(null)}
-                      activeOpacity={0.75}
-                    >
-                      <Text
-                        style={[
-                          styles.eventLinkChipText,
-                          { color: selectedEventId === null ? colors.onPrimaryContainer : colors.textSecondary },
-                        ]}
+                {events && events.length > 0 && (
+                  <>
+                    <Text style={[styles.label, { color: colors.onSurfaceVariant }]}>Vincular a compromisso</Text>
+                    <View style={styles.row}>
+                      <TouchableOpacity
+                        style={[styles.chip, selectedEventId === null && { backgroundColor: colors.primary, borderColor: colors.primary }, { borderColor: colors.outlineVariant }]}
+                        onPress={() => setSelectedEventId(null)}
+                        activeOpacity={0.75}
+                        accessibilityLabel="Sem vínculo"
                       >
-                        Nenhum
-                      </Text>
-                    </TouchableOpacity>
-                    {events.slice(0, 5).map((ev) => {
-                      const isSelected = selectedEventId === ev.id;
-                      return (
-                        <TouchableOpacity
-                          key={ev.id}
-                          style={[
-                            styles.eventLinkChip,
-                            {
-                              backgroundColor: isSelected ? colors.primaryContainer : colors.surfaceContainerLow,
-                              borderColor: isSelected ? colors.primary : colors.outlineVariant,
-                            },
-                          ]}
-                          onPress={() => setSelectedEventId(isSelected ? null : ev.id)}
-                          activeOpacity={0.75}
-                        >
-                          <MaterialIcons
-                            name="event"
-                            size={12}
-                            color={isSelected ? colors.onPrimaryContainer : colors.primary}
-                          />
-                          <Text
-                            style={[
-                              styles.eventLinkChipText,
-                              { color: isSelected ? colors.onPrimaryContainer : colors.onSurface },
-                            ]}
-                            numberOfLines={1}
+                        <Text style={[styles.chipText, { color: selectedEventId === null ? colors.onPrimary : colors.onSurfaceVariant }]}>
+                          Nenhum
+                        </Text>
+                      </TouchableOpacity>
+                      {events.slice(0, 5).map((ev) => {
+                        const active = selectedEventId === ev.id;
+                        return (
+                          <TouchableOpacity
+                            key={ev.id}
+                            style={[styles.chip, active && { backgroundColor: colors.primary, borderColor: colors.primary }, { borderColor: colors.outlineVariant }]}
+                            onPress={() => setSelectedEventId(active ? null : ev.id)}
+                            activeOpacity={0.75}
+                            accessibilityLabel={`Vincular a ${ev.title}`}
                           >
-                            {ev.title}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                </View>
-              )}
+                            <Text
+                              style={[styles.chipText, { color: active ? colors.onPrimary : colors.onSurface }]}
+                              numberOfLines={1}
+                            >
+                              {ev.title}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </>
+                )}
+              </>
+            )}
 
-              {/* Botões de Ação */}
-              <View style={styles.footerRow}>
-                <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
-                  <Text style={[styles.cancelBtnText, { color: colors.textSecondary }]}>Cancelar</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.saveBtn,
-                    { backgroundColor: colors.primary },
-                    !title.trim() && styles.saveBtnDisabled,
-                  ]}
-                  onPress={handleSave}
-                  disabled={!title.trim()}
-                >
-                  <Text style={[styles.saveBtnText, { color: colors.onPrimary }]}>Salvar</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </TouchableWithoutFeedback>
+            <TouchableOpacity
+              style={[styles.saveBtn, { backgroundColor: colors.primary, opacity: title.trim() ? 1 : 0.6 }]}
+              onPress={handleSave}
+              disabled={!title.trim()}
+              activeOpacity={0.85}
+              accessibilityLabel={tab === 'event' ? 'Criar compromisso' : 'Criar tarefa'}
+              accessibilityRole="button"
+            >
+              <Text style={[styles.saveText, { color: colors.onPrimary }]}>
+                {tab === 'event' ? 'Criar compromisso' : 'Criar tarefa'}
+              </Text>
+            </TouchableOpacity>
+          </ScrollView>
         </View>
-      </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
@@ -320,142 +332,131 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.75)',
-    justifyContent: 'center',
-    padding: tokens.spacing.md,
-  },
-  card: {
-    backgroundColor: tokens.colors.surfaceContainer,
-    borderRadius: tokens.radii.lg,
-    padding: tokens.spacing.md,
-    borderWidth: 1,
-    borderColor: tokens.colors.surfaceBorder,
-    gap: tokens.spacing.md,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  segmentedGroup: {
-    flexDirection: 'row',
-    backgroundColor: tokens.colors.surfaceContainerLowest,
-    borderRadius: tokens.radii.full,
-    padding: 3,
-    gap: 4,
-  },
-  segmentBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: tokens.radii.full,
-  },
-  segmentBtnActive: {
-    backgroundColor: tokens.colors.surfaceContainerHigh,
-  },
-  segmentText: {
-    color: tokens.colors.textSecondary,
-    fontSize: tokens.typography.size.xs,
-  },
-  segmentTextActive: {
-    color: tokens.colors.textPrimary,
-    fontWeight: tokens.typography.weight.semibold,
-  },
-  dateLabel: {
-    color: tokens.colors.textSecondary,
-    fontSize: tokens.typography.size.xs,
-  },
-  input: {
-    backgroundColor: tokens.colors.surfaceContainerLow,
-    borderRadius: tokens.radii.md,
-    paddingHorizontal: tokens.spacing.md,
-    paddingVertical: 10,
-    color: tokens.colors.textPrimary,
-    fontSize: tokens.typography.size.sm,
-    borderWidth: 1,
-    borderColor: tokens.colors.surfaceBorder,
-  },
-  priorityRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  priorityLabel: {
-    color: tokens.colors.textSecondary,
-    fontSize: tokens.typography.size.xs,
-  },
-  priorityChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: tokens.radii.full,
-    backgroundColor: tokens.colors.surfaceContainerLow,
-    borderWidth: 1,
-    borderColor: tokens.colors.surfaceBorder,
-  },
-  priorityChipActive: {
-    backgroundColor: tokens.colors.primaryLight,
-    borderColor: tokens.colors.primary,
-  },
-  priorityChipText: {
-    color: tokens.colors.textSecondary,
-    fontSize: tokens.typography.size.xs,
-  },
-  priorityChipTextActive: {
-    color: tokens.colors.primary,
-    fontWeight: tokens.typography.weight.semibold,
-  },
-  footerRow: {
-    flexDirection: 'row',
     justifyContent: 'flex-end',
-    gap: tokens.spacing.sm,
-    marginTop: tokens.spacing.xs,
+    backgroundColor: 'rgba(0,0,0,0.4)',
   },
-  cancelBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: tokens.radii.full,
+  scrollContent: {
+    paddingBottom: 24,
   },
-  cancelBtnText: {
-    color: tokens.colors.textSecondary,
-    fontSize: tokens.typography.size.xs + 1,
+  sheet: {
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
+    paddingHorizontal: tokens.spacing.md,
+    paddingTop: 8,
+    paddingBottom: 28,
+    maxHeight: '90%',
   },
-  saveBtn: {
-    backgroundColor: tokens.colors.cobalt,
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    borderRadius: tokens.radii.full,
+  handle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#9CA3AF',
+    alignSelf: 'center',
+    marginBottom: 4,
   },
-  saveBtnDisabled: {
-    opacity: 0.5,
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+    gap: 12,
   },
-  saveBtnText: {
-    color: '#fff',
-    fontSize: tokens.typography.size.xs + 1,
-    fontWeight: tokens.typography.weight.semibold,
+  title: {
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: -0.2,
   },
-  eventLinkSection: {
-    marginTop: tokens.spacing.sm,
+  subtitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 2,
   },
-  eventChipsWrap: {
+  closeBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  typeRow: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(0,0,0,0.06)',
+    borderRadius: 14,
+    padding: 4,
+    gap: 4,
+    marginBottom: 8,
+  },
+  typeBtn: {
+    flex: 1,
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  typeText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  titleInput: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontSize: 15,
+    marginBottom: 4,
+  },
+  label: {
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 10,
+    marginBottom: 6,
+  },
+  row: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
-    marginTop: 6,
+    gap: 8,
   },
-  eventLinkChip: {
+  chip: {
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  chipText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  timeBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: tokens.radii.sm,
+    justifyContent: 'center',
+    gap: 8,
     borderWidth: 1,
-    maxWidth: 180,
+    borderRadius: 12,
+    paddingVertical: 12,
   },
-  eventLinkChipText: {
-    fontSize: 11,
-    fontWeight: tokens.typography.weight.medium,
+  timeBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  doneBtn: {
+    borderRadius: 12,
+    paddingVertical: 10,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  doneText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  saveBtn: {
+    borderRadius: 16,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  saveText: {
+    fontSize: 15,
+    fontWeight: '700',
   },
 });

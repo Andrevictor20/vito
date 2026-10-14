@@ -124,7 +124,7 @@ func (h *PendingHandler) GetPending(w http.ResponseWriter, r *http.Request) {
 	item, err := h.svc.GetByID(id, userID)
 	if err != nil {
 		if err == domain.ErrPendingItemNotFound {
-			http.Error(w, `{"error":"pendência não encontrada"}`, http.StatusNotFound)
+			respondError(w, domain.ErrPendingItemNotFound)
 			return
 		}
 		http.Error(w, `{"error":"falha ao buscar pendência"}`, http.StatusInternalServerError)
@@ -165,7 +165,7 @@ func (h *PendingHandler) UpdatePending(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		if err == domain.ErrPendingItemNotFound {
-			http.Error(w, `{"error":"pendência não encontrada"}`, http.StatusNotFound)
+			respondError(w, domain.ErrPendingItemNotFound)
 			return
 		}
 		http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusBadRequest)
@@ -197,7 +197,7 @@ func (h *PendingHandler) SchedulePending(w http.ResponseWriter, r *http.Request)
 	item, err := h.svc.SchedulePending(id, userID, req.ScheduledDate)
 	if err != nil {
 		if err == domain.ErrPendingItemNotFound {
-			http.Error(w, `{"error":"pendência não encontrada"}`, http.StatusNotFound)
+			respondError(w, domain.ErrPendingItemNotFound)
 			return
 		}
 		http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusBadRequest)
@@ -223,7 +223,7 @@ func (h *PendingHandler) CompletePending(w http.ResponseWriter, r *http.Request)
 	item, err := h.svc.CompletePending(id, userID)
 	if err != nil {
 		if err == domain.ErrPendingItemNotFound {
-			http.Error(w, `{"error":"pendência não encontrada"}`, http.StatusNotFound)
+			respondError(w, domain.ErrPendingItemNotFound)
 			return
 		}
 		http.Error(w, `{"error":"falha ao concluir pendência"}`, http.StatusInternalServerError)
@@ -248,7 +248,7 @@ func (h *PendingHandler) DeletePending(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.svc.DeletePending(id, userID); err != nil {
 		if err == domain.ErrPendingItemNotFound {
-			http.Error(w, `{"error":"pendência não encontrada"}`, http.StatusNotFound)
+			respondError(w, domain.ErrPendingItemNotFound)
 			return
 		}
 		http.Error(w, `{"error":"falha ao excluir pendência"}`, http.StatusInternalServerError)

@@ -53,7 +53,26 @@ func FetchGoogleNews(ctx context.Context, query string, maxResults int, customCl
 		client = &http.Client{Timeout: 6 * time.Second}
 	}
 
-	return fetchGoogleNewsFromURL(ctx, searchURL, client, maxResults, time.Now())
+	// Bug §8.7/11: retry com backoff + validação de conteúdo não-vazio.
+	var items []NewsItem
+	var err error
+	for attempt := 0; attempt < 3; attempt++ {
+		if attempt > 0 {
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(time.Duration(attempt) * 500 * time.Millisecond):
+			}
+		}
+		items, err = fetchGoogleNewsFromURL(ctx, searchURL, client, maxResults, time.Now())
+		if err == nil && len(items) > 0 {
+			return items, nil
+		}
+		if err == nil {
+			err = fmt.Errorf("feed RSS sem notícias utilizáveis para %q", cleanQuery)
+		}
+	}
+	return nil, fmt.Errorf("falha ao coletar notícias após 3 tentativas: %w", err)
 }
 
 func fetchGoogleNewsFromURL(ctx context.Context, targetURL string, client *http.Client, maxResults int, refDate time.Time) ([]NewsItem, error) {

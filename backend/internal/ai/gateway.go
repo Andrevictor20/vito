@@ -6,9 +6,16 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	"github.com/andrevmp/vito/backend/internal/domain"
 )
+
+// attemptCtx isola cada tentativa com timeout próprio (bug §8.7/10): um ctx
+// expirado pelo provedor anterior não aborta os próximos instantaneamente.
+func attemptCtx(parent context.Context) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.WithoutCancel(parent), 15*time.Second)
+}
 
 // Gateway orquestra múltiplos provedores de IA aplicando failover em cascata.
 type Gateway struct {
@@ -64,7 +71,13 @@ func (g *Gateway) ParseIntent(ctx context.Context, input UserInput) (*ParsedInte
 
 	var lastErr error
 	for _, provider := range candidates {
-		intent, err := provider.ParseIntent(ctx, input)
+		attempt, cancel := attemptCtx(ctx)
+		intent, err := provider.ParseIntent(attempt, input)
+		cancel()
+		// Resposta vazia com err == nil conta como falha (bug §8.7/9).
+		if err == nil && intent.IsEmpty() {
+			err = errors.New("resposta vazia do provedor (sem mensagem nem ações)")
+		}
 		if err == nil && intent != nil {
 			intent.ProviderUsed = provider.Name()
 			intent.LocalizeTimes(input.Timezone)
@@ -87,8 +100,11 @@ func (g *Gateway) EvaluateTrigger(ctx context.Context, t *domain.Trigger) (*doma
 	var lastErr error
 	for _, p := range g.providers {
 		if ep, ok := p.(TriggerEvaluatorProvider); ok {
-			res, err := ep.EvaluateTrigger(ctx, t)
+			attempt, cancel := attemptCtx(ctx)
+			res, err := ep.EvaluateTrigger(attempt, t)
+			cancel()
 			if err == nil && res != nil {
+				res.EnforceConfidenceGate()
 				return res, nil
 			}
 			lastErr = err
@@ -108,7 +124,9 @@ func (g *Gateway) GenerateText(ctx context.Context, systemPrompt, userPrompt str
 	var lastErr error
 	for _, p := range g.providers {
 		if tg, ok := p.(TextGeneratorProvider); ok {
-			text, err := tg.GenerateText(ctx, systemPrompt, userPrompt)
+			attempt, cancel := attemptCtx(ctx)
+			text, err := tg.GenerateText(attempt, systemPrompt, userPrompt)
+			cancel()
 			if err == nil && strings.TrimSpace(text) != "" {
 				return text, nil
 			}

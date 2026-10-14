@@ -2,6 +2,7 @@ package ai
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/andrevmp/vito/backend/internal/domain"
@@ -51,6 +52,8 @@ type UserInput struct {
 	ConversationHistory []ChatMessageContext `json:"conversation_history,omitempty"` // Histórico recente da conversa multi-turn
 	UserName            string               `json:"user_name,omitempty"`            // Nome do usuário para personalização
 	AutonomyMode        string               `json:"autonomy_mode,omitempty"`        // "assisted" (padrão) | "proactive"
+	AppStateFlags       []string             `json:"app_state_flags,omitempty"`      // §8.5 telemetria compacta
+	CoreProfile         []string             `json:"core_profile,omitempty"`         // §8.2 Camada 1 (8-10 itens)
 }
 
 // ParsedEvent dados extraídos para criação, atualização ou remoção de evento.
@@ -123,6 +126,8 @@ type ParsedBooking struct {
 // ParsedIntent resultado normalizado da interpretação do assistente Toki-like.
 type ParsedIntent struct {
 	Action         IntentAction   `json:"action"`
+	Thought        string         `json:"thought,omitempty"`      // §8.6 CoT: raciocínio guiado obrigatório
+	ContextUsed    []string       `json:"context_used,omitempty"` // §8.6 CoT: memórias/entidades usadas
 	Message        string         `json:"message"` // Resposta amigável da secretária
 	Event          *ParsedEvent   `json:"event,omitempty"`
 	Todo           *ParsedTodo    `json:"todo,omitempty"`
@@ -132,6 +137,20 @@ type ParsedIntent struct {
 	MemoryContent  string         `json:"memory_content,omitempty"`
 	MemoryCategory string         `json:"memory_category,omitempty"`
 	ProviderUsed   string         `json:"provider_used,omitempty"`
+}
+
+// IsEmpty detecta resposta vazia (bug §8.7/9): Reply em branco e nenhuma ação.
+// O gateway trata como falha e aciona o próximo provedor em vez de engolir.
+func (p *ParsedIntent) IsEmpty() bool {
+	if p == nil {
+		return true
+	}
+	if strings.TrimSpace(p.Message) != "" {
+		return false
+	}
+	return p.Event == nil && p.Todo == nil && p.Trigger == nil &&
+		p.Pending == nil && p.Booking == nil &&
+		strings.TrimSpace(p.MemoryContent) == ""
 }
 
 // Provider contrato unificado para provedores de IA (Google, OpenRouter, Groq).

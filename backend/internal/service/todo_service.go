@@ -146,6 +146,8 @@ func (s *TodoService) UpdateTodo(id, userID string, input domain.UpdateTodoInput
 	if err != nil {
 		return nil, err
 	}
+	beforeTitle := todo.Title
+	createdAt := todo.CreatedAt
 
 	if input.Title != nil {
 		trimmed := strings.TrimSpace(*input.Title)
@@ -186,6 +188,10 @@ func (s *TodoService) UpdateTodo(id, userID string, input domain.UpdateTodoInput
 
 	if err := s.todoRepo.Update(todo); err != nil {
 		return nil, err
+	}
+	// Ciclo 2 §8.4: correção manual rápida vira preferência aprendida.
+	if insight := BuildCorrectionInsight("tarefa", beforeTitle, todo.Title, createdAt, time.Now().UTC()); insight != "" {
+		emitImplicitFeedback(userID, insight)
 	}
 
 	return todo, nil

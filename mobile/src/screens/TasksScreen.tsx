@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   StyleSheet,
   View,
@@ -7,6 +7,7 @@ import {
   RefreshControl,
   ActivityIndicator,
   TouchableOpacity,
+  TextInput,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens } from '../theme/tokens';
@@ -14,6 +15,7 @@ import { useTheme } from '../context/ThemeContext';
 import { Todo, PendingItem } from '../types';
 import { TaskRow } from '../components/tasks/TaskRow';
 import { TaskSheet, TaskPayload } from '../components/tasks/TaskSheet';
+import { BottomSheetModal } from '../components/ui/BottomSheetModal';
 import { usePendingItems } from '../hooks/usePendingItems';
 import { toUnifiedRows, sortUnifiedRows, filterUnifiedRows, TaskFilter, TaskSort } from '../utils/unifiedTasks';
 
@@ -49,6 +51,8 @@ interface TasksScreenProps {
     remind_advance_minutes?: number;
   }) => Promise<any>;
   onOpenEventCreate?: (title: string, date?: string) => void;
+  /** Sinal do Header (+ Nova tarefa): incrementa para abrir o sheet em criação. */
+  createRequestId?: number;
 }
 
 const FILTERS: Array<{ id: TaskFilter; label: string }> = [
@@ -59,16 +63,24 @@ const FILTERS: Array<{ id: TaskFilter; label: string }> = [
 ];
 
 const SORTS: Array<{ id: TaskSort; label: string }> = [
-  { id: 'date', label: 'Data' },
+  { id: 'date', label: 'Prazo' },
   { id: 'priority', label: 'Prioridade' },
   { id: 'alpha', label: 'A–Z' },
+];
+
+type PriorityFilter = 'all' | 'low' | 'medium' | 'high';
+
+const PRIORITY_FILTERS: Array<{ id: PriorityFilter; label: string }> = [
+  { id: 'all', label: 'Todas as prioridades' },
+  { id: 'high', label: '• Alta Prioridade' },
+  { id: 'medium', label: '• Média Prioridade' },
+  { id: 'low', label: '• Baixa Prioridade' },
 ];
 
 export const TasksScreen: React.FC<TasksScreenProps> = ({
   todos,
   pendingTodos,
   completedTodosList,
-  completedCount,
   loading,
   refreshing,
   onRefresh,
@@ -80,11 +92,15 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
   onSaveTodoFull,
   onUpdateTodoFull,
   onOpenEventCreate,
+  createRequestId,
 }) => {
   const { colors, isDark } = useTheme();
   const [showCompleted, setShowCompleted] = useState(false);
   const [filter, setFilter] = useState<TaskFilter>('all');
   const [sort, setSort] = useState<TaskSort>('date');
+  const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterVisible, setFilterVisible] = useState(false);
   const [sheetVisible, setSheetVisible] = useState(false);
   const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
   // Pendência legada em conversão para tarefa unificada.
@@ -94,25 +110,63 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
 
   const pending = usePendingItems(onOpenEventCreate);
 
+  // CTA do Header (+ Nova tarefa): abre o sheet em modo criação.
+  const firstCreateRender = useRef(true);
+  useEffect(() => {
+    if (firstCreateRender.current) {
+      firstCreateRender.current = false;
+      return;
+    }
+    if ((createRequestId ?? 0) > 0) {
+      setEditingTodo(null);
+      setConvertingPending(null);
+      setSaveError(null);
+      setSheetVisible(true);
+    }
+  }, [createRequestId]);
+
   const rows = useMemo(
     () => toUnifiedRows([...pendingTodos, ...completedTodosList], pending.items, Date.now()),
     [pendingTodos, completedTodosList, pending.items],
   );
   const now = Date.now();
-  const activeRows = useMemo(
+  const query = searchQuery.trim().toLowerCase();
+  const baseRows = useMemo(
     () => sortUnifiedRows(filterUnifiedRows(rows, filter, now), sort),
     [rows, filter, sort],
   );
+  const activeRows = useMemo(() => {
+    let list = baseRows;
+    if (priorityFilter !== 'all') {
+      list = list.filter((r) => r.priority === priorityFilter);
+    }
+    if (query) {
+      list = list.filter(
+        (r) =>
+          r.title.toLowerCase().includes(query) ||
+          r.detail.toLowerCase().includes(query)
+      );
+    }
+    return list;
+  }, [baseRows, priorityFilter, query]);
+  // Contagens vivas por período (para o sheet de filtro).
+  const counts = useMemo(() => {
+    const c: Record<TaskFilter, number> = { all: 0, today: 0, overdue: 0, nodate: 0 };
+    (Object.keys(c) as TaskFilter[]).forEach((f) => {
+      c[f] = filterUnifiedRows(rows, f, now).length;
+    });
+    return c;
+  }, [rows, now]);
   const doneRows = useMemo(() => rows.filter((r) => r.done), [rows]);
-  const overdueCount = useMemo(() => rows.filter((r) => !r.done && r.overdue).length, [rows]);
 
-  const renderRow = (row: (typeof activeRows)[number]) => {
+  const renderRow = (row: (typeof activeRows)[number], isLast = false) => {
     if (row.kind === 'todo' && row.sourceTodo) {
       const t = row.sourceTodo;
       return (
         <TaskRow
           key={`todo-${row.id}`}
           row={row}
+          isLast={isLast}
           onToggle={() => onToggleTodo(t.id)}
           onDelete={() => onDeleteTodo(t.id)}
           onEdit={() => { setEditingTodo(t); setConvertingPending(null); setSaveError(null); setSheetVisible(true); }}
@@ -130,6 +184,7 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
         <TaskRow
           key={`pending-${row.id}`}
           row={row}
+          isLast={isLast}
           onToggle={() => pending.toggleComplete(p)}
           onDelete={() => pending.remove(p.id)}
           onEdit={() => {
@@ -223,49 +278,59 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
           />
         }
       >
-        <View style={styles.sectionHeader}>
-          <Text style={[styles.checklistSubtitle, { color: colors.textMuted }]}>
-            {activeRows.length} {activeRows.length === 1 ? 'ativa' : 'ativas'}
-            {overdueCount > 0 ? ` · ${overdueCount} atrasada${overdueCount === 1 ? '' : 's'}` : ''}
-            {completedCount > 0 ? ` · ${completedCount} concluída${completedCount === 1 ? '' : 's'}` : ''}
-          </Text>
+        <View style={styles.searchRow}>
+          <View style={[styles.searchBox, { backgroundColor: colors.surfaceContainerLow, borderColor: colors.outlineVariant }]}>
+            <MaterialIcons name="search" size={18} color={colors.onSurfaceVariant} />
+            <TextInput
+              style={[styles.searchInput, { color: colors.onSurface }]}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="Pesquisar tarefas..."
+              placeholderTextColor={colors.textMuted}
+              returnKeyType="search"
+              accessibilityLabel="Pesquisar tarefas"
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity
+                onPress={() => setSearchQuery('')}
+                hitSlop={tokens.hitSlop.sm}
+                accessibilityLabel="Limpar busca"
+                accessibilityRole="button"
+              >
+                <MaterialIcons name="close" size={18} color={colors.onSurfaceVariant} />
+              </TouchableOpacity>
+            )}
+          </View>
+          <TouchableOpacity
+            style={[
+              styles.filterBtn,
+              {
+                backgroundColor: (filter !== 'all' || priorityFilter !== 'all' || sort !== 'date')
+                  ? colors.primary
+                  : colors.surfaceContainerLow,
+                borderColor: colors.outlineVariant,
+              },
+            ]}
+            onPress={() => setFilterVisible(true)}
+            activeOpacity={0.8}
+            hitSlop={tokens.hitSlop.sm}
+            accessibilityLabel="Filtrar e ordenar tarefas"
+            accessibilityRole="button"
+          >
+            <MaterialIcons
+              name="filter-list"
+              size={20}
+              color={(filter !== 'all' || priorityFilter !== 'all' || sort !== 'date') ? colors.onPrimary : colors.onSurface}
+            />
+          </TouchableOpacity>
         </View>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.filterStrip}>
-          {FILTERS.map((f) => {
-            const active = filter === f.id;
-            return (
-              <TouchableOpacity
-                key={f.id}
-                style={[styles.filterChip, { borderColor: active ? colors.primary : colors.outlineVariant, backgroundColor: active ? colors.primary : 'transparent' }]}
-                onPress={() => setFilter(f.id)}
-                activeOpacity={0.8}
-                accessibilityRole="button"
-                accessibilityState={{ selected: active }}
-                accessibilityLabel={`Filtrar ${f.label}`}
-              >
-                <Text style={[styles.filterText, { color: active ? colors.onPrimary : colors.onSurfaceVariant }]}>{f.label}</Text>
-              </TouchableOpacity>
-            );
-          })}
-          <View style={[styles.sortDivider, { backgroundColor: colors.outlineVariant }]} />
-          {SORTS.map((s) => {
-            const active = sort === s.id;
-            return (
-              <TouchableOpacity
-                key={s.id}
-                style={[styles.filterChip, { borderColor: active ? colors.primary : colors.outlineVariant, backgroundColor: active ? colors.primary : 'transparent' }]}
-                onPress={() => setSort(s.id)}
-                activeOpacity={0.8}
-                accessibilityRole="button"
-                accessibilityState={{ selected: active }}
-                accessibilityLabel={`Ordenar por ${s.label}`}
-              >
-                <Text style={[styles.filterText, { color: active ? colors.onPrimary : colors.onSurfaceVariant }]}>{s.label}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
+        {(filter !== 'all' || priorityFilter !== 'all' || query) && (
+          <Text style={[styles.activeFilterLine, { color: colors.textMuted }]}>
+            {activeRows.length} {activeRows.length === 1 ? 'tarefa' : 'tarefas'}
+            {query ? ` para "${searchQuery.trim()}"` : ''}
+          </Text>
+        )}
 
         {pending.error && (
           <View style={[styles.errorCard, { backgroundColor: colors.errorContainer, borderColor: colors.error }]}>
@@ -281,18 +346,25 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
         ) : activeRows.length === 0 ? (
           <View style={[styles.emptyCard, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
             <View style={[styles.emptyIconContainer, { backgroundColor: 'rgba(52, 211, 153, 0.15)' }]}>
-              <MaterialIcons name="done-all" size={20} color={colors.success} />
+              <MaterialIcons name={query ? 'search-off' : 'done-all'} size={20} color={colors.success} />
             </View>
             <View style={styles.emptyContent}>
-              <Text style={[styles.emptyTitle, { color: colors.onSurface }]}>Tudo em Dia</Text>
-              <Text style={[styles.emptySub, { color: colors.onSurfaceVariant }]}>
-                Nenhuma tarefa neste filtro.
+              <Text style={[styles.emptyTitle, { color: colors.onSurface }]}>
+                {query ? `Nada para "${searchQuery.trim()}"` : 'Tudo em Dia'}
               </Text>
+              <Text style={[styles.emptySub, { color: colors.onSurfaceVariant }]}>
+                {query ? 'Tente outro termo ou limpe a busca.' : 'Nenhuma tarefa neste filtro.'}
+              </Text>
+              {query ? (
+                <TouchableOpacity onPress={() => setSearchQuery('')} activeOpacity={0.7} accessibilityLabel="Limpar busca">
+                  <Text style={[styles.retryText, { color: colors.primary }]}>Limpar busca</Text>
+                </TouchableOpacity>
+              ) : null}
             </View>
           </View>
         ) : (
           <View style={[styles.checklistCard, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant, borderWidth: 1 }]}>
-            {activeRows.map(renderRow)}
+            {activeRows.map((r, i) => renderRow(r, i === activeRows.length - 1))}
           </View>
         )}
 
@@ -337,26 +409,130 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
                   },
                 ]}
               >
-                {doneRows.map(renderRow)}
+                {doneRows.map((r, i) => renderRow(r, i === doneRows.length - 1))}
               </View>
             )}
           </View>
         )}
       </ScrollView>
 
-      {/* FAB fixo padronizado: pill compacta, sempre visível mesmo com 300 itens */}
-      <View style={styles.fabOverlay} pointerEvents="box-none">
-        <TouchableOpacity
-          style={[styles.fab, { backgroundColor: colors.primary }]}
-          onPress={() => { setEditingTodo(null); setConvertingPending(null); setSaveError(null); setSheetVisible(true); }}
-          activeOpacity={0.85}
-          accessibilityLabel="Nova tarefa"
-          accessibilityRole="button"
-        >
-          <MaterialIcons name="add" size={22} color={colors.onPrimary} />
-          <Text style={[styles.fabText, { color: colors.onPrimary }]}>Nova</Text>
-        </TouchableOpacity>
-      </View>
+      {/* CTA vive no Header (+ Nova tarefa); sem FAB sobre a lista. */}
+      <BottomSheetModal
+        visible={filterVisible}
+        onClose={() => setFilterVisible(false)}
+        title="Filtrar e Ordenar"
+        subtitle="Refine sua visualização de tarefas ativas"
+      >
+        <Text style={[styles.sheetGroupLabel, { color: colors.textMuted }]}>PERÍODO / STATUS</Text>
+        <View style={styles.sheetGrid}>
+          {FILTERS.map((f) => {
+            const active = filter === f.id;
+            return (
+              <TouchableOpacity
+                key={f.id}
+                style={[
+                  styles.sheetChip,
+                  {
+                    backgroundColor: active ? colors.primary : colors.surfaceContainerLow,
+                    borderColor: colors.outlineVariant,
+                  },
+                ]}
+                onPress={() => setFilter(f.id)}
+                activeOpacity={0.8}
+                hitSlop={tokens.hitSlop.sm}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={`Filtrar ${f.label}`}
+              >
+                <Text style={[styles.sheetChipText, { color: active ? colors.onPrimary : colors.onSurface }]}>
+                  {f.label} ({counts[f.id]})
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        <Text style={[styles.sheetGroupLabel, { color: colors.textMuted }]}>PRIORIDADE</Text>
+        <View style={styles.sheetGrid}>
+          {PRIORITY_FILTERS.map((p) => {
+            const active = priorityFilter === p.id;
+            return (
+              <TouchableOpacity
+                key={p.id}
+                style={[
+                  styles.sheetChip,
+                  {
+                    backgroundColor: active ? colors.primary : colors.surfaceContainerLow,
+                    borderColor: colors.outlineVariant,
+                  },
+                ]}
+                onPress={() => setPriorityFilter(p.id)}
+                activeOpacity={0.8}
+                hitSlop={tokens.hitSlop.sm}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={`Prioridade ${p.label}`}
+              >
+                <Text style={[styles.sheetChipText, { color: active ? colors.onPrimary : colors.onSurface }]}>
+                  {p.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        <Text style={[styles.sheetGroupLabel, { color: colors.textMuted }]}>ORDENAR LISTA POR</Text>
+        <View style={styles.sheetGrid}>
+          {SORTS.map((s) => {
+            const active = sort === s.id;
+            return (
+              <TouchableOpacity
+                key={s.id}
+                style={[
+                  styles.sheetChip,
+                  {
+                    backgroundColor: active ? colors.primary : colors.surfaceContainerLow,
+                    borderColor: colors.outlineVariant,
+                  },
+                ]}
+                onPress={() => setSort(s.id)}
+                activeOpacity={0.8}
+                hitSlop={tokens.hitSlop.sm}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={`Ordenar por ${s.label}`}
+              >
+                <Text style={[styles.sheetChipText, { color: active ? colors.onPrimary : colors.onSurface }]}>
+                  {s.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        <View style={styles.sheetFooter}>
+          <TouchableOpacity
+            style={[styles.sheetClearBtn, { borderColor: colors.outlineVariant }]}
+            onPress={() => { setFilter('all'); setPriorityFilter('all'); setSort('date'); setSearchQuery(''); }}
+            activeOpacity={0.8}
+            accessibilityLabel="Limpar filtros"
+            accessibilityRole="button"
+          >
+            <Text style={[styles.sheetClearText, { color: colors.onSurface }]}>Limpar</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.sheetApplyBtn, { backgroundColor: colors.primary }]}
+            onPress={() => setFilterVisible(false)}
+            activeOpacity={0.85}
+            accessibilityLabel={`Mostrar ${activeRows.length} tarefas`}
+            accessibilityRole="button"
+          >
+            <Text style={[styles.sheetApplyText, { color: colors.onPrimary }]}>
+              Mostrar {activeRows.length} tarefas
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </BottomSheetModal>
 
       <TaskSheet
         visible={sheetVisible}
@@ -386,30 +562,134 @@ const styles = StyleSheet.create({
     marginTop: tokens.spacing.sm,
     marginBottom: tokens.spacing.sm,
   },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: tokens.spacing.sm,
+    marginBottom: tokens.spacing.xs,
+  },
+  searchBox: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    minHeight: 48,
+    gap: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    paddingVertical: 10,
+  },
+  filterBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activeFilterLine: {
+    fontSize: 12,
+    marginBottom: tokens.spacing.xs,
+  },
+  sheetGroupLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    marginTop: tokens.spacing.md,
+    marginBottom: tokens.spacing.xs,
+  },
+  sheetGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  sheetChip: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  sheetChipText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  sheetFooter: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: tokens.spacing.lg,
+  },
+  sheetClearBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 48,
+  },
+  sheetClearText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  sheetApplyBtn: {
+    flex: 2,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 48,
+  },
+  sheetApplyText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
   checklistSubtitle: {
     fontSize: 12,
     marginTop: 2,
   },
-  filterStrip: {
-    gap: 8,
-    paddingRight: 8,
-    marginBottom: tokens.spacing.sm,
-    alignItems: 'center',
-  },
-  filterChip: {
+  segmented: {
+    flexDirection: 'row',
     borderWidth: 1,
-    borderRadius: 9999,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
+    borderRadius: 14,
+    padding: 3,
+    gap: 2,
+    marginBottom: tokens.spacing.xs,
   },
-  filterText: {
+  segmentBtn: {
+    flex: 1,
+    borderRadius: 11,
+    paddingVertical: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  segmentText: {
     fontSize: 12,
     fontWeight: '700',
   },
-  sortDivider: {
-    width: 1,
-    height: 20,
-    marginHorizontal: 2,
+  sortRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: tokens.spacing.sm,
+  },
+  sortLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  sortChip: {
+    borderWidth: 1,
+    borderRadius: 9999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  sortChipText: {
+    fontSize: 12,
+    fontWeight: '700',
   },
   checklistCard: {
     borderRadius: 20,

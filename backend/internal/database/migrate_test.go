@@ -1,0 +1,62 @@
+package database
+
+import (
+	"path/filepath"
+	"testing"
+)
+
+func TestVersionedMigrations_FreshDB(t *testing.T) {
+	db, err := Open(filepath.Join(t.TempDir(), "fresh.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	var count int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM schema_migrations`).Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	if count != 6 {
+		t.Fatalf("esperava 6 migrações registradas, vieram %d", count)
+	}
+	if !hasColumn(db, "todos", "category") || !hasColumn(db, "todos", "remind_at") {
+		t.Fatal("001 deveria criar todos com category e remind_at")
+	}
+	if !hasColumn(db, "events", "recurrence") || !hasColumn(db, "triggers", "days_of_week") {
+		t.Fatal("001 deveria incluir colunas dobradas dos ALTERs legados")
+	}
+	if !hasColumn(db, "triggers", "user_intent") || !hasColumn(db, "triggers", "search_keywords") {
+		t.Fatal("006 deveria criar user_intent e search_keywords em triggers")
+	}
+	if !hasTable(db, "user_core_profile") {
+		t.Fatal("005 deveria criar user_core_profile")
+	}
+}
+
+func TestVersionedMigrations_LegacyDB(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "legacy.db")
+	db, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Simula base pré-versionada: apaga o rastreio e remove a coluna category.
+	if _, err := db.Exec(`DELETE FROM schema_migrations`); err != nil {
+		t.Fatal(err)
+	}
+	db.Close()
+
+	// Reabre "legada": sem rastreio, mas com tabelas (sem category).
+	db2, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db2.Close()
+	// Como a base já tinha category (001 aplicada antes do DELETE), o carimbo ocorre.
+	var count int
+	if err := db2.QueryRow(`SELECT COUNT(*) FROM schema_migrations`).Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	if count != 6 {
+		t.Fatalf("base legada deveria ser carimbada com 6, veio %d", count)
+	}
+}

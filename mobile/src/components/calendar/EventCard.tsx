@@ -166,15 +166,6 @@ export const EventCard: React.FC<EventCardProps> = ({
               <Text style={[styles.inlineIndicatorText, { color: colors.onSurfaceVariant }]}>Recorrente</Text>
             </View>
           )}
-          <View style={styles.pillSpacer} />
-          <TouchableOpacity
-            style={styles.deleteButton}
-            onPress={handleDeletePress}
-            hitSlop={tokens.hitSlop.sm}
-            accessibilityLabel="Excluir compromisso"
-          >
-            <MaterialIcons name="close" size={15} color={colors.onSurfaceVariant} />
-          </TouchableOpacity>
         </View>
 
         <Text style={[styles.title, { color: colors.onSurface }]} numberOfLines={2}>
@@ -200,12 +191,22 @@ export const EventCard: React.FC<EventCardProps> = ({
         </View>
       </View>
 
-      {/* Chevron de navegação */}
-      {onPress && !isHolidayCard ? (
-        <View style={styles.chevron}>
-          <MaterialIcons name="chevron-right" size={18} color={colors.onSurfaceVariant} />
-        </View>
-      ) : null}
+      {/* Coluna direita: excluir no topo, chevron centralizado — alinhados no mesmo eixo */}
+      <View style={styles.rightCol}>
+        <TouchableOpacity
+          style={styles.deleteButton}
+          onPress={handleDeletePress}
+          hitSlop={tokens.hitSlop.sm}
+          accessibilityLabel="Excluir compromisso"
+        >
+          <MaterialIcons name="close" size={15} color={colors.onSurfaceVariant} />
+        </TouchableOpacity>
+        {onPress && !isHolidayCard ? (
+          <View style={styles.chevron}>
+            <MaterialIcons name="chevron-right" size={18} color={colors.onSurfaceVariant} />
+          </View>
+        ) : null}
+      </View>
     </TouchableOpacity>
   );
 };
@@ -271,11 +272,18 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.6,
   },
-  pillSpacer: {
-    flex: 1,
+  rightCol: {
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    alignSelf: 'stretch',
+    flexShrink: 0,
+    paddingVertical: 2,
   },
   deleteButton: {
-    padding: tokens.spacing.xs,
+    minWidth: 32,
+    minHeight: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   title: {
     fontSize: tokens.typography.size.titleMedium,

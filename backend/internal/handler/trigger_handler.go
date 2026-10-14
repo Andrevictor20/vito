@@ -35,14 +35,16 @@ func (h *TriggerHandler) SetWorker(worker *service.TriggerWorker) {
 }
 
 type createTriggerRequest struct {
-	Title         string                      `json:"title"`
-	Category      domain.TriggerCategory      `json:"category"`
-	Query         string                      `json:"query"`
-	ConditionType domain.TriggerConditionType `json:"condition_type"`
-	TargetValue   string                      `json:"target_value"`
-	Frequency     domain.TriggerFrequency     `json:"frequency"`
-	ScheduledTime string                      `json:"scheduled_time"`
-	DaysOfWeek    string                      `json:"days_of_week"`
+	Title          string                      `json:"title"`
+	Category       domain.TriggerCategory      `json:"category"`
+	Query          string                      `json:"query"`
+	UserIntent     string                      `json:"user_intent"`
+	SearchKeywords string                      `json:"search_keywords"`
+	ConditionType  domain.TriggerConditionType `json:"condition_type"`
+	TargetValue    string                      `json:"target_value"`
+	Frequency      domain.TriggerFrequency     `json:"frequency"`
+	ScheduledTime  string                      `json:"scheduled_time"`
+	DaysOfWeek     string                      `json:"days_of_week"`
 }
 
 func (h *TriggerHandler) CreateTrigger(w http.ResponseWriter, r *http.Request) {
@@ -59,14 +61,16 @@ func (h *TriggerHandler) CreateTrigger(w http.ResponseWriter, r *http.Request) {
 	}
 
 	trigger, err := h.triggerSvc.CreateTrigger(userID, domain.CreateTriggerInput{
-		Title:         req.Title,
-		Category:      req.Category,
-		Query:         req.Query,
-		ConditionType: req.ConditionType,
-		TargetValue:   req.TargetValue,
-		Frequency:     req.Frequency,
-		ScheduledTime: req.ScheduledTime,
-		DaysOfWeek:    req.DaysOfWeek,
+		Title:          req.Title,
+		Category:       req.Category,
+		Query:          req.Query,
+		UserIntent:     req.UserIntent,
+		SearchKeywords: req.SearchKeywords,
+		ConditionType:  req.ConditionType,
+		TargetValue:    req.TargetValue,
+		Frequency:      req.Frequency,
+		ScheduledTime:  req.ScheduledTime,
+		DaysOfWeek:     req.DaysOfWeek,
 	})
 	if err != nil {
 		if strings.Contains(err.Error(), "FOREIGN KEY") {
@@ -124,7 +128,7 @@ func (h *TriggerHandler) GetTrigger(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	trigger, err := h.triggerSvc.GetTrigger(id, userID)
 	if err != nil {
-		http.Error(w, `{"error":"disparador não encontrado"}`, http.StatusNotFound)
+		respondError(w, domain.ErrTriggerNotFound)
 		return
 	}
 
@@ -151,15 +155,17 @@ func (h *TriggerHandler) ToggleStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 type updateTriggerRequest struct {
-	Title         *string                      `json:"title"`
-	Category      *domain.TriggerCategory      `json:"category"`
-	Query         *string                      `json:"query"`
-	ConditionType *domain.TriggerConditionType `json:"condition_type"`
-	TargetValue   *string                      `json:"target_value"`
-	Frequency     *domain.TriggerFrequency     `json:"frequency"`
-	Status        *domain.TriggerStatus        `json:"status"`
-	ScheduledTime *string                      `json:"scheduled_time"`
-	DaysOfWeek    *string                      `json:"days_of_week"`
+	Title          *string                      `json:"title"`
+	Category       *domain.TriggerCategory      `json:"category"`
+	Query          *string                      `json:"query"`
+	UserIntent     *string                      `json:"user_intent"`
+	SearchKeywords *string                      `json:"search_keywords"`
+	ConditionType  *domain.TriggerConditionType `json:"condition_type"`
+	TargetValue    *string                      `json:"target_value"`
+	Frequency      *domain.TriggerFrequency     `json:"frequency"`
+	Status         *domain.TriggerStatus        `json:"status"`
+	ScheduledTime  *string                      `json:"scheduled_time"`
+	DaysOfWeek     *string                      `json:"days_of_week"`
 }
 
 func (h *TriggerHandler) UpdateTrigger(w http.ResponseWriter, r *http.Request) {
@@ -177,15 +183,17 @@ func (h *TriggerHandler) UpdateTrigger(w http.ResponseWriter, r *http.Request) {
 	}
 
 	trigger, err := h.triggerSvc.UpdateTrigger(id, userID, domain.UpdateTriggerInput{
-		Title:         req.Title,
-		Category:      req.Category,
-		Query:         req.Query,
-		ConditionType: req.ConditionType,
-		TargetValue:   req.TargetValue,
-		Frequency:     req.Frequency,
-		Status:        req.Status,
-		ScheduledTime: req.ScheduledTime,
-		DaysOfWeek:    req.DaysOfWeek,
+		Title:          req.Title,
+		Category:       req.Category,
+		Query:          req.Query,
+		UserIntent:     req.UserIntent,
+		SearchKeywords: req.SearchKeywords,
+		ConditionType:  req.ConditionType,
+		TargetValue:    req.TargetValue,
+		Frequency:      req.Frequency,
+		Status:         req.Status,
+		ScheduledTime:  req.ScheduledTime,
+		DaysOfWeek:     req.DaysOfWeek,
 	})
 	if err != nil {
 		http.Error(w, `{"error":"falha ao atualizar disparador"}`, http.StatusBadRequest)
@@ -217,7 +225,7 @@ func (h *TriggerHandler) RunTrigger(w http.ResponseWriter, r *http.Request) {
 
 	t, err := h.triggerSvc.GetTrigger(id, userID)
 	if err != nil {
-		http.Error(w, `{"error":"disparador não encontrado"}`, http.StatusNotFound)
+		respondError(w, domain.ErrTriggerNotFound)
 		return
 	}
 	_ = h.triggerSvc.RecordTriggerEvaluation(t.ID, "Execução manual concluída", t.Status, "Verificação sob demanda realizada para: "+t.Title)
@@ -251,7 +259,7 @@ func (h *TriggerHandler) TestTrigger(w http.ResponseWriter, r *http.Request) {
 
 	t, err := h.triggerSvc.GetTrigger(id, userID)
 	if err != nil {
-		http.Error(w, `{"error":"disparador não encontrado"}`, http.StatusNotFound)
+		respondError(w, domain.ErrTriggerNotFound)
 		return
 	}
 
@@ -264,6 +272,8 @@ func (h *TriggerHandler) TestTrigger(w http.ResponseWriter, r *http.Request) {
 		CurrentData:           "Verificação de simulação executada com sucesso.",
 		Summary:               "Simulação da vigília em " + timeStr + ": parâmetros estáveis.",
 		SimulatedNotification: "Alerta Vito: " + t.Title,
+		Confidence:            0,
+		WhyRelevant:           "",
 		TestedAt:              time.Now().UTC(),
 	}
 

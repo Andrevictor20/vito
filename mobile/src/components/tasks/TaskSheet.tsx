@@ -59,6 +59,150 @@ const ADVANCES = [0, 15, 30, 60];
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
+const WEEKDAYS_PT = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
+
+/** Mini-calendário padrão (números do mês): fallback web/sem módulo nativo. */
+const MiniCalendar: React.FC<{
+  value: string | null;
+  onSelect: (iso: string) => void;
+}> = ({ value, onSelect }) => {
+  const { colors } = useTheme();
+  const today = todayISO();
+  const init = value ?? today;
+  const [py, pm] = init.split('-').map(Number);
+  const [viewY, setViewY] = useState(py);
+  const [viewM, setViewM] = useState(pm);
+  const firstWeekday = new Date(viewY, viewM - 1, 1).getDay();
+  const daysInMonth = new Date(viewY, viewM, 0).getDate();
+  const monthLabel = new Date(viewY, viewM - 1, 1)
+    .toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
+    .replace(/^./, (c) => c.toUpperCase());
+  const atMinMonth =
+    viewY < Number(today.slice(0, 4)) ||
+    (viewY === Number(today.slice(0, 4)) && viewM <= Number(today.slice(5, 7)));
+  const shiftMonth = (delta: number) => {
+    let y = viewY;
+    let m = viewM + delta;
+    while (m < 1) { m += 12; y -= 1; }
+    while (m > 12) { m -= 12; y += 1; }
+    setViewY(y);
+    setViewM(m);
+  };
+  const cells: Array<number | null> = [
+    ...Array<number | null>(firstWeekday).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+  ];
+  return (
+    <View style={[styles.miniCal, { borderColor: colors.outlineVariant, backgroundColor: colors.surface }]}>
+      <View style={styles.miniCalHeader}>
+        <TouchableOpacity
+          onPress={() => shiftMonth(-1)}
+          disabled={atMinMonth}
+          hitSlop={tokens.hitSlop.sm}
+          accessibilityLabel="Mês anterior"
+          accessibilityRole="button"
+          style={{ opacity: atMinMonth ? 0.3 : 1 }}
+        >
+          <MaterialIcons name="chevron-left" size={22} color={colors.onSurface} />
+        </TouchableOpacity>
+        <Text style={[styles.miniCalTitle, { color: colors.onSurface }]}>{monthLabel}</Text>
+        <TouchableOpacity
+          onPress={() => shiftMonth(1)}
+          hitSlop={tokens.hitSlop.sm}
+          accessibilityLabel="Próximo mês"
+          accessibilityRole="button"
+        >
+          <MaterialIcons name="chevron-right" size={22} color={colors.onSurface} />
+        </TouchableOpacity>
+      </View>
+      <View style={styles.miniCalWeekRow}>
+        {WEEKDAYS_PT.map((w, i) => (
+          <Text key={i} style={[styles.miniCalWeekday, { color: colors.textMuted }]}>{w}</Text>
+        ))}
+      </View>
+      <View style={styles.miniCalGrid}>
+        {cells.map((d, i) => {
+          if (d === null) return <View key={`b-${i}`} style={styles.miniCalCell} />;
+          const iso = `${viewY}-${pad(viewM)}-${pad(d)}`;
+          const selected = value === iso;
+          const past = iso < today;
+          return (
+            <TouchableOpacity
+              key={iso}
+              disabled={past}
+              onPress={() => { hapticFeedback.selection(); onSelect(iso); }}
+              activeOpacity={0.8}
+              hitSlop={tokens.hitSlop.sm}
+              accessibilityLabel={`Dia ${d}`}
+              accessibilityRole="button"
+              accessibilityState={{ selected, disabled: past }}
+              style={[
+                styles.miniCalCell,
+                selected && { backgroundColor: colors.primary, borderRadius: 9999 },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.miniCalDay,
+                  { color: selected ? colors.onPrimary : colors.onSurface, opacity: past ? 0.3 : 1 },
+                ]}
+              >
+                {d}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
+  );
+};
+
+/** Mini-seletor de hora (HH/MM por números): fallback web/sem módulo nativo. */
+const MiniTimePicker: React.FC<{
+  value: string;
+  onChange: (t: string) => void;
+}> = ({ value, onChange }) => {
+  const { colors } = useTheme();
+  const [hh, mm] = value.split(':');
+  const hours = Array.from({ length: 24 }, (_, i) => pad(i));
+  const minutes = Array.from({ length: 12 }, (_, i) => pad(i * 5));
+  const col = (opts: string[], selected: string, onPick: (v: string) => void, label: string) => (
+    <View style={styles.miniTimeCol}>
+      <Text style={[styles.miniTimeColLabel, { color: colors.textMuted }]}>{label}</Text>
+      <ScrollView style={styles.miniTimeList} showsVerticalScrollIndicator={false}>
+        {opts.map((o) => {
+          const active = o === selected;
+          return (
+            <TouchableOpacity
+              key={o}
+              onPress={() => { hapticFeedback.selection(); onPick(o); }}
+              activeOpacity={0.8}
+              accessibilityLabel={`${label} ${o}`}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
+              style={[
+                styles.miniTimeOpt,
+                active && { backgroundColor: colors.primary, borderRadius: 10 },
+              ]}
+            >
+              <Text style={[styles.miniTimeOptText, { color: active ? colors.onPrimary : colors.onSurface }]}>
+                {o}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+    </View>
+  );
+  return (
+    <View style={[styles.miniTime, { borderColor: colors.outlineVariant, backgroundColor: colors.surface }]}>
+      {col(hours, hh, (h) => onChange(`${h}:${mm}`), 'Hora')}
+      <Text style={[styles.miniTimeSep, { color: colors.onSurface }]}>:</Text>
+      {col(minutes, minutes.includes(mm) ? mm : pad(Math.round(Number(mm) / 5) * 5 % 60), (m) => onChange(`${hh}:${m}`), 'Min')}
+    </View>
+  );
+};
+
 function fmtPreview(dateISO: string | null, time: string): string {
   if (!dateISO) return 'Sem data';
   const [y, m, d] = dateISO.split('-').map(Number);
@@ -90,6 +234,10 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
+  // Painel do seletor padrão (calendário/relogio): no Android abre o dialog
+  // nativo direto; no iOS/web expande o mini-seletor embutido.
+  const [dateExpanded, setDateExpanded] = useState(false);
+  const [timeExpanded, setTimeExpanded] = useState(false);
 
   useEffect(() => {
     if (visible) {
@@ -116,6 +264,9 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
       setShowDatePicker(false);
       setShowTimePicker(false);
       setLocalError(null);
+      // Recolhidos por padrão a cada abertura.
+      setDateExpanded(false);
+      setTimeExpanded(false);
     }
   }, [visible, editingTodo]);
 
@@ -222,7 +373,36 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
             />
 
             <Text style={[styles.label, { color: colors.onSurfaceVariant }]}>Data</Text>
-            <View style={styles.row}>
+            <TouchableOpacity
+              style={[styles.dateToggle, { borderColor: colors.outlineVariant }]}
+              onPress={() => {
+                hapticFeedback.selection();
+                // Android: dialog padrão de calendário direto; iOS/web: painel embutido.
+                if (Platform.OS === 'android') setShowDatePicker(true);
+                else setDateExpanded((v) => !v);
+              }}
+              activeOpacity={0.7}
+              accessibilityLabel={dateExpanded ? 'Recolher calendário' : 'Escolher data no calendário'}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: dateExpanded }}
+            >
+              <MaterialIcons name="calendar-month" size={18} color={colors.primary} />
+              <Text style={[styles.dateToggleText, { color: colors.onSurface }]}>
+                {dateISO ? fmtPreview(dateISO, time) : 'Escolher data…'}
+              </Text>
+              <MaterialIcons
+                name={dateExpanded ? 'expand-less' : 'expand-more'}
+                size={20}
+                color={colors.onSurfaceVariant}
+              />
+            </TouchableOpacity>
+
+            {/* Atalhos rápidos (1 toque) */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.chipStrip}
+            >
               <TouchableOpacity
                 style={chip(dateISO === todayISO())}
                 onPress={() => { hapticFeedback.selection(); setDateISO(todayISO()); }}
@@ -239,14 +419,6 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
               >
                 <Text style={chipText(dateISO === addDaysISO(todayISO(), 1))}>Amanhã</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={chip(false)}
-                onPress={() => { hapticFeedback.selection(); setShowDatePicker(true); }}
-                activeOpacity={0.8}
-                accessibilityLabel="Escolher data"
-              >
-                <Text style={chipText(false)}>Escolher…</Text>
-              </TouchableOpacity>
               {dateISO && (
                 <TouchableOpacity
                   style={chip(false)}
@@ -257,7 +429,7 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
                   <Text style={chipText(false)}>Limpar</Text>
                 </TouchableOpacity>
               )}
-            </View>
+            </ScrollView>
 
             {showDatePicker && Platform.OS === 'android' && (
               <DateTimePickerNative
@@ -271,7 +443,13 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
                 }}
               />
             )}
-            {showDatePicker && Platform.OS === 'ios' && (
+            {dateExpanded && Platform.OS === 'web' && (
+              <MiniCalendar
+                value={dateISO}
+                onSelect={(iso) => { setDateISO(iso); setDateExpanded(false); }}
+              />
+            )}
+            {dateExpanded && Platform.OS === 'ios' && (
               <View style={[styles.iosPicker, { borderColor: colors.outlineVariant }]}>
                 <DateTimePickerNative
                   value={dateValue}
@@ -284,7 +462,7 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
                 />
                 <TouchableOpacity
                   style={[styles.doneBtn, { backgroundColor: colors.primary }]}
-                  onPress={() => setShowDatePicker(false)}
+                  onPress={() => setDateExpanded(false)}
                   accessibilityLabel="Confirmar data"
                 >
                   <Text style={[styles.doneText, { color: colors.onPrimary }]}>OK</Text>
@@ -292,48 +470,64 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
               </View>
             )}
 
-            <Text style={[styles.label, { color: colors.onSurfaceVariant }]}>Hora · {time}</Text>
-            <View style={styles.row}>
-              {['08:00', '09:00', '12:00', '14:00', '18:00'].map((h) => (
-                <TouchableOpacity
-                  key={h}
-                  style={chip(time === h)}
-                  onPress={() => { hapticFeedback.selection(); setTime(h); }}
-                  activeOpacity={0.8}
-                  accessibilityLabel={`Hora ${h}`}
-                >
-                  <Text style={chipText(time === h)}>{h}</Text>
-                </TouchableOpacity>
-              ))}
-              <TouchableOpacity
-                style={chip(false)}
-                onPress={() => { hapticFeedback.selection(); setShowTimePicker(true); }}
-                activeOpacity={0.8}
-                accessibilityLabel="Outra hora"
-              >
-                <Text style={chipText(false)}>Outra…</Text>
-              </TouchableOpacity>
-            </View>
-            {showTimePicker && (
+            <Text style={[styles.label, { color: colors.onSurfaceVariant }]}>Hora</Text>
+            <TouchableOpacity
+              style={[styles.dateToggle, { borderColor: colors.outlineVariant }]}
+              onPress={() => {
+                hapticFeedback.selection();
+                // Android: relógio padrão direto; iOS/web: mini-seletor embutido.
+                if (Platform.OS === 'android') setShowTimePicker(true);
+                else setTimeExpanded((v) => !v);
+              }}
+              activeOpacity={0.7}
+              accessibilityLabel="Escolher hora e minuto"
+              accessibilityRole="button"
+              accessibilityState={{ expanded: timeExpanded }}
+            >
+              <MaterialIcons name="schedule" size={18} color={colors.primary} />
+              <Text style={[styles.dateToggleText, { color: colors.onSurface }]}>
+                {time}
+              </Text>
+              <MaterialIcons
+                name={timeExpanded && Platform.OS !== 'android' ? 'expand-less' : 'expand-more'}
+                size={20}
+                color={colors.onSurfaceVariant}
+              />
+            </TouchableOpacity>
+            {showTimePicker && Platform.OS === 'android' && (
               <DateTimePickerNative
                 value={timeValue}
                 mode="time"
-                display={Platform.OS === 'ios' ? 'spinner' : 'clock'}
+                display="clock"
                 is24Hour
                 onChange={(_, d) => {
-                  if (Platform.OS === 'android') setShowTimePicker(false);
+                  setShowTimePicker(false);
                   if (d) setTime(`${pad(d.getHours())}:${pad(d.getMinutes())}`);
                 }}
               />
             )}
-            {Platform.OS === 'ios' && showTimePicker && (
-              <TouchableOpacity
-                style={[styles.doneBtn, { backgroundColor: colors.primary }]}
-                onPress={() => setShowTimePicker(false)}
-                accessibilityLabel="Confirmar hora"
-              >
-                <Text style={[styles.doneText, { color: colors.onPrimary }]}>OK</Text>
-              </TouchableOpacity>
+            {timeExpanded && Platform.OS === 'web' && (
+              <MiniTimePicker value={time} onChange={(t) => setTime(t)} />
+            )}
+            {timeExpanded && Platform.OS === 'ios' && (
+              <View style={[styles.iosPicker, { borderColor: colors.outlineVariant }]}>
+                <DateTimePickerNative
+                  value={timeValue}
+                  mode="time"
+                  display="spinner"
+                  is24Hour
+                  onChange={(_, d) => {
+                    if (d) setTime(`${pad(d.getHours())}:${pad(d.getMinutes())}`);
+                  }}
+                />
+                <TouchableOpacity
+                  style={[styles.doneBtn, { backgroundColor: colors.primary }]}
+                  onPress={() => setTimeExpanded(false)}
+                  accessibilityLabel="Confirmar hora"
+                >
+                  <Text style={[styles.doneText, { color: colors.onPrimary }]}>OK</Text>
+                </TouchableOpacity>
+              </View>
             )}
 
             <Text style={[styles.label, { color: colors.onSurfaceVariant }]}>Prioridade</Text>
@@ -511,6 +705,28 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
   },
+  chipStrip: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingRight: 20,
+    alignItems: 'center',
+  },
+  dateToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 2,
+  },
+  dateToggleText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '700',
+  },
   chip: {
     borderWidth: 1,
     borderRadius: 16,
@@ -526,6 +742,82 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginTop: 8,
     overflow: 'hidden',
+  },
+  miniCal: {
+    borderWidth: 1,
+    borderRadius: 14,
+    marginTop: 8,
+    padding: 12,
+  },
+  miniCalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  miniCalTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  miniCalWeekRow: {
+    flexDirection: 'row',
+    marginBottom: 4,
+  },
+  miniCalWeekday: {
+    width: '14.28%',
+    textAlign: 'center',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  miniCalGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  miniCalCell: {
+    width: '14.28%',
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  miniCalDay: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  miniTime: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderRadius: 14,
+    marginTop: 8,
+    padding: 12,
+    gap: 8,
+  },
+  miniTimeCol: {
+    flex: 1,
+    alignItems: 'stretch',
+  },
+  miniTimeColLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  miniTimeList: {
+    maxHeight: 180,
+  },
+  miniTimeOpt: {
+    paddingVertical: 9,
+    alignItems: 'center',
+  },
+  miniTimeOptText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  miniTimeSep: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginTop: 24,
   },
   doneBtn: {
     borderRadius: 12,

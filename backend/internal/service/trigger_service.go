@@ -123,6 +123,66 @@ func HeuristicClassifyCategory(text string) domain.TriggerCategory {
 	return domain.CategoryCustom
 }
 
+// ptStopwords remove ruído em português para expansão de busca sem IA (Lote C §9).
+var ptStopwords = map[string]bool{
+	"de": true, "da": true, "do": true, "das": true, "dos": true,
+	"e": true, "o": true, "a": true, "os": true, "as": true,
+	"em": true, "no": true, "na": true, "nos": true, "nas": true,
+	"para": true, "pra": true, "com": true, "sem": true, "por": true,
+	"pelo": true, "pela": true, "pelos": true, "pelas": true,
+	"que": true, "se": true, "me": true, "mim": true, "lhe": true,
+	"meu": true, "minha": true, "meus": true, "minhas": true,
+	"seu": true, "sua": true, "seus": true, "suas": true,
+	"um": true, "uma": true, "uns": true, "umas": true,
+	"sobre": true, "como": true, "quando": true, "onde": true,
+	"qual": true, "quais": true, "este": true, "esta": true,
+	"estes": true, "estas": true, "esse": true, "essa": true,
+	"esses": true, "essas": true, "aquele": true, "aquela": true,
+	"isso": true, "isto": true, "aquilo": true, "muito": true,
+	"mais": true, "menos": true, "ja": true, "já": true,
+	"ainda": true, "tambem": true, "também": true, "ate": true, "até": true,
+	"entre": true, "apos": true, "após": true, "antes": true, "depois": true,
+	"durante": true, "contra": true, "sob": true, "ser": true, "estar": true,
+	"ter": true, "foi": true, "sao": true, "são": true, "eh": true, "é": true,
+	"avise": true, "avisar": true, "avisa": true, "monitore": true, "monitorar": true,
+	"quero": true, "saber": true, "ver": true, "olhar": true, "fica": true, "ficar": true,
+}
+
+// ExpandQuery deriva a consulta de busca e 2-3 keywords curtas sem IA (Lote C §9).
+// Remove stopwords pt, preserva ordem e deduplica; expanded mantém a query
+// original (ou o título como fallback) para não perder a intenção do usuário.
+func ExpandQuery(title, query string) (string, []string) {
+	expanded := strings.TrimSpace(query)
+	if expanded == "" {
+		expanded = strings.TrimSpace(title)
+	}
+	combined := strings.TrimSpace(title + " " + query)
+	// Tokeniza por letras/números (unicode-aware).
+	tokens := strings.FieldsFunc(strings.ToLower(combined), func(r rune) bool {
+		return !(r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r >= 'A' && r <= 'Z' || r > 127)
+	})
+	seen := map[string]bool{}
+	var keywords []string
+	for _, tok := range tokens {
+		tok = strings.TrimSpace(tok)
+		if len([]rune(tok)) <= 2 {
+			continue
+		}
+		if ptStopwords[tok] {
+			continue
+		}
+		if seen[tok] {
+			continue
+		}
+		seen[tok] = true
+		keywords = append(keywords, tok)
+		if len(keywords) == 3 {
+			break
+		}
+	}
+	return expanded, keywords
+}
+
 // TriggerService orquestra o ciclo de vida dos disparadores de monitoramento.
 type TriggerService struct {
 	repo domain.TriggerRepository
@@ -147,6 +207,17 @@ func (s *TriggerService) CreateTrigger(userID string, input domain.CreateTrigger
 		category = HeuristicClassifyCategory(input.Title + " " + input.Query)
 	}
 
+	// Lote C §9: expande a consulta sem IA e deriva intenção/keywords.
+	expandedQuery, keywords := ExpandQuery(input.Title, input.Query)
+	userIntent := strings.TrimSpace(input.UserIntent)
+	if userIntent == "" {
+		userIntent = strings.TrimSpace(input.Title + " — " + input.Query)
+	}
+	searchKeywords := strings.TrimSpace(input.SearchKeywords)
+	if searchKeywords == "" && len(keywords) > 0 {
+		searchKeywords = strings.Join(keywords, ", ")
+	}
+
 	conditionType := input.ConditionType
 	if conditionType == "" {
 		conditionType = domain.ConditionDailyBrief
@@ -168,22 +239,24 @@ func (s *TriggerService) CreateTrigger(userID string, input domain.CreateTrigger
 	nextCheck := CalculateNextCheck(scheduledTime, frequency, now, loc)
 
 	trigger := &domain.Trigger{
-		ID:            uuid.New().String(),
-		UserID:        userID,
-		Title:         input.Title,
-		Category:      category,
-		Query:         input.Query,
-		ConditionType: conditionType,
-		TargetValue:   input.TargetValue,
-		CurrentValue:  "",
-		Status:        domain.TriggerStatusActive,
-		Frequency:     frequency,
-		ScheduledTime: scheduledTime,
-		DaysOfWeek:    daysOfWeek,
-		LastRunStatus: "",
-		NextCheckAt:   &nextCheck,
-		CreatedAt:     now,
-		UpdatedAt:     now,
+		ID:             uuid.New().String(),
+		UserID:         userID,
+		Title:          input.Title,
+		Category:       category,
+		Query:          expandedQuery,
+		UserIntent:     userIntent,
+		SearchKeywords: searchKeywords,
+		ConditionType:  conditionType,
+		TargetValue:    input.TargetValue,
+		CurrentValue:   "",
+		Status:         domain.TriggerStatusActive,
+		Frequency:      frequency,
+		ScheduledTime:  scheduledTime,
+		DaysOfWeek:     daysOfWeek,
+		LastRunStatus:  "",
+		NextCheckAt:    &nextCheck,
+		CreatedAt:      now,
+		UpdatedAt:      now,
 	}
 
 	if err := s.repo.Create(trigger); err != nil {
@@ -284,7 +357,27 @@ func (s *TriggerService) UpdateTrigger(id, userID string, input domain.UpdateTri
 		t.Category = *input.Category
 	}
 	if input.Query != nil && strings.TrimSpace(*input.Query) != "" {
-		t.Query = *input.Query
+		t.Query = strings.TrimSpace(*input.Query)
+	}
+	if input.UserIntent != nil {
+		t.UserIntent = strings.TrimSpace(*input.UserIntent)
+	}
+	if input.SearchKeywords != nil {
+		t.SearchKeywords = strings.TrimSpace(*input.SearchKeywords)
+	}
+	// Lote C §9: se título/query mudaram e intent/keywords não foram
+	// informados explicitamente, re-deriva via heurística sem IA.
+	if (input.Title != nil || input.Query != nil) && (input.SearchKeywords == nil || strings.TrimSpace(*input.SearchKeywords) == "") {
+		expanded, keywords := ExpandQuery(t.Title, t.Query)
+		t.Query = expanded
+		if len(keywords) > 0 {
+			t.SearchKeywords = strings.Join(keywords, ", ")
+		}
+		if input.UserIntent == nil || strings.TrimSpace(*input.UserIntent) == "" {
+			if strings.TrimSpace(t.UserIntent) == "" {
+				t.UserIntent = strings.TrimSpace(t.Title + " — " + t.Query)
+			}
+		}
 	}
 	if input.ConditionType != nil {
 		t.ConditionType = *input.ConditionType

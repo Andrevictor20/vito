@@ -65,9 +65,11 @@ export function buildMonthGrid(year: number, month: number): MonthCell[][] {
   return weeks;
 }
 
-/** "outubro de 2026" sem depender de ICU do runtime. */
+/** "Outubro de 2026" — primeira letra maiúscula, "de" sempre minúsculo (sem ICU). */
 export function monthLabelPt(year: number, month: number): string {
-  return `${MESES_PT[month - 1] || ''} de ${year}`;
+  const base = MESES_PT[month - 1] || '';
+  const capitalized = base.charAt(0).toUpperCase() + base.slice(1);
+  return `${capitalized} de ${year}`;
 }
 
 /** Slots "HH:MM" de stepMin em stepMin (default 30). */

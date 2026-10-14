@@ -1,0 +1,514 @@
+﻿Relatório de Auditoria Técnica, Segurança e Arquitetura — Repositório Vito
+Repositório Analisado: Andrevictor20/vito
+Data da Auditoria: 13 de outubro de 2026
+Escopo: Segurança, Back-end (Go / Clean Architecture), Front-end Mobile (React Native / Expo SDK 57) e Estrutura de Repositório / DevOps.
+1. Visão Geral da Arquitetura Atual
+O projeto Andrevictor20/vito é organizado como um monorepo composto por dois módulos principais:
+
+
+* Back-end (backend/): API RESTful desenvolvida em Go com roteador chi/v5, persistência local em SQLite via driver puro (modernc.org/sqlite), autenticação JWT + Google OAuth2, sanitização HTML (bluemonday) e um Gateway de Inteligência Artificial multi-provedor com failover automático entre Google Gemini (gemini-2.5-flash), Groq e OpenRouter.
+* Front-end / Mobile (mobile/): Aplicativo móvel multiplataforma em React Native 0.84.0 com Expo SDK 57 (~57.0.25), React 19.1.0 e TypeScript, estilizado com tema dinâmico Material Design 3 (mobile/src/context/ThemeContext.tsx) e integrado a recursos nativos (expo-secure-store, expo-audio, expo-notifications, expo-calendar).
+* Infraestrutura e CI/CD: Orquestração via docker-compose.yml com suporte a Cloudflare Tunnel e pipeline automatizado em .github/workflows/ci.yml para execução de testes e publicação de imagens multi-arquitetura (linux/amd64 e linux/arm64) no GitHub Container Registry.
+2. Matriz Resumo de Prioridades
+ID
+	Categoria
+	Problema Identificado
+	Arquivos Afetados
+	Severidade
+	SEC-01
+	Segurança
+	Chave de API do Short.io exposta em texto claro no código e no Docker Compose
+	backend/internal/config/config.go, docker-compose.yml
+	Crítica
+	SEC-02
+	Segurança
+	Segredo JWT padrão (JWT_SECRET) hardcoded como fallback
+	backend/internal/config/config.go, docker-compose.yml
+	Crítica
+	SEC-03
+	Segurança
+	CORS aberto (AllowedOrigins: "*") no roteador HTTP
+	backend/internal/server/server.go
+	Alta
+	SEC-04
+	Segurança
+	Ausência de limite de payload (MaxBytesReader) e de timeouts no http.Server
+	backend/internal/server/server.go, backend/cmd/server/main.go
+	Alta
+	SEC-05
+	Segurança
+	Falta de Rate Limiting global para rotas autenticadas gerais
+	backend/internal/server/server.go
+	Média
+	BACK-01
+	Back-end
+	Serviço monolítico de IA com 953 linhas violando responsabilidade única (SRP)
+	backend/internal/service/assistant_service.go
+	Alta
+	BACK-02
+	Back-end
+	Risco de database is locked por falta de limite de conexões no pool SQLite
+	backend/internal/database/sqlite.go
+	Alta
+	BACK-03
+	Back-end
+	Migrações SQL de 14 tabelas acopladas em string única sem controle de versão
+	backend/internal/database/sqlite.go
+	Média
+	BACK-04
+	Back-end
+	Ausência de validação estruturada de entrada e padronização de erros de domínio
+	backend/internal/handler/auth_handler.go, backend/internal/handler/todo_handler.go
+	Média
+	BACK-05
+	Back-end
+	Consultas de listagem (ListTodos, eventos) sem paginação (limit/offset)
+	backend/internal/handler/todo_handler.go
+	Média
+	MOB-01
+	Mobile
+	Divergência de porta padrão entre o cliente mobile (8080) e o back-end (8180)
+	mobile/src/services/api.ts, backend/internal/config/config.go
+	Alta
+	MOB-02
+	Mobile
+	Navegação manual por estado booleano em vez de React Navigation / Expo Router
+	mobile/src/AppRoot.tsx, mobile/src/screens/HomeScreen.tsx
+	Alta
+	MOB-03
+	Mobile
+	Acoplamento excessivo em HomeScreen.tsx (654 linhas) e useChat.ts (731 linhas)
+	mobile/src/screens/HomeScreen.tsx, mobile/src/hooks/useChat.ts
+	Média
+	MOB-04
+	Mobile
+	Uso de asserções any e falta de camada de cache/sincronização (React Query)
+	mobile/src/hooks/useChat.ts, mobile/src/screens/ChatScreen.tsx
+	Média
+	DEV-01
+	Repositório
+	Diretiva de versão go 1.26.0 incompatível com toolchains padrão e nome legado kito-root
+	backend/go.mod, package.json
+	Baixa
+	3. Análise Detalhada — Segurança (Prioridade Crítica)
+3.1. Exposição de Chave de API em Texto Claro (SEC-01)
+* Onde ocorre: backend/internal/config/config.go (linha 68) e docker-compose.yml (linha 25).
+* Diagnóstico: A configuração carrega ShortIOAPIKey: getEnv("SHORTIO_API_KEY", "sk_D21hNzydC1vWH7S"). Como a chave real está escrita diretamente no código-fonte e no arquivo Docker Compose versionado, qualquer pessoa com acesso de leitura ao repositório pode utilizá-la para criar, alterar ou excluir links encurtados na conta associada.
+* Plano de Correção:
+   1. Revogar imediatamente a chave sk_D21hNzydC1vWH7S no painel do Short.io e gerar uma nova.
+   2. Alterar backend/internal/config/config.go para usar string vazia "" como fallback: ShortIOAPIKey: getEnv("SHORTIO_API_KEY", "").
+   3. Em docker-compose.yml, substituir o valor fixo por interpolação limpa ${SHORTIO_API_KEY} sem valor padrão sensível.
+3.2. Segredo JWT Padrão Conhecido (SEC-02)
+* Onde ocorre: backend/internal/config/config.go e docker-compose.yml.
+* Diagnóstico: A variável JWT_SECRET possui como valor padrão vito-raspberry-pi-secret-key-32chars!. Caso o ambiente de produção suba sem a variável de ambiente configurada, o servidor aceitará tokens JWT assinados com essa string pública, permitindo falsificação de identidade de qualquer usuário (Account Takeover).
+* Plano de Correção:
+   1. Remover o valor padrão de JWT_SECRET em docker-compose.yml.
+   2. Em backend/internal/config/config.go, validar na inicialização: se APP_ENV != "development" (ou sempre que JWT_SECRET e DATA_ENCRYPTION_KEY estiverem vazios ou tiverem menos de 32 bytes), encerrar o processo imediatamente com erro explícito.
+3.3. Política de CORS Excessivamente Permissiva (SEC-03)
+* Onde ocorre: backend/internal/server/server.go.
+* Diagnóstico: O middleware de CORS está configurado com AllowedOrigins: []string{"*"}. Embora o aplicativo mobile não dependa de CORS, páginas web públicas (como a tela de agendamento /book/{username}/{slug}) e chamadas feitas a partir de navegadores ficam desprotegidas contra origens arbitrárias.
+* Plano de Correção:
+   1. Adicionar a variável CORS_ALLOWED_ORIGINS em backend/internal/config/config.go (recebendo uma lista separada por vírgulas, com fallback para PUBLIC_BASE_URL em produção e * apenas quando APP_ENV == "development").
+3.4. Falta de Limite de Payload (Body Limit) e Timeouts HTTP (SEC-04)
+* Onde ocorre: backend/internal/server/server.go, backend/cmd/server/main.go e backend/internal/handler/assistant_handler.go.
+* Diagnóstico: O servidor processa áudio (/assistant/audio) e imagens (/assistant/vision) em Base64 via json.NewDecoder(r.Body).Decode(&req), sem http.MaxBytesReader. Além disso, o http.Server em backend/cmd/server/main.go não define ReadTimeout, ReadHeaderTimeout, WriteTimeout nem IdleTimeout. Em um Raspberry Pi ou servidor com memória limitada, uma única requisição gigante ou dezenas de conexões lentas podem derrubar o serviço por falta de memória (OOM).
+* Plano de Correção:
+   1. Configurar ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 30 * time.Second, WriteTimeout: 90 * time.Second (para acomodar respostas de IA) e IdleTimeout: 120 * time.Second em backend/cmd/server/main.go.
+   2. Adicionar um middleware de limite de tamanho de corpo (ex: 1 MB para rotas JSON padrão e até 15 MB especificamente para /assistant/audio e /assistant/vision).
+3.5. Ausência de Rate Limiting Global (SEC-05)
+* Onde ocorre: backend/internal/server/server.go.
+* Diagnóstico: Existem limitadores dedicados para autenticação (authLimiter), IA (aiLimiter) e reservas públicas (bookingLimiter), mas endpoints como /api/v1/events, /api/v1/todos e /api/v1/memories não possuem limite de taxa.
+* Plano de Correção:
+   1. Aplicar um rate limiter geral por IP/usuário no grupo /api/v1 (por exemplo, 120 requisições por minuto) além dos limitadores mais restritivos já existentes.
+4. Análise Detalhada — Back-end (Go)
+4.1. Refatoração do Serviço Monolítico assistant_service.go (BACK-01)
+* Onde ocorre: backend/internal/service/assistant_service.go (953 linhas).
+* Diagnóstico: O arquivo concentra múltiplas responsabilidades distintas: construção de prompts do sistema, injeção de contexto temporal e memórias, parsing de JSON retornado pelos LLMs, execução de ações de domínio (criação/edição de eventos, tarefas, subtarefas, lembretes e links de agendamento), detecção de conflitos de agenda e persistência do histórico de conversas. Isso dificulta testes unitários isolados e aumenta o risco de regressões ao alterar regras do assistente.
+* Plano de Correção:
+   1. Extrair a montagem de prompts e contexto do usuário para backend/internal/service/assistant/prompt_builder.go.
+   2. Extrair o parser e validador de ações estruturadas da IA para backend/internal/service/assistant/action_parser.go.
+   3. Extrair os executores de intenção (eventos, tarefas, agendamentos, memórias) para backend/internal/service/assistant/intent_executor.go.
+   4. Manter assistant_service.go apenas como orquestrador do fluxo de conversa.
+4.2. Ajuste de Concorrência no Pool de Conexões SQLite (BACK-02)
+* Onde ocorre: backend/internal/database/sqlite.go.
+* Diagnóstico: O banco configura corretamente PRAGMA journal_mode = WAL;, PRAGMA busy_timeout = 5000; e PRAGMA foreign_keys = ON;. Contudo, o sql.DB padrão do Go abre múltiplas conexões simultâneas sob carga. Como o SQLite permite apenas um escritor por vez mesmo em modo WAL, múltiplas goroutines gravando simultaneamente (por exemplo, sincronização de calendário em background + mensagens de chat + criação de tarefas) podem esgotar o busy_timeout ou receber SQLITE_BUSY (database is locked) se os PRAGMAs não forem aplicados por conexão via DSN.
+* Plano de Correção:
+   1. Passar os pragmas diretamente na string DSN do modernc.org/sqlite (ex: ?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)&_pragma=synchronous(NORMAL)) para garantir que toda nova conexão do pool herde as configurações.
+   2. Configurar db.SetMaxOpenConns(1) para operações de escrita (ou manter SetMaxOpenConns(1) globalmente caso o volume de leituras seja local/pessoal), eliminando contenção de escrita entre goroutines.
+4.3. Versionamento e Desacoplamento de Migrações SQL (BACK-03)
+* Onde ocorre: backend/internal/database/sqlite.go.
+* Diagnóstico: As definições das 14 tabelas (users, events, todos, memories, device_tokens, triggers, daily_briefings, ai_settings, pending_items, booking_links, booking_availability, bookings, chat_conversations, chat_messages) e migrações incrementais estão concatenadas dentro do código Go.
+* Plano de Correção:
+   1. Criar a pasta backend/internal/database/migrations/ com arquivos .sql numerados (001_initial_schema.sql, 002_bookings.sql, etc.) carregados via //go:embed.
+   2. Registrar as migrações aplicadas em uma tabela schema_migrations para execução idempotente e rastreável.
+4.4. Padronização de Erros de Domínio e Validação de Entrada (BACK-04)
+* Onde ocorre: backend/internal/handler/auth_handler.go, backend/internal/handler/todo_handler.go, backend/internal/handler/assistant_handler.go e backend/internal/service/booking_service.go.
+* Diagnóstico: Os handlers verificam campos manualmente com condicionais simples e retornam erros com http.Error ou JSON ad-hoc, às vezes expondo mensagens internas de erro ou retornando 500 Internal Server Error para falhas de negócio (como recurso não encontrado ou conflito de horário).
+* Plano de Correção:
+   1. Definir erros sentinela no pacote domain (ErrNotFound, ErrUnauthorized, ErrForbidden, ErrConflict, ErrValidation).
+   2. Criar um helper central respondError(w, r, err) nos handlers que traduza automaticamente erros de domínio para os códigos HTTP correspondentes (404, 401, 403, 409, 422) em um formato JSON único ({"error": {"code": "...", "message": "..."}}).
+4.5. Paginação nas Rotas de Listagem (BACK-05)
+* Onde ocorre: backend/internal/handler/todo_handler.go e repositórios de eventos, tarefas e memórias.
+* Diagnóstico: Endpoints como GET /api/v1/todos retornam todos os registros históricos do usuário sem limite, o que degrada o tempo de resposta e o consumo de memória no app mobile conforme o uso contínuo.
+* Plano de Correção:
+   1. Adicionar suporte a query params limit (padrão 50, máximo 200) e offset (padrão 0) nos handlers e repositórios de listagem.
+5. Análise Detalhada — Front-end / Mobile (React Native & Expo)
+5.1. Divergência de Porta Padrão entre Mobile e Back-end (MOB-01)
+* Onde ocorre: mobile/src/services/api.ts vs. backend/internal/config/config.go.
+* Diagnóstico: Enquanto o back-end em Go define a porta padrão como 8180 (PORT: getEnv("PORT", "8180")), o cliente HTTP do aplicativo mobile faz fallback final para http://localhost:8080. Em ambiente local sem variáveis de ambiente extras, o app tenta conectar na porta errada.
+* Plano de Correção:
+   1. Alinhar o fallback em mobile/src/services/api.ts para http://localhost:8180.
+5.2. Ausência de Biblioteca de Navegação Nativa (MOB-02)
+* Onde ocorre: mobile/App.tsx, mobile/src/AppRoot.tsx e mobile/src/screens/HomeScreen.tsx.
+* Diagnóstico: O aplicativo alterna entre autenticação e tela principal por renderização condicional (user ? <HomeScreen /> : <AuthScreen />) e gerencia a troca entre abas (ChatScreen, TasksScreen, BookingScreen, TriggersScreen, ExecutiveSummariesHubView) por estados locais dentro de HomeScreen.tsx. Isso causa:
+   * Falta de integração automática com o botão físico/gesto "Voltar" do Android e swipe-back do iOS.
+   * Dificuldade para lidar com Deep Links nativos (retornos de OAuth ou links diretos para notificações push de uma tarefa/evento específico).
+   * Montagem/desmontagem manual de telas sem preservação nativa de pilha e estado de scroll.
+* Plano de Correção:
+   1. Adotar @react-navigation/native (com @react-navigation/bottom-tabs e @react-navigation/native-stack) ou expo-router, separando a pilha pública (AuthStack) da estrutura autenticada (MainTabs).
+5.3. Desacoplamento de HomeScreen.tsx e useChat.ts (MOB-03)
+* Onde ocorre: mobile/src/screens/HomeScreen.tsx (654 linhas) e mobile/src/hooks/useChat.ts (731 linhas).
+* Diagnóstico:
+   * HomeScreen.tsx acumula cabeçalho, cards de resumo do dia, agenda, modais, barra de abas inferior e renderização de todas as outras telas do aplicativo. Qualquer atualização de estado na Home dispara reconciliação em uma árvore de componentes pesada.
+   * useChat.ts mistura estado visual de mensagens, gerenciamento de múltiplas sessões de conversa, leituras/escritas diretas no AsyncStorage (@vito_chat_sessions, @vito_persistent_chat), gravação de áudio, chamadas de API e lógica de retentativa (retry).
+* Plano de Correção:
+   1. Extrair a visão de dashboard da Home para um componente dedicado DashboardView.tsx, deixando o container de navegação apenas com o roteamento de abas.
+   2. Dividir useChat.ts em três módulos coesos: chatStorageService.ts (persistência local no AsyncStorage), useChatSessions.ts (listagem, troca e exclusão de conversas) e useChatMessages.ts (envio de texto/áudio/imagem, estado de carregamento e retry).
+5.4. Tipagem TypeScript Estrita e Gerenciamento de Estado Assíncrono (MOB-04)
+* Onde ocorre: mobile/src/hooks/useChat.ts, mobile/src/screens/ChatScreen.tsx e mobile/src/context/AuthContext.tsx.
+* Diagnóstico: Há uso de any para contornar tipos ausentes nas respostas da API (como (res as any).booking_url em useChat.ts) e importações dinâmicas não tipadas (let ImagePicker: any = null em ChatScreen.tsx). Além disso, a sincronização entre cache local (AsyncStorage) e servidor é feita manualmente em múltiplos hooks (useHomeData, usePendingItems, useTriggers).
+* Plano de Correção:
+   1. Criar contratos de tipos centralizados em mobile/src/types/api.ts espelhando exatamente os structs de resposta do Go e remover os casts as any.
+   2. Avaliar a adoção gradual do @tanstack/react-query para gerenciar cache, invalidação automática após mutações (ex: quando o assistente cria uma tarefa no chat, invalidar automaticamente a lista de tarefas e a Home) e retry de rede.
+6. Estrutura do Repositório, Configuração e DevOps
+* Alinhamento da Versão do Go (DEV-01): O arquivo backend/go.mod especifica go 1.26.0. Recomenda-se ajustar a diretiva para a versão estável efetivamente utilizada no Dockerfile e na pipeline .github/workflows/ci.yml para evitar falhas de compatibilidade em ferramentas de análise estática e linters.
+* Padronização de Nomenclatura (DEV-02): O arquivo package.json na raiz do monorepo ainda utiliza "name": "kito-root". Atualizar para "vito-root" mantém a consistência com o restante do projeto e com mobile/package.json.
+* Criação de .env.example (DEV-03): O arquivo .gitignore ignora corretamente os arquivos .env, mas não há um template .env.example documentando as variáveis esperadas pelo backend/internal/config/config.go e pelo mobile/src/services/api.ts.
+7. Avaliação da Estrutura de Pastas e Padrões de Mercado
+De forma geral, a estrutura atual de pastas e arquivos do repositório Andrevictor20/vito é sólida e segue de perto os padrões de mercado. Os pontos de melhoria identificados na auditoria não decorrem de desorganização da árvore de diretórios, mas sim do crescimento excessivo de arquivos específicos dentro de pastas já bem posicionadas.
+7.1. O que já está alinhado aos padrões da indústria
+* Raiz de Monorepo Poliglota: A divisão clara na raiz entre backend/, mobile/, docs/, scripts/ e .github/workflows/ci.yml, acompanhada de Makefile e docker-compose.yml, segue a convenção padrão para monorepos que integram Go no servidor e TypeScript/React Native no cliente.
+* Standard Go Project Layout e Clean Architecture (backend/): A separação entre backend/cmd/server/main.go (exclusivo para bootstrap e injeção de dependências) e backend/internal/ (domain, repository, service, handler, server, config, database, ai, integrations) reflete fielmente o layout oficial recomendado pela comunidade Go, garantindo encapsulamento e baixo acoplamento entre camadas.
+* Arquitetura em Camadas no React Native (mobile/src/): A organização em mobile/src/screens/, mobile/src/hooks/, mobile/src/context/ e mobile/src/services/ segue o padrão clássico e mais adotado em aplicações Expo/React Native de pequeno e médio porte.
+7.2. Adições Pontuais de Pastas Recomendadas para Escalar
+* backend/internal/database/migrations/: Em vez de manter todo o SQL de criação das 14 tabelas dentro de backend/internal/database/sqlite.go, o padrão de mercado em Go é isolar arquivos .sql numerados em uma subpasta migrations/ e embuti-los no binário via embed.FS.
+* backend/internal/service/assistant/: Quando um serviço ultrapassa 400–500 linhas — como backend/internal/service/assistant_service.go com 953 linhas —, a boa prática em Go é promovê-lo a um subpacote próprio (internal/service/assistant/) contendo arquivos menores divididos por responsabilidade (prompt_builder.go, action_parser.go, intent_executor.go).
+* mobile/src/navigation/, mobile/src/components/ e mobile/src/types/: Para evitar que mobile/src/screens/HomeScreen.tsx e mobile/src/screens/ChatScreen.tsx acumulem roteamento, componentes visuais e interfaces soltas, recomenda-se:
+   1. Criar mobile/src/navigation/ para concentrar as pilhas e abas de navegação (retirando a troca manual de estado de mobile/src/AppRoot.tsx e HomeScreen.tsx).
+   2. Criar mobile/src/components/ (ex: ui/ e componentes de domínio) para extrair blocos visuais reutilizáveis das telas principais.
+   3. Criar mobile/src/types/ para centralizar os contratos e DTOs retornados por mobile/src/services/api.ts e consumidos por mobile/src/hooks/useChat.ts.
+8. Arquitetura de Evolução da IA e Memória Contínua (Padrão IAs de Mercado)
+Para que o assistente Vito alcance o nível de inteligência contextual, retenção de longo prazo e adaptação progressiva das principais IAs de mercado (como ChatGPT Memory, Claude e arquiteturas cognitivas como Mem0 e Letta), é necessário evoluir o modelo atual de prompt estático + lista das 15 últimas memórias para um Sistema Cognitivo de Memória em Camadas, Aprendizado Comportamental Implícito e Orquestração Padronizada no Back-end Go.
+8.1. Diagnóstico dos Gargalos Atuais na Camada de IA (backend/internal/ai/)
+* Amnésia por Corte Cronológico Fixo (LIMIT 15): Em backend/internal/service/assistant_service.go, o método ProcessMessage busca memórias via s.memoryRepo.ListByUser(userID, 15). Como backend/internal/repository/memory_repo.go executa apenas SELECT ... FROM memories WHERE user_id = ? ORDER BY created_at DESC LIMIT 15, qualquer fato essencial registrado há mais tempo deixa de ser enviado ao modelo assim que 15 fatos novos são salvos.
+* Acúmulo de Fatos Duplicados ou Contraditórios: A função persistLearnedMemory em backend/internal/service/assistant_service.go realiza apenas INSERT direto na tabela memories (backend/internal/database/sqlite.go), sem verificar se o novo fato atualiza, contradiz ou duplica uma memória anterior.
+* Falta de Aprendizado por Observação (Apenas Declarativo): O assistente só registra o que o usuário diz explicitamente na conversa, ignorando o comportamento real registrado nas tabelas todos, events, bookings e pending_items.
+* Disparidade de Raciocínio entre Provedores: O gateway backend/internal/ai/gateway.go alterna entre Gemini (backend/internal/ai/gemini.go) e Groq/OpenRouter (backend/internal/ai/openai_compat.go) enviando um System Prompt único montado em backend/internal/ai/prompt.go e exigindo o JSON final de imediato, sem etapa estruturada de raciocínio (Chain-of-Thought).
+8.2. Arquitetura de Memória Cognitiva em 4 Camadas (RAG Híbrido no SQLite)
+Não é necessário adicionar um banco vetorial externo pesado (como Pinecone ou Qdrant) que aumentaria o consumo de memória no container/Raspberry Pi. Como os dados já são particionados por user_id no SQLite (backend/internal/database/sqlite.go), a recuperação vetorial em memória no próprio Go combinada ao índice textual nativo SQLite FTS5 executa em menos de 1 milissegundo para milhares de registros por usuário:
+Camada Cognitiva
+	O que armazena
+	Implementação no SQLite + Go
+	Como é injetada em prompt.go
+	1. Core Profile (Memória Semântica Fixa)
+	Identidade, profissão, regras inegociáveis de rotina, tom de resposta preferido e restrições fixas
+	Chave única memory_key por usuário (ex: work_hours, comm_style) atualizada via UPSERT
+	Sempre presente no System Prompt (bloco enxuto de 8 a 10 itens permanentes)
+	2. Memória Episódica e Factual (RAG Híbrido)
+	Fatos específicos, histórico de decisões, preferências pontuais e resumos de conversas passadas (chat_messages)
+	Coluna embedding BLOB + tabela virtual FTS5; busca híbrida ranqueada por Similaridade + Importância + Recência
+	Sob demanda (Top 5 a 8 memórias) mais pertinentes à mensagem atual do usuário
+	3. Grafo Leve de Entidades (user_entities)
+	Pessoas, clientes, médicos, projetos e lugares recorrentes na rotina do usuário e seus atributos
+	Nova tabela user_entities (id, user_id, name, relation, metadata_json, updated_at) com busca por nome/alias
+	Sob demanda sempre que uma pessoa, projeto ou local cadastrado for mencionado na mensagem
+	4. Memória Comportamental (Pattern Mining)
+	Hábitos reais medidos no app (horários de pico de foco, taxa de conclusão de tarefas, duração típica de eventos)
+	Worker analítico em Go que agrega métricas SQL dos últimos 30 dias de todos e events
+	Sempre presente como um resumo compacto de "Padrões Observados do Usuário"
+	8.3. Fórmula de Ranking e Reforço Sináptico (Como a Memória Evolui com o Tempo)
+Nas IAs de mercado, uma memória não é recuperada apenas pela distância do vetor (RAG puro), pois um fato antigo e irrelevante pode ter palavras parecidas com a pergunta atual. A evolução da tabela memories em backend/internal/database/sqlite.go deve incluir metadados cognitivos:
+* Novas colunas em memories: embedding BLOB, importance INTEGER DEFAULT 3 (escala 1 a 5), confidence REAL DEFAULT 1.0, access_count INTEGER DEFAULT 0, last_accessed_at DATETIME e superseded_by TEXT.
+* Score Composto de Recuperação no Go:
+   1. Score = (0.55 * Similaridade_Híbrida_Vetor_FTS5) + (0.25 * Importância_Normalizada) + (0.20 * Decaimento_Temporal_Exponencial)
+* Reforço por Uso (Spaced Reinforcement): Sempre que uma memória é recuperada e utilizada na resposta, o back-end incrementa access_count e atualiza last_accessed_at. Memórias úteis ganham força permanente, enquanto memórias triviais nunca mais acionadas perdem prioridade naturally com o tempo.
+8.4. Três Ciclos de Aprendizado Contínuo (Como o Vito Fica Mais Inteligente a Cada Semana)
+1. Ciclo 1 — Consolidação e Deduplicação em Tempo Real (Memory Consolidator):
+   1. Quando backend/internal/service/assistant_service.go recebe um novo fato extraído da conversa, em vez de executar um INSERT cego em persistLearnedMemory, uma goroutine assíncrona busca as 5 memórias existentes mais similares daquele usuário e aplica uma operação de resolução:
+      1. ADD: Insere se for um fato genuinamente novo.
+      2. UPDATE / SUPERSEDE: Se o usuário mudou um hábito (ex: "agora faço academia às 19h" em vez de "academia às 07h"), atualiza a memória ativa e marca a antiga com superseded_by para preservar histórico sem poluir o prompt.
+      3. NOOP: Ignora se o fato já for conhecido, incrementando apenas a confiança (confidence) e o contador de reforço.
+2. Ciclo 2 — Aprendizado Implícito por Correção do Usuário (Implicit Feedback Loop):
+   1. O sinal mais forte de aprendizado em um assistente de produtividade ocorre quando o usuário corrige uma ação recém-executada pela IA:
+      1. Se o assistente cria um evento ou tarefa e, nos minutos seguintes, o usuário altera manualmente o horário/título via PATCH /api/v1/events/{id} ou PATCH /api/v1/todos/{id} (ou corrige no próprio chat), um hook no serviço compara o estado "antes vs. depois" e registra automaticamente um padrão aprendido (ex: "Quando o usuário pede 'reunião de alinhamento' sem especificar duração, ele prefere 30 minutos em vez de 60 minutos").
+3. Ciclo 3 — Job Noturno de Síntese Comportamental ("Dream / Consolidation Worker"):
+   1. Integrado ao agendador que já prepara os daily_briefings, um job noturno roda queries analíticas sobre os últimos 30 dias de uso real do usuário no SQLite:
+      1. Janela real de produtividade: Em quais faixas de horário o usuário efetivamente chama /todos/{id}/complete?
+      2. Taxa de procrastinação por categoria: Quais tipos de tarefas ficam pendentes por mais de 3 dias?
+      3. Padrões de agenda: Quais dias da semana concentram mais reuniões e quais costumam ficar livres para trabalho focado?
+   2. O resultado gera um bloco atualizado na Camada 4 (category = 'behavioral_insight'), permitindo que o Vito faça sugestões proativas como: "Notei que suas quintas à tarde costumam ter 3 reuniões seguidas e você raramente conclui tarefas pesadas nesse horário; quer que eu agende a revisão do projeto para sexta às 9h, onde sua taxa de conclusão é maior?"
+8.5. Consciência Profunda do Próprio Aplicativo (App Self-Awareness)
+Para que a IA entenda profundamente o funcionamento do próprio Vito sem desperdiçar tokens em todas as chamadas:
+* Snapshot Compacto do Estado da Conta (App State Telemetry): Injetar em backend/internal/ai/prompt.go 4 a 5 flags booleanas/contadores do estado atual do usuário no app (ex: google_calendar_connected: true/false, active_booking_links_count, pending_approvals_count, push_notifications_enabled). Assim, se o usuário pedir algo que dependa do Google Calendar e a integração não estiver ativa, o próprio assistente orienta o usuário a ativá-la na aba ProfileScreen.tsx.
+* Injeção Modular de Documentação Interna (App Manual RAG): Dividir as instruções de funcionalidades avançadas do Vito (como regras de booking_availability, sintaxe de triggers e funcionamento do ExecutiveSummariesHubView) em pequenos módulos em Go e injetar no prompt apenas o módulo correspondente aos tópicos detectados na mensagem do usuário.
+8.6. Padronização de Alto Nível Entre os 3 Provedores (Gemini, Groq e OpenRouter)
+Para garantir que o usuário tenha a mesma experiência inteligente independentemente de qual provedor responda no backend/internal/ai/gateway.go:
+4. Desacoplar a Inteligência de Contexto do Modelo (Orchestrator-Centric AI):
+   1. Toda a busca híbrida (RAG vetorial + FTS5), resolução de entidades, injeção de padrões comportamentais e consolidação de memória deve ocorrer na camada Go antes de chamar AIProvider.ParseIntent (backend/internal/ai/provider.go).
+   2. Para a vetorização (embeddings), utilize um único endpoint leve (como text-embedding-004 da API do Gemini já configurada em backend/internal/config/config.go) e mantenha o SQLite FTS5 (BM25) como fallback automático zero-latência caso a API de embedding esteja offline.
+5. Raciocínio Guiado Obrigatório (Chain-of-Thought no Schema JSON):
+   1. Adicione os campos "thought" e "context_used" no topo da struct ParsedIntent em backend/internal/ai/provider.go.
+   2. Como LLMs geram texto token por token da esquerda para a direita, obrigar o modelo a preencher primeiro "thought" (ex: "1. Verificar fuso e data atual; 2. Checar memórias recuperadas sobre preferência de horário; 3. Verificar conflitos em ActiveSchedule; 4. Definir ação") eleva drasticamente a precisão lógica de modelos rápidos no Groq (qwen) e OpenRouter (nemotron), aproximando-os do comportamento do Gemini.
+6. Strict JSON Schema + Loop de Auto-Reparo em backend/internal/ai/normalizer.go:
+   1. Substituir o modo genérico json_object por responseSchema estrito em backend/internal/ai/gemini.go e json_schema / tools em backend/internal/ai/openai_compat.go.
+   2. Caso backend/internal/ai/normalizer.go detecte falha de parse ou violação de regra (ex: evento criado com data de término anterior à data de início), executar uma retentativa rápida passando o erro exato de validação antes de acionar o failover para o próximo provedor.
+8.7. Diagnóstico de Falhas no Fallback do Chat e nas Funções de Radares (Triggers / Buscas)
+A inspeção do fluxo de execução entre o gateway de IA, os serviços de radares e o cliente mobile revelou cinco bugs diretos no código que explicam por que o chat e os radares frequentemente falham em silêncio e não acionam o fallback entre Gemini, Groq e OpenRouter:
+7. O método EvaluateTrigger (Radares) não possui loop de fallback em backend/internal/ai/gateway.go:
+   1. Causa no código: Em EvaluateTrigger, o loop faz return ep.EvaluateTrigger(ctx, trigger) diretamente no primeiro provedor que implementa a interface TriggerEvaluatorProvider.
+   2. Impacto: Se o primeiro provedor (Gemini) falhar por limite de cota (HTTP 429), timeout ou erro de modelo, a função retorna o erro imediatamente e nunca tenta o Groq nem o OpenRouter.
+   3. Correção: Alterar o loop em EvaluateTrigger para capturar o erro (eval, err := ep.EvaluateTrigger(...)), registrar o log de falha e executar continue para tentar o próximo provedor da lista, exatamente como um fallback real.
+8. IDs de modelos de fallback truncados ou inexistentes hardcoded em backend/cmd/server/main.go:
+   1. Causa no código: Nas linhas 61 e 67 de backend/cmd/server/main.go, os provedores secundários são instanciados com strings fixas incorretas:
+      1. Groq recebe "qwen/qwen3.8-27b" (ID inexistente no catálogo da API da Groq, que retorna erro HTTP 400/404).
+      2. OpenRouter recebe "nvidia/nemotron-3.5-light" (ID truncado em relação ao sufixo exigido pelo OpenRouter, gerando falha imediata na API).
+   2. Impacto: Mesmo quando o gateway.go tenta acionar o fallback no chat, tanto a Groq quanto o OpenRouter rejeitam a chamada imediatamente por model_not_found.
+   3. Correção: Extrair os nomes dos modelos para variáveis de ambiente em backend/internal/config/config.go (GROQ_MODEL, OPENROUTER_MODEL) com defaults válidos e estáveis (ex: llama-3.3-70b-versatile na Groq).
+9. Supressão do Fallback por retorno de struct vazia com err == nil em backend/internal/ai/normalizer.go:
+   1. Causa no código: Em backend/internal/ai/gateway.go, a condição de parada do fallback em ParseIntent é if err == nil && intent != nil { return intent, nil }. Porém, quando um provedor retorna texto malformado ou resposta bloqueada/vazia, backend/internal/ai/normalizer.go retorna uma struct ParsedIntent não-nula com campos vazios e err == nil.
+   2. Impacto: O gateway interpreta a resposta vazia como sucesso, interrompe o loop sem chamar os provedores de fallback e devolve uma resposta em branco para backend/internal/service/assistant_service.go.
+   3. Correção: Fazer ParseAndNormalize retornar um erro explícito sempre que o JSON for inválido ou quando Reply e todas as listas de ações estiverem simultaneamente vazias.
+10. Reutilização de context.Context já expirado entre tentativas de fallback em backend/internal/ai/gateway.go:
+   1. Causa no código: O loop de ParseIntent passa o mesmo ctx para todos os provedores. Se o primeiro provedor demorar e estourar o timeout (context.DeadlineExceeded), o ctx fica cancelado. Ao passar para o 2º e 3º provedores, o http.Client aborta instantaneamente antes mesmo de abrir conexão de rede.
+   2. Correção: Criar um sub-contexto com timeout individual por tentativa (attemptCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)) respeitando um timeout global maior no servidor.
+11. Falha silenciosa no buscador de notícias (backend/internal/ai/news_fetcher.go), no worker de radares (backend/internal/service/trigger_worker.go) e no Mobile:
+   1. Causa no código: O news_fetcher.go depende exclusivamente do parse de RSS do Google News sem retry e sem fonte secundária; quando falha ou retorna vazio, o trigger_worker.go e o assistant_service.go engolem o erro (retornando HTTP 200 vazio no chat ou apenas fazendo log.Printf no background). No app mobile, mobile/src/hooks/useChat.ts, mobile/src/hooks/useTriggers.ts e mobile/src/screens/TriggersScreen.tsx não tratam respostas com texto vazio nem possuem AbortController em mobile/src/services/api.ts.
+   2. Correção: Adicionar timeout/retry e validação de conteúdo não-vazio no news_fetcher.go, gravar last_error e last_checked_at na tabela triggers para visibilidade na tela mobile/src/screens/TriggersScreen.tsx e impedir que assistant_service.go retorne HTTP 200 com mensagem vazia.
+9. Evolução dos Radares Inteligentes (Triggers): Tempo Real, Fontes Multi-Categoria e Atualização Automática
+A funcionalidade de Radares (backend/internal/domain/trigger.go, backend/internal/service/trigger_worker.go e mobile/src/screens/TriggersScreen.tsx) já possui uma modelagem rica de categorias (finance, weather, news, tech, career, shopping, etc.) e condições (price_above, price_below, event_upcoming, change_detected, daily_brief). Contudo, quatro limitações na implementação atual impedem que os radares sejam realmente inteligentes, precisos e atualizados em tempo real.
+9.1. Diagnóstico das Limitações Atuais dos Radares
+* Fonte Única (Google News RSS) para Todas as 13 Categorias: Em backend/internal/ai/news_fetcher.go, qualquer radar — seja de cotação financeira (finance), clima (weather) ou preço de produto (shopping) — consulta exclusivamente https://news.google.com/rss/search?q=.... Como o RSS traz apenas títulos de matérias jornalísticas sem o corpo da notícia ou dados numéricos em tempo real, a IA não consegue validar condições como price_below ou mudanças climáticas com precisão.
+* Busca Literal sem Expansão de Query (Query Expansion): O texto digitado pelo usuário no campo Query em mobile/src/screens/TriggersScreen.tsx (muitas vezes uma frase longa em linguagem natural, como "Me avise se sair edital de concurso de TI") é enviado literalmente na URL do Google News RSS via url.QueryEscape(cleanQuery). Frases conversacionais no parâmetro q= do RSS frequentemente retornam zero resultados.
+* Falta de Deduplicação Determinística Pré-IA: O worker em backend/internal/service/trigger_worker.go roda um ticker de 1 minuto e, ao processar um radar elegível, busca o feed RSS e aciona a IA mesmo quando as manchetes retornadas são exatamente as mesmas da checagem anterior. Isso consome cota das APIs de IA desnecessariamente (causando erros HTTP 429) e pode gerar alertas repetidos para o mesmo fato.
+* Ausência de Sincronização Automática Servidor -> App Mobile no Disparo: Em mobile/src/hooks/useTriggers.ts, o barramento dataSync atualiza a tela apenas quando o usuário executa ações manuais no próprio celular (createTrigger, updateTrigger, testTrigger). Quando o trigger_worker.go dispara um radar em background no servidor, a tela mobile/src/screens/TriggersScreen.tsx não é atualizada automaticamente até que o usuário recarregue manualmente.
+9.2. Arquitetura de Fontes Especializadas por Categoria (Multi-Source Connectors)
+Para que os radares entreguem dados reais e atualizados ao usuário final, backend/internal/ai/news_fetcher.go deve ser evoluído para um Data Fetcher Roteado por Categoria (TriggerDataSource):
+Categoria do Radar (TriggerCategory)
+	Fonte Atual
+	Conector Recomendado (Gratuito / Sem Custo Fixo)
+	Ganho Prático para o Usuário
+	finance (Ações, Câmbio, Cripto)
+	Google News RSS
+	APIs públicas de cotação (AwesomeAPI para moedas/cripto, Brapi / Yahoo Finance para B3) + Google News RSS financeiro
+	Permite validar price_above e price_below com o valor numérico exato em tempo real
+	weather (Clima e Alertas)
+	Google News RSS
+	API Open-Meteo (gratuita e sem API Key) + alertas meteorológicos
+	Informa temperatura real, probabilidade de chuva e alertas severos para a cidade do usuário
+	news, tech, career, taxes_docs
+	Google News RSS simples
+	Google News RSS com operadores temporais (when:1h ou when:1d) + extração de snippet/resumo da página (Readable Fetcher)
+	Garante notícias frescas da última hora e entrega o lide da matéria para a IA avaliar com precisão
+	shopping, real_estate, automotive
+	Google News RSS
+	Busca web leve (DuckDuckGo Lite / Google RSS com filtros de domínio) + comparação com CurrentValue salvo no banco
+	Detecta variações reais de preço ou novos anúncios publicados
+	9.3. Como Tornar a Avaliação dos Radares Mais Inteligente e Econômica
+* Reescrita Inteligente de Busca no Cadastro (AI Query Expansion):
+   1. No momento em que o usuário cria ou edita um radar em backend/internal/service/trigger_service.go, use uma chamada rápida de IA para separar o input do usuário em dois campos:
+      1. UserIntent (O que a IA deve julgar): Ex: "Avisar apenas quando abrir inscrição ou sair edital oficial do concurso X".
+      2. SearchKeywords (2 a 3 queries curtas otimizadas para motores de busca): Ex: ["concurso X edital publicado", "inscrições concurso X"].
+* Portão de Deduplicação por Hash antes de Acionar a IA (Pre-AI Delta Gate):
+   1. Adicione uma coluna last_seen_hashes TEXT (JSON array com os hashes SHA-256 das URLs/títulos já processados) na tabela triggers em backend/internal/database/sqlite.go.
+   2. Quando backend/internal/service/trigger_worker.go buscar as notícias no news_fetcher.go, ele filtra primeiro em Go puro: há alguma notícia ou valor cujo hash ainda não está em last_seen_hashes?
+      1. Se não houver nada novo, o worker apenas atualiza last_checked_at e next_check_at sem gastar nenhuma chamada de IA.
+      2. Se houver itens inéditos, apenas os itens novos são enviados para aiGateway.EvaluateTrigger, economizando até 90% de tokens e evitando bloqueios por rate limit.
+* Filtro de Relevância com Score de Confiança e Contexto do Usuário:
+   1. Ao avaliar os itens inéditos, injete no prompt do EvaluateTrigger o resumo do perfil do usuário (memories) e os últimos 3 disparos da tabela trigger_logs. Exija que a IA retorne um confidence_score (0 a 100) e um campo why_relevant (1 frase explicando por que aquilo importa para o usuário), disparando a notificação apenas quando ConditionMet == true && confidence_score >= 75.
+9.4. Como Fazer os Radares Atualizarem de Forma 100% Automática Quando uma Notícia Acontecer
+Para que o usuário receba e visualize a atualização instantaneamente sem precisar atualizar a tela manualmente, implemente o ciclo completo Servidor -> Push Silencioso/Ativo -> Sincronização Reativa no App:
+* No Back-end (trigger_worker.go + Operador when:1h):
+   1. Para radares com frequência immediate ou hourly, anexe automaticamente o operador temporal when:1h na query do Google News RSS em backend/internal/ai/news_fetcher.go (ex: q=termo+when:1h), forçando o Google News a retornar exclusivamente notícias indexadas nos últimos 60 minutos.
+   2. Como o Pre-AI Delta Gate (Seção 9.3) elimina chamadas de IA quando não há notícias novas, os radares marcados como immediate podem ser verificados pelo backend/internal/service/trigger_worker.go a cada 5 minutos sem custo adicional de IA.
+* Gatilho Reativo via Push Payload no App Mobile (notificationService.ts + useTriggers.ts):
+   1. Quando o trigger_worker.go detectar uma notícia relevante e enviar a notificação push para os device_tokens do usuário, inclua no campo estruturado data do Expo Push:
+{"type": "RADAR_TRIGGERED", "triggerId": trigger.ID, "logId": log.ID, "currentValue": eval.CurrentData}
+   2. No aplicativo mobile, configure o listener Notifications.addNotificationReceivedListener (quando o app está aberto) e Notifications.addNotificationResponseReceivedListener (quando o usuário toca na notificação) para disparar imediatamente dataSync.emit('triggers') e dataSync.emit('pending_items') em mobile/src/hooks/useTriggers.ts.
+   3. Assim, se o usuário estiver com o app aberto, o card do radar na mobile/src/screens/TriggersScreen.tsx pisca/atualiza sozinho em tempo real mostrando o novo CurrentValue e o badge de alerta não lido (is_read = false).
+   * Auto-Refresh ao Retornar para o App (AppState Listener):
+   1. Adicione um listener de AppState do React Native em mobile/src/hooks/useTriggers.ts: sempre que o aplicativo transicionar de background para active, invocar fetchTriggers() silenciosamente em background para sincronizar quaisquer disparos ocorridos enquanto o celular estava bloqueado.
+   * Radares Acionáveis na Interface (Actionable Cards em mobile/src/screens/TriggersScreen.tsx):
+   1. Quando uma notícia relevante for exibida no modal de histórico (TriggerLog) ou no card do radar, adicione três botões de ação direta para o usuário final:
+   1. "Conversar com o Vito sobre isso": Abre a mobile/src/screens/ChatScreen.tsx já injetando a notícia e o link na conversa para tirar dúvidas ou pedir resumo detalhado.
+   2. "Criar Tarefa / Lembrete": Converte o alerta diretamente em um item na aba TasksScreen.tsx já preenchido.
+   3. "Agendar Data": Caso a notícia mencione um prazo ou evento (event_upcoming), abre a criação de compromisso no calendário com a data pré-preenchida.
+10. Auditoria Visual de UI/UX, Design System e Padronização Premium
+A análise visual das 10 telas reais do aplicativo em execução mostra que o Vito já possui uma direção estética promissora — inspirada em um estilo Editorial Minimalista / Monochrome High-Contrast (semelhante a apps premium como Notion, Linear e ChatGPT Mobile), visível especialmente nos modais de configuração (Autonomia do Vito e Notificações & Alertas). Contudo, há inconsistências de espaçamento, colisões de elementos flutuantes, excesso de ações por linha e vazamento de erros técnicos que quebram a percepção de produto premium.
+10.1. Diagnóstico Tela a Tela (Problemas Visuais e de UX Identificados)
+Tela / Componente
+	Problemas Visuais e de Usabilidade Detectados nas Capturas
+	Arquivos Relacionados
+	Barra Inferior Flutuante (Global)
+	1. Na tela de Tarefas, o botão flutuante + Novo item fica colado/sobreposto à barra de abas inferior e ao acordeão Concluídas (3), criando 3 barras empilhadas competindo no rodapé.
+2. Na tela de Agenda, falta paddingBottom na lista de rolagem, fazendo a barra flutuante cobrir o último compromisso (27 OUT - Dia do Servidor Público).
+3. Na tela Vito Booking, o ícone da 5ª aba muda de símbolo (🔗 inativo para 📅 ativo) ao ser selecionado.
+	mobile/src/screens/HomeScreen.tsx, mobile/src/screens/TasksScreen.tsx
+	Chat (Estado Vazio e Barra de Input)
+	1. O subtítulo repete literalmente a mesma frase do título ("Me diga o que precisa" aparece duas vezes seguidas).
+2. Os chips de sugestão (☕ Almoço amanhã...) cortam de forma seca na borda direita da tela sem contentContainerStyle={{ paddingHorizontal: 16 }}.
+3. A sombra pesada da barra de digitação colide com a sombra da barra de navegação logo abaixo.
+4. No modo escuro, o chapéu do mascote (polvo) perde contraste e some no fundo escuro.
+	mobile/src/screens/ChatScreen.tsx
+	Gaveta de Conversas (Drawer)
+	1. Vazamento de erro técnico cru no subtítulo: A sessão exibe fetch failed: java.net.UnknownHost... e dezenas de sessões falhas mostram "Não consegui processar agora por i...".
+2. Falta geração automática de títulos semânticos (várias conversas chamadas apenas "Ola" ou "Nova Conversa").
+3. O botão + Nova conversa no rodapé da gaveta invade a barra de gestos nativa do Android (SafeAreaInsets.bottom).
+	mobile/src/screens/ChatScreen.tsx, mobile/src/hooks/useChat.ts
+	Tarefas (TasksScreen)
+	1. Poluição visual do contador 0/0: Tarefas sem subtarefas exibem 0/0 em negrito ao lado da data. O indicador de subtarefas só deve aparecer quando o total for > 0 (ex: 0/2).
+2. Todas as tarefas ativas ficam presas dentro de um único bloco cinza contínuo sem divisores sutis (1px) ou espaçamento entre cards.
+3. Ícones de ação à direita (🔔, ✏️, 🗑️) são muito pequenos (< 32px de área de toque) e ficam desalinhados quando o ícone de sino aparece.
+	mobile/src/screens/TasksScreen.tsx
+	Radares (TriggersScreen)
+	1. Congestionamento horizontal severo nos cards: Cada card tenta espremer [Ícone] + [Título] + [Lápis ✏️] + [Lixeira 🗑️] + [Switch Grande] + [Chevron >] na mesma linha. Isso esmaga o título para menos da metade da tela (Radar de Notícias de T..., Monitoramento de ET...) e faz o texto colidir em cima do ícone de lápis nos cards de Concurso TCE-MA e Jogos do Flamengo.
+2. O placeholder da barra superior corta a palavra no meio (Ex: Dólar, voos, elei).
+	mobile/src/screens/TriggersScreen.tsx
+10.1.2. Diagnóstico Complementar: Modais, Central de Resumos, Detalhes do Radar e Booking
+Tela / Fluxo
+	Problemas Visuais, de UX e de Lógica Expostos na Interface
+	Arquivos Relacionados
+	Agenda — Modal Novo Evento e Rodapé
+	1. Quebra do padrão de Modal: Enquanto todas as outras telas usam Bottom Sheets, o cadastro de evento na Agenda abre como um Dialog centralizado pequeno, sem título no topo, com o botão ✕ à esquerda (em vez de à direita) e botões Cancelar / Salvar cinzas que destoam do resto do app.
+2. Ausência de seletor de horário no modal: O diálogo mostra apenas Data selecionada: 13 de outubro, input de título e tipo de alerta, sem permitir escolher hora de início e término.
+3. Inconsistência do botão primário flutuante: Na Agenda, + Novo Evento é uma barra preta de largura total (100%), enquanto em Tarefas + Novo item é uma pílula curta centralizada.
+	mobile/src/screens/HomeScreen.tsx
+	Tarefas — Modal Editar tarefa
+	1. Omissão do título da tarefa e excesso de altura do calendário: O modal abre direto no seletor de prazo com um calendário mensal aberto ocupando quase metade da tela, escondendo o título/descrição da tarefa que está sendo editada.
+2. Colisão visual entre o dia atual e o dia selecionado: O círculo preto do dia 12 encosta no anel preto do dia 13, causando confusão visual sobre qual data está ativa.
+3. Faixa de horários iniciando à meia-noite (00:00): Mesmo com Hora · 09:00 selecionada, a lista horizontal de horários começa em 00:00, 00:30, 01:00 (horários de madrugada raramente usados) sem fazer auto-scroll até 09:00, além de cortar o chip 02: na borda direita.
+4. Capitalização incorreta de data: Exibe "Outubro De 2026" com "De" maiúsculo em vez de "Outubro de 2026".
+	mobile/src/screens/TasksScreen.tsx
+	Central de Resumos (Diário, Semanal, Mensal e Modais Raio-X)
+	1. Mistura de Emojis Coloridos 3D com Ícones Monocromáticos: As abas (☀️ Diário, 📊 Semanal, 🗓️ Mensal) e o card de equilíbrio (💼 Trabalho: 2%, 🌿 Pessoal: 98%) usam emojis nativos coloridos do Android, quebrando a estética monocromática de ícones lucide-react-native do app.
+2. Bug grave de cálculo de horas em Feriados/Eventos de Dia Inteiro: O evento "Dia do Professor" (Feriado de dia inteiro do Google Calendar) é contabilizado como 24h de trabalho na quarta-feira (27.3h na semana e 92h no mês), levando a IA a recomendar descanso contra "fadiga cognitiva cumulativa" por causa de um feriado.
+3. Pluralização artificial com (s) e textos cortados: Textos exibem "4 tarefa(s) pendente(s)" e "3 tarefa(s) concl..." (cortado com reticências dentro do card semanal).
+4. Card cortado pelo rodapé do Modal: No modal Raio-X Executivo da Semana, o 3º card de recomendação fica cortado ao meio pelo botão fixo Discutir esta semana no chat com o Vito.
+	mobile/src/screens/ExecutiveSummariesHubView.tsx, backend/internal/service/briefing_service.go
+	Detalhes do Radar (Radar de Notícias...)
+	1. Cabeçalho Duplo Redundante: A tela exibe o topo centralizado Radares / Radar do Vito e, imediatamente abaixo, uma segunda barra com ← Radares, desperdiçando espaço vertical.
+2. Corte de scroll no card superior: Ao rolar o histórico, o botão preto ▶ Verificar Agora fica cortado horizontalmente ao meio.
+3. Badge semântico contraditório (✓ VERIFICADO em caso de erro): Quando a coleta falha com "Oscilação temporária ao coletar notícias da web.", o card exibe o badge azul de sucesso ✓ VERIFICADO em vez de um estado de alerta/falha (⚠️ Falha na coleta).
+4. Notícias em bloco de texto plano e sobreposição no rodapé: As notícias encontradas (12/10 às 15:22) aparecem concatenadas com travessões (—) em um único texto sem links individuais clicáveis por notícia, e o último card fica encoberto pela barra de navegação inferior.
+	mobile/src/screens/TriggersScreen.tsx
+	Vito Booking — Modal Novo Link de Agendamento
+	1. Inconsistência visual de chips selecionados no mesmo formulário: Nos seletores Duração (30 min) e Buffer (10 min), o estado ativo usa fundo preto sólido com texto branco; já logo abaixo, em Horário de Atendimento (09h às 18h), o estado ativo usa fundo cinza claro com borda preta.
+2. Prévia da URL sem o {username}: A caixa Prévia do link: exibe https://vito.rasppi.cloud/book/seu-link, omitindo o segmento {username} exigido pela rota pública /book/{username}/{slug} em backend/internal/server/server.go.
+	mobile/src/screens/BookingScreen.tsx
+	
+
+	Agenda (HomeScreen)
+	1. O botão ✕ (excluir) no card 17 OUT - Aula de inglês está flutuando deslocado para a esquerda em relação ao chevron >, quebrando o alinhamento vertical com o card de cima.
+2. Exibição redundante de cabeçalhos centrados simples em todas as telas sem hierarquia editorial consistente.
+	mobile/src/screens/HomeScreen.tsx
+	Perfil e Modais (ProfileScreen)
+	1. Quebra de padrão nos itens de lista: Os 4 primeiros itens usam um card agrupado com ícones dentro de quadrados arredondados (40x40), enquanto Buscar Atualizações, Trocar de Conta e Encerrar Sessão usam pílulas soltas com ícones sem fundo.
+2. No modal Sincronização de Calendários, a data está em formato americano/inglês (8:33 PM de 10/12/2026 em vez de 12/10/2026 às 20:33), e o card Apple Calendar (EventKit no iOS) é exibido mesmo rodando em um aparelho Android.
+	mobile/src/screens/ProfileScreen.tsx
+	10.3. Diretrizes de Design System para um Visual Premium (ThemeContext.tsx + Componentes Base)
+Para elevar o Vito ao padrão visual de aplicativos como Linear, Notion Calendar, Things 3 e ChatGPT, recomenda-se consolidar um Design System enxuto em mobile/src/theme/ e mobile/src/components/ui/:
+   * Paleta de Superfícies em Camadas e Contraste Refinado (mobile/src/context/ThemeContext.tsx):
+   1. Modo Claro (Editorial Warm/Clean): Em vez de cinzas chapados (#EFEFEF) em todos os cards sobre fundo branco (#FFFFFF), utilize fundo de tela levemente off-white/gelo (#F8F9FA), cards em branco puro (#FFFFFF) com borda hairline ultra-sutil (1px solid #EAECEF) e sombra difusa suave (shadowOpacity: 0.04, shadowRadius: 8). Isso cria profundidade imediata sem pesar.
+   2. Modo Escuro (True OLED / Slate): Fundo #0B0D10, superfície primária #14171C, superfície elevada #1C2026 e bordas #262B33.
+   3. Mascote Adaptativo (SVG com Tema): No SVG do mascote Vito (polvo com cartola e gravata-borboleta), adicionar um contorno sutil claro (stroke) ou inverter o preenchimento para branco/off-white quando isDark === true, garantindo que o chapéu nunca suma no fundo escuro.
+   * Padronização Tipográfica e Escala Espacial (Grid de 4pt / 8pt):
+   1. Cabeçalhos de Tela Alinhados à Esquerda (Padrão iOS/Material Moderno): Os títulos centralizados atuais (Tarefas / Tarefas e Pendências, Agenda / Compromissos, Radares / Radar do Vito) ocupam espaço vertical nobre e parecem genéricos. Alinhar o título principal à esquerda (28px, fontWeight: '700', letterSpacing: -0.5) com ações contextuais à direita (ex: botão + Nova tarefa ou filtro compacto no próprio cabeçalho) libera o rodapé da tela e elimina a colisão com a barra de abas inferior.
+   2. Tokens fixos de espaçamento e raio de borda: Padronizar radius.sm = 8, radius.md = 14, radius.lg = 20, radius.full = 9999, evitando misturar cards muito quadrados com pílulas exageradas na mesma tela.
+   * Despoluição de Cards (Progressive Disclosure):
+   1. Nos Cards de Radares (mobile/src/screens/TriggersScreen.tsx): Remover os ícones de lápis (✏️), lixeira (🗑️) e chevron (>) da listagem principal! Deixe no card apenas [Ícone da Categoria] + [Título Completo em até 2 linhas + Subtítulo de Horário/Último Valor] + [Switch Toggle]. As opções de Editar, Testar e Excluir devem abrir ao tocar no card (em um Bottom Sheet de detalhes/histórico) ou via gesto de deslizar (Swipe-to-Delete / menu ⋯). Isso devolve 35% de largura útil ao título e acaba com os textos truncados e sobrepostos.
+   2. Nos Cards de Tarefas (mobile/src/screens/TasksScreen.tsx):• Ocultar o contador 0/0 quando não houver subtarefas.• Substituir os ícones ✏️ e 🗑️ expostos em cada linha por toque direto no card para editar/ver detalhes e gesto de swipe (ou menu discreto) para excluir.• Usar badges semânticos com ponto colorido (• Alta em vermelho suave, • Média em âmbar) em vez de múltiplas caixas cinzas.
+   * Correção da Arquitetura de Rodapé, Safe Area e Feedback de Erros:
+   1. Unificar o Rodapé e SafeAreaInsets: Definir uma constante global BOTTOM_NAV_CLEARANCE = 100 (somada ao useSafeAreaInsets().bottom do react-native-safe-area-context) aplicada como paddingBottom em todas as ScrollView e FlatList do app.
+   2. Reposicionar o Botão + Novo item em Tarefas: Mover o botão + Novo item para um FAB circular no canto inferior direito (acima da barra de navegação) ou integrá-lo ao cabeçalho superior direito da tela de Tarefas, eliminando o empilhamento triplo no rodapé.
+   3. Sanitizar Erros de Rede na UI (humanizeError): Nunca gravar exceções técnicas (fetch failed: java.net.UnknownHostException) como texto de mensagem na conversa em mobile/src/hooks/useChat.ts. Exibir um estado visual de falha elegante com botão "Tentar novamente" e manter o subtítulo da conversa no drawer limpo.
+   4. Detecção de Plataforma e Locale pt-BR: Em mobile/src/screens/ProfileScreen.tsx, formatar datas com toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) e exibir Apple Calendar (EventKit) apenas quando Platform.OS === 'ios' (mostrando Calendário Local do Android no Android).
+Recomendações Adicionais de Padronização para essas Telas
+   * Substituir todos os emojis coloridos por ícones vetoriais lucide-react-native: Em mobile/src/screens/ExecutiveSummariesHubView.tsx, trocar ☀️, 📊, 🗓️, 💼 e 🌿 pelos componentes Sun, BarChart3, CalendarRange, Briefcase e Sprout/Leaf do Lucide, mantendo 100% de coesão monocromática.
+   * Excluir feriados e eventos all_day da soma de horas trabalhadas: No cálculo de carga horária da Central de Resumos, ignorar eventos marcados como FERIADO ou Dia Inteiro (24h) para que a métrica reflita apenas horas reais de compromissos e reuniões.
+   * Unificar o componente BottomSheetModal e o componente SelectableChip: Criar dois componentes base em mobile/src/components/ui/:
+1. BottomSheetModal: usado inclusive para o Novo Evento na Agenda (com alça superior, título à esquerda, botão ✕ à direita e paddingBottom seguro para o botão de ação não cortar o conteúdo rolável).
+2. SelectableChip: garantindo que todo chip selecionado no app (seja em Tarefas, Booking, Perfil ou Notificações) use exatamente o mesmo estilo ativo (fundo preto #111 no tema claro com texto branco).
+   * Refinar a tela de Detalhes do Radar: Ocultar o cabeçalho principal quando estiver na sub-view de detalhes de um radar (deixando apenas a barra ← Voltar para Radares), transformar o calendário de Editar tarefa em um seletor retrátil (que só expande ao tocar na data, com auto-scroll da faixa de hora para o horário selecionado) e renderizar cada notícia capturada pelo radar como um mini-card clicável independente.
+11. Automação de Deploy Contínuo (CD) no Raspberry Pi 4 (Substituição do Watchtower)
+Atualmente, a pipeline .github/workflows/ci.yml compila e publica com sucesso a imagem multi-arquitetura (linux/amd64 e linux/arm64) no GitHub Container Registry (ghcr.io/andrevictor20/vito:latest), mas o ciclo para na publicação. O uso anterior do Watchtower no Raspberry Pi 4 apresentava falhas por três motivos técnicos e estruturais:
+11.1. Por que o Watchtower Falhava na Arquitetura Atual
+      * Descontinuação Oficial do Projeto Watchtower: O repositório oficial containrrr/watchtower foi oficialmente arquivado/descontinuado (comunicado oficial #2135), acumulando falhas de compatibilidade com versões recentes da API do Docker Engine e com manifestos multi-arquitetura (arm64) no ghcr.io.
+      * Conflito entre build: e image: em docker-compose.yml: O serviço backend declara simultaneamente build: context: ./backend e image: ghcr.io/andrevictor20/vito:latest. Quando o Docker Compose no Raspberry Pi possui a diretiva build: ativa ou uma imagem construída localmente, ocorre conflito de resolução de digest com a imagem remota do GHCR.
+      * Expiração de Credenciais do GHCR e Ausência de Sincronização do docker-compose.yml: Pacotes no ghcr.io exigem autenticação (PAT com escopo read:packages) para evitar bloqueios de rate limit ou erro 401 Unauthorized no polling. Além disso, o Watchtower atualiza apenas a imagem binária, ignorando alterações feitas no próprio docker-compose.yml (como novas variáveis de ambiente ou ajustes no Cloudflare Tunnel).
+11.2. Comparativo das 3 Melhores Alternativas para o Raspberry Pi 4
+Solução de Deploy Automático
+	Como Funciona após o git push
+	Atualiza também o docker-compose.yml?
+	Exige Abrir Porta no Roteador?
+	Recomendação
+	1. GitHub Actions Self-Hosted Runner (No próprio Raspberry Pi 4)
+	A nuvem do GitHub compila a imagem arm64 e, ao terminar, aciona um job leve deploy direto no Raspberry Pi que roda git pull, docker compose pull e docker compose up -d
+	Sim (sincroniza o repositório e recria o container)
+	Não (conexão HTTPS de saída, compatível com Cloudflare Tunnel)
+	Padrão Ouro (Recomendada)
+	2. Tailscale GitHub Action (Deploy via SSH sobre VPN Mesh)
+	O runner da nuvem do GitHub conecta-se temporariamente à rede Tailscale do Raspberry Pi (guia prático) e executa o docker compose pull && up -d via SSH
+	Sim
+	Não
+	Excelente se você já usa Tailscale
+	3. What's Up Docker — WUD (getwud/wud) (Substituto moderno do Watchtower)
+	Container leve no Raspberry Pi que monitora o ghcr.io (ou recebe Webhook) e recria o container automaticamente (comparativo de alternativas)
+	Não (atualiza apenas a imagem Docker)
+	Não
+	Melhor se quiser manter apenas um container monitorando imagens
+	11.3. Arquitetura Recomendada: Build na Nuvem + Deploy via Self-Hosted Runner no Raspberry Pi 4
+A melhor abordagem para um Raspberry Pi 4 é híbrida: manter os jobs pesados de teste (test) e compilação multi-arquitetura (docker-publish) rodando nos servidores gratuitos ubuntu-latest do GitHub (poupando a CPU e a memória RAM do Raspberry Pi) e usar o GitHub Actions Self-Hosted Runner (arm64) no Raspberry Pi exclusivamente para o passo final de baixar a imagem pronta e recriar o container.
+Passo 1: Ajustar o docker-compose.yml para Produção
+Remover ou isolar o bloco build: para que o Raspberry Pi sempre utilize a imagem oficial assinada pelo CI no GHCR, além de adicionar pull_policy: always:
+services:
+  backend:
+    image: ghcr.io/andrevictor20/vito:latest
+    pull_policy: always
+    container_name: vito-backend
+    restart: unless-stopped
+Passo 2: Adicionar o Job deploy ao final de .github/workflows/ci.yml
+Assim que o job docker-publish concluir o envio da imagem linux/arm64 para o ghcr.io, o job deploy é disparado automaticamente no Raspberry Pi:
+  deploy:
+    name: Auto-Deploy on Raspberry Pi 4
+    needs: docker-publish
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: [self-hosted, linux, arm64]
+    steps:
+      - name: Log in to GitHub Container Registry on Pi
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+
+      - name: Sync docker-compose and Recreate Container
+        run: |
+          cd ~/vito
+          git fetch origin main
+          git reset --hard origin/main
+          docker compose pull backend
+          docker compose up -d --force-recreate --remove-orphans backend
+          docker image prune -f
+
+
+      - name: Verify Backend Healthcheck
+        run: |
+          sleep 5
+          wget -qO- http://localhost:8180/healthz
+Benefícios Diretos desse Fluxo:
+      * Zero atraso (Tempo Real): Você faz git commit e git push no computador; assim que o build termina no GitHub, o container no Raspberry Pi atualiza no mesmo segundo, sem esperar janelas de polling de 5 ou 30 minutos.
+      * Autenticação Automática no GHCR: O próprio secrets.GITHUB_TOKEN autentica o docker login ghcr.io no Raspberry Pi antes de cada docker compose pull, eliminando erros de pacote privado ou expiração de token.
+      * Limpeza Automática de Disco (docker image prune -f): Remove automaticamente as camadas antigas a cada deploy, evitando que o cartão SD ou SSD do Raspberry Pi 4 fique cheio com o tempo.
+      * Verificação de Saúde (Healthcheck) Visível no GitHub: O último passo testa http://localhost:8180/healthz no Raspberry Pi; se o container quebrar na subida, você recebe o alerta imediatamente na aba Actions do GitHub.
+12. Roteiro Sugerido de Execução (Ordem de Implementação)
+      12. Etapa 1 — Blindagem de Segurança e Config (Rápida / Alto Impacto): Remover SHORTIO_API_KEY e JWT_SECRET hardcoded de backend/internal/config/config.go e docker-compose.yml, criar .env.example, corrigir a porta fallback em mobile/src/services/api.ts e ajustar package.json e backend/go.mod.
+      13. Etapa 2 — Resiliência do Servidor e SQLite: Configurar timeouts HTTP em backend/cmd/server/main.go, MaxBytesReader, CORS restrito e rate limit global em backend/internal/server/server.go, além de ajustar o pool de conexões e DSN do SQLite em backend/internal/database/sqlite.go.
+      14. Etapa 3 — Modularização do Back-end: Dividir backend/internal/service/assistant_service.go em subcomponentes testáveis, padronizar erros de domínio e adicionar paginação nos handlers.
+      15. Etapa 4 — Evolução do App Mobile: Desacoplar mobile/src/hooks/useChat.ts e mobile/src/screens/HomeScreen.tsx, remover tipagens any e estruturar a navegação nativa.
+      16. Etapa 5 — Auditoria de UI/UX e Design System Premium: Corrigir o empilhamento e colisões no rodapé, remover ícones redundantes dos cards, sanitizar erros técnicos no drawer do chat e aplicar a paleta com contraste aprimorado no modo claro e escuro.

@@ -28,6 +28,8 @@ interface TaskRowProps {
   onEdit?: () => void;
   onSchedule?: (dateStr: string) => void;
   onReminder?: () => void;
+  /** Última linha do grupo: sem divisor inferior. */
+  isLast?: boolean;
   subtasks?: Subtask[];
   onToggleSubtask?: (subtaskId: string) => void;
   onAddSubtask?: (title: string) => void;
@@ -37,6 +39,8 @@ interface TaskRowProps {
 const PRIORITY_LABEL: Record<string, string> = { high: 'ALTA', medium: 'MÉDIA', low: 'BAIXA' };
 
 /** Linha única p/ tarefa e pendência: mesmo checkbox, título, meta e ações. */
+const PRIORITY_DOT: Record<string, 'error' | 'warning' | 'muted'> = { high: 'error', medium: 'warning', low: 'muted' };
+
 export const TaskRow: React.FC<TaskRowProps> = ({
   row,
   onToggle,
@@ -44,6 +48,7 @@ export const TaskRow: React.FC<TaskRowProps> = ({
   onEdit,
   onSchedule,
   onReminder,
+  isLast = false,
   subtasks,
   onToggleSubtask,
   onAddSubtask,
@@ -65,8 +70,11 @@ export const TaskRow: React.FC<TaskRowProps> = ({
     setDraft('');
   };
 
+  const dotKind = PRIORITY_DOT[todo?.priority || 'medium'] || 'muted';
+  const dotColor = dotKind === 'error' ? colors.error : dotKind === 'warning' ? colors.warning : colors.onSurfaceVariant;
+
   return (
-    <View style={styles.row}>
+    <View style={[styles.row, !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.outlineVariant }]}>
       <TouchableOpacity
         style={[
           styles.checkCircle,
@@ -93,6 +101,7 @@ export const TaskRow: React.FC<TaskRowProps> = ({
         <View style={styles.meta}>
           {isTodo && todo ? (
             <View style={[styles.badge, { backgroundColor: colors.secondaryContainer }]}>
+              <View style={[styles.dot, { backgroundColor: dotColor }]} />
               <Text style={[styles.badgeText, { color: colors.onSecondaryContainer }]}>
                 {PRIORITY_LABEL[todo.priority] || 'MÉDIA'}
               </Text>
@@ -112,7 +121,7 @@ export const TaskRow: React.FC<TaskRowProps> = ({
           {hasReminder && !row.done && (
             <MaterialIcons name="notifications-active" size={14} color={colors.primary} />
           )}
-          {isTodo && (subtasks?.length || onAddSubtask) ? (
+          {isTodo && ((subtasks?.length || 0) > 0 || onAddSubtask) ? (
             <TouchableOpacity
               onPress={() => setExpanded(!expanded)}
               hitSlop={tokens.hitSlop.sm}
@@ -120,7 +129,9 @@ export const TaskRow: React.FC<TaskRowProps> = ({
               accessibilityLabel={expanded ? 'Ocultar subtarefas' : 'Ver subtarefas'}
             >
               <Text style={[styles.subCount, { color: colors.primary }]}>
-                {subtasks?.filter((s) => s.completed).length || 0}/{subtasks?.length || 0}
+                {(subtasks?.length || 0) > 0
+                  ? `${subtasks?.filter((s) => s.completed).length || 0}/${subtasks?.length || 0}`
+                  : '+ subtarefas'}
               </Text>
             </TouchableOpacity>
           ) : null}
@@ -202,6 +213,7 @@ export const TaskRow: React.FC<TaskRowProps> = ({
       <View style={styles.actions}>
         {onReminder && !row.done && (
           <TouchableOpacity
+            style={styles.actionBtn}
             onPress={onReminder}
             hitSlop={tokens.hitSlop.sm}
             activeOpacity={0.7}
@@ -216,6 +228,7 @@ export const TaskRow: React.FC<TaskRowProps> = ({
         )}
         {onEdit && !row.done && (
           <TouchableOpacity
+            style={styles.actionBtn}
             onPress={onEdit}
             hitSlop={tokens.hitSlop.sm}
             activeOpacity={0.7}
@@ -225,6 +238,7 @@ export const TaskRow: React.FC<TaskRowProps> = ({
           </TouchableOpacity>
         )}
         <TouchableOpacity
+          style={styles.actionBtn}
           onPress={onDelete}
           hitSlop={tokens.hitSlop.sm}
           activeOpacity={0.7}
@@ -274,9 +288,23 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   badge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
     borderRadius: 9999,
     paddingHorizontal: 8,
     paddingVertical: 4,
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  actionBtn: {
+    minWidth: 32,
+    minHeight: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   badgeText: {
     fontSize: 10,

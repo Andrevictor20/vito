@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   StyleSheet,
   View,
@@ -21,12 +21,12 @@ import { useAuth } from '../context/AuthContext';
 import { useTriggers } from '../hooks/useTriggers';
 import { TriggerCard } from '../components/triggers/TriggerCard';
 import { TriggerReportsView } from '../components/triggers/TriggerReportsView';
-import { ExecutiveSummariesHubView } from './ExecutiveSummariesHubView';
 import { EditTriggerModal } from '../components/triggers/EditTriggerModal';
+import { CreateTriggerModal } from '../components/triggers/CreateTriggerModal';
 import { TRIGGER_CATEGORIES, Trigger, TriggerCategory } from '../types';
 import { api } from '../services/api';
 
-export const TriggersScreen: React.FC<{ onOpenExecutiveSummaries?: () => void }> = ({ onOpenExecutiveSummaries }) => {
+export const TriggersScreen: React.FC<{ onSubViewChange?: (inSubView: boolean) => void; createRequestId?: number }> = ({ onSubViewChange, createRequestId }) => {
   const { colors, isDark } = useTheme();
   const { user } = useAuth();
   const {
@@ -47,14 +47,32 @@ export const TriggersScreen: React.FC<{ onOpenExecutiveSummaries?: () => void }>
   // Modais e navegação
   const [reportTrigger, setReportTrigger] = useState<Trigger | null>(null);
   const [editTrigger, setEditTrigger] = useState<Trigger | null>(null);
-  const [showWeeklySummaries, setShowWeeklySummaries] = useState<boolean>(false);
   const [showCategoryPicker, setShowCategoryPicker] = useState<boolean>(false);
+  // CTA do Header (+ Novo): abre o modal de criação.
+  const [createVisible, setCreateVisible] = useState<boolean>(false);
+  const firstCreateRender = useRef(false);
+
+  // Sub-view ativa (relatório): o Header global oculta o título.
+  useEffect(() => {
+    onSubViewChange?.(!!reportTrigger);
+  }, [reportTrigger, onSubViewChange]);
+
+  // CTA do Header (+ Novo): abre o modal de criação (decisão a).
+  useEffect(() => {
+    if (!firstCreateRender.current) {
+      firstCreateRender.current = true;
+      return;
+    }
+    if ((createRequestId ?? 0) > 0) {
+      setCreateVisible(true);
+    }
+  }, [createRequestId]);
 
   // Intercepta gesto de voltar no Android para retornar à tela anterior sem fechar o app
   useEffect(() => {
     const onBackPress = () => {
-      if (showWeeklySummaries) {
-        setShowWeeklySummaries(false);
+      if (createVisible) {
+        setCreateVisible(false);
         return true;
       }
       if (reportTrigger) {
@@ -74,7 +92,7 @@ export const TriggersScreen: React.FC<{ onOpenExecutiveSummaries?: () => void }>
 
     const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
     return () => subscription.remove();
-  }, [showWeeklySummaries, reportTrigger, editTrigger, showCategoryPicker]);
+  }, [createVisible, reportTrigger, editTrigger, showCategoryPicker]);
 
   // Entrada em Linguagem Natural
   const [naturalPrompt, setNaturalPrompt] = useState('');
@@ -123,10 +141,6 @@ export const TriggersScreen: React.FC<{ onOpenExecutiveSummaries?: () => void }>
       setIsSubmittingPrompt(false);
     }
   };
-
-  if (showWeeklySummaries) {
-    return <ExecutiveSummariesHubView onBack={() => setShowWeeklySummaries(false)} />;
-  }
 
   if (reportTrigger) {
     return (
@@ -193,7 +207,7 @@ export const TriggersScreen: React.FC<{ onOpenExecutiveSummaries?: () => void }>
             style={[styles.naturalInput, { color: colors.onSurface }]}
             value={naturalPrompt}
             onChangeText={setNaturalPrompt}
-            placeholder="No que quer ficar de olho? Ex: Dólar, voos, eleições..."
+            placeholder="No que quer ficar de olho?"
             placeholderTextColor={colors.onSurfaceVariant}
             onSubmitEditing={handleCreateFromNaturalPrompt}
             returnKeyType="send"
@@ -286,93 +300,11 @@ export const TriggersScreen: React.FC<{ onOpenExecutiveSummaries?: () => void }>
           data={activeTriggers}
           keyboardShouldPersistTaps="handled"
           keyExtractor={(item) => item.id}
-          ListHeaderComponent={
-            selectedCategory === 'all' ? (
-              <View
-                style={[
-                  styles.systemRadarCard,
-                  {
-                    backgroundColor: isDark ? colors.surfaceContainer : colors.surfaceContainerLow,
-                    borderColor: isDark ? 'rgba(56, 189, 248, 0.25)' : 'rgba(14, 165, 233, 0.2)',
-                  },
-                ]}
-              >
-                <View style={styles.systemRadarHeader}>
-                  <View style={styles.systemRadarBadgeRow}>
-                    <View style={[styles.systemCategoryBadge, { backgroundColor: isDark ? 'rgba(56, 189, 248, 0.14)' : '#E0F2FE' }]}>
-                      <MaterialIcons name="auto-awesome" size={13} color={colors.accents.sky} />
-                      <Text style={[styles.systemCategoryText, { color: colors.accents.sky }]}>
-                        INTELIGÊNCIA PROATIVA
-                      </Text>
-                    </View>
-                    <View style={[styles.systemTimePill, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.04)' }]}>
-                      <MaterialIcons name="event-repeat" size={12} color={colors.onSurfaceVariant} />
-                      <Text style={[styles.systemTimeText, { color: colors.onSurfaceVariant }]}>
-                        Todo domingo · 19:00
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View style={[styles.systemStatusDot, { backgroundColor: '#10B981' }]} />
-                </View>
-
-                <Text style={[styles.systemRadarTitle, { color: colors.onSurface }]}>
-                  Balanço Semanal & Diagnóstico de Tempo
-                </Text>
-                <Text style={[styles.systemRadarDesc, { color: colors.onSurfaceVariant }]}>
-                  O Vito consolida seus compromissos, tarefas concluídas e identifica gargalos na sua rotina para planejar a próxima semana com precisão.
-                </Text>
-
-                {/* Destaques de inteligência */}
-                <View style={styles.systemRadarTagsRow}>
-                  <View style={[styles.systemRadarTag, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)' }]}>
-                    <MaterialIcons name="bolt" size={12} color={isDark ? '#FBBF24' : '#D97706'} />
-                    <Text style={[styles.systemRadarTagText, { color: colors.onSurfaceVariant }]}>Foco & Eficiência</Text>
-                  </View>
-                  <View style={[styles.systemRadarTag, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)' }]}>
-                    <MaterialIcons name="schedule" size={12} color={colors.accents.sky} />
-                    <Text style={[styles.systemRadarTagText, { color: colors.onSurfaceVariant }]}>Carga Horária</Text>
-                  </View>
-                  <View style={[styles.systemRadarTag, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)' }]}>
-                    <MaterialIcons name="flag" size={12} color={isDark ? '#34D399' : '#059669'} />
-                    <Text style={[styles.systemRadarTagText, { color: colors.onSurfaceVariant }]}>Plano de Ação</Text>
-                  </View>
-                </View>
-
-                <TouchableOpacity
-                  style={[
-                    styles.systemRadarActionBtn,
-                    {
-                      backgroundColor: isDark ? 'rgba(56, 189, 248, 0.1)' : '#F0F9FF',
-                      borderColor: isDark ? 'rgba(56, 189, 248, 0.2)' : 'rgba(14, 165, 233, 0.15)',
-                    },
-                  ]}
-                  onPress={() => {
-                    if (onOpenExecutiveSummaries) {
-                      onOpenExecutiveSummaries();
-                    } else {
-                      setShowWeeklySummaries(true);
-                    }
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.systemRadarActionLeft}>
-                    <MaterialIcons name="insights" size={16} color={colors.accents.sky} />
-                    <Text style={[styles.systemRadarActionText, { color: isDark ? '#E0F2FE' : '#0369A1' }]}>
-                      Acessar Raio-X Semanal
-                    </Text>
-                  </View>
-                  <MaterialIcons name="arrow-forward" size={16} color={colors.accents.sky} />
-                </TouchableOpacity>
-              </View>
-            ) : null
-          }
+          ListHeaderComponent={null}
           renderItem={({ item }) => (
             <TriggerCard
               trigger={item}
               onToggle={handleToggleTrigger}
-              onEdit={(t) => setEditTrigger(t)}
-              onDelete={handleDeleteTrigger}
               onPress={(t) => setReportTrigger(t)}
             />
           )}
@@ -416,8 +348,6 @@ export const TriggersScreen: React.FC<{ onOpenExecutiveSummaries?: () => void }>
                         key={item.id}
                         trigger={item}
                         onToggle={handleToggleTrigger}
-                        onEdit={(t) => setEditTrigger(t)}
-                        onDelete={handleDeleteTrigger}
                         onPress={(t) => setReportTrigger(t)}
                       />
                     ))}
@@ -482,6 +412,16 @@ export const TriggersScreen: React.FC<{ onOpenExecutiveSummaries?: () => void }>
         onDelete={handleDeleteTrigger}
         onSave={async (id, updates) => {
           await handleUpdateTrigger(id, updates);
+        }}
+      />
+
+      {/* Modal de Criação (+ Novo no Header) */}
+      <CreateTriggerModal
+        visible={createVisible}
+        onClose={() => setCreateVisible(false)}
+        onSubmit={async (input) => {
+          await handleCreateTrigger(input);
+          setCreateVisible(false);
         }}
       />
 
@@ -591,7 +531,7 @@ export const TriggersScreen: React.FC<{ onOpenExecutiveSummaries?: () => void }>
                     >
                       <View style={styles.categoryOptionLeft}>
                         <View style={[styles.categoryOptionIconWrap, { backgroundColor: catBg }]}>
-                          <MaterialIcons name={c.icon as any} size={18} color={catColor} />
+                          <MaterialIcons name={c.icon} size={18} color={catColor} />
                         </View>
                         <Text
                           style={[

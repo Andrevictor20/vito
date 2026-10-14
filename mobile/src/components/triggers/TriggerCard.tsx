@@ -1,7 +1,7 @@
 import React from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, Alert, Platform } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { tokens, MD3Shapes } from '../../theme/tokens';
+import { MD3Shapes } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { Trigger, TRIGGER_CATEGORIES, TriggerCategory } from '../../types';
 import { M3Switch } from '../ui/M3Switch';
@@ -9,16 +9,12 @@ import { M3Switch } from '../ui/M3Switch';
 interface TriggerCardProps {
   trigger: Trigger;
   onToggle: (id: string) => void;
-  onEdit: (trigger: Trigger) => void;
-  onDelete: (id: string) => void;
   onPress: (trigger: Trigger) => void;
 }
 
 export const TriggerCard: React.FC<TriggerCardProps> = ({
   trigger,
   onToggle,
-  onEdit,
-  onDelete,
   onPress,
 }) => {
   const { colors, isDark } = useTheme();
@@ -37,29 +33,6 @@ export const TriggerCard: React.FC<TriggerCardProps> = ({
   const isActive = trigger.status === 'active';
   const categoryColor = isDark ? categoryMeta.colorDark : categoryMeta.colorLight;
   const categoryBg = isDark ? categoryMeta.bgDark : categoryMeta.bgLight;
-
-  const handleDeletePress = () => {
-    if (Platform.OS === 'web') {
-      const confirmed = typeof window !== 'undefined' ? window.confirm(`Deseja parar de acompanhar "${trigger.title}"?`) : true;
-      if (confirmed) {
-        onDelete(trigger.id);
-      }
-      return;
-    }
-
-    Alert.alert(
-      'Remover radar',
-      `Deseja parar de acompanhar "${trigger.title}"?`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Remover',
-          style: 'destructive',
-          onPress: () => onDelete(trigger.id),
-        },
-      ]
-    );
-  };
 
   const getFrequencyLabel = () => {
     if (trigger.scheduled_time) {
@@ -95,14 +68,14 @@ export const TriggerCard: React.FC<TriggerCardProps> = ({
       <View style={styles.contentRow}>
         {/* Ícone da Categoria com container circular tonal */}
         <View style={[styles.iconCircle, { backgroundColor: categoryBg }]}>
-          <MaterialIcons name={categoryMeta.icon as any} size={18} color={categoryColor} />
+          <MaterialIcons name={categoryMeta.icon} size={18} color={categoryColor} />
         </View>
 
-        {/* Informações Centrais: Título + Linha de Meta (Categoria • Horário) */}
+        {/* Informações Centrais: Título (2 linhas) + Meta (Categoria • Horário) */}
         <View style={styles.textContainer}>
           <Text
             style={[styles.title, { color: colors.onSurface }]}
-            numberOfLines={1}
+            numberOfLines={2}
             ellipsizeMode="tail"
           >
             {trigger.title}
@@ -122,46 +95,11 @@ export const TriggerCard: React.FC<TriggerCardProps> = ({
           </View>
         </View>
 
-        {/* Ações Rápidas: Editar + Excluir + Switch On/Off + Seta */}
+        {/* Só o Switch: editar/excluir vivem na tela de detalhes (toque no card) */}
         <View style={styles.actionsRight}>
-          <TouchableOpacity
-            style={styles.actionIconButton}
-            onPress={(e) => {
-              e.stopPropagation();
-              onEdit(trigger);
-            }}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            accessibilityLabel="Editar radar"
-          >
-            <MaterialIcons name="edit" size={16} color={isDark ? '#A1A1AA' : '#71717A'} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.actionIconButton}
-            onPress={(e) => {
-              e.stopPropagation();
-              handleDeletePress();
-            }}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            accessibilityLabel="Remover radar"
-          >
-            <MaterialIcons
-              name="delete-outline"
-              size={17}
-              color={isDark ? '#71717A' : '#9CA3AF'}
-            />
-          </TouchableOpacity>
-
           <View style={styles.switchWrapper}>
             <M3Switch value={isActive} onValueChange={() => onToggle(trigger.id)} />
           </View>
-
-          <MaterialIcons
-            name="chevron-right"
-            size={18}
-            color={colors.onSurfaceVariant}
-            style={styles.chevron}
-          />
         </View>
       </View>
     </TouchableOpacity>
@@ -228,16 +166,8 @@ const styles = StyleSheet.create({
   actionsRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-  },
-  actionIconButton: {
-    padding: 3,
   },
   switchWrapper: {
-    marginLeft: 2,
     transform: [{ scale: 0.85 }],
-  },
-  chevron: {
-    marginLeft: -2,
   },
 });

@@ -17,7 +17,9 @@ type Config struct {
 	GeminiAPIKey       string
 	GeminiModel        string
 	OpenRouterAPIKey   string
+	OpenRouterModel    string
 	GroqAPIKey         string
+	GroqModel          string
 	GoogleClientID     string
 	GoogleClientSecret string
 	GoogleRedirectURL  string
@@ -62,6 +64,16 @@ func Load() *Config {
 		geminiModel = "gemini-2.5-flash"
 	}
 
+	// Modelos de fallback via env (bug §8.7/8): sem IDs hardcoded inválidos.
+	groqModel := os.Getenv("GROQ_MODEL")
+	if groqModel == "" {
+		groqModel = "llama-3.3-70b-versatile"
+	}
+	openRouterModel := os.Getenv("OPENROUTER_MODEL")
+	if openRouterModel == "" {
+		openRouterModel = "nvidia/nemotron-3.5-lightning:free"
+	}
+
 	dataKey := os.Getenv("DATA_ENCRYPTION_KEY")
 	if dataKey == "" {
 		dataKey = jwtSecret
@@ -91,7 +103,9 @@ func Load() *Config {
 		GeminiAPIKey:       geminiKey,
 		GeminiModel:        geminiModel,
 		OpenRouterAPIKey:   os.Getenv("OPENROUTER_API_KEY"),
+		OpenRouterModel:    openRouterModel,
 		GroqAPIKey:         os.Getenv("GROQ_API_KEY"),
+		GroqModel:          groqModel,
 		GoogleClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
 		GoogleClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
 		GoogleRedirectURL:  googleRedirectURL,

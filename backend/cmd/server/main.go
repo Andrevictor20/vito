@@ -19,6 +19,7 @@ import (
 	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/andrevmp/vito/backend/internal/server"
 	"github.com/andrevmp/vito/backend/internal/service"
+	"github.com/google/uuid"
 )
 
 func main() {
@@ -59,12 +60,12 @@ func main() {
 		aiProviders = append(aiProviders, geminiProv)
 	}
 	if cfg.GroqAPIKey != "" {
-		log.Println("🤖 [AI Provider] Groq Cloud ativado como fallback.")
-		aiProviders = append(aiProviders, ai.NewGroqProvider(cfg.GroqAPIKey, "qwen/qwen3.8-27b"))
+		log.Printf("🤖 [AI Provider] Groq Cloud ativado como fallback (%s).", cfg.GroqModel)
+		aiProviders = append(aiProviders, ai.NewGroqProvider(cfg.GroqAPIKey, cfg.GroqModel))
 	}
 	if cfg.OpenRouterAPIKey != "" {
-		log.Println("🤖 [AI Provider] OpenRouter ativado como fallback.")
-		aiProviders = append(aiProviders, ai.NewOpenRouterProvider(cfg.OpenRouterAPIKey, "nvidia/nemotron-3.5-lightning:free"))
+		log.Printf("🤖 [AI Provider] OpenRouter ativado como fallback (%s).", cfg.OpenRouterModel)
+		aiProviders = append(aiProviders, ai.NewOpenRouterProvider(cfg.OpenRouterAPIKey, cfg.OpenRouterModel))
 	}
 
 	aiGateway := ai.NewGateway(aiProviders...)
@@ -80,6 +81,22 @@ func main() {
 	astSvc.SetUserRepository(userRepo)
 	astSvc.SetAISettingsRepository(aiSettingsRepo)
 	astSvc.SetPendingService(pendingSvc)
+	// Ciclo 2 §8.4: correção manual rápida vira learned_preference (opt-out via VITO_DISABLE_IMPLICIT_FEEDBACK=1).
+	if os.Getenv("VITO_DISABLE_IMPLICIT_FEEDBACK") == "1" {
+		service.ImplicitFeedbackDisabled = true
+	}
+	service.ImplicitFeedbackHook = func(userID, insight string) {
+		_ = memoryRepo.Create(&domain.Memory{
+			ID:         uuid.New().String(),
+			UserID:     userID,
+			Category:   "learned_preference",
+			Content:    insight,
+			Importance: 4,
+			Confidence: 0.85,
+			CreatedAt:  time.Now().UTC(),
+			UpdatedAt:  time.Now().UTC(),
+		})
+	}
 
 	syncRepo := repository.NewCalendarSyncRepository(db)
 	syncSvc := service.NewCalendarSyncService(syncRepo, eventRepo, cfg.DataEncryptionKey)
@@ -105,6 +122,30 @@ func main() {
 		})
 	}
 	triggerWorker := service.NewTriggerWorker(triggerRepo, notifSvc, triggerEvaluator, 1*time.Minute)
+	// Delta gate pré-IA (§9.3): hashes dos fatos atuais via conectores por categoria.
+	triggerWorker.SetDeltaFetcher(func(fetchCtx context.Context, t *domain.Trigger) ([]string, []string, error) {
+		items, err := ai.RouteTriggerSource(t).Fetch(fetchCtx, t)
+		if err != nil {
+			return nil, nil, err
+		}
+		stored, err := triggerRepo.GetSeenHashes(t.ID)
+		if err != nil {
+			return nil, nil, err
+		}
+		seen := map[string]bool{}
+		for _, h := range stored {
+			seen[h] = true
+		}
+		var fresh, all []string
+		for _, it := range items {
+			h := ai.HashDataPoint(it)
+			all = append(all, h)
+			if !seen[h] {
+				fresh = append(fresh, h)
+			}
+		}
+		return fresh, all, nil
+	})
 	triggerWorker.Start()
 	defer triggerWorker.Stop()
 
@@ -125,6 +166,17 @@ func main() {
 	todoReminderWorker := service.NewTodoReminderWorker(todoRepo, notifSvc, 15*time.Minute)
 	todoReminderWorker.Start()
 	defer todoReminderWorker.Stop()
+
+	// Worker em segundo plano para consolidação comportamental noturna (§8.4 ciclo 3)
+	behavioralWorker := service.NewBehavioralWorker(todoRepo, eventRepo, memoryRepo)
+	behavioralWorker.Start(func() []string {
+		ids, err := userRepo.ListIDs()
+		if err != nil {
+			return nil
+		}
+		return ids
+	})
+	defer behavioralWorker.Stop()
 
 	// Worker em segundo plano para resumos executivos (diário, semanal e mensal)
 	executiveSummaryWorker := service.NewExecutiveSummaryWorker(db, userRepo, notifSvc, 1*time.Minute)

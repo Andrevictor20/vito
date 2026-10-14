@@ -150,7 +150,7 @@ export const TriggerReportsModal: React.FC<TriggerReportsModalProps> = ({
           <View style={styles.header}>
             <View style={styles.headerTitleArea}>
               <View style={styles.categoryRow}>
-                <MaterialIcons name={categoryMeta.icon as any} size={16} color={catColor} />
+                <MaterialIcons name={categoryMeta.icon} size={16} color={catColor} />
                 <Text style={[styles.categoryLabel, { color: catColor }]}>
                   {categoryMeta.label}
                 </Text>

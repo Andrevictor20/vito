@@ -1,4 +1,10 @@
 import { Event, Todo } from '../types';
+import { isAllDayEvent } from './calendarDateUtils';
+
+/** Plural pt-BR sem "(s)": 1 tarefa, 2 tarefas. */
+export function plural(count: number, one: string, many: string): string {
+  return count === 1 ? `1 ${one}` : `${count} ${many}`;
+}
 
 export interface DailyActivityItem {
   dayLabel: string;
@@ -198,8 +204,13 @@ function normalizeCategory(category?: string, title?: string): { name: string; c
 
 /**
  * Calcula a duração em horas de um evento
+ * Exclui all_day / FERIADO / 24h (>= 23h) da soma de horas.
  */
 function getEventDurationHours(event: Event): number {
+  // Feriados e eventos de dia inteiro valem 0h de carga (não é trabalho).
+  if (isAllDayEvent(event)) return 0;
+  const cat = (event.category || '').toLowerCase();
+  if (cat === 'holiday' || cat === 'feriado') return 0;
   try {
     const start = new Date(event.start_at).getTime();
     const end = new Date(event.end_at).getTime();
@@ -207,6 +218,8 @@ function getEventDurationHours(event: Event): number {
       return 1; // 1 hora padrão se não houver intervalo válido
     }
     const diffMs = end - start;
+    // Eventos de 24h / >= 23h (all_day disfarçado) valem 0h.
+    if (diffMs / (1000 * 60 * 60) >= 23) return 0;
     const diffHours = diffMs / (1000 * 60 * 60);
     return Math.max(0.25, Math.round(diffHours * 10) / 10);
   } catch {
@@ -248,7 +261,7 @@ function generateNarrative(
   }
 
   const eventsMention = topEventTitles.length > 0 ? ` como "${topEventTitles.slice(0, 2).join('" e "')}"` : '';
-  const todosMention = completedTodosCount > 0 ? `, com ${completedTodosCount} tarefa(s) concluída(s) com sucesso` : '';
+  const todosMention = completedTodosCount > 0 ? `, com ${plural(completedTodosCount, 'tarefa concluída', 'tarefas concluídas')} com sucesso` : '';
 
   const eventLabel = eventsCount === 1 ? 'compromisso registrado' : 'compromissos registrados';
   const narrative = `Você dedicou cerca de ${hours}h em ${eventsCount} ${eventLabel}${eventsMention}${todosMention}. ${

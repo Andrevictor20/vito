@@ -2,7 +2,12 @@ package domain
 
 import (
 	"context"
+	"errors"
 	"time"
+)
+
+var (
+	ErrChatSessionNotFound = errors.New("conversa não encontrada")
 )
 
 // ChatSession representa uma sessão de conversa do usuário com o assistente Vito.

@@ -68,3 +68,51 @@ func UnmarshalIntent(raw string, target *ParsedIntent) error {
 
 	return nil
 }
+
+// ValidateIntent aplica strict schema + auto-reparo (§8.6/6): erro explícito em
+// JSON inválido, reply vazio sem ações ou evento com fim<=início (gateway faz
+// 1 retentativa com o erro antes do failover).
+func ValidateIntent(intent *ParsedIntent) error {
+	if intent == nil {
+		return errors.New("intent nula após parse")
+	}
+	if intent.IsEmpty() {
+		return errors.New("resposta vazia do provedor (sem message nem ações)")
+	}
+	if intent.Event != nil && !intent.Event.StartAt.IsZero() && !intent.Event.EndAt.IsZero() {
+		if intent.Event.EndAt.Before(intent.Event.StartAt) || intent.Event.EndAt.Equal(intent.Event.StartAt) {
+			return errors.New("evento com end_at anterior ou igual a start_at")
+		}
+	}
+	return nil
+}
+
+// ParseAndNormalizeWithRepair sanitiza, decodifica e valida com 1 tentativa de
+// reparo (remove cercas markdown residuais e vírgulas sobressalentes).
+func ParseAndNormalizeWithRepair(raw string, target *ParsedIntent) error {
+	if err := UnmarshalIntent(raw, target); err == nil {
+		if verr := ValidateIntent(target); verr == nil {
+			return nil
+		} else {
+			lastErr := verr
+			// Reparo: tenta extrair novamente após trim agressivo.
+			cleaned := strings.TrimSpace(raw)
+			cleaned = strings.Trim(cleaned, "`")
+			if err2 := UnmarshalIntent(cleaned, target); err2 == nil {
+				if verr2 := ValidateIntent(target); verr2 == nil {
+					return nil
+				}
+			}
+			return lastErr
+		}
+	} else {
+		// Reparo único com o erro exato antes do failover.
+		cleaned := trailingCommaRegex.ReplaceAllString(strings.TrimSpace(raw), "$1")
+		if err2 := UnmarshalIntent(cleaned, target); err2 == nil {
+			if verr := ValidateIntent(target); verr == nil {
+				return nil
+			}
+		}
+		return err
+	}
+}

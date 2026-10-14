@@ -28,19 +28,28 @@ func (r *MemoryRepositorySQLite) Create(m *domain.Memory) error {
 
 func (r *MemoryRepositorySQLite) GetByID(id, userID string) (*domain.Memory, error) {
 	query := `
-		SELECT id, user_id, category, content, created_at, updated_at
+		SELECT id, user_id, category, content,
+		       COALESCE(importance, 3), COALESCE(confidence, 1.0),
+		       COALESCE(access_count, 0), last_accessed_at, COALESCE(superseded_by, ''),
+		       created_at, updated_at
 		FROM memories
 		WHERE id = ? AND user_id = ?
 	`
 	var m domain.Memory
+	var lastAcc sql.NullTime
 	err := r.db.QueryRow(query, id, userID).Scan(
-		&m.ID, &m.UserID, &m.Category, &m.Content, &m.CreatedAt, &m.UpdatedAt,
+		&m.ID, &m.UserID, &m.Category, &m.Content,
+		&m.Importance, &m.Confidence, &m.AccessCount, &lastAcc, &m.SupersededBy,
+		&m.CreatedAt, &m.UpdatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, domain.ErrMemoryNotFound
 		}
 		return nil, err
+	}
+	if lastAcc.Valid {
+		m.LastAccessedAt = &lastAcc.Time
 	}
 	return &m, nil
 }
