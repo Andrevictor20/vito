@@ -1,0 +1,42 @@
+package handler
+
+import (
+	"encoding/json"
+	"errors"
+	"net/http"
+
+	"github.com/andrevmp/vito/backend/internal/domain"
+)
+
+// apiError padroniza o corpo de erro (BACK-04).
+type apiError struct {
+	Error apiErrorBody `json:"error"`
+}
+
+type apiErrorBody struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
+// respondError traduz erros de domínio para o HTTP correspondente em JSON único.
+func respondError(w http.ResponseWriter, err error) {
+	w.Header().Set("Content-Type", "application/json")
+	switch {
+	case errors.Is(err, domain.ErrTodoNotFound),
+		errors.Is(err, domain.ErrSubtaskNotFound),
+		errors.Is(err, domain.ErrEventNotFound),
+		errors.Is(err, domain.ErrMemoryNotFound),
+		errors.Is(err, domain.ErrPendingItemNotFound):
+		w.WriteHeader(http.StatusNotFound)
+		_ = json.NewEncoder(w).Encode(apiError{Error: apiErrorBody{Code: "not_found", Message: err.Error()}})
+	case errors.Is(err, domain.ErrConflict):
+		w.WriteHeader(http.StatusConflict)
+		_ = json.NewEncoder(w).Encode(apiError{Error: apiErrorBody{Code: "conflict", Message: err.Error()}})
+	case errors.Is(err, domain.ErrValidation):
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		_ = json.NewEncoder(w).Encode(apiError{Error: apiErrorBody{Code: "validation", Message: err.Error()}})
+	default:
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(apiError{Error: apiErrorBody{Code: "bad_request", Message: err.Error()}})
+	}
+}

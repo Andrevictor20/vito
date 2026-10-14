@@ -30,6 +30,9 @@ func (m *mockReminderTodoRepo) GetByID(id, userID string) (*domain.Todo, error) 
 func (m *mockReminderTodoRepo) ListByUser(userID string, status domain.TodoStatus) ([]domain.Todo, error) {
 	return m.todos, nil
 }
+func (m *mockReminderTodoRepo) ListPaged(userID string, f domain.TodoFilter) ([]domain.Todo, int, error) {
+	return m.todos, len(m.todos), nil
+}
 func (m *mockReminderTodoRepo) ListUpcomingUnreminded(from, to time.Time) ([]domain.Todo, error) {
 	var res []domain.Todo
 	for _, t := range m.todos {

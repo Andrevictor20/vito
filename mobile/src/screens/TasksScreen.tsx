@@ -13,11 +13,9 @@ import { tokens } from '../theme/tokens';
 import { useTheme } from '../context/ThemeContext';
 import { Todo, PendingItem } from '../types';
 import { TaskRow } from '../components/tasks/TaskRow';
-import { CreateTaskSheet, NewItemPayload } from '../components/tasks/CreateTaskSheet';
-import { EditTaskSheet, EditTarget, EditItemPayload } from '../components/tasks/EditTaskSheet';
-import { ReminderSheet, RepeatOption } from '../components/pending/ReminderSheet';
+import { TaskSheet, TaskPayload } from '../components/tasks/TaskSheet';
 import { usePendingItems } from '../hooks/usePendingItems';
-import { toUnifiedRows, sortUnifiedRows } from '../utils/unifiedTasks';
+import { toUnifiedRows, sortUnifiedRows, filterUnifiedRows, TaskFilter, TaskSort } from '../utils/unifiedTasks';
 
 interface TasksScreenProps {
   todos: Todo[];
@@ -35,6 +33,7 @@ interface TasksScreenProps {
   onSaveTodoFull: (input: {
     title: string;
     priority?: string;
+    category?: string;
     due_date?: string;
     remind_at?: string;
     remind_repeat?: string;
@@ -43,6 +42,7 @@ interface TasksScreenProps {
   onUpdateTodoFull: (id: string, input: {
     title?: string;
     priority?: string;
+    category?: string;
     due_date?: string;
     remind_at?: string;
     remind_repeat?: string;
@@ -50,6 +50,19 @@ interface TasksScreenProps {
   }) => Promise<any>;
   onOpenEventCreate?: (title: string, date?: string) => void;
 }
+
+const FILTERS: Array<{ id: TaskFilter; label: string }> = [
+  { id: 'all', label: 'Todas' },
+  { id: 'today', label: 'Hoje' },
+  { id: 'overdue', label: 'Atrasadas' },
+  { id: 'nodate', label: 'Sem data' },
+];
+
+const SORTS: Array<{ id: TaskSort; label: string }> = [
+  { id: 'date', label: 'Data' },
+  { id: 'priority', label: 'Prioridade' },
+  { id: 'alpha', label: 'A–Z' },
+];
 
 export const TasksScreen: React.FC<TasksScreenProps> = ({
   todos,
@@ -70,15 +83,14 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
 }) => {
   const { colors, isDark } = useTheme();
   const [showCompleted, setShowCompleted] = useState(false);
-  const [reminderItem, setReminderItem] = useState<PendingItem | null>(null);
-  const [reminderSaving, setReminderSaving] = useState(false);
-  const [reminderError, setReminderError] = useState<string | null>(null);
-  const [createVisible, setCreateVisible] = useState(false);
-  const [createSaving, setCreateSaving] = useState(false);
-  const [createError, setCreateError] = useState<string | null>(null);
-  const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
-  const [editSaving, setEditSaving] = useState(false);
-  const [editError, setEditError] = useState<string | null>(null);
+  const [filter, setFilter] = useState<TaskFilter>('all');
+  const [sort, setSort] = useState<TaskSort>('date');
+  const [sheetVisible, setSheetVisible] = useState(false);
+  const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
+  // Pendência legada em conversão para tarefa unificada.
+  const [convertingPending, setConvertingPending] = useState<PendingItem | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const pending = usePendingItems(onOpenEventCreate);
 
@@ -86,9 +98,13 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
     () => toUnifiedRows([...pendingTodos, ...completedTodosList], pending.items, Date.now()),
     [pendingTodos, completedTodosList, pending.items],
   );
-  const activeRows = useMemo(() => sortUnifiedRows(rows), [rows]);
+  const now = Date.now();
+  const activeRows = useMemo(
+    () => sortUnifiedRows(filterUnifiedRows(rows, filter, now), sort),
+    [rows, filter, sort],
+  );
   const doneRows = useMemo(() => rows.filter((r) => r.done), [rows]);
-  const overdueCount = useMemo(() => activeRows.filter((r) => r.overdue).length, [activeRows]);
+  const overdueCount = useMemo(() => rows.filter((r) => !r.done && r.overdue).length, [rows]);
 
   const renderRow = (row: (typeof activeRows)[number]) => {
     if (row.kind === 'todo' && row.sourceTodo) {
@@ -99,7 +115,7 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
           row={row}
           onToggle={() => onToggleTodo(t.id)}
           onDelete={() => onDeleteTodo(t.id)}
-          onEdit={() => setEditTarget({ kind: 'todo', todo: t })}
+          onEdit={() => { setEditingTodo(t); setConvertingPending(null); setSaveError(null); setSheetVisible(true); }}
           onReminder={undefined}
           subtasks={t.subtasks}
           onToggleSubtask={(sid) => onToggleSubtask(t.id, sid)}
@@ -116,118 +132,75 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
           row={row}
           onToggle={() => pending.toggleComplete(p)}
           onDelete={() => pending.remove(p.id)}
-          onEdit={() => setEditTarget({ kind: 'pending', pending: p })}
+          onEdit={() => {
+            // Converte pendência legada: preenche o sheet unificado.
+            setConvertingPending(p);
+            setEditingTodo({
+              id: p.id,
+              user_id: '',
+              title: p.title,
+              priority: 'medium',
+              category: p.category || 'geral',
+              status: 'pending',
+              due_date: p.scheduled_date ? `${p.scheduled_date}T09:00:00` : undefined,
+              remind_at: p.remind_at || undefined,
+              remind_repeat: (p.remind_repeat as any) || 'none',
+              remind_advance_minutes: p.remind_advance_minutes || 0,
+              created_at: '',
+            } as Todo);
+            setSaveError(null);
+            setSheetVisible(true);
+          }}
           onSchedule={(dateStr) => pending.schedule(p, dateStr)}
-          onReminder={() => setReminderItem(p)}
+          onReminder={undefined}
         />
       );
     }
     return null;
   };
 
-  const handleSaveNew = async (payload: NewItemPayload) => {
-    setCreateSaving(true);
-    setCreateError(null);
+  const handleSave = async (payload: TaskPayload) => {
+    setSaving(true);
+    setSaveError(null);
     try {
-      if (payload.kind === 'todo') {
-        await onSaveTodoFull({
-          title: payload.title,
-          priority: payload.priority,
-          due_date: payload.dateISO,
-          remind_at: payload.remind_at,
-          remind_repeat: payload.remind_repeat,
-          remind_advance_minutes: payload.remind_advance_minutes,
-        });
+      const input = {
+        title: payload.title,
+        priority: payload.priority,
+        category: payload.category,
+        due_date: payload.dateISO,
+        remind_at: payload.remind_at,
+        remind_repeat: payload.remind_repeat,
+        remind_advance_minutes: payload.remind_advance_minutes,
+      };
+      if (editingTodo && !convertingPending) {
+        await onUpdateTodoFull(editingTodo.id, input);
+      } else if (convertingPending) {
+        // Migração on-the-fly: cria tarefa unificada e apaga a pendência legada.
+        await onSaveTodoFull(input);
+        await pending.remove(convertingPending.id);
       } else {
-        await pending.create(payload.title, payload.category || 'geral', {
-          scheduled_date: payload.dateOnly,
-          remind_at: payload.remind_at,
-          remind_repeat: payload.remind_repeat,
-          remind_advance_minutes: payload.remind_advance_minutes,
-        });
+        await onSaveTodoFull(input);
       }
-      setCreateVisible(false);
+      setSheetVisible(false);
+      setEditingTodo(null);
+      setConvertingPending(null);
     } catch (err) {
-      console.warn('[TasksScreen] Falha ao criar item:', err);
-      setCreateError('Não foi possível criar. Tente de novo.');
+      console.warn('[TasksScreen] Falha ao salvar tarefa:', err);
+      setSaveError('Não foi possível salvar. Tente de novo.');
     } finally {
-      setCreateSaving(false);
+      setSaving(false);
     }
   };
 
-  const handleSaveEdit = async (id: string, kind: 'todo' | 'pending', payload: EditItemPayload) => {
-    setEditSaving(true);
-    setEditError(null);
+  const handleDelete = async (id: string) => {
     try {
-      if (kind === 'todo') {
-        await onUpdateTodoFull(id, {
-          title: payload.title,
-          priority: payload.priority,
-          due_date: payload.dateISO,
-          remind_at: payload.remind_at,
-          remind_repeat: payload.remind_repeat,
-          remind_advance_minutes: payload.remind_advance_minutes,
-        });
-      } else {
-        const full = editTarget?.kind === 'pending' && editTarget.pending
-          ? editTarget.pending
-          : ({ id } as PendingItem);
-        await pending.updateItem(
-          full,
-          {
-            title: payload.title,
-            category: payload.category,
-            scheduled_date: payload.dateOnly,
-            remind_at: payload.remind_at,
-            remind_repeat: payload.remind_repeat,
-            remind_advance_minutes: payload.remind_advance_minutes,
-          },
-        );
-      }
-      setEditTarget(null);
+      if (convertingPending) await pending.remove(convertingPending.id);
+      else onDeleteTodo(id);
+      setSheetVisible(false);
+      setEditingTodo(null);
+      setConvertingPending(null);
     } catch (err) {
-      console.warn('[TasksScreen] Falha ao editar item:', err);
-      setEditError('Não foi possível salvar. Tente de novo.');
-    } finally {
-      setEditSaving(false);
-    }
-  };
-
-  const handleDeleteFromEdit = async (id: string, kind: 'todo' | 'pending') => {
-    try {
-      if (kind === 'todo') onDeleteTodo(id);
-      else await pending.remove(id);
-      setEditTarget(null);
-    } catch (err) {
-      setEditError('Não foi possível excluir. Tente de novo.');
-    }
-  };
-
-  const handleSaveReminder = async (reminder: { remind_at: string; remind_repeat: RepeatOption; remind_advance_minutes: number }) => {
-    if (!reminderItem) return;
-    setReminderSaving(true);
-    setReminderError(null);
-    try {
-      await pending.updateReminder(reminderItem, reminder);
-      setReminderItem(null);
-    } catch (err) {
-      setReminderError('Não foi possível salvar o lembrete. Tente de novo.');
-    } finally {
-      setReminderSaving(false);
-    }
-  };
-
-  const handleClearReminder = async () => {
-    if (!reminderItem) return;
-    setReminderSaving(true);
-    setReminderError(null);
-    try {
-      await pending.updateReminder(reminderItem, { remind_at: null, remind_repeat: 'none', remind_advance_minutes: 0 });
-      setReminderItem(null);
-    } catch (err) {
-      setReminderError('Não foi possível remover o lembrete. Tente de novo.');
-    } finally {
-      setReminderSaving(false);
+      setSaveError('Não foi possível excluir. Tente de novo.');
     }
   };
 
@@ -238,6 +211,7 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
         refreshControl={
           <RefreshControl
             refreshing={refreshing || pending.refreshing}
@@ -249,7 +223,6 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
           />
         }
       >
-        {/* Linha de contexto (o Header global já titula a página) */}
         <View style={styles.sectionHeader}>
           <Text style={[styles.checklistSubtitle, { color: colors.textMuted }]}>
             {activeRows.length} {activeRows.length === 1 ? 'ativa' : 'ativas'}
@@ -257,6 +230,42 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
             {completedCount > 0 ? ` · ${completedCount} concluída${completedCount === 1 ? '' : 's'}` : ''}
           </Text>
         </View>
+
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.filterStrip}>
+          {FILTERS.map((f) => {
+            const active = filter === f.id;
+            return (
+              <TouchableOpacity
+                key={f.id}
+                style={[styles.filterChip, { borderColor: active ? colors.primary : colors.outlineVariant, backgroundColor: active ? colors.primary : 'transparent' }]}
+                onPress={() => setFilter(f.id)}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={`Filtrar ${f.label}`}
+              >
+                <Text style={[styles.filterText, { color: active ? colors.onPrimary : colors.onSurfaceVariant }]}>{f.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+          <View style={[styles.sortDivider, { backgroundColor: colors.outlineVariant }]} />
+          {SORTS.map((s) => {
+            const active = sort === s.id;
+            return (
+              <TouchableOpacity
+                key={s.id}
+                style={[styles.filterChip, { borderColor: active ? colors.primary : colors.outlineVariant, backgroundColor: active ? colors.primary : 'transparent' }]}
+                onPress={() => setSort(s.id)}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={`Ordenar por ${s.label}`}
+              >
+                <Text style={[styles.filterText, { color: active ? colors.onPrimary : colors.onSurfaceVariant }]}>{s.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
 
         {pending.error && (
           <View style={[styles.errorCard, { backgroundColor: colors.errorContainer, borderColor: colors.error }]}>
@@ -277,7 +286,7 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
             <View style={styles.emptyContent}>
               <Text style={[styles.emptyTitle, { color: colors.onSurface }]}>Tudo em Dia</Text>
               <Text style={[styles.emptySub, { color: colors.onSurfaceVariant }]}>
-                Nenhuma tarefa ou pendência no momento.
+                Nenhuma tarefa neste filtro.
               </Text>
             </View>
           </View>
@@ -333,46 +342,30 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
             )}
           </View>
         )}
-
-        {/* Entrada única de criação */}
-        <View style={styles.createBtnWrapper}>
-          <TouchableOpacity
-            style={[styles.createFab, { backgroundColor: colors.primary }]}
-            onPress={() => setCreateVisible(true)}
-            activeOpacity={0.85}
-            accessibilityLabel="Criar tarefa ou pendência"
-          >
-            <MaterialIcons name="add" size={22} color={colors.onPrimary} />
-            <Text style={[styles.createFabText, { color: colors.onPrimary }]}>Novo item</Text>
-          </TouchableOpacity>
-        </View>
       </ScrollView>
 
-      <CreateTaskSheet
-        visible={createVisible}
-        saving={createSaving}
-        error={createError}
-        onClose={() => setCreateVisible(false)}
-        onSave={handleSaveNew}
-      />
+      {/* FAB fixo padronizado: pill compacta, sempre visível mesmo com 300 itens */}
+      <View style={styles.fabOverlay} pointerEvents="box-none">
+        <TouchableOpacity
+          style={[styles.fab, { backgroundColor: colors.primary }]}
+          onPress={() => { setEditingTodo(null); setConvertingPending(null); setSaveError(null); setSheetVisible(true); }}
+          activeOpacity={0.85}
+          accessibilityLabel="Nova tarefa"
+          accessibilityRole="button"
+        >
+          <MaterialIcons name="add" size={22} color={colors.onPrimary} />
+          <Text style={[styles.fabText, { color: colors.onPrimary }]}>Nova</Text>
+        </TouchableOpacity>
+      </View>
 
-      <ReminderSheet
-        visible={!!reminderItem}
-        item={reminderItem}
-        saving={reminderSaving}
-        error={reminderError}
-        onClose={() => setReminderItem(null)}
-        onSave={handleSaveReminder}
-        onClear={handleClearReminder}
-      />
-
-      <EditTaskSheet
-        target={editTarget}
-        saving={editSaving}
-        error={editError}
-        onClose={() => setEditTarget(null)}
-        onSave={handleSaveEdit}
-        onDelete={handleDeleteFromEdit}
+      <TaskSheet
+        visible={sheetVisible}
+        editingTodo={editingTodo}
+        saving={saving}
+        error={saveError}
+        onClose={() => { setSheetVisible(false); setEditingTodo(null); setConvertingPending(null); }}
+        onSave={handleSave}
+        onDelete={handleDelete}
       />
     </View>
   );
@@ -387,7 +380,7 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: tokens.spacing.md,
-    paddingBottom: 110,
+    paddingBottom: 150,
   },
   sectionHeader: {
     marginTop: tokens.spacing.sm,
@@ -396,6 +389,27 @@ const styles = StyleSheet.create({
   checklistSubtitle: {
     fontSize: 12,
     marginTop: 2,
+  },
+  filterStrip: {
+    gap: 8,
+    paddingRight: 8,
+    marginBottom: tokens.spacing.sm,
+    alignItems: 'center',
+  },
+  filterChip: {
+    borderWidth: 1,
+    borderRadius: 9999,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+  },
+  filterText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  sortDivider: {
+    width: 1,
+    height: 20,
+    marginHorizontal: 2,
   },
   checklistCard: {
     borderRadius: 20,
@@ -463,20 +477,27 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
-  createBtnWrapper: {
-    marginTop: tokens.spacing.md,
-    alignItems: 'center',
+  fabOverlay: {
+    position: 'absolute',
+    right: 16,
+    bottom: 96,
+    zIndex: 50,
+    alignItems: 'flex-end',
   },
-  createFab: {
+  fab: {
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: 9999,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    gap: 8,
-    elevation: 3,
+    paddingHorizontal: 18,
+    paddingVertical: 13,
+    gap: 6,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.22,
+    shadowRadius: 6,
   },
-  createFabText: {
+  fabText: {
     fontSize: 14,
     fontWeight: '700',
   },

@@ -138,7 +138,7 @@ export function useHomeData(currentUserId?: string) {
     }
   };
 
-  const handleCreateTodo = async (todoData: { title: string; priority?: string; due_date?: string; remind_at?: string; remind_repeat?: string; remind_advance_minutes?: number; event_id?: string; event_title?: string }) => {
+  const handleCreateTodo = async (todoData: { title: string; priority?: string; category?: string; due_date?: string; remind_at?: string; remind_repeat?: string; remind_advance_minutes?: number; event_id?: string; event_title?: string }) => {
     try {
       const newTodo = await api.createTodo(todoData);
       if (newTodo) {
@@ -160,7 +160,7 @@ export function useHomeData(currentUserId?: string) {
     }
   };
 
-  const handleUpdateTodo = async (id: string, todoData: { title?: string; priority?: string; due_date?: string; remind_at?: string; remind_repeat?: string; remind_advance_minutes?: number }) => {
+  const handleUpdateTodo = async (id: string, todoData: { title?: string; priority?: string; category?: string; due_date?: string; remind_at?: string; remind_repeat?: string; remind_advance_minutes?: number }) => {
     try {
       const updated = await api.updateTodo(id, todoData);
       if (updated) {

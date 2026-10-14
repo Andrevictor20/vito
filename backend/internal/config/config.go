@@ -25,6 +25,7 @@ type Config struct {
 	ShortIoDomain      string
 	TurnstileSecretKey string
 	PublicBaseURL      string
+	CorsAllowedOrigins string
 }
 
 // Load carrega a configuração a partir de variáveis de ambiente com fallbacks seguros.
@@ -33,7 +34,7 @@ func Load() *Config {
 
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "8080"
+		port = "8180"
 	}
 
 	env := os.Getenv("APP_ENV")
@@ -98,6 +99,7 @@ func Load() *Config {
 		ShortIoDomain:      shortIoDomain,
 		TurnstileSecretKey: os.Getenv("CLOUDFLARE_TURNSTILE_SECRET_KEY"),
 		PublicBaseURL:      os.Getenv("PUBLIC_BASE_URL"),
+		CorsAllowedOrigins: os.Getenv("CORS_ALLOWED_ORIGINS"),
 	}
 }
 
@@ -109,11 +111,36 @@ func getEnvOrDefault(key, fallback string) string {
 	return v
 }
 
+// AllowedOrigins resolve as origens CORS: env explícito, PublicBaseURL em produção, * em development.
+func (c *Config) AllowedOrigins() []string {
+	if strings.TrimSpace(c.CorsAllowedOrigins) != "" {
+		var out []string
+		for _, o := range strings.Split(c.CorsAllowedOrigins, ",") {
+			if trimmed := strings.TrimSpace(o); trimmed != "" {
+				out = append(out, trimmed)
+			}
+		}
+		if len(out) > 0 {
+			return out
+		}
+	}
+	if !strings.EqualFold(c.Environment, "production") {
+		return []string{"*"}
+	}
+	if strings.TrimSpace(c.PublicBaseURL) != "" {
+		return []string{strings.TrimSpace(c.PublicBaseURL)}
+	}
+	return []string{}
+}
+
 // Validate verifica a integridade de segurança da configuração, impedindo que segredos fracos sejam usados em produção.
 func (c *Config) Validate() error {
 	if strings.EqualFold(c.Environment, "production") {
 		if c.JWTSecret == "vito-development-secret-change-in-production-12345" || len(c.JWTSecret) < 32 {
 			return errors.New("em ambiente de produção (APP_ENV=production), JWT_SECRET deve ser configurado com no mínimo 32 caracteres seguros")
+		}
+		if strings.TrimSpace(c.DataEncryptionKey) == "" || len(c.DataEncryptionKey) < 32 {
+			return errors.New("em ambiente de produção (APP_ENV=production), DATA_ENCRYPTION_KEY deve ser configurado com no mínimo 32 caracteres seguros")
 		}
 	}
 	return nil

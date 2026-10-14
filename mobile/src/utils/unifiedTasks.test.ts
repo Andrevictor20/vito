@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { toUnifiedRows, sortUnifiedRows } from './unifiedTasks';
+import { toUnifiedRows, sortUnifiedRows, filterUnifiedRows } from './unifiedTasks';
 import type { Todo, PendingItem } from '../types';
 
 // W1: página única "Tarefas e Pendências" — lista mista ordenada por urgência:
@@ -57,5 +57,31 @@ describe('unifiedTasks', () => {
     assert.equal(rows[0].kind, 'pending');
     assert.equal(rows[0].sortKey, null);
     assert.match(rows[0].detail || '', /saude/i);
+  });
+
+  it('dedupe: pendência já migrada (mesmo id) não duplica', () => {
+    const rows = toUnifiedRows(
+      [todo({ id: 'same', title: 'Migrada' })],
+      [pending({ id: 'same', title: 'Legada' })],
+      NOW,
+    );
+    assert.equal(rows.filter((r) => r.id === 'same').length, 1);
+  });
+
+  it('filtra hoje/atrasadas/sem data e ordena por prioridade e A–Z', () => {
+    const rows = toUnifiedRows(
+      [
+        todo({ id: 'late', title: 'Zeta', priority: 'low', due_date: '2026-10-10T10:00:00' }),
+        todo({ id: 'today', title: 'Alfa', priority: 'high', due_date: '2026-10-13T18:00:00' }),
+        todo({ id: 'nodate', title: 'Beta', priority: 'high' }),
+      ],
+      [],
+      NOW,
+    );
+    assert.deepEqual(filterUnifiedRows(rows, 'overdue', NOW).map((r) => r.id), ['late']);
+    assert.deepEqual(filterUnifiedRows(rows, 'today', NOW).map((r) => r.id), ['today']);
+    assert.deepEqual(filterUnifiedRows(rows, 'nodate', NOW).map((r) => r.id), ['nodate']);
+    assert.deepEqual(sortUnifiedRows(rows, 'priority').map((r) => r.id), ['today', 'nodate', 'late']);
+    assert.deepEqual(sortUnifiedRows(rows, 'alpha').map((r) => r.id), ['today', 'nodate', 'late']);
   });
 });

@@ -3,8 +3,10 @@ package repository
 import (
 	"database/sql"
 	"errors"
+	"strings"
 	"time"
 
+	"github.com/andrevmp/vito/backend/internal/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
 )
 
@@ -19,23 +21,29 @@ func NewTodoRepository(db *sql.DB) *TodoRepositorySQLite {
 }
 
 func (r *TodoRepositorySQLite) Create(t *domain.Todo) error {
+	if t.Category == "" {
+		t.Category = "geral"
+	}
 	query := `
-		INSERT INTO todos (id, user_id, title, status, priority, due_date, remind_at, remind_repeat, remind_advance, event_id, event_title, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO todos (id, user_id, title, status, priority, category, due_date, remind_at, remind_repeat, remind_advance, event_id, event_title, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
-	_, err := r.db.Exec(query, t.ID, t.UserID, t.Title, t.Status, t.Priority, t.DueDate, t.RemindAt, t.RemindRepeat, t.RemindAdvance, t.EventID, t.EventTitle, t.CreatedAt, t.UpdatedAt)
+	err := database.WithBusyRetry(4, func() error {
+		_, execErr := r.db.Exec(query, t.ID, t.UserID, t.Title, t.Status, t.Priority, t.Category, t.DueDate, t.RemindAt, t.RemindRepeat, t.RemindAdvance, t.EventID, t.EventTitle, t.CreatedAt, t.UpdatedAt)
+		return execErr
+	})
 	return err
 }
 
 func (r *TodoRepositorySQLite) GetByID(id, userID string) (*domain.Todo, error) {
 	query := `
-		SELECT id, user_id, title, status, priority, due_date, remind_at, COALESCE(remind_repeat, 'none'), COALESCE(remind_advance, 0), COALESCE(event_id, ''), COALESCE(event_title, ''), created_at, updated_at
+		SELECT id, user_id, title, status, priority, COALESCE(category, 'geral'), due_date, remind_at, COALESCE(remind_repeat, 'none'), COALESCE(remind_advance, 0), COALESCE(event_id, ''), COALESCE(event_title, ''), created_at, updated_at
 		FROM todos
 		WHERE id = ? AND user_id = ?
 	`
 	var t domain.Todo
 	err := r.db.QueryRow(query, id, userID).Scan(
-		&t.ID, &t.UserID, &t.Title, &t.Status, &t.Priority, &t.DueDate, &t.RemindAt, &t.RemindRepeat, &t.RemindAdvance, &t.EventID, &t.EventTitle, &t.CreatedAt, &t.UpdatedAt,
+		&t.ID, &t.UserID, &t.Title, &t.Status, &t.Priority, &t.Category, &t.DueDate, &t.RemindAt, &t.RemindRepeat, &t.RemindAdvance, &t.EventID, &t.EventTitle, &t.CreatedAt, &t.UpdatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -53,7 +61,7 @@ func (r *TodoRepositorySQLite) ListByUser(userID string, status domain.TodoStatu
 
 	if status != "" {
 		query = `
-			SELECT id, user_id, title, status, priority, due_date, remind_at, COALESCE(remind_repeat, 'none'), COALESCE(remind_advance, 0), COALESCE(event_id, ''), COALESCE(event_title, ''), created_at, updated_at
+			SELECT id, user_id, title, status, priority, COALESCE(category, 'geral'), due_date, remind_at, COALESCE(remind_repeat, 'none'), COALESCE(remind_advance, 0), COALESCE(event_id, ''), COALESCE(event_title, ''), created_at, updated_at
 			FROM todos
 			WHERE user_id = ? AND status = ?
 			ORDER BY created_at DESC
@@ -61,7 +69,7 @@ func (r *TodoRepositorySQLite) ListByUser(userID string, status domain.TodoStatu
 		args = []interface{}{userID, status}
 	} else {
 		query = `
-			SELECT id, user_id, title, status, priority, due_date, remind_at, COALESCE(remind_repeat, 'none'), COALESCE(remind_advance, 0), COALESCE(event_id, ''), COALESCE(event_title, ''), created_at, updated_at
+			SELECT id, user_id, title, status, priority, COALESCE(category, 'geral'), due_date, remind_at, COALESCE(remind_repeat, 'none'), COALESCE(remind_advance, 0), COALESCE(event_id, ''), COALESCE(event_title, ''), created_at, updated_at
 			FROM todos
 			WHERE user_id = ?
 			ORDER BY created_at DESC
@@ -78,7 +86,7 @@ func (r *TodoRepositorySQLite) ListByUser(userID string, status domain.TodoStatu
 	var todos []domain.Todo
 	for rows.Next() {
 		var t domain.Todo
-		if err := rows.Scan(&t.ID, &t.UserID, &t.Title, &t.Status, &t.Priority, &t.DueDate, &t.RemindAt, &t.RemindRepeat, &t.RemindAdvance, &t.EventID, &t.EventTitle, &t.CreatedAt, &t.UpdatedAt); err != nil {
+		if err := rows.Scan(&t.ID, &t.UserID, &t.Title, &t.Status, &t.Priority, &t.Category, &t.DueDate, &t.RemindAt, &t.RemindRepeat, &t.RemindAdvance, &t.EventID, &t.EventTitle, &t.CreatedAt, &t.UpdatedAt); err != nil {
 			return nil, err
 		}
 		todos = append(todos, t)
@@ -89,6 +97,91 @@ func (r *TodoRepositorySQLite) ListByUser(userID string, status domain.TodoStatu
 	}
 
 	return todos, rows.Err()
+}
+
+// ListPaged lista com filtros server-side, ordenação e paginação (BACK-05).
+// Limit<=0 retorna tudo (compatível com clientes que ainda carregam a lista cheia).
+func (r *TodoRepositorySQLite) ListPaged(userID string, f domain.TodoFilter) ([]domain.Todo, int, error) {
+	var conditions []string
+	var args []interface{}
+
+	conditions = append(conditions, "user_id = ?")
+	args = append(args, userID)
+
+	if f.Status != "" {
+		conditions = append(conditions, "status = ?")
+		args = append(args, string(f.Status))
+	}
+	if f.Overdue {
+		conditions = append(conditions, "due_date IS NOT NULL AND due_date < datetime('now')")
+	}
+	if f.NoDate {
+		conditions = append(conditions, "due_date IS NULL")
+	}
+	if f.Query != "" {
+		conditions = append(conditions, "title LIKE ? ESCAPE '\\'")
+		args = append(args, "%"+escapeLike(f.Query)+"%")
+	}
+
+	where := "WHERE " + strings.Join(conditions, " AND ")
+
+	var total int
+	if err := r.db.QueryRow(`SELECT COUNT(*) FROM todos `+where, args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	order := "ORDER BY CASE WHEN due_date IS NULL THEN 1 ELSE 0 END, due_date ASC, created_at DESC"
+	switch f.Sort {
+	case "priority":
+		order = "ORDER BY CASE priority WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END, CASE WHEN due_date IS NULL THEN 1 ELSE 0 END, due_date ASC"
+	case "alpha":
+		order = "ORDER BY title COLLATE NOCASE ASC"
+	}
+
+	query := `
+		SELECT id, user_id, title, status, priority, COALESCE(category, 'geral'), due_date, remind_at, COALESCE(remind_repeat, 'none'), COALESCE(remind_advance, 0), COALESCE(event_id, ''), COALESCE(event_title, ''), created_at, updated_at
+		FROM todos
+		` + where + `
+		` + order
+
+	pageArgs := append([]interface{}{}, args...)
+	if f.Limit > 0 {
+		if f.Limit > 200 {
+			f.Limit = 200
+		}
+		if f.Offset < 0 {
+			f.Offset = 0
+		}
+		query += ` LIMIT ? OFFSET ?`
+		pageArgs = append(pageArgs, f.Limit, f.Offset)
+	}
+
+	rows, err := r.db.Query(query, pageArgs...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var todos []domain.Todo
+	for rows.Next() {
+		var t domain.Todo
+		if err := rows.Scan(&t.ID, &t.UserID, &t.Title, &t.Status, &t.Priority, &t.Category, &t.DueDate, &t.RemindAt, &t.RemindRepeat, &t.RemindAdvance, &t.EventID, &t.EventTitle, &t.CreatedAt, &t.UpdatedAt); err != nil {
+			return nil, 0, err
+		}
+		todos = append(todos, t)
+	}
+	if todos == nil {
+		todos = []domain.Todo{}
+	}
+
+	return todos, total, rows.Err()
+}
+
+func escapeLike(s string) string {
+	s = strings.ReplaceAll(s, "\\", "\\\\")
+	s = strings.ReplaceAll(s, "%", "\\%")
+	s = strings.ReplaceAll(s, "_", "\\_")
+	return s
 }
 
 func (r *TodoRepositorySQLite) UpdateStatus(id, userID string, status domain.TodoStatus) error {
@@ -109,8 +202,16 @@ func (r *TodoRepositorySQLite) UpdateStatus(id, userID string, status domain.Tod
 
 // Update persiste a edição completa de uma tarefa.
 func (r *TodoRepositorySQLite) Update(t *domain.Todo) error {
-	query := `UPDATE todos SET title = ?, priority = ?, due_date = ?, remind_at = ?, remind_repeat = ?, remind_advance = ?, updated_at = ? WHERE id = ? AND user_id = ?`
-	res, err := r.db.Exec(query, t.Title, t.Priority, t.DueDate, t.RemindAt, t.RemindRepeat, t.RemindAdvance, time.Now().UTC(), t.ID, t.UserID)
+	if t.Category == "" {
+		t.Category = "geral"
+	}
+	query := `UPDATE todos SET title = ?, priority = ?, category = ?, due_date = ?, remind_at = ?, remind_repeat = ?, remind_advance = ?, updated_at = ? WHERE id = ? AND user_id = ?`
+	var res sql.Result
+	err := database.WithBusyRetry(4, func() error {
+		var execErr error
+		res, execErr = r.db.Exec(query, t.Title, t.Priority, t.Category, t.DueDate, t.RemindAt, t.RemindRepeat, t.RemindAdvance, time.Now().UTC(), t.ID, t.UserID)
+		return execErr
+	})
 	if err != nil {
 		return err
 	}

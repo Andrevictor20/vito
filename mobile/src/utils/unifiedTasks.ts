@@ -11,9 +11,15 @@ export interface UnifiedRow {
   sortKey: number | null;
   overdue: boolean;
   done: boolean;
+  priority: 'low' | 'medium' | 'high';
   sourceTodo?: Todo;
   sourcePending?: PendingItem;
 }
+
+export type TaskFilter = 'all' | 'today' | 'overdue' | 'nodate';
+export type TaskSort = 'date' | 'alpha' | 'priority';
+
+const PRIORITY_W: Record<string, number> = { high: 0, medium: 1, low: 2 };
 
 function startOfToday(now: number): number {
   const d = new Date(now);
@@ -32,21 +38,27 @@ export function toUnifiedRows(todos: Todo[], pendings: PendingItem[], now: numbe
   const today = startOfToday(now);
   const rows: UnifiedRow[] = [];
 
+  const seen = new Set<string>();
   for (const t of todos || []) {
     const key = toMs(t.due_date);
+    seen.add(t.id);
+    const cat = (t as Todo).category || '';
     rows.push({
       kind: 'todo',
       id: t.id,
       title: t.title,
-      detail: t.priority === 'high' ? 'Prioridade alta' : t.event_title ? `Evento: ${t.event_title}` : 'Tarefa',
+      detail: t.priority === 'high' ? 'Prioridade alta' : t.event_title ? `Evento: ${t.event_title}` : cat ? `Tarefa · ${cat}` : 'Tarefa',
       sortKey: key,
       overdue: t.status !== 'completed' && key !== null && key < today,
       done: t.status === 'completed',
+      priority: t.priority || 'medium',
       sourceTodo: t,
     });
   }
 
+  // Dedupe: ids já migrados para todos não aparecem duas vezes (expand-and-contract).
   for (const p of pendings || []) {
+    if (seen.has(p.id)) continue;
     const key = toMs(p.scheduled_date);
     rows.push({
       kind: 'pending',
@@ -56,6 +68,7 @@ export function toUnifiedRows(todos: Todo[], pendings: PendingItem[], now: numbe
       sortKey: key,
       overdue: p.status !== 'done' && key !== null && key < today,
       done: p.status === 'done',
+      priority: 'medium',
       sourcePending: p,
     });
   }
@@ -63,15 +76,48 @@ export function toUnifiedRows(todos: Todo[], pendings: PendingItem[], now: numbe
   return rows;
 }
 
-/** Ordena ativas por urgência: atrasadas → hoje/próximas → sem data. */
-export function sortUnifiedRows(rows: UnifiedRow[]): UnifiedRow[] {
+function isTodayKey(key: number | null, now: number): boolean {
+  if (key === null) return false;
+  const d = new Date(key);
+  const n = new Date(now);
+  return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate();
+}
+
+/** Filtra ativas: todas, hoje, atrasadas ou sem data. */
+export function filterUnifiedRows(rows: UnifiedRow[], filter: TaskFilter, now: number): UnifiedRow[] {
+  const active = rows.filter((r) => !r.done);
+  switch (filter) {
+    case 'today':
+      return active.filter((r) => isTodayKey(r.sortKey, now));
+    case 'overdue':
+      return active.filter((r) => r.overdue);
+    case 'nodate':
+      return active.filter((r) => r.sortKey === null);
+    default:
+      return active;
+  }
+}
+
+/** Ordena ativas: data (atrasadas → próximas → sem data), A–Z ou prioridade. */
+export function sortUnifiedRows(rows: UnifiedRow[], sort: TaskSort = 'date'): UnifiedRow[] {
   const active = rows.filter((r) => !r.done);
   return [...active].sort((a, b) => {
+    if (sort === 'alpha') return a.title.localeCompare(b.title, 'pt-BR');
+    if (sort === 'priority') {
+      const pa = PRIORITY_W[a.priority] ?? 1;
+      const pb = PRIORITY_W[b.priority] ?? 1;
+      if (pa !== pb) return pa - pb;
+      if (a.sortKey === null && b.sortKey === null) return a.title.localeCompare(b.title, 'pt-BR');
+      if (a.sortKey === null) return 1;
+      if (b.sortKey === null) return -1;
+      if (a.sortKey !== b.sortKey) return a.sortKey - b.sortKey;
+      return a.title.localeCompare(b.title, 'pt-BR');
+    }
     if (a.overdue !== b.overdue) return a.overdue ? -1 : 1;
-    if (a.sortKey === null && b.sortKey === null) return a.title.localeCompare(b.title);
+    if (a.sortKey === null && b.sortKey === null) return a.title.localeCompare(b.title, 'pt-BR');
     if (a.sortKey === null) return 1;
     if (b.sortKey === null) return -1;
     if (a.sortKey !== b.sortKey) return a.sortKey - b.sortKey;
-    return a.title.localeCompare(b.title);
+    return a.title.localeCompare(b.title, 'pt-BR');
   });
 }

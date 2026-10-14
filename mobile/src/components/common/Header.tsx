@@ -56,18 +56,18 @@ export const HeaderIconButton: React.FC<HeaderIconButtonProps> = ({
 };
 
 const TAB_TITLES: Record<MainTabType, { title: string; subtitle: string }> = {
-  chat: { title: 'Vito', subtitle: 'Assistente Executivo' },
-  calendar: { title: 'Agenda', subtitle: 'Compromissos' },
-  tasks: { title: 'Tarefas', subtitle: 'Tarefas e Pendências' },
-  triggers: { title: 'Radares', subtitle: 'Radar do Vito' },
-  booking: { title: 'Vito Booking', subtitle: 'Links de Agendamento' },
-  profile: { title: 'Perfil', subtitle: 'Conta e ajustes' },
+  chat: { title: 'Vito', subtitle: '' },
+  calendar: { title: 'Agenda', subtitle: '' },
+  tasks: { title: 'Tarefas', subtitle: '' },
+  triggers: { title: 'Radares', subtitle: '' },
+  booking: { title: 'Vito Booking', subtitle: '' },
+  profile: { title: 'Perfil', subtitle: '' },
 };
 
 export const Header: React.FC<HeaderProps> = ({
   title,
   subtitle,
-  showDivider = true,
+  showDivider = false,
   contextualActions,
   onPressTitle,
   activeTab,
@@ -80,7 +80,8 @@ export const Header: React.FC<HeaderProps> = ({
 
   const resolved = activeTab ? TAB_TITLES[activeTab] : undefined;
   const displayTitle = hideTitle ? null : title ?? resolved?.title ?? 'Agenda';
-  const displaySubtitle = hideTitle ? null : subtitle ?? resolved?.subtitle;
+  // Subtítulo removido por decisão de design (visual contínuo e clean).
+  const displaySubtitle: string | null = null;
 
   const isChat = activeTab === 'chat';
   const centered = align === 'center';
@@ -158,10 +159,10 @@ export const TopAppBar = Header;
 
 const styles = StyleSheet.create({
   header: {
-    minHeight: 44,
+    minHeight: 40,
     justifyContent: 'center',
     paddingHorizontal: tokens.spacing.md,
-    paddingVertical: tokens.spacing.xs,
+    paddingVertical: 2,
   },
   topRow: {
     flexDirection: 'row',
@@ -169,7 +170,7 @@ const styles = StyleSheet.create({
     gap: tokens.spacing.sm,
   },
   sideSlot: {
-    width: 40,
+    width: 36,
     alignItems: 'flex-start',
     justifyContent: 'center',
   },
@@ -181,17 +182,17 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   title: {
-    fontSize: 22,
-    lineHeight: 28,
-    fontWeight: '800',
-    letterSpacing: -0.4,
+    fontSize: 17,
+    lineHeight: 22,
+    fontWeight: '700',
+    letterSpacing: -0.2,
   },
   subtitle: {
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: 11,
+    lineHeight: 14,
     fontWeight: '500',
     letterSpacing: 0.1,
-    marginTop: 1,
+    marginTop: 0,
   },
   actionsRow: {
     flexDirection: 'row',
@@ -201,11 +202,11 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   sideSlotRight: {
-    minWidth: 40,
+    minWidth: 36,
   },
   actionBtn: {
-    width: 36,
-    height: 36,
+    width: 32,
+    height: 32,
     borderRadius: MD3Shapes.full,
     borderWidth: 1,
     alignItems: 'center',

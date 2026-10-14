@@ -76,6 +76,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     <ScrollView
       style={[styles.scroll, { backgroundColor: colors.surface }]}
       contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
       refreshControl={
         onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} /> : undefined
       }

@@ -137,19 +137,36 @@ func (r *EventRepositorySQLite) GetByID(id, userID string) (*domain.Event, error
 }
 
 func (r *EventRepositorySQLite) ListByUser(userID string, from, to time.Time) ([]domain.Event, error) {
+	return r.ListByUserPaged(userID, from, to, 0, 0)
+}
+
+// ListByUserPaged lista eventos do intervalo com paginação opcional (BACK-05).
+// Limit<=0 retorna tudo (compatível com sincronizações internas e workers).
+func (r *EventRepositorySQLite) ListByUserPaged(userID string, from, to time.Time, limit, offset int) ([]domain.Event, error) {
 	fromUTC := from.UTC()
 	toUTC := to.UTC()
 
 	query := `
-		SELECT id, user_id, COALESCE(title, ''), COALESCE(description, ''), COALESCE(location, ''), 
-		       start_at, end_at, COALESCE(source, 'vito'), COALESCE(category, 'general'), 
+		SELECT id, user_id, COALESCE(title, ''), COALESCE(description, ''), COALESCE(location, ''),
+		       start_at, end_at, COALESCE(source, 'vito'), COALESCE(category, 'general'),
 		       COALESCE(color, ''), COALESCE(recurrence, ''), COALESCE(created_at, datetime('now')), COALESCE(updated_at, datetime('now'))
 		FROM events
-		WHERE user_id = ? 
+		WHERE user_id = ?
 		  AND ((start_at >= ? AND start_at <= ?) OR (end_at >= ? AND start_at <= ?))
 		ORDER BY start_at ASC
 	`
-	rows, err := r.db.Query(query, userID, fromUTC, toUTC, fromUTC, toUTC)
+	args := []interface{}{userID, fromUTC, toUTC, fromUTC, toUTC}
+	if limit > 0 {
+		if limit > 200 {
+			limit = 200
+		}
+		if offset < 0 {
+			offset = 0
+		}
+		query += ` LIMIT ? OFFSET ?`
+		args = append(args, limit, offset)
+	}
+	rows, err := r.db.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}

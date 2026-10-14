@@ -184,14 +184,16 @@ func main() {
 		BookingHandler:    bookingHandler,
 		ChatHandler:       chatHandler,
 		AuthSvc:           authSvc,
+		AllowedOrigins:    cfg.AllowedOrigins(),
 	})
 
 	httpServer := &http.Server{
-		Addr:         ":" + cfg.Port,
-		Handler:      srv.Router(),
-		ReadTimeout:  60 * time.Second,
-		WriteTimeout: 90 * time.Second,
-		IdleTimeout:  120 * time.Second,
+		Addr:              ":" + cfg.Port,
+		Handler:           srv.Router(),
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      90 * time.Second,
+		IdleTimeout:       120 * time.Second,
 	}
 
 	// Shutdown gracioso

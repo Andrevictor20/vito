@@ -23,6 +23,7 @@ func NewTodoHandler(todoSvc *service.TodoService) *TodoHandler {
 type createTodoRequest struct {
 	Title         string     `json:"title"`
 	Priority      string     `json:"priority"`
+	Category      string     `json:"category,omitempty"`
 	DueDate       *time.Time `json:"due_date,omitempty"`
 	RemindAt      *time.Time `json:"remind_at,omitempty"`
 	RemindRepeat  string     `json:"remind_repeat,omitempty"`
@@ -47,6 +48,7 @@ func (h *TodoHandler) CreateTodo(w http.ResponseWriter, r *http.Request) {
 	todo, err := h.todoSvc.CreateTodoWithOptions(userID, domain.CreateTodoInput{
 		Title:         req.Title,
 		Priority:      req.Priority,
+		Category:      req.Category,
 		DueDate:       req.DueDate,
 		RemindAt:      req.RemindAt,
 		RemindRepeat:  req.RemindRepeat,
@@ -71,24 +73,56 @@ func (h *TodoHandler) ListTodos(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	status := domain.TodoStatus(r.URL.Query().Get("status"))
-	todos, err := h.todoSvc.ListTodos(userID, status)
+	q := r.URL.Query()
+	// Sem ?limit= a resposta é a lista cheia (compatível com clientes atuais).
+	if q.Get("limit") == "" {
+		status := domain.TodoStatus(q.Get("status"))
+		todos, err := h.todoSvc.ListTodos(userID, status)
+		if err != nil {
+			http.Error(w, `{"error":"falha ao listar tarefas"}`, http.StatusInternalServerError)
+			return
+		}
+
+		if todos == nil {
+			todos = []domain.Todo{}
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(todos)
+		return
+	}
+
+	filter := domain.TodoFilter{
+		Status:  domain.TodoStatus(q.Get("status")),
+		Overdue: q.Get("overdue") == "true",
+		NoDate:  q.Get("nodate") == "true",
+		Query:   q.Get("q"),
+		Sort:    q.Get("sort"),
+	}
+	if n, err := parsePositiveInt(q.Get("limit"), 50); err == nil {
+		filter.Limit = n
+	} else {
+		filter.Limit = 50
+	}
+	if n, err := parsePositiveInt(q.Get("offset"), 0); err == nil {
+		filter.Offset = n
+	}
+
+	todos, total, err := h.todoSvc.ListTodosPaged(userID, filter)
 	if err != nil {
 		http.Error(w, `{"error":"falha ao listar tarefas"}`, http.StatusInternalServerError)
 		return
 	}
 
-	if todos == nil {
-		todos = []domain.Todo{}
-	}
-
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("X-Total-Count", itoa(total))
 	_ = json.NewEncoder(w).Encode(todos)
 }
 
 type updateTodoRequest struct {
 	Title         *string    `json:"title,omitempty"`
 	Priority      *string    `json:"priority,omitempty"`
+	Category      *string    `json:"category,omitempty"`
 	DueDate       *time.Time `json:"due_date,omitempty"`
 	RemindAt      *time.Time `json:"remind_at,omitempty"`
 	RemindRepeat  *string    `json:"remind_repeat,omitempty"`
@@ -121,6 +155,7 @@ func (h *TodoHandler) UpdateTodo(w http.ResponseWriter, r *http.Request) {
 	todo, err := h.todoSvc.UpdateTodo(todoID, userID, domain.UpdateTodoInput{
 		Title:         req.Title,
 		Priority:      req.Priority,
+		Category:      req.Category,
 		DueDate:       req.DueDate,
 		RemindAt:      req.RemindAt,
 		RemindRepeat:  req.RemindRepeat,
@@ -128,7 +163,7 @@ func (h *TodoHandler) UpdateTodo(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		if err == domain.ErrTodoNotFound {
-			http.Error(w, `{"error":"tarefa não encontrada"}`, http.StatusNotFound)
+			respondError(w, domain.ErrTodoNotFound)
 			return
 		}
 		http.Error(w, `{"error":"falha ao atualizar tarefa: `+err.Error()+`"}`, http.StatusBadRequest)
@@ -157,7 +192,7 @@ func (h *TodoHandler) CompleteTodo(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.todoSvc.CompleteTodo(todoID, userID); err != nil {
 		if err == domain.ErrTodoNotFound {
-			http.Error(w, `{"error":"tarefa não encontrada"}`, http.StatusNotFound)
+			respondError(w, domain.ErrTodoNotFound)
 			return
 		}
 		http.Error(w, `{"error":"falha ao concluir tarefa"}`, http.StatusInternalServerError)
@@ -187,7 +222,7 @@ func (h *TodoHandler) ReopenTodo(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.todoSvc.ReopenTodo(todoID, userID); err != nil {
 		if err == domain.ErrTodoNotFound {
-			http.Error(w, `{"error":"tarefa não encontrada"}`, http.StatusNotFound)
+			respondError(w, domain.ErrTodoNotFound)
 			return
 		}
 		http.Error(w, `{"error":"falha ao reabrir tarefa"}`, http.StatusInternalServerError)
@@ -216,7 +251,7 @@ func (h *TodoHandler) DeleteTodo(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.todoSvc.DeleteTodo(todoID, userID); err != nil {
 		if err == domain.ErrTodoNotFound {
-			http.Error(w, `{"error":"tarefa não encontrada"}`, http.StatusNotFound)
+			respondError(w, domain.ErrTodoNotFound)
 			return
 		}
 		http.Error(w, `{"error":"falha ao excluir tarefa"}`, http.StatusInternalServerError)
@@ -251,7 +286,7 @@ func (h *TodoHandler) AddSubtask(w http.ResponseWriter, r *http.Request) {
 	st, err := h.todoSvc.AddSubtask(todoID, userID, req.Title)
 	if err != nil {
 		if err == domain.ErrTodoNotFound {
-			http.Error(w, `{"error":"tarefa não encontrada"}`, http.StatusNotFound)
+			respondError(w, domain.ErrTodoNotFound)
 			return
 		}
 		http.Error(w, `{"error":"falha ao adicionar subtarefa: `+err.Error()+`"}`, http.StatusBadRequest)
@@ -282,7 +317,7 @@ func (h *TodoHandler) ToggleSubtask(w http.ResponseWriter, r *http.Request) {
 	st, err := h.todoSvc.ToggleSubtask(subtaskID, todoID, userID)
 	if err != nil {
 		if err == domain.ErrSubtaskNotFound || err == domain.ErrTodoNotFound {
-			http.Error(w, `{"error":"subtarefa não encontrada"}`, http.StatusNotFound)
+			respondError(w, domain.ErrSubtaskNotFound)
 			return
 		}
 		http.Error(w, `{"error":"falha ao alternar subtarefa"}`, http.StatusInternalServerError)
@@ -311,7 +346,7 @@ func (h *TodoHandler) DeleteSubtask(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.todoSvc.DeleteSubtask(subtaskID, todoID, userID); err != nil {
 		if err == domain.ErrSubtaskNotFound || err == domain.ErrTodoNotFound {
-			http.Error(w, `{"error":"subtarefa não encontrada"}`, http.StatusNotFound)
+			respondError(w, domain.ErrSubtaskNotFound)
 			return
 		}
 		http.Error(w, `{"error":"falha ao excluir subtarefa"}`, http.StatusInternalServerError)

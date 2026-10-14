@@ -90,7 +90,16 @@ func (h *CalendarHandler) ListEvents(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	events, err := h.calSvc.ListEvents(userID, from, to)
+	// Paginação opcional (BACK-05): sem ?limit=, retorna o intervalo cheio.
+	var events []domain.Event
+	var err error
+	if r.URL.Query().Get("limit") == "" {
+		events, err = h.calSvc.ListEvents(userID, from, to)
+	} else {
+		limit, _ := parsePositiveInt(r.URL.Query().Get("limit"), 50)
+		offset, _ := parsePositiveInt(r.URL.Query().Get("offset"), 0)
+		events, err = h.calSvc.ListEventsPaged(userID, from, to, limit, offset)
+	}
 	if err != nil {
 		log.Printf("[CalendarHandler] ListEvents erro ao listar eventos para user %s: %v", userID, err)
 		http.Error(w, fmt.Sprintf(`{"error":"falha ao listar eventos: %v"}`, err), http.StatusInternalServerError)
@@ -159,13 +168,7 @@ func (h *CalendarHandler) UpdateEvent(w http.ResponseWriter, r *http.Request) {
 
 	updated, count, err := h.calSvc.UpdateEvent(userID, ev, req.UpdateSeries)
 	if err != nil {
-		if err == domain.ErrEventNotFound {
-			http.Error(w, `{"error":"evento não encontrado"}`, http.StatusNotFound)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		respondError(w, err)
 		return
 	}
 
@@ -196,7 +199,7 @@ func (h *CalendarHandler) DeleteEvent(w http.ResponseWriter, r *http.Request) {
 
 	if _, err := h.calSvc.DeleteEventWithOption(eventID, userID, allSeries); err != nil {
 		if err == domain.ErrEventNotFound {
-			http.Error(w, `{"error":"evento não encontrado"}`, http.StatusNotFound)
+			respondError(w, err)
 			return
 		}
 		http.Error(w, `{"error":"falha ao excluir evento"}`, http.StatusInternalServerError)

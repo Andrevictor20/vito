@@ -8,6 +8,9 @@ import (
 var (
 	ErrTodoNotFound    = errors.New("tarefa não encontrada")
 	ErrSubtaskNotFound = errors.New("subtarefa não encontrada")
+	// Erros sentinela compartilhados (BACK-04: respondError traduz p/ HTTP).
+	ErrConflict   = errors.New("conflito de recurso")
+	ErrValidation = errors.New("dados inválidos")
 )
 
 type TodoStatus string
@@ -27,13 +30,14 @@ type Subtask struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-// Todo representa uma pendência/tarefa do usuário.
+// Todo representa uma pendência/tarefa do usuário (entidade unificada).
 type Todo struct {
 	ID                  string     `json:"id"`
 	UserID              string     `json:"user_id"`
 	Title               string     `json:"title"`
 	Status              TodoStatus `json:"status"`
 	Priority            string     `json:"priority"` // low, medium, high
+	Category            string     `json:"category"` // geral, trabalho, financas, estudos, saude, pessoal
 	DueDate             *time.Time `json:"due_date,omitempty"`
 	RemindAt            *time.Time `json:"remind_at,omitempty"`
 	RemindRepeat        string     `json:"remind_repeat,omitempty"` // none, daily, weekly
@@ -51,6 +55,7 @@ type Todo struct {
 type CreateTodoInput struct {
 	Title         string     `json:"title"`
 	Priority      string     `json:"priority,omitempty"`
+	Category      string     `json:"category,omitempty"`
 	DueDate       *time.Time `json:"due_date,omitempty"`
 	RemindAt      *time.Time `json:"remind_at,omitempty"`
 	RemindRepeat  string     `json:"remind_repeat,omitempty"`
@@ -63,10 +68,26 @@ type CreateTodoInput struct {
 type UpdateTodoInput struct {
 	Title         *string    `json:"title,omitempty"`
 	Priority      *string    `json:"priority,omitempty"`
+	Category      *string    `json:"category,omitempty"`
 	DueDate       *time.Time `json:"due_date,omitempty"`
 	RemindAt      *time.Time `json:"remind_at,omitempty"`
 	RemindRepeat  *string    `json:"remind_repeat,omitempty"`
 	RemindAdvance *int       `json:"remind_advance_minutes,omitempty"`
+}
+
+// TodoFilter pagina e filtra a listagem unificada (BACK-05, infinite scroll).
+type TodoFilter struct {
+	Status TodoStatus
+	// Overdue=true: só vencidas. NoDate=true: só sem prazo.
+	Overdue bool
+	NoDate  bool
+	// Query busca case-insensitive no título.
+	Query string
+	// Sort: date (padrão), priority, alpha.
+	Sort string
+	// Limit<=0 significa sem paginação (compatível com clientes atuais).
+	Limit  int
+	Offset int
 }
 
 // TodoRepository define o contrato de persistência para pendências e subtarefas.
@@ -74,6 +95,8 @@ type TodoRepository interface {
 	Create(todo *Todo) error
 	GetByID(id, userID string) (*Todo, error)
 	ListByUser(userID string, status TodoStatus) ([]Todo, error)
+	// ListPaged retorna a página + total (para X-Total-Count).
+	ListPaged(userID string, f TodoFilter) ([]Todo, int, error)
 	ListUpcomingUnreminded(from, to time.Time) ([]Todo, error)
 	ListDueNowUnreminded(from, to time.Time) ([]Todo, error)
 	MarkReminderSent(todoID string, sentAt time.Time) error

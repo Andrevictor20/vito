@@ -15,9 +15,10 @@ import (
 	"github.com/andrevmp/vito/backend/internal/service"
 )
 
-// Server encapsula o roteador Chi e dependências HTTP do Kito.
+// Server encapsula o roteador Chi e dependências HTTP do Vito.
 type Server struct {
 	router            *chi.Mux
+	allowedOrigins    []string
 	authHandler       *handler.AuthHandler
 	googleAuthHandler *handler.GoogleAuthHandler
 	calHandler        *handler.CalendarHandler
@@ -50,6 +51,8 @@ type Config struct {
 	BookingHandler    *handler.BookingHandler
 	ChatHandler       *handler.ChatHandler
 	AuthSvc           *service.AuthService
+	// AllowedOrigins restringe o CORS (SEC-03). Vazio = ["*"] (dev/testes).
+	AllowedOrigins []string
 }
 
 // New instancia o servidor com o roteador Chi, middlewares e rotas registrados.
@@ -59,6 +62,7 @@ func New(cfg ...Config) *Server {
 	}
 
 	if len(cfg) > 0 {
+		s.allowedOrigins = cfg[0].AllowedOrigins
 		s.authHandler = cfg[0].AuthHandler
 		s.googleAuthHandler = cfg[0].GoogleAuthHandler
 		s.calHandler = cfg[0].CalHandler
@@ -91,10 +95,15 @@ func (s *Server) setupMiddlewares() {
 	s.router.Use(chimiddleware.Logger)
 	s.router.Use(chimiddleware.Recoverer)
 	s.router.Use(middleware.SecurityHeadersMiddleware)
+	s.router.Use(middleware.BodyLimitMiddleware)
 
-	// Configuração segura e completa de CORS para Mobile e Web
+	// CORS restrito por ambiente (SEC-03): env explícito, PublicBaseURL em produção, * em dev.
+	origins := s.allowedOrigins
+	if len(origins) == 0 {
+		origins = []string{"*"}
+	}
 	s.router.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"*"},
+		AllowedOrigins:   origins,
 		AllowedMethods:   []string{"GET", "POST", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		ExposedHeaders:   []string{"Link"},
@@ -121,8 +130,11 @@ func (s *Server) registerRoutes() {
 
 	authLimiter := middleware.NewRateLimiter(10, 1*time.Minute)
 	aiLimiter := middleware.NewRateLimiter(30, 1*time.Minute)
+	// Rate limit global da API (SEC-05): 120 req/min por IP/usuário, além dos estritos.
+	apiLimiter := middleware.NewRateLimiter(120, 1*time.Minute)
 
 	s.router.Route("/api/v1", func(r chi.Router) {
+		r.Use(apiLimiter)
 		// Rotas públicas de autenticação com proteção anti-bruteforce
 		if s.authHandler != nil {
 			r.Group(func(ar chi.Router) {

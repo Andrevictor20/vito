@@ -238,6 +238,7 @@ export const ExecutiveSummariesHubView: React.FC<ExecutiveSummariesHubViewProps>
       <ScrollView
         style={styles.container}
         contentContainerStyle={styles.contentContainer}
+        keyboardShouldPersistTaps="handled"
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
         }

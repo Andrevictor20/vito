@@ -30,6 +30,9 @@ func (m *mockReminderEventRepo) GetByID(id, userID string) (*domain.Event, error
 func (m *mockReminderEventRepo) ListByUser(userID string, from, to time.Time) ([]domain.Event, error) {
 	return m.events, nil
 }
+func (m *mockReminderEventRepo) ListByUserPaged(userID string, from, to time.Time, limit, offset int) ([]domain.Event, error) {
+	return m.events, nil
+}
 func (m *mockReminderEventRepo) ListUpcomingUnreminded(from, to time.Time) ([]domain.Event, error) {
 	var res []domain.Event
 	for _, e := range m.events {

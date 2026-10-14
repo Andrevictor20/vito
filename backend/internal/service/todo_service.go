@@ -53,6 +53,9 @@ func (s *TodoService) CreateTodoWithOptions(userID string, input domain.CreateTo
 	if input.Priority == "" {
 		input.Priority = ClassifyTodoPriority(input.Title, input.DueDate)
 	}
+	if strings.TrimSpace(input.Category) == "" {
+		input.Category = "geral"
+	}
 
 	now := time.Now().UTC()
 	todo := &domain.Todo{
@@ -61,6 +64,7 @@ func (s *TodoService) CreateTodoWithOptions(userID string, input domain.CreateTo
 		Title:         input.Title,
 		Status:        domain.TodoStatusPending,
 		Priority:      input.Priority,
+		Category:      normalizeTodoCategory(input.Category),
 		DueDate:       input.DueDate,
 		RemindAt:      input.RemindAt,
 		RemindRepeat:  input.RemindRepeat,
@@ -160,6 +164,10 @@ func (s *TodoService) UpdateTodo(id, userID string, input domain.UpdateTodoInput
 		}
 	}
 
+	if input.Category != nil {
+		todo.Category = normalizeTodoCategory(*input.Category)
+	}
+
 	if input.DueDate != nil {
 		todo.DueDate = input.DueDate
 	}
@@ -183,6 +191,23 @@ func (s *TodoService) UpdateTodo(id, userID string, input domain.UpdateTodoInput
 	return todo, nil
 }
 
+// normalizeTodoCategory valida a categoria da tarefa unificada.
+func normalizeTodoCategory(raw string) string {
+	c := strings.ToLower(strings.TrimSpace(raw))
+	switch c {
+	case "geral", "trabalho", "financas", "finanças", "estudos", "saude", "saúde", "pessoal":
+		if c == "finanças" {
+			return "financas"
+		}
+		if c == "saúde" {
+			return "saude"
+		}
+		return c
+	default:
+		return "geral"
+	}
+}
+
 // ReopenTodo desfaz a conclusão: tarefa concluída volta a pendente.
 func (s *TodoService) ReopenTodo(id, userID string) error {
 	return s.todoRepo.UpdateStatus(id, userID, domain.TodoStatusPending)
@@ -191,6 +216,17 @@ func (s *TodoService) ReopenTodo(id, userID string) error {
 // ListTodos retorna tarefas filtradas pelo status do usuário autenticado.
 func (s *TodoService) ListTodos(userID string, status domain.TodoStatus) ([]domain.Todo, error) {
 	return s.todoRepo.ListByUser(userID, status)
+}
+
+// ListTodosPaged retorna a página filtrada + total (BACK-05, infinite scroll).
+func (s *TodoService) ListTodosPaged(userID string, f domain.TodoFilter) ([]domain.Todo, int, error) {
+	if f.Limit > 200 {
+		f.Limit = 200
+	}
+	if f.Offset < 0 {
+		f.Offset = 0
+	}
+	return s.todoRepo.ListPaged(userID, f)
 }
 
 // DeleteTodo remove uma tarefa do usuário.

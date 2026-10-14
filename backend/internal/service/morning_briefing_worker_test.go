@@ -71,6 +71,9 @@ func (m *mockEventRepoForBriefing) GetByID(id, userID string) (*domain.Event, er
 func (m *mockEventRepoForBriefing) ListByUser(userID string, from, to time.Time) ([]domain.Event, error) {
 	return m.events, nil
 }
+func (m *mockEventRepoForBriefing) ListByUserPaged(userID string, from, to time.Time, limit, offset int) ([]domain.Event, error) {
+	return m.events, nil
+}
 func (m *mockEventRepoForBriefing) ListUpcomingUnreminded(from, to time.Time) ([]domain.Event, error) {
 	return nil, nil
 }
@@ -101,6 +104,9 @@ func (m *mockTodoRepoForBriefing) Create(todo *domain.Todo) error               
 func (m *mockTodoRepoForBriefing) GetByID(id, userID string) (*domain.Todo, error)                  { return nil, nil }
 func (m *mockTodoRepoForBriefing) ListByUser(userID string, status domain.TodoStatus) ([]domain.Todo, error) {
 	return m.todos, nil
+}
+func (m *mockTodoRepoForBriefing) ListPaged(userID string, f domain.TodoFilter) ([]domain.Todo, int, error) {
+	return m.todos, len(m.todos), nil
 }
 func (m *mockTodoRepoForBriefing) ListUpcomingUnreminded(from, to time.Time) ([]domain.Todo, error) {
 	return nil, nil

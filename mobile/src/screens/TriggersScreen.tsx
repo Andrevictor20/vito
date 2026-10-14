@@ -284,6 +284,7 @@ export const TriggersScreen: React.FC<{ onOpenExecutiveSummaries?: () => void }>
       ) : (
         <FlatList
           data={activeTriggers}
+          keyboardShouldPersistTaps="handled"
           keyExtractor={(item) => item.id}
           ListHeaderComponent={
             selectedCategory === 'all' ? (

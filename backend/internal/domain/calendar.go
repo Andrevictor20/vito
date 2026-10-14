@@ -51,6 +51,8 @@ type EventRepository interface {
 	Create(event *Event) error
 	GetByID(id, userID string) (*Event, error)
 	ListByUser(userID string, from, to time.Time) ([]Event, error)
+	// ListByUserPaged aplica paginação opcional (limit<=0 = tudo).
+	ListByUserPaged(userID string, from, to time.Time, limit, offset int) ([]Event, error)
 	ListUpcomingUnreminded(from, to time.Time) ([]Event, error)
 	ListStartingNowUnreminded(from, to time.Time) ([]Event, error)
 	MarkReminderSent(eventID string, sentAt time.Time) error

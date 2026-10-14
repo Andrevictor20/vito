@@ -115,7 +115,7 @@ const SERVER_URL_KEY = '@vito_server_url';
 const SERVER_MANUAL_OVERRIDE_KEY = '@vito_server_manual_override_v2';
 export const PI_SERVER_URL = process.env.EXPO_PUBLIC_LOCAL_SERVER_URL || '';
 export const CLOUDFLARE_SERVER_URL = process.env.EXPO_PUBLIC_API_URL || '';
-export const DEFAULT_SERVER_URL = CLOUDFLARE_SERVER_URL || PI_SERVER_URL || 'http://localhost:8080';
+export const DEFAULT_SERVER_URL = CLOUDFLARE_SERVER_URL || PI_SERVER_URL || 'http://localhost:8180';
 
 export const isCloudServer = (url: string): boolean => {
   return url === CLOUDFLARE_SERVER_URL || (!url.includes('192.168.') && !url.includes('localhost') && !url.includes('127.0.0.1'));
@@ -144,14 +144,14 @@ class ApiService {
     if (hasManualOverride === 'true' && savedUrl) {
       this.baseUrl = savedUrl;
     } else {
-      // Se for ambiente Web executando em localhost, conecta ao backend local na 8080 para evitar divergência de banco SQLite
+      // Se for ambiente Web executando em localhost, conecta ao backend local na 8180 para evitar divergência de banco SQLite
       const isWebLocalhost =
         Platform.OS === 'web' &&
         typeof window !== 'undefined' &&
         (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
       if (isWebLocalhost) {
-        this.baseUrl = 'http://localhost:8080';
+        this.baseUrl = 'http://localhost:8180';
       } else {
         // Caso contrário, prioriza a Nuvem pública (Cloudflare) para funcionar de qualquer lugar (4G, WiFi)
         this.baseUrl = CLOUDFLARE_SERVER_URL || DEFAULT_SERVER_URL;
@@ -224,9 +224,9 @@ class ApiService {
       const data = await res.json().catch(() => null);
 
       if (!res.ok) {
-        if (res.status === 404 && this.baseUrl !== 'http://localhost:8080' && endpoint.includes('/triggers/')) {
+        if (res.status === 404 && this.baseUrl !== 'http://localhost:8180' && endpoint.includes('/triggers/')) {
           try {
-            const localRes = await fetch(`http://localhost:8080${endpoint}`, {
+            const localRes = await fetch(`http://localhost:8180${endpoint}`, {
               ...options,
               headers,
               signal: controller.signal,
@@ -356,7 +356,7 @@ class ApiService {
     return res || [];
   }
 
-  async createTodo(todo: { title: string; priority?: string; due_date?: string; remind_at?: string; remind_repeat?: string; remind_advance_minutes?: number; event_id?: string; event_title?: string }): Promise<Todo> {
+  async createTodo(todo: { title: string; priority?: string; category?: string; due_date?: string; remind_at?: string; remind_repeat?: string; remind_advance_minutes?: number; event_id?: string; event_title?: string }): Promise<Todo> {
     return this.request<Todo>('/api/v1/todos', {
       method: 'POST',
       body: JSON.stringify(todo),
@@ -379,7 +379,7 @@ class ApiService {
     return this.request<void>(`/api/v1/todos/${id}`, { method: 'DELETE' });
   }
 
-  async updateTodo(id: string, data: { title?: string; priority?: string; due_date?: string; remind_at?: string; remind_repeat?: string; remind_advance_minutes?: number }): Promise<Todo> {
+  async updateTodo(id: string, data: { title?: string; priority?: string; category?: string; due_date?: string; remind_at?: string; remind_repeat?: string; remind_advance_minutes?: number }): Promise<Todo> {
     return this.request<Todo>(`/api/v1/todos/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),

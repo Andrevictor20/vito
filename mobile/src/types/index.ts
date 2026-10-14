@@ -53,6 +53,7 @@ export interface Todo {
   user_id: string;
   title: string;
   priority: 'low' | 'medium' | 'high';
+  category?: string;
   status: 'pending' | 'completed';
   due_date?: string;
   remind_at?: string;

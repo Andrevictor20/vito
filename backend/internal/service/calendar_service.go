@@ -170,6 +170,20 @@ func (s *CalendarService) ListEvents(userID string, from, to time.Time) ([]domai
 	return s.eventRepo.ListByUser(userID, from, to)
 }
 
+// ListEventsPaged lista com paginação opcional (BACK-05; limit<=0 = tudo).
+func (s *CalendarService) ListEventsPaged(userID string, from, to time.Time, limit, offset int) ([]domain.Event, error) {
+	if to.Before(from) {
+		to = from.Add(30 * 24 * time.Hour)
+	}
+	if limit > 200 {
+		limit = 200
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	return s.eventRepo.ListByUserPaged(userID, from, to, limit, offset)
+}
+
 // DeleteEvent remove um evento pertencente ao usuário.
 func (s *CalendarService) DeleteEvent(id, userID string) error {
 	if s.syncPusher != nil {

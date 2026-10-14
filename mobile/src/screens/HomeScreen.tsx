@@ -9,9 +9,8 @@ import {
   TouchableOpacity,
   BackHandler,
   useWindowDimensions,
-  NativeSyntheticEvent,
-  NativeScrollEvent,
 } from 'react-native';
+import { AdaptivePager, AdaptivePagerRef } from '../components/common/AdaptivePager';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens, MD3Shapes } from '../theme/tokens';
 import { FloatingTabBar } from '../components/common/FloatingTabBar';
@@ -34,8 +33,7 @@ import { useAuth } from '../context/AuthContext';
 import { Event } from '../types';
 import {
   MainTabType,
-  calculatePageIndex,
-  calculateScrollTarget,
+  getIndexForTab,
   getTabForIndex,
   shouldPreventSwipe,
   determineBackAction,
@@ -58,17 +56,11 @@ export const HomeScreen: React.FC<{
   const [createTab, setCreateTab] = useState<'event' | 'todo'>('event');
 
   const chatRef = useRef<ChatScreenRef>(null);
-  const pagerRef = useRef<ScrollView>(null);
+  const pagerRef = useRef<AdaptivePagerRef>(null);
   const { width: windowWidth } = useWindowDimensions();
   const [containerWidth, setContainerWidth] = useState(windowWidth || 390);
-  const isProgrammaticScroll = useRef(false);
 
-  const handleSelectTab = (tab: MainTabType) => {
-    if (tab === activeTab) return;
-    setActiveTab(tab);
-    isProgrammaticScroll.current = true;
-    const targetX = calculateScrollTarget(tab, containerWidth);
-    pagerRef.current?.scrollTo({ x: targetX, animated: true });
+  const fireTabSideEffects = (tab: MainTabType) => {
     if (tab === 'calendar' || tab === 'tasks') {
       loadData(true);
     } else if (tab === 'triggers') {
@@ -78,31 +70,22 @@ export const HomeScreen: React.FC<{
     }
   };
 
-  const handleMomentumScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    isProgrammaticScroll.current = false;
-    const offsetX = e.nativeEvent.contentOffset.x;
-    const pageIndex = calculatePageIndex(offsetX, containerWidth);
-    const newTab = getTabForIndex(pageIndex);
+  const handleSelectTab = (tab: MainTabType) => {
+    if (tab === activeTab) return;
+    setActiveTab(tab);
+    pagerRef.current?.setPage(getIndexForTab(tab));
+    fireTabSideEffects(tab);
+  };
+
+  // Fonte única de verdade: gesto de swipe atualiza Header + Footbar juntos.
+  const handlePageSelected = (position: number) => {
+    const newTab = getTabForIndex(position);
     if (newTab !== activeTab) {
       hapticFeedback.selection();
       setActiveTab(newTab);
-      if (newTab === 'calendar' || newTab === 'tasks') {
-        loadData(true);
-      } else if (newTab === 'triggers') {
-        dataSync.notify('refresh_triggers');
-      } else if (newTab === 'booking') {
-        dataSync.notify('refresh_bookings');
-      }
+      fireTabSideEffects(newTab);
     }
   };
-
-  // Mantém a visualização sincronizada com a largura da tela em caso de rotação
-  useEffect(() => {
-    if (containerWidth > 0) {
-      const targetX = calculateScrollTarget(activeTab, containerWidth);
-      pagerRef.current?.scrollTo({ x: targetX, animated: false });
-    }
-  }, [containerWidth]);
 
   // Intercepta gesto de voltar do hardware/sistema para navegar hierarquicamente
   useEffect(() => {
@@ -116,7 +99,7 @@ export const HomeScreen: React.FC<{
 
       if (showSummariesScreen) {
         setShowSummariesScreen(false);
-        pagerRef.current?.scrollTo({ x: calculateScrollTarget(activeTab, containerWidth), animated: false });
+        pagerRef.current?.setPageWithoutAnimation(getIndexForTab(activeTab));
         return true;
       }
       if (action.type === 'CLOSE_MODAL') {
@@ -198,29 +181,21 @@ export const HomeScreen: React.FC<{
           }
         }}
       >
-        <ScrollView
+        <AdaptivePager
           ref={pagerRef}
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          bounces={false}
-          scrollEventThrottle={16}
-          nestedScrollEnabled={true}
-          directionalLockEnabled={true}
-            scrollEnabled={
-              !shouldPreventSwipe({
-                isKeyboardOpen,
-                hasModal: createModalVisible || editModalVisible || Boolean(editingEvent),
-                hasSubScreen: showSummariesScreen,
-              })
-            }
-          contentOffset={{ x: calculateScrollTarget(activeTab, containerWidth), y: 0 }}
-          onMomentumScrollEnd={handleMomentumScrollEnd}
           style={styles.pagerScrollView}
-          contentContainerStyle={styles.pagerContentContainer}
+          initialPage={0}
+          scrollEnabled={
+            !shouldPreventSwipe({
+              isKeyboardOpen,
+              hasModal: createModalVisible || editModalVisible || Boolean(editingEvent),
+              hasSubScreen: showSummariesScreen,
+            })
+          }
+          onPageSelected={handlePageSelected}
         >
           {/* Página 0: Chat com IA */}
-          <View style={[styles.pageWrapper, { width: containerWidth }]}>
+          <View key="0" style={[styles.pageWrapper, { width: containerWidth }]}>
             <ChatScreen
               ref={chatRef}
               onDataChanged={loadData}
@@ -230,11 +205,12 @@ export const HomeScreen: React.FC<{
           </View>
 
           {/* Página 1: Agenda & Tarefas */}
-          <View style={[styles.pageWrapper, { width: containerWidth }]}>
+          <View key="1" style={[styles.pageWrapper, { width: containerWidth }]}>
             <ScrollView
               style={[styles.scroll, { backgroundColor: colors.surface }]}
               contentContainerStyle={[styles.content, { backgroundColor: colors.surface }]}
               nestedScrollEnabled={true}
+              keyboardShouldPersistTaps="handled"
               refreshControl={
                 <RefreshControl
                   refreshing={refreshing}
@@ -338,8 +314,10 @@ export const HomeScreen: React.FC<{
                 </View>
               )}
 
-              {/* Botão de Criação Rápida de Evento */}
-              <View style={styles.createBtnWrapper}>
+            </ScrollView>
+            {/* FAB fixo padronizado: pill compacta sempre visível */}
+            {!isKeyboardOpen && (
+              <View style={styles.fabOverlay} pointerEvents="box-none">
                 <TouchableOpacity
                   style={[styles.createFab, { backgroundColor: colors.primary }]}
                   onPress={() => {
@@ -348,16 +326,17 @@ export const HomeScreen: React.FC<{
                   }}
                   activeOpacity={0.85}
                   accessibilityLabel="Criar novo evento"
+                  accessibilityRole="button"
                 >
                   <MaterialIcons name="add" size={22} color={colors.onPrimary} />
-                  <Text style={[styles.createFabText, { color: colors.onPrimary }]}>Novo Evento</Text>
+                  <Text style={[styles.createFabText, { color: colors.onPrimary }]}>Novo</Text>
                 </TouchableOpacity>
               </View>
-            </ScrollView>
+            )}
           </View>
 
           {/* Página 2: Tarefas e Pendências */}
-          <View style={[styles.pageWrapper, { width: containerWidth }]}>
+          <View key="2" style={[styles.pageWrapper, { width: containerWidth }]}>
             <TasksScreen
               todos={todos}
               pendingTodos={pendingTodos}
@@ -381,20 +360,20 @@ export const HomeScreen: React.FC<{
           </View>
 
           {/* Página 3: Disparadores / Radares */}
-          <View style={[styles.pageWrapper, { width: containerWidth }]}>
+          <View key="3" style={[styles.pageWrapper, { width: containerWidth }]}>
             <TriggersScreen onOpenExecutiveSummaries={() => setShowSummariesScreen(true)} />
           </View>
 
           {/* Página 4: Vito Booking */}
-          <View style={[styles.pageWrapper, { width: containerWidth }]}>
+          <View key="4" style={[styles.pageWrapper, { width: containerWidth }]}>
             <BookingScreen />
           </View>
 
           {/* Página 5: Perfil e Configurações */}
-          <View style={[styles.pageWrapper, { width: containerWidth }]}>
+          <View key="5" style={[styles.pageWrapper, { width: containerWidth }]}>
             <ProfileScreen refreshing={refreshing} onRefresh={onRefresh} onDataChanged={loadData} />
           </View>
-        </ScrollView>
+        </AdaptivePager>
 
         <CreateItemModal
           visible={createModalVisible}
@@ -442,7 +421,7 @@ export const HomeScreen: React.FC<{
           <ExecutiveSummariesHubView
             onBack={() => {
               setShowSummariesScreen(false);
-              pagerRef.current?.scrollTo({ x: calculateScrollTarget(activeTab, containerWidth), animated: false });
+              pagerRef.current?.setPageWithoutAnimation(getIndexForTab(activeTab));
             }}
             onOpenChatWithPrompt={(prompt) => {
               setShowSummariesScreen(false);
@@ -489,7 +468,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: tokens.spacing.lg,
-    paddingBottom: 100,
+    paddingBottom: 150,
     maxWidth: 640,
     width: '100%',
     alignSelf: 'center',
@@ -569,14 +548,22 @@ const styles = StyleSheet.create({
     paddingTop: tokens.spacing.sm,
     paddingBottom: tokens.spacing.md,
   },
-  // Extended FAB Material Design 3
+  fabOverlay: {
+    position: 'absolute',
+    right: 16,
+    bottom: 96,
+    zIndex: 50,
+    alignItems: 'flex-end',
+  },
+  // Extended FAB Material Design 3 (pill compacta fixa)
   createFab: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 6,
     backgroundColor: tokens.colors.primary,
-    paddingVertical: 14,
+    paddingHorizontal: 18,
+    paddingVertical: 13,
     borderRadius: MD3Shapes.full,
     ...tokens.shadows.level3,
   },

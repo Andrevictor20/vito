@@ -383,6 +383,7 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack }) => {
         <ScrollView
           style={styles.content}
           contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -992,6 +993,7 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack }) => {
               style={styles.pickerScrollView}
               contentContainerStyle={styles.pickerGrid}
               showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
             >
               {AVAILABLE_HOURS.map((hour) => {
                 const isCurrent = (timePickerTarget === 'start' ? newStartHour : newEndHour) === hour;
@@ -1036,15 +1038,17 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack }) => {
         </View>
       </Modal>
 
-      {/* FAB único de criação: só com links existentes (no vazio, o CTA "Criar Primeiro Link" é a entrada) */}
+      {/* FAB fixo padronizado: pill compacta sempre visível (só some no vazio, onde o CTA é a entrada) */}
       {(types || []).length > 0 && (
         <TouchableOpacity
           onPress={handleOpenCreate}
           style={[styles.fab, { backgroundColor: colors.primary }]}
           activeOpacity={0.85}
           accessibilityLabel="Criar novo link de agendamento"
+          accessibilityRole="button"
         >
-          <MaterialIcons name="add" size={24} color={colors.onPrimary} />
+          <MaterialIcons name="add" size={22} color={colors.onPrimary} />
+          <Text style={[styles.fabText, { color: colors.onPrimary }]}>Novo</Text>
         </TouchableOpacity>
       )}
     </SafeAreaView>
@@ -1096,18 +1100,24 @@ const styles = StyleSheet.create({
   },
   fab: {
     position: 'absolute',
-    right: 20,
-    bottom: 28,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    right: 16,
+    bottom: 96,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: 18,
+    paddingVertical: 13,
+    borderRadius: 9999,
     elevation: 6,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.3,
     shadowRadius: 5,
+    zIndex: 50,
+  },
+  fabText: {
+    fontSize: 14,
+    fontWeight: '700',
   },
   tabButtonActive: {
     shadowColor: '#000',
