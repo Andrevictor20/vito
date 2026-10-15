@@ -3,6 +3,10 @@ package service_test
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -248,5 +252,90 @@ func TestBookingService_ReserveAppointment_ConcurrencyLock(t *testing.T) {
 	}
 	if conflictCount != concurrency-1 {
 		t.Errorf("esperado %d conflitos rejeitados, obteve %d", concurrency-1, conflictCount)
+	}
+}
+
+// Reserva de booking deve disparar push com quem agendou, comentário e dia/horário.
+func TestBookingService_ReserveAppointment_SendsPushWithGuestNotes(t *testing.T) {
+	db, err := database.Open(":memory:")
+	if err != nil {
+		t.Fatalf("erro ao abrir sqlite: %v", err)
+	}
+	t.Cleanup(func() { db.Close() })
+
+	userRepo := repository.NewUserRepository(db)
+	eventRepo := repository.NewEventRepository(db)
+	bookingRepo := repository.NewBookingRepositorySQLite(db)
+	tokenRepo := repository.NewDeviceTokenRepository(db)
+
+	host := &domain.User{
+		ID: "user-booking-push", Name: "André Victor", Email: "andre@push.local",
+		PasswordHash: "h", CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
+	}
+	if err := userRepo.Create(host); err != nil {
+		t.Fatal(err)
+	}
+
+	var received []service.PushMessage
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var msgs []service.PushMessage
+		if err := json.NewDecoder(r.Body).Decode(&msgs); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		received = msgs
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"data":[{"status":"ok"}]}`))
+	}))
+	defer ts.Close()
+
+	notifSvc := service.NewNotificationService(tokenRepo, ts.Client())
+	notifSvc.SetExpoAPIURL(ts.URL)
+	if _, err := notifSvc.RegisterDeviceToken(host.ID, "ExponentPushToken[booking-test]", "android"); err != nil {
+		t.Fatal(err)
+	}
+
+	bookingSvc := service.NewBookingService(
+		bookingRepo, eventRepo, userRepo, notifSvc,
+		service.NewShortIoShortenerService("", "", "http://localhost:8080"),
+		service.NewTurnstileValidator(""),
+		"http://localhost:8080",
+	)
+
+	bt := &domain.BookingType{
+		ID: "bt-push", UserID: host.ID, Slug: "alinhamento", Title: "Alinhamento",
+		DurationMinutes: 30, BufferMinutes: 0, DaysOfWeek: "[1,2,3,4,5,6,7]",
+		StartHour: "09:00", EndHour: "18:00", IsActive: true,
+	}
+	if err := bookingRepo.CreateType(bt); err != nil {
+		t.Fatal(err)
+	}
+
+	startAt := time.Date(2026, 10, 21, 14, 0, 0, 0, time.UTC)
+	req := service.ReserveRequest{
+		GuestName:  "Maria Silva",
+		GuestEmail: "maria@test.com",
+		GuestNotes: "Tragam o contrato.",
+		StartAt:    startAt,
+		EndAt:      startAt.Add(30 * time.Minute),
+	}
+	if _, err := bookingSvc.ReserveAppointment(context.Background(), host.ID, bt.Slug, req, "127.0.0.1"); err != nil {
+		t.Fatalf("ReserveAppointment falhou: %v", err)
+	}
+
+	if len(received) != 1 {
+		t.Fatalf("esperado 1 push de aceite, obteve %d", len(received))
+	}
+	msg := received[0]
+	if msg.ChannelID != "vito_booking" {
+		t.Errorf("esperado canal vito_booking, obteve %q", msg.ChannelID)
+	}
+	if msg.Data["type"] != "booking_appointment" {
+		t.Errorf("push deveria carregar type=booking_appointment: %+v", msg.Data)
+	}
+	for _, want := range []string{"Maria Silva", "Alinhamento", "21/10/2026", "14:00", "Tragam o contrato."} {
+		if !strings.Contains(msg.Title+" "+msg.Body, want) {
+			t.Errorf("push deveria conter %q (título=%q corpo=%q)", want, msg.Title, msg.Body)
+		}
 	}
 }

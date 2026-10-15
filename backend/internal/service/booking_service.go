@@ -340,17 +340,27 @@ func (s *BookingService) ReserveAppointment(ctx context.Context, userIdentifier,
 		return nil, fmt.Errorf("falha ao registrar agendamento: %w", err)
 	}
 
-	// 6. Despacho de Push Notification Instantâneo no canal vito_default
+	// 6. Despacho de Push Notification Instantâneo no canal vito_booking:
+	// quem agendou + comentário + dia/horário.
 	if s.notificationSvc != nil {
 		timePT := req.StartAt.Format("15:04")
 		datePT := req.StartAt.Format("02/01/2006")
 		pushTitle := fmt.Sprintf("Novo agendamento: %s", guestName)
 		pushBody := fmt.Sprintf("%s agendou '%s' para %s às %s", guestName, bt.Title, datePT, timePT)
-		_, _ = s.notificationSvc.SendPushToUser(bt.UserID, pushTitle, pushBody, "high", map[string]interface{}{
+		if guestNotes != "" {
+			pushBody = fmt.Sprintf("%s\nComentário: %s", pushBody, guestNotes)
+		}
+		if sent, err := s.notificationSvc.SendPushToUser(bt.UserID, pushTitle, pushBody, "high", map[string]interface{}{
 			"type":           "booking_appointment",
 			"appointment_id": appt.ID,
 			"event_id":       eventID,
-		})
+			"guest_name":     guestName,
+			"guest_notes":    guestNotes,
+		}); err != nil {
+			log.Printf("[BookingService] Falha ao notificar reserva '%s' do usuário %s: %v", appt.ID, bt.UserID, err)
+		} else if sent == 0 {
+			log.Printf("[BookingService] Reserva '%s' sem dispositivos para notificar (user=%s)", appt.ID, bt.UserID)
+		}
 	}
 
 	return appt, nil

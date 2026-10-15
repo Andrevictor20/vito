@@ -76,6 +76,8 @@ const ChatTabScreen: React.FC = () => {
 };
 
 // Push de radar -> refresh imediato; toque na notificação -> abre Radares (§9.4).
+// Push de booking (booking_appointment) -> atualiza Recebidos + Agenda;
+// toque na notificação -> abre a aba Booking.
 const useRadarPushSync = () => {
   const navigation = useNavigation<any>();
   useEffect(() => {
@@ -84,6 +86,10 @@ const useRadarPushSync = () => {
       if (data.type === 'RADAR_TRIGGERED') {
         dataSync.notify('refresh_triggers');
       }
+      if (data.type === 'booking_appointment') {
+        dataSync.notify('refresh_bookings');
+        dataSync.notify('refresh_events');
+      }
     });
     const subResponse = Notifications.addNotificationResponseReceivedListener((resp) => {
       const data = (resp.notification.request?.content?.data || {}) as Record<string, unknown>;
@@ -91,6 +97,12 @@ const useRadarPushSync = () => {
         dataSync.notify('refresh_triggers');
         if (navigation) navigation.navigate('main', { screen: 'triggers' });
         else navigateToTab('triggers');
+      }
+      if (data.type === 'booking_appointment') {
+        dataSync.notify('refresh_bookings');
+        dataSync.notify('refresh_events');
+        if (navigation) navigation.navigate('main', { screen: 'booking' });
+        else navigateToTab('booking');
       }
     });
     return () => {
