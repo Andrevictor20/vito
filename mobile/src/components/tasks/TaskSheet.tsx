@@ -223,6 +223,9 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
   const { colors } = useTheme();
   const isEdit = !!editingTodo;
   const [title, setTitle] = useState('');
+  /** Altura adaptativa do campo de título (cresce com o texto até o teto). */
+  const [titleHeight, setTitleHeight] = useState(48);
+  const TITLE_MAX_HEIGHT = 160;
   const [dateISO, setDateISO] = useState<string | null>(null);
   const [time, setTime] = useState('09:00');
   const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium');
@@ -263,6 +266,7 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
       setShowDatePicker(false);
       setShowTimePicker(false);
       setLocalError(null);
+      setTitleHeight(48);
       // Recolhidos por padrão a cada abertura.
       setDateExpanded(false);
       setTimeExpanded(false);
@@ -340,12 +344,16 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
             contentContainerStyle={styles.scrollContent}
           >
             <TextInput
-              style={[styles.titleInput, { color: colors.onSurface, borderColor: colors.outlineVariant }]}
+              style={[styles.titleInput, { color: colors.onSurface, borderColor: colors.outlineVariant, height: Math.max(48, Math.min(titleHeight, TITLE_MAX_HEIGHT)) }]}
               placeholder="O que precisa ser feito?"
               placeholderTextColor={colors.onSurfaceVariant}
               value={title}
               onChangeText={setTitle}
-              maxLength={140}
+              multiline
+              scrollEnabled={titleHeight >= TITLE_MAX_HEIGHT}
+              onContentSizeChange={(e) => setTitleHeight(e.nativeEvent.contentSize.height)}
+              textAlignVertical="top"
+              maxLength={500}
               accessibilityLabel="Título da tarefa"
             />
 
