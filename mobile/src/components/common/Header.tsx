@@ -87,6 +87,8 @@ export const Header: React.FC<HeaderProps> = ({
 
   const isChat = activeTab === 'chat';
   const centered = align === 'center';
+  const hasLeft = !!onPressMenu;
+  const hasRight = !!((isChat && onPressNewChat) || contextualActions);
 
   const titleBlock = displayTitle ? (
     onPressTitle ? (
@@ -127,31 +129,35 @@ export const Header: React.FC<HeaderProps> = ({
       accessibilityRole="header"
     >
       <View style={styles.topRow}>
-        <View style={styles.sideSlot}>
-          {onPressMenu ? (
-            <HeaderIconButton
-              icon="menu"
-              onPress={onPressMenu}
-              accessibilityLabel="Abrir histórico de conversas"
-              size={22}
-            />
-          ) : null}
-        </View>
+        {hasLeft || centered ? (
+          <View style={styles.sideSlot}>
+            {onPressMenu ? (
+              <HeaderIconButton
+                icon="menu"
+                onPress={onPressMenu}
+                accessibilityLabel="Abrir histórico de conversas"
+                size={22}
+              />
+            ) : null}
+          </View>
+        ) : null}
 
         <View style={styles.titleSlot}>{titleBlock}</View>
 
-        <View style={[styles.actionsRow, styles.sideSlotRight]}>
-          {isChat && onPressNewChat ? (
-            <HeaderIconButton
-              icon="add"
-              onPress={onPressNewChat}
-              accessibilityLabel="Nova conversa"
-              size={20}
-            />
-          ) : (
-            contextualActions
-          )}
-        </View>
+        {hasRight || centered ? (
+          <View style={[styles.actionsRow, styles.sideSlotRight]}>
+            {isChat && onPressNewChat ? (
+              <HeaderIconButton
+                icon="add"
+                onPress={onPressNewChat}
+                accessibilityLabel="Nova conversa"
+                size={20}
+              />
+            ) : (
+              contextualActions
+            )}
+          </View>
+        ) : null}
       </View>
     </View>
   );
