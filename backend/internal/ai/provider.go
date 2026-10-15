@@ -47,6 +47,8 @@ type UserInput struct {
 	ActiveSchedule      []string             `json:"active_schedule,omitempty"`      // Próximos compromissos
 	PendingTodos        []string             `json:"pending_todos,omitempty"`        // Tarefas urgentes/pendentes
 	ActiveTriggers      []string             `json:"active_triggers,omitempty"`      // Vigílias / disparadores em andamento
+	// ActiveTriggerAlerts resume alertas não lidos dos radares (Fase 3, top 3).
+	ActiveTriggerAlerts []string             `json:"active_trigger_alerts,omitempty"`
 	ActiveBookings      []string             `json:"active_bookings,omitempty"`      // Links de agendamento do usuário
 	UpcomingAppointments []string             `json:"upcoming_appointments,omitempty"` // Agendamentos recebidos de convidados
 	ConversationHistory []ChatMessageContext `json:"conversation_history,omitempty"` // Histórico recente da conversa multi-turn

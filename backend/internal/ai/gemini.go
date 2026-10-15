@@ -352,7 +352,8 @@ Responda ESTRITAMENTE em formato JSON puro (sem marcações markdown extras):
   "summary": string,
   "simulated_notification": string,
   "confidence": number (0-100, quão confiante você está de que há fato novo e relevante),
-  "why_relevant": string (1 frase explicando por que é relevante para a vigília; vazio se irrelevante)
+  "why_relevant": string (1 frase explicando por que é relevante para a vigília; vazio se irrelevante),
+  "urgency": string ("high" apenas se fato urgente/breaking das últimas horas que exige atenção imediata; senão "low")
 }`, t.Title, t.Query, t.Category, nowStr, currentMonthYear, realtimeBlock, currentMonthYear, currentMonthYear)
 
 	// Modelos prioritários com fallback resiliente para Grounding e geração
@@ -487,6 +488,7 @@ Responda ESTRITAMENTE em formato JSON puro (sem marcações markdown extras):
 		SimulatedNotification string `json:"simulated_notification"`
 		Confidence            int    `json:"confidence"`
 		WhyRelevant           string `json:"why_relevant"`
+		Urgency               string `json:"urgency"`
 	}
 
 	var eval testEvalResult
@@ -522,6 +524,7 @@ Responda ESTRITAMENTE em formato JSON puro (sem marcações markdown extras):
 		SimulatedNotification: eval.SimulatedNotification,
 		Confidence:            eval.Confidence,
 		WhyRelevant:           eval.WhyRelevant,
+		Urgency:               eval.Urgency,
 		TestedAt:              time.Now().UTC(),
 	}
 	res.EnforceConfidenceGate()

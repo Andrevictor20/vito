@@ -93,6 +93,37 @@ func TestBuildSystemPrompt_AutonomyMode_Assisted(t *testing.T) {
 	}
 }
 
+func TestBuildSystemPromptFromInput_TriggerAlertsBlock(t *testing.T) {
+	now := time.Date(2026, 10, 10, 10, 0, 0, 0, time.UTC)
+	withAlerts := ai.UserInput{
+		Now:      now,
+		Timezone: "America/Sao_Paulo",
+		ActiveTriggerAlerts: []string{
+			"[TV 55 polegadas] Preço atingido: 3499.00 (alvo R$ 3.500)",
+		},
+	}
+	prompt := ai.BuildSystemPromptFromInput(withAlerts)
+	if !strings.Contains(prompt, "ALERTAS RECENTES DOS RADARES") {
+		t.Errorf("esperava bloco de alertas recentes dos radares no prompt")
+	}
+	if !strings.Contains(prompt, "3499.00") {
+		t.Errorf("esperava valor do alerta no prompt")
+	}
+
+	withoutAlerts := ai.UserInput{Now: now, Timezone: "America/Sao_Paulo"}
+	plain := ai.BuildSystemPromptFromInput(withoutAlerts)
+	if strings.Contains(plain, "ALERTAS RECENTES DOS RADARES") {
+		t.Errorf("sem alertas o bloco não deveria aparecer")
+	}
+}
+
+func TestManualRadarModule_CitesProposalRules(t *testing.T) {
+	got := ai.ManualModuleFor("marque reunião sobre o que meu radar achou")
+	if !strings.Contains(got, "PROPOSTA") && !strings.Contains(got, "proposta") {
+		t.Errorf("módulo radar deveria orientar proposta com confirmação, veio: %q", got)
+	}
+}
+
 func TestBuildSystemPrompt_AutonomyMode_Proactive(t *testing.T) {
 	input := ai.UserInput{
 		Now:          time.Date(2026, 10, 10, 10, 0, 0, 0, time.UTC),

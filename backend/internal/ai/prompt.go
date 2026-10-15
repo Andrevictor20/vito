@@ -82,11 +82,30 @@ func BuildSystemPromptFromInput(input UserInput) string {
 		input.AutonomyMode,
 	)
 	// §8.5–8.6: blocos cognitivos opcionais (retrocompatível: vazios = sem bloco).
-	extra := CoreProfileBlock(input.CoreProfile) + BuildAppStateBlock(input.AppStateFlags) + ManualModuleFor(input.Text) + CoTInstruction()
+	extra := CoreProfileBlock(input.CoreProfile) + BuildAppStateBlock(input.AppStateFlags) + ManualModuleFor(input.Text) + TriggerAlertsBlock(input.ActiveTriggerAlerts) + CoTInstruction()
 	if extra == CoTInstruction() {
 		return base + extra
 	}
 	return base + extra
+}
+
+// TriggerAlertsBlock injeta os alertas não lidos dos radares (Fase 3).
+// Vazio quando não há alertas — sem bloco, sem ruído no prompt.
+func TriggerAlertsBlock(alerts []string) string {
+	var lines []string
+	for _, a := range alerts {
+		if strings.TrimSpace(a) != "" {
+			lines = append(lines, a)
+		}
+	}
+	if len(lines) == 0 {
+		return ""
+	}
+	out := "\nALERTAS RECENTES DOS RADARES (base para conversar, propor eventos e checar conflitos):\n"
+	for _, l := range lines {
+		out += fmt.Sprintf("- %s\n", l)
+	}
+	return out
 }
 
 // BuildSystemPromptWithContext constrói o prompt mantendo compatibilidade com assinaturas anteriores.

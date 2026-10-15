@@ -334,6 +334,27 @@ func (r *TriggerRepositorySQLite) UpdateLastError(id string, errMsg string) erro
 	return err
 }
 
+// GetLastNotifiedAt lê o último push enviado (cooldown Fase 1).
+func (r *TriggerRepositorySQLite) GetLastNotifiedAt(id string) (*time.Time, error) {
+	var raw sql.NullTime
+	if err := r.db.QueryRow(`SELECT last_notified_at FROM triggers WHERE id = ?`, id).Scan(&raw); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, domain.ErrTriggerNotFound
+		}
+		return nil, err
+	}
+	if !raw.Valid {
+		return nil, nil
+	}
+	return &raw.Time, nil
+}
+
+// UpdateLastNotifiedAt registra o push enviado (cooldown Fase 1).
+func (r *TriggerRepositorySQLite) UpdateLastNotifiedAt(id string, t time.Time) error {
+	_, err := r.db.Exec(`UPDATE triggers SET last_notified_at = ?, updated_at = ? WHERE id = ?`, t.UTC(), time.Now().UTC(), id)
+	return err
+}
+
 // GetSeenHashes lê os hashes do delta gate (§9.3).
 func (r *TriggerRepositorySQLite) GetSeenHashes(id string) ([]string, error) {
 	var raw sql.NullString

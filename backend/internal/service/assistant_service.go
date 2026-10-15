@@ -165,6 +165,22 @@ func (s *AssistantService) Process(ctx context.Context, userID string, input ai.
 		for _, tr := range trigs[:limit] {
 			input.ActiveTriggers = append(input.ActiveTriggers, assistant.FormatTriggerLine(tr))
 		}
+			// Alertas não lidos (Fase 3): top 3 viram base do chat para propor
+			// eventos e analisar conflitos — nunca criação automática.
+			if len(input.ActiveTriggerAlerts) == 0 {
+				logsByTrigger := map[string][]domain.TriggerLog{}
+				for _, tr := range trigs[:limit] {
+					if logs, err := s.triggerSvc.ListTriggerLogs(tr.ID, userID); err == nil && len(logs) > 0 {
+						logsByTrigger[tr.ID] = logs
+					}
+				}
+				input.ActiveTriggerAlerts = assistant.CollectTriggerAlerts(trigs[:limit], logsByTrigger, 3)
+			}
+			// Telemetria compacta de radares (§8.5).
+			input.AppStateFlags = append(input.AppStateFlags,
+				fmt.Sprintf("radares_ativos:%d", len(trigs[:limit])),
+				fmt.Sprintf("alertas_radar_nao_lidos:%d", len(input.ActiveTriggerAlerts)),
+			)
 		}
 	}
 

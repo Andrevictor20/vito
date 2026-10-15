@@ -2,6 +2,7 @@ package assistant
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/andrevmp/vito/backend/internal/ai"
@@ -36,6 +37,35 @@ func FormatTriggerLine(tr domain.Trigger) string {
 		schedule = fmt.Sprintf("%s às %s", schedule, tr.ScheduledTime)
 	}
 	return fmt.Sprintf("[%s - %s] %s (%s)", tr.Category, schedule, tr.Title, tr.Query)
+}
+
+// FormatTriggerAlertLine resume um alerta não lido de radar para o chat (Fase 3).
+func FormatTriggerAlertLine(triggerTitle, message, currentValue string) string {
+	line := fmt.Sprintf("[%s] %s", triggerTitle, message)
+	if strings.TrimSpace(currentValue) != "" {
+		line += fmt.Sprintf(" (valor: %s)", strings.TrimSpace(currentValue))
+	}
+	return line
+}
+
+// CollectTriggerAlerts monta até limit linhas dos alertas não lidos (Fase 3).
+func CollectTriggerAlerts(triggers []domain.Trigger, logsByTrigger map[string][]domain.TriggerLog, limit int) []string {
+	if limit <= 0 {
+		return nil
+	}
+	var out []string
+	for _, tr := range triggers {
+		for _, l := range logsByTrigger[tr.ID] {
+			if l.IsRead {
+				continue
+			}
+			out = append(out, FormatTriggerAlertLine(tr.Title, l.Message, tr.CurrentValue))
+			if len(out) >= limit {
+				return out
+			}
+		}
+	}
+	return out
 }
 
 func FormatBookingLine(title string, dur int, sh, eh, url string) string {

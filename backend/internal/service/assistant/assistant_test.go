@@ -1,9 +1,11 @@
 package assistant
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/andrevmp/vito/backend/internal/ai"
+	"github.com/andrevmp/vito/backend/internal/domain"
 )
 
 func TestDecideMemoryOp(t *testing.T) {
@@ -36,5 +38,34 @@ func TestBookingHelpers(t *testing.T) {
 	}
 	if msg := ClarificationMessage(""); msg == "" {
 		t.Fatal("ClarificationMessage vazio")
+	}
+}
+
+func TestFormatTriggerAlertLine(t *testing.T) {
+	got := FormatTriggerAlertLine("TV 55 polegadas", "Preço atingido: 3499.00", "3499.00")
+	if got == "" || !strings.Contains(got, "TV 55") || !strings.Contains(got, "3499.00") {
+		t.Fatalf("linha de alerta deveria citar radar e valor: %q", got)
+	}
+}
+
+func TestCollectTriggerAlerts(t *testing.T) {
+	trigs := []domain.Trigger{{ID: "t1", Title: "TV 55"}, {ID: "t2", Title: "Dólar"}}
+	logs := map[string][]domain.TriggerLog{
+		"t1": {
+			{ID: "l1", TriggerID: "t1", Message: "Preço atingido", IsRead: false},
+			{ID: "l2", TriggerID: "t1", Message: "Antigo lido", IsRead: true},
+		},
+		"t2": {{ID: "l3", TriggerID: "t2", Message: "Dólar subiu", IsRead: false}},
+	}
+	got := CollectTriggerAlerts(trigs, logs, 3)
+	if len(got) != 2 {
+		t.Fatalf("esperava 2 alertas não lidos, veio %d: %v", len(got), got)
+	}
+	got1 := CollectTriggerAlerts(trigs, logs, 1)
+	if len(got1) != 1 {
+		t.Fatalf("limite 1 deveria retornar 1, veio %d", len(got1))
+	}
+	if len(CollectTriggerAlerts(nil, logs, 3)) != 0 {
+		t.Fatal("sem triggers não há alertas")
 	}
 }

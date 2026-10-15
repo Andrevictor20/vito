@@ -200,6 +200,18 @@ func runVersionedMigrations(db *sql.DB) error {
 			}
 			continue
 		}
+		if version == "007_trigger_last_notified.sql" {
+			// Cooldown do push de preço-alvo (Fase 1).
+			if !hasColumn(db, "triggers", "last_notified_at") {
+				if _, err := db.Exec("ALTER TABLE triggers ADD COLUMN last_notified_at DATETIME"); err != nil {
+					return err
+				}
+			}
+			if err := recordMigration(db, version); err != nil {
+				return err
+			}
+			continue
+		}
 		content, err := migrationFS.ReadFile(name)
 		if err != nil {
 			return err

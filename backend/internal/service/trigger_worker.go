@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -17,6 +18,55 @@ import (
 type TriggerEvaluator interface {
 	Evaluate(ctx context.Context, trigger *domain.Trigger) (summary string, payload string, err error)
 	TestEvaluate(ctx context.Context, trigger *domain.Trigger) (*domain.TriggerTestResult, error)
+}
+
+// PushDispatcher desacopla o envio de push do worker (testabilidade).
+type PushDispatcher interface {
+	SendPushToUser(userID, title, body, priority string, data map[string]interface{}) (int, error)
+}
+
+// evalSignal carrega o gate anti-spam + urgência do payload (Fases 0 e 2).
+type evalSignal struct {
+	hasGate    bool
+	met        bool
+	confidence int
+	urgent     bool
+}
+
+// parseEvalSignal interpreta o payload de avaliação.
+// Sem campos de gate (legado/default), met=true e o comportamento atual é mantido.
+func parseEvalSignal(payload string) evalSignal {
+	sig := evalSignal{met: true}
+	var raw struct {
+		ConditionMet *bool  `json:"condition_met"`
+		Confidence   *int   `json:"confidence"`
+		Urgency      string `json:"urgency"`
+	}
+	if err := json.Unmarshal([]byte(payload), &raw); err != nil {
+		return sig
+	}
+	if raw.ConditionMet == nil && raw.Confidence == nil {
+		return sig
+	}
+	sig.hasGate = true
+	if raw.ConditionMet != nil {
+		sig.met = *raw.ConditionMet
+	}
+	if raw.Confidence != nil {
+		sig.confidence = *raw.Confidence
+	}
+	sig.urgent = strings.EqualFold(strings.TrimSpace(raw.Urgency), "high")
+	return sig
+}
+
+func (s evalSignal) allowsNotify() bool {
+	if !s.hasGate {
+		return true
+	}
+	if !s.met {
+		return false
+	}
+	return s.confidence >= domain.MinTriggerConfidence
 }
 
 // DefaultTriggerEvaluator gera relatórios informativos e executivos para vigílias ativas.
@@ -73,6 +123,7 @@ func (e *AITriggerEvaluator) Evaluate(ctx context.Context, t *domain.Trigger) (s
 				"simulated_notification": res.SimulatedNotification,
 				"confidence":             res.Confidence,
 				"why_relevant":           res.WhyRelevant,
+				"urgency":                res.Urgency,
 				"tested_at":              res.TestedAt.Format(time.RFC3339),
 			}
 			payloadBytes, errMarshal := json.Marshal(payloadObj)
@@ -97,7 +148,7 @@ func (e *AITriggerEvaluator) TestEvaluate(ctx context.Context, t *domain.Trigger
 // TriggerWorker orquestra a vigília contínua, cumprimento de horários e despacho de relatórios.
 type TriggerWorker struct {
 	triggerRepo   domain.TriggerRepository
-	notifSvc      *NotificationService
+	notifSvc      PushDispatcher
 	evaluator     TriggerEvaluator
 	checkInterval time.Duration
 	stopCh        chan struct{}
@@ -107,6 +158,15 @@ type TriggerWorker struct {
 	// deltaFetcher retorna os hashes dos fatos atuais; nil desliga o delta gate.
 	// Na volta: (hashesNovos, todosHashes, erro).
 	deltaFetcher func(ctx context.Context, t *domain.Trigger) (fresh []string, all []string, err error)
+	// priceFetcher retorna o valor numérico atual da fonte (ex: bid AwesomeAPI);
+	// nil desliga o fast-path determinístico de preço-alvo (Fase 1).
+	// Na volta: (valor, exibição, ok, erro). ok=false cai no fluxo IA.
+	priceFetcher func(ctx context.Context, t *domain.Trigger) (value float64, display string, ok bool, err error)
+}
+
+// SetPriceFetcher instala o fast-path determinístico de preço-alvo (Fase 1).
+func (w *TriggerWorker) SetPriceFetcher(fn func(ctx context.Context, t *domain.Trigger) (float64, string, bool, error)) {
+	w.priceFetcher = fn
 }
 
 // SetDeltaFetcher instala o portão de deduplicação pré-IA (§9.3).
@@ -117,7 +177,7 @@ func (w *TriggerWorker) SetDeltaFetcher(fn func(ctx context.Context, t *domain.T
 // NewTriggerWorker instancia o worker de avaliação autônoma de disparadores.
 func NewTriggerWorker(
 	triggerRepo domain.TriggerRepository,
-	notifSvc *NotificationService,
+	notifSvc PushDispatcher,
 	evaluator TriggerEvaluator,
 	checkInterval ...time.Duration,
 ) *TriggerWorker {
@@ -188,6 +248,72 @@ func (w *TriggerWorker) Stop() {
 	log.Println("✅ [TriggerWorker] Vigília autônoma encerrada.")
 }
 
+// checkPriceFastPath avalia price_above/price_below de forma determinística
+// contra o valor numérico da fonte (Fase 1). Retorna (handled, notified):
+// handled=true dispensa o fluxo IA; notified=true conta como avaliado.
+// Sem número no alvo ou na fonte, devolve handled=false (cai na IA).
+func (w *TriggerWorker) checkPriceFastPath(ctx context.Context, now time.Time, t *domain.Trigger, loc *time.Location) (bool, bool) {
+	if w.priceFetcher == nil {
+		return false, false
+	}
+	if t.ConditionType != domain.ConditionPriceAbove && t.ConditionType != domain.ConditionPriceBelow {
+		return false, false
+	}
+	target, ok := ParseMoneyValue(t.TargetValue)
+	if !ok {
+		return false, false
+	}
+	current, display, ok, err := w.priceFetcher(ctx, t)
+	if err != nil || !ok {
+		return false, false
+	}
+	nextCheck := CalculateNextCheck(t.ScheduledTime, t.Frequency, now, loc)
+	advanceSilent := func() {
+		_ = w.triggerRepo.UpdateRunResult(t.ID, t.CurrentValue, t.Status, "skipped", now.UTC(), &nextCheck)
+	}
+	if !PriceConditionMet(t.ConditionType, target, current) {
+		advanceSilent()
+		return true, false
+	}
+	last, err := w.triggerRepo.GetLastNotifiedAt(t.ID)
+	if err != nil {
+		log.Printf("[TriggerWorker] Aviso ao ler cooldown do disparador %s: %v", t.ID, err)
+	}
+	if PriceNotifyCooldownActive(last, now, PriceNotifyCooldown) {
+		advanceSilent()
+		return true, false
+	}
+	direction := "atingiu ou ficou abaixo de"
+	if t.ConditionType == domain.ConditionPriceAbove {
+		direction = "atingiu ou superou"
+	}
+	summary := fmt.Sprintf("Preço atingido: %s %s o alvo %s.", display, direction, t.TargetValue)
+	logEntry := &domain.TriggerLog{
+		ID:          uuid.New().String(),
+		TriggerID:   t.ID,
+		TriggeredAt: now.UTC(),
+		Message:     summary,
+		Payload:     fmt.Sprintf(`{"status":"price_hit","condition_met":true,"confidence":100,"target":"%s","current":"%s"}`, t.TargetValue, display),
+		IsRead:      false,
+	}
+	if err := w.triggerRepo.CreateLog(logEntry); err != nil {
+		log.Printf("[TriggerWorker] Erro ao gravar log de preço do disparador %s: %v", t.ID, err)
+	}
+	if w.notifSvc != nil && t.UserID != "" {
+		pushData := map[string]interface{}{
+			"type":         "RADAR_TRIGGERED",
+			"triggerId":    t.ID,
+			"logId":        logEntry.ID,
+			"currentValue": summary,
+			"urgency":      "price_target",
+		}
+		_, _ = w.notifSvc.SendPushToUser(t.UserID, fmt.Sprintf("Preço atingido: %s", t.Title), summary, "urgent", pushData)
+	}
+	_ = w.triggerRepo.UpdateLastNotifiedAt(t.ID, now.UTC())
+	_ = w.triggerRepo.UpdateRunResult(t.ID, summary, t.Status, "success", now.UTC(), &nextCheck)
+	return true, true
+}
+
 // CheckAndEvaluateTriggers busca disparadores com horário de vigília vencido e gera relatórios.
 func (w *TriggerWorker) CheckAndEvaluateTriggers(now time.Time) (int, error) {
 	dueTriggers, err := w.triggerRepo.ListDueTriggers(now)
@@ -200,6 +326,14 @@ func (w *TriggerWorker) CheckAndEvaluateTriggers(now time.Time) (int, error) {
 
 	for _, t := range dueTriggers {
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		// Fast-path determinístico de preço-alvo (Fase 1): sem custo de IA.
+		if handled, notified := w.checkPriceFastPath(ctx, now, &t, loc); handled {
+			cancel()
+			if notified {
+				evaluatedCount++
+			}
+			continue
+		}
 		// Portão de deduplicação pré-IA: sem fatos novos, só atualiza a
 		// próxima checagem — economiza a chamada de IA (§9.3).
 		if w.deltaFetcher != nil {
@@ -231,6 +365,15 @@ func (w *TriggerWorker) CheckAndEvaluateTriggers(now time.Time) (int, error) {
 			_ = w.triggerRepo.UpdateLastError(t.ID, "")
 		}
 
+		// Portão anti-spam (Fase 0): condição falsa ou confiança baixa não
+		// geram log visível nem push — só avançam a próxima checagem.
+		sig := parseEvalSignal(payload)
+		if evalErr == nil && !sig.allowsNotify() {
+			nextCheck := CalculateNextCheck(t.ScheduledTime, t.Frequency, now, loc)
+			_ = w.triggerRepo.UpdateRunResult(t.ID, t.CurrentValue, t.Status, "skipped", now.UTC(), &nextCheck)
+			continue
+		}
+
 		// 1. Grava relatório em trigger_logs
 		logEntry := &domain.TriggerLog{
 			ID:          uuid.New().String(),
@@ -244,8 +387,10 @@ func (w *TriggerWorker) CheckAndEvaluateTriggers(now time.Time) (int, error) {
 			log.Printf("[TriggerWorker] Erro ao gravar log do disparador %s: %v", t.ID, err)
 		}
 
-		// 2. Despacha notificação push se serviço disponível
-		if w.notifSvc != nil && t.UserID != "" {
+		// 2. Despacha notificação push se serviço disponível.
+		// Falhas de avaliação geram log + badge, mas nunca push (anti-spam).
+		// Urgência alta (Fase 2) usa o canal urgente com som.
+		if evalErr == nil && w.notifSvc != nil && t.UserID != "" {
 			pushTitle := fmt.Sprintf("Vigília: %s", t.Title)
 			pushData := map[string]interface{}{
 				"type":         "RADAR_TRIGGERED",
@@ -253,7 +398,11 @@ func (w *TriggerWorker) CheckAndEvaluateTriggers(now time.Time) (int, error) {
 				"logId":        logEntry.ID,
 				"currentValue": summary,
 			}
-			_, _ = w.notifSvc.SendPushToUser(t.UserID, pushTitle, summary, "default", pushData)
+			priority := "default"
+			if sig.urgent {
+				priority = "urgent"
+			}
+			_, _ = w.notifSvc.SendPushToUser(t.UserID, pushTitle, summary, priority, pushData)
 		}
 
 		// 3. Calcula o próximo horário com base no scheduled_time e fuso

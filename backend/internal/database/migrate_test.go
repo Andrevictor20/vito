@@ -16,8 +16,8 @@ func TestVersionedMigrations_FreshDB(t *testing.T) {
 	if err := db.QueryRow(`SELECT COUNT(*) FROM schema_migrations`).Scan(&count); err != nil {
 		t.Fatal(err)
 	}
-	if count != 6 {
-		t.Fatalf("esperava 6 migrações registradas, vieram %d", count)
+	if count != 7 {
+		t.Fatalf("esperava 7 migrações registradas, vieram %d", count)
 	}
 	if !hasColumn(db, "todos", "category") || !hasColumn(db, "todos", "remind_at") {
 		t.Fatal("001 deveria criar todos com category e remind_at")
@@ -56,7 +56,18 @@ func TestVersionedMigrations_LegacyDB(t *testing.T) {
 	if err := db2.QueryRow(`SELECT COUNT(*) FROM schema_migrations`).Scan(&count); err != nil {
 		t.Fatal(err)
 	}
-	if count != 6 {
-		t.Fatalf("base legada deveria ser carimbada com 6, veio %d", count)
+	if count != 7 {
+		t.Fatalf("base legada deveria ser carimbada com 7, veio %d", count)
+	}
+}
+
+func TestVersionedMigrations_LastNotifiedColumn(t *testing.T) {
+	db, err := Open(filepath.Join(t.TempDir(), "notified.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if !hasColumn(db, "triggers", "last_notified_at") {
+		t.Fatal("007 deveria criar last_notified_at em triggers")
 	}
 }

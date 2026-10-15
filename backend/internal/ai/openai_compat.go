@@ -213,7 +213,8 @@ Responda EXCLUSIVAMENTE em formato JSON puro, sem markdown delimitador nem expli
   "summary": "manchete da notícia mais importante e recente em 1 frase",
   "simulated_notification": "título curto e impactante da notificação de alerta",
   "confidence": 0-100,
-  "why_relevant": "1 frase explicando por que é relevante para a vigília; vazio se irrelevante"
+  "why_relevant": "1 frase explicando por que é relevante para a vigília; vazio se irrelevante",
+  "urgency": "high apenas se fato urgente/breaking das últimas horas que exige atenção imediata; senão low"
 }`, nowStr, currentMonthYear, currentMonthYear)
 
 	userPrompt := fmt.Sprintf(`Avalie esta vigília/radar do usuário:
@@ -287,6 +288,7 @@ Analise o cenário, verifique se a condição foi atingida ou se há fatos relev
 		SimulatedNotification string `json:"simulated_notification"`
 		Confidence            int    `json:"confidence"`
 		WhyRelevant           string `json:"why_relevant"`
+		Urgency               string `json:"urgency"`
 	}
 
 	cleanJSON := rawText
@@ -322,6 +324,7 @@ Analise o cenário, verifique se a condição foi atingida ou se há fatos relev
 		SimulatedNotification: eval.SimulatedNotification,
 		Confidence:            eval.Confidence,
 		WhyRelevant:           eval.WhyRelevant,
+		Urgency:               eval.Urgency,
 		TestedAt:              time.Now().UTC(),
 	}
 	res.EnforceConfidenceGate()

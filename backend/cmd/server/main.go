@@ -123,8 +123,7 @@ func main() {
 	}
 	triggerWorker := service.NewTriggerWorker(triggerRepo, notifSvc, triggerEvaluator, 1*time.Minute)
 	// Delta gate pré-IA (§9.3): hashes dos fatos atuais via conectores por categoria.
-	triggerWorker.SetDeltaFetcher(func(fetchCtx context.Context, t *domain.Trigger) ([]string, []string, error) {
-		items, err := ai.RouteTriggerSource(t).Fetch(fetchCtx, t)
+	triggerWorker.SetDeltaFetcher(func(fetchCtx context.Context, t *domain.Trigger) ([]string, []string, error) {		items, err := ai.RouteTriggerSource(t).Fetch(fetchCtx, t)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -145,6 +144,23 @@ func main() {
 			}
 		}
 		return fresh, all, nil
+	})
+	// Fast-path determinístico de preço-alvo (Fase 1): primeiro valor numérico
+	// da fonte da categoria (ex: bid AwesomeAPI); sem número, cai na IA.
+	triggerWorker.SetPriceFetcher(func(fetchCtx context.Context, t *domain.Trigger) (float64, string, bool, error) {
+		if t.ConditionType != domain.ConditionPriceAbove && t.ConditionType != domain.ConditionPriceBelow {
+			return 0, "", false, nil
+		}
+		items, err := ai.RouteTriggerSource(t).Fetch(fetchCtx, t)
+		if err != nil {
+			return 0, "", false, err
+		}
+		for _, it := range items {
+			if v, ok := service.ParseMoneyValue(it.Value); ok {
+				return v, it.Value, true, nil
+			}
+		}
+		return 0, "", false, nil
 	})
 	triggerWorker.Start()
 	defer triggerWorker.Stop()

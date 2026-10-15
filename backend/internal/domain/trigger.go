@@ -104,6 +104,8 @@ type TriggerTestResult struct {
 	SimulatedNotification string    `json:"simulated_notification"`
 	Confidence            int       `json:"confidence"`
 	WhyRelevant           string    `json:"why_relevant"`
+	// Urgency indica breaking/imediato ("high") vs rotina ("low"/vazio) — Fase 2.
+	Urgency               string    `json:"urgency,omitempty"`
 	TestedAt              time.Time `json:"tested_at"`
 }
 
@@ -160,6 +162,9 @@ type TriggerRepository interface {
 	UpdateRunResult(id string, currentValue string, status TriggerStatus, lastRunStatus string, lastChecked time.Time, nextCheck *time.Time) error
 	// UpdateLastError persiste o erro da última coleta (visível no app).
 	UpdateLastError(id string, errMsg string) error
+	// GetLastNotifiedAt/UpdateLastNotifiedAt sustentam o cooldown do push (Fase 1).
+	GetLastNotifiedAt(id string) (*time.Time, error)
+	UpdateLastNotifiedAt(id string, t time.Time) error
 	// SeenHashes lê/grava os hashes do delta gate (§9.3).
 	GetSeenHashes(id string) ([]string, error)
 	SetSeenHashes(id string, hashes []string) error

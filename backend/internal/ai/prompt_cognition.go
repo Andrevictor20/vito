@@ -28,7 +28,10 @@ func ManualModuleFor(text string) string {
 	case strings.Contains(t, "booking") || strings.Contains(t, "agendamento") || strings.Contains(t, "link"):
 		return "\nMANUAL VITO BOOKING: tipos têm duration 15/30/45/60, buffer, janela start_hour/end_hour, days [1..7]; rota pública /book/{username}/{slug}; cancele por nome/e-mail do convidado.\n"
 	case strings.Contains(t, "radar") || strings.Contains(t, "vigília") || strings.Contains(t, "vigilia") || strings.Contains(t, "trigger"):
-		return "\nMANUAL RADARES: 12 categorias canônicas; condition daily_brief/price_above/price_below/event_upcoming/change_detected; frequency immediate/hourly/daily_morning/daily_evening; confidence>=75 exige why_relevant.\n"
+		return "\nMANUAL RADARES: 12 categorias canônicas; condition daily_brief/price_above/price_below/event_upcoming/change_detected; frequency immediate/hourly/daily_morning/daily_evening; confidence>=75 exige why_relevant.\n" +
+			"ALERTAS COMO BASE (Fase 3): o bloco ALERTAS RECENTES DOS RADARES traz os disparos não lidos (título + valor atual). " +
+			"Quando o usuário pedir para marcar/agendar algo sobre um alerta (ex: 'marque reunião sobre o que meu radar achou'), monte uma PROPOSTA de evento (título, data, horário) citando o alerta e PERGUNTE antes de criar — nunca crie direto sem dia e hora confirmados (vale a regra de coleta progressiva). " +
+			"Quando perguntar 'isso conflita?' ou 'posso nesse horário?', confira contra COMPROMISSOS PRÓXIMOS NA AGENDA, cite o evento concorrente pelo nome e ofereça 2 horários livres próximos.\n"
 	case strings.Contains(t, "resumo") || strings.Contains(t, "raio-x") || strings.Contains(t, "raio x") || strings.Contains(t, "semana"):
 		return "\nMANUAL RESUMOS: Diário/Semanal/Mensal + Raio-X; ignore all_day/feriado/24h nas horas; use eventos reais e tarefas concluídas.\n"
 	case strings.Contains(t, "lembrete") || strings.Contains(t, "tarefa") || strings.Contains(t, "pendência") || strings.Contains(t, "pendencia"):
