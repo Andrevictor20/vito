@@ -95,6 +95,7 @@ jobs:
           cache-to: type=gha,mode=max
 
   # §11.3: deploy automático no Raspberry Pi via self-hosted runner (arm64).
+# Compose único (sem override): `docker compose pull/up` direto.
   # Pré-requisito no Pi (uma vez):
   #   1. Instalar o runner: Settings > Actions > Runners > New self-hosted runner
   #      (labels: self-hosted, linux, arm64) em ~/actions-runner e rodar ./run.sh
@@ -115,8 +116,8 @@ jobs:
           cd ~/vito
           git fetch origin main
           git reset --hard origin/main
-          docker compose -f docker-compose.yml -f docker-compose.prod.yml pull backend
-          docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --force-recreate --remove-orphans backend
+          docker compose pull backend
+          docker compose up -d --force-recreate --remove-orphans backend
           docker image prune -f
 
       - name: Verify Backend Healthcheck

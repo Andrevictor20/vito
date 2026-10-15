@@ -1,11 +1,11 @@
 # ==============================================================================
-# docker-compose.yml — Vito (Deploy Raspberry Pi 4 / Local)
+# docker-compose.yml — Vito (arquivo único: notebook e Raspberry Pi)
+# O backend roda SEMPRE da imagem publicada no GHCR (build só no CI via
+# buildx); sem bloco build: para não haver conflito de digest no Pi.
+# Uso: docker compose pull/up (sem -f).
 # ==============================================================================
 services:
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
     image: ghcr.io/andrevictor20/vito:latest
     pull_policy: always
     container_name: vito-backend

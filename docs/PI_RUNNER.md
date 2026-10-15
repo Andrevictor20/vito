@@ -4,9 +4,9 @@ Guia passo a passo para operar o deploy automático (`ci.yml` → job `deploy`)
 no Raspberry Pi 4 (arm64) a partir da imagem publicada
 `ghcr.io/andrevictor20/vito:latest`.
 
-> O job `deploy` usa override de produção:
-> `docker compose -f docker-compose.yml -f docker-compose.prod.yml pull/up`
-> O `docker-compose.prod.yml` contém **só `image:` + `pull_policy: always`**,
+> O job `deploy` usa o compose único:
+> `docker compose pull/up` (sem `-f`, sem override).
+> O `docker-compose.yml` contém **só `image:` + `pull_policy: always`**,
 > **sem `build:`** — o Pi nunca compila, apenas puxa a imagem multi-arch
 > (`linux/amd64`, `linux/arm64`) publicada pelo job `docker-publish`.
 
@@ -104,12 +104,12 @@ git fetch origin main
 git reset --hard origin/main
 echo "${GITHUB_TOKEN}" | docker login ghcr.io -u <seu-usuario> --password-stdin
 # Para teste local sem token pessoal, o login no CI usa secrets.GITHUB_TOKEN.
-docker compose -f docker-compose.yml -f docker-compose.prod.yml pull backend
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --force-recreate --remove-orphans backend
+docker compose pull backend
+docker compose up -d --force-recreate --remove-orphans backend
 docker image prune -f
 sleep 5
 wget -qO- http://localhost:8180/healthz
-docker compose -f docker-compose.yml -f docker-compose.prod.yml config
+docker compose config
 ```
 
 O `healthz` deve responder `200`. O `config` deve mostrar o `backend`
@@ -121,9 +121,9 @@ O `healthz` deve responder `200`. O `config` deve mostrar o `backend`
 1. Push em `main` → `test` → `docker-publish` (buildx multi-arch + push
    `latest` + `sha`) → `deploy` (só no runner do Pi).
 2. O `deploy` faz `git fetch + reset --hard origin/main` em `~/vito`,
-   `pull` + `up -d` com os dois `-f`, `image prune` e `wget /healthz`.
+   `pull` + `up -d` (compose único, sem `-f`), `image prune` e `wget /healthz`.
 3. Rollback rápido: `git reset --hard <sha-anterior> &&
-   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d backend`.
+   docker compose up -d backend`.
 
 ## 5. Troubleshooting
 
@@ -135,5 +135,4 @@ O `healthz` deve responder `200`. O `config` deve mostrar o `backend`
 | `pull` pede login | token expirado | refaça `docker login ghcr.io` (CI usa `GITHUB_TOKEN` automático) |
 | `/healthz` sem resposta | `.env` incompleto / porta ocupada | `docker logs vito-backend`; confira `JWT_SECRET`/`DATA_ENCRYPTION_KEY>=32` |
 | Preflight CORS falha no web dev | `CORS_ALLOWED_ORIGINS` sem a origem do browser | inclua `http://localhost:8081` (notebook) na var + `up -d --force-recreate backend` (`restart` sozinho não relê o `.env`) |
-| `config` mostra `build:` | esqueceu o `-f docker-compose.prod.yml` | use sempre os dois `-f` em `pull/up/config` |
 | Disco cheio | imagens antigas | `docker image prune -f && docker system df` |

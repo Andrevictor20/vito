@@ -40,10 +40,10 @@ mobile:
 	@echo "📱 Iniciando Expo Dev Server (escaneie o QR code no Expo Go)..."
 	@cd mobile && npx expo start
 
-# Docker
+# Docker (build local direto pelo Dockerfile; o compose usa só a imagem GHCR)
 docker:
 	@echo "🐳 Construindo imagem Docker do backend..."
-	@docker compose build
+	@docker build -t ghcr.io/andrevictor20/vito:latest -f backend/Dockerfile backend
 
 clean:
 	@rm -rf backend/bin mobile/node_modules
