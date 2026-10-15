@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { AccessibilityInfo, Animated, Easing, Image, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
+import { useTheme } from '../../context/ThemeContext';
 
 // Corpo sem olhos: a camada animada é a única fonte dos olhos (evita o bug dos 4 olhos).
 const MASCOT_BODY = require('../../../assets/mascot-body.png');
@@ -181,9 +182,18 @@ export const VitoMascot: React.FC<VitoMascotProps> = ({
     },
   ];
 
+  const { isDark } = useTheme();
+
   return (
     <View style={[styles.container, { width: size, height: size }, style]}>
-      <Image source={MASCOT_BODY} style={{ width: size, height: size }} resizeMode="contain" />
+      <Image
+        source={MASCOT_BODY}
+        style={[
+          { width: size, height: size },
+          isDark && styles.mascotDark,
+        ]}
+        resizeMode="contain"
+      />
       <Animated.View pointerEvents="none" style={eyeStyle(EYE.leftCenterX)} />
       <Animated.View pointerEvents="none" style={eyeStyle(EYE.rightCenterX)} />
     </View>
@@ -195,6 +205,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
+  },
+  mascotDark: {
+    // Iluminação de contorno sutil (rim lighting) para não perder a cartola no fundo OLED #0B0D10
+    shadowColor: '#FFFFFF',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.35,
+    shadowRadius: 4,
   },
   eye: {
     position: 'absolute',

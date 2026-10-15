@@ -20,6 +20,29 @@ export const toChatBooking = (res: AssistantChatResponse): ChatBooking | undefin
   };
 };
 
+export const sanitizeErrorMessage = (err: unknown): string => {
+  const msg = err instanceof Error ? err.message : String(err || '');
+  const lower = msg.toLowerCase();
+  if (lower.includes('tempo limite') || lower.includes('timeout')) {
+    return 'O servidor demorou a responder. Verifique sua conexão — nada foi criado. Tente de novo com uma frase mais completa.';
+  }
+  if (
+    lower.includes('fetch failed') ||
+    lower.includes('unknownhost') ||
+    lower.includes('network request failed') ||
+    lower.includes('network error') ||
+    lower.includes('econnrefused') ||
+    lower.includes('failed to connect') ||
+    lower.includes('enotfound')
+  ) {
+    return 'Oscilação temporária de conexão com o servidor. Verifique sua internet e tente novamente em instantes.';
+  }
+  if (msg && msg !== 'USER_CANCELLED' && !msg.startsWith('Error:') && !msg.includes('java.net')) {
+    return msg;
+  }
+  return 'Não consegui processar agora por instabilidade temporária. Nada foi criado ou apagado. Tente de novo em instantes.';
+};
+
 export { humanizePreview };
 
 export interface UseChatMessagesOptions {
@@ -224,20 +247,10 @@ export function useChatMessages(
         }
 
         console.warn('[useChat] falha no assistente:', err);
-        // Superfície o motivo real vindo do servidor (ex: validação da IA) em vez
-        // de esconder tudo atrás de um genérico — nada foi criado nesse caminho.
-        const serverMsg = err instanceof Error ? err.message : '';
-        const friendlyFallback =
-          'Não consegui processar agora por instabilidade na IA ou na rede. Nada foi criado ou apagado. Tente de novo em instantes com mais detalhes (ex: criar evento Dentista amanhã às 14h).';
         const errorMsg: ChatMessage = {
           id: `err-${Date.now()}`,
           sender: 'vito',
-          text:
-            serverMsg && serverMsg !== 'USER_CANCELLED' && !serverMsg.includes('Tempo limite esgotado')
-              ? serverMsg
-              : serverMsg.includes('Tempo limite')
-                ? 'O servidor demorou a responder (60s). Verifique sua conexão — nada foi criado. Tente de novo com uma frase mais completa.'
-                : friendlyFallback,
+          text: sanitizeErrorMessage(err),
           timestamp: new Date().toISOString(),
         };
         const withError = [...withUser, errorMsg];
@@ -340,7 +353,7 @@ export function useChatMessages(
         const errorMsg: ChatMessage = {
           id: `err-${Date.now()}`,
           sender: 'vito',
-          text: 'Não consegui processar seu pedido agora. Pode tentar de novo em instantes?',
+          text: sanitizeErrorMessage(err),
           timestamp: new Date().toISOString(),
         };
         const withError = [...truncatedList, errorMsg];

@@ -414,3 +414,9 @@ export type ThemeTokens = ReturnType<typeof getThemeTokens>;
 export const tabularNumbers: TextStyle = {
   fontVariant: ['tabular-nums'],
 };
+
+/**
+ * Distância de segurança para conteúdo rolável em relação à barra de navegação flutuante inferior.
+ * Conforme recomendado na auditoria de UI/UX (Seção 10.3).
+ */
+export const BOTTOM_NAV_CLEARANCE = 100;
