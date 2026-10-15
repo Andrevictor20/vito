@@ -81,14 +81,9 @@ func (h *TriggerHandler) CreateTrigger(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Executa imediatamente a pesquisa inicial para já entregar fatos e notícias reais atualizadas
-	if h.triggerWorker != nil {
-		if logEntry, errRun := h.triggerWorker.RunTriggerNow(trigger.ID, userID); errRun == nil && logEntry != nil {
-			trigger.CurrentValue = logEntry.Message
-			trigger.LastRunStatus = "success"
-		}
-	}
-
+	// Resposta imediata (201): a primeira pesquisa é feita pelo app via
+	// POST /run com timeout longo; IA inline aqui estourava os 15s do
+	// cliente, abortava a criação e o radar sumia da lista até o reload.
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	_ = json.NewEncoder(w).Encode(trigger)

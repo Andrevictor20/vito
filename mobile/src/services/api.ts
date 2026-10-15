@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { secureStorage } from './secureStore';
+import { isAbortLike, AI_ENDPOINT_TIMEOUT_MS } from '../utils/requestTimeout';
 import {
   User,
   AuthResponse,
@@ -257,7 +258,7 @@ class ApiService {
         userErr.name = 'AbortError';
         throw userErr;
       }
-      if (err.name === 'AbortError') {
+      if (isAbortLike(err)) {
         const seconds = Math.round(timeoutMs / 1000);
         throw new Error(`Tempo limite esgotado (${seconds}s) ao conectar no servidor (${this.baseUrl}).`);
       }
@@ -730,12 +731,14 @@ class ApiService {
   async testTrigger(id: string): Promise<TriggerTestResult> {
     return this.request<TriggerTestResult>(`/api/v1/triggers/${id}/test`, {
       method: 'POST',
+      timeoutMs: AI_ENDPOINT_TIMEOUT_MS,
     });
   }
 
   async runTrigger(id: string): Promise<TriggerLog> {
     return this.request<TriggerLog>(`/api/v1/triggers/${id}/run`, {
       method: 'POST',
+      timeoutMs: AI_ENDPOINT_TIMEOUT_MS,
     });
   }
 
