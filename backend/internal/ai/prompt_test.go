@@ -140,3 +140,22 @@ func TestBuildSystemPrompt_AutonomyMode_Proactive(t *testing.T) {
 		t.Errorf("esperava diretiva de iniciativa no modo proativo: %s", prompt)
 	}
 }
+
+func TestSystemPrompt_TokenBudget(t *testing.T) {
+	now := time.Date(2026, 10, 10, 10, 0, 0, 0, time.UTC)
+	base := ai.BuildSystemPrompt(now, "America/Sao_Paulo")
+	t.Logf("system prompt base: %d chars (~%d tokens)", len(base), len(base)/4)
+	full := ai.BuildSystemPromptFromInput(ai.UserInput{
+		Now:             now,
+		Timezone:        "America/Sao_Paulo",
+		UserName:        "André",
+		ContextMemories: []string{"[pref] Café sem açúcar"},
+		ActiveSchedule:  []string{"10/10/2026 (16:00 às 17:00): Reunião"},
+		ActiveTriggers:  []string{"[finance] PETR3"},
+	})
+	t.Logf("system prompt com contexto: %d chars (~%d tokens)", len(full), len(full)/4)
+	// Groq free: 8000 TPM por minuto; base deve deixar folga p/ histórico+memórias.
+	if len(base) > 20000 {
+		t.Errorf("base acima do orçamento (20k chars): %d", len(base))
+	}
+}
