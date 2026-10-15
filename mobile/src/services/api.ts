@@ -115,9 +115,13 @@ export async function fileUriToBase64(uri: string): Promise<string> {
 const TOKEN_KEY = '@vito_jwt_token';
 const SERVER_URL_KEY = '@vito_server_url';
 const SERVER_MANUAL_OVERRIDE_KEY = '@vito_server_manual_override_v2';
+// Servidor único: sempre a nuvem. O fallback hardcoded protege builds geradas
+// sem .env (EAS cloud), que antes caíam em http://localhost:8180 e quebravam
+// o app no Android (CLEARTEXT + host errado).
 export const PI_SERVER_URL = process.env.EXPO_PUBLIC_LOCAL_SERVER_URL || '';
-export const CLOUDFLARE_SERVER_URL = process.env.EXPO_PUBLIC_API_URL || '';
-export const DEFAULT_SERVER_URL = CLOUDFLARE_SERVER_URL || PI_SERVER_URL || 'http://localhost:8180';
+export const CLOUDFLARE_SERVER_URL =
+  process.env.EXPO_PUBLIC_API_URL || 'https://vito.rasppi.cloud';
+export const DEFAULT_SERVER_URL = CLOUDFLARE_SERVER_URL;
 
 export const isCloudServer = (url: string): boolean => {
   return url === CLOUDFLARE_SERVER_URL || (!url.includes('192.168.') && !url.includes('localhost') && !url.includes('127.0.0.1'));
@@ -151,20 +155,8 @@ class ApiService {
     if (hasManualOverride === 'true' && savedUrl) {
       this.baseUrl = savedUrl;
     } else {
-      // Fonte única de verdade: celular e computador usam o mesmo backend (nuvem).
-      // Web-localhost caía no banco do notebook e divergia do celular sem aviso.
-      const isWebLocalhost =
-        Platform.OS === 'web' &&
-        typeof window !== 'undefined' &&
-        (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-
-      if (CLOUDFLARE_SERVER_URL) {
-        this.baseUrl = CLOUDFLARE_SERVER_URL;
-      } else if (isWebLocalhost) {
-        this.baseUrl = 'http://localhost:8180';
-      } else {
-        this.baseUrl = DEFAULT_SERVER_URL;
-      }
+      // Sempre a nuvem: mesmo backend no celular e no computador.
+      this.baseUrl = CLOUDFLARE_SERVER_URL;
       await AsyncStorage.setItem(SERVER_URL_KEY, this.baseUrl);
     }
     this.token = await secureStorage.getItem(TOKEN_KEY);
@@ -178,13 +170,6 @@ class ApiService {
     this.baseUrl = url;
     await AsyncStorage.setItem(SERVER_URL_KEY, url);
     await AsyncStorage.setItem(SERVER_MANUAL_OVERRIDE_KEY, 'true');
-  }
-
-  /** Volta ao servidor automático (nuvem por padrão) e recarrega a escolha. */
-  async resetBaseUrl() {
-    await AsyncStorage.removeItem(SERVER_MANUAL_OVERRIDE_KEY);
-    await AsyncStorage.removeItem(SERVER_URL_KEY);
-    await this.init();
   }
 
   shortServerHost(): string {
@@ -246,21 +231,6 @@ class ApiService {
       const data = await res.json().catch(() => null);
 
       if (!res.ok) {
-        if (res.status === 404 && this.baseUrl !== 'http://localhost:8180' && endpoint.includes('/triggers/')) {
-          try {
-            const localRes = await fetch(`http://localhost:8180${endpoint}`, {
-              ...options,
-              headers,
-              signal: controller.signal,
-            });
-            if (localRes.ok) {
-              const localData = await localRes.json().catch(() => null);
-              return localData as T;
-            }
-          } catch {
-            // Mantém comportamento e mensagem original caso o backend local não esteja ativo
-          }
-        }
         const errorMsg = data?.error || `Erro HTTP ${res.status}`;
         const httpErr = new Error(errorMsg) as Error & { status?: number };
         httpErr.status = res.status;

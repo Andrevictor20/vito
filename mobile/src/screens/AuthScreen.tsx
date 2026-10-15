@@ -74,7 +74,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ serverUrl, onToggleServe
         msg.includes('esgotado') ||
         msg.includes('AbortError')
       ) {
-        setError(`Falha ao conectar no servidor (${serverUrl || 'vito.rasppi.cloud'}). Toque no botão acima para alternar para a Nuvem.`);
+        setError(`Falha ao conectar no servidor (${serverUrl || 'vito.rasppi.cloud'}). Verifique sua conexão com a internet.`);
       } else {
         setError(msg || 'Falha ao autenticar.');
       }
