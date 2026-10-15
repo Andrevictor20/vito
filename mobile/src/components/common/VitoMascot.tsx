@@ -210,7 +210,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#000000',
   },
   eyeDark: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#A0A6B0',
   },
 });
 
