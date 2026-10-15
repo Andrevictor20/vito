@@ -4,6 +4,7 @@ import { useTheme } from '../../context/ThemeContext';
 
 // Corpo sem olhos: a camada animada é a única fonte dos olhos (evita o bug dos 4 olhos).
 const MASCOT_BODY = require('../../../assets/mascot-body.png');
+const MASCOT_BODY_DARK = require('../../../assets/mascot-body-dark.png');
 
 // Geometria medida no canvas 512x512 do mascot.png original (centros dos olhos).
 const EYE = {
@@ -170,8 +171,11 @@ export const VitoMascot: React.FC<VitoMascotProps> = ({
   const eyeHeight = Math.max(3, size * EYE.height);
   const eyeTop = size * EYE.centerY - eyeHeight / 2;
 
+  const { isDark } = useTheme();
+
   const eyeStyle = (centerX: number) => [
     styles.eye,
+    isDark && styles.eyeDark,
     {
       width: eyeWidth,
       height: eyeHeight,
@@ -182,16 +186,11 @@ export const VitoMascot: React.FC<VitoMascotProps> = ({
     },
   ];
 
-  const { isDark } = useTheme();
-
   return (
     <View style={[styles.container, { width: size, height: size }, style]}>
       <Image
-        source={MASCOT_BODY}
-        style={[
-          { width: size, height: size },
-          isDark && styles.mascotDark,
-        ]}
+        source={isDark ? MASCOT_BODY_DARK : MASCOT_BODY}
+        style={{ width: size, height: size }}
         resizeMode="contain"
       />
       <Animated.View pointerEvents="none" style={eyeStyle(EYE.leftCenterX)} />
@@ -206,16 +205,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     position: 'relative',
   },
-  mascotDark: {
-    // Iluminação de contorno sutil (rim lighting) para não perder a cartola no fundo OLED #0B0D10
-    shadowColor: '#FFFFFF',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.35,
-    shadowRadius: 4,
-  },
   eye: {
     position: 'absolute',
     backgroundColor: '#000000',
+  },
+  eyeDark: {
+    backgroundColor: '#FFFFFF',
   },
 });
 

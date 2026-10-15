@@ -461,12 +461,8 @@ const styles = StyleSheet.create({
   },
   emptyMascotWrapper: {
     marginBottom: tokens.spacing.md,
-    // Medalão claro: o mascote PNG escuro some no fundo dark sem contraste.
-    backgroundColor: 'rgba(255, 255, 255, 0.92)',
-    borderRadius: 9999,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.06)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   emptyWelcomeTitle: {
     fontSize: tokens.typography.size.headlineSmall,
