@@ -151,13 +151,16 @@ class ApiService {
     const hasManualOverride = await AsyncStorage.getItem(SERVER_MANUAL_OVERRIDE_KEY);
     const savedUrl = await AsyncStorage.getItem(SERVER_URL_KEY);
 
-    // Se o usuário alternou manualmente na UI desta versão, respeita a escolha
-    if (hasManualOverride === 'true' && savedUrl) {
-      this.baseUrl = savedUrl;
+    // Sempre a nuvem: mesmo backend no celular e no computador.
+    // Override antigo só vale se for https (nuvem); localhost/LAN salvo de
+    // versões anteriores é descartado (causava CLEARTEXT no Android).
+    const savedIsCloud = !!savedUrl && savedUrl.startsWith('https://');
+    if (hasManualOverride === 'true' && savedIsCloud) {
+      this.baseUrl = savedUrl as string;
     } else {
-      // Sempre a nuvem: mesmo backend no celular e no computador.
       this.baseUrl = CLOUDFLARE_SERVER_URL;
       await AsyncStorage.setItem(SERVER_URL_KEY, this.baseUrl);
+      await AsyncStorage.removeItem(SERVER_MANUAL_OVERRIDE_KEY);
     }
     this.token = await secureStorage.getItem(TOKEN_KEY);
   }
