@@ -84,3 +84,15 @@ func TestConfig_GroqDefaultModel(t *testing.T) {
 		t.Errorf("env GROQ_MODEL deveria prevalecer, veio %q", cfg2.GroqModel)
 	}
 }
+
+func TestConfig_MistralDefaultModel(t *testing.T) {
+	t.Setenv("MISTRAL_API_KEY", "test-key")
+	t.Setenv("MISTRAL_MODEL", "")
+	cfg := config.Load()
+	if cfg.MistralAPIKey != "test-key" {
+		t.Errorf("MISTRAL_API_KEY deveria carregar, veio %q", cfg.MistralAPIKey)
+	}
+	if cfg.MistralModel != "ministral-8b-latest" {
+		t.Errorf("default Mistral deveria ser ministral-8b-latest, veio %q", cfg.MistralModel)
+	}
+}

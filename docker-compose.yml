@@ -22,6 +22,8 @@ services:
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
       - GROQ_API_KEY=${GROQ_API_KEY:-}
       - GROQ_MODEL=${GROQ_MODEL:-openai/gpt-oss-20b}
+      - MISTRAL_API_KEY=${MISTRAL_API_KEY:-}
+      - MISTRAL_MODEL=${MISTRAL_MODEL:-ministral-8b-latest}
       - OPENROUTER_MODEL=${OPENROUTER_MODEL:-nvidia/nemotron-3.5-lightning:free}
       - JWT_SECRET=${JWT_SECRET:-}
       - DATA_ENCRYPTION_KEY=${DATA_ENCRYPTION_KEY:-}

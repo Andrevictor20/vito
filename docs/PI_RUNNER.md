@@ -47,6 +47,8 @@ JWT_SECRET=<mínimo 32 chars aleatórios>
 DATA_ENCRYPTION_KEY=<mínimo 32 chars aleatórios, diferente do JWT_SECRET>
 SHORTIO_API_KEY=<sua chave Short.io>
 SHORTIO_DOMAIN=vito.s.gy
+MISTRAL_API_KEY=<sua chave Mistral (La Plateforme, free mode)>
+# MISTRAL_MODEL opcional (default: ministral-8b-latest)
 PUBLIC_BASE_URL=https://vito.rasppi.cloud
 GOOGLE_REDIRECT_URL=https://vito.rasppi.cloud/api/v1/auth/google/callback
 # Origens de browser autorizadas (SEC-03). Sem esta var, produção só aceita o

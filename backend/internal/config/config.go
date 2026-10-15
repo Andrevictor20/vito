@@ -20,6 +20,8 @@ type Config struct {
 	OpenRouterModel    string
 	GroqAPIKey         string
 	GroqModel          string
+	MistralAPIKey       string
+	MistralModel        string
 	GoogleClientID     string
 	GoogleClientSecret string
 	GoogleRedirectURL  string
@@ -75,6 +77,11 @@ func Load() *Config {
 	if openRouterModel == "" {
 		openRouterModel = "nvidia/nemotron-3.5-lightning:free"
 	}
+	// Mistral La Plateforme (4º elo): default pequeno e rápido (IDs 2512 válidos).
+	mistralModel := os.Getenv("MISTRAL_MODEL")
+	if mistralModel == "" {
+		mistralModel = "ministral-8b-latest"
+	}
 
 	dataKey := os.Getenv("DATA_ENCRYPTION_KEY")
 	if dataKey == "" {
@@ -108,6 +115,8 @@ func Load() *Config {
 		OpenRouterModel:    openRouterModel,
 		GroqAPIKey:         os.Getenv("GROQ_API_KEY"),
 		GroqModel:          groqModel,
+		MistralAPIKey:       os.Getenv("MISTRAL_API_KEY"),
+		MistralModel:        mistralModel,
 		GoogleClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
 		GoogleClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
 		GoogleRedirectURL:  googleRedirectURL,

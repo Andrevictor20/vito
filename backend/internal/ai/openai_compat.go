@@ -51,6 +51,22 @@ func NewGroqProvider(apiKey, model string) *OpenAICompatProvider {
 	}
 }
 
+// NewMistralProvider instancia o provedor para o Mistral La Plateforme
+// (4º elo: free mode sem cartão, IDs 2512).
+func NewMistralProvider(apiKey, model string) *OpenAICompatProvider {
+	if model == "" {
+		// Mesmo default de MISTRAL_MODEL em config.go.
+		model = "ministral-8b-latest"
+	}
+	return &OpenAICompatProvider{
+		providerName: "Mistral (" + model + ")",
+		baseURL:      "https://api.mistral.ai/v1/chat/completions",
+		apiKey:       apiKey,
+		model:        model,
+		httpClient:   &http.Client{Timeout: 30 * time.Second},
+	}
+}
+
 // NewOpenAICompatProviderForTest cria uma instância com cliente customizado para testes.
 func NewOpenAICompatProviderForTest(name, baseURL, apiKey, model string, client *http.Client) *OpenAICompatProvider {
 	if client == nil {

@@ -60,6 +60,10 @@ func main() {
 		log.Printf("🤖 [AI Provider] Groq Cloud primário (%s).", cfg.GroqModel)
 		aiProviders = append(aiProviders, ai.NewGroqProvider(cfg.GroqAPIKey, cfg.GroqModel))
 	}
+	if cfg.MistralAPIKey != "" {
+		log.Printf("🤖 [AI Provider] Mistral La Plateforme (%s).", cfg.MistralModel)
+		aiProviders = append(aiProviders, ai.NewMistralProvider(cfg.MistralAPIKey, cfg.MistralModel))
+	}
 	if cfg.GeminiAPIKey != "" {
 		log.Printf("🤖 [AI Provider] Google AI Studio como fallback (%s).", cfg.GeminiModel)
 		geminiProv = ai.NewGeminiProvider(cfg.GeminiAPIKey, cfg.GeminiModel)
@@ -116,7 +120,7 @@ func main() {
 	reminderWorker.Start()
 	defer reminderWorker.Stop()
 
-	// Worker em segundo plano para vigília autônoma de disparadores com cascata completa de IA (Groq -> Gemini -> OpenRouter)
+	// Worker em segundo plano para vigília autônoma de disparadores com cascata completa de IA (Groq -> Mistral -> Gemini -> OpenRouter)
 	var triggerEvaluator service.TriggerEvaluator = &service.DefaultTriggerEvaluator{}
 	if len(aiProviders) > 0 {
 		triggerEvaluator = service.NewAITriggerEvaluator(func(ctx context.Context, t *domain.Trigger) (*domain.TriggerTestResult, error) {
