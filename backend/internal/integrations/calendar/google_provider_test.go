@@ -443,4 +443,44 @@ func TestGoogleProvider_CreateUpdateDelete_EscapedCalendarID(t *testing.T) {
 	}
 }
 
+func TestGoogleProvider_FetchEvents_AllDayBRTMidnight(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp := map[string]interface{}{
+			"items": []map[string]interface{}{
+				{
+					"id":      "evt-feriado",
+					"summary": "Dia do Professor",
+					"status":  "confirmed",
+					"start":   map[string]string{"date": "2026-10-15"},
+					"end":     map[string]string{"date": "2026-10-16"},
+				},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer ts.Close()
+
+	provider := calendar.NewGoogleProvider(calendar.GoogleConfig{
+		BaseURL:    ts.URL,
+		HTTPClient: ts.Client(),
+	})
+
+	res, err := provider.FetchEvents(context.Background(), "token", "single-cal", "", time.Now(), time.Now().Add(24*time.Hour))
+	if err != nil {
+		t.Fatalf("fetch events failed: %v", err)
+	}
+	if len(res.Items) != 1 {
+		t.Fatalf("esperava 1 item, obteve %d", len(res.Items))
+	}
+	item := res.Items[0]
+	brt := time.FixedZone("BRT", -3*3600)
+	if got := item.StartAt.In(brt).Day(); got != 15 {
+		t.Errorf("all-day deveria começar dia 15 em BRT, veio %v (%v)", got, item.StartAt)
+	}
+	if got := item.StartAt.Hour(); got != 3 {
+		t.Errorf("all-day deveria ser 03:00Z (meia-noite BRT), veio %02d:00Z", got)
+	}
+}
+
 

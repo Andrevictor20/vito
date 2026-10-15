@@ -14,7 +14,7 @@ import { tokens, MD3Shapes } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { BottomSheetModal } from '../ui/BottomSheetModal';
 import { Event } from '../../types';
-import { parseSafeDate } from '../../utils/calendarDateUtils';
+import { parseSafeDate, isHolidayReadOnly } from '../../utils/calendarDateUtils';
 
 interface EditEventModalProps {
   visible: boolean;
@@ -74,6 +74,9 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
   }, [event, isRecurring]);
 
   if (!event) return null;
+
+  // Feriados são somente-leitura (P3): o modal nem abre.
+  if (isHolidayReadOnly(event)) return null;
 
   let eventDateLabel: string | undefined;
   try {

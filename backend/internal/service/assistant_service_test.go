@@ -97,6 +97,57 @@ func TestAssistantService_ProcessText(t *testing.T) {
 	}
 }
 
+func TestAssistantService_QueryScheduleListsEvents(t *testing.T) {
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "test_schedule.db")
+	db, err := database.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+
+	userID := "user-sched-1"
+	_ = repository.NewUserRepository(db).Create(&domain.User{
+		ID: userID, Name: "André", Email: "a@s.local",
+		PasswordHash: "h", CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
+	})
+	eventRepo := repository.NewEventRepository(db)
+	calSvc := service.NewCalendarService(eventRepo)
+
+	now := time.Now().UTC()
+	dayStart := now.Truncate(24 * time.Hour)
+	// 11:00Z = 08:00 BRT; fim 14:15Z = 11:15 BRT.
+	start := dayStart.Add(11 * time.Hour)
+	if _, _, err := calSvc.CreateEvent(userID, "Aula de inglês", "", "", start, start.Add(3*time.Hour+15*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+
+	mockAI := &mockAIGateway{intent: &ai.ParsedIntent{Action: ai.ActionQuerySchedule, Message: ""}}
+	astSvc := service.NewAssistantService(mockAI, calSvc, nil, nil)
+
+	resp, err := astSvc.Process(context.Background(), userID, ai.UserInput{Text: "O que tenho na agenda hoje?", Now: now, Timezone: "America/Sao_Paulo"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(resp.Message, "(s)") {
+		t.Errorf("plural quebrado com (s): %q", resp.Message)
+	}
+	if !strings.Contains(resp.Message, "Aula de inglês") {
+		t.Errorf("resposta deveria listar o compromisso: %q", resp.Message)
+	}
+	if !strings.Contains(resp.Message, "08:00") || !strings.Contains(resp.Message, "11:15") {
+		t.Errorf("resposta deveria citar os horários locais: %q", resp.Message)
+	}
+
+	respEmpty, err := astSvc.Process(context.Background(), "user-vazio", ai.UserInput{Text: "agenda hoje?", Now: now})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(respEmpty.Message, "nenhum compromisso") {
+		t.Errorf("sem eventos deveria manter frase de vazio: %q", respEmpty.Message)
+	}
+}
+
 func TestAssistantService_EmptyInputReturnsGreeting(t *testing.T) {
 	astSvc, _, _, userID := setupAssistantTest(t)
 

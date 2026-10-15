@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { isAllDayEvent, isEventOnDate, getEventDays, formatEventTimeRange } from './calendarDateUtils';
+import { isAllDayEvent, isEventOnDate, getEventDays, formatEventTimeRange, badgeDayMonthUTC, isHolidayReadOnly } from './calendarDateUtils';
 import { Event } from '../types';
 
 describe('Calendar Date Utils & All-Day / Holiday Detection (TDD)', () => {
@@ -87,3 +87,20 @@ describe('Calendar Date Utils & All-Day / Holiday Detection (TDD)', () => {
     });
   });
 });
+
+  describe('badgeDayMonthUTC', () => {
+    test('linha legada 00:00Z mantém o dia civil', () => {
+      assert.deepEqual(badgeDayMonthUTC('2026-10-15T00:00:00Z', true), { day: '15', month: 'out' });
+    });
+    test('linha nova 03:00Z mantém o dia civil', () => {
+      assert.deepEqual(badgeDayMonthUTC('2026-10-15T03:00:00Z', true), { day: '15', month: 'out' });
+    });
+  });
+
+  describe('isHolidayReadOnly', () => {
+    test('feriado trava, resto libera', () => {
+      assert.equal(isHolidayReadOnly({ category: 'holiday' }), true);
+      assert.equal(isHolidayReadOnly({ category: 'work' }), false);
+      assert.equal(isHolidayReadOnly(null), false);
+    });
+  });

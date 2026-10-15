@@ -39,7 +39,8 @@ func respondError(w http.ResponseWriter, err error) {
 		w.WriteHeader(http.StatusConflict)
 		_ = json.NewEncoder(w).Encode(apiError{Error: apiErrorBody{Code: "conflict", Message: err.Error()}})
 	case errors.Is(err, domain.ErrValidation),
-		errors.Is(err, domain.ErrInvalidAutonomyMode):
+		errors.Is(err, domain.ErrInvalidAutonomyMode),
+		errors.Is(err, domain.ErrHolidayReadOnly):
 		w.WriteHeader(http.StatusUnprocessableEntity)
 		_ = json.NewEncoder(w).Encode(apiError{Error: apiErrorBody{Code: "validation", Message: err.Error()}})
 	default:

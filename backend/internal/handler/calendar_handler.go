@@ -198,7 +198,7 @@ func (h *CalendarHandler) DeleteEvent(w http.ResponseWriter, r *http.Request) {
 	allSeries := r.URL.Query().Get("all_series") == "true"
 
 	if _, err := h.calSvc.DeleteEventWithOption(eventID, userID, allSeries); err != nil {
-		if err == domain.ErrEventNotFound {
+		if err == domain.ErrEventNotFound || err == domain.ErrHolidayReadOnly {
 			respondError(w, err)
 			return
 		}

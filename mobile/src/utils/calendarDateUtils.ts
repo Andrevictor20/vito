@@ -23,6 +23,31 @@ export const toLocalDateString = (d: Date): string => {
   return `${y}-${m}-${day}`;
 };
 
+const MESES_PT_CURTO = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+
+/**
+ * Dia/mês do badge para eventos de dia inteiro (P2): usa o dia civil em UTC,
+ * imune ao fuso do aparelho. Cobre linhas legadas 00:00Z e novas 03:00Z.
+ */
+export const badgeDayMonthUTC = (iso: string, allDay: boolean): { day: string; month: string } => {
+  const d = parseSafeDate(iso);
+  if (!allDay) {
+    return {
+      day: String(d.getDate()).padStart(2, '0'),
+      month: MESES_PT_CURTO[d.getMonth()],
+    };
+  }
+  return {
+    day: String(d.getUTCDate()).padStart(2, '0'),
+    month: MESES_PT_CURTO[d.getUTCMonth()],
+  };
+};
+
+/** Feriados (qualquer origem) são somente-leitura (P3). */
+export const isHolidayReadOnly = (event?: Partial<Event> | null): boolean => {
+  return event?.category === 'holiday';
+};
+
 export const createDateKey = (year: number, month: number, day: number): string => {
   const m = String(month + 1).padStart(2, '0');
   const d = String(day).padStart(2, '0');

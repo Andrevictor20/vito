@@ -9,6 +9,8 @@ var (
 	ErrEventNotFound  = errors.New("evento não encontrado")
 	ErrInvalidEvent   = errors.New("dados de evento inválidos")
 	ErrScheduleConflict = errors.New("conflito de horário detectado")
+	// ErrHolidayReadOnly bloqueia edição/exclusão de feriados (P3: somente-leitura).
+	ErrHolidayReadOnly = errors.New("feriados são somente leitura")
 )
 
 // Event representa um compromisso ou bloco de tempo na agenda.

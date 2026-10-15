@@ -186,6 +186,11 @@ func (s *CalendarService) ListEventsPaged(userID string, from, to time.Time, lim
 
 // DeleteEvent remove um evento pertencente ao usuário.
 func (s *CalendarService) DeleteEvent(id, userID string) error {
+	if stored, err := s.eventRepo.GetByID(id, userID); err == nil {
+		if err := rejectHolidayChange(stored); err != nil {
+			return err
+		}
+	}
 	if s.syncPusher != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		_ = s.syncPusher.DeleteEvent(ctx, userID, id)
@@ -197,6 +202,11 @@ func (s *CalendarService) DeleteEvent(id, userID string) error {
 // DeleteEventWithOption remove um evento individual ou toda a série recorrente.
 // Com allSeries=true apaga TUDO (backend + Google + mappings) para não restar notificação órfã.
 func (s *CalendarService) DeleteEventWithOption(id, userID string, allSeries bool) (int, error) {
+	if stored, err := s.eventRepo.GetByID(id, userID); err == nil {
+		if err := rejectHolidayChange(stored); err != nil {
+			return 0, err
+		}
+	}
 	if allSeries {
 		// Lista IDs da série ANTES de apagar para propagar cada um ao Google.
 		orig, err := s.eventRepo.GetByID(id, userID)
@@ -232,6 +242,11 @@ func (s *CalendarService) DeleteEventWithOption(id, userID string, allSeries boo
 func (s *CalendarService) UpdateEvent(userID string, event *domain.Event, updateSeries bool) (*domain.Event, int, error) {
 	if event.Title == "" {
 		return nil, 0, errors.New("o título do evento é obrigatório")
+	}
+	if stored, err := s.eventRepo.GetByID(event.ID, userID); err == nil {
+		if err := rejectHolidayChange(stored); err != nil {
+			return nil, 0, err
+		}
 	}
 	if event.EndAt.Before(event.StartAt) || event.EndAt.Equal(event.StartAt) {
 		return nil, 0, errors.New("o horário de término deve ser após o início")
@@ -270,6 +285,38 @@ func (s *CalendarService) UpdateEvent(userID string, event *domain.Event, update
 	return event, 1, nil
 }
 
+// rejectHolidayChange barra edição/exclusão de feriados (P3: somente-leitura).
+func rejectHolidayChange(ev *domain.Event) error {
+	if ev != nil && ev.Category == "holiday" {
+		return domain.ErrHolidayReadOnly
+	}
+	return nil
+}
+
+// titleMatchesHolidays informa se o termo só encontra feriados (P3).
+func (s *CalendarService) titleMatchesHolidays(userID, titleQuery string) bool {
+	clean := strings.ToLower(strings.TrimSpace(titleQuery))
+	if clean == "" {
+		return false
+	}
+	from := time.Now().Add(-365 * 24 * time.Hour)
+	to := time.Now().Add(365 * 24 * time.Hour)
+	events, err := s.eventRepo.ListByUser(userID, from, to)
+	if err != nil {
+		return false
+	}
+	found := false
+	for _, ev := range events {
+		if strings.Contains(strings.ToLower(ev.Title), clean) {
+			found = true
+			if ev.Category != "holiday" {
+				return false
+			}
+		}
+	}
+	return found
+}
+
 // DeleteEventsByTitle remove eventos que correspondam ao termo de busca (para comandos de voz/chat).
 func (s *CalendarService) DeleteEventsByTitle(userID, titleQuery string) (int, error) {
 	if s.syncPusher != nil {
@@ -280,6 +327,9 @@ func (s *CalendarService) DeleteEventsByTitle(userID, titleQuery string) (int, e
 			cleanQuery := strings.ToLower(strings.TrimSpace(titleQuery))
 			for _, ev := range events {
 				if strings.Contains(strings.ToLower(ev.Title), cleanQuery) {
+					if ev.Category == "holiday" {
+						continue // feriado nunca propaga delete (P3)
+					}
 					ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 					_ = s.syncPusher.DeleteEvent(ctx, userID, ev.ID)
 					cancel()
@@ -287,14 +337,28 @@ func (s *CalendarService) DeleteEventsByTitle(userID, titleQuery string) (int, e
 			}
 		}
 	}
-	return s.eventRepo.DeleteByTitle(userID, titleQuery)
+	n, err := s.eventRepo.DeleteByTitle(userID, titleQuery)
+	if err != nil {
+		return n, err
+	}
+	if n == 0 && s.titleMatchesHolidays(userID, titleQuery) {
+		return 0, domain.ErrHolidayReadOnly
+	}
+	return n, nil
 }
 
 // UpdateEventTimesByTitle ajusta o horário de início e término dos eventos que correspondam ao título.
 func (s *CalendarService) UpdateEventTimesByTitle(userID, titleQuery string, newStart, newEnd time.Time) (int, error) {
 	count, err := s.eventRepo.UpdateTimesByTitle(userID, titleQuery, newStart, newEnd)
-	if err != nil || count == 0 {
+	if err != nil {
+		// O repo filtra feriados antes de contar: ausência total pode ser só-feriado (P3).
+		if err == domain.ErrEventNotFound && s.titleMatchesHolidays(userID, titleQuery) {
+			return 0, domain.ErrHolidayReadOnly
+		}
 		return count, err
+	}
+	if count == 0 && s.titleMatchesHolidays(userID, titleQuery) {
+		return 0, domain.ErrHolidayReadOnly
 	}
 
 	if s.syncPusher != nil {
@@ -305,6 +369,9 @@ func (s *CalendarService) UpdateEventTimesByTitle(userID, titleQuery string, new
 			cleanQuery := strings.ToLower(strings.TrimSpace(titleQuery))
 			for _, ev := range events {
 				if strings.Contains(strings.ToLower(ev.Title), cleanQuery) {
+					if ev.Category == "holiday" {
+						continue // feriado nunca é reescrito nem propagado (P3)
+					}
 					evCopy := ev
 					go func(evt *domain.Event) {
 						ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)

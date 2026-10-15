@@ -4,7 +4,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { tokens, MD3Shapes, tabularNumbers } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { Event } from '../../types';
-import { isAllDayEvent } from '../../utils/calendarDateUtils';
+import { isAllDayEvent, badgeDayMonthUTC, isHolidayReadOnly } from '../../utils/calendarDateUtils';
 
 interface EventCardProps {
   event: Event;
@@ -38,9 +38,10 @@ export const EventCard: React.FC<EventCardProps> = ({
   let dayNum = '';
   let monthShort = '';
   try {
-    const startDate = new Date(event.start_at);
-    dayNum = startDate.toLocaleDateString('pt-BR', { day: '2-digit' });
-    monthShort = startDate.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
+    // All-day usa o dia civil em UTC (P2): imune ao fuso do aparelho.
+    const badge = badgeDayMonthUTC(event.start_at, isAllDay);
+    dayNum = badge.day;
+    monthShort = badge.month;
   } catch {
     dayNum = '';
     monthShort = '';
@@ -112,6 +113,9 @@ export const EventCard: React.FC<EventCardProps> = ({
   const isHolidayCard = category.label === 'FERIADO';
   const isGoogle = event.source === 'google';
   const isRecurring = event.is_recurring || !!event.recurrence;
+  // Feriados são somente-leitura (P3): sem excluir, sem abrir edição.
+  const readOnly = isHolidayReadOnly(event);
+  const canPress = !!onPress && !readOnly;
 
   const handleDeletePress = () => {
     if (onRequestDelete) {
@@ -123,10 +127,10 @@ export const EventCard: React.FC<EventCardProps> = ({
 
   return (
     <TouchableOpacity
-      activeOpacity={onPress ? 0.85 : 1}
-      onPress={onPress ? () => onPress(event) : undefined}
-      accessibilityRole={onPress ? 'button' : undefined}
-      accessibilityLabel={onPress ? `Abrir detalhes de ${event.title}` : event.title}
+      activeOpacity={canPress ? 0.85 : 1}
+      onPress={canPress && onPress ? () => onPress(event) : undefined}
+      accessibilityRole={canPress ? 'button' : undefined}
+      accessibilityLabel={canPress ? `Abrir detalhes de ${event.title}` : `${event.title} (feriado, somente leitura)`}
       style={[
         styles.card,
         {
@@ -193,14 +197,16 @@ export const EventCard: React.FC<EventCardProps> = ({
 
       {/* Coluna direita: excluir no topo, chevron centralizado — alinhados no mesmo eixo */}
       <View style={styles.rightCol}>
-        <TouchableOpacity
-          style={styles.deleteButton}
-          onPress={handleDeletePress}
-          hitSlop={tokens.hitSlop.sm}
-          accessibilityLabel="Excluir compromisso"
-        >
-          <MaterialIcons name="close" size={15} color={colors.onSurfaceVariant} />
-        </TouchableOpacity>
+        {!readOnly && (
+          <TouchableOpacity
+            style={styles.deleteButton}
+            onPress={handleDeletePress}
+            hitSlop={tokens.hitSlop.sm}
+            accessibilityLabel="Excluir compromisso"
+          >
+            <MaterialIcons name="close" size={15} color={colors.onSurfaceVariant} />
+          </TouchableOpacity>
+        )}
         {onPress && !isHolidayCard ? (
           <View style={styles.chevron}>
             <MaterialIcons name="chevron-right" size={18} color={colors.onSurfaceVariant} />

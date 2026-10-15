@@ -392,7 +392,7 @@ func (r *EventRepositorySQLite) DeleteByTitle(userID, titleQuery string) (int, e
 		return 0, errors.New("termo para exclusão não pode ser vazio")
 	}
 
-	query := `DELETE FROM events WHERE user_id = ? AND LOWER(title) LIKE '%' || LOWER(?) || '%'`
+	query := `DELETE FROM events WHERE user_id = ? AND LOWER(title) LIKE '%' || LOWER(?) || '%' AND COALESCE(category, '') != 'holiday'`
 	res, err := r.db.Exec(query, userID, clean)
 	if err != nil {
 		return 0, err
@@ -411,7 +411,7 @@ func (r *EventRepositorySQLite) UpdateTimesByTitle(userID, titleQuery string, ne
 		return 0, errors.New("termo para atualização não pode ser vazio")
 	}
 
-	querySelect := `SELECT id, start_at FROM events WHERE user_id = ? AND LOWER(title) LIKE '%' || LOWER(?) || '%'`
+	querySelect := `SELECT id, start_at, COALESCE(category, '') FROM events WHERE user_id = ? AND LOWER(title) LIKE '%' || LOWER(?) || '%'`
 	rows, err := r.db.Query(querySelect, userID, clean)
 	if err != nil {
 		return 0, err
@@ -419,14 +419,20 @@ func (r *EventRepositorySQLite) UpdateTimesByTitle(userID, titleQuery string, ne
 	defer rows.Close()
 
 	type evItem struct {
-		id      string
-		startAt time.Time
+		id       string
+		startAt  time.Time
+		category string
 	}
 	var items []evItem
 	for rows.Next() {
 		var id string
 		var rawStart any
-		if err := rows.Scan(&id, &rawStart); err == nil {
+		var cat string
+		if err := rows.Scan(&id, &rawStart, &cat); err == nil {
+			// Feriados são somente-leitura (P3): nunca têm horário alterado em massa.
+			if cat == "holiday" {
+				continue
+			}
 			items = append(items, evItem{id: id, startAt: parseDBTime(rawStart)})
 		}
 	}

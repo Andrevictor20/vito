@@ -479,7 +479,26 @@ func (s *AssistantService) Process(ctx context.Context, userID string, input ai.
 			if len(events) == 0 {
 				res.Message = "Você não tem nenhum compromisso agendado para hoje."
 			} else {
-				res.Message = fmt.Sprintf("Você tem %d compromisso(s) para hoje.", len(events))
+				// Lista o quê (não só quantos): responde "qual compromisso?" de uma vez.
+				loc := userLocation(input.Timezone)
+				noun := "compromisso"
+				if len(events) > 1 {
+					noun = "compromissos"
+				}
+				parts := make([]string, 0, len(events))
+				for _, ev := range events {
+					if IsAllDayEvent(ev) {
+						parts = append(parts, fmt.Sprintf("%s (Dia inteiro)", ev.Title))
+					} else {
+						start := ev.StartAt.In(loc).Format("15:04")
+						end := ""
+						if !ev.EndAt.IsZero() && ev.EndAt.After(ev.StartAt) {
+							end = "–" + ev.EndAt.In(loc).Format("15:04")
+						}
+						parts = append(parts, fmt.Sprintf("%s, %s%s", ev.Title, start, end))
+					}
+				}
+				res.Message = fmt.Sprintf("Você tem %d %s hoje: %s.", len(events), noun, strings.Join(parts, "; "))
 			}
 			res.Reply = res.Message
 		} else {
