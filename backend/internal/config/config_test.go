@@ -70,3 +70,17 @@ func TestConfig_AllowedOrigins(t *testing.T) {
 		t.Errorf("produção deveria cair para PUBLIC_BASE_URL, veio %v", got)
 	}
 }
+
+func TestConfig_GroqDefaultModel(t *testing.T) {
+	t.Setenv("GROQ_MODEL", "")
+	cfg := config.Load()
+	if cfg.GroqModel != "openai/gpt-oss-20b" {
+		t.Errorf("default Groq deveria ser openai/gpt-oss-20b (llama-3.3 aposentado), veio %q", cfg.GroqModel)
+	}
+
+	t.Setenv("GROQ_MODEL", "custom/model")
+	cfg2 := config.Load()
+	if cfg2.GroqModel != "custom/model" {
+		t.Errorf("env GROQ_MODEL deveria prevalecer, veio %q", cfg2.GroqModel)
+	}
+}

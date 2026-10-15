@@ -122,7 +122,7 @@ func (h *AssistantHandler) Chat(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		log.Printf("❌ [Assistant] falha ao processar comando (user=%s): %v", userID, err)
-		_ = json.NewEncoder(w).Encode(map[string]string{"error": assistantFriendlyError})
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": ai.FriendlyAIMessage(ai.ClassifyAIError(err))})
 		return
 	}
 
@@ -130,7 +130,6 @@ func (h *AssistantHandler) Chat(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(resp)
 }
 
-// AudioChat processa um arquivo de áudio enviado via multipart/form-data, transcreve com Whisper e processa o comando.
 // AudioChat processa um arquivo de áudio enviado via multipart/form-data ou payload JSON com audio_b64.
 // Transcreve com Whisper e processa o comando, aplicando fallback para áudio nativo se necessário.
 func (h *AssistantHandler) AudioChat(w http.ResponseWriter, r *http.Request) {
@@ -247,7 +246,7 @@ func (h *AssistantHandler) AudioChat(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		log.Printf("❌ [AudioChat] falha ao processar comando (user=%s): %v", userID, err)
-		_ = json.NewEncoder(w).Encode(map[string]string{"error": assistantFriendlyError, "transcript": transcript})
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": ai.FriendlyAIMessage(ai.ClassifyAIError(err)), "transcript": transcript})
 		return
 	}
 
@@ -267,10 +266,6 @@ func (h *AssistantHandler) AudioChat(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(responseMap)
 }
-
-// assistantFriendlyError evita vazar detalhes internos (stack de provedores/JSON bruto) no chat,
-// mas explica que nada foi criado/apagado e orienta a reformular com detalhes.
-const assistantFriendlyError = "Não consegui processar agora por instabilidade na IA ou na rede. Nada foi criado ou apagado. Tente de novo em instantes com mais detalhes (ex: 'Criar evento Dentista amanhã às 14h')."
 
 // VisionChat processa upload de imagem (recibos, fotos de documentos ou anotações) via multipart/form-data ou JSON com image_b64.
 func (h *AssistantHandler) VisionChat(w http.ResponseWriter, r *http.Request) {
@@ -373,7 +368,7 @@ func (h *AssistantHandler) VisionChat(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		log.Printf("❌ [Assistant] falha ao processar comando (user=%s): %v", userID, err)
-		_ = json.NewEncoder(w).Encode(map[string]string{"error": assistantFriendlyError})
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": ai.FriendlyAIMessage(ai.ClassifyAIError(err))})
 		return
 	}
 
