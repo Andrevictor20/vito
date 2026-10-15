@@ -19,7 +19,7 @@ import { ProfileSettingsGroup } from '../components/profile/ProfileSettingsGroup
 import { NotificationSettingsModal } from '../components/notifications/NotificationSettingsModal';
 import { CalendarSyncSettingsModal } from '../components/profile/CalendarSyncSettingsModal';
 import { AISettingsModal } from '../components/profile/AISettingsModal';
-import { api } from '../services/api';
+import { api, CLOUDFLARE_SERVER_URL, PI_SERVER_URL } from '../services/api';
 import { notificationService } from '../services/notificationService';
 import { calendarSyncService } from '../services/calendarSyncService';
 import type { AutonomyMode } from '../types';
@@ -42,6 +42,57 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const [syncVisible, setSyncVisible] = useState(false);
   const [aiVisible, setAiVisible] = useState(false);
   const [checking, setChecking] = useState(false);
+  const [serverHost, setServerHost] = useState(api.shortServerHost());
+
+  const reloadServerHost = useCallback(() => {
+    setServerHost(api.shortServerHost());
+  }, []);
+
+  useEffect(() => {
+    reloadServerHost();
+  }, [reloadServerHost]);
+
+  const shortUrl = (url: string) => url.replace(/^https?:\/\//, '').replace(/\/$/, '');
+
+  const handleSwitchServer = () => {
+    const refreshAfterSwitch = () => {
+      reloadServerHost();
+      onRefresh?.();
+      onDataChanged?.();
+    };
+    Alert.alert(
+      'Servidor Conectado',
+      `Atual: ${serverHost}\nCelular e computador precisam apontar para o mesmo servidor para ver os mesmos dados.`,
+      [
+        ...(CLOUDFLARE_SERVER_URL
+          ? [{
+              text: `Nuvem (${shortUrl(CLOUDFLARE_SERVER_URL)})`,
+              onPress: async () => {
+                await api.setBaseUrl(CLOUDFLARE_SERVER_URL);
+                refreshAfterSwitch();
+              },
+            }]
+          : []),
+        ...(PI_SERVER_URL
+          ? [{
+              text: `Rede local (${shortUrl(PI_SERVER_URL)})`,
+              onPress: async () => {
+                await api.setBaseUrl(PI_SERVER_URL);
+                refreshAfterSwitch();
+              },
+            }]
+          : []),
+        {
+          text: 'Automático (nuvem)',
+          onPress: async () => {
+            await api.resetBaseUrl();
+            refreshAfterSwitch();
+          },
+        },
+        { text: 'Voltar', style: 'cancel' },
+      ],
+    );
+  };
 
   const name = user?.name || 'Andre Victor';
   const email = user?.email || 'andre@vito.ai';
@@ -193,6 +244,31 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 <MaterialIcons name="chevron-right" size={20} color={colors.outline} />
               </>
             )}
+          </View>
+        </TouchableOpacity>
+
+        <View style={[styles.divider, { backgroundColor: colors.outlineVariant }]} />
+
+        <TouchableOpacity
+          style={styles.groupItem}
+          onPress={handleSwitchServer}
+          activeOpacity={0.8}
+          accessibilityLabel="Servidor conectado, toque para trocar"
+          accessibilityRole="button"
+        >
+          <View style={styles.actionLeft}>
+            <View style={[styles.itemIconBox, { backgroundColor: colors.surfaceContainerHigh }]}>
+              <MaterialIcons name="dns" size={18} color={colors.primary} />
+            </View>
+            <View style={styles.itemTextCol}>
+              <Text style={[styles.actionText, { color: colors.onSurface }]}>Servidor Conectado</Text>
+              <Text style={[styles.itemSub, { color: colors.textSecondary }]} numberOfLines={1}>
+                {serverHost || 'automático'}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.itemRight}>
+            <MaterialIcons name="chevron-right" size={20} color={colors.outline} />
           </View>
         </TouchableOpacity>
 

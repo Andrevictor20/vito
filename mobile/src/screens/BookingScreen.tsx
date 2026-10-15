@@ -14,8 +14,10 @@ import {
   StatusBar as RNStatusBar,
   BackHandler,
   Share,
+  Alert,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { useFocusEffect } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens, MD3Shapes, tabularNumbers } from '../theme/tokens';
 import { useTheme } from '../context/ThemeContext';
@@ -134,6 +136,10 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack, createRequ
   const [newBuffer, setNewBuffer] = useState(10);
   const [newStartHour, setNewStartHour] = useState('09:00');
   const [newEndHour, setNewEndHour] = useState('18:00');
+  const [newValidity, setNewValidity] = useState<'7d' | '14d' | '30d' | 'none'>('7d');
+  const [newDaysMode, setNewDaysMode] = useState<'week' | 'dates'>('week');
+  const [newWeekDays, setNewWeekDays] = useState<number[]>([1, 2, 3, 4, 5]);
+  const [newSpecificDates, setNewSpecificDates] = useState<string[]>([]);
   const [timePickerTarget, setTimePickerTarget] = useState<'start' | 'end' | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deletingAppointmentId, setDeletingAppointmentId] = useState<string | null>(null);
@@ -147,16 +153,31 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack, createRequ
 
   const handleDeleteAppointment = async (appt: BookingAppointment) => {
     hapticFeedback.medium();
-    try {
-      setDeletingAppointmentId(appt.id);
-      await api.deleteBookingAppointment(appt.id);
-      hapticFeedback.success();
-      setAppointments((prev) => prev.filter((a) => a.id !== appt.id));
-    } catch (err: any) {
-      console.warn('[BookingScreen] Falha ao cancelar agendamento:', err);
-    } finally {
-      setDeletingAppointmentId(null);
-    }
+    const dateObj = new Date(appt.start_at);
+    const when = `${dateObj.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} às ${dateObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+    Alert.alert(
+      'Cancelar agendamento',
+      `${appt.guest_name} em ${when} será removido da sua agenda. Continuar?`,
+      [
+        { text: 'Voltar', style: 'cancel' },
+        {
+          text: 'Remover',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setDeletingAppointmentId(appt.id);
+              await api.deleteBookingAppointment(appt.id);
+              hapticFeedback.success();
+              setAppointments((prev) => prev.filter((a) => a.id !== appt.id));
+            } catch (err: any) {
+              console.warn('[BookingScreen] Falha ao cancelar agendamento:', err);
+            } finally {
+              setDeletingAppointmentId(null);
+            }
+          },
+        },
+      ],
+    );
   };
 
   // Intercepta botão voltar do hardware no Android.
@@ -203,6 +224,13 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack, createRequ
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Abas ficam montadas: recarrega ao focar para convergir com outros devices.
+  useFocusEffect(
+    React.useCallback(() => {
+      loadData();
+    }, [loadData])
+  );
 
   useEffect(() => dataSync.subscribe('refresh_bookings', () => { loadData(); }), [loadData]);
 
@@ -252,16 +280,79 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack, createRequ
     }
   };
 
-  // Remove tipo de agendamento
+  // Remove link de agendamento (cascata: confirmações + eventos da agenda).
   const handleDeleteType = async (id: string) => {
     hapticFeedback.medium();
-    setTypes((prev) => prev.filter((item) => item.id !== id));
-    try {
-      await api.deleteBookingType(id);
-    } catch (err) {
-      loadData();
-    }
+    const target = types.find((t) => t.id === id);
+    const linked = appointments.filter((a) => a.booking_type_id === id);
+    const upcoming = linked.filter((a) => new Date(a.start_at).getTime() >= Date.now()).length;
+    const noun = linked.length === 1 ? 'confirmação' : 'confirmações';
+    Alert.alert(
+      'Apagar link',
+      `Isso vai apagar "${target?.title ?? 'este link'}" e remover ${linked.length} ${noun} da sua agenda${upcoming > 0 ? ` (${upcoming} futura${upcoming === 1 ? '' : 's'})` : ''}. Continuar?`,
+      [
+        { text: 'Voltar', style: 'cancel' },
+        {
+          text: 'Apagar tudo',
+          style: 'destructive',
+          onPress: async () => {
+            setTypes((prev) => prev.filter((item) => item.id !== id));
+            try {
+              const impact = await api.deleteBookingType(id);
+              hapticFeedback.success();
+              setAppointments((prev) => prev.filter((a) => a.booking_type_id !== id));
+              if (impact && (impact.deleted_appointments > 0 || impact.deleted_events > 0)) {
+                console.log(`[BookingScreen] Link apagado: ${impact.deleted_appointments} confirmações, ${impact.deleted_events} eventos removidos.`);
+              }
+            } catch (err) {
+              loadData();
+            }
+          },
+        },
+      ],
+    );
   };
+
+  const toDayKey = (d: Date): string =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+  const validityEndFor = (preset: '7d' | '14d' | '30d' | 'none'): string | null => {
+    if (preset === 'none') return null;
+    const days = preset === '7d' ? 7 : preset === '14d' ? 14 : 30;
+    const end = new Date();
+    end.setDate(end.getDate() + days);
+    return toDayKey(end);
+  };
+
+  const toggleWeekDay = (day: number) => {
+    hapticFeedback.selection();
+    setNewWeekDays((prev) =>
+      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day].sort()
+    );
+  };
+
+  const toggleSpecificDate = (key: string) => {
+    hapticFeedback.selection();
+    setNewSpecificDates((prev) =>
+      prev.includes(key) ? prev.filter((d) => d !== key) : [...prev, key].sort()
+    );
+  };
+
+  // Próximos 14 dias para escolha de datas específicas.
+  const next14DayKeys: Array<{ key: string; label: string; weekday: string }> = (() => {
+    const out: Array<{ key: string; label: string; weekday: string }> = [];
+    const today = new Date();
+    for (let i = 0; i < 14; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() + i);
+      out.push({
+        key: toDayKey(d),
+        label: `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`,
+        weekday: d.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', ''),
+      });
+    }
+    return out;
+  })();
 
   // Abre modal para criação de novo link
   const handleOpenCreate = () => {
@@ -274,6 +365,10 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack, createRequ
     setNewBuffer(10);
     setNewStartHour('09:00');
     setNewEndHour('18:00');
+    setNewValidity('7d');
+    setNewDaysMode('week');
+    setNewWeekDays([1, 2, 3, 4, 5]);
+    setNewSpecificDates([]);
     setCreateModalVisible(true);
   };
 
@@ -288,6 +383,32 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack, createRequ
     setNewBuffer(bt.buffer_minutes ?? 10);
     setNewStartHour(bt.start_hour || '09:00');
     setNewEndHour(bt.end_hour || '18:00');
+    try {
+      const dates: string[] = bt.allowed_dates ? JSON.parse(bt.allowed_dates) : [];
+      if (Array.isArray(dates) && dates.length > 0) {
+        setNewDaysMode('dates');
+        setNewSpecificDates(dates);
+      } else {
+        setNewDaysMode('week');
+        setNewSpecificDates([]);
+      }
+    } catch {
+      setNewDaysMode('week');
+      setNewSpecificDates([]);
+    }
+    try {
+      const days: number[] = bt.days_of_week ? JSON.parse(bt.days_of_week) : [1, 2, 3, 4, 5];
+      setNewWeekDays(Array.isArray(days) && days.length > 0 ? days : [1, 2, 3, 4, 5]);
+    } catch {
+      setNewWeekDays([1, 2, 3, 4, 5]);
+    }
+    if (bt.valid_until) {
+      const end = new Date(`${bt.valid_until}T12:00:00`);
+      const remaining = Math.ceil((end.getTime() - Date.now()) / 86400000);
+      setNewValidity(remaining <= 10 ? '7d' : remaining <= 21 ? '14d' : '30d');
+    } else {
+      setNewValidity('none');
+    }
     setCreateModalVisible(true);
   };
 
@@ -299,6 +420,7 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack, createRequ
     hapticFeedback.medium();
     setIsSubmitting(true);
     try {
+      const validityEnd = validityEndFor(newValidity);
       const payload: CreateBookingTypeInput = {
         title: newTitle.trim(),
         slug: newSlug.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-'),
@@ -307,7 +429,14 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack, createRequ
         buffer_minutes: newBuffer,
         start_hour: newStartHour,
         end_hour: newEndHour,
-        days_of_week: editingType?.days_of_week || '[1,2,3,4,5]',
+        days_of_week: newDaysMode === 'week'
+          ? JSON.stringify(newWeekDays.length > 0 ? newWeekDays : [1, 2, 3, 4, 5])
+          : editingType?.days_of_week || '[1,2,3,4,5,6,7]',
+        valid_from: `${toDayKey(new Date())}T00:00:00`,
+        valid_until: validityEnd ? `${validityEnd}T23:59:59` : null,
+        allowed_dates: newDaysMode === 'dates' && newSpecificDates.length > 0
+          ? JSON.stringify(newSpecificDates)
+          : null,
       };
 
       if (editingType) {
@@ -528,6 +657,14 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack, createRequ
                           </Text>
                         </View>
                       </View>
+
+                      {(bt.valid_until || (bt.allowed_dates && bt.allowed_dates !== '[]')) && (
+                        <Text style={[styles.validityLine, { color: colors.onSurfaceVariant }]}>
+                          {bt.allowed_dates && bt.allowed_dates !== '[]'
+                            ? `Datas específicas (${(() => { try { return (JSON.parse(bt.allowed_dates) as string[]).length; } catch { return 0; } })()} dias)`
+                            : `Válido até ${(() => { try { return new Date(`${bt.valid_until!.slice(0, 10)}T12:00:00`).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }); } catch { return bt.valid_until; } })()}`}
+                        </Text>
+                      )}
 
                       {/* URL Box & Copiar */}
                       <View style={[styles.urlBox, { backgroundColor: colors.surfaceVariant }]}>
@@ -893,6 +1030,82 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack, createRequ
                     </View>
                   </TouchableOpacity>
                 </View>
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={[styles.formLabel, { color: colors.onSurface }]}>Validade do Link</Text>
+                <View style={styles.pillSelectorRow}>
+                  {([
+                    { id: '7d', label: '7 dias' },
+                    { id: '14d', label: '14 dias' },
+                    { id: '30d', label: '30 dias' },
+                    { id: 'none', label: 'Sem expiração' },
+                  ] as const).map((v) => (
+                    <SelectableChip
+                      key={v.id}
+                      label={v.label}
+                      selected={newValidity === v.id}
+                      onPress={() => setNewValidity(v.id)}
+                      accessibilityLabel={`Validade ${v.label}`}
+                    />
+                  ))}
+                </View>
+                <Text style={[styles.validityHint, { color: colors.onSurfaceVariant }]}>
+                  {newValidity === 'none'
+                    ? 'O link fica no ar até você apagar.'
+                    : `Expira em ${validityEndFor(newValidity)} — depois disso o link se apaga sozinho e mantém o passado na agenda.`}
+                </Text>
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={[styles.formLabel, { color: colors.onSurface }]}>Dias Disponíveis</Text>
+                <View style={styles.pillSelectorRow}>
+                  <SelectableChip
+                    label="Dias da semana"
+                    selected={newDaysMode === 'week'}
+                    onPress={() => setNewDaysMode('week')}
+                    accessibilityLabel="Disponibilidade por dias da semana"
+                  />
+                  <SelectableChip
+                    label="Datas específicas"
+                    selected={newDaysMode === 'dates'}
+                    onPress={() => setNewDaysMode('dates')}
+                    accessibilityLabel="Disponibilidade em datas específicas"
+                  />
+                </View>
+                {newDaysMode === 'week' ? (
+                  <View style={styles.timePresetsContainer}>
+                    {([
+                      { id: 1, label: 'Seg' },
+                      { id: 2, label: 'Ter' },
+                      { id: 3, label: 'Qua' },
+                      { id: 4, label: 'Qui' },
+                      { id: 5, label: 'Sex' },
+                      { id: 6, label: 'Sáb' },
+                      { id: 7, label: 'Dom' },
+                    ]).map((d) => (
+                      <SelectableChip
+                        key={d.id}
+                        label={d.label}
+                        selected={newWeekDays.includes(d.id)}
+                        onPress={() => toggleWeekDay(d.id)}
+                        accessibilityLabel={`Dia ${d.label}`}
+                      />
+                    ))}
+                  </View>
+                ) : (
+                  <View style={styles.timePresetsContainer}>
+                    {next14DayKeys.map((d) => (
+                      <SelectableChip
+                        key={d.key}
+                        label={`${d.weekday} ${d.label}`}
+                        selected={newSpecificDates.includes(d.key)}
+                        onPress={() => toggleSpecificDate(d.key)}
+                        accessibilityLabel={`Data ${d.label}`}
+                      />
+                    ))}
+                  </View>
+                )}
               </View>
 
               <TouchableOpacity
@@ -1305,6 +1518,16 @@ const styles = StyleSheet.create({
   pillSelectorRow: {
     flexDirection: 'row',
     gap: 8,
+  },
+  validityHint: {
+    fontSize: 12,
+    lineHeight: 16,
+    marginTop: 6,
+  },
+  validityLine: {
+    fontSize: 12,
+    fontWeight: '500',
+    marginBottom: 8,
   },
   pillOption: {
     flex: 1,

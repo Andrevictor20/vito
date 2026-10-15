@@ -25,6 +25,7 @@ import {
   BookingType,
   BookingAppointment,
   CreateBookingTypeInput,
+  DeleteBookingImpact,
   ChatMessage,
   ConversationSession,
 } from '../types';
@@ -150,17 +151,19 @@ class ApiService {
     if (hasManualOverride === 'true' && savedUrl) {
       this.baseUrl = savedUrl;
     } else {
-      // Se for ambiente Web executando em localhost, conecta ao backend local na 8180 para evitar divergência de banco SQLite
+      // Fonte única de verdade: celular e computador usam o mesmo backend (nuvem).
+      // Web-localhost caía no banco do notebook e divergia do celular sem aviso.
       const isWebLocalhost =
         Platform.OS === 'web' &&
         typeof window !== 'undefined' &&
         (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
-      if (isWebLocalhost) {
+      if (CLOUDFLARE_SERVER_URL) {
+        this.baseUrl = CLOUDFLARE_SERVER_URL;
+      } else if (isWebLocalhost) {
         this.baseUrl = 'http://localhost:8180';
       } else {
-        // Caso contrário, prioriza a Nuvem pública (Cloudflare) para funcionar de qualquer lugar (4G, WiFi)
-        this.baseUrl = CLOUDFLARE_SERVER_URL || DEFAULT_SERVER_URL;
+        this.baseUrl = DEFAULT_SERVER_URL;
       }
       await AsyncStorage.setItem(SERVER_URL_KEY, this.baseUrl);
     }
@@ -175,6 +178,19 @@ class ApiService {
     this.baseUrl = url;
     await AsyncStorage.setItem(SERVER_URL_KEY, url);
     await AsyncStorage.setItem(SERVER_MANUAL_OVERRIDE_KEY, 'true');
+  }
+
+  /** Volta ao servidor automático (nuvem por padrão) e recarrega a escolha. */
+  async resetBaseUrl() {
+    await AsyncStorage.removeItem(SERVER_MANUAL_OVERRIDE_KEY);
+    await AsyncStorage.removeItem(SERVER_URL_KEY);
+    await this.init();
+  }
+
+  shortServerHost(): string {
+    return this.baseUrl
+      .replace(/^https?:\/\//, '')
+      .replace(/\/$/, '');
   }
 
   async setToken(token: string | null) {
@@ -848,10 +864,12 @@ class ApiService {
     });
   }
 
-  async deleteBookingType(id: string): Promise<void> {
-    await this.request<void>(`/api/v1/booking/types/${id}`, {
+  async deleteBookingType(id: string): Promise<DeleteBookingImpact> {
+    const res = await this.request<DeleteBookingImpact>(`/api/v1/booking/types/${id}`, {
       method: 'DELETE',
     });
+    if (res && typeof res.deleted_appointments === 'number') return res;
+    return { deleted_appointments: 0, deleted_events: 0 };
   }
 
   async getBookingAppointments(): Promise<BookingAppointment[]> {

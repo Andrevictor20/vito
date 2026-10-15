@@ -467,11 +467,19 @@ export interface BookingType {
   days_of_week: string;
   start_hour: string;
   end_hour: string;
+  valid_from?: string | null;
+  valid_until?: string | null;
+  allowed_dates?: string | null;
   is_active: boolean;
   public_url?: string;
   short_url?: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface DeleteBookingImpact {
+  deleted_appointments: number;
+  deleted_events: number;
 }
 
 export interface BookingAppointment {
@@ -488,6 +496,8 @@ export interface BookingAppointment {
   created_at: string;
 }
 
+export type BookingValidityPreset = '7d' | '14d' | '30d' | 'none';
+
 export interface CreateBookingTypeInput {
   slug: string;
   title: string;
@@ -497,6 +507,9 @@ export interface CreateBookingTypeInput {
   days_of_week?: string;
   start_hour?: string;
   end_hour?: string;
+  valid_from?: string | null;
+  valid_until?: string | null;
+  allowed_dates?: string | null;
 }
 
 
