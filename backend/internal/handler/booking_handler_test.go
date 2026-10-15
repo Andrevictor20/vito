@@ -113,6 +113,33 @@ func TestBookingHandler_ServePublicPage(t *testing.T) {
 	}
 }
 
+// A página pública de booking deve seguir o M3 Dark do app (fundo #0B0D10,
+// cards #14171C, primário branco) e não a paleta teal antiga.
+func TestBookingHandler_PublicPageFollowsAppDarkTheme(t *testing.T) {
+	router, _, bt := setupBookingHandlerTest(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/book/andre/"+bt.Slug, nil)
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("esperado status 200, obteve %d", rec.Code)
+	}
+
+	body := rec.Body.String()
+	for _, want := range []string{"#0B0D10", "#14171C", "#FFFFFF", "color-scheme: dark"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("página deveria seguir o M3 Dark do app (faltando %q)", want)
+		}
+	}
+	for _, gone := range []string{"#4fd8eb", "#006874", "#0e1415", "#141c1e"} {
+		if strings.Contains(body, gone) {
+			t.Errorf("página ainda usa a paleta teal antiga (%q)", gone)
+		}
+	}
+}
+
 func TestBookingHandler_GetPublicSlots(t *testing.T) {
 	router, _, bt := setupBookingHandlerTest(t)
 

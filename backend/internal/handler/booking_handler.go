@@ -260,7 +260,8 @@ func (h *BookingHandler) DeleteAppointment(w http.ResponseWriter, r *http.Reques
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// bookingPageHTMLTemplate é o HTML5/CSS3 Material Design 3 ultraleve (< 25 KB).
+// bookingPageHTMLTemplate é a página pública de agendamento no M3 Dark do app
+// (fundo #0B0D10, cards #14171C, primário branco) — HTML5/CSS3 ultraleve (< 25 KB).
 const bookingPageHTMLTemplate = `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -269,73 +270,65 @@ const bookingPageHTMLTemplate = `<!DOCTYPE html>
   <title>{{.Title}} · Vito Booking</title>
   <style>
     :root {
-      --primary: #006874;
-      --on-primary: #ffffff;
-      --bg: #f8fdff;
-      --surface: #ffffff;
-      --surface-container: #edf5f7;
-      --text: #191c1d;
-      --text-subtle: #4b6267;
-      --border: #dbe4e6;
-      --accent: #2e7d32;
-      --error: #ba1a1a;
-      --radius: 16px;
+      color-scheme: dark;
+      --primary: #FFFFFF;
+      --on-primary: #09090B;
+      --bg: #0B0D10;
+      --surface: #14171C;
+      --surface-high: #1C2026;
+      --text: #FAFAFA;
+      --text-subtle: #A1A1AA;
+      --text-muted: #52525B;
+      --border: #262B33;
+      --accent: #34D399;
+      --error: #F87171;
+      --radius: 20px;
     }
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --primary: #4fd8eb;
-        --on-primary: #00363d;
-        --bg: #0e1415;
-        --surface: #141c1e;
-        --surface-container: #1c2628;
-        --text: #e1e3e4;
-        --text-subtle: #899294;
-        --border: #2c383b;
-        --accent: #81c784;
-        --error: #ffb4ab;
-      }
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-    body { background-color: var(--bg); color: var(--text); display: flex; justify-content: center; min-height: 100vh; padding: 24px 16px; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); display: flex; justify-content: center; min-height: 100vh; padding: 24px 16px; -webkit-font-smoothing: antialiased; }
     .container { width: 100%; max-width: 580px; display: flex; flex-direction: column; gap: 20px; }
-    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.03); }
-    .header-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; background: var(--surface-container); border-radius: 99px; font-size: 12px; font-weight: 600; color: var(--primary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; }
-    h1 { font-size: 24px; font-weight: 700; margin-bottom: 6px; }
-    .desc { font-size: 14px; color: var(--text-subtle); line-height: 1.5; margin-bottom: 16px; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; }
+    .header-badge { display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px; background: rgba(255, 255, 255, 0.08); border: 1px solid var(--border); border-radius: 99px; font-size: 11px; font-weight: 700; color: var(--text); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 14px; }
+    .header-badge .dot { width: 6px; height: 6px; border-radius: 3px; background: var(--accent); }
+    h1 { font-size: 26px; line-height: 32px; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 6px; }
+    .desc { font-size: 14px; color: var(--text-subtle); line-height: 1.55; margin-bottom: 16px; }
     .meta-row { display: flex; gap: 16px; font-size: 13px; font-weight: 500; color: var(--text-subtle); border-top: 1px solid var(--border); padding-top: 14px; }
     .meta-item { display: flex; align-items: center; gap: 6px; }
     .date-scroller { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: none; }
     .date-scroller::-webkit-scrollbar { display: none; }
-    .date-btn { flex: 0 0 68px; height: 74px; border: 1px solid var(--border); background: var(--surface); border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; transition: all 0.15s ease; color: var(--text); }
+    .date-btn { flex: 0 0 68px; height: 76px; border: 1px solid var(--border); background: var(--surface-high); border-radius: 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; transition: all 0.15s ease; color: var(--text); }
+    .date-btn:hover { border-color: var(--text-muted); }
     .date-btn.active { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
-    .date-btn .weekday { font-size: 11px; font-weight: 600; text-transform: uppercase; margin-bottom: 2px; }
-    .date-btn .day { font-size: 20px; font-weight: 700; font-feature-settings: 'tnum'; }
+    .date-btn .weekday { font-size: 11px; font-weight: 700; text-transform: uppercase; margin-bottom: 2px; }
+    .date-btn .day { font-size: 20px; font-weight: 800; font-feature-settings: 'tnum'; }
     .slots-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; margin-top: 14px; }
-    .slot-btn { padding: 12px 8px; border: 1px solid var(--border); background: var(--surface); border-radius: 10px; font-size: 14px; font-weight: 600; color: var(--text); cursor: pointer; text-align: center; transition: all 0.15s ease; font-feature-settings: 'tnum'; }
-    .slot-btn:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
+    .slot-btn { padding: 12px 8px; border: 1px solid var(--border); background: var(--surface-high); border-radius: 12px; font-size: 14px; font-weight: 700; color: var(--text); cursor: pointer; text-align: center; transition: all 0.15s ease; font-feature-settings: 'tnum'; }
+    .slot-btn:hover:not(:disabled) { border-color: var(--text-muted); }
     .slot-btn.selected { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
     .slot-btn:disabled { opacity: 0.35; cursor: not-allowed; text-decoration: line-through; }
     .form-group { margin-top: 16px; display: flex; flex-direction: column; gap: 6px; }
     label { font-size: 13px; font-weight: 600; color: var(--text); }
-    input, textarea { width: 100%; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: 14px; outline: none; }
-    input:focus, textarea:focus { border-color: var(--primary); }
+    input, textarea { width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface-high); color: var(--text); font-size: 14px; outline: none; }
+    input::placeholder, textarea::placeholder { color: var(--text-muted); }
+    input:focus, textarea:focus { border-color: var(--text-subtle); }
     .btn-submit { width: 100%; padding: 14px; margin-top: 20px; border: none; border-radius: 12px; background: var(--primary); color: var(--on-primary); font-size: 15px; font-weight: 700; cursor: pointer; transition: opacity 0.15s ease; }
+    .btn-submit:hover:not(:disabled) { opacity: 0.9; }
     .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
     .success-card { text-align: center; padding: 40px 20px; }
-    .success-icon { width: 56px; height: 56px; border-radius: 28px; background: rgba(46, 125, 50, 0.15); color: var(--accent); display: inline-flex; align-items: center; justify-content: center; font-size: 28px; margin-bottom: 16px; }
-    .powered { text-align: center; font-size: 12px; color: var(--text-subtle); margin-top: 12px; }
-    .error-banner { background: rgba(186, 26, 26, 0.1); border: 1px solid var(--error); color: var(--error); padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-top: 12px; display: none; }
+    .success-icon { width: 56px; height: 56px; border-radius: 28px; background: rgba(52, 211, 153, 0.16); color: var(--accent); display: inline-flex; align-items: center; justify-content: center; font-size: 28px; margin-bottom: 16px; }
+    .powered { text-align: center; font-size: 12px; color: var(--text-muted); margin-top: 12px; }
+    .error-banner { background: rgba(248, 113, 113, 0.12); border: 1px solid var(--error); color: var(--error); padding: 10px 14px; border-radius: 12px; font-size: 13px; margin-top: 12px; display: none; }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="card" id="bookingCard">
-      <div class="header-badge">● Vito Booking</div>
+      <div class="header-badge"><span class="dot"></span>Vito Booking</div>
       <h1>{{.Title}}</h1>
       {{if .Description}}<p class="desc">{{.Description}}</p>{{end}}
       <div class="meta-row">
-        <div class="meta-item">⏱ {{.DurationMinutes}} min</div>
-        <div class="meta-item">📅 Escolha uma data</div>
+        <div class="meta-item">{{.DurationMinutes}} min</div>
+        <div class="meta-item">Escolha uma data</div>
       </div>
 
       <div style="margin-top: 20px;">
