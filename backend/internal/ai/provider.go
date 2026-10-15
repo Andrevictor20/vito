@@ -123,6 +123,7 @@ type ParsedBooking struct {
 	StartHour       string `json:"start_hour,omitempty"`
 	EndHour         string `json:"end_hour,omitempty"`
 	DaysOfWeek      string `json:"days_of_week,omitempty"`
+	ValidUntil      string `json:"valid_until,omitempty"` // YYYY-MM-DD (fim da validade; padrão +7 dias)
 	TargetQuery     string `json:"target_query,omitempty"`
 }
 

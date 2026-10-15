@@ -50,12 +50,20 @@ func (h *BookingHandler) ServePublicPage(w http.ResponseWriter, r *http.Request)
 		DurationMinutes int
 		Username        string
 		Slug            string
+		Expired         bool
+		ValidFrom       string
+		ValidUntil      string
+		AllowedDates    string
 	}{
 		Title:           bt.Title,
 		Description:     bt.Description,
 		DurationMinutes: bt.DurationMinutes,
 		Username:        username,
 		Slug:            slug,
+		Expired:         !bt.IsActive || service.BookingLinkExpired(bt),
+		ValidFrom:       service.BookingValidityBound(bt.ValidFrom),
+		ValidUntil:      service.BookingValidityBound(bt.ValidUntil),
+		AllowedDates:    bt.AllowedDates,
 	}
 
 	_ = h.pageTmpl.Execute(w, data)
@@ -121,6 +129,14 @@ func (h *BookingHandler) ReservePublicSlot(w http.ResponseWriter, r *http.Reques
 			w.WriteHeader(http.StatusBadRequest)
 			_ = json.NewEncoder(w).Encode(map[string]string{
 				"error": "Falha na validação anti-bot.",
+			})
+			return
+		}
+		if errors.Is(err, domain.ErrBookingExpired) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusGone)
+			_ = json.NewEncoder(w).Encode(map[string]string{
+				"error": "Este link de agendamento expirou.",
 			})
 			return
 		}
@@ -205,7 +221,8 @@ func (h *BookingHandler) UpdateType(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(updated)
 }
 
-// DeleteType remove o tipo de agendamento.
+// DeleteType remove o link e cascateia (agendamentos + eventos da agenda).
+// Retorna o impacto para a mensagem de confirmação no app.
 func (h *BookingHandler) DeleteType(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok || userID == "" {
@@ -214,12 +231,17 @@ func (h *BookingHandler) DeleteType(w http.ResponseWriter, r *http.Request) {
 	}
 
 	id := chi.URLParam(r, "id")
-	if err := h.bookingSvc.DeleteBookingType(r.Context(), userID, id); err != nil {
+	impact, err := h.bookingSvc.DeleteBookingType(r.Context(), userID, id)
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	w.WriteHeader(http.StatusNoContent)
+	w.Header().Set("Content-Type", "application/json")
+	if impact == nil {
+		impact = &domain.DeleteBookingImpact{}
+	}
+	_ = json.NewEncoder(w).Encode(impact)
 }
 
 // ListAppointments retorna o histórico de agendamentos recebidos pelo anfitrião.
@@ -329,11 +351,16 @@ const bookingPageHTMLTemplate = `<!DOCTYPE html>
       <div class="meta-row">
         <div class="meta-item">{{.DurationMinutes}} min</div>
         <div class="meta-item">Escolha uma data</div>
+        {{if .ValidUntil}}<div class="meta-item">Válido até {{.ValidUntil}}</div>{{end}}
       </div>
 
+      {{if .Expired}}
+      <div class="error-banner" style="display: block; margin-top: 20px;">Este link de agendamento expirou e não aceita mais reservas.</div>
+      {{else}}
       <div style="margin-top: 20px;">
         <div class="date-scroller" id="dateScroller"></div>
       </div>
+      {{end}}
 
       <div style="margin-top: 16px;">
         <label>Horários disponíveis</label>
@@ -376,19 +403,39 @@ const bookingPageHTMLTemplate = `<!DOCTYPE html>
   <script>
     const username = "{{.Username}}";
     const slug = "{{.Slug}}";
+    const validFrom = "{{.ValidFrom}}";
+    const validUntil = "{{.ValidUntil}}";
+    let allowedDates = [];
+    try { allowedDates = JSON.parse('{{.AllowedDates}}' || '[]'); } catch (e) { allowedDates = []; }
     let selectedDate = new Date();
     let selectedSlot = null;
 
+    function dateKey(d) {
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
+
+    function dateAllowed(d) {
+      const k = dateKey(d);
+      if (validFrom && k < validFrom) return false;
+      if (validUntil && k > validUntil) return false;
+      if (allowedDates && allowedDates.length > 0) return allowedDates.indexOf(k) !== -1;
+      return true;
+    }
+
     function initDates() {
       const scroller = document.getElementById('dateScroller');
+      if (!scroller) return;
       scroller.innerHTML = '';
       const today = new Date();
-      for (let i = 0; i < 14; i++) {
+      let first = null;
+      for (let i = 0; i < 60; i++) {
         const d = new Date(today);
         d.setDate(today.getDate() + i);
-        // 7 dias por decisão P2: booking vale sábado, domingo e feriados; backend filtra via DaysOfWeek.
+        // Validade do link (período + datas específicas); backend filtra via DaysOfWeek.
+        if (!dateAllowed(d)) continue;
+        if (scroller.children.length >= 14) break;
         const btn = document.createElement('button');
-        btn.className = 'date-btn' + (i === 0 ? ' active' : '');
+        btn.className = 'date-btn' + (first === null ? ' active' : '');
         btn.innerHTML = '<span class="weekday">' + d.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '') + '</span><span class="day">' + d.getDate() + '</span>';
         btn.onclick = () => {
           document.querySelectorAll('.date-btn').forEach(b => b.classList.remove('active'));
@@ -397,6 +444,11 @@ const bookingPageHTMLTemplate = `<!DOCTYPE html>
           loadSlots(d);
         };
         scroller.appendChild(btn);
+        if (first === null) { first = d; selectedDate = d; }
+      }
+      if (first === null) {
+        document.getElementById('slotsGrid').innerHTML = '<div style="font-size: 13px; color: var(--text-subtle); grid-column: 1 / -1;">Nenhuma data disponível neste link.</div>';
+        return;
       }
       loadSlots(selectedDate);
     }

@@ -212,6 +212,25 @@ func runVersionedMigrations(db *sql.DB) error {
 			}
 			continue
 		}
+		if version == "008_booking_validity.sql" {
+			// Validade configurável dos links de booking (período + datas específicas).
+			cols := []struct{ name, ddl string }{
+				{"valid_from", "ALTER TABLE booking_types ADD COLUMN valid_from DATETIME"},
+				{"valid_until", "ALTER TABLE booking_types ADD COLUMN valid_until DATETIME"},
+				{"allowed_dates", "ALTER TABLE booking_types ADD COLUMN allowed_dates TEXT"},
+			}
+			for _, c := range cols {
+				if !hasColumn(db, "booking_types", c.name) {
+					if _, err := db.Exec(c.ddl); err != nil {
+						return err
+					}
+				}
+			}
+			if err := recordMigration(db, version); err != nil {
+				return err
+			}
+			continue
+		}
 		content, err := migrationFS.ReadFile(name)
 		if err != nil {
 			return err

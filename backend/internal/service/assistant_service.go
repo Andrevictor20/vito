@@ -765,6 +765,16 @@ func (s *AssistantService) Process(ctx context.Context, userID string, input ai.
 			if dow == "" {
 				dow = inferBookingDaysOfWeek(input.Text)
 			}
+			// Validade do link: padrão +7 dias; IA pode fixar via valid_until (YYYY-MM-DD).
+			loc := userLocation(input.Timezone)
+			nowLoc := input.Now.In(loc)
+			validFrom := time.Date(nowLoc.Year(), nowLoc.Month(), nowLoc.Day(), 0, 0, 0, 0, loc).UTC()
+			validUntil := validFrom.AddDate(0, 0, 7)
+			if vu := strings.TrimSpace(intent.Booking.ValidUntil); vu != "" {
+				if parsed, err := time.ParseInLocation("2006-01-02", vu[:min(10, len(vu))], loc); err == nil {
+					validUntil = time.Date(parsed.Year(), parsed.Month(), parsed.Day(), 23, 59, 59, 0, loc).UTC()
+				}
+			}
 			bt, err := s.bookingSvc.CreateBookingType(ctx, userID, &domain.BookingType{
 				Title:           title,
 				Slug:            slug,
@@ -774,6 +784,8 @@ func (s *AssistantService) Process(ctx context.Context, userID string, input ai.
 				StartHour:       sh,
 				EndHour:         eh,
 				DaysOfWeek:      dow,
+				ValidFrom:       &validFrom,
+				ValidUntil:      &validUntil,
 			})
 			if err != nil {
 				log.Printf("⚠️ [AssistantService] Erro ao criar booking type via chat: %v", err)

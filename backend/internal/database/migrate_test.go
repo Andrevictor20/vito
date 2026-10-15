@@ -16,8 +16,11 @@ func TestVersionedMigrations_FreshDB(t *testing.T) {
 	if err := db.QueryRow(`SELECT COUNT(*) FROM schema_migrations`).Scan(&count); err != nil {
 		t.Fatal(err)
 	}
-	if count != 7 {
-		t.Fatalf("esperava 7 migrações registradas, vieram %d", count)
+	if count != 8 {
+		t.Fatalf("esperava 8 migrações registradas, vieram %d", count)
+	}
+	if !hasColumn(db, "booking_types", "valid_from") || !hasColumn(db, "booking_types", "valid_until") || !hasColumn(db, "booking_types", "allowed_dates") {
+		t.Fatal("008 deveria criar valid_from, valid_until e allowed_dates em booking_types")
 	}
 	if !hasColumn(db, "todos", "category") || !hasColumn(db, "todos", "remind_at") {
 		t.Fatal("001 deveria criar todos com category e remind_at")
@@ -56,8 +59,8 @@ func TestVersionedMigrations_LegacyDB(t *testing.T) {
 	if err := db2.QueryRow(`SELECT COUNT(*) FROM schema_migrations`).Scan(&count); err != nil {
 		t.Fatal(err)
 	}
-	if count != 7 {
-		t.Fatalf("base legada deveria ser carimbada com 7, veio %d", count)
+	if count != 8 {
+		t.Fatalf("base legada deveria ser carimbada com 8, veio %d", count)
 	}
 }
 

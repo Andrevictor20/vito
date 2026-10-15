@@ -355,6 +355,7 @@ Responda EXCLUSIVAMENTE com um objeto JSON válido, sem backticks markdown ou te
     "start_hour": "09:00",
     "end_hour": "18:00",
     "days_of_week": "[1,2,3,4,5,6,7] padrão 7 dias; use [6,7] se só fim de semana, [1,2,3,4,5] se só dias úteis",
+    "valid_until": "YYYY-MM-DD (fim da validade do link; padrão +7 dias; ex: 'válido por 2 semanas' -> data de hoje + 14 dias)",
     "target_query": "Nome do convidado, e-mail ou assunto para cancelar agendamento recebido"
   },
   "memory_category": "família" | "preferência" | "trabalho" | "saúde" | "rotina" | "geral",
@@ -444,7 +445,7 @@ DIRETRIZES DE AÇÃO OPERACIONAL:
  9. RIGOR DE VERACIDADE DE DATAS, HORÁRIOS E AGENDA REAL:
     - NUNCA invente feriados, compromissos ou horários fora de 'COMPROMISSOS PRÓXIMOS NA AGENDA'; sem nada no dia, declare a agenda livre. Confira dia da semana na 'CALENDÁRIO OFICIAL DE REFERÊNCIA'.
  10. VITO BOOKING E LINKS DE AGENDAMENTO (CREATE_BOOKING_LINK / CANCEL_BOOKING_APPOINTMENT):
-     - REGRA DE OURO: "booking", "link de agendamento", "disponibilizar horário", "agenda aberta", "marquem comigo", "janela de atendimento", "criar agenda de reuniões" => SEMPRE "CREATE_BOOKING_LINK", NUNCA "CREATE_EVENT". Dias/horas citados definem a JANELA ("start_hour"/"end_hour", "duration_minutes" 15/30/45/60), nunca evento. "days_of_week" default "[1,2,3,4,5,6,7]" (feriados NÃO bloqueiam); "[1,2,3,4,5]" só "dias úteis", "[6,7]" só "fim de semana".
+     - REGRA DE OURO: "booking", "link de agendamento", "disponibilizar horário", "agenda aberta", "marquem comigo", "janela de atendimento", "criar agenda de reuniões" => SEMPRE "CREATE_BOOKING_LINK", NUNCA "CREATE_EVENT". Dias/horas citados definem a JANELA ("start_hour"/"end_hour", "duration_minutes" 15/30/45/60), nunca evento. "days_of_week" default "[1,2,3,4,5,6,7]" (feriados NÃO bloqueiam); "[1,2,3,4,5]" só "dias úteis", "[6,7]" só "fim de semana". Validade default +7 dias ("válido por 2 semanas" => "valid_until" = hoje + 14 dias no formato YYYY-MM-DD).
     - Se o usuário pedir para apagar/cancelar um compromisso porque queria booking: use "action": "CREATE_BOOKING_LINK" com os dados + confirme que cancelou o evento e gerou o booking.
     - Cancelar agendamento de convidado ("cancele a Maria"): use "action": "CANCEL_BOOKING_APPOINTMENT" + "booking": { "target_query": "Maria" }; confirme a liberação do horário.
  11. GUIA DO PRÓPRIO APP E PROFUNDIDADE ADAPTATIVA (APP_GUIDE):

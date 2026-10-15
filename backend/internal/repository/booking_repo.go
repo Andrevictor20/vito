@@ -33,12 +33,21 @@ func NewBookingRepositorySQLite(db *sql.DB) *BookingRepositorySQLite {
 	return &BookingRepositorySQLite{db: db}
 }
 
+// bookingTimeVal converte *time.Time em valor gravável (NULL quando ausente).
+func bookingTimeVal(t *time.Time) any {
+	if t == nil || t.IsZero() {
+		return nil
+	}
+	return t.UTC()
+}
+
 func (r *BookingRepositorySQLite) CreateType(bt *domain.BookingType) error {
 	query := `
 		INSERT INTO booking_types (
 			id, user_id, slug, title, description, duration_minutes, buffer_minutes,
-			days_of_week, start_hour, end_hour, is_active, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			days_of_week, start_hour, end_hour, valid_from, valid_until, allowed_dates,
+			is_active, created_at, updated_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	now := time.Now().UTC()
 	if bt.CreatedAt.IsZero() {
@@ -50,7 +59,8 @@ func (r *BookingRepositorySQLite) CreateType(bt *domain.BookingType) error {
 
 	_, err := r.db.Exec(query,
 		bt.ID, bt.UserID, bt.Slug, bt.Title, bt.Description, bt.DurationMinutes, bt.BufferMinutes,
-		bt.DaysOfWeek, bt.StartHour, bt.EndHour, bt.IsActive, bt.CreatedAt, bt.UpdatedAt,
+		bt.DaysOfWeek, bt.StartHour, bt.EndHour, bookingTimeVal(bt.ValidFrom), bookingTimeVal(bt.ValidUntil), bt.AllowedDates,
+		bt.IsActive, bt.CreatedAt, bt.UpdatedAt,
 	)
 	return err
 }
@@ -59,13 +69,15 @@ func (r *BookingRepositorySQLite) UpdateType(bt *domain.BookingType) error {
 	query := `
 		UPDATE booking_types SET
 			slug = ?, title = ?, description = ?, duration_minutes = ?, buffer_minutes = ?,
-			days_of_week = ?, start_hour = ?, end_hour = ?, is_active = ?, updated_at = ?
+			days_of_week = ?, start_hour = ?, end_hour = ?, valid_from = ?, valid_until = ?,
+			allowed_dates = ?, is_active = ?, updated_at = ?
 		WHERE id = ? AND user_id = ?
 	`
 	bt.UpdatedAt = time.Now().UTC()
 	res, err := r.db.Exec(query,
 		bt.Slug, bt.Title, bt.Description, bt.DurationMinutes, bt.BufferMinutes,
-		bt.DaysOfWeek, bt.StartHour, bt.EndHour, bt.IsActive, bt.UpdatedAt,
+		bt.DaysOfWeek, bt.StartHour, bt.EndHour, bookingTimeVal(bt.ValidFrom), bookingTimeVal(bt.ValidUntil),
+		bt.AllowedDates, bt.IsActive, bt.UpdatedAt,
 		bt.ID, bt.UserID,
 	)
 	if err != nil {
@@ -97,34 +109,56 @@ func (r *BookingRepositorySQLite) DeleteType(id, userID string) error {
 	return nil
 }
 
+// scanBookingType lê uma linha de booking_types (ordem canônica das colunas).
+func scanBookingType(bt *domain.BookingType, scanner interface {
+	Scan(dest ...any) error
+}) error {
+	var rawValidFrom, rawValidUntil, rawCreated, rawUpdated any
+	err := scanner.Scan(
+		&bt.ID, &bt.UserID, &bt.Slug, &bt.Title, &bt.Description, &bt.DurationMinutes, &bt.BufferMinutes,
+		&bt.DaysOfWeek, &bt.StartHour, &bt.EndHour, &rawValidFrom, &rawValidUntil, &bt.AllowedDates,
+		&bt.IsActive, &rawCreated, &rawUpdated,
+	)
+	if err != nil {
+		return err
+	}
+	if vf := parseBookingDBTime(rawValidFrom); !vf.IsZero() {
+		vf = vf.UTC()
+		bt.ValidFrom = &vf
+	}
+	if vu := parseBookingDBTime(rawValidUntil); !vu.IsZero() {
+		vu = vu.UTC()
+		bt.ValidUntil = &vu
+	}
+	bt.CreatedAt = parseDBTime(rawCreated)
+	bt.UpdatedAt = parseDBTime(rawUpdated)
+	return nil
+}
+
 func (r *BookingRepositorySQLite) GetTypeByID(id, userID string) (*domain.BookingType, error) {
 	query := `
 		SELECT id, user_id, slug, title, COALESCE(description, ''), duration_minutes, buffer_minutes,
-		       days_of_week, start_hour, end_hour, is_active, created_at, updated_at
+		       days_of_week, start_hour, end_hour, valid_from, valid_until, COALESCE(allowed_dates, ''),
+		       is_active, created_at, updated_at
 		FROM booking_types
 		WHERE id = ? AND user_id = ?
 	`
 	var bt domain.BookingType
-	var rawCreated, rawUpdated any
-	err := r.db.QueryRow(query, id, userID).Scan(
-		&bt.ID, &bt.UserID, &bt.Slug, &bt.Title, &bt.Description, &bt.DurationMinutes, &bt.BufferMinutes,
-		&bt.DaysOfWeek, &bt.StartHour, &bt.EndHour, &bt.IsActive, &rawCreated, &rawUpdated,
-	)
+	err := scanBookingType(&bt, r.db.QueryRow(query, id, userID))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, domain.ErrBookingTypeNotFound
 		}
 		return nil, err
 	}
-	bt.CreatedAt = parseDBTime(rawCreated)
-	bt.UpdatedAt = parseDBTime(rawUpdated)
 	return &bt, nil
 }
 
 func (r *BookingRepositorySQLite) GetTypeBySlug(userIdentifier, slug string) (*domain.BookingType, error) {
 	query := `
 		SELECT bt.id, bt.user_id, bt.slug, bt.title, COALESCE(bt.description, ''), bt.duration_minutes, bt.buffer_minutes,
-		       bt.days_of_week, bt.start_hour, bt.end_hour, bt.is_active, bt.created_at, bt.updated_at
+		       bt.days_of_week, bt.start_hour, bt.end_hour, bt.valid_from, bt.valid_until, COALESCE(bt.allowed_dates, ''),
+		       bt.is_active, bt.created_at, bt.updated_at
 		FROM booking_types bt
 		LEFT JOIN users u ON bt.user_id = u.id
 		WHERE (
@@ -141,26 +175,21 @@ func (r *BookingRepositorySQLite) GetTypeBySlug(userIdentifier, slug string) (*d
 	`
 	cleanID := strings.TrimSpace(userIdentifier)
 	var bt domain.BookingType
-	var rawCreated, rawUpdated any
-	err := r.db.QueryRow(query, cleanID, cleanID, cleanID, cleanID, cleanID, cleanID, cleanID, slug).Scan(
-		&bt.ID, &bt.UserID, &bt.Slug, &bt.Title, &bt.Description, &bt.DurationMinutes, &bt.BufferMinutes,
-		&bt.DaysOfWeek, &bt.StartHour, &bt.EndHour, &bt.IsActive, &rawCreated, &rawUpdated,
-	)
+	err := scanBookingType(&bt, r.db.QueryRow(query, cleanID, cleanID, cleanID, cleanID, cleanID, cleanID, cleanID, slug))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, domain.ErrBookingTypeNotFound
 		}
 		return nil, err
 	}
-	bt.CreatedAt = parseDBTime(rawCreated)
-	bt.UpdatedAt = parseDBTime(rawUpdated)
 	return &bt, nil
 }
 
 func (r *BookingRepositorySQLite) ListTypesByUser(userID string) ([]domain.BookingType, error) {
 	query := `
 		SELECT id, user_id, slug, title, COALESCE(description, ''), duration_minutes, buffer_minutes,
-		       days_of_week, start_hour, end_hour, is_active, created_at, updated_at
+		       days_of_week, start_hour, end_hour, valid_from, valid_until, COALESCE(allowed_dates, ''),
+		       is_active, created_at, updated_at
 		FROM booking_types
 		WHERE user_id = ?
 		ORDER BY created_at ASC
@@ -174,15 +203,9 @@ func (r *BookingRepositorySQLite) ListTypesByUser(userID string) ([]domain.Booki
 	list := make([]domain.BookingType, 0)
 	for rows.Next() {
 		var bt domain.BookingType
-		var rawCreated, rawUpdated any
-		if err := rows.Scan(
-			&bt.ID, &bt.UserID, &bt.Slug, &bt.Title, &bt.Description, &bt.DurationMinutes, &bt.BufferMinutes,
-			&bt.DaysOfWeek, &bt.StartHour, &bt.EndHour, &bt.IsActive, &rawCreated, &rawUpdated,
-		); err != nil {
+		if err := scanBookingType(&bt, rows); err != nil {
 			return nil, err
 		}
-		bt.CreatedAt = parseDBTime(rawCreated)
-		bt.UpdatedAt = parseDBTime(rawUpdated)
 		list = append(list, bt)
 	}
 	return list, nil

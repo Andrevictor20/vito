@@ -135,14 +135,90 @@ func (s *BookingService) UpdateBookingType(ctx context.Context, userID string, b
 	return s.enrichWithLinks(ctx, userID, updated)
 }
 
-// DeleteBookingType remove o tipo de agendamento.
-func (s *BookingService) DeleteBookingType(ctx context.Context, userID, id string) error {
-	return s.bookingRepo.DeleteType(id, userID)
+// DeleteBookingType remove o link E cascateia: apaga todos os agendamentos
+// vinculados e seus eventos da agenda (o FK do banco removeria as linhas de
+// agendamento sem tocar nos eventos, deixando órfãos — causa raiz do bug).
+// Retorna o impacto para a mensagem de confirmação no app.
+func (s *BookingService) DeleteBookingType(ctx context.Context, userID, id string) (*domain.DeleteBookingImpact, error) {
+	if _, err := s.bookingRepo.GetTypeByID(id, userID); err != nil {
+		return nil, err
+	}
+	appts, err := s.bookingRepo.ListAppointmentsByUser(userID, time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC), time.Date(2100, 1, 1, 0, 0, 0, 0, time.UTC))
+	if err != nil {
+		return nil, err
+	}
+	impact := &domain.DeleteBookingImpact{}
+	for _, ap := range appts {
+		if ap.BookingTypeID != id {
+			continue
+		}
+		if err := s.removeAppointmentEvent(userID, &ap); err != nil {
+			log.Printf("[BookingService] Falha ao remover evento do agendamento '%s' na exclusão do link '%s': %v", ap.ID, id, err)
+		} else {
+			impact.DeletedEvents++
+		}
+		if err := s.bookingRepo.DeleteAppointment(ap.ID, userID); err != nil {
+			log.Printf("[BookingService] Falha ao remover agendamento '%s' na exclusão do link '%s': %v", ap.ID, id, err)
+		} else {
+			impact.DeletedAppointments++
+		}
+	}
+	if err := s.bookingRepo.DeleteType(id, userID); err != nil {
+		return nil, err
+	}
+	return impact, nil
+}
+
+// removeAppointmentEvent apaga o evento da agenda vinculado ao agendamento:
+// propaga para Google/Apple, remove o mapeamento e apaga localmente.
+// Quando EventID está vazio (linhas legadas), localiza por convidado+horário.
+func (s *BookingService) removeAppointmentEvent(userID string, appt *domain.BookingAppointment) error {
+	eventID := appt.EventID
+	if eventID == "" {
+		eventID = s.findAppointmentEventID(userID, appt)
+		if eventID == "" {
+			return errors.New("evento vinculado não localizado")
+		}
+	}
+	if s.syncPusher != nil {
+		pctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		err := s.syncPusher.DeleteEvent(pctx, userID, eventID)
+		cancel()
+		if err != nil {
+			log.Printf("[BookingService] Falha ao propagar exclusão do evento '%s' para agenda remota: %v", eventID, err)
+		}
+	}
+	return s.eventRepo.Delete(eventID, userID)
+}
+
+// findAppointmentEventID localiza o evento de um agendamento sem EventID
+// (linhas legadas): mesmo convidado no título e sobreposição de horário.
+func (s *BookingService) findAppointmentEventID(userID string, appt *domain.BookingAppointment) string {
+	events, err := s.eventRepo.ListByUser(userID, appt.StartAt.Add(-time.Hour), appt.EndAt.Add(time.Hour))
+	if err != nil {
+		return ""
+	}
+	guest := strings.ToLower(strings.TrimSpace(appt.GuestName))
+	for _, ev := range events {
+		if !strings.Contains(strings.ToLower(ev.Title), guest) {
+			continue
+		}
+		if ev.StartAt.Before(appt.EndAt) && ev.EndAt.After(appt.StartAt) {
+			return ev.ID
+		}
+	}
+	return ""
 }
 
 // ListBookingTypes lista os tipos de agendamento com seus links públicos.
+// Antes de listar, varre e auto-apaga links vencidos (mantém o passado).
 func (s *BookingService) ListBookingTypes(ctx context.Context, userID string) ([]BookingTypeWithLink, error) {
 	types, err := s.bookingRepo.ListTypesByUser(userID)
+	if err != nil {
+		return nil, err
+	}
+	s.sweepExpiredBookingTypes(userID, types)
+	types, err = s.bookingRepo.ListTypesByUser(userID)
 	if err != nil {
 		return nil, err
 	}
@@ -161,6 +237,93 @@ func (s *BookingService) GetBookingTypeBySlug(ctx context.Context, userIdentifie
 	return s.bookingRepo.GetTypeBySlug(userIdentifier, slug)
 }
 
+// bookingDayKey normaliza para comparação por dia (YYYY-MM-DD).
+func bookingDayKey(t time.Time) string {
+	return t.Format("2006-01-02")
+}
+
+// bookingDateAllowed verifica janela de validade e datas específicas do link.
+func bookingDateAllowed(bt *domain.BookingType, date time.Time) bool {
+	day := bookingDayKey(date)
+	if bt.ValidFrom != nil && !bt.ValidFrom.IsZero() && day < bookingDayKey(*bt.ValidFrom) {
+		return false
+	}
+	if bt.ValidUntil != nil && !bt.ValidUntil.IsZero() && day > bookingDayKey(*bt.ValidUntil) {
+		return false
+	}
+	allowed := strings.TrimSpace(bt.AllowedDates)
+	if allowed != "" && allowed != "[]" && allowed != "null" {
+		var dates []string
+		if err := json.Unmarshal([]byte(allowed), &dates); err != nil || len(dates) == 0 {
+			if err != nil {
+				return false
+			}
+		} else {
+			for _, d := range dates {
+				if strings.TrimSpace(d) == day {
+					return true
+				}
+			}
+			return false
+		}
+	}
+	return true
+}
+
+// bookingExpired informa se a validade do link já terminou (ontem ou antes).
+func bookingExpired(bt *domain.BookingType, now time.Time) bool {
+	if bt.ValidUntil == nil || bt.ValidUntil.IsZero() {
+		return false
+	}
+	return bookingDayKey(now) > bookingDayKey(*bt.ValidUntil)
+}
+
+// BookingLinkExpired expõe bookingExpired para o handler da página pública.
+func BookingLinkExpired(bt *domain.BookingType) bool {
+	return bookingExpired(bt, time.Now().UTC())
+}
+
+// BookingValidityBound formata um limite de validade (YYYY-MM-DD ou vazio).
+func BookingValidityBound(t *time.Time) string {
+	if t == nil || t.IsZero() {
+		return ""
+	}
+	return bookingDayKey(t.UTC())
+}
+
+// sweepExpiredBookingTypes remove links vencidos: apaga agendamentos futuros e
+// seus eventos da agenda, mantém o passado (compromissos ocorridos ficam).
+// A exclusão do link cascateia as linhas restantes no banco.
+func (s *BookingService) sweepExpiredBookingTypes(userID string, types []domain.BookingType) {
+	now := time.Now().UTC()
+	dayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	for i := range types {
+		bt := &types[i]
+		if !bookingExpired(bt, now) {
+			continue
+		}
+		appts, err := s.bookingRepo.ListAppointmentsByUser(userID, dayStart, time.Date(2100, 1, 1, 0, 0, 0, 0, time.UTC))
+		if err != nil {
+			log.Printf("[BookingService] Falha ao varrer expirados do link '%s': %v", bt.ID, err)
+			continue
+		}
+		for _, ap := range appts {
+			if ap.BookingTypeID != bt.ID {
+				continue
+			}
+			if err := s.removeAppointmentEvent(userID, &ap); err != nil {
+				log.Printf("[BookingService] Falha ao remover evento futuro expirado '%s': %v", ap.ID, err)
+			}
+			_ = s.bookingRepo.DeleteAppointment(ap.ID, userID)
+		}
+		if err := s.bookingRepo.DeleteType(bt.ID, userID); err != nil {
+			log.Printf("[BookingService] Falha ao auto-apagar link expirado '%s': %v", bt.ID, err)
+		} else {
+			log.Printf("[BookingService] Link expirado auto-apagado '%s' (%s)", bt.ID, bt.Title)
+		}
+	}
+}
+
 // GetAvailableSlots calcula em tempo real os horários livres na data informada.
 func (s *BookingService) GetAvailableSlots(ctx context.Context, userIdentifier, slug string, date time.Time) ([]domain.BookingSlot, error) {
 	bt, err := s.bookingRepo.GetTypeBySlug(userIdentifier, slug)
@@ -169,6 +332,12 @@ func (s *BookingService) GetAvailableSlots(ctx context.Context, userIdentifier, 
 	}
 	if !bt.IsActive {
 		return nil, errors.New("este link de agendamento está desativado")
+	}
+	if bookingExpired(bt, time.Now().UTC()) {
+		return nil, domain.ErrBookingExpired
+	}
+	if !bookingDateAllowed(bt, date) {
+		return []domain.BookingSlot{}, nil
 	}
 
 	// Normaliza dia da semana (Segunda = 1 ... Domingo = 7)
@@ -271,6 +440,11 @@ func (s *BookingService) ReserveAppointment(ctx context.Context, userIdentifier,
 
 	if req.StartAt.IsZero() || req.EndAt.IsZero() || !req.EndAt.After(req.StartAt) {
 		return nil, domain.ErrInvalidBookingData
+	}
+
+	// Fora da validade (período ou datas específicas) não reserva.
+	if bookingExpired(bt, time.Now().UTC()) || !bookingDateAllowed(bt, req.StartAt) {
+		return nil, domain.ErrBookingExpired
 	}
 
 	// 3. Lock Atômico Serializável contra Double-Booking Concorrente
@@ -390,13 +564,8 @@ func (s *BookingService) CancelAppointment(ctx context.Context, userID, id strin
 	if err != nil {
 		return err
 	}
-	if appt.EventID != "" {
-		if s.syncPusher != nil {
-			pctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-			_ = s.syncPusher.DeleteEvent(pctx, userID, appt.EventID)
-			cancel()
-		}
-		_ = s.eventRepo.Delete(appt.EventID, userID)
+	if err := s.removeAppointmentEvent(userID, appt); err != nil {
+		log.Printf("[BookingService] Aviso ao remover evento do agendamento '%s': %v", id, err)
 	}
 	return s.bookingRepo.DeleteAppointment(id, userID)
 }
