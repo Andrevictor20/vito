@@ -7,11 +7,11 @@ const MASCOT_BODY = require('../../../assets/mascot-body.png');
 
 // Geometria medida no canvas 512x512 do mascot.png com 8 tentáculos (centros dos olhos).
 const EYE = {
-  width: 20 / 512,
-  height: 42 / 512,
-  centerY: 231.6 / 512,
-  leftCenterX: 222.4 / 512,
-  rightCenterX: 288.6 / 512,
+  width: 28 / 512,
+  height: 70 / 512,
+  centerY: 215.6 / 512,
+  leftCenterX: 214.0 / 512,
+  rightCenterX: 297.4 / 512,
 };
 
 // Movimento estilo "sacada + fixação": deslocamento rápido e suave seguido de pausa.
