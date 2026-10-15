@@ -51,17 +51,19 @@ func main() {
 	bookingRepo := repository.NewBookingRepositorySQLite(db)
 	chatRepo := repository.NewChatRepository(db)
 
-	// 3. Provedores de IA & AI Gateway com Failover
+	// 3. Provedores de IA & AI Gateway com Failover.
+	// Ordem: Groq primário (free generoso: 30 RPM/1000 RPD), Gemini como
+	// fallback de qualidade (+grounding) e OpenRouter por último.
 	var aiProviders []ai.Provider
 	var geminiProv *ai.GeminiProvider
+	if cfg.GroqAPIKey != "" {
+		log.Printf("🤖 [AI Provider] Groq Cloud primário (%s).", cfg.GroqModel)
+		aiProviders = append(aiProviders, ai.NewGroqProvider(cfg.GroqAPIKey, cfg.GroqModel))
+	}
 	if cfg.GeminiAPIKey != "" {
-		log.Printf("🤖 [AI Provider] Google AI Studio ativado (%s).", cfg.GeminiModel)
+		log.Printf("🤖 [AI Provider] Google AI Studio como fallback (%s).", cfg.GeminiModel)
 		geminiProv = ai.NewGeminiProvider(cfg.GeminiAPIKey, cfg.GeminiModel)
 		aiProviders = append(aiProviders, geminiProv)
-	}
-	if cfg.GroqAPIKey != "" {
-		log.Printf("🤖 [AI Provider] Groq Cloud ativado como fallback (%s).", cfg.GroqModel)
-		aiProviders = append(aiProviders, ai.NewGroqProvider(cfg.GroqAPIKey, cfg.GroqModel))
 	}
 	if cfg.OpenRouterAPIKey != "" {
 		log.Printf("🤖 [AI Provider] OpenRouter ativado como fallback (%s).", cfg.OpenRouterModel)
@@ -114,7 +116,7 @@ func main() {
 	reminderWorker.Start()
 	defer reminderWorker.Stop()
 
-	// Worker em segundo plano para vigília autônoma de disparadores com cascata completa de IA (Gemini -> Groq -> OpenRouter)
+	// Worker em segundo plano para vigília autônoma de disparadores com cascata completa de IA (Groq -> Gemini -> OpenRouter)
 	var triggerEvaluator service.TriggerEvaluator = &service.DefaultTriggerEvaluator{}
 	if len(aiProviders) > 0 {
 		triggerEvaluator = service.NewAITriggerEvaluator(func(ctx context.Context, t *domain.Trigger) (*domain.TriggerTestResult, error) {
