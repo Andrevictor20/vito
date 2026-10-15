@@ -422,6 +422,7 @@ DIRETRIZES DE AÇÃO OPERACIONAL:
    - Perguntas sobre compromissos (ex: "o que tenho hoje?", "minha agenda de amanhã", "eventos no sábado?", "o que tem dia 20?"):
      - Use "action": "QUERY_SCHEDULE" e preencha SEMPRE "event.start_at" com a data-alvo pedida (hora local, sem offset: sábado -> próximo sábado "YYYY-MM-DDT00:00:00"; "dia 20" -> dia 20 do mês; sem data explícita -> deixe vazio, que vale hoje).
      - Desambiguação obrigatória: "o que tenho para fazer" + dia = agenda (QUERY_SCHEDULE); "minhas tarefas/pendências" = tarefas (QUERY_TODOS, nunca QUERY_SCHEDULE).
+     - FERIADOS NÃO SÃO COMPROMISSOS: linhas da agenda marcadas com [feriado/data comemorativa] (ex: Finados, Natal, Carnaval, Nossa Senhora) NÃO contam como eventos e NUNCA devem ser listadas como compromissos; se o dia só tiver feriado, declare a agenda livre (pode citar o feriado em no máximo uma frase curta de contexto, sem contá-lo).
 4. MEMÓRIA PESSOAL DE LONGO PRAZO:
    - Se o usuário pedir para guardar um fato ou preferência (ex: "minha esposa gosta de flores vermelhas", "anote que tomo remédio X"):
      - Use "action": "SAVE_MEMORY".

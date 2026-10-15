@@ -137,7 +137,11 @@ func (s *AssistantService) Process(ctx context.Context, userID string, input ai.
 			}
 		loc := userLocation(input.Timezone)
 		for _, ev := range events[:limit] {
-			input.ActiveSchedule = append(input.ActiveSchedule, assistant.FormatScheduleLine(ev, loc))
+			line := assistant.FormatScheduleLine(ev, loc)
+			if isHolidayLikeEvent(ev) {
+				line += " [feriado/data comemorativa — NÃO é um compromisso]"
+			}
+			input.ActiveSchedule = append(input.ActiveSchedule, line)
 		}
 		}
 	}
@@ -486,6 +490,14 @@ func (s *AssistantService) Process(ctx context.Context, userID string, input ai.
 		dayLabel := queryDayLabel(input.Now.In(loc), targetDay)
 		events, err := s.calSvc.ListEvents(userID, from, to)
 		if err == nil {
+			// Feriados/datas comemorativas do Google não são compromissos.
+			realEvents := make([]domain.Event, 0, len(events))
+			for _, ev := range events {
+				if !isHolidayLikeEvent(ev) {
+					realEvents = append(realEvents, ev)
+				}
+			}
+			events = realEvents
 			if len(events) == 0 {
 				res.Message = fmt.Sprintf("Você não tem nenhum compromisso %s.", dayLabel)
 			} else {
@@ -898,6 +910,50 @@ func userLocation(timezone string) *time.Location {
 		}
 	}
 	return time.FixedZone("BRT", -3*3600)
+}
+
+// holidayQueryKeywords espelha ClassifyEvent/CheckConflict: termos que, combinados
+// com categoria holiday ou duração de dia inteiro, identificam feriados e datas
+// comemorativas vindos do Google — que não são compromissos.
+var holidayQueryKeywords = []string{
+	"feriado", "nossa senhora", "aparecida", "ano novo", "confraternização",
+	"carnaval", "quarta-feira de cinzas", "quarta de cinzas", "sexta-feira santa",
+	"paixão de cristo", "páscoa", "pascoa", "tiradentes", "dia do trabalho",
+	"dia do trabalhador", "corpus christi", "independência", "independencia",
+	"finados", "proclamação da república", "proclamacao da republica",
+	"consciência negra", "consciencia negra", "natal", "véspera de natal",
+	"vespera de natal", "véspera de ano novo", "vespera de ano novo",
+	"dia das mães", "dia dos pais", "dia das crianças", "holiday",
+	"réveillon", "reveillon",
+}
+
+// isHolidayLikeEvent identifica feriados/datas comemorativas (ex: calendário de
+// feriados do Google): categoria holiday/feriado sempre; por título, só quando
+// dia inteiro (dura >= 20h ou ancora na meia-noite) para não excluir
+// compromissos reais com nome parecido ("Jantar de Natal 20h" continua evento).
+func isHolidayLikeEvent(ev domain.Event) bool {
+	cat := strings.ToLower(strings.TrimSpace(ev.Category))
+	if cat == "holiday" || cat == "feriado" {
+		return true
+	}
+	combined := strings.ToLower(strings.TrimSpace(ev.Title + " " + ev.Description))
+	matched := false
+	for _, kw := range holidayQueryKeywords {
+		if strings.Contains(combined, kw) {
+			matched = true
+			break
+		}
+	}
+	if !matched {
+		return false
+	}
+	if ev.EndAt.Sub(ev.StartAt) >= 20*time.Hour {
+		return true
+	}
+	if ev.StartAt.Hour() == 0 && ev.StartAt.Minute() == 0 {
+		return true
+	}
+	return false
 }
 
 // queryDayLabel rotula o dia consultado em linguagem natural: hoje/amanhã ou

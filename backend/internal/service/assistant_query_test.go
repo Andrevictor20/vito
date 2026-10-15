@@ -117,3 +117,89 @@ func TestAssistantService_QueryScheduleTargetDate(t *testing.T) {
 		t.Errorf("resposta de sábado não deveria vazar o evento de hoje: %q", resp.Message)
 	}
 }
+
+// Feriados/datas comemorativas vindos do Google (categoria holiday, dia inteiro)
+// não são compromissos: "quais meus eventos de hoje?" deve ignorá-los.
+func TestAssistantService_QueryScheduleIgnoresHolidays(t *testing.T) {
+	db, err := database.Open(filepath.Join(t.TempDir(), "test_query_holiday.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+
+	userRepo := repository.NewUserRepository(db)
+	eventRepo := repository.NewEventRepository(db)
+	calSvc := service.NewCalendarService(eventRepo)
+
+	seedUser := func(id string) {
+		t.Helper()
+		if err := userRepo.Create(&domain.User{
+			ID: id, Name: "André", Email: id + "@q.local",
+			PasswordHash: "h", CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// 02/11/2026 = segunda-feira (Finados), dia inteiro em BRT.
+	brt := time.FixedZone("BRT", -3*3600)
+	seedHoliday := func(userID string) {
+		t.Helper()
+		hol := &domain.Event{
+			ID: "hol-" + userID, UserID: userID, Title: "Finados",
+			Category: "holiday", Source: "google",
+			StartAt:   time.Date(2026, 11, 2, 0, 0, 0, 0, brt).UTC(),
+			EndAt:     time.Date(2026, 11, 3, 0, 0, 0, 0, brt).UTC(),
+			CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
+		}
+		if err := eventRepo.Create(hol); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Caso 1: feriado + compromisso real no mesmo dia.
+	seedUser("user-qhol-1")
+	seedHoliday("user-qhol-1")
+	dentStart := time.Date(2026, 11, 2, 14, 0, 0, 0, time.UTC) // 11:00 BRT
+	if _, _, err := calSvc.CreateEvent("user-qhol-1", "Dentista", "", "", dentStart, dentStart.Add(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+
+	mockAI := &mockAIGateway{intent: &ai.ParsedIntent{Action: ai.ActionQuerySchedule, Message: ""}}
+	astSvc := service.NewAssistantService(mockAI, calSvc, nil, nil)
+
+	resp, err := astSvc.Process(context.Background(), "user-qhol-1", ai.UserInput{
+		Text:     "quais meus eventos de hoje?",
+		Now:      time.Date(2026, 11, 2, 12, 0, 0, 0, time.UTC),
+		Timezone: "America/Sao_Paulo",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(resp.Message, "Finados") {
+		t.Errorf("feriado não deveria ser listado como evento: %q", resp.Message)
+	}
+	for _, want := range []string{"Dentista", "1 compromisso", "hoje"} {
+		if !strings.Contains(resp.Message, want) {
+			t.Errorf("resposta deveria conter %q: %q", want, resp.Message)
+		}
+	}
+
+	// Caso 2: dia com SÓ feriado → agenda livre.
+	seedUser("user-qhol-2")
+	seedHoliday("user-qhol-2")
+
+	resp2, err := astSvc.Process(context.Background(), "user-qhol-2", ai.UserInput{
+		Text:     "quais meus eventos de hoje?",
+		Now:      time.Date(2026, 11, 2, 12, 0, 0, 0, time.UTC),
+		Timezone: "America/Sao_Paulo",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(resp2.Message, "nenhum compromisso") {
+		t.Errorf("dia só com feriado deveria declarar agenda livre: %q", resp2.Message)
+	}
+	if strings.Contains(resp2.Message, "Finados") {
+		t.Errorf("feriado isolado não deveria ser listado: %q", resp2.Message)
+	}
+}
