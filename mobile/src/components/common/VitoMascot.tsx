@@ -5,13 +5,13 @@ import { useTheme } from '../../context/ThemeContext';
 // Corpo sem olhos: a camada animada é a única fonte dos olhos (evita o bug dos 4 olhos).
 const MASCOT_BODY = require('../../../assets/mascot-body.png');
 
-// Geometria medida no canvas 512x512 do mascot.png original (centros dos olhos).
+// Geometria medida no canvas 512x512 do mascot.png com 8 tentáculos (centros dos olhos).
 const EYE = {
-  width: 29 / 512,
-  height: 71 / 512,
-  centerY: 216.5 / 512,
-  leftCenterX: 214.5 / 512,
-  rightCenterX: 297.5 / 512,
+  width: 20 / 512,
+  height: 42 / 512,
+  centerY: 231.6 / 512,
+  leftCenterX: 222.4 / 512,
+  rightCenterX: 288.6 / 512,
 };
 
 // Movimento estilo "sacada + fixação": deslocamento rápido e suave seguido de pausa.
