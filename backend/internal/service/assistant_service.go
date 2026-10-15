@@ -472,15 +472,24 @@ func (s *AssistantService) Process(ctx context.Context, userID string, input ai.
 			res.Reply = res.Message
 			return res, nil
 		}
-		from := input.Now.Truncate(24 * time.Hour)
-		to := from.Add(24 * time.Hour)
+		loc := userLocation(input.Timezone)
+		// Data-alvo (P2): se a IA preencheu event.start_at com o dia pedido, consulta esse
+		// dia; senão, mantém o comportamento histórico (hoje).
+		targetDay := input.Now.In(loc)
+		hasTarget := intent.Event != nil && !intent.Event.StartAt.IsZero()
+		if hasTarget {
+			targetDay = intent.Event.StartAt.In(loc)
+		}
+		dayStartLoc := time.Date(targetDay.Year(), targetDay.Month(), targetDay.Day(), 0, 0, 0, 0, loc)
+		from := dayStartLoc.UTC()
+		to := dayStartLoc.Add(24 * time.Hour).UTC()
+		dayLabel := queryDayLabel(input.Now.In(loc), targetDay)
 		events, err := s.calSvc.ListEvents(userID, from, to)
 		if err == nil {
 			if len(events) == 0 {
-				res.Message = "Você não tem nenhum compromisso agendado para hoje."
+				res.Message = fmt.Sprintf("Você não tem nenhum compromisso %s.", dayLabel)
 			} else {
 				// Lista o quê (não só quantos): responde "qual compromisso?" de uma vez.
-				loc := userLocation(input.Timezone)
 				noun := "compromisso"
 				if len(events) > 1 {
 					noun = "compromissos"
@@ -498,7 +507,7 @@ func (s *AssistantService) Process(ctx context.Context, userID string, input ai.
 						parts = append(parts, fmt.Sprintf("%s, %s%s", ev.Title, start, end))
 					}
 				}
-				res.Message = fmt.Sprintf("Você tem %d %s hoje: %s.", len(events), noun, strings.Join(parts, "; "))
+				res.Message = fmt.Sprintf("Você tem %d %s %s: %s.", len(events), noun, dayLabel, strings.Join(parts, "; "))
 			}
 			res.Reply = res.Message
 		} else {
@@ -507,6 +516,40 @@ func (s *AssistantService) Process(ctx context.Context, userID string, input ai.
 			res.Reply = res.Message
 			return res, nil
 		}
+
+	case ai.ActionQueryTodos:
+		if s.todoSvc == nil {
+			log.Printf("⚠️ [AssistantService] TodoService indisponível para QUERY_TODOS (user=%s)", userID)
+			res.Message = "Não consegui consultar suas tarefas agora. Tente novamente em instantes."
+			res.Reply = res.Message
+			return res, nil
+		}
+		todos, err := s.todoSvc.ListTodos(userID, domain.TodoStatusPending)
+		if err != nil {
+			log.Printf("⚠️ [AssistantService] Falha ao consultar tarefas (user=%s): %v", userID, err)
+			res.Message = fmt.Sprintf("Não consegui consultar suas tarefas agora (%v). Tente novamente em instantes.", err)
+			res.Reply = res.Message
+			return res, nil
+		}
+		if len(todos) == 0 {
+			res.Message = "Você não tem tarefas pendentes. Aproveite o dia!"
+		} else {
+			loc := userLocation(input.Timezone)
+			noun := "tarefa pendente"
+			if len(todos) > 1 {
+				noun = "tarefas pendentes"
+			}
+			parts := make([]string, 0, len(todos))
+			for _, td := range todos {
+				due := "sem prazo"
+				if td.DueDate != nil {
+					due = "até " + td.DueDate.In(loc).Format("02/01 às 15:04")
+				}
+				parts = append(parts, fmt.Sprintf("%s (%s)", td.Title, due))
+			}
+			res.Message = fmt.Sprintf("Você tem %d %s: %s.", len(todos), noun, strings.Join(parts, "; "))
+		}
+		res.Reply = res.Message
 
 	case ai.ActionSaveMemory:
 		if s.memoryRepo != nil {
@@ -855,6 +898,21 @@ func userLocation(timezone string) *time.Location {
 		}
 	}
 	return time.FixedZone("BRT", -3*3600)
+}
+
+// queryDayLabel rotula o dia consultado em linguagem natural: hoje/amanhã ou
+// dia da semana com data (ex: "sábado (17/10)"). Sem data-alvo, vale hoje.
+func queryDayLabel(now, target time.Time) string {
+	ymd := func(t time.Time) string { return t.Format("2006-01-02") }
+	switch ymd(target) {
+	case ymd(now):
+		return "hoje"
+	case ymd(now.Add(24 * time.Hour)):
+		return "amanhã"
+	default:
+		return fmt.Sprintf("no %s (%s)",
+			strings.ToLower(ai.WeekdayPT(target.Weekday())), target.Format("02/01"))
+	}
 }
 
 // clarificationResponse monta uma resposta de pergunta sem tocar no banco.

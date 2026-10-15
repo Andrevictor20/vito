@@ -19,6 +19,7 @@ const (
 	ActionCreatePending IntentAction = "CREATE_PENDING_ITEM"
 	ActionConvertPending IntentAction = "CONVERT_PENDING_TO_EVENT"
 	ActionQuerySchedule IntentAction = "QUERY_SCHEDULE"
+	ActionQueryTodos    IntentAction = "QUERY_TODOS"
 	ActionSaveMemory    IntentAction = "SAVE_MEMORY"
 	ActionCreateTrigger IntentAction = "CREATE_TRIGGER"
 	ActionCreateBookingLink IntentAction = "CREATE_BOOKING_LINK"

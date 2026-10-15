@@ -26,6 +26,10 @@ func DefaultMessageFor(action ai.IntentAction) string {
 		return "Qual compromisso devo excluir? Me diga o nome (ex: 'exclua a aula de inglês')."
 	case ai.ActionUpdateEvent:
 		return "Qual compromisso devo reagendar e para quando? Ex: 'mude a aula de inglês para as 9h'."
+	case ai.ActionQuerySchedule:
+		return "Sobre qual dia quer saber? Ex: 'o que tenho hoje?', 'eventos no sábado?' ou 'agenda do dia 20'."
+	case ai.ActionQueryTodos:
+		return "Claro! Já listo suas tarefas pendentes para você."
 	default:
 		return "Pode me dar mais detalhes para eu ajudar? Ex: 'Criar evento Dentista amanhã às 14h'."
 	}
