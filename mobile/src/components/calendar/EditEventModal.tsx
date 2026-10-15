@@ -3,10 +3,8 @@ import {
   StyleSheet,
   View,
   Text,
-  Modal,
   TextInput,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   ScrollView,
   ActivityIndicator,
   Alert,
@@ -14,6 +12,7 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens, MD3Shapes } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
+import { BottomSheetModal } from '../ui/BottomSheetModal';
 import { Event } from '../../types';
 import { parseSafeDate } from '../../utils/calendarDateUtils';
 
@@ -76,6 +75,16 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
 
   if (!event) return null;
 
+  let eventDateLabel: string | undefined;
+  try {
+    eventDateLabel = parseSafeDate(event.start_at).toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: 'short',
+    });
+  } catch {
+    eventDateLabel = undefined;
+  }
+
   const handleSave = async () => {
     if (!title.trim() || !event) return;
     setSaving(true);
@@ -131,28 +140,12 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <TouchableWithoutFeedback onPress={onClose}>
-        <View style={styles.overlay}>
-          <TouchableWithoutFeedback>
-            <View style={[styles.card, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
-              {/* Header do Modal */}
-              <View style={styles.header}>
-                <View style={styles.headerLeft}>
-                  <Text style={[styles.title, { color: colors.onSurface }]}>Editar Compromisso</Text>
-                  {isRecurring && (
-                    <View style={[styles.recurringBadge, { backgroundColor: isDark ? '#1E293B' : '#E0F2FE', borderColor: colors.primary }]}>
-                      <MaterialIcons name="repeat" size={13} color={colors.primary} />
-                      <Text style={[styles.recurringBadgeText, { color: colors.primary }]}>Série Recorrente</Text>
-                    </View>
-                  )}
-                </View>
-
-                <TouchableOpacity onPress={onClose} hitSlop={tokens.hitSlop.sm} accessibilityLabel="Fechar">
-                  <MaterialIcons name="close" size={20} color={colors.onSurfaceVariant} />
-                </TouchableOpacity>
-              </View>
-
+    <BottomSheetModal
+      visible={visible}
+      onClose={onClose}
+      title="Editar Compromisso"
+      subtitle={isRecurring ? `Série recorrente${eventDateLabel ? ` · ${eventDateLabel}` : ''}` : eventDateLabel}
+    >
               <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
                 {/* Título */}
                 <View style={styles.fieldGroup}>
@@ -397,58 +390,11 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
                   </TouchableOpacity>
                 </View>
               </View>
-            </View>
-          </TouchableWithoutFeedback>
-        </View>
-      </TouchableWithoutFeedback>
-    </Modal>
+    </BottomSheetModal>
   );
 };
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.75)',
-    justifyContent: 'center',
-    padding: tokens.spacing.md,
-  },
-  card: {
-    borderRadius: MD3Shapes.large,
-    borderWidth: 1,
-    maxHeight: '90%',
-    overflow: 'hidden',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: tokens.spacing.md,
-    paddingTop: tokens.spacing.md,
-    paddingBottom: tokens.spacing.sm,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flexWrap: 'wrap',
-  },
-  title: {
-    fontSize: tokens.typography.size.titleMedium,
-    fontWeight: tokens.typography.weight.bold,
-  },
-  recurringBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: MD3Shapes.full,
-    borderWidth: 1,
-  },
-  recurringBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-  },
   scrollContent: {
     paddingHorizontal: tokens.spacing.md,
     paddingBottom: tokens.spacing.md,

@@ -5,13 +5,10 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  Modal,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
 import { tokens } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
+import { BottomSheetModal } from '../ui/BottomSheetModal';
 import { hapticFeedback } from '../../theme/motion';
 import type { PendingItem } from '../../types';
 import { parseReminderInput, splitReminderISO } from '../../utils/reminderInput';
@@ -82,24 +79,13 @@ export const ReminderSheet: React.FC<ReminderSheetProps> = ({
   ];
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.overlay}
-      >
-        <View style={[styles.sheet, { backgroundColor: colors.surfaceContainer }]}>
-          <View style={styles.handle} />
-          <View style={styles.headerRow}>
-            <Text style={[styles.title, { color: colors.onSurface }]}>Lembrete</Text>
-            <TouchableOpacity onPress={onClose} hitSlop={tokens.hitSlop.sm} accessibilityLabel="Fechar lembrete">
-              <MaterialIcons name="close" size={22} color={colors.onSurfaceVariant} />
-            </TouchableOpacity>
-          </View>
-          {item && (
-            <Text style={[styles.itemTitle, { color: colors.onSurfaceVariant }]} numberOfLines={1}>
-              {item.title}
-            </Text>
-          )}
+    <BottomSheetModal
+      visible={visible}
+      onClose={onClose}
+      title="Lembrete"
+      subtitle={item?.title}
+    >
+      <View style={styles.body}>
 
           <Text style={[styles.label, { color: colors.onSurfaceVariant }]}>Data e hora</Text>
           <View style={styles.row}>
@@ -195,46 +181,14 @@ export const ReminderSheet: React.FC<ReminderSheetProps> = ({
               </Text>
             </TouchableOpacity>
           </View>
-        </View>
-      </KeyboardAvoidingView>
-    </Modal>
+      </View>
+    </BottomSheetModal>
   );
 };
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.4)',
-  },
-  sheet: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingHorizontal: tokens.spacing.md,
-    paddingTop: 8,
-    paddingBottom: 28,
+  body: {
     gap: 10,
-  },
-  handle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#9CA3AF',
-    alignSelf: 'center',
-    marginBottom: 4,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  title: {
-    fontSize: 17,
-    fontWeight: '700',
-  },
-  itemTitle: {
-    fontSize: 13,
-    marginTop: -6,
   },
   label: {
     fontSize: 12,

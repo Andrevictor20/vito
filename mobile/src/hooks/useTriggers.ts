@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../services/api';
 import { Trigger, TriggerLog, TriggerTestResult, TriggerCategory, TriggerStatus, CreateTriggerInput } from '../types';
+import { filterTriggersByCategory } from '../utils/radarFilter';
 
 import { dataSync } from '../services/dataSync';
 import { queryKeys } from '../services/queryClient';
@@ -189,10 +190,7 @@ export const useTriggers = (userId?: string) => {
   );
 
   const filteredTriggers = useMemo(() => {
-    if (selectedCategory === 'all') {
-      return triggers;
-    }
-    return triggers.filter((t) => t.category === selectedCategory);
+    return filterTriggersByCategory(triggers, selectedCategory);
   }, [triggers, selectedCategory]);
 
   const stats = useMemo(() => {

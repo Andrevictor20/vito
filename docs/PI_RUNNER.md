@@ -49,6 +49,10 @@ SHORTIO_API_KEY=<sua chave Short.io>
 SHORTIO_DOMAIN=vito.s.gy
 PUBLIC_BASE_URL=https://vito.rasppi.cloud
 GOOGLE_REDIRECT_URL=https://vito.rasppi.cloud/api/v1/auth/google/callback
+# Origens de browser autorizadas (SEC-03). Sem esta var, produção só aceita o
+# PUBLIC_BASE_URL e o web dev (ex: http://localhost:8081 no notebook) cai no
+# preflight CORS. Formato: vírgula, sem barra no fim, sem aspas.
+CORS_ALLOWED_ORIGINS=https://vito.rasppi.cloud,http://localhost:8081
 CLOUDFLARE_TUNNEL_TOKEN=<token do tunnel, se usar perfil tunnel>
 ```
 
@@ -125,8 +129,11 @@ O `healthz` deve responder `200`. O `config` deve mostrar o `backend`
 
 | Sintoma | Causa provável | Ação |
 |---|---|---|
+| Job `deploy` preso em **Queued** por horas | runner nunca instalado, offline (Pi reiniciou) ou labels divergentes — o job exige `runs-on: [self-hosted, linux, arm64]` | confira `Settings > Actions > Runners` (deve estar verde com os 3 labels); no Pi: `sudo ./svc.sh start && sudo ./svc.sh status` em `~/actions-runner` |
+| Run antigo destravou mas deployou commit velho | o Queued retoma de onde parou | **Cancel workflow** no run antigo e **Re-run failed jobs** (ou push novo) após o runner ficar verde |
 | Runner offline | `svc.sh` parado / Pi reiniciou | `sudo ./svc.sh start && sudo ./svc.sh status` |
 | `pull` pede login | token expirado | refaça `docker login ghcr.io` (CI usa `GITHUB_TOKEN` automático) |
 | `/healthz` sem resposta | `.env` incompleto / porta ocupada | `docker logs vito-backend`; confira `JWT_SECRET`/`DATA_ENCRYPTION_KEY>=32` |
+| Preflight CORS falha no web dev | `CORS_ALLOWED_ORIGINS` sem a origem do browser | inclua `http://localhost:8081` (notebook) na var + `up -d --force-recreate backend` (`restart` sozinho não relê o `.env`) |
 | `config` mostra `build:` | esqueceu o `-f docker-compose.prod.yml` | use sempre os dois `-f` em `pull/up/config` |
 | Disco cheio | imagens antigas | `docker image prune -f && docker system df` |

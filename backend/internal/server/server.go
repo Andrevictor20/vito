@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -19,6 +20,7 @@ import (
 type Server struct {
 	router            *chi.Mux
 	allowedOrigins    []string
+	environment       string
 	authHandler       *handler.AuthHandler
 	googleAuthHandler *handler.GoogleAuthHandler
 	calHandler        *handler.CalendarHandler
@@ -37,6 +39,8 @@ type Server struct {
 
 // Config contém as dependências necessárias para inicializar o Server.
 type Config struct {
+	// Environment espelha APP_ENV (development/production) para o fail-closed do CORS.
+	Environment       string
 	AuthHandler       *handler.AuthHandler
 	GoogleAuthHandler *handler.GoogleAuthHandler
 	CalHandler        *handler.CalendarHandler
@@ -51,7 +55,8 @@ type Config struct {
 	BookingHandler    *handler.BookingHandler
 	ChatHandler       *handler.ChatHandler
 	AuthSvc           *service.AuthService
-	// AllowedOrigins restringe o CORS (SEC-03). Vazio = ["*"] (dev/testes).
+	// AllowedOrigins restringe o CORS (SEC-03). Vazio = ["*"] apenas fora
+	// de produção (dev/testes); em produção, vazio nega origens (fail-closed).
 	AllowedOrigins []string
 }
 
@@ -63,6 +68,7 @@ func New(cfg ...Config) *Server {
 
 	if len(cfg) > 0 {
 		s.allowedOrigins = cfg[0].AllowedOrigins
+		s.environment = cfg[0].Environment
 		s.authHandler = cfg[0].AuthHandler
 		s.googleAuthHandler = cfg[0].GoogleAuthHandler
 		s.calHandler = cfg[0].CalHandler
@@ -98,13 +104,19 @@ func (s *Server) setupMiddlewares() {
 	s.router.Use(middleware.BodyLimitMiddleware)
 
 	// CORS restrito por ambiente (SEC-03): env explícito, PublicBaseURL em produção, * em dev.
+	// Em produção sem origens, o handler nem é instalado (o go-chi/cors trata
+	// lista vazia como allow-all): navegadores bloqueiam tudo (fail-closed) e
+	// o app nativo segue normal, pois não usa CORS.
 	origins := s.allowedOrigins
-	if len(origins) == 0 {
+	if len(origins) == 0 && !strings.EqualFold(s.environment, "production") {
 		origins = []string{"*"}
+	}
+	if len(origins) == 0 {
+		return
 	}
 	s.router.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   origins,
-		AllowedMethods:   []string{"GET", "POST", "PATCH", "DELETE", "OPTIONS"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		ExposedHeaders:   []string{"Link"},
 		AllowCredentials: false,

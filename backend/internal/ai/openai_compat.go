@@ -39,7 +39,8 @@ func NewOpenRouterProvider(apiKey, model string) *OpenAICompatProvider {
 // NewGroqProvider instancia o provedor para o Groq Cloud.
 func NewGroqProvider(apiKey, model string) *OpenAICompatProvider {
 	if model == "" {
-		model = "qwen/qwen3.8-27b"
+		// Mesmo default de GROQ_MODEL em config.go (llama válido no catálogo Groq).
+		model = "llama-3.3-70b-versatile"
 	}
 	return &OpenAICompatProvider{
 		providerName: "Groq (" + model + ")",

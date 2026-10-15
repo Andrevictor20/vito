@@ -237,6 +237,7 @@ func main() {
 		ChatHandler:       chatHandler,
 		AuthSvc:           authSvc,
 		AllowedOrigins:    cfg.AllowedOrigins(),
+		Environment:       cfg.Environment,
 	})
 
 	httpServer := &http.Server{

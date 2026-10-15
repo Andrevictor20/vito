@@ -9,19 +9,18 @@ import {
   TextInput,
   ActivityIndicator,
   RefreshControl,
-  Modal,
   Platform,
   SafeAreaView,
   StatusBar as RNStatusBar,
   BackHandler,
   Share,
-  KeyboardAvoidingView,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens, MD3Shapes, tabularNumbers } from '../theme/tokens';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
+import { BottomSheetModal } from '../components/ui/BottomSheetModal';
 import { hapticFeedback } from '../theme/motion';
 import { api } from '../services/api';
 import { SelectableChip } from '../components/ui/SelectableChip';
@@ -693,51 +692,16 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack, createRequ
         </ScrollView>
       )}
 
-      {/* Modal de Criação / Edição de Link de Booking */}
-      <Modal
+      {/* Criação / Edição de Link de Booking */}
+      <BottomSheetModal
         visible={createModalVisible}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => {
+        onClose={() => {
           setCreateModalVisible(false);
           setEditingType(null);
         }}
+        title={editingType ? 'Editar Link de Agendamento' : 'Novo Link de Agendamento'}
+        subtitle={editingType ? 'Ajuste regras, horários e duração do link' : 'Configure janelas e regras para convidados'}
       >
-        <KeyboardAvoidingView
-          style={styles.modalOverlay}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        >
-          <TouchableOpacity
-            style={styles.modalBackdrop}
-            activeOpacity={1}
-            onPress={() => {
-              setCreateModalVisible(false);
-              setEditingType(null);
-            }}
-          />
-          <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
-            <View style={styles.modalHeader}>
-              <View style={styles.modalTitleBlock}>
-                <Text style={[styles.modalTitle, { color: colors.onSurface }]}>
-                  {editingType ? 'Editar Link de Agendamento' : 'Novo Link de Agendamento'}
-                </Text>
-                <Text style={[styles.modalSubtitle, { color: colors.onSurfaceVariant }]}>
-                  {editingType
-                    ? 'Ajuste regras, horários e duração do link'
-                    : 'Configure janelas e regras para convidados'}
-                </Text>
-              </View>
-              <TouchableOpacity
-                onPress={() => {
-                  setCreateModalVisible(false);
-                  setEditingType(null);
-                }}
-                style={styles.modalCloseBtn}
-              >
-                <MaterialIcons name="close" size={22} color={colors.onSurfaceVariant} />
-              </TouchableOpacity>
-            </View>
-
             <ScrollView
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
@@ -949,39 +913,14 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack, createRequ
                 )}
               </TouchableOpacity>
             </ScrollView>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+      </BottomSheetModal>
 
-      {/* Modal Seletor Rápido de Horário (Início ou Fim) */}
-      <Modal
+      {/* Seletor Rápido de Horário (Início ou Fim) */}
+      <BottomSheetModal
         visible={timePickerTarget !== null}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setTimePickerTarget(null)}
+        onClose={() => setTimePickerTarget(null)}
+        title={timePickerTarget === 'start' ? 'Horário de Início' : 'Horário de Término'}
       >
-        <View style={styles.pickerModalOverlay}>
-          <TouchableOpacity
-            style={styles.pickerModalBackdrop}
-            activeOpacity={1}
-            onPress={() => setTimePickerTarget(null)}
-          />
-          <View style={[styles.pickerModalContent, { backgroundColor: colors.surface, borderColor: colors.outlineVariant }]}>
-            <View style={styles.pickerModalHeader}>
-              <View style={styles.pickerModalTitleRow}>
-                <MaterialIcons name="schedule" size={20} color={colors.primary} />
-                <Text style={[styles.pickerModalTitle, { color: colors.onSurface }]}>
-                  {timePickerTarget === 'start' ? 'Horário de Início' : 'Horário de Término'}
-                </Text>
-              </View>
-              <TouchableOpacity
-                onPress={() => setTimePickerTarget(null)}
-                style={styles.modalCloseBtn}
-              >
-                <MaterialIcons name="close" size={20} color={colors.onSurfaceVariant} />
-              </TouchableOpacity>
-            </View>
-
             <ScrollView
               style={styles.pickerScrollView}
               contentContainerStyle={styles.pickerGrid}
@@ -1027,9 +966,7 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack, createRequ
                 );
               })}
             </ScrollView>
-          </View>
-        </View>
-      </Modal>
+      </BottomSheetModal>
 
       {/* FAB fixo padronizado: pill compacta sempre visível (só some no vazio, onde o CTA é a entrada) */}
       {(types || []).length > 0 && (
@@ -1327,45 +1264,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontStyle: 'italic',
   },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  modalBackdrop: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.55)',
-  },
-  modalContent: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingHorizontal: 20,
-    paddingTop: 18,
-    paddingBottom: Platform.OS === 'ios' ? 36 : 16,
-    maxHeight: '85%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16,
-  },
-  modalTitleBlock: {
-    flex: 1,
-    marginRight: 8,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    letterSpacing: -0.3,
-  },
-  modalSubtitle: {
-    fontSize: 12,
-    marginTop: 2,
-  },
   modalScrollContent: {
     paddingBottom: 40,
   },
@@ -1496,48 +1394,6 @@ const styles = StyleSheet.create({
   },
   timeSelectorValue: {
     fontSize: 15,
-    fontWeight: '700',
-  },
-  pickerModalOverlay: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  pickerModalBackdrop: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
-  },
-  pickerModalContent: {
-    width: '100%',
-    maxWidth: 380,
-    maxHeight: '70%',
-    borderRadius: 20,
-    borderWidth: 1,
-    padding: 18,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  pickerModalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  pickerModalTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  pickerModalTitle: {
-    fontSize: 16,
     fontWeight: '700',
   },
   pickerScrollView: {

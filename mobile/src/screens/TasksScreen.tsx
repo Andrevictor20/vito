@@ -199,7 +199,7 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
               status: 'pending',
               due_date: p.scheduled_date ? `${p.scheduled_date}T09:00:00` : undefined,
               remind_at: p.remind_at || undefined,
-              remind_repeat: (p.remind_repeat as any) || 'none',
+              remind_repeat: p.remind_repeat || 'none',
               remind_advance_minutes: p.remind_advance_minutes || 0,
               created_at: '',
             } as Todo);
@@ -332,7 +332,7 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
           </Text>
         )}
 
-        {pending.error && (
+        {pending.error && pending.items.length === 0 && (
           <View style={[styles.errorCard, { backgroundColor: colors.errorContainer, borderColor: colors.error }]}>
             <Text style={[styles.errorText, { color: colors.onErrorContainer }]}>{pending.error}</Text>
             <TouchableOpacity onPress={pending.retry} activeOpacity={0.7} accessibilityLabel="Tentar carregar de novo">

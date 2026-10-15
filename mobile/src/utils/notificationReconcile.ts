@@ -9,7 +9,7 @@ export function findOrphanNotificationIds(
   const pd = validPendingIds instanceof Set ? validPendingIds : new Set(validPendingIds || []);
   const orphans: string[] = [];
   for (const n of scheduled || []) {
-    const data: any = (n as any)?.content?.data || {};
+    const data = n.content?.data || {};
     const eventId: string | undefined = data.eventId;
     const todoId: string | undefined = data.todoId;
     const pendingId: string | undefined = data.pendingId;

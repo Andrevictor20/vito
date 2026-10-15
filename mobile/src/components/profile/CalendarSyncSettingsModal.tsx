@@ -3,7 +3,6 @@ import {
   StyleSheet,
   View,
   Text,
-  Modal,
   TouchableOpacity,
   ScrollView,
   TextInput,
@@ -13,6 +12,7 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
+import { BottomSheetModal } from '../ui/BottomSheetModal';
 import { useCalendarSync } from '../../hooks/useCalendarSync';
 
 interface CalendarSyncSettingsModalProps {
@@ -138,38 +138,12 @@ export const CalendarSyncSettingsModal: React.FC<CalendarSyncSettingsModalProps>
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={styles.modalOverlay}>
-        <View
-          style={[
-            styles.modalContainer,
-            { backgroundColor: colors.surface, borderColor: colors.outlineVariant },
-          ]}
-        >
-          {/* Header */}
-          <View style={[styles.header, { borderBottomColor: colors.outlineVariant }]}>
-            <View style={styles.headerLeft}>
-              <View style={[styles.headerIconBox, { backgroundColor: colors.surfaceContainerHigh }]}>
-                <MaterialIcons name="sync" size={20} color={colors.primary} />
-              </View>
-              <View>
-                <Text style={[styles.title, { color: colors.onSurface }]}>
-                  Sincronização de Calendários
-                </Text>
-                <Text style={[styles.subtitle, { color: colors.onSurfaceVariant }]}>
-                  Google Calendar & Calendário do Dispositivo
-                </Text>
-              </View>
-            </View>
-            <TouchableOpacity
-              onPress={onClose}
-              style={[styles.closeBtn, { backgroundColor: colors.surfaceContainerHigh }]}
-              accessibilityLabel="Fechar modal"
-            >
-              <MaterialIcons name="close" size={20} color={colors.onSurface} />
-            </TouchableOpacity>
-          </View>
-
+    <BottomSheetModal
+      visible={visible}
+      onClose={onClose}
+      title="Sincronização de Calendários"
+      subtitle="Google Calendar & Calendário do Dispositivo"
+    >
           <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
 
             {/* CARD 1: GOOGLE CALENDAR */}
@@ -350,60 +324,11 @@ export const CalendarSyncSettingsModal: React.FC<CalendarSyncSettingsModalProps>
               </TouchableOpacity>
             </View>
           </ScrollView>
-        </View>
-      </View>
-    </Modal>
+    </BottomSheetModal>
   );
 };
 
 const styles = StyleSheet.create({
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    justifyContent: 'flex-end',
-  },
-  modalContainer: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: '90%',
-    borderWidth: 1,
-    borderBottomWidth: 0,
-    paddingBottom: 24,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  headerIconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  subtitle: {
-    fontSize: 12,
-  },
-  closeBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   scrollContent: {
     padding: 20,
     gap: 16,

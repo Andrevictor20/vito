@@ -3,7 +3,6 @@ import {
   StyleSheet,
   View,
   Text,
-  Modal,
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
@@ -14,6 +13,7 @@ import { tokens, MD3Shapes } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { api } from '../../services/api';
 import { AutonomyMode, AISettings } from '../../types';
+import { BottomSheetModal } from '../ui/BottomSheetModal';
 import { M3Switch } from '../ui/M3Switch';
 
 interface AISettingsModalProps {
@@ -88,38 +88,12 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={styles.modalOverlay}>
-        <View
-          style={[
-            styles.modalContainer,
-            { backgroundColor: colors.surface, borderColor: colors.outlineVariant },
-          ]}
-        >
-          {/* Header */}
-          <View style={[styles.header, { borderBottomColor: colors.outlineVariant }]}>
-            <View style={styles.headerLeft}>
-              <View style={[styles.headerIconBox, { backgroundColor: colors.surfaceContainerHigh }]}>
-                <MaterialIcons name="psychology" size={20} color={colors.primary} />
-              </View>
-              <View>
-                <Text style={[styles.title, { color: colors.onSurface }]}>
-                  Autonomia do Vito
-                </Text>
-                <Text style={[styles.subtitle, { color: colors.onSurfaceVariant }]}>
-                  Controle a iniciativa e o comportamento do assistente
-                </Text>
-              </View>
-            </View>
-            <TouchableOpacity
-              onPress={onClose}
-              style={[styles.closeBtn, { backgroundColor: colors.surfaceContainerHigh }]}
-              accessibilityLabel="Fechar configurações de IA"
-            >
-              <MaterialIcons name="close" size={20} color={colors.onSurface} />
-            </TouchableOpacity>
-          </View>
-
+    <BottomSheetModal
+      visible={visible}
+      onClose={onClose}
+      title="Autonomia do Vito"
+      subtitle="Controle a iniciativa e o comportamento do assistente"
+    >
           {isLoading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color={colors.primary} />
@@ -394,63 +368,11 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
               </View>
             </ScrollView>
           )}
-        </View>
-      </View>
-    </Modal>
+    </BottomSheetModal>
   );
 };
 
 const styles = StyleSheet.create({
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'flex-end',
-  },
-  modalContainer: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: '92%',
-    minHeight: '60%',
-    borderWidth: 1,
-    overflow: 'hidden',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-  },
-  headerIconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    fontSize: 16,
-    fontWeight: '700',
-    letterSpacing: -0.2,
-  },
-  subtitle: {
-    fontSize: 11,
-    marginTop: 2,
-  },
-  closeBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   loadingContainer: {
     padding: 40,
     alignItems: 'center',

@@ -3,17 +3,16 @@ import {
   StyleSheet,
   View,
   Text,
-  Modal,
   TextInput,
   TouchableOpacity,
   ScrollView,
-  KeyboardAvoidingView,
   Platform,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import DateTimePickerNative from '@react-native-community/datetimepicker';
 import { tokens } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
+import { BottomSheetModal } from '../ui/BottomSheetModal';
 import { hapticFeedback } from '../../theme/motion';
 
 import { NotificationPriority } from '../../types';
@@ -100,34 +99,12 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        behavior="padding"
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 44 : 0}
-        style={styles.overlay}
-      >
-        <View style={[styles.sheet, { backgroundColor: colors.surfaceContainer }]}>
-          <View style={styles.handle} />
-          <View style={styles.headerRow}>
-            <View>
-              <Text style={[styles.title, { color: colors.onSurface }]}>
-                {tab === 'event' ? 'Novo compromisso' : 'Nova tarefa'}
-              </Text>
-              <Text style={[styles.subtitle, { color: colors.onSurfaceVariant }]}>
-                {formattedDate} · {startTime}–{endTime}
-              </Text>
-            </View>
-            <TouchableOpacity
-              style={[styles.closeBtn, { backgroundColor: colors.surfaceContainerHighest }]}
-              onPress={onClose}
-              hitSlop={tokens.hitSlop.sm}
-              accessibilityLabel="Fechar"
-              accessibilityRole="button"
-            >
-              <MaterialIcons name="close" size={18} color={colors.onSurfaceVariant} />
-            </TouchableOpacity>
-          </View>
-
+    <BottomSheetModal
+      visible={visible}
+      onClose={onClose}
+      title={tab === 'event' ? 'Novo compromisso' : 'Nova tarefa'}
+      subtitle={`${formattedDate} · ${startTime}–${endTime}`}
+    >
           <ScrollView
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
@@ -323,60 +300,13 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({
               </Text>
             </TouchableOpacity>
           </ScrollView>
-        </View>
-      </KeyboardAvoidingView>
-    </Modal>
+    </BottomSheetModal>
   );
 };
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.4)',
-  },
   scrollContent: {
     paddingBottom: 24,
-  },
-  sheet: {
-    borderTopLeftRadius: 26,
-    borderTopRightRadius: 26,
-    paddingHorizontal: tokens.spacing.md,
-    paddingTop: 8,
-    paddingBottom: 28,
-    maxHeight: '90%',
-  },
-  handle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#9CA3AF',
-    alignSelf: 'center',
-    marginBottom: 4,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-    gap: 12,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '800',
-    letterSpacing: -0.2,
-  },
-  subtitle: {
-    fontSize: 12,
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  closeBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   typeRow: {
     flexDirection: 'row',

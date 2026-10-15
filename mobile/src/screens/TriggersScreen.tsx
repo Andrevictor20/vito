@@ -4,14 +4,11 @@ import {
   View,
   Text,
   FlatList,
-  ScrollView,
   TouchableOpacity,
   TextInput,
   RefreshControl,
   ActivityIndicator,
   Keyboard,
-  Modal,
-  TouchableWithoutFeedback,
   BackHandler,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -21,9 +18,11 @@ import { useAuth } from '../context/AuthContext';
 import { useTriggers } from '../hooks/useTriggers';
 import { TriggerCard } from '../components/triggers/TriggerCard';
 import { TriggerReportsView } from '../components/triggers/TriggerReportsView';
+import { RadarFilterButton } from '../components/triggers/RadarFilterButton';
 import { EditTriggerModal } from '../components/triggers/EditTriggerModal';
 import { CreateTriggerModal } from '../components/triggers/CreateTriggerModal';
-import { TRIGGER_CATEGORIES, Trigger, TriggerCategory } from '../types';
+import { TRIGGER_CATEGORIES, Trigger } from '../types';
+import { countTriggersByCategory } from '../utils/radarFilter';
 import { api } from '../services/api';
 
 export const TriggersScreen: React.FC<{ onSubViewChange?: (inSubView: boolean) => void; createRequestId?: number }> = ({ onSubViewChange, createRequestId }) => {
@@ -47,7 +46,6 @@ export const TriggersScreen: React.FC<{ onSubViewChange?: (inSubView: boolean) =
   // Modais e navegação
   const [reportTrigger, setReportTrigger] = useState<Trigger | null>(null);
   const [editTrigger, setEditTrigger] = useState<Trigger | null>(null);
-  const [showCategoryPicker, setShowCategoryPicker] = useState<boolean>(false);
   // CTA do Header (+ Novo): abre o modal de criação.
   const [createVisible, setCreateVisible] = useState<boolean>(false);
   const firstCreateRender = useRef(false);
@@ -83,27 +81,27 @@ export const TriggersScreen: React.FC<{ onSubViewChange?: (inSubView: boolean) =
         setEditTrigger(null);
         return true;
       }
-      if (showCategoryPicker) {
-        setShowCategoryPicker(false);
-        return true;
-      }
       return false;
     };
 
     const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
     return () => subscription.remove();
-  }, [createVisible, reportTrigger, editTrigger, showCategoryPicker]);
+  }, [createVisible, reportTrigger, editTrigger]);
 
   // Entrada em Linguagem Natural
   const [naturalPrompt, setNaturalPrompt] = useState('');
   const [isSubmittingPrompt, setIsSubmittingPrompt] = useState(false);
   const [promptError, setPromptError] = useState<string | null>(null);
 
-  // Categorias ativas com pelo menos 1 disparador
-  const activeCategories = useMemo(() => {
-    const presentCats = new Set(allTriggers.map((t) => t.category));
-    return TRIGGER_CATEGORIES.filter((c) => presentCats.has(c.id));
-  }, [allTriggers]);
+  // Contagens vivas por categoria (funil).
+  const categoryCounts = useMemo(
+    () => countTriggersByCategory(allTriggers),
+    [allTriggers]
+  );
+  const selectedCategoryLabel =
+    selectedCategory === 'all'
+      ? null
+      : TRIGGER_CATEGORIES.find((c) => c.id === selectedCategory)?.label ?? selectedCategory;
 
   // Divisão em Ativos e Pausados para evitar rolagem infinita
   const activeTriggers = useMemo(
@@ -126,11 +124,18 @@ export const TriggersScreen: React.FC<{ onSubViewChange?: (inSubView: boolean) =
 
     try {
       const parsed = await api.parseTriggerPrompt(trimmed);
+      const parsedCondition = parsed.condition_type;
       await handleCreateTrigger({
         title: parsed.suggested_title || trimmed,
         category: parsed.category,
         query: trimmed,
-        condition_type: (parsed.condition_type as any) || 'daily_brief',
+        condition_type:
+          parsedCondition === 'price_above' ||
+          parsedCondition === 'price_below' ||
+          parsedCondition === 'event_upcoming' ||
+          parsedCondition === 'change_detected'
+            ? parsedCondition
+            : 'daily_brief',
         frequency: 'daily_morning',
       });
       setNaturalPrompt('');
@@ -191,101 +196,70 @@ export const TriggersScreen: React.FC<{ onSubViewChange?: (inSubView: boolean) =
 
   return (
     <View style={[styles.container, { backgroundColor: colors.surface }]}>
-      {/* 1. Barra de Criação por Linguagem Natural (o Header global já titula "Radares") */}
+      {/* 1. Criação por Linguagem Natural + funil (padrão Agenda) */}
       <View style={styles.inputSection}>
-        <View
-          style={[
-            styles.inputCard,
-            {
-              backgroundColor: isDark ? colors.surfaceContainerLow : '#FFFFFF',
-              borderColor: isDark ? colors.outlineVariant : 'rgba(0,0,0,0.08)',
-            },
-          ]}
-        >
-          <MaterialIcons name="auto-awesome" size={20} color={colors.primary} />
-          <TextInput
-            style={[styles.naturalInput, { color: colors.onSurface }]}
-            value={naturalPrompt}
-            onChangeText={setNaturalPrompt}
-            placeholder="No que quer ficar de olho?"
-            placeholderTextColor={colors.onSurfaceVariant}
-            onSubmitEditing={handleCreateFromNaturalPrompt}
-            returnKeyType="send"
-            editable={!isSubmittingPrompt}
-          />
-          <TouchableOpacity
+        <View style={styles.inputRow}>
+          <View
             style={[
-              styles.sendButton,
-              { backgroundColor: colors.primary },
-              (!naturalPrompt.trim() || isSubmittingPrompt) && { opacity: 0.5 },
-            ]}
-            onPress={handleCreateFromNaturalPrompt}
-            disabled={!naturalPrompt.trim() || isSubmittingPrompt}
-          >
-            {isSubmittingPrompt ? (
-              <ActivityIndicator size="small" color={colors.onPrimary} />
-            ) : (
-              <MaterialIcons name="arrow-forward" size={16} color={colors.onPrimary} />
-            )}
-          </TouchableOpacity>
-        </View>
-        {promptError && <Text style={styles.inputErrorText}>{promptError}</Text>}
-      </View>
-
-      {/* 3. Seletor de Categoria Inteligente (Sem Rolagem Infinita) */}
-      {activeCategories.length > 0 && (
-        <View style={styles.filterBar}>
-          <TouchableOpacity
-            style={[
-              styles.categoryPickerBtn,
+              styles.inputCard,
               {
-                backgroundColor: selectedCategory !== 'all'
-                  ? (isDark ? colors.surfaceContainerHighest : colors.primary)
-                  : (isDark ? colors.surfaceContainerLow : '#F4F4F5'),
-                borderColor: colors.outlineVariant,
+                backgroundColor: isDark ? colors.surfaceContainerLow : '#FFFFFF',
+                borderColor: isDark ? colors.outlineVariant : 'rgba(0,0,0,0.08)',
               },
             ]}
-            onPress={() => setShowCategoryPicker(true)}
-            activeOpacity={0.7}
-            hitSlop={tokens.hitSlop.sm}
-            accessibilityLabel="Filtrar por categoria"
           >
-            <MaterialIcons
-              name="filter-list"
-              size={16}
-              color={selectedCategory !== 'all' ? (isDark ? colors.onSurface : colors.onPrimary) : colors.onSurfaceVariant}
+            <MaterialIcons name="auto-awesome" size={20} color={colors.primary} />
+            <TextInput
+              style={[styles.naturalInput, { color: colors.onSurface }]}
+              value={naturalPrompt}
+              onChangeText={setNaturalPrompt}
+              placeholder="No que quer ficar de olho?"
+              placeholderTextColor={colors.onSurfaceVariant}
+              onSubmitEditing={handleCreateFromNaturalPrompt}
+              returnKeyType="send"
+              editable={!isSubmittingPrompt}
             />
-            <Text
-              style={[
-                styles.categoryPickerText,
-                {
-                  color: selectedCategory !== 'all' ? (isDark ? colors.onSurface : colors.onPrimary) : colors.onSurface,
-                  fontWeight: selectedCategory !== 'all' ? '700' : '500',
-                },
-              ]}
-            >
-              {selectedCategory === 'all'
-                ? `Todas as categorias (${allTriggers.length})`
-                : `${activeCategories.find((c) => c.id === selectedCategory)?.label || selectedCategory} (${allTriggers.filter((t) => t.category === selectedCategory).length})`}
-            </Text>
-            <MaterialIcons
-              name="arrow-drop-down"
-              size={18}
-              color={selectedCategory !== 'all' ? (isDark ? colors.onSurface : colors.onPrimary) : colors.onSurfaceVariant}
-            />
-          </TouchableOpacity>
-
-          {selectedCategory !== 'all' && (
             <TouchableOpacity
-              style={[styles.clearFilterBtn, { backgroundColor: colors.surfaceContainerHighest, borderColor: colors.outlineVariant }]}
+              style={[
+                styles.sendButton,
+                { backgroundColor: colors.primary },
+                (!naturalPrompt.trim() || isSubmittingPrompt) && { opacity: 0.5 },
+              ]}
+              onPress={handleCreateFromNaturalPrompt}
+              disabled={!naturalPrompt.trim() || isSubmittingPrompt}
+            >
+              {isSubmittingPrompt ? (
+                <ActivityIndicator size="small" color={colors.onPrimary} />
+              ) : (
+                <MaterialIcons name="arrow-forward" size={16} color={colors.onPrimary} />
+              )}
+            </TouchableOpacity>
+          </View>
+          <RadarFilterButton
+            selected={selectedCategory}
+            onChange={setSelectedCategory}
+            counts={categoryCounts}
+            total={allTriggers.length}
+            resultCount={triggers.length}
+          />
+        </View>
+        {promptError && <Text style={styles.inputErrorText}>{promptError}</Text>}
+        {selectedCategoryLabel && (
+          <View style={styles.activeFilterRow}>
+            <Text style={[styles.activeFilterText, { color: colors.textMuted }]}>
+              {selectedCategoryLabel} · {triggers.length} {triggers.length === 1 ? 'radar' : 'radares'}
+            </Text>
+            <TouchableOpacity
               onPress={() => setSelectedCategory('all')}
               hitSlop={tokens.hitSlop.sm}
+              accessibilityLabel="Limpar filtro de categoria"
+              accessibilityRole="button"
             >
-              <Text style={[styles.clearFilterText, { color: colors.primary }]}>Limpar</Text>
+              <Text style={[styles.activeFilterClear, { color: colors.primary }]}>Limpar</Text>
             </TouchableOpacity>
-          )}
-        </View>
-      )}
+          </View>
+        )}
+      </View>
 
       {/* 4. Lista Minimalista de Disparadores */}
       {loading && !refreshing ? (
@@ -425,144 +399,6 @@ export const TriggersScreen: React.FC<{ onSubViewChange?: (inSubView: boolean) =
         }}
       />
 
-      {/* Modal do Seletor de Categorias Inteligente */}
-      <Modal
-        visible={showCategoryPicker}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowCategoryPicker(false)}
-      >
-        <TouchableWithoutFeedback onPress={() => setShowCategoryPicker(false)}>
-          <View style={styles.modalOverlay}>
-            <TouchableWithoutFeedback>
-              <View
-                style={[
-                  styles.categoryPickerModal,
-                  {
-                    backgroundColor: isDark ? colors.surfaceContainer : colors.surface,
-                    borderColor: colors.outlineVariant,
-                  },
-                ]}
-              >
-                <View style={styles.categoryModalHeader}>
-                  <Text style={[styles.categoryModalTitle, { color: colors.onSurface }]}>
-                    Filtrar por Categoria
-                  </Text>
-                  <TouchableOpacity
-                    onPress={() => setShowCategoryPicker(false)}
-                    hitSlop={tokens.hitSlop.sm}
-                    style={styles.categoryModalCloseBtn}
-                    accessibilityLabel="Fechar seletor"
-                  >
-                    <MaterialIcons name="close" size={20} color={colors.onSurfaceVariant} />
-                  </TouchableOpacity>
-                </View>
-
-                {/* Opção: Todas as categorias */}
-                <TouchableOpacity
-                  style={[
-                    styles.categoryOptionItem,
-                    selectedCategory === 'all' && [
-                      styles.categoryOptionItemActive,
-                      { backgroundColor: isDark ? colors.surfaceContainerHigh : colors.primaryContainer },
-                    ],
-                  ]}
-                  onPress={() => {
-                    setSelectedCategory('all');
-                    setShowCategoryPicker(false);
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.categoryOptionLeft}>
-                    <View
-                      style={[
-                        styles.categoryOptionIconWrap,
-                        { backgroundColor: isDark ? colors.surfaceContainerHighest : '#E4E4E7' },
-                      ]}
-                    >
-                      <MaterialIcons name="apps" size={18} color={colors.onSurface} />
-                    </View>
-                    <Text
-                      style={[
-                        styles.categoryOptionLabel,
-                        {
-                          color: colors.onSurface,
-                          fontWeight: selectedCategory === 'all' ? '700' : '500',
-                        },
-                      ]}
-                    >
-                      Todas as categorias
-                    </Text>
-                  </View>
-                  <View
-                    style={[
-                      styles.categoryOptionBadge,
-                      { backgroundColor: isDark ? colors.surfaceContainerHighest : '#F4F4F5' },
-                    ]}
-                  >
-                    <Text style={[styles.categoryOptionBadgeText, { color: colors.onSurfaceVariant }]}>
-                      {allTriggers.length}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-
-                {/* Lista das Categorias Ativas */}
-                {activeCategories.map((c) => {
-                  const count = allTriggers.filter((t) => t.category === c.id).length;
-                  const isSelected = selectedCategory === c.id;
-                  const catColor = isDark ? c.colorDark : c.colorLight;
-                  const catBg = isDark ? c.bgDark : c.bgLight;
-
-                  return (
-                    <TouchableOpacity
-                      key={c.id}
-                      style={[
-                        styles.categoryOptionItem,
-                        isSelected && [
-                          styles.categoryOptionItemActive,
-                          { backgroundColor: isDark ? colors.surfaceContainerHigh : colors.primaryContainer },
-                        ],
-                      ]}
-                      onPress={() => {
-                        setSelectedCategory(c.id);
-                        setShowCategoryPicker(false);
-                      }}
-                      activeOpacity={0.7}
-                    >
-                      <View style={styles.categoryOptionLeft}>
-                        <View style={[styles.categoryOptionIconWrap, { backgroundColor: catBg }]}>
-                          <MaterialIcons name={c.icon} size={18} color={catColor} />
-                        </View>
-                        <Text
-                          style={[
-                            styles.categoryOptionLabel,
-                            {
-                              color: colors.onSurface,
-                              fontWeight: isSelected ? '700' : '500',
-                            },
-                          ]}
-                        >
-                          {c.label}
-                        </Text>
-                      </View>
-                      <View
-                        style={[
-                          styles.categoryOptionBadge,
-                          { backgroundColor: isDark ? colors.surfaceContainerHighest : '#F4F4F5' },
-                        ]}
-                      >
-                        <Text style={[styles.categoryOptionBadgeText, { color: colors.onSurfaceVariant }]}>
-                          {count}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
     </View>
   );
 };
@@ -575,7 +411,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
   },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  activeFilterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 4,
+    paddingTop: 6,
+  },
+  activeFilterText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  activeFilterClear: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
   inputCard: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: MD3Shapes.largeIncreased,
@@ -601,137 +458,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 6,
     marginLeft: 4,
-  },
-  filterBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    gap: 8,
-  },
-  categoryPickerBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: MD3Shapes.full,
-    borderWidth: 1,
-    gap: 6,
-  },
-  categoryPickerText: {
-    fontSize: 13,
-  },
-  clearFilterBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: MD3Shapes.full,
-    borderWidth: 1,
-  },
-  clearFilterText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  systemRadarCard: {
-    borderRadius: MD3Shapes.largeIncreased,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  systemRadarHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  systemRadarBadgeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flexWrap: 'wrap',
-  },
-  systemCategoryBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: MD3Shapes.full,
-  },
-  systemCategoryText: {
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  systemTimePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: MD3Shapes.full,
-  },
-  systemTimeText: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  systemStatusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  systemRadarTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    letterSpacing: -0.2,
-    marginBottom: 4,
-  },
-  systemRadarDesc: {
-    fontSize: 13,
-    lineHeight: 18,
-    marginBottom: 10,
-  },
-  systemRadarTagsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    flexWrap: 'wrap',
-    marginBottom: 12,
-  },
-  systemRadarTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: MD3Shapes.full,
-  },
-  systemRadarTagText: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  systemRadarActionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: MD3Shapes.full,
-    borderWidth: 1,
-  },
-  systemRadarActionLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  systemRadarActionText: {
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 0.2,
   },
   centerContainer: {
     flex: 1,
@@ -809,73 +535,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 18,
     maxWidth: 280,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  categoryPickerModal: {
-    width: '100%',
-    maxWidth: 400,
-    borderRadius: MD3Shapes.extraLarge,
-    borderWidth: 1,
-    padding: 18,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  categoryModalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  categoryModalTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  categoryModalCloseBtn: {
-    padding: 4,
-  },
-  categoryOptionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: MD3Shapes.medium,
-    marginBottom: 6,
-  },
-  categoryOptionItemActive: {
-    borderRadius: MD3Shapes.medium,
-  },
-  categoryOptionLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  categoryOptionIconWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  categoryOptionLabel: {
-    fontSize: 14,
-  },
-  categoryOptionBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: MD3Shapes.full,
-  },
-  categoryOptionBadgeText: {
-    fontSize: 12,
-    fontWeight: '600',
   },
 });

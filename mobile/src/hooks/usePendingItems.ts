@@ -1,16 +1,23 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '../services/api';
 import { dataSync } from '../services/dataSync';
 import { notificationService } from '../services/notificationService';
 import { hapticFeedback } from '../theme/motion';
+import { useAuth } from '../context/AuthContext';
+import { getPendingCacheKey, parseCachedPendingItems, isNetworkError } from '../utils/pendingCache';
 import type { PendingItem } from '../types';
 
 /** Estado e mutações das pendências para a página unificada. */
 export function usePendingItems(onScheduled?: (title: string, dateStr: string) => void) {
+  const { user } = useAuth();
+  const cacheKey = getPendingCacheKey(user?.id);
   const [items, setItems] = useState<PendingItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const itemsRef = useRef<PendingItem[]>([]);
+  itemsRef.current = items;
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -18,16 +25,34 @@ export function usePendingItems(onScheduled?: (title: string, dateStr: string) =
     try {
       const data = await api.getPendingItems();
       setItems(data || []);
-    } catch (err) {
-      console.warn('[usePendingItems] Erro ao carregar pendências:', err);
-      setError('Não foi possível carregar as pendências.');
+    } catch (err: any) {
+      const status = err?.status as number | undefined;
+      if (isNetworkError(err)) {
+        // Sem transporte (CORS/offline/timeout/DNS): vale o cache; só bloqueia sem nada.
+        console.warn('[usePendingItems] Servidor inacessível, usando cache:', err?.message);
+        if (itemsRef.current.length === 0) {
+          setError('Sem conexão com o servidor. Verifique a rede e tente de novo.');
+        }
+      } else if (status === 401) {
+        setError('Sessão expirada. Entre novamente para carregar as pendências.');
+      } else {
+        console.warn('[usePendingItems] Erro ao carregar pendências:', err);
+        setError('Não foi possível carregar as pendências.');
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [cacheKey]);
 
   useEffect(() => {
+    // Hidratação instantânea do cache (espelho dos todos em useHomeData).
+    AsyncStorage.getItem(cacheKey)
+      .then((raw) => {
+        const cached = parseCachedPendingItems(raw);
+        if (cached) setItems(cached);
+      })
+      .catch(() => {});
     load();
     const offPending = dataSync.subscribe('refresh_pending', () => load(true));
     const offAll = dataSync.subscribe('refresh_all', () => load(true));
@@ -35,7 +60,14 @@ export function usePendingItems(onScheduled?: (title: string, dateStr: string) =
       offPending();
       offAll();
     };
-  }, [load]);
+  }, [load, cacheKey]);
+
+  // Persiste cada mudança (carga + mutações) para o próximo boot offline.
+  useEffect(() => {
+    if (!loading) {
+      AsyncStorage.setItem(cacheKey, JSON.stringify(items)).catch(() => {});
+    }
+  }, [items, cacheKey, loading]);
 
   const refresh = useCallback(() => {
     setRefreshing(true);

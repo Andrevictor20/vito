@@ -785,14 +785,14 @@ export const notificationService = {
       const validTodos = new Set(
         (fetchedTodos || []).filter((t) => t.status !== 'completed').map((t) => t.id),
       );
-      const orphans = findOrphanNotificationIds(scheduled as any, validEvents, validTodos);
+      const orphans = findOrphanNotificationIds(scheduled, validEvents, validTodos);
       const orphanSet = new Set(orphans);
       let purged = 0;
       for (const n of scheduled) {
-        const data: any = (n as any)?.content?.data || {};
+        const data: { eventId?: string; todoId?: string } = n.content?.data || {};
         const eventId: string | undefined = data.eventId;
         const todoId: string | undefined = data.todoId;
-        const identifier: string | undefined = (n as any)?.identifier;
+        const identifier: string | undefined = n.identifier;
         if (identifier && orphanSet.has(identifier)) {
           try {
             await Notifications.cancelScheduledNotificationAsync(identifier);

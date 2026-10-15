@@ -121,6 +121,11 @@ export const isCloudServer = (url: string): boolean => {
   return url === CLOUDFLARE_SERVER_URL || (!url.includes('192.168.') && !url.includes('localhost') && !url.includes('127.0.0.1'));
 };
 
+export interface ApiRequestOptions extends RequestInit {
+  /** Timeout por chamada (ms); padrão 15s (60s em IA/integrações). */
+  timeoutMs?: number;
+}
+
 export interface ChatHistoryItem {
   sender: 'user' | 'vito';
   text: string;
@@ -185,7 +190,7 @@ class ApiService {
     return this.token;
   }
 
-  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  private async request<T>(endpoint: string, options: ApiRequestOptions = {}): Promise<T> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       Accept: 'application/json',
@@ -199,7 +204,7 @@ class ApiService {
     const isAiEndpoint = endpoint.includes('/assistant/');
     const isIntegrationEndpoint = endpoint.includes('/integrations/');
     const defaultTimeout = isAiEndpoint || isIntegrationEndpoint ? 60000 : 15000;
-    const timeoutMs = (options as any)?.timeoutMs || defaultTimeout;
+    const timeoutMs = options.timeoutMs || defaultTimeout;
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -240,7 +245,9 @@ class ApiService {
           }
         }
         const errorMsg = data?.error || `Erro HTTP ${res.status}`;
-        throw new Error(errorMsg);
+        const httpErr = new Error(errorMsg) as Error & { status?: number };
+        httpErr.status = res.status;
+        throw httpErr;
       }
 
       return data as T;

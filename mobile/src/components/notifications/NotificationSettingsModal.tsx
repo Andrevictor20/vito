@@ -3,9 +3,7 @@ import {
   StyleSheet,
   View,
   Text,
-  Modal,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   ScrollView,
   Alert,
   Linking,
@@ -13,6 +11,7 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens, MD3Shapes } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
+import { BottomSheetModal } from '../ui/BottomSheetModal';
 import { useNotifications } from '../../hooks/useNotifications';
 import { notificationService } from '../../services/notificationService';
 import { api } from '../../services/api';
@@ -97,40 +96,12 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.overlay}>
-        <TouchableOpacity
-          style={styles.backdrop}
-          onPress={onClose}
-          activeOpacity={1}
-          accessibilityLabel="Fechar modal"
-        />
-        <View style={[styles.sheet, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
-          {/* Grab Bar & Top Bar */}
-          <View style={styles.header}>
-            <View style={[styles.grabBar, { backgroundColor: colors.outlineVariant }]} />
-            <View style={styles.titleRow}>
-              <View style={styles.titleLeft}>
-                <View style={[styles.titleIconBox, { backgroundColor: colors.surfaceContainerHigh }]}>
-                  <MaterialIcons name="notifications-active" size={20} color={colors.primary} />
-                </View>
-                <View>
-                  <Text style={[styles.title, { color: colors.onSurface }]}>Notificações & Alertas</Text>
-                  <Text style={[styles.subtitle, { color: colors.onSurfaceVariant }]}>
-                    Alertas discretos e pontuais
-                  </Text>
-                </View>
-              </View>
-              <TouchableOpacity
-                style={[styles.closeBtn, { backgroundColor: colors.surfaceContainerHighest, borderColor: colors.outlineVariant }]}
-                onPress={onClose}
-                activeOpacity={0.7}
-              >
-                <MaterialIcons name="close" size={18} color={colors.onSurface} />
-              </TouchableOpacity>
-            </View>
-          </View>
-
+    <BottomSheetModal
+      visible={visible}
+      onClose={onClose}
+      title="Notificações & Alertas"
+      subtitle="Alertas discretos e pontuais"
+    >
           <ScrollView
             contentContainerStyle={styles.content}
             showsVerticalScrollIndicator={true}
@@ -353,73 +324,11 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
                 </View>
 
               </ScrollView>
-            </View>
-        </View>
-    </Modal>
+    </BottomSheetModal>
   );
 };
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.65)',
-    justifyContent: 'flex-end',
-  },
-  backdrop: {
-    flex: 1,
-  },
-  sheet: {
-    borderTopLeftRadius: MD3Shapes.extraLarge,
-    borderTopRightRadius: MD3Shapes.extraLarge,
-    borderWidth: 1,
-    maxHeight: '92%',
-    overflow: 'hidden',
-  },
-  header: {
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 16,
-  },
-  grabBar: {
-    width: 36,
-    height: 4,
-    borderRadius: MD3Shapes.full,
-    alignSelf: 'center',
-    marginBottom: 16,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  titleLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  titleIconBox: {
-    width: 38,
-    height: 38,
-    borderRadius: MD3Shapes.medium,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    fontSize: tokens.typography.size.md,
-    fontWeight: '700',
-  },
-  subtitle: {
-    fontSize: tokens.typography.size.xs,
-    marginTop: 2,
-  },
-  closeBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: MD3Shapes.full,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   content: {
     paddingHorizontal: 20,
     paddingTop: 4,
