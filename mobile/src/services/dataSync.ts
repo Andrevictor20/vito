@@ -8,7 +8,7 @@ export type SyncEventType =
 
 type SyncCallback = () => void;
 
-class DataSyncBus {
+export class DataSyncBus {
   private listeners: Map<SyncEventType, Set<SyncCallback>> = new Map();
 
   subscribe(eventType: SyncEventType, callback: SyncCallback): () => void {
@@ -23,28 +23,36 @@ class DataSyncBus {
   }
 
   notify(eventType: SyncEventType = 'refresh_all'): void {
-    const specificListeners = this.listeners.get(eventType);
-    if (specificListeners) {
-      specificListeners.forEach((cb) => {
-        try {
-          cb();
-        } catch (err) {
-          console.warn(`[dataSync] Erro no listener para ${eventType}:`, err);
-        }
-      });
-    }
+    const executedCallbacks = new Set<SyncCallback>();
 
-    if (eventType !== 'refresh_all') {
-      const allListeners = this.listeners.get('refresh_all');
-      if (allListeners) {
-        allListeners.forEach((cb) => {
+    const runCallbacks = (list?: Set<SyncCallback>) => {
+      if (!list) return;
+      list.forEach((cb) => {
+        if (!executedCallbacks.has(cb)) {
+          executedCallbacks.add(cb);
           try {
             cb();
           } catch (err) {
-            console.warn('[dataSync] Erro no listener para refresh_all:', err);
+            console.warn(`[dataSync] Erro no listener para ${eventType}:`, err);
           }
-        });
-      }
+        }
+      });
+    };
+
+    if (eventType === 'refresh_all') {
+      // 1. Notifica quem escuta refresh_all
+      runCallbacks(this.listeners.get('refresh_all'));
+      // 2. Propaga em cascata para todos os listeners específicos
+      this.listeners.forEach((set, key) => {
+        if (key !== 'refresh_all') {
+          runCallbacks(set);
+        }
+      });
+    } else {
+      // 1. Notifica os ouvintes específicos do tópico
+      runCallbacks(this.listeners.get(eventType));
+      // 2. Notifica os ouvintes globais de refresh_all
+      runCallbacks(this.listeners.get('refresh_all'));
     }
   }
 }

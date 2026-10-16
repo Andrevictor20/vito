@@ -105,10 +105,14 @@ export function useHomeData(currentUserId?: string) {
   }, [currentUserId, cacheKeys.eventsKey, cacheKeys.todosKey, loadData]);
 
   useEffect(() => {
-    const unsub = dataSync.subscribe('refresh_events', () => {
-      loadData(true);
-    });
-    return unsub;
+    const unsubEvents = dataSync.subscribe('refresh_events', () => loadData(true));
+    const unsubTodos = dataSync.subscribe('refresh_todos', () => loadData(true));
+    const unsubAll = dataSync.subscribe('refresh_all', () => loadData(true));
+    return () => {
+      unsubEvents();
+      unsubTodos();
+      unsubAll();
+    };
   }, [loadData]);
 
   const onRefresh = () => {
@@ -186,38 +190,40 @@ export function useHomeData(currentUserId?: string) {
   };
 
   const handleDeleteEvent = async (id: string, allSeries: boolean = false) => {
+    const previousEvents = events;
+    const targetEvent = events.find((e) => e.id === id);
+    let seriesIds: string[] = [id];
+    if (allSeries && targetEvent) {
+      const targetTitle = targetEvent.title.trim().toLowerCase();
+      seriesIds = events
+        .filter((e) => e.title.trim().toLowerCase() === targetTitle || e.id === id)
+        .map((e) => e.id);
+      if (seriesIds.length === 0) seriesIds = [id];
+    }
+
+    // 1. Optimistic Update instantâneo (< 16ms)
+    let nextEvents: Event[];
+    if (allSeries && targetEvent) {
+      const targetTitle = targetEvent.title.trim().toLowerCase();
+      nextEvents = events.filter((e) => e.title.trim().toLowerCase() !== targetTitle && e.id !== id);
+    } else {
+      nextEvents = events.filter((e) => e.id !== id);
+    }
+    setEvents(nextEvents);
+    AsyncStorage.setItem(cacheKeys.eventsKey, JSON.stringify(nextEvents)).catch(() => {});
+    notificationService.reconcileOrphanReminders(nextEvents, todos).catch(() => {});
+
     try {
-      const targetEvent = events.find((e) => e.id === id);
-      // Coleta TODOS os ids da série antes de apagar para purge total de notificações.
-      let seriesIds: string[] = [id];
-      if (allSeries && targetEvent) {
-        const targetTitle = targetEvent.title.trim().toLowerCase();
-        seriesIds = events
-          .filter((e) => e.title.trim().toLowerCase() === targetTitle || e.id === id)
-          .map((e) => e.id);
-        if (seriesIds.length === 0) seriesIds = [id];
-      }
       await api.deleteEvent(id, allSeries);
       notificationService.cancelEventReminders(seriesIds).catch(() => {});
-      setEvents((prev) => {
-        let next: Event[];
-        if (allSeries && targetEvent) {
-          const targetTitle = targetEvent.title.trim().toLowerCase();
-          next = prev.filter((e) => e.title.trim().toLowerCase() !== targetTitle && e.id !== id);
-        } else {
-          next = prev.filter((e) => e.id !== id);
-        }
-        AsyncStorage.setItem(cacheKeys.eventsKey, JSON.stringify(next)).catch(() => {});
-        // Reconcilia órfãos com a lista resultante para garantir zero fantasma.
-        notificationService.reconcileOrphanReminders(next, todos).catch(() => {});
-        return next;
-      });
-      // Revalida em background para garantir integridade com o backend
+      dataSync.notify('refresh_events');
       if (allSeries) {
         loadData(true);
       }
     } catch (e) {
-      console.error('Erro ao deletar evento:', e);
+      console.error('Erro ao deletar evento, revertendo:', e);
+      setEvents(previousEvents);
+      AsyncStorage.setItem(cacheKeys.eventsKey, JSON.stringify(previousEvents)).catch(() => {});
       throw e;
     }
   };
@@ -244,7 +250,18 @@ export function useHomeData(currentUserId?: string) {
 
   const handleToggleTodo = async (id: string) => {
     const current = todos.find((t) => t.id === id);
-    const reopening = current?.status === 'completed';
+    if (!current) return;
+    const reopening = current.status === 'completed';
+    const nextStatus = reopening ? ('pending' as const) : ('completed' as const);
+
+    // 1. Optimistic Update instantâneo (< 16ms)
+    const previousTodos = todos;
+    const nextTodos = todos.map((t) =>
+      t.id === id ? { ...t, status: nextStatus } : t
+    );
+    setTodos(nextTodos);
+    AsyncStorage.setItem(cacheKeys.todosKey, JSON.stringify(nextTodos)).catch(() => {});
+
     try {
       if (reopening) {
         await api.reopenTodo(id);
@@ -252,48 +269,65 @@ export function useHomeData(currentUserId?: string) {
         await api.completeTodo(id);
         notificationService.cancelTodoReminder(id).catch(() => {});
       }
-      setTodos((prev) => {
-        const next = prev.map((t) =>
-          t.id === id ? { ...t, status: reopening ? ('pending' as const) : ('completed' as const) } : t,
-        );
-        AsyncStorage.setItem(cacheKeys.todosKey, JSON.stringify(next)).catch(() => {});
-        return next;
-      });
+      dataSync.notify('refresh_todos');
     } catch (e) {
-      console.error('Erro ao alternar tarefa:', e);
+      console.error('Erro ao alternar tarefa, revertendo:', e);
+      setTodos(previousTodos);
+      AsyncStorage.setItem(cacheKeys.todosKey, JSON.stringify(previousTodos)).catch(() => {});
     }
   };
 
   const handleDeleteTodo = async (id: string) => {
+    const previousTodos = todos;
+    const target = todos.find((t) => t.id === id);
+    if (!target) return;
+
+    // 1. Optimistic Update instantâneo
+    const nextTodos = todos.filter((t) => t.id !== id);
+    setTodos(nextTodos);
+    AsyncStorage.setItem(cacheKeys.todosKey, JSON.stringify(nextTodos)).catch(() => {});
+
     try {
       await api.deleteTodo(id);
       notificationService.cancelTodoReminder(id).catch(() => {});
-      setTodos((prev) => {
-        const next = prev.filter((t) => t.id !== id);
-        AsyncStorage.setItem(cacheKeys.todosKey, JSON.stringify(next)).catch(() => {});
-        return next;
-      });
+      dataSync.notify('refresh_todos');
     } catch (e) {
-      console.error('Erro ao deletar tarefa:', e);
+      console.error('Erro ao deletar tarefa, revertendo:', e);
+      setTodos(previousTodos);
+      AsyncStorage.setItem(cacheKeys.todosKey, JSON.stringify(previousTodos)).catch(() => {});
     }
   };
 
   const handleToggleSubtask = async (todoId: string, subtaskId: string) => {
+    const previousTodos = todos;
+    const nextTodos = todos.map((t) => {
+      if (t.id !== todoId) return t;
+      const subtasks = (t.subtasks || []).map((st) =>
+        st.id === subtaskId ? { ...st, completed: !st.completed } : st
+      );
+      return { ...t, subtasks };
+    });
+    setTodos(nextTodos);
+    AsyncStorage.setItem(cacheKeys.todosKey, JSON.stringify(nextTodos)).catch(() => {});
+
     try {
       const updated = await api.toggleSubtask(todoId, subtaskId);
       setTodos((prev) => {
-        const next = prev.map((t) => {
+        const confirmed = prev.map((t) => {
           if (t.id !== todoId) return t;
           const subtasks = (t.subtasks || []).map((st) =>
             st.id === subtaskId ? { ...st, completed: updated.completed } : st
           );
           return { ...t, subtasks };
         });
-        AsyncStorage.setItem(cacheKeys.todosKey, JSON.stringify(next)).catch(() => {});
-        return next;
+        AsyncStorage.setItem(cacheKeys.todosKey, JSON.stringify(confirmed)).catch(() => {});
+        return confirmed;
       });
+      dataSync.notify('refresh_todos');
     } catch (e) {
-      console.error('Erro ao alternar subtarefa:', e);
+      console.error('Erro ao alternar subtarefa, revertendo:', e);
+      setTodos(previousTodos);
+      AsyncStorage.setItem(cacheKeys.todosKey, JSON.stringify(previousTodos)).catch(() => {});
     }
   };
 
@@ -309,25 +343,29 @@ export function useHomeData(currentUserId?: string) {
         AsyncStorage.setItem(cacheKeys.todosKey, JSON.stringify(next)).catch(() => {});
         return next;
       });
+      dataSync.notify('refresh_todos');
     } catch (e) {
       console.error('Erro ao adicionar subtarefa:', e);
     }
   };
 
   const handleDeleteSubtask = async (todoId: string, subtaskId: string) => {
+    const previousTodos = todos;
+    const nextTodos = todos.map((t) => {
+      if (t.id !== todoId) return t;
+      const subtasks = (t.subtasks || []).filter((st) => st.id !== subtaskId);
+      return { ...t, subtasks };
+    });
+    setTodos(nextTodos);
+    AsyncStorage.setItem(cacheKeys.todosKey, JSON.stringify(nextTodos)).catch(() => {});
+
     try {
       await api.deleteSubtask(todoId, subtaskId);
-      setTodos((prev) => {
-        const next = prev.map((t) => {
-          if (t.id !== todoId) return t;
-          const subtasks = (t.subtasks || []).filter((st) => st.id !== subtaskId);
-          return { ...t, subtasks };
-        });
-        AsyncStorage.setItem(cacheKeys.todosKey, JSON.stringify(next)).catch(() => {});
-        return next;
-      });
+      dataSync.notify('refresh_todos');
     } catch (e) {
-      console.error('Erro ao excluir subtarefa:', e);
+      console.error('Erro ao excluir subtarefa, revertendo:', e);
+      setTodos(previousTodos);
+      AsyncStorage.setItem(cacheKeys.todosKey, JSON.stringify(previousTodos)).catch(() => {});
     }
   };
 

@@ -1,9 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { View, StyleSheet, Keyboard, Platform } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import * as Notifications from 'expo-notifications';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { dataSync, chatPromptBus } from '../services/dataSync';
 import { navigateToTab } from './navigationRef';
 import { FloatingTabBar } from '../components/common/FloatingTabBar';
@@ -122,6 +122,13 @@ const AgendaTabScreen: React.FC = () => {
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   // Central de Resumos vive na Agenda (mesma rota de antes, novo acesso).
   const [showSummaries, setShowSummaries] = useState(false);
+
+  // Revalidação silenciosa em background ao focar na aba
+  useFocusEffect(
+    useCallback(() => {
+      home.loadData(true);
+    }, [home.loadData])
+  );
 
   useEffect(() => {
     const s1 = Keyboard.addListener('keyboardDidShow', () => setKeyboardOpen(true));
@@ -245,6 +252,14 @@ const AgendaTabScreen: React.FC = () => {
 
 const TasksTabScreen: React.FC = () => {
   const home = useHomeDataContext();
+
+  // Revalidação silenciosa em background ao focar na aba
+  useFocusEffect(
+    useCallback(() => {
+      home.loadData(true);
+    }, [home.loadData])
+  );
+
   const pendingTodos = home.todos.filter((t) => t.status !== 'completed');
   const completedList = home.todos.filter((t) => t.status === 'completed');
   const [createRequestId, setCreateRequestId] = useState(0);

@@ -26,6 +26,15 @@ dataSync.subscribe('refresh_triggers', () => {
 dataSync.subscribe('refresh_events', () => {
   queryClient.invalidateQueries({ queryKey: ['events'] }).catch(() => {});
 });
+dataSync.subscribe('refresh_todos', () => {
+  queryClient.invalidateQueries({ queryKey: ['todos'] }).catch(() => {});
+});
+dataSync.subscribe('refresh_bookings', () => {
+  queryClient.invalidateQueries({ queryKey: ['bookings'] }).catch(() => {});
+});
+dataSync.subscribe('refresh_pending', () => {
+  queryClient.invalidateQueries({ queryKey: ['pending'] }).catch(() => {});
+});
 dataSync.subscribe('refresh_all', () => {
   queryClient.invalidateQueries().catch(() => {});
 });
