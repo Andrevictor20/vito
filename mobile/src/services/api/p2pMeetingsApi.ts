@@ -6,6 +6,17 @@ import {
   SendP2PInviteInput,
 } from '../../types';
 
+export interface PhoneVerificationChallenge {
+  token: string;
+  code: string;
+  user_id: string;
+  phone: string;
+  verify_url: string;
+  whatsapp_url: string;
+  expires_at: string;
+  verified: boolean;
+}
+
 export class P2PMeetingsApi {
   constructor(private client: ApiClient) {}
 
@@ -21,10 +32,24 @@ export class P2PMeetingsApi {
     return res && Array.isArray(res.matches) ? res.matches : [];
   }
 
-  async updatePhone(phone: string): Promise<{ status: string }> {
-    return this.client.request<{ status: string }>('/api/v1/users/phone', {
+  async updatePhone(phone: string): Promise<{ status: string; phone?: string }> {
+    return this.client.request<{ status: string; phone?: string }>('/api/v1/users/phone', {
       method: 'POST',
       body: JSON.stringify({ phone }),
+    });
+  }
+
+  async requestPhoneVerification(phone: string): Promise<PhoneVerificationChallenge> {
+    return this.client.request<PhoneVerificationChallenge>('/api/v1/users/phone/request-verification', {
+      method: 'POST',
+      body: JSON.stringify({ phone }),
+    });
+  }
+
+  async verifyPhoneCode(payload: { code?: string; token?: string }): Promise<{ status: string; verified: boolean; phone: string }> {
+    return this.client.request<{ status: string; verified: boolean; phone: string }>('/api/v1/users/phone/verify', {
+      method: 'POST',
+      body: JSON.stringify(payload),
     });
   }
 

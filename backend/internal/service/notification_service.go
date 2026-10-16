@@ -122,7 +122,7 @@ func (s *NotificationService) SendPushToUser(userID, title, body, priority strin
 			channelID = "vito_radar"
 		case "RADAR_TRIGGERED":
 			channelID = "vito_radar"
-		case "booking_appointment":
+		case "booking_appointment", "meeting_vote", "meeting_confirmed":
 			channelID = "vito_booking"
 		case "executive_summary", "daily_summary", "weekly_summary", "monthly_summary":
 			channelID = "vito_summaries"

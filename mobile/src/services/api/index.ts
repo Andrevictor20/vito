@@ -272,7 +272,7 @@ export class ApiService extends ApiClient {
   }
 
   // Meetings
-  getMeetings(status?: string): Promise<Meeting[]> {
+  getMeetings(status?: string): Promise<MeetingWithDetails[]> {
     return this.meetingsApi.getMeetings(status);
   }
   getMeeting(id: string): Promise<MeetingWithDetails> {
@@ -280,6 +280,9 @@ export class ApiService extends ApiClient {
   }
   createMeeting(data: CreateMeetingInput): Promise<MeetingWithDetails> {
     return this.meetingsApi.createMeeting(data);
+  }
+  updateMeeting(id: string, data: { title: string; description?: string; duration_minutes: number; slots: { start_at: string; end_at: string }[] }): Promise<MeetingWithDetails> {
+    return this.meetingsApi.updateMeeting(id, data);
   }
   deleteMeeting(id: string): Promise<void> {
     return this.meetingsApi.deleteMeeting(id);
@@ -298,12 +301,20 @@ export class ApiService extends ApiClient {
   matchP2PContacts(salt: string, hashes: string[]): Promise<ContactMatchResult[]> {
     return this.p2pMeetingsApi.matchContacts(salt, hashes);
   }
-  updateP2PPhone(phone: string): Promise<{ status: string }> {
+  updateP2PPhone(phone: string): Promise<{ status: string; phone?: string }> {
     return this.p2pMeetingsApi.updatePhone(phone);
   }
 
-  updatePhone(phone: string): Promise<{ status: string }> {
+  updatePhone(phone: string): Promise<{ status: string; phone?: string }> {
     return this.updateP2PPhone(phone);
+  }
+
+  requestPhoneVerification(phone: string) {
+    return this.p2pMeetingsApi.requestPhoneVerification(phone);
+  }
+
+  verifyPhoneCode(payload: { code?: string; token?: string }) {
+    return this.p2pMeetingsApi.verifyPhoneCode(payload);
   }
   getP2PMutualSlots(targetUserId: string, from?: string, to?: string, duration?: number): Promise<P2PMutualSlot[]> {
     return this.p2pMeetingsApi.getMutualSlots(targetUserId, from, to, duration);

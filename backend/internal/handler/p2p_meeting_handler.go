@@ -88,7 +88,12 @@ func (h *P2PMeetingHandler) UpdatePhone(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if err := h.userRepo.UpdatePhone(userID, req.Phone); err != nil {
+	phone := service.NormalizeE164Phone(req.Phone)
+	if phone == "" {
+		phone = req.Phone
+	}
+
+	if err := h.userRepo.UpdatePhone(userID, phone); err != nil {
 		respondError(w, err)
 		return
 	}
@@ -96,6 +101,7 @@ func (h *P2PMeetingHandler) UpdatePhone(w http.ResponseWriter, r *http.Request) 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]string{
 		"status": "updated",
+		"phone":  phone,
 	})
 }
 

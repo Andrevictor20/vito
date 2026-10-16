@@ -155,6 +155,12 @@ func (s *Server) registerRoutes() {
 			pub.Post("/api/public/meet/{id}/vote", s.meetingHandler.SubmitPublicVote)
 		})
 	}
+	if s.p2pHandler != nil {
+		s.router.Group(func(pub chi.Router) {
+			pub.Use(meetingLimiter)
+			pub.Get("/verify-phone/{token}", s.p2pHandler.VerifyPhonePublicPage)
+		})
+	}
 
 	authLimiter := middleware.NewRateLimiter(10, 1*time.Minute)
 	aiLimiter := middleware.NewRateLimiter(30, 1*time.Minute)
@@ -303,6 +309,8 @@ func (s *Server) registerRoutes() {
 						mr.Get("/", s.meetingHandler.ListMeetings)
 						mr.Post("/", s.meetingHandler.CreateMeeting)
 						mr.Get("/{id}", s.meetingHandler.GetMeeting)
+						mr.Put("/{id}", s.meetingHandler.UpdateMeeting)
+						mr.Patch("/{id}", s.meetingHandler.UpdateMeeting)
 						mr.Delete("/{id}", s.meetingHandler.DeleteMeeting)
 						mr.Post("/{id}/confirm", s.meetingHandler.ConfirmConsensus)
 						mr.Get("/{id}/share", s.meetingHandler.GetWhatsAppShare)
@@ -311,6 +319,8 @@ func (s *Server) registerRoutes() {
 
 				if s.p2pHandler != nil {
 					protected.Post("/users/phone", s.p2pHandler.UpdatePhone)
+					protected.Post("/users/phone/request-verification", s.p2pHandler.RequestPhoneVerification)
+					protected.Post("/users/phone/verify", s.p2pHandler.VerifyPhoneCode)
 					protected.Route("/meetings/p2p", func(p2pr chi.Router) {
 						p2pr.Get("/mutual-slots", s.p2pHandler.GetMutualSlots)
 						p2pr.Post("/invite", s.p2pHandler.SendInvite)

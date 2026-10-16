@@ -25,9 +25,10 @@ type P2PMeetingService struct {
 	calService   *CalendarService
 	notifService *NotificationService
 
-	mu          sync.RWMutex
-	currentSalt string
-	saltExpires time.Time
+	mu                 sync.RWMutex
+	currentSalt        string
+	saltExpires        time.Time
+	phoneVerifications map[string]*domain.PhoneVerificationChallenge
 }
 
 // NewP2PMeetingService cria uma nova instância de P2PMeetingService.
@@ -38,10 +39,11 @@ func NewP2PMeetingService(
 	notifService *NotificationService,
 ) *P2PMeetingService {
 	return &P2PMeetingService{
-		p2pRepo:      p2pRepo,
-		userRepo:     userRepo,
-		calService:   calService,
-		notifService: notifService,
+		p2pRepo:            p2pRepo,
+		userRepo:           userRepo,
+		calService:         calService,
+		notifService:       notifService,
+		phoneVerifications: make(map[string]*domain.PhoneVerificationChallenge),
 	}
 }
 
@@ -100,12 +102,21 @@ func (s *P2PMeetingService) MatchContactsByHashes(ctx context.Context, salt stri
 	for _, u := range users {
 		matched := false
 
-		// Compara telefone
+		// Compara telefone (normalizado E.164 e bruto)
 		if u.Phone != nil && *u.Phone != "" {
-			phoneHash := calcHMAC(*u.Phone)
-			for _, ch := range clientDecoded {
-				if subtle.ConstantTimeCompare(phoneHash, ch.bytes) == 1 {
-					matched = true
+			candidates := []string{*u.Phone}
+			if norm := NormalizeE164Phone(*u.Phone); norm != "" && norm != *u.Phone {
+				candidates = append(candidates, norm)
+			}
+			for _, phoneCandidate := range candidates {
+				phoneHash := calcHMAC(phoneCandidate)
+				for _, ch := range clientDecoded {
+					if subtle.ConstantTimeCompare(phoneHash, ch.bytes) == 1 {
+						matched = true
+						break
+					}
+				}
+				if matched {
 					break
 				}
 			}

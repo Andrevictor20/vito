@@ -101,6 +101,7 @@ type TriggerTestResult struct {
 	ConditionMet          bool      `json:"condition_met"`
 	CurrentData           string    `json:"current_data"`
 	Summary               string    `json:"summary"`
+	Paragraphs            []string  `json:"paragraphs,omitempty"`
 	SimulatedNotification string    `json:"simulated_notification"`
 	Confidence            int       `json:"confidence"`
 	WhyRelevant           string    `json:"why_relevant"`

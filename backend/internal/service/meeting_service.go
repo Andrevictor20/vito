@@ -33,6 +33,14 @@ type CreateMeetingRequest struct {
 	Slots           []MeetingSlotInput `json:"slots"`
 }
 
+// UpdateMeetingRequest define os parâmetros para editar uma reunião existente.
+type UpdateMeetingRequest struct {
+	Title           string             `json:"title"`
+	Description     string             `json:"description"`
+	DurationMinutes int                `json:"duration_minutes"`
+	Slots           []MeetingSlotInput `json:"slots"`
+}
+
 // SubmitVoteRequest define o voto submetido por um participante na página pública.
 type SubmitVoteRequest struct {
 	MeetingID       string   `json:"meeting_id"`
@@ -177,21 +185,82 @@ func (s *MeetingService) CreateMeeting(ctx context.Context, req CreateMeetingReq
 	}, nil
 }
 
-// GetMeetingDetails retorna a reunião com seus slots e participantes.
+// GetMeetingDetails retorna a reunião com seus slots, votos cruzados e participantes.
 func (s *MeetingService) GetMeetingDetails(ctx context.Context, meetingID string) (*domain.MeetingWithDetails, error) {
 	m, err := s.meetingRepo.GetByID(ctx, meetingID)
 	if err != nil {
 		return nil, err
 	}
 
-	slots, err := s.meetingRepo.ListSlots(ctx, meetingID)
+	return s.enrichMeetingDetails(ctx, m)
+}
+
+func (s *MeetingService) enrichMeetingDetails(ctx context.Context, m *domain.Meeting) (*domain.MeetingWithDetails, error) {
+	slots, err := s.meetingRepo.ListSlots(ctx, m.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	parts, err := s.meetingRepo.ListParticipants(ctx, meetingID)
+	parts, err := s.meetingRepo.ListParticipants(ctx, m.ID)
 	if err != nil {
 		return nil, err
+	}
+
+	votes, err := s.meetingRepo.ListVotesByMeeting(ctx, m.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	partNameByID := make(map[string]string, len(parts))
+	for _, p := range parts {
+		partNameByID[p.ID] = p.Name
+	}
+
+	votersBySlot := make(map[string][]string)
+	slotsByPart := make(map[string][]string)
+	for _, v := range votes {
+		if name, ok := partNameByID[v.ParticipantID]; ok {
+			votersBySlot[v.SlotID] = append(votersBySlot[v.SlotID], name)
+		}
+		slotsByPart[v.ParticipantID] = append(slotsByPart[v.ParticipantID], v.SlotID)
+	}
+
+	maxVotes := 0
+	for i := range slots {
+		names := votersBySlot[slots[i].ID]
+		if names == nil {
+			names = []string{}
+		}
+		slots[i].VoterNames = names
+		if len(names) > slots[i].VotesCount {
+			slots[i].VotesCount = len(names)
+		}
+		if slots[i].VotesCount > maxVotes {
+			maxVotes = slots[i].VotesCount
+		}
+	}
+
+	if maxVotes > 0 {
+		for i := range slots {
+			if slots[i].VotesCount == maxVotes {
+				slots[i].IsWinner = true
+			}
+		}
+	}
+
+	for i := range parts {
+		voted := slotsByPart[parts[i].ID]
+		if voted == nil {
+			voted = []string{}
+		}
+		parts[i].VotedSlotIDs = voted
+	}
+
+	if slots == nil {
+		slots = []domain.MeetingSlot{}
+	}
+	if parts == nil {
+		parts = []domain.MeetingParticipant{}
 	}
 
 	canonicalURL := fmt.Sprintf("%s/meet/%s", s.publicBaseURL, m.ID)
@@ -203,14 +272,82 @@ func (s *MeetingService) GetMeetingDetails(ctx context.Context, meetingID string
 	}, nil
 }
 
-// ListUserMeetings lista as reuniões do usuário com filtro opcional de status.
-func (s *MeetingService) ListUserMeetings(ctx context.Context, userID, status string) ([]domain.Meeting, error) {
-	return s.meetingRepo.ListByUser(ctx, userID, status)
+// ListUserMeetings lista as reuniões do usuário enriquecidas com slots, votos e participantes.
+func (s *MeetingService) ListUserMeetings(ctx context.Context, userID, status string) ([]domain.MeetingWithDetails, error) {
+	rawList, err := s.meetingRepo.ListByUser(ctx, userID, status)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]domain.MeetingWithDetails, 0, len(rawList))
+	for i := range rawList {
+		details, err := s.enrichMeetingDetails(ctx, &rawList[i])
+		if err != nil {
+			continue
+		}
+		result = append(result, *details)
+	}
+	return result, nil
+}
+
+// UpdateMeeting edita título, descrição, duração e horários de uma reunião preservando votos em slots mantidos.
+func (s *MeetingService) UpdateMeeting(ctx context.Context, userID, meetingID string, req UpdateMeetingRequest) (*domain.MeetingWithDetails, error) {
+	s.lockMu.Lock()
+	defer s.lockMu.Unlock()
+
+	m, err := s.meetingRepo.GetByIDAndUser(ctx, meetingID, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	title := strings.TrimSpace(s.sanitizer.Sanitize(req.Title))
+	if title != "" {
+		m.Title = title
+	}
+	m.Description = strings.TrimSpace(s.sanitizer.Sanitize(req.Description))
+	if req.DurationMinutes > 0 {
+		m.DurationMinutes = req.DurationMinutes
+	}
+
+	now := time.Now().UTC()
+	var newSlots []domain.MeetingSlot
+	for _, sl := range req.Slots {
+		if sl.StartAt.IsZero() || sl.EndAt.IsZero() || !sl.EndAt.After(sl.StartAt) {
+			continue
+		}
+		newSlots = append(newSlots, domain.MeetingSlot{
+			ID:         uuid.New().String(),
+			MeetingID:  m.ID,
+			StartAt:    sl.StartAt.UTC(),
+			EndAt:      sl.EndAt.UTC(),
+			VotesCount: 0,
+			CreatedAt:  now,
+		})
+	}
+
+	if len(newSlots) > 0 {
+		if err := s.meetingRepo.UpdateWithSlots(ctx, m, newSlots); err != nil {
+			return nil, fmt.Errorf("falha ao atualizar reunião e horários: %w", err)
+		}
+	} else {
+		if err := s.meetingRepo.Update(ctx, m); err != nil {
+			return nil, fmt.Errorf("falha ao atualizar reunião: %w", err)
+		}
+	}
+
+	return s.GetMeetingDetails(ctx, m.ID)
 }
 
 // DeleteMeeting remove uma reunião pertencente ao usuário.
 func (s *MeetingService) DeleteMeeting(ctx context.Context, userID, meetingID string) error {
 	return s.meetingRepo.Delete(ctx, meetingID, userID)
+}
+
+func brtLocation() *time.Location {
+	loc, err := time.LoadLocation("America/Sao_Paulo")
+	if err != nil {
+		return time.FixedZone("BRT", -3*3600)
+	}
+	return loc
 }
 
 // SubmitVote processa o voto de um convidado na página pública.
@@ -276,6 +413,8 @@ func (s *MeetingService) SubmitVote(ctx context.Context, req SubmitVoteRequest) 
 		MeetingStatus: m.Status,
 	}
 
+	loc := brtLocation()
+
 	// 4. Se for 1-on-1, primeiro voto confirma imediatamente
 	if m.Mode == domain.MeetingModeOneOnOne {
 		chosenSlotID := req.SlotIDs[0]
@@ -327,14 +466,16 @@ func (s *MeetingService) SubmitVote(ctx context.Context, req SubmitVoteRequest) 
 			}(&evCopy)
 		}
 
-		// Push notification
+		// Push notification em horário de Brasília (BRT)
 		if s.notificationSvc != nil {
-			timeStr := slot.StartAt.Format("15:04")
-			dateStr := slot.StartAt.Format("02/01/2006")
-			pushTitle := fmt.Sprintf("Reunião confirmada: %s", name)
+			localStart := slot.StartAt.In(loc)
+			timeStr := localStart.Format("15:04")
+			dateStr := localStart.Format("02/01")
+			pushTitle := fmt.Sprintf("📅 Reunião confirmada: %s", name)
 			pushBody := fmt.Sprintf("%s confirmou '%s' para %s às %s", name, m.Title, dateStr, timeStr)
 			_, _ = s.notificationSvc.SendPushToUser(m.UserID, pushTitle, pushBody, "high", map[string]interface{}{
 				"type":       "meeting_confirmed",
+				"channelId":  "vito_booking",
 				"meeting_id": m.ID,
 				"event_id":   eventID,
 			})
@@ -345,12 +486,24 @@ func (s *MeetingService) SubmitVote(ctx context.Context, req SubmitVoteRequest) 
 		resp.ConfirmedSlotStart = &slot.StartAt
 		resp.ConfirmedSlotEnd = &slot.EndAt
 	} else {
-		// Modo grupo: notifica anfitrião sobre novo voto
+		// Modo grupo: notifica anfitrião sobre novo voto com alta prioridade e canal vito_booking
 		if s.notificationSvc != nil {
-			pushTitle := fmt.Sprintf("Novo voto na reunião: %s", name)
-			pushBody := fmt.Sprintf("%s votou nos horários de '%s'", name, m.Title)
-			_, _ = s.notificationSvc.SendPushToUser(m.UserID, pushTitle, pushBody, "default", map[string]interface{}{
+			var votedTimes []string
+			for _, sid := range req.SlotIDs {
+				if sl, err := s.meetingRepo.GetSlotByID(ctx, sid); err == nil && sl != nil {
+					localSt := sl.StartAt.In(loc)
+					votedTimes = append(votedTimes, fmt.Sprintf("%s às %s", localSt.Format("02/01"), localSt.Format("15:04")))
+				}
+			}
+			timeSummary := fmt.Sprintf("%d horário(s)", len(req.SlotIDs))
+			if len(votedTimes) > 0 {
+				timeSummary = strings.Join(votedTimes, ", ")
+			}
+			pushTitle := fmt.Sprintf("🗳️ Novo voto em '%s'", m.Title)
+			pushBody := fmt.Sprintf("%s votou em: %s", name, timeSummary)
+			_, _ = s.notificationSvc.SendPushToUser(m.UserID, pushTitle, pushBody, "high", map[string]interface{}{
 				"type":       "meeting_vote",
+				"channelId":  "vito_booking",
 				"meeting_id": m.ID,
 			})
 		}

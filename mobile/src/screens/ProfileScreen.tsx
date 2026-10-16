@@ -184,6 +184,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
       <PhoneEditModal
         visible={phoneVisible}
         currentPhone={userPhone}
+        userName={name}
+        userEmail={email}
         onClose={() => setPhoneVisible(false)}
         onPhoneUpdated={(newPhone) => {
           setUserPhone(newPhone);

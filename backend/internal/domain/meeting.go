@@ -50,18 +50,21 @@ type MeetingSlot struct {
 	StartAt    time.Time `json:"start_at"`
 	EndAt      time.Time `json:"end_at"`
 	VotesCount int       `json:"votes_count"`
+	VoterNames []string  `json:"voter_names,omitempty"`
+	IsWinner   bool      `json:"is_winner,omitempty"`
 	CreatedAt  time.Time `json:"created_at"`
 }
 
 // MeetingParticipant representa um participante convidado que respondeu/votou.
 type MeetingParticipant struct {
-	ID          string     `json:"id"`
-	MeetingID   string     `json:"meeting_id"`
-	Name        string     `json:"name"`
-	ContactInfo string     `json:"contact_info,omitempty"`
-	VitoUserID  *string    `json:"vito_user_id,omitempty"`
-	RespondedAt time.Time  `json:"responded_at"`
-	CreatedAt   time.Time  `json:"created_at"`
+	ID           string    `json:"id"`
+	MeetingID    string    `json:"meeting_id"`
+	Name         string    `json:"name"`
+	ContactInfo  string    `json:"contact_info,omitempty"`
+	VitoUserID   *string   `json:"vito_user_id,omitempty"`
+	VotedSlotIDs []string  `json:"voted_slot_ids,omitempty"`
+	RespondedAt  time.Time `json:"responded_at"`
+	CreatedAt    time.Time `json:"created_at"`
 }
 
 // MeetingVote registra o voto de um participante em um slot específico.
@@ -88,6 +91,7 @@ type MeetingRepository interface {
 	GetByIDAndUser(ctx context.Context, id, userID string) (*Meeting, error)
 	ListByUser(ctx context.Context, userID string, status string) ([]Meeting, error)
 	Update(ctx context.Context, m *Meeting) error
+	UpdateWithSlots(ctx context.Context, m *Meeting, newSlots []MeetingSlot) error
 	Delete(ctx context.Context, id, userID string) error
 	ListSlots(ctx context.Context, meetingID string) ([]MeetingSlot, error)
 	GetSlotByID(ctx context.Context, slotID string) (*MeetingSlot, error)
@@ -97,3 +101,4 @@ type MeetingRepository interface {
 	ListVotesByMeeting(ctx context.Context, meetingID string) ([]MeetingVote, error)
 	ConfirmMeetingSlot(ctx context.Context, meetingID, slotID string, startAt, endAt time.Time) error
 }
+

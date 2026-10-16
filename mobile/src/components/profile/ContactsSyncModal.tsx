@@ -83,18 +83,18 @@ export const ContactsSyncModal: React.FC<ContactsSyncModalProps> = ({
     <BottomSheetModal
       visible={visible}
       onClose={onClose}
-      title="Contatos da Agenda (P2P)"
+      title="Contatos da Agenda"
     >
       <View style={styles.container}>
-        {/* Zero-Knowledge Privacy Card */}
+        {/* Privacy Card */}
         <View style={[styles.privacyBanner, { backgroundColor: colors.surfaceContainerHighest, borderColor: colors.outlineVariant }]}>
           <MaterialIcons name="security" size={20} color={colors.primary} style={styles.privacyIcon} />
           <View style={styles.privacyTextCol}>
             <Text style={[styles.privacyTitle, { color: colors.onSurface }]}>
-              Privacidade Zero-Knowledge
+              Privacidade e Segurança
             </Text>
             <Text style={[styles.privacyDesc, { color: colors.onSurfaceVariant }]}>
-              Sua agenda nunca sai do seu celular em texto claro. Os números são hasheados localmente com HMAC-SHA256 antes do matching.
+              Seus contatos continuam protegidos no seu aparelho. O Vito apenas verifica quais dos seus contatos já usam o app para facilitar o agendamento de reuniões.
             </Text>
           </View>
         </View>
@@ -122,7 +122,7 @@ export const ContactsSyncModal: React.FC<ContactsSyncModalProps> = ({
             <>
               <MaterialIcons name="sync" size={18} color={colors.onPrimary} />
               <Text style={[styles.syncButtonText, { color: colors.onPrimary }]}>
-                {hasScanned ? 'Sincronizar Novamente' : 'Buscar Colegas na Minha Agenda'}
+                {hasScanned ? 'Atualizar Lista' : 'Buscar Amigos na Agenda'}
               </Text>
             </>
           )}
@@ -133,10 +133,10 @@ export const ContactsSyncModal: React.FC<ContactsSyncModalProps> = ({
           <View style={styles.resultsArea}>
             <View style={styles.resultsHeader}>
               <Text style={[styles.resultsTitle, { color: colors.onSurface }]}>
-                Encontrados no Vito ({matches.length})
+                Amigos no Vito ({matches.length})
               </Text>
               <Text style={[styles.scannedCount, { color: colors.outline }]}>
-                {totalScanned} contatos analisados
+                {totalScanned} contatos verificados
               </Text>
             </View>
 

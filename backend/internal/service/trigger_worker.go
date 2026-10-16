@@ -63,6 +63,9 @@ func (s evalSignal) allowsNotify() bool {
 	if !s.hasGate {
 		return true
 	}
+	if s.urgent {
+		return true
+	}
 	if !s.met {
 		return false
 	}
@@ -120,6 +123,7 @@ func (e *AITriggerEvaluator) Evaluate(ctx context.Context, t *domain.Trigger) (s
 				"status":                 "evaluated",
 				"condition_met":          res.ConditionMet,
 				"data":                   res.CurrentData,
+				"paragraphs":             res.Paragraphs,
 				"simulated_notification": res.SimulatedNotification,
 				"confidence":             res.Confidence,
 				"why_relevant":           res.WhyRelevant,
@@ -391,9 +395,10 @@ func (w *TriggerWorker) CheckAndEvaluateTriggers(now time.Time) (int, error) {
 		// Falhas de avaliação geram log + badge, mas nunca push (anti-spam).
 		// Urgência alta (Fase 2) usa o canal urgente com som.
 		if evalErr == nil && w.notifSvc != nil && t.UserID != "" {
-			pushTitle := fmt.Sprintf("Vigília: %s", t.Title)
+			pushTitle := fmt.Sprintf("Radar: %s", t.Title)
 			pushData := map[string]interface{}{
 				"type":         "RADAR_TRIGGERED",
+				"channelId":    "vito_radar",
 				"triggerId":    t.ID,
 				"logId":        logEntry.ID,
 				"currentValue": summary,
@@ -453,6 +458,18 @@ func (w *TriggerWorker) RunTriggerNow(id, userID string) (*domain.TriggerLog, er
 
 	nextCheck := CalculateNextCheck(t.ScheduledTime, t.Frequency, now, loc)
 	_ = w.triggerRepo.UpdateRunResult(t.ID, summary, t.Status, runStatus, now, &nextCheck)
+
+	// Despacha notificação push para confirmar que a verificação imediata foi concluída com sucesso
+	if w.notifSvc != nil && t.UserID != "" {
+		pushData := map[string]interface{}{
+			"type":         "RADAR_TRIGGERED",
+			"channelId":    "vito_radar",
+			"triggerId":    t.ID,
+			"logId":        logEntry.ID,
+			"currentValue": summary,
+		}
+		_, _ = w.notifSvc.SendPushToUser(t.UserID, fmt.Sprintf("Radar: %s", t.Title), summary, "high", pushData)
+	}
 
 	return logEntry, nil
 }

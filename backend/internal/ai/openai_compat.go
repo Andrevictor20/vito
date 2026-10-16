@@ -200,9 +200,9 @@ func (p *OpenAICompatProvider) EvaluateTrigger(ctx context.Context, t *domain.Tr
 	currentMonthYear := now.Format("01/2006")
 
 	var realtimeFeed string
-	searchQuery := t.Query
-	if strings.TrimSpace(searchQuery) == "" {
-		searchQuery = t.Title
+	searchQuery := CleanSearchQuery(t.Query, string(t.Category))
+	if searchQuery == "" {
+		searchQuery = CleanSearchQuery(t.Title, string(t.Category))
 	}
 	if items, err := FetchGoogleNews(ctx, searchQuery, 6, p.httpClient); err == nil && len(items) > 0 {
 		realtimeFeed = FormatNewsFeed(items)
@@ -212,25 +212,34 @@ func (p *OpenAICompatProvider) EvaluateTrigger(ctx context.Context, t *domain.Tr
 
 	realtimeBlock := ""
 	if realtimeFeed != "" {
-		realtimeBlock = fmt.Sprintf("\nNOTÍCIAS FACTUAIS COLETADAS EM TEMPO REAL NA WEB (GOOGLE NOTÍCIAS):\n%s\n", realtimeFeed)
+		realtimeBlock = fmt.Sprintf("\nNOTÍCIAS FACTUAIS COLETADAS EM TEMPO REAL NA WEB (GOOGLE NOTÍCIAS BRASIL):\n%s\n", realtimeFeed)
 	}
 
 	systemPrompt := fmt.Sprintf(`Você é o Vito, assistente de inteligência autônoma e monitoramento executivo do usuário.
-Sua missão é avaliar uma vigília/radar cadastrado pelo usuário e trazer as NOTÍCIAS MAIS RECENTES sobre o tema (estilo Google Notícias), nunca um panorama genérico ou histórico.
+Sua missão é avaliar uma vigília/radar cadastrado pelo usuário e trazer as NOTÍCIAS MAIS RECENTES sobre o tema, nunca um panorama genérico ou histórico.
 DATA ATUAL DO SISTEMA: %s (Mês/Ano: %s).
-ATENÇÃO CRÍTICA À ATUALIDADE:
-- As notícias do radar DEVEM ser estritamente deste mês (%s) ou dos últimos dias.
-- NUNCA traga notícias antigas de meses anteriores (como maio, junho, etc.).
-- Se houver notícias reais fornecidas no prompt do usuário, baseie sua resposta ('current_data' e 'summary') OBRIGATORIAMENTE nelas.
-Responda EXCLUSIVAMENTE em formato JSON puro, sem markdown delimitador nem explicações fora do JSON:
+DIRETRIZES DE LOCALIZAÇÃO, IDIOMA E ATUALIDADE:
+1. IDIOMA E LOCALIZAÇÃO MANDATÓRIOS: Responda 100%% em PORTUGUÊS DO BRASIL (pt-BR). É EXPRESSAMENTE PROIBIDO gerar texto em inglês. Todos os preços DEVEM ser em Reais (R$) e voltados para o mercado brasileiro.
+2. ATENÇÃO CRÍTICA À ATUALIDADE: Estamos em %s. As notícias e preços DEVEM ser de hoje ou dos últimos dias do mês atual. PROIBIDO trazer notícias de meses anteriores.
+3. SE FOR MONITORAMENTO DE PRODUTO OU PREÇO:
+   - Pesquise exclusivamente lojas confiáveis que operam no Brasil (ex: Mercado Livre, Amazon Brasil, KaBuM!, Magazine Luiza, Casas Bahia, Fast Shop, Promobit).
+   - Discrimine obrigatoriamente: o menor preço à vista no PIX com desconto, preço no DÉBITO e opções de parcelamento sem juros no CARTÃO DE CRÉDITO (ex: até 10x ou 12x).
+4. ESTRUTURA DOS PARÁGRAFOS (campo "paragraphs"):
+   Gere de 2 a 3 parágrafos analíticos completos e substanciais:
+   - Parágrafo 1: Notícia e fato central do dia, contextualizando a vigília e variação em relação ao histórico.
+   - Parágrafo 2: Dados detalhados e concretos (se produto: lojas, preços Pix, débito e parcelado; se notícias/viagens: números, companhias, linhas ou datas de impacto).
+   - Parágrafo 3: Análise prática e recomendação executiva para o usuário (se vale a pena comprar hoje, esperar ou tomar uma ação preventiva).
+5. REGRA ANTI-SLOP: NUNCA use metalinguagem de IA (não diga "Conforme monitorado", "A condição foi atendida").
+Responda EXCLUSIVAMENTE em formato JSON puro, sem markdown delimitador:
 {
   "condition_met": true,
-  "current_data": "3 a 6 linhas no formato '— DD/MM · Manchete curta: detalhe concreto (placar, número, decisão)', da mais recente para a mais antiga; opcionalmente uma última linha 'Próximo: DD/MM HH:MM · evento'. Sem introduções institucionais, sem calendário completo, máximo ~120 palavras",
-  "summary": "manchete da notícia mais importante e recente em 1 frase",
+  "summary": "manchete executiva principal em 1 frase em português do Brasil",
+  "paragraphs": ["Parágrafo 1...", "Parágrafo 2...", "Parágrafo 3..."],
+  "current_data": "dados resumidos em tópicos factuais",
   "simulated_notification": "título curto e impactante da notificação de alerta",
   "confidence": 0-100,
-  "why_relevant": "1 frase explicando por que é relevante para a vigília; vazio se irrelevante",
-  "urgency": "high apenas se fato urgente/breaking das últimas horas que exige atenção imediata; senão low"
+  "why_relevant": "1 frase explicando por que é relevante para a vigília em português",
+  "urgency": "high se for queda histórica de preço, cupom urgente ou notícia de impacto imediato; senão low"
 }`, nowStr, currentMonthYear, currentMonthYear)
 
 	userPrompt := fmt.Sprintf(`Avalie esta vigília/radar do usuário:
@@ -298,13 +307,14 @@ Analise o cenário, verifique se a condição foi atingida ou se há fatos relev
 	rawText := strings.TrimSpace(chatResp.Choices[0].Message.Content)
 
 	type testEvalResult struct {
-		ConditionMet          bool   `json:"condition_met"`
-		CurrentData           string `json:"current_data"`
-		Summary               string `json:"summary"`
-		SimulatedNotification string `json:"simulated_notification"`
-		Confidence            int    `json:"confidence"`
-		WhyRelevant           string `json:"why_relevant"`
-		Urgency               string `json:"urgency"`
+		ConditionMet          bool     `json:"condition_met"`
+		CurrentData           string   `json:"current_data"`
+		Summary               string   `json:"summary"`
+		Paragraphs            []string `json:"paragraphs"`
+		SimulatedNotification string   `json:"simulated_notification"`
+		Confidence            int      `json:"confidence"`
+		WhyRelevant           string   `json:"why_relevant"`
+		Urgency               string   `json:"urgency"`
 	}
 
 	cleanJSON := rawText
@@ -323,6 +333,7 @@ Analise o cenário, verifique se a condição foi atingida ou se há fatos relev
 			ConditionMet:          false,
 			CurrentData:           rawText,
 			Summary:               "Consulta realizada com sucesso. Condições avaliadas.",
+			Paragraphs:            []string{rawText},
 			SimulatedNotification: fmt.Sprintf("Alerta Vito: Vigília de '%s' atualizada.", t.Title),
 			Confidence:            0,
 			WhyRelevant:           "",
@@ -337,6 +348,7 @@ Analise o cenário, verifique se a condição foi atingida ou se há fatos relev
 		ConditionMet:          eval.ConditionMet,
 		CurrentData:           eval.CurrentData,
 		Summary:               eval.Summary,
+		Paragraphs:            eval.Paragraphs,
 		SimulatedNotification: eval.SimulatedNotification,
 		Confidence:            eval.Confidence,
 		WhyRelevant:           eval.WhyRelevant,

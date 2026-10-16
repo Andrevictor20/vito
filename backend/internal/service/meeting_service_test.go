@@ -320,3 +320,135 @@ func TestMeetingService_XSSSanitization(t *testing.T) {
 	}
 	_ = res
 }
+
+func TestMeetingService_VoterNamesAndParticipantVotedSlots(t *testing.T) {
+	tc := setupMeetingTest(t)
+	defer tc.db.Close()
+	ctx := context.Background()
+
+	now := time.Now().UTC().Truncate(time.Second)
+	m, err := tc.meetingSvc.CreateMeeting(ctx, service.CreateMeetingRequest{
+		UserID:          tc.user.ID,
+		Title:           "Design Review",
+		DurationMinutes: 30,
+		Mode:            domain.MeetingModeGroupConsensus,
+		Slots: []service.MeetingSlotInput{
+			{StartAt: now.Add(24 * time.Hour), EndAt: now.Add(24*time.Hour + 30*time.Minute)},
+			{StartAt: now.Add(26 * time.Hour), EndAt: now.Add(26*time.Hour + 30*time.Minute)},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	slot1 := m.Slots[0].ID
+	slot2 := m.Slots[1].ID
+
+	_, err = tc.meetingSvc.SubmitVote(ctx, service.SubmitVoteRequest{
+		MeetingID:       m.ID,
+		ParticipantName: "Ana Silva",
+		ContactInfo:     "11999999999",
+		SlotIDs:         []string{slot1, slot2},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = tc.meetingSvc.SubmitVote(ctx, service.SubmitVoteRequest{
+		MeetingID:       m.ID,
+		ParticipantName: "Bruno Costa",
+		SlotIDs:         []string{slot1},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	details, err := tc.meetingSvc.GetMeetingDetails(ctx, m.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(details.Slots[0].VoterNames) != 2 || details.Slots[0].VoterNames[0] != "Ana Silva" || details.Slots[0].VoterNames[1] != "Bruno Costa" {
+		t.Fatalf("esperava VoterNames=[Ana Silva, Bruno Costa] no slot 1, veio %+v", details.Slots[0].VoterNames)
+	}
+	if !details.Slots[0].IsWinner {
+		t.Errorf("slot 1 deveria estar marcado como IsWinner=true")
+	}
+	if len(details.Slots[1].VoterNames) != 1 || details.Slots[1].VoterNames[0] != "Ana Silva" {
+		t.Fatalf("esperava VoterNames=[Ana Silva] no slot 2, veio %+v", details.Slots[1].VoterNames)
+	}
+	if len(details.Participants) != 2 || len(details.Participants[0].VotedSlotIDs) != 2 {
+		t.Fatalf("esperava VotedSlotIDs populado no participante 1, veio %+v", details.Participants)
+	}
+
+	// ListUserMeetings deve retornar MeetingWithDetails com Slots e Participants populados
+	list, err := tc.meetingSvc.ListUserMeetings(ctx, tc.user.ID, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 1 || len(list[0].Slots) != 2 || len(list[0].Participants) != 2 {
+		t.Fatalf("ListUserMeetings deveria retornar detalhes completos: %+v", list)
+	}
+}
+
+func TestMeetingService_UpdateMeeting_PreservesVotesOnMatchingSlots(t *testing.T) {
+	tc := setupMeetingTest(t)
+	defer tc.db.Close()
+	ctx := context.Background()
+
+	t1 := time.Date(2026, 10, 19, 21, 0, 0, 0, time.UTC)
+	t2 := time.Date(2026, 10, 20, 21, 0, 0, 0, time.UTC)
+	t3 := time.Date(2026, 10, 21, 21, 0, 0, 0, time.UTC)
+
+	m, err := tc.meetingSvc.CreateMeeting(ctx, service.CreateMeetingRequest{
+		UserID:          tc.user.ID,
+		Title:           "Reunião Original",
+		Description:     "Pauta 1",
+		DurationMinutes: 30,
+		Mode:            domain.MeetingModeGroupConsensus,
+		Slots: []service.MeetingSlotInput{
+			{StartAt: t1, EndAt: t1.Add(30 * time.Minute)},
+			{StartAt: t2, EndAt: t2.Add(30 * time.Minute)},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Alguém vota no primeiro slot (t1)
+	_, err = tc.meetingSvc.SubmitVote(ctx, service.SubmitVoteRequest{
+		MeetingID:       m.ID,
+		ParticipantName: "Mariana",
+		SlotIDs:         []string{m.Slots[0].ID},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Atualiza mantendo t1, removendo t2 e adicionando t3
+	updated, err := tc.meetingSvc.UpdateMeeting(ctx, tc.user.ID, m.ID, service.UpdateMeetingRequest{
+		Title:           "Reunião Editada",
+		Description:     "Nova Pauta",
+		DurationMinutes: 45,
+		Slots: []service.MeetingSlotInput{
+			{StartAt: t1, EndAt: t1.Add(45 * time.Minute)},
+			{StartAt: t3, EndAt: t3.Add(45 * time.Minute)},
+		},
+	})
+	if err != nil {
+		t.Fatalf("UpdateMeeting falhou: %v", err)
+	}
+
+	if updated.Title != "Reunião Editada" || updated.DurationMinutes != 45 {
+		t.Fatalf("metadados não foram atualizados: %+v", updated)
+	}
+	if len(updated.Slots) != 2 {
+		t.Fatalf("esperava 2 slots após update, vieram %d", len(updated.Slots))
+	}
+	if updated.Slots[0].VotesCount != 1 || len(updated.Slots[0].VoterNames) != 1 || updated.Slots[0].VoterNames[0] != "Mariana" {
+		t.Fatalf("voto de Mariana no slot t1 deveria ter sido preservado: %+v", updated.Slots[0])
+	}
+	if updated.Slots[1].VotesCount != 0 {
+		t.Fatalf("novo slot t3 deveria ter 0 votos: %+v", updated.Slots[1])
+	}
+}
+

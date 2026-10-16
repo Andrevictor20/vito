@@ -42,6 +42,10 @@ func FetchGoogleNews(ctx context.Context, query string, maxResults int, customCl
 	cleanQuery := strings.TrimSpace(query)
 	if cleanQuery == "" {
 		cleanQuery = "tecnologia"
+	} else {
+		if sanitized := CleanSearchQuery(cleanQuery, ""); sanitized != "" {
+			cleanQuery = sanitized
+		}
 	}
 
 	searchURL := fmt.Sprintf("https://news.google.com/rss/search?q=%s&hl=pt-BR&gl=BR&ceid=BR:pt-419", url.QueryEscape(cleanQuery))
@@ -50,7 +54,7 @@ func FetchGoogleNews(ctx context.Context, query string, maxResults int, customCl
 	if len(customClient) > 0 && customClient[0] != nil {
 		client = customClient[0]
 	} else {
-		client = &http.Client{Timeout: 6 * time.Second}
+		client = &http.Client{Timeout: 12 * time.Second}
 	}
 
 	// Bug §8.7/11: retry com backoff + validação de conteúdo não-vazio.

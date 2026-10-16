@@ -255,8 +255,23 @@ export interface TriggerTestResult {
   condition_met: boolean;
   current_data: string;
   summary: string;
+  paragraphs?: string[];
   simulated_notification: string;
   tested_at: string;
+}
+
+export interface TriggerReportPayload {
+  status?: string;
+  condition_met?: boolean;
+  data?: string;
+  paragraphs?: string[];
+  summary?: string;
+  simulated_notification?: string;
+  confidence?: number;
+  why_relevant?: string;
+  urgency?: string;
+  tested_at?: string;
+  last_error?: string;
 }
 
 export interface CreateTriggerInput {
@@ -537,6 +552,8 @@ export interface MeetingSlot {
   start_at: string;
   end_at: string;
   votes_count: number;
+  voter_names?: string[];
+  is_winner?: boolean;
   created_at: string;
 }
 
@@ -546,6 +563,7 @@ export interface MeetingParticipant {
   name: string;
   contact_info?: string;
   vito_user_id?: string;
+  voted_slot_ids?: string[];
   responded_at: string;
   created_at: string;
 }
@@ -559,10 +577,13 @@ export interface Meeting {
   mode: 'one_on_one' | 'group_consensus';
   status: 'open' | 'confirmed' | 'expired' | 'cancelled';
   short_url?: string;
+  public_url?: string;
   expires_at: string;
   confirmed_slot_id?: string;
   confirmed_slot_start?: string;
   confirmed_slot_end?: string;
+  slots?: MeetingSlot[];
+  participants?: MeetingParticipant[];
   created_at: string;
   updated_at: string;
 }
@@ -579,6 +600,13 @@ export interface CreateMeetingInput {
   duration_minutes: number;
   mode?: 'one_on_one' | 'group_consensus';
   expires_at?: string;
+  slots: { start_at: string; end_at: string }[];
+}
+
+export interface UpdateMeetingInput {
+  title: string;
+  description?: string;
+  duration_minutes: number;
   slots: { start_at: string; end_at: string }[];
 }
 

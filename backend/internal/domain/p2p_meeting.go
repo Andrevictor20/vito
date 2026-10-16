@@ -7,11 +7,12 @@ import (
 )
 
 var (
-	ErrP2PInviteNotFound     = errors.New("convite de reunião P2P não encontrado")
-	ErrP2PInviteNotPending    = errors.New("convite de reunião P2P não está pendente")
-	ErrP2PInviteUnauthorized  = errors.New("não autorizado a responder a este convite")
-	ErrP2PSlotConflict        = errors.New("um dos participantes possui conflito no horário selecionado")
-	ErrP2PSelfInvite          = errors.New("não é possível convidar a si mesmo")
+	ErrP2PInviteNotFound        = errors.New("convite de reunião P2P não encontrado")
+	ErrP2PInviteNotPending      = errors.New("convite de reunião P2P não está pendente")
+	ErrP2PInviteUnauthorized    = errors.New("não autorizado a responder a este convite")
+	ErrP2PSlotConflict          = errors.New("um dos participantes possui conflito no horário selecionado")
+	ErrP2PSelfInvite            = errors.New("não é possível convidar a si mesmo")
+	ErrPhoneVerificationInvalid = errors.New("código ou link de verificação de telefone inválido ou expirado")
 )
 
 const (
@@ -20,6 +21,18 @@ const (
 	P2PInviteStatusDeclined  = "declined"
 	P2PInviteStatusCancelled = "cancelled"
 )
+
+// PhoneVerificationChallenge representa uma sessão ativa de verificação de telefone via WhatsApp.
+type PhoneVerificationChallenge struct {
+	Token       string    `json:"token"`
+	Code        string    `json:"code"`
+	UserID      string    `json:"user_id"`
+	Phone       string    `json:"phone"`
+	VerifyURL   string    `json:"verify_url"`
+	WhatsAppURL string    `json:"whatsapp_url"`
+	ExpiresAt   time.Time `json:"expires_at"`
+	Verified    bool      `json:"verified"`
+}
 
 // P2PMeetingInvite representa um convite de reunião bilateral entre dois usuários do Vito.
 type P2PMeetingInvite struct {

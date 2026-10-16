@@ -324,3 +324,93 @@ func TestP2PMeetingService_DeclineInvite(t *testing.T) {
 		t.Fatalf("status esperado declined, obteve: %s", invites[0].Status)
 	}
 }
+
+func TestP2PMeetingService_PhoneWhatsAppVerification(t *testing.T) {
+	ctx := context.Background()
+	tc := setupP2PServiceTest(t)
+
+	u1 := &domain.User{
+		ID:        uuid.New().String(),
+		Email:     "verify1@vito.app",
+		Name:      "Andre",
+		CreatedAt: time.Now().UTC(),
+		UpdatedAt: time.Now().UTC(),
+	}
+	u2 := &domain.User{
+		ID:        uuid.New().String(),
+		Email:     "verify2@vito.app",
+		Name:      "Outro",
+		CreatedAt: time.Now().UTC(),
+		UpdatedAt: time.Now().UTC(),
+	}
+	if err := tc.userRepo.Create(u1); err != nil {
+		t.Fatal(err)
+	}
+	if err := tc.userRepo.Create(u2); err != nil {
+		t.Fatal(err)
+	}
+
+	// 1. Solicita verificação com telefone nacional sem +55 -> deve normalizar para +5511987654321
+	challenge, err := tc.svc.RequestPhoneVerification(ctx, u1.ID, "(11) 98765-4321", "https://vito.rasppi.cloud")
+	if err != nil {
+		t.Fatalf("RequestPhoneVerification falhou: %v", err)
+	}
+	if challenge.Phone != "+5511987654321" {
+		t.Fatalf("esperava E.164 +5511987654321, obteve %s", challenge.Phone)
+	}
+	if len(challenge.Code) != 6 {
+		t.Fatalf("esperava código de 6 dígitos, obteve %q", challenge.Code)
+	}
+	if challenge.Token == "" || challenge.WhatsAppURL == "" || challenge.VerifyURL == "" {
+		t.Fatalf("challenge incompleto: %+v", challenge)
+	}
+
+	// Antes de confirmar, o telefone do usuário no banco ainda deve ser nil
+	u1Before, err := tc.userRepo.GetByID(u1.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if u1Before.Phone != nil {
+		t.Fatalf("telefone não deveria estar salvo antes da confirmação, obteve %v", *u1Before.Phone)
+	}
+
+	// 2. Confirma via Token (simulando clique no link mágico dentro do WhatsApp)
+	confirmed, err := tc.svc.ConfirmPhoneVerificationByToken(ctx, challenge.Token)
+	if err != nil {
+		t.Fatalf("ConfirmPhoneVerificationByToken falhou: %v", err)
+	}
+	if !confirmed.Verified || confirmed.Phone != "+5511987654321" {
+		t.Fatalf("challenge deveria estar verificado: %+v", confirmed)
+	}
+
+	u1After, err := tc.userRepo.GetByID(u1.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if u1After.Phone == nil || *u1After.Phone != "+5511987654321" {
+		t.Fatalf("telefone deveria estar salvo no banco após confirmação, obteve %v", u1After.Phone)
+	}
+
+	// 3. Outro usuário tentando verificar o mesmo número deve receber ErrUserAlreadyExists
+	_, err = tc.svc.RequestPhoneVerification(ctx, u2.ID, "11987654321", "https://vito.rasppi.cloud")
+	if err != domain.ErrUserAlreadyExists {
+		t.Fatalf("esperava ErrUserAlreadyExists ao tentar usar telefone de outro usuário, obteve %v", err)
+	}
+
+	// 4. Fluxo de confirmação via código de 6 dígitos para u2 com outro número
+	ch2, err := tc.svc.RequestPhoneVerification(ctx, u2.ID, "+5521998887766", "https://vito.rasppi.cloud")
+	if err != nil {
+		t.Fatalf("RequestPhoneVerification u2 falhou: %v", err)
+	}
+	_, err = tc.svc.ConfirmPhoneVerificationByCode(ctx, u2.ID, "000000")
+	if err != domain.ErrPhoneVerificationInvalid {
+		t.Fatalf("esperava ErrPhoneVerificationInvalid para código incorreto, obteve %v", err)
+	}
+	confirmedCh2, err := tc.svc.ConfirmPhoneVerificationByCode(ctx, u2.ID, ch2.Code)
+	if err != nil {
+		t.Fatalf("ConfirmPhoneVerificationByCode falhou: %v", err)
+	}
+	if !confirmedCh2.Verified || confirmedCh2.Phone != "+5521998887766" {
+		t.Fatalf("esperava confirmação de +5521998887766, obteve %+v", confirmedCh2)
+	}
+}

@@ -226,3 +226,62 @@ func TestP2PMeetingHandler_MutualSlots(t *testing.T) {
 		t.Fatal("esperava slots mútuos")
 	}
 }
+
+func TestP2PMeetingHandler_PhoneWhatsAppVerificationFlow(t *testing.T) {
+	tc := setupP2PHandlerTest(t)
+
+	// 1. Solicita verificação de novo telefone via WhatsApp
+	reqBody, _ := json.Marshal(map[string]string{
+		"phone": "(11) 97777-6655",
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/users/phone/request-verification", bytes.NewReader(reqBody))
+	req.Host = "vito.rasppi.cloud"
+	req = req.WithContext(context.WithValue(req.Context(), middleware.UserIDKey, tc.u1.ID))
+	rec := httptest.NewRecorder()
+	tc.handler.RequestPhoneVerification(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("esperava 200 em request-verification, obteve %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var ch domain.PhoneVerificationChallenge
+	if err := json.Unmarshal(rec.Body.Bytes(), &ch); err != nil {
+		t.Fatal(err)
+	}
+	if ch.Phone != "+5511977776655" || ch.Token == "" || len(ch.Code) != 6 {
+		t.Fatalf("challenge inválido: %+v", ch)
+	}
+
+	// 2. Simula clique no link mágico do WhatsApp: GET /verify-phone/{token}
+	rPub := chi.NewRouter()
+	rPub.Get("/verify-phone/{token}", tc.handler.VerifyPhonePublicPage)
+
+	reqPub := httptest.NewRequest(http.MethodGet, "/verify-phone/"+ch.Token, nil)
+	recPub := httptest.NewRecorder()
+	rPub.ServeHTTP(recPub, reqPub)
+
+	if recPub.Code != http.StatusOK {
+		t.Fatalf("esperava 200 na página pública de confirmação, obteve %d", recPub.Code)
+	}
+
+	// 3. Verifica via endpoint autenticado /api/v1/users/phone/verify (polling/retorno do WhatsApp)
+	verifyBody, _ := json.Marshal(map[string]string{
+		"token": ch.Token,
+	})
+	reqVerify := httptest.NewRequest(http.MethodPost, "/api/v1/users/phone/verify", bytes.NewReader(verifyBody))
+	reqVerify = reqVerify.WithContext(context.WithValue(reqVerify.Context(), middleware.UserIDKey, tc.u1.ID))
+	recVerify := httptest.NewRecorder()
+	tc.handler.VerifyPhoneCode(recVerify, reqVerify)
+
+	if recVerify.Code != http.StatusOK {
+		t.Fatalf("esperava 200 em verify, obteve %d: %s", recVerify.Code, recVerify.Body.String())
+	}
+
+	uUpdated, err := tc.userRepo.GetByID(tc.u1.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if uUpdated.Phone == nil || *uUpdated.Phone != "+5511977776655" {
+		t.Fatalf("esperava telefone atualizado +5511977776655, obteve %v", uUpdated.Phone)
+	}
+}

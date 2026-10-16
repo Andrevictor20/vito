@@ -309,9 +309,9 @@ func (p *GeminiProvider) TestEvaluateTrigger(ctx context.Context, t *domain.Trig
 	currentMonthYear := now.Format("01/2006")
 
 	var realtimeFeed string
-	searchQuery := t.Query
-	if strings.TrimSpace(searchQuery) == "" {
-		searchQuery = t.Title
+	searchQuery := CleanSearchQuery(t.Query, string(t.Category))
+	if searchQuery == "" {
+		searchQuery = CleanSearchQuery(t.Title, string(t.Category))
 	}
 	if items, err := FetchGoogleNews(ctx, searchQuery, 6, p.httpClient); err == nil && len(items) > 0 {
 		realtimeFeed = FormatNewsFeed(items)
@@ -321,40 +321,40 @@ func (p *GeminiProvider) TestEvaluateTrigger(ctx context.Context, t *domain.Trig
 
 	realtimeBlock := ""
 	if realtimeFeed != "" {
-		realtimeBlock = fmt.Sprintf("\nNOTÍCIAS FACTUAIS COLETADAS EM TEMPO REAL NA WEB (GOOGLE NOTÍCIAS):\n%s\n", realtimeFeed)
+		realtimeBlock = fmt.Sprintf("\nNOTÍCIAS FACTUAIS COLETADAS EM TEMPO REAL NA WEB (GOOGLE NOTÍCIAS BRASIL):\n%s\n", realtimeFeed)
 	}
 
 	promptText := fmt.Sprintf(`Você é o motor de inteligência e vigília proativa do assistente executivo Vito.
-Avalie em tempo real este radar de monitoramento consultando dados atualizados da web:
+Avalie em tempo real este radar de monitoramento consultando dados atualizados da web brasileira:
 - TÍTULO: %s
 - CONSULTA / VIGÍLIA: %s
 - CATEGORIA: %s
 - DATA/HORA DE REFERÊNCIA: %s (Mês/Ano Atual: %s)
 %s
-DIRETRIZES DE ATUALIDADE E RIGOR TEMPORAL:
-1. ATENÇÃO MÁXIMA AO CALENDÁRIO: Estamos em %s. As notícias DEVEM ser deste mês corrente ou das últimas horas/dias.
-2. É TERMINANTEMENTE PROIBIDO trazer notícias de meses passados (como maio, junho, etc.). Se buscar na web, restrinja expressamente as buscas a notícias recentes do mês atual (%s).
-3. Se houver notícias coletadas em tempo real fornecidas acima, utilize-as OBRIGATORIAMENTE como a principal fonte factual para o "current_data" e "summary".
-
-Diretrizes de Conteúdo (estilo Google Notícias — o que ACONTECEU de novo, não um panorama):
-1. "current_data": Feed de notícias recentes, do mais novo para o mais antigo. Formato OBRIGATÓRIO, 3 a 6 itens, um por linha:
-   "— DD/MM · Manchete factual curta: detalhe concreto em 1 frase (placar, número, decisão, nome)."
-   * Priorize o que ocorreu nos últimos 7 dias: resultados de jogos com placar e competição, anúncios, mudanças de preço, decisões.
-   * Ao final, opcionalmente 1 linha "Próximo: DD/MM HH:MM · evento" com o próximo compromisso relevante (apenas o próximo, nunca a agenda inteira).
-   * PROIBIDO: introduções institucionais ("O Clube X, equipe de..."), contexto histórico, tabelas completas, listas de calendário futuro, parágrafos longos. Máximo ~120 palavras.
-2. "summary": Manchete da notícia mais importante e recente em 1 frase (ex: "Flamengo vence o Bahia por 2 a 1 e mantém a liderança do Brasileirão").
-3. REGRA ANTI-SLOP ESTRITA: NUNCA use metalinguagem de IA (expressamente proibido falar "A condição para o alerta foi atendida", "Identifiquei que", "Conforme monitorado", "A regra foi acionada"). Entregue apenas fatos com data.
+DIRETRIZES DE LOCALIZAÇÃO, IDIOMA E ATUALIDADE:
+1. IDIOMA E LOCALIZAÇÃO MANDATÓRIOS: Responda 100%% em PORTUGUÊS DO BRASIL (pt-BR). É EXPRESSAMENTE PROIBIDO gerar texto em inglês. Todos os preços DEVEM ser em Reais (R$) e voltados para o Brasil.
+2. ATENÇÃO AO CALENDÁRIO: Estamos em %s. As notícias e preços DEVEM ser de hoje ou dos últimos dias do mês atual. PROIBIDO trazer fatos antigos de meses anteriores.
+3. SE FOR MONITORAMENTO DE PRODUTO OU PREÇO:
+   - Pesquise exclusivamente lojas confiáveis que operam no Brasil (ex: Mercado Livre, Amazon Brasil, KaBuM!, Magazine Luiza, Casas Bahia, Fast Shop, Promobit).
+   - Discrimine obrigatoriamente: o menor preço à vista no PIX com desconto, preço no DÉBITO e opções de parcelamento sem juros no CARTÃO DE CRÉDITO (ex: até 10x ou 12x).
+4. ESTRUTURA DOS PARÁGRAFOS (campo "paragraphs"):
+   Gere de 2 a 3 parágrafos analíticos completos e substanciais:
+   - Parágrafo 1: Notícia e fato central do dia, contextualizando a vigília e variação em relação ao histórico.
+   - Parágrafo 2: Dados detalhados e concretos (se produto: lojas, preços Pix, débito e parcelado; se notícias/viagens: números, companhias, linhas ou datas de impacto).
+   - Parágrafo 3: Análise prática e recomendação executiva para o usuário (se vale a pena comprar hoje, esperar ou tomar uma ação preventiva).
+5. REGRA ANTI-SLOP ESTRITA: NUNCA use metalinguagem de IA (não diga "Conforme solicitado", "Identifiquei que", "A condição foi atendida"). Seja analítico e direto como um briefing executivo.
 
 Responda ESTRITAMENTE em formato JSON puro (sem marcações markdown extras):
 {
   "condition_met": boolean,
-  "current_data": string,
-  "summary": string,
-  "simulated_notification": string,
-  "confidence": number (0-100, quão confiante você está de que há fato novo e relevante),
-  "why_relevant": string (1 frase explicando por que é relevante para a vigília; vazio se irrelevante),
-  "urgency": string ("high" apenas se fato urgente/breaking das últimas horas que exige atenção imediata; senão "low")
-}`, t.Title, t.Query, t.Category, nowStr, currentMonthYear, realtimeBlock, currentMonthYear, currentMonthYear)
+  "summary": string (manchete executiva principal em 1 frase em português do Brasil),
+  "paragraphs": [string, string, string] (array de 2 a 3 parágrafos detalhados em português do Brasil),
+  "current_data": string (dados resumidos em tópicos factuais),
+  "simulated_notification": string (alerta curto e chamativo para push notification),
+  "confidence": number (0-100),
+  "why_relevant": string (1 frase explicando a relevância imediata para o usuário em português),
+  "urgency": string ("high" se for queda histórica de preço, cupom urgente ou notícia de impacto imediato; senão "low")
+}`, t.Title, t.Query, t.Category, nowStr, currentMonthYear, realtimeBlock, currentMonthYear)
 
 	// Modelos prioritários com fallback resiliente para Grounding e geração
 	modelsToTry := []string{p.model}
@@ -482,13 +482,14 @@ Responda ESTRITAMENTE em formato JSON puro (sem marcações markdown extras):
 	}
 
 	type testEvalResult struct {
-		ConditionMet          bool   `json:"condition_met"`
-		CurrentData           string `json:"current_data"`
-		Summary               string `json:"summary"`
-		SimulatedNotification string `json:"simulated_notification"`
-		Confidence            int    `json:"confidence"`
-		WhyRelevant           string `json:"why_relevant"`
-		Urgency               string `json:"urgency"`
+		ConditionMet          bool     `json:"condition_met"`
+		CurrentData           string   `json:"current_data"`
+		Summary               string   `json:"summary"`
+		Paragraphs            []string `json:"paragraphs"`
+		SimulatedNotification string   `json:"simulated_notification"`
+		Confidence            int      `json:"confidence"`
+		WhyRelevant           string   `json:"why_relevant"`
+		Urgency               string   `json:"urgency"`
 	}
 
 	var eval testEvalResult
@@ -507,6 +508,7 @@ Responda ESTRITAMENTE em formato JSON puro (sem marcações markdown extras):
 			ConditionMet:          false,
 			CurrentData:           rawText,
 			Summary:               "Consulta realizada com sucesso. Condições avaliadas.",
+			Paragraphs:            []string{rawText},
 			SimulatedNotification: fmt.Sprintf("Alerta Vito: Vigília de '%s' atualizada.", t.Title),
 			Confidence:            0,
 			WhyRelevant:           "",
@@ -521,6 +523,7 @@ Responda ESTRITAMENTE em formato JSON puro (sem marcações markdown extras):
 		ConditionMet:          eval.ConditionMet,
 		CurrentData:           eval.CurrentData,
 		Summary:               eval.Summary,
+		Paragraphs:            eval.Paragraphs,
 		SimulatedNotification: eval.SimulatedNotification,
 		Confidence:            eval.Confidence,
 		WhyRelevant:           eval.WhyRelevant,

@@ -3,6 +3,7 @@ import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
+import { formatPhoneNumber } from '../../utils/phoneFormat';
 
 interface ProfileUserCardProps {
   name: string;
@@ -40,11 +41,11 @@ export const ProfileUserCard: React.FC<ProfileUserCardProps> = ({
               style={styles.phoneRow}
               onPress={onEditPhone}
               activeOpacity={0.7}
-              accessibilityLabel="Editar número de telefone"
+              accessibilityLabel="Confirmar ou editar número de telefone"
             >
-              <MaterialIcons name="phone" size={12} color={colors.primary} />
+              <MaterialIcons name={phone ? 'verified-user' : 'phone'} size={12} color={colors.primary} />
               <Text style={[styles.phoneText, { color: phone ? colors.onSurfaceVariant : colors.primary }]}>
-                {phone || '+ Adicionar telefone'}
+                {phone ? formatPhoneNumber(phone) : '+ Confirmar telefone via WhatsApp'}
               </Text>
               <MaterialIcons name="edit" size={12} color={colors.textSecondary} style={{ marginLeft: 2 }} />
             </TouchableOpacity>

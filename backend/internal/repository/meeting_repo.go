@@ -250,6 +250,104 @@ func (r *MeetingRepositorySQLite) Update(ctx context.Context, m *domain.Meeting)
 	return nil
 }
 
+func (r *MeetingRepositorySQLite) UpdateWithSlots(ctx context.Context, m *domain.Meeting, newSlots []domain.MeetingSlot) error {
+	existingSlots, err := r.ListSlots(ctx, m.ID)
+	if err != nil {
+		return err
+	}
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	m.UpdatedAt = time.Now().UTC()
+	queryUpdate := `
+		UPDATE meetings SET
+			title = ?, description = ?, duration_minutes = ?, mode = ?, status = ?,
+			short_url = ?, expires_at = ?, confirmed_slot_id = ?, confirmed_slot_start = ?,
+			confirmed_slot_end = ?, updated_at = ?
+		WHERE id = ? AND user_id = ?
+	`
+	res, err := tx.ExecContext(ctx, queryUpdate,
+		m.Title, m.Description, m.DurationMinutes, m.Mode, m.Status,
+		m.ShortURL, m.ExpiresAt.UTC(), m.ConfirmedSlotID, meetingTimeVal(m.ConfirmedSlotStart),
+		meetingTimeVal(m.ConfirmedSlotEnd), m.UpdatedAt.UTC(), m.ID, m.UserID,
+	)
+	if err != nil {
+		return err
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return domain.ErrMeetingNotFound
+	}
+
+	// Mapa de slots existentes por timestamp de início (em segundos UTC) para preservar ID e votos
+	existingByStart := make(map[int64]domain.MeetingSlot, len(existingSlots))
+	for _, es := range existingSlots {
+		existingByStart[es.StartAt.UTC().Unix()] = es
+	}
+
+	keptIDs := make(map[string]bool)
+	var toInsert []domain.MeetingSlot
+
+	for _, ns := range newSlots {
+		startKey := ns.StartAt.UTC().Unix()
+		if ex, ok := existingByStart[startKey]; ok {
+			keptIDs[ex.ID] = true
+			// Atualiza end_at caso a duração tenha mudado
+			if _, err := tx.ExecContext(ctx, `UPDATE meeting_slots SET end_at = ? WHERE id = ?`, ns.EndAt.UTC(), ex.ID); err != nil {
+				return err
+			}
+		} else {
+			toInsert = append(toInsert, ns)
+		}
+	}
+
+	// Remove slots que não estão mais na lista (e seus votos)
+	for _, es := range existingSlots {
+		if !keptIDs[es.ID] {
+			if _, err := tx.ExecContext(ctx, `DELETE FROM meeting_votes WHERE slot_id = ?`, es.ID); err != nil {
+				return err
+			}
+			if _, err := tx.ExecContext(ctx, `DELETE FROM meeting_slots WHERE id = ?`, es.ID); err != nil {
+				return err
+			}
+		}
+	}
+
+	// Insere novos slots
+	if len(toInsert) > 0 {
+		queryInsert := `
+			INSERT INTO meeting_slots (
+				id, meeting_id, start_at, end_at, votes_count, created_at
+			) VALUES (?, ?, ?, ?, ?, ?)
+		`
+		stmt, err := tx.PrepareContext(ctx, queryInsert)
+		if err != nil {
+			return err
+		}
+		defer stmt.Close()
+
+		now := time.Now().UTC()
+		for _, s := range toInsert {
+			createdAt := s.CreatedAt
+			if createdAt.IsZero() {
+				createdAt = now
+			}
+			if _, err := stmt.ExecContext(ctx, s.ID, m.ID, s.StartAt.UTC(), s.EndAt.UTC(), 0, createdAt.UTC()); err != nil {
+				return err
+			}
+		}
+	}
+
+	return tx.Commit()
+}
+
 func (r *MeetingRepositorySQLite) Delete(ctx context.Context, id, userID string) error {
 	query := `DELETE FROM meetings WHERE id = ? AND user_id = ?`
 	res, err := r.db.ExecContext(ctx, query, id, userID)

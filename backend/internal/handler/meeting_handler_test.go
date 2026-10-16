@@ -94,6 +94,7 @@ func setupMeetingHandlerTest(t *testing.T) (*chi.Mux, *domain.User, *domain.Meet
 		sub.Post("/", h.CreateMeeting)
 		sub.Get("/", h.ListMeetings)
 		sub.Get("/{id}", h.GetMeeting)
+		sub.Put("/{id}", h.UpdateMeeting)
 		sub.Delete("/{id}", h.DeleteMeeting)
 		sub.Post("/{id}/confirm", h.ConfirmConsensus)
 		sub.Get("/{id}/share", h.GetWhatsAppShare)
@@ -116,8 +117,76 @@ func TestMeetingHandler_ServePublicPage(t *testing.T) {
 	if !strings.Contains(body, m.Title) {
 		t.Errorf("página não contém título da reunião: %s", body)
 	}
-	if !strings.Contains(body, "Vito Reuniões") {
+	if !strings.Contains(body, "Vito") {
 		t.Errorf("página não contém menção ao Vito: %s", body)
+	}
+}
+
+func TestMeetingHandler_PublicPage_BRTTimezoneAndPortugueseDatesAndUpdate(t *testing.T) {
+	r, _, _ := setupMeetingHandlerTest(t)
+
+	// Cria uma reunião com slot às 21:00 UTC de Segunda-feira 19/10/2026 (= 18:00 BRT)
+	createPayload := map[string]interface{}{
+		"title":            "Reunião design vito",
+		"description":      "Discussão sobre o design do app",
+		"duration_minutes": 30,
+		"mode":             "group_consensus",
+		"slots": []map[string]string{
+			{
+				"start_at": "2026-10-19T21:00:00Z",
+				"end_at":   "2026-10-19T21:30:00Z",
+			},
+		},
+	}
+	b, _ := json.Marshal(createPayload)
+	reqCreate := httptest.NewRequest(http.MethodPost, "/api/v1/meetings/", bytes.NewReader(b))
+	reqCreate.Header.Set("Content-Type", "application/json")
+	recCreate := httptest.NewRecorder()
+	r.ServeHTTP(recCreate, reqCreate)
+
+	if recCreate.Code != http.StatusCreated {
+		t.Fatalf("esperava 201 no create, veio %d: %s", recCreate.Code, recCreate.Body.String())
+	}
+
+	var created domain.MeetingWithDetails
+	_ = json.NewDecoder(recCreate.Body).Decode(&created)
+
+	// Verifica página pública: deve exibir 18:00 – 18:30 (BRT) e "Seg" (nunca "Mon" nem "21:00")
+	reqPage := httptest.NewRequest(http.MethodGet, "/meet/"+created.ID, nil)
+	recPage := httptest.NewRecorder()
+	r.ServeHTTP(recPage, reqPage)
+	pageHTML := recPage.Body.String()
+
+	if !strings.Contains(pageHTML, "18:00 – 18:30") {
+		t.Errorf("página pública deveria converter 21:00Z para 18:00 – 18:30 BRT, HTML:\n%s", pageHTML)
+	}
+	if strings.Contains(pageHTML, "(Mon)") {
+		t.Errorf("página pública não deve conter dias em inglês '(Mon)', HTML:\n%s", pageHTML)
+	}
+	if !strings.Contains(pageHTML, "Seg") {
+		t.Errorf("página pública deve conter dia da semana em português 'Seg', HTML:\n%s", pageHTML)
+	}
+
+	// Testa PUT /api/v1/meetings/{id}
+	updatePayload := map[string]interface{}{
+		"title":            "Reunião design vito v2",
+		"description":      "Nova descrição",
+		"duration_minutes": 45,
+		"slots": []map[string]string{
+			{
+				"start_at": "2026-10-19T21:00:00Z",
+				"end_at":   "2026-10-19T21:45:00Z",
+			},
+		},
+	}
+	ub, _ := json.Marshal(updatePayload)
+	reqUpdate := httptest.NewRequest(http.MethodPut, "/api/v1/meetings/"+created.ID, bytes.NewReader(ub))
+	reqUpdate.Header.Set("Content-Type", "application/json")
+	recUpdate := httptest.NewRecorder()
+	r.ServeHTTP(recUpdate, reqUpdate)
+
+	if recUpdate.Code != http.StatusOK {
+		t.Fatalf("esperava 200 no PUT update, veio %d: %s", recUpdate.Code, recUpdate.Body.String())
 	}
 }
 

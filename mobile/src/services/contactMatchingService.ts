@@ -219,3 +219,65 @@ export async function syncAndMatchDeviceContacts(
     permissionGranted: true,
   };
 }
+
+/**
+ * Procura nos contatos locais um registro correspondente ao próprio usuário (por e-mail, nome exato ou "Eu"/"Me")
+ * e retorna o número normalizado em E.164.
+ */
+export function findSelfPhoneInContacts(
+  contacts: LocalContactRecord[],
+  userEmail?: string,
+  userName?: string
+): string {
+  if (!Array.isArray(contacts) || contacts.length === 0) return '';
+  const targetEmail = (userEmail || '').trim().toLowerCase();
+  const targetName = (userName || '').trim().toLowerCase();
+
+  // 1. Prioridade máxima: contato que possui o mesmo e-mail da conta do usuário
+  if (targetEmail) {
+    for (const c of contacts) {
+      const hasEmail = (c.emails || []).some(e => e.trim().toLowerCase() === targetEmail);
+      if (hasEmail) {
+        for (const p of c.phoneNumbers || []) {
+          const e164 = toE164Phone(p);
+          if (e164) return e164;
+        }
+      }
+    }
+  }
+
+  // 2. Contato com nome exato do usuário ou cartão próprio ("eu", "me", "meu número")
+  const selfAliases = new Set(['eu', 'me', 'meu numero', 'meu número']);
+  if (targetName) selfAliases.add(targetName);
+
+  for (const c of contacts) {
+    const cName = (c.name || '').trim().toLowerCase();
+    if (cName && selfAliases.has(cName)) {
+      for (const p of c.phoneNumbers || []) {
+        const e164 = toE164Phone(p);
+        if (e164) return e164;
+      }
+    }
+  }
+
+  return '';
+}
+
+/**
+ * Tenta detectar silenciosamente o telefone do próprio usuário na agenda se a permissão já tiver sido concedida.
+ */
+export async function detectUserPhoneFromDevice(
+  userEmail?: string,
+  userName?: string
+): Promise<string> {
+  try {
+    const Contacts = await loadExpoContacts();
+    if (!Contacts?.getPermissionsAsync) return '';
+    const perm = await Contacts.getPermissionsAsync();
+    if (perm?.status !== 'granted') return '';
+    const contacts = await getDeviceContacts();
+    return findSelfPhoneInContacts(contacts, userEmail, userName);
+  } catch {
+    return '';
+  }
+}

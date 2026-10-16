@@ -3,15 +3,16 @@ import {
   Meeting,
   MeetingWithDetails,
   CreateMeetingInput,
+  UpdateMeetingInput,
   WhatsAppShareData,
 } from '../../types';
 
 export class MeetingsApi {
   constructor(private client: ApiClient) {}
 
-  async getMeetings(status?: string): Promise<Meeting[]> {
+  async getMeetings(status?: string): Promise<MeetingWithDetails[]> {
     const query = status ? `?status=${encodeURIComponent(status)}` : '';
-    const res = await this.client.request<Meeting[]>(`/api/v1/meetings${query}`);
+    const res = await this.client.request<MeetingWithDetails[]>(`/api/v1/meetings${query}`);
     return Array.isArray(res) ? res : [];
   }
 
@@ -22,6 +23,13 @@ export class MeetingsApi {
   async createMeeting(data: CreateMeetingInput): Promise<MeetingWithDetails> {
     return this.client.request<MeetingWithDetails>('/api/v1/meetings', {
       method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateMeeting(id: string, data: UpdateMeetingInput): Promise<MeetingWithDetails> {
+    return this.client.request<MeetingWithDetails>(`/api/v1/meetings/${id}`, {
+      method: 'PUT',
       body: JSON.stringify(data),
     });
   }

@@ -22,6 +22,12 @@ import { api } from '../../services/api';
 import { chatPromptBus } from '../../services/dataSync';
 import { navigateToTab } from '../../navigation/navigationRef';
 import { M3Switch } from '../ui/M3Switch';
+import {
+  extractReportParagraphs,
+  detectPaymentAndMarketFeatures,
+  buildRadarChatPrompt,
+  ParsedReportData,
+} from '../../utils/radarReportUtils';
 
 interface TriggerReportsViewProps {
   trigger: Trigger;
@@ -32,17 +38,7 @@ interface TriggerReportsViewProps {
   onDeleteRadar?: (id: string) => Promise<void> | void;
 }
 
-interface ParsedReportPayload {
-  status?: string;
-  condition_met?: boolean;
-  data?: string;
-  simulated_notification?: string;
-  tested_at?: string;
-  confidence?: number;
-  why_relevant?: string;
-  summary?: string;
-  last_error?: string;
-}
+type ParsedReportPayload = ParsedReportData;
 
 export const TriggerReportsView: React.FC<TriggerReportsViewProps> = ({
   trigger,
@@ -284,7 +280,8 @@ export const TriggerReportsView: React.FC<TriggerReportsViewProps> = ({
     return false;
   };
 
-  // Primeiro fato do relatório (para os botões de ação).
+
+  // Primeiro fato do relatório (para resumo rápido).
   const firstNewsText = (text?: string): string => {
     const items = splitNewsItems(text);
     return (items[0] || text || '').slice(0, 220);
@@ -339,13 +336,10 @@ export const TriggerReportsView: React.FC<TriggerReportsViewProps> = ({
 
   const runCardAction = (kind: 'chat' | 'task' | 'schedule') => {
     if (!activeLog) return;
-    const snippet = firstNewsText(activeParsed?.data || activeLog.message);
-    const prompt =
-      kind === 'chat'
-        ? `Vito, me explique esta notícia do radar "${trigger.title}": ${snippet}`
-        : kind === 'task'
-        ? `Crie uma tarefa a partir deste alerta do radar "${trigger.title}": ${snippet}`
-        : `Agende um compromisso relacionado a este alerta do radar "${trigger.title}": ${snippet}`;
+    const paras = extractReportParagraphs(activeLog.message, activeParsed);
+    const content = paras.length > 0 ? paras.join('\n\n') : (activeLog.message || activeParsed?.data || '');
+    const prompt = buildRadarChatPrompt(trigger.title, kind, content);
+
     setActiveCardId(null);
     chatPromptBus.notify(prompt);
     navigateToTab('chat');
@@ -551,10 +545,15 @@ export const TriggerReportsView: React.FC<TriggerReportsViewProps> = ({
           const parsed = parsePayload(item.payload);
           const failed = hasCollectionError(item, parsed);
           const url = extractUrl(parsed?.data || item.message || '');
-          const title = (firstNewsText(item.message || parsed?.data || '').trim() || 'Relatório do radar');
-          const why = (parsed?.why_relevant || '').trim();
           const confidence = extractConfidence(parsed);
           const relative = formatRelativePt(item.triggered_at);
+          const paragraphs = extractReportParagraphs(item.message, parsed);
+          const why = (parsed?.why_relevant || '').trim();
+          const { hasPix, hasInstallments, hasReal } = detectPaymentAndMarketFeatures(
+            item.message,
+            parsed?.data,
+            paragraphs
+          );
 
           return (
             <View
@@ -566,44 +565,18 @@ export const TriggerReportsView: React.FC<TriggerReportsViewProps> = ({
                 },
               ]}
             >
-              <View style={styles.cardRow}>
-                <TouchableOpacity
-                  style={styles.cardMain}
-                  onPress={() => {
-                    if (url) {
-                      Linking.openURL(url).catch(() => {});
-                    }
-                  }}
-                  disabled={!url}
-                  activeOpacity={url ? 0.7 : 1}
-                  accessibilityRole={url ? 'link' : 'text'}
-                  accessibilityLabel={url ? `Abrir notícia: ${title.slice(0, 80)}` : `Relatório: ${title.slice(0, 80)}`}
-                >
-                  <View style={styles.cardTextCol}>
-                    <Text style={[styles.cardTitle, { color: colors.onSurface }]} numberOfLines={2} ellipsizeMode="tail">
-                      {title}
+              <View style={styles.cardHeaderRow}>
+                <View style={styles.cardHeaderLeft}>
+                  <Text style={[styles.cardMetaText, { color: colors.onSurfaceVariant }]} numberOfLines={1}>
+                    {relative}
+                    {confidence != null ? ` • ${confidence}% relevância` : ''}
+                  </Text>
+                  {failed ? (
+                    <Text style={[styles.cardFailText, { color: colors.error }]} numberOfLines={1}>
+                      {' • ⚠️ Falha na coleta'}
                     </Text>
-                    {why ? (
-                      <Text style={[styles.cardWhy, { color: colors.onSurfaceVariant }]} numberOfLines={2} ellipsizeMode="tail">
-                        {why}
-                      </Text>
-                    ) : null}
-                    <View style={styles.cardMetaRow}>
-                      <Text style={[styles.cardMetaText, { color: colors.onSurfaceVariant }]} numberOfLines={1}>
-                        {relative}
-                        {confidence != null ? ` • ${confidence}%` : ''}
-                      </Text>
-                      {failed ? (
-                        <Text style={[styles.cardFailText, { color: colors.error }]} numberOfLines={1}>
-                          {' • ⚠️ Falha na coleta'}
-                        </Text>
-                      ) : null}
-                    </View>
-                  </View>
-                  {url ? (
-                    <MaterialIcons name="chevron-right" size={22} color={colors.onSurfaceVariant} />
                   ) : null}
-                </TouchableOpacity>
+                </View>
 
                 <TouchableOpacity
                   style={styles.cardMoreBtn}
@@ -612,6 +585,91 @@ export const TriggerReportsView: React.FC<TriggerReportsViewProps> = ({
                   accessibilityLabel={`Opções do relatório de ${relative}`}
                 >
                   <MaterialIcons name="more-vert" size={20} color={colors.onSurfaceVariant} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Badges de Lojas / Pagamentos Brasil */}
+              {(hasReal || hasPix || hasInstallments) && (
+                <View style={styles.badgesRow}>
+                  {hasPix && (
+                    <View style={[styles.offerBadge, { backgroundColor: '#E8F5E9', borderColor: '#A5D6A7' }]}>
+                      <MaterialIcons name="flash-on" size={13} color="#2E7D32" />
+                      <Text style={[styles.offerBadgeText, { color: '#1B5E20' }]}>Pix c/ Desconto</Text>
+                    </View>
+                  )}
+                  {hasInstallments && (
+                    <View style={[styles.offerBadge, { backgroundColor: '#E3F2FD', borderColor: '#90CAF9' }]}>
+                      <MaterialIcons name="credit-card" size={13} color="#1565C0" />
+                      <Text style={[styles.offerBadgeText, { color: '#0D47A1' }]}>Parcelado</Text>
+                    </View>
+                  )}
+                  {hasReal && (
+                    <View style={[styles.offerBadge, { backgroundColor: colors.surfaceContainerHighest, borderColor: colors.outlineVariant }]}>
+                      <MaterialIcons name="shopping-bag" size={13} color={colors.onSurfaceVariant} />
+                      <Text style={[styles.offerBadgeText, { color: colors.onSurfaceVariant }]}>Lojas do Brasil (R$)</Text>
+                    </View>
+                  )}
+                </View>
+              )}
+
+              {/* Relatório Completo (2 a 3 Parágrafos) */}
+              <View style={styles.paragraphsContainer}>
+                {paragraphs.length > 0 ? (
+                  paragraphs.map((p, pIdx) => (
+                    <Text
+                      key={`p-${item.id}-${pIdx}`}
+                      style={[styles.paragraphText, { color: colors.onSurface }]}
+                      selectable
+                    >
+                      {p}
+                    </Text>
+                  ))
+                ) : (
+                  <Text style={[styles.paragraphText, { color: colors.onSurface }]} selectable>
+                    {item.message || 'Sem detalhes disponíveis.'}
+                  </Text>
+                )}
+              </View>
+
+              {why ? (
+                <View style={[styles.whyContainer, { backgroundColor: colors.surfaceContainerLow, borderColor: colors.outlineVariant }]}>
+                  <MaterialIcons name="lightbulb-outline" size={15} color={colors.primary} />
+                  <Text style={[styles.whyText, { color: colors.onSurfaceVariant }]}>
+                    {why}
+                  </Text>
+                </View>
+              ) : null}
+
+              {/* Rodapé: Acesso à Fonte e Ação Imediata de Conversa */}
+              <View style={styles.cardFooterRow}>
+                {url ? (
+                  <TouchableOpacity
+                    style={[styles.linkBtn, { borderColor: colors.outlineVariant }]}
+                    onPress={() => Linking.openURL(url).catch(() => {})}
+                    accessibilityRole="link"
+                    accessibilityLabel="Abrir fonte original"
+                  >
+                    <MaterialIcons name="open-in-new" size={14} color={colors.primary} />
+                    <Text style={[styles.linkBtnText, { color: colors.primary }]}>Abrir fonte</Text>
+                  </TouchableOpacity>
+                ) : <View />}
+
+                <TouchableOpacity
+                  style={[styles.chatActionBtn, { backgroundColor: colors.primaryContainer }]}
+                  onPress={() => {
+                    const paras = extractReportParagraphs(item.message, parsed);
+                    const content = paras.length > 0 ? paras.join('\n\n') : (item.message || parsed?.data || '');
+                    const prompt = buildRadarChatPrompt(trigger.title, 'chat', content);
+                    chatPromptBus.notify(prompt);
+                    navigateToTab('chat');
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Conversar com Vito sobre este relatório"
+                >
+                  <MaterialIcons name="chat-bubble-outline" size={15} color={colors.onPrimaryContainer} />
+                  <Text style={[styles.chatActionBtnText, { color: colors.onPrimaryContainer }]}>
+                    Conversar com Vito
+                  </Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -968,39 +1026,21 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   reportCard: {
-    padding: tokens.spacing.lg,
+    padding: tokens.spacing.md,
     borderRadius: tokens.radii.lg,
     borderWidth: 1,
+    gap: tokens.spacing.xs,
   },
-  cardRow: {
+  cardHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  cardMain: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    minHeight: 48,
-    gap: tokens.spacing.sm,
-  },
-  cardTextCol: {
-    flex: 1,
-    gap: 4,
-  },
-  cardTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    lineHeight: 19,
-  },
-  cardWhy: {
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  cardMetaRow: {
+  cardHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
-    marginTop: 2,
+    flex: 1,
   },
   cardMetaText: {
     fontSize: 12,
@@ -1011,11 +1051,89 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   cardMoreBtn: {
-    width: 48,
-    minHeight: 48,
+    width: 40,
+    height: 40,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: -12,
+    marginRight: -8,
+  },
+  badgesRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginVertical: 4,
+  },
+  offerBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: tokens.radii.full,
+    borderWidth: 1,
+  },
+  offerBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  paragraphsContainer: {
+    gap: 8,
+    marginVertical: 4,
+  },
+  paragraphText: {
+    fontSize: 14,
+    lineHeight: 21,
+    fontWeight: '400',
+  },
+  whyContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    padding: 8,
+    borderRadius: tokens.radii.sm,
+    borderWidth: 1,
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  whyText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 17,
+    fontStyle: 'italic',
+  },
+  cardFooterRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 6,
+    paddingTop: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(150,150,150,0.2)',
+  },
+  linkBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: tokens.radii.sm,
+    borderWidth: 1,
+  },
+  linkBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  chatActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: tokens.radii.full,
+  },
+  chatActionBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
   },
   emptyStateCard: {
     padding: 30,
