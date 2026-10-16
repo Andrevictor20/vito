@@ -19,6 +19,7 @@ import { ProfileSettingsGroup } from '../components/profile/ProfileSettingsGroup
 import { NotificationSettingsModal } from '../components/notifications/NotificationSettingsModal';
 import { CalendarSyncSettingsModal } from '../components/profile/CalendarSyncSettingsModal';
 import { AISettingsModal } from '../components/profile/AISettingsModal';
+import { PhoneEditModal } from '../components/profile/PhoneEditModal';
 import { api } from '../services/api';
 import { notificationService } from '../services/notificationService';
 import { calendarSyncService } from '../services/calendarSyncService';
@@ -41,7 +42,13 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const [notifVisible, setNotifVisible] = useState(false);
   const [syncVisible, setSyncVisible] = useState(false);
   const [aiVisible, setAiVisible] = useState(false);
+  const [phoneVisible, setPhoneVisible] = useState(false);
+  const [userPhone, setUserPhone] = useState(user?.phone || '');
   const [checking, setChecking] = useState(false);
+
+  useEffect(() => {
+    if (user?.phone) setUserPhone(user.phone);
+  }, [user?.phone]);
   // Servidor único (nuvem): apenas exibição, sem seletor.
   const [serverHost, setServerHost] = useState(api.shortServerHost());
 
@@ -124,7 +131,13 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} /> : undefined
       }
     >
-      <ProfileUserCard name={name} email={email} quotaPercentage={18.5} />
+      <ProfileUserCard
+        name={name}
+        email={email}
+        phone={userPhone}
+        onEditPhone={() => setPhoneVisible(true)}
+        quotaPercentage={18.5}
+      />
 
       <View style={styles.sectionHeader}>
         <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>ASSISTENTE EXECUTIVO & IA</Text>
@@ -162,6 +175,15 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         }}
         onDataChanged={() => {
           loadStatuses();
+          onDataChanged?.();
+        }}
+      />
+      <PhoneEditModal
+        visible={phoneVisible}
+        currentPhone={userPhone}
+        onClose={() => setPhoneVisible(false)}
+        onPhoneUpdated={(newPhone) => {
+          setUserPhone(newPhone);
           onDataChanged?.();
         }}
       />

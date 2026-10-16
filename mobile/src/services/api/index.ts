@@ -301,6 +301,10 @@ export class ApiService extends ApiClient {
   updateP2PPhone(phone: string): Promise<{ status: string }> {
     return this.p2pMeetingsApi.updatePhone(phone);
   }
+
+  updatePhone(phone: string): Promise<{ status: string }> {
+    return this.updateP2PPhone(phone);
+  }
   getP2PMutualSlots(targetUserId: string, from?: string, to?: string, duration?: number): Promise<P2PMutualSlot[]> {
     return this.p2pMeetingsApi.getMutualSlots(targetUserId, from, to, duration);
   }

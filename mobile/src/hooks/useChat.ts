@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { useChatSessions } from './useChatSessions';
 import { useChatMessages } from './useChatMessages';
 
-export { toChatBooking } from './useChatMessages';
+export { toChatBooking, toChatMeeting } from './useChatMessages';
 export { getChatStorageKeys } from '../services/chatStorageService';
 
 /**

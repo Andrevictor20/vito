@@ -14,7 +14,8 @@ import { useTheme } from '../../context/ThemeContext';
 import { BottomSheetModal } from '../ui/BottomSheetModal';
 import { SelectableChip } from '../ui/SelectableChip';
 import { hapticFeedback } from '../../theme/motion';
-import { BookingType, CreateBookingTypeInput } from '../../types';
+import { BookingType, CreateBookingTypeInput, Meeting } from '../../types';
+import { api } from '../../services/api';
 
 const TIME_PRESETS = [
   { label: '09h às 18h', start: '09:00', end: '18:00' },
@@ -36,6 +37,7 @@ interface BookingTypeModalProps {
   editingType: BookingType | null;
   onClose: () => void;
   onSubmit: (payload: CreateBookingTypeInput) => Promise<void>;
+  onMeetingCreated?: (meeting: Meeting) => void;
   bookingUsername: string;
 }
 
@@ -58,6 +60,7 @@ export const BookingTypeModal: React.FC<BookingTypeModalProps> = ({
   editingType,
   onClose,
   onSubmit,
+  onMeetingCreated,
   bookingUsername,
 }) => {
   const { colors, isDark } = useTheme();
@@ -75,6 +78,13 @@ export const BookingTypeModal: React.FC<BookingTypeModalProps> = ({
   const [newSpecificDates, setNewSpecificDates] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [timePickerTarget, setTimePickerTarget] = useState<'start' | 'end' | null>(null);
+
+  // Estados de Reunião em Grupo (Consenso)
+  const [creationMode, setCreationMode] = useState<'booking' | 'meeting'>('booking');
+  const [meetingTitle, setMeetingTitle] = useState('');
+  const [meetingDescription, setMeetingDescription] = useState('');
+  const [meetingDuration, setMeetingDuration] = useState<number>(45);
+  const [meetingSlots, setMeetingSlots] = useState<{ date: string; time: string }[]>([]);
 
   // Sincroniza estado quando editingType muda
   React.useEffect(() => {
@@ -124,8 +134,47 @@ export const BookingTypeModal: React.FC<BookingTypeModalProps> = ({
       setNewDaysMode('week');
       setNewWeekDays([1, 2, 3, 4, 5]);
       setNewSpecificDates([]);
+      setCreationMode('booking');
+      setMeetingTitle('');
+      setMeetingDescription('');
+      setMeetingDuration(45);
+      const d1 = new Date(Date.now() + 86400000);
+      const d2 = new Date(Date.now() + 2 * 86400000);
+      setMeetingSlots([
+        { date: toDayKey(d1), time: '19:00' },
+        { date: toDayKey(d2), time: '19:00' },
+      ]);
     }
   }, [editingType, visible]);
+
+  const handleSubmitMeeting = async () => {
+    if (!meetingTitle.trim() || meetingSlots.length === 0) return;
+    setIsSubmitting(true);
+    try {
+      const slotsPayload = meetingSlots.map((s) => {
+        const start = new Date(`${s.date}T${s.time}:00`);
+        const end = new Date(start.getTime() + meetingDuration * 60000);
+        return {
+          start_at: start.toISOString(),
+          end_at: end.toISOString(),
+        };
+      });
+      const created = await api.createMeeting({
+        title: meetingTitle.trim(),
+        description: meetingDescription.trim() || undefined,
+        duration_minutes: meetingDuration,
+        mode: 'group_consensus',
+        slots: slotsPayload,
+      });
+      hapticFeedback.success();
+      onMeetingCreated?.(created);
+      onClose();
+    } catch (err: any) {
+      hapticFeedback.medium();
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const autoGenerateSlug = (titleText: string) => {
     setNewTitle(titleText);
@@ -202,14 +251,220 @@ export const BookingTypeModal: React.FC<BookingTypeModalProps> = ({
       <BottomSheetModal
         visible={visible}
         onClose={onClose}
-        title={editingType ? 'Editar Link de Agendamento' : 'Novo Link de Agendamento'}
-        subtitle={editingType ? 'Ajuste regras, horários e duração do link' : 'Configure janelas e regras para convidados'}
+        title={editingType ? 'Editar Link de Agendamento' : creationMode === 'meeting' ? 'Nova Reunião em Grupo' : 'Novo Link de Agendamento'}
+        subtitle={editingType ? 'Ajuste regras, horários e duração do link' : creationMode === 'meeting' ? 'Crie uma enquete de horários para votação de consenso' : 'Configure janelas e regras para convidados'}
       >
         <ScrollView
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.modalScrollContent}
         >
+          {!editingType && (
+            <View style={styles.modeTabsRow}>
+              <TouchableOpacity
+                style={[
+                  styles.modeTabBtn,
+                  creationMode === 'booking' && [styles.modeTabBtnActive, { backgroundColor: colors.surfaceContainerHighest, borderColor: colors.primary }],
+                ]}
+                onPress={() => {
+                  hapticFeedback.selection();
+                  setCreationMode('booking');
+                }}
+                activeOpacity={0.7}
+              >
+                <MaterialIcons
+                  name="link"
+                  size={16}
+                  color={creationMode === 'booking' ? colors.primary : colors.textSecondary}
+                />
+                <Text
+                  style={[
+                    styles.modeTabText,
+                    { color: creationMode === 'booking' ? colors.onSurface : colors.textSecondary },
+                  ]}
+                >
+                  Individual (1-on-1)
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.modeTabBtn,
+                  creationMode === 'meeting' && [styles.modeTabBtnActive, { backgroundColor: colors.surfaceContainerHighest, borderColor: colors.primary }],
+                ]}
+                onPress={() => {
+                  hapticFeedback.selection();
+                  setCreationMode('meeting');
+                }}
+                activeOpacity={0.7}
+              >
+                <MaterialIcons
+                  name="how-to-vote"
+                  size={16}
+                  color={creationMode === 'meeting' ? colors.primary : colors.textSecondary}
+                />
+                <Text
+                  style={[
+                    styles.modeTabText,
+                    { color: creationMode === 'meeting' ? colors.onSurface : colors.textSecondary },
+                  ]}
+                >
+                  Reunião em Grupo
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {creationMode === 'meeting' ? (
+            <View style={{ gap: 14 }}>
+              <View style={styles.formGroup}>
+                <Text style={[styles.formLabel, { color: colors.onSurface }]}>Título da Reunião *</Text>
+                <TextInput
+                  style={[
+                    styles.formInput,
+                    {
+                      backgroundColor: colors.surfaceVariant,
+                      color: colors.onSurface,
+                      borderColor: colors.outlineVariant,
+                    },
+                  ]}
+                  placeholder="Ex: Alinhamento de Projeto, Planejamento"
+                  placeholderTextColor={colors.onSurfaceVariant}
+                  value={meetingTitle}
+                  onChangeText={setMeetingTitle}
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={[styles.formLabel, { color: colors.onSurface }]}>Pauta / Descrição (opcional)</Text>
+                <TextInput
+                  style={[
+                    styles.formInput,
+                    {
+                      backgroundColor: colors.surfaceVariant,
+                      color: colors.onSurface,
+                      borderColor: colors.outlineVariant,
+                      height: 60,
+                      textAlignVertical: 'top',
+                      paddingTop: 8,
+                    },
+                  ]}
+                  placeholder="Adicione tópicos ou pauta da reunião..."
+                  placeholderTextColor={colors.onSurfaceVariant}
+                  value={meetingDescription}
+                  onChangeText={setMeetingDescription}
+                  multiline
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={[styles.formLabel, { color: colors.onSurface }]}>Duração por Encontro</Text>
+                <View style={styles.durationRow}>
+                  {[15, 30, 45, 60].map((d) => (
+                    <SelectableChip
+                      key={d}
+                      label={`${d} min`}
+                      selected={meetingDuration === d}
+                      onPress={() => {
+                        hapticFeedback.selection();
+                        setMeetingDuration(d);
+                      }}
+                    />
+                  ))}
+                </View>
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={[styles.formLabel, { color: colors.onSurface, marginBottom: 4 }]}>
+                  Opções de Horários Ofertados ({meetingSlots.length}) *
+                </Text>
+                <Text style={[styles.helperText, { color: colors.textSecondary, marginBottom: 8 }]}>
+                  Os participantes votarão nestes horários na página pública para formar consenso.
+                </Text>
+
+                <View style={{ gap: 8 }}>
+                  {meetingSlots.map((slot, idx) => (
+                    <View
+                      key={idx}
+                      style={[
+                        styles.slotCard,
+                        {
+                          backgroundColor: colors.surfaceContainerHigh,
+                          borderColor: colors.outlineVariant,
+                        },
+                      ]}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+                        <MaterialIcons name="event" size={16} color={colors.primary} />
+                        <Text style={[styles.slotCardText, { color: colors.onSurface }]}>
+                          {slot.date.split('-').reverse().slice(0, 2).join('/')} às {slot.time}
+                        </Text>
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => {
+                          hapticFeedback.selection();
+                          setMeetingSlots((prev) => prev.filter((_, i) => i !== idx));
+                        }}
+                        style={{ padding: 4 }}
+                        accessibilityLabel="Remover horário"
+                      >
+                        <MaterialIcons name="close" size={16} color={colors.textSecondary} />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+
+                  <Text style={[styles.helperText, { color: colors.textSecondary, marginTop: 4 }]}>
+                    Adicionar opções rápidas (próximos dias às 19h):
+                  </Text>
+                  <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+                    {next14DayKeys.slice(0, 5).map((d) => (
+                      <TouchableOpacity
+                        key={d.key}
+                        style={[
+                          styles.addSlotChip,
+                          {
+                            backgroundColor: colors.surfaceContainerHighest,
+                            borderColor: colors.outlineVariant,
+                          },
+                        ]}
+                        onPress={() => {
+                          hapticFeedback.selection();
+                          setMeetingSlots((prev) => [...prev, { date: d.key, time: '19:00' }]);
+                        }}
+                      >
+                        <MaterialIcons name="add" size={12} color={colors.primary} />
+                        <Text style={[styles.addSlotChipText, { color: colors.onSurface }]}>
+                          {d.weekday} {d.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={[
+                  styles.submitModalBtn,
+                  {
+                    backgroundColor: colors.primary,
+                    opacity: isSubmitting || !meetingTitle.trim() || meetingSlots.length === 0 ? 0.5 : 1,
+                  },
+                ]}
+                onPress={handleSubmitMeeting}
+                disabled={isSubmitting || !meetingTitle.trim() || meetingSlots.length === 0}
+                activeOpacity={0.8}
+              >
+                {isSubmitting ? (
+                  <ActivityIndicator size="small" color={colors.onPrimary} />
+                ) : (
+                  <Text style={[styles.submitModalText, { color: colors.onPrimary }]}>
+                    Criar Enquete de Grupo
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <>
           <View style={styles.formGroup}>
             <Text style={[styles.formLabel, { color: colors.onSurface }]}>Título da Reunião *</Text>
             <TextInput
@@ -481,6 +736,8 @@ export const BookingTypeModal: React.FC<BookingTypeModalProps> = ({
               </Text>
             )}
           </TouchableOpacity>
+          </>
+          )}
         </ScrollView>
       </BottomSheetModal>
 
@@ -652,6 +909,65 @@ const styles = StyleSheet.create({
   },
   hourGridText: {
     fontSize: 14,
+    fontWeight: '600',
+  },
+  helperText: {
+    fontSize: 12,
+    fontFamily: tokens.typography.family.regular,
+  },
+  modeTabsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 16,
+  },
+  modeTabBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: MD3Shapes.extraSmall,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    gap: 6,
+  },
+  modeTabBtnActive: {
+    borderWidth: 1,
+  },
+  modeTabText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  durationRow: {
+    flexDirection: 'row',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  slotCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: MD3Shapes.extraSmall,
+    borderWidth: 1,
+  },
+  slotCardText: {
+    fontSize: 13,
+    fontWeight: '600',
+    fontFamily: tokens.typography.family.medium,
+  },
+  addSlotChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 4,
+  },
+  addSlotChipText: {
+    fontSize: 11,
     fontWeight: '600',
   },
 });

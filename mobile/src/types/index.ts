@@ -6,6 +6,7 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  phone?: string;
 }
 
 export interface AuthResponse {
@@ -99,6 +100,19 @@ export interface ChatBooking {
   short_url?: string;
 }
 
+export interface ChatMeeting {
+  id: string;
+  title: string;
+  description?: string;
+  duration_minutes: number;
+  mode: 'one_on_one' | 'group_consensus';
+  status: string;
+  short_url?: string;
+  public_url?: string;
+  whatsapp_url?: string;
+  slots_count?: number;
+}
+
 export interface AssistantChatResponse {
   action?: string;
   intent: string;
@@ -113,6 +127,10 @@ export interface AssistantChatResponse {
   booking?: ChatBooking;
   booking_url?: string;
   booking_short_url?: string;
+  meeting?: MeetingWithDetails | Meeting;
+  meeting_url?: string;
+  meeting_short_url?: string;
+  meeting_whatsapp_url?: string;
   conflict?: ConflictInfo;
   provider_used?: string;
 }
@@ -129,6 +147,7 @@ export interface ChatMessage {
   trigger?: Trigger;
   pending?: PendingItem;
   booking?: ChatBooking;
+  meeting?: ChatMeeting;
   conflict?: ConflictInfo;
 }
 

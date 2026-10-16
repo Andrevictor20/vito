@@ -10,6 +10,9 @@ import {
   bookingDisplayLink,
   formatRecurrenceLabel,
   formatTriggerSchedule,
+  formatMeetingMode,
+  meetingDisplayLink,
+  toChatMeeting,
 } from './chatCards';
 
 describe('Chat Cards helpers (TDD)', () => {
@@ -89,6 +92,76 @@ describe('Chat Cards helpers (TDD)', () => {
       assert.equal(formatTriggerSchedule('daily_morning', '08:30'), 'Diário de manhã · 08:30');
       assert.equal(formatTriggerSchedule('hourly'), 'De hora em hora');
       assert.equal(formatTriggerSchedule(undefined, undefined), 'Diário de manhã');
+    });
+  });
+
+  describe('formatMeetingMode', () => {
+    it('rotula modos de reunião em PT-BR', () => {
+      assert.equal(formatMeetingMode('group_consensus'), 'Enquete em Grupo (Consenso)');
+      assert.equal(formatMeetingMode('one_on_one'), 'Reunião 1-on-1');
+      assert.equal(formatMeetingMode('outro'), 'Reunião');
+    });
+  });
+
+  describe('meetingDisplayLink', () => {
+    it('prefere short_url e cai para public_url', () => {
+      assert.equal(
+        meetingDisplayLink({
+          id: 'm1',
+          title: 'Alinhamento',
+          duration_minutes: 45,
+          mode: 'group_consensus',
+          status: 'open',
+          short_url: 'https://vito.s.gy/meet1',
+          public_url: 'https://vito.app/meet/m1',
+        }),
+        'https://vito.s.gy/meet1'
+      );
+      assert.equal(
+        meetingDisplayLink({
+          id: 'm1',
+          title: 'Alinhamento',
+          duration_minutes: 45,
+          mode: 'group_consensus',
+          status: 'open',
+          public_url: 'https://vito.app/meet/m1',
+        }),
+        'https://vito.app/meet/m1'
+      );
+    });
+  });
+
+  describe('toChatMeeting', () => {
+    it('extrai ChatMeeting de AssistantChatResponse', () => {
+      const res = {
+        intent: 'create_meeting',
+        reply: 'Reunião criada',
+        meeting: {
+          id: 'm-123',
+          title: 'Alinhamento Q4',
+          description: 'Pauta geral',
+          duration_minutes: 60,
+          mode: 'group_consensus' as const,
+          status: 'open',
+          slots: [
+            { id: 's1', meeting_id: 'm-123', start_at: '2026-10-20T19:00:00Z', end_at: '2026-10-20T20:00:00Z', votes_count: 0, created_at: '' }
+          ],
+        },
+        meeting_short_url: 'https://vito.s.gy/m123',
+        meeting_whatsapp_url: 'https://wa.me/?text=oi',
+      };
+      const cm = toChatMeeting(res as any);
+      assert.ok(cm);
+      assert.equal(cm?.id, 'm-123');
+      assert.equal(cm?.title, 'Alinhamento Q4');
+      assert.equal(cm?.short_url, 'https://vito.s.gy/m123');
+      assert.equal(cm?.whatsapp_url, 'https://wa.me/?text=oi');
+      assert.equal(cm?.slots_count, 1);
+    });
+
+    it('retorna undefined quando não há meeting na resposta', () => {
+      const cm = toChatMeeting({ intent: 'general_chat', reply: 'Olá' } as any);
+      assert.equal(cm, undefined);
     });
   });
 });

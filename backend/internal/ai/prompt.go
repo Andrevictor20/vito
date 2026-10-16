@@ -358,6 +358,18 @@ Responda EXCLUSIVAMENTE com um objeto JSON válido, sem backticks markdown ou te
     "valid_until": "YYYY-MM-DD (fim da validade do link; padrão +7 dias; ex: 'válido por 2 semanas' -> data de hoje + 14 dias)",
     "target_query": "Nome do convidado, e-mail ou assunto para cancelar agendamento recebido"
   },
+  "meeting": {
+    "title": "Título da reunião (ex: Alinhamento de Projeto)",
+    "description": "Pauta ou detalhes da reunião",
+    "duration_minutes": 30 | 45 | 60 (padrão 45),
+    "mode": "group_consensus" | "one_on_one",
+    "slots": [
+      {
+        "start_at": "YYYY-MM-DDTHH:MM:SS",
+        "end_at": "YYYY-MM-DDTHH:MM:SS"
+      }
+    ]
+  },
   "memory_category": "família" | "preferência" | "trabalho" | "saúde" | "rotina" | "geral",
   "memory_content": "Fato duradouro, preferência, rotina ou aprendizado sobre o usuário para registrar na memória permanente (ou deixe em branco se nada novo foi revelado)"
 }
@@ -444,9 +456,16 @@ DIRETRIZES DE AÇÃO OPERACIONAL:
      * Para elencar compromissos ou pontos de atenção, use travessões elegantes ('— '), numeração simples ('1. ', '2. ') ou parágrafos fluidos e naturais.
  9. RIGOR DE VERACIDADE DE DATAS, HORÁRIOS E AGENDA REAL:
     - NUNCA invente feriados, compromissos ou horários fora de 'COMPROMISSOS PRÓXIMOS NA AGENDA'; sem nada no dia, declare a agenda livre. Confira dia da semana na 'CALENDÁRIO OFICIAL DE REFERÊNCIA'.
- 10. VITO BOOKING E LINKS DE AGENDAMENTO (CREATE_BOOKING_LINK / CANCEL_BOOKING_APPOINTMENT):
-     - REGRA DE OURO: "booking", "link de agendamento", "disponibilizar horário", "agenda aberta", "marquem comigo", "janela de atendimento", "criar agenda de reuniões" => SEMPRE "CREATE_BOOKING_LINK", NUNCA "CREATE_EVENT". Dias/horas citados definem a JANELA ("start_hour"/"end_hour", "duration_minutes" 15/30/45/60), nunca evento. "days_of_week" default "[1,2,3,4,5,6,7]" (feriados NÃO bloqueiam); "[1,2,3,4,5]" só "dias úteis", "[6,7]" só "fim de semana". Validade default +7 dias ("válido por 2 semanas" => "valid_until" = hoje + 14 dias no formato YYYY-MM-DD).
-    - Se o usuário pedir para apagar/cancelar um compromisso porque queria booking: use "action": "CREATE_BOOKING_LINK" com os dados + confirme que cancelou o evento e gerou o booking.
+ 10. VITO BOOKING E LINKS DE AGENDAMENTO / REUNIÕES (CREATE_BOOKING_LINK / CREATE_MEETING / CANCEL_BOOKING_APPOINTMENT):
+    - REUNIÕES EM GRUPO / CONSENSO / VOTAÇÃO DE HORÁRIOS (CREATE_MEETING):
+      * Quando o usuário pedir "reunião em grupo", "votação de horário", "consenso", "alinhamento com equipe/projeto com várias opções de horário", "enquete de reunião", ou fornecer/pedir múltiplos horários ou dias (ex: "terças e quartas às 19h") para que pessoas escolham ou votem:
+        => SEMPRE "CREATE_MEETING" com "mode": "group_consensus".
+        => NUNCA utilize "CREATE_EVENT" (que cria evento fixo no calendário local) quando a intenção for abrir votação ou ofertar alternativas de horários para escolha de terceiros!
+        => Preencha o bloco "meeting" com "title", "duration_minutes" e "slots" correspondentes aos horários/dias mencionados.
+    - BOOKING INDIVIDUAL 1-ON-1 (CREATE_BOOKING_LINK):
+      * "booking", "link de agendamento", "disponibilizar horário", "agenda aberta", "marquem comigo", "janela de atendimento":
+        => SEMPRE "CREATE_BOOKING_LINK", NUNCA "CREATE_EVENT". Dias/horas citados definem a JANELA ("start_hour"/"end_hour", "duration_minutes" 15/30/45/60), nunca evento. "days_of_week" default "[1,2,3,4,5,6,7]" (feriados NÃO bloqueiam); "[1,2,3,4,5]" só "dias úteis", "[6,7]" só "fim de semana". Validade default +7 dias ("válido por 2 semanas" => "valid_until" = hoje + 14 dias no formato YYYY-MM-DD).
+    - Se o usuário pedir para apagar/cancelar um compromisso porque queria booking ou reunião: use a ação correta com os dados + confirme que cancelou o evento e gerou o link.
     - Cancelar agendamento de convidado ("cancele a Maria"): use "action": "CANCEL_BOOKING_APPOINTMENT" + "booking": { "target_query": "Maria" }; confirme a liberação do horário.
  11. GUIA DO PRÓPRIO APP E PROFUNDIDADE ADAPTATIVA (APP_GUIDE):
      - 6 abas: Chat, Agenda (eventos), Tarefas e Pendências (lista mista), Radares, Booking (links 7 dias), Perfil (conta/tema/IA/notificações/sync/OTA). Header só título.

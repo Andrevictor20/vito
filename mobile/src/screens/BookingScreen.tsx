@@ -19,9 +19,10 @@ import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
 import { hapticFeedback } from "../theme/motion";
 import { api } from "../services/api";
-import { BookingType, BookingAppointment, CreateBookingTypeInput } from "../types";
+import { BookingType, BookingAppointment, CreateBookingTypeInput, Meeting } from "../types";
 import { BookingCard } from "../components/booking/BookingCard";
 import { BookingAppointmentCard } from "../components/booking/BookingAppointmentCard";
+import { MeetingCard } from "../components/booking/MeetingCard";
 import { BookingTypeModal } from "../components/booking/BookingTypeModal";
 
 let ClipboardModule: any = null;
@@ -62,6 +63,7 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack, createRequ
 
   const [types, setTypes] = useState<BookingType[]>([]);
   const [appointments, setAppointments] = useState<BookingAppointment[]>([]);
+  const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<"links" | "appointments">("links");
@@ -82,12 +84,14 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack, createRequ
 
   const loadData = useCallback(async () => {
     try {
-      const [fetchedTypes, fetchedAppts] = await Promise.all([
+      const [fetchedTypes, fetchedAppts, fetchedMeetings] = await Promise.all([
         api.getBookingTypes(),
         api.getBookingAppointments(),
+        api.getMeetings(),
       ]);
       setTypes(fetchedTypes || []);
       setAppointments(fetchedAppts || []);
+      setMeetings(fetchedMeetings || []);
     } catch (err) {
       console.error("[BookingScreen] erro ao carregar dados:", err);
     } finally {
@@ -200,6 +204,36 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack, createRequ
     hapticFeedback.success();
   };
 
+  const handleDeleteMeeting = async (id: string) => {
+    Alert.alert("Excluir Reunião", "Deseja encerrar e excluir este link de reunião?", [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Excluir",
+        style: "destructive",
+        onPress: async () => {
+          hapticFeedback.medium();
+          try {
+            await api.deleteMeeting(id);
+            setMeetings((prev) => (prev || []).filter((m) => m.id !== id));
+            hapticFeedback.success();
+          } catch (err) {
+            console.error("[BookingScreen] erro ao excluir reunião:", err);
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleCopyMeetingLink = async (m: Meeting) => {
+    const rawLink = m.short_url || `https://vito.rasppi.cloud/meet/${m.id}`;
+    if (ClipboardModule) {
+      await ClipboardModule.setStringAsync(rawLink);
+      setCopiedSlug(m.id);
+      hapticFeedback.selection();
+      setTimeout(() => setCopiedSlug(null), 2000);
+    }
+  };
+
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.surface }]}>
       <StatusBar style={isDark ? "light" : "dark"} />
@@ -277,7 +311,7 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack, createRequ
           }
         >
           {activeTab === "links" ? (
-            (types || []).length === 0 ? (
+            (types || []).length === 0 && (meetings || []).length === 0 ? (
               <View style={styles.emptyContainer}>
                 <View style={[styles.emptyIconCircle, { backgroundColor: colors.surfaceVariant }]}>
                   <MaterialIcons name="link-off" size={32} color={colors.onSurfaceVariant} />
@@ -286,7 +320,7 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack, createRequ
                   Nenhum link configurado
                 </Text>
                 <Text style={[styles.emptySubtitle, { color: colors.onSurfaceVariant }]}>
-                  Crie links personalizados com janelas de atendimento para que convidados agendem reuniões respeitando sua agenda.
+                  Crie links personalizados com janelas de atendimento ou enquetes de reuniões em grupo com votação de horários.
                 </Text>
                 <TouchableOpacity
                   style={[styles.emptyActionButton, { backgroundColor: colors.primary }]}
@@ -304,21 +338,65 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack, createRequ
               </View>
             ) : (
               <View style={styles.cardsList}>
-                {(types || []).map((bt) => (
-                  <BookingCard
-                    key={bt.id}
-                    type={bt}
-                    isCopied={copiedSlug === bt.slug}
-                    onCopyLink={handleCopyLink}
-                    onToggleActive={handleToggleActive}
-                    onEdit={(t) => {
-                      setEditingType(t);
-                      setCreateModalVisible(true);
-                    }}
-                    onDelete={handleDeleteType}
-                    username={bookingUsername}
-                  />
-                ))}
+                {meetings.length > 0 && (
+                  <View style={{ marginBottom: 12 }}>
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        fontWeight: '700',
+                        color: colors.textSecondary,
+                        letterSpacing: 0.5,
+                        marginBottom: 8,
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      Reuniões em Grupo & Consenso ({meetings.length})
+                    </Text>
+                    {meetings.map((m) => (
+                      <MeetingCard
+                        key={m.id}
+                        meeting={m}
+                        isCopied={copiedSlug === m.id}
+                        onCopyLink={handleCopyMeetingLink}
+                        onDelete={handleDeleteMeeting}
+                      />
+                    ))}
+                  </View>
+                )}
+
+                {types.length > 0 && (
+                  <View>
+                    {meetings.length > 0 && (
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          fontWeight: '700',
+                          color: colors.textSecondary,
+                          letterSpacing: 0.5,
+                          marginBottom: 8,
+                          textTransform: 'uppercase',
+                        }}
+                      >
+                        Agendamentos Individuais (1-on-1) ({types.length})
+                      </Text>
+                    )}
+                    {(types || []).map((bt) => (
+                      <BookingCard
+                        key={bt.id}
+                        type={bt}
+                        isCopied={copiedSlug === bt.slug}
+                        onCopyLink={handleCopyLink}
+                        onToggleActive={handleToggleActive}
+                        onEdit={(t) => {
+                          setEditingType(t);
+                          setCreateModalVisible(true);
+                        }}
+                        onDelete={handleDeleteType}
+                        username={bookingUsername}
+                      />
+                    ))}
+                  </View>
+                )}
               </View>
             )
           ) : (appointments || []).length === 0 ? (
@@ -356,6 +434,7 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ onBack, createRequ
           setEditingType(null);
         }}
         onSubmit={handleSaveType}
+        onMeetingCreated={(created) => setMeetings((prev) => [created, ...(prev || [])])}
         bookingUsername={bookingUsername}
       />
     </SafeAreaView>

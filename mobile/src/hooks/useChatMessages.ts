@@ -1,13 +1,16 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { AssistantChatResponse, ChatBooking, ChatMessage, ConversationSession } from '../types';
+import type { AssistantChatResponse, ChatBooking, ChatMeeting, ChatMessage, ConversationSession } from '../types';
 import { api } from '../services/api';
 import { notificationService } from '../services/notificationService';
 import { dataSync } from '../services/dataSync';
 import { isAbortError, truncateMessagesForEdit } from '../utils/chatActions';
 import { humanizePreview, semanticTitle } from '../utils/chatPreview';
+import { toChatMeeting } from '../utils/chatCards';
 import type { ChatStorageKeys } from '../services/chatStorageService';
 import { getChatStorageKeys } from '../services/chatStorageService';
+
+export { toChatMeeting };
 
 // Normaliza o booking da resposta do chat para o card: mescla o objeto
 // booking com as URLs top-level (booking_url / booking_short_url).
@@ -219,6 +222,7 @@ export function useChatMessages(
           trigger: res.trigger,
           pending: res.pending,
           booking: toChatBooking(res),
+          meeting: toChatMeeting(res),
           conflict: res.conflict,
         };
 
@@ -322,6 +326,7 @@ export function useChatMessages(
           trigger: res.trigger,
           pending: res.pending,
           booking: toChatBooking(res),
+          meeting: toChatMeeting(res),
           conflict: res.conflict,
         };
 
@@ -423,6 +428,7 @@ export function useChatMessages(
           trigger: res.trigger,
           pending: res.pending,
           booking: toChatBooking(res),
+          meeting: toChatMeeting(res),
           conflict: res.conflict,
         };
 
@@ -503,6 +509,7 @@ export function useChatMessages(
           trigger: res.trigger,
           pending: res.pending,
           booking: toChatBooking(res),
+          meeting: toChatMeeting(res),
           conflict: res.conflict,
         };
 

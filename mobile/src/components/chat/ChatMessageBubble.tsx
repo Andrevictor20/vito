@@ -11,6 +11,7 @@ import { TodoInlineCard } from './cards/TodoInlineCard';
 import { PendingInlineCard } from './cards/PendingInlineCard';
 import { TriggerInlineCard } from './cards/TriggerInlineCard';
 import { BookingInlineCard } from './cards/BookingInlineCard';
+import { MeetingInlineCard } from './cards/MeetingInlineCard';
 import { VitoMascot } from '../common/VitoMascot';
 import { preparePlainTextForCopy } from '../../utils/chatActions';
 
@@ -290,6 +291,7 @@ export const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
         {message.pending && <PendingInlineCard pending={message.pending} />}
         {message.trigger && <TriggerInlineCard trigger={message.trigger} />}
         {message.booking && <BookingInlineCard booking={message.booking} />}
+        {message.meeting && <MeetingInlineCard meeting={message.meeting} />}
 
         <View style={styles.metaRow}>
           {/* Botão Copiar Resposta do Vito */}

@@ -1,4 +1,4 @@
-import type { ChatBooking } from '../types';
+import type { ChatBooking, ChatMeeting, AssistantChatResponse } from '../types';
 
 // Helpers puros de formatação para os cards inline do chat (testáveis).
 
@@ -91,4 +91,32 @@ export const formatRecurrenceLabel = (recurrence?: string): string | null => {
     default:
       return null;
   }
+};
+
+export const formatMeetingMode = (mode?: string): string => {
+  if (mode === 'group_consensus') return 'Enquete em Grupo (Consenso)';
+  if (mode === 'one_on_one') return 'Reunião 1-on-1';
+  return 'Reunião';
+};
+
+export const meetingDisplayLink = (meeting: ChatMeeting): string =>
+  meeting.short_url || meeting.public_url || '';
+
+export const toChatMeeting = (res: AssistantChatResponse): ChatMeeting | undefined => {
+  if (!res.meeting) return undefined;
+  const m = res.meeting;
+  const slotsCount = Array.isArray((m as any).slots) ? (m as any).slots.length : undefined;
+
+  return {
+    id: m.id,
+    title: m.title,
+    description: m.description,
+    duration_minutes: m.duration_minutes,
+    mode: m.mode,
+    status: m.status,
+    short_url: (m as any).short_url || res.meeting_short_url || undefined,
+    public_url: (m as any).public_url || res.meeting_url || undefined,
+    whatsapp_url: res.meeting_whatsapp_url || undefined,
+    slots_count: slotsCount,
+  };
 };

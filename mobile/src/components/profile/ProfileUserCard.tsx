@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, View, Text } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
@@ -7,12 +7,16 @@ import { useTheme } from '../../context/ThemeContext';
 interface ProfileUserCardProps {
   name: string;
   email: string;
+  phone?: string;
+  onEditPhone?: () => void;
   quotaPercentage?: number;
 }
 
 export const ProfileUserCard: React.FC<ProfileUserCardProps> = ({
   name,
   email,
+  phone,
+  onEditPhone,
   quotaPercentage = 18.5,
 }) => {
   const { colors } = useTheme();
@@ -31,6 +35,20 @@ export const ProfileUserCard: React.FC<ProfileUserCardProps> = ({
             <MaterialIcons name="check-circle" size={14} color={colors.primary} />
           </View>
           <Text style={[styles.email, { color: colors.textSecondary }]} numberOfLines={1} ellipsizeMode="middle">{email}</Text>
+          {onEditPhone ? (
+            <TouchableOpacity
+              style={styles.phoneRow}
+              onPress={onEditPhone}
+              activeOpacity={0.7}
+              accessibilityLabel="Editar número de telefone"
+            >
+              <MaterialIcons name="phone" size={12} color={colors.primary} />
+              <Text style={[styles.phoneText, { color: phone ? colors.onSurfaceVariant : colors.primary }]}>
+                {phone || '+ Adicionar telefone'}
+              </Text>
+              <MaterialIcons name="edit" size={12} color={colors.textSecondary} style={{ marginLeft: 2 }} />
+            </TouchableOpacity>
+          ) : null}
         </View>
 
         <View style={[styles.proBadge, { backgroundColor: colors.primaryContainer, borderColor: colors.outlineVariant }]}>
@@ -87,6 +105,16 @@ const styles = StyleSheet.create({
     color: tokens.colors.textSecondary,
     fontSize: tokens.typography.size.xs,
     marginTop: 2,
+  },
+  phoneRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 4,
+  },
+  phoneText: {
+    fontSize: tokens.typography.size.xs,
+    fontFamily: tokens.typography.family.medium,
   },
   proBadge: {
     paddingHorizontal: 8,
