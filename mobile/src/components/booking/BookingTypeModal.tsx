@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   View,
@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   TextInput,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens, MD3Shapes, tabularNumbers } from '../../theme/tokens';
@@ -14,8 +15,9 @@ import { useTheme } from '../../context/ThemeContext';
 import { BottomSheetModal } from '../ui/BottomSheetModal';
 import { SelectableChip } from '../ui/SelectableChip';
 import { hapticFeedback } from '../../theme/motion';
-import { BookingType, CreateBookingTypeInput, Meeting } from '../../types';
+import { BookingType, CreateBookingTypeInput, Meeting, Event } from '../../types';
 import { api } from '../../services/api';
+import { checkSlotAvailability, formatSlotConflictMessage } from '../../utils/slotAvailability';
 
 const TIME_PRESETS = [
   { label: '09h às 18h', start: '09:00', end: '18:00' },
@@ -85,6 +87,51 @@ export const BookingTypeModal: React.FC<BookingTypeModalProps> = ({
   const [meetingDescription, setMeetingDescription] = useState('');
   const [meetingDuration, setMeetingDuration] = useState<number>(45);
   const [meetingSlots, setMeetingSlots] = useState<{ date: string; time: string }[]>([]);
+  const [calendarEvents, setCalendarEvents] = useState<Event[]>([]);
+  const [customSlotDate, setCustomSlotDate] = useState<string>('');
+  const [customSlotTime, setCustomSlotTime] = useState<string>('14:00');
+  const [customSlotSectionOpen, setCustomSlotSectionOpen] = useState(false);
+
+  useEffect(() => {
+    if (visible) {
+      api.getEvents().then(setCalendarEvents).catch(() => {});
+    }
+  }, [visible]);
+
+  const handleAddSlotWithConflictCheck = (date: string, time: string) => {
+    if (!date || !time) return;
+    if (meetingSlots.some((s) => s.date === date && s.time === time)) {
+      Alert.alert('Horário Já Incluído', 'Este horário já está na lista de opções.');
+      return;
+    }
+
+    const check = checkSlotAvailability(
+      { date, time, durationMinutes: meetingDuration },
+      calendarEvents
+    );
+
+    if (!check.available && check.conflictingEvent) {
+      hapticFeedback.medium();
+      Alert.alert(
+        '⚠️ Horário Ocupado na Sua Agenda',
+        `Você já possui o compromisso "${check.conflictingEvent.title}" agendado neste horário.\n\nDeseja adicionar este horário mesmo assim na enquete de grupo?`,
+        [
+          { text: 'Escolher Outro', style: 'cancel' },
+          {
+            text: 'Adicionar Mesmo Assim',
+            onPress: () => {
+              hapticFeedback.selection();
+              setMeetingSlots((prev) => [...prev, { date, time }]);
+            },
+          },
+        ]
+      );
+      return;
+    }
+
+    hapticFeedback.success();
+    setMeetingSlots((prev) => [...prev, { date, time }]);
+  };
 
   // Sincroniza estado quando editingType muda
   React.useEffect(() => {
@@ -383,35 +430,226 @@ export const BookingTypeModal: React.FC<BookingTypeModalProps> = ({
                 </Text>
 
                 <View style={{ gap: 8 }}>
-                  {meetingSlots.map((slot, idx) => (
+                  {meetingSlots.map((slot, idx) => {
+                    const conflict = checkSlotAvailability(
+                      { date: slot.date, time: slot.time, durationMinutes: meetingDuration },
+                      calendarEvents
+                    );
+                    return (
+                      <View
+                        key={idx}
+                        style={[
+                          styles.slotCard,
+                          {
+                            backgroundColor: colors.surfaceContainerHigh,
+                            borderColor: conflict.available ? colors.outlineVariant : '#EF4444',
+                          },
+                        ]}
+                      >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                          <MaterialIcons
+                            name={conflict.available ? 'event-available' : 'event-busy'}
+                            size={18}
+                            color={conflict.available ? colors.primary : '#EF4444'}
+                          />
+                          <View style={{ flex: 1 }}>
+                            <Text style={[styles.slotCardText, { color: colors.onSurface }]}>
+                              {slot.date.split('-').reverse().slice(0, 2).join('/')} às {slot.time} ({meetingDuration} min)
+                            </Text>
+                            {!conflict.available && conflict.conflictingEvent && (
+                              <Text style={{ color: '#EF4444', fontSize: 11, fontWeight: '500' }} numberOfLines={1}>
+                                ⚠️ Conflito com "{conflict.conflictingEvent.title}"
+                              </Text>
+                            )}
+                          </View>
+                        </View>
+                        <TouchableOpacity
+                          onPress={() => {
+                            hapticFeedback.selection();
+                            setMeetingSlots((prev) => prev.filter((_, i) => i !== idx));
+                          }}
+                          style={{ padding: 4 }}
+                          accessibilityLabel="Remover horário"
+                        >
+                          <MaterialIcons name="close" size={16} color={colors.textSecondary} />
+                        </TouchableOpacity>
+                      </View>
+                    );
+                  })}
+
+                  {/* Seletor Customizado de Dia & Horário com Checagem de Conflito */}
+                  <TouchableOpacity
+                    style={[
+                      styles.customSlotToggleBtn,
+                      {
+                        backgroundColor: customSlotSectionOpen ? colors.surfaceContainerHighest : 'transparent',
+                        borderColor: colors.outlineVariant,
+                      },
+                    ]}
+                    onPress={() => {
+                      hapticFeedback.selection();
+                      if (!customSlotDate && next14DayKeys.length > 0) {
+                        setCustomSlotDate(next14DayKeys[0].key);
+                      }
+                      setCustomSlotSectionOpen(!customSlotSectionOpen);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <MaterialIcons
+                      name={customSlotSectionOpen ? 'tune' : 'add-circle-outline'}
+                      size={18}
+                      color={colors.primary}
+                    />
+                    <Text style={[styles.customSlotToggleText, { color: colors.primary }]}>
+                      {customSlotSectionOpen ? 'Ocultar Seletor Personalizado' : '+ Escolher Dia e Horário Personalizado'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  {customSlotSectionOpen && (
                     <View
-                      key={idx}
                       style={[
-                        styles.slotCard,
+                        styles.customSlotBox,
                         {
-                          backgroundColor: colors.surfaceContainerHigh,
+                          backgroundColor: colors.surfaceContainer,
                           borderColor: colors.outlineVariant,
                         },
                       ]}
                     >
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
-                        <MaterialIcons name="event" size={16} color={colors.primary} />
-                        <Text style={[styles.slotCardText, { color: colors.onSurface }]}>
-                          {slot.date.split('-').reverse().slice(0, 2).join('/')} às {slot.time}
-                        </Text>
+                      <Text style={[styles.customSlotSectionTitle, { color: colors.onSurface }]}>
+                        1. Escolha o Dia:
+                      </Text>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingVertical: 4 }}>
+                        {next14DayKeys.map((d) => {
+                          const isSelected = (customSlotDate || next14DayKeys[0]?.key) === d.key;
+                          return (
+                            <TouchableOpacity
+                              key={d.key}
+                              style={[
+                                styles.daySelectChip,
+                                {
+                                  backgroundColor: isSelected ? colors.primary : colors.surfaceContainerHigh,
+                                  borderColor: isSelected ? colors.primary : colors.outlineVariant,
+                                },
+                              ]}
+                              onPress={() => {
+                                hapticFeedback.selection();
+                                setCustomSlotDate(d.key);
+                              }}
+                            >
+                              <Text
+                                style={[
+                                  styles.daySelectChipWeekday,
+                                  { color: isSelected ? colors.onPrimary : colors.onSurfaceVariant },
+                                ]}
+                              >
+                                {d.weekday}
+                              </Text>
+                              <Text
+                                style={[
+                                  styles.daySelectChipLabel,
+                                  { color: isSelected ? colors.onPrimary : colors.onSurface },
+                                ]}
+                              >
+                                {d.label}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </ScrollView>
+
+                      <Text style={[styles.customSlotSectionTitle, { color: colors.onSurface, marginTop: 8 }]}>
+                        2. Escolha o Horário:
+                      </Text>
+                      <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+                        {[
+                          '08:00', '09:00', '10:00', '11:00', '13:00',
+                          '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00',
+                        ].map((h) => {
+                          const isSelected = customSlotTime === h;
+                          return (
+                            <TouchableOpacity
+                              key={h}
+                              style={[
+                                styles.timeSelectChip,
+                                {
+                                  backgroundColor: isSelected ? colors.primary : colors.surfaceContainerHigh,
+                                  borderColor: isSelected ? colors.primary : colors.outlineVariant,
+                                },
+                              ]}
+                              onPress={() => {
+                                hapticFeedback.selection();
+                                setCustomSlotTime(h);
+                              }}
+                            >
+                              <Text
+                                style={{
+                                  fontSize: 12,
+                                  fontWeight: '600',
+                                  color: isSelected ? colors.onPrimary : colors.onSurface,
+                                }}
+                              >
+                                {h}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
                       </View>
+
+                      {/* Prévia de Disponibilidade em Tempo Real */}
+                      {(() => {
+                        const targetDate = customSlotDate || next14DayKeys[0]?.key || toDayKey(new Date());
+                        const previewCheck = checkSlotAvailability(
+                          { date: targetDate, time: customSlotTime, durationMinutes: meetingDuration },
+                          calendarEvents
+                        );
+                        return (
+                          <View
+                            style={[
+                              styles.availabilityPreviewBox,
+                              {
+                                backgroundColor: previewCheck.available
+                                  ? 'rgba(34, 197, 94, 0.12)'
+                                  : 'rgba(239, 68, 68, 0.12)',
+                                borderColor: previewCheck.available ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)',
+                              },
+                            ]}
+                          >
+                            <MaterialIcons
+                              name={previewCheck.available ? 'check-circle' : 'error-outline'}
+                              size={16}
+                              color={previewCheck.available ? '#22C55E' : '#EF4444'}
+                            />
+                            <Text
+                              style={{
+                                fontSize: 12,
+                                fontWeight: '500',
+                                color: previewCheck.available ? '#22C55E' : '#EF4444',
+                                flex: 1,
+                              }}
+                            >
+                              {previewCheck.available
+                                ? `Horário livre na sua agenda (${targetDate.split('-').reverse().slice(0, 2).join('/')} às ${customSlotTime})`
+                                : `Ocupado: conflito com "${previewCheck.conflictingEvent?.title}"`}
+                            </Text>
+                          </View>
+                        );
+                      })()}
+
                       <TouchableOpacity
+                        style={[styles.addCustomSlotBtn, { backgroundColor: colors.primary }]}
                         onPress={() => {
-                          hapticFeedback.selection();
-                          setMeetingSlots((prev) => prev.filter((_, i) => i !== idx));
+                          const targetDate = customSlotDate || next14DayKeys[0]?.key || toDayKey(new Date());
+                          handleAddSlotWithConflictCheck(targetDate, customSlotTime);
                         }}
-                        style={{ padding: 4 }}
-                        accessibilityLabel="Remover horário"
+                        activeOpacity={0.8}
                       >
-                        <MaterialIcons name="close" size={16} color={colors.textSecondary} />
+                        <MaterialIcons name="add" size={16} color={colors.onPrimary} />
+                        <Text style={[styles.addCustomSlotBtnText, { color: colors.onPrimary }]}>
+                          Adicionar Horário Selecionado
+                        </Text>
                       </TouchableOpacity>
                     </View>
-                  ))}
+                  )}
 
                   <Text style={[styles.helperText, { color: colors.textSecondary, marginTop: 4 }]}>
                     Adicionar opções rápidas (próximos dias às 19h):
@@ -427,10 +665,7 @@ export const BookingTypeModal: React.FC<BookingTypeModalProps> = ({
                             borderColor: colors.outlineVariant,
                           },
                         ]}
-                        onPress={() => {
-                          hapticFeedback.selection();
-                          setMeetingSlots((prev) => [...prev, { date: d.key, time: '19:00' }]);
-                        }}
+                        onPress={() => handleAddSlotWithConflictCheck(d.key, '19:00')}
                       >
                         <MaterialIcons name="add" size={12} color={colors.primary} />
                         <Text style={[styles.addSlotChipText, { color: colors.onSurface }]}>
@@ -968,6 +1203,79 @@ const styles = StyleSheet.create({
   },
   addSlotChipText: {
     fontSize: 11,
+    fontWeight: '600',
+  },
+  customSlotToggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    marginTop: 4,
+  },
+  customSlotToggleText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  customSlotBox: {
+    padding: 12,
+    borderRadius: MD3Shapes.extraSmall,
+    borderWidth: 1,
+    gap: 8,
+    marginTop: 4,
+  },
+  customSlotSectionTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  daySelectChip: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    minWidth: 54,
+  },
+  daySelectChipWeekday: {
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  daySelectChipLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  timeSelectChip: {
+    paddingVertical: 5,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  availabilityPreviewBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    padding: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+    marginTop: 4,
+  },
+  addCustomSlotBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 9,
+    borderRadius: 8,
+    marginTop: 4,
+  },
+  addCustomSlotBtnText: {
+    fontSize: 13,
     fontWeight: '600',
   },
 });
