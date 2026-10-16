@@ -58,7 +58,7 @@ func TestIntegration_Auth_Calendar_Todos(t *testing.T) {
 	// 1. Registro de usuário
 	registerBody := map[string]string{
 		"name":     "André Teste",
-		"email":    "andre@kito.test",
+		"email":    "andre@vito.test",
 		"password": "senhaSegura123",
 	}
 	regJSON, _ := json.Marshal(registerBody)

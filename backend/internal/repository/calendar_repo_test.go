@@ -13,7 +13,7 @@ import (
 
 func setupCalendarTestDB(t *testing.T) (*repository.EventRepositorySQLite, *repository.UserRepositorySQLite, *sql.DB) {
 	tmpDir := t.TempDir()
-	dbPath := filepath.Join(tmpDir, "test_kito_cal.db")
+	dbPath := filepath.Join(tmpDir, "test_vito_cal.db")
 
 	db, err := database.Open(dbPath)
 	if err != nil {

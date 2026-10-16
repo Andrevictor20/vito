@@ -12,7 +12,7 @@ var (
 	ErrInvalidEmail      = errors.New("email inválido")
 )
 
-// User representa a entidade de usuário no Kito.
+// User representa a entidade de usuário no Vito.
 type User struct {
 	ID           string    `json:"id"`
 	Name         string    `json:"name"`

@@ -1,5 +1,5 @@
 # ==============================================================================
-# Dockerfile — Kito Backend (Multi-Arquitetura: linux/amd64, linux/arm64)
+# Dockerfile — Vito Backend (Multi-Arquitetura: linux/amd64, linux/arm64)
 # ==============================================================================
 
 # Stage 1: Build

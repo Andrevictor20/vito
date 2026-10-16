@@ -114,11 +114,15 @@ func TestAssistantService_QueryScheduleListsEvents(t *testing.T) {
 	eventRepo := repository.NewEventRepository(db)
 	calSvc := service.NewCalendarService(eventRepo)
 
-	now := time.Now().UTC()
-	dayStart := now.Truncate(24 * time.Hour)
-	// 11:00Z = 08:00 BRT; fim 14:15Z = 11:15 BRT.
-	start := dayStart.Add(11 * time.Hour)
-	if _, _, err := calSvc.CreateEvent(userID, "Aula de inglês", "", "", start, start.Add(3*time.Hour+15*time.Minute)); err != nil {
+	loc, err := time.LoadLocation("America/Sao_Paulo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, 4, 15, 10, 0, 0, 0, loc)
+	dayStart := time.Date(2026, 4, 15, 0, 0, 0, 0, loc)
+	// 08:00 BRT; fim 11:15 BRT.
+	start := dayStart.Add(8 * time.Hour)
+	if _, _, err := calSvc.CreateEvent(userID, "Aula de inglês", "", "", start.UTC(), start.Add(3*time.Hour+15*time.Minute).UTC()); err != nil {
 		t.Fatal(err)
 	}
 

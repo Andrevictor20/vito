@@ -12,7 +12,7 @@ import (
 
 func setupTodoTestDB(t *testing.T) (*repository.TodoRepositorySQLite, *repository.UserRepositorySQLite) {
 	tmpDir := t.TempDir()
-	dbPath := filepath.Join(tmpDir, "test_kito_todo.db")
+	dbPath := filepath.Join(tmpDir, "test_vito_todo.db")
 
 	db, err := database.Open(dbPath)
 	if err != nil {

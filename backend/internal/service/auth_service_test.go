@@ -30,26 +30,26 @@ func TestAuthService_RegisterAndLogin(t *testing.T) {
 	authSvc, _ := setupAuthService(t)
 
 	// 1. Registro com sucesso
-	user, token, err := authSvc.Register("André", "andre@kito.local", "senha12345")
+	user, token, err := authSvc.Register("André", "andre@vito.local", "senha12345")
 	if err != nil {
 		t.Fatalf("expected nil error on register, got: %v", err)
 	}
-	if user.Email != "andre@kito.local" {
-		t.Errorf("expected email andre@kito.local, got %s", user.Email)
+	if user.Email != "andre@vito.local" {
+		t.Errorf("expected email andre@vito.local, got %s", user.Email)
 	}
 	if token == "" {
 		t.Errorf("expected non-empty token")
 	}
 
 	// 2. Registro duplicado falha
-	_, _, err = authSvc.Register("Outro André", "andre@kito.local", "outrasenha123")
+	_, _, err = authSvc.Register("Outro André", "andre@vito.local", "outrasenha123")
 	if err != domain.ErrUserAlreadyExists {
 		t.Errorf("expected ErrUserAlreadyExists, got: %v", err)
 	}
 
 
 	// 3. Login com senha correta
-	loggedUser, loginToken, err := authSvc.Login("andre@kito.local", "senha12345")
+	loggedUser, loginToken, err := authSvc.Login("andre@vito.local", "senha12345")
 	if err != nil {
 		t.Fatalf("expected nil error on login, got: %v", err)
 	}
@@ -61,7 +61,7 @@ func TestAuthService_RegisterAndLogin(t *testing.T) {
 	}
 
 	// 4. Login com senha errada
-	_, _, err = authSvc.Login("andre@kito.local", "senha_errada")
+	_, _, err = authSvc.Login("andre@vito.local", "senha_errada")
 	if err != domain.ErrInvalidPassword {
 		t.Errorf("expected ErrInvalidPassword, got: %v", err)
 	}
@@ -80,16 +80,16 @@ func TestAuthService_CaseInsensitiveEmailAndTrim(t *testing.T) {
 	authSvc, _ := setupAuthService(t)
 
 	// 1. Registro com espaços e maiúsculas
-	user, _, err := authSvc.Register("André", "  Andre.Silva@Kito.Local  ", "senha12345")
+	user, _, err := authSvc.Register("André", "  Andre.Silva@Vito.Local  ", "senha12345")
 	if err != nil {
 		t.Fatalf("expected nil error on register, got: %v", err)
 	}
-	if user.Email != "andre.silva@kito.local" {
-		t.Errorf("expected normalized email andre.silva@kito.local, got %s", user.Email)
+	if user.Email != "andre.silva@vito.local" {
+		t.Errorf("expected normalized email andre.silva@vito.local, got %s", user.Email)
 	}
 
 	// 2. Login com formatação limpa
-	loggedUser, _, err := authSvc.Login("andre.silva@kito.local", "senha12345")
+	loggedUser, _, err := authSvc.Login("andre.silva@vito.local", "senha12345")
 	if err != nil {
 		t.Fatalf("expected successful login with clean email, got: %v", err)
 	}
@@ -98,7 +98,7 @@ func TestAuthService_CaseInsensitiveEmailAndTrim(t *testing.T) {
 	}
 
 	// 3. Login com espaços no input
-	_, _, err = authSvc.Login(" andre.silva@kito.local ", "senha12345")
+	_, _, err = authSvc.Login(" andre.silva@vito.local ", "senha12345")
 	if err != nil {
 		t.Fatalf("expected successful login with padded email, got: %v", err)
 	}
@@ -108,25 +108,25 @@ func TestAuthService_PasswordPolicy(t *testing.T) {
 	authSvc, _ := setupAuthService(t)
 
 	// Menos de 8 caracteres
-	_, _, err := authSvc.Register("João", "joao1@kito.local", "abc1234")
+	_, _, err := authSvc.Register("João", "joao1@vito.local", "abc1234")
 	if err == nil {
 		t.Error("esperava erro para senha < 8 caracteres")
 	}
 
 	// 8 caracteres apenas letras (sem números)
-	_, _, err = authSvc.Register("João", "joao2@kito.local", "abcdefgh")
+	_, _, err = authSvc.Register("João", "joao2@vito.local", "abcdefgh")
 	if err == nil {
 		t.Error("esperava erro para senha sem números")
 	}
 
 	// 8 caracteres apenas números (sem letras)
-	_, _, err = authSvc.Register("João", "joao3@kito.local", "12345678")
+	_, _, err = authSvc.Register("João", "joao3@vito.local", "12345678")
 	if err == nil {
 		t.Error("esperava erro para senha sem letras")
 	}
 
 	// Senha válida com letras e números
-	user, token, err := authSvc.Register("João", "joao4@kito.local", "segura123")
+	user, token, err := authSvc.Register("João", "joao4@vito.local", "segura123")
 	if err != nil {
 		t.Fatalf("esperava sucesso para senha forte, obteve: %v", err)
 	}
@@ -138,7 +138,7 @@ func TestAuthService_PasswordPolicy(t *testing.T) {
 func TestAuthService_RevokeAllSessions(t *testing.T) {
 	authSvc, userRepo := setupAuthService(t)
 
-	user, token1, err := authSvc.Register("Maria", "maria@kito.local", "senhaForte2026")
+	user, token1, err := authSvc.Register("Maria", "maria@vito.local", "senhaForte2026")
 	if err != nil {
 		t.Fatalf("falha ao registrar: %v", err)
 	}
@@ -170,7 +170,7 @@ func TestAuthService_RevokeAllSessions(t *testing.T) {
 	}
 
 	// 5. Novo login gera token com a nova versão
-	_, token2, err := authSvc.Login("maria@kito.local", "senhaForte2026")
+	_, token2, err := authSvc.Login("maria@vito.local", "senhaForte2026")
 	if err != nil {
 		t.Fatalf("login após reset falhou: %v", err)
 	}
