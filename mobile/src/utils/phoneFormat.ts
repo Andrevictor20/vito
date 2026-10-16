@@ -51,3 +51,35 @@ export const isValidPhoneNumber = (raw: string): boolean => {
   const digits = raw.replace(/\D/g, '');
   return digits.length >= 10 && digits.length <= 15;
 };
+
+export const toE164Phone = (raw: string): string => {
+  if (!raw) return '';
+  const trimmed = raw.trim();
+  const hasPlus = trimmed.startsWith('+');
+  let digits = trimmed.replace(/\D/g, '');
+  if (!digits) return '';
+
+  if (hasPlus) {
+    if (digits.length >= 8 && digits.length <= 15) {
+      return `+${digits}`;
+    }
+    return '';
+  }
+
+  // Remove zero à esquerda no DDD nacional (ex: 011987654321 -> 11987654321)
+  if (digits.startsWith('0') && (digits.length === 11 || digits.length === 12)) {
+    digits = digits.slice(1);
+  }
+
+  // Se tem 12 ou 13 dígitos começando com 55 (já com DDI Brasil)
+  if (digits.startsWith('55') && (digits.length === 12 || digits.length === 13)) {
+    return `+${digits}`;
+  }
+
+  // Se tem 10 ou 11 dígitos nacionais (DDD + número)
+  if (digits.length === 10 || digits.length === 11) {
+    return `+55${digits}`;
+  }
+
+  return '';
+};

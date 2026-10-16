@@ -327,6 +327,10 @@ export class ApiService extends ApiClient {
     return this.p2pMeetingsApi.cancelInvite(id);
   }
 
+  get p2p(): P2PMeetingsApi {
+    return this.p2pMeetingsApi;
+  }
+
   // Notifications & Briefing & Settings
   registerPushToken(token: string, platform: string = 'expo'): Promise<{ status: string; token: string }> {
     return this.notificationsApi.registerPushToken(token, platform);

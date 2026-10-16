@@ -20,6 +20,7 @@ import { NotificationSettingsModal } from '../components/notifications/Notificat
 import { CalendarSyncSettingsModal } from '../components/profile/CalendarSyncSettingsModal';
 import { AISettingsModal } from '../components/profile/AISettingsModal';
 import { PhoneEditModal } from '../components/profile/PhoneEditModal';
+import { ContactsSyncModal } from '../components/profile/ContactsSyncModal';
 import { api } from '../services/api';
 import { notificationService } from '../services/notificationService';
 import { calendarSyncService } from '../services/calendarSyncService';
@@ -43,6 +44,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const [syncVisible, setSyncVisible] = useState(false);
   const [aiVisible, setAiVisible] = useState(false);
   const [phoneVisible, setPhoneVisible] = useState(false);
+  const [contactsVisible, setContactsVisible] = useState(false);
   const [userPhone, setUserPhone] = useState(user?.phone || '');
   const [checking, setChecking] = useState(false);
 
@@ -147,6 +149,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         onOpenNotifications={() => setNotifVisible(true)}
         onOpenCalendarSync={() => setSyncVisible(true)}
         onOpenAISettings={() => setAiVisible(true)}
+        onOpenContactsSync={() => setContactsVisible(true)}
         autonomyMode={autonomyMode}
         notifActive={notifActive}
         calendarsActive={calendarsActive}
@@ -186,6 +189,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           setUserPhone(newPhone);
           onDataChanged?.();
         }}
+      />
+      <ContactsSyncModal
+        visible={contactsVisible}
+        onClose={() => setContactsVisible(false)}
       />
 
       <View style={styles.sectionHeader}>

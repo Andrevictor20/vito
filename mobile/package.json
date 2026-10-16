@@ -1,13 +1,13 @@
 {
   "name": "vito-mobile",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "private": true,
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "test": "tsx --test src/utils/pagerNavigation.test.ts src/utils/calendarDateUtils.test.ts src/utils/chatActions.test.ts src/utils/notificationReconcile.test.ts src/utils/chatGreetings.test.ts src/utils/chatCards.test.ts src/utils/chatSendGuard.test.ts src/utils/chatPreview.test.ts src/utils/unifiedTasks.test.ts src/utils/reminderInput.test.ts src/utils/dateTimePicker.test.ts src/utils/taskEdit.test.ts src/utils/keyboardHeight.test.ts"
+    "test": "tsx --test src/utils/pagerNavigation.test.ts src/utils/calendarDateUtils.test.ts src/utils/chatActions.test.ts src/utils/notificationReconcile.test.ts src/utils/chatGreetings.test.ts src/utils/chatCards.test.ts src/utils/chatSendGuard.test.ts src/utils/chatPreview.test.ts src/utils/unifiedTasks.test.ts src/utils/reminderInput.test.ts src/utils/dateTimePicker.test.ts src/utils/taskEdit.test.ts src/utils/keyboardHeight.test.ts src/utils/phoneFormat.test.ts src/services/contactMatchingService.test.ts src/services/api/p2pMeetingsApi.test.ts"
   },
   "dependencies": {
     "@expo-google-fonts/inter": "^0.4.2",
@@ -25,6 +25,8 @@
     "expo-audio": "~57.0.5",
     "expo-calendar": "~57.0.5",
     "expo-clipboard": "~57.0.2",
+    "expo-contacts": "~57.0.8",
+    "expo-crypto": "~57.0.4",
     "expo-device": "~57.0.2",
     "expo-font": "~57.0.4",
     "expo-image-picker": "~57.0.20",

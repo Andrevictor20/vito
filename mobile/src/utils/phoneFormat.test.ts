@@ -1,7 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-// @ts-ignore
-import { formatPhoneNumber, cleanPhoneNumber, isValidPhoneNumber } from './phoneFormat';
+import { formatPhoneNumber, cleanPhoneNumber, isValidPhoneNumber, toE164Phone } from './phoneFormat';
 
 describe('Phone format helpers (TDD)', () => {
   it('limpa caracteres não numéricos preservando o +', () => {
@@ -20,4 +19,19 @@ describe('Phone format helpers (TDD)', () => {
     assert.equal(isValidPhoneNumber('123'), false);
     assert.equal(isValidPhoneNumber(''), false);
   });
+
+  it('normaliza telefones para padrão E.164 com DDI', () => {
+    // Nacional com DDD (11 dígitos)
+    assert.equal(toE164Phone('(11) 98765-4321'), '+5511987654321');
+    // Nacional com DDD e zero na frente (011...)
+    assert.equal(toE164Phone('011 98765-4321'), '+5511987654321');
+    // Já com +55
+    assert.equal(toE164Phone('+55 11 98765-4321'), '+5511987654321');
+    // Internacional genérico
+    assert.equal(toE164Phone('+1 415 555 2671'), '+14155552671');
+    // Inválido ou vazio
+    assert.equal(toE164Phone(''), '');
+    assert.equal(toE164Phone('123'), '');
+  });
 });
+

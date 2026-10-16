@@ -9,6 +9,7 @@ interface ProfileSettingsGroupProps {
   onOpenNotifications?: () => void;
   onOpenCalendarSync?: () => void;
   onOpenAISettings?: () => void;
+  onOpenContactsSync?: () => void;
   /** Modo de autonomia atual (para o status da linha). */
   autonomyMode?: AutonomyMode;
   /** Permissão de notificação concedida (null = desconhecido). */
@@ -35,6 +36,7 @@ export const ProfileSettingsGroup: React.FC<ProfileSettingsGroupProps> = ({
   onOpenNotifications,
   onOpenCalendarSync,
   onOpenAISettings,
+  onOpenContactsSync,
   autonomyMode = 'assisted',
   notifActive = null,
   calendarsActive = null,
@@ -158,6 +160,31 @@ export const ProfileSettingsGroup: React.FC<ProfileSettingsGroupProps> = ({
                 : `${calendarsActive} ativo${calendarsActive === 1 ? '' : 's'}`
             }
           />
+          <RowChevron />
+        </View>
+      </TouchableOpacity>
+
+      {/* Sincronização de Contatos da Agenda (P2P) */}
+      <View style={[styles.divider, { backgroundColor: colors.outlineVariant }]} />
+      <TouchableOpacity
+        style={styles.groupItem}
+        onPress={onOpenContactsSync}
+        activeOpacity={0.7}
+        accessibilityLabel="Abrir agenda de contatos para agendamento mútuo"
+        accessibilityRole="button"
+      >
+        <View style={styles.itemLeft}>
+          <View style={[styles.itemIconBox, { backgroundColor: colors.surfaceContainerHigh }]}>
+            <MaterialIcons name="contacts" size={18} color={colors.primary} />
+          </View>
+          <View style={styles.itemTextCol}>
+            <Text style={[styles.itemTitle, { color: colors.onSurface }]}>Agenda de Contatos</Text>
+            <Text style={[styles.itemSub, { color: colors.onSurfaceVariant }]}>
+              Encontrar colegas e amigos no Vito
+            </Text>
+          </View>
+        </View>
+        <View style={styles.itemRight}>
           <RowChevron />
         </View>
       </TouchableOpacity>
