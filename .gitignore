@@ -25,6 +25,7 @@ __pycache__/
 # Builds, Artefatos & Compilados
 dist/
 build/
+apk/
 target/
 out/
 .next/
