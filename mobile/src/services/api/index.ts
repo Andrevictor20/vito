@@ -9,6 +9,7 @@ import { TriggersApi } from './triggersApi';
 import { PendingApi } from './pendingApi';
 import { BookingApi } from './bookingApi';
 import { MeetingsApi } from './meetingsApi';
+import { P2PMeetingsApi } from './p2pMeetingsApi';
 import { NotificationsApi } from './notificationsApi';
 import {
   User,
@@ -41,6 +42,10 @@ import {
   WhatsAppShareData,
   ChatMessage,
   ConversationSession,
+  P2PMeetingInvite,
+  ContactMatchResult,
+  P2PMutualSlot,
+  SendP2PInviteInput,
 } from '../../types';
 
 export {
@@ -63,6 +68,7 @@ export class ApiService extends ApiClient {
   private pendingApi = new PendingApi(this);
   private bookingApi = new BookingApi(this);
   private meetingsApi = new MeetingsApi(this);
+  private p2pMeetingsApi = new P2PMeetingsApi(this);
   private notificationsApi = new NotificationsApi(this);
 
   // Auth
@@ -283,6 +289,38 @@ export class ApiService extends ApiClient {
   }
   getMeetingWhatsAppShare(id: string): Promise<WhatsAppShareData> {
     return this.meetingsApi.getWhatsAppShare(id);
+  }
+
+  // P2P Meetings & Contacts
+  getP2PChallenge(): Promise<{ salt: string }> {
+    return this.p2pMeetingsApi.getChallenge();
+  }
+  matchP2PContacts(salt: string, hashes: string[]): Promise<ContactMatchResult[]> {
+    return this.p2pMeetingsApi.matchContacts(salt, hashes);
+  }
+  updateP2PPhone(phone: string): Promise<{ status: string }> {
+    return this.p2pMeetingsApi.updatePhone(phone);
+  }
+  getP2PMutualSlots(targetUserId: string, from?: string, to?: string, duration?: number): Promise<P2PMutualSlot[]> {
+    return this.p2pMeetingsApi.getMutualSlots(targetUserId, from, to, duration);
+  }
+  sendP2PInvite(data: SendP2PInviteInput): Promise<P2PMeetingInvite> {
+    return this.p2pMeetingsApi.sendInvite(data);
+  }
+  getP2PPendingInvites(): Promise<P2PMeetingInvite[]> {
+    return this.p2pMeetingsApi.getPendingInvites();
+  }
+  getP2PInvites(): Promise<P2PMeetingInvite[]> {
+    return this.p2pMeetingsApi.getInvites();
+  }
+  acceptP2PInvite(id: string): Promise<P2PMeetingInvite> {
+    return this.p2pMeetingsApi.acceptInvite(id);
+  }
+  declineP2PInvite(id: string): Promise<{ status: string }> {
+    return this.p2pMeetingsApi.declineInvite(id);
+  }
+  cancelP2PInvite(id: string): Promise<{ status: string }> {
+    return this.p2pMeetingsApi.cancelInvite(id);
   }
 
   // Notifications & Briefing & Settings

@@ -34,6 +34,7 @@ type Server struct {
 	pendingHandler    *handler.PendingHandler
 	bookingHandler    *handler.BookingHandler
 	meetingHandler    *handler.MeetingHandler
+	p2pHandler        *handler.P2PMeetingHandler
 	chatHandler       *handler.ChatHandler
 	authSvc           *service.AuthService
 }
@@ -55,6 +56,7 @@ type Config struct {
 	PendingHandler    *handler.PendingHandler
 	BookingHandler    *handler.BookingHandler
 	MeetingHandler    *handler.MeetingHandler
+	P2PHandler        *handler.P2PMeetingHandler
 	ChatHandler       *handler.ChatHandler
 	AuthSvc           *service.AuthService
 	// AllowedOrigins restringe o CORS (SEC-03). Vazio = ["*"] apenas fora
@@ -84,6 +86,7 @@ func New(cfg ...Config) *Server {
 		s.pendingHandler = cfg[0].PendingHandler
 		s.bookingHandler = cfg[0].BookingHandler
 		s.meetingHandler = cfg[0].MeetingHandler
+		s.p2pHandler = cfg[0].P2PHandler
 		s.chatHandler = cfg[0].ChatHandler
 		s.authSvc = cfg[0].AuthSvc
 	}
@@ -171,6 +174,11 @@ func (s *Server) registerRoutes() {
 		if s.googleAuthHandler != nil {
 			r.Get("/auth/google/start", s.googleAuthHandler.Start)
 			r.Get("/auth/google/callback", s.googleAuthHandler.Callback)
+		}
+
+		if s.p2pHandler != nil {
+			r.Get("/contacts/challenge", s.p2pHandler.GetChallenge)
+			r.Post("/contacts/match", s.p2pHandler.MatchContacts)
 		}
 
 		// Rotas protegidas por JWT
@@ -298,6 +306,19 @@ func (s *Server) registerRoutes() {
 						mr.Delete("/{id}", s.meetingHandler.DeleteMeeting)
 						mr.Post("/{id}/confirm", s.meetingHandler.ConfirmConsensus)
 						mr.Get("/{id}/share", s.meetingHandler.GetWhatsAppShare)
+					})
+				}
+
+				if s.p2pHandler != nil {
+					protected.Post("/users/phone", s.p2pHandler.UpdatePhone)
+					protected.Route("/meetings/p2p", func(p2pr chi.Router) {
+						p2pr.Get("/mutual-slots", s.p2pHandler.GetMutualSlots)
+						p2pr.Post("/invite", s.p2pHandler.SendInvite)
+						p2pr.Get("/invites/pending", s.p2pHandler.ListPendingInvites)
+						p2pr.Get("/invites", s.p2pHandler.ListUserInvites)
+						p2pr.Post("/invites/{id}/accept", s.p2pHandler.AcceptInvite)
+						p2pr.Post("/invites/{id}/decline", s.p2pHandler.DeclineInvite)
+						p2pr.Post("/invites/{id}/cancel", s.p2pHandler.CancelInvite)
 					})
 				}
 

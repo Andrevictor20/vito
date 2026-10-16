@@ -15,7 +15,10 @@ type mockUserRepoForNudge struct {
 func (m *mockUserRepoForNudge) Create(user *domain.User) error             { return nil }
 func (m *mockUserRepoForNudge) GetByID(id string) (*domain.User, error)     { return m.user, nil }
 func (m *mockUserRepoForNudge) GetByEmail(email string) (*domain.User, error) { return m.user, nil }
+func (m *mockUserRepoForNudge) GetByPhone(phone string) (*domain.User, error) { return m.user, nil }
+func (m *mockUserRepoForNudge) UpdatePhone(id, phone string) error             { return nil }
 func (m *mockUserRepoForNudge) IncrementTokenVersion(id string) error         { return nil }
+func (m *mockUserRepoForNudge) ListAll() ([]domain.User, error)               { return []domain.User{*m.user}, nil }
 
 type mockTokenRepoForNudge struct {
 	token domain.DeviceToken

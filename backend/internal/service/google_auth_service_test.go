@@ -54,6 +54,33 @@ func (m *MockUserRepositoryInMemory) IncrementTokenVersion(id string) error {
 	return domain.ErrUserNotFound
 }
 
+func (m *MockUserRepositoryInMemory) GetByPhone(phone string) (*domain.User, error) {
+	for _, u := range m.users {
+		if u.Phone != nil && *u.Phone == phone {
+			return u, nil
+		}
+	}
+	return nil, domain.ErrUserNotFound
+}
+
+func (m *MockUserRepositoryInMemory) UpdatePhone(id, phone string) error {
+	for _, u := range m.users {
+		if u.ID == id {
+			u.Phone = &phone
+			return nil
+		}
+	}
+	return domain.ErrUserNotFound
+}
+
+func (m *MockUserRepositoryInMemory) ListAll() ([]domain.User, error) {
+	var list []domain.User
+	for _, u := range m.users {
+		list = append(list, *u)
+	}
+	return list, nil
+}
+
 
 // MockSyncServiceInMemory para registrar integração de calendário
 type MockSyncServiceInMemory struct {

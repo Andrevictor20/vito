@@ -31,22 +31,29 @@ func respondError(w http.ResponseWriter, err error) {
 		errors.Is(err, domain.ErrChatSessionNotFound),
 		errors.Is(err, domain.ErrIntegrationNotFound),
 		errors.Is(err, domain.ErrMeetingNotFound),
-		errors.Is(err, domain.ErrMeetingSlotNotFound):
+		errors.Is(err, domain.ErrMeetingSlotNotFound),
+		errors.Is(err, domain.ErrP2PInviteNotFound):
 		w.WriteHeader(http.StatusNotFound)
 		_ = json.NewEncoder(w).Encode(apiError{Error: apiErrorBody{Code: "not_found", Message: err.Error()}})
+	case errors.Is(err, domain.ErrP2PInviteUnauthorized):
+		w.WriteHeader(http.StatusForbidden)
+		_ = json.NewEncoder(w).Encode(apiError{Error: apiErrorBody{Code: "forbidden", Message: err.Error()}})
 	case errors.Is(err, domain.ErrConflict),
 		errors.Is(err, domain.ErrScheduleConflict),
 		errors.Is(err, domain.ErrBookingTypeSlugExists),
 		errors.Is(err, domain.ErrUserAlreadyExists),
 		errors.Is(err, domain.ErrMeetingAlreadyConfirmed),
-		errors.Is(err, domain.ErrParticipantAlreadyVoted):
+		errors.Is(err, domain.ErrParticipantAlreadyVoted),
+		errors.Is(err, domain.ErrP2PSlotConflict),
+		errors.Is(err, domain.ErrP2PInviteNotPending):
 		w.WriteHeader(http.StatusConflict)
 		_ = json.NewEncoder(w).Encode(apiError{Error: apiErrorBody{Code: "conflict", Message: err.Error()}})
 	case errors.Is(err, domain.ErrValidation),
 		errors.Is(err, domain.ErrInvalidAutonomyMode),
 		errors.Is(err, domain.ErrHolidayReadOnly),
 		errors.Is(err, domain.ErrMeetingExpired),
-		errors.Is(err, domain.ErrInvalidMeetingData):
+		errors.Is(err, domain.ErrInvalidMeetingData),
+		errors.Is(err, domain.ErrP2PSelfInvite):
 		w.WriteHeader(http.StatusUnprocessableEntity)
 		_ = json.NewEncoder(w).Encode(apiError{Error: apiErrorBody{Code: "validation", Message: err.Error()}})
 	default:

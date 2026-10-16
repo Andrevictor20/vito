@@ -569,6 +569,44 @@ export interface WhatsAppShareData {
   whatsapp_web_url: string;
 }
 
+export interface P2PMeetingInvite {
+  id: string;
+  from_user_id: string;
+  to_user_id: string;
+  title: string;
+  description?: string;
+  start_at: string;
+  end_at: string;
+  duration_minutes: number;
+  status: 'pending' | 'accepted' | 'declined' | 'cancelled';
+  event_id_from?: string;
+  event_id_to?: string;
+  from_user_name?: string;
+  to_user_name?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ContactMatchResult {
+  user_id: string;
+  name: string;
+  phone?: string;
+  email?: string;
+}
+
+export interface P2PMutualSlot {
+  start_at: string;
+  end_at: string;
+}
+
+export interface SendP2PInviteInput {
+  to_user_id: string;
+  title: string;
+  description?: string;
+  start_at: string;
+  end_at: string;
+}
+
 
 
 

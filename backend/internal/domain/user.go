@@ -17,6 +17,7 @@ type User struct {
 	ID           string    `json:"id"`
 	Name         string    `json:"name"`
 	Email        string    `json:"email"`
+	Phone        *string   `json:"phone,omitempty"`
 	PasswordHash string    `json:"-"`
 	TokenVersion int       `json:"token_version"`
 	CreatedAt    time.Time `json:"created_at"`
@@ -28,6 +29,9 @@ type UserRepository interface {
 	Create(user *User) error
 	GetByID(id string) (*User, error)
 	GetByEmail(email string) (*User, error)
+	GetByPhone(phone string) (*User, error)
+	UpdatePhone(id, phone string) error
 	IncrementTokenVersion(id string) error
+	ListAll() ([]User, error)
 }
 

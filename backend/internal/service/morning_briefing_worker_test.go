@@ -135,7 +135,10 @@ type mockUserRepoForBriefing struct {
 func (m *mockUserRepoForBriefing) Create(user *domain.User) error             { return nil }
 func (m *mockUserRepoForBriefing) GetByID(id string) (*domain.User, error)     { return m.user, nil }
 func (m *mockUserRepoForBriefing) GetByEmail(email string) (*domain.User, error) { return m.user, nil }
+func (m *mockUserRepoForBriefing) GetByPhone(phone string) (*domain.User, error) { return m.user, nil }
+func (m *mockUserRepoForBriefing) UpdatePhone(id, phone string) error             { return nil }
 func (m *mockUserRepoForBriefing) IncrementTokenVersion(id string) error         { return nil }
+func (m *mockUserRepoForBriefing) ListAll() ([]domain.User, error)               { return []domain.User{*m.user}, nil }
 
 type mockTokenRepoForBriefing struct {
 	token domain.DeviceToken
