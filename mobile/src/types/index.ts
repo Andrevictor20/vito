@@ -512,6 +512,63 @@ export interface CreateBookingTypeInput {
   allowed_dates?: string | null;
 }
 
+export interface MeetingSlot {
+  id: string;
+  meeting_id: string;
+  start_at: string;
+  end_at: string;
+  votes_count: number;
+  created_at: string;
+}
+
+export interface MeetingParticipant {
+  id: string;
+  meeting_id: string;
+  name: string;
+  contact_info?: string;
+  vito_user_id?: string;
+  responded_at: string;
+  created_at: string;
+}
+
+export interface Meeting {
+  id: string;
+  user_id: string;
+  title: string;
+  description?: string;
+  duration_minutes: number;
+  mode: 'one_on_one' | 'group_consensus';
+  status: 'open' | 'confirmed' | 'expired' | 'cancelled';
+  short_url?: string;
+  expires_at: string;
+  confirmed_slot_id?: string;
+  confirmed_slot_start?: string;
+  confirmed_slot_end?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MeetingWithDetails extends Meeting {
+  slots: MeetingSlot[];
+  participants: MeetingParticipant[];
+  public_url?: string;
+}
+
+export interface CreateMeetingInput {
+  title: string;
+  description?: string;
+  duration_minutes: number;
+  mode?: 'one_on_one' | 'group_consensus';
+  expires_at?: string;
+  slots: { start_at: string; end_at: string }[];
+}
+
+export interface WhatsAppShareData {
+  message_text: string;
+  whatsapp_deep_link: string;
+  whatsapp_web_url: string;
+}
+
 
 
 

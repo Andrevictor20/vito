@@ -49,6 +49,7 @@ func main() {
 	aiSettingsRepo := repository.NewAISettingsRepository(db)
 	pendingRepo := repository.NewPendingRepository(db)
 	bookingRepo := repository.NewBookingRepositorySQLite(db)
+	meetingRepo := repository.NewMeetingRepositorySQLite(db)
 	chatRepo := repository.NewChatRepository(db)
 
 	// 3. Provedores de IA & AI Gateway com Failover.
@@ -239,6 +240,12 @@ func main() {
 	bookingSvc.SetSyncPusher(syncSvc)
 	astSvc.SetBookingService(bookingSvc)
 	bookingHandler := handler.NewBookingHandler(bookingSvc)
+
+	meetingSvc := service.NewMeetingService(meetingRepo, eventRepo, notifSvc, linkShortener, cfg.PublicBaseURL)
+	meetingSvc.SetSyncPusher(syncSvc)
+	astSvc.SetMeetingService(meetingSvc)
+	meetingHandler := handler.NewMeetingHandler(meetingSvc)
+
 	chatSvc := service.NewChatService(chatRepo)
 	chatHandler := handler.NewChatHandler(chatSvc)
 
@@ -256,6 +263,7 @@ func main() {
 		AISettingsHandler: aiSettingsHandler,
 		PendingHandler:    pendingHandler,
 		BookingHandler:    bookingHandler,
+		MeetingHandler:    meetingHandler,
 		ChatHandler:       chatHandler,
 		AuthSvc:           authSvc,
 		AllowedOrigins:    cfg.AllowedOrigins(),

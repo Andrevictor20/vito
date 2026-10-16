@@ -307,7 +307,7 @@ Responda EXCLUSIVAMENTE com um objeto JSON válido, sem backticks markdown ou te
 {
   "thought": "1. Verificar fuso/data atual; 2. Checar memórias relevantes; 3. Verificar conflitos; 4. Definir ação",
   "context_used": ["[categoria] trecho usado"],
-  "action": "CREATE_EVENT" | "UPDATE_EVENT" | "DELETE_EVENT" | "CREATE_TODO" | "CREATE_PENDING_ITEM" | "CONVERT_PENDING_TO_EVENT" | "QUERY_SCHEDULE" | "QUERY_TODOS" | "CREATE_TRIGGER" | "CREATE_BOOKING_LINK" | "CANCEL_BOOKING_APPOINTMENT" | "SAVE_MEMORY" | "NEEDS_CLARIFICATION" | "GENERAL_CHAT",
+  "action": "CREATE_EVENT" | "UPDATE_EVENT" | "DELETE_EVENT" | "CREATE_TODO" | "CREATE_PENDING_ITEM" | "CONVERT_PENDING_TO_EVENT" | "QUERY_SCHEDULE" | "QUERY_TODOS" | "CREATE_TRIGGER" | "CREATE_BOOKING_LINK" | "CANCEL_BOOKING_APPOINTMENT" | "CREATE_MEETING" | "SAVE_MEMORY" | "NEEDS_CLARIFICATION" | "GENERAL_CHAT",
   "message": "Mensagem calorosa, atenciosa, articulada, elegante e executiva do secretário Vito",
   "event": {
     "title": "Título conciso do evento",

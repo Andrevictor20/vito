@@ -24,6 +24,7 @@ const (
 	ActionCreateTrigger IntentAction = "CREATE_TRIGGER"
 	ActionCreateBookingLink IntentAction = "CREATE_BOOKING_LINK"
 	ActionCancelBookingAppointment IntentAction = "CANCEL_BOOKING_APPOINTMENT"
+	ActionCreateMeeting IntentAction = "CREATE_MEETING"
 	ActionGeneralChat   IntentAction = "GENERAL_CHAT"
 	ActionNeedsClarification IntentAction = "NEEDS_CLARIFICATION"
 	ActionOutOfScope    IntentAction = "OUT_OF_SCOPE"
@@ -127,6 +128,21 @@ type ParsedBooking struct {
 	TargetQuery     string `json:"target_query,omitempty"`
 }
 
+// ParsedMeetingSlot slot sugerido na criação da reunião via chat.
+type ParsedMeetingSlot struct {
+	StartAt time.Time `json:"start_at"`
+	EndAt   time.Time `json:"end_at"`
+}
+
+// ParsedMeeting dados extraídos para criação de reunião com link mágico/votação.
+type ParsedMeeting struct {
+	Title           string              `json:"title"`
+	Description     string              `json:"description,omitempty"`
+	DurationMinutes int                 `json:"duration_minutes,omitempty"`
+	Mode            string              `json:"mode,omitempty"` // one_on_one | group_consensus
+	Slots           []ParsedMeetingSlot `json:"slots,omitempty"`
+}
+
 // ParsedIntent resultado normalizado da interpretação do assistente Toki-like.
 type ParsedIntent struct {
 	Action         IntentAction   `json:"action"`
@@ -138,6 +154,7 @@ type ParsedIntent struct {
 	Trigger        *ParsedTrigger `json:"trigger,omitempty"`
 	Pending        *ParsedPending `json:"pending,omitempty"`
 	Booking        *ParsedBooking `json:"booking,omitempty"`
+	Meeting        *ParsedMeeting `json:"meeting,omitempty"`
 	MemoryContent  string         `json:"memory_content,omitempty"`
 	MemoryCategory string         `json:"memory_category,omitempty"`
 	ProviderUsed   string         `json:"provider_used,omitempty"`

@@ -26,10 +26,14 @@ type AssistantResponse struct {
 	Todo         *domain.Todo         `json:"todo,omitempty"`
 	Trigger      *domain.Trigger      `json:"trigger,omitempty"`
 	Pending      *domain.PendingItem  `json:"pending,omitempty"`
-	Booking      *domain.BookingType  `json:"booking,omitempty"`
-	BookingURL   string               `json:"booking_url,omitempty"`
-	BookingShort string               `json:"booking_short_url,omitempty"`
-	ProviderUsed string               `json:"provider_used,omitempty"`
+	Booking      *domain.BookingType        `json:"booking,omitempty"`
+	BookingURL   string                     `json:"booking_url,omitempty"`
+	BookingShort string                     `json:"booking_short_url,omitempty"`
+	Meeting      *domain.MeetingWithDetails `json:"meeting,omitempty"`
+	MeetingURL   string                     `json:"meeting_url,omitempty"`
+	MeetingShort string                     `json:"meeting_short_url,omitempty"`
+	MeetingWhatsApp string                  `json:"meeting_whatsapp_url,omitempty"`
+	ProviderUsed string                     `json:"provider_used,omitempty"`
 }
 
 // AssistantService orquestra o parsing de IA com os serviços de calendário, tarefas, memórias e disparadores.
@@ -41,6 +45,7 @@ type AssistantService struct {
 	triggerSvc     *TriggerService
 	pendingSvc     *PendingService
 	bookingSvc     *BookingService
+	meetingSvc     *MeetingService
 	userRepo       domain.UserRepository
 	aiSettingsRepo domain.AISettingsRepository
 }
@@ -63,6 +68,11 @@ func NewAssistantService(aiGateway AIParsingGateway, calSvc *CalendarService, to
 // SetBookingService injeta o serviço de Vito Booking.
 func (s *AssistantService) SetBookingService(bookingSvc *BookingService) {
 	s.bookingSvc = bookingSvc
+}
+
+// SetMeetingService injeta o serviço do módulo de Reuniões.
+func (s *AssistantService) SetMeetingService(meetingSvc *MeetingService) {
+	s.meetingSvc = meetingSvc
 }
 
 // SetPendingService injeta o serviço da Incubadora de Pendências.

@@ -33,6 +33,7 @@ type Server struct {
 	aiSettingsHandler *handler.AISettingsHandler
 	pendingHandler    *handler.PendingHandler
 	bookingHandler    *handler.BookingHandler
+	meetingHandler    *handler.MeetingHandler
 	chatHandler       *handler.ChatHandler
 	authSvc           *service.AuthService
 }
@@ -53,6 +54,7 @@ type Config struct {
 	AISettingsHandler *handler.AISettingsHandler
 	PendingHandler    *handler.PendingHandler
 	BookingHandler    *handler.BookingHandler
+	MeetingHandler    *handler.MeetingHandler
 	ChatHandler       *handler.ChatHandler
 	AuthSvc           *service.AuthService
 	// AllowedOrigins restringe o CORS (SEC-03). Vazio = ["*"] apenas fora
@@ -81,6 +83,7 @@ func New(cfg ...Config) *Server {
 		s.aiSettingsHandler = cfg[0].AISettingsHandler
 		s.pendingHandler = cfg[0].PendingHandler
 		s.bookingHandler = cfg[0].BookingHandler
+		s.meetingHandler = cfg[0].MeetingHandler
 		s.chatHandler = cfg[0].ChatHandler
 		s.authSvc = cfg[0].AuthSvc
 	}
@@ -137,6 +140,16 @@ func (s *Server) registerRoutes() {
 			pub.Get("/book/{username}/{slug}", s.bookingHandler.ServePublicPage)
 			pub.Get("/api/public/book/{username}/{slug}/slots", s.bookingHandler.GetPublicSlots)
 			pub.Post("/api/public/book/{username}/{slug}/reserve", s.bookingHandler.ReservePublicSlot)
+		})
+	}
+
+	meetingLimiter := middleware.NewRateLimiter(60, 1*time.Minute)
+	if s.meetingHandler != nil {
+		s.router.Group(func(pub chi.Router) {
+			pub.Use(meetingLimiter)
+			pub.Get("/meet/{id}", s.meetingHandler.ServePublicPage)
+			pub.Get("/api/public/meet/{id}", s.meetingHandler.GetPublicMeeting)
+			pub.Post("/api/public/meet/{id}/vote", s.meetingHandler.SubmitPublicVote)
 		})
 	}
 
@@ -274,6 +287,17 @@ func (s *Server) registerRoutes() {
 						br.Delete("/types/{id}", s.bookingHandler.DeleteType)
 						br.Get("/appointments", s.bookingHandler.ListAppointments)
 						br.Delete("/appointments/{id}", s.bookingHandler.DeleteAppointment)
+					})
+				}
+
+				if s.meetingHandler != nil {
+					protected.Route("/meetings", func(mr chi.Router) {
+						mr.Get("/", s.meetingHandler.ListMeetings)
+						mr.Post("/", s.meetingHandler.CreateMeeting)
+						mr.Get("/{id}", s.meetingHandler.GetMeeting)
+						mr.Delete("/{id}", s.meetingHandler.DeleteMeeting)
+						mr.Post("/{id}/confirm", s.meetingHandler.ConfirmConsensus)
+						mr.Get("/{id}/share", s.meetingHandler.GetWhatsAppShare)
 					})
 				}
 

@@ -8,6 +8,7 @@ import { ChatApi } from './chatApi';
 import { TriggersApi } from './triggersApi';
 import { PendingApi } from './pendingApi';
 import { BookingApi } from './bookingApi';
+import { MeetingsApi } from './meetingsApi';
 import { NotificationsApi } from './notificationsApi';
 import {
   User,
@@ -34,6 +35,10 @@ import {
   BookingAppointment,
   CreateBookingTypeInput,
   DeleteBookingImpact,
+  Meeting,
+  MeetingWithDetails,
+  CreateMeetingInput,
+  WhatsAppShareData,
   ChatMessage,
   ConversationSession,
 } from '../../types';
@@ -57,6 +62,7 @@ export class ApiService extends ApiClient {
   private triggersApi = new TriggersApi(this);
   private pendingApi = new PendingApi(this);
   private bookingApi = new BookingApi(this);
+  private meetingsApi = new MeetingsApi(this);
   private notificationsApi = new NotificationsApi(this);
 
   // Auth
@@ -257,6 +263,26 @@ export class ApiService extends ApiClient {
   }
   deleteBookingAppointment(id: string): Promise<void> {
     return this.bookingApi.deleteBookingAppointment(id);
+  }
+
+  // Meetings
+  getMeetings(status?: string): Promise<Meeting[]> {
+    return this.meetingsApi.getMeetings(status);
+  }
+  getMeeting(id: string): Promise<MeetingWithDetails> {
+    return this.meetingsApi.getMeeting(id);
+  }
+  createMeeting(data: CreateMeetingInput): Promise<MeetingWithDetails> {
+    return this.meetingsApi.createMeeting(data);
+  }
+  deleteMeeting(id: string): Promise<void> {
+    return this.meetingsApi.deleteMeeting(id);
+  }
+  confirmMeetingConsensus(id: string, slotId: string): Promise<{ status: string }> {
+    return this.meetingsApi.confirmConsensus(id, slotId);
+  }
+  getMeetingWhatsAppShare(id: string): Promise<WhatsAppShareData> {
+    return this.meetingsApi.getWhatsAppShare(id);
   }
 
   // Notifications & Briefing & Settings

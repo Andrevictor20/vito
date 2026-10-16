@@ -581,6 +581,87 @@ func (s *AssistantService) executeAction(ctx context.Context, userID string, int
 			return clarificationResponse(intent, "Qual agendamento devo cancelar? Me diga o nome do convidado, e-mail ou assunto."), nil
 		}
 
+	case ai.ActionCreateMeeting:
+		if intent.Meeting == nil || strings.TrimSpace(intent.Meeting.Title) == "" {
+			return clarificationResponse(intent, "Qual o assunto ou título da reunião que você deseja agendar? (Ex: 'Reunião de alinhamento com Carlos')"), nil
+		}
+		if s.meetingSvc == nil {
+			log.Printf("⚠️ [AssistantService] MeetingService indisponível para CREATE_MEETING (user=%s)", userID)
+			res.Message = "O serviço de reuniões está temporariamente indisponível. Nada foi criado. Tente novamente em instantes."
+			res.Reply = res.Message
+			return res, nil
+		}
+
+		dur := intent.Meeting.DurationMinutes
+		if dur <= 0 {
+			dur = 45
+		}
+		mode := intent.Meeting.Mode
+		if mode != domain.MeetingModeGroupConsensus {
+			mode = domain.MeetingModeOneOnOne
+		}
+
+		var slots []MeetingSlotInput
+		for _, sl := range intent.Meeting.Slots {
+			if !sl.StartAt.IsZero() && !sl.EndAt.IsZero() && sl.EndAt.After(sl.StartAt) {
+				slots = append(slots, MeetingSlotInput{
+					StartAt: sl.StartAt,
+					EndAt:   sl.EndAt,
+				})
+			}
+		}
+
+		// Se a IA não forneceu slots explícitos, gera 3 opções nos próximos dias úteis
+		if len(slots) == 0 {
+			now := input.Now
+			loc := now.Location()
+			baseDate := now.Add(24 * time.Hour)
+			for d := 0; d < 3; d++ {
+				slotDate := baseDate.AddDate(0, 0, d)
+				hour := 10 + d*3
+				st := time.Date(slotDate.Year(), slotDate.Month(), slotDate.Day(), hour, 0, 0, 0, loc)
+				et := st.Add(time.Duration(dur) * time.Minute)
+				slots = append(slots, MeetingSlotInput{
+					StartAt: st,
+					EndAt:   et,
+				})
+			}
+		}
+
+		mDetails, err := s.meetingSvc.CreateMeeting(ctx, CreateMeetingRequest{
+			UserID:          userID,
+			Title:           intent.Meeting.Title,
+			Description:     intent.Meeting.Description,
+			DurationMinutes: dur,
+			Mode:            mode,
+			Slots:           slots,
+		})
+		if err != nil {
+			log.Printf("⚠️ [AssistantService] Erro ao criar reunião via chat: %v", err)
+			res.Message = fmt.Sprintf("Não consegui criar a reunião no momento (%v). Nada foi criado.", err)
+			res.Reply = res.Message
+		} else {
+			res.Meeting = mDetails
+			linkURL := mDetails.ShortURL
+			if linkURL == "" {
+				linkURL = mDetails.PublicURL
+			}
+			res.MeetingURL = mDetails.PublicURL
+			res.MeetingShort = mDetails.ShortURL
+
+			share, _ := s.meetingSvc.GenerateWhatsAppShare(ctx, userID, mDetails.ID)
+			if share != nil {
+				res.MeetingWhatsApp = share.WhatsAppDeepLink
+			}
+
+			if mode == domain.MeetingModeOneOnOne {
+				res.Message = fmt.Sprintf("Criei o link mágico para a reunião '%s' (%d min) com %d opções de horários:\n%s\n\nVocê pode copiar o link ou enviar direto pelo WhatsApp!", mDetails.Title, mDetails.DurationMinutes, len(mDetails.Slots), linkURL)
+			} else {
+				res.Message = fmt.Sprintf("Criei a votação de consenso em grupo para a reunião '%s' com %d horários disponíveis:\n%s", mDetails.Title, len(mDetails.Slots), linkURL)
+			}
+			res.Reply = res.Message
+		}
+
 	default:
 		if res.Message == "" {
 			res.Message = "Não entendi bem o pedido. Pode dizer de novo com mais detalhes? Ex: 'Criar evento Dentista amanhã às 14h', 'Criar tarefa Comprar café até sexta' ou 'Criar radar da PETR3 todo dia às 08:30'."

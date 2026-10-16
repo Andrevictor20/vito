@@ -29,18 +29,24 @@ func respondError(w http.ResponseWriter, err error) {
 		errors.Is(err, domain.ErrPendingItemNotFound),
 		errors.Is(err, domain.ErrTriggerNotFound),
 		errors.Is(err, domain.ErrChatSessionNotFound),
-		errors.Is(err, domain.ErrIntegrationNotFound):
+		errors.Is(err, domain.ErrIntegrationNotFound),
+		errors.Is(err, domain.ErrMeetingNotFound),
+		errors.Is(err, domain.ErrMeetingSlotNotFound):
 		w.WriteHeader(http.StatusNotFound)
 		_ = json.NewEncoder(w).Encode(apiError{Error: apiErrorBody{Code: "not_found", Message: err.Error()}})
 	case errors.Is(err, domain.ErrConflict),
 		errors.Is(err, domain.ErrScheduleConflict),
 		errors.Is(err, domain.ErrBookingTypeSlugExists),
-		errors.Is(err, domain.ErrUserAlreadyExists):
+		errors.Is(err, domain.ErrUserAlreadyExists),
+		errors.Is(err, domain.ErrMeetingAlreadyConfirmed),
+		errors.Is(err, domain.ErrParticipantAlreadyVoted):
 		w.WriteHeader(http.StatusConflict)
 		_ = json.NewEncoder(w).Encode(apiError{Error: apiErrorBody{Code: "conflict", Message: err.Error()}})
 	case errors.Is(err, domain.ErrValidation),
 		errors.Is(err, domain.ErrInvalidAutonomyMode),
-		errors.Is(err, domain.ErrHolidayReadOnly):
+		errors.Is(err, domain.ErrHolidayReadOnly),
+		errors.Is(err, domain.ErrMeetingExpired),
+		errors.Is(err, domain.ErrInvalidMeetingData):
 		w.WriteHeader(http.StatusUnprocessableEntity)
 		_ = json.NewEncoder(w).Encode(apiError{Error: apiErrorBody{Code: "validation", Message: err.Error()}})
 	default:
