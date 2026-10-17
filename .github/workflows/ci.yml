@@ -117,10 +117,23 @@ jobs:
           git fetch origin main
           git reset --hard origin/main
           docker compose pull backend
+          docker compose stop backend || true
+          docker compose run --rm --no-deps --user 0:0 --entrypoint sh backend -c "mkdir -p /app/data /app/data/backups /app/backups && chown -R 10001:10001 /app/data /app/backups && chmod 0700 /app/data /app/backups"
           docker compose up -d --force-recreate --remove-orphans backend
           docker image prune -f
 
       - name: Verify Backend Healthcheck
         run: |
-          sleep 5
-          wget -qO- http://localhost:8180/healthz
+          for i in $(seq 1 15); do
+            if wget -qO- http://localhost:8180/healthz; then
+              echo ""
+              echo "✅ Healthcheck OK on attempt $i"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "❌ Backend healthcheck failed after 30s. Container status & logs:"
+          docker ps -a
+          docker logs --tail 80 vito-backend || true
+          exit 1
+

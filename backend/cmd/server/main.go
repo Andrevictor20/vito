@@ -44,7 +44,7 @@ func main() {
 	if cfg.DBPath != ":memory:" && len(cfg.DataEncryptionKey) >= 16 {
 		backupDir := os.Getenv("BACKUP_DIR")
 		if backupDir == "" {
-			backupDir = "/app/backups"
+			backupDir = "/app/data/backups"
 			if cfg.Environment != "production" {
 				backupDir = "./backups"
 			}

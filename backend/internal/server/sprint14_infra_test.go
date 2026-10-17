@@ -73,3 +73,20 @@ func TestSprint14_DockerfileNonRootVitoUID10001(t *testing.T) {
 		t.Fatal("Dockerfile deve configurar permissões para /app/data")
 	}
 }
+
+func TestDeployWorkflow_FixesVolumeOwnershipForNonRootVitoAndRetriesHealthcheck(t *testing.T) {
+	ciPath := filepath.Join("..", "..", "..", ".github", "workflows", "ci.yml")
+	raw, err := os.ReadFile(ciPath)
+	if err != nil {
+		t.Fatalf("falha ao ler .github/workflows/ci.yml: %v", err)
+	}
+	content := string(raw)
+
+	if !strings.Contains(content, "chown -R 10001:10001 /app/data") {
+		t.Fatal("ci.yml deve corrigir a propriedade do volume /app/data para UID 10001:10001 antes de subir o container non-root no Pi")
+	}
+	if !strings.Contains(content, "docker logs") {
+		t.Fatal("ci.yml deve exibir docker logs do vito-backend caso o healthcheck falhe")
+	}
+}
+
