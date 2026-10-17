@@ -53,12 +53,18 @@ type BookingService struct {
 	publicBaseURL   string
 	sanitizer       *bluemonday.Policy
 	syncPusher      BookingSyncPusher
+	emailSvc        *EmailService
 	lockMu          sync.Mutex
 }
 
 // SetSyncPusher registra o propagador para sync total bidirecional com Google/Apple.
 func (s *BookingService) SetSyncPusher(pusher BookingSyncPusher) {
 	s.syncPusher = pusher
+}
+
+// SetEmailService injeta o serviço de e-mail SMTP para envio de confirmações e convites .ics.
+func (s *BookingService) SetEmailService(emailSvc *EmailService) {
+	s.emailSvc = emailSvc
 }
 
 // NewBookingService instancia o serviço de booking.
@@ -535,6 +541,15 @@ func (s *BookingService) ReserveAppointment(ctx context.Context, userIdentifier,
 		} else if sent == 0 {
 			log.Printf("[BookingService] Reserva '%s' sem dispositivos para notificar (user=%s)", appt.ID, bt.UserID)
 		}
+	}
+
+	// 7. Notificação por e-mail com anexo .ics para o convidado
+	if s.emailSvc != nil && s.emailSvc.IsConfigured() && strings.Contains(guestEmail, "@") {
+		go func(title, desc, toEmail, toName string, stAt, endAt time.Time) {
+			pctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			_ = s.emailSvc.SendMeetingConfirmation(pctx, toEmail, toName, title, desc, stAt, endAt, "")
+		}(bt.Title, eventDesc, guestEmail, guestName, req.StartAt, req.EndAt)
 	}
 
 	return appt, nil

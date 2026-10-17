@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"net/smtp"
 	"strings"
 	"sync"
 	"testing"
@@ -557,3 +558,54 @@ func TestBookingService_ReserveAppointment_SendsPushWithGuestNotes(t *testing.T)
 		}
 	}
 }
+
+type mockBookingEmailSender struct {
+	sentTo  []string
+	sentMsg []byte
+}
+
+func (m *mockBookingEmailSender) SendMail(addr string, a smtp.Auth, from string, to []string, msg []byte) error {
+	m.sentTo = to
+	m.sentMsg = msg
+	return nil
+}
+
+func TestBookingService_ReserveAppointment_SendsEmailNotification(t *testing.T) {
+	tc := setupBookingTest(t)
+	defer tc.db.Close()
+
+	mockSender := &mockBookingEmailSender{}
+	emailSvc := service.NewEmailService("smtp.gmail.com", 587, "vito@gmail.com", "pass123", "Vito <vito@gmail.com>", mockSender)
+	tc.bookingSvc.SetEmailService(emailSvc)
+
+	bt := &domain.BookingType{
+		ID: "bt-email-test", UserID: tc.user.ID, Slug: "consultoria", Title: "Consultoria Técnica",
+		DurationMinutes: 60, DaysOfWeek: "[1,2,3,4,5]", StartHour: "09:00", EndHour: "18:00", IsActive: true,
+	}
+	if err := tc.bookingRepo.CreateType(bt); err != nil {
+		t.Fatal(err)
+	}
+
+	startAt := time.Date(2026, 10, 22, 10, 0, 0, 0, time.UTC)
+	req := service.ReserveRequest{
+		GuestName:  "Juliana Mendes",
+		GuestEmail: "juliana@cliente.com",
+		StartAt:    startAt,
+		EndAt:      startAt.Add(time.Hour),
+	}
+
+	_, err := tc.bookingSvc.ReserveAppointment(context.Background(), tc.user.ID, bt.Slug, req, "127.0.0.1")
+	if err != nil {
+		t.Fatalf("ReserveAppointment falhou: %v", err)
+	}
+
+	time.Sleep(50 * time.Millisecond)
+
+	if len(mockSender.sentTo) != 1 || mockSender.sentTo[0] != "juliana@cliente.com" {
+		t.Fatalf("esperado e-mail para juliana@cliente.com, obteve %v", mockSender.sentTo)
+	}
+	if !strings.Contains(string(mockSender.sentMsg), "text/calendar") {
+		t.Errorf("e-mail deveria conter anexo de calendário .ics")
+	}
+}
+

@@ -508,6 +508,19 @@ func (s *MeetingService) SubmitVote(ctx context.Context, req SubmitVoteRequest) 
 			})
 		}
 
+		// Notificação por e-mail com .ics para o participante 1-on-1 se informou e-mail
+		if s.emailSvc != nil && s.emailSvc.IsConfigured() && strings.Contains(contact, "@") {
+			publicURL := m.ShortURL
+			if publicURL == "" {
+				publicURL = fmt.Sprintf("%s/meet/%s", s.publicBaseURL, m.ID)
+			}
+			go func(title, desc, pubURL, toEmail, toName string, stAt, endAt time.Time) {
+				pctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				defer cancel()
+				_ = s.emailSvc.SendMeetingConfirmation(pctx, toEmail, toName, title, desc, stAt, endAt, pubURL)
+			}(m.Title, eventDesc, publicURL, contact, name, slot.StartAt, slot.EndAt)
+		}
+
 		resp.MeetingStatus = domain.MeetingStatusConfirmed
 		resp.ConfirmedSlotID = &slot.ID
 		resp.ConfirmedSlotStart = &slot.StartAt
