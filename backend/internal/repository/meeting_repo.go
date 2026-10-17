@@ -4,8 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
 
 	"github.com/andrevmp/vito/backend/internal/domain"
 )
@@ -545,4 +548,128 @@ func (r *MeetingRepositorySQLite) ConfirmMeetingSlot(ctx context.Context, meetin
 		return domain.ErrMeetingNotFound
 	}
 	return nil
+}
+
+func (r *MeetingRepositorySQLite) FindParticipant(ctx context.Context, meetingID, participantID, contactInfo, name string) (*domain.MeetingParticipant, error) {
+	participantID = strings.TrimSpace(participantID)
+	contactInfo = strings.TrimSpace(contactInfo)
+	name = strings.TrimSpace(name)
+
+	var query string
+	var args []interface{}
+
+	if participantID != "" {
+		query = `
+			SELECT id, meeting_id, name, contact_info, vito_user_id, responded_at, created_at
+			FROM meeting_participants
+			WHERE meeting_id = ? AND id = ?
+			LIMIT 1
+		`
+		args = []interface{}{meetingID, participantID}
+	} else if contactInfo != "" {
+		query = `
+			SELECT id, meeting_id, name, contact_info, vito_user_id, responded_at, created_at
+			FROM meeting_participants
+			WHERE meeting_id = ? AND LOWER(TRIM(contact_info)) = LOWER(?)
+			LIMIT 1
+		`
+		args = []interface{}{meetingID, contactInfo}
+	} else if name != "" {
+		query = `
+			SELECT id, meeting_id, name, contact_info, vito_user_id, responded_at, created_at
+			FROM meeting_participants
+			WHERE meeting_id = ? AND LOWER(TRIM(name)) = LOWER(?)
+			LIMIT 1
+		`
+		args = []interface{}{meetingID, name}
+	} else {
+		return nil, nil
+	}
+
+	var p domain.MeetingParticipant
+	var respAt, crAt any
+	err := r.db.QueryRowContext(ctx, query, args...).Scan(
+		&p.ID, &p.MeetingID, &p.Name, &p.ContactInfo, &p.VitoUserID, &respAt, &crAt,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	p.RespondedAt = parseMeetingDBTime(respAt)
+	p.CreatedAt = parseMeetingDBTime(crAt)
+	return &p, nil
+}
+
+func (r *MeetingRepositorySQLite) ReplaceParticipantVotes(ctx context.Context, meetingID, participantID, name, contactInfo string, newSlotIDs []string) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	now := time.Now().UTC()
+
+	// 1. Atualiza dados do participante e data de resposta
+	updatePartQuery := `
+		UPDATE meeting_participants
+		SET name = ?, contact_info = ?, responded_at = ?
+		WHERE id = ? AND meeting_id = ?
+	`
+	if _, err := tx.ExecContext(ctx, updatePartQuery, name, contactInfo, now, participantID, meetingID); err != nil {
+		return fmt.Errorf("falha ao atualizar participante: %w", err)
+	}
+
+	// 2. Localiza os slots em que o participante havia votado anteriormente
+	oldSlotsQuery := `
+		SELECT slot_id FROM meeting_votes
+		WHERE participant_id = ? AND meeting_id = ?
+	`
+	rows, err := tx.QueryContext(ctx, oldSlotsQuery, participantID, meetingID)
+	if err != nil {
+		return fmt.Errorf("falha ao buscar votos anteriores: %w", err)
+	}
+	var oldSlotIDs []string
+	for rows.Next() {
+		var sID string
+		if err := rows.Scan(&sID); err == nil {
+			oldSlotIDs = append(oldSlotIDs, sID)
+		}
+	}
+	rows.Close()
+
+	// 3. Decrementa votes_count nos slots antigos
+	for _, oldID := range oldSlotIDs {
+		decQuery := `UPDATE meeting_slots SET votes_count = MAX(0, votes_count - 1) WHERE id = ?`
+		if _, err := tx.ExecContext(ctx, decQuery, oldID); err != nil {
+			return fmt.Errorf("falha ao decrementar slot antigo %s: %w", oldID, err)
+		}
+	}
+
+	// 4. Remove os votos antigos
+	delVotesQuery := `DELETE FROM meeting_votes WHERE participant_id = ? AND meeting_id = ?`
+	if _, err := tx.ExecContext(ctx, delVotesQuery, participantID, meetingID); err != nil {
+		return fmt.Errorf("falha ao limpar votos antigos: %w", err)
+	}
+
+	// 5. Insere os novos votos e incrementa os novos slots
+	for _, newSlotID := range newSlotIDs {
+		voteID := uuid.New().String()
+		insQuery := `
+			INSERT INTO meeting_votes (id, meeting_id, slot_id, participant_id, created_at)
+			VALUES (?, ?, ?, ?, ?)
+		`
+		if _, err := tx.ExecContext(ctx, insQuery, voteID, meetingID, newSlotID, participantID, now); err != nil {
+			return fmt.Errorf("falha ao inserir novo voto no slot %s: %w", newSlotID, err)
+		}
+
+		incQuery := `UPDATE meeting_slots SET votes_count = votes_count + 1 WHERE id = ?`
+		if _, err := tx.ExecContext(ctx, incQuery, newSlotID); err != nil {
+			return fmt.Errorf("falha ao incrementar novo slot %s: %w", newSlotID, err)
+		}
+	}
+
+	return tx.Commit()
 }

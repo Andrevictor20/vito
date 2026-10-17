@@ -333,21 +333,25 @@ const TriggersTabScreen: React.FC = () => {
 };
 
 const BookingTabScreen: React.FC = () => {
+  const [inSubView, setInSubView] = useState(false);
   const [createRequestId, setCreateRequestId] = useState(0);
   return (
     <View style={styles.tabRoot}>
       <Header
         activeTab="booking"
         align="left"
+        hideTitle={inSubView}
         contextualActions={
-          <HeaderPill
-            label="Novo Link"
-            onPress={() => setCreateRequestId((n) => n + 1)}
-            accessibilityLabel="Criar novo link de agendamento"
-          />
+          inSubView ? undefined : (
+            <HeaderPill
+              label="Novo Link"
+              onPress={() => setCreateRequestId((n) => n + 1)}
+              accessibilityLabel="Criar novo link de agendamento"
+            />
+          )
         }
       />
-      <BookingScreen createRequestId={createRequestId} />
+      <BookingScreen onSubViewChange={setInSubView} createRequestId={createRequestId} />
     </View>
   );
 };

@@ -6,20 +6,21 @@ import {
   TouchableOpacity,
   Share,
   Linking,
-  ActivityIndicator,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { MD3Shapes, tabularNumbers } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { Meeting, MeetingSlot } from '../../types';
 import { meetingDisplayLink } from '../../utils/chatCards';
-import { formatSlotBRTDisplay, computeSlotVotePercentage } from '../../utils/meetingPollUtils';
+import { formatSlotBRTDisplay, getLeadingSlot } from '../../utils/meetingPollUtils';
+import { hapticFeedback } from '../../theme/motion';
 
 interface MeetingCardProps {
   meeting: Meeting;
   isCopied: boolean;
   onCopyLink: (m: Meeting) => void;
   onEdit?: (m: Meeting) => void;
+  onOpenDetail?: (m: Meeting) => void;
   onConfirmSlot?: (meetingId: string, slotId: string) => void;
   onDelete: (id: string) => void;
   confirmingSlotId?: string | null;
@@ -30,15 +31,24 @@ export const MeetingCard: React.FC<MeetingCardProps> = ({
   isCopied,
   onCopyLink,
   onEdit,
-  onConfirmSlot,
+  onOpenDetail,
   onDelete,
-  confirmingSlotId,
 }) => {
   const { colors } = useTheme();
   const link = meetingDisplayLink(meeting as any);
   const isConfirmed = meeting.status === 'confirmed';
   const slots: MeetingSlot[] = Array.isArray(meeting.slots) ? meeting.slots : [];
   const participants = Array.isArray(meeting.participants) ? meeting.participants : [];
+  const totalParticipants = participants.length;
+  const leading = getLeadingSlot(slots, totalParticipants);
+
+  // Slot confirmado (se houver)
+  const confirmedSlot = isConfirmed
+    ? slots.find((s) => s.id === meeting.confirmed_slot_id)
+    : undefined;
+  const confirmedFormatted = confirmedSlot
+    ? formatSlotBRTDisplay(confirmedSlot.start_at, confirmedSlot.end_at)
+    : undefined;
 
   const handleWhatsApp = () => {
     if (!link) return;
@@ -58,6 +68,11 @@ export const MeetingCard: React.FC<MeetingCardProps> = ({
     } catch {}
   };
 
+  const handlePressDetail = () => {
+    hapticFeedback.light();
+    onOpenDetail?.(meeting);
+  };
+
   return (
     <View
       style={[
@@ -68,6 +83,7 @@ export const MeetingCard: React.FC<MeetingCardProps> = ({
         },
       ]}
     >
+      {/* Cabeçalho do Card */}
       <View style={styles.cardHeader}>
         <View style={styles.cardTitleBlock}>
           <Text style={[styles.cardTitle, { color: colors.onSurface }]}>
@@ -105,8 +121,8 @@ export const MeetingCard: React.FC<MeetingCardProps> = ({
           >
             {isConfirmed
               ? 'Confirmada'
-              : participants.length > 0
-                ? `${participants.length} ${participants.length === 1 ? 'voto' : 'votos'}`
+              : totalParticipants > 0
+                ? `${totalParticipants} ${totalParticipants === 1 ? 'voto' : 'votos'}`
                 : 'Aberta'}
           </Text>
         </View>
@@ -118,220 +134,134 @@ export const MeetingCard: React.FC<MeetingCardProps> = ({
         </Text>
       ) : null}
 
-      {slots.length > 0 && (
-        <View style={styles.slotsSection}>
-          <View style={[styles.pollSummaryBar, { backgroundColor: colors.surfaceContainerHigh, borderColor: colors.outlineVariant }]}>
-            <View style={styles.pollSummaryLeft}>
-              <MaterialIcons name="poll" size={16} color={colors.primary} />
-              <Text style={[styles.pollSummaryTitle, { color: colors.onSurface }]}>
-                {isConfirmed ? 'Resultado Final' : 'Placar da Votação'}
-              </Text>
-              <Text style={[styles.pollSummaryCount, { color: colors.onSurfaceVariant }, tabularNumbers]}>
-                • {participants.length} {participants.length === 1 ? 'participante' : 'participantes'}
-              </Text>
-            </View>
+      {/* Card Resumido da Votação (Clicável para ir à página dedicada) */}
+      <TouchableOpacity
+        style={[
+          styles.summaryPollBox,
+          {
+            backgroundColor: colors.surfaceContainerHigh,
+            borderColor: isConfirmed ? 'rgba(46, 125, 50, 0.4)' : colors.outlineVariant,
+          },
+        ]}
+        onPress={handlePressDetail}
+        activeOpacity={0.75}
+        accessibilityLabel="Ver detalhes completos da votação"
+      >
+        <View style={styles.summaryTopRow}>
+          <View style={styles.summaryTitleRow}>
+            <MaterialIcons name="poll" size={16} color={colors.primary} />
+            <Text style={[styles.summaryPollTitle, { color: colors.onSurface }]}>
+              {isConfirmed ? 'Resultado da Votação' : 'Placar da Votação'}
+            </Text>
+            <Text style={[styles.summaryPollSubtitle, { color: colors.onSurfaceVariant }, tabularNumbers]}>
+              • {totalParticipants} {totalParticipants === 1 ? 'participante' : 'participantes'}
+            </Text>
+          </View>
+
+          <View
+            style={[
+              styles.liveBadge,
+              {
+                backgroundColor: isConfirmed ? 'rgba(46, 125, 50, 0.14)' : 'rgba(52, 211, 153, 0.12)',
+              },
+            ]}
+          >
             <View
               style={[
-                styles.pollLiveBadge,
-                {
-                  backgroundColor: isConfirmed ? 'rgba(46, 125, 50, 0.14)' : 'rgba(52, 211, 153, 0.12)',
-                  borderColor: isConfirmed ? '#2e7d32' : colors.primary,
-                },
+                styles.liveDot,
+                { backgroundColor: isConfirmed ? '#2e7d32' : colors.primary },
+              ]}
+            />
+            <Text
+              style={[
+                styles.liveText,
+                { color: isConfirmed ? '#2e7d32' : colors.onSurface },
               ]}
             >
-              <View
-                style={[
-                  styles.pollLiveDot,
-                  { backgroundColor: isConfirmed ? '#2e7d32' : colors.primary },
-                ]}
-              />
-              <Text
-                style={[
-                  styles.pollLiveText,
-                  { color: isConfirmed ? '#2e7d32' : colors.onSurface },
-                ]}
-              >
-                {isConfirmed ? 'Definitivo' : 'Ao vivo'}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.slotsList}>
-            {slots.map((slot) => {
-              const formatted = formatSlotBRTDisplay(slot.start_at, slot.end_at);
-              const isSlotConfirmed = meeting.confirmed_slot_id === slot.id;
-              const voters = Array.isArray(slot.voter_names) ? slot.voter_names : [];
-              const votesCount = Math.max(slot.votes_count || 0, voters.length);
-              const isWinner = Boolean(slot.is_winner && votesCount > 0);
-              const isConfirmingThis = confirmingSlotId === slot.id;
-              const totalParticipants = participants.length;
-              const percentage = computeSlotVotePercentage(votesCount, totalParticipants);
-
-              return (
-                <View
-                  key={slot.id}
-                  style={[
-                    styles.slotRow,
-                    {
-                      backgroundColor: isSlotConfirmed
-                        ? 'rgba(46, 125, 50, 0.10)'
-                        : colors.surfaceContainerHigh,
-                      borderColor: isSlotConfirmed
-                        ? '#2e7d32'
-                        : isWinner
-                          ? colors.primary
-                          : colors.outlineVariant,
-                    },
-                  ]}
-                >
-                  {/* Barra de progresso visual de votos */}
-                  <View style={[styles.progressBarTrack, { backgroundColor: colors.surfaceContainerHighest }]}>
-                    <View
-                      style={[
-                        styles.progressBarFill,
-                        {
-                          width: `${percentage}%`,
-                          backgroundColor: isSlotConfirmed
-                            ? '#2e7d32'
-                            : isWinner
-                              ? colors.primary
-                              : colors.onSurfaceVariant,
-                        },
-                      ]}
-                    />
-                  </View>
-
-                  <View style={styles.slotTopLine}>
-                    <View style={styles.slotTimeBlock}>
-                      <MaterialIcons
-                        name={isSlotConfirmed ? 'check-circle' : isWinner ? 'star' : 'event'}
-                        size={15}
-                        color={isSlotConfirmed ? '#2e7d32' : colors.primary}
-                      />
-                      <Text style={[styles.slotDateText, { color: colors.onSurface }, tabularNumbers]}>
-                        {formatted.dateLabel}
-                      </Text>
-                      <Text style={[styles.slotTimeText, { color: colors.onSurface }, tabularNumbers]}>
-                        {formatted.timeRange}
-                      </Text>
-                      {isWinner && !isSlotConfirmed && (
-                        <View style={[styles.winnerPill, { backgroundColor: colors.surfaceContainerHighest }]}>
-                          <Text style={[styles.winnerPillText, { color: colors.primary }]}>
-                            ★ Liderando
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-
-                    <View style={styles.slotRightBlock}>
-                      <View
-                        style={[
-                          styles.voteCountBadge,
-                          {
-                            backgroundColor:
-                              votesCount > 0 ? colors.primary : colors.surface,
-                          },
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.voteCountText,
-                            {
-                              color:
-                                votesCount > 0 ? colors.onPrimary : colors.onSurfaceVariant,
-                            },
-                            tabularNumbers,
-                          ]}
-                        >
-                          {votesCount} {votesCount === 1 ? 'voto' : 'votos'} ({percentage}%)
-                        </Text>
-                      </View>
-
-                      {!isConfirmed && onConfirmSlot && (
-                        <TouchableOpacity
-                          style={[
-                            styles.confirmSlotBtn,
-                            {
-                              backgroundColor: isWinner ? colors.primary : colors.surface,
-                              borderColor: colors.outlineVariant,
-                            },
-                          ]}
-                          onPress={() => onConfirmSlot(meeting.id, slot.id)}
-                          disabled={Boolean(confirmingSlotId)}
-                          activeOpacity={0.75}
-                        >
-                          {isConfirmingThis ? (
-                            <ActivityIndicator size="small" color={isWinner ? colors.onPrimary : colors.onSurface} />
-                          ) : (
-                            <>
-                              <MaterialIcons
-                                name="check"
-                                size={13}
-                                color={isWinner ? colors.onPrimary : colors.onSurface}
-                              />
-                              <Text
-                                style={[
-                                  styles.confirmSlotBtnText,
-                                  { color: isWinner ? colors.onPrimary : colors.onSurface },
-                                ]}
-                              >
-                                Fechar
-                              </Text>
-                            </>
-                          )}
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                  </View>
-
-                  {voters.length > 0 && (
-                    <View style={styles.votersChipsRow}>
-                      <Text style={[styles.votersPrefix, { color: colors.onSurfaceVariant }]}>
-                        Votaram:
-                      </Text>
-                      {voters.map((voterName, i) => (
-                        <View
-                          key={`${slot.id}-voter-${i}`}
-                          style={[
-                            styles.voterChip,
-                            {
-                              backgroundColor: colors.surface,
-                              borderColor: colors.outlineVariant,
-                            },
-                          ]}
-                        >
-                          <MaterialIcons name="person" size={11} color={colors.onSurfaceVariant} />
-                          <Text style={[styles.voterChipText, { color: colors.onSurface }]}>
-                            {voterName}
-                          </Text>
-                        </View>
-                      ))}
-                    </View>
-                  )}
-                </View>
-              );
-            })}
+              {isConfirmed ? 'Definitivo' : 'Ao vivo'}
+            </Text>
           </View>
         </View>
-      )}
 
-      {link ? (
-        <View style={[styles.urlContainer, { backgroundColor: colors.surfaceVariant }]}>
-          <MaterialIcons name="how-to-vote" size={14} color={colors.primary} />
-          <Text style={[styles.urlText, { color: colors.onSurfaceVariant }]} numberOfLines={1}>
-            {link.replace(/^https?:\/\//, '')}
+        {/* Linha do Resultado / Liderança */}
+        {isConfirmed && confirmedFormatted ? (
+          <View style={styles.leadingSlotRow}>
+            <MaterialIcons name="check-circle" size={15} color="#2e7d32" />
+            <Text style={[styles.leadingSlotText, { color: '#2e7d32' }]} numberOfLines={1}>
+              Confirmada para: <Text style={{ fontWeight: '700' }}>{confirmedFormatted.dateLabel} às {confirmedFormatted.timeRange}</Text>
+            </Text>
+          </View>
+        ) : leading.votesCount > 0 && leading.formatted ? (
+          <View style={styles.leadingSlotRow}>
+            <MaterialIcons name="star" size={15} color={colors.primary} />
+            <Text style={[styles.leadingSlotText, { color: colors.onSurface }]} numberOfLines={1}>
+              Liderando: <Text style={{ fontWeight: '700' }}>{leading.formatted.dateLabel} às {leading.formatted.timeRange}</Text> ({leading.votesCount} {leading.votesCount === 1 ? 'voto' : 'votos'} • {leading.percentage}%)
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.leadingSlotRow}>
+            <MaterialIcons name="schedule" size={14} color={colors.textSecondary} />
+            <Text style={[styles.emptySlotText, { color: colors.textSecondary }]}>
+              Aguardando votos • {slots.length} {slots.length === 1 ? 'horário proposto' : 'horários propostos'}
+            </Text>
+          </View>
+        )}
+
+        {/* Rodapé do Bloco de Votação com Chamada para Detalhes */}
+        <View style={styles.viewDetailLinkRow}>
+          <Text style={[styles.viewDetailText, { color: colors.primary }]}>
+            Ver Detalhes da Votação
           </Text>
+          <MaterialIcons name="chevron-right" size={18} color={colors.primary} />
         </View>
-      ) : null}
+      </TouchableOpacity>
 
+      {/* Barra de Ações Rápidas */}
       <View style={styles.cardActionsRow}>
+        <TouchableOpacity
+          style={[styles.primaryActionBtn, { backgroundColor: colors.primary }]}
+          onPress={handlePressDetail}
+          activeOpacity={0.8}
+        >
+          <MaterialIcons name="how-to-vote" size={15} color={colors.onPrimary} />
+          <Text style={[styles.primaryActionText, { color: colors.onPrimary }]}>
+            Ver Votação
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.copyButton,
+            {
+              backgroundColor: isCopied ? '#2e7d32' : colors.surfaceContainerHigh,
+              borderColor: colors.outlineVariant,
+            },
+          ]}
+          onPress={() => onCopyLink(meeting)}
+          activeOpacity={0.8}
+        >
+          <MaterialIcons
+            name={isCopied ? 'check' : 'content-copy'}
+            size={14}
+            color={isCopied ? '#FFFFFF' : colors.onSurface}
+          />
+          <Text
+            style={[
+              styles.copyButtonText,
+              { color: isCopied ? '#FFFFFF' : colors.onSurface },
+            ]}
+          >
+            {isCopied ? 'Copiado' : 'Link'}
+          </Text>
+        </TouchableOpacity>
+
         <TouchableOpacity
           style={[styles.iconButton, { borderColor: colors.outlineVariant }]}
           onPress={handleWhatsApp}
           activeOpacity={0.7}
           accessibilityLabel="Enviar no WhatsApp"
         >
-          <MaterialIcons name="chat-bubble-outline" size={16} color={colors.onSurface} />
+          <MaterialIcons name="chat-bubble-outline" size={15} color={colors.onSurface} />
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -340,42 +270,17 @@ export const MeetingCard: React.FC<MeetingCardProps> = ({
           activeOpacity={0.7}
           accessibilityLabel="Compartilhar link"
         >
-          <MaterialIcons name="share" size={16} color={colors.onSurface} />
+          <MaterialIcons name="share" size={15} color={colors.onSurface} />
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[
-            styles.copyButton,
-            { backgroundColor: isCopied ? '#2e7d32' : colors.primary },
-          ]}
-          onPress={() => onCopyLink(meeting)}
-          activeOpacity={0.8}
-        >
-          <MaterialIcons
-            name={isCopied ? 'check' : 'content-copy'}
-            size={15}
-            color={isCopied ? '#FFFFFF' : colors.onPrimary}
-          />
-          <Text
-            style={[
-              styles.copyButtonText,
-              { color: isCopied ? '#FFFFFF' : colors.onPrimary },
-            ]}
-          >
-            {isCopied ? 'Copiado!' : 'Copiar Link'}
-          </Text>
-        </TouchableOpacity>
-
-        {onEdit && (
+        {onEdit && !isConfirmed && (
           <TouchableOpacity
-            style={[styles.editButton, { borderColor: colors.outlineVariant }]}
+            style={[styles.iconButton, { borderColor: colors.outlineVariant }]}
             onPress={() => onEdit(meeting)}
             activeOpacity={0.7}
+            accessibilityLabel="Editar reunião"
           >
             <MaterialIcons name="edit" size={15} color={colors.onSurface} />
-            <Text style={[styles.editButtonText, { color: colors.onSurface }]}>
-              Editar
-            </Text>
           </TouchableOpacity>
         )}
 
@@ -385,7 +290,7 @@ export const MeetingCard: React.FC<MeetingCardProps> = ({
           activeOpacity={0.7}
           accessibilityLabel="Excluir reunião"
         >
-          <MaterialIcons name="delete-outline" size={18} color={colors.error} />
+          <MaterialIcons name="delete-outline" size={16} color={colors.error} />
         </TouchableOpacity>
       </View>
     </View>
@@ -394,11 +299,11 @@ export const MeetingCard: React.FC<MeetingCardProps> = ({
 
 const styles = StyleSheet.create({
   card: {
-    padding: 16,
+    padding: 14,
     borderRadius: MD3Shapes.large,
     borderWidth: 1,
-    gap: 12,
-    marginBottom: 12,
+    gap: 10,
+    marginBottom: 10,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -415,8 +320,8 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     fontSize: 16,
-    fontWeight: '700',
-    letterSpacing: -0.2,
+    fontWeight: '800',
+    lineHeight: 22,
   },
   durationPill: {
     flexDirection: 'row',
@@ -424,19 +329,19 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 8,
+    borderRadius: MD3Shapes.large,
   },
   durationPillText: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   statusPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 9,
+    paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 99,
+    borderRadius: MD3Shapes.large,
   },
   statusDot: {
     width: 6,
@@ -451,215 +356,107 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
   },
-  slotsSection: {
-    gap: 6,
+  summaryPollBox: {
+    padding: 12,
+    borderRadius: MD3Shapes.large,
+    borderWidth: 1,
+    gap: 8,
   },
-  pollSummaryBar: {
+  summaryTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
-    borderWidth: 1,
-    marginBottom: 4,
   },
-  pollSummaryLeft: {
+  summaryTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    flex: 1,
   },
-  pollSummaryTitle: {
-    fontSize: 12,
+  summaryPollTitle: {
+    fontSize: 13,
     fontWeight: '700',
   },
-  pollSummaryCount: {
-    fontSize: 11,
-    fontWeight: '600',
+  summaryPollSubtitle: {
+    fontSize: 12,
+    fontWeight: '500',
   },
-  pollLiveBadge: {
+  liveBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    paddingHorizontal: 8,
+    paddingHorizontal: 7,
     paddingVertical: 2,
-    borderRadius: 99,
-    borderWidth: 1,
+    borderRadius: MD3Shapes.large,
   },
-  pollLiveDot: {
-    width: 6,
-    height: 6,
+  liveDot: {
+    width: 5,
+    height: 5,
     borderRadius: 3,
   },
-  pollLiveText: {
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  sectionLabel: {
+  liveText: {
     fontSize: 11,
     fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
   },
-  slotsList: {
-    gap: 8,
-  },
-  slotRow: {
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 1,
+  leadingSlotRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 6,
-    overflow: 'hidden',
   },
-  progressBarTrack: {
-    height: 3,
-    borderRadius: 2,
-    overflow: 'hidden',
-    width: '100%',
-    marginBottom: 2,
+  leadingSlotText: {
+    fontSize: 12,
+    flex: 1,
   },
-  progressBarFill: {
-    height: '100%',
-    borderRadius: 2,
+  emptySlotText: {
+    fontSize: 12,
   },
-  slotTopLine: {
+  viewDetailLinkRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 8,
+    paddingTop: 4,
+    borderTopWidth: 0.5,
+    borderTopColor: 'rgba(150, 150, 150, 0.15)',
   },
-  slotTimeBlock: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    flex: 1,
-    flexWrap: 'wrap',
-  },
-  slotDateText: {
+  viewDetailText: {
     fontSize: 12,
-    fontWeight: '600',
-  },
-  slotTimeText: {
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  slotRightBlock: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  voteCountBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 99,
-  },
-  voteCountText: {
-    fontSize: 11,
     fontWeight: '700',
-  },
-  confirmSlotBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  confirmSlotBtnText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  winnerPill: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  winnerPillText: {
-    fontSize: 10,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-  },
-  votersChipsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    gap: 6,
-    paddingLeft: 21,
-  },
-  votersPrefix: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  voterChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 6,
-    borderWidth: 1,
-  },
-  voterChipText: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  urlContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  urlText: {
-    fontSize: 12,
-    fontWeight: '600',
-    flex: 1,
   },
   cardActionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginTop: 2,
+    gap: 6,
   },
-  iconButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    borderWidth: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  copyButton: {
-    flex: 1,
-    height: 36,
+  primaryActionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    borderRadius: 10,
-    paddingHorizontal: 10,
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: MD3Shapes.large,
   },
-  copyButtonText: {
-    fontSize: 13,
+  primaryActionText: {
+    fontSize: 12,
     fontWeight: '700',
   },
-  editButton: {
-    height: 36,
+  copyButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     gap: 4,
-    borderRadius: 10,
-    borderWidth: 1,
     paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: MD3Shapes.large,
+    borderWidth: 1,
   },
-  editButtonText: {
+  copyButtonText: {
     fontSize: 12,
     fontWeight: '600',
   },
+  iconButton: {
+    width: 34,
+    height: 34,
+    borderRadius: MD3Shapes.large,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });
-

@@ -242,8 +242,11 @@ func main() {
 	astSvc.SetBookingService(bookingSvc)
 	bookingHandler := handler.NewBookingHandler(bookingSvc)
 
+	emailSvc := service.NewEmailService(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUser, cfg.SMTPPassword, cfg.SMTPFrom)
+
 	meetingSvc := service.NewMeetingService(meetingRepo, eventRepo, notifSvc, linkShortener, cfg.PublicBaseURL)
 	meetingSvc.SetSyncPusher(syncSvc)
+	meetingSvc.SetEmailService(emailSvc)
 	astSvc.SetMeetingService(meetingSvc)
 	meetingHandler := handler.NewMeetingHandler(meetingSvc)
 

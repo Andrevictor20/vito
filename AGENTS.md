@@ -1,70 +1,58 @@
-# Regras Globais do Antigravity — XP Multi-Agent Kit v2
+# Global Agent Governance — XP Multi-Agent Kit v3.0 (Agnostic Core)
 
-Disciplinas inegociáveis em núcleo enxuto: o detalhamento vive em `.agents/policies/` (sob demanda) e os valores numéricos apenas em `scripts/kit_constants.py`.
+Core non-negotiable engineering disciplines for **Antigravity, OpenCode, Cursor, Codex, and Qoder (IDE & CLI)**. Detailed rules and numeric constants live on-demand in `.agents/policies/` (limits in `token-economy.md`, skills catalog in `.agents/skills/SKILLS_INDEX.md`).
+
+> **🌐 MANDATORY LANGUAGE RULE (PT-BR OUTPUT):** Internal prompts, skills, workflows, and policies are written in concise English to maximize LLM reasoning accuracy and reduce token consumption. **However, ALL user-facing responses, explanations, architectural plans, and chat outputs MUST be written in Portuguese (Português)** unless the user explicitly asks for another language.
 
 ---
 
-## 1. Regra de Ouro & Roteamento por Risco
+## 1. Golden Rule & Risk Routing
 
-**Use SEMPRE o menor número de agentes, skills, etapas e turnos capaz de produzir uma alteração correta, testada, segura, acessível, observável e sustentável.**
+**ALWAYS use the minimum number of agents, skills, steps, and turns required to produce a correct, tested, secure, accessible, observable, and maintainable change.**
 
-Infira o risco automaticamente (zero-prompt) e declare risco + workflow na primeira linha de toda resposta.
+Infer risk automatically (zero-prompt) and declare `Risco + Workflow` on the first line of every response.
 
-| Risco | Escopo | Fluxo | Agentes |
-|-------|--------|-------|---------|
-| **L0** | typo, docs, CSS menor | validação estática → arquivar. **Testes de código dispensados** | `builder` → `archivist` |
-| **L1** | ajuste/refatoração isolada | AC informais → RED → GREEN → conformidade resumida | `navigator` → `builder` → `archivist` → `release-gatekeeper` |
-| **L2** | feature/API | Pirâmide de Especificação + **⏸️ Stop Gate humano** → RED → GREEN → Conformance Report | pirâmide completa |
-| **L3** | auth, pagamentos, migração | Threat Modeling (STRIDE) + Stop Gate + TDD/segurança + Zero-Downtime Plan | pirâmide + `sentinel` + `shipper` |
-| **Design/UI** | telas, componentes, UX | Token Discovery → 6 Estados → Ergonomia Mobile → Polish Gate (`/design`) | `designer` → `builder` → `archivist` |
-| **Bugfix** | falha reproduzível | debugging sistemático → regressão RED → causa raiz → GREEN → `lesson-learned` | — |
-| **Incident/Release** | produção | mitigação + rollback, ou CI gate + Canary/Blue-Green | `shipper` |
+| Risk | Scope | Flow | Agents |
+|------|-------|------|--------|
+| **L0** | typo, docs, minor CSS | static check → archive. **Code tests waived** | `builder` → `archivist` |
+| **L1** | isolated fix/refactor | informal ACs → RED → GREEN → 1-line conformance | `navigator` → `builder` → `archivist` → `release-gatekeeper` |
+| **L2** | feature/API | Spec Pyramid + **⏸️ Human Stop Gate** → RED → GREEN → Conformance Report | full pyramid |
+| **L3** | auth, payments, migration | Threat Model (STRIDE) + Stop Gate + TDD/Security + Zero-Downtime Plan | pyramid + `sentinel` + `shipper` |
+| **Design/UI** | screens, components, UX | Token Discovery → 6-State Blueprint → Mobile Ergonomics → Polish Gate (`/design`) | `designer` → `builder` → `archivist` |
+| **Bugfix** | reproducible failure | systematic debugging → RED regression → root cause → GREEN → `lesson-learned` | — |
+| **Incident/Release** | production | mitigation + rollback, or CI gate + Canary/Blue-Green | `shipper` |
 
-Workflows completos em `.agents/workflows/` (incluindo `design.md`).
+**Reasoning Effort:** L0/L1 direct & concise (`agy-effort low`); L2/L3 drafts spec plan, emits **⏸️ Stop Gate** requesting `high` effort, and pauses until human confirmation.
 
-**Esforço de raciocínio:** L0/L1 direto e conciso (CLI: `agy-effort low`); L2/L3 elabora o plano, emite **Stop Gate** pedindo elevação para `high` e pausa até confirmação. Código no Flash (effort por risco); Pro reservado a planos arquiteturais e STRIDE.
+## 2. Specification, TDD & Anti-Test-Bypass
 
-## 2. Especificação, TDD & Anti-Test-Bypass
+**Contract Separation:** Human defines *WHAT* (AC → SbE → Gherkin), AI implements *HOW* (tests → code → refactor). `agy-conformance --spec ... --tests ...` derives the AC → test → status matrix; untested AC or failing test = `NON-COMPLIANT` = delivery **BLOCKED**.
 
-**Separação de contrato:** humano define *o quê* (AC → SbE → Gherkin), IA implementa *como* (testes → código → refatoração). `agy-conformance --spec ... --tests ...` deriva a matriz AC → teste → status; AC sem teste ou teste em falha = `NON-COMPLIANT` = entrega **bloqueada**.
+- **Anti-Self-Test:** Never define ACs and tests in L2/L3 without intermediate human Stop Gate approval.
+- **Strict TDD (`RED → GREEN → REFACTOR`):** No production code without a failing test first.
+- **Zero Tolerance:** Zero blind mocks (only 3rd-party I/O), zero empty assertions, zero `.skip`, **never delete/comment failing tests** (fix root cause), always assert concrete values.
+- **Surgical Execution:** Run only affected module tests (`python3 -m unittest tests/test_<mod>.py`). Full suite reserved for final L3 gate; L0 exempt. Details: `.agents/policies/{atdd-bdd-tdd,tdd,evidence}.md`.
 
-Pirâmide obrigatória em L2/L3 com **⏸️ Stop Gate** humano antes de qualquer código. **Regra Anti-Self-Test:** a IA nunca define critérios e testes sem aprovação humana intermediária. Ciclo TDD estrito RED → GREEN → REFACTOR: nenhum código de produção sem teste prévio falhando.
+## 3. Autonomous Self-Correction & Pre-Response Self-Audit
 
-Tolerância zero: **zero mocks cegos** (só I/O de terceiros), **zero asserções vazias**, **zero skips**, **proibido deletar/comentar testes** (corrigir a causa raiz), **asserção de valor**.
+When a tool fails (`exit_code != 0`, traceback, test/lint error) or `[SELF-HEAL TRIGGER]` fires, **never stop or hand back a broken state**: isolate the root cause, fix the code, and re-verify automatically.
 
-**Execução cirúrgica:** testes só com mudança em código executável e no módulo afetado (`python3 -m unittest tests/test_<modulo>.py`). Suíte completa só no gate L3; L0 isento. Detalhes: `.agents/policies/{atdd-bdd-tdd,tdd,evidence}.md`.
+Before emitting any final response for code tasks, execute the **3-Point Pre-Response Self-Audit**:
+1. **Goal Check:** Were 100% of the user's requested items addressed? If anything was missed, complete it now.
+2. **Green Check:** Were any files edited after the last test run (`dirty_code_untested`)? If yes, run the module test now.
+3. **Memory Check:** Was `.agents/memory/PROJECT_MEMORY.md` updated on disk?
 
-## 3. Evidência & Segurança
+## 4. Token Economy & Mechanical Discipline
 
-Afirmações verbais são rejeitadas: execute o comando real e observe o output. O log completo fica em `.agents/runtime/evidence/`; o `walkthrough.md` recebe só a tabela resumo (`agy-evidence run` / `render`), nunca o output bruto.
+**Cost Model:** `cost ≈ Σ_turns(base_context + history) + Σ tool_outputs`. Reducing turns beats shrinking outputs.
 
-SSDLC e Zero Trust: STRIDE para auth/pagamentos/privacidade, governança de segredos, hardening non-root, OIDC/Cosign; vulnerabilidade alta bloqueia release. CI Auto-Healer: máx. **3 iterações** ([L-003]). Deploy Blue/Green ou Canary + telemetria RED + rollback. Detalhes: `.agents/policies/{security,release}.md`.
+- **Turn Budget:** L0 ≤ 3 · L1 ≤ 8 · L2 ≤ 20 · L3 checkpointed. **Mandatory Batching:** Turn 1 groups `PROJECT_MEMORY.md` + target file reads in parallel.
+- **Anti-Tool-Spam:** Never poll `manage_task(status)` (wait for reactive wakeup). Never re-read a file immediately after `replace_file_content`.
+- **File Reading:** Files ≤ 800 lines → read whole in 1 call; > 800 lines → locate symbol via grep/AST graph (`code-review-graph`) and read exact section.
+- **Commands:** Use `agy-run` / `xp-run` where native hooks are absent. Compact Git/CI only (`git status -s`, `git diff --stat`).
+- **Telemetry Footer:** **MANDATORY compact 4-line footer at the end of EVERY response** (`Contexto`, `Limites`, `Consumo`, `Modelo` via `agy-tokens --turn`). Pre-Flight Gate alerts at >70% context or >80% quota.
 
-## 4. Economia de Tokens (disciplina central)
+## 5. Continuous Memory (4 Tiers) & Code Quality
 
-**Modelo de custo:** `custo ≈ Σ_turnos(contexto + histórico) + Σ saídas`. Reduzir turnos e contexto base vale mais do que encolher saídas.
-
-- **Orçamento de turnos:** L0 ≤ 3 · L1 ≤ 8 · L2 ≤ 20 · L3 com checkpoint. **Batching obrigatório.** Turno 1: agrupar leitura de memória + arquivos alvo.
-- **Anti-Tool-Spam:** Proibido polling com `manage_task(status)` (aguarde notificação reativa). Proibido reler arquivo imediatamente após edição (`replace_file_content`).
-- **Leitura:** arquivo ≤ 800 linhas → inteiro em 1 chamada; acima → localizar símbolo e pedir intervalo exato.
-- **Comandos:** `agy-run` (ou `agy-sanitize`) remove ruído e registra telemetria. `WaitMsBeforeAsync: 8000` em testes assíncronos. Git/CI só compacto.
-- **L0 conceitual:** zero ferramenta, resposta direta.
-- **Navegação:** `REPO_MAP.md` + grep antes de ler. Proibido `write_to_file` acima de `WRITE_TO_FILE_MAX_LINES`.
-- **Telemetria:** 3 camadas (turno · reenvio · cota). **Rodapé canônico OBRIGATÓRIO no final de TODA resposta** (`agy-tokens --turn`). Pre-Flight: > 70% contexto ou > 80% cota → alertar.
-- **Auto-compact:** checkpoint periódico (`scripts/kit_constants.py`).
-
-Detalhes: `.agents/policies/token-economy.md`.
-
-## 5. Memória Contínua (4 Tiers) & Handoff
-
-**Hard-Enforcement Gate:** proibido encerrar tarefa sem gravar `.agents/memory/PROJECT_MEMORY.md`. **Passo 0:** ler esse arquivo (< 2k tokens). Tiers: *Working* · *Episodic* · *Semantic* (ADRs) · *Procedural* (`[L-NNN]`). Handoff Packet obrigatório entre agentes (`agy-handoff`).
-
-## 6. Qualidade de Código & Frontend
-
-Causa raiz sempre: sem `as any`, `@ts-ignore`, cast forçado ou sleep artificial. Code Deslop: sem comentários óbvios, **No God Files** (< 500 linhas). Frontend Anti-Slop: sem UI genérica, Color/Shape Lock, WCAG AA, teclado, viewport `100dvh`. Detalhes: `.agents/policies/{frontend,design-system,database}.md`.
-
-## 🗺️ Mapa de Recursos
-
-- **Agentes:** `orchestrator`, `navigator`, `designer`, `sentinel`, `test-guardian`, `builder`, `refactor-warden`, `archivist`, `release-gatekeeper`, `shipper`, `genesis` (`.agents/agents/`).
-- **Políticas** (`.agents/policies/`): `token-economy`, `atdd-bdd-tdd`, `tdd`, `evidence`, `memory`, `agent-handoff`, `release`, `security`, `frontend`, `design-system`, `database`.
-- **Skills/Memória/CLI:** catálogo em `SKILLS_INDEX.md`; memória em `.agents/memory/`; CLI e templates em `.agents/policies/token-economy.md`.
+- **Hard-Enforcement Gate:** Never close a task without updating `.agents/memory/PROJECT_MEMORY.md` (< 2k tokens). Step 0: read it first.
+- **Root Cause & Deslop:** Zero `as any`, `@ts-ignore`, forced casts, or arbitrary `sleep()`. **No God Files** (< 500 lines). Frontend Anti-Slop: Color/Shape Lock, WCAG AA, keyboard nav, `100dvh`. Details: `.agents/policies/{memory,frontend,design-system,database,security,release}.md`.

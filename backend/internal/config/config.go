@@ -2,7 +2,9 @@ package config
 
 import (
 	"errors"
+	"fmt"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -30,6 +32,11 @@ type Config struct {
 	TurnstileSecretKey string
 	PublicBaseURL      string
 	CorsAllowedOrigins string
+	SMTPHost           string
+	SMTPPort           int
+	SMTPUser           string
+	SMTPPassword       string
+	SMTPFrom           string
 }
 
 // Load carrega a configuração a partir de variáveis de ambiente com fallbacks seguros.
@@ -103,6 +110,18 @@ func Load() *Config {
 		shortIoDomain = os.Getenv("SHORT_IO_DOMAIN")
 	}
 
+	smtpPort := 587
+	if pStr := os.Getenv("SMTP_PORT"); pStr != "" {
+		if pVal, err := strconv.Atoi(pStr); err == nil && pVal > 0 {
+			smtpPort = pVal
+		}
+	}
+	smtpPass := strings.ReplaceAll(os.Getenv("SMTP_PASS"), " ", "")
+	smtpFrom := os.Getenv("SMTP_FROM")
+	if smtpFrom == "" && os.Getenv("SMTP_USER") != "" {
+		smtpFrom = fmt.Sprintf("Vito Assistente <%s>", os.Getenv("SMTP_USER"))
+	}
+
 	return &Config{
 		Port:               port,
 		Environment:        env,
@@ -125,6 +144,11 @@ func Load() *Config {
 		TurnstileSecretKey: os.Getenv("CLOUDFLARE_TURNSTILE_SECRET_KEY"),
 		PublicBaseURL:      os.Getenv("PUBLIC_BASE_URL"),
 		CorsAllowedOrigins: os.Getenv("CORS_ALLOWED_ORIGINS"),
+		SMTPHost:           os.Getenv("SMTP_HOST"),
+		SMTPPort:           smtpPort,
+		SMTPUser:           os.Getenv("SMTP_USER"),
+		SMTPPassword:       smtpPass,
+		SMTPFrom:           smtpFrom,
 	}
 }
 

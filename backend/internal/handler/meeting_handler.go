@@ -758,6 +758,23 @@ const meetingPageHTMLTemplate = `<!DOCTYPE html>
       font-size: 12px;
       line-height: 1.4;
     }
+    .btn-change-vote {
+      background: rgba(56, 189, 248, 0.15);
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      color: var(--primary);
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      margin-top: 8px;
+      display: inline-block;
+    }
+    .btn-change-vote:hover {
+      background: var(--primary);
+      color: #0c1017;
+    }
     .powered {
       text-align: center;
       font-size: 12px;
@@ -896,20 +913,49 @@ const meetingPageHTMLTemplate = `<!DOCTYPE html>
     const meetingId = "{{.ID}}";
 
     // Verifica se já votou anteriormente
+    let myParticipantId = '';
     try {
+      myParticipantId = localStorage.getItem('vito_part_id_' + meetingId) || '';
       const savedVoter = localStorage.getItem('vito_voter_' + meetingId);
       if (savedVoter) {
-        const cachedBanner = document.getElementById('votedCachedBanner');
-        if (cachedBanner) {
-          cachedBanner.style.display = 'block';
-          cachedBanner.innerHTML = '✓ Seu voto já foi registrado como <strong>' + savedVoter + '</strong>. Você pode acompanhar o placar ao vivo ou selecionar horários adicionais.';
-        }
-        const nameInput = document.getElementById('pName');
-        if (nameInput && !nameInput.value) {
-          nameInput.value = savedVoter;
-        }
+        showVotedBanner(savedVoter);
       }
     } catch (e) {}
+
+    function showVotedBanner(name) {
+      const cachedBanner = document.getElementById('votedCachedBanner');
+      if (cachedBanner) {
+        cachedBanner.style.display = 'block';
+        cachedBanner.innerHTML = '<div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">' +
+          '<span>✓ Seu voto está registrado como <strong>' + name + '</strong>.</span>' +
+          '<button type="button" class="btn-change-vote" onclick="enableVoteEditing()">✏️ Alterar meu voto</button>' +
+          '</div>';
+      }
+      const nameInput = document.getElementById('pName');
+      if (nameInput && !nameInput.value) {
+        nameInput.value = name;
+      }
+    }
+
+    function enableVoteEditing() {
+      const btn = document.getElementById('btnSubmit');
+      if (btn) {
+        btn.innerText = 'Salvar Alteração do Voto';
+        btn.disabled = false;
+      }
+      const formSec = document.getElementById('voterFormSection');
+      if (formSec) {
+        formSec.style.display = 'block';
+      }
+      const instr = document.getElementById('instructionLabel');
+      if (instr) {
+        instr.innerText = 'Toque nos horários para alterar suas opções:';
+      }
+      const slotListEl = document.getElementById('slotList');
+      if (slotListEl) {
+        slotListEl.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
 
     function toggleSlot(id) {
       if (isConfirmed) return;
@@ -1043,14 +1089,19 @@ const meetingPageHTMLTemplate = `<!DOCTYPE html>
       btn.innerText = 'Registrando...';
 
       try {
+        const payload = {
+          participant_name: name,
+          contact_info: contact,
+          slot_ids: Array.from(selectedSlots)
+        };
+        if (myParticipantId) {
+          payload.participant_id = myParticipantId;
+        }
+
         const res = await fetch('/api/public/meet/' + meetingId + '/vote', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            participant_name: name,
-            contact_info: contact,
-            slot_ids: Array.from(selectedSlots)
-          })
+          body: JSON.stringify(payload)
         });
 
         if (!res.ok) {
@@ -1058,6 +1109,13 @@ const meetingPageHTMLTemplate = `<!DOCTYPE html>
           throw new Error(err.error?.message || err.error || 'Falha ao processar voto.');
         }
 
+        const resData = await res.json().catch(() => ({}));
+        if (resData.participant_id) {
+          myParticipantId = resData.participant_id;
+          try {
+            localStorage.setItem('vito_part_id_' + meetingId, myParticipantId);
+          } catch (e) {}
+        }
         try {
           localStorage.setItem('vito_voter_' + meetingId, name);
         } catch (e) {}
@@ -1073,8 +1131,10 @@ const meetingPageHTMLTemplate = `<!DOCTYPE html>
             const formSec = document.getElementById('voterFormSection');
             if (formSec) formSec.style.display = 'none';
           } else {
-            banner.innerHTML = '✓ <strong>Voto registrado com sucesso, ' + name + '!</strong> Veja abaixo o resultado parcial atualizado em tempo real.';
-            btn.innerText = 'Voto Registrado ✓';
+            const isUpdate = Boolean(resData.is_vote_update);
+            banner.innerHTML = '✓ <strong>' + (isUpdate ? 'Voto alterado com sucesso, ' : 'Voto registrado com sucesso, ') + name + '!</strong> Placar atualizado em tempo real.';
+            btn.innerText = 'Voto Salvo ✓';
+            showVotedBanner(name);
           }
         }
       } catch (e) {

@@ -44,6 +44,7 @@ type UpdateMeetingRequest struct {
 // SubmitVoteRequest define o voto submetido por um participante na página pública.
 type SubmitVoteRequest struct {
 	MeetingID       string   `json:"meeting_id"`
+	ParticipantID   string   `json:"participant_id,omitempty"`
 	ParticipantName string   `json:"participant_name"`
 	ContactInfo     string   `json:"contact_info,omitempty"`
 	SlotIDs         []string `json:"slot_ids"`
@@ -52,7 +53,9 @@ type SubmitVoteRequest struct {
 // SubmitVoteResponse resume o resultado do voto.
 type SubmitVoteResponse struct {
 	MeetingID          string     `json:"meeting_id"`
+	ParticipantID      string     `json:"participant_id"`
 	MeetingStatus      string     `json:"meeting_status"`
+	IsVoteUpdate       bool       `json:"is_vote_update,omitempty"`
 	ConfirmedSlotID    *string    `json:"confirmed_slot_id,omitempty"`
 	ConfirmedSlotStart *time.Time `json:"confirmed_slot_start,omitempty"`
 	ConfirmedSlotEnd   *time.Time `json:"confirmed_slot_end,omitempty"`
@@ -74,6 +77,7 @@ type MeetingService struct {
 	publicBaseURL   string
 	sanitizer       *bluemonday.Policy
 	syncPusher      BookingSyncPusher
+	emailSvc        *EmailService
 	lockMu          sync.Mutex
 }
 
@@ -98,6 +102,11 @@ func NewMeetingService(
 		publicBaseURL:   cleanBaseURL,
 		sanitizer:       bluemonday.UGCPolicy(),
 	}
+}
+
+// SetEmailService define o serviço de e-mail para envio de convites de calendário .ics.
+func (s *MeetingService) SetEmailService(emailSvc *EmailService) {
+	s.emailSvc = emailSvc
 }
 
 // SetSyncPusher registra o propagador para sync total com Google/Apple.
@@ -380,37 +389,55 @@ func (s *MeetingService) SubmitVote(ctx context.Context, req SubmitVoteRequest) 
 		return nil, domain.ErrMeetingAlreadyConfirmed
 	}
 
-	// 2. Registra participante
-	partID := uuid.New().String()
-	participant := &domain.MeetingParticipant{
-		ID:          partID,
-		MeetingID:   m.ID,
-		Name:        name,
-		ContactInfo: contact,
-		RespondedAt: now,
-		CreatedAt:   now,
-	}
-	if err := s.meetingRepo.AddParticipant(ctx, participant); err != nil {
-		return nil, fmt.Errorf("falha ao registrar participante: %w", err)
+	// 2. Busca participante existente para evitar duplicações e permitir alteração limpa do voto
+	existingPart, err := s.meetingRepo.FindParticipant(ctx, m.ID, req.ParticipantID, contact, name)
+	if err != nil {
+		return nil, fmt.Errorf("falha ao verificar participante: %w", err)
 	}
 
-	// 3. Registra os votos
-	for _, slotID := range req.SlotIDs {
-		vote := &domain.MeetingVote{
-			ID:            uuid.New().String(),
-			MeetingID:     m.ID,
-			SlotID:        slotID,
-			ParticipantID: partID,
-			CreatedAt:     now,
+	var partID string
+	var isVoteUpdate bool
+
+	if existingPart != nil {
+		partID = existingPart.ID
+		isVoteUpdate = true
+		if err := s.meetingRepo.ReplaceParticipantVotes(ctx, m.ID, partID, name, contact, req.SlotIDs); err != nil {
+			return nil, fmt.Errorf("falha ao atualizar votos: %w", err)
 		}
-		if err := s.meetingRepo.RecordVote(ctx, vote); err != nil && !errors.Is(err, domain.ErrParticipantAlreadyVoted) {
-			return nil, fmt.Errorf("falha ao registrar voto no slot %s: %w", slotID, err)
+	} else {
+		partID = uuid.New().String()
+		participant := &domain.MeetingParticipant{
+			ID:          partID,
+			MeetingID:   m.ID,
+			Name:        name,
+			ContactInfo: contact,
+			RespondedAt: now,
+			CreatedAt:   now,
+		}
+		if err := s.meetingRepo.AddParticipant(ctx, participant); err != nil {
+			return nil, fmt.Errorf("falha ao registrar participante: %w", err)
+		}
+
+		// 3. Registra os votos
+		for _, slotID := range req.SlotIDs {
+			vote := &domain.MeetingVote{
+				ID:            uuid.New().String(),
+				MeetingID:     m.ID,
+				SlotID:        slotID,
+				ParticipantID: partID,
+				CreatedAt:     now,
+			}
+			if err := s.meetingRepo.RecordVote(ctx, vote); err != nil && !errors.Is(err, domain.ErrParticipantAlreadyVoted) {
+				return nil, fmt.Errorf("falha ao registrar voto no slot %s: %w", slotID, err)
+			}
 		}
 	}
 
 	resp := &SubmitVoteResponse{
 		MeetingID:     m.ID,
+		ParticipantID: partID,
 		MeetingStatus: m.Status,
+		IsVoteUpdate:  isVoteUpdate,
 	}
 
 	loc := brtLocation()
@@ -501,6 +528,10 @@ func (s *MeetingService) SubmitVote(ctx context.Context, req SubmitVoteRequest) 
 			}
 			pushTitle := fmt.Sprintf("🗳️ Novo voto em '%s'", m.Title)
 			pushBody := fmt.Sprintf("%s votou em: %s", name, timeSummary)
+			if isVoteUpdate {
+				pushTitle = fmt.Sprintf("✏️ Voto alterado em '%s'", m.Title)
+				pushBody = fmt.Sprintf("%s alterou sua escolha para: %s", name, timeSummary)
+			}
 			_, _ = s.notificationSvc.SendPushToUser(m.UserID, pushTitle, pushBody, "high", map[string]interface{}{
 				"type":       "meeting_vote",
 				"channelId":  "vito_booking",
@@ -575,6 +606,22 @@ func (s *MeetingService) ConfirmConsensusSlot(ctx context.Context, userID, meeti
 			defer cancel()
 			_ = s.syncPusher.PushEvent(pctx, m.UserID, evt)
 		}(&evCopy)
+	}
+
+	if s.emailSvc != nil && s.emailSvc.IsConfigured() {
+		publicURL := m.ShortURL
+		if publicURL == "" {
+			publicURL = fmt.Sprintf("%s/meet/%s", s.publicBaseURL, m.ID)
+		}
+		go func(title, desc, pubURL string, stAt, endAt time.Time, participants []domain.MeetingParticipant) {
+			pctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+			defer cancel()
+			for _, p := range participants {
+				if strings.Contains(p.ContactInfo, "@") {
+					_ = s.emailSvc.SendMeetingConfirmation(pctx, p.ContactInfo, p.Name, title, desc, stAt, endAt, pubURL)
+				}
+			}
+		}(m.Title, eventDesc, publicURL, slot.StartAt, slot.EndAt, parts)
 	}
 
 	return nil

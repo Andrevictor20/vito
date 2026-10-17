@@ -79,6 +79,14 @@ docs/roadmap/
 .idea/
 *.sublime-project
 *.sublime-workspace
+.cursor/
+.cursorignore
+.codex/
+.codexignore
+.opencode/
+opencode.json
+.qoder/
+.qoderignore
 
 # Sistema Operacional
 .DS_Store

@@ -97,7 +97,9 @@ type MeetingRepository interface {
 	GetSlotByID(ctx context.Context, slotID string) (*MeetingSlot, error)
 	AddParticipant(ctx context.Context, p *MeetingParticipant) error
 	ListParticipants(ctx context.Context, meetingID string) ([]MeetingParticipant, error)
+	FindParticipant(ctx context.Context, meetingID, participantID, contactInfo, name string) (*MeetingParticipant, error)
 	RecordVote(ctx context.Context, vote *MeetingVote) error
+	ReplaceParticipantVotes(ctx context.Context, meetingID, participantID, name, contactInfo string, newSlotIDs []string) error
 	ListVotesByMeeting(ctx context.Context, meetingID string) ([]MeetingVote, error)
 	ConfirmMeetingSlot(ctx context.Context, meetingID, slotID string, startAt, endAt time.Time) error
 }

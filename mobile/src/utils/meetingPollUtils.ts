@@ -147,14 +147,13 @@ export function computeBookingTabCounts(
   appointmentsCount: number
 ): { linksCount: number; receivedCount: number } {
   const safeMeetings = Array.isArray(meetings) ? meetings : [];
-  const totalMeetingParticipants = safeMeetings.reduce(
-    (sum, m) => sum + (Array.isArray(m.participants) ? m.participants.length : 0),
-    0
-  );
+  const activeMeetingPollsCount = safeMeetings.filter(
+    (m) => Array.isArray(m.participants) && m.participants.length > 0
+  ).length;
 
   return {
     linksCount: (bookingTypesCount || 0) + safeMeetings.length,
-    receivedCount: (appointmentsCount || 0) + totalMeetingParticipants,
+    receivedCount: (appointmentsCount || 0) + activeMeetingPollsCount,
   };
 }
 
@@ -221,3 +220,107 @@ export function extractMeetingVotesActivity(meetings: Meeting[]): MeetingVoteAct
 
   return items.sort((a, b) => (b.respondedAt || '').localeCompare(a.respondedAt || ''));
 }
+
+export interface LeadingSlotInfo {
+  slot?: MeetingSlot;
+  formatted?: ReturnType<typeof formatSlotBRTDisplay>;
+  votesCount: number;
+  percentage: number;
+  voterNames: string[];
+}
+
+/**
+ * Identifica o horário com mais votos ou definido como vencedor na reunião.
+ */
+export function getLeadingSlot(slots?: MeetingSlot[], totalParticipants = 0): LeadingSlotInfo {
+  if (!Array.isArray(slots) || slots.length === 0) {
+    return { votesCount: 0, percentage: 0, voterNames: [] };
+  }
+
+  let leading: MeetingSlot | undefined;
+  for (const s of slots) {
+    const voters = Array.isArray(s.voter_names) ? s.voter_names : [];
+    const count = Math.max(s.votes_count || 0, voters.length);
+    if (!leading) {
+      leading = s;
+    } else {
+      const leadingVoters = Array.isArray(leading.voter_names) ? leading.voter_names : [];
+      const leadingCount = Math.max(leading.votes_count || 0, leadingVoters.length);
+      if (s.is_winner || count > leadingCount) {
+        leading = s;
+      }
+    }
+  }
+
+  if (!leading) {
+    return { votesCount: 0, percentage: 0, voterNames: [] };
+  }
+
+  const voterNames = Array.isArray(leading.voter_names) ? leading.voter_names : [];
+  const votesCount = Math.max(leading.votes_count || 0, voterNames.length);
+  const percentage = computeSlotVotePercentage(votesCount, totalParticipants);
+  const formatted = formatSlotBRTDisplay(leading.start_at, leading.end_at);
+
+  return {
+    slot: leading,
+    formatted,
+    votesCount,
+    percentage,
+    voterNames,
+  };
+}
+
+export interface GroupedMeetingPollItem {
+  meeting: Meeting;
+  meetingId: string;
+  meetingTitle: string;
+  meetingStatus: 'open' | 'confirmed' | 'expired' | 'cancelled';
+  totalParticipants: number;
+  participantNames: string[];
+  leadingSlot: LeadingSlotInfo;
+  isConfirmed: boolean;
+  confirmedSlotLabel?: string;
+}
+
+/**
+ * Agrupa as reuniões com votos recebidos em itens únicos e consolidados por reunião para a aba "Recebidos".
+ */
+export function extractGroupedMeetingPolls(meetings: Meeting[]): GroupedMeetingPollItem[] {
+  if (!Array.isArray(meetings)) return [];
+  const items: GroupedMeetingPollItem[] = [];
+
+  for (const m of meetings) {
+    const participants = Array.isArray(m.participants) ? m.participants : [];
+    if (participants.length === 0) continue;
+
+    const slots = Array.isArray(m.slots) ? m.slots : [];
+    const leading = getLeadingSlot(slots, participants.length);
+    const participantNames = participants.map((p) => p.name).filter(Boolean);
+
+    let confirmedSlotLabel: string | undefined;
+    if (m.status === 'confirmed' && m.confirmed_slot_id) {
+      const confSlot = slots.find((s) => s.id === m.confirmed_slot_id);
+      if (confSlot) {
+        confirmedSlotLabel = formatSlotBRTDisplay(confSlot.start_at, confSlot.end_at).compactLabel;
+      }
+    }
+
+    items.push({
+      meeting: m,
+      meetingId: m.id,
+      meetingTitle: m.title,
+      meetingStatus: m.status,
+      totalParticipants: participants.length,
+      participantNames,
+      leadingSlot: leading,
+      isConfirmed: m.status === 'confirmed',
+      confirmedSlotLabel,
+    });
+  }
+
+  return items.sort((a, b) => {
+    if (a.isConfirmed !== b.isConfirmed) return a.isConfirmed ? 1 : -1;
+    return b.totalParticipants - a.totalParticipants;
+  });
+}
+

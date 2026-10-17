@@ -3,6 +3,7 @@ package service_test
 import (
 	"context"
 	"database/sql"
+	"net/smtp"
 	"strings"
 	"testing"
 	"time"
@@ -451,4 +452,133 @@ func TestMeetingService_UpdateMeeting_PreservesVotesOnMatchingSlots(t *testing.T
 		t.Fatalf("novo slot t3 deveria ter 0 votos: %+v", updated.Slots[1])
 	}
 }
+
+func TestMeetingService_ChangeVote_AntiDuplicationAndCorrection(t *testing.T) {
+	tc := setupMeetingTest(t)
+	defer tc.db.Close()
+	ctx := context.Background()
+
+	now := time.Now().UTC().Truncate(time.Second)
+	t1 := now.Add(24 * time.Hour)
+	t2 := now.Add(48 * time.Hour)
+	t3 := now.Add(72 * time.Hour)
+
+	m, err := tc.meetingSvc.CreateMeeting(ctx, service.CreateMeetingRequest{
+		UserID:          tc.user.ID,
+		Title:           "Planejamento Trimestral",
+		DurationMinutes: 60,
+		Mode:            domain.MeetingModeGroupConsensus,
+		Slots: []service.MeetingSlotInput{
+			{StartAt: t1, EndAt: t1.Add(time.Hour)},
+			{StartAt: t2, EndAt: t2.Add(time.Hour)},
+			{StartAt: t3, EndAt: t3.Add(time.Hour)},
+		},
+	})
+	if err != nil {
+		t.Fatalf("CreateMeeting falhou: %v", err)
+	}
+
+	slot0 := m.Slots[0].ID
+	slot1 := m.Slots[1].ID
+	slot2 := m.Slots[2].ID
+
+	// 1. Carlos vota inicialmente no Slot 0
+	res1, err := tc.meetingSvc.SubmitVote(ctx, service.SubmitVoteRequest{
+		MeetingID:       m.ID,
+		ParticipantName: "Carlos Pereira",
+		ContactInfo:     "carlos@empresa.com",
+		SlotIDs:         []string{slot0},
+	})
+	if err != nil {
+		t.Fatalf("primeiro voto de Carlos falhou: %v", err)
+	}
+	if res1.IsVoteUpdate {
+		t.Errorf("primeiro voto não deveria ser IsVoteUpdate")
+	}
+	if res1.ParticipantID == "" {
+		t.Errorf("esperava ParticipantID preenchido")
+	}
+
+	// Verifica estado após primeiro voto
+	d1, err := tc.meetingSvc.GetMeetingDetails(ctx, m.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(d1.Participants) != 1 {
+		t.Fatalf("esperava 1 participante, vieram %d", len(d1.Participants))
+	}
+	if d1.Slots[0].VotesCount != 1 || d1.Slots[1].VotesCount != 0 || d1.Slots[2].VotesCount != 0 {
+		t.Fatalf("contagem inesperada após primeiro voto: s0=%d, s1=%d, s2=%d",
+			d1.Slots[0].VotesCount, d1.Slots[1].VotesCount, d1.Slots[2].VotesCount)
+	}
+
+	// 2. Carlos muda de ideia (ou clicou errado) e altera para Slot 1 e Slot 2
+	res2, err := tc.meetingSvc.SubmitVote(ctx, service.SubmitVoteRequest{
+		MeetingID:       m.ID,
+		ParticipantID:   res1.ParticipantID,
+		ParticipantName: "Carlos Pereira",
+		ContactInfo:     "carlos@empresa.com",
+		SlotIDs:         []string{slot1, slot2},
+	})
+	if err != nil {
+		t.Fatalf("alteração de voto de Carlos falhou: %v", err)
+	}
+	if !res2.IsVoteUpdate {
+		t.Errorf("esperava IsVoteUpdate = true ao alterar voto")
+	}
+	if res2.ParticipantID != res1.ParticipantID {
+		t.Errorf("ParticipantID deveria ser o mesmo: anterior=%s atual=%s", res1.ParticipantID, res2.ParticipantID)
+	}
+
+	// 3. Verifica estado final: NENHUM participante duplicado, slot 0 estornado (0 votos) e slots 1 e 2 com 1 voto
+	d2, err := tc.meetingSvc.GetMeetingDetails(ctx, m.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(d2.Participants) != 1 {
+		t.Fatalf("NÃO pode duplicar participante na alteração! Esperava 1, vieram %d", len(d2.Participants))
+	}
+	if d2.Slots[0].VotesCount != 0 {
+		t.Errorf("slot 0 deveria ter sido estornado para 0 votos, está com %d", d2.Slots[0].VotesCount)
+	}
+	if d2.Slots[1].VotesCount != 1 || d2.Slots[2].VotesCount != 1 {
+		t.Errorf("slots 1 e 2 deveriam ter 1 voto cada, estão com s1=%d, s2=%d", d2.Slots[1].VotesCount, d2.Slots[2].VotesCount)
+	}
+
+	// 4. Configura EmailService com MockSender e fecha a reunião no Slot 1
+	mockSender := &mockMeetingEmailSender{}
+	emailSvc := service.NewEmailService("smtp.gmail.com", 587, "vito@gmail.com", "pass123", "Vito <vito@gmail.com>", mockSender)
+	tc.meetingSvc.SetEmailService(emailSvc)
+
+	err = tc.meetingSvc.ConfirmConsensusSlot(ctx, tc.user.ID, m.ID, slot1)
+	if err != nil {
+		t.Fatalf("ConfirmConsensusSlot falhou: %v", err)
+	}
+
+	// Dá um pequeno tempo para a goroutine de e-mail executar
+	time.Sleep(50 * time.Millisecond)
+
+	if len(mockSender.sentTo) != 1 || mockSender.sentTo[0] != "carlos@empresa.com" {
+		t.Errorf("esperava e-mail disparado para carlos@empresa.com, obteve %v", mockSender.sentTo)
+	}
+	if !strings.Contains(string(mockSender.sentMsg), "text/calendar") {
+		t.Errorf("e-mail deveria conter anexo de calendário .ics")
+	}
+}
+
+type mockMeetingEmailSender struct {
+	sentAddr string
+	sentFrom string
+	sentTo   []string
+	sentMsg  []byte
+}
+
+func (m *mockMeetingEmailSender) SendMail(addr string, a smtp.Auth, from string, to []string, msg []byte) error {
+	m.sentAddr = addr
+	m.sentFrom = from
+	m.sentTo = to
+	m.sentMsg = msg
+	return nil
+}
+
 
