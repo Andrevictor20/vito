@@ -11,7 +11,23 @@ export interface User {
 
 export interface AuthResponse {
   token: string;
+  access_token?: string;
+  refresh_token?: string;
+  session_id?: string;
+  expires_in?: number;
   user: User;
+}
+
+export interface UserSession {
+  id: string;
+  user_id: string;
+  device_name: string;
+  ip_address: string;
+  expires_at: string;
+  revoked_at?: string;
+  created_at: string;
+  last_used_at: string;
+  is_current: boolean;
 }
 
 export interface TimeSlot {
@@ -113,6 +129,14 @@ export interface ChatMeeting {
   slots_count?: number;
 }
 
+export interface DestructiveConfirmation {
+  action_type: string;
+  target_title: string;
+  impact_count: number;
+  description: string;
+  confirm_prompt: string;
+}
+
 export interface AssistantChatResponse {
   action?: string;
   intent: string;
@@ -132,6 +156,7 @@ export interface AssistantChatResponse {
   meeting_short_url?: string;
   meeting_whatsapp_url?: string;
   conflict?: ConflictInfo;
+  pending_confirmation?: DestructiveConfirmation;
   provider_used?: string;
 }
 
@@ -149,6 +174,7 @@ export interface ChatMessage {
   booking?: ChatBooking;
   meeting?: ChatMeeting;
   conflict?: ConflictInfo;
+  pending_confirmation?: DestructiveConfirmation;
 }
 
 export interface ConversationSession {

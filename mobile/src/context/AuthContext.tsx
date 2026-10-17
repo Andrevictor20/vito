@@ -56,10 +56,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
           } catch (meErr: any) {
             const errMsg = meErr?.message || '';
-            // Apenas desloga se o token for explicitamente rejeitado pelo servidor (401 com token inválido/expirado/ausente)
-            if (errMsg.includes('401') && (errMsg.includes('inválido') || errMsg.includes('expirado') || errMsg.includes('não autorizado') || errMsg.includes('ausente'))) {
-              console.warn('[AuthContext] Sessão expirada no servidor, deslogando:', errMsg);
-              await api.setToken(null);
+            // Apenas desloga se o token for explicitamente rejeitado pelo servidor (401 com token inválido/expirado/ausente/revogada)
+            if (errMsg.includes('401') || errMsg.includes('inválido') || errMsg.includes('expirado') || errMsg.includes('revogada') || errMsg.includes('não autorizado') || errMsg.includes('ausente')) {
+              console.warn('[AuthContext] Sessão expirada ou revogada no servidor, deslogando:', errMsg);
+              await api.setAuthTokens(null, null, null);
               await secureStorage.removeItem(USER_KEY);
               setUser(null);
             } else {
@@ -127,11 +127,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.warn('[AuthContext] Falha ao revogar push token no logout:', tokErr);
       }
 
-      // 2. Cancela todos os alarmes locais do SO para não tocar alertas da conta anterior
+      // 2. Revoga a sessão de Refresh Token atual no servidor e limpa tokens locais
+      await api.logoutSession().catch((err) => {
+        console.warn('[AuthContext] Falha ao revogar sessão no logout:', err);
+      });
+
+      // 3. Cancela todos os alarmes locais do SO para não tocar alertas da conta anterior
       await notificationService.cancelAllUpcomingReminders().catch(() => {});
 
-      // 3. Remove credenciais e chaves do usuário
-      await api.setToken(null);
+      // 4. Remove credenciais e chaves do usuário
+      await api.setAuthTokens(null, null, null);
       await secureStorage.removeItem(USER_KEY);
       setUser(null);
     } finally {

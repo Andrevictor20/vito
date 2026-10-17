@@ -29,13 +29,38 @@ func main() {
 	}
 
 
-	// 1. Conexão ao SQLite com WAL mode e Migrações
+	// 1. Conexão ao SQLite com WAL mode, Single-Writer Queue e Migrações
 	log.Printf("📦 [Vito DB] Inicializando banco SQLite em '%s'...", cfg.DBPath)
 	db, err := database.Open(cfg.DBPath)
 	if err != nil {
 		log.Fatalf("❌ Falha crítica ao inicializar banco de dados: %v", err)
 	}
 	defer db.Close()
+
+	writerQueue := database.NewSingleWriterQueue(256)
+	defer writerQueue.Close()
+	database.SetDefaultWriterQueue(writerQueue)
+
+	if cfg.DBPath != ":memory:" && len(cfg.DataEncryptionKey) >= 16 {
+		backupDir := os.Getenv("BACKUP_DIR")
+		if backupDir == "" {
+			backupDir = "/app/backups"
+			if cfg.Environment != "production" {
+				backupDir = "./backups"
+			}
+		}
+		if bkpMgr, bkpErr := database.NewBackupManager(database.BackupConfig{
+			DB:         db,
+			BackupDir:  backupDir,
+			MasterKey:  cfg.DataEncryptionKey,
+			MaxBackups: 7,
+			Interval:   6 * time.Hour,
+		}); bkpErr == nil {
+			bkpMgr.Start()
+			defer bkpMgr.Stop()
+			log.Printf("🔒 [BackupWorker] Rotina de backup criptografado AES-256-GCM ativa (%s).", backupDir)
+		}
+	}
 	log.Println("✅ [Vito DB] Banco SQLite e migrações aplicadas com sucesso.")
 
 	// 2. Repositórios
@@ -79,7 +104,9 @@ func main() {
 	aiGateway := ai.NewGateway(aiProviders...)
 
 	// 4. Serviços
+	sessionRepo := repository.NewSessionRepository(db)
 	authSvc := service.NewAuthService(userRepo, cfg.JWTSecret)
+	authSvc.SetSessionRepository(sessionRepo)
 	calSvc := service.NewCalendarService(eventRepo)
 	todoSvc := service.NewTodoService(todoRepo)
 	notifSvc := service.NewNotificationService(notifRepo)

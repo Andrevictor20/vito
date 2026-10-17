@@ -317,6 +317,30 @@ func (s *CalendarService) titleMatchesHolidays(userID, titleQuery string) bool {
 	return found
 }
 
+// CountMatchingEventsByTitle conta quantos eventos não-feriado correspondem ao título informado.
+func (s *CalendarService) CountMatchingEventsByTitle(userID, titleQuery string) int {
+	clean := strings.ToLower(strings.TrimSpace(titleQuery))
+	if clean == "" {
+		return 0
+	}
+	from := time.Now().Add(-365 * 24 * time.Hour)
+	to := time.Now().Add(365 * 24 * time.Hour)
+	events, err := s.eventRepo.ListByUser(userID, from, to)
+	if err != nil {
+		return 0
+	}
+	count := 0
+	for _, ev := range events {
+		if ev.Category == "holiday" {
+			continue
+		}
+		if strings.Contains(strings.ToLower(ev.Title), clean) {
+			count++
+		}
+	}
+	return count
+}
+
 // DeleteEventsByTitle remove eventos que correspondam ao termo de busca (para comandos de voz/chat).
 func (s *CalendarService) DeleteEventsByTitle(userID, titleQuery string) (int, error) {
 	if s.syncPusher != nil {

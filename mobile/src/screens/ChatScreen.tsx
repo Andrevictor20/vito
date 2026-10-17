@@ -337,6 +337,7 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
             onSelectSlot={handleSelectSlot}
             onEditMessage={handleEditMessage}
             onSaveEdit={(messageId, newText) => editAndResendMessage(messageId, newText)}
+            onConfirmAction={handleQuickPrompt}
             disabled={loading}
           />
         )}

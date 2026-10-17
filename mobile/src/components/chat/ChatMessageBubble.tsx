@@ -12,106 +12,17 @@ import { PendingInlineCard } from './cards/PendingInlineCard';
 import { TriggerInlineCard } from './cards/TriggerInlineCard';
 import { BookingInlineCard } from './cards/BookingInlineCard';
 import { MeetingInlineCard } from './cards/MeetingInlineCard';
+import { DestructiveConfirmationCard } from './cards/DestructiveConfirmationCard';
+import { FormattedChatMessageText } from './FormattedChatMessageText';
 import { VitoMascot } from '../common/VitoMascot';
 import { preparePlainTextForCopy } from '../../utils/chatActions';
-
-const renderInlineFormatted = (raw: string, textColor: string) => {
-  if (!raw) return null;
-
-  // Remove caracteres markdown crus residuais como hashtags soltas
-  const clean = raw.replace(/^#+\s*/, '');
-
-  // Divide por delimitadores de negrito **
-  const parts = clean.split(/(\*\*[^*]+?\*\*)/g);
-
-  return parts.map((part, idx) => {
-    if (part.startsWith('**') && part.endsWith('**') && part.length >= 4) {
-      const boldText = part.slice(2, -2);
-      return (
-        <Text key={idx} style={{ fontWeight: '700', color: textColor }}>
-          {boldText}
-        </Text>
-      );
-    }
-    // Remove asteriscos soltos indesejados da parte comum
-    const sanitizedPart = part.replace(/\*/g, '');
-    return (
-      <Text key={idx} style={{ color: textColor }}>
-        {sanitizedPart}
-      </Text>
-    );
-  });
-};
-
-interface FormattedChatMessageTextProps {
-  text: string;
-  isUser: boolean;
-  style?: any;
-  textColor: string;
-}
-
-const FormattedChatMessageText: React.FC<FormattedChatMessageTextProps> = ({
-  text,
-  isUser,
-  style,
-  textColor,
-}) => {
-  if (!text) return null;
-
-  if (isUser) {
-    return <Text style={[style, { color: textColor }]}>{text}</Text>;
-  }
-
-  const lines = text.split('\n');
-
-  return (
-    <View style={styles.formattedContainer}>
-      {lines.map((line, lineIdx) => {
-        const trimmed = line.trim();
-
-        if (!trimmed) {
-          return <View key={lineIdx} style={styles.paragraphSpacer} />;
-        }
-
-        // Títulos Markdown (# Título, ## Subtítulo)
-        if (/^#{1,4}\s+/.test(trimmed)) {
-          const headerClean = trimmed.replace(/^#{1,4}\s+/, '').trim();
-          return (
-            <Text key={lineIdx} style={[style, styles.headerLine, { color: textColor }]}>
-              {renderInlineFormatted(headerClean, textColor)}
-            </Text>
-          );
-        }
-
-        // Marcadores de lista (* Item, - Item, + Item)
-        if (/^[\*\-\+]\s+/.test(trimmed)) {
-          const bulletClean = trimmed.replace(/^[\*\-\+]\s+/, '').trim();
-          return (
-            <View key={lineIdx} style={styles.bulletRow}>
-              <Text style={[styles.bulletSymbol, { color: textColor }]}>•</Text>
-              <Text style={[style, styles.bulletContent, { color: textColor }]}>
-                {renderInlineFormatted(bulletClean, textColor)}
-              </Text>
-            </View>
-          );
-        }
-
-        // Linha normal
-        return (
-          <Text key={lineIdx} style={[style, styles.normalLine, { color: textColor }]}>
-            {renderInlineFormatted(line, textColor)}
-          </Text>
-        );
-      })}
-    </View>
-  );
-};
 
 interface ChatMessageBubbleProps {
   message: ChatMessage;
   onSelectSlot?: (slot: import('../../types').TimeSlot, message: ChatMessage) => void;
   onEditMessage?: (text: string) => void;
   onSaveEdit?: (messageId: string, newText: string) => void;
+  onConfirmAction?: (confirmPrompt: string) => void;
   disabled?: boolean;
 }
 
@@ -120,6 +31,7 @@ export const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
   onSelectSlot,
   onEditMessage,
   onSaveEdit,
+  onConfirmAction,
   disabled = false,
 }) => {
   const { colors, isDark } = useTheme();
@@ -292,6 +204,13 @@ export const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
         {message.trigger && <TriggerInlineCard trigger={message.trigger} />}
         {message.booking && <BookingInlineCard booking={message.booking} />}
         {message.meeting && <MeetingInlineCard meeting={message.meeting} />}
+        {message.pending_confirmation && (
+          <DestructiveConfirmationCard
+            confirmation={message.pending_confirmation}
+            onConfirm={onConfirmAction}
+            disabled={disabled}
+          />
+        )}
 
         <View style={styles.metaRow}>
           {/* Botão Copiar Resposta do Vito */}

@@ -24,20 +24,23 @@ RUN if [ -n "$TARGETARCH" ]; then \
         CGO_ENABLED=0 go build -ldflags="-w -s" -o /app/vito-server ./cmd/server; \
     fi
 
-# Stage 2: Runtime Minimalista Non-Root
+# Stage 2: Runtime Minimalista Non-Root (Sprint 14 Hardening - UID 10001)
 FROM alpine:3.20 AS runner
 
 RUN apk add --no-cache ca-certificates tzdata \
-    && addgroup -S appgroup && adduser -S appuser -G appgroup
+    && addgroup -S -g 10001 vito \
+    && adduser -S -u 10001 -G vito vito
 
 WORKDIR /app
 
-# Cria diretório para dados persistentes (SQLite)
-RUN mkdir -p /app/data && chown -R appuser:appgroup /app/data
+# Cria diretórios para dados persistentes (SQLite) e backups criptografados com permissão restrita
+RUN mkdir -p /app/data /app/backups \
+    && chown -R vito:vito /app/data /app/backups \
+    && chmod 0700 /app/data /app/backups
 
-COPY --from=builder --chown=appuser:appgroup /app/vito-server /app/vito-server
+COPY --from=builder --chown=vito:vito /app/vito-server /app/vito-server
 
-USER appuser
+USER vito
 
 EXPOSE 8080 8180
 

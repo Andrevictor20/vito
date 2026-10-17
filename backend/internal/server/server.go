@@ -135,6 +135,9 @@ func (s *Server) registerRoutes() {
 	s.router.Get("/healthz", s.handleHealthCheck)
 	s.router.Get("/privacy", s.handlePrivacyPolicy)
 	s.router.Get("/terms", s.handleTermsOfService)
+	s.router.Get("/.well-known/assetlinks.json", s.handleAssetLinks)
+	s.router.Get("/.well-known/apple-app-site-association", s.handleAppleAppSiteAssociation)
+	s.router.Get("/apple-app-site-association", s.handleAppleAppSiteAssociation)
 
 	bookingLimiter := middleware.NewRateLimiter(60, 1*time.Minute)
 	if s.bookingHandler != nil {
@@ -175,6 +178,7 @@ func (s *Server) registerRoutes() {
 				ar.Use(authLimiter)
 				ar.Post("/auth/register", s.authHandler.Register)
 				ar.Post("/auth/login", s.authHandler.Login)
+				ar.Post("/auth/refresh", s.authHandler.Refresh)
 			})
 		}
 		if s.googleAuthHandler != nil {
@@ -194,6 +198,9 @@ func (s *Server) registerRoutes() {
 
 				if s.authHandler != nil {
 					protected.Get("/auth/me", s.authHandler.Me)
+					protected.Get("/auth/sessions", s.authHandler.ListSessions)
+					protected.Delete("/auth/sessions/{id}", s.authHandler.RevokeSession)
+					protected.Post("/auth/logout", s.authHandler.Logout)
 				}
 
 				if s.calHandler != nil {

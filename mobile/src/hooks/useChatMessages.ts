@@ -6,45 +6,27 @@ import { notificationService } from '../services/notificationService';
 import { dataSync } from '../services/dataSync';
 import { isAbortError, truncateMessagesForEdit } from '../utils/chatActions';
 import { humanizePreview, semanticTitle } from '../utils/chatPreview';
-import { toChatMeeting } from '../utils/chatCards';
+import { toChatMeeting, toChatBooking, sanitizeErrorMessage } from '../utils/chatCards';
 import type { ChatStorageKeys } from '../services/chatStorageService';
 import { getChatStorageKeys } from '../services/chatStorageService';
 
-export { toChatMeeting };
+export { toChatMeeting, toChatBooking, sanitizeErrorMessage };
 
-// Normaliza o booking da resposta do chat para o card: mescla o objeto
-// booking com as URLs top-level (booking_url / booking_short_url).
-export const toChatBooking = (res: AssistantChatResponse): ChatBooking | undefined => {
-  if (!res.booking) return undefined;
-  return {
-    ...res.booking,
-    public_url: res.booking.public_url || res.booking_url || undefined,
-    short_url: res.booking.short_url || res.booking_short_url || undefined,
-  };
-};
-
-export const sanitizeErrorMessage = (err: unknown): string => {
-  const msg = err instanceof Error ? err.message : String(err || '');
-  const lower = msg.toLowerCase();
-  if (lower.includes('tempo limite') || lower.includes('timeout')) {
-    return 'O servidor demorou a responder. Verifique sua conexão — nada foi criado. Tente de novo com uma frase mais completa.';
-  }
-  if (
-    lower.includes('fetch failed') ||
-    lower.includes('unknownhost') ||
-    lower.includes('network request failed') ||
-    lower.includes('network error') ||
-    lower.includes('econnrefused') ||
-    lower.includes('failed to connect') ||
-    lower.includes('enotfound')
-  ) {
-    return 'Oscilação temporária de conexão com o servidor. Verifique sua internet e tente novamente em instantes.';
-  }
-  if (msg && msg !== 'USER_CANCELLED' && !msg.startsWith('Error:') && !msg.includes('java.net')) {
-    return msg;
-  }
-  return 'Não consegui processar agora por instabilidade temporária. Nada foi criado ou apagado. Tente de novo em instantes.';
-};
+const buildAssistantMessage = (idPrefix: string, res: AssistantChatResponse, defaultReply: string): ChatMessage => ({
+  id: `${idPrefix}-${Date.now()}`,
+  sender: 'vito',
+  text: res.reply || res.message || defaultReply,
+  timestamp: new Date().toISOString(),
+  action_performed: res.action_performed,
+  event: res.event,
+  todo: res.todo,
+  trigger: res.trigger,
+  pending: res.pending,
+  booking: toChatBooking(res),
+  meeting: toChatMeeting(res),
+  conflict: res.conflict,
+  pending_confirmation: res.pending_confirmation,
+});
 
 export const notifyAssistantResult = (res: AssistantChatResponse) => {
   const action = res.action_performed?.toLowerCase() || '';
@@ -211,20 +193,7 @@ export function useChatMessages(
           history: recentHistory,
           signal: controller.signal,
         });
-        const vitoMsg: ChatMessage = {
-          id: `vito-${Date.now()}`,
-          sender: 'vito',
-          text: res.reply || res.message || 'Instrução processada com sucesso.',
-          timestamp: new Date().toISOString(),
-          action_performed: res.action_performed,
-          event: res.event,
-          todo: res.todo,
-          trigger: res.trigger,
-          pending: res.pending,
-          booking: toChatBooking(res),
-          meeting: toChatMeeting(res),
-          conflict: res.conflict,
-        };
+        const vitoMsg = buildAssistantMessage('vito', res, 'Instrução processada com sucesso.');
 
         const withVito = [...withUser, vitoMsg];
         setMessages(withVito);
@@ -315,20 +284,7 @@ export function useChatMessages(
           signal: controller.signal,
         });
 
-        const vitoMsg: ChatMessage = {
-          id: `vito-${Date.now()}`,
-          sender: 'vito',
-          text: res.reply || res.message || 'Instrução processada com sucesso.',
-          timestamp: new Date().toISOString(),
-          action_performed: res.action_performed,
-          event: res.event,
-          todo: res.todo,
-          trigger: res.trigger,
-          pending: res.pending,
-          booking: toChatBooking(res),
-          meeting: toChatMeeting(res),
-          conflict: res.conflict,
-        };
+        const vitoMsg = buildAssistantMessage('vito', res, 'Instrução processada com sucesso.');
 
         const withVito = [...truncatedList, vitoMsg];
         setMessages(withVito);
@@ -417,20 +373,7 @@ export function useChatMessages(
           : 'Voz processada';
 
         const updatedUserMsg: ChatMessage = { ...userMsg, text: transcriptText };
-        const vitoMsg: ChatMessage = {
-          id: `vito-audio-${Date.now()}`,
-          sender: 'vito',
-          text: res.reply || res.message || 'Instrução de voz processada.',
-          timestamp: new Date().toISOString(),
-          action_performed: res.action_performed,
-          event: res.event,
-          todo: res.todo,
-          trigger: res.trigger,
-          pending: res.pending,
-          booking: toChatBooking(res),
-          meeting: toChatMeeting(res),
-          conflict: res.conflict,
-        };
+        const vitoMsg = buildAssistantMessage('vito-audio', res, 'Instrução de voz processada.');
 
         const withVito = [...messages, updatedUserMsg, vitoMsg];
         setMessages(withVito);
@@ -498,20 +441,7 @@ export function useChatMessages(
 
       try {
         const res = await api.assistantVision(imageUri, prompt, 'image.jpg', undefined, base64Override);
-        const vitoMsg: ChatMessage = {
-          id: `vito-img-${Date.now()}`,
-          sender: 'vito',
-          text: res.reply || res.message || 'Imagem analisada com sucesso.',
-          timestamp: new Date().toISOString(),
-          action_performed: res.action_performed,
-          event: res.event,
-          todo: res.todo,
-          trigger: res.trigger,
-          pending: res.pending,
-          booking: toChatBooking(res),
-          meeting: toChatMeeting(res),
-          conflict: res.conflict,
-        };
+        const vitoMsg = buildAssistantMessage('vito-img', res, 'Imagem analisada com sucesso.');
 
         const withVito = [...withUser, vitoMsg];
         setMessages(withVito);

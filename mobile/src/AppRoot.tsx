@@ -13,6 +13,7 @@ import { api, DEFAULT_SERVER_URL, CLOUDFLARE_SERVER_URL, PI_SERVER_URL, isCloudS
 import { notificationService } from './services/notificationService';
 import { UpdateBanner } from './components/common/UpdateBanner';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
+import { PrivacyScreenShield } from './components/common/PrivacyScreenShield';
 
 export type MainTabParamList = {
   chat: undefined;
@@ -90,6 +91,7 @@ const MainNavigator: React.FC = () => {
       <NavigationContainer linking={linking} ref={navigationRef}>
         <RootNavigator serverUrl={serverUrl} onToggleServer={toggleServer} />
       </NavigationContainer>
+      <PrivacyScreenShield />
     </View>
   );
 };

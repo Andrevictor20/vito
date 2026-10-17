@@ -13,6 +13,7 @@ type contextKey string
 const (
 	UserIDKey    contextKey = "user_id"
 	UserEmailKey contextKey = "user_email"
+	SessionIDKey contextKey = "session_id"
 )
 
 // AuthMiddleware intercepta requisições, valida o Bearer Token e injeta o UserID no Context.
@@ -50,9 +51,17 @@ func AuthMiddleware(authSvc *service.AuthService) func(http.Handler) http.Handle
 				return
 			}
 
+			// Valida revogação granular de dispositivo (Sprint 13)
+			if claims.SessionID != "" && authSvc.IsSessionRevoked(claims.UserID, claims.SessionID) {
+				http.Error(w, `{"error":"sessão deste dispositivo foi revogada. faça login novamente"}`, http.StatusUnauthorized)
+				return
+			}
 
 			ctx := context.WithValue(r.Context(), UserIDKey, claims.UserID)
 			ctx = context.WithValue(ctx, UserEmailKey, claims.Email)
+			if claims.SessionID != "" {
+				ctx = context.WithValue(ctx, SessionIDKey, claims.SessionID)
+			}
 
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
@@ -63,4 +72,10 @@ func AuthMiddleware(authSvc *service.AuthService) func(http.Handler) http.Handle
 func UserIDFromContext(ctx context.Context) (string, bool) {
 	val, ok := ctx.Value(UserIDKey).(string)
 	return val, ok
+}
+
+// SessionIDFromContext recupera o ID da sessão do dispositivo atual injetado pelo AuthMiddleware.
+func SessionIDFromContext(ctx context.Context) string {
+	val, _ := ctx.Value(SessionIDKey).(string)
+	return val
 }

@@ -14,7 +14,11 @@
       "backgroundColor": "#121214"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.andrevmp.vito",
+      "associatedDomains": [
+        "applinks:vito.rasppi.cloud"
+      ]
     },
     "android": {
       "package": "com.andrevmp.vito",
@@ -24,6 +28,23 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FFFFFF"
       },
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "vito.rasppi.cloud",
+              "pathPrefix": "/"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ],
       "permissions": [
         "RECORD_AUDIO",
         "CAMERA",

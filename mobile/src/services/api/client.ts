@@ -4,6 +4,8 @@ import { isAbortLike } from '../../utils/requestTimeout';
 import { ApiRequestOptions } from './types';
 
 const TOKEN_KEY = '@vito_jwt_token';
+const REFRESH_TOKEN_KEY = '@vito_refresh_token';
+const SESSION_ID_KEY = '@vito_session_id';
 const SERVER_URL_KEY = '@vito_server_url';
 const SERVER_MANUAL_OVERRIDE_KEY = '@vito_server_manual_override_v2';
 
@@ -19,6 +21,9 @@ export const isCloudServer = (url: string): boolean => {
 export class ApiClient {
   protected baseUrl: string = DEFAULT_SERVER_URL;
   protected token: string | null = null;
+  protected refreshToken: string | null = null;
+  protected sessionId: string | null = null;
+  private refreshPromise: Promise<string | null> | null = null;
 
   async init() {
     const hasManualOverride = await AsyncStorage.getItem(SERVER_MANUAL_OVERRIDE_KEY);
@@ -33,6 +38,8 @@ export class ApiClient {
       await AsyncStorage.removeItem(SERVER_MANUAL_OVERRIDE_KEY);
     }
     this.token = await secureStorage.getItem(TOKEN_KEY);
+    this.refreshToken = await secureStorage.getItem(REFRESH_TOKEN_KEY);
+    this.sessionId = await secureStorage.getItem(SESSION_ID_KEY);
   }
 
   getBaseUrl(): string {
@@ -62,6 +69,90 @@ export class ApiClient {
 
   getToken(): string | null {
     return this.token;
+  }
+
+  async setRefreshToken(refreshToken: string | null) {
+    this.refreshToken = refreshToken;
+    if (refreshToken) {
+      await secureStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+    } else {
+      await secureStorage.removeItem(REFRESH_TOKEN_KEY);
+    }
+  }
+
+  getRefreshToken(): string | null {
+    return this.refreshToken;
+  }
+
+  async setSessionId(sessionId: string | null) {
+    this.sessionId = sessionId;
+    if (sessionId) {
+      await secureStorage.setItem(SESSION_ID_KEY, sessionId);
+    } else {
+      await secureStorage.removeItem(SESSION_ID_KEY);
+    }
+  }
+
+  getSessionId(): string | null {
+    return this.sessionId;
+  }
+
+  async setAuthTokens(token: string | null, refreshToken?: string | null, sessionId?: string | null) {
+    await this.setToken(token);
+    if (refreshToken !== undefined) {
+      await this.setRefreshToken(refreshToken);
+    }
+    if (sessionId !== undefined) {
+      await this.setSessionId(sessionId);
+    }
+  }
+
+  private async performTokenRefresh(): Promise<string | null> {
+    if (!this.refreshToken) {
+      return null;
+    }
+    if (this.refreshPromise) {
+      return this.refreshPromise;
+    }
+
+    this.refreshPromise = (async () => {
+      try {
+        const res = await fetch(`${this.baseUrl}/api/v1/auth/refresh`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          },
+          body: JSON.stringify({ refresh_token: this.refreshToken }),
+        });
+
+        if (!res.ok) {
+          if (res.status === 401 || res.status === 403) {
+            await this.setAuthTokens(null, null, null);
+          }
+          return null;
+        }
+
+        const data = await res.json().catch(() => null);
+        const newAccess = data?.access_token || data?.token;
+        if (!newAccess) {
+          return null;
+        }
+
+        await this.setAuthTokens(
+          newAccess,
+          data?.refresh_token ?? this.refreshToken,
+          data?.session_id ?? this.sessionId
+        );
+        return newAccess;
+      } catch {
+        return null;
+      } finally {
+        this.refreshPromise = null;
+      }
+    })();
+
+    return this.refreshPromise;
   }
 
   async request<T>(endpoint: string, options: ApiRequestOptions = {}): Promise<T> {
@@ -99,6 +190,18 @@ export class ApiClient {
         headers,
         signal: controller.signal,
       });
+
+      const isAuthFlow =
+        endpoint.includes('/auth/login') ||
+        endpoint.includes('/auth/register') ||
+        endpoint.includes('/auth/refresh');
+
+      if (res.status === 401 && !options._isRetry && !isAuthFlow && this.refreshToken) {
+        const refreshedToken = await this.performTokenRefresh();
+        if (refreshedToken) {
+          return this.request<T>(endpoint, { ...options, _isRetry: true });
+        }
+      }
 
       const data = await res.json().catch(() => null);
 

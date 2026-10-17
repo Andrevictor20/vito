@@ -15,25 +15,35 @@ type AIParsingGateway interface {
 	ParseIntent(ctx context.Context, input ai.UserInput) (*ai.ParsedIntent, error)
 }
 
+// DestructiveConfirmation representa o banner de confirmação humana (Human-in-the-Loop) para ações críticas ou em massa (Sprint 13).
+type DestructiveConfirmation struct {
+	ActionType    string `json:"action_type"`
+	TargetTitle   string `json:"target_title"`
+	ImpactCount   int    `json:"impact_count"`
+	Description   string `json:"description"`
+	ConfirmPrompt string `json:"confirm_prompt"`
+}
+
 // AssistantResponse representa o retorno da interação com a secretária Vito.
 type AssistantResponse struct {
-	Action       ai.IntentAction      `json:"action"`
-	Intent       string               `json:"intent,omitempty"`
-	Message      string               `json:"message"`
-	Reply        string               `json:"reply,omitempty"`
-	Event        *domain.Event        `json:"event,omitempty"`
-	Conflict     *domain.ConflictInfo `json:"conflict,omitempty"`
-	Todo         *domain.Todo         `json:"todo,omitempty"`
-	Trigger      *domain.Trigger      `json:"trigger,omitempty"`
-	Pending      *domain.PendingItem  `json:"pending,omitempty"`
-	Booking      *domain.BookingType        `json:"booking,omitempty"`
-	BookingURL   string                     `json:"booking_url,omitempty"`
-	BookingShort string                     `json:"booking_short_url,omitempty"`
-	Meeting      *domain.MeetingWithDetails `json:"meeting,omitempty"`
-	MeetingURL   string                     `json:"meeting_url,omitempty"`
-	MeetingShort string                     `json:"meeting_short_url,omitempty"`
-	MeetingWhatsApp string                  `json:"meeting_whatsapp_url,omitempty"`
-	ProviderUsed string                     `json:"provider_used,omitempty"`
+	Action              ai.IntentAction          `json:"action"`
+	Intent              string                   `json:"intent,omitempty"`
+	Message             string                   `json:"message"`
+	Reply               string                   `json:"reply,omitempty"`
+	Event               *domain.Event            `json:"event,omitempty"`
+	Conflict            *domain.ConflictInfo     `json:"conflict,omitempty"`
+	Todo                *domain.Todo             `json:"todo,omitempty"`
+	Trigger             *domain.Trigger          `json:"trigger,omitempty"`
+	Pending             *domain.PendingItem      `json:"pending,omitempty"`
+	Booking             *domain.BookingType        `json:"booking,omitempty"`
+	BookingURL          string                     `json:"booking_url,omitempty"`
+	BookingShort        string                     `json:"booking_short_url,omitempty"`
+	Meeting             *domain.MeetingWithDetails `json:"meeting,omitempty"`
+	MeetingURL          string                     `json:"meeting_url,omitempty"`
+	MeetingShort        string                     `json:"meeting_short_url,omitempty"`
+	MeetingWhatsApp     string                     `json:"meeting_whatsapp_url,omitempty"`
+	PendingConfirmation *DestructiveConfirmation   `json:"pending_confirmation,omitempty"`
+	ProviderUsed        string                     `json:"provider_used,omitempty"`
 }
 
 // AssistantService orquestra o parsing de IA com os serviços de calendário, tarefas, memórias e disparadores.

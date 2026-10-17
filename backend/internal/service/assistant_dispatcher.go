@@ -114,6 +114,22 @@ func (s *AssistantService) executeAction(ctx context.Context, userID string, int
 				res.Reply = res.Message
 				return res, nil
 			}
+			matchingCount := s.calSvc.CountMatchingEventsByTitle(userID, target)
+			if matchingCount > 1 && strings.EqualFold(strings.TrimSpace(input.AutonomyMode), "proactive") && !isExplicitDeleteConfirmation(input.Text) {
+				msg := fmt.Sprintf("Identifiquei %d compromissos de '%s' na sua agenda. Por segurança, confirme abaixo se deseja realmente remover toda a série.", matchingCount, target)
+				res.Action = ai.ActionNeedsClarification
+				res.Intent = string(ai.ActionNeedsClarification)
+				res.Message = msg
+				res.Reply = msg
+				res.PendingConfirmation = &DestructiveConfirmation{
+					ActionType:    "DELETE_EVENT_SERIES",
+					TargetTitle:   target,
+					ImpactCount:   matchingCount,
+					Description:   fmt.Sprintf("Esta ação removerá %d compromissos de '%s' da sua agenda.", matchingCount, target),
+					ConfirmPrompt: fmt.Sprintf("Confirmar exclusão de %s", target),
+				}
+				return res, nil
+			}
 			count, err := s.calSvc.DeleteEventsByTitle(userID, target)
 			if err != nil {
 				log.Printf("⚠️ [AssistantService] Falha ao excluir evento(s) (user=%s, target=%q): %v", userID, target, err)

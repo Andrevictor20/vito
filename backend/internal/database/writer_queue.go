@@ -13,7 +13,24 @@ var (
 	ErrQueueClosed = errors.New("writer queue is closed")
 	// ErrQueueTimeout indica que a escrita expirou antes de ser processada.
 	ErrQueueTimeout = errors.New("writer queue operation timed out")
+
+	defaultQueueMu sync.RWMutex
+	defaultQueue   *SingleWriterQueue
 )
+
+// SetDefaultWriterQueue registra a fila de escrita padrão compartilhada pelo processo.
+func SetDefaultWriterQueue(q *SingleWriterQueue) {
+	defaultQueueMu.Lock()
+	defer defaultQueueMu.Unlock()
+	defaultQueue = q
+}
+
+// DefaultWriterQueue retorna a fila de escrita padrão, se inicializada.
+func DefaultWriterQueue() *SingleWriterQueue {
+	defaultQueueMu.RLock()
+	defer defaultQueueMu.RUnlock()
+	return defaultQueue
+}
 
 type writeRequest struct {
 	ctx  context.Context

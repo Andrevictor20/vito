@@ -49,9 +49,45 @@ func ExportedInferBookingDays(text string) string { return inferBookingDaysOfWee
 // inferBookingDaysOfWeek deriva a janela semanal; default 7 dias (inclui fds e feriados).
 func inferBookingDaysOfWeek(text string) string { return assistant.InferBookingDaysOfWeek(text) }
 
+// IsSafeMemoryContent aplica validação heurística semântica contra injeção persistente de prompt
+// (Context Poisoning Defense - Sprint 13) antes de gravar fatos na tabela memories.
+func IsSafeMemoryContent(content string) bool {
+	trimmed := strings.TrimSpace(content)
+	if trimmed == "" || len(trimmed) > 500 {
+		return false
+	}
+	lower := strings.ToLower(trimmed)
+	poisonPatterns := []string{
+		"ignore todas as instruções",
+		"ignore as instruções",
+		"ignore previous",
+		"ignore all previous",
+		"system prompt",
+		"instrução de sistema",
+		"instrucoes de sistema",
+		"apague todos os eventos",
+		"delete all events",
+		"sem pedir confirmação",
+		"sem confirmacao",
+		"<untrusted_",
+		"</untrusted_",
+		"<script",
+		"modo desenvolvedor",
+		"jailbreak",
+		"você agora é",
+		"override system",
+	}
+	for _, pat := range poisonPatterns {
+		if strings.Contains(lower, pat) {
+			return false
+		}
+	}
+	return true
+}
+
 func (s *AssistantService) persistLearnedMemory(userID, category, content string) {
 	content = strings.TrimSpace(content)
-	if content == "" {
+	if !IsSafeMemoryContent(content) {
 		return
 	}
 	if category == "" {
@@ -92,3 +128,25 @@ func (s *AssistantService) persistLearnedMemory(userID, category, content string
 
 // sameTopic delega ao subpacote assistant (BACK-01).
 func sameTopic(a, b string) bool { return assistant.SameTopic(a, b) }
+
+// isExplicitDeleteConfirmation verifica se o texto do usuário contém confirmação explícita para exclusão em massa.
+func isExplicitDeleteConfirmation(text string) bool {
+	lower := strings.ToLower(strings.TrimSpace(text))
+	confirmKeywords := []string{
+		"confirmar exclusão",
+		"confirmar exclusao",
+		"confirmo a exclusão",
+		"confirmo a exclusao",
+		"pode apagar tudo",
+		"sim, apague",
+		"sim, exclua",
+		"[confirmed]",
+	}
+	for _, kw := range confirmKeywords {
+		if strings.Contains(lower, kw) {
+			return true
+		}
+	}
+	return false
+}
+

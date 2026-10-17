@@ -72,3 +72,21 @@ func SanitizeUntrustedInput(raw string) string {
 
 	return fmt.Sprintf("<untrusted_user_input>\n%s\n</untrusted_user_input>", neutralized)
 }
+
+// WrapUntrustedContent encapsula dados externos (web_search, vision_ocr, audio_whisper) em tags XML <untrusted_content>
+// neutralizando qualquer tentativa de escape de tag (Indirect Prompt Injection Defense - Sprint 13).
+func WrapUntrustedContent(source, raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return ""
+	}
+	if strings.TrimSpace(source) == "" {
+		source = "external"
+	}
+
+	neutralized := strings.ReplaceAll(trimmed, "</untrusted_content>", "[escaped_closed_tag]")
+	neutralized = strings.ReplaceAll(neutralized, "<untrusted_content", "[escaped_open_tag")
+
+	return fmt.Sprintf("<untrusted_content source=%q>\n%s\n</untrusted_content>", source, neutralized)
+}
+

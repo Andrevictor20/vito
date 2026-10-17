@@ -46,6 +46,7 @@ import {
   ContactMatchResult,
   P2PMutualSlot,
   SendP2PInviteInput,
+  UserSession,
 } from '../../types';
 
 export {
@@ -71,7 +72,7 @@ export class ApiService extends ApiClient {
   private p2pMeetingsApi = new P2PMeetingsApi(this);
   private notificationsApi = new NotificationsApi(this);
 
-  // Auth
+  // Auth & Sessions
   login(email: string, password: string): Promise<AuthResponse> {
     return this.authApi.login(email, password);
   }
@@ -80,6 +81,18 @@ export class ApiService extends ApiClient {
   }
   getMe(): Promise<{ user: User }> {
     return this.authApi.getMe();
+  }
+  getSessions(): Promise<{ sessions: UserSession[] }> {
+    return this.authApi.getSessions();
+  }
+  revokeSession(sessionId: string): Promise<{ status: string }> {
+    return this.authApi.revokeSession(sessionId);
+  }
+  revokeOtherSessions(): Promise<{ status: string }> {
+    return this.authApi.revokeOtherSessions();
+  }
+  logoutSession(): Promise<{ status: string }> {
+    return this.authApi.logoutSession();
   }
 
   // Calendar

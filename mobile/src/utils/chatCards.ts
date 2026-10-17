@@ -120,3 +120,38 @@ export const toChatMeeting = (res: AssistantChatResponse): ChatMeeting | undefin
     slots_count: slotsCount,
   };
 };
+
+// Normaliza o booking da resposta do chat para o card: mescla o objeto
+// booking com as URLs top-level (booking_url / booking_short_url).
+export const toChatBooking = (res: AssistantChatResponse): ChatBooking | undefined => {
+  if (!res.booking) return undefined;
+  return {
+    ...res.booking,
+    public_url: res.booking.public_url || res.booking_url || undefined,
+    short_url: res.booking.short_url || res.booking_short_url || undefined,
+  };
+};
+
+export const sanitizeErrorMessage = (err: unknown): string => {
+  const msg = err instanceof Error ? err.message : String(err || '');
+  const lower = msg.toLowerCase();
+  if (lower.includes('tempo limite') || lower.includes('timeout')) {
+    return 'O servidor demorou a responder. Verifique sua conexão — nada foi criado. Tente de novo com uma frase mais completa.';
+  }
+  if (
+    lower.includes('fetch failed') ||
+    lower.includes('unknownhost') ||
+    lower.includes('network request failed') ||
+    lower.includes('network error') ||
+    lower.includes('econnrefused') ||
+    lower.includes('failed to connect') ||
+    lower.includes('enotfound')
+  ) {
+    return 'Oscilação temporária de conexão com o servidor. Verifique sua internet e tente novamente em instantes.';
+  }
+  if (msg && msg !== 'USER_CANCELLED' && !msg.startsWith('Error:') && !msg.includes('java.net')) {
+    return msg;
+  }
+  return 'Não consegui processar agora por instabilidade temporária. Nada foi criado ou apagado. Tente de novo em instantes.';
+};
+

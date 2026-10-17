@@ -13,19 +13,26 @@ import (
 	"github.com/andrevmp/vito/backend/internal/domain"
 )
 
+const (
+	AccessTokenTTL  = 15 * time.Minute
+	RefreshTokenTTL = 30 * 24 * time.Hour
+)
+
 // UserClaims representa as informações contidas no payload do JWT.
 type UserClaims struct {
 	UserID       string `json:"user_id"`
 	Email        string `json:"email"`
 	Name         string `json:"name"`
 	TokenVersion int    `json:"token_version"`
+	SessionID    string `json:"session_id,omitempty"`
 	jwt.RegisteredClaims
 }
 
 // AuthService gerencia regras de negócio de autenticação e tokens.
 type AuthService struct {
-	userRepo  domain.UserRepository
-	jwtSecret []byte
+	userRepo    domain.UserRepository
+	sessionRepo domain.SessionRepository
+	jwtSecret   []byte
 }
 
 func validatePassword(password string) error {
@@ -150,18 +157,24 @@ func (s *AuthService) GenerateTokenForUser(user *domain.User) (string, error) {
 }
 
 func (s *AuthService) generateToken(user *domain.User) (string, error) {
+	return s.generateTokenWithSession(user, "")
+}
+
+func (s *AuthService) generateTokenWithSession(user *domain.User, sessionID string) (string, error) {
 	tokenVersion := user.TokenVersion
 	if tokenVersion <= 0 {
 		tokenVersion = 1
 	}
+	now := time.Now()
 	claims := UserClaims{
 		UserID:       user.ID,
 		Email:        user.Email,
 		Name:         user.Name,
 		TokenVersion: tokenVersion,
+		SessionID:    sessionID,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(30 * 24 * time.Hour)), // 30 dias para uso pessoal
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			ExpiresAt: jwt.NewNumericDate(now.Add(AccessTokenTTL)),
+			IssuedAt:  jwt.NewNumericDate(now),
 			Subject:   user.ID,
 		},
 	}
@@ -172,6 +185,9 @@ func (s *AuthService) generateToken(user *domain.User) (string, error) {
 
 // RevokeAllSessions revoga todas as sessões e tokens JWT ativos do usuário incrementando sua versão.
 func (s *AuthService) RevokeAllSessions(userID string) error {
+	if s.sessionRepo != nil {
+		_ = s.sessionRepo.RevokeAllByUser(userID, time.Now().UTC())
+	}
 	return s.userRepo.IncrementTokenVersion(userID)
 }
 

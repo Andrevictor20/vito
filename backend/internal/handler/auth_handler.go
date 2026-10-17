@@ -22,19 +22,25 @@ func NewAuthHandler(authSvc *service.AuthService, userRepo domain.UserRepository
 }
 
 type registerRequest struct {
-	Name     string `json:"name"`
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	Name       string `json:"name"`
+	Email      string `json:"email"`
+	Password   string `json:"password"`
+	DeviceName string `json:"device_name,omitempty"`
 }
 
 type loginRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	Email      string `json:"email"`
+	Password   string `json:"password"`
+	DeviceName string `json:"device_name,omitempty"`
 }
 
 type authResponse struct {
-	User  *domain.User `json:"user"`
-	Token string       `json:"token"`
+	User         *domain.User `json:"user"`
+	Token        string       `json:"token"`
+	AccessToken  string       `json:"access_token,omitempty"`
+	RefreshToken string       `json:"refresh_token,omitempty"`
+	SessionID    string       `json:"session_id,omitempty"`
+	ExpiresIn    int          `json:"expires_in,omitempty"`
 }
 
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
@@ -44,7 +50,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, token, err := h.authSvc.Register(req.Name, req.Email, req.Password)
+	user, pair, err := h.authSvc.RegisterWithSession(req.Name, req.Email, req.Password, resolveDeviceName(req.DeviceName, r), extractClientIP(r))
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		if err == domain.ErrUserAlreadyExists {
@@ -58,7 +64,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(authResponse{User: user, Token: token})
+	_ = json.NewEncoder(w).Encode(buildAuthResponse(user, pair))
 }
 
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
@@ -68,7 +74,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, token, err := h.authSvc.Login(req.Email, req.Password)
+	user, pair, err := h.authSvc.LoginWithSession(req.Email, req.Password, resolveDeviceName(req.DeviceName, r), extractClientIP(r))
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
@@ -77,7 +83,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(authResponse{User: user, Token: token})
+	_ = json.NewEncoder(w).Encode(buildAuthResponse(user, pair))
 }
 
 func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {

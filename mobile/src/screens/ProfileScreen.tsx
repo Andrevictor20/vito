@@ -21,6 +21,7 @@ import { CalendarSyncSettingsModal } from '../components/profile/CalendarSyncSet
 import { AISettingsModal } from '../components/profile/AISettingsModal';
 import { PhoneEditModal } from '../components/profile/PhoneEditModal';
 import { ContactsSyncModal } from '../components/profile/ContactsSyncModal';
+import { ConnectedDevicesModal } from '../components/profile/ConnectedDevicesModal';
 import { api } from '../services/api';
 import { notificationService } from '../services/notificationService';
 import { calendarSyncService } from '../services/calendarSyncService';
@@ -45,6 +46,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const [aiVisible, setAiVisible] = useState(false);
   const [phoneVisible, setPhoneVisible] = useState(false);
   const [contactsVisible, setContactsVisible] = useState(false);
+  const [devicesVisible, setDevicesVisible] = useState(false);
   const [userPhone, setUserPhone] = useState(user?.phone || '');
   const [checking, setChecking] = useState(false);
 
@@ -67,6 +69,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const [autonomyMode, setAutonomyMode] = useState<AutonomyMode>('assisted');
   const [notifActive, setNotifActive] = useState<boolean | null>(null);
   const [calendarsActive, setCalendarsActive] = useState<number | null>(null);
+  const [sessionsCount, setSessionsCount] = useState<number | null>(null);
 
   const loadStatuses = useCallback(async () => {
     try {
@@ -86,6 +89,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
       setCalendarsActive((list || []).filter((i) => i.status === 'active').length);
     } catch {
       setCalendarsActive(null);
+    }
+    try {
+      const sess = await api.getSessions();
+      setSessionsCount(sess?.sessions?.length ?? 1);
+    } catch {
+      setSessionsCount(null);
     }
   }, []);
 
@@ -196,12 +205,47 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         visible={contactsVisible}
         onClose={() => setContactsVisible(false)}
       />
+      <ConnectedDevicesModal
+        visible={devicesVisible}
+        onClose={() => setDevicesVisible(false)}
+        onSessionsChanged={(count) => setSessionsCount(count)}
+      />
 
       <View style={styles.sectionHeader}>
         <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>SISTEMA & SESSÃO</Text>
       </View>
 
       <View style={[styles.groupCard, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
+        <TouchableOpacity
+          style={styles.groupItem}
+          onPress={() => setDevicesVisible(true)}
+          activeOpacity={0.8}
+          accessibilityLabel="Dispositivos conectados"
+          accessibilityRole="button"
+        >
+          <View style={styles.actionLeft}>
+            <View style={[styles.itemIconBox, { backgroundColor: colors.surfaceContainerHigh }]}>
+              <MaterialIcons name="devices" size={18} color={colors.primary} />
+            </View>
+            <View style={styles.itemTextCol}>
+              <Text style={[styles.actionText, { color: colors.onSurface }]}>Dispositivos Conectados</Text>
+              <Text style={[styles.itemSub, { color: colors.textSecondary }]} numberOfLines={1}>
+                Gerenciar sessões e acessos ativos
+              </Text>
+            </View>
+          </View>
+          <View style={styles.itemRight}>
+            {sessionsCount !== null && (
+              <Text style={[styles.statusText, { color: colors.onSurfaceVariant }]}>
+                {sessionsCount} {sessionsCount === 1 ? 'ativo' : 'ativos'}
+              </Text>
+            )}
+            <MaterialIcons name="chevron-right" size={20} color={colors.outline} />
+          </View>
+        </TouchableOpacity>
+
+        <View style={[styles.divider, { backgroundColor: colors.outlineVariant }]} />
+
         <TouchableOpacity
           style={styles.groupItem}
           onPress={handleCheckUpdate}

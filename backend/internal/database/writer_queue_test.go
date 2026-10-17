@@ -24,10 +24,10 @@ func TestSingleWriterQueue_ConcurrencyStress(t *testing.T) {
 		t.Fatalf("falha ao criar schema: %v", err)
 	}
 
-	queue := NewSingleWriterQueue(100)
+	queue := NewSingleWriterQueue(256)
 	defer queue.Close()
 
-	const concurrentGoroutines = 50
+	const concurrentGoroutines = 100
 	var wg sync.WaitGroup
 	errs := make(chan error, concurrentGoroutines)
 

@@ -212,7 +212,7 @@ func (p *OpenAICompatProvider) EvaluateTrigger(ctx context.Context, t *domain.Tr
 
 	realtimeBlock := ""
 	if realtimeFeed != "" {
-		realtimeBlock = fmt.Sprintf("\nNOTÍCIAS FACTUAIS COLETADAS EM TEMPO REAL NA WEB (GOOGLE NOTÍCIAS BRASIL):\n%s\n", realtimeFeed)
+		realtimeBlock = fmt.Sprintf("\nNOTÍCIAS FACTUAIS COLETADAS EM TEMPO REAL NA WEB (GOOGLE NOTÍCIAS BRASIL):\n%s\n", WrapUntrustedContent("web_search", realtimeFeed))
 	}
 
 	systemPrompt := fmt.Sprintf(`Você é o Vito, assistente de inteligência autônoma e monitoramento executivo do usuário.
