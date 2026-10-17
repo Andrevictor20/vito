@@ -30,8 +30,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const bootstrap = async () => {
       try {
         await api.init();
+        const token = api.getToken();
         const cachedUser = await secureStorage.getItem(USER_KEY);
-        if (cachedUser) {
+        if (cachedUser && token) {
           try {
             const parsed = JSON.parse(cachedUser);
             if (parsed && parsed.id) {
@@ -39,6 +40,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               setIsInitialLoading(false);
             }
           } catch {}
+        } else if (cachedUser && !token) {
+          console.warn('[AuthContext] Usuário em cache sem token válido. Limpando sessão inconsistente.');
+          await secureStorage.removeItem(USER_KEY);
+          setUser(null);
         }
 
         // Validação ou atualização silenciosa do perfil em background se houver token
@@ -51,8 +56,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
           } catch (meErr: any) {
             const errMsg = meErr?.message || '';
-            // Apenas desloga se o token for explicitamente rejeitado pelo servidor (401 com token inválido/expirado)
-            if (errMsg.includes('401') && (errMsg.includes('inválido') || errMsg.includes('expirado') || errMsg.includes('não autorizado'))) {
+            // Apenas desloga se o token for explicitamente rejeitado pelo servidor (401 com token inválido/expirado/ausente)
+            if (errMsg.includes('401') && (errMsg.includes('inválido') || errMsg.includes('expirado') || errMsg.includes('não autorizado') || errMsg.includes('ausente'))) {
               console.warn('[AuthContext] Sessão expirada no servidor, deslogando:', errMsg);
               await api.setToken(null);
               await secureStorage.removeItem(USER_KEY);

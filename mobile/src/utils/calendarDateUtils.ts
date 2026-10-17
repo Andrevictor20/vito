@@ -205,3 +205,54 @@ export const formatEventTimeRange = (event: Event): string => {
 
   return `${startTime} - ${endTime}`;
 };
+
+/**
+ * Próximos eventos a partir de hoje em ordem cronológica (com agrupamento inteligente de séries recorrentes).
+ */
+export const getUpcomingGroupedEvents = (events: Event[]): Event[] => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const futureEvents = events
+    .filter((ev) => {
+      try {
+        const end = ev.end_at ? parseSafeDate(ev.end_at) : parseSafeDate(ev.start_at);
+        return end.getTime() >= today.getTime();
+      } catch {
+        return false;
+      }
+    })
+    .sort((a, b) => {
+      const tA = parseSafeDate(a.start_at).getTime();
+      const tB = parseSafeDate(b.start_at).getTime();
+      return tA - tB;
+    });
+
+  const titleCounts = new Map<string, number>();
+  for (const ev of futureEvents) {
+    const key = ev.title.trim().toLowerCase();
+    titleCounts.set(key, (titleCounts.get(key) || 0) + 1);
+  }
+
+  const seenSeries = new Set<string>();
+  const grouped: Event[] = [];
+
+  for (const ev of futureEvents) {
+    const key = ev.title.trim().toLowerCase();
+    const isSeries = (titleCounts.get(key) || 0) > 1 || !!ev.recurrence;
+
+    if (isSeries) {
+      if (!seenSeries.has(key)) {
+        seenSeries.add(key);
+        grouped.push({
+          ...ev,
+          is_recurring: true,
+        });
+      }
+    } else {
+      grouped.push(ev);
+    }
+  }
+
+  return grouped;
+};

@@ -20,9 +20,14 @@ func TestBuildSystemPrompt_AppGuideCoverage(t *testing.T) {
 
 	for _, anchor := range []string{
 		"APP_GUIDE",
+		"TOPOLOGIA FÍSICA E NAVEGAÇÃO",
 		"Tarefas e Pendências",
 		"Radares",
 		"Booking",
+		"Perfil (ícone de pessoa",
+		"PROIBIÇÃO ABSOLUTA (ANTI-ALUCINAÇÃO DO HEADER)",
+		"NUNCA existe menu de perfil",
+		"COMO ALTERAR O TEMA DO APP",
 		"Nível 1",
 		"Nível 2",
 		"Nível 3",

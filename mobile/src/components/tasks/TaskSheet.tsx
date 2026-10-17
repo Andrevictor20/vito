@@ -584,7 +584,7 @@ export const TaskSheet: React.FC<TaskSheetProps> = ({
               </>
             )}
 
-            {(localError || error) && (
+            {Boolean(localError || error) && (
               <Text style={[styles.errorText, { color: colors.error }]}>{localError || error}</Text>
             )}
 

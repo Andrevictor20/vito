@@ -243,8 +243,8 @@ export const TriggersScreen: React.FC<{ onSubViewChange?: (inSubView: boolean) =
             resultCount={triggers.length}
           />
         </View>
-        {promptError && <Text style={styles.inputErrorText}>{promptError}</Text>}
-        {selectedCategoryLabel && (
+        {!!promptError && <Text style={styles.inputErrorText}>{promptError}</Text>}
+        {!!selectedCategoryLabel && (
           <View style={styles.activeFilterRow}>
             <Text style={[styles.activeFilterText, { color: colors.textMuted }]}>
               {selectedCategoryLabel} · {triggers.length} {triggers.length === 1 ? 'radar' : 'radares'}

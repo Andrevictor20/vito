@@ -502,7 +502,7 @@ export const TriggerReportsView: React.FC<TriggerReportsViewProps> = ({
                 )}
               </TouchableOpacity>
 
-              {errorMessage && (
+              {!!errorMessage && (
                 <View style={[styles.errorBox, { backgroundColor: colors.errorContainer }]}>
                   <MaterialIcons name="error-outline" size={16} color={colors.error} />
                   <Text style={[styles.errorText, { color: colors.onErrorContainer }]} numberOfLines={3}>

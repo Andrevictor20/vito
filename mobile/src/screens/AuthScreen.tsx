@@ -163,7 +163,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ serverUrl, onToggleServe
           {isRegister ? 'Crie sua conta pessoal' : 'Seu secretário executivo pessoal com IA'}
         </Text>
 
-        {error && (
+        {!!error && (
           <View style={styles.errorBox}>
             <MaterialIcons name="error-outline" size={16} color={colors.onErrorContainer} />
             <Text style={styles.errorText}>{error}</Text>

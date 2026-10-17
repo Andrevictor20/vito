@@ -325,14 +325,14 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
           </TouchableOpacity>
         </View>
 
-        {(filter !== 'all' || priorityFilter !== 'all' || query) && (
+        {(filter !== 'all' || priorityFilter !== 'all' || !!query) && (
           <Text style={[styles.activeFilterLine, { color: colors.textMuted }]}>
             {activeRows.length} {activeRows.length === 1 ? 'tarefa' : 'tarefas'}
             {query ? ` para "${searchQuery.trim()}"` : ''}
           </Text>
         )}
 
-        {pending.error && pending.items.length === 0 && (
+        {!!pending.error && pending.items.length === 0 && (
           <View style={[styles.errorCard, { backgroundColor: colors.errorContainer, borderColor: colors.error }]}>
             <Text style={[styles.errorText, { color: colors.onErrorContainer }]}>{pending.error}</Text>
             <TouchableOpacity onPress={pending.retry} activeOpacity={0.7} accessibilityLabel="Tentar carregar de novo">

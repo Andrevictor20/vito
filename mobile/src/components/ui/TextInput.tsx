@@ -100,7 +100,7 @@ export const TextInput: React.FC<TextInputProps> = ({
   return (
     <View style={containerStyle}>
       <View style={styles.container}>
-        {label && (
+        {!!label && (
           <Text style={styles.label} pointerEvents="none">
             {label}
           </Text>
@@ -120,7 +120,7 @@ export const TextInput: React.FC<TextInputProps> = ({
           {...props}
         />
       </View>
-      {error && <Text style={styles.errorText}>{error}</Text>}
+      {!!error && <Text style={styles.errorText}>{error}</Text>}
     </View>
   );
 };

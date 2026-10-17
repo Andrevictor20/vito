@@ -153,7 +153,7 @@ export const ReminderSheet: React.FC<ReminderSheetProps> = ({
             ))}
           </View>
 
-          {(localError || error) && (
+          {Boolean(localError || error) && (
             <Text style={[styles.errorText, { color: colors.error }]}>{localError || error}</Text>
           )}
 

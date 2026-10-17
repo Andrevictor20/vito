@@ -60,9 +60,9 @@ export const M3ProgressRing: React.FC<M3ProgressRingProps> = ({
         />
       </Svg>
 
-      {(centerText || subtitle) && (
+      {!!(centerText || subtitle) && (
         <View style={styles.textContainer}>
-          {centerText && (
+          {!!centerText && (
             <Text
               style={[
                 styles.centerText,
@@ -75,7 +75,7 @@ export const M3ProgressRing: React.FC<M3ProgressRingProps> = ({
               {centerText}
             </Text>
           )}
-          {subtitle && (
+          {!!subtitle && (
             <Text
               style={[
                 styles.subtitle,

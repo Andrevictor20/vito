@@ -137,7 +137,7 @@ export const EditTriggerModal: React.FC<EditTriggerModalProps> = ({
       subtitle={trigger.title}
     >
       <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-        {error && (
+        {!!error && (
           <View style={styles.errorBanner}>
             <MaterialIcons name="error-outline" size={16} color="#EF4444" />
             <Text style={styles.errorText}>{error}</Text>

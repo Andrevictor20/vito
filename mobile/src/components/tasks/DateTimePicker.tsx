@@ -96,7 +96,7 @@ export const DateTimePicker: React.FC<DateTimePickerProps> = ({
         >
           <Text style={[styles.quickText, { color: colors.primary }]}>Amanhã</Text>
         </TouchableOpacity>
-        {dateISO && (
+        {!!dateISO && (
           <TouchableOpacity
             style={[styles.quickChip, { borderColor: colors.outlineVariant }]}
             onPress={() => pick(null)}
@@ -106,7 +106,7 @@ export const DateTimePicker: React.FC<DateTimePickerProps> = ({
             <Text style={[styles.quickText, { color: colors.onSurfaceVariant }]}>Limpar</Text>
           </TouchableOpacity>
         )}
-        {dateISO && (
+        {!!dateISO && (
           <View style={[styles.currentBadge, { backgroundColor: colors.secondaryContainer }]}>
             <Text style={[styles.currentText, { color: colors.onSecondaryContainer }]}>{shortLabel(dateISO)}</Text>
           </View>

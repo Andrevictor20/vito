@@ -5,7 +5,7 @@ import { api } from '../services/api';
 import { notificationService } from '../services/notificationService';
 import { dataSync } from '../services/dataSync';
 
-import { toLocalDateString, parseSafeDate, isEventOnDate, getEventDays } from '../utils/calendarDateUtils';
+import { toLocalDateString, parseSafeDate, isEventOnDate, getEventDays, getUpcomingGroupedEvents } from '../utils/calendarDateUtils';
 
 export const getHomeCacheKeys = (userId?: string) => {
   const suffix = userId ? `_${userId}` : '';
@@ -30,7 +30,7 @@ export function useHomeData(currentUserId?: string) {
   const [modalVisible, setModalVisible] = useState(false);
 
   const loadData = useCallback(async (isSilent = false) => {
-    if (!currentUserId) {
+    if (!currentUserId || !api.getToken()) {
       setEvents([]);
       setTodos([]);
       setLoading(false);
@@ -52,8 +52,12 @@ export function useHomeData(currentUserId?: string) {
       if ((fetchedEvents && fetchedEvents.length > 0) || (fetchedTodos && fetchedTodos.length > 0)) {
         notificationService.scheduleAllUpcomingReminders(fetchedEvents || [], fetchedTodos || []).catch(() => {});
       }
-    } catch (e) {
-      console.error('Falha ao carregar dados:', e);
+    } catch (e: any) {
+      if (e?.status === 401 || e?.message?.includes('autorização ausente') || e?.message?.includes('não autorizado')) {
+        console.warn('[useHomeData] Sessão desautenticada ao carregar dados:', e?.message || e);
+      } else {
+        console.error('Falha ao carregar dados:', e);
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -62,7 +66,7 @@ export function useHomeData(currentUserId?: string) {
 
   useEffect(() => {
     let isMounted = true;
-    if (!currentUserId) {
+    if (!currentUserId || !api.getToken()) {
       setEvents([]);
       setTodos([]);
       setLoading(false);
@@ -436,55 +440,7 @@ export function useHomeData(currentUserId?: string) {
   }, [events, selectedDate]);
 
   // Próximos eventos a partir de hoje em ordem cronológica (com agrupamento inteligente de séries recorrentes)
-  const upcomingEvents = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const futureEvents = events
-      .filter((ev) => {
-        try {
-          const end = ev.end_at ? parseSafeDate(ev.end_at) : parseSafeDate(ev.start_at);
-          return end.getTime() >= today.getTime();
-        } catch {
-          return false;
-        }
-      })
-      .sort((a, b) => {
-        const tA = parseSafeDate(a.start_at).getTime();
-        const tB = parseSafeDate(b.start_at).getTime();
-        return tA - tB;
-      });
-
-    // Detecta quantas ocorrências futuras existem por título/padrão
-    const titleCounts = new Map<string, number>();
-    for (const ev of futureEvents) {
-      const key = ev.title.trim().toLowerCase();
-      titleCounts.set(key, (titleCounts.get(key) || 0) + 1);
-    }
-
-    // Agrupa para que cada série recorrente apareça apenas como um compromisso único próximo
-    const seenSeries = new Set<string>();
-    const grouped: Event[] = [];
-
-    for (const ev of futureEvents) {
-      const key = ev.title.trim().toLowerCase();
-      const isSeries = (titleCounts.get(key) || 0) > 1 || !!ev.recurrence;
-
-      if (isSeries) {
-        if (!seenSeries.has(key)) {
-          seenSeries.add(key);
-          grouped.push({
-            ...ev,
-            is_recurring: true,
-          });
-        }
-      } else {
-        grouped.push(ev);
-      }
-    }
-
-    return grouped;
-  }, [events]);
+  const upcomingEvents = useMemo(() => getUpcomingGroupedEvents(events), [events]);
 
   const isTodaySelected = selectedDate.toDateString() === new Date().toDateString();
 
