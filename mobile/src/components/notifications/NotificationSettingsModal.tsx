@@ -17,6 +17,7 @@ import { notificationService } from '../../services/notificationService';
 import { api } from '../../services/api';
 import { NotificationPriority, MorningBriefingSettings } from '../../types';
 import { M3Switch } from '../ui/M3Switch';
+import { NotificationServerTestCard } from './NotificationServerTestCard';
 
 interface NotificationSettingsModalProps {
   visible: boolean;
@@ -35,7 +36,6 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
     requestPermissions,
     updateSettings,
   } = useNotifications();
-  const [testingNotif, setTestingNotif] = useState(false);
   const [briefingSettings, setBriefingSettings] = useState<MorningBriefingSettings>({
     enabled: true,
     scheduled_time: '07:30',
@@ -148,6 +148,18 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
                     </TouchableOpacity>
                   )}
                 </View>
+
+                {/* 1.1 Conexão Push com Servidor e Teste */}
+                <NotificationServerTestCard
+                  permissionGranted={permissionGranted}
+                  onPermissionRequest={() => {
+                    if (!canAskAgain) {
+                      Linking.openSettings();
+                    } else {
+                      requestPermissions(true).catch(() => {});
+                    }
+                  }}
+                />
 
                 {/* 2. Nível de Prioridade (Padrão vs Silencioso) */}
                 <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>PRIORIDADE DO ALERTA</Text>
@@ -426,35 +438,6 @@ const styles = StyleSheet.create({
     fontSize: tokens.typography.size.xs,
     fontWeight: '500',
   },
-  testButtonsRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 4,
-  },
-  testBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 12,
-    borderRadius: MD3Shapes.medium,
-    borderWidth: 1,
-  },
-  testBtnText: {
-    fontSize: tokens.typography.size.xs,
-    fontWeight: '600',
-  },
-  testFeedback: {
-    marginTop: 12,
-    padding: 10,
-    borderRadius: MD3Shapes.small,
-    alignItems: 'center',
-  },
-  testFeedbackText: {
-    fontSize: tokens.typography.size.xs,
-    fontWeight: '700',
-  },
   dualTriggerCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -468,21 +451,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: tokens.typography.size.xs,
     lineHeight: 16,
-  },
-  testButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: MD3Shapes.medium,
-    borderWidth: 1,
-    marginTop: 8,
-    marginBottom: 20,
-  },
-  testButtonText: {
-    fontSize: tokens.typography.size.sm,
-    fontWeight: '600',
   },
   briefingDetails: {
     marginTop: 14,

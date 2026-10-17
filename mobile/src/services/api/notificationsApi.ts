@@ -22,6 +22,12 @@ export class NotificationsApi {
     });
   }
 
+  async getNotificationStatus(): Promise<{ registered: boolean; device_count: number }> {
+    return this.client.request<{ registered: boolean; device_count: number }>('/api/v1/notifications/status', {
+      method: 'GET',
+    });
+  }
+
   async testPushNotification(
     priority: 'default' | 'silent' = 'default',
     title?: string,

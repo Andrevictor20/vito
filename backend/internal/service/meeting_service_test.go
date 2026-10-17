@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"net/smtp"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -558,15 +559,17 @@ func TestMeetingService_ChangeVote_AntiDuplicationAndCorrection(t *testing.T) {
 	// Dá um pequeno tempo para a goroutine de e-mail executar
 	time.Sleep(50 * time.Millisecond)
 
-	if len(mockSender.sentTo) != 1 || mockSender.sentTo[0] != "carlos@empresa.com" {
-		t.Errorf("esperava e-mail disparado para carlos@empresa.com, obteve %v", mockSender.sentTo)
+	sentTo, sentMsg := mockSender.getSent()
+	if len(sentTo) != 1 || sentTo[0] != "carlos@empresa.com" {
+		t.Errorf("esperava e-mail disparado para carlos@empresa.com, obteve %v", sentTo)
 	}
-	if !strings.Contains(string(mockSender.sentMsg), "text/calendar") {
+	if !strings.Contains(string(sentMsg), "text/calendar") {
 		t.Errorf("e-mail deveria conter anexo de calendário .ics")
 	}
 }
 
 type mockMeetingEmailSender struct {
+	mu       sync.Mutex
 	sentAddr string
 	sentFrom string
 	sentTo   []string
@@ -574,11 +577,20 @@ type mockMeetingEmailSender struct {
 }
 
 func (m *mockMeetingEmailSender) SendMail(addr string, a smtp.Auth, from string, to []string, msg []byte) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.sentAddr = addr
 	m.sentFrom = from
 	m.sentTo = to
 	m.sentMsg = msg
 	return nil
 }
+
+func (m *mockMeetingEmailSender) getSent() ([]string, []byte) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.sentTo, m.sentMsg
+}
+
 
 

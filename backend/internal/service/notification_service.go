@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -104,6 +105,7 @@ func (s *NotificationService) SendPushToUser(userID, title, body, priority strin
 	}
 
 	if len(tokens) == 0 {
+		log.Printf("[NotificationService] Push não despachado: usuário %s não possui tokens registrados (título: %q)", userID, title)
 		return 0, nil
 	}
 
@@ -142,7 +144,6 @@ func (s *NotificationService) SendPushToUser(userID, title, body, priority strin
 		expoPriority = "normal"
 	}
 
-
 	var messages []PushMessage
 	for _, t := range tokens {
 		messages = append(messages, PushMessage{
@@ -155,6 +156,8 @@ func (s *NotificationService) SendPushToUser(userID, title, body, priority strin
 			Priority:  expoPriority,
 		})
 	}
+
+	log.Printf("[NotificationService] Despachando push para user=%s (%d dispositivo(s), canal=%s, prioridade=%s): %q", userID, len(messages), channelID, expoPriority, title)
 
 	payloadBytes, err := json.Marshal(messages)
 	if err != nil {
@@ -176,6 +179,36 @@ func (s *NotificationService) SendPushToUser(userID, title, body, priority strin
 
 	if resp.StatusCode >= 400 {
 		return 0, fmt.Errorf("expo push API retornou status de erro: %d", resp.StatusCode)
+	}
+
+	// Inspeciona resposta individual de cada ticket da Expo para auto-cura e telemetria
+	type expoTicketResponse struct {
+		Data []struct {
+			Status  string                 `json:"status"`
+			ID      string                 `json:"id,omitempty"`
+			Message string                 `json:"message,omitempty"`
+			Details map[string]interface{} `json:"details,omitempty"`
+		} `json:"data"`
+	}
+
+	var expoResp expoTicketResponse
+	if err := json.NewDecoder(resp.Body).Decode(&expoResp); err == nil {
+		for i, ticket := range expoResp.Data {
+			if ticket.Status == "error" && i < len(tokens) {
+				tokenVal := tokens[i].Token
+				errDetail := ""
+				if ticket.Details != nil {
+					if d, ok := ticket.Details["error"].(string); ok {
+						errDetail = d
+					}
+				}
+				log.Printf("[NotificationService] Ticket de erro no push para user=%s token=%s: %s (detalhe=%s)", userID, tokenVal, ticket.Message, errDetail)
+				if errDetail == "DeviceNotRegistered" {
+					_ = s.tokenRepo.Delete(userID, tokenVal)
+					log.Printf("[NotificationService] Token inválido/desregistrado removido automaticamente para user=%s: %s", userID, tokenVal)
+				}
+			}
+		}
 	}
 
 	return len(messages), nil

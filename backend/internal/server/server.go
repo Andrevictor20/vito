@@ -231,6 +231,7 @@ func (s *Server) registerRoutes() {
 
 				if s.notifHandler != nil {
 					protected.Route("/notifications", func(nr chi.Router) {
+						nr.Get("/status", s.notifHandler.GetNotificationStatus)
 						nr.Post("/device-token", s.notifHandler.RegisterDeviceToken)
 						nr.Delete("/device-token", s.notifHandler.UnregisterDeviceToken)
 						nr.Post("/test", s.notifHandler.SendTestNotification)

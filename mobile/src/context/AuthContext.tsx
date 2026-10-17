@@ -78,6 +78,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const res = await api.login(email, pass);
       setUser(res.user);
       await secureStorage.setItem(USER_KEY, JSON.stringify(res.user));
+      notificationService.syncPushTokenWithBackend().catch(() => {});
     } finally {
       setIsLoading(false);
     }
@@ -89,6 +90,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const res = await api.register(name, email, pass);
       setUser(res.user);
       await secureStorage.setItem(USER_KEY, JSON.stringify(res.user));
+      notificationService.syncPushTokenWithBackend().catch(() => {});
     } finally {
       setIsLoading(false);
     }
@@ -101,6 +103,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await api.setToken(token);
       setUser(googleUser);
       await secureStorage.setItem(USER_KEY, JSON.stringify(googleUser));
+      notificationService.syncPushTokenWithBackend().catch(() => {});
     } finally {
       setIsLoading(false);
     }

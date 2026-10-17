@@ -86,7 +86,7 @@ const useRadarPushSync = () => {
       if (data.type === 'RADAR_TRIGGERED') {
         dataSync.notify('refresh_triggers');
       }
-      if (data.type === 'booking_appointment') {
+      if (data.type === 'booking_appointment' || data.type === 'meeting_vote' || data.type === 'meeting_confirmed') {
         dataSync.notify('refresh_bookings');
         dataSync.notify('refresh_events');
       }
@@ -98,7 +98,7 @@ const useRadarPushSync = () => {
         if (navigation) navigation.navigate('main', { screen: 'triggers' });
         else navigateToTab('triggers');
       }
-      if (data.type === 'booking_appointment') {
+      if (data.type === 'booking_appointment' || data.type === 'meeting_vote' || data.type === 'meeting_confirmed') {
         dataSync.notify('refresh_bookings');
         dataSync.notify('refresh_events');
         if (navigation) navigation.navigate('main', { screen: 'booking' });

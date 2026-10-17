@@ -500,12 +500,17 @@ func (s *MeetingService) SubmitVote(ctx context.Context, req SubmitVoteRequest) 
 			dateStr := localStart.Format("02/01")
 			pushTitle := fmt.Sprintf("📅 Reunião confirmada: %s", name)
 			pushBody := fmt.Sprintf("%s confirmou '%s' para %s às %s", name, m.Title, dateStr, timeStr)
-			_, _ = s.notificationSvc.SendPushToUser(m.UserID, pushTitle, pushBody, "high", map[string]interface{}{
+			sent, err := s.notificationSvc.SendPushToUser(m.UserID, pushTitle, pushBody, "high", map[string]interface{}{
 				"type":       "meeting_confirmed",
 				"channelId":  "vito_booking",
 				"meeting_id": m.ID,
 				"event_id":   eventID,
 			})
+			if err != nil {
+				log.Printf("[MeetingService] Falha ao enviar push de confirmação 1-on-1 para user=%s: %v", m.UserID, err)
+			} else {
+				log.Printf("[MeetingService] Push de confirmação 1-on-1 enviado para user=%s (dispositivos=%d)", m.UserID, sent)
+			}
 		}
 
 		// Notificação por e-mail com .ics para o participante 1-on-1 se informou e-mail
@@ -545,11 +550,16 @@ func (s *MeetingService) SubmitVote(ctx context.Context, req SubmitVoteRequest) 
 				pushTitle = fmt.Sprintf("✏️ Voto alterado em '%s'", m.Title)
 				pushBody = fmt.Sprintf("%s alterou sua escolha para: %s", name, timeSummary)
 			}
-			_, _ = s.notificationSvc.SendPushToUser(m.UserID, pushTitle, pushBody, "high", map[string]interface{}{
+			sent, err := s.notificationSvc.SendPushToUser(m.UserID, pushTitle, pushBody, "high", map[string]interface{}{
 				"type":       "meeting_vote",
 				"channelId":  "vito_booking",
 				"meeting_id": m.ID,
 			})
+			if err != nil {
+				log.Printf("[MeetingService] Falha ao enviar push de voto para user=%s (meeting=%s): %v", m.UserID, m.ID, err)
+			} else {
+				log.Printf("[MeetingService] Push de voto enviado para user=%s (meeting=%s, dispositivos=%d)", m.UserID, m.ID, sent)
+			}
 		}
 	}
 

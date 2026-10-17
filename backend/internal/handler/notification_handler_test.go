@@ -152,3 +152,51 @@ func TestNotificationHandler_UnregisterDeviceToken(t *testing.T) {
 	}
 }
 
+func TestNotificationHandler_GetNotificationStatus(t *testing.T) {
+	repo := &mockTokenRepo{}
+	svc := service.NewNotificationService(repo)
+	h := handler.NewNotificationHandler(svc)
+
+	// Sem autenticação -> 401
+	reqUnauth := httptest.NewRequest(http.MethodGet, "/notifications/status", nil)
+	rrUnauth := httptest.NewRecorder()
+	h.GetNotificationStatus(rrUnauth, reqUnauth)
+	if rrUnauth.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", rrUnauth.Code)
+	}
+
+	// Com autenticação mas 0 tokens -> registered: false, count: 0
+	req := httptest.NewRequest(http.MethodGet, "/notifications/status", nil)
+	ctx := context.WithValue(req.Context(), middleware.UserIDKey, "user-status-test")
+	req = req.WithContext(ctx)
+	rr := httptest.NewRecorder()
+	h.GetNotificationStatus(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+
+	var statusRes map[string]interface{}
+	if err := json.Unmarshal(rr.Body.Bytes(), &statusRes); err != nil {
+		t.Fatal(err)
+	}
+	if statusRes["registered"] != false || statusRes["device_count"].(float64) != 0 {
+		t.Errorf("esperava registered=false e device_count=0, obteve %v", statusRes)
+	}
+
+	// Registra token e checa status novamente
+	_, _ = svc.RegisterDeviceToken("user-status-test", "ExponentPushToken[status-token]", "android")
+	rr2 := httptest.NewRecorder()
+	req2 := httptest.NewRequest(http.MethodGet, "/notifications/status", nil).WithContext(ctx)
+	h.GetNotificationStatus(rr2, req2)
+	if rr2.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rr2.Code)
+	}
+
+	var statusRes2 map[string]interface{}
+	_ = json.Unmarshal(rr2.Body.Bytes(), &statusRes2)
+	if statusRes2["registered"] != true || statusRes2["device_count"].(float64) != 1 {
+		t.Errorf("esperava registered=true e device_count=1, obteve %v", statusRes2)
+	}
+}
+
+

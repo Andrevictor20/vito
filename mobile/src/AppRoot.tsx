@@ -54,8 +54,10 @@ const MainNavigator: React.FC = () => {
 
   useEffect(() => {
     if (user) {
-      // Auto-registro e inicialização de canais/push token
-      notificationService.requestPermissions().catch(() => {});
+      // Auto-registro e sincronização ativa de push token no backend Go
+      notificationService.requestPermissions().then(() => {
+        notificationService.syncPushTokenWithBackend().catch(() => {});
+      }).catch(() => {});
     }
   }, [user?.id]);
 

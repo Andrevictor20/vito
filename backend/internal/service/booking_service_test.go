@@ -560,14 +560,23 @@ func TestBookingService_ReserveAppointment_SendsPushWithGuestNotes(t *testing.T)
 }
 
 type mockBookingEmailSender struct {
+	mu      sync.Mutex
 	sentTo  []string
 	sentMsg []byte
 }
 
 func (m *mockBookingEmailSender) SendMail(addr string, a smtp.Auth, from string, to []string, msg []byte) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.sentTo = to
 	m.sentMsg = msg
 	return nil
+}
+
+func (m *mockBookingEmailSender) getSent() ([]string, []byte) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.sentTo, m.sentMsg
 }
 
 func TestBookingService_ReserveAppointment_SendsEmailNotification(t *testing.T) {
@@ -601,10 +610,11 @@ func TestBookingService_ReserveAppointment_SendsEmailNotification(t *testing.T) 
 
 	time.Sleep(50 * time.Millisecond)
 
-	if len(mockSender.sentTo) != 1 || mockSender.sentTo[0] != "juliana@cliente.com" {
-		t.Fatalf("esperado e-mail para juliana@cliente.com, obteve %v", mockSender.sentTo)
+	sentTo, sentMsg := mockSender.getSent()
+	if len(sentTo) != 1 || sentTo[0] != "juliana@cliente.com" {
+		t.Fatalf("esperado e-mail para juliana@cliente.com, obteve %v", sentTo)
 	}
-	if !strings.Contains(string(mockSender.sentMsg), "text/calendar") {
+	if !strings.Contains(string(sentMsg), "text/calendar") {
 		t.Errorf("e-mail deveria conter anexo de calendário .ics")
 	}
 }

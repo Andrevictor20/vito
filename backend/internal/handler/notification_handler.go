@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/andrevmp/vito/backend/internal/handler/middleware"
 	"github.com/andrevmp/vito/backend/internal/service"
@@ -104,7 +105,9 @@ func (h *NotificationHandler) SendTestNotification(w http.ResponseWriter, r *htt
 		title = "Vito — Lembrete de Teste"
 	}
 	body := req.Body
+	if body == "" {
 		body = "Notificação de lembrete do Vito entregue com sucesso."
+	}
 	priority := req.Priority
 	if priority == "" {
 		priority = "default"
@@ -127,3 +130,42 @@ func (h *NotificationHandler) SendTestNotification(w http.ResponseWriter, r *htt
 		"dispatched": sentCount,
 	})
 }
+
+// GetNotificationStatus retorna o status de registro de dispositivos para push do usuário autenticado.
+func (h *NotificationHandler) GetNotificationStatus(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, `{"error":"não autorizado"}`, http.StatusUnauthorized)
+		return
+	}
+
+	tokens, err := h.notifSvc.GetUserTokens(userID)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+
+	type deviceDTO struct {
+		Platform  string    `json:"platform"`
+		UpdatedAt time.Time `json:"updated_at"`
+	}
+
+	devices := make([]deviceDTO, 0, len(tokens))
+	for _, t := range tokens {
+		devices = append(devices, deviceDTO{
+			Platform:  t.Platform,
+			UpdatedAt: t.UpdatedAt,
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"registered":   len(tokens) > 0,
+		"device_count": len(tokens),
+		"devices":      devices,
+	})
+}
+

@@ -124,3 +124,51 @@ func TestNotificationService_SendPushToUser(t *testing.T) {
 		t.Errorf("expected 0 messages sent, got %d", countZero)
 	}
 }
+
+func TestNotificationService_SendPushToUser_PrunesInvalidTokens(t *testing.T) {
+	staleToken := "ExponentPushToken[stale-123]"
+	repo := &mockDeviceTokenRepo{
+		tokens: []domain.DeviceToken{
+			{
+				ID:       "dt-1",
+				UserID:   "user-stale",
+				Token:    staleToken,
+				Platform: "android",
+			},
+		},
+	}
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{
+			"data": [
+				{
+					"status": "error",
+					"message": "DeviceNotRegistered",
+					"details": {
+						"error": "DeviceNotRegistered"
+					}
+				}
+			]
+		}`))
+	}))
+	defer ts.Close()
+
+	svc := service.NewNotificationService(repo, ts.Client())
+	svc.SetExpoAPIURL(ts.URL)
+
+	count, err := svc.SendPushToUser("user-stale", "Teste", "Mensagem", "high", map[string]interface{}{"type": "meeting_vote"})
+	if err != nil {
+		t.Fatalf("não esperava erro HTTP: %v", err)
+	}
+	if count != 1 {
+		t.Errorf("esperava 1 tentativa despachada, obteve %d", count)
+	}
+
+	// Verifica se o token inválido foi removido do repositório
+	tokens, _ := repo.FindByUserID("user-stale")
+	if len(tokens) != 0 {
+		t.Errorf("esperava que token 'DeviceNotRegistered' fosse removido do repositório, mas ainda existem %d tokens", len(tokens))
+	}
+}
+

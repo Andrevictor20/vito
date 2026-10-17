@@ -349,6 +349,9 @@ export class ApiService extends ApiClient {
   revokePushToken(token: string): Promise<{ status: string; token: string }> {
     return this.notificationsApi.revokePushToken(token);
   }
+  getNotificationStatus(): Promise<{ registered: boolean; device_count: number }> {
+    return this.notificationsApi.getNotificationStatus();
+  }
   testPushNotification(priority?: 'default' | 'silent', title?: string, body?: string): Promise<{ status: string; dispatched: number }> {
     return this.notificationsApi.testPushNotification(priority, title, body);
   }

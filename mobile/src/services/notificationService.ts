@@ -234,6 +234,47 @@ export const notificationService = {
   },
 
   /**
+   * Obtém o push token da Expo e garante sincronização ativa com o backend Go.
+   */
+  async syncPushTokenWithBackend(): Promise<{ success: boolean; pushToken: string | null; error?: string }> {
+    if (!this.isAvailable() || Platform.OS === 'web') {
+      return { success: false, pushToken: null, error: 'unsupported_platform' };
+    }
+
+    try {
+      const perm = await Notifications.getPermissionsAsync();
+      if (perm.status !== 'granted') {
+        return { success: false, pushToken: null, error: 'permission_not_granted' };
+      }
+
+      const projectId = 'b376b3f5-a93f-4f3e-a262-ddded8f96586';
+      const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
+      const pushToken = tokenData?.data || null;
+
+      if (pushToken) {
+        await secureStorage.setItem(PUSH_TOKEN_SECURE_KEY, pushToken);
+        if (api.getToken()) {
+          await api.registerPushToken(pushToken, Platform.OS);
+          console.log('[NotificationService] Push token sincronizado com sucesso no backend Go');
+        }
+        return { success: true, pushToken };
+      }
+      return { success: false, pushToken: null, error: 'empty_token' };
+    } catch (err: any) {
+      console.warn('[NotificationService] Falha ao obter Expo Push Token:', err?.message || err);
+      // Fallback: se já tínhamos um token salvo localmente, tenta registrá-lo no backend
+      try {
+        const savedToken = await secureStorage.getItem(PUSH_TOKEN_SECURE_KEY);
+        if (savedToken && api.getToken()) {
+          await api.registerPushToken(savedToken, Platform.OS);
+          return { success: true, pushToken: savedToken };
+        }
+      } catch {}
+      return { success: false, pushToken: null, error: err?.message || 'unknown_error' };
+    }
+  },
+
+  /**
    * Solicita permissões nativas e registra o Push Token.
    */
   async requestPermissions(userInitiated: boolean = false): Promise<{ granted: boolean; pushToken: string | null; canAskAgain: boolean }> {
@@ -271,26 +312,8 @@ export const notificationService = {
       return { granted: false, pushToken: null, canAskAgain };
     }
 
-    let pushToken: string | null = null;
-    try {
-      const projectId = 'b376b3f5-a93f-4f3e-a262-ddded8f96586';
-      const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
-      pushToken = tokenData.data;
-
-      if (pushToken) {
-        // Salva em SecureStore com proteção de hardware
-        await secureStorage.setItem(PUSH_TOKEN_SECURE_KEY, pushToken);
-
-        // Registra o token no backend Go
-        await api.registerPushToken(pushToken, Platform.OS).catch((err) => {
-          console.warn('[NotificationService] Não foi possível sincronizar token com o backend:', err.message);
-        });
-      }
-    } catch (err) {
-      console.warn('[NotificationService] Aviso ao obter Expo Push Token (notificações locais operantes):', err);
-    }
-
-    return { granted: true, pushToken, canAskAgain: true };
+    const syncRes = await this.syncPushTokenWithBackend();
+    return { granted: true, pushToken: syncRes.pushToken, canAskAgain: true };
   },
 
   async getSavedPushToken(): Promise<string | null> {
