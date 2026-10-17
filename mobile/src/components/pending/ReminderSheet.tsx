@@ -5,6 +5,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  ScrollView,
 } from 'react-native';
 import { tokens } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
@@ -85,7 +86,11 @@ export const ReminderSheet: React.FC<ReminderSheetProps> = ({
       title="Lembrete"
       subtitle={item?.title}
     >
-      <View style={styles.body}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={styles.body}
+      >
 
           <Text style={[styles.label, { color: colors.onSurfaceVariant }]}>Data e hora</Text>
           <View style={styles.row}>
@@ -181,7 +186,7 @@ export const ReminderSheet: React.FC<ReminderSheetProps> = ({
               </Text>
             </TouchableOpacity>
           </View>
-      </View>
+      </ScrollView>
     </BottomSheetModal>
   );
 };

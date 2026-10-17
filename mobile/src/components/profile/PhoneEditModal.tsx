@@ -9,6 +9,7 @@ import {
   Alert,
   Linking,
   AppState,
+  ScrollView,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens, MD3Shapes } from '../../theme/tokens';
@@ -148,7 +149,11 @@ export const PhoneEditModal: React.FC<PhoneEditModalProps> = ({
 
   return (
     <BottomSheetModal visible={visible} onClose={onClose} title="Confirmar Telefone">
-      <View style={styles.content}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={styles.content}
+      >
         {step === 'input' ? (
           <>
             <Text style={[styles.description, { color: colors.textSecondary }]}>
@@ -275,7 +280,7 @@ export const PhoneEditModal: React.FC<PhoneEditModalProps> = ({
             </View>
           </>
         )}
-      </View>
+      </ScrollView>
     </BottomSheetModal>
   );
 };

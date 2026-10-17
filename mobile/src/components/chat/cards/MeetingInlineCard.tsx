@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, Linking } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, Linking, Share } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { tokens, MD3Shapes } from '../../../theme/tokens';
@@ -34,12 +34,17 @@ export const MeetingInlineCard: React.FC<MeetingInlineCardProps> = ({ meeting })
     });
   };
 
-  const handleWhatsApp = () => {
-    const waUrl = meeting.whatsapp_url || (link ? `https://wa.me/?text=${encodeURIComponent(`Olá! Escolha ou vote no melhor horário para nossa reunião "${meeting.title}": ${link}`)}` : '');
-    if (!waUrl) return;
-    Linking.openURL(waUrl).catch((e) => {
-      console.warn('[MeetingInlineCard] Falha ao abrir WhatsApp:', e);
-    });
+  const handleShare = async () => {
+    if (!link) return;
+    try {
+      await Share.share({
+        message: `Olá! Escolha ou vote no melhor horário para nossa reunião "${meeting.title}":\n${link}`,
+        url: link,
+        title: meeting.title,
+      });
+    } catch (e) {
+      console.warn('[MeetingInlineCard] Falha ao compartilhar:', e);
+    }
   };
 
   const isConsensus = meeting.mode === 'group_consensus';
@@ -98,14 +103,14 @@ export const MeetingInlineCard: React.FC<MeetingInlineCardProps> = ({ meeting })
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.actionButton, { backgroundColor: '#25D366' }]}
-          onPress={handleWhatsApp}
+          style={[styles.actionButton, { backgroundColor: colors.surfaceContainerHighest }]}
+          onPress={handleShare}
           disabled={!link}
           activeOpacity={0.8}
-          accessibilityLabel="Compartilhar no WhatsApp"
+          accessibilityLabel="Compartilhar link da reunião"
         >
-          <MaterialIcons name="share" size={14} color="#FFFFFF" />
-          <Text style={[styles.actionButtonText, { color: '#FFFFFF' }]}>WhatsApp</Text>
+          <MaterialIcons name="share" size={14} color={colors.onSurface} />
+          <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Compartilhar</Text>
         </TouchableOpacity>
 
         <TouchableOpacity

@@ -149,7 +149,11 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
       title="Editar Compromisso"
       subtitle={isRecurring ? `Série recorrente${eventDateLabel ? ` · ${eventDateLabel}` : ''}` : eventDateLabel}
     >
-              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={styles.scrollContent}
+              >
                 {/* Título */}
                 <View style={styles.fieldGroup}>
                   <Text style={[styles.label, { color: colors.textSecondary }]}>Título do compromisso</Text>

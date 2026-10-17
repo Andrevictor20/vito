@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Event, Todo, AssistantChatResponse } from '../types';
 import { api } from '../services/api';
@@ -21,6 +21,7 @@ export function useHomeData(currentUserId?: string) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const syncedRemoteUserRef = useRef<string | null>(null);
 
   const cacheKeys = useMemo(() => getHomeCacheKeys(currentUserId), [currentUserId]);
 
@@ -47,8 +48,8 @@ export function useHomeData(currentUserId?: string) {
       setTodos(fetchedTodos || []);
       AsyncStorage.setItem(cacheKeys.eventsKey, JSON.stringify(fetchedEvents || [])).catch(() => {});
       AsyncStorage.setItem(cacheKeys.todosKey, JSON.stringify(fetchedTodos || [])).catch(() => {});
-      // Purga órfãos primeiro (série deletada / Google inbound / outro device), depois reagenda.
-      notificationService.reconcileOrphanReminders(fetchedEvents || [], fetchedTodos || []).catch(() => {});
+      // Purga órfãos primeiro (série deletada / Google inbound / outro device), depois agenda de forma idempotente.
+      await notificationService.reconcileOrphanReminders(fetchedEvents || [], fetchedTodos || []).catch(() => {});
       if ((fetchedEvents && fetchedEvents.length > 0) || (fetchedTodos && fetchedTodos.length > 0)) {
         notificationService.scheduleAllUpcomingReminders(fetchedEvents || [], fetchedTodos || []).catch(() => {});
       }
@@ -100,8 +101,17 @@ export function useHomeData(currentUserId?: string) {
       }
     });
 
-    // 2. Sincronização em background
-    loadData(true);
+    // 2. Sincronização em background local + reconciliação inbound com Google Calendar da conta ativa
+    loadData(true).then(() => {
+      if (isMounted && syncedRemoteUserRef.current !== currentUserId) {
+        syncedRemoteUserRef.current = currentUserId;
+        api.syncCalendar('google')
+          .then(() => {
+            if (isMounted) loadData(true);
+          })
+          .catch(() => {});
+      }
+    });
 
     return () => {
       isMounted = false;
@@ -121,8 +131,11 @@ export function useHomeData(currentUserId?: string) {
 
   const onRefresh = () => {
     setRefreshing(true);
-
-    loadData(false);
+    api.syncCalendar('google')
+      .catch(() => {})
+      .finally(() => {
+        loadData(false);
+      });
   };
 
   const handleCreateEvent = async (eventData: { title: string; description?: string; location?: string; start_at: string; end_at: string }) => {

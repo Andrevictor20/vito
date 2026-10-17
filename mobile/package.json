@@ -1,11 +1,11 @@
 {
   "name": "vito-mobile",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "private": true,
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "web": "expo start --web",
     "test": "tsx --test src/utils/pagerNavigation.test.ts src/utils/calendarDateUtils.test.ts src/utils/chatActions.test.ts src/utils/notificationReconcile.test.ts src/utils/chatGreetings.test.ts src/utils/chatCards.test.ts src/utils/chatSendGuard.test.ts src/utils/chatPreview.test.ts src/utils/unifiedTasks.test.ts src/utils/reminderInput.test.ts src/utils/dateTimePicker.test.ts src/utils/taskEdit.test.ts src/utils/keyboardHeight.test.ts src/utils/phoneFormat.test.ts src/services/contactMatchingService.test.ts src/services/api/p2pMeetingsApi.test.ts src/utils/slotAvailability.test.ts src/utils/radarReportUtils.test.ts"
   },

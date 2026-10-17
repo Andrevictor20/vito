@@ -7,6 +7,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  ScrollView,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Updates from 'expo-updates';
@@ -140,7 +141,13 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ serverUrl, onToggleServe
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={styles.container}
     >
-      <Card variant="elevated" style={styles.card}>
+      <ScrollView
+        contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', width: '100%', alignItems: 'center' }}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        style={{ width: '100%' }}
+      >
+        <Card variant="elevated" style={styles.card}>
         {/* Top Header M3 com Alternador de Tema */}
         <View style={styles.topHeaderRow}>
           <VitoLogo size="small" />
@@ -279,6 +286,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ serverUrl, onToggleServe
           </TouchableOpacity>
         </View>
       </Card>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 };

@@ -55,6 +55,7 @@ func setupMeetingTest(t *testing.T) *meetingTestContext {
 		shortener,
 		"https://vito.app",
 	)
+	meetingSvc.SetUserRepository(userRepo)
 
 	return &meetingTestContext{
 		db:          db,
@@ -546,7 +547,21 @@ func TestMeetingService_ChangeVote_AntiDuplicationAndCorrection(t *testing.T) {
 		t.Errorf("slots 1 e 2 deveriam ter 1 voto cada, estão com s1=%d, s2=%d", d2.Slots[1].VotesCount, d2.Slots[2].VotesCount)
 	}
 
-	// 4. Configura EmailService com MockSender e fecha a reunião no Slot 1
+	// 4. Cadastra uma conta secundária no Vito com o mesmo e-mail do participante (carlos@empresa.com)
+	userRepo := repository.NewUserRepository(tc.db)
+	secondaryUser := &domain.User{
+		ID:           "user-secondary-carlos",
+		Name:         "Carlos Mendes",
+		Email:        "carlos@empresa.com",
+		PasswordHash: "hash123",
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+	if err := userRepo.Create(secondaryUser); err != nil {
+		t.Fatalf("erro ao criar usuário secundário: %v", err)
+	}
+
+	// 5. Configura EmailService com MockSender e fecha a reunião no Slot 1
 	mockSender := &mockMeetingEmailSender{}
 	emailSvc := service.NewEmailService("smtp.gmail.com", 587, "vito@gmail.com", "pass123", "Vito <vito@gmail.com>", mockSender)
 	tc.meetingSvc.SetEmailService(emailSvc)
@@ -554,6 +569,15 @@ func TestMeetingService_ChangeVote_AntiDuplicationAndCorrection(t *testing.T) {
 	err = tc.meetingSvc.ConfirmConsensusSlot(ctx, tc.user.ID, m.ID, slot1)
 	if err != nil {
 		t.Fatalf("ConfirmConsensusSlot falhou: %v", err)
+	}
+
+	// Verifica se o evento também foi espelhado automaticamente na agenda da conta secundária do Vito
+	secEvents, err := tc.eventRepo.ListByUser(secondaryUser.ID, now, now.Add(7*24*time.Hour))
+	if err != nil {
+		t.Fatalf("erro ao listar eventos da conta secundária: %v", err)
+	}
+	if len(secEvents) != 1 {
+		t.Fatalf("esperava 1 evento espelhado na agenda da conta secundária Vito, obteve %d", len(secEvents))
 	}
 
 	// Dá um pequeno tempo para a goroutine de e-mail executar

@@ -63,8 +63,8 @@ export const isAllDayEvent = (event?: Partial<Event> | null): boolean => {
   // 1. Categoria explícita de feriado
   if (event.category === 'holiday') return true;
 
-  // 2. Se gravado explicitamente com 00:00:00 (início do dia civil em UTC ou local)
-  if (event.start_at.includes('00:00:00') && (!event.end_at || event.end_at.includes('23:59:59') || event.end_at.includes('00:00:00'))) {
+  // 2. Se gravado explicitamente com 00:00:00 ou 03:00:00Z (início do dia civil em UTC ou BRT)
+  if ((event.start_at.includes('00:00:00') || event.start_at.includes('03:00:00')) && (!event.end_at || event.end_at.includes('23:59:59') || event.end_at.includes('00:00:00'))) {
     return true;
   }
 
@@ -72,8 +72,8 @@ export const isAllDayEvent = (event?: Partial<Event> | null): boolean => {
   const end = event.end_at ? parseSafeDate(event.end_at) : start;
   const diffHours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
 
-  // 3. Eventos com duração de 23h ou mais (cobre 24h, feriados e multi-dias)
-  if (diffHours >= 23) return true;
+  // 3. Eventos com duração de 20h ou mais (cobre 24h, feriados, multi-dias e all-day 03:00Z..23:59Z)
+  if (diffHours >= 20) return true;
 
   // 4. Reconhecimento contextual de feriados nacionais e religiosos (ex: Nossa Senhora Aparecida)
   const title = (event.title || '').toLowerCase().trim();

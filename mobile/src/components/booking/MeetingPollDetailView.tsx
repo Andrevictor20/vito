@@ -20,7 +20,10 @@ import { meetingDisplayLink } from '../../utils/chatCards';
 import {
   formatSlotBRTDisplay,
   getLeadingSlot,
+  buildMeetingShareMessage,
+  getMeetingShareButtonLabel,
 } from '../../utils/meetingPollUtils';
+import { computeSubViewBottomPadding } from '../../utils/keyboardHeight';
 import { hapticFeedback } from '../../theme/motion';
 import { MeetingPollSlotItem } from './MeetingPollSlotItem';
 import { MeetingPollHeroCard } from './MeetingPollHeroCard';
@@ -42,7 +45,7 @@ export const MeetingPollDetailView: React.FC<MeetingPollDetailViewProps> = ({
   confirmingSlotId,
   onDelete,
 }) => {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
 
   const link = meetingDisplayLink(meeting as any);
@@ -61,34 +64,10 @@ export const MeetingPollDetailView: React.FC<MeetingPollDetailViewProps> = ({
     return () => sub.remove();
   }, [onBack]);
 
-  const handleWhatsApp = () => {
-    if (!link) return;
-    let msg = '';
-    const confirmedSlot = slots.find((s) => s.id === meeting.confirmed_slot_id);
-    if (isConfirmed && confirmedSlot) {
-      const confLabel = formatSlotBRTDisplay(confirmedSlot.start_at, confirmedSlot.end_at).compactLabel;
-      const partNames = participants.map((p) => p.name).filter(Boolean).join(', ');
-      msg = `🎉 *Reunião Confirmada!*\n📌 *${meeting.title}*\n📅 Horário Definido: *${confLabel}*${partNames ? `\n👥 Participantes: ${partNames}` : ''}\n🔗 Detalhes / Acesso: ${link}`;
-    } else {
-      msg = `Olá! Participe da votação de horários para a nossa reunião "${meeting.title}":\n${link}`;
-    }
-    const waUrl = `whatsapp://send?text=${encodeURIComponent(msg)}`;
-    Linking.openURL(waUrl).catch(() => {
-      Linking.openURL(`https://wa.me/?text=${encodeURIComponent(msg)}`).catch(() => {});
-    });
-  };
-
   const handleShare = async () => {
     if (!link) return;
     try {
-      let msg = '';
-      const confirmedSlot = slots.find((s) => s.id === meeting.confirmed_slot_id);
-      if (isConfirmed && confirmedSlot) {
-        const confLabel = formatSlotBRTDisplay(confirmedSlot.start_at, confirmedSlot.end_at).compactLabel;
-        msg = `🎉 Reunião Confirmada: "${meeting.title}"\n📅 Horário: ${confLabel}\n🔗 ${link}`;
-      } else {
-        msg = `Participe da votação de horários para "${meeting.title}":\n${link}`;
-      }
+      const msg = buildMeetingShareMessage(meeting, link);
       await Share.share({
         message: msg,
         url: link,
@@ -159,7 +138,10 @@ export const MeetingPollDetailView: React.FC<MeetingPollDetailViewProps> = ({
 
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: computeSubViewBottomPadding(insets.bottom) },
+        ]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
@@ -196,7 +178,7 @@ export const MeetingPollDetailView: React.FC<MeetingPollDetailViewProps> = ({
           <View style={[styles.emptyVotesBanner, { backgroundColor: colors.surfaceContainerHigh, borderColor: colors.outlineVariant }]}>
             <MaterialIcons name="info-outline" size={18} color={colors.onSurfaceVariant} />
             <Text style={[styles.emptyVotesText, { color: colors.onSurfaceVariant }]}>
-              Nenhum participante votou ainda. Compartilhe o link no WhatsApp para recolher a disponibilidade do grupo.
+              Nenhum participante votou ainda. Compartilhe o link de votação para recolher a disponibilidade do grupo.
             </Text>
           </View>
         )}
@@ -226,15 +208,17 @@ export const MeetingPollDetailView: React.FC<MeetingPollDetailViewProps> = ({
           ))}
         </View>
 
-        {/* Botão de convite rápido via WhatsApp */}
+        {/* Botão de compartilhamento nativo padrão */}
         <TouchableOpacity
-          style={[styles.whatsappBigBtn, { backgroundColor: '#25D366' }]}
-          onPress={handleWhatsApp}
+          style={[styles.whatsappBigBtn, { backgroundColor: colors.primary }]}
+          onPress={handleShare}
           activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel={getMeetingShareButtonLabel(isConfirmed)}
         >
-          <MaterialIcons name={isConfirmed ? "campaign" : "chat"} size={18} color="#FFFFFF" />
-          <Text style={styles.whatsappBigBtnText}>
-            {isConfirmed ? 'Avisar Grupo no WhatsApp' : 'Enviar Enquete pelo WhatsApp'}
+          <MaterialIcons name="share" size={18} color={colors.onPrimary} />
+          <Text style={[styles.whatsappBigBtnText, { color: colors.onPrimary }]}>
+            {getMeetingShareButtonLabel(isConfirmed)}
           </Text>
         </TouchableOpacity>
       </ScrollView>

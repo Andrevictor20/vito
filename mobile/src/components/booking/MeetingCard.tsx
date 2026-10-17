@@ -12,7 +12,7 @@ import { MD3Shapes, tabularNumbers } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { Meeting, MeetingSlot } from '../../types';
 import { meetingDisplayLink } from '../../utils/chatCards';
-import { formatSlotBRTDisplay, getLeadingSlot } from '../../utils/meetingPollUtils';
+import { formatSlotBRTDisplay, getLeadingSlot, buildMeetingShareMessage } from '../../utils/meetingPollUtils';
 import { hapticFeedback } from '../../theme/motion';
 
 interface MeetingCardProps {
@@ -50,18 +50,11 @@ export const MeetingCard: React.FC<MeetingCardProps> = ({
     ? formatSlotBRTDisplay(confirmedSlot.start_at, confirmedSlot.end_at)
     : undefined;
 
-  const handleWhatsApp = () => {
-    if (!link) return;
-    const msg = `Olá! Vote nos horários que funcionam para você na nossa reunião "${meeting.title}":\n${link}`;
-    const waUrl = `https://wa.me/?text=${encodeURIComponent(msg)}`;
-    Linking.openURL(waUrl).catch(() => {});
-  };
-
   const handleShare = async () => {
     if (!link) return;
     try {
       await Share.share({
-        message: `Vote no melhor horário para "${meeting.title}":\n${link}`,
+        message: buildMeetingShareMessage(meeting, link),
         url: link,
         title: meeting.title,
       });
@@ -253,15 +246,6 @@ export const MeetingCard: React.FC<MeetingCardProps> = ({
           >
             {isCopied ? 'Copiado' : 'Link'}
           </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.iconButton, { borderColor: colors.outlineVariant }]}
-          onPress={handleWhatsApp}
-          activeOpacity={0.7}
-          accessibilityLabel="Enviar no WhatsApp"
-        >
-          <MaterialIcons name="chat-bubble-outline" size={15} color={colors.onSurface} />
         </TouchableOpacity>
 
         <TouchableOpacity

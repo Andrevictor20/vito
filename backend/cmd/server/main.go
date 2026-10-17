@@ -275,6 +275,7 @@ func main() {
 	bookingSvc.SetEmailService(emailSvc)
 
 	meetingSvc := service.NewMeetingService(meetingRepo, eventRepo, notifSvc, linkShortener, cfg.PublicBaseURL)
+	meetingSvc.SetUserRepository(userRepo)
 	meetingSvc.SetSyncPusher(syncSvc)
 	meetingSvc.SetEmailService(emailSvc)
 	astSvc.SetMeetingService(meetingSvc)

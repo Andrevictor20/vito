@@ -75,11 +75,43 @@ func TestEmailService_SendMeetingConfirmation(t *testing.T) {
 	}
 
 	rawMsg := string(mockSender.sentMsg)
-	if !strings.Contains(rawMsg, "Subject: Reunião Confirmada: Reunião de Alinhamento") {
-		t.Errorf("assunto ausente ou incorreto no cabeçalho MIME")
+	if !strings.Contains(rawMsg, "Date: ") {
+		t.Errorf("cabeçalho Date obrigatório (RFC 5322) ausente no MIME")
+	}
+	if !strings.Contains(rawMsg, "Message-ID: <") {
+		t.Errorf("cabeçalho Message-ID obrigatório (RFC 5322) ausente no MIME")
+	}
+	if !strings.Contains(rawMsg, "Reply-To: ") {
+		t.Errorf("cabeçalho Reply-To ausente no MIME")
+	}
+	if !strings.Contains(rawMsg, "multipart/alternative") {
+		t.Errorf("esperava multipart/alternative com text/plain + text/html contra filtros de spam")
+	}
+	if !strings.Contains(rawMsg, "Content-Type: text/plain; charset=UTF-8") {
+		t.Errorf("parte text/plain obrigatória contra spam ausente no MIME")
 	}
 	if !strings.Contains(rawMsg, "text/calendar; method=REQUEST") {
 		t.Errorf("anexo de calendário .ics ausente no MIME")
+	}
+	// Verifica que nenhuma linha do MIME excede 998 caracteres (RFC 5322 / RFC 2045 base64 wrapping)
+	for i, line := range strings.Split(rawMsg, "\r\n") {
+		if len(line) > 998 {
+			t.Errorf("linha %d excede limite RFC 5322 (len=%d)", i+1, len(line))
+		}
+	}
+
+	// Verifica identidade visual Editorial Minimalist OLED no HTML decodificado
+	htmlBody := BuildConfirmationEmailHTML(
+		"Convidado Teste",
+		"Reunião de Alinhamento",
+		"17/10/2026 (Sábado)",
+		"15:00 às 16:00",
+		"https://vito.rasppi.cloud/meet/123",
+	)
+	for _, token := range []string{"#0B0D10", "#14171C", "#1C2026", "#262B33", "#34D399"} {
+		if !strings.Contains(htmlBody, token) {
+			t.Errorf("esperava token visual OLED %s no HTML do e-mail", token)
+		}
 	}
 }
 
@@ -98,3 +130,4 @@ func TestGenerateICS(t *testing.T) {
 		t.Errorf("DTSTART incorreto no ICS: %s", ics)
 	}
 }
+

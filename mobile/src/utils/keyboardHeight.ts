@@ -21,3 +21,34 @@ export function resolveKeyboardHeight(
   if (Math.abs(next - prev) < deadzone) return null;
   return next;
 }
+
+/**
+ * Calcula margem e padding inferiores do BottomSheetModal para que o teclado
+ * nunca cubra inputs ou botões de ação no Android e no iOS.
+ */
+export function computeSheetBottomMetrics(
+  keyboardHeight: number,
+  safeBottom: number,
+  platformOS: string = 'android',
+  baseClearance = 100,
+): { marginBottom: number; paddingBottom: number } {
+  const safe = Math.max(0, safeBottom || 0);
+  if (keyboardHeight > 0) {
+    return {
+      marginBottom: platformOS === 'android' ? keyboardHeight : 0,
+      paddingBottom: 16,
+    };
+  }
+  return {
+    marginBottom: 0,
+    paddingBottom: baseClearance + safe,
+  };
+}
+
+/**
+ * Garante folga mínima (120px + safe-area) para sub-views com barra inferior flutuante (FloatingTabBar).
+ */
+export function computeSubViewBottomPadding(safeBottom: number, minClearance = 120): number {
+  return minClearance + Math.max(0, safeBottom || 0);
+}
+

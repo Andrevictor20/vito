@@ -47,13 +47,13 @@ func NewReminderWorker(
 
 // IsAllDayEvent detecta se o evento representa um dia inteiro ou feriado civil (RFC 5545).
 func IsAllDayEvent(event domain.Event) bool {
-	// 1. Duração igual ou superior a 23 horas (dia inteiro, feriado ou múltiplos dias)
+	// 1. Duração igual ou superior a 20 horas (cobre 24h, feriados, multi-dias e legados 03:00Z..23:59Z)
 	diff := event.EndAt.Sub(event.StartAt)
-	if diff >= 23*time.Hour {
+	if diff >= 20*time.Hour {
 		return true
 	}
-	// 2. Início explicitamente à meia-noite e fim próximo às 23:59
-	if event.StartAt.Hour() == 0 && event.StartAt.Minute() == 0 && event.StartAt.Second() == 0 &&
+	// 2. Início explicitamente à meia-noite (UTC ou BRT 03:00Z) e fim próximo às 23:59
+	if (event.StartAt.Hour() == 0 || event.StartAt.Hour() == 3) && event.StartAt.Minute() == 0 && event.StartAt.Second() == 0 &&
 		event.EndAt.Hour() == 23 && event.EndAt.Minute() == 59 {
 		return true
 	}

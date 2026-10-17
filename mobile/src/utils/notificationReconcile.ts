@@ -19,3 +19,34 @@ export function findOrphanNotificationIds(
   }
   return orphans;
 }
+
+export function buildEventScheduleKey(title: string, startMs: number): string {
+  return `${(title || '').trim().toLowerCase()}|${startMs}`;
+}
+
+/**
+ * Evita reagendar repetidamente o mesmo evento a cada loadData/foco de aba (o que fazia
+ * notificações descartadas pelo usuário, como "Do my Duolingo", reaparecerem na tela)
+ * e deduplica eventos com mesmo título e horário exato de início.
+ */
+export function shouldSkipReschedulingEvent(
+  eventId: string,
+  startMs: number,
+  scheduledSignatures: Map<string, number>,
+  seenBatchKeys?: Set<string>,
+  title?: string,
+): boolean {
+  if (!eventId || !Number.isFinite(startMs)) return true;
+  const dedupKey = buildEventScheduleKey(title || eventId, startMs);
+  if (seenBatchKeys) {
+    if (seenBatchKeys.has(dedupKey)) {
+      return true;
+    }
+    seenBatchKeys.add(dedupKey);
+  }
+  if (scheduledSignatures.get(eventId) === startMs) {
+    return true;
+  }
+  return false;
+}
+

@@ -72,6 +72,7 @@ type WhatsAppShare struct {
 type MeetingService struct {
 	meetingRepo     domain.MeetingRepository
 	eventRepo       domain.EventRepository
+	userRepo        domain.UserRepository
 	notificationSvc *NotificationService
 	shortener       LinkShortener
 	publicBaseURL   string
@@ -102,6 +103,11 @@ func NewMeetingService(
 		publicBaseURL:   cleanBaseURL,
 		sanitizer:       bluemonday.UGCPolicy(),
 	}
+}
+
+// SetUserRepository registra o repositório de usuários para espelhamento automático na agenda de participantes Vito.
+func (s *MeetingService) SetUserRepository(userRepo domain.UserRepository) {
+	s.userRepo = userRepo
 }
 
 // SetEmailService define o serviço de e-mail para envio de convites de calendário .ics.
@@ -276,6 +282,9 @@ func (s *MeetingService) SubmitVote(ctx context.Context, req SubmitVoteRequest) 
 			}
 		}
 
+		// Espelha o evento na agenda Vito do participante (caso tenha conta associada ao e-mail) e envia push
+		s.syncConfirmedEventToParticipant(contact, name, m.UserID, m.ID, eventTitle, eventDesc, slot.StartAt, slot.EndAt, now)
+
 		// Notificação por e-mail com .ics para o participante 1-on-1 se informou e-mail
 		if s.emailSvc != nil && s.emailSvc.IsConfigured() && strings.Contains(contact, "@") {
 			publicURL := m.ShortURL
@@ -392,6 +401,24 @@ func (s *MeetingService) ConfirmConsensusSlot(ctx context.Context, userID, meeti
 			defer cancel()
 			_ = s.syncPusher.PushEvent(pctx, m.UserID, evt)
 		}(&evCopy)
+	}
+
+	// Notifica confirmação via Push para o anfitrião e espelha o evento + envia Push para cada participante que possua conta Vito
+	if s.notificationSvc != nil {
+		loc := brtLocation()
+		localStart := slot.StartAt.In(loc)
+		pushTitle := fmt.Sprintf("📅 Reunião confirmada: %s", m.Title)
+		pushBody := fmt.Sprintf("Horário oficial definido para %s às %s", localStart.Format("02/01"), localStart.Format("15:04"))
+		_, _ = s.notificationSvc.SendPushToUser(m.UserID, pushTitle, pushBody, "high", map[string]interface{}{
+			"type":       "meeting_confirmed",
+			"channelId":  "vito_booking",
+			"meeting_id": m.ID,
+			"event_id":   event.ID,
+		})
+	}
+
+	for _, p := range parts {
+		s.syncConfirmedEventToParticipant(p.ContactInfo, p.Name, m.UserID, m.ID, eventTitle, eventDesc, slot.StartAt, slot.EndAt, now)
 	}
 
 	if s.emailSvc != nil && s.emailSvc.IsConfigured() {

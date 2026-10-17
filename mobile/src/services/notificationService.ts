@@ -3,16 +3,19 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { secureStorage } from './secureStore';
 import { api } from './api';
 import { NotificationPriority, NotificationSettings, ScheduleNotificationParams, Event } from '../types';
-import { isAllDayEvent } from '../utils/calendarDateUtils';
-import { findOrphanNotificationIds } from '../utils/notificationReconcile';
+import { isAllDayEvent, parseSafeDate } from '../utils/calendarDateUtils';
+import { findOrphanNotificationIds, shouldSkipReschedulingEvent } from '../utils/notificationReconcile';
 
 const SETTINGS_STORAGE_KEY = '@vito_notification_settings';
 const PUSH_TOKEN_SECURE_KEY = '@vito_push_token';
 const PROMPTED_ONCE_KEY = '@vito_notification_prompted_once';
 
-// Registro de idempotência em memória para alertas adaptativos em cima da hora
+// Registro de idempotência em memória para alertas adaptativos e assinaturas já agendadas (evita re-disparo ao trocar abas/descartar banner)
 const notifiedAdaptiveEventIds = new Set<string>();
+const notifiedStartEventIds = new Set<string>();
 const notifiedAdaptiveTodoIds = new Set<string>();
+const scheduledEventSignatures = new Map<string, number>();
+const scheduledTodoSignatures = new Map<string, number>();
 
 export { findOrphanNotificationIds };
 
@@ -412,12 +415,18 @@ export const notificationService = {
     const settings = await this.getSettings();
     if (!settings.enabled) return { advanceId: null, startId: null };
 
-    const start = new Date(event.start_at).getTime();
+    const start = parseSafeDate(event.start_at).getTime();
     if (isNaN(start)) return { advanceId: null, startId: null };
 
     const now = Date.now();
     const diffMs = start - now;
     if (diffMs <= 0) return { advanceId: null, startId: null };
+
+    // Se este evento já teve seus lembretes agendados com o mesmo horário de início nesta sessão,
+    // não sobrescreve no SO (impede que notificações descartadas pelo usuário reapareçam a cada refresh).
+    if (scheduledEventSignatures.get(event.id) === start) {
+      return { advanceId: null, startId: null };
+    }
 
     const minutesBefore = settings.reminderMinutesBefore || 10;
     const advanceMs = minutesBefore * 60 * 1000;
@@ -494,7 +503,8 @@ export const notificationService = {
     }
 
     // 2. Alerta do Horário de Início (Começando agora)
-    if (diffMs > 0) {
+    // Exige margem mínima de 15s no futuro e idempotência por event.id para evitar loop de disparo imediato
+    if (diffMs > 15 * 1000 && !notifiedStartEventIds.has(event.id)) {
       try {
         startId = await Notifications.scheduleNotificationAsync({
           identifier: `event-reminder-start-${event.id}`,
@@ -516,9 +526,14 @@ export const notificationService = {
             date: new Date(start),
           },
         });
+        notifiedStartEventIds.add(event.id);
       } catch (err) {
         console.warn('[NotificationService] Erro ao agendar alerta de início:', err);
       }
+    }
+
+    if (advanceId || startId) {
+      scheduledEventSignatures.set(event.id, start);
     }
 
     return { advanceId, startId };
@@ -537,12 +552,16 @@ export const notificationService = {
     const settings = await this.getSettings();
     if (!settings.enabled) return { advanceId: null, dueId: null };
 
-    const due = new Date(todo.due_date).getTime();
+    const due = parseSafeDate(todo.due_date).getTime();
     if (isNaN(due)) return { advanceId: null, dueId: null };
 
     const now = Date.now();
     const diffMs = due - now;
     if (diffMs <= 0) return { advanceId: null, dueId: null };
+
+    if (scheduledTodoSignatures.get(todo.id) === due) {
+      return { advanceId: null, dueId: null };
+    }
 
     const emoji = getNotificationContextEmoji(todo.title, 'todo') || '✓';
     const title = `${emoji} ${todo.title}`;
@@ -603,7 +622,7 @@ export const notificationService = {
     }
 
     // Alerta de Prazo Limite
-    if (diffMs > 0) {
+    if (diffMs > 15 * 1000) {
       try {
         dueId = await Notifications.scheduleNotificationAsync({
           identifier: `todo-reminder-due-${todo.id}`,
@@ -625,6 +644,10 @@ export const notificationService = {
       }
     }
 
+    if (advanceId || dueId) {
+      scheduledTodoSignatures.set(todo.id, due);
+    }
+
     return { advanceId, dueId };
   },
 
@@ -634,6 +657,7 @@ export const notificationService = {
   async cancelTodoReminder(todoId: string): Promise<void> {
     if (!this.isAvailable()) return;
     notifiedAdaptiveTodoIds.delete(todoId);
+    scheduledTodoSignatures.delete(todoId);
     await Promise.all([
       this.cancelNotification(`todo-reminder-adv-${todoId}`),
       this.cancelNotification(`todo-reminder-due-${todoId}`),
@@ -654,7 +678,7 @@ export const notificationService = {
     const settings = await this.getSettings();
     if (!settings.enabled) return { mainId: null, advanceId: null };
 
-    const at = new Date(pending.remind_at).getTime();
+    const at = parseSafeDate(pending.remind_at).getTime();
     if (isNaN(at) || at <= Date.now()) return { mainId: null, advanceId: null };
 
     const channelId = 'vito_todos';
@@ -739,6 +763,7 @@ export const notificationService = {
 
     const now = Date.now();
     const maxWindow = now + 7 * 24 * 60 * 60 * 1000;
+    const seenBatchKeys = new Set<string>();
     let scheduledCount = 0;
 
     for (const event of (events || [])) {
@@ -749,8 +774,12 @@ export const notificationService = {
           continue;
         }
 
-        const start = new Date(event.start_at).getTime();
+        const start = parseSafeDate(event.start_at).getTime();
         if (isNaN(start) || start <= now || start > maxWindow) continue;
+
+        if (shouldSkipReschedulingEvent(event.id, start, scheduledEventSignatures, seenBatchKeys, event.title)) {
+          continue;
+        }
 
         const res = await this.scheduleEventDualReminders(event);
         if (res.advanceId || res.startId) {
@@ -764,7 +793,7 @@ export const notificationService = {
     for (const todo of (todos || [])) {
       if (todo.status === 'completed' || !todo.due_date) continue;
       try {
-        const due = new Date(todo.due_date).getTime();
+        const due = parseSafeDate(todo.due_date).getTime();
         if (isNaN(due) || due <= now || due > maxWindow) continue;
 
         const res = await this.scheduleTodoReminder(todo);
@@ -785,6 +814,8 @@ export const notificationService = {
   async cancelEventReminder(eventId: string): Promise<void> {
     if (!this.isAvailable()) return;
     notifiedAdaptiveEventIds.delete(eventId);
+    notifiedStartEventIds.delete(eventId);
+    scheduledEventSignatures.delete(eventId);
     await Promise.all([
       this.cancelNotification(`event-reminder-${eventId}`),
       this.cancelNotification(`event-reminder-adv-${eventId}`),
@@ -819,8 +850,15 @@ export const notificationService = {
         if (identifier && orphanSet.has(identifier)) {
           try {
             await Notifications.cancelScheduledNotificationAsync(identifier);
-            if (eventId) notifiedAdaptiveEventIds.delete(eventId);
-            if (todoId) notifiedAdaptiveTodoIds.delete(todoId);
+            if (eventId) {
+              notifiedAdaptiveEventIds.delete(eventId);
+              notifiedStartEventIds.delete(eventId);
+              scheduledEventSignatures.delete(eventId);
+            }
+            if (todoId) {
+              notifiedAdaptiveTodoIds.delete(todoId);
+              scheduledTodoSignatures.delete(todoId);
+            }
             purged++;
           } catch {}
         }
@@ -888,14 +926,20 @@ export const notificationService = {
   },
 
   /**
-   * Cancela todas as notificações locais agendadas no dispositivo (utilizado no logout / troca de conta).
+   * Cancela todas as notificações locais agendadas e remove banners ativos no dispositivo (utilizado no logout / troca de conta).
    */
   async cancelAllUpcomingReminders(): Promise<void> {
     if (!this.isAvailable()) return;
     notifiedAdaptiveEventIds.clear();
+    notifiedStartEventIds.clear();
     notifiedAdaptiveTodoIds.clear();
+    scheduledEventSignatures.clear();
+    scheduledTodoSignatures.clear();
     try {
       await Notifications.cancelAllScheduledNotificationsAsync();
+      if (typeof Notifications.dismissAllNotificationsAsync === 'function') {
+        await Notifications.dismissAllNotificationsAsync();
+      }
     } catch (e) {
       console.warn('[NotificationService] Erro ao cancelar notificações locais:', e);
     }

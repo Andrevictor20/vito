@@ -445,7 +445,7 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     padding: tokens.spacing.md,
-    paddingBottom: 90,
+    paddingBottom: 120,
   },
   horizonSelectorContainer: {
     marginBottom: tokens.spacing.md,

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -11,6 +12,62 @@ import (
 
 	"github.com/andrevmp/vito/backend/internal/domain"
 )
+
+// syncConfirmedEventToParticipant espelha o evento confirmado na agenda Vito do participante (caso tenha conta associada ao e-mail)
+// e dispara notificação push de confirmação para o dispositivo dele.
+func (s *MeetingService) syncConfirmedEventToParticipant(
+	contactEmail, participantName, hostUserID, meetingID, meetingTitle, eventDesc string,
+	startAt, endAt, now time.Time,
+) {
+	if s.userRepo == nil || !strings.Contains(contactEmail, "@") {
+		return
+	}
+	partUser, err := s.userRepo.GetByEmail(strings.TrimSpace(contactEmail))
+	if err != nil || partUser == nil || partUser.ID == "" || partUser.ID == hostUserID {
+		return
+	}
+
+	partEventID := uuid.New().String()
+	partEvent := &domain.Event{
+		ID:          partEventID,
+		UserID:      partUser.ID,
+		Title:       meetingTitle,
+		Description: eventDesc,
+		StartAt:     startAt.UTC(),
+		EndAt:       endAt.UTC(),
+		Source:      "vito_meeting",
+		Category:    "meeting",
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+	if err := s.eventRepo.Create(partEvent); err != nil {
+		log.Printf("[MeetingService] Falha ao criar evento espelhado para participante user=%s: %v", partUser.ID, err)
+	} else {
+		log.Printf("[MeetingService] Evento confirmado '%s' espelhado na agenda Vito do participante user=%s (%s)", meetingTitle, partUser.ID, contactEmail)
+	}
+
+	if s.syncPusher != nil {
+		evCopy := *partEvent
+		go func(targetUserID string, evt *domain.Event) {
+			pctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			_ = s.syncPusher.PushEvent(pctx, targetUserID, evt)
+		}(partUser.ID, &evCopy)
+	}
+
+	if s.notificationSvc != nil {
+		loc := brtLocation()
+		localStart := startAt.In(loc)
+		pushTitle := fmt.Sprintf("📅 Reunião confirmada: %s", meetingTitle)
+		pushBody := fmt.Sprintf("Horário oficial definido para %s às %s", localStart.Format("02/01"), localStart.Format("15:04"))
+		_, _ = s.notificationSvc.SendPushToUser(partUser.ID, pushTitle, pushBody, "high", map[string]interface{}{
+			"type":       "meeting_confirmed",
+			"channelId":  "vito_booking",
+			"meeting_id": meetingID,
+			"event_id":   partEventID,
+		})
+	}
+}
 
 // CreateMeeting valida e cria a reunião e seus slots propostos.
 func (s *MeetingService) CreateMeeting(ctx context.Context, req CreateMeetingRequest) (*domain.MeetingWithDetails, error) {

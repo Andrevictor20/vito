@@ -319,8 +319,14 @@ func (s *CalendarSyncService) SyncIntegration(ctx context.Context, userID, provi
 			mapping.LastSyncedAt = now
 			_ = s.syncRepo.UpsertMapping(mapping)
 		} else {
-			// Evento novo originado na nuvem: cadastra no Vito
+			// Evento originado na nuvem sem mapeamento prévio: verifica se já existe evento idêntico (mesmo título e horário) para evitar duplicatas
 			newID := uuid.New().String()
+			for _, ex := range existingEvents {
+				if strings.EqualFold(strings.TrimSpace(ex.Title), strings.TrimSpace(item.Title)) && ex.StartAt.UTC().Equal(item.StartAt.UTC()) {
+					newID = ex.ID
+					break
+				}
+			}
 			newEvent := &domain.Event{
 				ID:          newID,
 				UserID:      userID,
@@ -364,10 +370,10 @@ func (s *CalendarSyncService) SyncIntegration(ctx context.Context, userID, provi
 	}
 
 	// 2.1 Outbound Sync: propaga eventos locais do Vito sem mapeamento no Google.
-	// Fontes locais sincronizáveis: "" (legado), "vito" e "vito_booking" (sync total).
+	// Fontes locais sincronizáveis: "" (legado), "vito", "vito_booking" e "vito_meeting" (sync total).
 	localEvents, _ := s.eventRepo.ListByUser(userID, from, to)
 	for _, le := range localEvents {
-		if le.Source != "" && le.Source != "vito" && le.Source != "vito_booking" {
+		if le.Source != "" && le.Source != "vito" && le.Source != "vito_booking" && le.Source != "vito_meeting" {
 			continue // evento importado de outro provedor externo
 		}
 		existingMap, _ := s.syncRepo.GetMappingByEventID(le.ID, providerName)

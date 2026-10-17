@@ -472,7 +472,7 @@ const styles = StyleSheet.create({
   listContent: {
     paddingHorizontal: 16,
     paddingTop: 8,
-    paddingBottom: 100,
+    paddingBottom: 120,
   },
   pausedSectionWrapper: {
     marginTop: 12,

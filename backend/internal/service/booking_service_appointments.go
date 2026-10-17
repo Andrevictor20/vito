@@ -227,6 +227,51 @@ func (s *BookingService) ReserveAppointment(ctx context.Context, userIdentifier,
 		}
 	}
 
+	// 6b. Se o convidado também possuir uma conta Vito associada ao guestEmail, espelha o evento na agenda dele e envia push
+	if s.userRepo != nil && strings.Contains(guestEmail, "@") {
+		if guestUser, gErr := s.userRepo.GetByEmail(guestEmail); gErr == nil && guestUser != nil && guestUser.ID != "" && guestUser.ID != bt.UserID {
+			guestEventID := uuid.New().String()
+			guestEvent := &domain.Event{
+				ID:          guestEventID,
+				UserID:      guestUser.ID,
+				Title:       bt.Title,
+				Description: eventDesc,
+				StartAt:     req.StartAt.UTC(),
+				EndAt:       req.EndAt.UTC(),
+				Source:      "vito_booking",
+				Category:    "meeting",
+				CreatedAt:   time.Now().UTC(),
+				UpdatedAt:   time.Now().UTC(),
+			}
+			if cErr := s.eventRepo.Create(guestEvent); cErr == nil {
+				if s.syncPusher != nil {
+					evCopy := *guestEvent
+					go func(targetUserID string, evt *domain.Event) {
+						pctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+						defer cancel()
+						_ = s.syncPusher.PushEvent(pctx, targetUserID, evt)
+					}(guestUser.ID, &evCopy)
+				}
+				if s.notificationSvc != nil {
+					loc := brtLocation()
+					localSt := req.StartAt.In(loc)
+					_, _ = s.notificationSvc.SendPushToUser(
+						guestUser.ID,
+						fmt.Sprintf("📅 Agendamento confirmado: %s", bt.Title),
+						fmt.Sprintf("Reservado para %s às %s", localSt.Format("02/01"), localSt.Format("15:04")),
+						"high",
+						map[string]interface{}{
+							"type":           "booking_appointment",
+							"channelId":      "vito_booking",
+							"appointment_id": appt.ID,
+							"event_id":       guestEventID,
+						},
+					)
+				}
+			}
+		}
+	}
+
 	// 7. Notificação por e-mail com anexo .ics para o convidado
 	if s.emailSvc != nil && s.emailSvc.IsConfigured() && strings.Contains(guestEmail, "@") {
 		go func(title, desc, toEmail, toName string, stAt, endAt time.Time) {

@@ -324,3 +324,29 @@ export function extractGroupedMeetingPolls(meetings: Meeting[]): GroupedMeetingP
   });
 }
 
+/**
+ * Retorna o rótulo padrão agnóstico de aplicativo para o botão de compartilhamento de reunião.
+ */
+export function getMeetingShareButtonLabel(isConfirmed: boolean): string {
+  return isConfirmed ? 'Compartilhar Confirmação' : 'Compartilhar Enquete';
+}
+
+/**
+ * Constrói a mensagem executiva de compartilhamento nativo (Share.share) para reuniões abertas ou confirmadas.
+ */
+export function buildMeetingShareMessage(meeting: Meeting, link: string): string {
+  const isConfirmed = meeting.status === 'confirmed';
+  const slots = Array.isArray(meeting.slots) ? meeting.slots : [];
+  const participants = Array.isArray(meeting.participants) ? meeting.participants : [];
+  const confirmedSlot = slots.find((s) => s.id === meeting.confirmed_slot_id);
+
+  if (isConfirmed && confirmedSlot) {
+    const confLabel = formatSlotBRTDisplay(confirmedSlot.start_at, confirmedSlot.end_at).compactLabel;
+    const partNames = participants.map((p) => p.name).filter(Boolean).join(', ');
+    return `🎉 Reunião Confirmada!\n📌 ${meeting.title}\n📅 Horário Definido: ${confLabel}${partNames ? `\n👥 Participantes: ${partNames}` : ''}\n🔗 Detalhes / Acesso: ${link}`;
+  }
+
+  return `Olá! Participe da votação de horários para a nossa reunião "${meeting.title}":\n${link}`;
+}
+
+

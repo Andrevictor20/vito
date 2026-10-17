@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   FlatList,
-  Linking,
+  Share,
   Alert,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -65,18 +65,14 @@ export const ContactsSyncModal: React.FC<ContactsSyncModalProps> = ({
     }
   };
 
-  const handleInviteWhatsApp = (phone?: string) => {
-    const text = encodeURIComponent(
-      'Olá! Estou usando o Vito para agendamentos e reuniões com IA. Vamos marcar nossos compromissos por lá: https://vito.app'
-    );
-    const cleanPhone = phone ? phone.replace(/\D/g, '') : '';
-    const url = cleanPhone
-      ? `whatsapp://send?phone=${cleanPhone}&text=${text}`
-      : `whatsapp://send?text=${text}`;
-
-    Linking.openURL(url).catch(() => {
-      Alert.alert('WhatsApp', 'Não foi possível abrir o WhatsApp neste aparelho.');
-    });
+  const handleShareInvite = async () => {
+    try {
+      await Share.share({
+        message:
+          'Olá! Estou usando o Vito para agendamentos e reuniões com IA. Vamos marcar nossos compromissos por lá: https://vito.rasppi.cloud',
+        title: 'Convite para o Vito',
+      });
+    } catch {}
   };
 
   return (
@@ -151,12 +147,12 @@ export const ContactsSyncModal: React.FC<ContactsSyncModalProps> = ({
                 </Text>
                 <TouchableOpacity
                   style={[styles.inviteButton, { borderColor: colors.primary }]}
-                  onPress={() => handleInviteWhatsApp()}
+                  onPress={handleShareInvite}
                   activeOpacity={0.7}
                 >
                   <MaterialIcons name="share" size={16} color={colors.primary} />
                   <Text style={[styles.inviteButtonText, { color: colors.primary }]}>
-                    Convidar Amigos via WhatsApp
+                    Compartilhar Convite
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -194,7 +190,7 @@ export const ContactsSyncModal: React.FC<ContactsSyncModalProps> = ({
                         if (onSelectContactForMeeting) {
                           onSelectContactForMeeting(item);
                         } else {
-                          handleInviteWhatsApp(item.phone);
+                          handleShareInvite();
                         }
                       }}
                       activeOpacity={0.7}

@@ -67,7 +67,7 @@ func (r *UserRepositorySQLite) GetByEmail(email string) (*domain.User, error) {
 	query := `
 		SELECT id, name, email, phone, password_hash, token_version, created_at, updated_at
 		FROM users
-		WHERE email = ?
+		WHERE LOWER(TRIM(email)) = LOWER(TRIM(?))
 	`
 	return r.scanUser(r.db.QueryRow(query, email))
 }
