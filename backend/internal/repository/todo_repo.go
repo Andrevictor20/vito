@@ -92,9 +92,7 @@ func (r *TodoRepositorySQLite) ListByUser(userID string, status domain.TodoStatu
 		todos = append(todos, t)
 	}
 
-	for i := range todos {
-		todos[i].Subtasks, _ = r.ListSubtasksByTodo(todos[i].ID)
-	}
+	r.populateSubtasksBatch(todos)
 
 	return todos, rows.Err()
 }
@@ -172,9 +170,46 @@ func (r *TodoRepositorySQLite) ListPaged(userID string, f domain.TodoFilter) ([]
 	}
 	if todos == nil {
 		todos = []domain.Todo{}
+	} else {
+		r.populateSubtasksBatch(todos)
 	}
 
 	return todos, total, rows.Err()
+}
+
+// populateSubtasksBatch carrega todas as subtarefas de uma fatia de tarefas em uma única consulta SQL IN (elimina N+1).
+func (r *TodoRepositorySQLite) populateSubtasksBatch(todos []domain.Todo) {
+	if len(todos) == 0 {
+		return
+	}
+	placeholders := make([]string, len(todos))
+	args := make([]interface{}, len(todos))
+	idxByTodoID := make(map[string]int, len(todos))
+	for i := range todos {
+		placeholders[i] = "?"
+		args[i] = todos[i].ID
+		idxByTodoID[todos[i].ID] = i
+	}
+	query := `
+		SELECT id, todo_id, title, completed, created_at, updated_at
+		FROM todo_subtasks
+		WHERE todo_id IN (` + strings.Join(placeholders, ",") + `)
+		ORDER BY created_at ASC
+	`
+	rows, err := r.db.Query(query, args...)
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var s domain.Subtask
+		if err := rows.Scan(&s.ID, &s.TodoID, &s.Title, &s.Completed, &s.CreatedAt, &s.UpdatedAt); err != nil {
+			continue
+		}
+		if idx, ok := idxByTodoID[s.TodoID]; ok {
+			todos[idx].Subtasks = append(todos[idx].Subtasks, s)
+		}
+	}
 }
 
 func escapeLike(s string) string {

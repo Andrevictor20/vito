@@ -16,6 +16,8 @@ const (
 	ActionUpdateEvent   IntentAction = "UPDATE_EVENT"
 	ActionDeleteEvent   IntentAction = "DELETE_EVENT"
 	ActionCreateTodo    IntentAction = "CREATE_TODO"
+	ActionCompleteTodo  IntentAction = "COMPLETE_TODO"
+	ActionDeleteTodo    IntentAction = "DELETE_TODO"
 	ActionCreatePending IntentAction = "CREATE_PENDING_ITEM"
 	ActionConvertPending IntentAction = "CONVERT_PENDING_TO_EVENT"
 	ActionQuerySchedule IntentAction = "QUERY_SCHEDULE"
@@ -69,13 +71,13 @@ type ParsedEvent struct {
 	EndAt       time.Time `json:"end_at"`
 	Recurrence      string    `json:"recurrence,omitempty"`       // "WEEKLY", "DAILY", "MONTHLY"
 	RecurrenceUntil string    `json:"recurrence_until,omitempty"` // "YYYY-MM-DD" inclusiva: último dia da série
-	TargetQuery     string    `json:"target_query,omitempty"`     // termo para busca ao atualizar/excluir (ex: "aula de inglês")
+	TargetQuery     string    `json:"target_query,omitempty"`     // termo ou ID exato para busca ao atualizar/excluir
 
 	startWallClock bool
 	endWallClock   bool
 }
 
-// ParsedTodo dados extraídos para criação de to-do.
+// ParsedTodo dados extraídos para criação, conclusão ou remoção de to-do.
 type ParsedTodo struct {
 	Title         string     `json:"title"`
 	Priority      string     `json:"priority"` // low, medium, high
@@ -83,6 +85,7 @@ type ParsedTodo struct {
 	RemindAt      *time.Time `json:"remind_at,omitempty"`
 	RemindRepeat  string     `json:"remind_repeat,omitempty"` // none, daily, weekly
 	RemindAdvance int        `json:"remind_advance_minutes,omitempty"`
+	TargetQuery   string     `json:"target_query,omitempty"` // ID exato ou título ao concluir/excluir
 
 	dueWallClock    bool
 	remindWallClock bool
@@ -145,19 +148,20 @@ type ParsedMeeting struct {
 
 // ParsedIntent resultado normalizado da interpretação do assistente Toki-like.
 type ParsedIntent struct {
-	Action         IntentAction   `json:"action"`
-	Thought        string         `json:"thought,omitempty"`      // §8.6 CoT: raciocínio guiado obrigatório
-	ContextUsed    []string       `json:"context_used,omitempty"` // §8.6 CoT: memórias/entidades usadas
-	Message        string         `json:"message"` // Resposta amigável da secretária
-	Event          *ParsedEvent   `json:"event,omitempty"`
-	Todo           *ParsedTodo    `json:"todo,omitempty"`
-	Trigger        *ParsedTrigger `json:"trigger,omitempty"`
-	Pending        *ParsedPending `json:"pending,omitempty"`
-	Booking        *ParsedBooking `json:"booking,omitempty"`
-	Meeting        *ParsedMeeting `json:"meeting,omitempty"`
-	MemoryContent  string         `json:"memory_content,omitempty"`
-	MemoryCategory string         `json:"memory_category,omitempty"`
-	ProviderUsed   string         `json:"provider_used,omitempty"`
+	Action            IntentAction   `json:"action"`
+	Thought           string         `json:"thought,omitempty"`      // §8.6 CoT: raciocínio guiado obrigatório
+	ContextUsed       []string       `json:"context_used,omitempty"` // §8.6 CoT: memórias/entidades usadas
+	Message           string         `json:"message"`                // Resposta amigável da secretária
+	Event             *ParsedEvent   `json:"event,omitempty"`
+	Todo              *ParsedTodo    `json:"todo,omitempty"`
+	Trigger           *ParsedTrigger `json:"trigger,omitempty"`
+	Pending           *ParsedPending `json:"pending,omitempty"`
+	Booking           *ParsedBooking `json:"booking,omitempty"`
+	Meeting           *ParsedMeeting `json:"meeting,omitempty"`
+	MemoryContent     string         `json:"memory_content,omitempty"`
+	MemoryCategory    string         `json:"memory_category,omitempty"`
+	AdditionalActions []ParsedIntent `json:"additional_actions,omitempty"` // Ações encadeadas no mesmo turno (até 3)
+	ProviderUsed      string         `json:"provider_used,omitempty"`
 }
 
 // IsEmpty detecta resposta vazia (bug §8.7/9): Reply em branco e nenhuma ação.
@@ -170,7 +174,8 @@ func (p *ParsedIntent) IsEmpty() bool {
 		return false
 	}
 	return p.Event == nil && p.Todo == nil && p.Trigger == nil &&
-		p.Pending == nil && p.Booking == nil &&
+		p.Pending == nil && p.Booking == nil && p.Meeting == nil &&
+		len(p.AdditionalActions) == 0 &&
 		strings.TrimSpace(p.MemoryContent) == ""
 }
 

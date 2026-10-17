@@ -18,11 +18,19 @@ func NewMemoryRepository(db *sql.DB) *MemoryRepositorySQLite {
 }
 
 func (r *MemoryRepositorySQLite) Create(m *domain.Memory) error {
+	imp := m.Importance
+	if imp <= 0 {
+		imp = 3
+	}
+	conf := m.Confidence
+	if conf <= 0 {
+		conf = 1.0
+	}
 	query := `
-		INSERT INTO memories (id, user_id, category, content, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?)
+		INSERT INTO memories (id, user_id, category, content, importance, confidence, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 	`
-	_, err := r.db.Exec(query, m.ID, m.UserID, m.Category, m.Content, m.CreatedAt, m.UpdatedAt)
+	_, err := r.db.Exec(query, m.ID, m.UserID, m.Category, m.Content, imp, conf, m.CreatedAt, m.UpdatedAt)
 	return err
 }
 
@@ -59,7 +67,9 @@ func (r *MemoryRepositorySQLite) ListByUser(userID string, limit int) ([]domain.
 		limit = 20
 	}
 	query := `
-		SELECT id, user_id, category, content, created_at, updated_at
+		SELECT id, user_id, category, content,
+		       COALESCE(importance, 3), COALESCE(confidence, 1.0),
+		       created_at, updated_at
 		FROM memories
 		WHERE user_id = ?
 		ORDER BY created_at DESC
@@ -74,7 +84,7 @@ func (r *MemoryRepositorySQLite) ListByUser(userID string, limit int) ([]domain.
 	var memories []domain.Memory
 	for rows.Next() {
 		var m domain.Memory
-		if err := rows.Scan(&m.ID, &m.UserID, &m.Category, &m.Content, &m.CreatedAt, &m.UpdatedAt); err != nil {
+		if err := rows.Scan(&m.ID, &m.UserID, &m.Category, &m.Content, &m.Importance, &m.Confidence, &m.CreatedAt, &m.UpdatedAt); err != nil {
 			return nil, err
 		}
 		memories = append(memories, m)

@@ -184,6 +184,11 @@ func (s *CalendarService) ListEventsPaged(userID string, from, to time.Time, lim
 	return s.eventRepo.ListByUserPaged(userID, from, to, limit, offset)
 }
 
+// GetEventByID busca um evento pelo ID exato pertencente ao usuário.
+func (s *CalendarService) GetEventByID(id, userID string) (*domain.Event, error) {
+	return s.eventRepo.GetByID(id, userID)
+}
+
 // DeleteEvent remove um evento pertencente ao usuário.
 func (s *CalendarService) DeleteEvent(id, userID string) error {
 	if stored, err := s.eventRepo.GetByID(id, userID); err == nil {

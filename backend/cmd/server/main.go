@@ -68,6 +68,7 @@ func main() {
 	eventRepo := repository.NewEventRepository(db)
 	todoRepo := repository.NewTodoRepository(db)
 	memoryRepo := repository.NewMemoryRepository(db)
+	coreProfileRepo := repository.NewCoreProfileRepository(db)
 	notifRepo := repository.NewDeviceTokenRepository(db)
 	triggerRepo := repository.NewTriggerRepository(db)
 	briefingRepo := repository.NewBriefingRepository(db)
@@ -115,6 +116,7 @@ func main() {
 	astSvc := service.NewAssistantService(aiGateway, calSvc, todoSvc, memoryRepo, triggerSvc)
 	astSvc.SetUserRepository(userRepo)
 	astSvc.SetAISettingsRepository(aiSettingsRepo)
+	astSvc.SetCoreProfileRepository(coreProfileRepo)
 	astSvc.SetPendingService(pendingSvc)
 	// Ciclo 2 §8.4: correção manual rápida vira learned_preference (opt-out via VITO_DISABLE_IMPLICIT_FEEDBACK=1).
 	if os.Getenv("VITO_DISABLE_IMPLICIT_FEEDBACK") == "1" {

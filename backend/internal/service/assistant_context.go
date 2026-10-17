@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/andrevmp/vito/backend/internal/ai"
@@ -26,124 +27,230 @@ var holidayQueryKeywords = []string{
 	"réveillon", "reveillon",
 }
 
-// enrichInputContext injeta dados contextuais dinâmicos (memória, agenda, tarefas, radares e bookings)
-// no input do usuário antes de enviar ao gateway de IA.
+// enrichInputContext injeta dados contextuais dinâmicos (perfil fixo, memória, agenda, janelas livres, tarefas, radares e bookings)
+// no input do usuário em paralelo (sync.WaitGroup) antes de enviar ao gateway de IA.
 func (s *AssistantService) enrichInputContext(ctx context.Context, userID string, input *ai.UserInput) {
-	// Carrega preferências de autonomia da IA se não estiverem definidas no input
-	if input.AutonomyMode == "" && s.aiSettingsRepo != nil {
-		if aiSettings, err := s.aiSettingsRepo.GetSettings(userID); err == nil && aiSettings != nil {
-			input.AutonomyMode = string(aiSettings.AutonomyMode)
-		}
-	}
+	loc := userLocation(input.Timezone)
+	now := input.Now
+	queryText := input.Text
 
-	// Carrega nome do usuário para contextualização e tratamento pessoal
-	if input.UserName == "" && s.userRepo != nil {
-		if u, err := s.userRepo.GetByID(userID); err == nil && u != nil && strings.TrimSpace(u.Name) != "" {
-			input.UserName = strings.TrimSpace(u.Name)
-		}
-	}
+	needAutonomy := input.AutonomyMode == "" && s.aiSettingsRepo != nil
+	needUserName := input.UserName == "" && s.userRepo != nil
+	needCoreProfile := len(input.CoreProfile) == 0 && s.coreProfileRepo != nil
+	needMemories := len(input.ContextMemories) == 0 && s.memoryRepo != nil
+	needSchedule := len(input.ActiveSchedule) == 0 && s.calSvc != nil
+	needTodos := len(input.PendingTodos) == 0 && s.todoSvc != nil
+	needTriggers := len(input.ActiveTriggers) == 0 && s.triggerSvc != nil
+	needTriggerAlerts := len(input.ActiveTriggerAlerts) == 0
+	needBookings := len(input.ActiveBookings) == 0 && s.bookingSvc != nil
+	needAppointments := len(input.UpcomingAppointments) == 0 && s.bookingSvc != nil
 
-	// Memória episódica sob demanda: top relevantes (similaridade+importância+recência).
-	if len(input.ContextMemories) == 0 && s.memoryRepo != nil {
-		if mems, err := s.memoryRepo.SearchRelevant(userID, input.Text, 8); err == nil && len(mems) > 0 {
-			for _, m := range mems {
-				input.ContextMemories = append(input.ContextMemories, fmt.Sprintf("[%s] %s", m.Category, m.Content))
+	var (
+		autonomyMode      string
+		userName          string
+		coreProfileLines  []string
+		contextMemories   []string
+		activeSchedule    []string
+		freeSlotsFlags    []string
+		pendingTodos      []string
+		activeTriggers    []string
+		triggerAlertLines []string
+		triggerFlags      []string
+		activeBookings    []string
+		upcomingAppts     []string
+		wg                sync.WaitGroup
+	)
+
+	if needAutonomy {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if aiSettings, err := s.aiSettingsRepo.GetSettings(userID); err == nil && aiSettings != nil {
+				autonomyMode = string(aiSettings.AutonomyMode)
 			}
-		}
+		}()
 	}
 
-	// Carrega compromissos ativos próximos na agenda (Camada 2 - Próximos 14 dias, até 15)
-	if len(input.ActiveSchedule) == 0 && s.calSvc != nil {
-		start := input.Now
-		end := input.Now.Add(14 * 24 * time.Hour)
-		if events, err := s.calSvc.ListEvents(userID, start, end); err == nil && len(events) > 0 {
-			limit := 15
-			if len(events) < limit {
-				limit = len(events)
+	if needUserName {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if u, err := s.userRepo.GetByID(userID); err == nil && u != nil && strings.TrimSpace(u.Name) != "" {
+				userName = strings.TrimSpace(u.Name)
 			}
-			loc := userLocation(input.Timezone)
-			for _, ev := range events[:limit] {
-				line := assistant.FormatScheduleLine(ev, loc)
-				if isHolidayLikeEvent(ev) {
-					line += " [feriado/data comemorativa — NÃO é um compromisso]"
+		}()
+	}
+
+	if needCoreProfile {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if items, err := s.coreProfileRepo.GetAll(userID); err == nil && len(items) > 0 {
+				for _, it := range items {
+					k := strings.TrimSpace(it.Key)
+					v := strings.TrimSpace(it.Value)
+					if k != "" && v != "" {
+						coreProfileLines = append(coreProfileLines, fmt.Sprintf("%s: %s", k, v))
+					}
 				}
-				input.ActiveSchedule = append(input.ActiveSchedule, line)
 			}
-		}
+		}()
 	}
 
-	// Carrega tarefas pendentes mais urgentes (Camada 2 - Até 5 não concluídas)
-	if len(input.PendingTodos) == 0 && s.todoSvc != nil {
-		if todos, err := s.todoSvc.ListTodos(userID, domain.TodoStatusPending); err == nil && len(todos) > 0 {
-			limit := 5
-			if len(todos) < limit {
-				limit = len(todos)
+	if needMemories {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if mems, err := s.memoryRepo.SearchRelevant(userID, queryText, 8); err == nil && len(mems) > 0 {
+				for _, m := range mems {
+					contextMemories = append(contextMemories, fmt.Sprintf("[%s] %s", m.Category, m.Content))
+				}
 			}
-			for _, td := range todos[:limit] {
-				input.PendingTodos = append(input.PendingTodos, assistant.FormatTodoLine(td, userLocation(input.Timezone)))
-			}
-		}
+		}()
 	}
 
-	// Carrega disparadores e vigílias ativas do usuário (Camada 2 - Até 8 vigílias ativas)
-	if len(input.ActiveTriggers) == 0 && s.triggerSvc != nil {
-		if trigs, err := s.triggerSvc.ListTriggers(userID, "", domain.TriggerStatusActive); err == nil && len(trigs) > 0 {
-			limit := 8
-			if len(trigs) < limit {
-				limit = len(trigs)
+	if needSchedule {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			start := now
+			end := now.Add(14 * 24 * time.Hour)
+			events, err := s.calSvc.ListEvents(userID, start, end)
+			if err == nil {
+				freeSlotsFlags = assistant.ComputeFreeSlotsSummary(events, now, loc)
+				if len(events) > 0 {
+					limit := 15
+					if len(events) < limit {
+						limit = len(events)
+					}
+					for _, ev := range events[:limit] {
+						line := assistant.FormatScheduleLine(ev, loc)
+						if isHolidayLikeEvent(ev) {
+							line += " [feriado/data comemorativa — NÃO é um compromisso]"
+						}
+						activeSchedule = append(activeSchedule, line)
+					}
+				}
 			}
-			for _, tr := range trigs[:limit] {
-				input.ActiveTriggers = append(input.ActiveTriggers, assistant.FormatTriggerLine(tr))
+		}()
+	}
+
+	if needTodos {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if todos, err := s.todoSvc.ListTodos(userID, domain.TodoStatusPending); err == nil && len(todos) > 0 {
+				limit := 5
+				if len(todos) < limit {
+					limit = len(todos)
+				}
+				for _, td := range todos[:limit] {
+					pendingTodos = append(pendingTodos, assistant.FormatTodoLine(td, loc))
+				}
 			}
-			// Alertas não lidos (Fase 3): top 3 viram base do chat para propor
-			// eventos e analisar conflitos — nunca criação automática.
-			if len(input.ActiveTriggerAlerts) == 0 {
-				logsByTrigger := map[string][]domain.TriggerLog{}
+		}()
+	}
+
+	if needTriggers {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if trigs, err := s.triggerSvc.ListTriggers(userID, "", domain.TriggerStatusActive); err == nil && len(trigs) > 0 {
+				limit := 8
+				if len(trigs) < limit {
+					limit = len(trigs)
+				}
+				var trigIDs []string
 				for _, tr := range trigs[:limit] {
-					if logs, err := s.triggerSvc.ListTriggerLogs(tr.ID, userID); err == nil && len(logs) > 0 {
-						logsByTrigger[tr.ID] = logs
-					}
+					activeTriggers = append(activeTriggers, assistant.FormatTriggerLine(tr))
+					trigIDs = append(trigIDs, tr.ID)
 				}
-				input.ActiveTriggerAlerts = assistant.CollectTriggerAlerts(trigs[:limit], logsByTrigger, 3)
+				if needTriggerAlerts {
+					logsByTrigger, _ := s.triggerSvc.ListUnreadLogsByTriggerIDs(userID, trigIDs)
+					triggerAlertLines = assistant.CollectTriggerAlerts(trigs[:limit], logsByTrigger, 3)
+				}
+				triggerFlags = []string{
+					fmt.Sprintf("radares_ativos:%d", len(trigs[:limit])),
+					fmt.Sprintf("alertas_radar_nao_lidos:%d", len(triggerAlertLines)),
+				}
 			}
-			// Telemetria compacta de radares (§8.5).
-			input.AppStateFlags = append(input.AppStateFlags,
-				fmt.Sprintf("radares_ativos:%d", len(trigs[:limit])),
-				fmt.Sprintf("alertas_radar_nao_lidos:%d", len(input.ActiveTriggerAlerts)),
-			)
-		}
+		}()
 	}
 
-	// Carrega links de agendamento ativos do usuário (Vito Booking)
-	if len(input.ActiveBookings) == 0 && s.bookingSvc != nil {
-		if bts, err := s.bookingSvc.ListBookingTypes(ctx, userID); err == nil && len(bts) > 0 {
-			for _, bt := range bts {
-				if bt.IsActive {
-					url := bt.ShortURL
-					if url == "" {
-						url = bt.PublicURL
+	if needBookings {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if bts, err := s.bookingSvc.ListBookingTypes(ctx, userID); err == nil && len(bts) > 0 {
+				for _, bt := range bts {
+					if bt.IsActive {
+						url := bt.ShortURL
+						if url == "" {
+							url = bt.PublicURL
+						}
+						activeBookings = append(activeBookings, assistant.FormatBookingLine(bt.Title, bt.DurationMinutes, bt.StartHour, bt.EndHour, url))
 					}
-					input.ActiveBookings = append(input.ActiveBookings, assistant.FormatBookingLine(bt.Title, bt.DurationMinutes, bt.StartHour, bt.EndHour, url))
 				}
 			}
-		}
+		}()
 	}
 
-	// Carrega agendamentos recebidos de convidados (Vito Booking)
-	if len(input.UpcomingAppointments) == 0 && s.bookingSvc != nil {
-		from := input.Now.Add(-1 * 24 * time.Hour)
-		to := input.Now.Add(30 * 24 * time.Hour)
-		if appts, err := s.bookingSvc.ListAppointments(ctx, userID, from, to); err == nil && len(appts) > 0 {
-			loc := userLocation(input.Timezone)
-			for _, ap := range appts {
-				if ap.Status != "cancelled" {
-					apStart, apEnd := ap.StartAt.In(loc), ap.EndAt.In(loc)
-					input.UpcomingAppointments = append(input.UpcomingAppointments, fmt.Sprintf("Convidado %s (%s, %s às %s - %s) [ID: %s]",
-						ap.GuestName, ap.GuestEmail, apStart.Format("02/01/2006"), apStart.Format("15:04"), apEnd.Format("15:04"), ap.ID,
-					))
+	if needAppointments {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			from := now.Add(-1 * 24 * time.Hour)
+			to := now.Add(30 * 24 * time.Hour)
+			if appts, err := s.bookingSvc.ListAppointments(ctx, userID, from, to); err == nil && len(appts) > 0 {
+				for _, ap := range appts {
+					if ap.Status != "cancelled" {
+						apStart, apEnd := ap.StartAt.In(loc), ap.EndAt.In(loc)
+						upcomingAppts = append(upcomingAppts, fmt.Sprintf("Convidado %s (%s, %s às %s - %s) [ID: %s]",
+							ap.GuestName, ap.GuestEmail, apStart.Format("02/01/2006"), apStart.Format("15:04"), apEnd.Format("15:04"), ap.ID,
+						))
+					}
 				}
 			}
-		}
+		}()
+	}
+
+	wg.Wait()
+
+	if autonomyMode != "" {
+		input.AutonomyMode = autonomyMode
+	}
+	if userName != "" {
+		input.UserName = userName
+	}
+	if len(coreProfileLines) > 0 {
+		input.CoreProfile = coreProfileLines
+	}
+	if len(contextMemories) > 0 {
+		input.ContextMemories = contextMemories
+	}
+	if len(activeSchedule) > 0 {
+		input.ActiveSchedule = activeSchedule
+	}
+	if len(freeSlotsFlags) > 0 {
+		input.AppStateFlags = append(input.AppStateFlags, freeSlotsFlags...)
+	}
+	if len(pendingTodos) > 0 {
+		input.PendingTodos = pendingTodos
+	}
+	if len(activeTriggers) > 0 {
+		input.ActiveTriggers = activeTriggers
+	}
+	if len(triggerAlertLines) > 0 {
+		input.ActiveTriggerAlerts = triggerAlertLines
+	}
+	if len(triggerFlags) > 0 {
+		input.AppStateFlags = append(input.AppStateFlags, triggerFlags...)
+	}
+	if len(activeBookings) > 0 {
+		input.ActiveBookings = activeBookings
+	}
+	if len(upcomingAppts) > 0 {
+		input.UpcomingAppointments = upcomingAppts
 	}
 }
 

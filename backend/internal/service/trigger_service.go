@@ -455,3 +455,24 @@ func (s *TriggerService) ClearTriggerLogs(triggerID, userID string) error {
 	}
 	return s.repo.ClearLogs(triggerID, userID)
 }
+
+type batchUnreadLogReader interface {
+	ListUnreadLogsByTriggerIDs(triggerIDs []string) (map[string][]domain.TriggerLog, error)
+}
+
+// ListUnreadLogsByTriggerIDs busca logs não lidos de múltiplos radares do usuário em batch (1 query quando suportado).
+func (s *TriggerService) ListUnreadLogsByTriggerIDs(userID string, triggerIDs []string) (map[string][]domain.TriggerLog, error) {
+	if len(triggerIDs) == 0 {
+		return map[string][]domain.TriggerLog{}, nil
+	}
+	if batchRepo, ok := s.repo.(batchUnreadLogReader); ok {
+		return batchRepo.ListUnreadLogsByTriggerIDs(triggerIDs)
+	}
+	out := make(map[string][]domain.TriggerLog, len(triggerIDs))
+	for _, id := range triggerIDs {
+		if logs, err := s.ListTriggerLogs(id, userID); err == nil && len(logs) > 0 {
+			out[id] = logs
+		}
+	}
+	return out, nil
+}

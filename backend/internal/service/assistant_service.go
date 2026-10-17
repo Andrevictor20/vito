@@ -48,16 +48,17 @@ type AssistantResponse struct {
 
 // AssistantService orquestra o parsing de IA com os serviços de calendário, tarefas, memórias e disparadores.
 type AssistantService struct {
-	aiGateway      AIParsingGateway
-	calSvc         *CalendarService
-	todoSvc        *TodoService
-	memoryRepo     domain.MemoryRepository
-	triggerSvc     *TriggerService
-	pendingSvc     *PendingService
-	bookingSvc     *BookingService
-	meetingSvc     *MeetingService
-	userRepo       domain.UserRepository
-	aiSettingsRepo domain.AISettingsRepository
+	aiGateway       AIParsingGateway
+	calSvc          *CalendarService
+	todoSvc         *TodoService
+	memoryRepo      domain.MemoryRepository
+	coreProfileRepo domain.CoreProfileRepository
+	triggerSvc      *TriggerService
+	pendingSvc      *PendingService
+	bookingSvc      *BookingService
+	meetingSvc      *MeetingService
+	userRepo        domain.UserRepository
+	aiSettingsRepo  domain.AISettingsRepository
 }
 
 // NewAssistantService instancia o serviço do assistente.
@@ -73,6 +74,11 @@ func NewAssistantService(aiGateway AIParsingGateway, calSvc *CalendarService, to
 		memoryRepo: memoryRepo,
 		triggerSvc: ts,
 	}
+}
+
+// SetCoreProfileRepository injeta o repositório de perfil fixo (Camada 1 §8.2).
+func (s *AssistantService) SetCoreProfileRepository(repo domain.CoreProfileRepository) {
+	s.coreProfileRepo = repo
 }
 
 // SetBookingService injeta o serviço de Vito Booking.
@@ -171,6 +177,35 @@ func (s *AssistantService) Process(ctx context.Context, userID string, input ai.
 	res, err = s.executeAction(ctx, userID, intent, input, res)
 	if err != nil {
 		return nil, err
+	}
+
+	// Execução encadeada de Compound Intents (até 3 ações complementares no mesmo turno).
+	if len(intent.AdditionalActions) > 0 {
+		primaryMsg := res.Message
+		maxSub := len(intent.AdditionalActions)
+		if maxSub > 3 {
+			maxSub = 3
+		}
+		for i := 0; i < maxSub; i++ {
+			sub := intent.AdditionalActions[i]
+			if sub.Action == "" || sub.Action == ai.ActionNeedsClarification || sub.Action == ai.ActionGeneralChat {
+				continue
+			}
+			if s.memoryRepo != nil && strings.TrimSpace(sub.MemoryContent) != "" {
+				s.persistLearnedMemory(userID, sub.MemoryCategory, sub.MemoryContent)
+			}
+			res, err = s.executeAction(ctx, userID, &sub, input, res)
+			if err != nil {
+				return nil, err
+			}
+			subMsg := strings.TrimSpace(sub.Message)
+			if subMsg != "" && !strings.Contains(primaryMsg, subMsg) {
+				primaryMsg = strings.TrimSpace(primaryMsg + " " + subMsg)
+			}
+		}
+		if primaryMsg != "" {
+			res.Message = primaryMsg
+		}
 	}
 
 	// Sincroniza Reply com Message para o mobile sempre exibir o motivo.
