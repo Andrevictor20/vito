@@ -116,16 +116,16 @@ jobs:
           cd ~/vito
           git fetch origin main
           git reset --hard origin/main
-          docker compose pull backend evolution-api evolution-postgres
-          docker compose stop backend || true
-          docker compose run --rm --no-deps --user 0:0 --entrypoint sh backend -c "mkdir -p /app/data /app/data/backups /app/backups && chown -R 10001:10001 /app/data /app/backups && chmod 0700 /app/data /app/backups"
-          docker compose up -d --force-recreate backend evolution-postgres evolution-api
+          # Encerra contêineres presos com timeout curto para liberar o dockerd imediatamente
+          docker stop -t 5 vito-evolution-api vito-backend || docker kill vito-evolution-api vito-backend || true
+          docker compose pull --quiet backend
+          docker compose up -d --force-recreate --remove-orphans evolution-postgres backend evolution-api
           docker image prune -f
 
       - name: Verify Backend & Evolution API Healthcheck
         run: |
           echo "Verificando Backend Vito..."
-          for i in $(seq 1 15); do
+          for i in $(seq 1 20); do
             if wget -qO- http://localhost:8180/healthz; then
               echo ""
               echo "✅ Backend Healthcheck OK on attempt $i"
@@ -134,8 +134,8 @@ jobs:
             sleep 2
           done
           echo "Verificando Evolution API..."
-          for i in $(seq 1 20); do
-            if wget -qO- http://127.0.0.1:8085 > /dev/null 2>&1; then
+          for i in $(seq 1 30); do
+            if wget -qO- http://127.0.0.1:8085 > /dev/null 2>&1 || curl -sf http://127.0.0.1:8085 > /dev/null 2>&1; then
               echo "✅ Evolution API OK on attempt $i"
               exit 0
             fi

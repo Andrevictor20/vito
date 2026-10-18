@@ -60,6 +60,16 @@ services:
       - evolution_pgdata:/var/lib/postgresql/data
     networks:
       - vito_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U evolution -d evolution"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     deploy:
       resources:
         limits:
@@ -74,7 +84,7 @@ services:
     restart: unless-stopped
     depends_on:
       evolution-postgres:
-        condition: service_started
+        condition: service_healthy
     ports:
       - "127.0.0.1:8085:8085"
     env_file:
@@ -95,6 +105,11 @@ services:
       - CACHE_REDIS_ENABLED=false
       - WEBHOOK_GLOBAL_ENABLED=false
       - DEL_INSTANCE=false
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     deploy:
       resources:
         limits:
