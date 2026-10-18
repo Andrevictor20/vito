@@ -1,11 +1,9 @@
 package service
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"regexp"
@@ -26,203 +24,9 @@ type WhatsAppServiceConfig struct {
 	HTTPClient      *http.Client
 }
 
-// EvolutionAPIClient abstrai as chamadas HTTP para o container da Evolution API v2.
-type EvolutionAPIClient interface {
-	CreateInstance(ctx context.Context, instanceName, phone string) error
-	SetWebhook(ctx context.Context, instanceName, webhookURL string) error
-	GetPairingCode(ctx context.Context, instanceName, phone string) (string, error)
-	GetConnectionState(ctx context.Context, instanceName string) (string, error)
-	Logout(ctx context.Context, instanceName string) error
-	SendText(ctx context.Context, instanceName, to, text string) error
-}
-
-// DefaultEvolutionClient implementa EvolutionAPIClient via chamadas REST para a Evolution API.
-type DefaultEvolutionClient struct {
-	baseURL    string
-	apiKey     string
-	httpClient *http.Client
-}
-
-// NewDefaultEvolutionClient instancia o cliente padrão da Evolution API v2.
-func NewDefaultEvolutionClient(baseURL, apiKey string, client *http.Client) *DefaultEvolutionClient {
-	if client == nil {
-		client = &http.Client{Timeout: 20 * time.Second}
-	}
-	baseURL = strings.TrimRight(baseURL, "/")
-	return &DefaultEvolutionClient{
-		baseURL:    baseURL,
-		apiKey:     apiKey,
-		httpClient: client,
-	}
-}
-
-func (c *DefaultEvolutionClient) doRequest(ctx context.Context, method, path string, body interface{}) (*http.Response, error) {
-	var bodyReader io.Reader
-	if body != nil {
-		data, err := json.Marshal(body)
-		if err != nil {
-			return nil, err
-		}
-		bodyReader = bytes.NewReader(data)
-	}
-
-	url := fmt.Sprintf("%s%s", c.baseURL, path)
-	req, err := http.NewRequestWithContext(ctx, method, url, bodyReader)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("apikey", c.apiKey)
-	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
-	}
-
-	return c.httpClient.Do(req)
-}
-
-func (c *DefaultEvolutionClient) CreateInstance(ctx context.Context, instanceName, phone string) error {
-	payload := map[string]interface{}{
-		"instanceName": instanceName,
-		"token":        "",
-		"qrcode":       false,
-		"number":       phone,
-		"integration":  "WHATSAPP-BAILEYS",
-	}
-
-	resp, err := c.doRequest(ctx, http.MethodPost, "/instance/create", payload)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	// Se a instância já existir (403 ou 400 com "already in use"), prossegue normalmente
-	if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusCreated || resp.StatusCode == http.StatusForbidden {
-		return nil
-	}
-
-	bodyBytes, _ := io.ReadAll(resp.Body)
-	if strings.Contains(string(bodyBytes), "already in use") {
-		return nil
-	}
-	return fmt.Errorf("evolution api create instance falhou (status %d): %s", resp.StatusCode, string(bodyBytes))
-}
-
-func (c *DefaultEvolutionClient) SetWebhook(ctx context.Context, instanceName, webhookURL string) error {
-	payload := map[string]interface{}{
-		"webhook": map[string]interface{}{
-			"enabled":  true,
-			"url":      webhookURL,
-			"byEvents": false,
-			"events": []string{
-				"MESSAGES_UPSERT",
-				"CONNECTION_UPDATE",
-			},
-		},
-	}
-
-	path := fmt.Sprintf("/webhook/set/%s", instanceName)
-	resp, err := c.doRequest(ctx, http.MethodPost, path, payload)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-		return nil
-	}
-	bodyBytes, _ := io.ReadAll(resp.Body)
-	return fmt.Errorf("evolution api set webhook falhou (status %d): %s", resp.StatusCode, string(bodyBytes))
-}
-
-func (c *DefaultEvolutionClient) GetPairingCode(ctx context.Context, instanceName, phone string) (string, error) {
-	path := fmt.Sprintf("/instance/connect/%s?number=%s", instanceName, phone)
-	resp, err := c.doRequest(ctx, http.MethodGet, path, nil)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return "", fmt.Errorf("evolution api get pairing code falhou (status %d): %s", resp.StatusCode, string(bodyBytes))
-	}
-
-	var parsed struct {
-		PairingCode string `json:"pairingCode"`
-		Code        string `json:"code"`
-	}
-	if err := json.Unmarshal(bodyBytes, &parsed); err != nil {
-		return "", err
-	}
-
-	resCode := parsed.PairingCode
-	if resCode == "" {
-		resCode = parsed.Code
-	}
-	if resCode == "" {
-		return "", fmt.Errorf("código de pareamento vazio na resposta da Evolution API: %s", string(bodyBytes))
-	}
-	return resCode, nil
-}
-
-func (c *DefaultEvolutionClient) GetConnectionState(ctx context.Context, instanceName string) (string, error) {
-	path := fmt.Sprintf("/instance/connectionState/%s", instanceName)
-	resp, err := c.doRequest(ctx, http.MethodGet, path, nil)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-
-	var parsed struct {
-		Instance struct {
-			State string `json:"state"`
-		} `json:"instance"`
-		State string `json:"state"`
-	}
-	_ = json.Unmarshal(bodyBytes, &parsed)
-
-	if parsed.Instance.State != "" {
-		return parsed.Instance.State, nil
-	}
-	return parsed.State, nil
-}
-
-func (c *DefaultEvolutionClient) Logout(ctx context.Context, instanceName string) error {
-	path := fmt.Sprintf("/instance/logout/%s", instanceName)
-	resp, err := c.doRequest(ctx, http.MethodDelete, path, nil)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	return nil
-}
-
-func (c *DefaultEvolutionClient) SendText(ctx context.Context, instanceName, to, text string) error {
-	payload := map[string]interface{}{
-		"number": to,
-		"text":   text,
-	}
-	path := fmt.Sprintf("/message/sendText/%s", instanceName)
-	resp, err := c.doRequest(ctx, http.MethodPost, path, payload)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-		return nil
-	}
-	bodyBytes, _ := io.ReadAll(resp.Body)
-	return fmt.Errorf("evolution api sendText falhou (status %d): %s", resp.StatusCode, string(bodyBytes))
+// NotificationSender define a interface para despacho de push notifications.
+type NotificationSender interface {
+	SendPushToUser(userID, title, body, priority string, data map[string]interface{}) (int, error)
 }
 
 // WhatsAppService gerencia o pareamento, sincronização de estado e webhook do WhatsApp.
@@ -231,6 +35,7 @@ type WhatsAppService struct {
 	repo         domain.WhatsAppRepository
 	client       EvolutionAPIClient
 	assistantSvc *AssistantService
+	notifSender  NotificationSender
 }
 
 // NewWhatsAppService instancia o serviço do WhatsApp.
@@ -246,6 +51,11 @@ func NewWhatsAppService(
 		client:       client,
 		assistantSvc: assistantSvc,
 	}
+}
+
+// SetNotificationSender injeta o serviço de notificações push no WhatsAppService.
+func (s *WhatsAppService) SetNotificationSender(sender NotificationSender) {
+	s.notifSender = sender
 }
 
 // SanitizePhoneNumber limpa e normaliza o número para o padrão internacional E.164 sem o '+'.
@@ -403,16 +213,17 @@ func (s *WhatsAppService) HandleWebhook(ctx context.Context, eventType string, p
 			return err
 		}
 
-		if msgData.Key.FromMe {
-			return nil
-		}
-
 		rawText := msgData.Message.Conversation
 		if rawText == "" {
 			rawText = msgData.Message.ExtendedTextMessage.Text
 		}
 		rawText = strings.TrimSpace(rawText)
 		if rawText == "" {
+			return nil
+		}
+
+		// Anti-loop: se a mensagem começou com a assinatura do Vito, é uma resposta gerada pelo próprio bot
+		if strings.HasPrefix(rawText, "🎩 Vito:") || strings.HasPrefix(rawText, "Vito diz:") || strings.HasPrefix(rawText, "Vito:") {
 			return nil
 		}
 
@@ -427,6 +238,28 @@ func (s *WhatsAppService) HandleWebhook(ctx context.Context, eventType string, p
 			rawText = strings.TrimSpace(reVito.ReplaceAllString(rawText, ""))
 			if rawText == "" {
 				return nil
+			}
+		} else if msgData.Key.FromMe {
+			// Em chats privados (1-on-1): se fromMe for true, só processa se for a conversa
+			// consigo mesmo ("Você" / seu próprio número) ou se tiver chamado @vito explicitamente.
+			// Isso impede que o Vito interfira em conversas privadas com amigos/família.
+			integration, err := s.repo.GetByInstanceName(ctx, base.Instance)
+			if err != nil || integration == nil {
+				return nil
+			}
+			cleanJid := strings.Split(msgData.Key.RemoteJid, "@")[0]
+			isSelfChat := cleanJid == integration.Phone
+			hasVitoTrigger := strings.Contains(strings.ToLower(rawText), "@vito") || strings.HasPrefix(strings.ToLower(rawText), "vito:")
+
+			if !isSelfChat && !hasVitoTrigger {
+				return nil
+			}
+			if hasVitoTrigger {
+				reVito := regexp.MustCompile(`(?i)@vito\s*|vito:\s*`)
+				rawText = strings.TrimSpace(reVito.ReplaceAllString(rawText, ""))
+				if rawText == "" {
+					return nil
+				}
 			}
 		}
 
@@ -452,7 +285,22 @@ func (s *WhatsAppService) HandleWebhook(ctx context.Context, eventType string, p
 			replyText = resp.Message
 		}
 		if replyText != "" {
-			_ = s.client.SendText(ctx, base.Instance, msgData.Key.RemoteJid, replyText)
+			formattedReply := fmt.Sprintf("🎩 Vito:\n\n%s", replyText)
+			_ = s.client.SendText(ctx, base.Instance, msgData.Key.RemoteJid, formattedReply)
+
+			if s.notifSender != nil {
+				notifBody := replyText
+				if isGroup {
+					notifBody = fmt.Sprintf("Respondeu no grupo: %s", replyText)
+				}
+				if len(notifBody) > 150 {
+					notifBody = notifBody[:147] + "..."
+				}
+				_, _ = s.notifSender.SendPushToUser(integration.UserID, "💬 Vito (WhatsApp)", notifBody, "default", map[string]interface{}{
+					"type":      "whatsapp_response",
+					"remoteJid": msgData.Key.RemoteJid,
+				})
+			}
 		}
 	}
 

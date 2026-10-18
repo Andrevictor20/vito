@@ -294,6 +294,7 @@ func main() {
 		EvolutionAPIURL: cfg.EvolutionAPIURL,
 		EvolutionAPIKey: cfg.EvolutionAPIKey,
 	}, waRepo, evoClient, astSvc)
+	waSvc.SetNotificationSender(notifSvc)
 	whatsappHandler := handler.NewWhatsAppHandler(waSvc)
 
 	// Gmail Conector & Scanner

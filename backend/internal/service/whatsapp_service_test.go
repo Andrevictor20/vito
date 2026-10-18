@@ -75,6 +75,33 @@ func (m *mockWhatsAppAIGateway) ParseIntent(ctx context.Context, input ai.UserIn
 	}, nil
 }
 
+type mockNotificationSender struct {
+	sentPushes []struct {
+		UserID   string
+		Title    string
+		Body     string
+		Priority string
+		Data     map[string]interface{}
+	}
+}
+
+func (m *mockNotificationSender) SendPushToUser(userID, title, body, priority string, data map[string]interface{}) (int, error) {
+	m.sentPushes = append(m.sentPushes, struct {
+		UserID   string
+		Title    string
+		Body     string
+		Priority string
+		Data     map[string]interface{}
+	}{
+		UserID:   userID,
+		Title:    title,
+		Body:     body,
+		Priority: priority,
+		Data:     data,
+	})
+	return 1, nil
+}
+
 func setupWhatsAppServiceTest(t *testing.T) (*service.WhatsAppService, *repository.WhatsAppRepositorySQLite, *mockEvolutionClient) {
 	tmpDir := t.TempDir()
 	db, err := database.Open(filepath.Join(tmpDir, "test_wa_svc.db"))
@@ -336,7 +363,7 @@ func TestWhatsAppService_Webhook_PrivateMessageAndAntiLoop(t *testing.T) {
 		t.Fatalf("esperava 1 mensagem enviada, obteve %d", len(mockClient.sentMessages))
 	}
 
-	// 2. Mensagem fromMe = true -> Ignorada (anti-loop)
+	// 2. Mensagem com assinatura do Vito (fromMe ou não) -> Ignorada (anti-loop)
 	payloadLoop := map[string]interface{}{
 		"event":    "messages.upsert",
 		"instance": "vito_user_100",
@@ -346,7 +373,7 @@ func TestWhatsAppService_Webhook_PrivateMessageAndAntiLoop(t *testing.T) {
 				"fromMe":    true,
 			},
 			"message": map[string]interface{}{
-				"conversation": "Olá! Sou o Vito...",
+				"conversation": "🎩 Vito:\n\nOlá! Sou o Vito...",
 			},
 		},
 	}
@@ -358,6 +385,141 @@ func TestWhatsAppService_Webhook_PrivateMessageAndAntiLoop(t *testing.T) {
 		t.Fatalf("erro ao processar loop: %v", err)
 	}
 	if len(mockClient.sentMessages) != 0 {
-		t.Fatalf("mensagem fromMe não deveria disparar nova resposta")
+		t.Fatalf("mensagem com assinatura do Vito não deveria disparar nova resposta (anti-loop)")
+	}
+}
+
+func TestWhatsAppService_Webhook_DispatchesPushNotificationOnReply(t *testing.T) {
+	svc, waRepo, mockClient := setupWhatsAppServiceTest(t)
+	ctx := context.Background()
+
+	mockNotif := &mockNotificationSender{}
+	svc.SetNotificationSender(mockNotif)
+
+	_ = waRepo.Upsert(ctx, &domain.WhatsAppIntegration{
+		ID:           "wa-1",
+		UserID:       "user-100",
+		InstanceName: "vito_user_100",
+		Phone:        "5511988887777",
+		Status:       domain.WhatsAppStatusConnected,
+	})
+
+	payload := map[string]interface{}{
+		"event":    "messages.upsert",
+		"instance": "vito_user_100",
+		"data": map[string]interface{}{
+			"key": map[string]interface{}{
+				"remoteJid": "12036302@g.us",
+				"fromMe":    true, // No grupo onde só tem o usuário, fromMe é true!
+			},
+			"message": map[string]interface{}{
+				"conversation": "@vito qual é meu próximo compromisso?",
+			},
+		},
+	}
+	payloadBytes, _ := json.Marshal(payload)
+
+	err := svc.HandleWebhook(ctx, "messages.upsert", payloadBytes)
+	if err != nil {
+		t.Fatalf("erro no webhook: %v", err)
+	}
+
+	// 1. Deve ter respondido no WhatsApp com o prefixo 🎩 Vito:
+	if len(mockClient.sentMessages) != 1 {
+		t.Fatalf("esperava 1 mensagem enviada no WhatsApp, obteve %d", len(mockClient.sentMessages))
+	}
+	if !strings.HasPrefix(mockClient.sentMessages[0].Text, "🎩 Vito:") {
+		t.Errorf("resposta no WhatsApp deveria ter o prefixo '🎩 Vito:', obteve: %s", mockClient.sentMessages[0].Text)
+	}
+
+	// 2. Deve ter despachado Push Notification para o celular do usuário
+	if len(mockNotif.sentPushes) != 1 {
+		t.Fatalf("esperava 1 push notification despachada, obteve %d", len(mockNotif.sentPushes))
+	}
+	push := mockNotif.sentPushes[0]
+	if push.UserID != "user-100" {
+		t.Errorf("push enviado para userID incorreto: %s", push.UserID)
+	}
+	if push.Title != "💬 Vito (WhatsApp)" {
+		t.Errorf("título do push incorreto: %s", push.Title)
+	}
+	if !strings.Contains(push.Body, "Respondeu no grupo") {
+		t.Errorf("corpo do push deveria indicar resposta no grupo: %s", push.Body)
+	}
+}
+
+func TestWhatsAppService_Webhook_UserFromMeInSelfChat(t *testing.T) {
+	svc, waRepo, mockClient := setupWhatsAppServiceTest(t)
+	ctx := context.Background()
+
+	_ = waRepo.Upsert(ctx, &domain.WhatsAppIntegration{
+		ID:           "wa-1",
+		UserID:       "user-100",
+		InstanceName: "vito_user_100",
+		Phone:        "5511988887777",
+		Status:       domain.WhatsAppStatusConnected,
+	})
+
+	// Usuário manda mensagem na conversa consigo mesmo ("Você" / seu próprio número) sem precisar de chip extra
+	payloadSelf := map[string]interface{}{
+		"event":    "messages.upsert",
+		"instance": "vito_user_100",
+		"data": map[string]interface{}{
+			"key": map[string]interface{}{
+				"remoteJid": "5511988887777@s.whatsapp.net",
+				"fromMe":    true,
+			},
+			"message": map[string]interface{}{
+				"conversation": "me lembre de comprar café amanhã às 9h",
+			},
+		},
+	}
+	payloadBytes, _ := json.Marshal(payloadSelf)
+
+	err := svc.HandleWebhook(ctx, "messages.upsert", payloadBytes)
+	if err != nil {
+		t.Fatalf("erro ao processar conversa própria: %v", err)
+	}
+
+	if len(mockClient.sentMessages) != 1 {
+		t.Fatalf("esperava 1 resposta na conversa própria, obteve %d", len(mockClient.sentMessages))
+	}
+}
+
+func TestWhatsAppService_Webhook_UserFromMeInPrivateChatWithFriend_Ignored(t *testing.T) {
+	svc, waRepo, mockClient := setupWhatsAppServiceTest(t)
+	ctx := context.Background()
+
+	_ = waRepo.Upsert(ctx, &domain.WhatsAppIntegration{
+		ID:           "wa-1",
+		UserID:       "user-100",
+		InstanceName: "vito_user_100",
+		Phone:        "5511988887777",
+		Status:       domain.WhatsAppStatusConnected,
+	})
+
+	// Usuário manda mensagem para um amigo em privado (não é grupo, não é ele mesmo e não chamou @vito)
+	payloadFriend := map[string]interface{}{
+		"event":    "messages.upsert",
+		"instance": "vito_user_100",
+		"data": map[string]interface{}{
+			"key": map[string]interface{}{
+				"remoteJid": "5511999990000@s.whatsapp.net", // Amigo
+				"fromMe":    true,
+			},
+			"message": map[string]interface{}{
+				"conversation": "Fala cara, tudo bem? Vamos jogar bola hoje?",
+			},
+		},
+	}
+	payloadBytes, _ := json.Marshal(payloadFriend)
+
+	err := svc.HandleWebhook(ctx, "messages.upsert", payloadBytes)
+	if err != nil {
+		t.Fatalf("erro no webhook: %v", err)
+	}
+
+	if len(mockClient.sentMessages) != 0 {
+		t.Fatalf("Vito NÃO deveria interferir na conversa privada do usuário com um amigo")
 	}
 }
