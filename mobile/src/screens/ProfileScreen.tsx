@@ -22,6 +22,7 @@ import { AISettingsModal } from '../components/profile/AISettingsModal';
 import { PhoneEditModal } from '../components/profile/PhoneEditModal';
 import { ContactsSyncModal } from '../components/profile/ContactsSyncModal';
 import { ConnectedDevicesModal } from '../components/profile/ConnectedDevicesModal';
+import { WhatsAppConnectModal } from '../components/profile/WhatsAppConnectModal';
 import { api } from '../services/api';
 import { notificationService } from '../services/notificationService';
 import { calendarSyncService } from '../services/calendarSyncService';
@@ -47,6 +48,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const [phoneVisible, setPhoneVisible] = useState(false);
   const [contactsVisible, setContactsVisible] = useState(false);
   const [devicesVisible, setDevicesVisible] = useState(false);
+  const [whatsAppVisible, setWhatsAppVisible] = useState(false);
+  const [whatsAppStatus, setWhatsAppStatus] = useState<'disconnected' | 'connecting' | 'connected' | null>(null);
   const [userPhone, setUserPhone] = useState(user?.phone || '');
   const [checking, setChecking] = useState(false);
 
@@ -96,7 +99,16 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     } catch {
       setSessionsCount(null);
     }
-  }, []);
+    try {
+      const wa = await api.getWhatsAppStatus();
+      setWhatsAppStatus(wa?.status || 'disconnected');
+      if (wa?.phone && !userPhone) {
+        setUserPhone(wa.phone);
+      }
+    } catch {
+      setWhatsAppStatus('disconnected');
+    }
+  }, [userPhone]);
 
   useEffect(() => {
     loadStatuses();
@@ -159,9 +171,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         onOpenCalendarSync={() => setSyncVisible(true)}
         onOpenAISettings={() => setAiVisible(true)}
         onOpenContactsSync={() => setContactsVisible(true)}
+        onOpenWhatsAppConnect={() => setWhatsAppVisible(true)}
         autonomyMode={autonomyMode}
         notifActive={notifActive}
         calendarsActive={calendarsActive}
+        whatsAppStatus={whatsAppStatus}
       />
 
       <AISettingsModal
@@ -209,6 +223,18 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         visible={devicesVisible}
         onClose={() => setDevicesVisible(false)}
         onSessionsChanged={(count) => setSessionsCount(count)}
+      />
+      <WhatsAppConnectModal
+        visible={whatsAppVisible}
+        onClose={() => {
+          setWhatsAppVisible(false);
+          loadStatuses();
+        }}
+        defaultPhone={userPhone}
+        onStatusChanged={() => {
+          loadStatuses();
+          onDataChanged?.();
+        }}
       />
 
       <View style={styles.sectionHeader}>

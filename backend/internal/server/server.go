@@ -36,6 +36,7 @@ type Server struct {
 	meetingHandler    *handler.MeetingHandler
 	p2pHandler        *handler.P2PMeetingHandler
 	chatHandler       *handler.ChatHandler
+	whatsappHandler   *handler.WhatsAppHandler
 	authSvc           *service.AuthService
 }
 
@@ -58,6 +59,7 @@ type Config struct {
 	MeetingHandler    *handler.MeetingHandler
 	P2PHandler        *handler.P2PMeetingHandler
 	ChatHandler       *handler.ChatHandler
+	WhatsAppHandler   *handler.WhatsAppHandler
 	AuthSvc           *service.AuthService
 	// AllowedOrigins restringe o CORS (SEC-03). Vazio = ["*"] apenas fora
 	// de produção (dev/testes); em produção, vazio nega origens (fail-closed).
@@ -88,6 +90,7 @@ func New(cfg ...Config) *Server {
 		s.meetingHandler = cfg[0].MeetingHandler
 		s.p2pHandler = cfg[0].P2PHandler
 		s.chatHandler = cfg[0].ChatHandler
+		s.whatsappHandler = cfg[0].WhatsAppHandler
 		s.authSvc = cfg[0].AuthSvc
 	}
 
@@ -191,6 +194,10 @@ func (s *Server) registerRoutes() {
 			r.Post("/contacts/match", s.p2pHandler.MatchContacts)
 		}
 
+		if s.whatsappHandler != nil {
+			r.Post("/integrations/whatsapp/webhook", s.whatsappHandler.Webhook)
+		}
+
 		// Rotas protegidas por JWT
 		if s.authSvc != nil {
 			r.Group(func(protected chi.Router) {
@@ -253,6 +260,14 @@ func (s *Server) registerRoutes() {
 						ir.Post("/{provider}/sync", s.syncHandler.SyncIntegration)
 						ir.Delete("/{provider}", s.syncHandler.DisconnectIntegration)
 						ir.Post("/google/webhook", s.syncHandler.GoogleWebhook)
+					})
+				}
+
+				if s.whatsappHandler != nil {
+					protected.Route("/integrations/whatsapp", func(wr chi.Router) {
+						wr.Get("/status", s.whatsappHandler.GetStatus)
+						wr.Post("/pairing-code", s.whatsappHandler.RequestPairingCode)
+						wr.Delete("/disconnect", s.whatsappHandler.Disconnect)
 					})
 				}
 

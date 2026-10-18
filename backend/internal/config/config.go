@@ -37,6 +37,8 @@ type Config struct {
 	SMTPUser           string
 	SMTPPassword       string
 	SMTPFrom           string
+	EvolutionAPIURL    string
+	EvolutionAPIKey    string
 }
 
 // Load carrega a configuração a partir de variáveis de ambiente com fallbacks seguros.
@@ -149,6 +151,8 @@ func Load() *Config {
 		SMTPUser:           os.Getenv("SMTP_USER"),
 		SMTPPassword:       smtpPass,
 		SMTPFrom:           smtpFrom,
+		EvolutionAPIURL:    getEnvOrDefault("EVOLUTION_API_URL", "http://127.0.0.1:8085"),
+		EvolutionAPIKey:    os.Getenv("EVOLUTION_API_KEY"),
 	}
 }
 

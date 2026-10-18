@@ -11,6 +11,7 @@ import { BookingApi } from './bookingApi';
 import { MeetingsApi } from './meetingsApi';
 import { P2PMeetingsApi } from './p2pMeetingsApi';
 import { NotificationsApi } from './notificationsApi';
+import { WhatsAppApi, WhatsAppIntegrationStatus } from './whatsappApi';
 import {
   User,
   AuthResponse,
@@ -58,6 +59,7 @@ export {
   ApiRequestOptions,
   ChatHistoryItem,
   AssistantChatOptions,
+  WhatsAppIntegrationStatus,
 };
 
 export class ApiService extends ApiClient {
@@ -71,6 +73,7 @@ export class ApiService extends ApiClient {
   private meetingsApi = new MeetingsApi(this);
   private p2pMeetingsApi = new P2PMeetingsApi(this);
   private notificationsApi = new NotificationsApi(this);
+  private whatsappApi = new WhatsAppApi(this);
 
   // Auth & Sessions
   login(email: string, password: string): Promise<AuthResponse> {
@@ -379,6 +382,20 @@ export class ApiService extends ApiClient {
   }
   updateAISettings(data: { autonomy_mode?: AutonomyMode; auto_focus_blocks?: boolean }): Promise<AISettings> {
     return this.notificationsApi.updateAISettings(data);
+  }
+
+  // WhatsApp (Evolution API v2)
+  getWhatsAppStatus(): Promise<WhatsAppIntegrationStatus> {
+    return this.whatsappApi.getStatus();
+  }
+  requestWhatsAppPairingCode(phone: string): Promise<{ pairing_code: string; status: string }> {
+    return this.whatsappApi.requestPairingCode(phone);
+  }
+  disconnectWhatsApp(): Promise<{ message: string; status: string }> {
+    return this.whatsappApi.disconnect();
+  }
+  get whatsapp(): WhatsAppApi {
+    return this.whatsappApi;
   }
 }
 

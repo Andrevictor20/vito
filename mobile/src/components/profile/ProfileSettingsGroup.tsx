@@ -10,12 +10,15 @@ interface ProfileSettingsGroupProps {
   onOpenCalendarSync?: () => void;
   onOpenAISettings?: () => void;
   onOpenContactsSync?: () => void;
+  onOpenWhatsAppConnect?: () => void;
   /** Modo de autonomia atual (para o status da linha). */
   autonomyMode?: AutonomyMode;
   /** Permissão de notificação concedida (null = desconhecido). */
   notifActive?: boolean | null;
   /** Nº de calendários conectados (null = desconhecido). */
   calendarsActive?: number | null;
+  /** Status da integração WhatsApp via Evolution API v2 */
+  whatsAppStatus?: 'disconnected' | 'connecting' | 'connected' | null;
 }
 
 const StatusValue: React.FC<{ label: string }> = ({ label }) => {
@@ -37,9 +40,11 @@ export const ProfileSettingsGroup: React.FC<ProfileSettingsGroupProps> = ({
   onOpenCalendarSync,
   onOpenAISettings,
   onOpenContactsSync,
+  onOpenWhatsAppConnect,
   autonomyMode = 'assisted',
   notifActive = null,
   calendarsActive = null,
+  whatsAppStatus = null,
 }) => {
   const { colors, isDark, toggleTheme } = useTheme();
   const proactive = autonomyMode === 'proactive';
@@ -185,6 +190,42 @@ export const ProfileSettingsGroup: React.FC<ProfileSettingsGroupProps> = ({
           </View>
         </View>
         <View style={styles.itemRight}>
+          <RowChevron />
+        </View>
+      </TouchableOpacity>
+
+      {/* Integração WhatsApp (Evolution API v2) */}
+      <View style={[styles.divider, { backgroundColor: colors.outlineVariant }]} />
+      <TouchableOpacity
+        style={styles.groupItem}
+        onPress={onOpenWhatsAppConnect}
+        activeOpacity={0.7}
+        accessibilityLabel="Abrir conexão com WhatsApp"
+        accessibilityRole="button"
+      >
+        <View style={styles.itemLeft}>
+          <View style={[styles.itemIconBox, { backgroundColor: colors.surfaceContainerHigh }]}>
+            <MaterialIcons name="chat" size={18} color="#25D366" />
+          </View>
+          <View style={styles.itemTextCol}>
+            <Text style={[styles.itemTitle, { color: colors.onSurface }]}>WhatsApp</Text>
+            <Text style={[styles.itemSub, { color: colors.onSurfaceVariant }]} numberOfLines={1}>
+              {whatsAppStatus === 'connected'
+                ? 'Sessão ativa e pronto para receber @vito'
+                : 'Conectar via Evolution API v2'}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.itemRight}>
+          <StatusValue
+            label={
+              whatsAppStatus === 'connected'
+                ? 'Conectado'
+                : whatsAppStatus === 'connecting'
+                ? 'Conectando...'
+                : 'Off'
+            }
+          />
           <RowChevron />
         </View>
       </TouchableOpacity>

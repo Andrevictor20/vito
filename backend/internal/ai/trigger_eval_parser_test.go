@@ -1,0 +1,132 @@
+package ai
+
+import (
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/andrevmp/vito/backend/internal/domain"
+)
+
+func TestParseTriggerEvalResult_ArrayCurrentData(t *testing.T) {
+	// Payload idêntico ao reportado no print do usuário (onde current_data é array de strings)
+	raw := `{
+  "condition_met": false,
+  "summary": "Nenhuma novidade relevante sobre tendências em desenvolvimento web e IA para sites",
+  "paragraphs": [
+    "Não foram identificados novos fatos relevantes sobre desenvolvimento web.",
+    "Os únicos dados disponíveis referem-se a três matérias publicadas em outubro.",
+    "Dado que não há atualização imediata, recomenda-se manter o monitoramento."
+  ],
+  "current_data": [
+    "14/10 – Escola 5.0 aposta em tecnologia e IA para preparar jovens.",
+    "13/10 – Epic Games adota AI first e Sweeney quer sobreviver.",
+    "13/10 – IA reduz custos de golpes digitais e acelera expansão."
+  ],
+  "simulated_notification": "Sem atualizações críticas hoje",
+  "confidence": 85,
+  "why_relevant": "A vigília foca em tendências de IA em desenvolvimento web.",
+  "urgency": "low"
+}`
+
+	trig := &domain.Trigger{
+		ID:       "trig-123",
+		Title:    "Novas tendências em desenvolvimento web",
+		Query:    "desenvolvimento web e IA",
+		Category: domain.CategoryTech,
+	}
+
+	res, err := ParseTriggerEvalResult(raw, trig)
+	if err != nil {
+		t.Fatalf("erro inesperado ao fazer parse: %v", err)
+	}
+
+	if res.Confidence != 85 {
+		t.Errorf("esperava confidence 85, obteve %d", res.Confidence)
+	}
+	if res.ConditionMet {
+		t.Errorf("esperava condition_met false, obteve true")
+	}
+	if len(res.Paragraphs) != 3 {
+		t.Errorf("esperava 3 parágrafos, obteve %d", len(res.Paragraphs))
+	}
+	for i, p := range res.Paragraphs {
+		if strings.Contains(p, `{"condition_met"`) || strings.Contains(p, `"current_data"`) {
+			t.Errorf("parágrafo %d vazou JSON bruto: %s", i, p)
+		}
+	}
+	if !strings.Contains(res.CurrentData, "Escola 5.0") || !strings.Contains(res.CurrentData, "Epic Games") {
+		t.Errorf("current_data não concatenou os itens do array corretamente: %s", res.CurrentData)
+	}
+}
+
+func TestParseTriggerEvalResult_StringConfidenceAndMarkdownWrap(t *testing.T) {
+	// LLMs comumente envolvem em ```json ... ``` e podem enviar confidence como string "90"
+	raw := "```json\n" + `{
+  "condition_met": true,
+  "summary": "Cotação do Dólar atingiu R$ 5,45",
+  "paragraphs": "O dólar comercial abriu em queda nesta manhã.\nA moeda americana recua frente ao real.",
+  "current_data": "USD/BRL = 5.45",
+  "simulated_notification": "Dólar em queda",
+  "confidence": "90",
+  "why_relevant": "Alerta de câmbio",
+  "urgency": "high"
+}` + "\n```"
+
+	trig := &domain.Trigger{
+		ID:       "trig-cambio",
+		Title:    "Dólar",
+		Query:    "dólar hoje",
+		Category: domain.CategoryFinance,
+	}
+
+	res, err := ParseTriggerEvalResult(raw, trig)
+	if err != nil {
+		t.Fatalf("erro inesperado: %v", err)
+	}
+
+	if res.Confidence != 90 {
+		t.Errorf("esperava confidence 90, obteve %d", res.Confidence)
+	}
+	if !res.ConditionMet {
+		t.Errorf("esperava condition_met true, obteve false")
+	}
+	if len(res.Paragraphs) != 2 {
+		t.Errorf("esperava 2 parágrafos desmembrados de string, obteve %d", len(res.Paragraphs))
+	}
+	if res.Urgency != "high" {
+		t.Errorf("esperava urgency high, obteve %s", res.Urgency)
+	}
+}
+
+func TestParseTriggerEvalResult_MalformedJSONNeverDumpsJSONToParagraphs(t *testing.T) {
+	// JSON corrompido ou truncado pela metade
+	raw := `{"summary": "Notícia importante sobre tecnologia", "paragraphs": ["Parágrafo 1"], "confidence": 75, "incom`
+
+	trig := &domain.Trigger{
+		ID:       "trig-fail",
+		Title:    "Tech News",
+		Query:    "tech",
+		Category: domain.CategoryTech,
+	}
+
+	res, err := ParseTriggerEvalResult(raw, trig)
+	if err != nil {
+		t.Fatalf("não deve quebrar em panic mesmo com json quebrado: %v", err)
+	}
+
+	// Não deve vazar o JSON bruto no parágrafo
+	for i, p := range res.Paragraphs {
+		if strings.HasPrefix(p, `{"`) {
+			t.Errorf("parágrafo %d nunca deve começar com json bruto: %s", i, p)
+		}
+	}
+	// Deve ter conseguido extrair o summary via regex
+	if !strings.Contains(res.Summary, "Notícia importante") {
+		t.Errorf("esperava extrair o summary por fallback regex, obteve: %s", res.Summary)
+	}
+	if res.Confidence != 75 {
+		t.Errorf("esperava extrair confidence 75 por fallback regex, obteve %d", res.Confidence)
+	}
+	_ = time.Now()
+}

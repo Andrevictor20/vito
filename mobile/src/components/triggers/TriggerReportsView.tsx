@@ -28,6 +28,7 @@ import {
   buildRadarChatPrompt,
   ParsedReportData,
 } from '../../utils/radarReportUtils';
+import { computeSubViewBottomPadding } from '../../utils/keyboardHeight';
 
 interface TriggerReportsViewProps {
   trigger: Trigger;
@@ -408,7 +409,7 @@ export const TriggerReportsView: React.FC<TriggerReportsViewProps> = ({
       <FlatList
         data={logs}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: 100 + insets.bottom }]}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: computeSubViewBottomPadding(insets.bottom, 140) }]}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}

@@ -116,10 +116,10 @@ jobs:
           cd ~/vito
           git fetch origin main
           git reset --hard origin/main
-          docker compose pull backend
+          docker compose pull backend evolution-api
           docker compose stop backend || true
           docker compose run --rm --no-deps --user 0:0 --entrypoint sh backend -c "mkdir -p /app/data /app/data/backups /app/backups && chown -R 10001:10001 /app/data /app/backups && chmod 0700 /app/data /app/backups"
-          docker compose up -d --force-recreate --remove-orphans backend
+          docker compose up -d --force-recreate backend evolution-api
           docker image prune -f
 
       - name: Verify Backend Healthcheck

@@ -287,6 +287,15 @@ func main() {
 	chatSvc := service.NewChatService(chatRepo)
 	chatHandler := handler.NewChatHandler(chatSvc)
 
+	waRepo := repository.NewWhatsAppRepository(db)
+	evoClient := service.NewDefaultEvolutionClient(cfg.EvolutionAPIURL, cfg.EvolutionAPIKey, nil)
+	waSvc := service.NewWhatsAppService(service.WhatsAppServiceConfig{
+		WebhookBaseURL:  cfg.PublicBaseURL,
+		EvolutionAPIURL: cfg.EvolutionAPIURL,
+		EvolutionAPIKey: cfg.EvolutionAPIKey,
+	}, waRepo, evoClient, astSvc)
+	whatsappHandler := handler.NewWhatsAppHandler(waSvc)
+
 	// 6. Servidor HTTP
 	srv := server.New(server.Config{
 		AuthHandler:       authHandler,
@@ -304,6 +313,7 @@ func main() {
 		MeetingHandler:    meetingHandler,
 		P2PHandler:        p2pHandler,
 		ChatHandler:       chatHandler,
+		WhatsAppHandler:   whatsappHandler,
 		AuthSvc:           authSvc,
 		AllowedOrigins:    cfg.AllowedOrigins(),
 		Environment:       cfg.Environment,

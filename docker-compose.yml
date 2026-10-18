@@ -40,8 +40,40 @@ services:
       - SMTP_USER=${SMTP_USER:-}
       - SMTP_PASS=${SMTP_PASS:-}
       - SMTP_FROM=${SMTP_FROM:-}
+      - EVOLUTION_API_URL=${EVOLUTION_API_URL:-http://evolution-api:8085}
+      - EVOLUTION_API_KEY=${EVOLUTION_API_KEY:-}
     volumes:
       - vito_data:/app/data
+    networks:
+      - vito_net
+
+  # Serviço da Evolution API v2 para WhatsApp (Pairing Code, Webhooks e @vito)
+  evolution-api:
+    image: evoapicloud/evolution-api:v2.1.2
+    container_name: vito-evolution-api
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8085:8085"
+    env_file:
+      - .env
+    environment:
+      - SERVER_PORT=8085
+      - SERVER_TYPE=http
+      - SERVER_URL=http://localhost:8085
+      - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY:-vito_evo_key_default_change_in_prod}
+      - DATABASE_ENABLED=false
+      - CACHE_REDIS_ENABLED=false
+      - WEBHOOK_GLOBAL_ENABLED=false
+      - DEL_INSTANCE=false
+    deploy:
+      resources:
+        limits:
+          memory: 1024M
+        reservations:
+          memory: 256M
+    volumes:
+      - evolution_instances:/evolution/instances
+      - evolution_store:/evolution/store
     networks:
       - vito_net
 
@@ -65,4 +97,8 @@ networks:
 
 volumes:
   vito_data:
+    driver: local
+  evolution_instances:
+    driver: local
+  evolution_store:
     driver: local

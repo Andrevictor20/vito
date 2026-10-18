@@ -305,58 +305,7 @@ Analise o cenário, verifique se a condição foi atingida ou se há fatos relev
 	}
 
 	rawText := strings.TrimSpace(chatResp.Choices[0].Message.Content)
-
-	type testEvalResult struct {
-		ConditionMet          bool     `json:"condition_met"`
-		CurrentData           string   `json:"current_data"`
-		Summary               string   `json:"summary"`
-		Paragraphs            []string `json:"paragraphs"`
-		SimulatedNotification string   `json:"simulated_notification"`
-		Confidence            int      `json:"confidence"`
-		WhyRelevant           string   `json:"why_relevant"`
-		Urgency               string   `json:"urgency"`
-	}
-
-	cleanJSON := rawText
-	if start := strings.Index(cleanJSON, "{"); start != -1 {
-		if end := strings.LastIndex(cleanJSON, "}"); end != -1 && end > start {
-			cleanJSON = cleanJSON[start : end+1]
-		}
-	}
-
-	var eval testEvalResult
-	if err := json.Unmarshal([]byte(cleanJSON), &eval); err != nil {
-		return &domain.TriggerTestResult{
-			TriggerID:             t.ID,
-			Title:                 t.Title,
-			Query:                 t.Query,
-			ConditionMet:          false,
-			CurrentData:           rawText,
-			Summary:               "Consulta realizada com sucesso. Condições avaliadas.",
-			Paragraphs:            []string{rawText},
-			SimulatedNotification: fmt.Sprintf("Alerta Vito: Vigília de '%s' atualizada.", t.Title),
-			Confidence:            0,
-			WhyRelevant:           "",
-			TestedAt:              time.Now().UTC(),
-		}, nil
-	}
-
-	res := &domain.TriggerTestResult{
-		TriggerID:             t.ID,
-		Title:                 t.Title,
-		Query:                 t.Query,
-		ConditionMet:          eval.ConditionMet,
-		CurrentData:           eval.CurrentData,
-		Summary:               eval.Summary,
-		Paragraphs:            eval.Paragraphs,
-		SimulatedNotification: eval.SimulatedNotification,
-		Confidence:            eval.Confidence,
-		WhyRelevant:           eval.WhyRelevant,
-		Urgency:               eval.Urgency,
-		TestedAt:              time.Now().UTC(),
-	}
-	res.EnforceConfidenceGate()
-	return res, nil
+	return ParseTriggerEvalResult(rawText, t)
 }
 
 // GenerateText sintetiza textos e resumos executivos via OpenAICompatProvider.

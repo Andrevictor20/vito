@@ -30,6 +30,15 @@ describe('radarReportUtils', () => {
     assert.equal(paragraphs[1], 'Segundo parágrafo detalhando o impacto.');
   });
 
+  test('extractReportParagraphs extrai parágrafos limpos mesmo se receber JSON bruto por falha de deserialização', () => {
+    const leakedRawJson = '{"condition_met":false,"summary":"Nenhuma novidade relevante","paragraphs":["Primeiro fato verificado no mercado.","Segundo parágrafo com análise."],"current_data":["Item 1"]}';
+    const paragraphs = extractReportParagraphs(leakedRawJson, { paragraphs: [leakedRawJson] });
+    assert.equal(paragraphs.length, 2);
+    assert.equal(paragraphs[0], 'Primeiro fato verificado no mercado.');
+    assert.equal(paragraphs[1], 'Segundo parágrafo com análise.');
+    assert.equal(paragraphs[0].includes('{"condition_met"'), false);
+  });
+
   test('detectPaymentAndMarketFeatures identifica Pix, parcelamento e moeda BRL', () => {
     const features = detectPaymentAndMarketFeatures(
       'Menor preço KaBuM!',

@@ -16,8 +16,11 @@ func TestVersionedMigrations_FreshDB(t *testing.T) {
 	if err := db.QueryRow(`SELECT COUNT(*) FROM schema_migrations`).Scan(&count); err != nil {
 		t.Fatal(err)
 	}
-	if count != 11 {
-		t.Fatalf("esperava 11 migrações registradas, vieram %d", count)
+	if count != 12 {
+		t.Fatalf("esperava 12 migrações registradas, vieram %d", count)
+	}
+	if !hasTable(db, "whatsapp_integrations") {
+		t.Fatal("012 deveria criar tabela whatsapp_integrations")
 	}
 	if !hasTable(db, "refresh_tokens") {
 		t.Fatal("011 deveria criar tabela refresh_tokens")
@@ -68,8 +71,8 @@ func TestVersionedMigrations_LegacyDB(t *testing.T) {
 	if err := db2.QueryRow(`SELECT COUNT(*) FROM schema_migrations`).Scan(&count); err != nil {
 		t.Fatal(err)
 	}
-	if count != 11 {
-		t.Fatalf("base legada deveria ser carimbada com 11, veio %d", count)
+	if count != 12 {
+		t.Fatalf("base legada deveria ser carimbada com 12, veio %d", count)
 	}
 }
 
