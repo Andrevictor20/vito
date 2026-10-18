@@ -48,7 +48,7 @@ func TestListPaged_PaginationFiltersSort(t *testing.T) {
 	seedPagedTodo(t, r, "t1", "u1", "Alfa urgente", "high", "2020-01-01T10:00:00Z")
 	seedPagedTodo(t, r, "t2", "u1", "Beta futura", "low", "2099-01-01T10:00:00Z")
 	seedPagedTodo(t, r, "t3", "u1", "Gama sem data", "medium", "")
-	seedPagedTodo(t, r, "t4", "u1", "Delta hoje", "medium", time.Now().UTC().Format(time.RFC3339))
+	seedPagedTodo(t, r, "t4", "u1", "Delta hoje", "medium", time.Now().UTC().Add(2*time.Hour).Format(time.RFC3339))
 
 	// Página 1/2
 	page1, total, err := r.ListPaged("u1", domain.TodoFilter{Limit: 2, Offset: 0})

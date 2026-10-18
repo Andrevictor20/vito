@@ -239,10 +239,11 @@ func (s *WhatsAppService) HandleWebhook(ctx context.Context, eventType string, p
 			if rawText == "" {
 				return nil
 			}
-		} else if msgData.Key.FromMe {
-			// Em chats privados (1-on-1): se fromMe for true, só processa se for a conversa
-			// consigo mesmo ("Você" / seu próprio número) ou se tiver chamado @vito explicitamente.
-			// Isso impede que o Vito interfira em conversas privadas com amigos/família.
+		} else {
+			// Em chats privados (1-on-1):
+			// Se for o chat consigo mesmo ("Você" / seu próprio número), processa diretamente qualquer mensagem.
+			// Se for chat privado com amigos/família/terceiros, só processa se contiver @vito ou vito:
+			// (seja enviado pelo usuário ou pelo contato). Isso blinda totalmente as conversas privadas normais.
 			integration, err := s.repo.GetByInstanceName(ctx, base.Instance)
 			if err != nil || integration == nil {
 				return nil

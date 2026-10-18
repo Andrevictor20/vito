@@ -387,6 +387,56 @@ func TestWhatsAppService_Webhook_PrivateMessageAndAntiLoop(t *testing.T) {
 	if len(mockClient.sentMessages) != 0 {
 		t.Fatalf("mensagem com assinatura do Vito não deveria disparar nova resposta (anti-loop)")
 	}
+
+	// 3. Mensagem privada de TERCEIRO sem @vito -> Ignorada (privacidade absoluta)
+	payloadThirdPartyNormal := map[string]interface{}{
+		"event":    "messages.upsert",
+		"instance": "vito_user_100",
+		"data": map[string]interface{}{
+			"key": map[string]interface{}{
+				"remoteJid": "5511999990000@s.whatsapp.net",
+				"fromMe":    false,
+			},
+			"message": map[string]interface{}{
+				"conversation": "Oi André, tudo bem? Vamos almoçar hoje?",
+			},
+		},
+	}
+	bytesThirdPartyNormal, _ := json.Marshal(payloadThirdPartyNormal)
+
+	mockClient.sentMessages = nil
+	err = svc.HandleWebhook(ctx, "messages.upsert", bytesThirdPartyNormal)
+	if err != nil {
+		t.Fatalf("erro ao processar mensagem normal de terceiro: %v", err)
+	}
+	if len(mockClient.sentMessages) != 0 {
+		t.Fatalf("conversa privada normal de terceiro sem @vito não deveria ser respondida pelo Vito")
+	}
+
+	// 4. Mensagem privada de TERCEIRO chamando @vito -> Respondida
+	payloadThirdPartyVito := map[string]interface{}{
+		"event":    "messages.upsert",
+		"instance": "vito_user_100",
+		"data": map[string]interface{}{
+			"key": map[string]interface{}{
+				"remoteJid": "5511999990000@s.whatsapp.net",
+				"fromMe":    false,
+			},
+			"message": map[string]interface{}{
+				"conversation": "@vito qual é o horário da nossa reunião?",
+			},
+		},
+	}
+	bytesThirdPartyVito, _ := json.Marshal(payloadThirdPartyVito)
+
+	mockClient.sentMessages = nil
+	err = svc.HandleWebhook(ctx, "messages.upsert", bytesThirdPartyVito)
+	if err != nil {
+		t.Fatalf("erro ao processar @vito em chat com terceiro: %v", err)
+	}
+	if len(mockClient.sentMessages) != 1 {
+		t.Fatalf("esperava 1 mensagem respondida pelo Vito para terceiro chamando @vito, obteve %d", len(mockClient.sentMessages))
+	}
 }
 
 func TestWhatsAppService_Webhook_DispatchesPushNotificationOnReply(t *testing.T) {
