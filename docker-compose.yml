@@ -47,11 +47,34 @@ services:
     networks:
       - vito_net
 
+  # Banco PostgreSQL dedicado para a Evolution API v2 (Prisma ORM)
+  evolution-postgres:
+    image: postgres:16-alpine
+    container_name: vito-evolution-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=evolution
+      - POSTGRES_PASSWORD=${EVOLUTION_DB_PASSWORD:-vito_evolution_pass_2026}
+      - POSTGRES_DB=evolution
+    volumes:
+      - evolution_pgdata:/var/lib/postgresql/data
+    networks:
+      - vito_net
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 64M
+
   # Serviço da Evolution API v2 para WhatsApp (Pairing Code, Webhooks e @vito)
   evolution-api:
     image: evoapicloud/evolution-api:v2.1.2
     container_name: vito-evolution-api
     restart: unless-stopped
+    depends_on:
+      evolution-postgres:
+        condition: service_started
     ports:
       - "127.0.0.1:8085:8085"
     env_file:
@@ -61,7 +84,14 @@ services:
       - SERVER_TYPE=http
       - SERVER_URL=http://localhost:8085
       - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY:-vito_evo_key_default_change_in_prod}
-      - DATABASE_ENABLED=false
+      - DATABASE_ENABLED=true
+      - DATABASE_PROVIDER=postgresql
+      - DATABASE_CONNECTION_URI=postgresql://evolution:${EVOLUTION_DB_PASSWORD:-vito_evolution_pass_2026}@evolution-postgres:5432/evolution?schema=public
+      - DATABASE_SAVE_DATA_INSTANCE=true
+      - DATABASE_SAVE_DATA_NEW_MESSAGE=true
+      - DATABASE_SAVE_MESSAGE_UPDATE=true
+      - DATABASE_SAVE_DATA_CONTACTS=true
+      - DATABASE_SAVE_DATA_CHATS=true
       - CACHE_REDIS_ENABLED=false
       - WEBHOOK_GLOBAL_ENABLED=false
       - DEL_INSTANCE=false
@@ -101,4 +131,6 @@ volumes:
   evolution_instances:
     driver: local
   evolution_store:
+    driver: local
+  evolution_pgdata:
     driver: local

@@ -116,24 +116,35 @@ jobs:
           cd ~/vito
           git fetch origin main
           git reset --hard origin/main
-          docker compose pull backend evolution-api
+          docker compose pull backend evolution-api evolution-postgres
           docker compose stop backend || true
           docker compose run --rm --no-deps --user 0:0 --entrypoint sh backend -c "mkdir -p /app/data /app/data/backups /app/backups && chown -R 10001:10001 /app/data /app/backups && chmod 0700 /app/data /app/backups"
-          docker compose up -d --force-recreate backend evolution-api
+          docker compose up -d --force-recreate backend evolution-postgres evolution-api
           docker image prune -f
 
-      - name: Verify Backend Healthcheck
+      - name: Verify Backend & Evolution API Healthcheck
         run: |
+          echo "Verificando Backend Vito..."
           for i in $(seq 1 15); do
             if wget -qO- http://localhost:8180/healthz; then
               echo ""
-              echo "✅ Healthcheck OK on attempt $i"
+              echo "✅ Backend Healthcheck OK on attempt $i"
+              break
+            fi
+            sleep 2
+          done
+          echo "Verificando Evolution API..."
+          for i in $(seq 1 20); do
+            if wget -qO- http://127.0.0.1:8085 > /dev/null 2>&1; then
+              echo "✅ Evolution API OK on attempt $i"
               exit 0
             fi
             sleep 2
           done
-          echo "❌ Backend healthcheck failed after 30s. Container status & logs:"
+          echo "❌ Services healthcheck failed after timeout. Container status & logs:"
           docker ps -a
           docker logs --tail 80 vito-backend || true
+          docker logs --tail 80 vito-evolution-api || true
+          docker logs --tail 80 vito-evolution-postgres || true
           exit 1
 
