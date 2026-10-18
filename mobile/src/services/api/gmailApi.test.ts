@@ -27,6 +27,25 @@ describe('GmailApi Unit Tests', () => {
     assert.equal(res.last_scanned_at, '2026-10-17T20:00:00Z');
   });
 
+  test('getStatus desempacota resposta aninhada em data', async () => {
+    const client = {
+      request: async () => ({
+        data: {
+          connected: true,
+          email: 'aninhado@gmail.com',
+          last_scanned_at: '2026-10-18T10:00:00Z',
+        },
+      }),
+    } as unknown as ApiClient;
+
+    const api = new GmailApi(client);
+    const res = await api.getStatus();
+
+    assert.equal(res.connected, true);
+    assert.equal(res.email, 'aninhado@gmail.com');
+    assert.equal(res.last_scanned_at, '2026-10-18T10:00:00Z');
+  });
+
   test('scanEmails envia requisição POST com parâmetros e timeout de 60s', async () => {
     const calls: { ep: string; opt?: any }[] = [];
     const client = {

@@ -301,6 +301,7 @@ func main() {
 	gmailRepo := repository.NewGmailRepository(db)
 	gmailSvc := service.NewGmailService(gmailRepo, cfg.DataEncryptionKey, cfg.GoogleClientID, cfg.GoogleClientSecret)
 	googleAuthSvc.SetGmailRepository(gmailRepo, cfg.DataEncryptionKey)
+	astSvc.SetGmailService(gmailSvc)
 	gmailHandler := handler.NewGmailHandler(gmailSvc)
 
 	// WhatsApp Passwordless Login OTP

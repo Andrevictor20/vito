@@ -22,6 +22,7 @@ import (
 // GmailStatusResponse representa o status da conexão do Gmail.
 type GmailStatusResponse struct {
 	Connected     bool       `json:"connected"`
+	Email         string     `json:"email,omitempty"`
 	AccountEmail  string     `json:"account_email,omitempty"`
 	Status        string     `json:"status,omitempty"`
 	LastScannedAt *time.Time `json:"last_scanned_at,omitempty"`
@@ -73,6 +74,7 @@ func (s *GmailService) GetStatus(ctx context.Context, userID string) (*GmailStat
 
 	return &GmailStatusResponse{
 		Connected:     integ.Status == domain.GmailStatusActive,
+		Email:         integ.AccountEmail,
 		AccountEmail:  integ.AccountEmail,
 		Status:        integ.Status,
 		LastScannedAt: integ.LastScannedAt,

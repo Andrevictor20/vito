@@ -60,6 +60,7 @@ type UserInput struct {
 	AutonomyMode        string               `json:"autonomy_mode,omitempty"`        // "assisted" (padrão) | "proactive"
 	AppStateFlags       []string             `json:"app_state_flags,omitempty"`      // §8.5 telemetria compacta
 	CoreProfile         []string             `json:"core_profile,omitempty"`         // §8.2 Camada 1 (8-10 itens)
+	RecentEmails        []string             `json:"recent_emails,omitempty"`        // E-mails recentes / faturas / voos do Gmail
 }
 
 // ParsedEvent dados extraídos para criação, atualização ou remoção de evento.

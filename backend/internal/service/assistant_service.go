@@ -59,6 +59,7 @@ type AssistantService struct {
 	meetingSvc      *MeetingService
 	userRepo        domain.UserRepository
 	aiSettingsRepo  domain.AISettingsRepository
+	gmailSvc        *GmailService
 }
 
 // NewAssistantService instancia o serviço do assistente.
@@ -104,6 +105,11 @@ func (s *AssistantService) SetUserRepository(repo domain.UserRepository) {
 // SetAISettingsRepository configura o repositório de preferências de IA e autonomia.
 func (s *AssistantService) SetAISettingsRepository(repo domain.AISettingsRepository) {
 	s.aiSettingsRepo = repo
+}
+
+// SetGmailService injeta o serviço de integração com Gmail.
+func (s *AssistantService) SetGmailService(svc *GmailService) {
+	s.gmailSvc = svc
 }
 
 // Process recebe o input (voz/texto), invoca a IA e aplica a ação no banco de dados.

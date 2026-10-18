@@ -200,11 +200,18 @@ func (s *GoogleAuthService) GetAuthURL(mode, userID, redirectScheme string) (str
 	params.Set("response_type", "code")
 	params.Set("scope", scope)
 	params.Set("access_type", "offline")
-	if mode == "calendar" || mode == "gmail" {
-		params.Set("prompt", "consent")
-	} else {
-		params.Set("prompt", "select_account")
+	prompt := "select_account"
+	if mode == "calendar" {
+		prompt = "consent"
+	} else if mode == "gmail" {
+		prompt = "consent"
+		if s.gmailRepo != nil && strings.TrimSpace(userID) != "" {
+			if existing, err := s.gmailRepo.GetByUserID(context.Background(), userID); err == nil && existing != nil && existing.EncryptedCredentials != "" {
+				prompt = "select_account"
+			}
+		}
 	}
+	params.Set("prompt", prompt)
 	params.Set("state", state)
 
 	return s.cfg.AuthURL + "?" + params.Encode(), nil
@@ -300,9 +307,27 @@ func (s *GoogleAuthService) HandleCallback(ctx context.Context, code, stateStr s
 			return "", errors.New("userID obrigatório para vincular Gmail")
 		}
 
+		refreshToken := tokens.RefreshToken
+		if refreshToken == "" && s.gmailRepo != nil {
+			if existing, _ := s.gmailRepo.GetByUserID(ctx, state.UserID); existing != nil && existing.EncryptedCredentials != "" {
+				dec := existing.EncryptedCredentials
+				if s.encKey != "" {
+					if plain, err := crypto.Decrypt(existing.EncryptedCredentials, s.encKey); err == nil {
+						dec = plain
+					}
+				}
+				var oldCreds map[string]interface{}
+				if json.Unmarshal([]byte(dec), &oldCreds) == nil {
+					if rt, ok := oldCreds["refresh_token"].(string); ok && rt != "" {
+						refreshToken = rt
+					}
+				}
+			}
+		}
+
 		credsPayload, _ := json.Marshal(map[string]interface{}{
 			"access_token":  tokens.AccessToken,
-			"refresh_token": tokens.RefreshToken,
+			"refresh_token": refreshToken,
 			"expires_in":    tokens.ExpiresIn,
 		})
 

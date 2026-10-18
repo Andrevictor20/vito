@@ -34,7 +34,10 @@ func (h *GmailHandler) GetStatus(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{
-		"data": status,
+		"connected":       status.Connected,
+		"email":           status.Email,
+		"last_scanned_at": status.LastScannedAt,
+		"data":            status,
 	})
 }
 
@@ -53,7 +56,8 @@ func (h *GmailHandler) Disconnect(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{
-		"data": map[string]string{"message": "Gmail desconectado com sucesso"},
+		"message": "Gmail desconectado com sucesso",
+		"data":    map[string]string{"message": "Gmail desconectado com sucesso"},
 	})
 }
 
@@ -73,7 +77,11 @@ func (h *GmailHandler) ScanEmails(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{
-		"data": result,
+		"scanned_count": result.MessagesRead,
+		"bills":         result.Bills,
+		"flights":       result.Flights,
+		"urgent_emails": result.UrgentEmails,
+		"data":          result,
 	})
 }
 
@@ -106,6 +114,8 @@ func (h *GmailHandler) CreateDraft(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"draft_id": draftID,
+		"message":  "Rascunho criado com sucesso no Gmail",
 		"data": map[string]string{
 			"draft_id": draftID,
 			"message":  "Rascunho criado com sucesso no Gmail",

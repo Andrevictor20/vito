@@ -62,27 +62,49 @@ export class GmailApi {
   constructor(private client: ApiClient) {}
 
   async getStatus(): Promise<GmailStatusResponse> {
-    return this.client.request<GmailStatusResponse>('/api/v1/integrations/gmail/status');
+    const raw = await this.client.request<any>('/api/v1/integrations/gmail/status');
+    const data = raw?.data ?? raw;
+    return {
+      connected: Boolean(data?.connected),
+      email: data?.email || '',
+      last_scanned_at: data?.last_scanned_at ?? null,
+    };
   }
 
   async scanEmails(params?: { days?: number; limit?: number }): Promise<GmailScanResult> {
-    return this.client.request<GmailScanResult>('/api/v1/integrations/gmail/scan', {
+    const raw = await this.client.request<any>('/api/v1/integrations/gmail/scan', {
       method: 'POST',
       body: JSON.stringify(params || {}),
       timeoutMs: 60000,
     });
+    const data = raw?.data ?? raw;
+    return {
+      scanned_count: data?.scanned_count ?? (data?.messages_read ?? 0),
+      bills: data?.bills ?? [],
+      flights: data?.flights ?? [],
+      urgent_emails: data?.urgent_emails ?? [],
+    };
   }
 
   async disconnect(): Promise<{ message: string }> {
-    return this.client.request<{ message: string }>('/api/v1/integrations/gmail/disconnect', {
+    const raw = await this.client.request<any>('/api/v1/integrations/gmail/disconnect', {
       method: 'DELETE',
     });
+    const data = raw?.data ?? raw;
+    return {
+      message: data?.message || 'Desconectado com sucesso',
+    };
   }
 
   async createDraft(draft: GmailDraftInput): Promise<GmailDraftResponse> {
-    return this.client.request<GmailDraftResponse>('/api/v1/integrations/gmail/draft', {
+    const raw = await this.client.request<any>('/api/v1/integrations/gmail/draft', {
       method: 'POST',
       body: JSON.stringify(draft),
     });
+    const data = raw?.data ?? raw;
+    return {
+      id: data?.id || (data?.draft_id ?? ''),
+      thread_id: data?.thread_id ?? '',
+    };
   }
 }

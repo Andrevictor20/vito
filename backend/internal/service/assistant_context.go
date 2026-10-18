@@ -44,6 +44,7 @@ func (s *AssistantService) enrichInputContext(ctx context.Context, userID string
 	needTriggerAlerts := len(input.ActiveTriggerAlerts) == 0
 	needBookings := len(input.ActiveBookings) == 0 && s.bookingSvc != nil
 	needAppointments := len(input.UpcomingAppointments) == 0 && s.bookingSvc != nil
+	needGmail := s.gmailSvc != nil && len(input.RecentEmails) == 0
 
 	var (
 		autonomyMode      string
@@ -58,6 +59,8 @@ func (s *AssistantService) enrichInputContext(ctx context.Context, userID string
 		triggerFlags      []string
 		activeBookings    []string
 		upcomingAppts     []string
+		recentEmailLines  []string
+		gmailFlag         string
 		wg                sync.WaitGroup
 	)
 
@@ -214,6 +217,44 @@ func (s *AssistantService) enrichInputContext(ctx context.Context, userID string
 		}()
 	}
 
+	if needGmail {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			st, err := s.gmailSvc.GetStatus(ctx, userID)
+			if err == nil && st != nil && st.Connected {
+				accEmail := st.AccountEmail
+				if accEmail == "" {
+					accEmail = st.Email
+				}
+				gmailFlag = fmt.Sprintf("[INTEGRAÇÃO GMAIL ATIVA: conta=%s]", accEmail)
+				qLower := strings.ToLower(queryText)
+				if strings.Contains(qLower, "email") || strings.Contains(qLower, "e-mail") ||
+					strings.Contains(qLower, "gmail") || strings.Contains(qLower, "fatura") ||
+					strings.Contains(qLower, "boleto") || strings.Contains(qLower, "voo") ||
+					strings.Contains(qLower, "passagem") || strings.Contains(qLower, "inbox") ||
+					strings.Contains(qLower, "correio") || strings.Contains(qLower, "caixa") {
+					scan, scanErr := s.gmailSvc.ScanEmails(ctx, userID)
+					if scanErr == nil && scan != nil {
+						for _, b := range scan.Bills {
+							dueStr := "a definir"
+							if b.DueDate != nil {
+								dueStr = b.DueDate.Format("02/01/2006")
+							}
+							recentEmailLines = append(recentEmailLines, fmt.Sprintf("[BOLETO/FATURA] %s (R$ %.2f, Vence: %s, Beneficiário: %s) - Linha: %s", b.Subject, b.AmountBRL, dueStr, b.Beneficiary, b.Barcode))
+						}
+						for _, f := range scan.Flights {
+							recentEmailLines = append(recentEmailLines, fmt.Sprintf("[VOO] %s (Voo %s, Localizador: %s, %s -> %s)", f.Airline, f.FlightNum, f.BookingCode, f.Origin, f.Destination))
+						}
+						for _, u := range scan.UrgentEmails {
+							recentEmailLines = append(recentEmailLines, fmt.Sprintf("[MENSAGEM] De: %s | Assunto: %s | Trecho: %s", u.From, u.Subject, u.Snippet))
+						}
+					}
+				}
+			}
+		}()
+	}
+
 	wg.Wait()
 
 	if autonomyMode != "" {
@@ -251,6 +292,12 @@ func (s *AssistantService) enrichInputContext(ctx context.Context, userID string
 	}
 	if len(upcomingAppts) > 0 {
 		input.UpcomingAppointments = upcomingAppts
+	}
+	if len(recentEmailLines) > 0 {
+		input.RecentEmails = recentEmailLines
+	}
+	if gmailFlag != "" {
+		input.AppStateFlags = append(input.AppStateFlags, gmailFlag)
 	}
 }
 
