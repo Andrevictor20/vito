@@ -40,6 +40,10 @@ func (m *mockEvolutionClient) SetWebhook(ctx context.Context, instanceName, webh
 	return nil
 }
 
+func (m *mockEvolutionClient) SetSettings(ctx context.Context, instanceName string, settings map[string]interface{}) error {
+	return nil
+}
+
 func (m *mockEvolutionClient) GetPairingCode(ctx context.Context, instanceName, phone string) (string, error) {
 	m.getPairingCodeCalled = true
 	return m.mockPairingCode, nil

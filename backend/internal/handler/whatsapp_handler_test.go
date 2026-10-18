@@ -29,6 +29,9 @@ func (m *mockEvolutionAPIClientForHandler) CreateInstance(ctx context.Context, i
 func (m *mockEvolutionAPIClientForHandler) SetWebhook(ctx context.Context, instanceName, webhookURL string) error {
 	return nil
 }
+func (m *mockEvolutionAPIClientForHandler) SetSettings(ctx context.Context, instanceName string, settings map[string]interface{}) error {
+	return nil
+}
 func (m *mockEvolutionAPIClientForHandler) GetPairingCode(ctx context.Context, instanceName, phone string) (string, error) {
 	return m.pairingCode, nil
 }

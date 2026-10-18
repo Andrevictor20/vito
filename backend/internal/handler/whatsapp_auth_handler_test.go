@@ -28,6 +28,9 @@ func (m *mockEvolutionClientForAuthHandler) CreateInstance(ctx context.Context, 
 func (m *mockEvolutionClientForAuthHandler) SetWebhook(ctx context.Context, instanceName, webhookURL string) error {
 	return nil
 }
+func (m *mockEvolutionClientForAuthHandler) SetSettings(ctx context.Context, instanceName string, settings map[string]interface{}) error {
+	return nil
+}
 func (m *mockEvolutionClientForAuthHandler) GetPairingCode(ctx context.Context, instanceName, phone string) (string, error) {
 	return "1234-5678", nil
 }

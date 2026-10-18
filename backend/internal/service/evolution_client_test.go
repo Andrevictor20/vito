@@ -119,3 +119,32 @@ func TestEvolutionClient_DeleteInstance(t *testing.T) {
 		t.Fatalf("esperava que DELETE /instance/delete/test_inst fosse chamado")
 	}
 }
+
+func TestEvolutionClient_SetSettings(t *testing.T) {
+	var settingsCalled bool
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost && r.URL.Path == "/settings/set/test_inst" {
+			settingsCalled = true
+			var body map[string]interface{}
+			_ = json.NewDecoder(r.Body).Decode(&body)
+			if body["syncFullHistory"] == false {
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(`{"status":"SUCCESS"}`))
+				return
+			}
+		}
+		http.NotFound(w, r)
+	}))
+	defer server.Close()
+
+	client := service.NewDefaultEvolutionClient(server.URL, "test_api_key", server.Client())
+	err := client.SetSettings(context.Background(), "test_inst", map[string]interface{}{
+		"syncFullHistory": false,
+	})
+	if err != nil {
+		t.Fatalf("esperava sucesso no SetSettings, obteve: %v", err)
+	}
+	if !settingsCalled {
+		t.Fatalf("esperava que POST /settings/set/test_inst fosse chamado com syncFullHistory=false")
+	}
+}

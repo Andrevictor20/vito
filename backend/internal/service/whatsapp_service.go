@@ -75,6 +75,28 @@ func SanitizePhoneNumber(raw string) (string, error) {
 	return digits, nil
 }
 
+// isMatchingPhone compara dois números considerando possíveis variações do 9º dígito brasileiro (DDI 55).
+func isMatchingPhone(a, b string) bool {
+	if a == b {
+		return true
+	}
+	re := regexp.MustCompile(`\D+`)
+	da := re.ReplaceAllString(a, "")
+	db := re.ReplaceAllString(b, "")
+	if da == db {
+		return true
+	}
+	if strings.HasPrefix(da, "55") && strings.HasPrefix(db, "55") {
+		if len(da) == 13 && len(db) == 12 && da[:4] == db[:4] && da[5:] == db[4:] {
+			return true
+		}
+		if len(db) == 13 && len(da) == 12 && db[:4] == da[:4] && db[5:] == da[4:] {
+			return true
+		}
+	}
+	return false
+}
+
 // MakeInstanceName gera o identificador único da instância para a Evolution API.
 func MakeInstanceName(userID string) string {
 	clean := strings.ReplaceAll(userID, "-", "_")
@@ -105,6 +127,15 @@ func (s *WhatsAppService) RequestPairingCode(ctx context.Context, userID, rawPho
 	if err := s.client.SetWebhook(ctx, instanceName, webhookURL); err != nil {
 		log.Printf("⚠️ [WhatsAppService] Aviso ao configurar webhook para %s: %v", instanceName, err)
 	}
+
+	_ = s.client.SetSettings(ctx, instanceName, map[string]interface{}{
+		"rejectCall":      false,
+		"groupsIgnore":    false,
+		"alwaysOnline":    false,
+		"readMessages":    false,
+		"readStatus":      false,
+		"syncFullHistory": false,
+	})
 
 	code, err := s.client.GetPairingCode(ctx, instanceName, phone)
 	if err != nil {
@@ -249,7 +280,7 @@ func (s *WhatsAppService) HandleWebhook(ctx context.Context, eventType string, p
 			reVito := regexp.MustCompile(`(?i)@vito\s*|vito:\s*`)
 			rawText = strings.TrimSpace(reVito.ReplaceAllString(rawText, ""))
 			if rawText == "" {
-				return nil
+				rawText = "olá"
 			}
 		} else {
 			// Em chats privados (1-on-1):
@@ -261,7 +292,7 @@ func (s *WhatsAppService) HandleWebhook(ctx context.Context, eventType string, p
 				return nil
 			}
 			cleanJid := strings.Split(msgData.Key.RemoteJid, "@")[0]
-			isSelfChat := cleanJid == integration.Phone
+			isSelfChat := isMatchingPhone(cleanJid, integration.Phone)
 			hasVitoTrigger := strings.Contains(strings.ToLower(rawText), "@vito") || strings.HasPrefix(strings.ToLower(rawText), "vito:")
 
 			if !isSelfChat && !hasVitoTrigger {
@@ -271,7 +302,7 @@ func (s *WhatsAppService) HandleWebhook(ctx context.Context, eventType string, p
 				reVito := regexp.MustCompile(`(?i)@vito\s*|vito:\s*`)
 				rawText = strings.TrimSpace(reVito.ReplaceAllString(rawText, ""))
 				if rawText == "" {
-					return nil
+					rawText = "olá"
 				}
 			}
 		}

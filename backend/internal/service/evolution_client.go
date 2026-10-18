@@ -15,6 +15,7 @@ import (
 type EvolutionAPIClient interface {
 	CreateInstance(ctx context.Context, instanceName, phone string) error
 	SetWebhook(ctx context.Context, instanceName, webhookURL string) error
+	SetSettings(ctx context.Context, instanceName string, settings map[string]interface{}) error
 	GetPairingCode(ctx context.Context, instanceName, phone string) (string, error)
 	GetConnectionState(ctx context.Context, instanceName string) (string, error)
 	DeleteInstance(ctx context.Context, instanceName string) error
@@ -68,11 +69,20 @@ func (c *DefaultEvolutionClient) doRequest(ctx context.Context, method, path str
 
 func (c *DefaultEvolutionClient) CreateInstance(ctx context.Context, instanceName, phone string) error {
 	payload := map[string]interface{}{
-		"instanceName": instanceName,
-		"token":        "",
-		"qrcode":       false,
-		"number":       phone,
-		"integration":  "WHATSAPP-BAILEYS",
+		"instanceName":    instanceName,
+		"token":           "",
+		"qrcode":          false,
+		"number":          phone,
+		"integration":     "WHATSAPP-BAILEYS",
+		"syncFullHistory": false,
+		"settings": map[string]interface{}{
+			"rejectCall":      false,
+			"groupsIgnore":    false,
+			"alwaysOnline":    false,
+			"readMessages":    false,
+			"readStatus":      false,
+			"syncFullHistory": false,
+		},
 	}
 
 	resp, err := c.doRequest(ctx, http.MethodPost, "/instance/create", payload)
@@ -135,6 +145,16 @@ func (c *DefaultEvolutionClient) SetWebhook(ctx context.Context, instanceName, w
 	}
 	bodyBytes, _ := io.ReadAll(respFlat.Body)
 	return fmt.Errorf("evolution api set webhook falhou (status %d): %s", respFlat.StatusCode, string(bodyBytes))
+}
+
+func (c *DefaultEvolutionClient) SetSettings(ctx context.Context, instanceName string, settings map[string]interface{}) error {
+	path := fmt.Sprintf("/settings/set/%s", instanceName)
+	resp, err := c.doRequest(ctx, http.MethodPost, path, settings)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	return nil
 }
 
 func extractPairingCodeFromBody(bodyBytes []byte) string {
