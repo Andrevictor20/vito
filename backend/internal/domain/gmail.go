@@ -61,6 +61,7 @@ type UrgentEmail struct {
 	Subject   string    `json:"subject"`
 	Snippet   string    `json:"snippet"`
 	Date      time.Time `json:"date"`
+	IsUnread  bool      `json:"is_unread,omitempty"`
 }
 
 // GmailScanResult consolida a triagem inteligente de e-mails.

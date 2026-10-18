@@ -2,8 +2,11 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
+	"strconv"
 
+	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/handler/middleware"
 	"github.com/andrevmp/vito/backend/internal/service"
 )
@@ -65,13 +68,41 @@ func (h *GmailHandler) Disconnect(w http.ResponseWriter, r *http.Request) {
 func (h *GmailHandler) ScanEmails(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok || userID == "" {
-		http.Error(w, `{"error":"não autorizado"}`, http.StatusUnauthorized)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "não autorizado"})
 		return
 	}
 
-	result, err := h.svc.ScanEmails(r.Context(), userID)
+	opts := service.ScanOptions{
+		Folder:     r.URL.Query().Get("folder"),
+		Query:      r.URL.Query().Get("q"),
+		UnreadOnly: r.URL.Query().Get("unread_only") == "true",
+	}
+	if opts.Folder == "" {
+		opts.Folder = r.URL.Query().Get("category")
+	}
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+			opts.Limit = l
+		}
+	}
+
+	result, err := h.svc.ScanEmailsWithOptions(r.Context(), userID, opts)
 	if err != nil {
-		http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusInternalServerError)
+		w.Header().Set("Content-Type", "application/json")
+		if errors.Is(err, domain.ErrGmailNotConnected) {
+			w.WriteHeader(http.StatusNotFound)
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": "integração com Gmail não está conectada", "code": "not_connected"})
+			return
+		}
+		if errors.Is(err, domain.ErrGmailAuthFailed) || errors.Is(err, domain.ErrGmailInvalidCredentials) {
+			w.WriteHeader(http.StatusUnauthorized)
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": "autenticação do Gmail expirada ou revogada", "code": "reauth_required"})
+			return
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return
 	}
 

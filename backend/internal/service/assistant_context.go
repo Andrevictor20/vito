@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -222,33 +223,107 @@ func (s *AssistantService) enrichInputContext(ctx context.Context, userID string
 		go func() {
 			defer wg.Done()
 			st, err := s.gmailSvc.GetStatus(ctx, userID)
-			if err == nil && st != nil && st.Connected {
-				accEmail := st.AccountEmail
-				if accEmail == "" {
-					accEmail = st.Email
+			if err != nil || st == nil {
+				return
+			}
+
+			if !st.Connected {
+				if st.Status == domain.GmailStatusReauthRequired {
+					gmailFlag = "[INTEGRAÇÃO GMAIL: Reconexão necessária (autorização expirada)]"
+					qLower := strings.ToLower(queryText)
+					if strings.Contains(qLower, "email") || strings.Contains(qLower, "e-mail") || strings.Contains(qLower, "gmail") {
+						recentEmailLines = append(recentEmailLines, "[AVISO GMAIL: A autorização do Gmail expirou. Oriente o usuário a reconectar o Gmail nas configurações do app.]")
+					}
 				}
-				gmailFlag = fmt.Sprintf("[INTEGRAÇÃO GMAIL ATIVA: conta=%s]", accEmail)
-				qLower := strings.ToLower(queryText)
-				if strings.Contains(qLower, "email") || strings.Contains(qLower, "e-mail") ||
-					strings.Contains(qLower, "gmail") || strings.Contains(qLower, "fatura") ||
-					strings.Contains(qLower, "boleto") || strings.Contains(qLower, "voo") ||
-					strings.Contains(qLower, "passagem") || strings.Contains(qLower, "inbox") ||
-					strings.Contains(qLower, "correio") || strings.Contains(qLower, "caixa") {
-					scan, scanErr := s.gmailSvc.ScanEmails(ctx, userID)
-					if scanErr == nil && scan != nil {
-						for _, b := range scan.Bills {
-							dueStr := "a definir"
-							if b.DueDate != nil {
-								dueStr = b.DueDate.Format("02/01/2006")
-							}
-							recentEmailLines = append(recentEmailLines, fmt.Sprintf("[BOLETO/FATURA] %s (R$ %.2f, Vence: %s, Beneficiário: %s) - Linha: %s", b.Subject, b.AmountBRL, dueStr, b.Beneficiary, b.Barcode))
+				return
+			}
+
+			accEmail := st.AccountEmail
+			if accEmail == "" {
+				accEmail = st.Email
+			}
+			gmailFlag = fmt.Sprintf("[INTEGRAÇÃO GMAIL ATIVA: conta=%s]", accEmail)
+			qLower := strings.ToLower(queryText)
+			hasEmailIntent := strings.Contains(qLower, "email") || strings.Contains(qLower, "e-mail") ||
+				strings.Contains(qLower, "gmail") || strings.Contains(qLower, "fatura") ||
+				strings.Contains(qLower, "boleto") || strings.Contains(qLower, "voo") ||
+				strings.Contains(qLower, "passagem") || strings.Contains(qLower, "inbox") ||
+				strings.Contains(qLower, "correio") || strings.Contains(qLower, "caixa") ||
+				strings.Contains(qLower, "spam") || strings.Contains(qLower, "lixeira") ||
+				strings.Contains(qLower, "lixo") || strings.Contains(qLower, "promo") ||
+				strings.Contains(qLower, "newsletter")
+
+			if hasEmailIntent {
+				opts := ScanOptions{
+					Folder:     "primary", // Padrão: Caixa Principal
+					UnreadOnly: false,
+					Limit:      10,
+				}
+
+				// Triagem seletiva de caixas adicionais apenas se solicitado explicitamente
+				if strings.Contains(qLower, "spam") {
+					opts.Folder = "spam"
+				} else if strings.Contains(qLower, "lixeira") || strings.Contains(qLower, "lixo") {
+					opts.Folder = "trash"
+				} else if strings.Contains(qLower, "promo") || strings.Contains(qLower, "oferta") || strings.Contains(qLower, "newsletter") {
+					opts.Folder = "promotions"
+				} else if strings.Contains(qLower, "social") || strings.Contains(qLower, "redes sociais") {
+					opts.Folder = "social"
+				} else if strings.Contains(qLower, "atualizaç") || strings.Contains(qLower, "atualizac") || strings.Contains(qLower, "updates") {
+					opts.Folder = "updates"
+				} else if strings.Contains(qLower, "todas as caixas") || strings.Contains(qLower, "todos os e-mails") || strings.Contains(qLower, "todos os emails") || strings.Contains(qLower, "qualquer pasta") {
+					opts.Folder = "all"
+				}
+
+				// Filtro de mensagens não lidas
+				if strings.Contains(qLower, "não lido") || strings.Contains(qLower, "nao lido") ||
+					strings.Contains(qLower, "não lidas") || strings.Contains(qLower, "nao lidas") ||
+					strings.Contains(qLower, "pendente") {
+					opts.UnreadOnly = true
+				}
+
+				folderLabel := "Caixa Principal"
+				switch opts.Folder {
+				case "spam":
+					folderLabel = "Spam"
+				case "trash":
+					folderLabel = "Lixeira"
+				case "promotions":
+					folderLabel = "Promoções"
+				case "social":
+					folderLabel = "Social"
+				case "updates":
+					folderLabel = "Atualizações"
+				case "all":
+					folderLabel = "Todas as Pastas"
+				}
+
+				scan, scanErr := s.gmailSvc.ScanEmailsWithOptions(ctx, userID, opts)
+				if scanErr == nil && scan != nil {
+					for _, b := range scan.Bills {
+						dueStr := "a definir"
+						if b.DueDate != nil {
+							dueStr = b.DueDate.Format("02/01/2006")
 						}
-						for _, f := range scan.Flights {
-							recentEmailLines = append(recentEmailLines, fmt.Sprintf("[VOO] %s (Voo %s, Localizador: %s, %s -> %s)", f.Airline, f.FlightNum, f.BookingCode, f.Origin, f.Destination))
+						recentEmailLines = append(recentEmailLines, fmt.Sprintf("[BOLETO/FATURA] %s (R$ %.2f, Vence: %s, Beneficiário: %s) - Linha: %s", b.Subject, b.AmountBRL, dueStr, b.Beneficiary, b.Barcode))
+					}
+					for _, f := range scan.Flights {
+						recentEmailLines = append(recentEmailLines, fmt.Sprintf("[VOO] %s (Voo %s, Localizador: %s, %s -> %s)", f.Airline, f.FlightNum, f.BookingCode, f.Origin, f.Destination))
+					}
+					for _, u := range scan.UrgentEmails {
+						readStatus := "[LIDO]"
+						if u.IsUnread {
+							readStatus = "[NÃO LIDO]"
 						}
-						for _, u := range scan.UrgentEmails {
-							recentEmailLines = append(recentEmailLines, fmt.Sprintf("[MENSAGEM] De: %s | Assunto: %s | Trecho: %s", u.From, u.Subject, u.Snippet))
-						}
+						dateStr := u.Date.Format("02/01 15:04")
+						recentEmailLines = append(recentEmailLines, fmt.Sprintf("[%s - %s] %s | De: %s | Assunto: %s | Trecho: %s", folderLabel, readStatus, dateStr, u.From, u.Subject, u.Snippet))
+					}
+					if len(scan.Bills) == 0 && len(scan.Flights) == 0 && len(scan.UrgentEmails) == 0 {
+						recentEmailLines = append(recentEmailLines, fmt.Sprintf("[STATUS GMAIL: Varredura realizada na pasta '%s', nenhuma mensagem encontrada.]", folderLabel))
+					}
+				} else if scanErr != nil {
+					if errors.Is(scanErr, domain.ErrGmailAuthFailed) {
+						recentEmailLines = append(recentEmailLines, "[AVISO GMAIL: O acesso ao Gmail expirou e precisa ser reconectado no app.]")
 					}
 				}
 			}

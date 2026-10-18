@@ -201,15 +201,8 @@ func (s *GoogleAuthService) GetAuthURL(mode, userID, redirectScheme string) (str
 	params.Set("scope", scope)
 	params.Set("access_type", "offline")
 	prompt := "select_account"
-	if mode == "calendar" {
+	if mode == "calendar" || mode == "gmail" {
 		prompt = "consent"
-	} else if mode == "gmail" {
-		prompt = "consent"
-		if s.gmailRepo != nil && strings.TrimSpace(userID) != "" {
-			if existing, err := s.gmailRepo.GetByUserID(context.Background(), userID); err == nil && existing != nil && existing.EncryptedCredentials != "" {
-				prompt = "select_account"
-			}
-		}
 	}
 	params.Set("prompt", prompt)
 	params.Set("state", state)
@@ -329,6 +322,7 @@ func (s *GoogleAuthService) HandleCallback(ctx context.Context, code, stateStr s
 			"access_token":  tokens.AccessToken,
 			"refresh_token": refreshToken,
 			"expires_in":    tokens.ExpiresIn,
+			"updated_at":    time.Now().Unix(),
 		})
 
 		encryptedCreds := string(credsPayload)

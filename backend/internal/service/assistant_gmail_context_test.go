@@ -125,3 +125,95 @@ func TestAssistantContext_EnrichesGmailEmailsWhenQueryRelated(t *testing.T) {
 		t.Errorf("esperava flag de integração Gmail ativa em AppStateFlags: %+v", gw.lastInput.AppStateFlags)
 	}
 }
+
+func TestAssistantContext_SelectiveMailboxQuery(t *testing.T) {
+	db, err := database.Open(":memory:")
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer db.Close()
+
+	userID := "user-gmail-selective-1"
+	userRepo := repository.NewUserRepository(db)
+	_ = userRepo.Create(&domain.User{ID: userID, Name: "André", Email: "andre@test.com", PasswordHash: "x"})
+
+	var lastQueryCaptured string
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Path == "/gmail/v1/users/me/messages" {
+			lastQueryCaptured = r.URL.Query().Get("q")
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"messages": []map[string]string{{"id": "msg-select-1"}},
+			})
+			return
+		}
+		if r.URL.Path == "/gmail/v1/users/me/messages/msg-select-1" {
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"id":       "msg-select-1",
+				"snippet":  "Conteúdo da mensagem selecionada",
+				"labelIds": []string{"INBOX", "UNREAD"},
+				"payload": map[string]interface{}{
+					"headers": []map[string]string{
+						{"name": "Subject", "value": "Assunto Teste"},
+						{"name": "From", "value": "remetente@teste.com"},
+					},
+				},
+			})
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer mockServer.Close()
+
+	encKey := "test-enc-key-32-chars-long-12345"
+	gmailRepo := repository.NewGmailRepository(db)
+	gmailSvc := service.NewGmailService(gmailRepo, encKey, "cid", "csec")
+	gmailSvc.SetBaseURL(mockServer.URL)
+
+	credsJSON, _ := json.Marshal(map[string]interface{}{"access_token": "valid-token"})
+	encCreds, _ := crypto.Encrypt(string(credsJSON), encKey)
+	_ = gmailRepo.Upsert(context.Background(), &domain.GmailIntegration{
+		ID:                   "g-select",
+		UserID:               userID,
+		AccountEmail:         "andre@gmail.com",
+		EncryptedCredentials: encCreds,
+		Status:               domain.GmailStatusActive,
+	})
+
+	gw := &captureGateway{}
+	astSvc := service.NewAssistantService(gw, nil, nil, nil)
+	astSvc.SetGmailService(gmailSvc)
+
+	// 1. Pergunta padrão sobre últimos emails -> Caixa Principal (in:inbox category:primary)
+	_, _ = astSvc.Process(context.Background(), userID, ai.UserInput{
+		Text: "quais meus últimos emails?",
+	})
+	if lastQueryCaptured != "in:inbox category:primary" {
+		t.Errorf("esperava query para Caixa Principal 'in:inbox category:primary', obteve %q", lastQueryCaptured)
+	}
+
+	// 2. Pergunta explícita sobre Spam -> in:spam
+	_, _ = astSvc.Process(context.Background(), userID, ai.UserInput{
+		Text: "olhe meu spam por favor",
+	})
+	if lastQueryCaptured != "in:spam" {
+		t.Errorf("esperava query para Spam 'in:spam', obteve %q", lastQueryCaptured)
+	}
+
+	// 3. Pergunta explícita sobre Promoções -> category:promotions
+	_, _ = astSvc.Process(context.Background(), userID, ai.UserInput{
+		Text: "tem alguma promoção nova no meu email?",
+	})
+	if lastQueryCaptured != "category:promotions" {
+		t.Errorf("esperava query para Promoções 'category:promotions', obteve %q", lastQueryCaptured)
+	}
+
+	// 4. Pergunta sobre não lidos na caixa principal -> in:inbox category:primary is:unread
+	_, _ = astSvc.Process(context.Background(), userID, ai.UserInput{
+		Text: "tem algum e-mail não lido na minha caixa?",
+	})
+	if lastQueryCaptured != "in:inbox category:primary is:unread" {
+		t.Errorf("esperava query com is:unread 'in:inbox category:primary is:unread', obteve %q", lastQueryCaptured)
+	}
+}
+

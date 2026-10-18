@@ -205,3 +205,229 @@ func TestGmailService_ScanEmails_ParsesBillsAndFlights(t *testing.T) {
 		t.Errorf("esperava 2 e-mails na lista urgente, obteve %d", len(result.UrgentEmails))
 	}
 }
+
+func TestGmailService_BuildGmailQuery(t *testing.T) {
+	tests := []struct {
+		name     string
+		opts     service.ScanOptions
+		expected string
+	}{
+		{
+			name:     "Padrão vazio vai para Caixa Principal",
+			opts:     service.ScanOptions{},
+			expected: "in:inbox category:primary",
+		},
+		{
+			name:     "Pasta primária explícita",
+			opts:     service.ScanOptions{Folder: "primary"},
+			expected: "in:inbox category:primary",
+		},
+		{
+			name:     "Caixa Principal com não lidos apenas",
+			opts:     service.ScanOptions{Folder: "primary", UnreadOnly: true},
+			expected: "in:inbox category:primary is:unread",
+		},
+		{
+			name:     "Pasta Spam explicitamente solicitada",
+			opts:     service.ScanOptions{Folder: "spam"},
+			expected: "in:spam",
+		},
+		{
+			name:     "Pasta Lixeira explicitamente solicitada",
+			opts:     service.ScanOptions{Folder: "lixeira"},
+			expected: "in:trash",
+		},
+		{
+			name:     "Pasta Promoções explicitamente solicitada",
+			opts:     service.ScanOptions{Folder: "promoções"},
+			expected: "category:promotions",
+		},
+		{
+			name:     "Pasta Social explicitamente solicitada",
+			opts:     service.ScanOptions{Folder: "social"},
+			expected: "category:social",
+		},
+		{
+			name:     "Pasta Atualizações explicitamente solicitada",
+			opts:     service.ScanOptions{Folder: "atualizações"},
+			expected: "category:updates",
+		},
+		{
+			name:     "Todas as caixas",
+			opts:     service.ScanOptions{Folder: "all"},
+			expected: "in:anywhere -in:spam -in:trash",
+		},
+		{
+			name:     "Query customizada tem precedência",
+			opts:     service.ScanOptions{Query: "from:suporte@banco.com is:starred"},
+			expected: "from:suporte@banco.com is:starred",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := service.BuildGmailQuery(tc.opts)
+			if got != tc.expected {
+				t.Errorf("query gerada divergente: esperava %q, obteve %q", tc.expected, got)
+			}
+		})
+	}
+}
+
+func TestGmailService_AutoRefreshToken_Proactive(t *testing.T) {
+	encKey := "test-enc-key-32-chars-long-12345"
+	repo := &MockGmailRepoForService{}
+
+	tokenHitCount := 0
+	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tokenHitCount++
+		if err := r.ParseForm(); err != nil {
+			t.Fatalf("falha ao parsear form: %v", err)
+		}
+		if r.Form.Get("grant_type") != "refresh_token" {
+			t.Errorf("esperava grant_type=refresh_token, obteve %s", r.Form.Get("grant_type"))
+		}
+		if r.Form.Get("refresh_token") != "secret-refresh-123" {
+			t.Errorf("refresh_token divergente: %s", r.Form.Get("refresh_token"))
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"access_token": "fresh-access-token-999",
+			"expires_in":   3600,
+		})
+	}))
+	defer tokenServer.Close()
+
+	svc := service.NewGmailService(repo, encKey, "client-id", "client-secret")
+	svc.SetTokenURL(tokenServer.URL)
+
+	// Token expirado há 2 horas
+	expiredUpdatedAt := time.Now().Unix() - 7200
+	credsPayload, _ := json.Marshal(map[string]interface{}{
+		"access_token":  "stale-access-token",
+		"refresh_token": "secret-refresh-123",
+		"expires_in":    3600,
+		"updated_at":    expiredUpdatedAt,
+	})
+	encCreds, _ := crypto.Encrypt(string(credsPayload), encKey)
+	userID := "user-token-refresh"
+	repo.integration = &domain.GmailIntegration{
+		ID:                   "int-refresh-1",
+		UserID:               userID,
+		AccountEmail:         "andre@gmail.com",
+		EncryptedCredentials: encCreds,
+		Status:               domain.GmailStatusActive,
+	}
+
+	tok, err := svc.GetValidAccessToken(context.Background(), userID)
+	if err != nil {
+		t.Fatalf("GetValidAccessToken falhou: %v", err)
+	}
+
+	if tok != "fresh-access-token-999" {
+		t.Errorf("esperava novo token renovado 'fresh-access-token-999', obteve %q", tok)
+	}
+	if tokenHitCount != 1 {
+		t.Errorf("esperava 1 chamada ao token endpoint, obteve %d", tokenHitCount)
+	}
+
+	// Verifica se persistiu as credenciais atualizadas no repositório
+	decrypted, _ := crypto.Decrypt(repo.integration.EncryptedCredentials, encKey)
+	var stored map[string]interface{}
+	_ = json.Unmarshal([]byte(decrypted), &stored)
+	if stored["access_token"] != "fresh-access-token-999" {
+		t.Errorf("access_token não foi persistido no banco: %+v", stored)
+	}
+	if stored["refresh_token"] != "secret-refresh-123" {
+		t.Errorf("refresh_token foi perdido após renovação: %+v", stored)
+	}
+}
+
+func TestGmailService_AutoRefreshToken_Reactive401(t *testing.T) {
+	encKey := "test-enc-key-32-chars-long-12345"
+	repo := &MockGmailRepoForService{}
+
+	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"access_token": "fresh-token-after-401",
+			"expires_in":   3600,
+		})
+	}))
+	defer tokenServer.Close()
+
+	gmailHits := 0
+	gmailServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gmailHits++
+		authHeader := r.Header.Get("Authorization")
+		if authHeader != "Bearer fresh-token-after-401" {
+			// Simula token rejeitado pelo Google na 1ª tentativa
+			w.WriteHeader(http.StatusUnauthorized)
+			_, _ = w.Write([]byte(`{"error":{"code":401,"message":"Invalid Credentials"}}`))
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Path == "/gmail/v1/users/me/messages" {
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"messages": []map[string]string{
+					{"id": "msg-reactive-1"},
+				},
+			})
+			return
+		}
+		if r.URL.Path == "/gmail/v1/users/me/messages/msg-reactive-1" {
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"id":       "msg-reactive-1",
+				"snippet":  "Reunião de alinhamento amanhã",
+				"labelIds": []string{"INBOX", "UNREAD", "CATEGORY_PERSONAL"},
+				"payload": map[string]interface{}{
+					"headers": []map[string]string{
+						{"name": "Subject", "value": "Alinhamento"},
+						{"name": "From", "value": "chefe@empresa.com"},
+						{"name": "Date", "value": "Sat, 18 Oct 2026 10:00:00 -0300"},
+					},
+				},
+			})
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer gmailServer.Close()
+
+	svc := service.NewGmailService(repo, encKey, "client-id", "client-secret")
+	svc.SetBaseURL(gmailServer.URL)
+	svc.SetTokenURL(tokenServer.URL)
+
+	credsPayload, _ := json.Marshal(map[string]interface{}{
+		"access_token":  "token-that-google-revoked",
+		"refresh_token": "valid-refresh-for-retry",
+		"expires_in":    3600,
+		"updated_at":    time.Now().Unix(), // parece válido localmente mas Google rejeitou
+	})
+	encCreds, _ := crypto.Encrypt(string(credsPayload), encKey)
+	userID := "user-reactive-401"
+	repo.integration = &domain.GmailIntegration{
+		ID:                   "int-reactive-1",
+		UserID:               userID,
+		AccountEmail:         "andre@gmail.com",
+		EncryptedCredentials: encCreds,
+		Status:               domain.GmailStatusActive,
+	}
+
+	result, err := svc.ScanEmails(context.Background(), userID)
+	if err != nil {
+		t.Fatalf("ScanEmails falhou mesmo com token refresh disponível: %v", err)
+	}
+
+	if result.MessagesRead != 1 {
+		t.Errorf("esperava 1 mensagem lida, obteve %d", result.MessagesRead)
+	}
+	if len(result.UrgentEmails) != 1 || !result.UrgentEmails[0].IsUnread {
+		t.Errorf("esperava mensagem com IsUnread = true, obteve %+v", result.UrgentEmails)
+	}
+	if repo.integration.Status != domain.GmailStatusActive {
+		t.Errorf("esperava status active após recuperação, obteve %s", repo.integration.Status)
+	}
+}
+

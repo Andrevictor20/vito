@@ -10,9 +10,8 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"regexp"
-	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/andrevmp/vito/backend/internal/crypto"
@@ -93,7 +92,102 @@ type gmailStoredTokens struct {
 	UpdatedAt    int64  `json:"updated_at,omitempty"`
 }
 
-// GetValidAccessToken recupera o token decifrado ou renova via refresh token se expirado.
+func (s *GmailService) refreshToken(ctx context.Context, userID string, integ *domain.GmailIntegration, tokens *gmailStoredTokens) (string, error) {
+	if tokens.RefreshToken == "" {
+		return "", domain.ErrGmailAuthFailed
+	}
+
+	data := url.Values{}
+	data.Set("client_id", s.clientID)
+	data.Set("client_secret", s.clientSecret)
+	data.Set("refresh_token", tokens.RefreshToken)
+	data.Set("grant_type", "refresh_token")
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.tokenURL, strings.NewReader(data.Encode()))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("falha ao comunicar com endpoint de token do Google: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		_ = s.repo.UpdateStatus(ctx, userID, domain.GmailStatusReauthRequired)
+		return "", fmt.Errorf("falha ao renovar token do Gmail (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	var tokenResp struct {
+		AccessToken  string `json:"access_token"`
+		RefreshToken string `json:"refresh_token"`
+		ExpiresIn    int    `json:"expires_in"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil {
+		return "", err
+	}
+
+	if tokenResp.AccessToken == "" {
+		return "", errors.New("Google não retornou novo access token")
+	}
+
+	tokens.AccessToken = tokenResp.AccessToken
+	if tokenResp.RefreshToken != "" {
+		tokens.RefreshToken = tokenResp.RefreshToken
+	}
+	if tokenResp.ExpiresIn > 0 {
+		tokens.ExpiresIn = tokenResp.ExpiresIn
+	} else {
+		tokens.ExpiresIn = 3600
+	}
+	tokens.UpdatedAt = time.Now().Unix()
+
+	newPayload, err := json.Marshal(tokens)
+	if err != nil {
+		return "", err
+	}
+
+	encryptedPayload := string(newPayload)
+	if s.encKey != "" {
+		if enc, err := crypto.Encrypt(string(newPayload), s.encKey); err == nil {
+			encryptedPayload = enc
+		}
+	}
+
+	integ.EncryptedCredentials = encryptedPayload
+	integ.Status = domain.GmailStatusActive
+	if err := s.repo.Upsert(ctx, integ); err != nil {
+		return "", fmt.Errorf("falha ao persistir credenciais renovadas do Gmail: %w", err)
+	}
+
+	return tokens.AccessToken, nil
+}
+
+func (s *GmailService) forceRefreshToken(ctx context.Context, userID string) (string, error) {
+	integ, err := s.repo.GetByUserID(ctx, userID)
+	if err != nil {
+		return "", err
+	}
+	rawPayload := integ.EncryptedCredentials
+	if s.encKey != "" {
+		if decrypted, err := crypto.Decrypt(rawPayload, s.encKey); err == nil {
+			rawPayload = decrypted
+		}
+	}
+	var tokens gmailStoredTokens
+	if err := json.Unmarshal([]byte(rawPayload), &tokens); err != nil {
+		return "", domain.ErrGmailInvalidCredentials
+	}
+	if tokens.RefreshToken == "" {
+		return "", domain.ErrGmailAuthFailed
+	}
+	return s.refreshToken(ctx, userID, integ, &tokens)
+}
+
+// GetValidAccessToken recupera o token decifrado ou renova proativamente se expirado.
 func (s *GmailService) GetValidAccessToken(ctx context.Context, userID string) (string, error) {
 	integ, err := s.repo.GetByUserID(ctx, userID)
 	if err != nil {
@@ -113,25 +207,58 @@ func (s *GmailService) GetValidAccessToken(ctx context.Context, userID string) (
 		return "", domain.ErrGmailInvalidCredentials
 	}
 
-	// Se não tiver refresh token ou ainda for válido, retorna o access token
-	if tokens.AccessToken != "" && tokens.RefreshToken == "" {
+	isExpired := tokens.AccessToken == "" || (tokens.UpdatedAt > 0 && time.Now().Unix() >= tokens.UpdatedAt+int64(tokens.ExpiresIn)-60)
+	if isExpired && tokens.RefreshToken != "" {
+		newTok, err := s.refreshToken(ctx, userID, integ, &tokens)
+		if err == nil {
+			return newTok, nil
+		}
+		return "", err
+	}
+
+	if tokens.AccessToken != "" {
 		return tokens.AccessToken, nil
 	}
 
-	return tokens.AccessToken, nil
+	if tokens.RefreshToken != "" {
+		return s.refreshToken(ctx, userID, integ, &tokens)
+	}
+
+	return "", domain.ErrGmailInvalidCredentials
 }
 
-// ScanEmails busca e faz a triagem de mensagens não lidas de boletos, faturas e voos.
-func (s *GmailService) ScanEmails(ctx context.Context, userID string) (*domain.GmailScanResult, error) {
+type messageDetailResult struct {
+	index    int
+	id       string
+	snippet  string
+	labelIDs []string
+	headers  []struct {
+		Name  string `json:"name"`
+		Value string `json:"value"`
+	}
+}
+
+// ScanEmailsWithOptions consulta e tria e-mails respeitando a pasta (default Caixa Principal) e concorrência otimizada.
+func (s *GmailService) ScanEmailsWithOptions(ctx context.Context, userID string, opts ScanOptions) (*domain.GmailScanResult, error) {
 	accessToken, err := s.GetValidAccessToken(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
 
-	reqURL := fmt.Sprintf("%s/gmail/v1/users/me/messages?q=%s&maxResults=20",
+	maxResults := opts.Limit
+	if maxResults <= 0 {
+		maxResults = 10
+	} else if maxResults > 20 {
+		maxResults = 20
+	}
+
+	queryString := BuildGmailQuery(opts)
+	reqURL := fmt.Sprintf("%s/gmail/v1/users/me/messages?q=%s&maxResults=%d",
 		s.baseURL,
-		url.QueryEscape("label:UNREAD"),
+		url.QueryEscape(queryString),
+		maxResults,
 	)
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
 	if err != nil {
 		return nil, err
@@ -141,6 +268,27 @@ func (s *GmailService) ScanEmails(ctx context.Context, userID string) (*domain.G
 	resp, err := s.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("falha ao consultar lista de mensagens do Gmail: %w", err)
+	}
+
+	// Recuperação reativa caso 401
+	if resp.StatusCode == http.StatusUnauthorized {
+		resp.Body.Close()
+		refreshedToken, refErr := s.forceRefreshToken(ctx, userID)
+		if refErr != nil {
+			_ = s.repo.UpdateStatus(ctx, userID, domain.GmailStatusReauthRequired)
+			return nil, domain.ErrGmailAuthFailed
+		}
+		accessToken = refreshedToken
+
+		req, err = http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Authorization", "Bearer "+accessToken)
+		resp, err = s.httpClient.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("falha ao consultar lista de mensagens do Gmail após renovação: %w", err)
+		}
 	}
 	defer resp.Body.Close()
 
@@ -167,63 +315,118 @@ func (s *GmailService) ScanEmails(ctx context.Context, userID string) (*domain.G
 		MessagesRead: len(listResp.Messages),
 	}
 
-	for _, msgMeta := range listResp.Messages {
-		detailURL := fmt.Sprintf("%s/gmail/v1/users/me/messages/%s?format=full", s.baseURL, msgMeta.ID)
-		dReq, err := http.NewRequestWithContext(ctx, http.MethodGet, detailURL, nil)
-		if err != nil {
+	if len(listResp.Messages) == 0 {
+		_ = s.repo.UpdateLastScanned(ctx, userID, "", result.ScannedAt)
+		return result, nil
+	}
+
+	// Concorrência limitada (máx 5 requisições paralelas) com payload leve de metadados
+	details := make([]*messageDetailResult, len(listResp.Messages))
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, 5)
+
+	for i, msgMeta := range listResp.Messages {
+		wg.Add(1)
+		go func(idx int, msgID string) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			detailURL := fmt.Sprintf("%s/gmail/v1/users/me/messages/%s?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date", s.baseURL, msgID)
+			dReq, err := http.NewRequestWithContext(ctx, http.MethodGet, detailURL, nil)
+			if err != nil {
+				return
+			}
+			dReq.Header.Set("Authorization", "Bearer "+accessToken)
+
+			dResp, err := s.httpClient.Do(dReq)
+			if err != nil {
+				return
+			}
+			defer dResp.Body.Close()
+
+			if dResp.StatusCode != http.StatusOK {
+				return
+			}
+
+			var d struct {
+				ID       string   `json:"id"`
+				Snippet  string   `json:"snippet"`
+				LabelIDs []string `json:"labelIds"`
+				Payload  struct {
+					Headers []struct {
+						Name  string `json:"name"`
+						Value string `json:"value"`
+					} `json:"headers"`
+				} `json:"payload"`
+			}
+			if err := json.NewDecoder(dResp.Body).Decode(&d); err == nil {
+				details[idx] = &messageDetailResult{
+					index:    idx,
+					id:       d.ID,
+					snippet:  d.Snippet,
+					labelIDs: d.LabelIDs,
+					headers:  d.Payload.Headers,
+				}
+			}
+		}(i, msgMeta.ID)
+	}
+	wg.Wait()
+
+	maxUrgent := maxResults
+	if maxUrgent > 10 {
+		maxUrgent = 10
+	}
+
+	for _, d := range details {
+		if d == nil {
 			continue
 		}
-		dReq.Header.Set("Authorization", "Bearer "+accessToken)
 
-		dResp, err := s.httpClient.Do(dReq)
-		if err != nil {
-			continue
-		}
-
-		var detail struct {
-			ID      string `json:"id"`
-			Snippet string `json:"snippet"`
-			Payload struct {
-				Headers []struct {
-					Name  string `json:"name"`
-					Value string `json:"value"`
-				} `json:"headers"`
-			} `json:"payload"`
-		}
-		_ = json.NewDecoder(dResp.Body).Decode(&detail)
-		dResp.Body.Close()
-
-		subject, from, dateStr := extractHeaders(detail.Payload.Headers)
-		combinedText := subject + " " + detail.Snippet
+		subject, from, dateStr := extractHeaders(d.headers)
+		combinedText := subject + " " + d.snippet
 
 		// 1. Parser de Boletos e Faturas
-		if bill := parseBill(detail.ID, subject, from, combinedText); bill != nil {
+		if bill := parseBill(d.id, subject, from, combinedText); bill != nil {
 			result.Bills = append(result.Bills, *bill)
 		}
 
 		// 2. Parser de Confirmações de Voo
-		if flight := parseFlight(detail.ID, subject, from, combinedText); flight != nil {
+		if flight := parseFlight(d.id, subject, from, combinedText); flight != nil {
 			result.Flights = append(result.Flights, *flight)
 		}
 
-		// 3. Adiciona na lista de e-mails urgentes (até 5)
-		if len(result.UrgentEmails) < 5 {
+		// 3. Adiciona na lista de e-mails urgentes/recentes
+		if len(result.UrgentEmails) < maxUrgent {
 			msgDate, _ := time.Parse(time.RFC1123Z, dateStr)
 			if msgDate.IsZero() {
 				msgDate = time.Now().UTC()
 			}
+			isUnread := false
+			for _, lbl := range d.labelIDs {
+				if lbl == "UNREAD" {
+					isUnread = true
+					break
+				}
+			}
 			result.UrgentEmails = append(result.UrgentEmails, domain.UrgentEmail{
-				MessageID: detail.ID,
+				MessageID: d.id,
 				From:      from,
 				Subject:   subject,
-				Snippet:   detail.Snippet,
+				Snippet:   d.snippet,
 				Date:      msgDate,
+				IsUnread:  isUnread,
 			})
 		}
 	}
 
 	_ = s.repo.UpdateLastScanned(ctx, userID, "", result.ScannedAt)
 	return result, nil
+}
+
+// ScanEmails busca e faz a triagem padrão da Caixa Principal.
+func (s *GmailService) ScanEmails(ctx context.Context, userID string) (*domain.GmailScanResult, error) {
+	return s.ScanEmailsWithOptions(ctx, userID, ScanOptions{Folder: "primary"})
 }
 
 // CreateDraft cria um rascunho de e-mail na conta do Gmail do usuário.
@@ -257,6 +460,26 @@ func (s *GmailService) CreateDraft(ctx context.Context, userID, to, subject, bod
 	if err != nil {
 		return "", err
 	}
+
+	if resp.StatusCode == http.StatusUnauthorized {
+		resp.Body.Close()
+		refreshedToken, refErr := s.forceRefreshToken(ctx, userID)
+		if refErr != nil {
+			_ = s.repo.UpdateStatus(ctx, userID, domain.GmailStatusReauthRequired)
+			return "", domain.ErrGmailAuthFailed
+		}
+		accessToken = refreshedToken
+		req, err = http.NewRequestWithContext(ctx, http.MethodPost, draftURL, bytes.NewReader(reqBytes))
+		if err != nil {
+			return "", err
+		}
+		req.Header.Set("Authorization", "Bearer "+accessToken)
+		req.Header.Set("Content-Type", "application/json")
+		resp, err = s.httpClient.Do(req)
+		if err != nil {
+			return "", err
+		}
+	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
@@ -269,119 +492,4 @@ func (s *GmailService) CreateDraft(ctx context.Context, userID, to, subject, bod
 	}
 	_ = json.NewDecoder(resp.Body).Decode(&draftResp)
 	return draftResp.ID, nil
-}
-
-func extractHeaders(headers []struct {
-	Name  string `json:"name"`
-	Value string `json:"value"`
-}) (subject, from, date string) {
-	for _, h := range headers {
-		switch strings.ToLower(h.Name) {
-		case "subject":
-			subject = h.Value
-		case "from":
-			from = h.Value
-		case "date":
-			date = h.Value
-		}
-	}
-	return
-}
-
-var (
-	billKeywordRegex = regexp.MustCompile(`(?i)(fatura|boleto|vencimento|mensalidade|conta|pagamento|fechamento)`)
-	amountRegex      = regexp.MustCompile(`(?i)(?:R\$\s*|valor:\s*)([0-9]{1,3}(?:\.[0-9]{3})*,[0-9]{2})`)
-	barcodeRegex     = regexp.MustCompile(`([0-9]{5}[\.\s]?[0-9]{5}[\.\s]?[0-9]{5}[\.\s]?[0-9]{6}[\.\s]?[0-9]{5}[\.\s]?[0-9]{6}[\.\s]?[0-9][\.\s]?[0-9]{14}|[0-9]{47,48}|[0-9]{44})`)
-	dueDateRegex     = regexp.MustCompile(`(?i)(?:vencimento|vence em|vencendo em|data de vencimento)[:\s]*([0-9]{1,2}[/\.-][0-9]{1,2}[/\.-][0-9]{2,4})`)
-
-	flightKeywordRegex = regexp.MustCompile(`(?i)(voo|reserva de voo|localizador|e-ticket|confirmação de voo|embarque|latam|gol|azul|boarding pass)`)
-	bookingCodeRegex   = regexp.MustCompile(`(?i)(?:localizador|código da reserva|reserva|booking code)[:\s]*([A-Z0-9]{6})`)
-	airportRegex       = regexp.MustCompile(`\b(GRU|CGH|SDU|GIG|BSB|CNF|SSA|REC|POA|CWB|FOR|FLN|VCP)\b`)
-)
-
-func parseBill(msgID, subject, from, text string) *domain.ScannedBill {
-	if !billKeywordRegex.MatchString(text) {
-		return nil
-	}
-
-	bill := &domain.ScannedBill{
-		MessageID: msgID,
-		Subject:   subject,
-	}
-
-	// Beneficiário
-	if from != "" {
-		bill.Beneficiary = strings.Split(from, "<")[0]
-		bill.Beneficiary = strings.TrimSpace(bill.Beneficiary)
-	}
-
-	// Valor R$
-	if m := amountRegex.FindStringSubmatch(text); len(m) > 1 {
-		rawVal := strings.ReplaceAll(m[1], ".", "")
-		rawVal = strings.ReplaceAll(rawVal, ",", ".")
-		if val, err := strconv.ParseFloat(rawVal, 64); err == nil {
-			bill.AmountBRL = val
-		}
-	}
-
-	// Linha digitável / Código de barras
-	if m := barcodeRegex.FindStringSubmatch(text); len(m) > 1 {
-		bill.Barcode = strings.ReplaceAll(strings.ReplaceAll(m[1], " ", ""), ".", "")
-	}
-
-	// Data de vencimento
-	if m := dueDateRegex.FindStringSubmatch(text); len(m) > 1 {
-		dateStr := strings.ReplaceAll(m[1], "-", "/")
-		dateStr = strings.ReplaceAll(dateStr, ".", "/")
-		if t, err := time.Parse("02/01/2006", dateStr); err == nil {
-			bill.DueDate = &t
-		}
-	}
-
-	return bill
-}
-
-func parseFlight(msgID, subject, from, text string) *domain.ScannedFlight {
-	if !flightKeywordRegex.MatchString(text) {
-		return nil
-	}
-
-	flight := &domain.ScannedFlight{
-		MessageID: msgID,
-		Subject:   subject,
-	}
-
-	// Localizador
-	if m := bookingCodeRegex.FindStringSubmatch(text); len(m) > 1 {
-		flight.BookingCode = strings.ToUpper(m[1])
-	} else {
-		// Fallback se encontrar qualquer código isolado de 6 caracteres alfanuméricos
-		reExact := regexp.MustCompile(`\b([A-Z0-9]{6})\b`)
-		if m := reExact.FindStringSubmatch(text); len(m) > 1 {
-			flight.BookingCode = m[1]
-		}
-	}
-
-	// Aeroportos de origem e destino
-	airports := airportRegex.FindAllString(text, -1)
-	if len(airports) >= 2 {
-		flight.Origin = airports[0]
-		flight.Destination = airports[1]
-	} else if len(airports) == 1 {
-		flight.Origin = airports[0]
-	}
-
-	// Companhia Aérea
-	lower := strings.ToLower(text)
-	if strings.Contains(lower, "latam") {
-		flight.Airline = "LATAM Airlines"
-	} else if strings.Contains(lower, "gol") {
-		flight.Airline = "GOL Linhas Aéreas"
-	} else if strings.Contains(lower, "azul") {
-		flight.Airline = "Azul Linhas Aéreas"
-	} else {
-		flight.Airline = "Companhia Aérea"
-	}
-
-	return flight
 }
