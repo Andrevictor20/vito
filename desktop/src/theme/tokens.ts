@@ -1,0 +1,42 @@
+export const tokens = {
+  colors: {
+    background: '#0B0D10',
+    surface: '#14171C',
+    surfaceElevated: '#1C2026',
+    surfaceOverlay: '#262B33',
+    surfaceHighest: '#313742',
+    hairline: 'rgba(255, 255, 255, 0.08)',
+    hairlineStrong: 'rgba(255, 255, 255, 0.16)',
+    text: {
+      primary: '#F1F5F9',
+      secondary: '#94A3B8',
+      muted: '#64748B',
+      inverse: '#0B0D10',
+    },
+    brand: {
+      primary: '#6366F1',
+      primaryHover: '#4F46E5',
+      primaryLight: '#818CF8',
+      primaryContainer: 'rgba(99, 102, 241, 0.15)',
+      emerald: '#10B981',
+      emeraldHover: '#059669',
+      emeraldLight: '#34D399',
+      emeraldContainer: 'rgba(16, 185, 129, 0.15)',
+      rose: '#F43F5E',
+      roseContainer: 'rgba(244, 63, 94, 0.15)',
+      amber: '#F59E0B',
+      amberContainer: 'rgba(245, 158, 11, 0.15)',
+    },
+  },
+  typography: {
+    fontSans: 'Inter, system-ui, -apple-system, sans-serif',
+    fontMono: 'JetBrains Mono, Menlo, monospace',
+  },
+  radius: {
+    sm: '6px',
+    md: '10px',
+    lg: '14px',
+    xl: '20px',
+    full: '9999px',
+  },
+};
