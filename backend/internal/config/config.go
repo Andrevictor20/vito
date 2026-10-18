@@ -144,7 +144,7 @@ func Load() *Config {
 		ShortIoAPIKey:      shortIoKey,
 		ShortIoDomain:      shortIoDomain,
 		TurnstileSecretKey: os.Getenv("CLOUDFLARE_TURNSTILE_SECRET_KEY"),
-		PublicBaseURL:      os.Getenv("PUBLIC_BASE_URL"),
+		PublicBaseURL:      getEnvOrDefault("PUBLIC_BASE_URL", "https://vito.rasppi.cloud"),
 		CorsAllowedOrigins: os.Getenv("CORS_ALLOWED_ORIGINS"),
 		SMTPHost:           os.Getenv("SMTP_HOST"),
 		SMTPPort:           smtpPort,
@@ -152,7 +152,7 @@ func Load() *Config {
 		SMTPPassword:       smtpPass,
 		SMTPFrom:           smtpFrom,
 		EvolutionAPIURL:    getEnvOrDefault("EVOLUTION_API_URL", "http://127.0.0.1:8085"),
-		EvolutionAPIKey:    os.Getenv("EVOLUTION_API_KEY"),
+		EvolutionAPIKey:    getEnvOrDefault("EVOLUTION_API_KEY", "vito_evo_key_default_change_in_prod"),
 	}
 }
 

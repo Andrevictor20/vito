@@ -41,7 +41,7 @@ services:
       - SMTP_PASS=${SMTP_PASS:-}
       - SMTP_FROM=${SMTP_FROM:-}
       - EVOLUTION_API_URL=${EVOLUTION_API_URL:-http://evolution-api:8085}
-      - EVOLUTION_API_KEY=${EVOLUTION_API_KEY:-}
+      - EVOLUTION_API_KEY=${EVOLUTION_API_KEY:-vito_evo_key_default_change_in_prod}
     volumes:
       - vito_data:/app/data
     networks:

@@ -92,7 +92,7 @@ func (c *DefaultEvolutionClient) CreateInstance(ctx context.Context, instanceNam
 }
 
 func (c *DefaultEvolutionClient) SetWebhook(ctx context.Context, instanceName, webhookURL string) error {
-	payload := map[string]interface{}{
+	wrappedPayload := map[string]interface{}{
 		"webhook": map[string]interface{}{
 			"enabled":  true,
 			"url":      webhookURL,
@@ -105,17 +105,35 @@ func (c *DefaultEvolutionClient) SetWebhook(ctx context.Context, instanceName, w
 	}
 
 	path := fmt.Sprintf("/webhook/set/%s", instanceName)
-	resp, err := c.doRequest(ctx, http.MethodPost, path, payload)
-	if err != nil {
-		return err
+	resp, err := c.doRequest(ctx, http.MethodPost, path, wrappedPayload)
+	if err == nil {
+		defer resp.Body.Close()
+		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+			return nil
+		}
 	}
-	defer resp.Body.Close()
 
-	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+	// Fallback para formato flat (utilizado em algumas distribuições da Evolution API v2)
+	flatPayload := map[string]interface{}{
+		"enabled":         true,
+		"url":             webhookURL,
+		"webhookByEvents": false,
+		"events": []string{
+			"MESSAGES_UPSERT",
+			"CONNECTION_UPDATE",
+		},
+	}
+	respFlat, errFlat := c.doRequest(ctx, http.MethodPost, path, flatPayload)
+	if errFlat != nil {
+		return errFlat
+	}
+	defer respFlat.Body.Close()
+
+	if respFlat.StatusCode >= 200 && respFlat.StatusCode < 300 {
 		return nil
 	}
-	bodyBytes, _ := io.ReadAll(resp.Body)
-	return fmt.Errorf("evolution api set webhook falhou (status %d): %s", resp.StatusCode, string(bodyBytes))
+	bodyBytes, _ := io.ReadAll(respFlat.Body)
+	return fmt.Errorf("evolution api set webhook falhou (status %d): %s", respFlat.StatusCode, string(bodyBytes))
 }
 
 func (c *DefaultEvolutionClient) GetPairingCode(ctx context.Context, instanceName, phone string) (string, error) {
