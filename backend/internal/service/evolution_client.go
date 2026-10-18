@@ -33,6 +33,7 @@ type EvolutionAPIClient interface {
 	SendTextWithQuoted(ctx context.Context, instanceName, to, text, quotedID string) error
 	GetMediaBase64(ctx context.Context, instanceName string, messagePayload interface{}) (string, error)
 	FindContacts(ctx context.Context, instanceName string) ([]WhatsAppContact, error)
+	SendReaction(ctx context.Context, instanceName, remoteJid, messageID, reaction string) error
 }
 
 // DefaultEvolutionClient implementa EvolutionAPIClient via chamadas REST para a Evolution API.
@@ -371,4 +372,32 @@ func (c *DefaultEvolutionClient) FindContacts(ctx context.Context, instanceName 
 	}
 	return contacts, nil
 }
+
+// SendReaction envia uma reação (emoji) a uma mensagem específica no WhatsApp via Evolution API v2.
+func (c *DefaultEvolutionClient) SendReaction(ctx context.Context, instanceName, remoteJid, messageID, reaction string) error {
+	if instanceName == "" || remoteJid == "" || messageID == "" || reaction == "" {
+		return nil
+	}
+	path := fmt.Sprintf("/message/sendReaction/%s", instanceName)
+	payload := map[string]interface{}{
+		"key": map[string]interface{}{
+			"remoteJid": remoteJid,
+			"fromMe":    false,
+			"id":        messageID,
+		},
+		"reaction": reaction,
+	}
+	resp, err := c.doRequest(ctx, http.MethodPost, path, payload)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		return nil
+	}
+	bodyBytes, _ := io.ReadAll(resp.Body)
+	return fmt.Errorf("evolution api sendReaction falhou (status %d): %s", resp.StatusCode, string(bodyBytes))
+}
+
 

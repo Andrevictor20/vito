@@ -26,6 +26,12 @@ type mockEvolutionClient struct {
 		To       string
 		Text     string
 	}
+	sentReactions []struct {
+		Instance  string
+		RemoteJid string
+		MessageID string
+		Reaction  string
+	}
 	mockPairingCode string
 	mockState       string
 }
@@ -86,6 +92,21 @@ func (m *mockEvolutionClient) GetMediaBase64(ctx context.Context, instanceName s
 
 func (m *mockEvolutionClient) FindContacts(ctx context.Context, instanceName string) ([]service.WhatsAppContact, error) {
 	return nil, nil
+}
+
+func (m *mockEvolutionClient) SendReaction(ctx context.Context, instanceName, remoteJid, messageID, reaction string) error {
+	m.sentReactions = append(m.sentReactions, struct {
+		Instance  string
+		RemoteJid string
+		MessageID string
+		Reaction  string
+	}{
+		Instance:  instanceName,
+		RemoteJid: remoteJid,
+		MessageID: messageID,
+		Reaction:  reaction,
+	})
+	return nil
 }
 
 type mockWhatsAppAIGateway struct{}
@@ -496,12 +517,12 @@ func TestWhatsAppService_Webhook_DispatchesPushNotificationOnReply(t *testing.T)
 		t.Fatalf("erro no webhook: %v", err)
 	}
 
-	// 1. Deve ter respondido no WhatsApp com o prefixo 🎩 Vito:
+	// 1. Deve ter respondido no WhatsApp com o prefixo 💼 Vito:
 	if len(mockClient.sentMessages) != 1 {
 		t.Fatalf("esperava 1 mensagem enviada no WhatsApp, obteve %d", len(mockClient.sentMessages))
 	}
-	if !strings.HasPrefix(mockClient.sentMessages[0].Text, "🎩 Vito:") {
-		t.Errorf("resposta no WhatsApp deveria ter o prefixo '🎩 Vito:', obteve: %s", mockClient.sentMessages[0].Text)
+	if !strings.HasPrefix(mockClient.sentMessages[0].Text, "💼 Vito:") {
+		t.Errorf("resposta no WhatsApp deveria ter o prefixo '💼 Vito:', obteve: %s", mockClient.sentMessages[0].Text)
 	}
 
 	// 2. Deve ter despachado Push Notification para o celular do usuário
@@ -595,3 +616,83 @@ func TestWhatsAppService_Webhook_UserFromMeInPrivateChatWithFriend_Ignored(t *te
 		t.Fatalf("Vito NÃO deveria interferir na conversa privada do usuário com um amigo")
 	}
 }
+
+func TestWhatsAppService_Webhook_SendsReadReactionAndRetainsContext(t *testing.T) {
+	svc, waRepo, mockClient := setupWhatsAppServiceTest(t)
+	ctx := context.Background()
+
+	_ = waRepo.Upsert(ctx, &domain.WhatsAppIntegration{
+		ID:           "wa-1",
+		UserID:       "user-100",
+		InstanceName: "vito_user_100",
+		Phone:        "5511988887777",
+		Status:       domain.WhatsAppStatusConnected,
+	})
+
+	// Turno 1: Usuário pergunta sobre emails
+	payload1 := map[string]interface{}{
+		"event":    "messages.upsert",
+		"instance": "vito_user_100",
+		"data": map[string]interface{}{
+			"key": map[string]interface{}{
+				"remoteJid": "5511988887777@s.whatsapp.net",
+				"fromMe":    true,
+				"id":        "MSG-001",
+			},
+			"message": map[string]interface{}{
+				"conversation": "Quais são meus emails?",
+			},
+		},
+	}
+	p1Bytes, _ := json.Marshal(payload1)
+	if err := svc.HandleWebhook(ctx, "messages.upsert", p1Bytes); err != nil {
+		t.Fatalf("erro turno 1: %v", err)
+	}
+
+	// Verifica se a reação 👀 foi disparada para a mensagem MSG-001
+	if len(mockClient.sentReactions) != 1 {
+		t.Fatalf("esperava 1 reação enviada, obteve %d", len(mockClient.sentReactions))
+	}
+	if mockClient.sentReactions[0].Reaction != "👀" || mockClient.sentReactions[0].MessageID != "MSG-001" {
+		t.Errorf("reação visual incorreta: %+v", mockClient.sentReactions[0])
+	}
+
+	// Turno 2: Usuário complementa com resposta contextual
+	payload2 := map[string]interface{}{
+		"event":    "messages.upsert",
+		"instance": "vito_user_100",
+		"data": map[string]interface{}{
+			"key": map[string]interface{}{
+				"remoteJid": "5511988887777@s.whatsapp.net",
+				"fromMe":    true,
+				"id":        "MSG-002",
+			},
+			"message": map[string]interface{}{
+				"conversation": "ok me diga aqui no chat",
+			},
+		},
+	}
+	p2Bytes, _ := json.Marshal(payload2)
+	if err := svc.HandleWebhook(ctx, "messages.upsert", p2Bytes); err != nil {
+		t.Fatalf("erro turno 2: %v", err)
+	}
+
+	// Verifica se enviou reação para o segundo turno também
+	if len(mockClient.sentReactions) != 2 {
+		t.Fatalf("esperava 2 reações enviadas, obteve %d", len(mockClient.sentReactions))
+	}
+	if mockClient.sentReactions[1].MessageID != "MSG-002" || mockClient.sentReactions[1].Reaction != "👀" {
+		t.Errorf("reação do turno 2 incorreta: %+v", mockClient.sentReactions[1])
+	}
+
+	// Verifica se ambas respostas foram enviadas com a identidade 💼 Vito:
+	if len(mockClient.sentMessages) != 2 {
+		t.Fatalf("esperava 2 respostas enviadas, obteve %d", len(mockClient.sentMessages))
+	}
+	for i, msg := range mockClient.sentMessages {
+		if !strings.HasPrefix(msg.Text, "💼 Vito:") {
+			t.Errorf("resposta %d sem prefixo '💼 Vito:': %s", i, msg.Text)
+		}
+	}
+}
+

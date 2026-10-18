@@ -11,6 +11,7 @@ import {
   ChevronRight,
   Command,
 } from 'lucide-react';
+import { VitoMascot } from '../common/VitoMascot';
 
 export type DesktopTab = 'calendar' | 'tasks' | 'triggers' | 'meetings' | 'profile';
 
@@ -50,25 +51,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="h-16 px-4 flex items-center justify-between border-b border-white/5">
           {!collapsed ? (
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-[#1C2026] border border-white/10 flex items-center justify-center text-base shadow-glow-primary">
-                🎩
-              </div>
+              <VitoMascot size={32} />
               <div className="flex flex-col">
-                <span className="text-sm font-bold text-white tracking-tight flex items-center gap-1.5">
-                  Vito
-                  <span className="text-[9px] px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-300 font-semibold border border-indigo-500/30">
-                    Desk
-                  </span>
+                <span className="text-sm font-bold text-white tracking-tight flex items-center gap-1.5 lowercase">
+                  vito
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#10B981] animate-pulse" />
                 </span>
-                <span className="text-[10px] text-slate-400 font-mono flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-[10px] text-zinc-400 font-mono">
                   Online
                 </span>
               </div>
             </div>
           ) : (
-            <div className="w-8 h-8 mx-auto rounded-xl bg-[#1C2026] border border-white/10 flex items-center justify-center text-base shadow-glow-primary">
-              🎩
+            <div className="mx-auto flex items-center justify-center">
+              <VitoMascot size={28} />
             </div>
           )}
 

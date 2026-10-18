@@ -128,6 +128,9 @@ services:
   # Serviço Web Desktop (porta 8190 no Raspberry Pi 4)
   desktop:
     image: ghcr.io/andrevictor20/vito-desktop:latest
+    build:
+      context: ./desktop
+      dockerfile: Dockerfile
     container_name: vito-desktop
     restart: unless-stopped
     ports:

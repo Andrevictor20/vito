@@ -47,6 +47,12 @@ jobs:
           cd mobile
           npx tsc --noEmit
 
+      - name: Install Desktop Dependencies & Build
+        run: |
+          cd desktop
+          npm ci
+          npm run build
+
   docker-publish:
     name: Build & Push Multi-Arch Docker Image
     needs: test
@@ -94,6 +100,27 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Extract Desktop Docker metadata
+        id: meta-desktop
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/vito-desktop
+          tags: |
+            type=raw,value=latest
+            type=sha,format=short
+
+      - name: Build and Push Desktop Multi-Arch Image (linux/amd64, linux/arm64)
+        uses: docker/build-push-action@v6
+        with:
+          context: ./desktop
+          file: ./desktop/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta-desktop.outputs.tags }}
+          labels: ${{ steps.meta-desktop.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
   # §11.3: deploy automático no Raspberry Pi via self-hosted runner (arm64).
 # Compose único (sem override): `docker compose pull/up` direto.
   # Pré-requisito no Pi (uma vez):
@@ -117,10 +144,10 @@ jobs:
           git fetch origin main
           git reset --hard origin/main
           # Encerra contêineres presos com timeout curto para liberar o dockerd imediatamente
-          docker stop -t 5 vito-evolution-api vito-backend || docker kill vito-evolution-api vito-backend || true
-          docker compose pull --quiet backend evolution-api
+          docker stop -t 5 vito-evolution-api vito-backend vito-desktop || docker kill vito-evolution-api vito-backend vito-desktop || true
+          docker compose pull --quiet backend evolution-api desktop || docker compose build desktop
           docker compose run -T --rm --no-deps --user 0:0 --entrypoint sh backend -c "mkdir -p /app/data /app/data/backups /app/backups && chown -R 10001:10001 /app/data /app/backups && chmod 0700 /app/data /app/backups" || true
-          docker compose up -d --force-recreate --remove-orphans evolution-postgres backend evolution-api
+          docker compose up -d --force-recreate --remove-orphans evolution-postgres backend evolution-api desktop
           docker image prune -f
 
       - name: Verify Backend & Evolution API Healthcheck
@@ -138,6 +165,14 @@ jobs:
           for i in $(seq 1 45); do
             if wget -qO- http://127.0.0.1:8085 > /dev/null 2>&1 || curl -sf http://127.0.0.1:8085 > /dev/null 2>&1; then
               echo "✅ Evolution API OK on attempt $i"
+              break
+            fi
+            sleep 2
+          done
+          echo "Verificando Desktop Web Vito (porta 8190)..."
+          for i in $(seq 1 15); do
+            if wget -qO- http://localhost:8190/ > /dev/null 2>&1 || curl -sf http://localhost:8190/ > /dev/null 2>&1; then
+              echo "✅ Desktop Web Vito OK on attempt $i"
               exit 0
             fi
             sleep 2
@@ -146,6 +181,7 @@ jobs:
           docker ps -a
           docker logs --tail 80 vito-backend || true
           docker logs --tail 80 vito-evolution-api || true
+          docker logs --tail 80 vito-desktop || true
           docker logs --tail 80 vito-evolution-postgres || true
           exit 1
 

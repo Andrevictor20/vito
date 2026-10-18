@@ -1,6 +1,6 @@
 import { User, AuthTokens, CalendarEvent, Todo, Trigger, WhatsAppStatus, GmailStatus, SessionDevice } from '../types';
 
-const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || 'https://vito.rasppi.cloud';
+const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || '';
 
 class ApiService {
   private accessToken: string | null = null;
@@ -8,11 +8,12 @@ class ApiService {
   private refreshSubscribers: Array<(token: string) => void> = [];
 
   constructor() {
-    this.accessToken = sessionStorage.getItem('vito_access_token');
+    this.accessToken = localStorage.getItem('vito_access_token') || sessionStorage.getItem('vito_access_token');
   }
 
   public setTokens(accessToken: string, refreshToken?: string) {
     this.accessToken = accessToken;
+    localStorage.setItem('vito_access_token', accessToken);
     sessionStorage.setItem('vito_access_token', accessToken);
     if (refreshToken) {
       localStorage.setItem('vito_refresh_token', refreshToken);
@@ -21,6 +22,7 @@ class ApiService {
 
   public clearTokens() {
     this.accessToken = null;
+    localStorage.removeItem('vito_access_token');
     sessionStorage.removeItem('vito_access_token');
     localStorage.removeItem('vito_refresh_token');
   }

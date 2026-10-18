@@ -59,6 +59,9 @@ func (m *mockEvolutionClientForAuthHandler) GetMediaBase64(ctx context.Context, 
 func (m *mockEvolutionClientForAuthHandler) FindContacts(ctx context.Context, instanceName string) ([]service.WhatsAppContact, error) {
 	return nil, nil
 }
+func (m *mockEvolutionClientForAuthHandler) SendReaction(ctx context.Context, instanceName, remoteJid, messageID, reaction string) error {
+	return nil
+}
 
 func setupWhatsAppAuthHandlerTest(t *testing.T) (*handler.WhatsAppAuthHandler, *mockEvolutionClientForAuthHandler) {
 	tmpDir := t.TempDir()

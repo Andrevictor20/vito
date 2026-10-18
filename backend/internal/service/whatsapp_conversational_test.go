@@ -191,6 +191,10 @@ func (m *mockExtendedEvolutionClient) FindContacts(ctx context.Context, instance
 	return m.mockContacts, nil
 }
 
+func (m *mockExtendedEvolutionClient) SendReaction(ctx context.Context, instanceName, remoteJid, messageID, reaction string) error {
+	return nil
+}
+
 type simpleTranscriber struct {
 	transcribedText string
 	called          bool

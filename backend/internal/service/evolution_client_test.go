@@ -148,3 +148,36 @@ func TestEvolutionClient_SetSettings(t *testing.T) {
 		t.Fatalf("esperava que POST /settings/set/test_inst fosse chamado com syncFullHistory=false")
 	}
 }
+
+func TestEvolutionClient_SendReaction(t *testing.T) {
+	var reactionCalled bool
+	var capturedPayload map[string]interface{}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost && r.URL.Path == "/message/sendReaction/test_inst" {
+			reactionCalled = true
+			_ = json.NewDecoder(r.Body).Decode(&capturedPayload)
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"status":"SUCCESS"}`))
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer server.Close()
+
+	client := service.NewDefaultEvolutionClient(server.URL, "test_api_key", server.Client())
+	err := client.SendReaction(context.Background(), "test_inst", "559884417165@s.whatsapp.net", "MSG-12345", "👀")
+	if err != nil {
+		t.Fatalf("esperava sucesso no SendReaction, obteve: %v", err)
+	}
+	if !reactionCalled {
+		t.Fatalf("esperava que POST /message/sendReaction/test_inst fosse chamado")
+	}
+	if capturedPayload["reaction"] != "👀" {
+		t.Fatalf("esperava reaction 👀, obteve: %v", capturedPayload["reaction"])
+	}
+	key, ok := capturedPayload["key"].(map[string]interface{})
+	if !ok || key["id"] != "MSG-12345" || key["remoteJid"] != "559884417165@s.whatsapp.net" {
+		t.Fatalf("key inválida no payload: %+v", capturedPayload["key"])
+	}
+}

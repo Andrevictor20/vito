@@ -40,6 +40,7 @@ type WhatsAppService struct {
 	notifSender      NotificationSender
 	audioTranscriber ai.AudioTranscriber
 	userRepo         domain.UserRepository
+	memory           *WhatsAppConversationMemory
 }
 
 // NewWhatsAppService instancia o serviço do WhatsApp.
@@ -54,6 +55,7 @@ func NewWhatsAppService(
 		repo:         repo,
 		client:       client,
 		assistantSvc: assistantSvc,
+		memory:       NewWhatsAppConversationMemory(),
 	}
 }
 
@@ -356,7 +358,7 @@ func (s *WhatsAppService) HandleWebhook(ctx context.Context, eventType string, p
 		}
 
 		// Anti-loop: se a mensagem começou com a assinatura do Vito, é uma resposta gerada pelo próprio bot
-		if strings.HasPrefix(rawText, "🎩 Vito:") || strings.HasPrefix(rawText, "Vito diz:") || strings.HasPrefix(rawText, "Vito:") {
+		if strings.HasPrefix(rawText, "💼 Vito:") || strings.HasPrefix(rawText, "🎩 Vito:") || strings.HasPrefix(rawText, "Vito diz:") || strings.HasPrefix(rawText, "Vito:") {
 			return nil
 		}
 
@@ -404,20 +406,37 @@ func (s *WhatsAppService) HandleWebhook(ctx context.Context, eventType string, p
 			return nil
 		}
 
+		// Feedback visual imediato: reagir com olhinho 👀 para confirmar leitura
+		if msgData.Key.ID != "" && msgData.Key.RemoteJid != "" {
+			_ = s.client.SendReaction(ctx, base.Instance, msgData.Key.RemoteJid, msgData.Key.ID, "👀")
+		}
+
+		// Contexto conversacional multi-turn por conversa no WhatsApp
+		if s.memory == nil {
+			s.memory = NewWhatsAppConversationMemory()
+		}
+		convKey := fmt.Sprintf("%s:%s", base.Instance, msgData.Key.RemoteJid)
+		history := s.memory.GetHistory(convKey)
+
 		resp, err := s.assistantSvc.Process(ctx, integration.UserID, ai.UserInput{
-			Text: rawText,
+			Text:                rawText,
+			ConversationHistory: history,
 		})
 		if err != nil {
 			log.Printf("⚠️ [WhatsAppService] Erro ao processar mensagem do WhatsApp: %v", err)
 			return nil
 		}
 
+		s.memory.AddMessage(convKey, "user", rawText)
+
 		replyText := resp.Reply
 		if replyText == "" {
 			replyText = resp.Message
 		}
 		if replyText != "" {
-			formattedReply := fmt.Sprintf("🎩 Vito:\n\n%s", replyText)
+			s.memory.AddMessage(convKey, "vito", replyText)
+
+			formattedReply := fmt.Sprintf("💼 Vito:\n\n%s", replyText)
 			if isGroup && msgData.Key.ID != "" {
 				_ = s.client.SendTextWithQuoted(ctx, base.Instance, msgData.Key.RemoteJid, formattedReply, msgData.Key.ID)
 			} else {
