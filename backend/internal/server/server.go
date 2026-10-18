@@ -294,6 +294,8 @@ func (s *Server) registerRoutes() {
 					protected.Route("/triggers", func(tr chi.Router) {
 						tr.Post("/", s.triggerHandler.CreateTrigger)
 						tr.Get("/", s.triggerHandler.ListTriggers)
+						tr.Get("/templates", s.triggerHandler.ListTemplates)
+						tr.Post("/templates/{id}/activate", s.triggerHandler.ActivateTemplate)
 						tr.Post("/parse", s.triggerHandler.ParsePrompt)
 						tr.Route("/{id}", func(r chi.Router) {
 							r.Get("/", s.triggerHandler.GetTrigger)

@@ -116,6 +116,34 @@ export const useTriggers = (userId?: string) => {
     return created;
   }, [queryClient, setTriggers, userId]);
 
+  const handleActivateTemplate = useCallback(
+    async (templateId: string, overrides?: Partial<CreateTriggerInput>): Promise<Trigger> => {
+      const created = await api.activateTriggerTemplate(templateId, overrides);
+      setTriggers((prev) => [created, ...prev]);
+
+      // Dispara a verificação imediata para já trazer dados reais
+      api.runTrigger(created.id)
+        .then((log) => {
+          setTriggers((prev) =>
+            prev.map((t) =>
+              t.id === created.id
+                ? { ...t, current_value: log.message, last_run_status: 'success' }
+                : t
+            )
+          );
+        })
+        .catch((runErr) => {
+          console.warn('[useTriggers] Pesquisa inicial do template ativado:', runErr);
+        })
+        .finally(() => {
+          queryClient.invalidateQueries({ queryKey: queryKeys.triggers(userId) }).catch(() => {});
+        });
+
+      return created;
+    },
+    [queryClient, setTriggers, userId]
+  );
+
   const handleToggleTrigger = useCallback(async (id: string): Promise<void> => {
     // Optimistic UI update
     setTriggers((prev) =>
@@ -216,6 +244,7 @@ export const useTriggers = (userId?: string) => {
     loadTriggers,
     onRefresh,
     handleCreateTrigger,
+    handleActivateTemplate,
     handleToggleTrigger,
     handleDeleteTrigger,
     handleUpdateTrigger,

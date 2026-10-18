@@ -387,3 +387,54 @@ func (h *TriggerHandler) ParsePrompt(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(res)
 }
+
+// ListTemplates retorna o catálogo de templates de vigílias disponíveis por área.
+func (h *TriggerHandler) ListTemplates(w http.ResponseWriter, r *http.Request) {
+	templates := h.triggerSvc.ListTemplates()
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"data":      templates,
+		"templates": templates,
+	})
+}
+
+// ActivateTemplate ativa um template pronto para o usuário autenticado.
+func (h *TriggerHandler) ActivateTemplate(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok || userID == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "não autorizado"})
+		return
+	}
+
+	templateID := chi.URLParam(r, "id")
+	if templateID == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "id do template obrigatório"})
+		return
+	}
+
+	var overrides domain.ActivateTemplateInput
+	if r.Body != nil {
+		_ = json.NewDecoder(r.Body).Decode(&overrides)
+	}
+
+	trig, err := h.triggerSvc.ActivateTemplate(r.Context(), userID, templateID, &overrides)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		if errors.Is(err, service.ErrTriggerTemplateNotFound) {
+			w.WriteHeader(http.StatusNotFound)
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": "template não encontrado"})
+			return
+		}
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	_ = json.NewEncoder(w).Encode(trig)
+}

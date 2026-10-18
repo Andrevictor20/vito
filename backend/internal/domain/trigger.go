@@ -29,6 +29,7 @@ const (
 	CategoryEventsSports  TriggerCategory = "events_sports"
 	CategoryEntertainment TriggerCategory = "entertainment"
 	CategoryWeather       TriggerCategory = "weather"
+	CategoryPublicExams   TriggerCategory = "public_exams"
 	CategoryCustom        TriggerCategory = "custom"
 )
 
@@ -174,4 +175,29 @@ type TriggerRepository interface {
 	ListLogsByTrigger(triggerID string) ([]TriggerLog, error)
 	DeleteLog(logID, userID string) error
 	ClearLogs(triggerID, userID string) error
+}
+
+// TriggerTemplate define um modelo pronto de vigília no catálogo "Explore por Área".
+type TriggerTemplate struct {
+	ID             string               `json:"id"`
+	Title          string               `json:"title"`
+	Description    string               `json:"description"`
+	Category       TriggerCategory      `json:"category"`
+	Area           string               `json:"area"` // "carreiras", "concursos", "imoveis", "financas", "viagens", "trabalho", "estudos"
+	Icon           string               `json:"icon"` // "work", "gavel", "home", "flight", "attach-money", "school", "newspaper", etc.
+	Connectors     []string             `json:"connectors"` // ["web", "gmail", "calendar", "profile"]
+	Query          string               `json:"query"`
+	UserIntent     string               `json:"user_intent"`
+	SearchKeywords string               `json:"search_keywords,omitempty"`
+	ConditionType  TriggerConditionType `json:"condition_type"`
+	TargetValue    string               `json:"target_value"`
+	Frequency      TriggerFrequency     `json:"frequency"`
+	ScheduledTime  string               `json:"scheduled_time,omitempty"`
+}
+
+// ActivateTemplateInput permite customizações opcionais ao ativar um template em 1 toque.
+type ActivateTemplateInput struct {
+	Title       string `json:"title,omitempty"`
+	Query       string `json:"query,omitempty"`
+	TargetValue string `json:"target_value,omitempty"`
 }

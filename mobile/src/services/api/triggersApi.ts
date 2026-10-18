@@ -7,6 +7,7 @@ import {
   CreateTriggerInput,
   TriggerTestResult,
   TriggerLog,
+  TriggerTemplate,
 } from '../../types';
 
 export class TriggersApi {
@@ -97,5 +98,20 @@ export class TriggersApi {
 
   async getTriggerLogs(id: string): Promise<TriggerLog[]> {
     return this.client.request<TriggerLog[]>(`/api/v1/triggers/${id}/logs`);
+  }
+
+  async getTemplates(): Promise<TriggerTemplate[]> {
+    const raw = await this.client.request<any>('/api/v1/triggers/templates');
+    return Array.isArray(raw) ? raw : (raw?.templates ?? raw?.data ?? []);
+  }
+
+  async activateTemplate(
+    templateId: string,
+    overrides?: { title?: string; query?: string; target_value?: string }
+  ): Promise<Trigger> {
+    return this.client.request<Trigger>(`/api/v1/triggers/templates/${templateId}/activate`, {
+      method: 'POST',
+      body: overrides ? JSON.stringify(overrides) : undefined,
+    });
   }
 }

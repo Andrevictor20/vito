@@ -221,6 +221,7 @@ export type TriggerCategory =
   | 'real_estate'
   | 'automotive'
   | 'career'
+  | 'public_exams'
   | 'news'
   | 'tech'
   | 'travel'
@@ -229,6 +230,23 @@ export type TriggerCategory =
   | 'entertainment'
   | 'weather'
   | 'custom';
+
+export interface TriggerTemplate {
+  id: string;
+  title: string;
+  description: string;
+  category: TriggerCategory;
+  area: string;
+  icon: string;
+  connectors: string[];
+  query: string;
+  user_intent: string;
+  search_keywords?: string;
+  condition_type: TriggerConditionType;
+  target_value: string;
+  frequency: TriggerFrequency;
+  scheduled_time?: string;
+}
 
 export type TriggerStatus = 'active' | 'paused' | 'triggered';
 
@@ -383,7 +401,17 @@ export const TRIGGER_CATEGORIES: CategoryMeta[] = [
     colorDark: '#A78BFA',
     bgLight: '#F5F3FF',
     bgDark: '#4C1D95',
-    placeholder: 'Ex: Vagas de Tech Lead ou concurso BACEN',
+    placeholder: 'Ex: Vagas de Tech Lead ou dev sênior',
+  },
+  {
+    id: 'public_exams',
+    label: 'Concursos Públicos',
+    icon: 'gavel',
+    colorLight: '#B45309',
+    colorDark: '#FBBF24',
+    bgLight: '#FFFBEB',
+    bgDark: '#78350F',
+    placeholder: 'Ex: Edital Receita Federal, BACEN ou tribunais',
   },
   {
     id: 'news',

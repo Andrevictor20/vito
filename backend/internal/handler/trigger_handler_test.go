@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-chi/chi/v5"
+
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/handler"
 	"github.com/andrevmp/vito/backend/internal/handler/middleware"
@@ -135,5 +137,66 @@ func TestTriggerHandler_CreateReturnsFastWithoutInlineRun(t *testing.T) {
 	}
 	if len(repo.logs) != 0 {
 		t.Errorf("POST não deve criar log síncrono, criou %d", len(repo.logs))
+	}
+}
+
+func TestTriggerHandler_ListTemplates(t *testing.T) {
+	repo := newMockTriggerRepoForHandler()
+	triggerSvc := service.NewTriggerService(repo)
+	h := handler.NewTriggerHandler(triggerSvc)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/triggers/templates", nil)
+	rec := httptest.NewRecorder()
+
+	h.ListTemplates(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("esperava 200, veio %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var res struct {
+		Templates []domain.TriggerTemplate `json:"templates"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&res); err != nil {
+		t.Fatalf("falha ao deserializar resposta: %v", err)
+	}
+	if len(res.Templates) < 8 {
+		t.Errorf("esperava ao menos 8 templates, obteve %d", len(res.Templates))
+	}
+}
+
+func TestTriggerHandler_ActivateTemplate(t *testing.T) {
+	repo := newMockTriggerRepoForHandler()
+	triggerSvc := service.NewTriggerService(repo)
+	h := handler.NewTriggerHandler(triggerSvc)
+
+	// 1. Não autenticado -> 401
+	reqUnauth := httptest.NewRequest(http.MethodPost, "/api/v1/triggers/templates/tmpl-career-jobs/activate", nil)
+	recUnauth := httptest.NewRecorder()
+	h.ActivateTemplate(recUnauth, reqUnauth)
+	if recUnauth.Code != http.StatusUnauthorized {
+		t.Errorf("esperava 401 para requisição sem usuário, veio %d", recUnauth.Code)
+	}
+
+	// 2. Autenticado com Chi context
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/triggers/templates/tmpl-career-jobs/activate", nil)
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("id", "tmpl-career-jobs")
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	req = req.WithContext(context.WithValue(req.Context(), middleware.UserIDKey, "user-test-activate"))
+	rec := httptest.NewRecorder()
+
+	h.ActivateTemplate(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("esperava 201 Created, veio %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var created domain.Trigger
+	if err := json.NewDecoder(rec.Body).Decode(&created); err != nil {
+		t.Fatalf("falha ao deserializar trigger criado: %v", err)
+	}
+	if created.UserID != "user-test-activate" || created.Category != domain.CategoryCareer {
+		t.Errorf("trigger criado incorreto: %+v", created)
 	}
 }

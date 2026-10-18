@@ -41,6 +41,7 @@ import {
   TriggerTestResult,
   TriggerStatus,
   CreateTriggerInput,
+  TriggerTemplate,
   MorningBriefingSettings,
   AutonomyMode,
   AISettings,
@@ -268,6 +269,15 @@ export class ApiService extends ApiClient {
   }
   getTriggerLogs(id: string): Promise<TriggerLog[]> {
     return this.triggersApi.getTriggerLogs(id);
+  }
+  getTriggerTemplates(): Promise<TriggerTemplate[]> {
+    return this.triggersApi.getTemplates();
+  }
+  activateTriggerTemplate(
+    templateId: string,
+    overrides?: { title?: string; query?: string; target_value?: string }
+  ): Promise<Trigger> {
+    return this.triggersApi.activateTemplate(templateId, overrides);
   }
 
   // Pendências
