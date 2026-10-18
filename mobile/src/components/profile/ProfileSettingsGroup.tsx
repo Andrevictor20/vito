@@ -11,6 +11,7 @@ interface ProfileSettingsGroupProps {
   onOpenAISettings?: () => void;
   onOpenContactsSync?: () => void;
   onOpenWhatsAppConnect?: () => void;
+  onOpenGmailConnect?: () => void;
   /** Modo de autonomia atual (para o status da linha). */
   autonomyMode?: AutonomyMode;
   /** Permissão de notificação concedida (null = desconhecido). */
@@ -19,6 +20,8 @@ interface ProfileSettingsGroupProps {
   calendarsActive?: number | null;
   /** Status da integração WhatsApp via Evolution API v2 */
   whatsAppStatus?: 'disconnected' | 'connecting' | 'connected' | null;
+  /** Status da integração Gmail */
+  gmailStatus?: { connected: boolean; email?: string } | null;
 }
 
 const StatusValue: React.FC<{ label: string }> = ({ label }) => {
@@ -41,10 +44,12 @@ export const ProfileSettingsGroup: React.FC<ProfileSettingsGroupProps> = ({
   onOpenAISettings,
   onOpenContactsSync,
   onOpenWhatsAppConnect,
+  onOpenGmailConnect,
   autonomyMode = 'assisted',
   notifActive = null,
   calendarsActive = null,
   whatsAppStatus = null,
+  gmailStatus = null,
 }) => {
   const { colors, isDark, toggleTheme } = useTheme();
   const proactive = autonomyMode === 'proactive';
@@ -225,6 +230,36 @@ export const ProfileSettingsGroup: React.FC<ProfileSettingsGroupProps> = ({
                 ? 'Conectando...'
                 : 'Off'
             }
+          />
+          <RowChevron />
+        </View>
+      </TouchableOpacity>
+
+      {/* Integração Gmail */}
+      <View style={[styles.divider, { backgroundColor: colors.outlineVariant }]} />
+      <TouchableOpacity
+        style={styles.groupItem}
+        onPress={onOpenGmailConnect}
+        activeOpacity={0.7}
+        accessibilityLabel="Abrir integração com Gmail"
+        accessibilityRole="button"
+      >
+        <View style={styles.itemLeft}>
+          <View style={[styles.itemIconBox, { backgroundColor: colors.surfaceContainerHigh }]}>
+            <MaterialIcons name="mail" size={18} color="#EA4335" />
+          </View>
+          <View style={styles.itemTextCol}>
+            <Text style={[styles.itemTitle, { color: colors.onSurface }]}>Gmail</Text>
+            <Text style={[styles.itemSub, { color: colors.onSurfaceVariant }]} numberOfLines={1}>
+              {gmailStatus?.connected
+                ? `Varredura ativa (${gmailStatus.email || 'Conectado'})`
+                : 'Ler boletos e alertas de viagens'}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.itemRight}>
+          <StatusValue
+            label={gmailStatus?.connected ? 'Conectado' : 'Off'}
           />
           <RowChevron />
         </View>

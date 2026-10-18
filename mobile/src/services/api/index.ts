@@ -13,6 +13,21 @@ import { P2PMeetingsApi } from './p2pMeetingsApi';
 import { NotificationsApi } from './notificationsApi';
 import { WhatsAppApi, WhatsAppIntegrationStatus } from './whatsappApi';
 import {
+  GmailApi,
+  GmailStatusResponse,
+  GmailScanResult,
+  GmailDraftInput,
+  GmailDraftResponse,
+  ScannedBill,
+  ScannedFlight,
+  UrgentEmail,
+} from './gmailApi';
+import {
+  WhatsAppAuthApi,
+  RequestWhatsAppOTPResponse,
+  VerifyWhatsAppOTPResponse,
+} from './whatsappAuthApi';
+import {
   User,
   AuthResponse,
   Event,
@@ -60,6 +75,15 @@ export {
   ChatHistoryItem,
   AssistantChatOptions,
   WhatsAppIntegrationStatus,
+  GmailStatusResponse,
+  GmailScanResult,
+  GmailDraftInput,
+  GmailDraftResponse,
+  ScannedBill,
+  ScannedFlight,
+  UrgentEmail,
+  RequestWhatsAppOTPResponse,
+  VerifyWhatsAppOTPResponse,
 };
 
 export class ApiService extends ApiClient {
@@ -74,6 +98,8 @@ export class ApiService extends ApiClient {
   private p2pMeetingsApi = new P2PMeetingsApi(this);
   private notificationsApi = new NotificationsApi(this);
   private whatsappApi = new WhatsAppApi(this);
+  private gmailApi = new GmailApi(this);
+  private whatsappAuthApi = new WhatsAppAuthApi(this);
 
   // Auth & Sessions
   login(email: string, password: string): Promise<AuthResponse> {
@@ -396,6 +422,31 @@ export class ApiService extends ApiClient {
   }
   get whatsapp(): WhatsAppApi {
     return this.whatsappApi;
+  }
+
+  // WhatsApp Auth (Passwordless OTP)
+  requestWhatsAppOTP(phone: string): Promise<RequestWhatsAppOTPResponse> {
+    return this.whatsappAuthApi.requestOTP(phone);
+  }
+  verifyWhatsAppOTP(phone: string, code: string): Promise<VerifyWhatsAppOTPResponse> {
+    return this.whatsappAuthApi.verifyOTP(phone, code);
+  }
+
+  // Gmail Integration & Scanning
+  getGmailStatus(): Promise<GmailStatusResponse> {
+    return this.gmailApi.getStatus();
+  }
+  scanGmail(params?: { days?: number; limit?: number }): Promise<GmailScanResult> {
+    return this.gmailApi.scanEmails(params);
+  }
+  disconnectGmail(): Promise<{ message: string }> {
+    return this.gmailApi.disconnect();
+  }
+  createGmailDraft(draft: GmailDraftInput): Promise<GmailDraftResponse> {
+    return this.gmailApi.createDraft(draft);
+  }
+  get gmail(): GmailApi {
+    return this.gmailApi;
   }
 }
 

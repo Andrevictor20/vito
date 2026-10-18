@@ -19,6 +19,7 @@ import { GoogleIcon } from '../components/common/GoogleIcon';
 import { Button } from '../components/ui/Button';
 import { TextInput } from '../components/ui/TextInput';
 import { Card } from '../components/ui/Card';
+import { WhatsAppAuthModal } from '../components/auth/WhatsAppAuthModal';
 import { createAuthStyles } from './AuthScreen.styles';
 
 interface AuthScreenProps {
@@ -37,6 +38,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ serverUrl, onToggleServe
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
+  const [showWhatsAppAuth, setShowWhatsAppAuth] = useState(false);
 
   const { currentlyRunning } = Updates.useUpdates();
 
@@ -253,6 +255,15 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ serverUrl, onToggleServe
           isLoading={isLoading}
         />
 
+        {/* Botão de Autenticação via WhatsApp (OTP sem senha) */}
+        <Button
+          label="Entrar com WhatsApp"
+          variant="outlined"
+          icon={<MaterialIcons name="chat" size={18} color="#25D366" />}
+          onPress={() => setShowWhatsAppAuth(true)}
+          style={{ marginTop: tokens.spacing.sm }}
+        />
+
         <Button
           label={isRegister ? 'Já possui uma conta? Faça login' : 'Não tem conta? Cadastre-se em instantes'}
           variant="text"
@@ -286,6 +297,11 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ serverUrl, onToggleServe
           </TouchableOpacity>
         </View>
       </Card>
+
+      <WhatsAppAuthModal
+        visible={showWhatsAppAuth}
+        onClose={() => setShowWhatsAppAuth(false)}
+      />
       </ScrollView>
     </KeyboardAvoidingView>
   );

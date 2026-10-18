@@ -24,6 +24,11 @@ export interface GoogleCalendarConnectResult {
   email: string;
 }
 
+export interface GmailConnectResult {
+  status: string;
+  email: string;
+}
+
 export const googleAuthService = {
   isAvailable(): boolean {
     return WebBrowser !== null && typeof WebBrowser.openAuthSessionAsync === 'function';
@@ -98,6 +103,40 @@ export const googleAuthService = {
 
     if (query.error) {
       throw new Error(`Permissão de calendário negada ou erro: ${query.error}`);
+    }
+
+    const status = (query.status as string) || 'success';
+    const email = decodeURIComponent((query.email as string) || '');
+
+    return { status, email };
+  },
+
+  /**
+   * Inicia o fluxo de concessão de permissão incremental e vinculação do Gmail.
+   */
+  async connectGmail(serverUrl: string, jwtToken: string): Promise<GmailConnectResult> {
+    if (!this.isAvailable()) {
+      throw new Error('A integração com Gmail requer a versão mais recente do aplicativo.');
+    }
+
+    const redirectUrl = Linking.createURL('oauth/callback');
+    const authStartUrl = `${serverUrl.replace(/\/+$/, '')}/api/v1/auth/google/start?mode=gmail&token=${encodeURIComponent(jwtToken)}&redirect_scheme=${encodeURIComponent(redirectUrl)}`;
+
+    const result = await WebBrowser.openAuthSessionAsync(authStartUrl, redirectUrl);
+
+    if (result.type !== 'success') {
+      if (result.type === 'cancel' || result.type === 'dismiss') {
+        throw new Error('Conexão com Gmail cancelada.');
+      }
+      throw new Error('Falha ao conectar com o Gmail.');
+    }
+
+    const { url } = result;
+    const parsed = Linking.parse(url);
+    const query = parsed.queryParams || {};
+
+    if (query.error) {
+      throw new Error(`Permissão do Gmail negada ou erro: ${query.error}`);
     }
 
     const status = (query.status as string) || 'success';

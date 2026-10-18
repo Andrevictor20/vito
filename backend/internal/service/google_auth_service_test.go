@@ -230,6 +230,21 @@ func TestGoogleAuthService_GetAuthURL(t *testing.T) {
 	if qCal.Get("prompt") != "consent" {
 		t.Errorf("prompt esperado 'consent' no modo calendar, obteve: %s", qCal.Get("prompt"))
 	}
+
+	// Teste URL para gmail
+	gmailURL, err := svc.GetAuthURL("gmail", "user-uuid-1", "vito://oauth/callback")
+	if err != nil {
+		t.Fatalf("falha ao obter URL de gmail: %v", err)
+	}
+	parsedGmail, _ := url.Parse(gmailURL)
+	qGmail := parsedGmail.Query()
+	expectedGmailScope := "openid email profile https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.compose"
+	if qGmail.Get("scope") != expectedGmailScope {
+		t.Errorf("scope de gmail esperado '%s', obteve: '%s'", expectedGmailScope, qGmail.Get("scope"))
+	}
+	if qGmail.Get("prompt") != "consent" {
+		t.Errorf("prompt esperado 'consent' no modo gmail, obteve: %s", qGmail.Get("prompt"))
+	}
 }
 
 func TestGoogleAuthService_HandleCallback_LoginMode(t *testing.T) {
@@ -360,5 +375,107 @@ func TestGoogleAuthService_HandleCallback_CalendarMode(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 	if !mockSync.syncTriggered {
 		t.Error("esperava que a sincronização inicial fosse engatilhada em segundo plano")
+	}
+}
+
+type MockGmailRepositoryInMemory struct {
+	saved *domain.GmailIntegration
+}
+
+func (m *MockGmailRepositoryInMemory) GetByUserID(ctx context.Context, userID string) (*domain.GmailIntegration, error) {
+	if m.saved == nil || m.saved.UserID != userID {
+		return nil, domain.ErrGmailNotConnected
+	}
+	return m.saved, nil
+}
+
+func (m *MockGmailRepositoryInMemory) Upsert(ctx context.Context, integ *domain.GmailIntegration) error {
+	m.saved = integ
+	return nil
+}
+
+func (m *MockGmailRepositoryInMemory) UpdateStatus(ctx context.Context, userID, status string) error {
+	if m.saved != nil && m.saved.UserID == userID {
+		m.saved.Status = status
+		return nil
+	}
+	return domain.ErrGmailNotConnected
+}
+
+func (m *MockGmailRepositoryInMemory) UpdateLastScanned(ctx context.Context, userID, historyID string, scannedAt time.Time) error {
+	if m.saved != nil && m.saved.UserID == userID {
+		m.saved.HistoryID = historyID
+		m.saved.LastScannedAt = &scannedAt
+		return nil
+	}
+	return domain.ErrGmailNotConnected
+}
+
+func (m *MockGmailRepositoryInMemory) DeleteByUserID(ctx context.Context, userID string) error {
+	m.saved = nil
+	return nil
+}
+
+func TestGoogleAuthService_HandleCallback_GmailMode(t *testing.T) {
+	googleServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/token":
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"access_token":  "mock-gmail-access-token",
+				"refresh_token": "mock-gmail-refresh-token",
+				"expires_in":    3600,
+				"token_type":    "Bearer",
+			})
+		case "/userinfo":
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"sub":   "google-sub-gmail",
+				"email": "andre.gmail@gmail.com",
+				"name":  "André Gmail",
+			})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer googleServer.Close()
+
+	userRepo := NewMockUserRepositoryInMemory()
+	authSvc := service.NewAuthService(userRepo, "test-jwt-secret")
+	mockSync := &MockSyncServiceInMemory{}
+	mockGmailRepo := &MockGmailRepositoryInMemory{}
+
+	cfg := service.GoogleAuthConfig{
+		ClientID:     "mock-client-id",
+		ClientSecret: "mock-client-secret",
+		RedirectURL:  "https://vito.rasppi.cloud/api/v1/auth/google/callback",
+		TokenURL:     googleServer.URL + "/token",
+		UserInfoURL:  googleServer.URL + "/userinfo",
+		JWTSecret:    "test-jwt-secret",
+	}
+
+	googleAuthSvc := service.NewGoogleAuthService(cfg, userRepo, authSvc, mockSync)
+	googleAuthSvc.SetGmailRepository(mockGmailRepo, "encryption-key-32-chars-long12")
+
+	stateStr, _ := googleAuthSvc.GenerateState("gmail", "user-uuid-999", "vito://oauth/callback")
+
+	redirectURL, err := googleAuthSvc.HandleCallback(context.Background(), "mock-auth-code", stateStr)
+	if err != nil {
+		t.Fatalf("falha ao processar callback de gmail: %v", err)
+	}
+
+	parsed, _ := url.Parse(redirectURL)
+	if parsed.Query().Get("status") != "success" || parsed.Query().Get("provider") != "gmail" {
+		t.Errorf("parâmetros de callback inesperados: %s", redirectURL)
+	}
+
+	if mockGmailRepo.saved == nil {
+		t.Fatal("esperava que a integração do Gmail fosse salva no repositório")
+	}
+	if mockGmailRepo.saved.AccountEmail != "andre.gmail@gmail.com" {
+		t.Errorf("e-mail salvo divergente: %s", mockGmailRepo.saved.AccountEmail)
+	}
+	if mockGmailRepo.saved.Status != domain.GmailStatusActive {
+		t.Errorf("status salvo divergente: %s", mockGmailRepo.saved.Status)
 	}
 }

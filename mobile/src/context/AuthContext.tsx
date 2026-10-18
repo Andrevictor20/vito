@@ -16,6 +16,7 @@ interface AuthContextType {
   login: (email: string, pass: string) => Promise<void>;
   register: (name: string, email: string, pass: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
+  loginWithWhatsApp: (phone: string, code: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -114,6 +115,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const loginWithWhatsApp = async (phone: string, code: string) => {
+    setIsLoading(true);
+    try {
+      const res = await api.verifyWhatsAppOTP(phone, code);
+      setUser(res.user);
+      await secureStorage.setItem(USER_KEY, JSON.stringify(res.user));
+      notificationService.syncPushTokenWithBackend().catch(() => {});
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const logout = async () => {
     setIsLoading(true);
     try {
@@ -147,7 +160,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, isInitialLoading, login, register, loginWithGoogle, logout }}>
+    <AuthContext.Provider value={{ user, isLoading, isInitialLoading, login, register, loginWithGoogle, loginWithWhatsApp, logout }}>
       {children}
     </AuthContext.Provider>
   );

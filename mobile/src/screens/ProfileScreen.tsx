@@ -23,6 +23,7 @@ import { PhoneEditModal } from '../components/profile/PhoneEditModal';
 import { ContactsSyncModal } from '../components/profile/ContactsSyncModal';
 import { ConnectedDevicesModal } from '../components/profile/ConnectedDevicesModal';
 import { WhatsAppConnectModal } from '../components/profile/WhatsAppConnectModal';
+import { GmailConnectModal } from '../components/profile/GmailConnectModal';
 import { api } from '../services/api';
 import { notificationService } from '../services/notificationService';
 import { calendarSyncService } from '../services/calendarSyncService';
@@ -50,6 +51,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const [devicesVisible, setDevicesVisible] = useState(false);
   const [whatsAppVisible, setWhatsAppVisible] = useState(false);
   const [whatsAppStatus, setWhatsAppStatus] = useState<'disconnected' | 'connecting' | 'connected' | null>(null);
+  const [gmailVisible, setGmailVisible] = useState(false);
+  const [gmailStatus, setGmailStatus] = useState<{ connected: boolean; email?: string } | null>(null);
   const [userPhone, setUserPhone] = useState(user?.phone || '');
   const [checking, setChecking] = useState(false);
 
@@ -107,6 +110,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
       }
     } catch {
       setWhatsAppStatus('disconnected');
+    }
+    try {
+      const gm = await api.getGmailStatus();
+      setGmailStatus(gm);
+    } catch {
+      setGmailStatus({ connected: false });
     }
   }, [userPhone]);
 
@@ -172,10 +181,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         onOpenAISettings={() => setAiVisible(true)}
         onOpenContactsSync={() => setContactsVisible(true)}
         onOpenWhatsAppConnect={() => setWhatsAppVisible(true)}
+        onOpenGmailConnect={() => setGmailVisible(true)}
         autonomyMode={autonomyMode}
         notifActive={notifActive}
         calendarsActive={calendarsActive}
         whatsAppStatus={whatsAppStatus}
+        gmailStatus={gmailStatus}
       />
 
       <AISettingsModal
@@ -231,6 +242,17 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           loadStatuses();
         }}
         defaultPhone={userPhone}
+        onStatusChanged={() => {
+          loadStatuses();
+          onDataChanged?.();
+        }}
+      />
+      <GmailConnectModal
+        visible={gmailVisible}
+        onClose={() => {
+          setGmailVisible(false);
+          loadStatuses();
+        }}
         onStatusChanged={() => {
           loadStatuses();
           onDataChanged?.();

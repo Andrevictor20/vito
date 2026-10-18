@@ -296,27 +296,40 @@ func main() {
 	}, waRepo, evoClient, astSvc)
 	whatsappHandler := handler.NewWhatsAppHandler(waSvc)
 
+	// Gmail Conector & Scanner
+	gmailRepo := repository.NewGmailRepository(db)
+	gmailSvc := service.NewGmailService(gmailRepo, cfg.DataEncryptionKey, cfg.GoogleClientID, cfg.GoogleClientSecret)
+	googleAuthSvc.SetGmailRepository(gmailRepo, cfg.DataEncryptionKey)
+	gmailHandler := handler.NewGmailHandler(gmailSvc)
+
+	// WhatsApp Passwordless Login OTP
+	waAuthRepo := repository.NewWhatsAppAuthRepository(db)
+	waAuthSvc := service.NewWhatsAppAuthService(waAuthRepo, userRepo, authSvc, evoClient, "vito_system", cfg.JWTSecret)
+	whatsappAuthHandler := handler.NewWhatsAppAuthHandler(waAuthSvc)
+
 	// 6. Servidor HTTP
 	srv := server.New(server.Config{
-		AuthHandler:       authHandler,
-		GoogleAuthHandler: googleAuthHandler,
-		CalHandler:        calHandler,
-		TodoHandler:       todoHandler,
-		AstHandler:        astHandler,
-		NotifHandler:      notifHandler,
-		SyncHandler:       syncHandler,
-		TriggerHandler:    triggerHandler,
-		BriefingHandler:   briefingHandler,
-		AISettingsHandler: aiSettingsHandler,
-		PendingHandler:    pendingHandler,
-		BookingHandler:    bookingHandler,
-		MeetingHandler:    meetingHandler,
-		P2PHandler:        p2pHandler,
-		ChatHandler:       chatHandler,
-		WhatsAppHandler:   whatsappHandler,
-		AuthSvc:           authSvc,
-		AllowedOrigins:    cfg.AllowedOrigins(),
-		Environment:       cfg.Environment,
+		AuthHandler:         authHandler,
+		GoogleAuthHandler:   googleAuthHandler,
+		CalHandler:          calHandler,
+		TodoHandler:         todoHandler,
+		AstHandler:          astHandler,
+		NotifHandler:        notifHandler,
+		SyncHandler:         syncHandler,
+		TriggerHandler:      triggerHandler,
+		BriefingHandler:     briefingHandler,
+		AISettingsHandler:   aiSettingsHandler,
+		PendingHandler:      pendingHandler,
+		BookingHandler:      bookingHandler,
+		MeetingHandler:      meetingHandler,
+		P2PHandler:          p2pHandler,
+		ChatHandler:         chatHandler,
+		WhatsAppHandler:     whatsappHandler,
+		GmailHandler:        gmailHandler,
+		WhatsAppAuthHandler: whatsappAuthHandler,
+		AuthSvc:             authSvc,
+		AllowedOrigins:      cfg.AllowedOrigins(),
+		Environment:         cfg.Environment,
 	})
 
 	httpServer := &http.Server{

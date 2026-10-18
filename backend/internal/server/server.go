@@ -35,9 +35,11 @@ type Server struct {
 	bookingHandler    *handler.BookingHandler
 	meetingHandler    *handler.MeetingHandler
 	p2pHandler        *handler.P2PMeetingHandler
-	chatHandler       *handler.ChatHandler
-	whatsappHandler   *handler.WhatsAppHandler
-	authSvc           *service.AuthService
+	chatHandler         *handler.ChatHandler
+	whatsappHandler     *handler.WhatsAppHandler
+	gmailHandler        *handler.GmailHandler
+	whatsappAuthHandler *handler.WhatsAppAuthHandler
+	authSvc             *service.AuthService
 }
 
 // Config contém as dependências necessárias para inicializar o Server.
@@ -56,11 +58,13 @@ type Config struct {
 	AISettingsHandler *handler.AISettingsHandler
 	PendingHandler    *handler.PendingHandler
 	BookingHandler    *handler.BookingHandler
-	MeetingHandler    *handler.MeetingHandler
-	P2PHandler        *handler.P2PMeetingHandler
-	ChatHandler       *handler.ChatHandler
-	WhatsAppHandler   *handler.WhatsAppHandler
-	AuthSvc           *service.AuthService
+	MeetingHandler      *handler.MeetingHandler
+	P2PHandler          *handler.P2PMeetingHandler
+	ChatHandler         *handler.ChatHandler
+	WhatsAppHandler     *handler.WhatsAppHandler
+	GmailHandler        *handler.GmailHandler
+	WhatsAppAuthHandler *handler.WhatsAppAuthHandler
+	AuthSvc             *service.AuthService
 	// AllowedOrigins restringe o CORS (SEC-03). Vazio = ["*"] apenas fora
 	// de produção (dev/testes); em produção, vazio nega origens (fail-closed).
 	AllowedOrigins []string
@@ -91,6 +95,8 @@ func New(cfg ...Config) *Server {
 		s.p2pHandler = cfg[0].P2PHandler
 		s.chatHandler = cfg[0].ChatHandler
 		s.whatsappHandler = cfg[0].WhatsAppHandler
+		s.gmailHandler = cfg[0].GmailHandler
+		s.whatsappAuthHandler = cfg[0].WhatsAppAuthHandler
 		s.authSvc = cfg[0].AuthSvc
 	}
 
@@ -182,6 +188,10 @@ func (s *Server) registerRoutes() {
 				ar.Post("/auth/register", s.authHandler.Register)
 				ar.Post("/auth/login", s.authHandler.Login)
 				ar.Post("/auth/refresh", s.authHandler.Refresh)
+				if s.whatsappAuthHandler != nil {
+					ar.Post("/auth/whatsapp/request-otp", s.whatsappAuthHandler.RequestOTP)
+					ar.Post("/auth/whatsapp/verify-otp", s.whatsappAuthHandler.VerifyOTP)
+				}
 			})
 		}
 		if s.googleAuthHandler != nil {
@@ -268,6 +278,15 @@ func (s *Server) registerRoutes() {
 						wr.Get("/status", s.whatsappHandler.GetStatus)
 						wr.Post("/pairing-code", s.whatsappHandler.RequestPairingCode)
 						wr.Delete("/disconnect", s.whatsappHandler.Disconnect)
+					})
+				}
+
+				if s.gmailHandler != nil {
+					protected.Route("/integrations/gmail", func(gr chi.Router) {
+						gr.Get("/status", s.gmailHandler.GetStatus)
+						gr.Post("/scan", s.gmailHandler.ScanEmails)
+						gr.Delete("/disconnect", s.gmailHandler.Disconnect)
+						gr.Post("/draft", s.gmailHandler.CreateDraft)
 					})
 				}
 

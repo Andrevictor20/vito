@@ -18,6 +18,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/andrevmp/vito/backend/internal/crypto"
 	"github.com/andrevmp/vito/backend/internal/domain"
 )
 
@@ -54,6 +55,8 @@ type GoogleAuthService struct {
 	userRepo   domain.UserRepository
 	authSvc    *AuthService
 	syncSvc    CalendarSyncConnector
+	gmailRepo  domain.GmailRepository
+	encKey     string
 	httpClient *http.Client
 }
 
@@ -85,6 +88,12 @@ func NewGoogleAuthService(
 		syncSvc:    syncSvc,
 		httpClient: client,
 	}
+}
+
+// SetGmailRepository injeta a dependência do repositório de Gmail e a chave de criptografia.
+func (s *GoogleAuthService) SetGmailRepository(repo domain.GmailRepository, encKey string) {
+	s.gmailRepo = repo
+	s.encKey = encKey
 }
 
 func isAllowedRedirectScheme(rawScheme string) bool {
@@ -179,8 +188,11 @@ func (s *GoogleAuthService) GetAuthURL(mode, userID, redirectScheme string) (str
 		return "", err
 	}
 
-	// Solicita perfil, identificação, leitura de listas de agendas e gerenciamento de eventos (Princípio do Menor Privilégio)
+	// Solicita perfil, identificação e escopos específicos por modo (Princípio do Menor Privilégio)
 	scope := "openid email profile https://www.googleapis.com/auth/calendar.calendarlist.readonly https://www.googleapis.com/auth/calendar.events"
+	if mode == "gmail" {
+		scope = "openid email profile https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.compose"
+	}
 
 	params := url.Values{}
 	params.Set("client_id", s.cfg.ClientID)
@@ -188,7 +200,7 @@ func (s *GoogleAuthService) GetAuthURL(mode, userID, redirectScheme string) (str
 	params.Set("response_type", "code")
 	params.Set("scope", scope)
 	params.Set("access_type", "offline")
-	if mode == "calendar" {
+	if mode == "calendar" || mode == "gmail" {
 		params.Set("prompt", "consent")
 	} else {
 		params.Set("prompt", "select_account")
@@ -274,6 +286,44 @@ func (s *GoogleAuthService) HandleCallback(ctx context.Context, code, stateStr s
 		}
 
 		deepLink := fmt.Sprintf("%s?status=success&provider=google&email=%s",
+			redirectScheme,
+			url.QueryEscape(userInfo.Email),
+		)
+		return deepLink, nil
+	}
+
+	if state.Mode == "gmail" {
+		if s.gmailRepo == nil {
+			return "", errors.New("repositório do Gmail não configurado")
+		}
+		if state.UserID == "" {
+			return "", errors.New("userID obrigatório para vincular Gmail")
+		}
+
+		credsPayload, _ := json.Marshal(map[string]interface{}{
+			"access_token":  tokens.AccessToken,
+			"refresh_token": tokens.RefreshToken,
+			"expires_in":    tokens.ExpiresIn,
+		})
+
+		encryptedCreds := string(credsPayload)
+		if s.encKey != "" {
+			if enc, err := crypto.Encrypt(string(credsPayload), s.encKey); err == nil {
+				encryptedCreds = enc
+			}
+		}
+
+		integ := &domain.GmailIntegration{
+			UserID:               state.UserID,
+			AccountEmail:         userInfo.Email,
+			EncryptedCredentials: encryptedCreds,
+			Status:               domain.GmailStatusActive,
+		}
+		if err := s.gmailRepo.Upsert(ctx, integ); err != nil {
+			return "", fmt.Errorf("falha ao salvar integração do Gmail: %w", err)
+		}
+
+		deepLink := fmt.Sprintf("%s?status=success&provider=gmail&email=%s",
 			redirectScheme,
 			url.QueryEscape(userInfo.Email),
 		)
