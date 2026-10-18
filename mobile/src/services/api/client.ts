@@ -18,6 +18,37 @@ export const isCloudServer = (url: string): boolean => {
   return url === CLOUDFLARE_SERVER_URL || (!url.includes('192.168.') && !url.includes('localhost') && !url.includes('127.0.0.1'));
 };
 
+function decodeBase64(str: string): string {
+  try {
+    if (typeof atob === 'function') {
+      return atob(str);
+    }
+  } catch {}
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+  let output = '';
+  str = String(str).replace(/=+$/, '');
+  for (let bc = 0, bs = 0, buffer, idx = 0; buffer = str.charAt(idx++); ~buffer && (bs = bc % 4 ? bs * 64 + buffer : buffer, bc++ % 4) ? output += String.fromCharCode(255 & bs >> (-2 * bc & 6)) : 0) {
+    buffer = chars.indexOf(buffer);
+  }
+  return output;
+}
+
+export function isJwtExpiringSoon(token: string | null, marginSeconds = 120): boolean {
+  if (!token) return true;
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return false;
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const jsonStr = decodeBase64(base64);
+    const payload = JSON.parse(jsonStr);
+    if (!payload.exp) return false;
+    const nowSec = Math.floor(Date.now() / 1000);
+    return payload.exp - nowSec <= marginSeconds;
+  } catch {
+    return false;
+  }
+}
+
 export class ApiClient {
   protected baseUrl: string = DEFAULT_SERVER_URL;
   protected token: string | null = null;
@@ -155,7 +186,31 @@ export class ApiClient {
     return this.refreshPromise;
   }
 
+  isTokenExpiringSoon(marginSeconds = 120): boolean {
+    return isJwtExpiringSoon(this.token, marginSeconds);
+  }
+
+  async ensureFreshToken(): Promise<string | null> {
+    if (!this.refreshToken) {
+      return this.token;
+    }
+    if (this.isTokenExpiringSoon()) {
+      return this.performTokenRefresh();
+    }
+    return this.token;
+  }
+
   async request<T>(endpoint: string, options: ApiRequestOptions = {}): Promise<T> {
+    const isAuthFlow =
+      endpoint.includes('/auth/login') ||
+      endpoint.includes('/auth/register') ||
+      endpoint.includes('/auth/refresh');
+
+    // Se o token estiver expirado ou prestes a expirar e houver refresh token, renova proativamente
+    if (!isAuthFlow && this.refreshToken && this.isTokenExpiringSoon()) {
+      await this.performTokenRefresh();
+    }
+
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       Accept: 'application/json',
@@ -190,11 +245,6 @@ export class ApiClient {
         headers,
         signal: controller.signal,
       });
-
-      const isAuthFlow =
-        endpoint.includes('/auth/login') ||
-        endpoint.includes('/auth/register') ||
-        endpoint.includes('/auth/refresh');
 
       if (res.status === 401 && !options._isRetry && !isAuthFlow && this.refreshToken) {
         const refreshedToken = await this.performTokenRefresh();

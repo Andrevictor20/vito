@@ -318,6 +318,71 @@ func TestGoogleAuthService_HandleCallback_LoginMode(t *testing.T) {
 	}
 }
 
+func TestGoogleAuthService_HandleCallback_LoginMode_DualTokenSession(t *testing.T) {
+	googleServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/token":
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"access_token":  "mock-access-token-123",
+				"refresh_token": "mock-refresh-token-456",
+				"expires_in":    3600,
+				"token_type":    "Bearer",
+			})
+		case "/userinfo":
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"sub":     "google-sub-999",
+				"email":   "andre.session@gmail.com",
+				"name":    "André Victor Dual",
+				"picture": "https://lh3.googleusercontent.com/a/photo.jpg",
+			})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer googleServer.Close()
+
+	authSvc, userRepo, _ := setupAuthServiceWithSessions(t)
+
+	cfg := service.GoogleAuthConfig{
+		ClientID:     "mock-client-id",
+		ClientSecret: "mock-client-secret",
+		RedirectURL:  "https://vito.rasppi.cloud/api/v1/auth/google/callback",
+		TokenURL:     googleServer.URL + "/token",
+		UserInfoURL:  googleServer.URL + "/userinfo",
+		JWTSecret:    "test-super-secret-jwt-key",
+	}
+
+	googleAuthSvc := service.NewGoogleAuthService(cfg, userRepo, authSvc, nil)
+
+	stateStr, _ := googleAuthSvc.GenerateState("login", "", "vito://oauth/callback")
+
+	redirectURL, err := googleAuthSvc.HandleCallback(context.Background(), "mock-auth-code", stateStr)
+	if err != nil {
+		t.Fatalf("falha ao processar callback com sessão: %v", err)
+	}
+
+	parsedRedirect, err := url.Parse(redirectURL)
+	if err != nil {
+		t.Fatalf("redirect URL inválido: %v", err)
+	}
+
+	q := parsedRedirect.Query()
+	if q.Get("token") == "" {
+		t.Error("esperava token JWT nos parâmetros de query do redirect")
+	}
+	if q.Get("access_token") == "" {
+		t.Error("esperava access_token nos parâmetros de query do redirect")
+	}
+	if q.Get("refresh_token") == "" {
+		t.Error("esperava refresh_token (30 dias) nos parâmetros de query do redirect para manter o app logado")
+	}
+	if q.Get("session_id") == "" {
+		t.Error("esperava session_id nos parâmetros de query do redirect")
+	}
+}
+
 func TestGoogleAuthService_HandleCallback_CalendarMode(t *testing.T) {
 	googleServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {

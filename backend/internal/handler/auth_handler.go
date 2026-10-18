@@ -99,6 +99,25 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	currentSessionID := middleware.SessionIDFromContext(r.Context())
+	resMap := map[string]interface{}{
+		"user": user,
+	}
+
+	// Auto-upgrade de sessão (Sprint 13 / Fix Session Persistence):
+	// Se o usuário autenticou com um token legado sem session_id (ex: Google OAuth anterior),
+	// emitimos atomicamente uma sessão Dual Token (Refresh Token 30d) para que o app nunca deslogue.
+	if currentSessionID == "" && h.authSvc != nil {
+		pair, err := h.authSvc.IssueSessionForUser(user, resolveDeviceName("", r), extractClientIP(r))
+		if err == nil && pair != nil {
+			resMap["token"] = pair.AccessToken
+			resMap["access_token"] = pair.AccessToken
+			resMap["refresh_token"] = pair.RefreshToken
+			resMap["session_id"] = pair.SessionID
+			resMap["expires_in"] = pair.ExpiresIn
+		}
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{"user": user})
+	_ = json.NewEncoder(w).Encode(resMap)
 }

@@ -111,3 +111,53 @@ func TestAuthSessionEndpoints_Flow(t *testing.T) {
 		t.Errorf("esperava 401 Unauthorized após revogar a sessão do dispositivo, obteve %d", respMe.StatusCode)
 	}
 }
+
+func TestAuthSessionEndpoints_MeAutoUpgradeLegacyToken(t *testing.T) {
+	tmpDir := t.TempDir()
+	db, err := database.Open(filepath.Join(tmpDir, "sessions_autoupgrade.db"))
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	t.Cleanup(func() { db.Close() })
+
+	userRepo := repository.NewUserRepository(db)
+	sessionRepo := repository.NewSessionRepository(db)
+	authSvc := service.NewAuthService(userRepo, "test-jwt-secret-sprint13")
+	authSvc.SetSessionRepository(sessionRepo)
+	authHandler := handler.NewAuthHandler(authSvc, userRepo)
+
+	srv := server.New(server.Config{
+		AuthHandler: authHandler,
+		AuthSvc:     authSvc,
+	})
+	ts := httptest.NewServer(srv.Router())
+	defer ts.Close()
+
+	// Cria usuário diretamente
+	user, legacyToken, err := authSvc.Register("Carlos", "carlos@vito.ai", "Password123")
+	if err != nil {
+		t.Fatalf("register failed: %v", err)
+	}
+	_ = user
+
+	// Chama GET /api/v1/auth/me com token legado (sem session_id nas claims)
+	reqMe, _ := http.NewRequest("GET", ts.URL+"/api/v1/auth/me", nil)
+	reqMe.Header.Set("Authorization", "Bearer "+legacyToken)
+	respMe, err := http.DefaultClient.Do(reqMe)
+	if err != nil || respMe.StatusCode != http.StatusOK {
+		t.Fatalf("GET /api/v1/auth/me failed: status=%v err=%v", respMe.StatusCode, err)
+	}
+
+	var meData struct {
+		User         map[string]interface{} `json:"user"`
+		Token        string                 `json:"token"`
+		RefreshToken string                 `json:"refresh_token"`
+		SessionID    string                 `json:"session_id"`
+	}
+	_ = json.NewDecoder(respMe.Body).Decode(&meData)
+	respMe.Body.Close()
+
+	if meData.RefreshToken == "" || meData.SessionID == "" {
+		t.Fatalf("esperava auto-upgrade com refresh_token e session_id emitidos na resposta do /me, obteve: %+v", meData)
+	}
+}

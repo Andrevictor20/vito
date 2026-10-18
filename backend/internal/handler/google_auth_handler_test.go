@@ -85,6 +85,68 @@ func TestGoogleAuthHandler_StartCalendar_RequiresAuth(t *testing.T) {
 	}
 }
 
+func TestGoogleAuthHandler_StartGmail_RequiresAuth(t *testing.T) {
+	cfg := service.GoogleAuthConfig{
+		ClientID:     "mock-client-id",
+		ClientSecret: "mock-client-secret",
+		RedirectURL:  "https://vito.rasppi.cloud/api/v1/auth/google/callback",
+		JWTSecret:    "secret123",
+	}
+
+	authSvc := service.NewAuthService(&mockUserRepoForHandler{}, "secret123")
+	googleAuthSvc := service.NewGoogleAuthService(cfg, &mockUserRepoForHandler{}, authSvc, nil)
+	googleHandler := handler.NewGoogleAuthHandler(googleAuthSvc, authSvc)
+
+	// Sem autenticação no modo gmail deve falhar com 401
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/auth/google/start?mode=gmail", nil)
+	rec := httptest.NewRecorder()
+
+	googleHandler.Start(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("esperava 401 Unauthorized para modo gmail sem token, obteve: %d", rec.Code)
+	}
+}
+
+func TestGoogleAuthHandler_StartGmail_WithAuth(t *testing.T) {
+	cfg := service.GoogleAuthConfig{
+		ClientID:     "mock-client-id",
+		ClientSecret: "mock-client-secret",
+		RedirectURL:  "https://vito.rasppi.cloud/api/v1/auth/google/callback",
+		JWTSecret:    "secret123",
+	}
+
+	authSvc := service.NewAuthService(&mockUserRepoForHandler{}, "secret123")
+	token, err := authSvc.GenerateTokenForUser(&domain.User{ID: "user-123", Email: "test@example.com"})
+	if err != nil {
+		t.Fatalf("falha ao gerar token: %v", err)
+	}
+
+	googleAuthSvc := service.NewGoogleAuthService(cfg, &mockUserRepoForHandler{}, authSvc, nil)
+	googleHandler := handler.NewGoogleAuthHandler(googleAuthSvc, authSvc)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/auth/google/start?mode=gmail&token="+token, nil)
+	rec := httptest.NewRecorder()
+
+	googleHandler.Start(rec, req)
+
+	if rec.Code != http.StatusTemporaryRedirect && rec.Code != http.StatusFound {
+		t.Fatalf("esperava redirect para Google OAuth no modo gmail, obteve status: %d", rec.Code)
+	}
+
+	loc := rec.Header().Get("Location")
+	if loc == "" {
+		t.Fatal("esperava Location no redirect")
+	}
+	parsed, err := url.Parse(loc)
+	if err != nil {
+		t.Fatalf("URL inválida: %v", err)
+	}
+	if parsed.Host != "accounts.google.com" {
+		t.Errorf("host esperado accounts.google.com, obteve %s", parsed.Host)
+	}
+}
+
 func TestGoogleAuthHandler_CallbackErrorParam(t *testing.T) {
 	cfg := service.GoogleAuthConfig{
 		ClientID:  "mock-client-id",

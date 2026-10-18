@@ -12,18 +12,18 @@ export class WhatsAppApi {
   constructor(private client: ApiClient) {}
 
   async getStatus(): Promise<WhatsAppIntegrationStatus> {
-    return this.client.request<WhatsAppIntegrationStatus>('/integrations/whatsapp/status');
+    return this.client.request<WhatsAppIntegrationStatus>('/api/v1/integrations/whatsapp/status');
   }
 
   async requestPairingCode(phone: string): Promise<{ pairing_code: string; status: string }> {
-    return this.client.request<{ pairing_code: string; status: string }>('/integrations/whatsapp/pairing-code', {
+    return this.client.request<{ pairing_code: string; status: string }>('/api/v1/integrations/whatsapp/pairing-code', {
       method: 'POST',
       body: JSON.stringify({ phone }),
     });
   }
 
   async disconnect(): Promise<{ message: string; status: string }> {
-    return this.client.request<{ message: string; status: string }>('/integrations/whatsapp/disconnect', {
+    return this.client.request<{ message: string; status: string }>('/api/v1/integrations/whatsapp/disconnect', {
       method: 'DELETE',
     });
   }

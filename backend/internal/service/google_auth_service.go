@@ -355,10 +355,19 @@ func (s *GoogleAuthService) HandleCallback(ctx context.Context, code, stateStr s
 		}
 	}
 
-	// Gera token JWT de sessão do Vito
-	token, err := s.authSvc.GenerateTokenForUser(user)
-	if err != nil {
-		return "", fmt.Errorf("falha ao emitir token JWT de sessão: %w", err)
+	// Emite sessão Dual Token (Access Token 15m + Refresh Token 30d) do Vito
+	var token, refreshToken, sessionID string
+	pair, err := s.authSvc.IssueSessionForUser(user, "Google OAuth", "")
+	if err == nil && pair != nil {
+		token = pair.AccessToken
+		refreshToken = pair.RefreshToken
+		sessionID = pair.SessionID
+	} else {
+		// Fallback caso repositório de sessão não esteja configurado
+		token, err = s.authSvc.GenerateTokenForUser(user)
+		if err != nil {
+			return "", fmt.Errorf("falha ao emitir token JWT de sessão: %w", err)
+		}
 	}
 
 	// Auto-vincula e sincroniza o calendário se o serviço de sincronização estiver disponível
@@ -385,9 +394,12 @@ func (s *GoogleAuthService) HandleCallback(ctx context.Context, code, stateStr s
 
 	userJSON, _ := json.Marshal(user)
 
-	deepLink := fmt.Sprintf("%s?status=success&token=%s&user=%s",
+	deepLink := fmt.Sprintf("%s?status=success&token=%s&access_token=%s&refresh_token=%s&session_id=%s&user=%s",
 		redirectScheme,
 		url.QueryEscape(token),
+		url.QueryEscape(token),
+		url.QueryEscape(refreshToken),
+		url.QueryEscape(sessionID),
 		url.QueryEscape(string(userJSON)),
 	)
 	return deepLink, nil

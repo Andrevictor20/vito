@@ -28,7 +28,7 @@ func NewGoogleAuthHandler(googleAuthSvc *service.GoogleAuthService, authSvc *ser
 // Start inicia o fluxo OAuth2 redirecionando para a tela de consentimento do Google.
 func (h *GoogleAuthHandler) Start(w http.ResponseWriter, r *http.Request) {
 	mode := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("mode")))
-	if mode != "calendar" {
+	if mode != "calendar" && mode != "gmail" {
 		mode = "login"
 	}
 
@@ -60,12 +60,12 @@ func (h *GoogleAuthHandler) Start(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Se o modo for 'calendar', autenticação do usuário do Vito é mandatória
-	if mode == "calendar" && userID == "" {
+	// Se o modo for 'calendar' ou 'gmail', autenticação do usuário do Vito é mandatória
+	if (mode == "calendar" || mode == "gmail") && userID == "" {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
 		_ = json.NewEncoder(w).Encode(map[string]string{
-			"error": "autenticação de usuário necessária para vincular calendário",
+			"error": fmt.Sprintf("autenticação de usuário necessária para vincular %s", mode),
 		})
 		return
 	}

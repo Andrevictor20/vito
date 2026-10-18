@@ -22,7 +22,7 @@ describe('WhatsAppApi Unit Tests', () => {
     const res = await api.getStatus();
 
     assert.equal(calls.length, 1);
-    assert.equal(calls[0].ep, '/integrations/whatsapp/status');
+    assert.equal(calls[0].ep, '/api/v1/integrations/whatsapp/status');
     assert.equal(res.status, 'connected');
     assert.equal(res.phone, '5511999998888');
   });
@@ -43,7 +43,7 @@ describe('WhatsAppApi Unit Tests', () => {
     const res = await api.requestPairingCode('11999998888');
 
     assert.equal(calls.length, 1);
-    assert.equal(calls[0].ep, '/integrations/whatsapp/pairing-code');
+    assert.equal(calls[0].ep, '/api/v1/integrations/whatsapp/pairing-code');
     assert.equal(calls[0].opt?.method, 'POST');
     assert.equal(calls[0].opt?.body, JSON.stringify({ phone: '11999998888' }));
     assert.equal(res.pairing_code, 'ABCD-1234');
@@ -66,7 +66,7 @@ describe('WhatsAppApi Unit Tests', () => {
     const res = await api.disconnect();
 
     assert.equal(calls.length, 1);
-    assert.equal(calls[0].ep, '/integrations/whatsapp/disconnect');
+    assert.equal(calls[0].ep, '/api/v1/integrations/whatsapp/disconnect');
     assert.equal(calls[0].opt?.method, 'DELETE');
     assert.equal(res.status, 'disconnected');
   });

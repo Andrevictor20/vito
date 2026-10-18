@@ -16,6 +16,9 @@ try {
 
 export interface GoogleLoginResult {
   token: string;
+  accessToken?: string;
+  refreshToken?: string;
+  sessionId?: string;
   user: User;
 }
 
@@ -62,7 +65,10 @@ export const googleAuthService = {
       throw new Error(`Google retornou erro: ${query.error}`);
     }
 
-    const token = query.token as string;
+    const token = ((query.access_token as string) || (query.token as string)) || '';
+    const accessToken = token;
+    const refreshToken = (query.refresh_token as string) || undefined;
+    const sessionId = (query.session_id as string) || undefined;
     const userStr = query.user as string;
 
     if (!token || !userStr) {
@@ -71,7 +77,7 @@ export const googleAuthService = {
 
     try {
       const user = JSON.parse(decodeURIComponent(userStr)) as User;
-      return { token, user };
+      return { token, accessToken, refreshToken, sessionId, user };
     } catch {
       throw new Error('Falha ao processar dados de usuário do Google.');
     }

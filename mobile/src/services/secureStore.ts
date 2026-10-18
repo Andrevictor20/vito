@@ -47,15 +47,12 @@ export const secureStorage = {
         console.warn(`[secureStorage] SecureStore indisponível/falha ao persistir '${secureKey}':`, secErr);
       }
 
-      if (secureStoreSuccess) {
-        // Se SecureStore foi bem-sucedido, purga cópia residual do AsyncStorage para evitar duplicidade
-        await AsyncStorage.removeItem(key).catch(() => {});
-        if (secureKey !== key) {
-          await AsyncStorage.removeItem(secureKey).catch(() => {});
-        }
-      } else {
-        // Fallback resiliente: salva no AsyncStorage para garantir continuidade da sessão caso o hardware falhe
-        await AsyncStorage.setItem(key, value).catch(() => {});
+      // Persistência Dual-Storage imutável:
+      // Mantém sempre uma cópia no AsyncStorage como salvaguarda contra suspensão/reset
+      // de Keystore nativo pelo gerenciador de bateria do Android (Samsung/Xiaomi/Motorola).
+      await AsyncStorage.setItem(key, value).catch(() => {});
+      if (secureKey !== key) {
+        await AsyncStorage.setItem(secureKey, value).catch(() => {});
       }
     } catch (err) {
       console.warn(`[secureStorage] Erro ao salvar chave segura '${key}':`, err);
