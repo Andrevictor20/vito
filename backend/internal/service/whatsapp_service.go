@@ -1,7 +1,9 @@
 package service
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -31,11 +33,13 @@ type NotificationSender interface {
 
 // WhatsAppService gerencia o pareamento, sincronização de estado e webhook do WhatsApp.
 type WhatsAppService struct {
-	cfg          WhatsAppServiceConfig
-	repo         domain.WhatsAppRepository
-	client       EvolutionAPIClient
-	assistantSvc *AssistantService
-	notifSender  NotificationSender
+	cfg              WhatsAppServiceConfig
+	repo             domain.WhatsAppRepository
+	client           EvolutionAPIClient
+	assistantSvc     *AssistantService
+	notifSender      NotificationSender
+	audioTranscriber ai.AudioTranscriber
+	userRepo         domain.UserRepository
 }
 
 // NewWhatsAppService instancia o serviço do WhatsApp.
@@ -56,6 +60,16 @@ func NewWhatsAppService(
 // SetNotificationSender injeta o serviço de notificações push no WhatsAppService.
 func (s *WhatsAppService) SetNotificationSender(sender NotificationSender) {
 	s.notifSender = sender
+}
+
+// SetAudioTranscriber injeta o transcritor de áudio (Groq Whisper) no WhatsAppService.
+func (s *WhatsAppService) SetAudioTranscriber(transcriber ai.AudioTranscriber) {
+	s.audioTranscriber = transcriber
+}
+
+// SetUserRepo injeta o repositório de usuários para discovery social de contatos.
+func (s *WhatsAppService) SetUserRepo(userRepo domain.UserRepository) {
+	s.userRepo = userRepo
 }
 
 // SanitizePhoneNumber limpa e normaliza o número para o padrão internacional E.164 sem o '+'.
@@ -205,6 +219,63 @@ func (s *WhatsAppService) Disconnect(ctx context.Context, userID string) error {
 	return s.repo.UpdateStatus(ctx, integration.ID, domain.WhatsAppStatusDisconnected, nil)
 }
 
+// MatchWhatsAppContacts consulta os contatos da Evolution API e cruza com a base de usuários do Vito.
+func (s *WhatsAppService) MatchWhatsAppContacts(ctx context.Context, userID string) ([]domain.ContactMatchResult, error) {
+	integration, err := s.repo.GetByUserID(ctx, userID)
+	if err != nil {
+		if err == domain.ErrWhatsAppIntegrationNotFound {
+			return []domain.ContactMatchResult{}, nil
+		}
+		return nil, err
+	}
+	if integration == nil || integration.Status != domain.WhatsAppStatusConnected {
+		return []domain.ContactMatchResult{}, nil
+	}
+
+	contacts, err := s.client.FindContacts(ctx, integration.InstanceName)
+	if err != nil {
+		return nil, err
+	}
+
+	var results []domain.ContactMatchResult
+	seenUserIDs := make(map[string]bool)
+
+	for _, contact := range contacts {
+		cleanPhone, err := SanitizePhoneNumber(contact.Number)
+		if err != nil {
+			cleanPhone, err = SanitizePhoneNumber(contact.ID)
+		}
+		if err != nil || cleanPhone == "" {
+			continue
+		}
+
+		if s.userRepo != nil {
+			user, err := s.userRepo.GetByPhone(cleanPhone)
+			if err == nil && user != nil && user.ID != userID && !seenUserIDs[user.ID] {
+				seenUserIDs[user.ID] = true
+				contactName := contact.Name
+				if contactName == "" {
+					contactName = contact.PushName
+				}
+				if contactName == "" {
+					contactName = user.Name
+				}
+				results = append(results, domain.ContactMatchResult{
+					UserID: user.ID,
+					Name:   contactName,
+					Phone:  cleanPhone,
+					Email:  user.Email,
+				})
+			}
+		}
+	}
+
+	if results == nil {
+		results = []domain.ContactMatchResult{}
+	}
+	return results, nil
+}
+
 // HandleWebhook processa eventos de atualização de conexão e mensagens recebidas.
 func (s *WhatsAppService) HandleWebhook(ctx context.Context, eventType string, payload []byte) error {
 	var base struct {
@@ -244,12 +315,15 @@ func (s *WhatsAppService) HandleWebhook(ctx context.Context, eventType string, p
 			Key struct {
 				RemoteJid string `json:"remoteJid"`
 				FromMe    bool   `json:"fromMe"`
+				ID        string `json:"id"`
 			} `json:"key"`
-			Message struct {
-				Conversation        string `json:"conversation"`
+			MessageType string `json:"messageType"`
+			Message     struct {
+				Conversation        string                 `json:"conversation"`
 				ExtendedTextMessage struct {
 					Text string `json:"text"`
 				} `json:"extendedTextMessage"`
+				AudioMessage map[string]interface{} `json:"audioMessage"`
 			} `json:"message"`
 		}
 		if err := json.Unmarshal(base.Data, &msgData); err != nil {
@@ -260,6 +334,22 @@ func (s *WhatsAppService) HandleWebhook(ctx context.Context, eventType string, p
 		if rawText == "" {
 			rawText = msgData.Message.ExtendedTextMessage.Text
 		}
+
+		// Se for áudio e tiver transcritor disponível (Groq Whisper), baixa e transcreve
+		isAudio := msgData.MessageType == "audioMessage" || msgData.Message.AudioMessage != nil
+		if strings.TrimSpace(rawText) == "" && isAudio && s.audioTranscriber != nil {
+			b64, err := s.client.GetMediaBase64(ctx, base.Instance, base.Data)
+			if err == nil && b64 != "" {
+				audioBytes, decodeErr := base64.StdEncoding.DecodeString(b64)
+				if decodeErr == nil && len(audioBytes) > 0 {
+					transcribed, trErr := s.audioTranscriber.Transcribe(ctx, bytes.NewReader(audioBytes), "audio.ogg")
+					if trErr == nil && strings.TrimSpace(transcribed) != "" {
+						rawText = strings.TrimSpace(transcribed)
+					}
+				}
+			}
+		}
+
 		rawText = strings.TrimSpace(rawText)
 		if rawText == "" {
 			return nil
@@ -270,14 +360,15 @@ func (s *WhatsAppService) HandleWebhook(ctx context.Context, eventType string, p
 			return nil
 		}
 
+		reVito := regexp.MustCompile(`(?i)(@vito|!vito|/vito|vito:)\s*`)
+		hasVitoTrigger := reVito.MatchString(rawText)
+
 		isGroup := strings.HasSuffix(msgData.Key.RemoteJid, "@g.us")
 		if isGroup {
-			lower := strings.ToLower(rawText)
-			if !strings.Contains(lower, "@vito") && !strings.HasPrefix(lower, "vito:") {
+			if !hasVitoTrigger {
 				// Privacidade em grupos: ignora conversas onde o Vito não foi mencionado
 				return nil
 			}
-			reVito := regexp.MustCompile(`(?i)@vito\s*|vito:\s*`)
 			rawText = strings.TrimSpace(reVito.ReplaceAllString(rawText, ""))
 			if rawText == "" {
 				rawText = "olá"
@@ -285,21 +376,18 @@ func (s *WhatsAppService) HandleWebhook(ctx context.Context, eventType string, p
 		} else {
 			// Em chats privados (1-on-1):
 			// Se for o chat consigo mesmo ("Você" / seu próprio número), processa diretamente qualquer mensagem.
-			// Se for chat privado com amigos/família/terceiros, só processa se contiver @vito ou vito:
-			// (seja enviado pelo usuário ou pelo contato). Isso blinda totalmente as conversas privadas normais.
+			// Se for chat privado com amigos/família/terceiros, só processa se contiver gatilho do Vito.
 			integration, err := s.repo.GetByInstanceName(ctx, base.Instance)
 			if err != nil || integration == nil {
 				return nil
 			}
 			cleanJid := strings.Split(msgData.Key.RemoteJid, "@")[0]
 			isSelfChat := isMatchingPhone(cleanJid, integration.Phone)
-			hasVitoTrigger := strings.Contains(strings.ToLower(rawText), "@vito") || strings.HasPrefix(strings.ToLower(rawText), "vito:")
 
 			if !isSelfChat && !hasVitoTrigger {
 				return nil
 			}
 			if hasVitoTrigger {
-				reVito := regexp.MustCompile(`(?i)@vito\s*|vito:\s*`)
 				rawText = strings.TrimSpace(reVito.ReplaceAllString(rawText, ""))
 				if rawText == "" {
 					rawText = "olá"
@@ -330,7 +418,11 @@ func (s *WhatsAppService) HandleWebhook(ctx context.Context, eventType string, p
 		}
 		if replyText != "" {
 			formattedReply := fmt.Sprintf("🎩 Vito:\n\n%s", replyText)
-			_ = s.client.SendText(ctx, base.Instance, msgData.Key.RemoteJid, formattedReply)
+			if isGroup && msgData.Key.ID != "" {
+				_ = s.client.SendTextWithQuoted(ctx, base.Instance, msgData.Key.RemoteJid, formattedReply, msgData.Key.ID)
+			} else {
+				_ = s.client.SendText(ctx, base.Instance, msgData.Key.RemoteJid, formattedReply)
+			}
 
 			if s.notifSender != nil {
 				notifBody := replyText

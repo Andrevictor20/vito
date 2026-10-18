@@ -64,6 +64,10 @@ func (m *mockEvolutionClient) Logout(ctx context.Context, instanceName string) e
 }
 
 func (m *mockEvolutionClient) SendText(ctx context.Context, instanceName, to, text string) error {
+	return m.SendTextWithQuoted(ctx, instanceName, to, text, "")
+}
+
+func (m *mockEvolutionClient) SendTextWithQuoted(ctx context.Context, instanceName, to, text, quotedID string) error {
 	m.sentMessages = append(m.sentMessages, struct {
 		Instance string
 		To       string
@@ -74,6 +78,14 @@ func (m *mockEvolutionClient) SendText(ctx context.Context, instanceName, to, te
 		Text:     text,
 	})
 	return nil
+}
+
+func (m *mockEvolutionClient) GetMediaBase64(ctx context.Context, instanceName string, messagePayload interface{}) (string, error) {
+	return "", nil
+}
+
+func (m *mockEvolutionClient) FindContacts(ctx context.Context, instanceName string) ([]service.WhatsAppContact, error) {
+	return nil, nil
 }
 
 type mockWhatsAppAIGateway struct{}

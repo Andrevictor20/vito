@@ -278,6 +278,7 @@ func (s *Server) registerRoutes() {
 						wr.Get("/status", s.whatsappHandler.GetStatus)
 						wr.Post("/pairing-code", s.whatsappHandler.RequestPairingCode)
 						wr.Delete("/disconnect", s.whatsappHandler.Disconnect)
+						wr.Get("/contacts", s.whatsappHandler.GetContacts)
 					})
 				}
 

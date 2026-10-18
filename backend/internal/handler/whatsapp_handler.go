@@ -113,6 +113,26 @@ func (h *WhatsAppHandler) Disconnect(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// GetContacts retorna os contatos do WhatsApp que possuem conta ativa no Vito.
+func (h *WhatsAppHandler) GetContacts(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "não autorizado"})
+		return
+	}
+
+	matches, err := h.waSvc.MatchWhatsAppContacts(r.Context(), userID)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "falha ao buscar contatos do whatsapp"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"contacts": matches,
+		"count":    len(matches),
+	})
+}
+
 // Webhook recebe notificações assíncronas enviadas pela Evolution API v2.
 func (h *WhatsAppHandler) Webhook(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)

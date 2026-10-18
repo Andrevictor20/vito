@@ -70,4 +70,33 @@ describe('WhatsAppApi Unit Tests', () => {
     assert.equal(calls[0].opt?.method, 'DELETE');
     assert.equal(res.status, 'disconnected');
   });
+
+  test('getContacts consulta o endpoint correto e retorna lista de contatos correspondidos', async () => {
+    const calls: { ep: string; opt?: any }[] = [];
+    const client = {
+      request: async (ep: string, opt?: any) => {
+        calls.push({ ep, opt });
+        return {
+          contacts: [
+            {
+              user_id: 'user-friend-2',
+              name: 'Amigo Vito',
+              phone: '5511988887777',
+              email: 'friend@vito.local',
+            },
+          ],
+          count: 1,
+        };
+      },
+    } as unknown as ApiClient;
+
+    const api = new WhatsAppApi(client);
+    const res = await api.getContacts();
+
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].ep, '/api/v1/integrations/whatsapp/contacts');
+    assert.equal(res.count, 1);
+    assert.equal(res.contacts[0].user_id, 'user-friend-2');
+    assert.equal(res.contacts[0].name, 'Amigo Vito');
+  });
 });

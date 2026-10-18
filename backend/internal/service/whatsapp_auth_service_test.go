@@ -92,6 +92,17 @@ func (m *MockEvolutionClientForAuth) SendText(ctx context.Context, instanceName,
 	m.sentText = text
 	return nil
 }
+func (m *MockEvolutionClientForAuth) SendTextWithQuoted(ctx context.Context, instanceName, to, text, quotedID string) error {
+	m.sentTo = to
+	m.sentText = text
+	return nil
+}
+func (m *MockEvolutionClientForAuth) GetMediaBase64(ctx context.Context, instanceName string, messagePayload interface{}) (string, error) {
+	return "", nil
+}
+func (m *MockEvolutionClientForAuth) FindContacts(ctx context.Context, instanceName string) ([]service.WhatsAppContact, error) {
+	return nil, nil
+}
 
 func TestWhatsAppAuthService_RequestAndVerifyOTP(t *testing.T) {
 	ctx := context.Background()

@@ -47,6 +47,15 @@ func (m *mockEvolutionAPIClientForHandler) Logout(ctx context.Context, instanceN
 func (m *mockEvolutionAPIClientForHandler) SendText(ctx context.Context, instanceName, to, text string) error {
 	return nil
 }
+func (m *mockEvolutionAPIClientForHandler) SendTextWithQuoted(ctx context.Context, instanceName, to, text, quotedID string) error {
+	return nil
+}
+func (m *mockEvolutionAPIClientForHandler) GetMediaBase64(ctx context.Context, instanceName string, messagePayload interface{}) (string, error) {
+	return "", nil
+}
+func (m *mockEvolutionAPIClientForHandler) FindContacts(ctx context.Context, instanceName string) ([]service.WhatsAppContact, error) {
+	return nil, nil
+}
 
 type mockHandlerAIGateway struct{}
 
@@ -193,6 +202,39 @@ func TestWhatsAppHandler_Webhook_PublicEndpoint(t *testing.T) {
 	}
 }
 
+func TestWhatsAppHandler_GetContacts(t *testing.T) {
+	h, _ := setupWhatsAppHandlerTest(t)
+
+	// Sem autenticação -> 401
+	unauthReq := httptest.NewRequest(http.MethodGet, "/api/v1/integrations/whatsapp/contacts", nil)
+	unauthRec := httptest.NewRecorder()
+	h.GetContacts(unauthRec, unauthReq)
+	if unauthRec.Code != http.StatusUnauthorized {
+		t.Errorf("esperava 401 Unauthorized, obteve %d", unauthRec.Code)
+	}
+
+	// Com autenticação -> 200 OK
+	ctx := context.WithValue(context.Background(), middleware.UserIDKey, "user-h-1")
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/integrations/whatsapp/contacts", nil).WithContext(ctx)
+	rec := httptest.NewRecorder()
+	h.GetContacts(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("esperava 200 OK, obteve %d", rec.Code)
+	}
+
+	var res struct {
+		Contacts []domain.ContactMatchResult `json:"contacts"`
+		Count    int                         `json:"count"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&res); err != nil {
+		t.Fatalf("falha ao deserializar resposta: %v", err)
+	}
+	if res.Contacts == nil {
+		t.Errorf("contacts array não deveria ser nulo")
+	}
+}
+
 func stringsReader(s string) *bytes.Reader {
 	return bytes.NewReader([]byte(s))
 }
+

@@ -430,6 +430,9 @@ export class ApiService extends ApiClient {
   disconnectWhatsApp(): Promise<{ message: string; status: string }> {
     return this.whatsappApi.disconnect();
   }
+  getWhatsAppContacts(): Promise<{ contacts: import('./whatsappApi').WhatsAppMatchedContact[]; count: number }> {
+    return this.whatsappApi.getContacts();
+  }
   get whatsapp(): WhatsAppApi {
     return this.whatsappApi;
   }

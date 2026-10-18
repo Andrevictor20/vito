@@ -295,6 +295,10 @@ func main() {
 		EvolutionAPIKey: cfg.EvolutionAPIKey,
 	}, waRepo, evoClient, astSvc)
 	waSvc.SetNotificationSender(notifSvc)
+	waSvc.SetUserRepo(userRepo)
+	if cfg.GroqAPIKey != "" {
+		waSvc.SetAudioTranscriber(ai.NewGroqWhisper(cfg.GroqAPIKey))
+	}
 	whatsappHandler := handler.NewWhatsAppHandler(waSvc)
 
 	// Gmail Conector & Scanner

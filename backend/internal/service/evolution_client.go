@@ -11,6 +11,15 @@ import (
 	"time"
 )
 
+// WhatsAppContact representa um contato retornado pela Evolution API v2.
+type WhatsAppContact struct {
+	ID            string `json:"id"`
+	Name          string `json:"name"`
+	PushName      string `json:"pushName"`
+	Number        string `json:"number"`
+	ProfilePicURL string `json:"profilePicUrl,omitempty"`
+}
+
 // EvolutionAPIClient abstrai as chamadas HTTP para o container da Evolution API v2.
 type EvolutionAPIClient interface {
 	CreateInstance(ctx context.Context, instanceName, phone string) error
@@ -21,6 +30,9 @@ type EvolutionAPIClient interface {
 	DeleteInstance(ctx context.Context, instanceName string) error
 	Logout(ctx context.Context, instanceName string) error
 	SendText(ctx context.Context, instanceName, to, text string) error
+	SendTextWithQuoted(ctx context.Context, instanceName, to, text, quotedID string) error
+	GetMediaBase64(ctx context.Context, instanceName string, messagePayload interface{}) (string, error)
+	FindContacts(ctx context.Context, instanceName string) ([]WhatsAppContact, error)
 }
 
 // DefaultEvolutionClient implementa EvolutionAPIClient via chamadas REST para a Evolution API.
@@ -272,9 +284,20 @@ func (c *DefaultEvolutionClient) Logout(ctx context.Context, instanceName string
 }
 
 func (c *DefaultEvolutionClient) SendText(ctx context.Context, instanceName, to, text string) error {
+	return c.SendTextWithQuoted(ctx, instanceName, to, text, "")
+}
+
+func (c *DefaultEvolutionClient) SendTextWithQuoted(ctx context.Context, instanceName, to, text, quotedID string) error {
 	payload := map[string]interface{}{
 		"number": to,
 		"text":   text,
+	}
+	if quotedID != "" {
+		payload["quoted"] = map[string]interface{}{
+			"key": map[string]interface{}{
+				"id": quotedID,
+			},
+		}
 	}
 	path := fmt.Sprintf("/message/sendText/%s", instanceName)
 	resp, err := c.doRequest(ctx, http.MethodPost, path, payload)
@@ -289,3 +312,63 @@ func (c *DefaultEvolutionClient) SendText(ctx context.Context, instanceName, to,
 	bodyBytes, _ := io.ReadAll(resp.Body)
 	return fmt.Errorf("evolution api sendText falhou (status %d): %s", resp.StatusCode, string(bodyBytes))
 }
+
+func (c *DefaultEvolutionClient) GetMediaBase64(ctx context.Context, instanceName string, messagePayload interface{}) (string, error) {
+	path := fmt.Sprintf("/chat/getBase64FromMediaMessage/%s", instanceName)
+	payload := map[string]interface{}{
+		"message":      messagePayload,
+		"convertToMp4": false,
+	}
+	resp, err := c.doRequest(ctx, http.MethodPost, path, payload)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", fmt.Errorf("evolution api getBase64 falhou (status %d): %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	var parsed struct {
+		Base64 string `json:"base64"`
+	}
+	if err := json.Unmarshal(bodyBytes, &parsed); err != nil {
+		return "", err
+	}
+
+	raw := parsed.Base64
+	if idx := strings.Index(raw, ";base64,"); idx != -1 {
+		raw = raw[idx+8:]
+	}
+	return strings.TrimSpace(raw), nil
+}
+
+func (c *DefaultEvolutionClient) FindContacts(ctx context.Context, instanceName string) ([]WhatsAppContact, error) {
+	path := fmt.Sprintf("/chat/findContacts/%s", instanceName)
+	resp, err := c.doRequest(ctx, http.MethodPost, path, map[string]interface{}{})
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("evolution api findContacts falhou (status %d): %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	var contacts []WhatsAppContact
+	if err := json.Unmarshal(bodyBytes, &contacts); err != nil {
+		return nil, err
+	}
+	return contacts, nil
+}
+

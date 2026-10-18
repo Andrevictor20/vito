@@ -8,6 +8,13 @@ export interface WhatsAppIntegrationStatus {
   last_connected_at?: string;
 }
 
+export interface WhatsAppMatchedContact {
+  user_id: string;
+  name: string;
+  phone?: string;
+  email?: string;
+}
+
 export class WhatsAppApi {
   constructor(private client: ApiClient) {}
 
@@ -26,5 +33,9 @@ export class WhatsAppApi {
     return this.client.request<{ message: string; status: string }>('/api/v1/integrations/whatsapp/disconnect', {
       method: 'DELETE',
     });
+  }
+
+  async getContacts(): Promise<{ contacts: WhatsAppMatchedContact[]; count: number }> {
+    return this.client.request<{ contacts: WhatsAppMatchedContact[]; count: number }>('/api/v1/integrations/whatsapp/contacts');
   }
 }
