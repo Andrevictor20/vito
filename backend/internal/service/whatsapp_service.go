@@ -90,6 +90,13 @@ func (s *WhatsAppService) RequestPairingCode(ctx context.Context, userID, rawPho
 
 	instanceName := MakeInstanceName(userID)
 
+	// Se a instância já existe mas não está conectada ("open"), remove a instância anterior
+	// para evitar que um socket zumbi ou estado "connecting" com count:0 bloqueie o novo código.
+	state, _ := s.client.GetConnectionState(ctx, instanceName)
+	if !strings.EqualFold(state, "open") {
+		_ = s.client.DeleteInstance(ctx, instanceName)
+	}
+
 	if err := s.client.CreateInstance(ctx, instanceName, phone); err != nil {
 		log.Printf("⚠️ [WhatsAppService] Erro ao criar instância %s: %v", instanceName, err)
 	}
@@ -101,7 +108,12 @@ func (s *WhatsAppService) RequestPairingCode(ctx context.Context, userID, rawPho
 
 	code, err := s.client.GetPairingCode(ctx, instanceName, phone)
 	if err != nil {
-		return "", fmt.Errorf("falha ao gerar código de pareamento: %w", err)
+		// Tolerância para o Baileys inicializar pre-keys caso o primeiro GET ocorra durante o boot da instância
+		time.Sleep(1 * time.Second)
+		code, err = s.client.GetPairingCode(ctx, instanceName, phone)
+		if err != nil {
+			return "", fmt.Errorf("falha ao gerar código de pareamento: %w", err)
+		}
 	}
 
 	existing, err := s.repo.GetByUserID(ctx, userID)

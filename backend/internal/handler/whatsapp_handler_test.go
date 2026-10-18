@@ -35,6 +35,9 @@ func (m *mockEvolutionAPIClientForHandler) GetPairingCode(ctx context.Context, i
 func (m *mockEvolutionAPIClientForHandler) GetConnectionState(ctx context.Context, instanceName string) (string, error) {
 	return "close", nil
 }
+func (m *mockEvolutionAPIClientForHandler) DeleteInstance(ctx context.Context, instanceName string) error {
+	return nil
+}
 func (m *mockEvolutionAPIClientForHandler) Logout(ctx context.Context, instanceName string) error {
 	return nil
 }

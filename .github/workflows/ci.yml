@@ -118,7 +118,7 @@ jobs:
           git reset --hard origin/main
           # Encerra contêineres presos com timeout curto para liberar o dockerd imediatamente
           docker stop -t 5 vito-evolution-api vito-backend || docker kill vito-evolution-api vito-backend || true
-          docker compose pull --quiet backend
+          docker compose pull --quiet backend evolution-api
           docker compose run -T --rm --no-deps --user 0:0 --entrypoint sh backend -c "mkdir -p /app/data /app/data/backups /app/backups && chown -R 10001:10001 /app/data /app/backups && chmod 0700 /app/data /app/backups" || true
           docker compose up -d --force-recreate --remove-orphans evolution-postgres backend evolution-api
           docker image prune -f

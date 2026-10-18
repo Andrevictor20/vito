@@ -20,6 +20,7 @@ type mockEvolutionClient struct {
 	setWebhookCalled     bool
 	getPairingCodeCalled bool
 	logoutCalled         bool
+	deleteInstanceCalled bool
 	sentMessages         []struct {
 		Instance string
 		To       string
@@ -46,6 +47,11 @@ func (m *mockEvolutionClient) GetPairingCode(ctx context.Context, instanceName, 
 
 func (m *mockEvolutionClient) GetConnectionState(ctx context.Context, instanceName string) (string, error) {
 	return m.mockState, nil
+}
+
+func (m *mockEvolutionClient) DeleteInstance(ctx context.Context, instanceName string) error {
+	m.deleteInstanceCalled = true
+	return nil
 }
 
 func (m *mockEvolutionClient) Logout(ctx context.Context, instanceName string) error {

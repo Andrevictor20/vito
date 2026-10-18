@@ -17,6 +17,7 @@ type EvolutionAPIClient interface {
 	SetWebhook(ctx context.Context, instanceName, webhookURL string) error
 	GetPairingCode(ctx context.Context, instanceName, phone string) (string, error)
 	GetConnectionState(ctx context.Context, instanceName string) (string, error)
+	DeleteInstance(ctx context.Context, instanceName string) error
 	Logout(ctx context.Context, instanceName string) error
 	SendText(ctx context.Context, instanceName, to, text string) error
 }
@@ -136,39 +137,71 @@ func (c *DefaultEvolutionClient) SetWebhook(ctx context.Context, instanceName, w
 	return fmt.Errorf("evolution api set webhook falhou (status %d): %s", respFlat.StatusCode, string(bodyBytes))
 }
 
-func (c *DefaultEvolutionClient) GetPairingCode(ctx context.Context, instanceName, phone string) (string, error) {
-	path := fmt.Sprintf("/instance/connect/%s?number=%s", instanceName, phone)
-	resp, err := c.doRequest(ctx, http.MethodGet, path, nil)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return "", fmt.Errorf("evolution api get pairing code falhou (status %d): %s", resp.StatusCode, string(bodyBytes))
-	}
-
+func extractPairingCodeFromBody(bodyBytes []byte) string {
 	var parsed struct {
 		PairingCode string `json:"pairingCode"`
 		Code        string `json:"code"`
 	}
-	if err := json.Unmarshal(bodyBytes, &parsed); err != nil {
-		return "", err
+	if err := json.Unmarshal(bodyBytes, &parsed); err == nil {
+		if parsed.PairingCode != "" {
+			return parsed.PairingCode
+		}
+		if parsed.Code != "" {
+			return parsed.Code
+		}
+	}
+	return ""
+}
+
+func (c *DefaultEvolutionClient) GetPairingCode(ctx context.Context, instanceName, phone string) (string, error) {
+	var lastBody []byte
+
+	// Tentativa 1: GET /instance/connect/{instanceName}?number={phone}
+	path := fmt.Sprintf("/instance/connect/%s?number=%s", instanceName, phone)
+	resp, err := c.doRequest(ctx, http.MethodGet, path, nil)
+	if err == nil {
+		defer resp.Body.Close()
+		bodyBytes, errRead := io.ReadAll(resp.Body)
+		if errRead == nil && resp.StatusCode >= 200 && resp.StatusCode < 300 {
+			lastBody = bodyBytes
+			if code := extractPairingCodeFromBody(bodyBytes); code != "" {
+				return code, nil
+			}
+		}
 	}
 
-	resCode := parsed.PairingCode
-	if resCode == "" {
-		resCode = parsed.Code
+	// Tentativa 2: POST /instance/connect/{instanceName} com body {"number": phone}
+	postPath := fmt.Sprintf("/instance/connect/%s", instanceName)
+	respPost, errPost := c.doRequest(ctx, http.MethodPost, postPath, map[string]interface{}{"number": phone})
+	if errPost == nil {
+		defer respPost.Body.Close()
+		bodyBytes, errRead := io.ReadAll(respPost.Body)
+		if errRead == nil && respPost.StatusCode >= 200 && respPost.StatusCode < 300 {
+			lastBody = bodyBytes
+			if code := extractPairingCodeFromBody(bodyBytes); code != "" {
+				return code, nil
+			}
+		}
 	}
-	if resCode == "" {
-		return "", fmt.Errorf("código de pareamento vazio na resposta da Evolution API: %s", string(bodyBytes))
+
+	// Tentativa 3: POST /instance/pair/{instanceName} com body {"number": phone, "phone": phone}
+	pairPath := fmt.Sprintf("/instance/pair/%s", instanceName)
+	respPair, errPair := c.doRequest(ctx, http.MethodPost, pairPath, map[string]interface{}{"number": phone, "phone": phone})
+	if errPair == nil {
+		defer respPair.Body.Close()
+		bodyBytes, errRead := io.ReadAll(respPair.Body)
+		if errRead == nil && respPair.StatusCode >= 200 && respPair.StatusCode < 300 {
+			lastBody = bodyBytes
+			if code := extractPairingCodeFromBody(bodyBytes); code != "" {
+				return code, nil
+			}
+		}
 	}
-	return resCode, nil
+
+	if len(lastBody) > 0 {
+		return "", fmt.Errorf("código de pareamento vazio na resposta da Evolution API: %s", string(lastBody))
+	}
+	return "", fmt.Errorf("falha ao comunicar com a Evolution API para obter código de pareamento")
 }
 
 func (c *DefaultEvolutionClient) GetConnectionState(ctx context.Context, instanceName string) (string, error) {
@@ -196,6 +229,16 @@ func (c *DefaultEvolutionClient) GetConnectionState(ctx context.Context, instanc
 		return parsed.Instance.State, nil
 	}
 	return parsed.State, nil
+}
+
+func (c *DefaultEvolutionClient) DeleteInstance(ctx context.Context, instanceName string) error {
+	path := fmt.Sprintf("/instance/delete/%s", instanceName)
+	resp, err := c.doRequest(ctx, http.MethodDelete, path, nil)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	return nil
 }
 
 func (c *DefaultEvolutionClient) Logout(ctx context.Context, instanceName string) error {
