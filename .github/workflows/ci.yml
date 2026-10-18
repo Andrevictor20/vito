@@ -119,7 +119,7 @@ jobs:
           # Encerra contêineres presos com timeout curto para liberar o dockerd imediatamente
           docker stop -t 5 vito-evolution-api vito-backend || docker kill vito-evolution-api vito-backend || true
           docker compose pull --quiet backend
-          docker compose run -T --rm --no-deps --no-build --user 0:0 --entrypoint sh backend -c "mkdir -p /app/data /app/data/backups /app/backups && chown -R 10001:10001 /app/data /app/backups && chmod 0700 /app/data /app/backups" || true
+          docker compose run -T --rm --no-deps --user 0:0 --entrypoint sh backend -c "mkdir -p /app/data /app/data/backups /app/backups && chown -R 10001:10001 /app/data /app/backups && chmod 0700 /app/data /app/backups" || true
           docker compose up -d --force-recreate --remove-orphans evolution-postgres backend evolution-api
           docker image prune -f
 
@@ -135,7 +135,7 @@ jobs:
             sleep 2
           done
           echo "Verificando Evolution API..."
-          for i in $(seq 1 30); do
+          for i in $(seq 1 45); do
             if wget -qO- http://127.0.0.1:8085 > /dev/null 2>&1 || curl -sf http://127.0.0.1:8085 > /dev/null 2>&1; then
               echo "✅ Evolution API OK on attempt $i"
               exit 0
