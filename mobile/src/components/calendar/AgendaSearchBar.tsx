@@ -1,55 +1,87 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, TextInput } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, TextInput, ScrollView } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { tokens } from '../../theme/tokens';
+import { tokens, MD3Shapes } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
-import { BottomSheetModal } from '../ui/BottomSheetModal';
+import { AgendaFilterModal } from './AgendaFilterModal';
+import {
+  AgendaFilterState,
+  DEFAULT_AGENDA_FILTER,
+  countActiveAgendaFilters,
+  AgendaPeriod,
+  AgendaSource,
+  AgendaCategory,
+  AgendaFormat,
+} from '../../utils/agendaFilter';
 
-export type AgendaPeriodFilter = 'all' | 'today' | 'week';
+export type AgendaPeriodFilter = AgendaPeriod;
 
-const PERIODS: Array<{ id: AgendaPeriodFilter; label: string }> = [
-  { id: 'all', label: 'Tudo' },
-  { id: 'today', label: 'Hoje' },
-  { id: 'week', label: '7 dias' },
-];
-
-interface AgendaSearchBarProps {
-  query: string;
-  onQueryChange: (q: string) => void;
-  period: AgendaPeriodFilter;
-  onPeriodChange: (p: AgendaPeriodFilter) => void;
+export interface AgendaSearchBarProps {
+  filters: AgendaFilterState;
+  onFiltersChange: (f: AgendaFilterState) => void;
   resultCount: number;
 }
 
-/** Busca + filtros da Agenda (espelho do padrão de Tarefas). */
+/** Busca + filtros completos da Agenda (período, origem, categoria e formato). */
 export const AgendaSearchBar: React.FC<AgendaSearchBarProps> = ({
-  query,
-  onQueryChange,
-  period,
-  onPeriodChange,
+  filters,
+  onFiltersChange,
   resultCount,
 }) => {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const [filterVisible, setFilterVisible] = useState(false);
-  const filtered = period !== 'all';
+  const activeCount = countActiveAgendaFilters(filters);
+  const hasActiveFilters = activeCount > 0 || !!filters.query;
+
+  const handleQueryChange = (q: string) => {
+    onFiltersChange({ ...filters, query: q });
+  };
+
+  const handlePeriodChange = (p: AgendaPeriod) => {
+    onFiltersChange({ ...filters, period: p });
+  };
+
+  const handleSourceChange = (s: AgendaSource) => {
+    onFiltersChange({ ...filters, source: s });
+  };
+
+  const handleCategoryChange = (c: AgendaCategory) => {
+    onFiltersChange({ ...filters, category: c });
+  };
+
+  const handleFormatChange = (f: AgendaFormat) => {
+    onFiltersChange({ ...filters, format: f });
+  };
+
+  const handleClearAll = () => {
+    onFiltersChange(DEFAULT_AGENDA_FILTER);
+  };
 
   return (
-    <View>
+    <View style={styles.container}>
       <View style={styles.row}>
-        <View style={[styles.searchBox, { backgroundColor: colors.surfaceContainerLow, borderColor: colors.outlineVariant }]}>
-          <MaterialIcons name="search" size={18} color={colors.onSurfaceVariant} />
+        <View
+          style={[
+            styles.searchBox,
+            {
+              backgroundColor: isDark ? colors.surfaceContainerLow : '#F4F4F5',
+              borderColor: colors.outlineVariant,
+            },
+          ]}
+        >
+          <MaterialIcons name="search" size={20} color={colors.onSurfaceVariant} />
           <TextInput
             style={[styles.input, { color: colors.onSurface }]}
-            value={query}
-            onChangeText={onQueryChange}
-            placeholder="Pesquisar eventos..."
+            value={filters.query}
+            onChangeText={handleQueryChange}
+            placeholder="Pesquisar eventos, locais..."
             placeholderTextColor={colors.textMuted}
             returnKeyType="search"
             accessibilityLabel="Pesquisar eventos"
           />
-          {query.length > 0 && (
+          {filters.query.length > 0 && (
             <TouchableOpacity
-              onPress={() => onQueryChange('')}
+              onPress={() => handleQueryChange('')}
               hitSlop={tokens.hitSlop.sm}
               accessibilityLabel="Limpar busca"
               accessibilityRole="button"
@@ -62,91 +94,216 @@ export const AgendaSearchBar: React.FC<AgendaSearchBarProps> = ({
           style={[
             styles.filterBtn,
             {
-              backgroundColor: filtered ? colors.primary : colors.surfaceContainerLow,
+              backgroundColor: activeCount > 0 ? colors.primary : (isDark ? colors.surfaceContainerLow : '#F4F4F5'),
               borderColor: colors.outlineVariant,
             },
           ]}
           onPress={() => setFilterVisible(true)}
           activeOpacity={0.8}
           hitSlop={tokens.hitSlop.sm}
-          accessibilityLabel="Filtrar agenda por período"
+          accessibilityLabel="Abrir filtros avançados da agenda"
           accessibilityRole="button"
         >
           <MaterialIcons
-            name="filter-list"
+            name="tune"
             size={20}
-            color={filtered ? colors.onPrimary : colors.onSurface}
+            color={activeCount > 0 ? colors.onPrimary : colors.onSurface}
           />
+          {activeCount > 0 && (
+            <View style={[styles.filterBadge, { backgroundColor: colors.accents.sky }]}>
+              <Text style={styles.filterBadgeText}>{activeCount}</Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
 
-      <BottomSheetModal
+      {/* Barra de Filtros Rápidos com Rolagem Horizontal */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.quickChipsContent}
+        style={styles.quickChipsScroll}
+      >
+        <TouchableOpacity
+          style={[
+            styles.quickChip,
+            {
+              backgroundColor:
+                filters.period === 'all' &&
+                filters.category === 'all' &&
+                filters.source === 'all' &&
+                filters.format === 'all'
+                  ? colors.primary
+                  : (isDark ? colors.surfaceContainerLow : '#F4F4F5'),
+              borderColor: colors.outlineVariant,
+            },
+          ]}
+          onPress={handleClearAll}
+          activeOpacity={0.75}
+        >
+          <Text
+            style={[
+              styles.quickChipText,
+              {
+                color:
+                  filters.period === 'all' &&
+                  filters.category === 'all' &&
+                  filters.source === 'all' &&
+                  filters.format === 'all'
+                    ? colors.onPrimary
+                    : colors.onSurface,
+              },
+            ]}
+          >
+            Todos
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.quickChip,
+            {
+              backgroundColor: filters.period === 'today' ? colors.primary : (isDark ? colors.surfaceContainerLow : '#F4F4F5'),
+              borderColor: colors.outlineVariant,
+            },
+          ]}
+          onPress={() => handlePeriodChange(filters.period === 'today' ? 'all' : 'today')}
+          activeOpacity={0.75}
+        >
+          <Text style={[styles.quickChipText, { color: filters.period === 'today' ? colors.onPrimary : colors.onSurface }]}>
+            Hoje
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.quickChip,
+            {
+              backgroundColor: filters.period === 'week' ? colors.primary : (isDark ? colors.surfaceContainerLow : '#F4F4F5'),
+              borderColor: colors.outlineVariant,
+            },
+          ]}
+          onPress={() => handlePeriodChange(filters.period === 'week' ? 'all' : 'week')}
+          activeOpacity={0.75}
+        >
+          <Text style={[styles.quickChipText, { color: filters.period === 'week' ? colors.onPrimary : colors.onSurface }]}>
+            7 dias
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.quickChip,
+            {
+              backgroundColor: filters.period === 'month' ? colors.primary : (isDark ? colors.surfaceContainerLow : '#F4F4F5'),
+              borderColor: colors.outlineVariant,
+            },
+          ]}
+          onPress={() => handlePeriodChange(filters.period === 'month' ? 'all' : 'month')}
+          activeOpacity={0.75}
+        >
+          <Text style={[styles.quickChipText, { color: filters.period === 'month' ? colors.onPrimary : colors.onSurface }]}>
+            Este mês
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.quickChip,
+            {
+              backgroundColor: filters.source === 'google' ? colors.primary : (isDark ? colors.surfaceContainerLow : '#F4F4F5'),
+              borderColor: colors.outlineVariant,
+            },
+          ]}
+          onPress={() => handleSourceChange(filters.source === 'google' ? 'all' : 'google')}
+          activeOpacity={0.75}
+        >
+          <Text style={[styles.quickChipText, { color: filters.source === 'google' ? colors.onPrimary : colors.onSurface }]}>
+            Google
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.quickChip,
+            {
+              backgroundColor: filters.category === 'work' ? colors.primary : (isDark ? colors.surfaceContainerLow : '#F4F4F5'),
+              borderColor: colors.outlineVariant,
+            },
+          ]}
+          onPress={() => handleCategoryChange(filters.category === 'work' ? 'all' : 'work')}
+          activeOpacity={0.75}
+        >
+          <Text style={[styles.quickChipText, { color: filters.category === 'work' ? colors.onPrimary : colors.onSurface }]}>
+            Trabalho
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.quickChip,
+            {
+              backgroundColor: filters.category === 'holiday' ? colors.primary : (isDark ? colors.surfaceContainerLow : '#F4F4F5'),
+              borderColor: colors.outlineVariant,
+            },
+          ]}
+          onPress={() => handleCategoryChange(filters.category === 'holiday' ? 'all' : 'holiday')}
+          activeOpacity={0.75}
+        >
+          <Text style={[styles.quickChipText, { color: filters.category === 'holiday' ? colors.onPrimary : colors.onSurface }]}>
+            Feriados
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.quickChip,
+            {
+              backgroundColor: filters.category === 'study' ? colors.primary : (isDark ? colors.surfaceContainerLow : '#F4F4F5'),
+              borderColor: colors.outlineVariant,
+            },
+          ]}
+          onPress={() => handleCategoryChange(filters.category === 'study' ? 'all' : 'study')}
+          activeOpacity={0.75}
+        >
+          <Text style={[styles.quickChipText, { color: filters.category === 'study' ? colors.onPrimary : colors.onSurface }]}>
+            Estudo
+          </Text>
+        </TouchableOpacity>
+      </ScrollView>
+
+      {/* Indicador de Filtros Ativos */}
+      {hasActiveFilters && (
+        <View style={styles.activeFilterRow}>
+          <Text style={[styles.activeFilterText, { color: colors.textMuted }]}>
+            {resultCount} {resultCount === 1 ? 'evento filtrado' : 'eventos filtrados'}
+            {filters.query ? ` para "${filters.query.trim()}"` : ''}
+          </Text>
+          <TouchableOpacity onPress={handleClearAll} activeOpacity={0.7}>
+            <Text style={[styles.clearFilterLink, { color: colors.primary }]}>Limpar filtros</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      <AgendaFilterModal
         visible={filterVisible}
         onClose={() => setFilterVisible(false)}
-        title="Filtrar Agenda"
-        subtitle="Refine os compromissos exibidos"
-      >
-        <Text style={[styles.groupLabel, { color: colors.textMuted }]}>PERÍODO</Text>
-        <View style={styles.grid}>
-          {PERIODS.map((p) => {
-            const active = period === p.id;
-            return (
-              <TouchableOpacity
-                key={p.id}
-                style={[
-                  styles.chip,
-                  {
-                    backgroundColor: active ? colors.primary : colors.surfaceContainerLow,
-                    borderColor: colors.outlineVariant,
-                  },
-                ]}
-                onPress={() => onPeriodChange(p.id)}
-                activeOpacity={0.8}
-                hitSlop={tokens.hitSlop.sm}
-                accessibilityRole="button"
-                accessibilityState={{ selected: active }}
-                accessibilityLabel={`Período ${p.label}`}
-              >
-                <Text style={[styles.chipText, { color: active ? colors.onPrimary : colors.onSurface }]}>
-                  {p.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-        <View style={styles.footer}>
-          <TouchableOpacity
-            style={[styles.clearBtn, { borderColor: colors.outlineVariant }]}
-            onPress={() => { onPeriodChange('all'); onQueryChange(''); }}
-            activeOpacity={0.8}
-            accessibilityLabel="Limpar filtros da agenda"
-            accessibilityRole="button"
-          >
-            <Text style={[styles.clearText, { color: colors.onSurface }]}>Limpar</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.applyBtn, { backgroundColor: colors.primary }]}
-            onPress={() => setFilterVisible(false)}
-            activeOpacity={0.85}
-            accessibilityLabel={`Mostrar ${resultCount} eventos`}
-            accessibilityRole="button"
-          >
-            <Text style={[styles.applyText, { color: colors.onPrimary }]}>
-              Mostrar {resultCount} eventos
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </BottomSheetModal>
+        filters={filters}
+        onFiltersChange={onFiltersChange}
+        resultCount={resultCount}
+      />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  container: {
+    marginBottom: tokens.spacing.sm,
+  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: tokens.spacing.sm,
   },
   searchBox: {
     flex: 1,
@@ -155,7 +312,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 14,
     paddingHorizontal: 12,
-    minHeight: 48,
+    minHeight: 46,
     gap: 8,
   },
   input: {
@@ -164,63 +321,62 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   filterBtn: {
-    width: 48,
-    height: 48,
+    width: 46,
+    height: 46,
     borderRadius: 14,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    position: 'relative',
   },
-  groupLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.6,
-    marginTop: tokens.spacing.md,
-    marginBottom: tokens.spacing.xs,
-  },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  chip: {
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    minHeight: 44,
-    justifyContent: 'center',
-  },
-  chipText: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  footer: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: tokens.spacing.lg,
-  },
-  clearBtn: {
-    flex: 1,
-    borderWidth: 1,
-    borderRadius: 12,
+  filterBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 48,
   },
-  clearText: {
-    fontSize: 14,
+  filterBadgeText: {
+    color: '#000',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  quickChipsScroll: {
+    marginTop: 8,
+  },
+  quickChipsContent: {
+    gap: 6,
+    paddingRight: 8,
+  },
+  quickChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: MD3Shapes.full,
+    borderWidth: 1,
+    minHeight: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  quickChipText: {
+    fontSize: 12,
     fontWeight: '700',
   },
-  applyBtn: {
-    flex: 2,
-    borderRadius: 12,
+  activeFilterRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 48,
+    marginTop: 8,
+    paddingHorizontal: 2,
   },
-  applyText: {
-    fontSize: 14,
+  activeFilterText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  clearFilterLink: {
+    fontSize: 12,
     fontWeight: '700',
   },
 });

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Header, HeaderPill } from '../components/common/Header';
 import { ExecutiveSummariesHubView } from '../screens/ExecutiveSummariesHubView';
+import { FullMonthCalendarView } from '../components/calendar/FullMonthCalendarView';
 import { AgendaView } from '../components/home/AgendaView';
 import { CreateItemModal } from '../components/calendar/CreateItemModal';
 import { EditEventModal } from '../components/calendar/EditEventModal';
@@ -32,10 +33,11 @@ export const AgendaTabScreen: React.FC<AgendaTabScreenProps> = ({
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [editVisible, setEditVisible] = useState(false);
   const [createTab, setCreateTab] = useState<'event' | 'todo'>('event');
+  const [showFullCalendar, setShowFullCalendar] = useState(false);
 
   useEffect(() => {
-    onSubViewChange(showSummaries);
-  }, [showSummaries, onSubViewChange]);
+    onSubViewChange(showSummaries || showFullCalendar);
+  }, [showSummaries, showFullCalendar, onSubViewChange]);
 
   useEffect(() => {
     onModalChange(createVisible || editVisible);
@@ -61,6 +63,32 @@ export const AgendaTabScreen: React.FC<AgendaTabScreenProps> = ({
     );
   }
 
+  if (showFullCalendar) {
+    return (
+      <View style={[styles.tabRoot, { backgroundColor: colors.surface }]}>
+        <FullMonthCalendarView
+          selectedDate={home.selectedDate}
+          onSelectDate={home.setSelectedDate}
+          onBack={() => setShowFullCalendar(false)}
+          events={home.events}
+          dayEvents={home.dayEvents}
+          eventDates={home.eventDates}
+          totalTodos={home.todos.length}
+          completedTodos={home.todos.filter((t) => t.status === 'completed').length}
+          onEditEvent={(item) => {
+            setEditingEvent(item);
+            setEditVisible(true);
+          }}
+          onDeleteEvent={home.handleDeleteEvent}
+          onCreateEvent={() => {
+            setCreateTab('event');
+            setCreateVisible(true);
+          }}
+        />
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.tabRoot, { backgroundColor: colors.surface }]}>
       <Header
@@ -69,6 +97,13 @@ export const AgendaTabScreen: React.FC<AgendaTabScreenProps> = ({
         subtitle={dateSubtitle}
         contextualActions={
           <>
+            <HeaderPill
+              label="Calendário"
+              variant="ghost"
+              icon="calendar-month"
+              onPress={() => setShowFullCalendar(true)}
+              accessibilityLabel="Abrir visão do mês em tela cheia"
+            />
             <HeaderPill
               label="Resumos"
               variant="ghost"
@@ -110,6 +145,7 @@ export const AgendaTabScreen: React.FC<AgendaTabScreenProps> = ({
           setCreateTab('event');
           setCreateVisible(true);
         }}
+        onOpenFullCalendar={() => setShowFullCalendar(true)}
       />
       <CreateItemModal
         visible={createVisible}

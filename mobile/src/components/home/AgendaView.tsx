@@ -6,13 +6,19 @@ import {
   ScrollView,
   RefreshControl,
   ActivityIndicator,
+  TouchableOpacity,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens, MD3Shapes } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
-import { ExecutiveMonthCalendarCard } from './ExecutiveMonthCalendarCard';
 import { EventCard } from '../calendar/EventCard';
-import { AgendaSearchBar, AgendaPeriodFilter } from '../calendar/AgendaSearchBar';
+import { AgendaSearchBar } from '../calendar/AgendaSearchBar';
+import {
+  AgendaFilterState,
+  DEFAULT_AGENDA_FILTER,
+  countActiveAgendaFilters,
+  filterAgendaEvents,
+} from '../../utils/agendaFilter';
 import type { Event } from '../../types';
 
 interface AgendaViewProps {
@@ -32,9 +38,10 @@ interface AgendaViewProps {
   onDeleteEvent: (id: string) => void;
   onEditEvent: (ev: Event) => void;
   onCreateEvent: () => void;
+  onOpenFullCalendar?: () => void;
 }
 
-// MOB-03: visão da Agenda extraída do HomeScreen (container fica só com roteamento).
+// MOB-03: visão da Agenda focada nos eventos com busca e filtros completos.
 export const AgendaView: React.FC<AgendaViewProps> = ({
   events,
   loading,
@@ -50,46 +57,24 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
   isTodaySelected,
   onDeleteEvent,
   onEditEvent,
+  onCreateEvent,
+  onOpenFullCalendar,
 }) => {
   const { colors } = useTheme();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [period, setPeriod] = useState<AgendaPeriodFilter>('all');
+  const [filters, setFilters] = useState<AgendaFilterState>(DEFAULT_AGENDA_FILTER);
 
-  const query = searchQuery.trim().toLowerCase();
-  const matchesQuery = (ev: Event) =>
-    !query ||
-    ev.title.toLowerCase().includes(query) ||
-    (ev.location || '').toLowerCase().includes(query);
-  const matchesPeriod = (ev: Event) => {
-    if (period === 'all') return true;
-    const ms = new Date(ev.start_at).getTime();
-    if (Number.isNaN(ms)) return false;
-    const now = new Date();
-    if (period === 'today') {
-      const d = new Date(ms);
-      return (
-        d.getFullYear() === now.getFullYear() &&
-        d.getMonth() === now.getMonth() &&
-        d.getDate() === now.getDate()
-      );
-    }
-    // week: hoje + próximos 7 dias
-    const start = new Date(now);
-    start.setHours(0, 0, 0, 0);
-    const end = start.getTime() + 7 * 24 * 3600 * 1000;
-    return ms >= start.getTime() && ms < end;
-  };
-  const filteredDay = useMemo(
-    () => dayEvents.filter((ev) => matchesQuery(ev)),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [dayEvents, query]
-  );
-  const filteredUpcoming = useMemo(
-    () => upcomingEvents.filter((ev) => matchesQuery(ev) && matchesPeriod(ev)),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [upcomingEvents, query, period]
-  );
-  const searching = query.length > 0 || period !== 'all';
+  const activeFilterCount = countActiveAgendaFilters(filters);
+  const isFiltering = activeFilterCount > 0 || !!filters.query;
+
+  // Eventos filtrados através do utilitário centralizado
+  const filteredAllEvents = useMemo(() => {
+    if (!isFiltering) return [];
+    return filterAgendaEvents(events, filters);
+  }, [events, filters, isFiltering]);
+
+  const totalResultsCount = isFiltering
+    ? filteredAllEvents.length
+    : dayEvents.length + upcomingEvents.length;
 
   return (
     <View style={{ flex: 1 }}>
@@ -106,60 +91,109 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
           />
         }
       >
-        <ExecutiveMonthCalendarCard
-          selectedDate={selectedDate}
-          onSelectDate={onSelectDate}
-          dayEvents={dayEvents}
-          totalTodos={totalTodos}
-          completedTodos={completedTodos}
-          eventDates={eventDates}
-        />
-
+        {/* Barra de Busca e Filtros Completos */}
         <AgendaSearchBar
-          query={searchQuery}
-          onQueryChange={setSearchQuery}
-          period={period}
-          onPeriodChange={setPeriod}
-          resultCount={filteredDay.length + filteredUpcoming.length}
+          filters={filters}
+          onFiltersChange={setFilters}
+          resultCount={totalResultsCount}
         />
 
+        {/* Seção Principal de Eventos (Foco Total nos Compromissos) */}
         <View style={styles.focusSectionContainer}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>
-              {isTodaySelected
-                ? 'Eventos de hoje'
-                : `Eventos de ${selectedDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`}
-            </Text>
-            <View style={[styles.countBadgePill, { backgroundColor: colors.primaryContainer }]}>
-              <Text style={[styles.countBadgeText, { color: colors.onPrimaryContainer }]}>
-                {filteredDay.length} {filteredDay.length === 1 ? 'evento' : 'eventos'}
-              </Text>
-            </View>
-          </View>
-
           {loading && events.length === 0 ? (
             <ActivityIndicator color={colors.primary} style={{ marginVertical: 20 }} />
-          ) : filteredDay.length === 0 ? (
+          ) : isFiltering ? (
+            /* Visualização Filtrada */
             <>
-              <View style={[styles.emptyCard, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
-                <View style={[styles.emptyIconContainer, { backgroundColor: colors.surfaceContainerHigh }]}>
-                  <MaterialIcons name={searching ? 'search-off' : 'event-available'} size={20} color={colors.primary} />
-                </View>
-                <View style={styles.emptyContent}>
-                  <Text style={[styles.emptyTitle, { color: colors.onSurface }]}>
-                    {searching ? `Nada para "${searchQuery.trim()}"` : 'Dia Livre'}
-                  </Text>
-                  <Text style={[styles.emptySub, { color: colors.onSurfaceVariant }]}>
-                    {searching
-                      ? 'Tente outro termo ou limpe a busca.'
-                      : isTodaySelected
-                      ? 'Nenhum compromisso marcado para hoje.'
-                      : `Nenhum compromisso marcado para ${selectedDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}.`}
+              <View style={styles.sectionHeader}>
+                <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>
+                  Eventos Filtrados
+                </Text>
+                <View style={[styles.countBadgePill, { backgroundColor: colors.primaryContainer }]}>
+                  <Text style={[styles.countBadgeText, { color: colors.onPrimaryContainer }]}>
+                    {filteredAllEvents.length} {filteredAllEvents.length === 1 ? 'evento' : 'eventos'}
                   </Text>
                 </View>
               </View>
 
-              {filteredUpcoming.length > 0 && (
+              {filteredAllEvents.length === 0 ? (
+                <View style={[styles.emptyCard, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
+                  <View style={[styles.emptyIconContainer, { backgroundColor: colors.surfaceContainerHigh }]}>
+                    <MaterialIcons name="search-off" size={20} color={colors.primary} />
+                  </View>
+                  <View style={styles.emptyContent}>
+                    <Text style={[styles.emptyTitle, { color: colors.onSurface }]}>
+                      Nenhum evento encontrado
+                    </Text>
+                    <Text style={[styles.emptySub, { color: colors.onSurfaceVariant }]}>
+                      Tente outro termo ou limpe os filtros ativos.
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => setFilters(DEFAULT_AGENDA_FILTER)}
+                      style={{ marginTop: 6 }}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.clearLinkText, { color: colors.primary }]}>Limpar filtros</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : (
+                filteredAllEvents.map((ev) => (
+                  <EventCard
+                    key={ev.id}
+                    event={ev}
+                    onDelete={onDeleteEvent}
+                    onPress={onEditEvent}
+                    onRequestDelete={onEditEvent}
+                  />
+                ))
+              )}
+            </>
+          ) : (
+            /* Visualização Padrão (Foco Total nos Eventos - Paridade com a Foto 2) */
+            <>
+              {/* Eventos de Hoje / Dia Selecionado */}
+              <View style={styles.sectionHeader}>
+                <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>
+                  {isTodaySelected
+                    ? 'Eventos de hoje'
+                    : `Eventos de ${selectedDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`}
+                </Text>
+                <View style={[styles.countBadgePill, { backgroundColor: colors.primaryContainer }]}>
+                  <Text style={[styles.countBadgeText, { color: colors.onPrimaryContainer }]}>
+                    {dayEvents.length} {dayEvents.length === 1 ? 'evento' : 'eventos'}
+                  </Text>
+                </View>
+              </View>
+
+              {dayEvents.length === 0 ? (
+                <View style={[styles.emptyCard, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
+                  <View style={[styles.emptyIconContainer, { backgroundColor: colors.surfaceContainerHigh }]}>
+                    <MaterialIcons name="event-available" size={20} color={colors.primary} />
+                  </View>
+                  <View style={styles.emptyContent}>
+                    <Text style={[styles.emptyTitle, { color: colors.onSurface }]}>Dia Livre</Text>
+                    <Text style={[styles.emptySub, { color: colors.onSurfaceVariant }]}>
+                      {isTodaySelected
+                        ? 'Nenhum compromisso marcado para hoje.'
+                        : `Nenhum compromisso marcado para ${selectedDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}.`}
+                    </Text>
+                  </View>
+                </View>
+              ) : (
+                dayEvents.map((ev) => (
+                  <EventCard
+                    key={ev.id}
+                    event={ev}
+                    onDelete={onDeleteEvent}
+                    onPress={onEditEvent}
+                    onRequestDelete={onEditEvent}
+                  />
+                ))
+              )}
+
+              {/* Próximos Compromissos na Agenda */}
+              {upcomingEvents.length > 0 && (
                 <View style={{ marginTop: tokens.spacing.md }}>
                   <View style={[styles.sectionHeader, { marginBottom: tokens.spacing.sm }]}>
                     <Text style={[styles.sectionTitle, { fontSize: tokens.typography.size.titleSmall, color: colors.onSurface }]}>
@@ -167,11 +201,11 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
                     </Text>
                     <View style={[styles.countBadgePill, { backgroundColor: colors.surfaceContainerHighest }]}>
                       <Text style={[styles.countBadgeText, { color: colors.onSurface }]}>
-                        {filteredUpcoming.length} no total
+                        {upcomingEvents.length} no total
                       </Text>
                     </View>
                   </View>
-                  {filteredUpcoming.slice(0, 5).map((ev) => (
+                  {upcomingEvents.map((ev) => (
                     <EventCard
                       key={ev.id}
                       event={ev}
@@ -183,20 +217,9 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
                 </View>
               )}
             </>
-          ) : (
-            filteredDay.map((ev) => (
-              <EventCard
-                key={ev.id}
-                event={ev}
-                onDelete={onDeleteEvent}
-                onPress={onEditEvent}
-                onRequestDelete={onEditEvent}
-              />
-            ))
           )}
         </View>
       </ScrollView>
-      {/* CTA vive no Header (+ Evento); sem FAB sobre a lista. */}
     </View>
   );
 };
@@ -262,26 +285,8 @@ const styles = StyleSheet.create({
   focusSectionContainer: {
     marginBottom: tokens.spacing.sm,
   },
-  fabOverlay: {
-    position: 'absolute',
-    right: 16,
-    bottom: 96,
-    zIndex: 50,
-    alignItems: 'flex-end',
-  },
-  createFab: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingHorizontal: 18,
-    paddingVertical: 13,
-    borderRadius: MD3Shapes.full,
-    ...tokens.shadows.level3,
-  },
-  createFabText: {
-    fontSize: tokens.typography.size.labelLarge,
-    fontWeight: tokens.typography.weight.bold,
-    letterSpacing: 0.2,
+  clearLinkText: {
+    fontSize: 13,
+    fontWeight: '700',
   },
 });
