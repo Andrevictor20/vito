@@ -98,13 +98,6 @@ export const AgendaTabScreen: React.FC<AgendaTabScreenProps> = ({
         contextualActions={
           <>
             <HeaderPill
-              label="Calendário"
-              variant="ghost"
-              icon="calendar-month"
-              onPress={() => setShowFullCalendar(true)}
-              accessibilityLabel="Abrir visão do mês em tela cheia"
-            />
-            <HeaderPill
               label="Resumos"
               variant="ghost"
               icon="bar-chart"

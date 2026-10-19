@@ -208,16 +208,23 @@ export const formatEventTimeRange = (event: Event): string => {
 
 /**
  * Próximos eventos a partir de hoje em ordem cronológica (com agrupamento inteligente de séries recorrentes).
+ * Filtra estritamente apenas compromissos futuros pertencentes ao mesmo mês da data de referência para evitar poluição visual.
  */
-export const getUpcomingGroupedEvents = (events: Event[]): Event[] => {
-  const today = new Date();
+export const getUpcomingGroupedEvents = (events: Event[], referenceDate?: Date): Event[] => {
+  const ref = referenceDate || new Date();
+  const today = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate());
   today.setHours(0, 0, 0, 0);
+
+  // Fim do mês da data de referência (ex.: 31 de Outubro às 23:59:59.999)
+  const endOfMonth = new Date(ref.getFullYear(), ref.getMonth() + 1, 0, 23, 59, 59, 999);
 
   const futureEvents = events
     .filter((ev) => {
       try {
-        const end = ev.end_at ? parseSafeDate(ev.end_at) : parseSafeDate(ev.start_at);
-        return end.getTime() >= today.getTime();
+        const start = parseSafeDate(ev.start_at);
+        const end = ev.end_at ? parseSafeDate(ev.end_at) : start;
+        // O evento não terminou ainda em relação a hoje e começa/termina no mesmo mês
+        return end.getTime() >= today.getTime() && start.getTime() <= endOfMonth.getTime();
       } catch {
         return false;
       }

@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { isAllDayEvent, isEventOnDate, getEventDays, formatEventTimeRange, badgeDayMonthUTC, isHolidayReadOnly } from './calendarDateUtils';
+import { isAllDayEvent, isEventOnDate, getEventDays, formatEventTimeRange, badgeDayMonthUTC, isHolidayReadOnly, getUpcomingGroupedEvents } from './calendarDateUtils';
 import { Event } from '../types';
 
 describe('Calendar Date Utils & All-Day / Holiday Detection (TDD)', () => {
@@ -102,5 +102,56 @@ describe('Calendar Date Utils & All-Day / Holiday Detection (TDD)', () => {
       assert.equal(isHolidayReadOnly({ category: 'holiday' }), true);
       assert.equal(isHolidayReadOnly({ category: 'work' }), false);
       assert.equal(isHolidayReadOnly(null), false);
+    });
+  });
+
+  describe('getUpcomingGroupedEvents (filtro de mesmo mês)', () => {
+    test('retorna apenas eventos futuros do mesmo mês de referência e exclui meses seguintes', () => {
+      const refDate = new Date(2026, 9, 19); // 19 de Outubro de 2026
+      const sampleEvents: Event[] = [
+        {
+          id: 'ev-1',
+          user_id: 'u-1',
+          title: 'Reunião de Planejamento',
+          start_at: '2026-10-21T18:00:00Z',
+          end_at: '2026-10-21T18:30:00Z',
+          category: 'work',
+          created_at: '2026-10-01T00:00:00Z',
+        },
+        {
+          id: 'ev-2',
+          user_id: 'u-1',
+          title: 'Dia do Servidor Público',
+          start_at: '2026-10-28T00:00:00Z',
+          end_at: '2026-10-28T23:59:59Z',
+          category: 'holiday',
+          created_at: '2026-10-01T00:00:00Z',
+        },
+        {
+          id: 'ev-3',
+          user_id: 'u-1',
+          title: 'Finados',
+          start_at: '2026-11-02T00:00:00Z',
+          end_at: '2026-11-02T23:59:59Z',
+          category: 'holiday',
+          created_at: '2026-10-01T00:00:00Z',
+        },
+        {
+          id: 'ev-passado',
+          user_id: 'u-1',
+          title: 'Reunião Passada',
+          start_at: '2026-10-10T10:00:00Z',
+          end_at: '2026-10-10T11:00:00Z',
+          category: 'work',
+          created_at: '2026-10-01T00:00:00Z',
+        },
+      ];
+
+      const result = getUpcomingGroupedEvents(sampleEvents, refDate);
+
+      // Deve incluir apenas ev-1 (21 Out) e ev-2 (28 Out), excluindo ev-3 (02 Nov) e ev-passado (10 Out)
+      assert.equal(result.length, 2);
+      assert.equal(result[0].id, 'ev-1');
+      assert.equal(result[1].id, 'ev-2');
     });
   });

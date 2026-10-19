@@ -13,6 +13,7 @@ import { tokens, MD3Shapes } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { EventCard } from '../calendar/EventCard';
 import { AgendaSearchBar } from '../calendar/AgendaSearchBar';
+import { AgendaWeekStrip } from '../calendar/AgendaWeekStrip';
 import {
   AgendaFilterState,
   DEFAULT_AGENDA_FILTER,
@@ -91,7 +92,15 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
           />
         }
       >
-        {/* Barra de Busca e Filtros Completos */}
+        {/* Visão Compacta da Semana (Toque para Expandir Calendário Toki) */}
+        <AgendaWeekStrip
+          selectedDate={selectedDate}
+          onSelectDate={onSelectDate}
+          onExpandCalendar={onOpenFullCalendar || (() => {})}
+          eventDates={eventDates}
+        />
+
+        {/* Barra de Busca e Filtros Completos (Apenas Modal) */}
         <AgendaSearchBar
           filters={filters}
           onFiltersChange={setFilters}
@@ -197,11 +206,11 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
                 <View style={{ marginTop: tokens.spacing.md }}>
                   <View style={[styles.sectionHeader, { marginBottom: tokens.spacing.sm }]}>
                     <Text style={[styles.sectionTitle, { fontSize: tokens.typography.size.titleSmall, color: colors.onSurface }]}>
-                      Próximos compromissos na agenda
+                      Próximos compromissos deste mês
                     </Text>
                     <View style={[styles.countBadgePill, { backgroundColor: colors.surfaceContainerHighest }]}>
                       <Text style={[styles.countBadgeText, { color: colors.onSurface }]}>
-                        {upcomingEvents.length} no total
+                        {upcomingEvents.length} este mês
                       </Text>
                     </View>
                   </View>

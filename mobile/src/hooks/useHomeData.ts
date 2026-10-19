@@ -452,8 +452,8 @@ export function useHomeData(currentUserId?: string) {
     return events.filter((ev) => isEventOnDate(ev, selectedDate));
   }, [events, selectedDate]);
 
-  // Próximos eventos a partir de hoje em ordem cronológica (com agrupamento inteligente de séries recorrentes)
-  const upcomingEvents = useMemo(() => getUpcomingGroupedEvents(events), [events]);
+  // Próximos eventos a partir de hoje em ordem cronológica (apenas do mesmo mês para não poluir a tela)
+  const upcomingEvents = useMemo(() => getUpcomingGroupedEvents(events, selectedDate), [events, selectedDate]);
 
   const isTodaySelected = selectedDate.toDateString() === new Date().toDateString();
 
