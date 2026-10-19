@@ -144,10 +144,11 @@ func TestGoogleAuthService_StateHMAC(t *testing.T) {
 
 func TestGoogleAuthService_RedirectSchemeAllowlist(t *testing.T) {
 	cfg := service.GoogleAuthConfig{
-		ClientID:     "mock-client-id",
-		ClientSecret: "mock-client-secret",
-		RedirectURL:  "https://vito.rasppi.cloud/api/v1/auth/google/callback",
-		JWTSecret:    "secret123",
+		ClientID:       "mock-client-id",
+		ClientSecret:   "mock-client-secret",
+		RedirectURL:    "https://vito.rasppi.cloud/api/v1/auth/google/callback",
+		JWTSecret:      "secret123",
+		AllowedOrigins: []string{"https://meuapp.custom.com"},
 	}
 	svc := service.NewGoogleAuthService(cfg, nil, nil, nil)
 
@@ -164,18 +165,53 @@ func TestGoogleAuthService_RedirectSchemeAllowlist(t *testing.T) {
 		t.Errorf("esperava sanitização para 'vito://oauth/callback', obteve: %s", parsedEvil.RedirectScheme)
 	}
 
-	// 2. Esquema legítimo vito:// deve ser aceito
+	// 2. Subdomínio falso com ataque de prefixo deve ser rejeitado
+	stateSubEvil, _ := svc.GenerateState("login", "", "https://vitoassistant.rasppi.cloud.attacker.com/steal")
+	parsedSubEvil, _ := svc.ValidateState(stateSubEvil)
+	if parsedSubEvil.RedirectScheme != "vito://oauth/callback" {
+		t.Errorf("esperava sanitização para 'vito://oauth/callback', obteve: %s", parsedSubEvil.RedirectScheme)
+	}
+
+	// 3. Esquema legítimo vito:// deve ser aceito
 	stateLegit, _ := svc.GenerateState("login", "", "vito://custom/path")
 	parsedLegit, _ := svc.ValidateState(stateLegit)
 	if parsedLegit.RedirectScheme != "vito://custom/path" {
 		t.Errorf("esperava 'vito://custom/path', obteve: %s", parsedLegit.RedirectScheme)
 	}
 
-	// 3. Esquema Expo em dev deve ser aceito
+	// 4. Esquema Expo em dev deve ser aceito
 	stateExpo, _ := svc.GenerateState("login", "", "exp://192.168.1.50:8081/--/oauth/callback")
 	parsedExpo, _ := svc.ValidateState(stateExpo)
 	if parsedExpo.RedirectScheme != "exp://192.168.1.50:8081/--/oauth/callback" {
 		t.Errorf("esperava scheme exp:// aceito, obteve: %s", parsedExpo.RedirectScheme)
+	}
+
+	// 5. Desktop web em produção: vitoassistant.rasppi.cloud deve ser aceito
+	stateDesktop, _ := svc.GenerateState("login", "", "https://vitoassistant.rasppi.cloud/auth/callback")
+	parsedDesktop, _ := svc.ValidateState(stateDesktop)
+	if parsedDesktop.RedirectScheme != "https://vitoassistant.rasppi.cloud/auth/callback" {
+		t.Errorf("esperava 'https://vitoassistant.rasppi.cloud/auth/callback', obteve: %s", parsedDesktop.RedirectScheme)
+	}
+
+	// 6. Desktop web em vito.rasppi.cloud deve ser aceito
+	stateVitoWeb, _ := svc.GenerateState("login", "", "https://vito.rasppi.cloud/auth/callback")
+	parsedVitoWeb, _ := svc.ValidateState(stateVitoWeb)
+	if parsedVitoWeb.RedirectScheme != "https://vito.rasppi.cloud/auth/callback" {
+		t.Errorf("esperava 'https://vito.rasppi.cloud/auth/callback', obteve: %s", parsedVitoWeb.RedirectScheme)
+	}
+
+	// 7. Desktop web local (localhost:8190) deve ser aceito
+	stateLocal, _ := svc.GenerateState("login", "", "http://localhost:8190/auth/callback")
+	parsedLocal, _ := svc.ValidateState(stateLocal)
+	if parsedLocal.RedirectScheme != "http://localhost:8190/auth/callback" {
+		t.Errorf("esperava 'http://localhost:8190/auth/callback', obteve: %s", parsedLocal.RedirectScheme)
+	}
+
+	// 8. Origem explicitamente configurada em AllowedOrigins deve ser aceita
+	stateCustom, _ := svc.GenerateState("login", "", "https://meuapp.custom.com/auth/callback")
+	parsedCustom, _ := svc.ValidateState(stateCustom)
+	if parsedCustom.RedirectScheme != "https://meuapp.custom.com/auth/callback" {
+		t.Errorf("esperava 'https://meuapp.custom.com/auth/callback', obteve: %s", parsedCustom.RedirectScheme)
 	}
 }
 
@@ -208,9 +244,9 @@ func TestGoogleAuthService_GetAuthURL(t *testing.T) {
 	if q.Get("access_type") != "offline" {
 		t.Errorf("access_type esperado 'offline', obteve: %s", q.Get("access_type"))
 	}
-	expectedScope := "openid email profile https://www.googleapis.com/auth/calendar.calendarlist.readonly https://www.googleapis.com/auth/calendar.events"
-	if q.Get("scope") != expectedScope {
-		t.Errorf("scope de login incorreto: %s", q.Get("scope"))
+	expectedLoginScope := "openid email profile"
+	if q.Get("scope") != expectedLoginScope {
+		t.Errorf("scope de login incorreto: esperado '%s', obteve '%s'", expectedLoginScope, q.Get("scope"))
 	}
 
 	if q.Get("prompt") != "select_account" {
@@ -224,8 +260,9 @@ func TestGoogleAuthService_GetAuthURL(t *testing.T) {
 	}
 	parsedCal, _ := url.Parse(calURL)
 	qCal := parsedCal.Query()
-	if qCal.Get("scope") != expectedScope {
-		t.Errorf("scope de calendário esperado '%s', obteve: '%s'", expectedScope, qCal.Get("scope"))
+	expectedCalScope := "openid email profile https://www.googleapis.com/auth/calendar.calendarlist.readonly https://www.googleapis.com/auth/calendar.events"
+	if qCal.Get("scope") != expectedCalScope {
+		t.Errorf("scope de calendário esperado '%s', obteve: '%s'", expectedCalScope, qCal.Get("scope"))
 	}
 	if qCal.Get("prompt") != "consent" {
 		t.Errorf("prompt esperado 'consent' no modo calendar, obteve: %s", qCal.Get("prompt"))

@@ -1,34 +1,34 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../services/api';
 import { CalendarEvent } from '../../types';
+import { CreateItemModal } from '../common/CreateItemModal';
+import { MonthGrid } from './MonthGrid';
+import { CalendarEventsSidebar } from './CalendarEventsSidebar';
 import {
-  Calendar as CalendarIcon,
   ChevronLeft,
   ChevronRight,
   Plus,
-  Clock,
-  MapPin,
-  Trash2,
-  Loader2,
-  X,
+  RefreshCw,
+  PanelRightClose,
+  PanelRightOpen,
+  BarChart2,
 } from 'lucide-react';
-import { format, addMonths, subMonths, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, isToday } from 'date-fns';
+import { format, addMonths, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-export const CalendarView: React.FC = () => {
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const [events, setEvents] = useState<CalendarEvent[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [modalOpen, setModalOpen] = useState(false);
+interface CalendarViewProps {
+  onNavigateToSummaries?: () => void;
+}
 
-  // New Event Form State
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [location, setLocation] = useState('');
-  const [startTime, setStartTime] = useState('09:00');
-  const [endTime, setEndTime] = useState('10:00');
-  const [creating, setCreating] = useState(false);
+export const CalendarView: React.FC<CalendarViewProps> = ({ onNavigateToSummaries }) => {
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [_loading, setLoading] = useState(true);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [viewMode, setViewMode] = useState<'day' | 'week' | 'month'>('month');
+  const [syncingGoogle, setSyncingGoogle] = useState(false);
 
   const fetchEvents = async () => {
     try {
@@ -42,40 +42,23 @@ export const CalendarView: React.FC = () => {
     }
   };
 
-  useEffect(() => {
-    fetchEvents();
-  }, []);
-
-  const handleCreateEvent = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!title.trim()) return;
-
-    setCreating(true);
+  const handleSyncGoogle = async () => {
+    setSyncingGoogle(true);
     try {
-      const dateStr = format(selectedDate, 'yyyy-MM-dd');
-      const startAt = `${dateStr}T${startTime}:00Z`;
-      const endAt = `${dateStr}T${endTime}:00Z`;
-
-      await api.createEvent({
-        title,
-        description,
-        location,
-        start_at: startAt,
-        end_at: endAt,
-        all_day: false,
-      });
-
-      setModalOpen(false);
-      setTitle('');
-      setDescription('');
-      setLocation('');
+      await api.syncCalendar('google');
       await fetchEvents();
-    } catch (err: any) {
-      alert(err.message || 'Erro ao criar evento');
+    } catch (err) {
+      console.warn('Sync google calendar:', err);
     } finally {
-      setCreating(false);
+      setSyncingGoogle(false);
     }
   };
+
+  useEffect(() => {
+    fetchEvents();
+    // Dispara sincronização em segundo plano no boot da tela
+    api.syncCalendar('google').then(() => fetchEvents()).catch(() => {});
+  }, []);
 
   const handleDeleteEvent = async (id: string) => {
     if (!confirm('Deseja realmente remover este evento?')) return;
@@ -87,289 +70,169 @@ export const CalendarView: React.FC = () => {
     }
   };
 
-  // Calendar calculations
-  const monthStart = startOfMonth(currentDate);
-  const monthEnd = endOfMonth(monthStart);
-  const startDate = startOfWeek(monthStart, { locale: ptBR });
-  const endDate = endOfWeek(monthEnd, { locale: ptBR });
-  const days = eachDayOfInterval({ start: startDate, end: endDate });
-
-  const selectedDateEvents = events.filter((ev) => {
-    const evDate = new Date(ev.start_at);
-    return isSameDay(evDate, selectedDate);
-  });
-
   return (
-    <div className="flex-1 h-screen flex flex-col bg-[#0B0D10] overflow-hidden select-none">
-      {/* Top Bar */}
-      <header className="h-16 px-6 border-b border-white/10 flex items-center justify-between bg-[#14171C]">
+    <div className="flex-1 h-screen flex flex-col bg-[#F8F9FA] dark:bg-[#0B0D10] text-zinc-900 dark:text-[#FAFAFA] overflow-hidden select-none transition-colors duration-200">
+      {/* Top Header estilo Toki com fontes maiores */}
+      <header className="h-20 px-8 border-b border-zinc-200/80 dark:border-[#222730] flex items-center justify-between bg-white/95 dark:bg-[#14171C]/95 backdrop-blur-md z-10 shrink-0">
+        {/* Esquerda: Botão Hoje + Setas + Título do Mês */}
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <CalendarIcon size={20} className="text-indigo-400" />
-            <h2 className="text-lg font-bold text-white tracking-tight">Agenda Executiva</h2>
-          </div>
-          <div className="flex items-center gap-1 bg-[#0B0D10] border border-white/5 rounded-xl px-2 py-1">
-            <button
-              onClick={() => setCurrentDate(subMonths(currentDate, 1))}
-              className="p-1 rounded text-slate-400 hover:text-white hover:bg-white/5"
-            >
-              <ChevronLeft size={16} />
-            </button>
-            <span className="text-xs font-semibold text-slate-200 px-2 capitalize">
-              {format(currentDate, 'MMMM yyyy', { locale: ptBR })}
-            </span>
-            <button
-              onClick={() => setCurrentDate(addMonths(currentDate, 1))}
-              className="p-1 rounded text-slate-400 hover:text-white hover:bg-white/5"
-            >
-              <ChevronRight size={16} />
-            </button>
-          </div>
           <button
             onClick={() => {
-              setCurrentDate(new Date());
-              setSelectedDate(new Date());
+              const now = new Date();
+              setCurrentDate(now);
+              setSelectedDate(now);
             }}
-            className="text-xs px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 border border-white/5 transition-colors"
+            className="px-4 py-2 rounded-full border border-zinc-200 dark:border-[#262B33] bg-zinc-50 hover:bg-zinc-100 dark:bg-[#1C2026] dark:hover:bg-[#222730] text-sm font-bold text-zinc-800 dark:text-zinc-200 transition-colors shadow-2xs"
           >
             Hoje
           </button>
+
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setCurrentDate(subMonths(currentDate, 1))}
+              className="p-2 rounded-full text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 transition-colors"
+              title="Mês anterior"
+            >
+              <ChevronLeft size={20} />
+            </button>
+            <button
+              onClick={() => setCurrentDate(addMonths(currentDate, 1))}
+              className="p-2 rounded-full text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 transition-colors"
+              title="Próximo mês"
+            >
+              <ChevronRight size={20} />
+            </button>
+          </div>
+
+          <h2 className="text-xl sm:text-2xl font-black text-zinc-900 dark:text-white capitalize ml-2 tracking-tight">
+            {format(currentDate, "MMMM 'de' yyyy", { locale: ptBR })}
+          </h2>
         </div>
 
-        <button
-          onClick={() => setModalOpen(true)}
-          className="flex items-center gap-2 py-2 px-3.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl shadow-lg shadow-indigo-600/20 transition-all"
-        >
-          <Plus size={15} />
-          <span>Novo Compromisso</span>
-        </button>
+        {/* Direita: Botão Resumos, + Novo evento, Sincronizar Google, Toggle Dia/Semana/Mês e Barra Lateral */}
+        <div className="flex items-center gap-3">
+          {/* Botão Resumos Executivos */}
+          {onNavigateToSummaries && (
+            <button
+              onClick={onNavigateToSummaries}
+              className="flex items-center gap-2 px-4 py-2 rounded-full bg-zinc-100 hover:bg-zinc-200 dark:bg-[#1C2026] dark:hover:bg-[#262B33] border border-zinc-200 dark:border-[#222730] text-sm font-bold text-zinc-800 dark:text-zinc-200 transition-colors shadow-2xs"
+              title="Abrir Resumos Executivos"
+            >
+              <BarChart2 size={16} className="text-indigo-500" />
+              <span>Resumos</span>
+            </button>
+          )}
+
+          {/* Botão + Novo evento */}
+          <button
+            onClick={() => setModalOpen(true)}
+            className="flex items-center gap-2 px-5 py-2 rounded-full bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-200 text-white dark:text-[#09090B] text-sm font-bold shadow-sm transition-all"
+          >
+            <Plus size={16} />
+            <span>Novo evento</span>
+          </button>
+
+          {/* Sincronizar Google */}
+          <button
+            onClick={handleSyncGoogle}
+            disabled={syncingGoogle}
+            className="flex items-center gap-2 px-4 py-2 rounded-full bg-zinc-100 hover:bg-zinc-200 dark:bg-[#1C2026] dark:hover:bg-[#262B33] border border-zinc-200 dark:border-[#222730] text-sm font-semibold text-zinc-700 dark:text-zinc-300 transition-colors shadow-2xs disabled:opacity-50"
+            title="Sincronizar com Google Calendar"
+          >
+            <RefreshCw size={14} className={`text-zinc-400 ${syncingGoogle ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">Google</span>
+          </button>
+
+          {/* Toggle de visão: Dia / Semana / Mês estilo Toki */}
+          <div className="flex items-center p-1.5 rounded-full bg-zinc-100 dark:bg-[#1C2026] border border-zinc-200 dark:border-[#222730] text-sm">
+            <button
+              onClick={() => setViewMode('day')}
+              className={`px-3.5 py-1.5 rounded-full font-bold transition-all ${
+                viewMode === 'day'
+                  ? 'bg-white dark:bg-[#262B33] text-zinc-900 dark:text-white shadow-xs'
+                  : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
+              }`}
+            >
+              Dia
+            </button>
+            <button
+              onClick={() => setViewMode('week')}
+              className={`px-3.5 py-1.5 rounded-full font-bold transition-all ${
+                viewMode === 'week'
+                  ? 'bg-white dark:bg-[#262B33] text-zinc-900 dark:text-white shadow-xs'
+                  : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
+              }`}
+            >
+              Semana
+            </button>
+            <button
+              onClick={() => setViewMode('month')}
+              className={`px-3.5 py-1.5 rounded-full font-bold transition-all ${
+                viewMode === 'month'
+                  ? 'bg-white dark:bg-[#262B33] text-zinc-900 dark:text-white shadow-xs'
+                  : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
+              }`}
+            >
+              Mês
+            </button>
+          </div>
+
+          {/* Toggle da Barra Lateral Direita de Eventos */}
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className={`p-2.5 rounded-full border transition-colors ${
+              sidebarOpen
+                ? 'bg-zinc-100 dark:bg-[#1C2026] text-zinc-900 dark:text-white border-zinc-200 dark:border-[#222730]'
+                : 'text-zinc-400 hover:text-zinc-900 dark:hover:text-white border-transparent hover:bg-zinc-100 dark:hover:bg-[#1C2026]'
+            }`}
+            title={sidebarOpen ? 'Ocultar barra de eventos' : 'Mostrar barra de eventos'}
+          >
+            {sidebarOpen ? <PanelRightClose size={18} /> : <PanelRightOpen size={18} />}
+          </button>
+        </div>
       </header>
 
-      {/* Main Grid: Split Month & Selected Day */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Month Calendar Grid */}
-        <div className="flex-1 flex flex-col p-6 overflow-y-auto">
-          {/* Day of Week Headers */}
-          <div className="grid grid-cols-7 gap-2 mb-2">
-            {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((day) => (
-              <div key={day} className="text-center text-xs font-semibold text-slate-400 py-1">
-                {day}
-              </div>
-            ))}
-          </div>
-
-          {/* Month Days Grid */}
-          <div className="grid grid-cols-7 gap-2 flex-1 auto-rows-fr">
-            {days.map((day) => {
-              const dayEvents = events.filter((ev) => isSameDay(new Date(ev.start_at), day));
-              const isSelected = isSameDay(day, selectedDate);
-              const isCurrentDay = isToday(day);
-              const isCurrentMonth = isSameMonth(day, currentDate);
-
-              return (
-                <div
-                  key={day.toISOString()}
-                  onClick={() => setSelectedDate(day)}
-                  className={`min-h-[90px] p-2 rounded-xl border transition-all cursor-pointer flex flex-col justify-between ${
-                    isSelected
-                      ? 'bg-indigo-600/10 border-indigo-500/50 shadow-sm'
-                      : isCurrentDay
-                      ? 'bg-[#1C2026] border-white/20'
-                      : 'bg-[#14171C] border-white/5 hover:border-white/15'
-                  } ${!isCurrentMonth ? 'opacity-35' : ''}`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span
-                      className={`text-xs font-bold tabular-nums w-6 h-6 rounded-full flex items-center justify-center ${
-                        isCurrentDay ? 'bg-indigo-600 text-white' : 'text-slate-300'
-                      }`}
-                    >
-                      {format(day, 'd')}
-                    </span>
-                    {dayEvents.length > 0 && (
-                      <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-indigo-500/20 text-indigo-300 font-semibold">
-                        {dayEvents.length}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Day mini preview tags */}
-                  <div className="space-y-1 mt-1 overflow-hidden">
-                    {dayEvents.slice(0, 2).map((ev) => (
-                      <div
-                        key={ev.id}
-                        className="text-[10px] px-1.5 py-0.5 rounded bg-[#1C2026] text-slate-300 truncate border border-white/5"
-                      >
-                        {ev.title}
-                      </div>
-                    ))}
-                    {dayEvents.length > 2 && (
-                      <span className="text-[9px] text-slate-500 font-medium">
-                        +{dayEvents.length - 2} mais
-                      </span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+      {/* Área Central: Grade Completa do Mês ocupando a maior parte + Barra Lateral Direita */}
+      <div className="flex-1 flex overflow-hidden relative">
+        {/* Grade do Mês ocupando a maior parte da tela estilo Toki */}
+        <div className="flex-1 h-full min-w-0 flex flex-col">
+          <MonthGrid
+            currentDate={currentDate}
+            selectedDate={selectedDate}
+            events={events}
+            onSelectDate={(date) => {
+              setSelectedDate(date);
+              if (!sidebarOpen) setSidebarOpen(true);
+            }}
+            onDoubleClickDate={(date) => {
+              setSelectedDate(date);
+              setModalOpen(true);
+            }}
+          />
         </div>
 
-        {/* Right Side: Selected Day Schedule Details */}
-        <div className="w-80 border-l border-white/10 bg-[#14171C] p-6 flex flex-col overflow-y-auto">
-          <div className="mb-4">
-            <h3 className="text-sm font-bold text-white capitalize">
-              {format(selectedDate, "EEEE, d 'de' MMMM", { locale: ptBR })}
-            </h3>
-            <p className="text-xs text-slate-400 mt-0.5">
-              {selectedDateEvents.length} compromisso(s) agendado(s)
-            </p>
-          </div>
-
-          <div className="flex-1 space-y-3">
-            {loading ? (
-              <div className="p-8 text-center text-xs text-slate-500 flex flex-col items-center gap-2">
-                <Loader2 size={18} className="animate-spin text-indigo-400" />
-                <span>Carregando agenda...</span>
-              </div>
-            ) : selectedDateEvents.length === 0 ? (
-              <div className="p-8 text-center text-xs text-slate-500 bg-[#0B0D10]/50 rounded-2xl border border-white/5">
-                Nenhum compromisso marcado para este dia.
-              </div>
-            ) : (
-              selectedDateEvents.map((ev) => (
-                <div
-                  key={ev.id}
-                  className="p-3.5 rounded-xl bg-[#1C2026] border border-white/10 hover:border-white/20 transition-colors group relative"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <h4 className="text-xs font-semibold text-white leading-tight">{ev.title}</h4>
-                    <button
-                      onClick={() => handleDeleteEvent(ev.id)}
-                      className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-rose-400 transition-opacity"
-                      title="Excluir evento"
-                    >
-                      <Trash2 size={13} />
-                    </button>
-                  </div>
-
-                  <div className="mt-2 space-y-1 text-[11px] text-slate-400">
-                    <div className="flex items-center gap-1.5 tabular-nums">
-                      <Clock size={12} className="text-indigo-400" />
-                      <span>
-                        {format(new Date(ev.start_at), 'HH:mm')} - {format(new Date(ev.end_at), 'HH:mm')}
-                      </span>
-                    </div>
-                    {ev.location && (
-                      <div className="flex items-center gap-1.5 truncate">
-                        <MapPin size={12} className="text-slate-500" />
-                        <span className="truncate">{ev.location}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
+        {/* Barra de Eventos listando na LATERAL DIREITA */}
+        {sidebarOpen && (
+          <CalendarEventsSidebar
+            currentDate={currentDate}
+            selectedDate={selectedDate}
+            events={events}
+            onSelectDate={(date) => setSelectedDate(date)}
+            onOpenCreateModal={() => setModalOpen(true)}
+            onDeleteEvent={handleDeleteEvent}
+            onCloseSidebar={() => setSidebarOpen(false)}
+          />
+        )}
       </div>
 
-      {/* Create Event Modal */}
-      {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-[#14171C] border border-white/10 rounded-2xl shadow-modal p-6">
-            <div className="flex items-center justify-between mb-4 pb-3 border-b border-white/5">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <CalendarIcon size={16} className="text-indigo-400" />
-                Novo Compromisso
-              </h3>
-              <button
-                onClick={() => setModalOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-white"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateEvent} className="space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">Título</label>
-                <input
-                  type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Ex: Reunião com Diretoria"
-                  required
-                  className="w-full px-3 py-2 bg-[#0B0D10] border border-white/10 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1">Início</label>
-                  <input
-                    type="time"
-                    value={startTime}
-                    onChange={(e) => setStartTime(e.target.value)}
-                    required
-                    className="w-full px-3 py-2 bg-[#0B0D10] border border-white/10 rounded-lg text-xs text-white focus:outline-none focus:border-indigo-500 font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1">Término</label>
-                  <input
-                    type="time"
-                    value={endTime}
-                    onChange={(e) => setEndTime(e.target.value)}
-                    required
-                    className="w-full px-3 py-2 bg-[#0B0D10] border border-white/10 rounded-lg text-xs text-white focus:outline-none focus:border-indigo-500 font-mono"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">Local / Link</label>
-                <input
-                  type="text"
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  placeholder="Google Meet, Sala 4, etc."
-                  className="w-full px-3 py-2 bg-[#0B0D10] border border-white/10 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">Descrição</label>
-                <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  rows={2}
-                  placeholder="Notas adicionais do compromisso..."
-                  className="w-full px-3 py-2 bg-[#0B0D10] border border-white/10 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 resize-none"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setModalOpen(false)}
-                  className="px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={creating}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg shadow-md transition-colors flex items-center gap-1.5"
-                >
-                  {creating && <Loader2 size={13} className="animate-spin" />}
-                  <span>Salvar Compromisso</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* Modal Unificado de Criação de Evento e Tarefa */}
+      <CreateItemModal
+        open={modalOpen}
+        selectedDate={selectedDate}
+        defaultTab="event"
+        onClose={() => setModalOpen(false)}
+        onCreated={fetchEvents}
+      />
     </div>
   );
 };

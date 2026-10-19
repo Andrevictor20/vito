@@ -1,23 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { Sidebar, DesktopTab } from './Sidebar';
-import { AIPanelDrawer } from '../chat/AIPanelDrawer';
+import { ChatView } from '../chat/ChatView';
 import { CommandPalette } from './CommandPalette';
 import { CalendarView } from '../calendar/CalendarView';
 import { TasksView } from '../tasks/TasksView';
 import { TriggersView } from '../triggers/TriggersView';
 import { MeetingsView } from '../meetings/MeetingsView';
-import { ProfileView } from '../profile/ProfileView';
+import { ExecutiveSummariesView } from '../summaries/ExecutiveSummariesView';
+import { SettingsModal } from '../profile/SettingsModal';
+import { MiniChatWidget } from '../chat/MiniChatWidget';
 import { useAuth } from '../../context/AuthContext';
-import { Sparkles } from 'lucide-react';
 
 export const DesktopLayout: React.FC = () => {
   const { logout } = useAuth();
-  const [currentTab, setCurrentTab] = useState<DesktopTab>('calendar');
+  const [currentTab, setCurrentTab] = useState<DesktopTab>('chat');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [aiPanelOpen, setAiPanelOpen] = useState(true);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [chatPrompt, setChatPrompt] = useState<string | undefined>();
 
-  // Keyboard Shortcuts: ⌘K (command palette), ⌘J (toggle AI), 1-5 (tabs)
+  // Keyboard Shortcuts: ⌘K (command palette), 1-5 (tabs), ⌘, (settings)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const isMeta = e.metaKey || e.ctrlKey;
@@ -25,13 +27,13 @@ export const DesktopLayout: React.FC = () => {
       if (isMeta && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         setCommandPaletteOpen((prev) => !prev);
-      } else if (isMeta && e.key.toLowerCase() === 'j') {
+      } else if (isMeta && e.key === ',') {
         e.preventDefault();
-        setAiPanelOpen((prev) => !prev);
+        setSettingsOpen((prev) => !prev);
       } else if (isMeta && !isNaN(Number(e.key))) {
         const num = Number(e.key);
-        const tabs: DesktopTab[] = ['calendar', 'tasks', 'triggers', 'meetings', 'profile'];
-        if (num >= 1 && num <= 5) {
+        const tabs: DesktopTab[] = ['chat', 'calendar', 'tasks', 'triggers', 'meetings', 'summaries'];
+        if (num >= 1 && num <= 6) {
           e.preventDefault();
           setCurrentTab(tabs[num - 1]);
         }
@@ -44,63 +46,90 @@ export const DesktopLayout: React.FC = () => {
 
   const renderActiveView = () => {
     switch (currentTab) {
+      case 'chat':
+        return (
+          <ChatView
+            initialPrompt={chatPrompt}
+            onNavigateTab={(tab) => setCurrentTab(tab as DesktopTab)}
+          />
+        );
       case 'calendar':
-        return <CalendarView />;
+        return <CalendarView onNavigateToSummaries={() => setCurrentTab('summaries')} />;
       case 'tasks':
         return <TasksView />;
       case 'triggers':
-        return <TriggersView />;
+        return (
+          <TriggersView
+            onOpenChatWithPrompt={(prompt) => {
+              setChatPrompt(prompt);
+              setCurrentTab('chat');
+            }}
+          />
+        );
       case 'meetings':
         return <MeetingsView />;
-      case 'profile':
-        return <ProfileView />;
+      case 'summaries':
+        return (
+          <ExecutiveSummariesView
+            onBack={() => setCurrentTab('calendar')}
+            onOpenChatWithPrompt={(prompt) => {
+              setChatPrompt(prompt);
+              setCurrentTab('chat');
+            }}
+          />
+        );
       default:
-        return <CalendarView />;
+        return <ChatView />;
     }
   };
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-[#0B0D10] text-[#F1F5F9]">
+    <div className="flex h-screen w-screen overflow-hidden bg-[#F8F9FA] dark:bg-[#0B0D10] text-zinc-900 dark:text-[#FAFAFA] transition-colors duration-200">
       {/* Left Sidebar */}
       <Sidebar
         currentTab={currentTab}
-        onSelectTab={setCurrentTab}
+        onSelectTab={(tab) => {
+          if (tab !== 'chat') setChatPrompt(undefined);
+          setCurrentTab(tab);
+        }}
         collapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
         onOpenCommandPalette={() => setCommandPaletteOpen(true)}
+        onOpenSettings={() => setSettingsOpen(true)}
       />
 
       {/* Main Workspace Central Area */}
       <main className="flex-1 h-screen flex flex-col overflow-hidden relative">
         {renderActiveView()}
-
-        {/* Floating Copilot Toggle Button (if closed) */}
-        {!aiPanelOpen && (
-          <button
-            onClick={() => setAiPanelOpen(true)}
-            className="fixed bottom-6 right-6 p-3.5 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white rounded-2xl shadow-xl shadow-indigo-600/30 border border-white/20 flex items-center gap-2 text-xs font-bold transition-all z-40 group"
-            title="Abrir Vito Copilot (⌘J)"
-          >
-            <Sparkles size={16} className="group-hover:rotate-12 transition-transform" />
-            <span>Copilot</span>
-            <kbd className="text-[10px] bg-black/20 px-1.5 py-0.5 rounded font-mono font-normal">⌘J</kbd>
-          </button>
-        )}
       </main>
 
-      {/* Right Assistant Panel */}
-      <AIPanelDrawer
-        open={aiPanelOpen}
-        onClose={() => setAiPanelOpen(false)}
+      {/* Mini Chat Widget no canto inferior direito nas outras telas */}
+      {currentTab !== 'chat' && (
+        <MiniChatWidget
+          onExpandToFullChat={(prompt) => {
+            if (prompt) setChatPrompt(prompt);
+            setCurrentTab('chat');
+          }}
+        />
+      )}
+
+      {/* Toki-Style Settings & Profile Modal */}
+      <SettingsModal
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
       />
 
       {/* Universal ⌘K Command Palette Modal */}
       <CommandPalette
         open={commandPaletteOpen}
         onClose={() => setCommandPaletteOpen(false)}
-        onSelectTab={(tab) => setCurrentTab(tab)}
-        onToggleAIPanel={() => setAiPanelOpen(!aiPanelOpen)}
+        onSelectTab={(tab) => {
+          if (tab !== 'chat') setChatPrompt(undefined);
+          setCurrentTab(tab as DesktopTab);
+        }}
+        onToggleAIPanel={() => setCurrentTab('chat')}
         onLogout={logout}
+        onOpenSettings={() => setSettingsOpen(true)}
       />
     </div>
   );

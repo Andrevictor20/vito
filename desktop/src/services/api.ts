@@ -1,4 +1,4 @@
-import { User, AuthTokens, CalendarEvent, Todo, Trigger, WhatsAppStatus, GmailStatus, SessionDevice } from '../types';
+import { User, AuthTokens, CalendarEvent, Todo, Trigger, TriggerLog, BookingType, Meeting, WhatsAppStatus, GmailStatus, SessionDevice } from '../types';
 
 const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || '';
 
@@ -170,19 +170,24 @@ class ApiService {
 
   // --- Calendar Endpoints ---
   async getEvents(): Promise<CalendarEvent[]> {
-    const res = await this.request<any>('/api/v1/calendar/events');
+    const res = await this.request<any>('/api/v1/events');
     return Array.isArray(res) ? res : res.events || [];
   }
 
   async createEvent(event: Partial<CalendarEvent>): Promise<CalendarEvent> {
-    return this.request('/api/v1/calendar/events', {
+    const res = await this.request<any>('/api/v1/events', {
       method: 'POST',
       body: JSON.stringify(event),
     });
+    return res.event || res;
   }
 
   async deleteEvent(id: string): Promise<void> {
-    return this.request(`/api/v1/calendar/events/${id}`, { method: 'DELETE' });
+    return this.request(`/api/v1/events/${id}`, { method: 'DELETE' });
+  }
+
+  async syncCalendar(provider: string = 'google'): Promise<{ status: string; provider: string }> {
+    return this.request(`/api/v1/integrations/calendars/${provider}/sync`, { method: 'POST' });
   }
 
   // --- Todos Endpoints ---
@@ -209,22 +214,88 @@ class ApiService {
     return this.request(`/api/v1/todos/${id}`, { method: 'DELETE' });
   }
 
-  // --- Assistant Chat Endpoints ---
-  async askAssistant(prompt: string, context?: any): Promise<{ reply: string; actions?: any[] }> {
+  // --- Assistant Chat & History Endpoints ---
+  async askAssistant(prompt: string, context?: any): Promise<{ reply: string; actions?: any[]; event?: CalendarEvent; todo?: Todo }> {
     const res = await this.request<any>('/api/v1/assistant/chat', {
       method: 'POST',
-      body: JSON.stringify({ prompt, text: prompt, ...context }),
+      body: JSON.stringify({
+        prompt,
+        text: prompt,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Sao_Paulo',
+        ...context,
+      }),
     });
     return {
       reply: res.reply || res.message || res.text || '',
       actions: res.actions,
+      event: res.event,
+      todo: res.todo,
     };
+  }
+
+  async getChatSessions(): Promise<any[]> {
+    const res = await this.request<any>('/api/v1/chat/sessions');
+    return Array.isArray(res) ? res : [];
+  }
+
+  async getChatSessionWithMessages(id: string): Promise<{ session: any; messages: any[] } | null> {
+    try {
+      return await this.request<{ session: any; messages: any[] }>(`/api/v1/chat/sessions/${id}`);
+    } catch {
+      return null;
+    }
+  }
+
+  async deleteChatSession(id: string): Promise<void> {
+    return this.request(`/api/v1/chat/sessions/${id}`, { method: 'DELETE' });
+  }
+
+  async syncChatSession(session: any, messages: any[]): Promise<any> {
+    try {
+      return await this.request('/api/v1/chat/sync', {
+        method: 'POST',
+        body: JSON.stringify({ session, messages }),
+      });
+    } catch {
+      return null;
+    }
   }
 
   // --- Triggers / Vigílias ---
   async getTriggers(): Promise<Trigger[]> {
     const res = await this.request<any>('/api/v1/triggers');
     return Array.isArray(res) ? res : res.triggers || [];
+  }
+
+  async getTriggerLogs(id: string): Promise<TriggerLog[]> {
+    const res = await this.request<any>(`/api/v1/triggers/${id}/logs`);
+    return Array.isArray(res) ? res : res.logs || [];
+  }
+
+  async testTrigger(id: string): Promise<any> {
+    return this.request(`/api/v1/triggers/${id}/test`, { method: 'POST' });
+  }
+
+  async runTrigger(id: string): Promise<TriggerLog> {
+    return this.request(`/api/v1/triggers/${id}/run`, { method: 'POST' });
+  }
+
+  async toggleTrigger(id: string, active: boolean): Promise<any> {
+    return this.request(`/api/v1/triggers/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: active ? 'active' : 'paused' }),
+    });
+  }
+
+  // --- Booking & Meetings ---
+  async getBookings(): Promise<BookingType[]> {
+    const res = await this.request<any>('/api/v1/booking/types');
+    return Array.isArray(res) ? res : res.types || res.booking_types || [];
+  }
+
+  async getMeetings(): Promise<Meeting[]> {
+    const res = await this.request<any>('/api/v1/meetings');
+    return Array.isArray(res) ? res : res.meetings || [];
   }
 
   // --- Integrations ---

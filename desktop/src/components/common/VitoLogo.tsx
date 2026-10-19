@@ -25,7 +25,7 @@ export const VitoLogo: React.FC<VitoLogoProps> = ({
       <VitoMascot size={dimensions.mascot} />
       {showWordmark && (
         <div className="flex items-baseline gap-1">
-          <span className={`font-extrabold tracking-[-0.04em] text-white ${dimensions.font} lowercase leading-none`}>
+          <span className={`font-extrabold tracking-[-0.04em] text-zinc-900 dark:text-white ${dimensions.font} lowercase leading-none`}>
             vito
           </span>
           {showDot && (

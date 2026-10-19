@@ -109,7 +109,11 @@ func (h *GoogleAuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 				redirectScheme = parsedState.RedirectScheme
 			}
 		}
-		errURL := fmt.Sprintf("%s?error=%s", redirectScheme, url.QueryEscape(googleErr))
+		sep := "?"
+		if strings.Contains(redirectScheme, "?") {
+			sep = "&"
+		}
+		errURL := fmt.Sprintf("%s%serror=%s", redirectScheme, sep, url.QueryEscape(googleErr))
 		http.Redirect(w, r, errURL, http.StatusTemporaryRedirect)
 		return
 	}
@@ -121,11 +125,18 @@ func (h *GoogleAuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 
 	redirectURL, err := h.googleAuthSvc.HandleCallback(r.Context(), code, stateStr)
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		_ = json.NewEncoder(w).Encode(map[string]string{
-			"error": fmt.Sprintf("falha ao processar autenticação Google: %v", err),
-		})
+		redirectScheme := defaultRedirectScheme
+		if stateStr != "" {
+			if parsedState, errState := h.googleAuthSvc.ValidateState(stateStr); errState == nil && parsedState.RedirectScheme != "" {
+				redirectScheme = parsedState.RedirectScheme
+			}
+		}
+		sep := "?"
+		if strings.Contains(redirectScheme, "?") {
+			sep = "&"
+		}
+		errURL := fmt.Sprintf("%s%serror=%s", redirectScheme, sep, url.QueryEscape(err.Error()))
+		http.Redirect(w, r, errURL, http.StatusTemporaryRedirect)
 		return
 	}
 

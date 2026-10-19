@@ -4,13 +4,11 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -30,14 +28,15 @@ type CalendarSyncConnector interface {
 
 // GoogleAuthConfig armazena parâmetros para o fluxo OAuth2 com o Google.
 type GoogleAuthConfig struct {
-	ClientID     string
-	ClientSecret string
-	RedirectURL  string
-	JWTSecret    string
-	AuthURL      string
-	TokenURL     string
-	UserInfoURL  string
-	HTTPClient   *http.Client
+	ClientID       string
+	ClientSecret   string
+	RedirectURL    string
+	JWTSecret      string
+	AuthURL        string
+	TokenURL       string
+	UserInfoURL    string
+	AllowedOrigins []string
+	HTTPClient     *http.Client
 }
 
 // OAuthState representa o payload assinado via HMAC transitado no parâmetro state.
@@ -96,30 +95,47 @@ func (s *GoogleAuthService) SetGmailRepository(repo domain.GmailRepository, encK
 	s.encKey = encKey
 }
 
-func isAllowedRedirectScheme(rawScheme string) bool {
+func (s *GoogleAuthService) isAllowedRedirectScheme(rawScheme string) bool {
 	lower := strings.ToLower(strings.TrimSpace(rawScheme))
 	if lower == "" {
 		return false
 	}
-	if strings.HasPrefix(lower, "vito://") {
-		return true
-	}
-	if strings.HasPrefix(lower, "exp://") {
+	if strings.HasPrefix(lower, "vito://") || strings.HasPrefix(lower, "exp://") {
 		return true
 	}
 	if strings.HasPrefix(lower, "http://localhost:") || strings.HasPrefix(lower, "https://localhost:") ||
 		strings.HasPrefix(lower, "http://127.0.0.1:") || strings.HasPrefix(lower, "https://127.0.0.1:") {
 		return true
 	}
+	parsed, err := url.Parse(lower)
+	if err != nil || parsed.Host == "" {
+		return false
+	}
+	host := parsed.Hostname()
+	if host == "rasppi.cloud" || strings.HasSuffix(host, ".rasppi.cloud") {
+		return true
+	}
+	for _, origin := range s.cfg.AllowedOrigins {
+		trimmed := strings.ToLower(strings.TrimSpace(origin))
+		if trimmed == "" || trimmed == "*" {
+			continue
+		}
+		if oParsed, err := url.Parse(trimmed); err == nil && oParsed.Host != "" {
+			if oParsed.Hostname() == host {
+				return true
+			}
+		} else if trimmed == host {
+			return true
+		}
+	}
 	return false
 }
 
 // GenerateState gera um token state assinado com HMAC-SHA256 anti-CSRF.
 func (s *GoogleAuthService) GenerateState(mode, userID, redirectScheme string) (string, error) {
-	if !isAllowedRedirectScheme(redirectScheme) {
+	if !s.isAllowedRedirectScheme(redirectScheme) {
 		redirectScheme = "vito://oauth/callback"
 	}
-
 
 	nonceBytes := make([]byte, 16)
 	if _, err := rand.Read(nonceBytes); err != nil {
@@ -189,8 +205,10 @@ func (s *GoogleAuthService) GetAuthURL(mode, userID, redirectScheme string) (str
 	}
 
 	// Solicita perfil, identificação e escopos específicos por modo (Princípio do Menor Privilégio)
-	scope := "openid email profile https://www.googleapis.com/auth/calendar.calendarlist.readonly https://www.googleapis.com/auth/calendar.events"
-	if mode == "gmail" {
+	scope := "openid email profile"
+	if mode == "calendar" {
+		scope = "openid email profile https://www.googleapis.com/auth/calendar.calendarlist.readonly https://www.googleapis.com/auth/calendar.events"
+	} else if mode == "gmail" {
 		scope = "openid email profile https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.compose"
 	}
 
@@ -208,23 +226,6 @@ func (s *GoogleAuthService) GetAuthURL(mode, userID, redirectScheme string) (str
 	params.Set("state", state)
 
 	return s.cfg.AuthURL + "?" + params.Encode(), nil
-}
-
-// GoogleTokenResponse modela a resposta do endpoint de token do Google.
-type GoogleTokenResponse struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
-	ExpiresIn    int    `json:"expires_in"`
-	TokenType    string `json:"token_type"`
-	IDToken      string `json:"id_token"`
-}
-
-// GoogleUserInfo modela o perfil do usuário retornado pelo Google.
-type GoogleUserInfo struct {
-	Sub     string `json:"sub"`
-	Email   string `json:"email"`
-	Name    string `json:"name"`
-	Picture string `json:"picture"`
 }
 
 // HandleCallback processa o código de autorização, troca por tokens e conclui o fluxo.
@@ -285,8 +286,13 @@ func (s *GoogleAuthService) HandleCallback(ctx context.Context, code, stateStr s
 			return "", fmt.Errorf("Google conectado, mas falhou ao sincronizar: %v", errSync)
 		}
 
-		deepLink := fmt.Sprintf("%s?status=success&provider=google&email=%s",
+		sep := "?"
+		if strings.Contains(redirectScheme, "?") {
+			sep = "&"
+		}
+		deepLink := fmt.Sprintf("%s%sstatus=success&provider=google&email=%s",
 			redirectScheme,
+			sep,
 			url.QueryEscape(userInfo.Email),
 		)
 		return deepLink, nil
@@ -342,8 +348,13 @@ func (s *GoogleAuthService) HandleCallback(ctx context.Context, code, stateStr s
 			return "", fmt.Errorf("falha ao salvar integração do Gmail: %w", err)
 		}
 
-		deepLink := fmt.Sprintf("%s?status=success&provider=gmail&email=%s",
+		sep := "?"
+		if strings.Contains(redirectScheme, "?") {
+			sep = "&"
+		}
+		deepLink := fmt.Sprintf("%s%sstatus=success&provider=gmail&email=%s",
 			redirectScheme,
+			sep,
 			url.QueryEscape(userInfo.Email),
 		)
 		return deepLink, nil
@@ -405,16 +416,19 @@ func (s *GoogleAuthService) HandleCallback(ctx context.Context, code, stateStr s
 			"primary",
 			"Google Calendar",
 		)
-		errSync := s.syncSvc.SyncIntegration(context.Background(), user.ID, domain.ProviderGoogle)
-		if errSync != nil {
-			return "", fmt.Errorf("Login com Google efetuado, mas sincronização do calendário falhou: %v", errSync)
-		}
+		// Dispara a sincronização de forma resiliente: falha de sync no login não cancela a autenticação do usuário
+		_ = s.syncSvc.SyncIntegration(context.Background(), user.ID, domain.ProviderGoogle)
 	}
 
 	userJSON, _ := json.Marshal(user)
 
-	deepLink := fmt.Sprintf("%s?status=success&token=%s&access_token=%s&refresh_token=%s&session_id=%s&user=%s",
+	sep := "?"
+	if strings.Contains(redirectScheme, "?") {
+		sep = "&"
+	}
+	deepLink := fmt.Sprintf("%s%sstatus=success&token=%s&access_token=%s&refresh_token=%s&session_id=%s&user=%s",
 		redirectScheme,
+		sep,
 		url.QueryEscape(token),
 		url.QueryEscape(token),
 		url.QueryEscape(refreshToken),
@@ -422,69 +436,4 @@ func (s *GoogleAuthService) HandleCallback(ctx context.Context, code, stateStr s
 		url.QueryEscape(string(userJSON)),
 	)
 	return deepLink, nil
-}
-
-func (s *GoogleAuthService) exchangeCode(ctx context.Context, code string) (*GoogleTokenResponse, error) {
-	data := url.Values{}
-	data.Set("code", code)
-	data.Set("client_id", s.cfg.ClientID)
-	data.Set("client_secret", s.cfg.ClientSecret)
-	data.Set("redirect_uri", s.cfg.RedirectURL)
-	data.Set("grant_type", "authorization_code")
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.cfg.TokenURL, strings.NewReader(data.Encode()))
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	resp, err := s.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("Google token endpoint retornou status %d: %s", resp.StatusCode, strings.TrimSpace(string(bodyBytes)))
-	}
-
-	var tokenResp GoogleTokenResponse
-	if err := json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil {
-		return nil, err
-	}
-
-	return &tokenResp, nil
-}
-
-func (s *GoogleAuthService) fetchUserInfo(ctx context.Context, accessToken string) (*GoogleUserInfo, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, s.cfg.UserInfoURL, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-
-	resp, err := s.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("Google userinfo retornou status %d: %s", resp.StatusCode, strings.TrimSpace(string(bodyBytes)))
-	}
-
-	var userInfo GoogleUserInfo
-	if err := json.NewDecoder(resp.Body).Decode(&userInfo); err != nil {
-		return nil, err
-	}
-
-	return &userInfo, nil
-}
-
-func (s *GoogleAuthService) signHMAC(payload string) string {
-	mac := hmac.New(sha256.New, []byte(s.cfg.JWTSecret))
-	mac.Write([]byte(payload))
-	return hex.EncodeToString(mac.Sum(nil))
 }

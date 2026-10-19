@@ -237,10 +237,11 @@ func main() {
 	defer executiveSummaryWorker.Stop()
 
 	googleAuthCfg := service.GoogleAuthConfig{
-		ClientID:     cfg.GoogleClientID,
-		ClientSecret: cfg.GoogleClientSecret,
-		RedirectURL:  cfg.GoogleRedirectURL,
-		JWTSecret:    cfg.JWTSecret,
+		ClientID:       cfg.GoogleClientID,
+		ClientSecret:   cfg.GoogleClientSecret,
+		RedirectURL:    cfg.GoogleRedirectURL,
+		JWTSecret:      cfg.JWTSecret,
+		AllowedOrigins: cfg.AllowedOrigins(),
 	}
 	googleAuthSvc := service.NewGoogleAuthService(googleAuthCfg, userRepo, authSvc, syncSvc)
 

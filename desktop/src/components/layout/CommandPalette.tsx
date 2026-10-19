@@ -17,6 +17,7 @@ interface CommandPaletteProps {
   onSelectTab: (tab: DesktopTab) => void;
   onToggleAIPanel: () => void;
   onLogout: () => void;
+  onOpenSettings?: () => void;
 }
 
 export const CommandPalette: React.FC<CommandPaletteProps> = ({
@@ -25,11 +26,19 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   onSelectTab,
   onToggleAIPanel,
   onLogout,
+  onOpenSettings,
 }) => {
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
 
   const actions = [
+    {
+      id: 'tab-chat',
+      label: 'Ir para Início & Chat',
+      category: 'Navegação',
+      icon: Sparkles,
+      run: () => onSelectTab('chat'),
+    },
     {
       id: 'tab-calendar',
       label: 'Ir para Agenda & Eventos',
@@ -60,10 +69,10 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     },
     {
       id: 'tab-profile',
-      label: 'Ir para Configurações & Conexões',
-      category: 'Navegação',
+      label: 'Abrir Configurações (⌘,)',
+      category: 'Conta',
       icon: User,
-      run: () => onSelectTab('profile'),
+      run: () => (onOpenSettings ? onOpenSettings() : undefined),
     },
     {
       id: 'toggle-ai',
