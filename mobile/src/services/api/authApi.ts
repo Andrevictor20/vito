@@ -33,6 +33,13 @@ export class AuthApi {
   async getMe(): Promise<{ user: User }> {
     const data = await this.client.request<any>('/api/v1/auth/me');
     const user = data?.user || data;
+    if (data?.access_token || data?.token) {
+      await (this.client as any).setAuthTokens?.(
+        data.access_token || data.token,
+        data.refresh_token || this.client.getRefreshToken?.(),
+        data.session_id || this.client.getSessionId?.()
+      );
+    }
     return { user };
   }
 

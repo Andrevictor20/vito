@@ -1,6 +1,6 @@
 import test, { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { DataSyncBus, SyncEventType } from './dataSync';
+import { DataSyncBus, SyncEventType, tabNavigationBus } from './dataSync';
 
 describe('DataSyncBus - Reatividade e Barramento Bidirecional (TDD)', () => {
   it('notifica subscribers específicos e genéricos quando evento específico é disparado', () => {
@@ -86,3 +86,41 @@ describe('DataSyncBus - Reatividade e Barramento Bidirecional (TDD)', () => {
     assert.equal(secondRan, true, 'Segundo listener deve rodar mesmo após erro do primeiro');
   });
 });
+
+describe('TabNavigationBus - Barramento de Navegação Lateral de Abas (TDD)', () => {
+  it('notifica ouvintes quando uma aba é selecionada', () => {
+    let targetTab: string | null = null;
+    const unsub = tabNavigationBus.subscribe((tab) => {
+      targetTab = tab;
+    });
+
+    tabNavigationBus.notify('triggers');
+    assert.equal(targetTab, 'triggers');
+
+    tabNavigationBus.notify('chat');
+    assert.equal(targetTab, 'chat');
+
+    unsub();
+    tabNavigationBus.notify('tasks');
+    assert.equal(targetTab, 'chat', 'Listener cancelado não deve receber novos eventos');
+  });
+
+  it('não quebra a execução se um subscriber lançar erro', () => {
+    let secondRan = false;
+    const unsub1 = tabNavigationBus.subscribe(() => {
+      throw new Error('Erro simulado');
+    });
+    const unsub2 = tabNavigationBus.subscribe(() => {
+      secondRan = true;
+    });
+
+    assert.doesNotThrow(() => {
+      tabNavigationBus.notify('booking');
+    });
+    assert.equal(secondRan, true);
+
+    unsub1();
+    unsub2();
+  });
+});
+

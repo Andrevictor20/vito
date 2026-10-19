@@ -31,21 +31,15 @@ export const CalendarSyncSettingsModal: React.FC<CalendarSyncSettingsModalProps>
     isLoading,
     isSyncing,
     connectGoogleOAuth,
-    connectAppleCalDAV,
     connectNativeApple,
     syncProvider,
     disconnectProvider,
     getIntegration,
   } = useCalendarSync();
 
-  // Estados de formulário CalDAV
-  const [showAppleForm, setShowAppleForm] = useState(false);
-  const [appleId, setAppleId] = useState('');
-  const [appSpecificPassword, setAppSpecificPassword] = useState('');
   const [disconnectingProvider, setDisconnectingProvider] = useState<string | null>(null);
 
   const googleInteg = getIntegration('google');
-  const appleCalDAVInteg = getIntegration('apple_caldav');
   const appleNativeInteg = getIntegration('apple_native');
 
   const handleDisconnect = async (provider: string, label: string) => {
@@ -80,7 +74,6 @@ export const CalendarSyncSettingsModal: React.FC<CalendarSyncSettingsModalProps>
       onDataChanged?.();
       Alert.alert('Sucesso', 'Eventos do Google Calendar sincronizados com sucesso!');
     } catch (err: any) {
-
       const msg = err?.message || '';
       if (msg.includes('403') || msg.includes('insufficient') || msg.includes('permission')) {
         Alert.alert(
@@ -93,43 +86,21 @@ export const CalendarSyncSettingsModal: React.FC<CalendarSyncSettingsModalProps>
     }
   };
 
-  const handleSyncAppleCalDAV = async () => {
-    try {
-      await syncProvider('apple_caldav');
-      Alert.alert('Sucesso', 'Eventos do iCloud sincronizados com sucesso!');
-    } catch (err: any) {
-      Alert.alert('Erro ao Sincronizar', err?.message || 'Falha ao sincronizar eventos do iCloud.');
-    }
-  };
-
-  const handleConnectAppleCalDAV = async () => {
-    if (!appleId.trim() || !appSpecificPassword.trim()) {
-      Alert.alert('Atenção', 'Preencha o Apple ID e a Senha de App Específica.');
-      return;
-    }
-    try {
-      await connectAppleCalDAV(appleId.trim(), appSpecificPassword.trim());
-      setShowAppleForm(false);
-      setAppleId('');
-      setAppSpecificPassword('');
-      Alert.alert('Sucesso', 'iCloud CalDAV conectado e sincronização ativada!');
-    } catch (err: any) {
-      Alert.alert('Erro', err.message || 'Falha ao conectar ao CalDAV da Apple');
-    }
-  };
-
   const handleToggleNativeApple = async () => {
     if (appleNativeInteg) {
       await disconnectProvider('apple_native');
+      onDataChanged?.();
     } else {
       try {
         await connectNativeApple();
-        Alert.alert('Sucesso', 'Calendário Nativo conectado com sucesso!');
+        onDataChanged?.();
+        Alert.alert('Sucesso', 'Calendário do aparelho conectado com sucesso!');
       } catch (err: any) {
-        Alert.alert('Atenção', err.message || 'Não foi possível conectar ao calendário nativo');
+        Alert.alert('Atenção', err.message || 'Não foi possível conectar ao calendário do aparelho');
       }
     }
   };
+
 
   const formatLastSync = (dateStr?: string) => {
     if (!dateStr) return 'Nunca sincronizado';
@@ -261,7 +232,7 @@ export const CalendarSyncSettingsModal: React.FC<CalendarSyncSettingsModalProps>
               )}
             </View>
 
-            {/* CARD 2: APPLE CALENDAR (Nativo do Dispositivo) */}
+            {/* CARD 2: CALENDÁRIO DO DISPOSITIVO (NATIVO) */}
             <View
               style={[
                 styles.card,
@@ -272,56 +243,74 @@ export const CalendarSyncSettingsModal: React.FC<CalendarSyncSettingsModalProps>
                 <View style={styles.cardHeaderLeft}>
                   <View style={[styles.providerIconBox, { backgroundColor: isDark ? '#FFFFFF15' : '#00000010' }]}>
                     <MaterialIcons
-                      name={Platform.OS === 'ios' ? 'apple' : 'smartphone'}
-                      size={22}
+                      name={Platform.OS === 'ios' ? 'phone-iphone' : 'smartphone'}
+                      size={20}
                       color={colors.onSurface}
                     />
                   </View>
                   <View>
                     <Text style={[styles.cardTitle, { color: colors.onSurface }]}>
-                      {Platform.OS === 'ios' ? 'Apple Calendar' : 'Calendário do aparelho'}
+                      {Platform.OS === 'ios' ? 'Apple Calendar' : 'Calendário do Aparelho'}
                     </Text>
                     <Text style={[styles.cardSub, { color: colors.onSurfaceVariant }]}>
                       {appleNativeInteg
-                        ? (Platform.OS === 'ios' ? 'Calendário Nativo iOS Ativo' : 'Calendário local Android ativo')
-                        : (Platform.OS === 'ios' ? 'Sincronização local via EventKit no iOS' : 'Sincronização local no Android')}
+                        ? (Platform.OS === 'ios' ? 'Conectado via EventKit' : 'Conectado ao calendário local')
+                        : 'Sincronização com a agenda nativa do sistema'}
                     </Text>
                   </View>
                 </View>
 
                 {appleNativeInteg && (
-                  <View style={[styles.badgeActive, { backgroundColor: '#10B981' + '20' }]}>
+                  <View style={[styles.badgeActive, { backgroundColor: '#10B98120' }]}>
                     <View style={[styles.statusDot, { backgroundColor: '#10B981' }]} />
                     <Text style={[styles.badgeText, { color: '#10B981' }]}>Ativo</Text>
                   </View>
                 )}
               </View>
 
-              {/* Opção Nativa iOS */}
-              <TouchableOpacity
-                style={[styles.optionRow, { borderTopColor: colors.outlineVariant }]}
-                onPress={handleToggleNativeApple}
-                activeOpacity={0.7}
-              >
-                <View style={styles.optionLeft}>
-                  <MaterialIcons name="phone-iphone" size={18} color={colors.primary} />
-                  <View style={styles.optionTexts}>
-                    <Text style={[styles.optionTitle, { color: colors.onSurface }]}>
-                      Sync Nativo do Dispositivo
-                    </Text>
-                    <Text style={[styles.optionDesc, { color: colors.onSurfaceVariant }]}>
-                      {Platform.OS === 'ios'
-                        ? 'Sincroniza sem digitar senhas usando o EventKit local'
-                        : 'Sincroniza sem digitar senhas usando o calendário local'}
-                    </Text>
+              {appleNativeInteg ? (
+                <View style={styles.connectedActions}>
+                  <Text style={[styles.syncTimeText, { color: colors.onSurfaceVariant }]}>
+                    Sincronização em tempo real com eventos do sistema
+                  </Text>
+                  <View style={styles.actionRow}>
+                    <TouchableOpacity
+                      style={[
+                        styles.secondaryActionBtn,
+                        {
+                          borderColor: colors.outlineVariant,
+                          flex: 1,
+                        },
+                      ]}
+                      onPress={handleToggleNativeApple}
+                    >
+                      <Text style={[styles.secondaryActionText, { color: colors.error }]}>
+                        Desconectar
+                      </Text>
+                    </TouchableOpacity>
                   </View>
                 </View>
-                <MaterialIcons
-                  name={appleNativeInteg ? 'check-circle' : 'radio-button-unchecked'}
-                  size={20}
-                  color={appleNativeInteg ? '#10B981' : colors.outline}
-                />
-              </TouchableOpacity>
+              ) : (
+                <View style={styles.disconnectedActions}>
+                  <TouchableOpacity
+                    style={[
+                      styles.connectBtn,
+                      {
+                        backgroundColor: isDark ? colors.surfaceContainerHighest : colors.primary,
+                        borderWidth: isDark ? 1 : 0,
+                        borderColor: colors.outlineVariant,
+                      },
+                    ]}
+                    onPress={handleToggleNativeApple}
+                    activeOpacity={0.8}
+                  >
+                    <MaterialIcons name="sync" size={16} color={isDark ? colors.onSurface : '#FFFFFF'} />
+                    <Text style={[styles.connectBtnText, { color: isDark ? colors.onSurface : '#FFFFFF' }]}>
+                      Ativar Calendário do Aparelho
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
           </ScrollView>
     </BottomSheetModal>
@@ -445,84 +434,5 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
-  connectBtnSecondary: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-  },
-  connectBtnSecondaryText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  optionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 12,
-    borderTopWidth: 1,
-  },
-  optionLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    flex: 1,
-  },
-  optionTexts: {
-    flex: 1,
-  },
-  optionTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  optionDesc: {
-    fontSize: 11,
-    marginTop: 1,
-  },
-  optionContainer: {
-    paddingTop: 12,
-  },
-  formContainer: {
-    gap: 10,
-  },
-  formHelper: {
-    fontSize: 11,
-  },
-  input: {
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: 13,
-    borderWidth: 1,
-  },
-  formButtonRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  confirmBtn: {
-    flex: 1,
-    paddingVertical: 9,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  confirmBtnText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  cancelBtn: {
-    paddingVertical: 9,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cancelBtnText: {
-    fontSize: 13,
-  },
 });
+

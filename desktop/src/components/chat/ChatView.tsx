@@ -29,7 +29,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
   const { user } = useAuth();
   const [conversations, setConversations] = useState<ConversationSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | undefined>();
-  const [historyOpen, setHistoryOpen] = useState(true);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [selectedFocus, setSelectedFocus] = useState<FocusMode | null>(null);
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -61,14 +61,6 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
     try {
       const data = await api.getChatSessions();
       setConversations(data);
-      if (data.length > 0 && !activeSessionId) {
-        const first = data[0];
-        setActiveSessionId(first.id);
-        const detailed = await api.getChatSessionWithMessages(first.id);
-        if (detailed && detailed.messages && detailed.messages.length > 0) {
-          setMessages(detailed.messages);
-        }
-      }
     } catch (err) {
       console.warn('Falha ao carregar sessões de chat:', err);
     }

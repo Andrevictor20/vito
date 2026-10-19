@@ -14,4 +14,6 @@ export interface AssistantChatOptions {
   timezone?: string;
   history?: ChatHistoryItem[];
   signal?: AbortSignal;
+  focus_mode?: string;
 }
+

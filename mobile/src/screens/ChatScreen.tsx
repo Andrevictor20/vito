@@ -26,7 +26,9 @@ import { ChatMessageBubble } from '../components/chat/ChatMessageBubble';
 import { ChatQuickChips } from '../components/chat/ChatQuickChips';
 import { ChatInputDock } from '../components/chat/ChatInputDock';
 import { ChatHistoryDrawer } from '../components/chat/ChatHistoryDrawer';
-import { VitoMascot } from '../components/common/VitoMascot';
+import { ChatEmptyWelcome } from '../components/chat/ChatEmptyWelcome';
+import { FocusMenuModal } from '../components/chat/FocusMenuModal';
+import { FocusMode } from '../types/focus';
 import { prepareEditDraft } from '../utils/chatActions';
 import { pickWelcomeGreeting } from '../utils/chatGreetings';
 import { resolveKeyboardHeight } from '../utils/keyboardHeight';
@@ -72,10 +74,13 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
   const [inputText, setInputText] = useState('');
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
   const [selectedImageBase64, setSelectedImageBase64] = useState<string | null>(null);
+  const [selectedFocus, setSelectedFocus] = useState<FocusMode | null>(null);
+  const [focusModalVisible, setFocusModalVisible] = useState(false);
   const [historyVisible, setHistoryVisible] = useState(false);
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+
   const flatListRef = useRef<FlatList>(null);
   const inputRef = useRef<any>(null);
   // Espelhos p/ o listener de teclado decidir sem re-subscrever (zona morta).
@@ -96,14 +101,16 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
       setInputText('');
       setSelectedImageUri(null);
       setSelectedImageBase64(null);
+      setSelectedFocus(null);
       startNewConversation();
     },
     submitExternalPrompt: (text: string) => {
       if (text.trim()) {
-        sendMessage(text.trim());
+        sendMessage(text.trim(), selectedFocus?.id);
       }
     },
-  }), [startNewConversation, sendMessage]);
+  }), [startNewConversation, sendMessage, selectedFocus?.id]);
+
 
   useEffect(() => {
     onLoadingStateChange?.(loading);
@@ -242,7 +249,7 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
     } else {
       const text = inputText;
       setInputText('');
-      sendMessage(text);
+      sendMessage(text, selectedFocus?.id);
     }
     // Mantém teclado aberto e foco para a próxima mensagem (1 toque sempre).
     requestAnimationFrame(() => inputRef.current?.focus?.());
@@ -250,7 +257,7 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
 
   const handleQuickPrompt = (prompt: string) => {
     if (loading) return;
-    sendMessage(prompt);
+    sendMessage(prompt, selectedFocus?.id);
   };
 
   const handleEditMessage = (text: string) => {
@@ -264,9 +271,9 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
     if (loading) return;
     const title = msg.event?.title || msg.conflict?.conflicting_title;
     if (title) {
-      sendMessage(`Reagendar "${title}" para ${slot.label}`);
+      sendMessage(`Reagendar "${title}" para ${slot.label}`, selectedFocus?.id);
     } else {
-      sendMessage(`Reagendar compromisso para ${slot.label}`);
+      sendMessage(`Reagendar compromisso para ${slot.label}`, selectedFocus?.id);
     }
   };
 
@@ -296,12 +303,13 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
       const result = await SafeAudioRecorder.stopRecording();
       if (result?.uri) {
         // Envia o áudio real para o backend (Groq Whisper)
-        await sendAudio(result.uri);
+        await sendAudio(result.uri, selectedFocus?.id);
       } else {
         console.warn('[Voice] Nenhum URI de áudio retornado.');
       }
     }
   };
+
 
   const handleCancelRecording = async () => {
     if (!isRecording) return;
@@ -348,17 +356,7 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
         ]}
         keyboardShouldPersistTaps="handled"
         ListEmptyComponent={
-          <View style={styles.emptyWelcomeContainer}>
-            <View style={styles.emptyMascotWrapper}>
-              <VitoMascot size={72} state={loading ? 'thinking' : 'idle'} animated={true} />
-            </View>
-            <Text style={[styles.emptyWelcomeTitle, { color: colors.onSurface }]}>
-              {welcomeGreeting}
-            </Text>
-            <Text style={[styles.emptyWelcomeSubtitle, { color: colors.onSurfaceVariant }]}>
-              Toque numa sugestão abaixo ou me diga o que precisa
-            </Text>
-          </View>
+          <ChatEmptyWelcome welcomeGreeting={welcomeGreeting} loading={loading} />
         }
         ListFooterComponent={
           loading ? (
@@ -385,8 +383,8 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
             paddingBottom: isKeyboardOpen
               ? 28
               : Platform.OS === 'ios'
-              ? 76
-              : 74,
+              ? 102
+              : 104,
           },
         ]}
       >
@@ -406,6 +404,9 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
             setSelectedImageUri(null);
             setSelectedImageBase64(null);
           }}
+          selectedFocus={selectedFocus}
+          onPressFocus={() => setFocusModalVisible(true)}
+          onClearFocus={() => setSelectedFocus(null)}
         />
       </View>
       <ChatHistoryDrawer
@@ -415,6 +416,12 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
         conversations={sessions}
         onSelectConversation={switchConversation}
         onDeleteConversation={deleteConversation}
+      />
+      <FocusMenuModal
+        visible={focusModalVisible}
+        onClose={() => setFocusModalVisible(false)}
+        selectedFocus={selectedFocus}
+        onSelectFocus={setSelectedFocus}
       />
     </KeyboardAvoidingView>
   );
@@ -454,30 +461,6 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
   },
-  emptyWelcomeContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: tokens.spacing.xl,
-    paddingVertical: tokens.spacing.xl,
-  },
-  emptyMascotWrapper: {
-    marginBottom: tokens.spacing.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyWelcomeTitle: {
-    fontSize: tokens.typography.size.headlineSmall,
-    fontWeight: '700',
-    letterSpacing: -0.5,
-    textAlign: 'center',
-    marginBottom: tokens.spacing.xs,
-  },
-  emptyWelcomeSubtitle: {
-    fontSize: tokens.typography.size.bodyMedium,
-    lineHeight: 22,
-    textAlign: 'center',
-    maxWidth: 320,
-  },
   suggestionsWrapper: {
     paddingBottom: 4,
   },
@@ -486,3 +469,4 @@ const styles = StyleSheet.create({
     paddingBottom: Platform.OS === 'android' ? 8 : 8,
   },
 });
+

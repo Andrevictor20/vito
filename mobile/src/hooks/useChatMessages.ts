@@ -48,6 +48,30 @@ export const notifyAssistantResult = (res: AssistantChatResponse) => {
   dataSync.notify('refresh_all');
 };
 
+export const handleAssistantSideEffects = (
+  res: AssistantChatResponse,
+  onDataChanged?: () => void
+) => {
+  if (res.event) {
+    notificationService.scheduleEventDualReminders(res.event).catch(() => {});
+  }
+  if (res.todo) {
+    notificationService.scheduleTodoReminder(res.todo).catch(() => {});
+  }
+  if (res.pending) {
+    notificationService.schedulePendingReminder(res.pending).catch(() => {});
+    dataSync.notify('refresh_pending');
+  }
+  if (res.action_performed === 'delete_event' && res.event?.id) {
+    notificationService.cancelEventReminder(res.event.id).catch(() => {});
+  }
+  if (res.action_performed === 'delete_todo' && res.todo?.id) {
+    notificationService.cancelTodoReminder(res.todo.id).catch(() => {});
+  }
+  notifyAssistantResult(res);
+  onDataChanged?.();
+};
+
 export { humanizePreview };
 
 export interface UseChatMessagesOptions {
@@ -61,13 +85,14 @@ export interface UseChatMessagesResult {
   setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
   loading: boolean;
   saveMessages: (newMessages: ChatMessage[]) => void;
-  sendMessage: (text: string) => Promise<void>;
-  editAndResendMessage: (messageId: string, newText: string) => Promise<void>;
+  sendMessage: (text: string, focusMode?: string) => Promise<void>;
+  editAndResendMessage: (messageId: string, newText: string, focusMode?: string) => Promise<void>;
   stopGeneration: () => void;
-  sendAudio: (audioUri: string) => Promise<void>;
+  sendAudio: (audioUri: string, focusMode?: string) => Promise<void>;
   sendImage: (imageUri: string, prompt?: string, base64Override?: string) => Promise<void>;
   clearHistory: () => Promise<void>;
 }
+
 
 /**
  * A3: dono de messages/loading/abort/send/stop/retry. Recebe o
@@ -165,7 +190,7 @@ export function useChatMessages(
   );
 
   const sendMessage = useCallback(
-    async (text: string) => {
+    async (text: string, focusMode?: string) => {
       if (!text.trim() || loading) return;
 
       const userMsg: ChatMessage = {
@@ -192,6 +217,7 @@ export function useChatMessages(
         const res = await api.assistantChat(text.trim(), {
           history: recentHistory,
           signal: controller.signal,
+          focus_mode: focusMode,
         });
         const vitoMsg = buildAssistantMessage('vito', res, 'Instrução processada com sucesso.');
 
@@ -199,27 +225,7 @@ export function useChatMessages(
         setMessages(withVito);
         saveMessages(withVito);
 
-        // Agenda lembretes locais imediatamente para itens criados/atualizados pela IA
-        if (res.event) {
-          notificationService.scheduleEventDualReminders(res.event).catch(() => {});
-        }
-        if (res.todo) {
-          notificationService.scheduleTodoReminder(res.todo).catch(() => {});
-        }
-        if (res.pending) {
-          notificationService.schedulePendingReminder(res.pending).catch(() => {});
-          dataSync.notify('refresh_pending');
-        }
-        if (res.action_performed === 'delete_event' && res.event?.id) {
-          notificationService.cancelEventReminder(res.event.id).catch(() => {});
-        }
-        if (res.action_performed === 'delete_todo' && res.todo?.id) {
-          notificationService.cancelTodoReminder(res.todo.id).catch(() => {});
-        }
-
-        // Sincroniza e notifica telas imediatamente (Agenda, Radares, Tarefas, etc.)
-        notifyAssistantResult(res);
-        onDataChanged?.();
+        handleAssistantSideEffects(res, onDataChanged);
       } catch (err: unknown) {
         if (isUserStoppedRef.current && isAbortError(err)) {
           // Geração intencionalmente cancelada pelo usuário
@@ -257,7 +263,7 @@ export function useChatMessages(
   );
 
   const editAndResendMessage = useCallback(
-    async (messageId: string, newText: string) => {
+    async (messageId: string, newText: string, focusMode?: string) => {
       if (!newText.trim() || loading) return;
 
       const targetIdx = messages.findIndex((m) => m.id === messageId);
@@ -282,6 +288,7 @@ export function useChatMessages(
         const res = await api.assistantChat(newText.trim(), {
           history: recentHistory,
           signal: controller.signal,
+          focus_mode: focusMode,
         });
 
         const vitoMsg = buildAssistantMessage('vito', res, 'Instrução processada com sucesso.');
@@ -290,24 +297,7 @@ export function useChatMessages(
         setMessages(withVito);
         saveMessages(withVito);
 
-        if (res.event) {
-          notificationService.scheduleEventDualReminders(res.event).catch(() => {});
-        }
-        if (res.todo) {
-          notificationService.scheduleTodoReminder(res.todo).catch(() => {});
-        }
-        if (res.pending) {
-          notificationService.schedulePendingReminder(res.pending).catch(() => {});
-          dataSync.notify('refresh_pending');
-        }
-        if (res.action_performed === 'delete_event' && res.event?.id) {
-          notificationService.cancelEventReminder(res.event.id).catch(() => {});
-        }
-        if (res.action_performed === 'delete_todo' && res.todo?.id) {
-          notificationService.cancelTodoReminder(res.todo.id).catch(() => {});
-        }
-        notifyAssistantResult(res);
-        onDataChanged?.();
+        handleAssistantSideEffects(res, onDataChanged);
       } catch (err: unknown) {
         if (isUserStoppedRef.current && isAbortError(err)) {
           const stoppedMsg: ChatMessage = {
@@ -344,7 +334,7 @@ export function useChatMessages(
   );
 
   const sendAudio = useCallback(
-    async (audioUri: string) => {
+    async (audioUri: string, focusMode?: string) => {
       if (loading) return;
 
       // Mensagem placeholder do usuário indicando envio de voz
@@ -365,7 +355,10 @@ export function useChatMessages(
           sender: m.sender === 'user' ? ('user' as const) : ('vito' as const),
           text: m.text,
         }));
-        const res = await api.assistantAudio(audioUri, 'audio.m4a', { history: recentHistory });
+        const res = await api.assistantAudio(audioUri, 'audio.m4a', {
+          history: recentHistory,
+          focus_mode: focusMode,
+        });
 
         // Substitui o placeholder com a transcrição real
         const transcriptText = res.transcript
@@ -379,26 +372,7 @@ export function useChatMessages(
         setMessages(withVito);
         saveMessages(withVito);
 
-        // Agenda lembretes locais imediatamente para itens criados/atualizados pela IA via áudio
-        if (res.event) {
-          notificationService.scheduleEventDualReminders(res.event).catch(() => {});
-        }
-        if (res.todo) {
-          notificationService.scheduleTodoReminder(res.todo).catch(() => {});
-        }
-        if (res.pending) {
-          notificationService.schedulePendingReminder(res.pending).catch(() => {});
-          dataSync.notify('refresh_pending');
-        }
-        if (res.action_performed === 'delete_event' && res.event?.id) {
-          notificationService.cancelEventReminder(res.event.id).catch(() => {});
-        }
-        if (res.action_performed === 'delete_todo' && res.todo?.id) {
-          notificationService.cancelTodoReminder(res.todo.id).catch(() => {});
-        }
-
-        notifyAssistantResult(res);
-        onDataChanged?.();
+        handleAssistantSideEffects(res, onDataChanged);
       } catch (err: unknown) {
         console.warn('[useChat] falha no assistente:', err);
         const errMsg = err instanceof Error ? err.message : '';
@@ -447,8 +421,7 @@ export function useChatMessages(
         setMessages(withVito);
         saveMessages(withVito);
 
-        notifyAssistantResult(res);
-        onDataChanged?.();
+        handleAssistantSideEffects(res, onDataChanged);
       } catch (err: unknown) {
         console.warn('[useChat] falha no assistente:', err);
         const errMsg = err instanceof Error ? err.message : '';

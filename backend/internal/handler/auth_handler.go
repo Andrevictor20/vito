@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/handler/middleware"
@@ -100,6 +101,9 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 	}
 
 	currentSessionID := middleware.SessionIDFromContext(r.Context())
+	if currentSessionID == "" {
+		currentSessionID = strings.TrimSpace(r.Header.Get("X-Session-ID"))
+	}
 	resMap := map[string]interface{}{
 		"user": user,
 	}

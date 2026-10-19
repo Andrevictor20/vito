@@ -68,6 +68,7 @@ export class ChatApi {
         timezone: tz,
         current_local_time: currentLocalTime,
         history: opts.history,
+        focus_mode: opts.focus_mode,
       }),
     });
   }
@@ -94,6 +95,7 @@ export class ChatApi {
             timezone: tz,
             current_local_time: currentLocalTime,
             history: opts.history,
+            focus_mode: opts.focus_mode,
           }),
         });
       }
@@ -114,6 +116,10 @@ export class ChatApi {
     } as unknown as Blob);
     formData.append('timezone', tz);
     formData.append('current_local_time', currentLocalTime);
+    if (opts.focus_mode) {
+      formData.append('focus_mode', opts.focus_mode);
+    }
+
 
     const headers: Record<string, string> = {
       Accept: 'application/json',

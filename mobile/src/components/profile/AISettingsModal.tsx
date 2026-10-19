@@ -106,42 +106,17 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
               contentContainerStyle={styles.scrollContent}
               showsVerticalScrollIndicator={false}
             >
-              {/* Status Banner */}
-              <View
-                style={[
-                  styles.statusBanner,
-                  {
-                    backgroundColor: colors.surfaceContainer,
-                    borderColor: colors.outlineVariant,
-                  },
-                ]}
-              >
-                <View style={styles.bannerRow}>
-                  <MaterialIcons
-                    name={autonomyMode === 'proactive' ? 'bolt' : 'verified-user'}
-                    size={18}
-                    color={colors.primary}
-                  />
-                  <Text style={[styles.bannerTitle, { color: colors.onSurface }]}>
-                    Nível Atual: {autonomyMode === 'proactive' ? 'Modo Proativo' : 'Modo Assistido'}
-                  </Text>
-                  {isSaving && (
-                    <View style={styles.savingBadge}>
-                      <ActivityIndicator size="small" color={colors.primary} />
-                      <Text style={[styles.savingText, { color: colors.primary }]}>Salvando</Text>
-                    </View>
-                  )}
-                </View>
-                <Text style={[styles.bannerDesc, { color: colors.onSurfaceVariant }]}>
-                  {autonomyMode === 'proactive'
-                    ? 'O Vito resolve conflitos, sugere blocos de foco e reorganiza a rotina com autonomia executiva.'
-                    : 'O Vito atua como secretário estrito, solicitando sua aprovação antes de qualquer alteração na agenda.'}
+              <View style={styles.sectionHeaderRow}>
+                <Text style={[styles.sectionTitle, { color: colors.onSurfaceVariant }]}>
+                  MODO DE OPERAÇÃO
                 </Text>
+                {isSaving && (
+                  <View style={styles.savingBadge}>
+                    <ActivityIndicator size="small" color={colors.primary} />
+                    <Text style={[styles.savingText, { color: colors.primary }]}>Salvando...</Text>
+                  </View>
+                )}
               </View>
-
-              <Text style={[styles.sectionTitle, { color: colors.onSurfaceVariant }]}>
-                MODO DE OPERAÇÃO
-              </Text>
 
               {/* OPÇÃO 1: MODO ASSISTIDO */}
               <TouchableOpacity
@@ -387,21 +362,11 @@ const styles = StyleSheet.create({
     gap: 14,
     paddingBottom: 40,
   },
-  statusBanner: {
-    padding: 14,
-    borderRadius: 14,
-    borderWidth: 1,
-    gap: 6,
-  },
-  bannerRow: {
+  sectionHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-  },
-  bannerTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    flex: 1,
+    justifyContent: 'space-between',
+    marginTop: 4,
   },
   savingBadge: {
     flexDirection: 'row',
@@ -412,15 +377,10 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
   },
-  bannerDesc: {
-    fontSize: 12,
-    lineHeight: 17,
-  },
   sectionTitle: {
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.8,
-    marginTop: 4,
   },
   modeCard: {
     padding: 16,

@@ -126,3 +126,59 @@ func TestAuthService_DualTokenRotationAndSessionGovernance(t *testing.T) {
 		t.Error("sessão atual (pair1) deveria continuar ativa após RevokeOtherSessions")
 	}
 }
+
+func TestAuthService_PrunesDuplicateSessions(t *testing.T) {
+	authSvc, _, sessionRepo := setupAuthServiceWithSessions(t)
+
+	user, pair1, err := authSvc.RegisterWithSession("André", "andre_dup@vito.local", "senhaForte123", "Android (Vito App)", "192.168.1.50")
+	if err != nil {
+		t.Fatalf("erro no registro: %v", err)
+	}
+
+	// Simula segundo login/issue no mesmo aparelho Android
+	_, pair2, err := authSvc.LoginWithSession("andre_dup@vito.local", "senhaForte123", "Android (Vito App)", "192.168.1.50")
+	if err != nil {
+		t.Fatalf("erro no segundo login: %v", err)
+	}
+
+	// Sessão antiga (pair1) deve ter sido revogada automaticamente pelo pruning
+	if !authSvc.IsSessionRevoked(user.ID, pair1.SessionID) {
+		t.Error("esperava que a sessão anterior do mesmo aparelho (pair1) fosse revogada")
+	}
+	if authSvc.IsSessionRevoked(user.ID, pair2.SessionID) {
+		t.Error("sessão nova (pair2) deveria estar ativa")
+	}
+
+	// Simula inserção manual de duplicatas legadas (zumbis) para testar o auto-cleanup do ListSessions
+	now := time.Now().UTC()
+	_ = sessionRepo.Create(&domain.RefreshToken{
+		ID:         "legacy-zombie-1",
+		UserID:     user.ID,
+		TokenHash:  "hash-zombie-1",
+		DeviceName: "Android (Vito App)",
+		ExpiresAt:  now.Add(24 * time.Hour),
+		CreatedAt:  now.Add(-10 * time.Minute),
+		LastUsedAt: now.Add(-10 * time.Minute),
+	})
+	_ = sessionRepo.Create(&domain.RefreshToken{
+		ID:         "legacy-zombie-2",
+		UserID:     user.ID,
+		TokenHash:  "hash-zombie-2",
+		DeviceName: "Android (Vito App)",
+		ExpiresAt:  now.Add(24 * time.Hour),
+		CreatedAt:  now.Add(-20 * time.Minute),
+		LastUsedAt: now.Add(-20 * time.Minute),
+	})
+
+	// ListSessions deve filtrar e revogar os zumbis, retornando apenas 1 sessão ativa para o Android
+	sessions, err := authSvc.ListSessions(user.ID, pair2.SessionID)
+	if err != nil {
+		t.Fatalf("erro ao listar sessões: %v", err)
+	}
+	if len(sessions) != 1 {
+		t.Fatalf("esperava apenas 1 sessão ativa após auto-cleanup de duplicatas, obteve %d", len(sessions))
+	}
+	if sessions[0].ID != pair2.SessionID || !sessions[0].IsCurrent {
+		t.Errorf("sessão retornada deve ser pair2 marcada como atual, obteve %+v", sessions[0])
+	}
+}

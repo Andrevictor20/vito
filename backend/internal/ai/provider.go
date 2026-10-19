@@ -61,6 +61,7 @@ type UserInput struct {
 	AppStateFlags       []string             `json:"app_state_flags,omitempty"`      // §8.5 telemetria compacta
 	CoreProfile         []string             `json:"core_profile,omitempty"`         // §8.2 Camada 1 (8-10 itens)
 	RecentEmails        []string             `json:"recent_emails,omitempty"`        // E-mails recentes / faturas / voos do Gmail
+	FocusMode           string               `json:"focus_mode,omitempty"`           // calendar, tasks, triggers, meetings, briefing, memory
 }
 
 // ParsedEvent dados extraídos para criação, atualização ou remoção de evento.

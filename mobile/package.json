@@ -7,7 +7,7 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "test": "tsx --test src/utils/pagerNavigation.test.ts src/utils/calendarDateUtils.test.ts src/utils/chatActions.test.ts src/utils/notificationReconcile.test.ts src/utils/chatGreetings.test.ts src/utils/chatCards.test.ts src/utils/chatSendGuard.test.ts src/utils/chatPreview.test.ts src/utils/unifiedTasks.test.ts src/utils/reminderInput.test.ts src/utils/dateTimePicker.test.ts src/utils/taskEdit.test.ts src/utils/keyboardHeight.test.ts src/utils/phoneFormat.test.ts src/services/contactMatchingService.test.ts src/services/api/p2pMeetingsApi.test.ts src/services/api/whatsappApi.test.ts src/services/api/gmailApi.test.ts src/services/api/whatsappAuthApi.test.ts src/utils/slotAvailability.test.ts src/utils/radarReportUtils.test.ts src/services/api/triggersApi.test.ts"
+    "test": "tsx --test src/utils/pagerNavigation.test.ts src/utils/calendarDateUtils.test.ts src/utils/chatActions.test.ts src/utils/notificationReconcile.test.ts src/utils/chatGreetings.test.ts src/utils/chatCards.test.ts src/utils/chatSendGuard.test.ts src/utils/chatPreview.test.ts src/utils/unifiedTasks.test.ts src/utils/reminderInput.test.ts src/utils/dateTimePicker.test.ts src/utils/taskEdit.test.ts src/utils/keyboardHeight.test.ts src/utils/phoneFormat.test.ts src/services/contactMatchingService.test.ts src/services/api/p2pMeetingsApi.test.ts src/services/api/whatsappApi.test.ts src/services/api/gmailApi.test.ts src/services/api/whatsappAuthApi.test.ts src/utils/slotAvailability.test.ts src/utils/radarReportUtils.test.ts src/services/api/triggersApi.test.ts src/services/dataSync.test.ts src/types/focus.test.ts"
   },
   "dependencies": {
     "@expo-google-fonts/inter": "^0.4.2",

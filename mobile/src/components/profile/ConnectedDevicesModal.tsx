@@ -144,18 +144,6 @@ export const ConnectedDevicesModal: React.FC<ConnectedDevicesModalProps> = ({
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          <View
-            style={[
-              styles.infoBanner,
-              { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant },
-            ]}
-          >
-            <MaterialIcons name="verified-user" size={18} color={colors.primary} />
-            <Text style={[styles.infoText, { color: colors.onSurfaceVariant }]}>
-              Sessões protegidas por rotação automática de tokens (Access 15m + Refresh 30d).
-            </Text>
-          </View>
-
           {sessions.length === 0 ? (
             <View style={styles.emptyBox}>
               <Text style={[styles.emptyText, { color: colors.onSurfaceVariant }]}>

@@ -42,6 +42,7 @@ type assistantChatRequest struct {
 	Timezone         string               `json:"timezone,omitempty"`
 	CurrentLocalTime string               `json:"current_local_time,omitempty"`
 	History          []ChatMessagePayload `json:"history,omitempty"`
+	FocusMode        string               `json:"focus_mode,omitempty"`
 }
 
 func parseClientNow(rawTime, tz string) (time.Time, string) {
@@ -115,6 +116,7 @@ func (h *AssistantHandler) Chat(w http.ResponseWriter, r *http.Request) {
 		Timezone:            tz,
 		Now:                 nowRef,
 		ConversationHistory: convHistory,
+		FocusMode:           req.FocusMode,
 	}
 
 	resp, err := h.astSvc.Process(r.Context(), userID, input)

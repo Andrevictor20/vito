@@ -159,3 +159,41 @@ func TestSystemPrompt_TokenBudget(t *testing.T) {
 		t.Errorf("base acima do orçamento (20k chars): %d", len(base))
 	}
 }
+
+func TestBuildSystemPromptFromInput_FocusModes(t *testing.T) {
+	now := time.Date(2026, 10, 10, 10, 0, 0, 0, time.UTC)
+	modes := map[string]string{
+		"calendar": "MODO DE FOCO ATIVO: AGENDA & EVENTOS",
+		"tasks":    "MODO DE FOCO ATIVO: TAREFAS & PRIORIDADES",
+		"triggers": "MODO DE FOCO ATIVO: VIGÍLIAS & RADARES",
+		"meetings": "MODO DE FOCO ATIVO: BOOKING & REUNIÕES",
+		"briefing": "MODO DE FOCO ATIVO: BRIEFING EXECUTIVO",
+		"memory":   "MODO DE FOCO ATIVO: MEMÓRIA & ROTINAS",
+	}
+
+	for mode, expectedPhrase := range modes {
+		t.Run(mode, func(t *testing.T) {
+			input := ai.UserInput{
+				Now:       now,
+				Timezone:  "America/Sao_Paulo",
+				FocusMode: mode,
+			}
+			prompt := ai.BuildSystemPromptFromInput(input)
+			if !strings.Contains(prompt, expectedPhrase) {
+				t.Fatalf("esperava que o prompt contivesse %q para o modo %q", expectedPhrase, mode)
+			}
+		})
+	}
+
+	t.Run("empty_focus_mode", func(t *testing.T) {
+		input := ai.UserInput{
+			Now:      now,
+			Timezone: "America/Sao_Paulo",
+		}
+		prompt := ai.BuildSystemPromptFromInput(input)
+		if strings.Contains(prompt, "MODO DE FOCO ATIVO") {
+			t.Fatalf("não esperava bloco de foco ativo para modo vazio")
+		}
+	})
+}
+

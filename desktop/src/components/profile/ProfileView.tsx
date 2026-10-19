@@ -80,11 +80,8 @@ export const ProfileView: React.FC = () => {
                 </p>
               </div>
             </div>
-
-            <span className="px-3 py-1 rounded-full bg-zinc-100 dark:bg-[#1C2026] text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-[#222730] text-xs font-bold tracking-wider uppercase shadow-sm">
-              PRO AI
-            </span>
           </div>
+
 
           {/* Grupo 1: Assistente Executivo & IA */}
           <div className="space-y-3">

@@ -16,7 +16,6 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { ProfileUserCard } from '../components/profile/ProfileUserCard';
 import { ProfileSettingsGroup } from '../components/profile/ProfileSettingsGroup';
-import { NotificationSettingsModal } from '../components/notifications/NotificationSettingsModal';
 import { CalendarSyncSettingsModal } from '../components/profile/CalendarSyncSettingsModal';
 import { AISettingsModal } from '../components/profile/AISettingsModal';
 import { PhoneEditModal } from '../components/profile/PhoneEditModal';
@@ -24,8 +23,8 @@ import { ContactsSyncModal } from '../components/profile/ContactsSyncModal';
 import { ConnectedDevicesModal } from '../components/profile/ConnectedDevicesModal';
 import { WhatsAppConnectModal } from '../components/profile/WhatsAppConnectModal';
 import { GmailConnectModal } from '../components/profile/GmailConnectModal';
+import { IntegrationsModal } from '../components/profile/IntegrationsModal';
 import { api } from '../services/api';
-import { notificationService } from '../services/notificationService';
 import { calendarSyncService } from '../services/calendarSyncService';
 import type { AutonomyMode } from '../types';
 import appJson from '../../app.json';
@@ -43,7 +42,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 }) => {
   const { user, logout } = useAuth();
   const { colors } = useTheme();
-  const [notifVisible, setNotifVisible] = useState(false);
+  const [integrationsVisible, setIntegrationsVisible] = useState(false);
   const [syncVisible, setSyncVisible] = useState(false);
   const [aiVisible, setAiVisible] = useState(false);
   const [phoneVisible, setPhoneVisible] = useState(false);
@@ -59,12 +58,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   useEffect(() => {
     if (user?.phone) setUserPhone(user.phone);
   }, [user?.phone]);
-  // Servidor único (nuvem): apenas exibição, sem seletor.
-  const [serverHost, setServerHost] = useState(api.shortServerHost());
 
-  useEffect(() => {
-    setServerHost(api.shortServerHost());
-  }, []);
 
   const name = user?.name || 'Andre Victor';
   const email = user?.email || 'andre@vito.ai';
@@ -73,9 +67,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
   // Statuses vivos das linhas (mesmas fontes dos modais).
   const [autonomyMode, setAutonomyMode] = useState<AutonomyMode>('assisted');
-  const [notifActive, setNotifActive] = useState<boolean | null>(null);
   const [calendarsActive, setCalendarsActive] = useState<number | null>(null);
   const [sessionsCount, setSessionsCount] = useState<number | null>(null);
+
+  const integrationsActiveCount =
+    (whatsAppStatus === 'connected' ? 1 : 0) + (gmailStatus?.connected ? 1 : 0);
 
   const loadStatuses = useCallback(async () => {
     try {
@@ -83,12 +79,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
       if (s?.autonomy_mode) setAutonomyMode(s.autonomy_mode);
     } catch {
       // Mantém default assistido; modal mostra o erro ao abrir.
-    }
-    try {
-      const p = await notificationService.checkPermissionStatus();
-      setNotifActive(p.granted);
-    } catch {
-      setNotifActive(null);
     }
     try {
       const list = await calendarSyncService.listIntegrations();
@@ -176,17 +166,13 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
       </View>
 
       <ProfileSettingsGroup
-        onOpenNotifications={() => setNotifVisible(true)}
         onOpenCalendarSync={() => setSyncVisible(true)}
         onOpenAISettings={() => setAiVisible(true)}
         onOpenContactsSync={() => setContactsVisible(true)}
-        onOpenWhatsAppConnect={() => setWhatsAppVisible(true)}
-        onOpenGmailConnect={() => setGmailVisible(true)}
+        onOpenIntegrations={() => setIntegrationsVisible(true)}
         autonomyMode={autonomyMode}
-        notifActive={notifActive}
         calendarsActive={calendarsActive}
-        whatsAppStatus={whatsAppStatus}
-        gmailStatus={gmailStatus}
+        integrationsActiveCount={integrationsActiveCount}
       />
 
       <AISettingsModal
@@ -196,12 +182,13 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           if (s?.autonomy_mode) setAutonomyMode(s.autonomy_mode);
         }}
       />
-      <NotificationSettingsModal
-        visible={notifVisible}
-        onClose={() => {
-          setNotifVisible(false);
-          loadStatuses();
-        }}
+      <IntegrationsModal
+        visible={integrationsVisible}
+        onClose={() => setIntegrationsVisible(false)}
+        whatsAppStatus={whatsAppStatus}
+        gmailStatus={gmailStatus}
+        onOpenWhatsApp={() => setWhatsAppVisible(true)}
+        onOpenGmail={() => setGmailVisible(true)}
       />
       <CalendarSyncSettingsModal
         visible={syncVisible}
@@ -275,12 +262,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             <View style={[styles.itemIconBox, { backgroundColor: colors.surfaceContainerHigh }]}>
               <MaterialIcons name="devices" size={18} color={colors.primary} />
             </View>
-            <View style={styles.itemTextCol}>
-              <Text style={[styles.actionText, { color: colors.onSurface }]}>Dispositivos Conectados</Text>
-              <Text style={[styles.itemSub, { color: colors.textSecondary }]} numberOfLines={1}>
-                Gerenciar sessões e acessos ativos
-              </Text>
-            </View>
+            <Text style={[styles.actionText, { color: colors.onSurface }]}>Dispositivos Conectados</Text>
           </View>
           <View style={styles.itemRight}>
             {sessionsCount !== null && (
@@ -306,12 +288,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             <View style={[styles.itemIconBox, { backgroundColor: colors.surfaceContainerHigh }]}>
               <MaterialIcons name="refresh" size={18} color={colors.primary} />
             </View>
-            <View style={styles.itemTextCol}>
-              <Text style={[styles.actionText, { color: colors.onSurface }]}>Buscar Atualizações</Text>
-              <Text style={[styles.itemSub, { color: colors.textSecondary }]} numberOfLines={1}>
-                {appVersion ? `Versão ${appVersion}${appBuild ? ` · Build ${appBuild}` : ''}` : 'Versão atual'}
-              </Text>
-            </View>
+            <Text style={[styles.actionText, { color: colors.onSurface }]}>Buscar Atualizações</Text>
           </View>
           <View style={styles.itemRight}>
             {checking ? (
@@ -327,22 +304,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
         <View style={[styles.divider, { backgroundColor: colors.outlineVariant }]} />
 
-        <View style={styles.groupItem} accessibilityLabel="Servidor conectado">
-          <View style={styles.actionLeft}>
-            <View style={[styles.itemIconBox, { backgroundColor: colors.surfaceContainerHigh }]}>
-              <MaterialIcons name="dns" size={18} color={colors.primary} />
-            </View>
-            <View style={styles.itemTextCol}>
-              <Text style={[styles.actionText, { color: colors.onSurface }]}>Servidor Conectado</Text>
-              <Text style={[styles.itemSub, { color: colors.textSecondary }]} numberOfLines={1}>
-                {serverHost || 'nuvem'}
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={[styles.divider, { backgroundColor: colors.outlineVariant }]} />
-
         <TouchableOpacity
           style={styles.groupItem}
           onPress={logout}
@@ -354,12 +315,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             <View style={[styles.itemIconBox, { backgroundColor: colors.surfaceContainerHigh }]}>
               <MaterialIcons name="switch-account" size={18} color={colors.primary} />
             </View>
-            <View style={styles.itemTextCol}>
-              <Text style={[styles.actionText, { color: colors.onSurface }]}>Trocar de Conta</Text>
-              <Text style={[styles.itemSub, { color: colors.textSecondary }]} numberOfLines={1}>
-                Alternar workspace ou perfil
-              </Text>
-            </View>
+            <Text style={[styles.actionText, { color: colors.onSurface }]}>Trocar de Conta</Text>
           </View>
           <MaterialIcons name="chevron-right" size={20} color={colors.outline} />
         </TouchableOpacity>

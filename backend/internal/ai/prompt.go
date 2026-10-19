@@ -28,12 +28,33 @@ func BuildSystemPromptFromInput(input UserInput) string {
 		input.AutonomyMode,
 	)
 	// §8.5–8.6: blocos cognitivos opcionais (retrocompatível: vazios = sem bloco).
-	extra := CoreProfileBlock(input.CoreProfile) + BuildAppStateBlock(input.AppStateFlags) + ManualModuleFor(input.Text) + TriggerAlertsBlock(input.ActiveTriggerAlerts) + RecentEmailsBlock(input.RecentEmails) + CoTInstruction()
+	extra := CoreProfileBlock(input.CoreProfile) + BuildAppStateBlock(input.AppStateFlags) + ManualModuleFor(input.Text) + TriggerAlertsBlock(input.ActiveTriggerAlerts) + RecentEmailsBlock(input.RecentEmails) + FocusModeBlock(input.FocusMode) + CoTInstruction()
 	if extra == CoTInstruction() {
 		return base + extra
 	}
 	return base + extra
 }
+
+// FocusModeBlock injeta diretriz prioritária de foco cognitivo quando selecionado pelo usuário.
+func FocusModeBlock(focusMode string) string {
+	switch strings.ToLower(strings.TrimSpace(focusMode)) {
+	case "calendar":
+		return "\n🎯 MODO DE FOCO ATIVO: AGENDA & EVENTOS\nPriorize estritamente compromissos, checagem de horários, conflitos de agenda, buffers e organização temporal. Suas respostas e ações devem girar em torno da agenda do usuário.\n"
+	case "tasks":
+		return "\n🎯 MODO DE FOCO ATIVO: TAREFAS & PRIORIDADES\nPriorize estritamente afazeres, prazos, prioridades (alta/média/baixa) e desdobramento em subtarefas acionáveis. Suas respostas e ações devem focar na produtividade e execução de tarefas.\n"
+	case "triggers":
+		return "\n🎯 MODO DE FOCO ATIVO: VIGÍLIAS & RADARES\nPriorize monitoramento contínuo, faturas, editais, concursos, passagens, oportunidades e alertas automatizados em tempo real.\n"
+	case "meetings":
+		return "\n🎯 MODO DE FOCO ATIVO: BOOKING & REUNIÕES\nPriorize links de agendamento público 1-on-1, pesquisas de consenso de horários de grupo e gestão de reuniões recebidas.\n"
+	case "briefing":
+		return "\n🎯 MODO DE FOCO ATIVO: BRIEFING EXECUTIVO\nForneça uma síntese panorâmica ultra-executiva, direta ao ponto, correlacionando agenda do dia, tarefas prioritárias, vigílias ativas e recomendações imediatas de ação.\n"
+	case "memory":
+		return "\n🎯 MODO DE FOCO ATIVO: MEMÓRIA & ROTINAS\nPriorize preferências pessoais, hábitos duradouros, histórico de decisões, contexto pessoal e rotinas comportamentais do usuário.\n"
+	default:
+		return ""
+	}
+}
+
 
 // RecentEmailsBlock injeta resumos de e-mails, boletos e voos do Gmail.
 func RecentEmailsBlock(emails []string) string {

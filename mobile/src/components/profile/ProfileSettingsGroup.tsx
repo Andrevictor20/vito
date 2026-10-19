@@ -6,22 +6,16 @@ import { useTheme } from '../../context/ThemeContext';
 import type { AutonomyMode } from '../../types';
 
 interface ProfileSettingsGroupProps {
-  onOpenNotifications?: () => void;
   onOpenCalendarSync?: () => void;
   onOpenAISettings?: () => void;
   onOpenContactsSync?: () => void;
-  onOpenWhatsAppConnect?: () => void;
-  onOpenGmailConnect?: () => void;
+  onOpenIntegrations?: () => void;
   /** Modo de autonomia atual (para o status da linha). */
   autonomyMode?: AutonomyMode;
-  /** Permissão de notificação concedida (null = desconhecido). */
-  notifActive?: boolean | null;
   /** Nº de calendários conectados (null = desconhecido). */
   calendarsActive?: number | null;
-  /** Status da integração WhatsApp via Evolution API v2 */
-  whatsAppStatus?: 'disconnected' | 'connecting' | 'connected' | null;
-  /** Status da integração Gmail */
-  gmailStatus?: { connected: boolean; email?: string } | null;
+  /** Nº de integrações ativas (WhatsApp, Gmail, etc.) */
+  integrationsActiveCount?: number;
 }
 
 const StatusValue: React.FC<{ label: string }> = ({ label }) => {
@@ -39,17 +33,13 @@ const RowChevron: React.FC = () => {
 };
 
 export const ProfileSettingsGroup: React.FC<ProfileSettingsGroupProps> = ({
-  onOpenNotifications,
   onOpenCalendarSync,
   onOpenAISettings,
   onOpenContactsSync,
-  onOpenWhatsAppConnect,
-  onOpenGmailConnect,
+  onOpenIntegrations,
   autonomyMode = 'assisted',
-  notifActive = null,
   calendarsActive = null,
-  whatsAppStatus = null,
-  gmailStatus = null,
+  integrationsActiveCount = 0,
 }) => {
   const { colors, isDark, toggleTheme } = useTheme();
   const proactive = autonomyMode === 'proactive';
@@ -72,12 +62,7 @@ export const ProfileSettingsGroup: React.FC<ProfileSettingsGroupProps> = ({
               color={colors.primary}
             />
           </View>
-          <View style={styles.itemTextCol}>
-            <Text style={[styles.itemTitle, { color: colors.onSurface }]}>Tema da Interface</Text>
-            <Text style={[styles.itemSub, { color: colors.textSecondary }]} numberOfLines={1}>
-              {isDark ? 'Modo Escuro (M3 Dark)' : 'Modo Claro (Editorial Clean)'}
-            </Text>
-          </View>
+          <Text style={[styles.itemTitle, { color: colors.onSurface }]}>Tema da Interface</Text>
         </View>
         <View style={styles.itemRight}>
           <StatusValue label={isDark ? 'Escuro' : 'Claro'} />
@@ -99,42 +84,10 @@ export const ProfileSettingsGroup: React.FC<ProfileSettingsGroupProps> = ({
           <View style={[styles.itemIconBox, { backgroundColor: colors.surfaceContainerHigh }]}>
             <MaterialIcons name="tune" size={18} color={colors.primary} />
           </View>
-          <View style={styles.itemTextCol}>
-            <Text style={[styles.itemTitle, { color: colors.onSurface }]}>Autonomia do Vito</Text>
-            <Text style={[styles.itemSub, { color: colors.onSurfaceVariant }]} numberOfLines={1}>
-              {proactive ? 'Proativo em radares e sugestões' : 'Modo Assistido ou Proativo'}
-            </Text>
-          </View>
+          <Text style={[styles.itemTitle, { color: colors.onSurface }]}>Autonomia do Vito</Text>
         </View>
         <View style={styles.itemRight}>
           <StatusValue label={proactive ? 'Nível Alto' : 'Assistido'} />
-          <RowChevron />
-        </View>
-      </TouchableOpacity>
-
-      <View style={[styles.divider, { backgroundColor: colors.outlineVariant }]} />
-
-      {/* Notificações */}
-      <TouchableOpacity
-        style={styles.groupItem}
-        onPress={onOpenNotifications}
-        activeOpacity={0.7}
-        accessibilityLabel="Abrir notificações"
-        accessibilityRole="button"
-      >
-        <View style={styles.itemLeft}>
-          <View style={[styles.itemIconBox, { backgroundColor: colors.surfaceContainerHigh }]}>
-            <MaterialIcons name="notifications-none" size={18} color={colors.primary} />
-          </View>
-          <View style={styles.itemTextCol}>
-            <Text style={[styles.itemTitle, { color: colors.onSurface }]}>Notificações</Text>
-            <Text style={[styles.itemSub, { color: colors.onSurfaceVariant }]} numberOfLines={1}>
-              Resumos às 08:30 e alertas críticos
-            </Text>
-          </View>
-        </View>
-        <View style={styles.itemRight}>
-          <StatusValue label={notifActive === null ? '—' : notifActive ? 'Ativas' : 'Off'} />
           <RowChevron />
         </View>
       </TouchableOpacity>
@@ -153,12 +106,9 @@ export const ProfileSettingsGroup: React.FC<ProfileSettingsGroupProps> = ({
           <View style={[styles.itemIconBox, { backgroundColor: colors.surfaceContainerHigh }]}>
             <MaterialIcons name="calendar-today" size={18} color={colors.primary} />
           </View>
-          <View style={styles.itemTextCol}>
-            <Text style={[styles.itemTitle, { color: colors.onSurface }]} numberOfLines={1}>Sincronização de Calendários</Text>
-            <Text style={[styles.itemSub, { color: colors.onSurfaceVariant }]} numberOfLines={1}>
-              Google Calendar e calendário local
-            </Text>
-          </View>
+          <Text style={[styles.itemTitle, { color: colors.onSurface }]} numberOfLines={1}>
+            Sincronização de Calendários
+          </Text>
         </View>
         <View style={styles.itemRight}>
           <StatusValue
@@ -174,8 +124,9 @@ export const ProfileSettingsGroup: React.FC<ProfileSettingsGroupProps> = ({
         </View>
       </TouchableOpacity>
 
-      {/* Sincronização de Contatos da Agenda (P2P) */}
       <View style={[styles.divider, { backgroundColor: colors.outlineVariant }]} />
+
+      {/* Sincronização de Contatos da Agenda (P2P) */}
       <TouchableOpacity
         style={styles.groupItem}
         onPress={onOpenContactsSync}
@@ -187,79 +138,36 @@ export const ProfileSettingsGroup: React.FC<ProfileSettingsGroupProps> = ({
           <View style={[styles.itemIconBox, { backgroundColor: colors.surfaceContainerHigh }]}>
             <MaterialIcons name="contacts" size={18} color={colors.primary} />
           </View>
-          <View style={styles.itemTextCol}>
-            <Text style={[styles.itemTitle, { color: colors.onSurface }]}>Agenda de Contatos</Text>
-            <Text style={[styles.itemSub, { color: colors.onSurfaceVariant }]}>
-              Encontrar colegas e amigos no Vito
-            </Text>
-          </View>
+          <Text style={[styles.itemTitle, { color: colors.onSurface }]}>Agenda de Contatos</Text>
         </View>
         <View style={styles.itemRight}>
           <RowChevron />
         </View>
       </TouchableOpacity>
 
-      {/* Integração WhatsApp (Evolution API v2) */}
       <View style={[styles.divider, { backgroundColor: colors.outlineVariant }]} />
+
+      {/* Integrações (WhatsApp, Gmail, etc.) */}
       <TouchableOpacity
         style={styles.groupItem}
-        onPress={onOpenWhatsAppConnect}
+        onPress={onOpenIntegrations}
         activeOpacity={0.7}
-        accessibilityLabel="Abrir conexão com WhatsApp"
+        accessibilityLabel="Abrir integrações externas"
         accessibilityRole="button"
       >
         <View style={styles.itemLeft}>
           <View style={[styles.itemIconBox, { backgroundColor: colors.surfaceContainerHigh }]}>
-            <MaterialIcons name="chat" size={18} color="#25D366" />
+            <MaterialIcons name="extension" size={18} color={colors.primary} />
           </View>
-          <View style={styles.itemTextCol}>
-            <Text style={[styles.itemTitle, { color: colors.onSurface }]}>WhatsApp</Text>
-            <Text style={[styles.itemSub, { color: colors.onSurfaceVariant }]} numberOfLines={1}>
-              {whatsAppStatus === 'connected'
-                ? 'Sessão ativa e pronto para receber @vito'
-                : 'Conectar via Evolution API v2'}
-            </Text>
-          </View>
+          <Text style={[styles.itemTitle, { color: colors.onSurface }]}>Integrações</Text>
         </View>
         <View style={styles.itemRight}>
           <StatusValue
             label={
-              whatsAppStatus === 'connected'
-                ? 'Conectado'
-                : whatsAppStatus === 'connecting'
-                ? 'Conectando...'
-                : 'Off'
+              integrationsActiveCount > 0
+                ? `${integrationsActiveCount} ativa${integrationsActiveCount === 1 ? '' : 's'}`
+                : 'Conectar'
             }
-          />
-          <RowChevron />
-        </View>
-      </TouchableOpacity>
-
-      {/* Integração Gmail */}
-      <View style={[styles.divider, { backgroundColor: colors.outlineVariant }]} />
-      <TouchableOpacity
-        style={styles.groupItem}
-        onPress={onOpenGmailConnect}
-        activeOpacity={0.7}
-        accessibilityLabel="Abrir integração com Gmail"
-        accessibilityRole="button"
-      >
-        <View style={styles.itemLeft}>
-          <View style={[styles.itemIconBox, { backgroundColor: colors.surfaceContainerHigh }]}>
-            <MaterialIcons name="mail" size={18} color="#EA4335" />
-          </View>
-          <View style={styles.itemTextCol}>
-            <Text style={[styles.itemTitle, { color: colors.onSurface }]}>Gmail</Text>
-            <Text style={[styles.itemSub, { color: colors.onSurfaceVariant }]} numberOfLines={1}>
-              {gmailStatus?.connected
-                ? `Varredura ativa (${gmailStatus.email || 'Conectado'})`
-                : 'Ler boletos e alertas de viagens'}
-            </Text>
-          </View>
-        </View>
-        <View style={styles.itemRight}>
-          <StatusValue
-            label={gmailStatus?.connected ? 'Conectado' : 'Off'}
           />
           <RowChevron />
         </View>

@@ -51,10 +51,6 @@ export const ProfileUserCard: React.FC<ProfileUserCardProps> = ({
             </TouchableOpacity>
           ) : null}
         </View>
-
-        <View style={[styles.proBadge, { backgroundColor: colors.primaryContainer, borderColor: colors.outlineVariant }]}>
-          <Text style={[styles.proBadgeText, { color: colors.primary }]}>PRO AI</Text>
-        </View>
       </View>
     </View>
   );

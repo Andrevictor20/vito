@@ -220,6 +220,9 @@ export class ApiClient {
     if (this.token) {
       headers['Authorization'] = `Bearer ${this.token}`;
     }
+    if (this.sessionId) {
+      headers['X-Session-ID'] = this.sessionId;
+    }
 
     const isAiEndpoint = endpoint.includes('/assistant/');
     const isIntegrationEndpoint = endpoint.includes('/integrations/');

@@ -84,10 +84,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose }) =
               <h3 className="text-sm font-bold tracking-tight text-zinc-900 dark:text-white">
                 Configurações
               </h3>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                PRO AI
-              </span>
             </div>
+
 
             <nav className="space-y-1">
               {navItems.map((item) => {

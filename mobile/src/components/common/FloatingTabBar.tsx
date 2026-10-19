@@ -58,7 +58,7 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
         >
           <MaterialIcons
             name={activeTab === 'chat' ? 'chat' : 'chat-bubble-outline'}
-            size={20}
+            size={24}
             color={activeTab === 'chat' ? (isDark ? colors.onSurface : colors.onPrimary) : colors.onSurfaceVariant}
           />
         </TouchableOpacity>
@@ -81,7 +81,7 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
         >
           <MaterialIcons
             name={activeTab === 'calendar' ? 'event' : 'calendar-today'}
-            size={20}
+            size={24}
             color={activeTab === 'calendar' ? (isDark ? colors.onSurface : colors.onPrimary) : colors.onSurfaceVariant}
           />
         </TouchableOpacity>
@@ -104,7 +104,7 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
         >
           <MaterialIcons
             name={activeTab === 'tasks' ? 'task-alt' : 'checklist'}
-            size={20}
+            size={24}
             color={activeTab === 'tasks' ? (isDark ? colors.onSurface : colors.onPrimary) : colors.onSurfaceVariant}
           />
         </TouchableOpacity>
@@ -127,7 +127,7 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
         >
           <MaterialIcons
             name={activeTab === 'triggers' ? 'radar' : 'track-changes'}
-            size={20}
+            size={24}
             color={activeTab === 'triggers' ? (isDark ? colors.onSurface : colors.onPrimary) : colors.onSurfaceVariant}
           />
         </TouchableOpacity>
@@ -150,7 +150,7 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
         >
           <MaterialIcons
             name={activeTab === 'booking' ? 'event-available' : 'link'}
-            size={20}
+            size={24}
             color={activeTab === 'booking' ? (isDark ? colors.onSurface : colors.onPrimary) : colors.onSurfaceVariant}
           />
         </TouchableOpacity>
@@ -173,7 +173,7 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
         >
           <MaterialIcons
             name={activeTab === 'profile' ? 'person' : 'person-outline'}
-            size={20}
+            size={24}
             color={activeTab === 'profile' ? (isDark ? colors.onSurface : colors.onPrimary) : colors.onSurfaceVariant}
           />
         </TouchableOpacity>
@@ -196,26 +196,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 28,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 32,
     borderWidth: 1,
-    gap: 8,
-    elevation: 8,
+    gap: 6,
+    elevation: 10,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.14,
-    shadowRadius: 10,
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
   },
   tabButton: {
-    width: 44,
-    height: 36,
-    borderRadius: 18,
+    width: 48,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
   },
   tabButtonActive: {
-    elevation: 2,
+    elevation: 3,
   },
 });
+
 

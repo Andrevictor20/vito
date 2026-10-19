@@ -1,66 +1,34 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { View, StyleSheet, Keyboard, Platform } from 'react-native';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
+import { View, StyleSheet, Keyboard, Platform, BackHandler, useWindowDimensions } from 'react-native';
 import * as Notifications from 'expo-notifications';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
-import { dataSync, chatPromptBus } from '../services/dataSync';
+import { dataSync, chatPromptBus, tabNavigationBus } from '../services/dataSync';
 import { navigateToTab } from './navigationRef';
 import { FloatingTabBar } from '../components/common/FloatingTabBar';
 import { Header, HeaderPill } from '../components/common/Header';
-import { ExecutiveSummariesHubView } from '../screens/ExecutiveSummariesHubView';
+import { AdaptivePager, AdaptivePagerRef } from '../components/common/AdaptivePager';
 import { ChatScreen, ChatScreenRef } from '../screens/ChatScreen';
 import { TasksScreen } from '../screens/TasksScreen';
 import { TriggersScreen } from '../screens/TriggersScreen';
 import { BookingScreen } from '../screens/BookingScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
-import { AgendaView } from '../components/home/AgendaView';
-import { CreateItemModal } from '../components/calendar/CreateItemModal';
-import { EditEventModal } from '../components/calendar/EditEventModal';
+import { AgendaTabScreen } from './AgendaTabScreen';
 import { useHomeDataContext } from './HomeDataProvider';
 import { useTheme } from '../context/ThemeContext';
-import type { MainTabType } from '../utils/pagerNavigation';
-import type { Event } from '../types';
+import { hapticFeedback } from '../theme/motion';
+import {
+  MainTabType,
+  getIndexForTab,
+  getTabForIndex,
+  shouldPreventSwipe,
+  determineBackAction,
+} from '../utils/pagerNavigation';
 
-import type { MainTabParamList } from '../AppRoot';
 
-const Tab = createBottomTabNavigator<MainTabParamList>();
-
-// MOB-02: FloatingTabBar vira a tabBar nativa (visibilidade segue o teclado).
-const VitoTabBar: React.FC<BottomTabBarProps> = ({ state, navigation }) => {
-  const [keyboardOpen, setKeyboardOpen] = useState(false);
-
-  useEffect(() => {
-    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-    const s1 = Keyboard.addListener(showEvent, () => setKeyboardOpen(true));
-    const s2 = Keyboard.addListener(hideEvent, () => setKeyboardOpen(false));
-    return () => {
-      s1.remove();
-      s2.remove();
-    };
-  }, []);
-
-  const activeTab = state.routes[state.index].name as MainTabType;
-  return (
-    <FloatingTabBar
-      activeTab={activeTab}
-      onSelectTab={(tab: MainTabType) => navigation.navigate(tab)}
-      visible={!keyboardOpen}
-    />
-  );
-};
-
-const ChatTabScreen: React.FC = () => {
+const ChatTabScreen: React.FC<{
+  chatRef: React.RefObject<ChatScreenRef | null>;
+  onKeyboardStateChange: (open: boolean) => void;
+}> = ({ chatRef, onKeyboardStateChange }) => {
   const { loadData } = useHomeDataContext();
-  const chatRef = useRef<ChatScreenRef>(null);
-
-  // Prompts externos vindos dos radares (§9.4: cards acionáveis).
-  useEffect(() => {
-    return chatPromptBus.subscribe((prompt) => {
-      chatRef.current?.submitExternalPrompt(prompt);
-    });
-  }, []);
 
   return (
     <View style={styles.tabRoot}>
@@ -70,16 +38,18 @@ const ChatTabScreen: React.FC = () => {
         onPressMenu={() => chatRef.current?.openHistory()}
         hideTitle
       />
-      <ChatScreen ref={chatRef} onDataChanged={loadData} />
+      <ChatScreen
+        ref={chatRef}
+        onDataChanged={loadData}
+        onKeyboardStateChange={onKeyboardStateChange}
+      />
     </View>
   );
 };
 
 // Push de radar -> refresh imediato; toque na notificação -> abre Radares (§9.4).
-// Push de booking (booking_appointment) -> atualiza Recebidos + Agenda;
-// toque na notificação -> abre a aba Booking.
-const useRadarPushSync = () => {
-  const navigation = useNavigation<any>();
+// Push de booking -> atualiza Recebidos + Agenda; toque -> abre Booking.
+const useRadarPushSync = (onSelectTab: (tab: MainTabType) => void) => {
   useEffect(() => {
     const subReceived = Notifications.addNotificationReceivedListener((n) => {
       const data = (n.request?.content?.data || {}) as Record<string, unknown>;
@@ -95,171 +65,24 @@ const useRadarPushSync = () => {
       const data = (resp.notification.request?.content?.data || {}) as Record<string, unknown>;
       if (data.type === 'RADAR_TRIGGERED') {
         dataSync.notify('refresh_triggers');
-        if (navigation) navigation.navigate('main', { screen: 'triggers' });
-        else navigateToTab('triggers');
+        onSelectTab('triggers');
       }
       if (data.type === 'booking_appointment' || data.type === 'meeting_vote' || data.type === 'meeting_confirmed') {
         dataSync.notify('refresh_bookings');
         dataSync.notify('refresh_events');
-        if (navigation) navigation.navigate('main', { screen: 'booking' });
-        else navigateToTab('booking');
+        onSelectTab('booking');
       }
     });
     return () => {
       subReceived.remove();
       subResponse.remove();
     };
-  }, [navigation]);
+  }, [onSelectTab]);
 };
 
-const AgendaTabScreen: React.FC = () => {
-  const home = useHomeDataContext();
-  const { colors } = useTheme();
-  const [createVisible, setCreateVisible] = useState(false);
-  const [editingEvent, setEditingEvent] = useState<Event | null>(null);
-  const [editVisible, setEditVisible] = useState(false);
-  const [createTab, setCreateTab] = useState<'event' | 'todo'>('event');
-  const [keyboardOpen, setKeyboardOpen] = useState(false);
-  // Central de Resumos vive na Agenda (mesma rota de antes, novo acesso).
-  const [showSummaries, setShowSummaries] = useState(false);
-
-  // Revalidação silenciosa em background ao focar na aba
-  useFocusEffect(
-    useCallback(() => {
-      home.loadData(true);
-    }, [home.loadData])
-  );
-
-  useEffect(() => {
-    const s1 = Keyboard.addListener('keyboardDidShow', () => setKeyboardOpen(true));
-    const s2 = Keyboard.addListener('keyboardDidHide', () => setKeyboardOpen(false));
-    return () => {
-      s1.remove();
-      s2.remove();
-    };
-  }, []);
-
-  const dateSubtitle = home.selectedDate.toLocaleDateString('pt-BR', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-  });
-
-  if (showSummaries) {
-    return (
-      <View style={[styles.tabRoot, { backgroundColor: colors.surface }]}>
-        <ExecutiveSummariesHubView
-          onBack={() => setShowSummaries(false)}
-          onOpenChatWithPrompt={(prompt) => {
-            chatPromptBus.notify(prompt);
-            navigateToTab('chat');
-          }}
-        />
-      </View>
-    );
-  }
-
-  return (
-    <View style={[styles.tabRoot, { backgroundColor: colors.surface }]}>
-      <Header
-        activeTab="calendar"
-        align="left"
-        subtitle={dateSubtitle}
-        contextualActions={
-          <>
-            <HeaderPill
-              label="Resumos"
-              variant="ghost"
-              icon="bar-chart"
-              onPress={() => setShowSummaries(true)}
-              accessibilityLabel="Abrir Central de Resumos"
-            />
-            <HeaderPill
-              label="Evento"
-              onPress={() => {
-                setCreateTab('event');
-                setCreateVisible(true);
-              }}
-              accessibilityLabel="Criar novo evento"
-            />
-          </>
-        }
-      />
-      <AgendaView
-        events={home.events}
-        loading={home.loading}
-        refreshing={home.refreshing}
-        onRefresh={home.onRefresh}
-        selectedDate={home.selectedDate}
-        onSelectDate={home.setSelectedDate}
-        dayEvents={home.dayEvents}
-        upcomingEvents={home.upcomingEvents}
-        eventDates={home.eventDates}
-        totalTodos={home.todos.length}
-        completedTodos={home.todos.filter((t) => t.status === 'completed').length}
-        isTodaySelected={home.isTodaySelected}
-        isKeyboardOpen={keyboardOpen}
-        onDeleteEvent={home.handleDeleteEvent}
-        onEditEvent={(item) => {
-          setEditingEvent(item);
-          setEditVisible(true);
-        }}
-        onCreateEvent={() => {
-          setCreateTab('event');
-          setCreateVisible(true);
-        }}
-      />
-      <CreateItemModal
-        visible={createVisible}
-        onClose={() => setCreateVisible(false)}
-        selectedDate={home.selectedDate}
-        events={home.events}
-        fixedTab={createTab}
-        onSaveEvent={async (title, _priority, startISO, endISO) => {
-          const start = startISO ? new Date(startISO) : new Date(home.selectedDate);
-          if (!startISO) start.setHours(9, 0, 0, 0);
-          const end = endISO ? new Date(endISO) : new Date(home.selectedDate);
-          if (!endISO) end.setHours(10, 0, 0, 0);
-          await home.handleCreateEvent({
-            title,
-            start_at: start.toISOString(),
-            end_at: end.toISOString(),
-          });
-        }}
-        onSaveTodo={async (title, priority, eventId, eventTitle) => {
-          await home.handleCreateTodo({
-            title,
-            priority,
-            due_date: home.selectedDate.toISOString(),
-            event_id: eventId,
-            event_title: eventTitle,
-          });
-        }}
-      />
-      <EditEventModal
-        visible={editVisible}
-        onClose={() => {
-          setEditVisible(false);
-          setEditingEvent(null);
-        }}
-        event={editingEvent}
-        onSave={home.handleUpdateEvent}
-        onDelete={home.handleDeleteEvent}
-      />
-    </View>
-  );
-};
 
 const TasksTabScreen: React.FC = () => {
   const home = useHomeDataContext();
-
-  // Revalidação silenciosa em background ao focar na aba
-  useFocusEffect(
-    useCallback(() => {
-      home.loadData(true);
-    }, [home.loadData])
-  );
-
   const pendingTodos = home.todos.filter((t) => t.status !== 'completed');
   const completedList = home.todos.filter((t) => t.status === 'completed');
   const [createRequestId, setCreateRequestId] = useState(0);
@@ -272,6 +95,7 @@ const TasksTabScreen: React.FC = () => {
     return !Number.isNaN(ms) && ms < dayStart.getTime();
   }).length;
   const subtitle = `${pendingTodos.length} ativas · ${overdue} atrasadas · ${completedList.length} concluídas`;
+
   return (
     <View style={styles.tabRoot}>
       <Header
@@ -308,9 +132,17 @@ const TasksTabScreen: React.FC = () => {
   );
 };
 
-const TriggersTabScreen: React.FC = () => {
+const TriggersTabScreen: React.FC<{
+  onSubViewChange: (inSubView: boolean) => void;
+}> = ({ onSubViewChange }) => {
   const [inSubView, setInSubView] = useState(false);
   const [createRequestId, setCreateRequestId] = useState(0);
+
+  const handleSubViewChange = (sub: boolean) => {
+    setInSubView(sub);
+    onSubViewChange(sub);
+  };
+
   return (
     <View style={styles.tabRoot}>
       <Header
@@ -327,14 +159,22 @@ const TriggersTabScreen: React.FC = () => {
           )
         }
       />
-      <TriggersScreen onSubViewChange={setInSubView} createRequestId={createRequestId} />
+      <TriggersScreen onSubViewChange={handleSubViewChange} createRequestId={createRequestId} />
     </View>
   );
 };
 
-const BookingTabScreen: React.FC = () => {
+const BookingTabScreen: React.FC<{
+  onSubViewChange: (inSubView: boolean) => void;
+}> = ({ onSubViewChange }) => {
   const [inSubView, setInSubView] = useState(false);
   const [createRequestId, setCreateRequestId] = useState(0);
+
+  const handleSubViewChange = (sub: boolean) => {
+    setInSubView(sub);
+    onSubViewChange(sub);
+  };
+
   return (
     <View style={styles.tabRoot}>
       <Header
@@ -351,7 +191,7 @@ const BookingTabScreen: React.FC = () => {
           )
         }
       />
-      <BookingScreen onSubViewChange={setInSubView} createRequestId={createRequestId} />
+      <BookingScreen onSubViewChange={handleSubViewChange} createRequestId={createRequestId} />
     </View>
   );
 };
@@ -370,27 +210,193 @@ const ProfileTabScreen: React.FC = () => {
   );
 };
 
-export const MainTabs: React.FC = () => {
-  useRadarPushSync();
+export const MainTabs: React.FC<{ route?: any }> = ({ route }) => {
+  const { colors } = useTheme();
+  const home = useHomeDataContext();
+  const [activeTab, setActiveTab] = useState<MainTabType>('chat');
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const [inAgendaSubView, setInAgendaSubView] = useState(false);
+  const [inAgendaModal, setInAgendaModal] = useState(false);
+  const [showSummaries, setShowSummaries] = useState(false);
+  const [inTriggersSubView, setInTriggersSubView] = useState(false);
+  const [inBookingSubView, setInBookingSubView] = useState(false);
+
+  const chatRef = useRef<ChatScreenRef>(null);
+  const pagerRef = useRef<AdaptivePagerRef>(null);
+  const { width: windowWidth } = useWindowDimensions();
+  const [containerWidth, setContainerWidth] = useState(windowWidth || 390);
+
+  const fireTabSideEffects = useCallback((tab: MainTabType) => {
+    if (tab === 'calendar' || tab === 'tasks') {
+      home.loadData(true);
+    } else if (tab === 'triggers') {
+      dataSync.notify('refresh_triggers');
+    } else if (tab === 'booking') {
+      dataSync.notify('refresh_bookings');
+    }
+  }, [home]);
+
+  const handleSelectTab = useCallback((tab: MainTabType) => {
+    setActiveTab(tab);
+    pagerRef.current?.setPage(getIndexForTab(tab));
+    fireTabSideEffects(tab);
+  }, [fireTabSideEffects]);
+
+  const handlePageSelected = useCallback((position: number) => {
+    const newTab = getTabForIndex(position);
+    if (newTab !== activeTab) {
+      hapticFeedback.selection();
+      setActiveTab(newTab);
+      fireTabSideEffects(newTab);
+    }
+  }, [activeTab, fireTabSideEffects]);
+
+  // Teclado global
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const s1 = Keyboard.addListener(showEvent, () => setKeyboardOpen(true));
+    const s2 = Keyboard.addListener(hideEvent, () => setKeyboardOpen(false));
+    return () => {
+      s1.remove();
+      s2.remove();
+    };
+  }, []);
+
+  // Barramento de navegação lateral direta (§Instagram/TikTok swipe)
+  useEffect(() => {
+    return tabNavigationBus.subscribe((tab) => {
+      handleSelectTab(tab);
+    });
+  }, [handleSelectTab]);
+
+  // Prompts externos vindos dos radares (§9.4: cards acionáveis)
+  useEffect(() => {
+    return chatPromptBus.subscribe((prompt) => {
+      chatRef.current?.submitExternalPrompt(prompt);
+      handleSelectTab('chat');
+    });
+  }, [handleSelectTab]);
+
+  useRadarPushSync(handleSelectTab);
+
+  // Parâmetro de rota / deep linking
+  const targetScreen = route?.params?.screen as MainTabType | undefined;
+  useEffect(() => {
+    if (targetScreen && targetScreen !== activeTab) {
+      handleSelectTab(targetScreen);
+    }
+  }, [targetScreen, handleSelectTab]);
+
+  // Intercepta gesto de voltar do hardware/sistema para navegar hierarquicamente
+  useEffect(() => {
+    const onBackPress = () => {
+      const hasModal = inAgendaModal;
+      const hasSub = inAgendaSubView || inTriggersSubView || inBookingSubView;
+      const action = determineBackAction({
+        activeTab,
+        hasSubScreen: hasSub,
+        hasModal,
+      });
+
+      if (action.type === 'CLOSE_SUBSCREEN') {
+        if (showSummaries) {
+          setShowSummaries(false);
+          return true;
+        }
+        return false;
+      }
+      if (action.type === 'CLOSE_MODAL') {
+        return false;
+      }
+      if (action.type === 'NAVIGATE_TO_TAB') {
+        handleSelectTab(action.targetTab);
+        return true;
+      }
+      return false;
+    };
+
+    const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => subscription.remove();
+  }, [activeTab, inAgendaModal, inAgendaSubView, inTriggersSubView, inBookingSubView, showSummaries, handleSelectTab]);
+
+  const hasSubScreen = inAgendaSubView || inTriggersSubView || inBookingSubView;
+  const hasModal = inAgendaModal;
+  const scrollEnabled = !shouldPreventSwipe({
+    isKeyboardOpen: keyboardOpen,
+    hasModal,
+    hasSubScreen,
+  });
+
   return (
-    <Tab.Navigator
-      initialRouteName="chat"
-      backBehavior="initialRoute"
-      screenOptions={{ headerShown: false }}
-      tabBar={(props) => <VitoTabBar {...props} />}
+    <View
+      style={[styles.mainTabsContainer, { backgroundColor: colors.surface }]}
+      onLayout={(e) => {
+        const w = e.nativeEvent.layout.width;
+        if (w > 0 && Math.abs(w - containerWidth) > 1) {
+          setContainerWidth(w);
+        }
+      }}
     >
-      <Tab.Screen name="chat" component={ChatTabScreen} options={{ tabBarAccessibilityLabel: 'Aba Chat' }} />
-      <Tab.Screen name="calendar" component={AgendaTabScreen} />
-      <Tab.Screen name="tasks" component={TasksTabScreen} />
-      <Tab.Screen name="triggers" component={TriggersTabScreen} />
-      <Tab.Screen name="booking" component={BookingTabScreen} />
-      <Tab.Screen name="profile" component={ProfileTabScreen} />
-    </Tab.Navigator>
+      <AdaptivePager
+        ref={pagerRef}
+        style={styles.pager}
+        initialPage={0}
+        scrollEnabled={scrollEnabled}
+        onPageSelected={handlePageSelected}
+      >
+        <View key="0" style={[styles.pageWrapper, { width: containerWidth }]} collapsable={false}>
+          <ChatTabScreen chatRef={chatRef} onKeyboardStateChange={setKeyboardOpen} />
+        </View>
+
+        <View key="1" style={[styles.pageWrapper, { width: containerWidth }]} collapsable={false}>
+          <AgendaTabScreen
+            onSubViewChange={setInAgendaSubView}
+            onModalChange={setInAgendaModal}
+            showSummaries={showSummaries}
+            setShowSummaries={setShowSummaries}
+            keyboardOpen={keyboardOpen}
+          />
+        </View>
+
+        <View key="2" style={[styles.pageWrapper, { width: containerWidth }]} collapsable={false}>
+          <TasksTabScreen />
+        </View>
+
+        <View key="3" style={[styles.pageWrapper, { width: containerWidth }]} collapsable={false}>
+          <TriggersTabScreen onSubViewChange={setInTriggersSubView} />
+        </View>
+
+        <View key="4" style={[styles.pageWrapper, { width: containerWidth }]} collapsable={false}>
+          <BookingTabScreen onSubViewChange={setInBookingSubView} />
+        </View>
+
+        <View key="5" style={[styles.pageWrapper, { width: containerWidth }]} collapsable={false}>
+          <ProfileTabScreen />
+        </View>
+      </AdaptivePager>
+
+      <FloatingTabBar
+        activeTab={activeTab}
+        onSelectTab={handleSelectTab}
+        visible={!keyboardOpen}
+      />
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
+  mainTabsContainer: {
+    flex: 1,
+  },
+  pager: {
+    flex: 1,
+  },
+  pageWrapper: {
+    flex: 1,
+  },
   tabRoot: {
     flex: 1,
   },
 });
+

@@ -232,6 +232,41 @@ func TestAssistantHandler_Chat_CurrentLocalTime(t *testing.T) {
 	}
 }
 
+func TestAssistantHandler_Chat_ForwardsFocusMode(t *testing.T) {
+	mockAI := &mockAIGateway{
+		intent: &ai.ParsedIntent{
+			Action:       ai.ActionQueryTodos,
+			Message:      "Tarefas filtradas por foco.",
+			ProviderUsed: "MockAI",
+		},
+	}
+	astSvc := service.NewAssistantService(mockAI, nil, nil, nil)
+	astHandler := handler.NewAssistantHandler(astSvc, nil)
+
+	reqPayload := map[string]string{
+		"text":       "Revisar pendências",
+		"focus_mode": "tasks",
+	}
+	bodyBytes, _ := json.Marshal(reqPayload)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/assistant/chat", bytes.NewReader(bodyBytes))
+	req.Header.Set("Content-Type", "application/json")
+	ctx := context.WithValue(req.Context(), middleware.UserIDKey, "user-chat-focus")
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	astHandler.Chat(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d. Body: %s", rr.Code, rr.Body.String())
+	}
+
+	captured := mockAI.capturedInput
+	if captured.FocusMode != "tasks" {
+		t.Fatalf("esperava FocusMode='tasks', obteve %q", captured.FocusMode)
+	}
+}
+
 func TestAssistantHandler_AudioChat_JSON(t *testing.T) {
 	mockTrans := &mockTranscriber{text: "Reunião de alinhamento amanhã"}
 	now := time.Now().Add(24 * time.Hour)

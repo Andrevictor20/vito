@@ -67,6 +67,17 @@ func (s *AuthService) IssueSessionForUser(user *domain.User, deviceName, ipAddre
 
 	now := time.Now().UTC()
 	if s.sessionRepo != nil {
+		// Pruning pró-ativo de sessões zumbis do mesmo aparelho/dispositivo:
+		// Revoga sessões ativas anteriores com o mesmo device_name para evitar acúmulo desnecessário.
+		if activeSessions, err := s.sessionRepo.ListActiveByUser(user.ID, now); err == nil {
+			trimmedName := strings.TrimSpace(deviceName)
+			for _, act := range activeSessions {
+				if act.DeviceName == trimmedName {
+					_ = s.sessionRepo.RevokeByID(act.ID, user.ID, now)
+				}
+			}
+		}
+
 		rt := &domain.RefreshToken{
 			ID:         sessionID,
 			UserID:     user.ID,
@@ -148,7 +159,8 @@ func (s *AuthService) RefreshSession(rawRefreshToken, deviceName, ipAddress stri
 	}, nil
 }
 
-// ListSessions retorna todas as sessões ativas do usuário, destacando a sessão atual (IsCurrent).
+// ListSessions retorna todas as sessões ativas do usuário, destacando a sessão atual (IsCurrent)
+// e higienizando automaticamente duplicatas legadas do mesmo dispositivo.
 func (s *AuthService) ListSessions(userID, currentSessionID string) ([]domain.RefreshToken, error) {
 	if s.sessionRepo == nil {
 		return []domain.RefreshToken{}, nil
@@ -157,12 +169,41 @@ func (s *AuthService) ListSessions(userID, currentSessionID string) ([]domain.Re
 	if err != nil {
 		return nil, err
 	}
+
+	now := time.Now().UTC()
+	seenDevice := make(map[string]bool)
+	var filtered []domain.RefreshToken
+
 	for i := range sessions {
 		if currentSessionID != "" && sessions[i].ID == currentSessionID {
 			sessions[i].IsCurrent = true
 		}
 	}
-	return sessions, nil
+
+	// 1. Preserva a sessão atual em primeiro lugar, se identificada
+	for _, sess := range sessions {
+		if sess.IsCurrent {
+			seenDevice[sess.DeviceName] = true
+			filtered = append(filtered, sess)
+			break
+		}
+	}
+
+	// 2. Adiciona as sessões mais recentes de outros dispositivos e revoga duplicatas zumbis
+	for _, sess := range sessions {
+		if sess.IsCurrent {
+			continue
+		}
+		if !seenDevice[sess.DeviceName] {
+			seenDevice[sess.DeviceName] = true
+			filtered = append(filtered, sess)
+		} else {
+			// Sessão duplicada/zumbi do mesmo dispositivo: auto-revoga no banco
+			_ = s.sessionRepo.RevokeByID(sess.ID, userID, now)
+		}
+	}
+
+	return filtered, nil
 }
 
 // RevokeSession revoga imediatamente um dispositivo específico do usuário.

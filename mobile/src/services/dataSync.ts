@@ -84,3 +84,29 @@ class ChatPromptBus {
 }
 
 export const chatPromptBus = new ChatPromptBus();
+
+// Barramento de navegação lateral direta de abas (§Instagram/TikTok swipe).
+type TabNavigationCallback = (tab: 'chat' | 'calendar' | 'tasks' | 'triggers' | 'booking' | 'profile') => void;
+
+export class TabNavigationBus {
+  private listeners = new Set<TabNavigationCallback>();
+
+  subscribe(cb: TabNavigationCallback): () => void {
+    this.listeners.add(cb);
+    return () => {
+      this.listeners.delete(cb);
+    };
+  }
+
+  notify(tab: 'chat' | 'calendar' | 'tasks' | 'triggers' | 'booking' | 'profile'): void {
+    this.listeners.forEach((cb) => {
+      try {
+        cb(tab);
+      } catch (err) {
+        console.warn('[tabNavigationBus] Erro no listener:', err);
+      }
+    });
+  }
+}
+
+export const tabNavigationBus = new TabNavigationBus();
