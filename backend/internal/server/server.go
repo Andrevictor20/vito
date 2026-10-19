@@ -209,7 +209,30 @@ func (s *Server) registerRoutes() {
 		}
 
 		if s.triggerHandler != nil {
-			r.Get("/triggers/templates", s.triggerHandler.ListTemplates)
+			r.Route("/triggers", func(tr chi.Router) {
+				tr.Get("/templates", s.triggerHandler.ListTemplates)
+
+				tr.Group(func(ptr chi.Router) {
+					if s.authSvc != nil {
+						ptr.Use(middleware.AuthMiddleware(s.authSvc))
+					}
+					ptr.Post("/", s.triggerHandler.CreateTrigger)
+					ptr.Get("/", s.triggerHandler.ListTriggers)
+					ptr.Post("/templates/{id}/activate", s.triggerHandler.ActivateTemplate)
+					ptr.Post("/parse", s.triggerHandler.ParsePrompt)
+					ptr.Route("/{id}", func(idr chi.Router) {
+						idr.Get("/", s.triggerHandler.GetTrigger)
+						idr.Patch("/", s.triggerHandler.UpdateTrigger)
+						idr.Delete("/", s.triggerHandler.DeleteTrigger)
+						idr.Patch("/toggle", s.triggerHandler.ToggleStatus)
+						idr.Post("/test", s.triggerHandler.TestTrigger)
+						idr.Post("/run", s.triggerHandler.RunTrigger)
+						idr.Get("/logs", s.triggerHandler.ListLogs)
+						idr.Delete("/logs", s.triggerHandler.ClearLogs)
+						idr.Delete("/logs/{logId}", s.triggerHandler.DeleteLog)
+					})
+				})
+			})
 		}
 
 		// Rotas protegidas por JWT
@@ -295,26 +318,7 @@ func (s *Server) registerRoutes() {
 					})
 				}
 
-				if s.triggerHandler != nil {
-					protected.Route("/triggers", func(tr chi.Router) {
-						tr.Post("/", s.triggerHandler.CreateTrigger)
-						tr.Get("/", s.triggerHandler.ListTriggers)
-						tr.Get("/templates", s.triggerHandler.ListTemplates)
-						tr.Post("/templates/{id}/activate", s.triggerHandler.ActivateTemplate)
-						tr.Post("/parse", s.triggerHandler.ParsePrompt)
-						tr.Route("/{id}", func(r chi.Router) {
-							r.Get("/", s.triggerHandler.GetTrigger)
-							r.Patch("/", s.triggerHandler.UpdateTrigger)
-							r.Delete("/", s.triggerHandler.DeleteTrigger)
-							r.Patch("/toggle", s.triggerHandler.ToggleStatus)
-							r.Post("/test", s.triggerHandler.TestTrigger)
-							r.Post("/run", s.triggerHandler.RunTrigger)
-							r.Get("/logs", s.triggerHandler.ListLogs)
-							r.Delete("/logs", s.triggerHandler.ClearLogs)
-							r.Delete("/logs/{logId}", s.triggerHandler.DeleteLog)
-						})
-					})
-				}
+
 
 				if s.briefingHandler != nil {
 					protected.Route("/users/briefing", func(br chi.Router) {
