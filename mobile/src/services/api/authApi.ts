@@ -1,13 +1,15 @@
 import { ApiClient } from './client';
 import { User, AuthResponse, UserSession } from '../../types';
+import { getMobileDeviceName } from '../../utils/platformInfo';
 
 export class AuthApi {
   constructor(private client: ApiClient) {}
 
   async login(email: string, password: string, deviceName?: string): Promise<AuthResponse> {
+    const resolvedDevice = deviceName || getMobileDeviceName();
     const res = await this.client.request<AuthResponse>('/api/v1/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email, password, device_name: deviceName }),
+      body: JSON.stringify({ email, password, device_name: resolvedDevice }),
     });
     if (typeof (this.client as any).setAuthTokens === 'function') {
       await (this.client as any).setAuthTokens(res.access_token || res.token, res.refresh_token, res.session_id);
@@ -18,9 +20,10 @@ export class AuthApi {
   }
 
   async register(name: string, email: string, password: string, deviceName?: string): Promise<AuthResponse> {
+    const resolvedDevice = deviceName || getMobileDeviceName();
     const res = await this.client.request<AuthResponse>('/api/v1/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ name, email, password, device_name: deviceName }),
+      body: JSON.stringify({ name, email, password, device_name: resolvedDevice }),
     });
     if (typeof (this.client as any).setAuthTokens === 'function') {
       await (this.client as any).setAuthTokens(res.access_token || res.token, res.refresh_token, res.session_id);

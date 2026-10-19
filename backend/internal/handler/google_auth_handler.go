@@ -70,7 +70,15 @@ func (h *GoogleAuthHandler) Start(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	authURL, err := h.googleAuthSvc.GetAuthURL(mode, userID, redirectScheme)
+	deviceName := strings.TrimSpace(r.URL.Query().Get("device_name"))
+	if deviceName == "" {
+		deviceName = resolveDeviceName("", r)
+		if (deviceName == "Dispositivo Vito" || deviceName == "") && strings.HasPrefix(redirectScheme, "vito://") {
+			deviceName = "Celular (Vito Mobile)"
+		}
+	}
+
+	authURL, err := h.googleAuthSvc.GetAuthURLWithDevice(mode, userID, redirectScheme, deviceName)
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)

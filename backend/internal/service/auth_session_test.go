@@ -182,3 +182,63 @@ func TestAuthService_PrunesDuplicateSessions(t *testing.T) {
 		t.Errorf("sessão retornada deve ser pair2 marcada como atual, obteve %+v", sessions[0])
 	}
 }
+
+func TestAuthService_ConcurrentMultiDevice_DesktopAndMobilePreserved(t *testing.T) {
+	authSvc, _, _ := setupAuthServiceWithSessions(t)
+
+	// 1. Usuário faz login no PC Desktop (Windows/Mac/Linux)
+	user, pcPair, err := authSvc.RegisterWithSession("André", "andre_multi@vito.local", "senhaForte123", "Navegador Web (Windows)", "200.100.50.1")
+	if err != nil {
+		t.Fatalf("erro no registro do PC: %v", err)
+	}
+
+	// 2. Usuário faz login no Celular (Android/iOS)
+	_, mobilePair, err := authSvc.LoginWithSession("andre_multi@vito.local", "senhaForte123", "Android (Vito App)", "189.50.20.2")
+	if err != nil {
+		t.Fatalf("erro no login do Mobile: %v", err)
+	}
+
+	// 3. Ambas as sessões DEVEM estar ativas e NÃO revogadas
+	if authSvc.IsSessionRevoked(user.ID, pcPair.SessionID) {
+		t.Errorf("CRÍTICO: sessão do PC Desktop (SessionID=%s) foi indevidamente revogada após login do Mobile!", pcPair.SessionID)
+	}
+	if authSvc.IsSessionRevoked(user.ID, mobilePair.SessionID) {
+		t.Errorf("CRÍTICO: sessão do Celular Mobile (SessionID=%s) foi indevidamente revogada!", mobilePair.SessionID)
+	}
+
+	// 4. PC consegue renovar seu token via RefreshSession
+	_, pcNewPair, err := authSvc.RefreshSession(pcPair.RefreshToken, "Navegador Web (Windows)", "200.100.50.1")
+	if err != nil {
+		t.Fatalf("falha ao renovar sessão do PC: %v", err)
+	}
+	if pcNewPair.AccessToken == "" {
+		t.Error("esperava novo access token para o PC")
+	}
+
+	// 5. Celular consegue renovar seu token via RefreshSession
+	_, mobileNewPair, err := authSvc.RefreshSession(mobilePair.RefreshToken, "Android (Vito App)", "189.50.20.2")
+	if err != nil {
+		t.Fatalf("falha ao renovar sessão do Mobile: %v", err)
+	}
+	if mobileNewPair.AccessToken == "" {
+		t.Error("esperava novo access token para o Mobile")
+	}
+
+	// 6. ListSessions chamado pelo PC deve listar tanto o PC quanto o Mobile como ativos
+	pcSessions, err := authSvc.ListSessions(user.ID, pcNewPair.SessionID)
+	if err != nil {
+		t.Fatalf("erro ao listar sessões a partir do PC: %v", err)
+	}
+	if len(pcSessions) != 2 {
+		t.Fatalf("esperava 2 sessões ativas simultâneas (PC e Celular), obteve %d", len(pcSessions))
+	}
+
+	// 7. ListSessions chamado pelo Celular deve listar ambas e manter o Mobile atual
+	mobileSessions, err := authSvc.ListSessions(user.ID, mobileNewPair.SessionID)
+	if err != nil {
+		t.Fatalf("erro ao listar sessões a partir do Celular: %v", err)
+	}
+	if len(mobileSessions) != 2 {
+		t.Fatalf("esperava 2 sessões ativas simultâneas a partir do Celular, obteve %d", len(mobileSessions))
+	}
+}

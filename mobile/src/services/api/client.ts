@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { secureStorage } from '../secureStore';
 import { isAbortLike } from '../../utils/requestTimeout';
 import { ApiRequestOptions } from './types';
+import { getMobileDeviceName } from '../../utils/platformInfo';
 
 const TOKEN_KEY = '@vito_jwt_token';
 const REFRESH_TOKEN_KEY = '@vito_refresh_token';
@@ -154,7 +155,10 @@ export class ApiClient {
             'Content-Type': 'application/json',
             Accept: 'application/json',
           },
-          body: JSON.stringify({ refresh_token: this.refreshToken }),
+          body: JSON.stringify({
+            refresh_token: this.refreshToken,
+            device_name: getMobileDeviceName(),
+          }),
         });
 
         if (!res.ok) {

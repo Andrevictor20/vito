@@ -44,6 +44,7 @@ type OAuthState struct {
 	Mode           string `json:"mode"`            // "login" ou "calendar"
 	UserID         string `json:"user_id"`         // ID do usuário logado (obrigatório se mode == "calendar")
 	RedirectScheme string `json:"redirect_scheme"` // ex: "vito://oauth/callback"
+	DeviceName     string `json:"device_name,omitempty"`
 	Timestamp      int64  `json:"timestamp"`
 	Nonce          string `json:"nonce"`
 }
@@ -133,6 +134,11 @@ func (s *GoogleAuthService) isAllowedRedirectScheme(rawScheme string) bool {
 
 // GenerateState gera um token state assinado com HMAC-SHA256 anti-CSRF.
 func (s *GoogleAuthService) GenerateState(mode, userID, redirectScheme string) (string, error) {
+	return s.GenerateStateWithDevice(mode, userID, redirectScheme, "")
+}
+
+// GenerateStateWithDevice gera um token state assinado com HMAC-SHA256 anti-CSRF contendo o nome do dispositivo.
+func (s *GoogleAuthService) GenerateStateWithDevice(mode, userID, redirectScheme, deviceName string) (string, error) {
 	if !s.isAllowedRedirectScheme(redirectScheme) {
 		redirectScheme = "vito://oauth/callback"
 	}
@@ -146,6 +152,7 @@ func (s *GoogleAuthService) GenerateState(mode, userID, redirectScheme string) (
 		Mode:           mode,
 		UserID:         userID,
 		RedirectScheme: redirectScheme,
+		DeviceName:     strings.TrimSpace(deviceName),
 		Timestamp:      time.Now().Unix(),
 		Nonce:          hex.EncodeToString(nonceBytes),
 	}
@@ -195,11 +202,16 @@ func (s *GoogleAuthService) ValidateState(stateStr string) (*OAuthState, error) 
 
 // GetAuthURL constrói a URL oficial de consentimento do Google.
 func (s *GoogleAuthService) GetAuthURL(mode, userID, redirectScheme string) (string, error) {
+	return s.GetAuthURLWithDevice(mode, userID, redirectScheme, "")
+}
+
+// GetAuthURLWithDevice constrói a URL oficial de consentimento do Google preservando o dispositivo do usuário.
+func (s *GoogleAuthService) GetAuthURLWithDevice(mode, userID, redirectScheme, deviceName string) (string, error) {
 	if strings.TrimSpace(s.cfg.ClientID) == "" {
 		return "", errors.New("GOOGLE_CLIENT_ID não configurado no servidor. Configure as credenciais Google OAuth no arquivo .env")
 	}
 
-	state, err := s.GenerateState(mode, userID, redirectScheme)
+	state, err := s.GenerateStateWithDevice(mode, userID, redirectScheme, deviceName)
 	if err != nil {
 		return "", err
 	}
@@ -385,9 +397,18 @@ func (s *GoogleAuthService) HandleCallback(ctx context.Context, code, stateStr s
 		}
 	}
 
-	// Emite sessão Dual Token (Access Token 15m + Refresh Token 30d) do Vito
+	// Emite sessão Dual Token (Access Token 15m + Refresh Token 30d) do Vito preservando o dispositivo de origem
+	deviceName := strings.TrimSpace(state.DeviceName)
+	if deviceName == "" {
+		if strings.HasPrefix(redirectScheme, "vito://") {
+			deviceName = "Celular (Vito Mobile)"
+		} else {
+			deviceName = "Navegador Web (Desktop)"
+		}
+	}
+
 	var token, refreshToken, sessionID string
-	pair, err := s.authSvc.IssueSessionForUser(user, "Google OAuth", "")
+	pair, err := s.authSvc.IssueSessionForUser(user, deviceName, "")
 	if err == nil && pair != nil {
 		token = pair.AccessToken
 		refreshToken = pair.RefreshToken

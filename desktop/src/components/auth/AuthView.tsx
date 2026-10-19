@@ -5,6 +5,7 @@ import { VitoLogo } from '../common/VitoLogo';
 import { GoogleIcon } from '../common/GoogleIcon';
 import { WhatsAppAuthModal } from './WhatsAppAuthModal';
 import { Eye, EyeOff, MessageSquare, Loader2, Sun, Moon, AlertCircle, RefreshCw } from 'lucide-react';
+import { getDesktopDeviceName } from '../../services/api';
 
 export const AuthView: React.FC = () => {
   const { login, register } = useAuth();
@@ -77,8 +78,9 @@ export const AuthView: React.FC = () => {
   const handleGoogleLogin = () => {
     setError(null);
     const redirectUrl = encodeURIComponent(`${window.location.origin}/auth/callback`);
+    const deviceName = encodeURIComponent(getDesktopDeviceName());
     const apiBase = (import.meta as any).env?.VITE_API_URL || '';
-    window.location.href = `${apiBase}/api/v1/auth/google/start?mode=login&redirect_scheme=${redirectUrl}`;
+    window.location.href = `${apiBase}/api/v1/auth/google/start?mode=login&redirect_scheme=${redirectUrl}&device_name=${deviceName}`;
   };
 
   return (

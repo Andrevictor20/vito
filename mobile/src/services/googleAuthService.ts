@@ -1,6 +1,8 @@
 import * as Linking from 'expo-linking';
-import { Platform } from 'react-native';
 import { User } from '../types';
+import { getMobileDeviceName, IN_APP_BROWSER_OPTIONS } from '../utils/platformInfo';
+
+export { getMobileDeviceName, IN_APP_BROWSER_OPTIONS };
 
 // Carregamento defensivo do módulo nativo WebBrowser para evitar crash no bootstrap caso o binário nativo não esteja presente
 let WebBrowser: any = null;
@@ -38,17 +40,18 @@ export const googleAuthService = {
   },
 
   /**
-   * Inicia o fluxo de Login / Cadastro via Google OAuth2.
+   * Inicia o fluxo de Login / Cadastro via Google OAuth2 integrado no app.
    */
   async loginWithGoogle(serverUrl: string): Promise<GoogleLoginResult> {
     if (!this.isAvailable()) {
       throw new Error('A autenticação com Google requer a versão mais recente do aplicativo. Por favor, atualize o APK.');
     }
 
+    const deviceName = getMobileDeviceName();
     const redirectUrl = Linking.createURL('oauth/callback');
-    const authStartUrl = `${serverUrl.replace(/\/+$/, '')}/api/v1/auth/google/start?mode=login&redirect_scheme=${encodeURIComponent(redirectUrl)}`;
+    const authStartUrl = `${serverUrl.replace(/\/+$/, '')}/api/v1/auth/google/start?mode=login&redirect_scheme=${encodeURIComponent(redirectUrl)}&device_name=${encodeURIComponent(deviceName)}`;
 
-    const result = await WebBrowser.openAuthSessionAsync(authStartUrl, redirectUrl);
+    const result = await WebBrowser.openAuthSessionAsync(authStartUrl, redirectUrl, IN_APP_BROWSER_OPTIONS);
 
     if (result.type !== 'success') {
       if (result.type === 'cancel' || result.type === 'dismiss') {
@@ -94,7 +97,7 @@ export const googleAuthService = {
     const redirectUrl = Linking.createURL('oauth/callback');
     const authStartUrl = `${serverUrl.replace(/\/+$/, '')}/api/v1/auth/google/start?mode=calendar&token=${encodeURIComponent(jwtToken)}&redirect_scheme=${encodeURIComponent(redirectUrl)}`;
 
-    const result = await WebBrowser.openAuthSessionAsync(authStartUrl, redirectUrl);
+    const result = await WebBrowser.openAuthSessionAsync(authStartUrl, redirectUrl, IN_APP_BROWSER_OPTIONS);
 
     if (result.type !== 'success') {
       if (result.type === 'cancel' || result.type === 'dismiss') {
@@ -128,7 +131,7 @@ export const googleAuthService = {
     const redirectUrl = Linking.createURL('oauth/callback');
     const authStartUrl = `${serverUrl.replace(/\/+$/, '')}/api/v1/auth/google/start?mode=gmail&token=${encodeURIComponent(jwtToken)}&redirect_scheme=${encodeURIComponent(redirectUrl)}`;
 
-    const result = await WebBrowser.openAuthSessionAsync(authStartUrl, redirectUrl);
+    const result = await WebBrowser.openAuthSessionAsync(authStartUrl, redirectUrl, IN_APP_BROWSER_OPTIONS);
 
     if (result.type !== 'success') {
       if (result.type === 'cancel' || result.type === 'dismiss') {

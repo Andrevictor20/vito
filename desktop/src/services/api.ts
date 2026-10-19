@@ -2,6 +2,15 @@ import { User, AuthTokens, CalendarEvent, Todo, Trigger, TriggerLog, BookingType
 
 const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || '';
 
+export function getDesktopDeviceName(): string {
+  if (typeof navigator === 'undefined') return 'Navegador Web (Desktop)';
+  const ua = navigator.userAgent.toLowerCase();
+  if (ua.includes('windows')) return 'Navegador Web (Windows)';
+  if (ua.includes('macintosh') || ua.includes('mac os')) return 'Navegador Web (macOS)';
+  if (ua.includes('linux')) return 'Navegador Web (Linux)';
+  return 'Navegador Web (Desktop)';
+}
+
 class ApiService {
   private accessToken: string | null = null;
   private isRefreshing = false;
@@ -53,7 +62,10 @@ class ApiService {
     const res = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refresh_token: refreshToken }),
+      body: JSON.stringify({
+        refresh_token: refreshToken,
+        device_name: getDesktopDeviceName(),
+      }),
     });
 
     if (!res.ok) {
@@ -117,19 +129,21 @@ class ApiService {
   }
 
   // --- Auth Endpoints ---
-  async login(email: string, password: string): Promise<AuthTokens> {
+  async login(email: string, password: string, deviceName?: string): Promise<AuthTokens> {
+    const resolvedDevice = deviceName || getDesktopDeviceName();
     const data = await this.request<AuthTokens>('/api/v1/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password, device_name: resolvedDevice }),
     });
     this.setTokens(data.access_token, data.refresh_token);
     return data;
   }
 
-  async register(name: string, email: string, password: string): Promise<AuthTokens> {
+  async register(name: string, email: string, password: string, deviceName?: string): Promise<AuthTokens> {
+    const resolvedDevice = deviceName || getDesktopDeviceName();
     const data = await this.request<AuthTokens>('/api/v1/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ name, email, password }),
+      body: JSON.stringify({ name, email, password, device_name: resolvedDevice }),
     });
     this.setTokens(data.access_token, data.refresh_token);
     return data;
