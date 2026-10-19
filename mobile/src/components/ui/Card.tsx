@@ -24,7 +24,7 @@ export const Card: React.FC<CardProps> = ({
 
     let baseContainer: ViewStyle = {
       borderRadius: cornerRadius,
-      padding: tokens.spacing.md,
+      padding: tokens.spacing.lg,
     };
 
     switch (variant) {
@@ -32,6 +32,8 @@ export const Card: React.FC<CardProps> = ({
         baseContainer = {
           ...baseContainer,
           backgroundColor: colors.surfaceContainerLow,
+          borderWidth: 1,
+          borderColor: colors.outlineVariant,
           ...tokens.shadows.level1,
         };
         break;

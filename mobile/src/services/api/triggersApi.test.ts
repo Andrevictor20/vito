@@ -63,4 +63,18 @@ describe('TriggersApi Unit Tests', () => {
     assert.equal(trigger.id, 'trig-123');
     assert.equal(trigger.title, 'Meu Radar de Vagas');
   });
+
+  test('getTemplates usa DEFAULT_TRIGGER_TEMPLATES em caso de falha de rede ou auth', async () => {
+    const client = {
+      request: async () => {
+        throw new Error('cabeçalho de autorização ausente');
+      },
+    } as unknown as ApiClient;
+
+    const api = new TriggersApi(client);
+    const templates = await api.getTemplates();
+
+    assert.ok(templates.length >= 8);
+    assert.equal(templates[0].id, 'tmpl-career-jobs');
+  });
 });

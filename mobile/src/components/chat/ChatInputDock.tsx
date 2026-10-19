@@ -387,9 +387,11 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     color: tokens.colors.onSurface,
+    fontFamily: tokens.typography.family.regular,
     fontSize: 15,
     lineHeight: 22,
-    paddingHorizontal: 6,
+    letterSpacing: -0.15,
+    paddingHorizontal: 8,
     paddingVertical: 8,
     minHeight: 46,
     maxHeight: 120,

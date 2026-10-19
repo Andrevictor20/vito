@@ -9,6 +9,7 @@ import {
   TriggerLog,
   TriggerTemplate,
 } from '../../types';
+import { DEFAULT_TRIGGER_TEMPLATES } from '../../data/defaultTriggerTemplates';
 
 export class TriggersApi {
   constructor(private client: ApiClient) {}
@@ -101,8 +102,17 @@ export class TriggersApi {
   }
 
   async getTemplates(): Promise<TriggerTemplate[]> {
-    const raw = await this.client.request<any>('/api/v1/triggers/templates');
-    return Array.isArray(raw) ? raw : (raw?.templates ?? raw?.data ?? []);
+    try {
+      const raw = await this.client.request<any>('/api/v1/triggers/templates');
+      const list = Array.isArray(raw) ? raw : (raw?.templates ?? raw?.data ?? []);
+      if (Array.isArray(list) && list.length > 0) {
+        return list;
+      }
+      return DEFAULT_TRIGGER_TEMPLATES;
+    } catch (err) {
+      console.warn('[TriggersApi] Falha ao consultar templates da API, usando catálogo local:', err);
+      return DEFAULT_TRIGGER_TEMPLATES;
+    }
   }
 
   async activateTemplate(

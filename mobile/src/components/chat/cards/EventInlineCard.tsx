@@ -157,11 +157,14 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: tokens.typography.weight.bold,
     lineHeight: 20,
+    letterSpacing: -0.4,
+    fontVariant: ['tabular-nums'],
   },
   dateBadgeMonth: {
     fontSize: 10,
-    fontWeight: tokens.typography.weight.semibold,
+    fontWeight: tokens.typography.weight.bold,
     textTransform: 'uppercase',
+    letterSpacing: 0.8,
     lineHeight: 12,
   },
   description: {
@@ -175,10 +178,12 @@ const styles = StyleSheet.create({
     color: tokens.colors.onSurface,
     fontSize: tokens.typography.size.titleSmall,
     fontWeight: tokens.typography.weight.semibold,
+    letterSpacing: -0.2,
   },
   subtitle: {
     color: tokens.colors.onSurfaceVariant,
     fontSize: tokens.typography.size.labelSmall,
+    letterSpacing: -0.05,
     marginTop: 1,
   },
   // Status Pill M3 com Success Container

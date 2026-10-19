@@ -267,9 +267,39 @@ class ApiService {
     return Array.isArray(res) ? res : res.triggers || [];
   }
 
+  async getTrigger(id: string): Promise<Trigger> {
+    return this.request<Trigger>(`/api/v1/triggers/${id}`);
+  }
+
+  async createTrigger(input: Partial<Trigger> & { title: string; query: string }): Promise<Trigger> {
+    return this.request('/api/v1/triggers', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  }
+
+  async updateTrigger(id: string, updates: Partial<Trigger>): Promise<Trigger> {
+    return this.request(`/api/v1/triggers/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(updates),
+    });
+  }
+
+  async deleteTrigger(id: string): Promise<void> {
+    return this.request(`/api/v1/triggers/${id}`, { method: 'DELETE' });
+  }
+
   async getTriggerLogs(id: string): Promise<TriggerLog[]> {
     const res = await this.request<any>(`/api/v1/triggers/${id}/logs`);
     return Array.isArray(res) ? res : res.logs || [];
+  }
+
+  async deleteTriggerLog(triggerId: string, logId: string): Promise<void> {
+    return this.request(`/api/v1/triggers/${triggerId}/logs/${logId}`, { method: 'DELETE' });
+  }
+
+  async clearTriggerLogs(triggerId: string): Promise<void> {
+    return this.request(`/api/v1/triggers/${triggerId}/logs`, { method: 'DELETE' });
   }
 
   async testTrigger(id: string): Promise<any> {
@@ -284,6 +314,17 @@ class ApiService {
     return this.request(`/api/v1/triggers/${id}`, {
       method: 'PATCH',
       body: JSON.stringify({ status: active ? 'active' : 'paused' }),
+    });
+  }
+
+  async getTriggerTemplates(): Promise<any[]> {
+    const res = await this.request<any>('/api/v1/triggers/templates');
+    return Array.isArray(res) ? res : res.templates || [];
+  }
+
+  async activateTriggerTemplate(templateId: string): Promise<Trigger> {
+    return this.request(`/api/v1/triggers/templates/${templateId}/activate`, {
+      method: 'POST',
     });
   }
 

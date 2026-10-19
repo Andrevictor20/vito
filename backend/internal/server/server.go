@@ -208,6 +208,10 @@ func (s *Server) registerRoutes() {
 			r.Post("/integrations/whatsapp/webhook", s.whatsappHandler.Webhook)
 		}
 
+		if s.triggerHandler != nil {
+			r.Get("/triggers/templates", s.triggerHandler.ListTemplates)
+		}
+
 		// Rotas protegidas por JWT
 		if s.authSvc != nil {
 			r.Group(func(protected chi.Router) {

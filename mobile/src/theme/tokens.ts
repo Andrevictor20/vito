@@ -309,6 +309,23 @@ export const tokens = {
       semibold: '600' as const,
       bold: '700' as const,
     },
+    letterSpacing: {
+      displayLarge: -0.5,
+      displayMedium: -0.4,
+      displaySmall: -0.3,
+      headlineLarge: -0.4,
+      headlineMedium: -0.3,
+      headlineSmall: -0.2,
+      titleLarge: -0.3,
+      titleMedium: -0.2,
+      titleSmall: -0.1,
+      bodyLarge: -0.1,
+      bodyMedium: 0,
+      bodySmall: 0.1,
+      labelLarge: 0.15,
+      labelMedium: 0.25,
+      labelSmall: 0.35,
+    },
   },
 
   // 3. Escala de Shapes do Material 3 — Design System: sm8/md14/lg20/full

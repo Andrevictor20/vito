@@ -127,7 +127,8 @@ const styles = StyleSheet.create({
   },
   pillText: {
     fontWeight: '600',
-    letterSpacing: 0.1,
+    letterSpacing: 0.25,
+    fontVariant: ['tabular-nums'],
   },
   iconWrapper: {
     marginRight: 2,

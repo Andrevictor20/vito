@@ -1,61 +1,81 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { api } from '../../services/api';
 import { Trigger, TriggerLog } from '../../types';
-import { extractReportParagraphs, parseReportPayload, buildRadarChatPrompt } from '../../utils/radarReportUtils';
 import { CreateTriggerModal } from './CreateTriggerModal';
+import { EditTriggerModal } from './EditTriggerModal';
+import { DeleteTriggerModal, DeleteModalType } from './DeleteTriggerModal';
+import { RadarCard } from './RadarCard';
+import { TriggerDetailView } from './TriggerDetailView';
+import { filterTriggersByCategory } from '../../utils/radarFilter';
 import {
   Sparkles,
   Clock,
   Loader2,
   ArrowLeft,
   MoreVertical,
-  Play,
-  MessageSquare,
-  CheckCircle2,
-  Lightbulb,
-  FileText,
   Plus,
+  Trash2,
+  Edit3,
 } from 'lucide-react';
 
 interface TriggersViewProps {
   onOpenChatWithPrompt?: (prompt: string) => void;
 }
 
+const CATEGORIES = [
+  { id: 'all', label: 'Todos' },
+  { id: 'career', label: 'Carreira' },
+  { id: 'finance', label: 'Finanças' },
+  { id: 'public_exams', label: 'Concursos' },
+  { id: 'real_estate', label: 'Imóveis' },
+  { id: 'travel', label: 'Viagens' },
+  { id: 'tech', label: 'Tecnologia' },
+  { id: 'news', label: 'Notícias' },
+];
+
 export const TriggersView: React.FC<TriggersViewProps> = ({ onOpenChatWithPrompt }) => {
   const [triggers, setTriggers] = useState<Trigger[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedTrigger, setSelectedTrigger] = useState<Trigger | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [logs, setLogs] = useState<TriggerLog[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
   const [runningTest, setRunningTest] = useState(false);
-  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
 
-  const fetchTriggers = async () => {
+  // Modals
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<Trigger | null>(null);
+  const [deleteModal, setDeleteModal] = useState<{
+    open: boolean;
+    type: DeleteModalType;
+    trigger?: Trigger;
+    logId?: string;
+  }>({ open: false, type: 'radar' });
+  const [deleting, setDeleting] = useState(false);
+
+  const fetchTriggers = useCallback(async () => {
     try {
+      setLoading(true);
       const data = await api.getTriggers();
       setTriggers(data);
-      if (data.length > 0 && !selectedTrigger) {
-        setSelectedTrigger(data[0]);
+      if (selectedTrigger) {
+        const updated = data.find((t) => t.id === selectedTrigger.id);
+        if (updated) setSelectedTrigger(updated);
       }
     } catch (err) {
       console.error('Erro ao buscar radares:', err);
+    } finally {
+      setLoading(false);
     }
-  };
+  }, [selectedTrigger?.id]);
 
   useEffect(() => {
     fetchTriggers();
   }, []);
 
-  const activeItem = selectedTrigger || triggers[0] || {
-    id: 'demo-1',
-    title: 'Monitoramento Ativo',
-    category: 'Geral',
-    query: 'Acompanhar atualizações importantes',
-    frequency: 'Diário às 08:30',
-    status: 'active' as const,
-  };
-
   const fetchLogs = useCallback(async (triggerId: string) => {
-    if (!triggerId || triggerId === 'demo-1') {
+    if (!triggerId) {
       setLogs([]);
       return;
     }
@@ -72,15 +92,20 @@ export const TriggersView: React.FC<TriggersViewProps> = ({ onOpenChatWithPrompt
   }, []);
 
   useEffect(() => {
-    if (activeItem.id) {
-      fetchLogs(activeItem.id);
+    if (selectedTrigger?.id) {
+      fetchLogs(selectedTrigger.id);
+    } else {
+      setLogs([]);
     }
-  }, [activeItem.id, fetchLogs]);
+  }, [selectedTrigger?.id, fetchLogs]);
 
   const handleToggleActive = async (tr: Trigger) => {
     const nextStatus = tr.status === 'active' ? 'paused' : 'active';
-    setSelectedTrigger({ ...tr, status: nextStatus });
-    setTriggers((prev) => prev.map((item) => (item.id === tr.id ? { ...item, status: nextStatus } : item)));
+    const updated = { ...tr, status: nextStatus as Trigger['status'] };
+    if (selectedTrigger?.id === tr.id) {
+      setSelectedTrigger(updated);
+    }
+    setTriggers((prev) => prev.map((item) => (item.id === tr.id ? updated : item)));
     try {
       await api.toggleTrigger(tr.id, nextStatus === 'active');
     } catch {
@@ -108,259 +133,319 @@ export const TriggersView: React.FC<TriggersViewProps> = ({ onOpenChatWithPrompt
     }
   };
 
+  const handleSaveEdit = async (id: string, updates: Partial<Trigger>) => {
+    await api.updateTrigger(id, updates);
+    await fetchTriggers();
+  };
+
+  const handleConfirmDelete = async () => {
+    setDeleting(true);
+    try {
+      if (deleteModal.type === 'radar' && deleteModal.trigger) {
+        await api.deleteTrigger(deleteModal.trigger.id);
+        setTriggers((prev) => prev.filter((t) => t.id !== deleteModal.trigger?.id));
+        if (selectedTrigger?.id === deleteModal.trigger.id) {
+          setSelectedTrigger(null);
+        }
+      } else if (deleteModal.type === 'clear_logs' && selectedTrigger) {
+        await api.clearTriggerLogs(selectedTrigger.id);
+        setLogs([]);
+      } else if (deleteModal.type === 'log' && selectedTrigger && deleteModal.logId) {
+        await api.deleteTriggerLog(selectedTrigger.id, deleteModal.logId);
+        setLogs((prev) => prev.filter((l) => l.id !== deleteModal.logId));
+      }
+      setDeleteModal({ open: false, type: 'radar' });
+    } catch (err: any) {
+      alert(err.message || 'Erro ao processar exclusão');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const filteredTriggers = useMemo(() => {
+    return filterTriggersByCategory(triggers, selectedCategory);
+  }, [triggers, selectedCategory]);
+
+  const activeTriggers = useMemo(() => filteredTriggers.filter((t) => t.status === 'active'), [filteredTriggers]);
+  const pausedTriggers = useMemo(() => filteredTriggers.filter((t) => t.status !== 'active'), [filteredTriggers]);
+
   return (
     <div className="flex-1 h-screen flex flex-col bg-[#F8F9FA] dark:bg-[#0B0D10] text-zinc-900 dark:text-[#FAFAFA] overflow-hidden select-none transition-colors duration-200">
       {/* Top Header */}
-      <header className="h-16 px-6 border-b border-zinc-200/80 dark:border-[#222730] flex items-center justify-between bg-white/80 dark:bg-[#14171C]/80 backdrop-blur-md z-10">
+      <header className="h-16 px-6 border-b border-zinc-200/80 dark:border-[#222730] flex items-center justify-between bg-white/80 dark:bg-[#14171C]/80 backdrop-blur-md z-10 shrink-0">
         <div className="flex items-center gap-3">
-          <button
-            onClick={() => {}}
-            className="p-1.5 rounded-full text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 transition-colors"
-          >
-            <ArrowLeft size={18} />
-          </button>
+          {selectedTrigger ? (
+            <button
+              onClick={() => setSelectedTrigger(null)}
+              className="p-1.5 rounded-full text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 transition-colors"
+              title="Voltar para todos os radares"
+            >
+              <ArrowLeft size={18} />
+            </button>
+          ) : (
+            <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+              <Sparkles size={16} />
+            </div>
+          )}
 
           <div>
             <h2 className="text-base font-bold tracking-tight text-zinc-900 dark:text-white leading-tight">
-              {activeItem.title}
+              {selectedTrigger ? selectedTrigger.title : 'Vigílias & Radares'}
             </h2>
             <p className="text-[11px] text-zinc-500 dark:text-zinc-400 capitalize">
-              {activeItem.category} • {activeItem.frequency || 'Diário às 08:00'}
+              {selectedTrigger
+                ? `${selectedTrigger.category} • ${selectedTrigger.frequency || 'Diário às 08:30'}`
+                : 'Monitoramento inteligente em segundo plano'}
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Botão + Novo Radar */}
-          <button
-            onClick={() => setCreateModalOpen(true)}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-200 text-white dark:text-[#09090B] text-xs font-semibold shadow-xs transition-all"
-          >
-            <Plus size={14} />
-            <span>+ Novo Radar</span>
-          </button>
+          {selectedTrigger ? (
+            <>
+              {/* Toggle Switch */}
+              <button
+                type="button"
+                onClick={() => handleToggleActive(selectedTrigger)}
+                className={`w-11 h-6 flex items-center rounded-full p-1 cursor-pointer transition-colors ${
+                  selectedTrigger.status === 'active' ? 'bg-[#10B981]' : 'bg-zinc-300 dark:bg-zinc-700'
+                }`}
+                title={selectedTrigger.status === 'active' ? 'Pausar monitoramento' : 'Ativar monitoramento'}
+              >
+                <div
+                  className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${
+                    selectedTrigger.status === 'active' ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
 
-          {/* Toggle Switch */}
-          <button
-            type="button"
-            onClick={() => handleToggleActive(activeItem)}
-            className={`w-11 h-6 flex items-center rounded-full p-1 cursor-pointer transition-colors ${
-              activeItem.status === 'active' ? 'bg-[#10B981]' : 'bg-zinc-300 dark:bg-zinc-700'
-            }`}
-            title={activeItem.status === 'active' ? 'Pausar monitoramento' : 'Ativar monitoramento'}
-          >
-            <div
-              className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${
-                activeItem.status === 'active' ? 'translate-x-5' : 'translate-x-0'
-              }`}
-            />
-          </button>
+              {/* Menu More Options */}
+              <div className="relative">
+                <button
+                  onClick={() => setHeaderMenuOpen(!headerMenuOpen)}
+                  className="p-1.5 text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 rounded-full transition-colors"
+                  title="Mais opções do radar"
+                >
+                  <MoreVertical size={18} />
+                </button>
 
-          <button
-            className="p-1 text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
-            title="Mais opções"
-          >
-            <MoreVertical size={18} />
-          </button>
+                {headerMenuOpen && (
+                  <>
+                    <div className="fixed inset-0 z-20" onClick={() => setHeaderMenuOpen(false)} />
+                    <div className="absolute right-0 top-9 z-30 w-44 py-1.5 rounded-2xl bg-white dark:bg-[#1C2026] border border-zinc-200 dark:border-[#2A313C] shadow-xl text-xs font-semibold">
+                      <button
+                        onClick={() => {
+                          setHeaderMenuOpen(false);
+                          setEditTarget(selectedTrigger);
+                        }}
+                        className="w-full px-3.5 py-2 text-left flex items-center gap-2 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/5 transition-colors"
+                      >
+                        <Edit3 size={14} />
+                        <span>Editar Radar</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setHeaderMenuOpen(false);
+                          setDeleteModal({ open: true, type: 'clear_logs', trigger: selectedTrigger });
+                        }}
+                        className="w-full px-3.5 py-2 text-left flex items-center gap-2 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/5 transition-colors"
+                      >
+                        <Clock size={14} />
+                        <span>Limpar Histórico</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setHeaderMenuOpen(false);
+                          setDeleteModal({ open: true, type: 'radar', trigger: selectedTrigger });
+                        }}
+                        className="w-full px-3.5 py-2 text-left flex items-center gap-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
+                      >
+                        <Trash2 size={14} />
+                        <span>Excluir Radar</span>
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </>
+          ) : (
+            <button
+              onClick={() => setCreateModalOpen(true)}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-200 text-white dark:text-[#09090B] text-xs font-semibold shadow-xs transition-all"
+            >
+              <Plus size={14} />
+              <span>+ Novo Radar</span>
+            </button>
+          )}
         </div>
       </header>
 
       {/* Main Content Area */}
       <div className="flex-1 overflow-y-auto px-6 py-8 scroll-smooth">
-        <div className="max-w-[1500px] mx-auto flex flex-col lg:flex-row gap-7">
-          {/* Coluna 1: Lista de Vigílias Ampliada */}
-          <div className="w-full lg:w-[420px] xl:w-[460px] shrink-0 space-y-3.5">
-            <div className="flex items-center justify-between pb-1">
-              <h3 className="text-xs sm:text-sm font-bold text-zinc-500 uppercase tracking-wider">
-                Vigílias Ativas ({triggers.length || 1})
-              </h3>
-            </div>
-
-            <div className="space-y-3">
-              {(triggers.length > 0 ? triggers : [activeItem]).map((tr) => {
-                const isSelected = activeItem.id === tr.id;
-                return (
-                  <button
-                    key={tr.id}
-                    onClick={() => setSelectedTrigger(tr)}
-                    className={`w-full text-left p-5 rounded-[22px] border transition-all ${
-                      isSelected
-                        ? 'bg-white dark:bg-[#1C2026] border-zinc-900 dark:border-white shadow-md'
-                        : 'bg-white/60 dark:bg-[#14171C]/60 border-zinc-200 dark:border-[#222730] hover:border-zinc-400 dark:hover:border-zinc-600 shadow-2xs'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-zinc-100 dark:bg-[#0B0D10] text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-[#222730]">
-                        {tr.category}
+        <div className="max-w-[1400px] mx-auto">
+          {selectedTrigger ? (
+            /* DETALHES DO RADAR SELECIONADO & RELATÓRIOS */
+            <TriggerDetailView
+              trigger={selectedTrigger}
+              logs={logs}
+              loadingLogs={loadingLogs}
+              runningTest={runningTest}
+              onRunVerifyNow={handleRunVerifyNow}
+              onRequestDeleteLog={(logId) => {
+                setDeleteModal({
+                  open: true,
+                  type: 'log',
+                  trigger: selectedTrigger,
+                  logId,
+                });
+              }}
+              onRequestClearLogs={() => {
+                setDeleteModal({
+                  open: true,
+                  type: 'clear_logs',
+                  trigger: selectedTrigger,
+                });
+              }}
+              onOpenChatWithPrompt={onOpenChatWithPrompt}
+            />
+          ) : (
+            /* VISÃO GERAL DE RADARES (LISTAGEM & CATEGORIAS) */
+            <div className="space-y-8">
+              {/* Filtro de Categorias */}
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+                {CATEGORIES.map((cat) => {
+                  const isSelected = selectedCategory === cat.id;
+                  const count =
+                    cat.id === 'all'
+                      ? triggers.length
+                      : triggers.filter((t) => t.category.toLowerCase() === cat.id.toLowerCase()).length;
+                  return (
+                    <button
+                      key={cat.id}
+                      onClick={() => setSelectedCategory(cat.id)}
+                      className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all shrink-0 ${
+                        isSelected
+                          ? 'bg-zinc-900 text-white dark:bg-white dark:text-[#09090B] shadow-xs'
+                          : 'bg-white/80 dark:bg-[#14171C]/80 border border-zinc-200 dark:border-[#222730] text-zinc-600 dark:text-zinc-400 hover:border-zinc-400'
+                      }`}
+                    >
+                      <span>{cat.label}</span>
+                      <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${isSelected ? 'bg-white/20 dark:bg-black/20' : 'bg-zinc-100 dark:bg-[#0B0D10]'}`}>
+                        {count}
                       </span>
-                      {tr.status === 'active' ? (
-                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_#10B981]" />
-                      ) : (
-                        <span className="w-2.5 h-2.5 rounded-full bg-zinc-400" />
-                      )}
-                    </div>
-                    <h4 className="text-base font-bold text-zinc-900 dark:text-white leading-snug">
-                      {tr.title}
-                    </h4>
-                    <p className="text-xs text-zinc-500 mt-1.5 flex items-center gap-1.5 font-medium">
-                      <Clock size={13} />
-                      <span>{tr.frequency || 'Diário às 08:00'}</span>
-                    </p>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Coluna 2: Detalhes do Radar Selecionado Ampliada */}
-          <div className="flex-1 space-y-7">
-            {/* Card de Monitoramento M3 */}
-            <div className="p-7 rounded-[28px] bg-white dark:bg-[#14171C] border border-zinc-200 dark:border-[#222730] shadow-sm space-y-5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs sm:text-sm font-semibold text-zinc-500 dark:text-zinc-400">
-                  {logs.length > 0
-                    ? `Última verificação ${new Date(logs[0].triggered_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}`
-                    : 'Aguardando verificação'}
-                </span>
-
-                {activeItem.status === 'active' ? (
-                  <span className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-xs font-bold tracking-wide uppercase">
-                    <CheckCircle2 size={14} />
-                    MONITORANDO
-                  </span>
-                ) : (
-                  <span className="px-3.5 py-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 text-xs font-bold uppercase">
-                    PAUSADO
-                  </span>
-                )}
+                    </button>
+                  );
+                })}
               </div>
 
-              <div className="flex items-center gap-2.5">
-                <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-100 dark:bg-[#0B0D10] border border-zinc-200 dark:border-[#222730] text-xs text-zinc-600 dark:text-zinc-300 font-semibold">
-                  <Sparkles size={14} className="text-amber-500" />
-                  {activeItem.category}
-                </span>
-                <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-100 dark:bg-[#0B0D10] border border-zinc-200 dark:border-[#222730] text-xs text-zinc-600 dark:text-zinc-300 font-semibold">
-                  <Clock size={14} className="text-zinc-400" />
-                  {activeItem.frequency || '08:30'}
-                </span>
-              </div>
-
-              <p className="text-base sm:text-lg text-zinc-800 dark:text-zinc-200 font-semibold leading-relaxed">
-                {activeItem.query || activeItem.title}
-              </p>
-
-              {/* Botão Primário Full Pill: Verificar Agora */}
-              <button
-                onClick={() => handleRunVerifyNow(activeItem)}
-                disabled={runningTest}
-                className="w-full h-14 rounded-full bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-200 text-white dark:text-[#09090B] font-bold text-sm uppercase tracking-wider flex items-center justify-center gap-2.5 transition-all shadow-md disabled:opacity-50"
-              >
-                {runningTest ? (
-                  <Loader2 size={18} className="animate-spin" />
-                ) : (
-                  <Play size={15} className="fill-current" />
-                )}
-                <span>Verificar Agora</span>
-              </button>
-            </div>
-
-            {/* Histórico de Relatórios Ampliado */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2.5 text-xs sm:text-sm font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">
-                <Clock size={17} />
-                <span>Histórico de Relatórios ({logs.length})</span>
-              </div>
-
-              {loadingLogs ? (
+              {loading ? (
                 <div className="p-16 text-center rounded-[28px] bg-white dark:bg-[#14171C] border border-zinc-200 dark:border-[#222730] flex flex-col items-center justify-center gap-3 text-zinc-400">
                   <Loader2 size={26} className="animate-spin text-zinc-600 dark:text-zinc-300" />
-                  <p className="text-sm font-medium">Carregando relatórios do radar...</p>
+                  <p className="text-sm font-medium">Sincronizando vigílias com o app mobile...</p>
                 </div>
-              ) : logs.length > 0 ? (
-                <div className="space-y-5">
-                  {logs.map((log) => {
-                    const paragraphs = extractReportParagraphs(log.message, log.payload);
-                    const parsed = parseReportPayload(log.payload, log.message);
-                    const formattedDate = new Date(log.triggered_at).toLocaleString('pt-BR', {
-                      dateStyle: 'short',
-                      timeStyle: 'short',
-                    });
-
-                    return (
-                      <div
-                        key={log.id}
-                        className="p-7 rounded-[28px] bg-white dark:bg-[#14171C] border border-zinc-200 dark:border-[#222730] shadow-sm space-y-5"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs sm:text-sm font-semibold text-zinc-500 dark:text-zinc-400">
-                            {formattedDate} {parsed?.confidence ? `• ${parsed.confidence}% relevância` : ''}
-                          </span>
-                          <button className="text-zinc-400 hover:text-zinc-900 dark:hover:text-white p-1">
-                            <MoreVertical size={18} />
-                          </button>
-                        </div>
-
-                        {/* Parágrafos do relatório com tamanho confortável */}
-                        <div className="space-y-3.5 text-base text-zinc-800 dark:text-zinc-200 leading-relaxed font-sans">
-                          {paragraphs.length > 0 ? (
-                            paragraphs.map((p, idx) => <p key={idx}>{p}</p>)
-                          ) : (
-                            <p>{log.message}</p>
-                          )}
-                        </div>
-
-                        {/* Callout de relevância */}
-                        {parsed?.why_relevant && (
-                          <div className="p-4 sm:p-5 rounded-2xl bg-zinc-50 dark:bg-[#0B0D10] border border-zinc-200 dark:border-[#222730] flex items-center gap-3 text-sm text-zinc-700 dark:text-zinc-300 italic">
-                            <Lightbulb size={18} className="text-amber-500 shrink-0" />
-                            <span>{parsed.why_relevant}</span>
-                          </div>
-                        )}
-
-                        {/* Botão Conversar com Vito */}
-                        <div className="pt-2 flex justify-end">
-                          <button
-                            onClick={() => {
-                              if (onOpenChatWithPrompt) {
-                                const prompt = buildRadarChatPrompt(activeItem.title, log.message);
-                                onOpenChatWithPrompt(prompt);
-                              }
-                            }}
-                            className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-zinc-100 hover:bg-zinc-200 dark:bg-[#1C2026] dark:hover:bg-[#262B33] border border-zinc-200 dark:border-[#222730] text-xs sm:text-sm font-semibold text-zinc-800 dark:text-white transition-colors shadow-xs"
-                          >
-                            <MessageSquare size={16} className="text-[#10B981]" />
-                            <span>Conversar com Vito</span>
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
+              ) : triggers.length === 0 ? (
+                /* Estado Vazio Real (Sem mock demo-1) */
+                <div className="p-12 text-center rounded-[28px] bg-white dark:bg-[#14171C] border border-zinc-200 dark:border-[#222730] shadow-sm space-y-4 max-w-xl mx-auto">
+                  <div className="w-14 h-14 mx-auto rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                    <Sparkles size={28} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <h3 className="text-lg font-bold text-zinc-900 dark:text-white">
+                      Nenhum radar cadastrado
+                    </h3>
+                    <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed max-w-md mx-auto">
+                      Crie um radar para o Vito pesquisar novidades, vagas de emprego, concursos e oportunidades automaticamente em segundo plano.
+                    </p>
+                  </div>
+                  <div className="pt-2">
+                    <button
+                      onClick={() => setCreateModalOpen(true)}
+                      className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-200 text-white dark:text-[#09090B] text-xs sm:text-sm font-bold shadow-md transition-all"
+                    >
+                      <Plus size={16} />
+                      <span>Criar Meu Primeiro Radar</span>
+                    </button>
+                  </div>
                 </div>
               ) : (
-              <div className="p-10 text-center rounded-[24px] bg-white dark:bg-[#14171C] border border-zinc-200 dark:border-[#222730] shadow-sm space-y-3">
-                <div className="w-10 h-10 mx-auto rounded-xl bg-zinc-100 dark:bg-white/5 flex items-center justify-center text-zinc-400">
-                  <FileText size={20} />
+                <div className="space-y-8">
+                  {/* Radares Ativos */}
+                  {activeTriggers.length > 0 && (
+                    <div className="space-y-3.5">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-xs sm:text-sm font-bold text-zinc-500 uppercase tracking-wider">
+                          Vigílias Ativas ({activeTriggers.length})
+                        </h3>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                        {activeTriggers.map((tr) => (
+                          <RadarCard
+                            key={tr.id}
+                            trigger={tr}
+                            onSelect={(item) => setSelectedTrigger(item)}
+                            onToggle={handleToggleActive}
+                            onEdit={(item) => setEditTarget(item)}
+                            onDelete={(item) => setDeleteModal({ open: true, type: 'radar', trigger: item })}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Radares Pausados */}
+                  {pausedTriggers.length > 0 && (
+                    <div className="space-y-3.5 pt-2">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-xs sm:text-sm font-bold text-zinc-400 uppercase tracking-wider">
+                          Pausados ({pausedTriggers.length})
+                        </h3>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 opacity-80">
+                        {pausedTriggers.map((tr) => (
+                          <RadarCard
+                            key={tr.id}
+                            trigger={tr}
+                            onSelect={(item) => setSelectedTrigger(item)}
+                            onToggle={handleToggleActive}
+                            onEdit={(item) => setEditTarget(item)}
+                            onDelete={(item) => setDeleteModal({ open: true, type: 'radar', trigger: item })}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div className="space-y-1">
-                  <h5 className="text-sm font-bold text-zinc-900 dark:text-white">Nenhum relatório gerado ainda</h5>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400 max-w-sm mx-auto">
-                    Esta vigília ainda não possui relatórios gravados. Clique no botão "Verificar Agora" acima para rodar a análise imediata com a IA.
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
-    </div>
 
-    {/* Modal de Criação de Radar */}
-    <CreateTriggerModal
-      open={createModalOpen}
-      onClose={() => setCreateModalOpen(false)}
-      onCreated={fetchTriggers}
-    />
-  </div>
+      {/* Modais */}
+      <CreateTriggerModal
+        open={createModalOpen}
+        onClose={() => setCreateModalOpen(false)}
+        onCreated={fetchTriggers}
+      />
+
+      <EditTriggerModal
+        open={editTarget !== null}
+        trigger={editTarget}
+        onClose={() => setEditTarget(null)}
+        onSave={handleSaveEdit}
+        onDeleteRequest={(item) => {
+          setDeleteModal({ open: true, type: 'radar', trigger: item });
+        }}
+      />
+
+      <DeleteTriggerModal
+        open={deleteModal.open}
+        type={deleteModal.type}
+        targetTitle={deleteModal.trigger?.title}
+        loading={deleting}
+        onClose={() => setDeleteModal({ open: false, type: 'radar' })}
+        onConfirm={handleConfirmDelete}
+      />
+    </div>
   );
 };

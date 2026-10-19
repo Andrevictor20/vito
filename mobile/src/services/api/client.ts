@@ -206,6 +206,26 @@ export class ApiClient {
       endpoint.includes('/auth/register') ||
       endpoint.includes('/auth/refresh');
 
+    // Se o token de acesso não estiver carregado em memória, recupera do storage seguro antes da requisição
+    if (!isAuthFlow && !this.token) {
+      const storedToken = await secureStorage.getItem(TOKEN_KEY);
+      if (storedToken) {
+        this.token = storedToken;
+      }
+      if (!this.refreshToken) {
+        const storedRefresh = await secureStorage.getItem(REFRESH_TOKEN_KEY);
+        if (storedRefresh) {
+          this.refreshToken = storedRefresh;
+        }
+      }
+      if (!this.sessionId) {
+        const storedSession = await secureStorage.getItem(SESSION_ID_KEY);
+        if (storedSession) {
+          this.sessionId = storedSession;
+        }
+      }
+    }
+
     // Se o token estiver expirado ou prestes a expirar e houver refresh token, renova proativamente
     if (!isAuthFlow && this.refreshToken && this.isTokenExpiringSoon()) {
       await this.performTokenRefresh();
@@ -249,10 +269,18 @@ export class ApiClient {
         signal: controller.signal,
       });
 
-      if (res.status === 401 && !options._isRetry && !isAuthFlow && this.refreshToken) {
-        const refreshedToken = await this.performTokenRefresh();
-        if (refreshedToken) {
-          return this.request<T>(endpoint, { ...options, _isRetry: true });
+      if (res.status === 401 && !options._isRetry && !isAuthFlow) {
+        if (!this.refreshToken) {
+          const storedRefresh = await secureStorage.getItem(REFRESH_TOKEN_KEY);
+          if (storedRefresh) {
+            this.refreshToken = storedRefresh;
+          }
+        }
+        if (this.refreshToken) {
+          const refreshedToken = await this.performTokenRefresh();
+          if (refreshedToken) {
+            return this.request<T>(endpoint, { ...options, _isRetry: true });
+          }
         }
       }
 

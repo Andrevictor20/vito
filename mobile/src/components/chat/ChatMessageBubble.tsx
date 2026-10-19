@@ -313,22 +313,23 @@ const styles = StyleSheet.create({
   bubble: {
     maxWidth: '85%',
     borderRadius: 20,
-    paddingHorizontal: tokens.spacing.md,
-    paddingVertical: tokens.spacing.sm + 4,
+    paddingHorizontal: tokens.spacing.lg,
+    paddingVertical: tokens.spacing.md,
   },
   // Balão do Usuário: M3 Primary Container com texto On-Primary-Container
   bubbleUser: {
     backgroundColor: tokens.colors.primaryContainer,
-    borderBottomRightRadius: 4,
+    borderBottomRightRadius: 6,
   },
   // Balão do Vito: M3 Surface Container High
   bubbleVito: {
     backgroundColor: tokens.colors.surfaceContainerHigh,
-    borderTopLeftRadius: 4,
+    borderTopLeftRadius: 6,
   },
   messageText: {
     fontSize: tokens.typography.size.bodyLarge,
-    lineHeight: tokens.typography.lineHeight.bodyLarge,
+    lineHeight: 23,
+    letterSpacing: -0.15,
   },
   messageTextUser: {
     color: tokens.colors.onPrimaryContainer,

@@ -12,9 +12,12 @@ import { useTheme } from '../../context/ThemeContext';
 
 export type ButtonVariant = 'filled' | 'elevated' | 'tonal' | 'outlined' | 'text';
 
+export type ButtonSize = 'sm' | 'md' | 'lg';
+
 export interface ButtonProps extends TouchableOpacityProps {
   label: string;
   variant?: ButtonVariant;
+  size?: ButtonSize;
   icon?: React.ReactNode;
   isLoading?: boolean;
 }
@@ -22,6 +25,7 @@ export interface ButtonProps extends TouchableOpacityProps {
 export const Button: React.FC<ButtonProps> = ({
   label,
   variant = 'filled',
+  size = 'md',
   icon,
   isLoading,
   disabled,
@@ -31,21 +35,44 @@ export const Button: React.FC<ButtonProps> = ({
   const { colors, tokens } = useTheme();
 
   const styles = useMemo(() => {
+    // Height & padding calibration by size
+    const heightMap: Record<ButtonSize, number> = {
+      sm: 36,
+      md: 44, // WCAG AA ergonomic mobile standard
+      lg: 50,
+    };
+    const paddingMap: Record<ButtonSize, number> = {
+      sm: tokens.spacing.md,
+      md: tokens.spacing.lg,
+      lg: tokens.spacing.xl,
+    };
+    const fontSizeMap: Record<ButtonSize, number> = {
+      sm: tokens.typography.size.labelMedium,
+      md: tokens.typography.size.labelLarge,
+      lg: tokens.typography.size.titleSmall,
+    };
+    const letterSpacingMap: Record<ButtonSize, number> = {
+      sm: 0.2,
+      md: 0.1,
+      lg: -0.1,
+    };
+
     // Base styles
     const baseContainer: ViewStyle = {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      height: 40,
-      paddingHorizontal: tokens.spacing.xl,
+      minHeight: heightMap[size],
+      paddingHorizontal: paddingMap[size],
       borderRadius: tokens.radii.full, // M3 default for most buttons
       gap: tokens.spacing.sm,
     };
 
     const baseText: TextStyle = {
-      fontFamily: tokens.typography.family.medium,
-      fontSize: tokens.typography.size.labelLarge,
-      lineHeight: tokens.typography.lineHeight.labelLarge,
+      fontFamily: tokens.typography.family.semibold,
+      fontSize: fontSizeMap[size],
+      lineHeight: fontSizeMap[size] + 6,
+      letterSpacing: letterSpacingMap[size],
     };
 
     let containerStyle: ViewStyle = { ...baseContainer };

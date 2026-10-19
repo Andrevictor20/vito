@@ -126,7 +126,8 @@ const styles = StyleSheet.create({
   title: {
     color: tokens.colors.onSurface,
     fontSize: tokens.typography.size.titleSmall,
-    fontWeight: tokens.typography.weight.medium,
+    fontWeight: tokens.typography.weight.semibold,
+    letterSpacing: -0.2,
   },
   titleCompleted: {
     textDecorationLine: 'line-through',
@@ -135,6 +136,7 @@ const styles = StyleSheet.create({
   subtitle: {
     color: tokens.colors.onSurfaceVariant,
     fontSize: tokens.typography.size.labelSmall,
+    letterSpacing: -0.05,
     marginTop: 1,
   },
   priorityBadge: {
@@ -145,6 +147,6 @@ const styles = StyleSheet.create({
   priorityBadgeText: {
     fontSize: 10,
     fontWeight: tokens.typography.weight.bold,
-    letterSpacing: 0.4,
+    letterSpacing: 0.6,
   },
 });
