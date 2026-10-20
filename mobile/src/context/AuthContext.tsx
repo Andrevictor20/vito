@@ -1,10 +1,11 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { AppState, type AppStateStatus } from 'react-native';
+import { AppState, Linking, type AppStateStatus } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { secureStorage } from '../services/secureStore';
 import { User } from '../types';
 import { api } from '../services/api';
 import { googleAuthService } from '../services/googleAuthService';
+import { parseGoogleOAuthCallback } from '../services/googleOAuthCallback';
 import { notificationService } from '../services/notificationService';
 
 
@@ -42,6 +43,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const bootstrap = async () => {
       try {
         await api.init();
+
+        // Deep link OAuth entregue por cold start: o app pode ter sido encerrado
+        // ou recriado enquanto o usuário concluía o consentimento no navegador.
+        try {
+          const initialCallback = parseGoogleOAuthCallback(await Linking.getInitialURL());
+          if (initialCallback?.kind === 'success') {
+            console.log('[AuthContext] Aplicando sessão do deep link OAuth de cold start.');
+            await api.setAuthTokens(
+              initialCallback.accessToken,
+              initialCallback.refreshToken ?? null,
+              initialCallback.sessionId ?? null
+            );
+            await secureStorage.setItem(USER_KEY, JSON.stringify(initialCallback.user));
+            setUser(initialCallback.user);
+          } else if (initialCallback?.kind === 'error') {
+            console.warn('[AuthContext] Deep link OAuth inicial retornou erro:', initialCallback.error);
+          }
+        } catch (deepLinkError) {
+          console.warn('[AuthContext] Falha ao processar deep link OAuth inicial:', deepLinkError);
+        }
+
         let token = api.getToken();
         const refreshToken = api.getRefreshToken();
 
@@ -107,6 +129,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     };
     bootstrap();
+  }, []);
+
+  // Rede de segurança para o fallback web do Google OAuth: o Android pode entregar
+  // o deep link `vito://oauth/callback?...` ao MainActivity antes (ou depois) de o
+  // `openAuthSessionAsync` resolver. Aplicar a sessão aqui garante que o app saia da
+  // tela de login mesmo se o serviço perder a corrida do redirect.
+  useEffect(() => {
+    let disposed = false;
+
+    const applyOAuthCallback = async (url: string | null) => {
+      const callback = parseGoogleOAuthCallback(url);
+      if (!callback || disposed) return;
+      if (callback.kind === 'error') {
+        console.warn('[AuthContext] Deep link OAuth retornou erro:', callback.error);
+        return;
+      }
+      if (callback.kind !== 'success') return;
+
+      try {
+        console.log('[AuthContext] Aplicando sessão do deep link OAuth em tempo real.');
+        await api.setAuthTokens(
+          callback.accessToken,
+          callback.refreshToken ?? null,
+          callback.sessionId ?? null
+        );
+        await secureStorage.setItem(USER_KEY, JSON.stringify(callback.user));
+        if (disposed) return;
+        setUser(callback.user);
+        notificationService.syncPushTokenWithBackend().catch(() => {});
+      } catch (error) {
+        console.warn('[AuthContext] Falha ao aplicar sessão do deep link OAuth:', error);
+      }
+    };
+
+    const subscription = Linking.addEventListener('url', (event) => {
+      void applyOAuthCallback(event.url);
+    });
+
+    return () => {
+      disposed = true;
+      subscription.remove();
+    };
   }, []);
 
   const login = async (email: string, pass: string) => {

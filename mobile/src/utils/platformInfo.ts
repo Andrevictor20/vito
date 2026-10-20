@@ -61,12 +61,18 @@ export const IN_APP_BROWSER_OPTIONS: Readonly<{
 };
 
 /**
- * Opções de navegador in-app com useProxyActivity: true para garantir
- * que o deep link (ex: vito://oauth/callback) seja interceptado confiavelmente no Android.
+ * Opções de navegador in-app com proxy activity para garantir que o deep link
+ * (ex: vito://oauth/callback) seja interceptado confiavelmente no Android.
  * DEVE ser usado em TODOS os fluxos de autenticação OAuth (login, calendar, gmail)
  * onde o app precisa receber o callback via deep link após o navegador fechar.
+ *
+ * `createTask: true` é obrigatório: o `CustomTabsActivitiesHelper` do expo-web-browser
+ * só respeita `useProxyActivity` quando `shouldCreateTask` é verdadeiro. Sem isso, a
+ * Custom Tab compartilha a task do app e o `singleTask` do MainActivity pode destruí-la
+ * antes de o redirect ser entregue ao JavaScript.
  */
 export const IN_APP_BROWSER_OPTIONS_WITH_PROXY: typeof IN_APP_BROWSER_OPTIONS = {
   ...IN_APP_BROWSER_OPTIONS,
+  createTask: true,
   useProxyActivity: true,
 };

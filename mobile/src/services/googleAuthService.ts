@@ -1,25 +1,23 @@
 import * as Linking from 'expo-linking';
 import { User } from '../types';
 import { getMobileDeviceName, IN_APP_BROWSER_OPTIONS, IN_APP_BROWSER_OPTIONS_WITH_PROXY } from '../utils/platformInfo';
+import {
+  isGoogleOAuthCallbackUrl,
+  parseGoogleOAuthCallback,
+  parseOAuthCallbackQuery,
+} from './googleOAuthCallback';
+import {
+  GoogleSignInCancelledError,
+  isCancelledSignInResult,
+  isConfigurationError,
+  isPlayServicesUnavailable,
+  isUserCancellation,
+  normalizeGoogleSignInErrorCode,
+} from './googleSignInErrors';
 
 export { getMobileDeviceName, IN_APP_BROWSER_OPTIONS, IN_APP_BROWSER_OPTIONS_WITH_PROXY };
 
 const GOOGLE_WEB_CLIENT_ID = '125131803371-im5dtmilhasug6spdhc50pr0ssb4l92b.apps.googleusercontent.com';
-
-// Mapeamento de códigos de erro conhecidos do Google Sign-In (valores numéricos da API nativa Android)
-const GOOGLE_SIGN_IN_ERROR_CODES: Record<number, string> = {
-  0: 'OK',
-  4: 'SIGN_IN_CANCELLED',
-  6: 'NETWORK_ERROR',
-  7: 'INTERNAL_ERROR',
-  8: 'IN_PROGRESS',
-  10: 'DEVELOPER_ERROR', // SHA-1 mismatch, package name mismatch, etc.
-  13: 'PLAY_SERVICES_NOT_AVAILABLE',
-  14: 'PLAY_SERVICES_VERSION_OUTDATED',
-  15: 'PLAY_SERVICES_DISABLED',
-  16: 'SIGN_IN_FAILED',
-  17: 'API_EXCEPTION',
-};
 
 // Carregamento defensivo do módulo nativo GoogleSignin (Google Play Services nativo One Tap)
 let GoogleSignin: any = null;
@@ -45,62 +43,6 @@ try {
   statusCodes = null;
 }
 
-/**
- * Normaliza códigos de erro do Google Sign-In para strings conhecidas.
- * Suporta tanto códigos string (statusCodes do módulo) quanto numéricos (API nativa Android).
- */
-function normalizeGoogleSignInErrorCode(err: any): string | null {
-  if (!err) return null;
-  
-  // Se já tem código string conhecido
-  const code = err?.code;
-  if (typeof code === 'string') {
-    return code;
-  }
-  
-  // Se é código numérico da API nativa
-  if (typeof code === 'number' && GOOGLE_SIGN_IN_ERROR_CODES[code]) {
-    return GOOGLE_SIGN_IN_ERROR_CODES[code];
-  }
-  
-  // Tenta extrair do message se contém padrão conhecido
-  const msg = err?.message || '';
-  if (msg.includes('DEVELOPER_ERROR') || msg.includes('10:')) return 'DEVELOPER_ERROR';
-  if (msg.includes('SIGN_IN_CANCELLED') || msg.includes('4:')) return 'SIGN_IN_CANCELLED';
-  if (msg.includes('PLAY_SERVICES_NOT_AVAILABLE') || msg.includes('13:')) return 'PLAY_SERVICES_NOT_AVAILABLE';
-  if (msg.includes('IN_PROGRESS') || msg.includes('8:')) return 'IN_PROGRESS';
-  if (msg.includes('NETWORK_ERROR') || msg.includes('6:')) return 'NETWORK_ERROR';
-  if (msg.includes('SIGN_IN_FAILED') || msg.includes('16:')) return 'SIGN_IN_FAILED';
-  
-  return null;
-}
-
-/**
- * Verifica se o erro é um cancelamento genuíno do usuário (não erro de configuração).
- */
-function isUserCancellation(err: any): boolean {
-  const code = normalizeGoogleSignInErrorCode(err);
-  return code === 'SIGN_IN_CANCELLED' || code === 'IN_PROGRESS';
-}
-
-/**
- * Verifica se o erro é de configuração (SHA-1, package name, etc.) - deve acionar fallback web.
- */
-function isConfigurationError(err: any): boolean {
-  const code = normalizeGoogleSignInErrorCode(err);
-  return code === 'DEVELOPER_ERROR' || code === 'SIGN_IN_FAILED' || code === 'API_EXCEPTION';
-}
-
-/**
- * Verifica se o erro é de indisponibilidade do Play Services - deve acionar fallback web.
- */
-function isPlayServicesUnavailable(err: any): boolean {
-  const code = normalizeGoogleSignInErrorCode(err);
-  return code === 'PLAY_SERVICES_NOT_AVAILABLE' || 
-         code === 'PLAY_SERVICES_VERSION_OUTDATED' || 
-         code === 'PLAY_SERVICES_DISABLED';
-}
-
 // Carregamento defensivo do módulo nativo WebBrowser para fallback de autenticação web
 let WebBrowser: any = null;
 try {
@@ -112,6 +54,135 @@ try {
 } catch (e) {
   console.warn('[googleAuthService] expo-web-browser não disponível neste runtime:', e);
   WebBrowser = null;
+}
+
+// Janela de tolerância no Android: o `openAuthSessionAsync` resolve { type: 'dismiss' }
+// assim que o app volta a ficar ativo, potencialmente antes de o evento de deep link
+// ser despachado pelo sistema para o Linking.
+const OAUTH_REDIRECT_GRACE_MS = 2000;
+
+interface OAuthBrowserFlowMessages {
+  label: string;
+  cancel: string;
+  failure: string;
+}
+
+function waitForRedirectGracePeriod(): Promise<null> {
+  return new Promise((resolve) => {
+    setTimeout(() => resolve(null), OAUTH_REDIRECT_GRACE_MS);
+  });
+}
+
+function matchesOAuthRedirect(candidate: string, redirectUrl: string): boolean {
+  const expected = redirectUrl.replace(/\/+$/, '');
+  const withoutHash = candidate.split('#')[0];
+  if (
+    withoutHash === expected ||
+    withoutHash.startsWith(`${expected}?`) ||
+    withoutHash.startsWith(`${expected}/?`)
+  ) {
+    return true;
+  }
+  // O Android pode normalizar o scheme/URL do deep link; o path canônico
+  // /oauth/callback é o discriminante confiável.
+  return isGoogleOAuthCallbackUrl(candidate);
+}
+
+/**
+ * Abre o navegador in-app e aguarda o callback OAuth por duas vias simultâneas:
+ * 1. o retorno do `openAuthSessionAsync` (quando o expo-web-browser consegue
+ *    capturar o redirect dentro da própria Custom Tab);
+ * 2. o listener de `Linking` (quando o Android entrega o deep link ao MainActivity).
+ *
+ * A corrida evita a perda do callback quando o app volta a ficar ativo antes de
+ * o evento de URL ser despachado, incluindo uma pequena janela de tolerância
+ * após `dismiss`/`cancel`.
+ */
+async function openOAuthBrowserAndWait(
+  authStartUrl: string,
+  redirectUrl: string,
+  browserOptions: Record<string, unknown>,
+  messages: OAuthBrowserFlowMessages
+): Promise<string> {
+  if (WebBrowser === null || typeof WebBrowser.openAuthSessionAsync !== 'function') {
+    throw new Error('Esta versão do aplicativo não suporta a autenticação com Google.');
+  }
+
+  let resolveRedirect: ((url: string) => void) | null = null;
+  const redirectPromise = new Promise<string>((resolve) => {
+    resolveRedirect = resolve;
+  });
+
+  const deliverRedirect = (url: string | null | undefined) => {
+    if (!url || !resolveRedirect || !matchesOAuthRedirect(url, redirectUrl)) return;
+    const resolve = resolveRedirect;
+    resolveRedirect = null;
+    resolve(url);
+  };
+
+  const subscription = Linking.addEventListener('url', (event: { url: string }) => {
+    deliverRedirect(event.url);
+  });
+
+  try {
+    console.log(`[googleAuthService] Abrindo navegador OAuth (${messages.label})`);
+    console.log(`[googleAuthService] URL de início (${messages.label}):`, authStartUrl);
+    console.log(`[googleAuthService] Redirect esperado (${messages.label}):`, redirectUrl);
+
+    const browserOutcome = WebBrowser.openAuthSessionAsync(
+      authStartUrl,
+      redirectUrl,
+      browserOptions
+    )
+      .then((result: any) => ({ source: 'browser' as const, result }))
+      .catch((error: unknown) => ({ source: 'browser-error' as const, error }));
+
+    const firstOutcome = await Promise.race([
+      browserOutcome,
+      redirectPromise.then((url) => ({ source: 'redirect' as const, url })),
+    ]);
+
+    if (firstOutcome.source === 'redirect') {
+      // O deep link chegou antes do WebBrowser concluir: fecha a aba para não
+      // deixar uma Custom Tab órfã na frente do app.
+      try {
+        await WebBrowser.dismissBrowser?.();
+      } catch {}
+      console.log(`[googleAuthService] Callback capturado via Linking (${messages.label})`);
+      return firstOutcome.url;
+    }
+
+    if (firstOutcome.source === 'browser-error') {
+      console.warn(`[googleAuthService] Navegador falhou (${messages.label}):`, firstOutcome.error);
+      throw firstOutcome.error;
+    }
+
+    const result = firstOutcome.result;
+    console.log(
+      `[googleAuthService] Resultado do navegador (${messages.label}):`,
+      JSON.stringify(result)
+    );
+
+    if (result?.type === 'success' && typeof result.url === 'string') {
+      return result.url;
+    }
+
+    if (result?.type === 'cancel' || result?.type === 'dismiss') {
+      // No Android, o app pode voltar a ficar ativo antes do evento de URL.
+      const lateRedirect = await Promise.race([redirectPromise, waitForRedirectGracePeriod()]);
+      if (lateRedirect) {
+        console.log(
+          `[googleAuthService] Callback capturado na janela de tolerância (${messages.label})`
+        );
+        return lateRedirect;
+      }
+      throw new Error(messages.cancel);
+    }
+
+    throw new Error(messages.failure);
+  } finally {
+    subscription.remove();
+  }
 }
 
 export interface GoogleLoginResult {
@@ -157,6 +228,13 @@ export const googleAuthService = {
         console.log('[googleAuthService] Google Play Services disponível, iniciando signIn...');
         const signinResult = await GoogleSignin.signIn();
         console.log('[googleAuthService] signIn resultado:', JSON.stringify(signinResult));
+
+        // v16 do módulo retorna { type: 'cancelled' } ao fechar o seletor de contas,
+        // sem lançar exceção. Tratar aqui evita o falso erro de "SHA-1" e o fallback web indevido.
+        if (isCancelledSignInResult(signinResult)) {
+          console.log('[googleAuthService] Usuário fechou o seletor de contas do Google (type=cancelled)');
+          throw new GoogleSignInCancelledError();
+        }
 
         const idToken = signinResult?.data?.idToken || signinResult?.idToken;
         if (idToken) {
@@ -210,7 +288,7 @@ export const googleAuthService = {
         // Erros de cancelamento genuíno do usuário: propaga para a UI tratar silenciosamente
         if (isUserCancellation(err)) {
           console.log('[googleAuthService] Usuário cancelou o login nativo');
-          throw new Error('Login com Google cancelado.');
+          throw new GoogleSignInCancelledError();
         }
 
         // Erros de configuração (SHA-1 mismatch, package name, etc.): loga claramente e aciona fallback web
@@ -255,7 +333,7 @@ export const googleAuthService = {
       console.warn('[googleAuthService] GoogleSignin não disponível ou hasPlayServices não é função, pulando para fallback web');
     }
 
-    // 2. Fallback Web Seguro com Custom Tabs integrado (useProxyActivity: true)
+    // 2. Fallback Web Seguro com Custom Tabs integrado (proxy activity + task própria)
     if (WebBrowser === null || typeof WebBrowser.openAuthSessionAsync !== 'function') {
       throw new Error('A autenticação com Google requer a versão mais recente do aplicativo.');
     }
@@ -265,55 +343,39 @@ export const googleAuthService = {
     const redirectUrl = Linking.createURL('oauth/callback');
     const authStartUrl = `${serverUrl.replace(/\/+$/, '')}/api/v1/auth/google/start?mode=login&redirect_scheme=${encodeURIComponent(redirectUrl)}&device_name=${encodeURIComponent(deviceName)}`;
 
-    // Para o deep link de retorno funcionar confiavelmente após o redirecionamento OAuth,
-    // o Android precisa usar a activity de proxy do expo-web-browser
-    const webBrowserOptions = IN_APP_BROWSER_OPTIONS_WITH_PROXY;
-
-    console.log('[googleAuthService] Abrindo WebBrowser com URL:', authStartUrl);
-    console.log('[googleAuthService] Redirect URL:', redirectUrl);
-    console.log('[googleAuthService] Opções do WebBrowser:', JSON.stringify(webBrowserOptions));
-
-    const result = await WebBrowser.openAuthSessionAsync(authStartUrl, redirectUrl, webBrowserOptions);
-
-    console.log('[googleAuthService] WebBrowser resultado:', JSON.stringify(result));
-
-    if (result.type !== 'success') {
-      if (result.type === 'cancel' || result.type === 'dismiss') {
-        console.log('[googleAuthService] Usuário cancelou/fechou o navegador web');
-        throw new Error('Login com Google cancelado.');
+    const callbackUrl = await openOAuthBrowserAndWait(
+      authStartUrl,
+      redirectUrl,
+      IN_APP_BROWSER_OPTIONS_WITH_PROXY,
+      {
+        label: 'login',
+        cancel: 'Login com Google cancelado.',
+        failure: 'Falha ao abrir autenticação Google.',
       }
-      console.error('[googleAuthService] WebBrowser falhou:', result);
-      throw new Error('Falha ao abrir autenticação Google.');
-    }
+    );
 
-    const { url } = result;
-    const parsed = Linking.parse(url);
-    const query = parsed.queryParams || {};
-
-    if (query.error) {
-      console.error('[googleAuthService] Google retornou erro no callback:', query.error);
-      throw new Error(`Google retornou erro: ${query.error}`);
-    }
-
-    const token = ((query.access_token as string) || (query.token as string)) || '';
-    const accessToken = token;
-    const refreshToken = (query.refresh_token as string) || undefined;
-    const sessionId = (query.session_id as string) || undefined;
-    const userStr = query.user as string;
-
-    if (!token || !userStr) {
-      console.error('[googleAuthService] Resposta de autenticação incompleta:', { token, userStr, query });
+    const callback = parseGoogleOAuthCallback(callbackUrl);
+    if (!callback) {
+      console.error('[googleAuthService] URL de callback não reconhecida:', callbackUrl);
       throw new Error('Resposta de autenticação Google incompleta.');
     }
-
-    try {
-      const user = JSON.parse(decodeURIComponent(userStr)) as User;
-      console.log('[googleAuthService] Login via fallback web bem-sucedido para:', user.email);
-      return { token, accessToken, refreshToken, sessionId, user };
-    } catch {
-      console.error('[googleAuthService] Falha ao parsear usuário do callback');
-      throw new Error('Falha ao processar dados de usuário do Google.');
+    if (callback.kind === 'error') {
+      console.error('[googleAuthService] Google retornou erro no callback:', callback.error);
+      throw new Error(`Google retornou erro: ${callback.error}`);
     }
+    if (callback.kind === 'invalid') {
+      console.error('[googleAuthService] Callback OAuth inválido:', callback.reason);
+      throw new Error(callback.reason);
+    }
+
+    console.log('[googleAuthService] Login via fallback web bem-sucedido para:', callback.user.email);
+    return {
+      token: callback.accessToken,
+      accessToken: callback.accessToken,
+      refreshToken: callback.refreshToken,
+      sessionId: callback.sessionId,
+      user: callback.user,
+    };
   },
 
   /**
@@ -327,26 +389,25 @@ export const googleAuthService = {
     const redirectUrl = Linking.createURL('oauth/callback');
     const authStartUrl = `${serverUrl.replace(/\/+$/, '')}/api/v1/auth/google/start?mode=calendar&token=${encodeURIComponent(jwtToken)}&redirect_scheme=${encodeURIComponent(redirectUrl)}`;
 
-    // useProxyActivity: true garante interceptação confiável do deep link no Android
-    const result = await WebBrowser.openAuthSessionAsync(authStartUrl, redirectUrl, IN_APP_BROWSER_OPTIONS_WITH_PROXY);
-
-    if (result.type !== 'success') {
-      if (result.type === 'cancel' || result.type === 'dismiss') {
-        throw new Error('Conexão com Google Calendar cancelada.');
+    const callbackUrl = await openOAuthBrowserAndWait(
+      authStartUrl,
+      redirectUrl,
+      IN_APP_BROWSER_OPTIONS_WITH_PROXY,
+      {
+        label: 'calendar',
+        cancel: 'Conexão com Google Calendar cancelada.',
+        failure: 'Falha ao conectar com o Google Calendar.',
       }
-      throw new Error('Falha ao conectar com o Google Calendar.');
-    }
+    );
 
-    const { url } = result;
-    const parsed = Linking.parse(url);
-    const query = parsed.queryParams || {};
+    const query = parseOAuthCallbackQuery(callbackUrl) || {};
 
     if (query.error) {
       throw new Error(`Permissão de calendário negada ou erro: ${query.error}`);
     }
 
-    const status = (query.status as string) || 'success';
-    const email = decodeURIComponent((query.email as string) || '');
+    const status = query.status || 'success';
+    const email = query.email || '';
 
     return { status, email };
   },
@@ -362,26 +423,25 @@ export const googleAuthService = {
     const redirectUrl = Linking.createURL('oauth/callback');
     const authStartUrl = `${serverUrl.replace(/\/+$/, '')}/api/v1/auth/google/start?mode=gmail&token=${encodeURIComponent(jwtToken)}&redirect_scheme=${encodeURIComponent(redirectUrl)}`;
 
-    // useProxyActivity: true garante interceptação confiável do deep link no Android
-    const result = await WebBrowser.openAuthSessionAsync(authStartUrl, redirectUrl, IN_APP_BROWSER_OPTIONS_WITH_PROXY);
-
-    if (result.type !== 'success') {
-      if (result.type === 'cancel' || result.type === 'dismiss') {
-        throw new Error('Conexão com Gmail cancelada.');
+    const callbackUrl = await openOAuthBrowserAndWait(
+      authStartUrl,
+      redirectUrl,
+      IN_APP_BROWSER_OPTIONS_WITH_PROXY,
+      {
+        label: 'gmail',
+        cancel: 'Conexão com Gmail cancelada.',
+        failure: 'Falha ao conectar com o Gmail.',
       }
-      throw new Error('Falha ao conectar com o Gmail.');
-    }
+    );
 
-    const { url } = result;
-    const parsed = Linking.parse(url);
-    const query = parsed.queryParams || {};
+    const query = parseOAuthCallbackQuery(callbackUrl) || {};
 
     if (query.error) {
       throw new Error(`Permissão do Gmail negada ou erro: ${query.error}`);
     }
 
-    const status = (query.status as string) || 'success';
-    const email = decodeURIComponent((query.email as string) || '');
+    const status = query.status || 'success';
+    const email = query.email || '';
 
     return { status, email };
   },
