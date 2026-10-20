@@ -150,3 +150,52 @@ func (h *GoogleAuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 
 	http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
 }
+
+type nativeGoogleAuthRequest struct {
+	IDToken    string `json:"id_token"`
+	DeviceName string `json:"device_name"`
+}
+
+// NativeAuth processa a autenticação nativa do Google no mobile via ID Token do Google Play Services.
+func (h *GoogleAuthHandler) NativeAuth(w http.ResponseWriter, r *http.Request) {
+	var req nativeGoogleAuthRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error":"payload JSON inválido"}`, http.StatusBadRequest)
+		return
+	}
+
+	if strings.TrimSpace(req.IDToken) == "" {
+		http.Error(w, `{"error":"id_token é obrigatório"}`, http.StatusBadRequest)
+		return
+	}
+
+	deviceName := strings.TrimSpace(req.DeviceName)
+	if deviceName == "" {
+		deviceName = r.Header.Get("X-Device-Name")
+	}
+	if deviceName == "" {
+		deviceName = r.UserAgent()
+	}
+	if deviceName == "" {
+		deviceName = "Vito Mobile (Android)"
+	}
+
+	ipAddress := r.RemoteAddr
+	if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
+		ipAddress = strings.Split(forwarded, ",")[0]
+	}
+
+	tokens, user, err := h.googleAuthSvc.AuthenticateNativeIDToken(r.Context(), req.IDToken, deviceName, ipAddress)
+	if err != nil {
+		http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusUnauthorized)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"data": map[string]interface{}{
+			"user":       user,
+			"token_pair": tokens,
+		},
+	})
+}

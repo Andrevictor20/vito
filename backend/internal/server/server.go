@@ -197,6 +197,7 @@ func (s *Server) registerRoutes() {
 		if s.googleAuthHandler != nil {
 			r.Get("/auth/google/start", s.googleAuthHandler.Start)
 			r.Get("/auth/google/callback", s.googleAuthHandler.Callback)
+			r.Post("/auth/google/native", s.googleAuthHandler.NativeAuth)
 		}
 
 		if s.p2pHandler != nil {

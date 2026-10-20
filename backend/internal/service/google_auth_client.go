@@ -6,11 +6,16 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
+
+	"github.com/andrevmp/vito/backend/internal/domain"
+	"github.com/google/uuid"
 )
 
 // GoogleTokenResponse modela a resposta do endpoint de token do Google.
@@ -89,8 +94,110 @@ func (s *GoogleAuthService) fetchUserInfo(ctx context.Context, accessToken strin
 	return &userInfo, nil
 }
 
+// ValidateGoogleIDToken valida o id_token recebido do Google Play Services via endpoint tokeninfo da Google.
+func (s *GoogleAuthService) ValidateGoogleIDToken(ctx context.Context, idToken string) (*GoogleUserInfo, error) {
+	cleanToken := strings.TrimSpace(idToken)
+	if cleanToken == "" {
+		return nil, fmt.Errorf("id_token não pode ser vazio")
+	}
+
+	tokenInfoBase := s.cfg.TokenInfoURL
+	if tokenInfoBase == "" {
+		tokenInfoBase = "https://oauth2.googleapis.com/tokeninfo"
+	}
+
+	sep := "?"
+	if strings.Contains(tokenInfoBase, "?") {
+		sep = "&"
+	}
+	urlStr := fmt.Sprintf("%s%sid_token=%s", tokenInfoBase, sep, url.QueryEscape(cleanToken))
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, urlStr, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("falha ao validar id_token com o Google: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("Google tokeninfo retornou status %d: %s", resp.StatusCode, strings.TrimSpace(string(bodyBytes)))
+	}
+
+	var parsed struct {
+		Sub           string `json:"sub"`
+		Email         string `json:"email"`
+		EmailVerified string `json:"email_verified"`
+		Name          string `json:"name"`
+		Picture       string `json:"picture"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&parsed); err != nil {
+		return nil, fmt.Errorf("falha ao decodificar resposta do Google tokeninfo: %w", err)
+	}
+
+	if parsed.Email == "" {
+		return nil, fmt.Errorf("token do Google não retornou e-mail válido")
+	}
+
+	return &GoogleUserInfo{
+		Sub:     parsed.Sub,
+		Email:   parsed.Email,
+		Name:    parsed.Name,
+		Picture: parsed.Picture,
+	}, nil
+}
+
 func (s *GoogleAuthService) signHMAC(payload string) string {
 	mac := hmac.New(sha256.New, []byte(s.cfg.JWTSecret))
 	mac.Write([]byte(payload))
 	return hex.EncodeToString(mac.Sum(nil))
+}
+
+// AuthenticateNativeIDToken valida o id_token recebido do Google Play Services no Android
+// e emite uma sessão Dual Token com o dispositivo identificado.
+func (s *GoogleAuthService) AuthenticateNativeIDToken(ctx context.Context, idToken, deviceName, ipAddress string) (*TokenPair, *domain.User, error) {
+	if s.userRepo == nil || s.authSvc == nil {
+		return nil, nil, errors.New("repositório de usuários ou serviço de auth não configurado")
+	}
+
+	userInfo, err := s.ValidateGoogleIDToken(ctx, idToken)
+	if err != nil {
+		return nil, nil, fmt.Errorf("id_token inválido: %w", err)
+	}
+
+	user, err := s.userRepo.GetByEmail(userInfo.Email)
+	if err != nil {
+		if errors.Is(err, domain.ErrUserNotFound) {
+			now := time.Now().UTC()
+			user = &domain.User{
+				ID:           uuid.New().String(),
+				Name:         userInfo.Name,
+				Email:        userInfo.Email,
+				PasswordHash: "oauth:google_native",
+				CreatedAt:    now,
+				UpdatedAt:    now,
+			}
+			if err := s.userRepo.Create(user); err != nil {
+				return nil, nil, fmt.Errorf("falha ao criar novo usuário via Google Nativo: %w", err)
+			}
+		} else {
+			return nil, nil, fmt.Errorf("erro ao consultar usuário por email: %w", err)
+		}
+	}
+
+	cleanDevice := strings.TrimSpace(deviceName)
+	if cleanDevice == "" {
+		cleanDevice = "Vito Mobile (Android)"
+	}
+
+	pair, err := s.authSvc.IssueSessionForUser(user, cleanDevice, ipAddress)
+	if err != nil {
+		return nil, nil, fmt.Errorf("falha ao emitir sessão de login: %w", err)
+	}
+
+	return pair, user, nil
 }

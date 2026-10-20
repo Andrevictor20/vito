@@ -4,7 +4,28 @@ import { getMobileDeviceName, IN_APP_BROWSER_OPTIONS } from '../utils/platformIn
 
 export { getMobileDeviceName, IN_APP_BROWSER_OPTIONS };
 
-// Carregamento defensivo do módulo nativo WebBrowser para evitar crash no bootstrap caso o binário nativo não esteja presente
+const GOOGLE_WEB_CLIENT_ID = '125131803371-im5dtmilhasug6spdhc50pr0ssb4l92b.apps.googleusercontent.com';
+
+// Carregamento defensivo do módulo nativo GoogleSignin (Google Play Services nativo One Tap)
+let GoogleSignin: any = null;
+let statusCodes: any = null;
+try {
+  const gModule = require('@react-native-google-signin/google-signin');
+  GoogleSignin = gModule.GoogleSignin;
+  statusCodes = gModule.statusCodes;
+  if (GoogleSignin && typeof GoogleSignin.configure === 'function') {
+    GoogleSignin.configure({
+      webClientId: GOOGLE_WEB_CLIENT_ID,
+      offlineAccess: true,
+      forceCodeForRefreshToken: true,
+    });
+  }
+} catch (e) {
+  GoogleSignin = null;
+  statusCodes = null;
+}
+
+// Carregamento defensivo do módulo nativo WebBrowser para fallback de autenticação web
 let WebBrowser: any = null;
 try {
   WebBrowser = require('expo-web-browser');
@@ -36,18 +57,68 @@ export interface GmailConnectResult {
 
 export const googleAuthService = {
   isAvailable(): boolean {
-    return WebBrowser !== null && typeof WebBrowser.openAuthSessionAsync === 'function';
+    const hasNative = GoogleSignin !== null && typeof GoogleSignin.signIn === 'function';
+    const hasWeb = WebBrowser !== null && typeof WebBrowser.openAuthSessionAsync === 'function';
+    return hasNative || hasWeb;
   },
 
   /**
-   * Inicia o fluxo de Login / Cadastro via Google OAuth2 integrado no app.
+   * Inicia o fluxo de Login / Cadastro via Google OAuth2.
+   * Prioriza o Google Play Services nativo (sem navegador).
+   * Caso o módulo nativo não esteja presente ou ocorra erro de Play Services,
+   * aciona o fallback resiliente com Custom Tabs integrado.
    */
   async loginWithGoogle(serverUrl: string): Promise<GoogleLoginResult> {
-    if (!this.isAvailable()) {
-      throw new Error('A autenticação com Google requer a versão mais recente do aplicativo. Por favor, atualize o APK.');
+    const deviceName = getMobileDeviceName();
+
+    // 1. Tenta fluxo nativo do Google Play Services (One Tap nativo sem abrir navegador)
+    if (GoogleSignin && typeof GoogleSignin.hasPlayServices === 'function') {
+      try {
+        await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+        const signinResult = await GoogleSignin.signIn();
+
+        const idToken = signinResult?.data?.idToken || signinResult?.idToken;
+        if (idToken) {
+          const resp = await fetch(`${serverUrl.replace(/\/+$/, '')}/api/v1/auth/google/native`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              id_token: idToken,
+              device_name: deviceName,
+            }),
+          });
+
+          if (resp.ok) {
+            const json = await resp.json();
+            const pair = json.data?.token_pair;
+            const user = json.data?.user;
+            if (pair?.access_token && user) {
+              return {
+                token: pair.access_token,
+                accessToken: pair.access_token,
+                refreshToken: pair.refresh_token,
+                sessionId: pair.session_id,
+                user,
+              };
+            }
+          }
+        }
+      } catch (err: any) {
+        if (err?.code === statusCodes?.SIGN_IN_CANCELLED) {
+          throw new Error('Login com Google cancelado.');
+        }
+        if (err?.code === statusCodes?.IN_PROGRESS) {
+          throw new Error('Login com Google já em andamento.');
+        }
+        console.warn('[googleAuthService] Google Sign-in nativo falhou, acionando fallback web seguro:', err?.message || err);
+      }
     }
 
-    const deviceName = getMobileDeviceName();
+    // 2. Fallback Web Seguro com Custom Tabs integrado
+    if (WebBrowser === null || typeof WebBrowser.openAuthSessionAsync !== 'function') {
+      throw new Error('A autenticação com Google requer a versão mais recente do aplicativo.');
+    }
+
     const redirectUrl = Linking.createURL('oauth/callback');
     const authStartUrl = `${serverUrl.replace(/\/+$/, '')}/api/v1/auth/google/start?mode=login&redirect_scheme=${encodeURIComponent(redirectUrl)}&device_name=${encodeURIComponent(deviceName)}`;
 
@@ -90,8 +161,8 @@ export const googleAuthService = {
    * Inicia o fluxo de concessão de permissão e vinculação do Google Calendar.
    */
   async connectGoogleCalendar(serverUrl: string, jwtToken: string): Promise<GoogleCalendarConnectResult> {
-    if (!this.isAvailable()) {
-      throw new Error('A sincronização com Google Calendar requer a versão mais recente do aplicativo. Por favor, atualize o APK.');
+    if (WebBrowser === null || typeof WebBrowser.openAuthSessionAsync !== 'function') {
+      throw new Error('A sincronização com Google Calendar requer a versão mais recente do aplicativo.');
     }
 
     const redirectUrl = Linking.createURL('oauth/callback');
@@ -124,7 +195,7 @@ export const googleAuthService = {
    * Inicia o fluxo de concessão de permissão incremental e vinculação do Gmail.
    */
   async connectGmail(serverUrl: string, jwtToken: string): Promise<GmailConnectResult> {
-    if (!this.isAvailable()) {
+    if (WebBrowser === null || typeof WebBrowser.openAuthSessionAsync !== 'function') {
       throw new Error('A integração com Gmail requer a versão mais recente do aplicativo.');
     }
 

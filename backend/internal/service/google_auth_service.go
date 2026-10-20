@@ -35,6 +35,7 @@ type GoogleAuthConfig struct {
 	AuthURL        string
 	TokenURL       string
 	UserInfoURL    string
+	TokenInfoURL   string
 	AllowedOrigins []string
 	HTTPClient     *http.Client
 }
