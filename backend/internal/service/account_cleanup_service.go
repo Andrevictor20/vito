@@ -73,8 +73,19 @@ func (s *AccountCleanupService) hasActiveSession(ctx context.Context, userID str
 	return len(sessions) > 0
 }
 
+// ActiveSessionsForUser expõe se a conta ainda tem sessão ativa (usado em diagnósticos).
+func (s *AccountCleanupService) ActiveSessionsForUser(ctx context.Context, userID string) bool {
+	return s.hasActiveSession(ctx, userID)
+}
+
 // PurgeOrphanPlaceholderAccounts remove as contas placeholder abandonadas e devolve
 // o número de telefone ao seu dono real. Retorna quantas contas foram removidas.
+//
+// Critério: conta @vito.local **sem nenhum dado do usuário** (eventos, tarefas ou memórias).
+// Sessões ativas não impedem a remoção: o login por WhatsApp para contas placeholder foi
+// desativado, ou seja, elas estão inacessíveis — mantê-las apenas retém o número de
+// telefone de terceiros (constraint UNIQUE em users.phone). As sessões são removidas em
+// cascata pelo próprio banco (FOREIGN KEY user_id ON DELETE CASCADE).
 func (s *AccountCleanupService) PurgeOrphanPlaceholderAccounts(ctx context.Context) (int, error) {
 	if s.userRepo == nil {
 		return 0, nil
@@ -89,9 +100,6 @@ func (s *AccountCleanupService) PurgeOrphanPlaceholderAccounts(ctx context.Conte
 	for i := range users {
 		u := users[i]
 		if u.ID == "" || !isPlaceholderEmail(u.Email) {
-			continue
-		}
-		if s.hasActiveSession(ctx, u.ID) {
 			continue
 		}
 		if s.hasUserData(ctx, u.ID) {

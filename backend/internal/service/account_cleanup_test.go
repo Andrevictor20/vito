@@ -91,14 +91,19 @@ func TestAccountCleanup_PurgesOnlyOrphanPlaceholders(t *testing.T) {
 	if err != nil {
 		t.Fatalf("falha na limpeza: %v", err)
 	}
-	if purged != 1 {
-		t.Fatalf("esperava 1 conta removida, obteve %d", purged)
+	// A conta órfã e a conta placeholder com sessão (inacessível, sem dados) são removidas;
+	// a conta com dados e a conta real são preservadas.
+	if purged != 2 {
+		t.Fatalf("esperava 2 contas removidas, obteve %d", purged)
 	}
 
 	if _, err := userRepo.GetByID(orphan.ID); err == nil {
 		t.Error("conta placeholder órfã deveria ter sido removida")
 	}
-	for _, id := range []string{withSession.ID, withData.ID, real.ID} {
+	if _, err := userRepo.GetByID(withSession.ID); err == nil {
+		t.Error("conta placeholder sem dados e sem porta de entrada deveria ter sido removida")
+	}
+	for _, id := range []string{withData.ID, real.ID} {
 		if _, err := userRepo.GetByID(id); err != nil {
 			t.Errorf("conta %s deveria ter sido preservada: %v", id, err)
 		}
