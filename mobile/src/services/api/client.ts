@@ -50,6 +50,17 @@ export function isJwtExpiringSoon(token: string | null, marginSeconds = 120): bo
   }
 }
 
+// Valores de sessão corrompidos (ex.: a string "undefined" persistida por um payload inválido).
+function isCorruptedSessionValue(value: string): boolean {
+  return value === 'undefined' || value === 'null' || value.trim() === '';
+}
+
+// Access token do backend é um JWT (3 segmentos separados por ponto).
+function isJwtLikeToken(token: string): boolean {
+  if (isCorruptedSessionValue(token)) return false;
+  return token.split('.').length === 3;
+}
+
 export class ApiClient {
   protected baseUrl: string = DEFAULT_SERVER_URL;
   protected token: string | null = null;
@@ -72,6 +83,23 @@ export class ApiClient {
     this.token = await secureStorage.getItem(TOKEN_KEY);
     this.refreshToken = await secureStorage.getItem(REFRESH_TOKEN_KEY);
     this.sessionId = await secureStorage.getItem(SESSION_ID_KEY);
+
+    // Saneamento de sessão corrompida: payloads inválidos gravavam a string "undefined"
+    // no storage, o que deixava o app travado em loading até o usuário limpar o cache.
+    if (this.token && !isJwtLikeToken(this.token)) {
+      console.warn('[api] Token de acesso corrompido, descartando.');
+      this.token = null;
+      await secureStorage.removeItem(TOKEN_KEY);
+    }
+    if (this.refreshToken && isCorruptedSessionValue(this.refreshToken)) {
+      console.warn('[api] Refresh token corrompido, descartando.');
+      this.refreshToken = null;
+      await secureStorage.removeItem(REFRESH_TOKEN_KEY);
+    }
+    if (this.sessionId && isCorruptedSessionValue(this.sessionId)) {
+      this.sessionId = null;
+      await secureStorage.removeItem(SESSION_ID_KEY);
+    }
   }
 
   getBaseUrl(): string {

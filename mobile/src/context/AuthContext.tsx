@@ -77,18 +77,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         const cachedUser = await secureStorage.getItem(USER_KEY);
-        if (cachedUser && (token || refreshToken)) {
+        if (cachedUser) {
+          let parsedUser: any = null;
+          let cacheIsValid = false;
           try {
-            const parsed = JSON.parse(cachedUser);
-            if (parsed && parsed.id) {
-              setUser(parsed);
-              setIsInitialLoading(false);
-            }
-          } catch {}
-        } else if (cachedUser && !token && !refreshToken) {
-          console.warn('[AuthContext] Usuário em cache sem token válido. Limpando sessão inconsistente.');
-          await secureStorage.removeItem(USER_KEY);
-          setUser(null);
+            parsedUser = JSON.parse(cachedUser);
+            cacheIsValid = !!parsedUser && !!parsedUser.id;
+          } catch {
+            cacheIsValid = false;
+          }
+
+          if (!cacheIsValid) {
+            // Cache corrompido (ex.: a string "undefined" gravada por um payload inválido):
+            // descarta sozinho, sem exigir que o usuário limpe o cache do aplicativo.
+            console.warn('[AuthContext] Cache de usuário corrompido, descartando.');
+            await secureStorage.removeItem(USER_KEY);
+            setUser(null);
+          } else if (token || refreshToken) {
+            setUser(parsedUser);
+            setIsInitialLoading(false);
+          } else {
+            console.warn('[AuthContext] Usuário em cache sem token válido. Limpando sessão inconsistente.');
+            await secureStorage.removeItem(USER_KEY);
+            setUser(null);
+          }
         }
 
         // Validação ou atualização silenciosa do perfil em background se houver token ou refresh token
@@ -218,6 +230,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(true);
     try {
       const res = await api.verifyWhatsAppOTP(phone, code);
+      // Guardrail: nunca persistir usuário ausente/inválido (gravava "undefined" no storage
+      // e deixava o app travado em loading até o usuário limpar o cache).
+      if (!res?.user?.id) {
+        throw new Error('Login do WhatsApp não devolveu o usuário. Tente novamente.');
+      }
       setUser(res.user);
       await secureStorage.setItem(USER_KEY, JSON.stringify(res.user));
       notificationService.syncPushTokenWithBackend().catch(() => {});
