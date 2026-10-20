@@ -1,0 +1,71 @@
+# Exclusões para o empacotamento do EAS Build local
+# Baseado no .gitignore, mas mantendo arquivos locais essenciais para o build do Android
+
+# Ambientes & Segredos
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.cert
+*firebase-adminsdk*.json
+
+# Dependências
+node_modules/
+.pnpm-store/
+vendor/
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+*.egg-info/
+
+# Builds e Caches
+dist/
+build/
+apk/
+target/
+out/
+.next/
+.nuxt/
+bin/
+obj/
+*.o
+*.so
+*.exe
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+coverage/
+.turbo/
+.cache/
+.repo_map_cache.json
+.memory_index.db
+.session_state.json
+.expo/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+backend/data/
+
+# Logs
+*.log
+*.tmp
+*.bak
+*.swp
+*~
+*.zip
+scratch/
+
+# IDEs
+.vscode/
+.idea/
+.agents/
+
+# Permite explicitamente o google-services.json local no build
+!google-services.json
+!mobile/google-services.json
