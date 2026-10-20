@@ -97,12 +97,15 @@ func (s *AccountCleanupService) PurgeOrphanPlaceholderAccounts(ctx context.Conte
 	}
 
 	purged := 0
+	placeholders := 0
 	for i := range users {
 		u := users[i]
 		if u.ID == "" || !isPlaceholderEmail(u.Email) {
 			continue
 		}
+		placeholders++
 		if s.hasUserData(ctx, u.ID) {
+			log.Printf("[account-cleanup] conta placeholder %s (%s) preservada: possui dados do usuário", u.ID, u.Email)
 			continue
 		}
 		if err := s.userRepo.Delete(u.ID); err != nil {
@@ -111,6 +114,10 @@ func (s *AccountCleanupService) PurgeOrphanPlaceholderAccounts(ctx context.Conte
 		}
 		purged++
 		log.Printf("[account-cleanup] conta placeholder órfã removida: %s (%s)", u.ID, u.Email)
+	}
+
+	if placeholders == 0 {
+		log.Printf("[account-cleanup] nenhuma conta placeholder encontrada")
 	}
 
 	return purged, nil
