@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -129,18 +130,51 @@ func (s *GoogleAuthService) ValidateGoogleIDToken(ctx context.Context, idToken s
 	}
 
 	var parsed struct {
-		Sub           string `json:"sub"`
-		Email         string `json:"email"`
-		EmailVerified string `json:"email_verified"`
-		Name          string `json:"name"`
-		Picture       string `json:"picture"`
+		Sub           string         `json:"sub"`
+		Email         string         `json:"email"`
+		EmailVerified flexibleString `json:"email_verified"`
+		Name          string         `json:"name"`
+		Picture       string         `json:"picture"`
+		Aud           flexibleString `json:"aud"`
+		Iss           flexibleString `json:"iss"`
+		Exp           flexibleString `json:"exp"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&parsed); err != nil {
 		return nil, fmt.Errorf("falha ao decodificar resposta do Google tokeninfo: %w", err)
 	}
 
-	if parsed.Email == "" {
+	if strings.TrimSpace(parsed.Sub) == "" {
+		return nil, fmt.Errorf("token do Google sem identificador de usuário (sub)")
+	}
+	if strings.TrimSpace(parsed.Email) == "" {
 		return nil, fmt.Errorf("token do Google não retornou e-mail válido")
+	}
+	if !strings.EqualFold(strings.TrimSpace(string(parsed.EmailVerified)), "true") {
+		return nil, fmt.Errorf("e-mail do Google não está verificado")
+	}
+
+	issuer := strings.TrimSpace(string(parsed.Iss))
+	if issuer != "https://accounts.google.com" && issuer != "accounts.google.com" {
+		return nil, fmt.Errorf("emissor do token Google inválido")
+	}
+
+	if strings.TrimSpace(s.cfg.ClientID) == "" {
+		return nil, fmt.Errorf("client ID do Google não configurado para validar a audiência do token")
+	}
+	if strings.TrimSpace(string(parsed.Aud)) != s.cfg.ClientID {
+		return nil, fmt.Errorf("audiência do token Google não corresponde ao cliente configurado")
+	}
+
+	expRaw := strings.TrimSpace(string(parsed.Exp))
+	if expRaw == "" {
+		return nil, fmt.Errorf("token do Google sem data de expiração")
+	}
+	expUnix, err := strconv.ParseInt(expRaw, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("data de expiração do token Google inválida")
+	}
+	if expUnix <= time.Now().Unix() {
+		return nil, fmt.Errorf("token do Google expirado")
 	}
 
 	return &GoogleUserInfo{
@@ -149,6 +183,38 @@ func (s *GoogleAuthService) ValidateGoogleIDToken(ctx context.Context, idToken s
 		Name:    parsed.Name,
 		Picture: parsed.Picture,
 	}, nil
+}
+
+// flexibleString aceita claims que a Google serializa como string ("true", "175...")
+// ou como literais nativos (true, 175...), evitando rejeições indevidas do tokeninfo.
+type flexibleString string
+
+func (f *flexibleString) UnmarshalJSON(data []byte) error {
+	trimmed := strings.TrimSpace(string(data))
+	if trimmed == "" || trimmed == "null" {
+		*f = ""
+		return nil
+	}
+
+	var s string
+	if err := json.Unmarshal(data, &s); err == nil {
+		*f = flexibleString(s)
+		return nil
+	}
+
+	var b bool
+	if err := json.Unmarshal(data, &b); err == nil {
+		*f = flexibleString(strconv.FormatBool(b))
+		return nil
+	}
+
+	var n json.Number
+	if err := json.Unmarshal(data, &n); err == nil {
+		*f = flexibleString(n.String())
+		return nil
+	}
+
+	return fmt.Errorf("claim JSON em formato não suportado: %s", trimmed)
 }
 
 func (s *GoogleAuthService) signHMAC(payload string) string {
