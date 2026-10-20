@@ -89,10 +89,29 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ serverUrl, onToggleServe
     try {
       await loginWithGoogle();
     } catch (err: any) {
-      if (err?.message?.includes('cancelado')) {
+      const msg = err?.message || '';
+      // Só ignora silenciosamente se for explicitamente um cancelamento do usuário
+      // (não erros de "falha ao abrir", "incompleta", etc. que contenham "cancelado" por coincidência)
+      if (msg === 'Login com Google cancelado.' || msg === 'Login com Google já em andamento.') {
         return;
       }
-      setError(err?.message || 'Falha ao autenticar com o Google.');
+      // Para erros de "Google Sign-in nativo não retornou token", mostra mensagem clara sobre SHA-1
+      if (msg.includes('não retornou token de identificação') || msg.includes('Verifique a configuração do SHA-1')) {
+        setError('Falha no login nativo do Google. Verifique se o app está assinado com a keystore correta e o SHA-1 está cadastrado no Google Cloud Console.');
+        return;
+      }
+      // Para erros de backend rejeitando o token, mostra o erro real
+      if (msg.includes('Falha no login com Google nativo:')) {
+        setError(msg.replace('Falha no login com Google nativo: ', 'Erro do servidor: '));
+        return;
+      }
+      // Para erros de configuração (DEVELOPER_ERROR, etc.) que caíram no fallback web mas falharam
+      if (msg.includes('DEVELOPER_ERROR') || msg.includes('SIGN_IN_FAILED') || msg.includes('configuração do Google')) {
+        setError('Configuração do Google Sign-In inválida. O SHA-1 do app não confere com o Google Cloud Console. Use o fallback web ou verifique a assinatura do APK.');
+        return;
+      }
+      // Outros erros: mostra mensagem genérica mas informativa
+      setError(msg || 'Falha ao autenticar com o Google. Tente novamente.');
     }
   };
 

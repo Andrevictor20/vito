@@ -29,7 +29,20 @@ export function getMobileDeviceName(): string {
  * Mantém o fluxo 100% contido dentro do próprio aplicativo Vito,
  * sem abrir janelas externas separadas no gerenciador de tarefas do Android.
  */
-export const IN_APP_BROWSER_OPTIONS: any = {
+export const IN_APP_BROWSER_OPTIONS: Readonly<{
+  toolbarColor: string;
+  secondaryToolbarColor: string;
+  controlsColor: string;
+  createTask: boolean;
+  useProxyActivity: boolean;
+  showInRecents: boolean;
+  enableDefaultShareMenuItem: boolean;
+  enableBarCollapsing: boolean;
+  showTitle: boolean;
+  presentationStyle: string;
+  dismissButtonStyle: string;
+  preferEphemeralSession: boolean;
+}> = {
   // Paleta True OLED do Vito
   toolbarColor: '#0B0D10',
   secondaryToolbarColor: '#14171C',
@@ -45,4 +58,15 @@ export const IN_APP_BROWSER_OPTIONS: any = {
   presentationStyle: 'pageSheet',
   dismissButtonStyle: 'close',
   preferEphemeralSession: false,
+};
+
+/**
+ * Opções de navegador in-app com useProxyActivity: true para garantir
+ * que o deep link (ex: vito://oauth/callback) seja interceptado confiavelmente no Android.
+ * DEVE ser usado em TODOS os fluxos de autenticação OAuth (login, calendar, gmail)
+ * onde o app precisa receber o callback via deep link após o navegador fechar.
+ */
+export const IN_APP_BROWSER_OPTIONS_WITH_PROXY: typeof IN_APP_BROWSER_OPTIONS = {
+  ...IN_APP_BROWSER_OPTIONS,
+  useProxyActivity: true,
 };
