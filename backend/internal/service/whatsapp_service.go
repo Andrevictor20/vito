@@ -184,6 +184,16 @@ func (s *WhatsAppService) RequestPairingCode(ctx context.Context, userID, rawPho
 		return "", fmt.Errorf("falha ao persistir sessão whatsapp: %w", err)
 	}
 
+	// Vincula o número de telefone à conta do usuário autenticado (Account Linking)
+	if s.userRepo != nil && phone != "" {
+		if existingUser, err := s.userRepo.GetByPhone(phone); err == nil && existingUser != nil {
+			if existingUser.ID != userID && strings.HasSuffix(strings.ToLower(existingUser.Email), "@vito.local") {
+				_ = s.userRepo.UpdatePhone(existingUser.ID, "")
+			}
+		}
+		_ = s.userRepo.UpdatePhone(userID, phone)
+	}
+
 	return code, nil
 }
 
@@ -305,6 +315,14 @@ func (s *WhatsAppService) HandleWebhook(ctx context.Context, eventType string, p
 			if strings.EqualFold(connData.State, "open") {
 				now := time.Now().UTC()
 				_ = s.repo.UpdateStatus(ctx, integration.ID, domain.WhatsAppStatusConnected, &now)
+				if s.userRepo != nil && integration.Phone != "" {
+					if existingUser, err := s.userRepo.GetByPhone(integration.Phone); err == nil && existingUser != nil {
+						if existingUser.ID != integration.UserID && strings.HasSuffix(strings.ToLower(existingUser.Email), "@vito.local") {
+							_ = s.userRepo.UpdatePhone(existingUser.ID, "")
+						}
+					}
+					_ = s.userRepo.UpdatePhone(integration.UserID, integration.Phone)
+				}
 			} else if strings.EqualFold(connData.State, "close") || strings.EqualFold(connData.State, "refused") {
 				_ = s.repo.UpdateStatus(ctx, integration.ID, domain.WhatsAppStatusDisconnected, nil)
 			}

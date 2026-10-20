@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/andrevmp/vito/backend/internal/domain"
+	"github.com/andrevmp/vito/backend/internal/handler/middleware"
 	"github.com/andrevmp/vito/backend/internal/service"
 )
 
@@ -60,8 +61,9 @@ func (h *WhatsAppAuthHandler) RequestOTP(w http.ResponseWriter, r *http.Request)
 }
 
 type verifyOTPPayload struct {
-	Phone string `json:"phone"`
-	Code  string `json:"code"`
+	Phone      string `json:"phone"`
+	Code       string `json:"code"`
+	DeviceName string `json:"device_name"`
 }
 
 // VerifyOTP valida o código OTP, autentica o usuário e emite a sessão Dual Token.
@@ -77,7 +79,13 @@ func (h *WhatsAppAuthHandler) VerifyOTP(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	deviceName := r.UserAgent()
+	deviceName := strings.TrimSpace(req.DeviceName)
+	if deviceName == "" {
+		deviceName = r.Header.Get("X-Device-Name")
+	}
+	if deviceName == "" {
+		deviceName = r.UserAgent()
+	}
 	if deviceName == "" {
 		deviceName = "Dispositivo Desconhecido"
 	}
@@ -109,6 +117,56 @@ func (h *WhatsAppAuthHandler) VerifyOTP(w http.ResponseWriter, r *http.Request) 
 		"data": map[string]interface{}{
 			"user":       user,
 			"token_pair": tokens,
+		},
+	})
+}
+
+type linkPhonePayload struct {
+	Phone string `json:"phone"`
+}
+
+// LinkPhone associa o telefone à conta do usuário autenticado.
+func (h *WhatsAppAuthHandler) LinkPhone(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok || userID == "" {
+		http.Error(w, `{"error":"não autenticado"}`, http.StatusUnauthorized)
+		return
+	}
+
+	var req linkPhonePayload
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error":"payload JSON inválido"}`, http.StatusBadRequest)
+		return
+	}
+
+	if strings.TrimSpace(req.Phone) == "" {
+		http.Error(w, `{"error":"telefone é obrigatório"}`, http.StatusBadRequest)
+		return
+	}
+
+	err := h.svc.LinkPhone(r.Context(), userID, req.Phone)
+	if err != nil {
+		if errors.Is(err, domain.ErrInvalidPhoneFormat) {
+			http.Error(w, `{"error":"formato de telefone inválido"}`, http.StatusBadRequest)
+			return
+		}
+		if errors.Is(err, domain.ErrUserAlreadyExists) {
+			http.Error(w, `{"error":"este número de telefone já está vinculado a outra conta"}`, http.StatusConflict)
+			return
+		}
+		if errors.Is(err, domain.ErrUserNotFound) {
+			http.Error(w, `{"error":"usuário não encontrado"}`, http.StatusNotFound)
+			return
+		}
+		http.Error(w, `{"error":"falha ao vincular telefone: `+err.Error()+`"}`, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"data": map[string]string{
+			"status":  "linked",
+			"message": "Telefone vinculado com sucesso à sua conta",
 		},
 	})
 }

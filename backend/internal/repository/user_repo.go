@@ -82,8 +82,13 @@ func (r *UserRepositorySQLite) GetByPhone(phone string) (*domain.User, error) {
 }
 
 func (r *UserRepositorySQLite) UpdatePhone(id, phone string) error {
+	var phoneVal interface{}
+	clean := strings.TrimSpace(phone)
+	if clean != "" {
+		phoneVal = clean
+	}
 	query := `UPDATE users SET phone = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
-	res, err := r.db.Exec(query, phone, id)
+	res, err := r.db.Exec(query, phoneVal, id)
 	if err != nil {
 		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
 			return domain.ErrUserAlreadyExists

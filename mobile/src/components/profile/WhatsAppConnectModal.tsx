@@ -98,6 +98,7 @@ export const WhatsAppConnectModal: React.FC<WhatsAppConnectModalProps> = ({
       if (res?.pairing_code) {
         setPairingCode(res.pairing_code);
         setStatus('connecting');
+        api.linkWhatsAppPhone(phone).catch(() => {});
         onStatusChanged?.();
       } else {
         setErrorMessage('Não foi possível obter o código de pareamento. Verifique a Evolution API.');

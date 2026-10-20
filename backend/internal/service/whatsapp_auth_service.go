@@ -15,10 +15,11 @@ import (
 	"github.com/google/uuid"
 )
 
-// WhatsAppAuthService orquestra o login sem senha por código OTP via WhatsApp.
+// WhatsAppAuthService orquestra o login sem senha por código OTP via WhatsApp e Account Linking.
 type WhatsAppAuthService struct {
 	otpRepo      domain.WhatsAppAuthRepository
 	userRepo     domain.UserRepository
+	waRepo       domain.WhatsAppRepository
 	authSvc      *AuthService
 	evoClient    EvolutionAPIClient
 	instanceName string
@@ -50,10 +51,75 @@ func NewWhatsAppAuthService(
 	}
 }
 
+// SetWhatsAppRepo injeta o repositório de sessões do WhatsApp para resolução dinâmica de instâncias ativas.
+func (s *WhatsAppAuthService) SetWhatsAppRepo(repo domain.WhatsAppRepository) {
+	s.waRepo = repo
+}
+
 func (s *WhatsAppAuthService) computeHash(code string) string {
 	h := hmac.New(sha256.New, []byte(s.hmacSecret))
 	h.Write([]byte(code))
 	return hex.EncodeToString(h.Sum(nil))
+}
+
+// resolveActiveInstance determina qual instância da Evolution API está conectada ("open") para envio de mensagens.
+func (s *WhatsAppAuthService) resolveActiveInstance(ctx context.Context) string {
+	target := s.instanceName
+	if target != "" && s.evoClient != nil {
+		state, err := s.evoClient.GetConnectionState(ctx, target)
+		if err == nil && strings.EqualFold(state, "open") {
+			return target
+		}
+	}
+
+	if s.waRepo != nil {
+		if connected, err := s.waRepo.FindConnectedInstance(ctx); err == nil && connected != nil && connected.InstanceName != "" {
+			return connected.InstanceName
+		}
+	}
+
+	if target == "" {
+		return "vito_system"
+	}
+	return target
+}
+
+// LinkPhone associa o número de WhatsApp informado à conta de um usuário existente.
+// Se o número estiver atribuído a uma conta placeholder temporária criada pelo WhatsApp (@vito.local),
+// desvincula a conta placeholder com segurança e atribui o telefone à conta principal.
+func (s *WhatsAppAuthService) LinkPhone(ctx context.Context, targetUserID, rawPhone string) error {
+	phone := NormalizeE164Phone(rawPhone)
+	if phone == "" {
+		return domain.ErrInvalidPhoneFormat
+	}
+
+	targetUser, err := s.userRepo.GetByID(targetUserID)
+	if err != nil {
+		return domain.ErrUserNotFound
+	}
+
+	// Verifica se este telefone já pertence a algum usuário cadastrado
+	existingUser, err := s.userRepo.GetByPhone(phone)
+	if err == nil && existingUser != nil {
+		if existingUser.ID == targetUser.ID {
+			return nil // Já está vinculado à mesma conta
+		}
+
+		// Se pertencer a uma conta placeholder órfã (@vito.local), desvincula o telefone dela
+		if strings.HasSuffix(strings.ToLower(existingUser.Email), "@vito.local") {
+			_ = s.userRepo.UpdatePhone(existingUser.ID, "")
+		} else {
+			// Pertence a outro usuário real com e-mail legítimo: recusa por segurança
+			return domain.ErrUserAlreadyExists
+		}
+	}
+
+	// Atualiza o telefone na conta do usuário alvo
+	if err := s.userRepo.UpdatePhone(targetUser.ID, phone); err != nil {
+		return fmt.Errorf("falha ao vincular telefone ao usuário: %w", err)
+	}
+
+	return nil
 }
 
 // RequestOTP gera e envia um código de 6 dígitos para o WhatsApp do usuário.
@@ -85,8 +151,16 @@ func (s *WhatsAppAuthService) RequestOTP(ctx context.Context, rawPhone string) e
 		return fmt.Errorf("falha ao persistir código OTP: %w", err)
 	}
 
+	activeInstance := s.resolveActiveInstance(ctx)
 	msg := fmt.Sprintf("Seu código de acesso ao Vito é: %s\n\nVálido por 5 minutos. Não compartilhe este código com ninguém.", code)
-	if err := s.evoClient.SendText(ctx, s.instanceName, phone, msg); err != nil {
+
+	if err := s.evoClient.SendText(ctx, activeInstance, phone, msg); err != nil {
+		// Se falhou na instância resolvida e for diferente da default, tenta a default como fallback
+		if activeInstance != s.instanceName && s.instanceName != "" {
+			if fallbackErr := s.evoClient.SendText(ctx, s.instanceName, phone, msg); fallbackErr == nil {
+				return nil
+			}
+		}
 		return fmt.Errorf("falha ao despachar mensagem pelo WhatsApp: %w", err)
 	}
 
@@ -129,9 +203,20 @@ func (s *WhatsAppAuthService) VerifyOTP(ctx context.Context, rawPhone, code, dev
 	// Código correto: consome o OTP imediatamente (One-Time)
 	_ = s.otpRepo.DeleteOTP(ctx, phone)
 
-	// Busca usuário por telefone ou cria nova conta vinculada
+	// 1. Busca usuário existente por telefone
 	user, err := s.userRepo.GetByPhone(phone)
-	if err != nil {
+	if err != nil && s.waRepo != nil {
+		// 2. Se não encontrou pelo users.phone, busca se há integração do WhatsApp pareada com este telefone
+		if it, itErr := s.waRepo.GetByPhone(ctx, phone); itErr == nil && it != nil && it.UserID != "" {
+			if linkedUser, uErr := s.userRepo.GetByID(it.UserID); uErr == nil && linkedUser != nil {
+				user = linkedUser
+				_ = s.userRepo.UpdatePhone(user.ID, phone)
+			}
+		}
+	}
+
+	// 3. Se ainda não houver usuário vinculado, cria nova conta com placeholder
+	if user == nil {
 		newID := uuid.NewString()
 		placeholderEmail := fmt.Sprintf("%s@vito.local", strings.TrimPrefix(phone, "+"))
 		user = &domain.User{
@@ -146,6 +231,10 @@ func (s *WhatsAppAuthService) VerifyOTP(ctx context.Context, rawPhone, code, dev
 		if err := s.userRepo.Create(user); err != nil {
 			return nil, nil, fmt.Errorf("falha ao criar usuário via WhatsApp: %w", err)
 		}
+	}
+
+	if deviceName == "" {
+		deviceName = "Dispositivo Desconhecido"
 	}
 
 	// Emite a sessão Dual Token (Access Token 15m + Refresh Token 30d)

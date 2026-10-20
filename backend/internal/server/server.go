@@ -370,6 +370,10 @@ func (s *Server) registerRoutes() {
 					})
 				}
 
+				if s.whatsappAuthHandler != nil {
+					protected.Post("/auth/whatsapp/link", s.whatsappAuthHandler.LinkPhone)
+				}
+
 				if s.p2pHandler != nil {
 					protected.Post("/users/phone", s.p2pHandler.UpdatePhone)
 					protected.Post("/users/phone/request-verification", s.p2pHandler.RequestPhoneVerification)

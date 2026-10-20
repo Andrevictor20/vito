@@ -1,5 +1,6 @@
 import { ApiClient } from './client';
 import { User } from '../../types';
+import { getMobileDeviceName } from '../../utils/platformInfo';
 
 export interface RequestWhatsAppOTPResponse {
   status: string;
@@ -14,6 +15,13 @@ export interface VerifyWhatsAppOTPResponse {
   user: User;
 }
 
+export interface LinkPhoneResponse {
+  data: {
+    status: string;
+    message: string;
+  };
+}
+
 export class WhatsAppAuthApi {
   constructor(private client: ApiClient) {}
 
@@ -24,10 +32,11 @@ export class WhatsAppAuthApi {
     });
   }
 
-  async verifyOTP(phone: string, code: string): Promise<VerifyWhatsAppOTPResponse> {
+  async verifyOTP(phone: string, code: string, deviceName?: string): Promise<VerifyWhatsAppOTPResponse> {
+    const resolvedDevice = deviceName || getMobileDeviceName();
     const res = await this.client.request<VerifyWhatsAppOTPResponse>('/api/v1/auth/whatsapp/verify-otp', {
       method: 'POST',
-      body: JSON.stringify({ phone, code }),
+      body: JSON.stringify({ phone, code, device_name: resolvedDevice }),
     });
 
     if (typeof (this.client as any).setAuthTokens === 'function') {
@@ -37,5 +46,12 @@ export class WhatsAppAuthApi {
     }
 
     return res;
+  }
+
+  async linkPhone(phone: string): Promise<LinkPhoneResponse> {
+    return this.client.request<LinkPhoneResponse>('/api/v1/auth/whatsapp/link', {
+      method: 'POST',
+      body: JSON.stringify({ phone }),
+    });
   }
 }

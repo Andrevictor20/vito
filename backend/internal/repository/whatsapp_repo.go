@@ -107,6 +107,95 @@ func (r *WhatsAppRepositorySQLite) GetByInstanceName(ctx context.Context, instan
 	return &w, nil
 }
 
+// GetByPhone busca a integração pelo número de telefone cadastrado.
+func (r *WhatsAppRepositorySQLite) GetByPhone(ctx context.Context, phone string) (*domain.WhatsAppIntegration, error) {
+	query := `
+		SELECT id, user_id, instance_name, phone, status, pairing_code, last_connected_at, created_at, updated_at
+		FROM whatsapp_integrations
+		WHERE phone = ?
+		LIMIT 1
+	`
+	var w domain.WhatsAppIntegration
+	var phoneCol, pairingCode sql.NullString
+	var lastConnectedAt sql.NullTime
+
+	err := r.db.QueryRowContext(ctx, query, phone).Scan(
+		&w.ID,
+		&w.UserID,
+		&w.InstanceName,
+		&phoneCol,
+		&w.Status,
+		&pairingCode,
+		&lastConnectedAt,
+		&w.CreatedAt,
+		&w.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, domain.ErrWhatsAppIntegrationNotFound
+		}
+		return nil, err
+	}
+
+	if phoneCol.Valid {
+		w.Phone = phoneCol.String
+	}
+	if pairingCode.Valid {
+		w.PairingCode = pairingCode.String
+	}
+	if lastConnectedAt.Valid {
+		t := lastConnectedAt.Time
+		w.LastConnectedAt = &t
+	}
+
+	return &w, nil
+}
+
+// FindConnectedInstance busca a integração de WhatsApp mais recente que esteja conectada ("connected").
+func (r *WhatsAppRepositorySQLite) FindConnectedInstance(ctx context.Context) (*domain.WhatsAppIntegration, error) {
+	query := `
+		SELECT id, user_id, instance_name, phone, status, pairing_code, last_connected_at, created_at, updated_at
+		FROM whatsapp_integrations
+		WHERE status = 'connected'
+		ORDER BY COALESCE(last_connected_at, updated_at) DESC
+		LIMIT 1
+	`
+	var w domain.WhatsAppIntegration
+	var phoneCol, pairingCode sql.NullString
+	var lastConnectedAt sql.NullTime
+
+	err := r.db.QueryRowContext(ctx, query).Scan(
+		&w.ID,
+		&w.UserID,
+		&w.InstanceName,
+		&phoneCol,
+		&w.Status,
+		&pairingCode,
+		&lastConnectedAt,
+		&w.CreatedAt,
+		&w.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, domain.ErrWhatsAppIntegrationNotFound
+		}
+		return nil, err
+	}
+
+	if phoneCol.Valid {
+		w.Phone = phoneCol.String
+	}
+	if pairingCode.Valid {
+		w.PairingCode = pairingCode.String
+	}
+	if lastConnectedAt.Valid {
+		t := lastConnectedAt.Time
+		w.LastConnectedAt = &t
+	}
+
+	return &w, nil
+}
+
 // Upsert salva ou atualiza o registro de integração do WhatsApp.
 func (r *WhatsAppRepositorySQLite) Upsert(ctx context.Context, i *domain.WhatsAppIntegration) error {
 	now := time.Now().UTC()

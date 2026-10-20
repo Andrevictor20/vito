@@ -437,12 +437,15 @@ export class ApiService extends ApiClient {
     return this.whatsappApi;
   }
 
-  // WhatsApp Auth (Passwordless OTP)
+  // WhatsApp Auth (Passwordless OTP & Account Linking)
   requestWhatsAppOTP(phone: string): Promise<RequestWhatsAppOTPResponse> {
     return this.whatsappAuthApi.requestOTP(phone);
   }
-  verifyWhatsAppOTP(phone: string, code: string): Promise<VerifyWhatsAppOTPResponse> {
-    return this.whatsappAuthApi.verifyOTP(phone, code);
+  verifyWhatsAppOTP(phone: string, code: string, deviceName?: string): Promise<VerifyWhatsAppOTPResponse> {
+    return this.whatsappAuthApi.verifyOTP(phone, code, deviceName);
+  }
+  linkWhatsAppPhone(phone: string): Promise<{ data: { status: string; message: string } }> {
+    return this.whatsappAuthApi.linkPhone(phone);
   }
 
   // Gmail Integration & Scanning

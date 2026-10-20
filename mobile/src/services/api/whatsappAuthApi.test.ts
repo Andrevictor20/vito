@@ -62,10 +62,32 @@ describe('WhatsAppAuthApi Unit Tests', () => {
     assert.equal(calls.length, 1);
     assert.equal(calls[0].ep, '/api/v1/auth/whatsapp/verify-otp');
     assert.equal(calls[0].opt?.method, 'POST');
-    assert.equal(calls[0].opt?.body, JSON.stringify({ phone: '+5511999998888', code: '123456' }));
+    const parsedBody = JSON.parse(calls[0].opt?.body as string);
+    assert.equal(parsedBody.phone, '+5511999998888');
+    assert.equal(parsedBody.code, '123456');
+    assert.ok(parsedBody.device_name);
     assert.equal(savedAccess, 'jwt-access-token');
     assert.equal(savedRefresh, 'jwt-refresh-token');
     assert.equal(savedSession, 'sess-123');
     assert.equal(res.user.phone, '+5511999998888');
+  });
+
+  test('linkPhone envia número de telefone via POST para /api/v1/auth/whatsapp/link', async () => {
+    const calls: { ep: string; opt?: RequestInit }[] = [];
+    const client = {
+      request: async <T>(ep: string, opt?: RequestInit): Promise<T> => {
+        calls.push({ ep, opt });
+        return { data: { status: 'linked', message: 'Telefone vinculado com sucesso' } } as T;
+      },
+    } as unknown as ApiClient;
+
+    const api = new WhatsAppAuthApi(client);
+    const res = await api.linkPhone('+5511999998888');
+
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].ep, '/api/v1/auth/whatsapp/link');
+    assert.equal(calls[0].opt?.method, 'POST');
+    assert.equal(calls[0].opt?.body, JSON.stringify({ phone: '+5511999998888' }));
+    assert.equal(res.data.status, 'linked');
   });
 });

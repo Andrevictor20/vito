@@ -312,6 +312,7 @@ func main() {
 	// WhatsApp Passwordless Login OTP
 	waAuthRepo := repository.NewWhatsAppAuthRepository(db)
 	waAuthSvc := service.NewWhatsAppAuthService(waAuthRepo, userRepo, authSvc, evoClient, "vito_system", cfg.JWTSecret)
+	waAuthSvc.SetWhatsAppRepo(waRepo)
 	whatsappAuthHandler := handler.NewWhatsAppAuthHandler(waAuthSvc)
 
 	// 6. Servidor HTTP

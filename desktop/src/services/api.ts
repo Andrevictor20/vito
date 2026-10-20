@@ -20,12 +20,15 @@ class ApiService {
     this.accessToken = localStorage.getItem('vito_access_token') || sessionStorage.getItem('vito_access_token');
   }
 
-  public setTokens(accessToken: string, refreshToken?: string) {
+  public setTokens(accessToken: string, refreshToken?: string, sessionId?: string) {
     this.accessToken = accessToken;
     localStorage.setItem('vito_access_token', accessToken);
     sessionStorage.setItem('vito_access_token', accessToken);
     if (refreshToken) {
       localStorage.setItem('vito_refresh_token', refreshToken);
+    }
+    if (sessionId) {
+      localStorage.setItem('vito_session_id', sessionId);
     }
   }
 
@@ -34,6 +37,7 @@ class ApiService {
     localStorage.removeItem('vito_access_token');
     sessionStorage.removeItem('vito_access_token');
     localStorage.removeItem('vito_refresh_token');
+    localStorage.removeItem('vito_session_id');
   }
 
   public getRefreshToken(): string | null {
@@ -173,13 +177,22 @@ class ApiService {
     });
   }
 
-  async verifyWhatsAppOTP(phone: string, code: string): Promise<AuthTokens> {
-    const data = await this.request<AuthTokens>('/api/v1/auth/whatsapp/verify-otp', {
+  async verifyWhatsAppOTP(phone: string, code: string, deviceName?: string): Promise<AuthTokens> {
+    const resolvedDevice = deviceName || getDesktopDeviceName();
+    const res = await this.request<any>('/api/v1/auth/whatsapp/verify-otp', {
       method: 'POST',
-      body: JSON.stringify({ phone, code }),
+      body: JSON.stringify({ phone, code, device_name: resolvedDevice }),
     });
-    this.setTokens(data.access_token, data.refresh_token);
-    return data;
+    const tokens: AuthTokens = res?.data?.token_pair || res?.token_pair || res;
+    this.setTokens(tokens.access_token, tokens.refresh_token, tokens.session_id);
+    return tokens;
+  }
+
+  async linkWhatsAppPhone(phone: string): Promise<{ data: { status: string; message: string } }> {
+    return this.request('/api/v1/auth/whatsapp/link', {
+      method: 'POST',
+      body: JSON.stringify({ phone }),
+    });
   }
 
   // --- Calendar Endpoints ---

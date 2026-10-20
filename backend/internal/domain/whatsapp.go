@@ -35,6 +35,8 @@ type WhatsAppIntegration struct {
 type WhatsAppRepository interface {
 	GetByUserID(ctx context.Context, userID string) (*WhatsAppIntegration, error)
 	GetByInstanceName(ctx context.Context, instanceName string) (*WhatsAppIntegration, error)
+	GetByPhone(ctx context.Context, phone string) (*WhatsAppIntegration, error)
+	FindConnectedInstance(ctx context.Context) (*WhatsAppIntegration, error)
 	Upsert(ctx context.Context, integration *WhatsAppIntegration) error
 	UpdateStatus(ctx context.Context, id string, status string, lastConnectedAt *time.Time) error
 	Delete(ctx context.Context, userID string) error

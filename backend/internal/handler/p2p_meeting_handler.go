@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -91,6 +92,14 @@ func (h *P2PMeetingHandler) UpdatePhone(w http.ResponseWriter, r *http.Request) 
 	phone := service.NormalizeE164Phone(req.Phone)
 	if phone == "" {
 		phone = req.Phone
+	}
+
+	// Se o telefone pertencer a uma conta placeholder criada anteriormente pelo WhatsApp (@vito.local),
+	// desvincula o telefone do placeholder para liberar a constraint única e associar à conta principal.
+	if existingUser, err := h.userRepo.GetByPhone(phone); err == nil && existingUser != nil {
+		if existingUser.ID != userID && strings.HasSuffix(strings.ToLower(existingUser.Email), "@vito.local") {
+			_ = h.userRepo.UpdatePhone(existingUser.ID, "")
+		}
 	}
 
 	if err := h.userRepo.UpdatePhone(userID, phone); err != nil {
