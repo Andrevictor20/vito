@@ -152,10 +152,14 @@ jobs:
 
       - name: Report Orphan Account Cleanup
         run: |
-          echo "Contas placeholder órfãs removidas pelo backend (limpeza automática):"
-          docker logs vito-backend 2>/dev/null | grep 'account-cleanup' | tail -10 || true
-          if ! docker logs vito-backend 2>/dev/null | grep -q 'account-cleanup'; then
-            echo "(nenhuma conta órfã removida nesta execução)"
+          echo "== Últimas linhas do log do backend (diagnóstico) =="
+          docker logs --tail 25 vito-backend 2>&1 || echo "(sem logs do container)"
+          echo ""
+          echo "== Contas placeholder órfãs (limpeza automática) =="
+          if docker logs vito-backend 2>/dev/null | grep -q 'account-cleanup'; then
+            docker logs vito-backend 2>/dev/null | grep 'account-cleanup' | tail -10
+          else
+            echo "(nenhuma linha de account-cleanup no log do container)"
           fi
 
       - name: Verify Backend & Evolution API Healthcheck
