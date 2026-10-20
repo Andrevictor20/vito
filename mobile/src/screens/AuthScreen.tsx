@@ -326,7 +326,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ serverUrl, onToggleServe
           setShowWhatsAppAuth(false);
           setIsRegister(true);
           setError(
-            `${message} Crie sua conta com e-mail ou Google para continuar; depois vincule seu WhatsApp em Perfil → Conectar WhatsApp.`
+            `${message} Crie sua conta com e-mail ou Google para continuar e vincule seu WhatsApp depois (Perfil → Conectar WhatsApp).`
           );
         }}
       />

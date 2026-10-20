@@ -150,6 +150,14 @@ jobs:
           docker compose up -d --force-recreate --remove-orphans evolution-postgres backend evolution-api desktop
           docker image prune -f
 
+      - name: Report Orphan Account Cleanup
+        run: |
+          echo "Contas placeholder órfãs removidas pelo backend (limpeza automática):"
+          docker logs vito-backend 2>/dev/null | grep 'account-cleanup' | tail -10 || true
+          if ! docker logs vito-backend 2>/dev/null | grep -q 'account-cleanup'; then
+            echo "(nenhuma conta órfã removida nesta execução)"
+          fi
+
       - name: Verify Backend & Evolution API Healthcheck
         run: |
           echo "Verificando Backend Vito..."

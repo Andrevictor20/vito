@@ -65,7 +65,7 @@ func (h *WhatsAppAuthHandler) RequestOTP(w http.ResponseWriter, r *http.Request)
 		}
 		if errors.Is(err, domain.ErrPhoneNotLinked) {
 			writeAuthError(w, http.StatusForbidden,
-				"Este número ainda não tem conta no Vito. Crie sua conta com e-mail ou Google e vincule seu WhatsApp depois.",
+				"Este número ainda não tem conta no Vito.",
 				"PHONE_NOT_LINKED", "register")
 			return
 		}
@@ -131,7 +131,7 @@ func (h *WhatsAppAuthHandler) VerifyOTP(w http.ResponseWriter, r *http.Request) 
 		}
 		if errors.Is(err, domain.ErrPhoneNotLinked) {
 			writeAuthError(w, http.StatusForbidden,
-				"Este número ainda não tem conta no Vito. Crie sua conta com e-mail ou Google e vincule seu WhatsApp depois.",
+				"Este número ainda não tem conta no Vito.",
 				"PHONE_NOT_LINKED", "register")
 			return
 		}
