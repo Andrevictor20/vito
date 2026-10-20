@@ -5,7 +5,9 @@ import { parseReminderInput } from './reminderInput';
 // W2: lembrete personalizado — "20/10 08:30" vira ISO local; inválidos dão null.
 describe('reminderInput', () => {
   it('converte data+hora válidas em ISO', () => {
-    const iso = parseReminderInput('20/10/2026', '08:30');
+    // Referência fixa anterior à data: evita que o teste quebre quando 20/10/2026 vira "hoje".
+    const ref = new Date(2026, 9, 13, 12, 0, 0).getTime();
+    const iso = parseReminderInput('20/10/2026', '08:30', ref);
     assert.ok(iso);
     const d = new Date(iso!);
     assert.equal(d.getDate(), 20);

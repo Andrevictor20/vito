@@ -96,16 +96,22 @@ func TestBookingService_GetAvailableSlots(t *testing.T) {
 		t.Fatalf("falha ao criar booking type: %v", err)
 	}
 
-	// Terça-feira futura (ex: 2026-10-20)
-	targetDate := time.Date(2026, 10, 20, 0, 0, 0, 0, time.UTC)
+	// Dia útil sempre futuro: uma data fixa quebra o teste quando ela vira "hoje",
+	// pois slots já passados deixam de estar disponíveis.
+	targetDate := time.Now().UTC().AddDate(0, 0, 7)
+	for targetDate.Weekday() == time.Saturday || targetDate.Weekday() == time.Sunday {
+		targetDate = targetDate.AddDate(0, 0, 1)
+	}
+	targetDate = time.Date(targetDate.Year(), targetDate.Month(), targetDate.Day(), 0, 0, 0, 0, time.UTC)
+	eventStart := time.Date(targetDate.Year(), targetDate.Month(), targetDate.Day(), 9, 30, 0, 0, time.UTC)
 
 	// Adiciona um evento existente na agenda do anfitrião das 09:30 às 10:00
 	existingEvent := &domain.Event{
 		ID:        "ev-conflict",
 		UserID:    ctx.user.ID,
 		Title:     "Reunião Interna",
-		StartAt:   time.Date(2026, 10, 20, 9, 30, 0, 0, time.UTC),
-		EndAt:     time.Date(2026, 10, 20, 10, 0, 0, 0, time.UTC),
+		StartAt:   eventStart,
+		EndAt:     eventStart.Add(30 * time.Minute),
 		CreatedAt: time.Now().UTC(),
 		UpdatedAt: time.Now().UTC(),
 	}
@@ -618,4 +624,3 @@ func TestBookingService_ReserveAppointment_SendsEmailNotification(t *testing.T) 
 		t.Errorf("e-mail deveria conter anexo de calendário .ics")
 	}
 }
-
