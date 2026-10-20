@@ -84,6 +84,71 @@ func (s *WhatsAppAuthService) resolveActiveInstance(ctx context.Context) string 
 	return target
 }
 
+// isPlaceholderEmail identifica contas provisórias (@vito.local) criadas pelo login por OTP.
+func isPlaceholderEmail(email string) bool {
+	return strings.HasSuffix(strings.ToLower(strings.TrimSpace(email)), "@vito.local")
+}
+
+// findUserByPhone localiza a conta dona do telefone tolerando diferenças de formato
+// (E.164, apenas dígitos e a variação do 9º dígito). Contas reais têm prioridade sobre
+// placeholders @vito.local.
+func (s *WhatsAppAuthService) findUserByPhone(ctx context.Context, phone string) *domain.User {
+	var placeholder *domain.User
+
+	for _, candidate := range domain.PhoneVariants(phone) {
+		u, err := s.userRepo.GetByPhone(candidate)
+		if err != nil || u == nil {
+			continue
+		}
+		if isPlaceholderEmail(u.Email) {
+			if placeholder == nil {
+				placeholder = u
+			}
+			continue
+		}
+		return u
+	}
+
+	return placeholder
+}
+
+// resolveUserByPhone localiza a conta dona do telefone e garante a consistência do vínculo:
+// quando o número está preso numa conta placeholder (@vito.local), ele é transferido para a
+// conta real e o placeholder fica sem telefone.
+func (s *WhatsAppAuthService) resolveUserByPhone(ctx context.Context, phone string) (*domain.User, error) {
+	var placeholder *domain.User
+
+	for _, candidate := range domain.PhoneVariants(phone) {
+		u, err := s.userRepo.GetByPhone(candidate)
+		if err != nil || u == nil {
+			continue
+		}
+		if isPlaceholderEmail(u.Email) {
+			if placeholder == nil {
+				placeholder = u
+			}
+			continue
+		}
+
+		// Conta real encontrada: libera o telefone preso no placeholder (se houver)
+		if placeholder != nil && placeholder.ID != u.ID {
+			_ = s.userRepo.UpdatePhone(placeholder.ID, "")
+		}
+		// Garante que a conta real fique com o telefone em E.164
+		if u.Phone == nil || *u.Phone != phone {
+			if err := s.userRepo.UpdatePhone(u.ID, phone); err == nil {
+				if refreshed, rErr := s.userRepo.GetByID(u.ID); rErr == nil {
+					u = refreshed
+				}
+			}
+		}
+		return u, nil
+	}
+
+	// Nenhuma conta real: reaproveita a placeholder (se existir) para o novo número
+	return placeholder, nil
+}
+
 // LinkPhone associa o número de WhatsApp informado à conta de um usuário existente.
 // Se o número estiver atribuído a uma conta placeholder temporária criada pelo WhatsApp (@vito.local),
 // desvincula a conta placeholder com segurança e atribui o telefone à conta principal.
@@ -98,15 +163,19 @@ func (s *WhatsAppAuthService) LinkPhone(ctx context.Context, targetUserID, rawPh
 		return domain.ErrUserNotFound
 	}
 
-	// Verifica se este telefone já pertence a algum usuário cadastrado
-	existingUser, err := s.userRepo.GetByPhone(phone)
-	if err == nil && existingUser != nil {
+	// Verifica se este telefone já pertence a algum usuário cadastrado (tolerante a formatos)
+	existingUser := s.findUserByPhone(ctx, phone)
+	if existingUser != nil {
 		if existingUser.ID == targetUser.ID {
-			return nil // Já está vinculado à mesma conta
+			// Já está vinculado à mesma conta: apenas canonicaliza o formato gravado
+			if existingUser.Phone == nil || *existingUser.Phone != phone {
+				_ = s.userRepo.UpdatePhone(targetUser.ID, phone)
+			}
+			return nil
 		}
 
 		// Se pertencer a uma conta placeholder órfã (@vito.local), desvincula o telefone dela
-		if strings.HasSuffix(strings.ToLower(existingUser.Email), "@vito.local") {
+		if isPlaceholderEmail(existingUser.Email) {
 			_ = s.userRepo.UpdatePhone(existingUser.ID, "")
 		} else {
 			// Pertence a outro usuário real com e-mail legítimo: recusa por segurança
@@ -203,15 +272,26 @@ func (s *WhatsAppAuthService) VerifyOTP(ctx context.Context, rawPhone, code, dev
 	// Código correto: consome o OTP imediatamente (One-Time)
 	_ = s.otpRepo.DeleteOTP(ctx, phone)
 
-	// 1. Busca usuário existente por telefone
-	user, err := s.userRepo.GetByPhone(phone)
-	if err != nil && s.waRepo != nil {
-		// 2. Se não encontrou pelo users.phone, busca se há integração do WhatsApp pareada com este telefone
-		if it, itErr := s.waRepo.GetByPhone(ctx, phone); itErr == nil && it != nil && it.UserID != "" {
-			if linkedUser, uErr := s.userRepo.GetByID(it.UserID); uErr == nil && linkedUser != nil {
-				user = linkedUser
-				_ = s.userRepo.UpdatePhone(user.ID, phone)
+	// 1. Busca usuário existente por telefone (tolerante a formatos, priorizando conta real)
+	user, err := s.resolveUserByPhone(ctx, phone)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// 2. Se não houver vínculo pelo telefone, busca se há integração do WhatsApp pareada com este telefone
+	if user == nil && s.waRepo != nil {
+		for _, candidate := range domain.PhoneVariants(phone) {
+			it, itErr := s.waRepo.GetByPhone(ctx, candidate)
+			if itErr != nil || it == nil || it.UserID == "" {
+				continue
 			}
+			linkedUser, uErr := s.userRepo.GetByID(it.UserID)
+			if uErr != nil || linkedUser == nil {
+				continue
+			}
+			user = linkedUser
+			_ = s.userRepo.UpdatePhone(user.ID, phone)
+			break
 		}
 	}
 

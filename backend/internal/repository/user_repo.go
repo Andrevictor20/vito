@@ -18,6 +18,21 @@ func NewUserRepository(db *sql.DB) *UserRepositorySQLite {
 	return &UserRepositorySQLite{db: db}
 }
 
+const userByPhoneQuery = `
+	SELECT id, name, email, phone, password_hash, token_version, created_at, updated_at
+	FROM users
+	WHERE phone = ?
+	LIMIT 1
+`
+
+const userByPhoneSuffixQuery = `
+	SELECT id, name, email, phone, password_hash, token_version, created_at, updated_at
+	FROM users
+	WHERE phone IS NOT NULL AND phone <> ''
+		AND REPLACE(REPLACE(REPLACE(phone, '+', ''), ' ', ''), '-', '') LIKE '%' || ?
+	LIMIT 25
+`
+
 func (r *UserRepositorySQLite) Create(u *domain.User) error {
 	if u.TokenVersion <= 0 {
 		u.TokenVersion = 1
@@ -73,19 +88,48 @@ func (r *UserRepositorySQLite) GetByEmail(email string) (*domain.User, error) {
 }
 
 func (r *UserRepositorySQLite) GetByPhone(phone string) (*domain.User, error) {
-	query := `
-		SELECT id, name, email, phone, password_hash, token_version, created_at, updated_at
-		FROM users
-		WHERE phone = ?
-	`
-	return r.scanUser(r.db.QueryRow(query, phone))
+	clean := strings.TrimSpace(phone)
+	if clean == "" {
+		return nil, domain.ErrUserNotFound
+	}
+
+	// 1) Correspondência exata e variantes equivalentes do mesmo número
+	//    (E.164, apenas dígitos e a variante brasileira de 8 dígitos).
+	for _, variant := range domain.PhoneVariants(clean) {
+		u, err := r.scanUser(r.db.QueryRow(userByPhoneQuery, variant))
+		if err == nil && u != nil {
+			return u, nil
+		}
+	}
+
+	// 2) Fallback tolerante: candidatos cujo sufixo de 8 dígitos bate, comparados de forma canônica.
+	digits := domain.PhoneDigits(clean)
+	if len(digits) >= 8 {
+		suffix := digits[len(digits)-8:]
+		rows, err := r.db.Query(userByPhoneSuffixQuery, suffix)
+		if err == nil {
+			defer rows.Close()
+			for rows.Next() {
+				u, scanErr := r.scanUser(rows)
+				if scanErr != nil || u == nil || u.Phone == nil {
+					continue
+				}
+				if domain.PhonesMatch(*u.Phone, clean) {
+					return u, nil
+				}
+			}
+		}
+	}
+
+	return nil, domain.ErrUserNotFound
 }
 
 func (r *UserRepositorySQLite) UpdatePhone(id, phone string) error {
 	var phoneVal interface{}
-	clean := strings.TrimSpace(phone)
-	if clean != "" {
-		phoneVal = clean
+	// Persistência canônica: o telefone é sempre gravado em E.164, evitando que o mesmo
+	// número exista em formatos diferentes (ex.: "5598984417165" e "+5598984417165").
+	if normalized := domain.NormalizePhone(phone); normalized != "" {
+		phoneVal = normalized
 	}
 	query := `UPDATE users SET phone = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
 	res, err := r.db.Exec(query, phoneVal, id)
@@ -161,4 +205,3 @@ func (r *UserRepositorySQLite) ListAll() ([]domain.User, error) {
 	}
 	return users, rows.Err()
 }
-

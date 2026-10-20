@@ -11,53 +11,14 @@ import (
 	"net/url"
 	"strings"
 	"time"
-	"unicode"
 
 	"github.com/andrevmp/vito/backend/internal/domain"
 )
 
 // NormalizeE164Phone normaliza números de telefone (especialmente BR) para o padrão internacional E.164 (+5511987654321).
+// A implementação canônica vive em domain.NormalizePhone (também usada pelo repositório na escrita).
 func NormalizeE164Phone(raw string) string {
-	trimmed := strings.TrimSpace(raw)
-	if trimmed == "" {
-		return ""
-	}
-	hasPlus := strings.HasPrefix(trimmed, "+")
-
-	var b strings.Builder
-	for _, r := range trimmed {
-		if unicode.IsDigit(r) {
-			b.WriteRune(r)
-		}
-	}
-	digits := b.String()
-	if digits == "" {
-		return ""
-	}
-
-	if hasPlus {
-		if len(digits) >= 8 && len(digits) <= 15 {
-			return "+" + digits
-		}
-		return ""
-	}
-
-	// Remove zero à esquerda em DDD nacional (ex: 011987654321 -> 11987654321)
-	if strings.HasPrefix(digits, "0") && (len(digits) == 11 || len(digits) == 12) {
-		digits = digits[1:]
-	}
-
-	// Já contém DDI 55 (12 ou 13 dígitos)
-	if strings.HasPrefix(digits, "55") && (len(digits) == 12 || len(digits) == 13) {
-		return "+" + digits
-	}
-
-	// Nacional BR com DDD (10 ou 11 dígitos)
-	if len(digits) == 10 || len(digits) == 11 {
-		return "+55" + digits
-	}
-
-	return ""
+	return domain.NormalizePhone(raw)
 }
 
 // RequestPhoneVerification inicia o fluxo de confirmação ativa de telefone via WhatsApp.
