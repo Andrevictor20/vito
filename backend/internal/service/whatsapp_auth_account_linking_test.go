@@ -137,7 +137,15 @@ func TestWhatsAppAuth_AccountLinking_GoogleAndWhatsAppUnified(t *testing.T) {
 		t.Fatalf("falha ao criar usuário placeholder: %v", err)
 	}
 
-	// 3. O usuário Google autenticado vincula o seu número de WhatsApp à sua conta
+	// 3. O usuário Google autenticado vincula o seu número de WhatsApp à sua conta.
+	//    Prova de posse: o número é o da integração de WhatsApp pareada pelo próprio usuário.
+	_ = waRepo.Upsert(ctx, &domain.WhatsAppIntegration{
+		ID:           "integration-google-101",
+		UserID:       googleUser.ID,
+		InstanceName: "vito_user_google_101",
+		Phone:        "+5511999998888",
+		Status:       domain.WhatsAppStatusConnected,
+	})
 	err = waAuthSvc.LinkPhone(ctx, googleUser.ID, phone)
 	if err != nil {
 		t.Fatalf("falha ao vincular telefone ao usuário Google: %v", err)
@@ -247,4 +255,3 @@ func TestWhatsAppAuth_RequestOTP_UsesConnectedInstanceFallback(t *testing.T) {
 		t.Errorf("esperado destinatário '+5511988887777', obteve '%s'", evoClient.sentTo)
 	}
 }
-

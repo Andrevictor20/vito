@@ -125,6 +125,21 @@ func TestWhatsAppAuthService_RequestAndVerifyOTP(t *testing.T) {
 
 	phone := "11987654321"
 
+	// 0. O número precisa pertencer a uma conta Vito para receber o código.
+	//    A conta abaixo representa o usuário já cadastrado (Google/e-mail) com o telefone vinculado.
+	linkedPhone := "+5511987654321"
+	linkedUser := &domain.User{
+		ID:        "user-wa-linked",
+		Name:      "André Victor",
+		Email:     "andre.victor@test.com",
+		Phone:     &linkedPhone,
+		CreatedAt: time.Now().UTC(),
+		UpdatedAt: time.Now().UTC(),
+	}
+	if err := userRepo.Create(linkedUser); err != nil {
+		t.Fatalf("falha ao criar usuário vinculado: %v", err)
+	}
+
 	// 1. RequestOTP com número inválido
 	err := svc.RequestOTP(ctx, "abc")
 	if err != domain.ErrInvalidPhoneFormat {

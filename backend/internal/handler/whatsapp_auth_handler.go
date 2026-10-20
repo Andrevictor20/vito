@@ -25,30 +25,51 @@ type requestOTPPayload struct {
 	Phone string `json:"phone"`
 }
 
+// writeAuthError responde sempre com JSON válido (o corpo precisa ser parseável pelo app
+// para exibir a mensagem real e reagir conforme o código do erro).
+func writeAuthError(w http.ResponseWriter, status int, message, code, action string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	payload := map[string]string{"error": message}
+	if code != "" {
+		payload["code"] = code
+	}
+	if action != "" {
+		payload["action"] = action
+	}
+	_ = json.NewEncoder(w).Encode(payload)
+}
+
 // RequestOTP solicita o envio de um código de 6 dígitos via WhatsApp.
 func (h *WhatsAppAuthHandler) RequestOTP(w http.ResponseWriter, r *http.Request) {
 	var req requestOTPPayload
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, `{"error":"payload JSON inválido"}`, http.StatusBadRequest)
+		writeAuthError(w, http.StatusBadRequest, "payload JSON inválido", "INVALID_PAYLOAD", "")
 		return
 	}
 
 	if strings.TrimSpace(req.Phone) == "" {
-		http.Error(w, `{"error":"telefone é obrigatório"}`, http.StatusBadRequest)
+		writeAuthError(w, http.StatusBadRequest, "telefone é obrigatório", "PHONE_REQUIRED", "")
 		return
 	}
 
 	err := h.svc.RequestOTP(r.Context(), req.Phone)
 	if err != nil {
 		if errors.Is(err, domain.ErrInvalidPhoneFormat) {
-			http.Error(w, `{"error":"formato de telefone inválido"}`, http.StatusBadRequest)
+			writeAuthError(w, http.StatusBadRequest, "formato de telefone inválido", "INVALID_PHONE", "")
 			return
 		}
 		if errors.Is(err, domain.ErrOTPRateLimited) {
-			http.Error(w, `{"error":"aguarde 30 segundos antes de solicitar um novo código"}`, http.StatusTooManyRequests)
+			writeAuthError(w, http.StatusTooManyRequests, "aguarde 30 segundos antes de solicitar um novo código", "RATE_LIMITED", "")
 			return
 		}
-		http.Error(w, `{"error":"falha ao enviar código pelo WhatsApp: `+err.Error()+`"}`, http.StatusInternalServerError)
+		if errors.Is(err, domain.ErrPhoneNotLinked) {
+			writeAuthError(w, http.StatusForbidden,
+				"Este número ainda não tem conta no Vito. Crie sua conta com e-mail ou Google e vincule seu WhatsApp depois.",
+				"PHONE_NOT_LINKED", "register")
+			return
+		}
+		writeAuthError(w, http.StatusInternalServerError, "falha ao enviar código pelo WhatsApp: "+err.Error(), "SEND_FAILED", "")
 		return
 	}
 
@@ -97,18 +118,24 @@ func (h *WhatsAppAuthHandler) VerifyOTP(w http.ResponseWriter, r *http.Request) 
 	tokens, user, err := h.svc.VerifyOTP(r.Context(), req.Phone, req.Code, deviceName, ipAddress)
 	if err != nil {
 		if errors.Is(err, domain.ErrOTPInvalid) || errors.Is(err, domain.ErrOTPExpired) || errors.Is(err, domain.ErrOTPNotFound) {
-			http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusUnauthorized)
+			writeAuthError(w, http.StatusUnauthorized, err.Error(), "OTP_INVALID", "")
 			return
 		}
 		if errors.Is(err, domain.ErrOTPMaxAttempts) {
-			http.Error(w, `{"error":"limite de tentativas excedido para este código"}`, http.StatusTooManyRequests)
+			writeAuthError(w, http.StatusTooManyRequests, "limite de tentativas excedido para este código", "OTP_MAX_ATTEMPTS", "")
 			return
 		}
 		if errors.Is(err, domain.ErrInvalidPhoneFormat) {
-			http.Error(w, `{"error":"formato de telefone inválido"}`, http.StatusBadRequest)
+			writeAuthError(w, http.StatusBadRequest, "formato de telefone inválido", "INVALID_PHONE", "")
 			return
 		}
-		http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusInternalServerError)
+		if errors.Is(err, domain.ErrPhoneNotLinked) {
+			writeAuthError(w, http.StatusForbidden,
+				"Este número ainda não tem conta no Vito. Crie sua conta com e-mail ou Google e vincule seu WhatsApp depois.",
+				"PHONE_NOT_LINKED", "register")
+			return
+		}
+		writeAuthError(w, http.StatusInternalServerError, err.Error(), "VERIFY_FAILED", "")
 		return
 	}
 
@@ -147,18 +174,24 @@ func (h *WhatsAppAuthHandler) LinkPhone(w http.ResponseWriter, r *http.Request) 
 	err := h.svc.LinkPhone(r.Context(), userID, req.Phone)
 	if err != nil {
 		if errors.Is(err, domain.ErrInvalidPhoneFormat) {
-			http.Error(w, `{"error":"formato de telefone inválido"}`, http.StatusBadRequest)
+			writeAuthError(w, http.StatusBadRequest, "formato de telefone inválido", "INVALID_PHONE", "")
 			return
 		}
 		if errors.Is(err, domain.ErrUserAlreadyExists) {
-			http.Error(w, `{"error":"este número de telefone já está vinculado a outra conta"}`, http.StatusConflict)
+			writeAuthError(w, http.StatusConflict, "este número de telefone já está vinculado a outra conta", "PHONE_TAKEN", "")
 			return
 		}
 		if errors.Is(err, domain.ErrUserNotFound) {
-			http.Error(w, `{"error":"usuário não encontrado"}`, http.StatusNotFound)
+			writeAuthError(w, http.StatusNotFound, "usuário não encontrado", "USER_NOT_FOUND", "")
 			return
 		}
-		http.Error(w, `{"error":"falha ao vincular telefone: `+err.Error()+`"}`, http.StatusInternalServerError)
+		if errors.Is(err, domain.ErrPhoneNotVerified) {
+			writeAuthError(w, http.StatusForbidden,
+				"Não foi possível confirmar a posse deste número. Pareie o seu WhatsApp ou use a confirmação de telefone para vincular.",
+				"PHONE_NOT_VERIFIED", "verify_phone")
+			return
+		}
+		writeAuthError(w, http.StatusInternalServerError, "falha ao vincular telefone: "+err.Error(), "LINK_FAILED", "")
 		return
 	}
 

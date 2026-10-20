@@ -31,6 +31,8 @@ type UserRepository interface {
 	GetByEmail(email string) (*User, error)
 	GetByPhone(phone string) (*User, error)
 	UpdatePhone(id, phone string) error
+	// Delete remove o usuário. Usado pela limpeza de contas placeholder órfãs.
+	Delete(id string) error
 	IncrementTokenVersion(id string) error
 	ListAll() ([]User, error)
 }

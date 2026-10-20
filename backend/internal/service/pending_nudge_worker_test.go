@@ -12,11 +12,12 @@ type mockUserRepoForNudge struct {
 	user *domain.User
 }
 
-func (m *mockUserRepoForNudge) Create(user *domain.User) error             { return nil }
-func (m *mockUserRepoForNudge) GetByID(id string) (*domain.User, error)     { return m.user, nil }
+func (m *mockUserRepoForNudge) Create(user *domain.User) error                { return nil }
+func (m *mockUserRepoForNudge) GetByID(id string) (*domain.User, error)       { return m.user, nil }
 func (m *mockUserRepoForNudge) GetByEmail(email string) (*domain.User, error) { return m.user, nil }
 func (m *mockUserRepoForNudge) GetByPhone(phone string) (*domain.User, error) { return m.user, nil }
-func (m *mockUserRepoForNudge) UpdatePhone(id, phone string) error             { return nil }
+func (m *mockUserRepoForNudge) UpdatePhone(id, phone string) error            { return nil }
+func (m *mockUserRepoForNudge) Delete(id string) error                        { return nil }
 func (m *mockUserRepoForNudge) IncrementTokenVersion(id string) error         { return nil }
 func (m *mockUserRepoForNudge) ListAll() ([]domain.User, error)               { return []domain.User{*m.user}, nil }
 
@@ -29,7 +30,6 @@ func (m *mockTokenRepoForNudge) FindByUserID(userID string) ([]domain.DeviceToke
 	return []domain.DeviceToken{m.token}, nil
 }
 func (m *mockTokenRepoForNudge) Delete(userID, token string) error { return nil }
-
 
 func TestPendingNudgeWorker_FormatNudgeMessage(t *testing.T) {
 	singleItem := []domain.PendingItem{

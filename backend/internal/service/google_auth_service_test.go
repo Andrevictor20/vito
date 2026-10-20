@@ -73,6 +73,16 @@ func (m *MockUserRepositoryInMemory) UpdatePhone(id, phone string) error {
 	return domain.ErrUserNotFound
 }
 
+func (m *MockUserRepositoryInMemory) Delete(id string) error {
+	for email, u := range m.users {
+		if u.ID == id {
+			delete(m.users, email)
+			return nil
+		}
+	}
+	return domain.ErrUserNotFound
+}
+
 func (m *MockUserRepositoryInMemory) ListAll() ([]domain.User, error) {
 	var list []domain.User
 	for _, u := range m.users {
@@ -80,7 +90,6 @@ func (m *MockUserRepositoryInMemory) ListAll() ([]domain.User, error) {
 	}
 	return list, nil
 }
-
 
 // MockSyncServiceInMemory para registrar integração de calendário
 type MockSyncServiceInMemory struct {
@@ -214,7 +223,6 @@ func TestGoogleAuthService_RedirectSchemeAllowlist(t *testing.T) {
 		t.Errorf("esperava 'https://meuapp.custom.com/auth/callback', obteve: %s", parsedCustom.RedirectScheme)
 	}
 }
-
 
 func TestGoogleAuthService_GetAuthURL(t *testing.T) {
 	cfg := service.GoogleAuthConfig{

@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/andrevmp/vito/backend/internal/domain"
-	"github.com/google/uuid"
 )
 
 // WhatsAppAuthService orquestra o login sem senha por código OTP via WhatsApp e Account Linking.
@@ -150,8 +149,13 @@ func (s *WhatsAppAuthService) resolveUserByPhone(ctx context.Context, phone stri
 }
 
 // LinkPhone associa o número de WhatsApp informado à conta de um usuário existente.
-// Se o número estiver atribuído a uma conta placeholder temporária criada pelo WhatsApp (@vito.local),
-// desvincula a conta placeholder com segurança e atribui o telefone à conta principal.
+// Regra de segurança (Fase 3): o número só pode ser vinculado se houver prova de posse:
+//
+//	(a) já está vinculado à própria conta; ou
+//	(b) é o número da integração de WhatsApp pareada pelo próprio usuário; ou
+//	(c) já foi verificado anteriormente por este usuário.
+//
+// Caso contrário, a operação é recusada — assim ninguém reivindica o número de terceiros.
 func (s *WhatsAppAuthService) LinkPhone(ctx context.Context, targetUserID, rawPhone string) error {
 	phone := NormalizeE164Phone(rawPhone)
 	if phone == "" {
@@ -183,12 +187,70 @@ func (s *WhatsAppAuthService) LinkPhone(ctx context.Context, targetUserID, rawPh
 		}
 	}
 
+	// Prova de posse: o número precisa ser o da integração pareada do próprio usuário
+	if !s.isPhoneProvenByPairing(ctx, targetUserID, phone) {
+		return domain.ErrPhoneNotVerified
+	}
+
 	// Atualiza o telefone na conta do usuário alvo
 	if err := s.userRepo.UpdatePhone(targetUser.ID, phone); err != nil {
 		return fmt.Errorf("falha ao vincular telefone ao usuário: %w", err)
 	}
 
 	return nil
+}
+
+// isKnownPhone informa se o número já é conhecido pelo sistema: pertence a uma conta real
+// (Google/e-mail) ou é o número de uma integração de WhatsApp pareada pelo próprio usuário.
+// Números desconhecidos nunca recebem código — isso evita spamear terceiros e abrir contas lixo.
+func (s *WhatsAppAuthService) isKnownPhone(ctx context.Context, phone string) bool {
+	if s.userRepo != nil {
+		// Varre as variantes do número: a conta real pode estar gravada em formato legado
+		// enquanto uma placeholder ocupa a variante canônica.
+		for _, candidate := range domain.PhoneVariants(phone) {
+			if u, err := s.userRepo.GetByPhone(candidate); err == nil && u != nil && !isPlaceholderEmail(u.Email) {
+				return true
+			}
+		}
+	}
+	if s.waRepo != nil {
+		for _, candidate := range domain.PhoneVariants(phone) {
+			if it, err := s.waRepo.GetByPhone(ctx, candidate); err == nil && it != nil && it.UserID != "" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// releasePhoneFromPlaceholder devolve o número ao seu dono real: contas placeholder (@vito.local)
+// deixam de segurar telefones que não lhes pertencem.
+func (s *WhatsAppAuthService) releasePhoneFromPlaceholder(ctx context.Context, phone string) {
+	if s.userRepo == nil {
+		return
+	}
+	for _, candidate := range domain.PhoneVariants(phone) {
+		u, err := s.userRepo.GetByPhone(candidate)
+		if err != nil || u == nil {
+			continue
+		}
+		if isPlaceholderEmail(u.Email) {
+			_ = s.userRepo.UpdatePhone(u.ID, "")
+		}
+	}
+}
+
+// isPhoneProvenByPairing informa se o telefone informado é o número da integração de WhatsApp
+// pareada pelo próprio usuário — a prova de posse disponível sem fluxo adicional.
+func (s *WhatsAppAuthService) isPhoneProvenByPairing(ctx context.Context, userID, phone string) bool {
+	if s.waRepo == nil || userID == "" {
+		return false
+	}
+	it, err := s.waRepo.GetByUserID(ctx, userID)
+	if err != nil || it == nil || it.Phone == "" {
+		return false
+	}
+	return domain.PhonesMatch(it.Phone, phone)
 }
 
 // RequestOTP gera e envia um código de 6 dígitos para o WhatsApp do usuário.
@@ -204,6 +266,13 @@ func (s *WhatsAppAuthService) RequestOTP(ctx context.Context, rawPhone string) e
 		if time.Since(existing.CreatedAt) < 30*time.Second {
 			return domain.ErrOTPRateLimited
 		}
+	}
+
+	// Portão de segurança: só enviamos código para números já vinculados a uma conta Vito.
+	// Sem isso, qualquer número digitado receberia uma mensagem do Vito e abriria uma conta nova.
+	if !s.isKnownPhone(ctx, phone) {
+		s.releasePhoneFromPlaceholder(ctx, phone)
+		return domain.ErrPhoneNotLinked
 	}
 
 	// Gera código criptográfico de 6 dígitos no intervalo 100000..999999
@@ -295,22 +364,12 @@ func (s *WhatsAppAuthService) VerifyOTP(ctx context.Context, rawPhone, code, dev
 		}
 	}
 
-	// 3. Se ainda não houver usuário vinculado, cria nova conta com placeholder
-	if user == nil {
-		newID := uuid.NewString()
-		placeholderEmail := fmt.Sprintf("%s@vito.local", strings.TrimPrefix(phone, "+"))
-		user = &domain.User{
-			ID:           newID,
-			Name:         "Usuário Vito",
-			Email:        placeholderEmail,
-			Phone:        &phone,
-			PasswordHash: "", // Sem senha (login exclusivo via WhatsApp/OAuth)
-			CreatedAt:    time.Now().UTC(),
-			UpdatedAt:    time.Now().UTC(),
-		}
-		if err := s.userRepo.Create(user); err != nil {
-			return nil, nil, fmt.Errorf("falha ao criar usuário via WhatsApp: %w", err)
-		}
+	// 3. Sem conta real resolvível: NUNCA criamos conta a partir de um número desconhecido.
+	// O login por WhatsApp existe para acessar contas já existentes (Google/e-mail) — não
+	// para abrir contas novas a partir de qualquer número digitado.
+	if user == nil || isPlaceholderEmail(user.Email) {
+		s.releasePhoneFromPlaceholder(ctx, phone)
+		return nil, nil, domain.ErrPhoneNotLinked
 	}
 
 	if deviceName == "" {

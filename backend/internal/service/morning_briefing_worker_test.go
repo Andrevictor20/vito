@@ -66,8 +66,8 @@ type mockEventRepoForBriefing struct {
 	events []domain.Event
 }
 
-func (m *mockEventRepoForBriefing) Create(event *domain.Event) error                         { return nil }
-func (m *mockEventRepoForBriefing) GetByID(id, userID string) (*domain.Event, error)         { return nil, nil }
+func (m *mockEventRepoForBriefing) Create(event *domain.Event) error                 { return nil }
+func (m *mockEventRepoForBriefing) GetByID(id, userID string) (*domain.Event, error) { return nil, nil }
 func (m *mockEventRepoForBriefing) ListByUser(userID string, from, to time.Time) ([]domain.Event, error) {
 	return m.events, nil
 }
@@ -80,17 +80,21 @@ func (m *mockEventRepoForBriefing) ListUpcomingUnreminded(from, to time.Time) ([
 func (m *mockEventRepoForBriefing) ListStartingNowUnreminded(from, to time.Time) ([]domain.Event, error) {
 	return nil, nil
 }
-func (m *mockEventRepoForBriefing) MarkReminderSent(eventID string, sentAt time.Time) error      { return nil }
-func (m *mockEventRepoForBriefing) MarkStartReminderSent(eventID string, sentAt time.Time) error { return nil }
+func (m *mockEventRepoForBriefing) MarkReminderSent(eventID string, sentAt time.Time) error {
+	return nil
+}
+func (m *mockEventRepoForBriefing) MarkStartReminderSent(eventID string, sentAt time.Time) error {
+	return nil
+}
 func (m *mockEventRepoForBriefing) CheckConflict(userID string, startAt, endAt time.Time, excludeEventID string) (*domain.ConflictInfo, error) {
 	return &domain.ConflictInfo{}, nil
 }
-func (m *mockEventRepoForBriefing) Delete(id, userID string) error               { return nil }
+func (m *mockEventRepoForBriefing) Delete(id, userID string) error { return nil }
 func (m *mockEventRepoForBriefing) DeleteByTitle(userID, titleQuery string) (int, error) {
 	return 0, nil
 }
-func (m *mockEventRepoForBriefing) DeleteSeries(id, userID string) (int, error) { return 0, nil }
-func (m *mockEventRepoForBriefing) Update(event *domain.Event) error             { return nil }
+func (m *mockEventRepoForBriefing) DeleteSeries(id, userID string) (int, error)   { return 0, nil }
+func (m *mockEventRepoForBriefing) Update(event *domain.Event) error              { return nil }
 func (m *mockEventRepoForBriefing) UpdateSeries(event *domain.Event) (int, error) { return 0, nil }
 func (m *mockEventRepoForBriefing) UpdateTimesByTitle(userID, titleQuery string, newStart, newEnd time.Time) (int, error) {
 	return 0, nil
@@ -100,8 +104,8 @@ type mockTodoRepoForBriefing struct {
 	todos []domain.Todo
 }
 
-func (m *mockTodoRepoForBriefing) Create(todo *domain.Todo) error                                  { return nil }
-func (m *mockTodoRepoForBriefing) GetByID(id, userID string) (*domain.Todo, error)                  { return nil, nil }
+func (m *mockTodoRepoForBriefing) Create(todo *domain.Todo) error                  { return nil }
+func (m *mockTodoRepoForBriefing) GetByID(id, userID string) (*domain.Todo, error) { return nil, nil }
 func (m *mockTodoRepoForBriefing) ListByUser(userID string, status domain.TodoStatus) ([]domain.Todo, error) {
 	return m.todos, nil
 }
@@ -120,25 +124,34 @@ func (m *mockTodoRepoForBriefing) MarkReminderSent(todoID string, sentAt time.Ti
 func (m *mockTodoRepoForBriefing) MarkDueReminderSent(todoID string, sentAt time.Time) error {
 	return nil
 }
-func (m *mockTodoRepoForBriefing) UpdateStatus(id, userID string, status domain.TodoStatus) error   { return nil }
-func (m *mockTodoRepoForBriefing) Update(todo *domain.Todo) error                                     { return nil }
-func (m *mockTodoRepoForBriefing) Delete(id, userID string) error                                  { return nil }
-func (m *mockTodoRepoForBriefing) AddSubtask(subtask *domain.Subtask) error                        { return nil }
-func (m *mockTodoRepoForBriefing) ToggleSubtask(id, todoID string) (*domain.Subtask, error)        { return nil, nil }
-func (m *mockTodoRepoForBriefing) DeleteSubtask(id, todoID string) error                           { return nil }
-func (m *mockTodoRepoForBriefing) ListSubtasksByTodo(todoID string) ([]domain.Subtask, error)     { return nil, nil }
+func (m *mockTodoRepoForBriefing) UpdateStatus(id, userID string, status domain.TodoStatus) error {
+	return nil
+}
+func (m *mockTodoRepoForBriefing) Update(todo *domain.Todo) error           { return nil }
+func (m *mockTodoRepoForBriefing) Delete(id, userID string) error           { return nil }
+func (m *mockTodoRepoForBriefing) AddSubtask(subtask *domain.Subtask) error { return nil }
+func (m *mockTodoRepoForBriefing) ToggleSubtask(id, todoID string) (*domain.Subtask, error) {
+	return nil, nil
+}
+func (m *mockTodoRepoForBriefing) DeleteSubtask(id, todoID string) error { return nil }
+func (m *mockTodoRepoForBriefing) ListSubtasksByTodo(todoID string) ([]domain.Subtask, error) {
+	return nil, nil
+}
 
 type mockUserRepoForBriefing struct {
 	user *domain.User
 }
 
-func (m *mockUserRepoForBriefing) Create(user *domain.User) error             { return nil }
-func (m *mockUserRepoForBriefing) GetByID(id string) (*domain.User, error)     { return m.user, nil }
+func (m *mockUserRepoForBriefing) Create(user *domain.User) error                { return nil }
+func (m *mockUserRepoForBriefing) GetByID(id string) (*domain.User, error)       { return m.user, nil }
 func (m *mockUserRepoForBriefing) GetByEmail(email string) (*domain.User, error) { return m.user, nil }
 func (m *mockUserRepoForBriefing) GetByPhone(phone string) (*domain.User, error) { return m.user, nil }
-func (m *mockUserRepoForBriefing) UpdatePhone(id, phone string) error             { return nil }
+func (m *mockUserRepoForBriefing) UpdatePhone(id, phone string) error            { return nil }
+func (m *mockUserRepoForBriefing) Delete(id string) error                        { return nil }
 func (m *mockUserRepoForBriefing) IncrementTokenVersion(id string) error         { return nil }
-func (m *mockUserRepoForBriefing) ListAll() ([]domain.User, error)               { return []domain.User{*m.user}, nil }
+func (m *mockUserRepoForBriefing) ListAll() ([]domain.User, error) {
+	return []domain.User{*m.user}, nil
+}
 
 type mockTokenRepoForBriefing struct {
 	token domain.DeviceToken

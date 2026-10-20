@@ -320,8 +320,16 @@ export class ApiClient {
 
       if (!res.ok) {
         const errorMsg = data?.error || `Erro HTTP ${res.status}`;
-        const httpErr = new Error(errorMsg) as Error & { status?: number };
+        const httpErr = new Error(errorMsg) as Error & {
+          status?: number;
+          code?: string;
+          action?: string;
+        };
         httpErr.status = res.status;
+        // O backend sinaliza ações específicas (ex.: "register" quando o número não tem conta)
+        // para que o app redirecione o usuário para o cadastro.
+        httpErr.code = data?.code;
+        httpErr.action = data?.action;
         throw httpErr;
       }
 

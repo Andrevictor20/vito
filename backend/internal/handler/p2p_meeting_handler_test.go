@@ -45,7 +45,8 @@ func setupP2PHandlerTest(t *testing.T) *p2pHandlerTestContext {
 	p2pRepo := repository.NewP2PInviteRepositorySQLite(db)
 	calSvc := service.NewCalendarService(eventRepo)
 	p2pSvc := service.NewP2PMeetingService(p2pRepo, userRepo, calSvc, nil)
-	p2pHandler := handler.NewP2PMeetingHandler(p2pSvc, userRepo)
+	waRepo := repository.NewWhatsAppRepository(db)
+	p2pHandler := handler.NewP2PMeetingHandler(p2pSvc, userRepo, waRepo)
 
 	phone1 := "+5511999991111"
 	u1 := &domain.User{ID: uuid.New().String(), Name: "Alice", Email: "alice@vito.app", Phone: &phone1, CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}
@@ -199,7 +200,7 @@ func TestP2PMeetingHandler_InviteAndAcceptFlow(t *testing.T) {
 func TestP2PMeetingHandler_MutualSlots(t *testing.T) {
 	tc := setupP2PHandlerTest(t)
 
-	from := time.Now().UTC().Truncate(24*time.Hour).Add(24 * time.Hour).Add(9 * time.Hour)
+	from := time.Now().UTC().Truncate(24 * time.Hour).Add(24 * time.Hour).Add(9 * time.Hour)
 	to := from.Add(8 * time.Hour)
 
 	url := "/api/v1/meetings/p2p/mutual-slots?target_user_id=" + tc.u2.ID +

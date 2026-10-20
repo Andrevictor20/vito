@@ -18,13 +18,15 @@ import (
 type P2PMeetingHandler struct {
 	p2pSvc   *service.P2PMeetingService
 	userRepo domain.UserRepository
+	waRepo   domain.WhatsAppRepository
 }
 
 // NewP2PMeetingHandler cria uma nova instância de P2PMeetingHandler.
-func NewP2PMeetingHandler(p2pSvc *service.P2PMeetingService, userRepo domain.UserRepository) *P2PMeetingHandler {
+func NewP2PMeetingHandler(p2pSvc *service.P2PMeetingService, userRepo domain.UserRepository, waRepo domain.WhatsAppRepository) *P2PMeetingHandler {
 	return &P2PMeetingHandler{
 		p2pSvc:   p2pSvc,
 		userRepo: userRepo,
+		waRepo:   waRepo,
 	}
 }
 
@@ -92,6 +94,28 @@ func (h *P2PMeetingHandler) UpdatePhone(w http.ResponseWriter, r *http.Request) 
 	phone := service.NormalizeE164Phone(req.Phone)
 	if phone == "" {
 		phone = req.Phone
+	}
+
+	// Prova de posse obrigatória (Fase 3): o telefone só é vinculado se já pertencer à
+	// própria conta ou se for o número da integração de WhatsApp pareada pelo usuário.
+	// Sem isso, qualquer usuário logado poderia reivindicar o número de terceiros.
+	alreadyLinked := false
+	if existingUser, err := h.userRepo.GetByPhone(phone); err == nil && existingUser != nil && existingUser.ID == userID {
+		alreadyLinked = true
+	}
+
+	if !alreadyLinked {
+		it, err := h.waRepo.GetByUserID(r.Context(), userID)
+		if err != nil || it == nil || it.Phone == "" || !domain.PhonesMatch(it.Phone, phone) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusForbidden)
+			_ = json.NewEncoder(w).Encode(map[string]string{
+				"error":  "Não foi possível confirmar a posse deste número. Pareie o seu WhatsApp ou use a confirmação de telefone para vincular.",
+				"code":   "PHONE_NOT_VERIFIED",
+				"action": "verify_phone",
+			})
+			return
+		}
 	}
 
 	// Se o telefone pertencer a uma conta placeholder criada anteriormente pelo WhatsApp (@vito.local),

@@ -13,6 +13,11 @@ var (
 	ErrOTPMaxAttempts     = errors.New("limite de tentativas excedido para este código")
 	ErrOTPRateLimited     = errors.New("aguarde alguns segundos antes de solicitar um novo código")
 	ErrInvalidPhoneFormat = errors.New("formato de telefone inválido")
+	// ErrPhoneNotLinked indica que o número informado não pertence a nenhuma conta Vito.
+	// Nesse caso o fluxo de OTP é recusado: nada é enviado ao número e nenhuma conta é criada.
+	ErrPhoneNotLinked = errors.New("este número ainda não está vinculado a uma conta Vito")
+	// ErrPhoneNotVerified indica que o número não tem prova de posse pelo usuário autenticado.
+	ErrPhoneNotVerified = errors.New("telefone não verificado para esta conta")
 )
 
 // WhatsAppAuthOTP representa o registro de código de uso único para login.

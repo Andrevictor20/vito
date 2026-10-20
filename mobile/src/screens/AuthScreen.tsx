@@ -320,6 +320,15 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ serverUrl, onToggleServe
       <WhatsAppAuthModal
         visible={showWhatsAppAuth}
         onClose={() => setShowWhatsAppAuth(false)}
+        onPhoneNotLinked={(message) => {
+          // O número não tem conta Vito: o usuário é levado ao cadastro (e-mail ou Google)
+          // e avisado de que o WhatsApp precisa ser vinculado depois de entrar.
+          setShowWhatsAppAuth(false);
+          setIsRegister(true);
+          setError(
+            `${message} Crie sua conta com e-mail ou Google para continuar; depois vincule seu WhatsApp em Perfil → Conectar WhatsApp.`
+          );
+        }}
       />
       </ScrollView>
     </KeyboardAvoidingView>

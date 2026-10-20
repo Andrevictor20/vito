@@ -51,6 +51,23 @@ func (r *UserRepositorySQLite) Create(u *domain.User) error {
 	return nil
 }
 
+// Delete remove o usuário do banco. Usado pela limpeza de contas placeholder órfãs
+// (contas @vito.local sem sessão ativa e sem qualquer dado do usuário).
+func (r *UserRepositorySQLite) Delete(id string) error {
+	res, err := r.db.Exec(`DELETE FROM users WHERE id = ?`, id)
+	if err != nil {
+		return err
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return domain.ErrUserNotFound
+	}
+	return nil
+}
+
 func (r *UserRepositorySQLite) scanUser(row interface{ Scan(dest ...any) error }) (*domain.User, error) {
 	var u domain.User
 	var phone sql.NullString

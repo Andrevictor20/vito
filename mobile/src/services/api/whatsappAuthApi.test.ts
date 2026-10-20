@@ -137,6 +137,31 @@ describe('WhatsAppAuthApi Unit Tests', () => {
     );
   });
 
+  test('requestOTP propaga o erro PHONE_NOT_LINKED para o app redirecionar ao cadastro', async () => {
+    const client = {
+      request: async () => {
+        const err: any = new Error('Este número ainda não tem conta no Vito. Crie sua conta com e-mail ou Google e vincule seu WhatsApp depois.');
+        err.status = 403;
+        err.code = 'PHONE_NOT_LINKED';
+        err.action = 'register';
+        throw err;
+      },
+    } as unknown as ApiClient;
+
+    const api = new WhatsAppAuthApi(client);
+
+    await assert.rejects(
+      () => api.requestOTP('+5511999998888'),
+      (err: any) => {
+        assert.equal(err.code, 'PHONE_NOT_LINKED');
+        assert.equal(err.action, 'register');
+        assert.equal(err.status, 403);
+        assert.match(err.message, /não tem conta no Vito/i);
+        return true;
+      }
+    );
+  });
+
   test('linkPhone envia número de telefone via POST para /api/v1/auth/whatsapp/link', async () => {
     const calls: { ep: string; opt?: RequestInit }[] = [];
     const client = {

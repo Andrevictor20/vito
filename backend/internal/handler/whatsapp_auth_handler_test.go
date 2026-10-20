@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"testing"
+	"time"
 
 	"github.com/andrevmp/vito/backend/internal/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
@@ -63,7 +64,7 @@ func (m *mockEvolutionClientForAuthHandler) SendReaction(ctx context.Context, in
 	return nil
 }
 
-func setupWhatsAppAuthHandlerTest(t *testing.T) (*handler.WhatsAppAuthHandler, *mockEvolutionClientForAuthHandler) {
+func setupWhatsAppAuthHandlerTest(t *testing.T) (*handler.WhatsAppAuthHandler, *mockEvolutionClientForAuthHandler, domain.UserRepository) {
 	tmpDir := t.TempDir()
 	db, err := database.Open(filepath.Join(tmpDir, "test_wa_auth_h.db"))
 	if err != nil {
@@ -88,11 +89,59 @@ func setupWhatsAppAuthHandlerTest(t *testing.T) (*handler.WhatsAppAuthHandler, *
 	)
 
 	h := handler.NewWhatsAppAuthHandler(svc)
-	return h, evoClient
+	return h, evoClient, userRepo
+}
+
+// TestWhatsAppAuthHandler_RequestOTP_RefusesUnknownPhone garante que a API recusa números
+// sem conta Vito, sem enviar mensagem, e sinaliza ao app que ele deve direcionar o usuário
+// para o cadastro (code PHONE_NOT_LINKED / action register).
+func TestWhatsAppAuthHandler_RequestOTP_RefusesUnknownPhone(t *testing.T) {
+	h, evoClient, _ := setupWhatsAppAuthHandlerTest(t)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/whatsapp/request-otp", bytes.NewBufferString(`{"phone": "11999998888"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	h.RequestOTP(w, req)
+
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("esperava status 403, obteve %d (%s)", w.Code, w.Body.String())
+	}
+	if evoClient.sentText != "" {
+		t.Errorf("nenhuma mensagem deveria ter sido enviada: %q", evoClient.sentText)
+	}
+
+	var payload map[string]string
+	if err := json.Unmarshal(w.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("resposta não é JSON válido: %v (%s)", err, w.Body.String())
+	}
+	if payload["code"] != "PHONE_NOT_LINKED" {
+		t.Errorf("esperava code PHONE_NOT_LINKED, obteve %q", payload["code"])
+	}
+	if payload["action"] != "register" {
+		t.Errorf("esperava action register, obteve %q", payload["action"])
+	}
+	if payload["error"] == "" {
+		t.Error("mensagem de erro vazia: o app precisa avisar o usuário")
+	}
 }
 
 func TestWhatsAppAuthHandler_RequestAndVerify(t *testing.T) {
-	h, evoClient := setupWhatsAppAuthHandlerTest(t)
+	h, evoClient, userRepo := setupWhatsAppAuthHandlerTest(t)
+
+	// 0. O número precisa pertencer a uma conta Vito para receber o código.
+	linkedPhone := "+5511987654321"
+	linkedUser := &domain.User{
+		ID:        "user-wa-handler",
+		Name:      "André Victor",
+		Email:     "andre.handler@test.com",
+		Phone:     &linkedPhone,
+		CreatedAt: time.Now().UTC(),
+		UpdatedAt: time.Now().UTC(),
+	}
+	if err := userRepo.Create(linkedUser); err != nil {
+		t.Fatalf("falha ao criar usuário vinculado: %v", err)
+	}
 
 	// 1. Request OTP com payload válido
 	reqBody := `{"phone": "11987654321"}`

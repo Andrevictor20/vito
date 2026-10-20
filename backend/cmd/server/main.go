@@ -28,7 +28,6 @@ func main() {
 		log.Fatalf("❌ Falha crítica de segurança na configuração: %v", err)
 	}
 
-
 	// 1. Conexão ao SQLite com WAL mode, Single-Writer Queue e Migrações
 	log.Printf("📦 [Vito DB] Inicializando banco SQLite em '%s'...", cfg.DBPath)
 	db, err := database.Open(cfg.DBPath)
@@ -160,7 +159,8 @@ func main() {
 	}
 	triggerWorker := service.NewTriggerWorker(triggerRepo, notifSvc, triggerEvaluator, 1*time.Minute)
 	// Delta gate pré-IA (§9.3): hashes dos fatos atuais via conectores por categoria.
-	triggerWorker.SetDeltaFetcher(func(fetchCtx context.Context, t *domain.Trigger) ([]string, []string, error) {		items, err := ai.RouteTriggerSource(t).Fetch(fetchCtx, t)
+	triggerWorker.SetDeltaFetcher(func(fetchCtx context.Context, t *domain.Trigger) ([]string, []string, error) {
+		items, err := ai.RouteTriggerSource(t).Fetch(fetchCtx, t)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -219,6 +219,13 @@ func main() {
 	todoReminderWorker := service.NewTodoReminderWorker(todoRepo, notifSvc, 15*time.Minute)
 	todoReminderWorker.Start()
 	defer todoReminderWorker.Stop()
+
+	// Worker em segundo plano para limpeza de contas placeholder órfãs (@vito.local)
+	// criadas por logins de WhatsApp — libera o número de telefone de terceiros.
+	accountCleanupSvc := service.NewAccountCleanupService(userRepo, sessionRepo, eventRepo, todoRepo, memoryRepo)
+	accountCleanupWorker := service.NewAccountCleanupWorker(accountCleanupSvc, 15*time.Minute)
+	accountCleanupWorker.Start()
+	defer accountCleanupWorker.Stop()
 
 	// Worker em segundo plano para consolidação comportamental noturna (§8.4 ciclo 3)
 	behavioralWorker := service.NewBehavioralWorker(todoRepo, eventRepo, memoryRepo)
@@ -282,13 +289,14 @@ func main() {
 	astSvc.SetMeetingService(meetingSvc)
 	meetingHandler := handler.NewMeetingHandler(meetingSvc)
 
+	waRepo := repository.NewWhatsAppRepository(db)
+
 	p2pSvc := service.NewP2PMeetingService(p2pRepo, userRepo, calSvc, notifSvc)
-	p2pHandler := handler.NewP2PMeetingHandler(p2pSvc, userRepo)
+	p2pHandler := handler.NewP2PMeetingHandler(p2pSvc, userRepo, waRepo)
 
 	chatSvc := service.NewChatService(chatRepo)
 	chatHandler := handler.NewChatHandler(chatSvc)
 
-	waRepo := repository.NewWhatsAppRepository(db)
 	evoClient := service.NewDefaultEvolutionClient(cfg.EvolutionAPIURL, cfg.EvolutionAPIKey, nil)
 	waSvc := service.NewWhatsAppService(service.WhatsAppServiceConfig{
 		WebhookBaseURL:  cfg.PublicBaseURL,

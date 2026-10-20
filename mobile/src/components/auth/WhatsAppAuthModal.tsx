@@ -18,9 +18,11 @@ import { tokens } from '../../theme/tokens';
 interface WhatsAppAuthModalProps {
   visible: boolean;
   onClose: () => void;
+  /** Disparado quando o número informado não tem conta Vito: o app deve levar o usuário ao cadastro. */
+  onPhoneNotLinked?: (message: string) => void;
 }
 
-export const WhatsAppAuthModal: React.FC<WhatsAppAuthModalProps> = ({ visible, onClose }) => {
+export const WhatsAppAuthModal: React.FC<WhatsAppAuthModalProps> = ({ visible, onClose, onPhoneNotLinked }) => {
   const { colors } = useTheme();
   const { loginWithWhatsApp } = useAuth();
 
@@ -55,6 +57,14 @@ export const WhatsAppAuthModal: React.FC<WhatsAppAuthModalProps> = ({ visible, o
       await api.requestWhatsAppOTP(cleanPhone);
       setStep('otp');
     } catch (err: any) {
+      // Número sem conta Vito: o app deve avisar e levar o usuário ao cadastro (e-mail ou Google).
+      if (err?.code === 'PHONE_NOT_LINKED' || err?.status === 403) {
+        const message = err?.message || 'Este número ainda não tem conta no Vito.';
+        setError(message);
+        setStep('phone');
+        onPhoneNotLinked?.(message);
+        return;
+      }
       setError(err?.message || 'Falha ao enviar código via WhatsApp. Verifique o número.');
     } finally {
       setLoading(false);
@@ -75,6 +85,13 @@ export const WhatsAppAuthModal: React.FC<WhatsAppAuthModalProps> = ({ visible, o
       await loginWithWhatsApp(cleanPhone, cleanCode);
       handleClose();
     } catch (err: any) {
+      if (err?.code === 'PHONE_NOT_LINKED' || err?.status === 403) {
+        const message = err?.message || 'Este número ainda não tem conta no Vito.';
+        setError(message);
+        setStep('phone');
+        onPhoneNotLinked?.(message);
+        return;
+      }
       setError(err?.message || 'Código incorreto ou expirado. Tente novamente.');
     } finally {
       setLoading(false);
