@@ -101,7 +101,14 @@ export const googleAuthService = {
                 user,
               };
             }
+          } else {
+            const errJson = await resp.json().catch(() => ({}));
+            const backendError = errJson?.error || `Erro HTTP ${resp.status} na autenticação nativa`;
+            console.warn('[googleAuthService] Backend rejeitou ID Token nativo:', backendError);
+            throw new Error(`Falha no login com Google nativo: ${backendError}`);
           }
+        } else {
+          console.warn('[googleAuthService] GoogleSignin não retornou idToken válido');
         }
       } catch (err: any) {
         if (err?.code === statusCodes?.SIGN_IN_CANCELLED) {
@@ -109,6 +116,10 @@ export const googleAuthService = {
         }
         if (err?.code === statusCodes?.IN_PROGRESS) {
           throw new Error('Login com Google já em andamento.');
+        }
+        // Se foi erro do backend, não mascara com fallback: lança o erro para o usuário
+        if (err?.message?.includes('Falha no login com Google nativo')) {
+          throw err;
         }
         console.warn('[googleAuthService] Google Sign-in nativo falhou, acionando fallback web seguro:', err?.message || err);
       }
@@ -122,7 +133,15 @@ export const googleAuthService = {
     const redirectUrl = Linking.createURL('oauth/callback');
     const authStartUrl = `${serverUrl.replace(/\/+$/, '')}/api/v1/auth/google/start?mode=login&redirect_scheme=${encodeURIComponent(redirectUrl)}&device_name=${encodeURIComponent(deviceName)}`;
 
-    const result = await WebBrowser.openAuthSessionAsync(authStartUrl, redirectUrl, IN_APP_BROWSER_OPTIONS);
+    // Para o deep link de retorno funcionar confiavelmente após o redirecionamento OAuth,
+    // o Android precisa usar a activity de proxy do expo-web-browser
+    const webBrowserOptions = {
+      ...IN_APP_BROWSER_OPTIONS,
+      createTask: false,
+      useProxyActivity: true, // Garante que a Intent do deep link seja interceptada pelo app
+    };
+
+    const result = await WebBrowser.openAuthSessionAsync(authStartUrl, redirectUrl, webBrowserOptions);
 
     if (result.type !== 'success') {
       if (result.type === 'cancel' || result.type === 'dismiss') {
