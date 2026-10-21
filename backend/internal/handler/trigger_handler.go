@@ -363,10 +363,10 @@ type parsePromptRequest struct {
 }
 
 type parsePromptResponse struct {
-	Category      domain.TriggerCategory      `json:"category"`
-	SuggestedTitle string                     `json:"suggested_title"`
-	Query         string                      `json:"query"`
-	ConditionType domain.TriggerConditionType `json:"condition_type"`
+	Category       domain.TriggerCategory      `json:"category"`
+	SuggestedTitle string                      `json:"suggested_title"`
+	Query          string                      `json:"query"`
+	ConditionType  domain.TriggerConditionType `json:"condition_type"`
 }
 
 func (h *TriggerHandler) ParsePrompt(w http.ResponseWriter, r *http.Request) {

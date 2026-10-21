@@ -193,6 +193,84 @@ func (c *DefaultEvolutionClient) FindParticipants(ctx context.Context, instanceN
 	return participants, nil
 }
 
+// FindOwnerJID descobre o JID do dono (número realmente pareado) da instância.
+//
+// Importante: o telefone cadastrado na conta Vito pode ser DIFERENTE do número do
+// WhatsApp pareado (ex.: celular pessoal cadastrado no app + chip empresarial
+// pareado na Evolution). Só o JID do owner da instância identifica com segurança
+// o chat "Você" (note-to-self).
+func (c *DefaultEvolutionClient) FindOwnerJID(ctx context.Context, instanceName string) (string, error) {
+	if instanceName == "" {
+		return "", fmt.Errorf("instância do Evolution API obrigatória")
+	}
+	resp, err := c.doRequest(ctx, http.MethodGet, "/instance/fetchInstances", nil)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", fmt.Errorf("evolution api fetchInstances falhou (status %d): %s", resp.StatusCode, truncateForError(string(bodyBytes)))
+	}
+
+	var payload interface{}
+	if err := json.Unmarshal(bodyBytes, &payload); err != nil {
+		return "", err
+	}
+	if jid := findOwnerJIDIn(payload, instanceName); jid != "" {
+		return jid, nil
+	}
+	return "", fmt.Errorf("owner da instância %s não encontrado na resposta do fetchInstances", instanceName)
+}
+
+// findOwnerJIDIn procura o JID do owner em uma resposta de fetchInstances.
+// O formato variou entre versões, então a busca é tolerante: qualquer chave
+// "owner"/"ownerJid" (string ou objeto com jid/id) abaixo do objeto da instância.
+func findOwnerJIDIn(node interface{}, instanceName string) string {
+	switch value := node.(type) {
+	case map[string]interface{}:
+		matchesInstance := instanceName == ""
+		if name, ok := value["name"].(string); ok && name != "" {
+			matchesInstance = name == instanceName
+		}
+		if matchesInstance {
+			for _, key := range []string{"owner", "ownerJid", "jid"} {
+				if jid, ok := value[key].(string); ok && strings.Contains(jid, "@s.whatsapp.net") {
+					return jid
+				}
+				if nested, ok := value[key].(map[string]interface{}); ok {
+					for _, inner := range []string{"jid", "id"} {
+						if jid, ok := nested[inner].(string); ok && strings.Contains(jid, "@s.whatsapp.net") {
+							return jid
+						}
+					}
+				}
+			}
+		}
+		for _, key := range []string{"owner", "ownerJid"} {
+			if jid, ok := value[key].(string); ok && strings.Contains(jid, "@s.whatsapp.net") {
+				return jid
+			}
+		}
+		for _, child := range value {
+			if jid := findOwnerJIDIn(child, instanceName); jid != "" {
+				return jid
+			}
+		}
+	case []interface{}:
+		for _, item := range value {
+			if jid := findOwnerJIDIn(item, instanceName); jid != "" {
+				return jid
+			}
+		}
+	}
+	return ""
+}
+
 // evolutionMessage é o formato cru devolvido por findMessages.
 type evolutionMessage struct {
 	ID  string `json:"id"`

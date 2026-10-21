@@ -12,24 +12,24 @@ import (
 type IntentAction string
 
 const (
-	ActionCreateEvent   IntentAction = "CREATE_EVENT"
-	ActionUpdateEvent   IntentAction = "UPDATE_EVENT"
-	ActionDeleteEvent   IntentAction = "DELETE_EVENT"
-	ActionCreateTodo    IntentAction = "CREATE_TODO"
-	ActionCompleteTodo  IntentAction = "COMPLETE_TODO"
-	ActionDeleteTodo    IntentAction = "DELETE_TODO"
-	ActionCreatePending IntentAction = "CREATE_PENDING_ITEM"
-	ActionConvertPending IntentAction = "CONVERT_PENDING_TO_EVENT"
-	ActionQuerySchedule IntentAction = "QUERY_SCHEDULE"
-	ActionQueryTodos    IntentAction = "QUERY_TODOS"
-	ActionSaveMemory    IntentAction = "SAVE_MEMORY"
-	ActionCreateTrigger IntentAction = "CREATE_TRIGGER"
-	ActionCreateBookingLink IntentAction = "CREATE_BOOKING_LINK"
+	ActionCreateEvent              IntentAction = "CREATE_EVENT"
+	ActionUpdateEvent              IntentAction = "UPDATE_EVENT"
+	ActionDeleteEvent              IntentAction = "DELETE_EVENT"
+	ActionCreateTodo               IntentAction = "CREATE_TODO"
+	ActionCompleteTodo             IntentAction = "COMPLETE_TODO"
+	ActionDeleteTodo               IntentAction = "DELETE_TODO"
+	ActionCreatePending            IntentAction = "CREATE_PENDING_ITEM"
+	ActionConvertPending           IntentAction = "CONVERT_PENDING_TO_EVENT"
+	ActionQuerySchedule            IntentAction = "QUERY_SCHEDULE"
+	ActionQueryTodos               IntentAction = "QUERY_TODOS"
+	ActionSaveMemory               IntentAction = "SAVE_MEMORY"
+	ActionCreateTrigger            IntentAction = "CREATE_TRIGGER"
+	ActionCreateBookingLink        IntentAction = "CREATE_BOOKING_LINK"
 	ActionCancelBookingAppointment IntentAction = "CANCEL_BOOKING_APPOINTMENT"
-	ActionCreateMeeting IntentAction = "CREATE_MEETING"
-	ActionGeneralChat   IntentAction = "GENERAL_CHAT"
-	ActionNeedsClarification IntentAction = "NEEDS_CLARIFICATION"
-	ActionOutOfScope    IntentAction = "OUT_OF_SCOPE"
+	ActionCreateMeeting            IntentAction = "CREATE_MEETING"
+	ActionGeneralChat              IntentAction = "GENERAL_CHAT"
+	ActionNeedsClarification       IntentAction = "NEEDS_CLARIFICATION"
+	ActionOutOfScope               IntentAction = "OUT_OF_SCOPE"
 )
 
 // ChatMessageContext representa uma mensagem no histórico da conversa para contexto multi-turn.
@@ -41,39 +41,39 @@ type ChatMessageContext struct {
 
 // UserInput encapsula a mensagem de entrada do usuário (texto ou áudio em base64).
 type UserInput struct {
-	Text                string               `json:"text,omitempty"`
-	AudioB64            string               `json:"audio_b64,omitempty"`
-	AudioMime           string               `json:"audio_mime,omitempty"`
-	ImageB64            string               `json:"image_b64,omitempty"`
-	ImageMime           string               `json:"image_mime,omitempty"`
-	Timezone            string               `json:"timezone,omitempty"` // ex: "America/Sao_Paulo"
-	Now                 time.Time            `json:"now"`
-	ContextMemories     []string             `json:"context_memories,omitempty"`     // RAG in-context pessoal
-	ActiveSchedule      []string             `json:"active_schedule,omitempty"`      // Próximos compromissos
-	PendingTodos        []string             `json:"pending_todos,omitempty"`        // Tarefas urgentes/pendentes
-	ActiveTriggers      []string             `json:"active_triggers,omitempty"`      // Vigílias / disparadores em andamento
+	Text            string    `json:"text,omitempty"`
+	AudioB64        string    `json:"audio_b64,omitempty"`
+	AudioMime       string    `json:"audio_mime,omitempty"`
+	ImageB64        string    `json:"image_b64,omitempty"`
+	ImageMime       string    `json:"image_mime,omitempty"`
+	Timezone        string    `json:"timezone,omitempty"` // ex: "America/Sao_Paulo"
+	Now             time.Time `json:"now"`
+	ContextMemories []string  `json:"context_memories,omitempty"` // RAG in-context pessoal
+	ActiveSchedule  []string  `json:"active_schedule,omitempty"`  // Próximos compromissos
+	PendingTodos    []string  `json:"pending_todos,omitempty"`    // Tarefas urgentes/pendentes
+	ActiveTriggers  []string  `json:"active_triggers,omitempty"`  // Vigílias / disparadores em andamento
 	// ActiveTriggerAlerts resume alertas não lidos dos radares (Fase 3, top 3).
-	ActiveTriggerAlerts []string             `json:"active_trigger_alerts,omitempty"`
-	ActiveBookings      []string             `json:"active_bookings,omitempty"`      // Links de agendamento do usuário
+	ActiveTriggerAlerts  []string             `json:"active_trigger_alerts,omitempty"`
+	ActiveBookings       []string             `json:"active_bookings,omitempty"`       // Links de agendamento do usuário
 	UpcomingAppointments []string             `json:"upcoming_appointments,omitempty"` // Agendamentos recebidos de convidados
-	ConversationHistory []ChatMessageContext `json:"conversation_history,omitempty"` // Histórico recente da conversa multi-turn
-	QuotedContext      string               `json:"quoted_context,omitempty"`      // Texto da mensagem citada/respondida no WhatsApp
-	ConversationWindow []ChatMessageContext `json:"conversation_window,omitempty"`  // Janela recente de chats do WhatsApp
-	UserName            string               `json:"user_name,omitempty"`            // Nome do usuário para personalização
-	AutonomyMode        string               `json:"autonomy_mode,omitempty"`        // "assisted" (padrão) | "proactive"
-	AppStateFlags       []string             `json:"app_state_flags,omitempty"`      // §8.5 telemetria compacta
-	CoreProfile         []string             `json:"core_profile,omitempty"`         // §8.2 Camada 1 (8-10 itens)
-	RecentEmails        []string             `json:"recent_emails,omitempty"`        // E-mails recentes / faturas / voos do Gmail
-	FocusMode           string               `json:"focus_mode,omitempty"`           // calendar, tasks, triggers, meetings, briefing, memory
+	ConversationHistory  []ChatMessageContext `json:"conversation_history,omitempty"`  // Histórico recente da conversa multi-turn
+	QuotedContext        string               `json:"quoted_context,omitempty"`        // Texto da mensagem citada/respondida no WhatsApp
+	ConversationWindow   []ChatMessageContext `json:"conversation_window,omitempty"`   // Janela recente de chats do WhatsApp
+	UserName             string               `json:"user_name,omitempty"`             // Nome do usuário para personalização
+	AutonomyMode         string               `json:"autonomy_mode,omitempty"`         // "assisted" (padrão) | "proactive"
+	AppStateFlags        []string             `json:"app_state_flags,omitempty"`       // §8.5 telemetria compacta
+	CoreProfile          []string             `json:"core_profile,omitempty"`          // §8.2 Camada 1 (8-10 itens)
+	RecentEmails         []string             `json:"recent_emails,omitempty"`         // E-mails recentes / faturas / voos do Gmail
+	FocusMode            string               `json:"focus_mode,omitempty"`            // calendar, tasks, triggers, meetings, briefing, memory
 }
 
 // ParsedEvent dados extraídos para criação, atualização ou remoção de evento.
 type ParsedEvent struct {
-	Title       string    `json:"title"`
-	Description string    `json:"description,omitempty"`
-	Location    string    `json:"location,omitempty"`
-	StartAt     time.Time `json:"start_at"`
-	EndAt       time.Time `json:"end_at"`
+	Title           string    `json:"title"`
+	Description     string    `json:"description,omitempty"`
+	Location        string    `json:"location,omitempty"`
+	StartAt         time.Time `json:"start_at"`
+	EndAt           time.Time `json:"end_at"`
 	Recurrence      string    `json:"recurrence,omitempty"`       // "WEEKLY", "DAILY", "MONTHLY"
 	RecurrenceUntil string    `json:"recurrence_until,omitempty"` // "YYYY-MM-DD" inclusiva: último dia da série
 	TargetQuery     string    `json:"target_query,omitempty"`     // termo ou ID exato para busca ao atualizar/excluir
@@ -209,4 +209,3 @@ type TriggerEvaluatorProvider interface {
 type TextGeneratorProvider interface {
 	GenerateText(ctx context.Context, systemPrompt, userPrompt string) (string, error)
 }
-

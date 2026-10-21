@@ -117,7 +117,7 @@ func (r *EventRepositorySQLite) GetByID(id, userID string) (*domain.Event, error
 	var e domain.Event
 	var rawStart, rawEnd, rawCreated, rawUpdated any
 	err := r.db.QueryRow(query, id, userID).Scan(
-		&e.ID, &e.UserID, &e.Title, &e.Description, &e.Location, 
+		&e.ID, &e.UserID, &e.Title, &e.Description, &e.Location,
 		&rawStart, &rawEnd, &e.Source, &e.Category, &e.Color, &e.Recurrence,
 		&rawCreated, &rawUpdated,
 	)
@@ -177,7 +177,7 @@ func (r *EventRepositorySQLite) ListByUserPaged(userID string, from, to time.Tim
 		var e domain.Event
 		var rawStart, rawEnd, rawCreated, rawUpdated any
 		if err := rows.Scan(
-			&e.ID, &e.UserID, &e.Title, &e.Description, &e.Location, 
+			&e.ID, &e.UserID, &e.Title, &e.Description, &e.Location,
 			&rawStart, &rawEnd, &e.Source, &e.Category, &e.Color, &e.Recurrence,
 			&rawCreated, &rawUpdated,
 		); err != nil {

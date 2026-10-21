@@ -29,7 +29,7 @@ func openCognitionDB(t *testing.T) (*MemoryRepositorySQLite, string) {
 func seedMemory(t *testing.T, r *MemoryRepositorySQLite, userID, category, content string, importance int) string {
 	t.Helper()
 	m := &domain.Memory{
-		ID: userID + "-" + content[:4] + string(rune('0'+importance)),
+		ID:     userID + "-" + content[:4] + string(rune('0'+importance)),
 		UserID: userID, Category: category, Content: content,
 		Importance: importance, Confidence: 1.0,
 		CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),

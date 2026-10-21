@@ -15,9 +15,9 @@ type Memory struct {
 	UserID         string     `json:"user_id"`
 	Category       string     `json:"category"` // preference, family, routine, health, general
 	Content        string     `json:"content"`
-	Importance     int        `json:"importance"`     // 1..5 (§8.3)
-	Confidence     float64    `json:"confidence"`     // 0..1
-	AccessCount    int        `json:"access_count"`   // reforço por uso
+	Importance     int        `json:"importance"`   // 1..5 (§8.3)
+	Confidence     float64    `json:"confidence"`   // 0..1
+	AccessCount    int        `json:"access_count"` // reforço por uso
 	LastAccessedAt *time.Time `json:"last_accessed_at,omitempty"`
 	SupersededBy   string     `json:"superseded_by,omitempty"`
 	CreatedAt      time.Time  `json:"created_at"`

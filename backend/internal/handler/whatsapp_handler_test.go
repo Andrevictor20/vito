@@ -20,7 +20,9 @@ import (
 )
 
 type mockEvolutionAPIClientForHandler struct {
-	pairingCode string
+	pairingCode     string
+	mockOwnerJID    string
+	mockOwnerJIDErr error
 }
 
 func (m *mockEvolutionAPIClientForHandler) CreateInstance(ctx context.Context, instanceName, phone string) error {
@@ -251,4 +253,8 @@ func (m *mockEvolutionAPIClientForHandler) FindGroups(ctx context.Context, insta
 
 func (m *mockEvolutionAPIClientForHandler) FindParticipants(ctx context.Context, instanceName, groupJid string) ([]string, error) {
 	return nil, nil
+}
+
+func (m *mockEvolutionAPIClientForHandler) FindOwnerJID(ctx context.Context, instanceName string) (string, error) {
+	return m.mockOwnerJID, m.mockOwnerJIDErr
 }

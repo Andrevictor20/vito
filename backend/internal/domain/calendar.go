@@ -6,8 +6,8 @@ import (
 )
 
 var (
-	ErrEventNotFound  = errors.New("evento não encontrado")
-	ErrInvalidEvent   = errors.New("dados de evento inválidos")
+	ErrEventNotFound    = errors.New("evento não encontrado")
+	ErrInvalidEvent     = errors.New("dados de evento inválidos")
 	ErrScheduleConflict = errors.New("conflito de horário detectado")
 	// ErrHolidayReadOnly bloqueia edição/exclusão de feriados (P3: somente-leitura).
 	ErrHolidayReadOnly = errors.New("feriados são somente leitura")
@@ -15,21 +15,21 @@ var (
 
 // Event representa um compromisso ou bloco de tempo na agenda.
 type Event struct {
-	ID          string    `json:"id"`
-	UserID      string    `json:"user_id"`
-	Title       string    `json:"title"`
-	Description string    `json:"description,omitempty"`
-	Location    string    `json:"location,omitempty"`
-	StartAt     time.Time `json:"start_at"`
-	EndAt       time.Time `json:"end_at"`
-	Source      string    `json:"source,omitempty"`
-	Category    string    `json:"category,omitempty"`
-	Color       string    `json:"color,omitempty"`
-	Recurrence  string     `json:"recurrence,omitempty"`
-	ReminderSentAt *time.Time `json:"reminder_sent_at,omitempty"`
+	ID                  string     `json:"id"`
+	UserID              string     `json:"user_id"`
+	Title               string     `json:"title"`
+	Description         string     `json:"description,omitempty"`
+	Location            string     `json:"location,omitempty"`
+	StartAt             time.Time  `json:"start_at"`
+	EndAt               time.Time  `json:"end_at"`
+	Source              string     `json:"source,omitempty"`
+	Category            string     `json:"category,omitempty"`
+	Color               string     `json:"color,omitempty"`
+	Recurrence          string     `json:"recurrence,omitempty"`
+	ReminderSentAt      *time.Time `json:"reminder_sent_at,omitempty"`
 	StartReminderSentAt *time.Time `json:"start_reminder_sent_at,omitempty"`
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
+	CreatedAt           time.Time  `json:"created_at"`
+	UpdatedAt           time.Time  `json:"updated_at"`
 }
 
 // TimeSlot representa uma janela de tempo disponível na agenda.

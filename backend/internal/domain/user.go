@@ -36,4 +36,3 @@ type UserRepository interface {
 	IncrementTokenVersion(id string) error
 	ListAll() ([]User, error)
 }
-

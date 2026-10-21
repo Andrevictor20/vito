@@ -239,15 +239,15 @@ func (p *GoogleProvider) fetchEventsFromCalendar(ctx context.Context, token, cal
 				if t, err := time.Parse(time.RFC3339, item.Start.DateTime); err == nil {
 					startAt = t.UTC()
 				}
-		} else if item.Start.Date != "" {
-			if t, err := time.Parse("2006-01-02", item.Start.Date); err == nil {
-				// Dia inteiro sem hora: meia-noite de Brasília (03:00Z) para o
-				// badge não cair no dia anterior em fusos UTC- (P2).
-				brt := time.FixedZone("BRT", -3*3600)
-				startAt = time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, brt).UTC()
-				isAllDay = true
+			} else if item.Start.Date != "" {
+				if t, err := time.Parse("2006-01-02", item.Start.Date); err == nil {
+					// Dia inteiro sem hora: meia-noite de Brasília (03:00Z) para o
+					// badge não cair no dia anterior em fusos UTC- (P2).
+					brt := time.FixedZone("BRT", -3*3600)
+					startAt = time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, brt).UTC()
+					isAllDay = true
+				}
 			}
-		}
 
 			if item.End.DateTime != "" {
 				if t, err := time.Parse(time.RFC3339, item.End.DateTime); err == nil {

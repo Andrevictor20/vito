@@ -36,19 +36,19 @@ type PhoneVerificationChallenge struct {
 
 // P2PMeetingInvite representa um convite de reunião bilateral entre dois usuários do Vito.
 type P2PMeetingInvite struct {
-	ID              string     `json:"id"`
-	FromUserID      string     `json:"from_user_id"`
-	ToUserID        string     `json:"to_user_id"`
-	Title           string     `json:"title"`
-	Description     string     `json:"description,omitempty"`
-	StartAt         time.Time  `json:"start_at"`
-	EndAt           time.Time  `json:"end_at"`
-	DurationMinutes int        `json:"duration_minutes"`
-	Status          string     `json:"status"` // pending, accepted, declined, cancelled
-	EventIDFrom     *string    `json:"event_id_from,omitempty"`
-	EventIDTo       *string    `json:"event_id_to,omitempty"`
-	CreatedAt       time.Time  `json:"created_at"`
-	UpdatedAt       time.Time  `json:"updated_at"`
+	ID              string    `json:"id"`
+	FromUserID      string    `json:"from_user_id"`
+	ToUserID        string    `json:"to_user_id"`
+	Title           string    `json:"title"`
+	Description     string    `json:"description,omitempty"`
+	StartAt         time.Time `json:"start_at"`
+	EndAt           time.Time `json:"end_at"`
+	DurationMinutes int       `json:"duration_minutes"`
+	Status          string    `json:"status"` // pending, accepted, declined, cancelled
+	EventIDFrom     *string   `json:"event_id_from,omitempty"`
+	EventIDTo       *string   `json:"event_id_to,omitempty"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
 
 	// Enriquecimento
 	FromUserName string `json:"from_user_name,omitempty"`

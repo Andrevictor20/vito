@@ -482,5 +482,3 @@ func TestGoogleProvider_FetchEvents_AllDayBRTMidnight(t *testing.T) {
 		t.Errorf("all-day deveria ser 03:00Z (meia-noite BRT), veio %02d:00Z", got)
 	}
 }
-
-

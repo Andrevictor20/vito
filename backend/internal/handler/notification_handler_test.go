@@ -198,5 +198,3 @@ func TestNotificationHandler_GetNotificationStatus(t *testing.T) {
 		t.Errorf("esperava registered=true e device_count=1, obteve %v", statusRes2)
 	}
 }
-
-

@@ -194,7 +194,6 @@ func TestGateway_GenerateText_Cascade(t *testing.T) {
 	}
 }
 
-
 func TestGateway_EmptyIntentFallsThrough(t *testing.T) {
 	// Bug §8.7/9: struct vazia com err == nil NÃO pode interromper a cascata.
 	pEmpty := &MockProvider{name: "P-vazio", shouldError: false, intent: &ai.ParsedIntent{}}

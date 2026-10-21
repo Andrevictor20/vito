@@ -301,4 +301,3 @@ func (p *GeminiProvider) GenerateText(ctx context.Context, systemPrompt, userPro
 
 	return "", fmt.Errorf("gemini falhou em sintetizar texto: %w", lastErr)
 }
-

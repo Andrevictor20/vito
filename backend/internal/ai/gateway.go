@@ -137,4 +137,3 @@ func (g *Gateway) GenerateText(ctx context.Context, systemPrompt, userPrompt str
 
 	return "", fmt.Errorf("todos os provedores falharam na síntese de texto (último erro: %w)", lastErr)
 }
-

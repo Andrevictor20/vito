@@ -40,6 +40,8 @@ type mockEvolutionClient struct {
 	}
 	mockPairingCode string
 	mockState       string
+	mockOwnerJID    string
+	mockOwnerJIDErr error
 }
 
 func (m *mockEvolutionClient) CreateInstance(ctx context.Context, instanceName, phone string) error {
@@ -712,4 +714,8 @@ func (m *mockEvolutionClient) FindGroups(ctx context.Context, instanceName strin
 
 func (m *mockEvolutionClient) FindParticipants(ctx context.Context, instanceName, groupJid string) ([]string, error) {
 	return m.mockParticipants, m.mockFindParticipantsErr
+}
+
+func (m *mockEvolutionClient) FindOwnerJID(ctx context.Context, instanceName string) (string, error) {
+	return m.mockOwnerJID, m.mockOwnerJIDErr
 }

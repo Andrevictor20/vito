@@ -37,6 +37,7 @@ type WhatsAppBackfillService struct {
 	client     EvolutionAPIClient
 	contextSvc *WhatsAppContextService
 	groupMeta  *WhatsAppGroupMeta
+	ownerCache *WhatsAppOwnerCache
 	waRepo     domain.WhatsAppRepository
 	cfg        WhatsAppBackfillConfig
 }
@@ -46,6 +47,7 @@ func NewWhatsAppBackfillService(
 	client EvolutionAPIClient,
 	contextSvc *WhatsAppContextService,
 	groupMeta *WhatsAppGroupMeta,
+	ownerCache *WhatsAppOwnerCache,
 	waRepo domain.WhatsAppRepository,
 	cfg WhatsAppBackfillConfig,
 ) *WhatsAppBackfillService {
@@ -62,6 +64,7 @@ func NewWhatsAppBackfillService(
 		client:     client,
 		contextSvc: contextSvc,
 		groupMeta:  groupMeta,
+		ownerCache: ownerCache,
 		waRepo:     waRepo,
 		cfg:        cfg,
 	}
@@ -95,6 +98,14 @@ func (s *WhatsAppBackfillService) Run(ctx context.Context) (int, error) {
 func (s *WhatsAppBackfillService) runForInstance(ctx context.Context, integration domain.WhatsAppIntegration) (int, error) {
 	from := time.Now().UTC().AddDate(0, 0, -s.cfg.LookbackDay)
 	to := time.Now().UTC()
+
+	// O JID do owner (número realmente pareado) habilita o reconhecimento do chat
+	// "Você"; é resolvido aqui, em background, antes do primeiro webhook.
+	if s.ownerCache != nil {
+		if _, err := s.ownerCache.Fetch(ctx, integration.InstanceName); err != nil {
+			log.Printf("⚠️ [WhatsAppBackfill] falha ao buscar o owner da instância %s: %v", integration.InstanceName, err)
+		}
+	}
 
 	labels := make(map[string]string)
 	imported := 0
@@ -149,7 +160,13 @@ func (s *WhatsAppBackfillService) importMessage(ctx context.Context, integration
 		}
 	}
 
-	chatKind := ClassifyChat(m.RemoteJID, integration.Phone, participants, fresh)
+	selfReference := integration.Phone
+	if s.ownerCache != nil {
+		if ownerJID, fresh := s.ownerCache.JID(integration.InstanceName); fresh {
+			selfReference = ownerJID
+		}
+	}
+	chatKind := ClassifyChat(m.RemoteJID, selfReference, participants, fresh)
 
 	label := "Contato"
 	switch chatKind {

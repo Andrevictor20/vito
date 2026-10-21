@@ -63,8 +63,8 @@ type multiStatusXML struct {
 }
 
 type responseXML struct {
-	Href     string       `xml:"href"`
-	PropStat propStatXML  `xml:"propstat"`
+	Href     string      `xml:"href"`
+	PropStat propStatXML `xml:"propstat"`
 }
 
 type propStatXML struct {

@@ -8,41 +8,40 @@ import (
 	"strings"
 )
 
-
 // Config armazena as configurações do ambiente do servidor Vito.
 type Config struct {
-	Port               string
-	Environment        string
-	DBPath             string
-	JWTSecret          string
-	DataEncryptionKey  string
-	GeminiAPIKey       string
-	GeminiModel        string
-	OpenRouterAPIKey   string
-	OpenRouterModel    string
-	GroqAPIKey         string
-	GroqModel          string
-	MistralAPIKey       string
-	MistralModel        string
-	GoogleClientID     string
-	GoogleClientSecret string
-	GoogleRedirectURL  string
-	ShortIoAPIKey      string
-	ShortIoDomain      string
-	TurnstileSecretKey string
-	PublicBaseURL      string
-	CorsAllowedOrigins string
-	SMTPHost           string
-	SMTPPort           int
-	SMTPUser           string
-	SMTPPassword       string
-	SMTPFrom           string
-	EvolutionAPIURL    string
-	EvolutionAPIKey    string
-	WhatsAppContextScope        string
-	WhatsAppContextWindowSize   int
+	Port                         string
+	Environment                  string
+	DBPath                       string
+	JWTSecret                    string
+	DataEncryptionKey            string
+	GeminiAPIKey                 string
+	GeminiModel                  string
+	OpenRouterAPIKey             string
+	OpenRouterModel              string
+	GroqAPIKey                   string
+	GroqModel                    string
+	MistralAPIKey                string
+	MistralModel                 string
+	GoogleClientID               string
+	GoogleClientSecret           string
+	GoogleRedirectURL            string
+	ShortIoAPIKey                string
+	ShortIoDomain                string
+	TurnstileSecretKey           string
+	PublicBaseURL                string
+	CorsAllowedOrigins           string
+	SMTPHost                     string
+	SMTPPort                     int
+	SMTPUser                     string
+	SMTPPassword                 string
+	SMTPFrom                     string
+	EvolutionAPIURL              string
+	EvolutionAPIKey              string
+	WhatsAppContextScope         string
+	WhatsAppContextWindowSize    int
 	WhatsAppContextRetentionDays int
-	WhatsAppBackfillEnabled     bool
+	WhatsAppBackfillEnabled      bool
 }
 
 // Load carrega a configuração a partir de variáveis de ambiente com fallbacks seguros.
@@ -129,34 +128,34 @@ func Load() *Config {
 	}
 
 	return &Config{
-		Port:               port,
-		Environment:        env,
-		DBPath:             dbPath,
-		JWTSecret:          jwtSecret,
-		DataEncryptionKey:  dataKey,
-		GeminiAPIKey:       geminiKey,
-		GeminiModel:        geminiModel,
-		OpenRouterAPIKey:   os.Getenv("OPENROUTER_API_KEY"),
-		OpenRouterModel:    openRouterModel,
-		GroqAPIKey:         os.Getenv("GROQ_API_KEY"),
-		GroqModel:          groqModel,
-		MistralAPIKey:       os.Getenv("MISTRAL_API_KEY"),
-		MistralModel:        mistralModel,
-		GoogleClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
-		GoogleClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
-		GoogleRedirectURL:  googleRedirectURL,
-		ShortIoAPIKey:      shortIoKey,
-		ShortIoDomain:      shortIoDomain,
-		TurnstileSecretKey: os.Getenv("CLOUDFLARE_TURNSTILE_SECRET_KEY"),
-		PublicBaseURL:      getEnvOrDefault("PUBLIC_BASE_URL", "https://vito.rasppi.cloud"),
-		CorsAllowedOrigins: os.Getenv("CORS_ALLOWED_ORIGINS"),
-		SMTPHost:           os.Getenv("SMTP_HOST"),
-		SMTPPort:           smtpPort,
-		SMTPUser:           os.Getenv("SMTP_USER"),
-		SMTPPassword:       smtpPass,
-		SMTPFrom:           smtpFrom,
-		EvolutionAPIURL:    getEnvOrDefault("EVOLUTION_API_URL", "http://127.0.0.1:8085"),
-		EvolutionAPIKey:    getEnvOrDefault("EVOLUTION_API_KEY", "vito_evo_key_default_change_in_prod"),
+		Port:                         port,
+		Environment:                  env,
+		DBPath:                       dbPath,
+		JWTSecret:                    jwtSecret,
+		DataEncryptionKey:            dataKey,
+		GeminiAPIKey:                 geminiKey,
+		GeminiModel:                  geminiModel,
+		OpenRouterAPIKey:             os.Getenv("OPENROUTER_API_KEY"),
+		OpenRouterModel:              openRouterModel,
+		GroqAPIKey:                   os.Getenv("GROQ_API_KEY"),
+		GroqModel:                    groqModel,
+		MistralAPIKey:                os.Getenv("MISTRAL_API_KEY"),
+		MistralModel:                 mistralModel,
+		GoogleClientID:               os.Getenv("GOOGLE_CLIENT_ID"),
+		GoogleClientSecret:           os.Getenv("GOOGLE_CLIENT_SECRET"),
+		GoogleRedirectURL:            googleRedirectURL,
+		ShortIoAPIKey:                shortIoKey,
+		ShortIoDomain:                shortIoDomain,
+		TurnstileSecretKey:           os.Getenv("CLOUDFLARE_TURNSTILE_SECRET_KEY"),
+		PublicBaseURL:                getEnvOrDefault("PUBLIC_BASE_URL", "https://vito.rasppi.cloud"),
+		CorsAllowedOrigins:           os.Getenv("CORS_ALLOWED_ORIGINS"),
+		SMTPHost:                     os.Getenv("SMTP_HOST"),
+		SMTPPort:                     smtpPort,
+		SMTPUser:                     os.Getenv("SMTP_USER"),
+		SMTPPassword:                 smtpPass,
+		SMTPFrom:                     smtpFrom,
+		EvolutionAPIURL:              getEnvOrDefault("EVOLUTION_API_URL", "http://127.0.0.1:8085"),
+		EvolutionAPIKey:              getEnvOrDefault("EVOLUTION_API_KEY", "vito_evo_key_default_change_in_prod"),
 		WhatsAppContextScope:         getEnvOrDefault("WHATSAPP_CONTEXT_SCOPE_DEFAULT", "all"),
 		WhatsAppContextWindowSize:    getEnvIntDefault("WHATSAPP_CONTEXT_WINDOW_DEFAULT", 12),
 		WhatsAppContextRetentionDays: getEnvIntDefault("WHATSAPP_CONTEXT_RETENTION_DAYS", 30),
@@ -229,7 +228,6 @@ func (c *Config) Validate() error {
 	}
 	return nil
 }
-
 
 func loadEnvFile(paths ...string) {
 	for _, p := range paths {

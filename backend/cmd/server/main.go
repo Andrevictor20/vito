@@ -375,14 +375,16 @@ func main() {
 	}
 	waContextSvc := service.NewWhatsAppContextService(waConvRepo, waContextCfg)
 	waGroupMeta := service.NewWhatsAppGroupMeta(evoClient, time.Hour, 24*time.Hour)
+	waOwnerCache := service.NewWhatsAppOwnerCache(evoClient, time.Hour)
 	waSvc.SetContextService(waContextSvc)
 	waSvc.SetGroupMeta(waGroupMeta)
+	waSvc.SetOwnerCache(waOwnerCache)
 	accountCleanupWorker.SetContextService(waContextSvc, cfg.WhatsAppContextRetentionDays)
 
 	// Backfill do contexto do WhatsApp: importa o histórico recente da Evolution API.
 	// Roda em background (nunca no caminho quente) e é idempotente.
 	if cfg.WhatsAppBackfillEnabled {
-		waBackfill := service.NewWhatsAppBackfillService(evoClient, waContextSvc, waGroupMeta, waRepo, service.DefaultWhatsAppBackfillConfig())
+		waBackfill := service.NewWhatsAppBackfillService(evoClient, waContextSvc, waGroupMeta, waOwnerCache, waRepo, service.DefaultWhatsAppBackfillConfig())
 		waBackfillWorker := service.NewWhatsAppBackfillWorker(waBackfill, waGroupMeta, 6*time.Hour)
 		waBackfillWorker.Start()
 		defer waBackfillWorker.Stop()

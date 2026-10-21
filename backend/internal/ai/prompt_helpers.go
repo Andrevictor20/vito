@@ -89,4 +89,3 @@ func WrapUntrustedContent(source, raw string) string {
 
 	return fmt.Sprintf("<untrusted_content source=%q>\n%s\n</untrusted_content>", source, neutralized)
 }
-

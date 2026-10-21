@@ -19,8 +19,10 @@ import (
 )
 
 type mockEvolutionClientForAuthHandler struct {
-	sentTo   string
-	sentText string
+	sentTo          string
+	sentText        string
+	mockOwnerJID    string
+	mockOwnerJIDErr error
 }
 
 func (m *mockEvolutionClientForAuthHandler) CreateInstance(ctx context.Context, instanceName, phone string) error {
@@ -222,4 +224,8 @@ func (m *mockEvolutionClientForAuthHandler) FindGroups(ctx context.Context, inst
 
 func (m *mockEvolutionClientForAuthHandler) FindParticipants(ctx context.Context, instanceName, groupJid string) ([]string, error) {
 	return nil, nil
+}
+
+func (m *mockEvolutionClientForAuthHandler) FindOwnerJID(ctx context.Context, instanceName string) (string, error) {
+	return m.mockOwnerJID, m.mockOwnerJIDErr
 }

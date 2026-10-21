@@ -88,7 +88,6 @@ func (h *NotificationHandler) UnregisterDeviceToken(w http.ResponseWriter, r *ht
 	})
 }
 
-
 // SendTestNotification dispara uma notificação push de teste para o usuário autenticado.
 func (h *NotificationHandler) SendTestNotification(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
@@ -168,4 +167,3 @@ func (h *NotificationHandler) GetNotificationStatus(w http.ResponseWriter, r *ht
 		"devices":      devices,
 	})
 }
-

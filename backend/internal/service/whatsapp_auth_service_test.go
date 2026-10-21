@@ -62,8 +62,10 @@ func (m *MockWhatsAppAuthRepo) PruneExpired(ctx context.Context) error {
 }
 
 type MockEvolutionClientForAuth struct {
-	sentTo   string
-	sentText string
+	sentTo          string
+	sentText        string
+	mockOwnerJID    string
+	mockOwnerJIDErr error
 }
 
 func (m *MockEvolutionClientForAuth) CreateInstance(ctx context.Context, instanceName, phone string) error {
@@ -212,4 +214,8 @@ func (m *MockEvolutionClientForAuth) FindGroups(ctx context.Context, instanceNam
 
 func (m *MockEvolutionClientForAuth) FindParticipants(ctx context.Context, instanceName, groupJid string) ([]string, error) {
 	return nil, nil
+}
+
+func (m *MockEvolutionClientForAuth) FindOwnerJID(ctx context.Context, instanceName string) (string, error) {
+	return m.mockOwnerJID, m.mockOwnerJIDErr
 }

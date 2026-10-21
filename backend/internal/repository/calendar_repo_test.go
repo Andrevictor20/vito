@@ -388,6 +388,3 @@ func TestEventRepository_UpdateTimesByTitle_PreservesUserTimezone(t *testing.T) 
 		t.Errorf("hora local no fuso do usuário deve ser 17, mas foi %d", updated.StartAt.In(loc).Hour())
 	}
 }
-
-
-

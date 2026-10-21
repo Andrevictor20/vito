@@ -42,6 +42,7 @@ type WhatsAppService struct {
 	memory           *WhatsAppConversationMemory
 	contextSvc       *WhatsAppContextService
 	groupMeta        *WhatsAppGroupMeta
+	ownerCache       *WhatsAppOwnerCache
 	labelsMu         sync.RWMutex
 	chatLabels       map[string]string
 }
@@ -85,6 +86,11 @@ func (s *WhatsAppService) SetContextService(contextSvc *WhatsAppContextService) 
 // SetGroupMeta injeta o cache de metadados de grupo (participantes e nomes).
 func (s *WhatsAppService) SetGroupMeta(groupMeta *WhatsAppGroupMeta) {
 	s.groupMeta = groupMeta
+}
+
+// SetOwnerCache injeta o cache do JID do owner (número realmente pareado).
+func (s *WhatsAppService) SetOwnerCache(ownerCache *WhatsAppOwnerCache) {
+	s.ownerCache = ownerCache
 }
 
 // SanitizePhoneNumber limpa e normaliza o número para o padrão internacional E.164 sem o '+'.

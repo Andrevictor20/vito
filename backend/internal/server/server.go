@@ -18,23 +18,23 @@ import (
 
 // Server encapsula o roteador Chi e dependências HTTP do Vito.
 type Server struct {
-	router            *chi.Mux
-	allowedOrigins    []string
-	environment       string
-	authHandler       *handler.AuthHandler
-	googleAuthHandler *handler.GoogleAuthHandler
-	calHandler        *handler.CalendarHandler
-	todoHandler       *handler.TodoHandler
-	astHandler        *handler.AssistantHandler
-	notifHandler      *handler.NotificationHandler
-	syncHandler       *handler.CalendarSyncHandler
-	triggerHandler    *handler.TriggerHandler
-	briefingHandler   *handler.BriefingHandler
-	aiSettingsHandler *handler.AISettingsHandler
-	pendingHandler    *handler.PendingHandler
-	bookingHandler    *handler.BookingHandler
-	meetingHandler    *handler.MeetingHandler
-	p2pHandler        *handler.P2PMeetingHandler
+	router              *chi.Mux
+	allowedOrigins      []string
+	environment         string
+	authHandler         *handler.AuthHandler
+	googleAuthHandler   *handler.GoogleAuthHandler
+	calHandler          *handler.CalendarHandler
+	todoHandler         *handler.TodoHandler
+	astHandler          *handler.AssistantHandler
+	notifHandler        *handler.NotificationHandler
+	syncHandler         *handler.CalendarSyncHandler
+	triggerHandler      *handler.TriggerHandler
+	briefingHandler     *handler.BriefingHandler
+	aiSettingsHandler   *handler.AISettingsHandler
+	pendingHandler      *handler.PendingHandler
+	bookingHandler      *handler.BookingHandler
+	meetingHandler      *handler.MeetingHandler
+	p2pHandler          *handler.P2PMeetingHandler
 	chatHandler         *handler.ChatHandler
 	whatsappHandler     *handler.WhatsAppHandler
 	gmailHandler        *handler.GmailHandler
@@ -45,19 +45,19 @@ type Server struct {
 // Config contém as dependências necessárias para inicializar o Server.
 type Config struct {
 	// Environment espelha APP_ENV (development/production) para o fail-closed do CORS.
-	Environment       string
-	AuthHandler       *handler.AuthHandler
-	GoogleAuthHandler *handler.GoogleAuthHandler
-	CalHandler        *handler.CalendarHandler
-	TodoHandler       *handler.TodoHandler
-	AstHandler        *handler.AssistantHandler
-	NotifHandler      *handler.NotificationHandler
-	SyncHandler       *handler.CalendarSyncHandler
-	TriggerHandler    *handler.TriggerHandler
-	BriefingHandler   *handler.BriefingHandler
-	AISettingsHandler *handler.AISettingsHandler
-	PendingHandler    *handler.PendingHandler
-	BookingHandler    *handler.BookingHandler
+	Environment         string
+	AuthHandler         *handler.AuthHandler
+	GoogleAuthHandler   *handler.GoogleAuthHandler
+	CalHandler          *handler.CalendarHandler
+	TodoHandler         *handler.TodoHandler
+	AstHandler          *handler.AssistantHandler
+	NotifHandler        *handler.NotificationHandler
+	SyncHandler         *handler.CalendarSyncHandler
+	TriggerHandler      *handler.TriggerHandler
+	BriefingHandler     *handler.BriefingHandler
+	AISettingsHandler   *handler.AISettingsHandler
+	PendingHandler      *handler.PendingHandler
+	BookingHandler      *handler.BookingHandler
 	MeetingHandler      *handler.MeetingHandler
 	P2PHandler          *handler.P2PMeetingHandler
 	ChatHandler         *handler.ChatHandler
@@ -280,7 +280,6 @@ func (s *Server) registerRoutes() {
 					})
 				}
 
-
 				if s.notifHandler != nil {
 					protected.Route("/notifications", func(nr chi.Router) {
 						nr.Get("/status", s.notifHandler.GetNotificationStatus)
@@ -289,7 +288,6 @@ func (s *Server) registerRoutes() {
 						nr.Post("/test", s.notifHandler.SendTestNotification)
 					})
 				}
-
 
 				if s.syncHandler != nil {
 					protected.Route("/integrations/calendars", func(ir chi.Router) {
@@ -307,9 +305,9 @@ func (s *Server) registerRoutes() {
 						wr.Post("/pairing-code", s.whatsappHandler.RequestPairingCode)
 						wr.Delete("/disconnect", s.whatsappHandler.Disconnect)
 						wr.Get("/contacts", s.whatsappHandler.GetContacts)
-					wr.Get("/context-settings", s.whatsappHandler.GetContextSettings)
-					wr.Put("/context-settings", s.whatsappHandler.UpdateContextSettings)
-					wr.Delete("/context-messages", s.whatsappHandler.PurgeContextMessages)
+						wr.Get("/context-settings", s.whatsappHandler.GetContextSettings)
+						wr.Put("/context-settings", s.whatsappHandler.UpdateContextSettings)
+						wr.Delete("/context-messages", s.whatsappHandler.PurgeContextMessages)
 					})
 				}
 
@@ -321,8 +319,6 @@ func (s *Server) registerRoutes() {
 						gr.Post("/draft", s.gmailHandler.CreateDraft)
 					})
 				}
-
-
 
 				if s.briefingHandler != nil {
 					protected.Route("/users/briefing", func(br chi.Router) {

@@ -31,10 +31,13 @@ func TestWhatsAppBackfill_ImportsHistoryIdempotently(t *testing.T) {
 		},
 	}
 
+	ownerCache := service.NewWhatsAppOwnerCache(fx.client, time.Hour)
+	fx.client.mockOwnerJID = "559884097322@s.whatsapp.net"
 	backfill := service.NewWhatsAppBackfillService(
 		fx.client,
 		fx.contextSvc,
 		fx.groupMeta,
+		ownerCache,
 		fx.waRepo,
 		service.DefaultWhatsAppBackfillConfig(),
 	)
@@ -85,7 +88,7 @@ func TestWhatsAppBackfill_DisabledDoesNothing(t *testing.T) {
 
 	cfg := service.DefaultWhatsAppBackfillConfig()
 	cfg.Enabled = false
-	backfill := service.NewWhatsAppBackfillService(fx.client, fx.contextSvc, fx.groupMeta, fx.waRepo, cfg)
+	backfill := service.NewWhatsAppBackfillService(fx.client, fx.contextSvc, fx.groupMeta, service.NewWhatsAppOwnerCache(fx.client, time.Hour), fx.waRepo, cfg)
 
 	imported, err := backfill.Run(context.Background())
 	if err != nil {

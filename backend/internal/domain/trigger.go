@@ -96,19 +96,19 @@ type TriggerLog struct {
 
 // TriggerTestResult resultado de uma simulação ou teste sob demanda de disparador.
 type TriggerTestResult struct {
-	TriggerID             string    `json:"trigger_id"`
-	Title                 string    `json:"title"`
-	Query                 string    `json:"query"`
-	ConditionMet          bool      `json:"condition_met"`
-	CurrentData           string    `json:"current_data"`
-	Summary               string    `json:"summary"`
-	Paragraphs            []string  `json:"paragraphs,omitempty"`
-	SimulatedNotification string    `json:"simulated_notification"`
-	Confidence            int       `json:"confidence"`
-	WhyRelevant           string    `json:"why_relevant"`
+	TriggerID             string   `json:"trigger_id"`
+	Title                 string   `json:"title"`
+	Query                 string   `json:"query"`
+	ConditionMet          bool     `json:"condition_met"`
+	CurrentData           string   `json:"current_data"`
+	Summary               string   `json:"summary"`
+	Paragraphs            []string `json:"paragraphs,omitempty"`
+	SimulatedNotification string   `json:"simulated_notification"`
+	Confidence            int      `json:"confidence"`
+	WhyRelevant           string   `json:"why_relevant"`
 	// Urgency indica breaking/imediato ("high") vs rotina ("low"/vazio) — Fase 2.
-	Urgency               string    `json:"urgency,omitempty"`
-	TestedAt              time.Time `json:"tested_at"`
+	Urgency  string    `json:"urgency,omitempty"`
+	TestedAt time.Time `json:"tested_at"`
 }
 
 // EnforceConfidenceGate filtra ConditionMet=false quando a avaliação está
@@ -183,8 +183,8 @@ type TriggerTemplate struct {
 	Title          string               `json:"title"`
 	Description    string               `json:"description"`
 	Category       TriggerCategory      `json:"category"`
-	Area           string               `json:"area"` // "carreiras", "concursos", "imoveis", "financas", "viagens", "trabalho", "estudos"
-	Icon           string               `json:"icon"` // "work", "gavel", "home", "flight", "attach-money", "school", "newspaper", etc.
+	Area           string               `json:"area"`       // "carreiras", "concursos", "imoveis", "financas", "viagens", "trabalho", "estudos"
+	Icon           string               `json:"icon"`       // "work", "gavel", "home", "flight", "attach-money", "school", "newspaper", etc.
 	Connectors     []string             `json:"connectors"` // ["web", "gmail", "calendar", "profile"]
 	Query          string               `json:"query"`
 	UserIntent     string               `json:"user_intent"`

@@ -596,3 +596,66 @@ func TestWhatsAppContext_PrefixedSelfJIDEnablesCrossChat(t *testing.T) {
 		t.Errorf("esperava a mensagem de outro chat na janela cross-chat, obteve %+v", window)
 	}
 }
+
+// O telefone cadastrado pode ser DIFERENTE do número do WhatsApp pareado:
+// o owner JID é a única referência confiável para o chat "Você".
+func TestWhatsAppContext_OwnerJIDIdentifiesSelfChat(t *testing.T) {
+	fx := setupContextualWhatsApp(t)
+	ctx := context.Background()
+
+	// Telefone cadastrado (outro número) e owner JID (número realmente pareado).
+	integration, err := fx.waRepo.GetByInstanceName(ctx, "vito_ctx_user")
+	if err != nil || integration == nil {
+		t.Fatalf("integração não encontrada: %v", err)
+	}
+	integration.Phone = "5598984417165"
+	if err := fx.waRepo.Upsert(ctx, integration); err != nil {
+		t.Fatalf("Upsert: %v", err)
+	}
+	ownerCache := service.NewWhatsAppOwnerCache(fx.client, time.Hour)
+	ownerCache.Set("vito_ctx_user", "559884097322@s.whatsapp.net")
+	fx.svc.SetOwnerCache(ownerCache)
+
+	// Mensagem em outro chat (LID de contato) — arquivada, sem acionar o Vito.
+	otherChat := []byte(`{
+		"event": "messages.upsert",
+		"instance": "vito_ctx_user",
+		"data": {
+			"key": {"remoteJid": "471331507024120@lid", "fromMe": false, "id": "msg-lid-2"},
+			"pushName": "Ana",
+			"messageType": "extendedTextMessage",
+			"message": {"extendedTextMessage": {"text": "pode ser quinta às 10h"}}
+		}
+	}`)
+	if err := fx.svc.HandleWebhook(ctx, "messages.upsert", otherChat); err != nil {
+		t.Fatalf("HandleWebhook: %v", err)
+	}
+
+	// Chat "Você" com o JID do número paired: sem @vito, responde e enxerga o outro chat.
+	selfChat := []byte(`{
+		"event": "messages.upsert",
+		"instance": "vito_ctx_user",
+		"data": {
+			"key": {"remoteJid": "559884097322@s.whatsapp.net", "fromMe": true, "id": "msg-self-3"},
+			"pushName": "André",
+			"messageType": "extendedTextMessage",
+			"message": {"extendedTextMessage": {"text": "lembra da reunião com a Ana?"}}
+		}
+	}`)
+	if err := fx.svc.HandleWebhook(ctx, "messages.upsert", selfChat); err != nil {
+		t.Fatalf("HandleWebhook: %v", err)
+	}
+
+	if len(fx.client.sentMessages) != 1 {
+		t.Fatalf("esperava resposta no chat Você sem @vito, obteve %d", len(fx.client.sentMessages))
+	}
+	found := false
+	for _, m := range fx.gateway.lastInput().ConversationWindow {
+		if strings.Contains(m.Text, "pode ser quinta às 10h") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("esperava a mensagem de outro chat na janela cross-chat, obteve %+v", fx.gateway.lastInput().ConversationWindow)
+	}
+}

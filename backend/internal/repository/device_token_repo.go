@@ -52,7 +52,6 @@ func (r *DeviceTokenRepositorySQLite) Save(dt *domain.DeviceToken) error {
 	return tx.Commit()
 }
 
-
 // FindByUserID recupera todos os tokens de dispositivo associados a um usuário.
 func (r *DeviceTokenRepositorySQLite) FindByUserID(userID string) ([]domain.DeviceToken, error) {
 	query := `

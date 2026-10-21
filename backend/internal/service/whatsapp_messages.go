@@ -165,6 +165,10 @@ func (s *WhatsAppService) transcribeAudio(ctx context.Context, instanceName stri
 }
 
 // classifyChat classifica a conversa e agenda a atualização do cache de participantes.
+//
+// A referência para reconhecer o chat "Você" é o **JID do owner** da instância
+// (o número realmente pareado), e não o telefone cadastrado na conta Vito — que
+// pode ser outro número. Sem o owner, o fallback é o telefone cadastrado.
 func (s *WhatsAppService) classifyChat(ctx context.Context, instanceName string, integration *domain.WhatsAppIntegration, remoteJID string) string {
 	participants, fresh := 0, false
 	if strings.HasSuffix(remoteJID, "@g.us") && s.groupMeta != nil {
@@ -173,7 +177,16 @@ func (s *WhatsAppService) classifyChat(ctx context.Context, instanceName string,
 			s.groupMeta.EnsureParticipants(ctx, instanceName, remoteJID)
 		}
 	}
-	return ClassifyChat(remoteJID, integration.Phone, participants, fresh)
+
+	selfReference := integration.Phone
+	if s.ownerCache != nil {
+		if ownerJID, ownerFresh := s.ownerCache.JID(instanceName); ownerFresh {
+			selfReference = ownerJID
+		} else {
+			s.ownerCache.Ensure(ctx, instanceName)
+		}
+	}
+	return ClassifyChat(remoteJID, selfReference, participants, fresh)
 }
 
 // archiveMessage persiste a mensagem no shadow inbox (idempotente por id).

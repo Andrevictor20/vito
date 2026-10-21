@@ -109,4 +109,3 @@ type TodoRepository interface {
 	DeleteSubtask(id, todoID string) error
 	ListSubtasksByTodo(todoID string) ([]Subtask, error)
 }
-

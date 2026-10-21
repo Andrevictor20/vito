@@ -196,4 +196,3 @@ func TestBuildSystemPromptFromInput_FocusModes(t *testing.T) {
 		}
 	})
 }
-

@@ -85,7 +85,6 @@ func (h *AssistantHandler) Chat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-
 	rawText := req.Text
 	if rawText == "" {
 		rawText = req.Prompt

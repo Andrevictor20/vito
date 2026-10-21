@@ -37,6 +37,7 @@ type EvolutionAPIClient interface {
 	FindMessages(ctx context.Context, in EvolutionFindMessagesInput) ([]WhatsAppChatMessage, error)
 	FindGroups(ctx context.Context, instanceName string) ([]WhatsAppGroup, error)
 	FindParticipants(ctx context.Context, instanceName, groupJid string) ([]string, error)
+	FindOwnerJID(ctx context.Context, instanceName string) (string, error)
 }
 
 // DefaultEvolutionClient implementa EvolutionAPIClient via chamadas REST para a Evolution API.

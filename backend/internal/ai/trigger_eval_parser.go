@@ -12,13 +12,13 @@ import (
 )
 
 var (
-	regexJSONBlock     = regexp.MustCompile(`(?s)\{.*\}`)
-	regexSummaryField  = regexp.MustCompile(`"summary"\s*:\s*"([^"]+)"`)
-	regexConfField     = regexp.MustCompile(`"confidence"\s*:\s*"?(\d+)"?`)
-	regexUrgencyField  = regexp.MustCompile(`"urgency"\s*:\s*"([^"]+)"`)
-	regexWhyRelField   = regexp.MustCompile(`"why_relevant"\s*:\s*"([^"]+)"`)
-	regexNotifField    = regexp.MustCompile(`"simulated_notification"\s*:\s*"([^"]+)"`)
-	regexCondMetField  = regexp.MustCompile(`"condition_met"\s*:\s*(true|false)`)
+	regexJSONBlock    = regexp.MustCompile(`(?s)\{.*\}`)
+	regexSummaryField = regexp.MustCompile(`"summary"\s*:\s*"([^"]+)"`)
+	regexConfField    = regexp.MustCompile(`"confidence"\s*:\s*"?(\d+)"?`)
+	regexUrgencyField = regexp.MustCompile(`"urgency"\s*:\s*"([^"]+)"`)
+	regexWhyRelField  = regexp.MustCompile(`"why_relevant"\s*:\s*"([^"]+)"`)
+	regexNotifField   = regexp.MustCompile(`"simulated_notification"\s*:\s*"([^"]+)"`)
+	regexCondMetField = regexp.MustCompile(`"condition_met"\s*:\s*(true|false)`)
 )
 
 type rawEvalResult struct {

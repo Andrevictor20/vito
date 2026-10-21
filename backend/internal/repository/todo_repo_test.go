@@ -155,4 +155,3 @@ func TestTodoRepository_Reminders(t *testing.T) {
 		t.Fatalf("expected 0 due now todos after mark, got %d", len(dueNowAfter))
 	}
 }
-

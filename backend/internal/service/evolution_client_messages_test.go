@@ -194,3 +194,48 @@ func TestEvolutionClient_FindMessages_FiltersByChat(t *testing.T) {
 		t.Errorf("esperava o filtro por remoteJid, obteve %v", key)
 	}
 }
+
+// O owner da instância (número realmente pareado) habilita o reconhecimento do
+// chat "Você" — o telefone cadastrado na conta pode ser outro número.
+func TestEvolutionClient_FindOwnerJID_ParsesFetchInstances(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/instance/fetchInstances" {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`[{"name":"vito_user_1","number":"5598984417165","owner":"559884097322@s.whatsapp.net","status":"connected"}]`))
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer server.Close()
+
+	client := service.NewDefaultEvolutionClient(server.URL, "test_api_key", server.Client())
+	jid, err := client.FindOwnerJID(context.Background(), "vito_user_1")
+	if err != nil {
+		t.Fatalf("esperava sucesso, obteve erro: %v", err)
+	}
+	if jid != "559884097322@s.whatsapp.net" {
+		t.Errorf("owner JID incorreto: %q", jid)
+	}
+}
+
+// Formato alternativo: owner como objeto com jid.
+func TestEvolutionClient_FindOwnerJID_ParsesNestedOwner(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/instance/fetchInstances" {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"instances":[{"name":"vito_user_1","owner":{"jid":"559884097322@s.whatsapp.net","pushName":"André"}}]}`))
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer server.Close()
+
+	client := service.NewDefaultEvolutionClient(server.URL, "test_api_key", server.Client())
+	jid, err := client.FindOwnerJID(context.Background(), "vito_user_1")
+	if err != nil {
+		t.Fatalf("esperava sucesso, obteve erro: %v", err)
+	}
+	if jid != "559884097322@s.whatsapp.net" {
+		t.Errorf("owner JID incorreto: %q", jid)
+	}
+}

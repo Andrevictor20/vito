@@ -28,11 +28,11 @@ func TestBackupManager_EncryptedSnapshotRoundtripAndRotation(t *testing.T) {
 
 	masterKey := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 	mgr, err := NewBackupManager(BackupConfig{
-		DB:        db,
-		BackupDir: backupDir,
-		MasterKey: masterKey,
+		DB:         db,
+		BackupDir:  backupDir,
+		MasterKey:  masterKey,
 		MaxBackups: 2,
-		Interval:  1 * time.Hour,
+		Interval:   1 * time.Hour,
 	})
 	if err != nil {
 		t.Fatalf("NewBackupManager falhou: %v", err)

@@ -39,7 +39,6 @@ func (m *mockAIGateway) ParseIntent(ctx context.Context, input ai.UserInput) (*a
 	return m.intent, nil
 }
 
-
 func TestAssistantHandler_AudioChat(t *testing.T) {
 	mockTrans := &mockTranscriber{text: "Lembrar de comprar leite"}
 	mockAI := &mockAIGateway{
@@ -415,5 +414,3 @@ func TestAssistantHandler_ChatWithHistory(t *testing.T) {
 		t.Errorf("expected history item text 'Quero estudar cálculo', got: %s", mockAI.capturedInput.ConversationHistory[0].Text)
 	}
 }
-
-

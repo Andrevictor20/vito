@@ -16,8 +16,8 @@ var (
 )
 
 const (
-	MeetingModeOneOnOne        = "one_on_one"
-	MeetingModeGroupConsensus  = "group_consensus"
+	MeetingModeOneOnOne       = "one_on_one"
+	MeetingModeGroupConsensus = "group_consensus"
 
 	MeetingStatusOpen      = "open"
 	MeetingStatusConfirmed = "confirmed"
@@ -103,4 +103,3 @@ type MeetingRepository interface {
 	ListVotesByMeeting(ctx context.Context, meetingID string) ([]MeetingVote, error)
 	ConfirmMeetingSlot(ctx context.Context, meetingID, slotID string, startAt, endAt time.Time) error
 }
-

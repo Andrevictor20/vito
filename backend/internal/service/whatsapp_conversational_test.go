@@ -130,6 +130,8 @@ type mockExtendedEvolutionClient struct {
 	mockFindParticErr    error
 	findMessagesCount    int
 	findParticipantsCnt  int
+	mockOwnerJID         string
+	mockOwnerJIDErr      error
 }
 
 func (m *mockExtendedEvolutionClient) CreateInstance(ctx context.Context, instanceName, phone string) error {
@@ -357,4 +359,8 @@ func (m *mockExtendedEvolutionClient) FindGroups(ctx context.Context, instanceNa
 func (m *mockExtendedEvolutionClient) FindParticipants(ctx context.Context, instanceName, groupJid string) ([]string, error) {
 	m.findParticipantsCnt++
 	return m.mockParticipants, m.mockFindParticErr
+}
+
+func (m *mockExtendedEvolutionClient) FindOwnerJID(ctx context.Context, instanceName string) (string, error) {
+	return m.mockOwnerJID, m.mockOwnerJIDErr
 }

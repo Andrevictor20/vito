@@ -6,11 +6,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/andrevmp/vito/backend/internal/domain"
 	"io"
 	"net/http"
 	"strings"
 	"time"
-	"github.com/andrevmp/vito/backend/internal/domain"
 )
 
 // OpenAICompatProvider atende OpenRouter, Groq e qualquer API compatível com OpenAI.
@@ -363,4 +363,3 @@ func (p *OpenAICompatProvider) GenerateText(ctx context.Context, systemPrompt, u
 
 	return strings.TrimSpace(chatResp.Choices[0].Message.Content), nil
 }
-

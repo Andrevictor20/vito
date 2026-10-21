@@ -89,4 +89,3 @@ func TestDeployWorkflow_FixesVolumeOwnershipForNonRootVitoAndRetriesHealthcheck(
 		t.Fatal("ci.yml deve exibir docker logs do vito-backend caso o healthcheck falhe")
 	}
 }
-

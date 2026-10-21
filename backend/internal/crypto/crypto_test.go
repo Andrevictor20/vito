@@ -160,4 +160,3 @@ func TestDecrypt_LegacyCiphertextCompatibility(t *testing.T) {
 		t.Fatalf("esperado %q, obtido %q", plaintext, decrypted)
 	}
 }
-

@@ -29,10 +29,10 @@ func MigratePendingItemsToTodos(db *sql.DB) error {
 
 	type pendingRow struct {
 		id, userID, title, category, status, scheduledDate string
-		remindAt                                          sql.NullTime
-		remindRepeat                                      string
-		remindAdvance                                     int
-		createdAt, updatedAt                              string
+		remindAt                                           sql.NullTime
+		remindRepeat                                       string
+		remindAdvance                                      int
+		createdAt, updatedAt                               string
 	}
 
 	var pendings []pendingRow
