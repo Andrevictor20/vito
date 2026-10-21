@@ -205,13 +205,14 @@ func (s *WhatsAppBackfillService) importMessage(ctx context.Context, integration
 
 // WhatsAppBackfillWorker roda o backfill periodicamente em background.
 type WhatsAppBackfillWorker struct {
-	backfill  *WhatsAppBackfillService
-	groupMeta *WhatsAppGroupMeta
-	interval  time.Duration
-	stopCh    chan struct{}
-	wg        sync.WaitGroup
-	running   bool
-	mu        sync.Mutex
+	backfill     *WhatsAppBackfillService
+	groupMeta    *WhatsAppGroupMeta
+	interval     time.Duration
+	initialDelay time.Duration
+	stopCh       chan struct{}
+	wg           sync.WaitGroup
+	running      bool
+	mu           sync.Mutex
 }
 
 // NewWhatsAppBackfillWorker cria o worker de backfill (intervalo padrão: 6 h).
@@ -221,10 +222,11 @@ func NewWhatsAppBackfillWorker(backfill *WhatsAppBackfillService, groupMeta *Wha
 		period = interval[0]
 	}
 	return &WhatsAppBackfillWorker{
-		backfill:  backfill,
-		groupMeta: groupMeta,
-		interval:  period,
-		stopCh:    make(chan struct{}),
+		backfill:     backfill,
+		groupMeta:    groupMeta,
+		interval:     period,
+		initialDelay: 45 * time.Second,
+		stopCh:       make(chan struct{}),
 	}
 }
 
@@ -241,6 +243,13 @@ func (w *WhatsAppBackfillWorker) Start() {
 	w.wg.Add(1)
 	go func() {
 		defer w.wg.Done()
+		// A Evolution API (Prisma + Postgres) leva ~20s para ficar pronta no boot
+		// do Pi; sem essa espera o primeiro backfill falha por DNS.
+		select {
+		case <-w.stopCh:
+			return
+		case <-time.After(w.initialDelay):
+		}
 		w.runOnce()
 		ticker := time.NewTicker(w.interval)
 		defer ticker.Stop()
@@ -272,15 +281,27 @@ func (w *WhatsAppBackfillWorker) runOnce() {
 	if w.backfill == nil {
 		return
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
+	// A Evolution API pode ainda estar subindo (Prisma + Postgres no Pi): poucas tentativas com backoff.
+	delays := []time.Duration{0, 30 * time.Second, 60 * time.Second}
+	for attempt, delay := range delays {
+		if delay > 0 {
+			select {
+			case <-w.stopCh:
+				return
+			case <-time.After(delay):
+			}
+		}
 
-	imported, err := w.backfill.Run(ctx)
-	if err != nil {
-		log.Printf("⚠️ [WhatsAppBackfill] erro no backfill: %v", err)
-		return
-	}
-	if imported > 0 {
-		log.Printf("[WhatsAppBackfill] %d mensagem(ns) importada(s) para o contexto do WhatsApp", imported)
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		imported, err := w.backfill.Run(ctx)
+		cancel()
+
+		if err == nil {
+			if imported > 0 {
+				log.Printf("[WhatsAppBackfill] %d mensagem(ns) importada(s) para o contexto do WhatsApp", imported)
+			}
+			return
+		}
+		log.Printf("⚠️ [WhatsAppBackfill] erro no backfill (tentativa %d/%d): %v", attempt+1, len(delays), err)
 	}
 }
