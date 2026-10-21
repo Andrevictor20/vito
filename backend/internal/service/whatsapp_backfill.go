@@ -126,6 +126,7 @@ func (s *WhatsAppBackfillService) runForInstance(ctx context.Context, integratio
 			break
 		}
 
+		log.Printf("[WhatsAppBackfill] instância %s página %d: %d registro(s) retornado(s) pela Evolution", integration.InstanceName, page, len(messages))
 		for _, m := range messages {
 			if err := s.importMessage(ctx, integration, m, labels); err != nil {
 				log.Printf("⚠️ [WhatsAppBackfill] falha ao importar mensagem %s: %v", m.ID, err)
@@ -316,9 +317,7 @@ func (w *WhatsAppBackfillWorker) runOnce() {
 		cancel()
 
 		if err == nil {
-			if imported > 0 {
-				log.Printf("[WhatsAppBackfill] %d mensagem(ns) importada(s) para o contexto do WhatsApp", imported)
-			}
+			log.Printf("[WhatsAppBackfill] concluído: %d mensagem(ns) importada(s) para o contexto do WhatsApp", imported)
 			return
 		}
 		log.Printf("⚠️ [WhatsAppBackfill] erro no backfill (tentativa %d/%d): %v", attempt+1, len(delays), err)
