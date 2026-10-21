@@ -162,6 +162,16 @@ jobs:
             echo "(nenhuma linha de account-cleanup no log do container)"
           fi
 
+      - name: Report WhatsApp Context Diagnostics
+        run: |
+          # O backfill roda ~45s após o boot (espera a Evolution API subir).
+          sleep 55
+          echo "== Backfill / contexto do WhatsApp =="
+          docker logs vito-backend 2>&1 | grep -E 'WhatsAppBackfill|WhatsAppGroupMeta|Teto de heap' | tail -12 || echo "(sem linhas de backfill)"
+          echo ""
+          echo "== Shadow inbox (tamanho do banco de contexto) =="
+          docker exec vito-backend sh -c 'ls -l /app/data/vito.db' 2>/dev/null || echo "(não foi possível inspecionar o volume)"
+
       - name: Verify Backend & Evolution API Healthcheck
         run: |
           echo "Verificando Backend Vito..."
