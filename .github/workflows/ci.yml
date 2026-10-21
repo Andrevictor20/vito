@@ -56,7 +56,8 @@ jobs:
   docker-publish:
     name: Build & Push Multi-Arch Docker Image
     needs: test
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    if: github.event_name == 'push'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -132,7 +133,7 @@ jobs:
   deploy:
     name: Auto-Deploy on Raspberry Pi 4
     needs: docker-publish
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: [self-hosted, linux, arm64]
     steps:
       - name: Log in to GitHub Container Registry on Pi
