@@ -81,6 +81,7 @@ func (s *WhatsAppBackfillService) Run(ctx context.Context) (int, error) {
 	}
 
 	total := 0
+	var lastErr error
 	for _, integration := range integrations {
 		if integration.Status != domain.WhatsAppStatusConnected {
 			continue
@@ -88,8 +89,14 @@ func (s *WhatsAppBackfillService) Run(ctx context.Context) (int, error) {
 		imported, err := s.runForInstance(ctx, integration)
 		total += imported
 		if err != nil {
+			lastErr = err
 			log.Printf("⚠️ [WhatsAppBackfill] falha ao importar a instância %s: %v", integration.InstanceName, err)
 		}
+	}
+	// Se nada foi importado e houve erro, o erro precisa propagar: é o que faz o
+	// worker do backoff tentar de novo (a Evolution API pode ainda estar subindo).
+	if total == 0 && lastErr != nil {
+		return total, lastErr
 	}
 	return total, nil
 }

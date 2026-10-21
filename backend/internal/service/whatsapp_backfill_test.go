@@ -2,6 +2,7 @@ package service_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -165,5 +166,27 @@ func TestWhatsAppContext_CascadeOnUserDeletion(t *testing.T) {
 	}
 	if len(msgs) != 0 {
 		t.Fatalf("esperava o inbox vazio após a exclusão da conta, restaram %d", len(msgs))
+	}
+}
+
+// O erro precisa propagar quando nada foi importado: é o que faz o worker
+// repetir com backoff (a Evolution API pode ainda estar subindo no boot).
+func TestWhatsAppBackfill_PropagatesErrorWhenNothingImported(t *testing.T) {
+	fx := setupContextualWhatsApp(t)
+
+	fx.client.mockFindMessagesErr = errors.New("connection refused")
+	ownerCache := service.NewWhatsAppOwnerCache(fx.client, time.Hour)
+	fx.client.mockOwnerJIDErr = errors.New("connection refused")
+
+	backfill := service.NewWhatsAppBackfillService(
+		fx.client, fx.contextSvc, fx.groupMeta, ownerCache, fx.waRepo, service.DefaultWhatsAppBackfillConfig(),
+	)
+
+	imported, err := backfill.Run(context.Background())
+	if err == nil {
+		t.Fatal("esperava erro quando nada foi importado e a Evolution falhou")
+	}
+	if imported != 0 {
+		t.Errorf("esperava 0 importações, obteve %d", imported)
 	}
 }
