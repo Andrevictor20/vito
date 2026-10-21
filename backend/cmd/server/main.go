@@ -383,6 +383,7 @@ func main() {
 	waSvc.SetContextService(waContextSvc)
 	waSvc.SetGroupMeta(waGroupMeta)
 	waSvc.SetOwnerCache(waOwnerCache)
+	waSvc.SetContextDebugLog(cfg.WhatsAppContextDebugLog)
 	accountCleanupWorker.SetContextService(waContextSvc, cfg.WhatsAppContextRetentionDays)
 
 	// Backfill do contexto do WhatsApp: importa o histórico recente da Evolution API.

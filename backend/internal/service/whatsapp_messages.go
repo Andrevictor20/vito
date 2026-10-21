@@ -93,7 +93,9 @@ func (s *WhatsAppService) handleMessagesEvent(ctx context.Context, instanceName 
 	// enxergou. O conteúdo (truncado) é essential para diagnosticar "não sei".
 	log.Printf("🧠 [WhatsAppContext] kind=%s janela=%d cross_chat=%v citada=%v chats=%s msg_id=%s",
 		chatKind, len(window), AllowsCrossChat(chatKind), quoted != "", describeWindowChats(window), msg.MessageID)
-	log.Printf("🧠 [WhatsAppContext] conteúdo da janela: %s", describeWindowContent(window))
+	if s.contextDebugLog {
+		log.Printf("🧠 [WhatsAppContext] conteúdo da janela: %s", describeWindowContent(window))
+	}
 
 	convKey := fmt.Sprintf("%s:%s", instanceName, msg.RemoteJID)
 	history := s.memory.GetHistory(convKey)

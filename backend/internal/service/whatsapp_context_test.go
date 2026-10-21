@@ -821,3 +821,34 @@ func TestWhatsAppContext_PreviewReportsWhatVitoSees(t *testing.T) {
 		t.Error("esperava a lista de chats da janela")
 	}
 }
+
+// O shadow inbox arquiva TUDO, inclusive os códigos de acesso que o Vito envia
+// no login por WhatsApp. Esses segredos não podem ir para a janela (e nem para
+// a LLM de terceiro).
+func TestWhatsAppContext_SecretsNeverEnterTheWindow(t *testing.T) {
+	fx := setupContextualWhatsApp(t)
+	now := time.Now().UTC()
+	ctx := context.Background()
+
+	archiveMessage(t, fx, "msg-secret-1", selfJID(), domain.WhatsAppChatKindSelf, "Você",
+		"Seu codigo de acesso ao Vito e: 216637", now)
+	archiveMessage(t, fx, "msg-secret-2", selfJID(), domain.WhatsAppChatKindSelf, "Você",
+		"216637", now)
+	archiveMessage(t, fx, "msg-secret-3", selfJID(), domain.WhatsAppChatKindSelf, "Você",
+		"seu codigo de verificacao e 884512", now)
+	archiveMessage(t, fx, "msg-ok-1", selfJID(), domain.WhatsAppChatKindSelf, "Você",
+		"reuniao com a Ana quinta as 10h", now)
+
+	window := fx.contextSvc.SelfWindow(ctx, "user-ctx-1", "")
+	for _, m := range window {
+		if strings.Contains(m.Text, "216637") || strings.Contains(m.Text, "884512") {
+			t.Fatalf("segredo entrou na janela de contexto: %q", m.Text)
+		}
+	}
+	if len(window) != 1 {
+		t.Fatalf("esperava apenas a mensagem legitima na janela, obteve %d: %+v", len(window), window)
+	}
+	if !strings.Contains(window[0].Text, "reuniao com a Ana") {
+		t.Errorf("a mensagem legitima deveria estar na janela, obteve %q", window[0].Text)
+	}
+}

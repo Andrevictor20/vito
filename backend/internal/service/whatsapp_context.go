@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"regexp"
-	"sort"
 	"strings"
 	"time"
 
@@ -189,112 +188,7 @@ func (s *WhatsAppContextService) Window(ctx context.Context, userID, chatJID, ch
 		if text == "" {
 			continue
 		}
-		window = append(window, ai.ChatMessageContext{
-			Sender: windowSender(m),
-			Text:   TruncateContextText(text, s.cfg.TruncChars),
-			Chat:   windowChatLabel(m),
-		})
-	}
-	return window
-}
-
-// maxMessagesPerChatInWindow limita quantas mensagens de um MESMO chat entram na
-// parte cross-chat da janela. Sem esse teto, uma conversa muito ativa (o chat
-// "Você") expulsa as outras — e o Vito nunca via a conversa que o usuário
-// estava retomando.
-const maxMessagesPerChatInWindow = 3
-
-// crossChatWindow monta a janela com diversidade: metade do chat em que o Vito
-// foi acionado e metade distribuída pelos demais chats (no máximo
-// maxMessagesPerChatInWindow de cada), do mais recente para o mais antigo.
-func (s *WhatsAppContextService) crossChatWindow(ctx context.Context, userID, chatJID string, size int, since time.Time) []domain.WhatsAppConversationMessage {
-	half := size / 2
-	if half < 1 {
-		half = 1
-	}
-	otherLimit := size - half
-
-	selected := make([]domain.WhatsAppConversationMessage, 0, size)
-
-	current, err := s.repo.RecentMessages(ctx, userID, chatJID, half+1, since)
-	if err == nil && len(current) > half {
-		current = current[len(current)-half:]
-	}
-	selected = append(selected, current...)
-
-	others, err := s.repo.RecentMessagesAcrossChats(ctx, userID, size*4, since)
-	if err == nil {
-		perChat := make(map[string]int, 8)
-		chosen := 0
-		for i := len(others) - 1; i >= 0 && chosen < otherLimit; i-- {
-			m := others[i]
-			if m.ChatJID == chatJID {
-				continue
-			}
-			if perChat[m.ChatJID] >= maxMessagesPerChatInWindow {
-				continue
-			}
-			perChat[m.ChatJID]++
-			selected = append(selected, m)
-			chosen++
-		}
-	}
-
-	sort.SliceStable(selected, func(i, j int) bool {
-		return selected[i].MessageTimestamp.Before(selected[j].MessageTimestamp)
-	})
-	if len(selected) > size {
-		selected = selected[len(selected)-size:]
-	}
-	return selected
-}
-
-// SelfWindow devolve a janela de contexto para as surfaces do APP e do DESKTOP.
-//
-// No WhatsApp existe um "chat atual" (onde o Vito foi acionado) e a segurança
-// exige não cruzar chats quando a resposta será entregue a terceiros. No app e
-// no desktop a resposta só é vista pelo próprio usuário, então o escopo `all`
-// pode trazer todos os chats com segurança.
-//
-// Mapeamento do escopo nas surfaces do app:
-//   - `off`    => nada;
-//   - `quoted` => nada (não há citação no app);
-//   - `chat`   => apenas a conversa "Você" (chat_kind = self);
-//   - `all`    => todos os chats do usuário.
-func (s *WhatsAppContextService) SelfWindow(ctx context.Context, userID, currentText string) []ai.ChatMessageContext {
-	if s.repo == nil {
-		return nil
-	}
-	settings, err := s.Settings(ctx, userID)
-	if err != nil {
-		return nil
-	}
-	if settings.Scope == domain.WhatsAppContextScopeOff || settings.Scope == domain.WhatsAppContextScopeQuoted {
-		return nil
-	}
-	size := settings.WindowSize
-	if size <= 0 {
-		return nil
-	}
-	if s.cfg.ReferentialEnabled && !NeedsFullWindow(currentText) && size > minTier0Window {
-		size = minTier0Window
-	}
-
-	since := time.Now().UTC().Add(-s.cfg.MaxAge)
-	var messages []domain.WhatsAppConversationMessage
-	if settings.Scope == domain.WhatsAppContextScopeAll {
-		messages, err = s.repo.RecentMessagesAcrossChats(ctx, userID, size, since)
-	} else {
-		messages, err = s.repo.RecentMessagesByKind(ctx, userID, domain.WhatsAppChatKindSelf, size, since)
-	}
-	if err != nil {
-		return nil
-	}
-
-	window := make([]ai.ChatMessageContext, 0, len(messages))
-	for _, m := range messages {
-		text := strings.TrimSpace(m.Text)
-		if text == "" {
+		if isSensitiveContextMessage(text) {
 			continue
 		}
 		window = append(window, ai.ChatMessageContext{
@@ -304,61 +198,6 @@ func (s *WhatsAppContextService) SelfWindow(ctx context.Context, userID, current
 		})
 	}
 	return window
-}
-
-// WhatsAppContextPreview mostra ao usuário o que o Vito está enxergando agora.
-type WhatsAppContextPreview struct {
-	Scope          string   `json:"scope"`
-	WindowSize     int      `json:"window_size"`
-	MaxAgeDays     int      `json:"max_age_days"`
-	ArchivedTotal  int64    `json:"archived_total"`
-	WindowMessages int      `json:"window_messages"`
-	Chats          []string `json:"chats"`
-	Sample         []string `json:"sample"`
-}
-
-// Preview monta a prévia do contexto (usada pela tela do Perfil).
-func (s *WhatsAppContextService) Preview(ctx context.Context, userID string) (*WhatsAppContextPreview, error) {
-	settings, err := s.Settings(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-	since := time.Now().UTC().Add(-s.cfg.MaxAge)
-	preview := &WhatsAppContextPreview{
-		Scope:      settings.Scope,
-		WindowSize: settings.WindowSize,
-		MaxAgeDays: int(s.cfg.MaxAge.Hours() / 24),
-		Chats:      []string{},
-		Sample:     []string{},
-	}
-	if s.repo == nil {
-		return preview, nil
-	}
-
-	total, err := s.repo.CountMessages(ctx, userID, since)
-	if err != nil {
-		return nil, err
-	}
-	preview.ArchivedTotal = total
-
-	window := s.SelfWindow(ctx, userID, "")
-	preview.WindowMessages = len(window)
-
-	seen := map[string]bool{}
-	for _, m := range window {
-		label := strings.TrimSpace(m.Chat)
-		if label != "" && !seen[label] {
-			seen[label] = true
-			preview.Chats = append(preview.Chats, label)
-		}
-	}
-	for i, m := range window {
-		if i >= 5 {
-			break
-		}
-		preview.Sample = append(preview.Sample, TruncateContextText(m.Text, 120))
-	}
-	return preview, nil
 }
 
 // minTier0Window é o piso da janela quando a mensagem é autocontida.
