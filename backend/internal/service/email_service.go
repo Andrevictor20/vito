@@ -397,4 +397,3 @@ func (s *EmailService) SendMeetingConfirmation(ctx context.Context, toEmail, toN
 	log.Printf("[EmailService] Enviando confirmação de reunião para %s via %s", toEmail, addr)
 	return s.sender.SendMail(addr, auth, s.User, []string{toEmail}, []byte(raw.String()))
 }
-

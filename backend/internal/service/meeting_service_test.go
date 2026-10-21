@@ -615,6 +615,3 @@ func (m *mockMeetingEmailSender) getSent() ([]string, []byte) {
 	defer m.mu.Unlock()
 	return m.sentTo, m.sentMsg
 }
-
-
-

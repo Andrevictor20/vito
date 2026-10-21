@@ -407,5 +407,3 @@ func TestCalendarSyncService_PushEvent_ReturnsErrorOnProviderFailure(t *testing.
 		t.Fatalf("esperava que PushEvent retornasse erro quando provider falha de forma permanente")
 	}
 }
-
-

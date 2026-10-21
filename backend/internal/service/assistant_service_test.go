@@ -223,7 +223,6 @@ func TestAssistantService_ScopeGuard_AllowsDates(t *testing.T) {
 	}
 }
 
-
 func TestAssistantService_SaveMemory(t *testing.T) {
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "test_memory.db")
@@ -607,4 +606,3 @@ func TestAssistantService_PopulatesActiveTriggersInInput(t *testing.T) {
 		t.Errorf("expected trigger title 'PETR3 Alerta', got: %s", mockAI.capturedInput.ActiveTriggers[0])
 	}
 }
-

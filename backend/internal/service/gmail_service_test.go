@@ -430,4 +430,3 @@ func TestGmailService_AutoRefreshToken_Reactive401(t *testing.T) {
 		t.Errorf("esperava status active após recuperação, obteve %s", repo.integration.Status)
 	}
 }
-

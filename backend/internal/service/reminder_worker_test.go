@@ -74,12 +74,14 @@ func (m *mockReminderEventRepo) MarkStartReminderSent(eventID string, sentAt tim
 func (m *mockReminderEventRepo) CheckConflict(userID string, startAt, endAt time.Time, excludeEventID string) (*domain.ConflictInfo, error) {
 	return &domain.ConflictInfo{HasConflict: false}, nil
 }
-func (m *mockReminderEventRepo) Delete(id, userID string) error { return nil }
+func (m *mockReminderEventRepo) Delete(id, userID string) error                       { return nil }
 func (m *mockReminderEventRepo) DeleteByTitle(userID, titleQuery string) (int, error) { return 0, nil }
-func (m *mockReminderEventRepo) DeleteSeries(id, userID string) (int, error) { return 0, nil }
-func (m *mockReminderEventRepo) Update(event *domain.Event) error { return nil }
-func (m *mockReminderEventRepo) UpdateSeries(event *domain.Event) (int, error) { return 0, nil }
-func (m *mockReminderEventRepo) UpdateTimesByTitle(userID, titleQuery string, newStart, newEnd time.Time) (int, error) { return 0, nil }
+func (m *mockReminderEventRepo) DeleteSeries(id, userID string) (int, error)          { return 0, nil }
+func (m *mockReminderEventRepo) Update(event *domain.Event) error                     { return nil }
+func (m *mockReminderEventRepo) UpdateSeries(event *domain.Event) (int, error)        { return 0, nil }
+func (m *mockReminderEventRepo) UpdateTimesByTitle(userID, titleQuery string, newStart, newEnd time.Time) (int, error) {
+	return 0, nil
+}
 
 func TestReminderWorker_CheckAndDispatchReminders(t *testing.T) {
 	// 1. Mock do servidor Expo
@@ -288,4 +290,3 @@ func TestReminderWorker_SkipsAllDayEventsAndHolidays(t *testing.T) {
 		t.Errorf("esperava que ReminderSentAt fosse marcado para o evento de dia inteiro")
 	}
 }
-

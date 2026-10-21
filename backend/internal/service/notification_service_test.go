@@ -171,4 +171,3 @@ func TestNotificationService_SendPushToUser_PrunesInvalidTokens(t *testing.T) {
 		t.Errorf("esperava que token 'DeviceNotRegistered' fosse removido do repositório, mas ainda existem %d tokens", len(tokens))
 	}
 }
-

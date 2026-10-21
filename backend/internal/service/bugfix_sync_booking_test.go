@@ -102,8 +102,8 @@ func TestBugfix_BookingSlot_IgnoresHolidays(t *testing.T) {
 	targetDate := time.Date(2026, 12, 25, 0, 0, 0, 0, time.UTC) // Natal (sexta), feriado
 	hol := &domain.Event{
 		ID: "ev-hol", UserID: ctx.user.ID, Title: "Natal", Category: "holiday",
-		StartAt: time.Date(2026, 12, 25, 0, 0, 0, 0, time.UTC),
-		EndAt:   time.Date(2026, 12, 26, 0, 0, 0, 0, time.UTC),
+		StartAt:   time.Date(2026, 12, 25, 0, 0, 0, 0, time.UTC),
+		EndAt:     time.Date(2026, 12, 26, 0, 0, 0, 0, time.UTC),
 		CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
 	}
 	if err := ctx.eventRepo.Create(hol); err != nil {
@@ -175,7 +175,7 @@ func TestBugfix_DeleteSeries_PropagatesAll(t *testing.T) {
 		ev := &domain.Event{
 			ID: "series-ev-" + string(rune('a'+i)), UserID: "user-cal-svc-1",
 			Title: "Aula de Inglês", StartAt: base.Add(time.Duration(i*24) * time.Hour),
-			EndAt: base.Add(time.Duration(i*24)*time.Hour + time.Hour),
+			EndAt:     base.Add(time.Duration(i*24)*time.Hour + time.Hour),
 			CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
 		}
 		if err := eventRepo.Create(ev); err != nil {
@@ -198,9 +198,9 @@ func TestBugfix_DeleteSeries_PropagatesAll(t *testing.T) {
 func TestBugfix_BookingIntentHelpers(t *testing.T) {
 	cases := map[string]bool{
 		"crie um link de agendamento amanhã 19h-20h": true,
-		"disponibilize horário sábado":              true,
-		"deixe marcarem comigo essa semana":         true,
-		"marque uma reunião amanhã às 10h":          false,
+		"disponibilize horário sábado":               true,
+		"deixe marcarem comigo essa semana":          true,
+		"marque uma reunião amanhã às 10h":           false,
 	}
 	for text, want := range cases {
 		_ = text

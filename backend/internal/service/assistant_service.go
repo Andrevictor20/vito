@@ -26,15 +26,15 @@ type DestructiveConfirmation struct {
 
 // AssistantResponse representa o retorno da interação com a secretária Vito.
 type AssistantResponse struct {
-	Action              ai.IntentAction          `json:"action"`
-	Intent              string                   `json:"intent,omitempty"`
-	Message             string                   `json:"message"`
-	Reply               string                   `json:"reply,omitempty"`
-	Event               *domain.Event            `json:"event,omitempty"`
-	Conflict            *domain.ConflictInfo     `json:"conflict,omitempty"`
-	Todo                *domain.Todo             `json:"todo,omitempty"`
-	Trigger             *domain.Trigger          `json:"trigger,omitempty"`
-	Pending             *domain.PendingItem      `json:"pending,omitempty"`
+	Action              ai.IntentAction            `json:"action"`
+	Intent              string                     `json:"intent,omitempty"`
+	Message             string                     `json:"message"`
+	Reply               string                     `json:"reply,omitempty"`
+	Event               *domain.Event              `json:"event,omitempty"`
+	Conflict            *domain.ConflictInfo       `json:"conflict,omitempty"`
+	Todo                *domain.Todo               `json:"todo,omitempty"`
+	Trigger             *domain.Trigger            `json:"trigger,omitempty"`
+	Pending             *domain.PendingItem        `json:"pending,omitempty"`
 	Booking             *domain.BookingType        `json:"booking,omitempty"`
 	BookingURL          string                     `json:"booking_url,omitempty"`
 	BookingShort        string                     `json:"booking_short_url,omitempty"`

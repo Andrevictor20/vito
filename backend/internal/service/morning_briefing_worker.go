@@ -193,8 +193,8 @@ func (w *MorningBriefingWorker) ProcessBriefings(now time.Time) (int, error) {
 		}
 
 		data := map[string]interface{}{
-			"type":      "morning_briefing",
-			"date":      currentDateStr,
+			"type":        "morning_briefing",
+			"date":        currentDateStr,
 			"eventsCount": len(events),
 			"todosCount":  len(todos),
 		}

@@ -73,7 +73,6 @@ func (s *AuthService) Register(name, email, password string) (*domain.User, stri
 		return nil, "", err
 	}
 
-
 	existing, _ := s.userRepo.GetByEmail(email)
 	if existing != nil {
 		return nil, "", domain.ErrUserAlreadyExists
@@ -195,4 +194,3 @@ func (s *AuthService) RevokeAllSessions(userID string) error {
 func (s *AuthService) GetUserByID(id string) (*domain.User, error) {
 	return s.userRepo.GetByID(id)
 }
-

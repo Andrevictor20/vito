@@ -417,7 +417,6 @@ func (s *CalendarService) UpdateEventTimesByTitle(userID, titleQuery string, new
 	return count, nil
 }
 
-
 // CreateRecurringEvents gera uma série de ocorrências para um evento recorrente (ex: semanal).
 func (s *CalendarService) CreateRecurringEvents(userID, title, description, location string, startAt, endAt time.Time, recurrence string, count int) ([]*domain.Event, error) {
 	if count <= 0 {

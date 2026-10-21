@@ -424,5 +424,3 @@ func TestCalendarService_CreateEvent_AutoEndTimeWhenZeroOrBefore(t *testing.T) {
 		t.Errorf("esperava EndAt %v, obteve %v", expectedEnd, evt2.EndAt)
 	}
 }
-
-

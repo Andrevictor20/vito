@@ -94,9 +94,22 @@ func (c *DefaultEvolutionClient) FindMessages(ctx context.Context, in EvolutionF
 		return nil, fmt.Errorf("evolution api findMessages falhou (status %d): %s", resp.StatusCode, truncateForError(string(bodyBytes)))
 	}
 
-	var raw []evolutionMessage
-	if err := json.Unmarshal(bodyBytes, &raw); err != nil {
-		return nil, err
+	// A Evolution v2.3.7 responde com o envelope
+	// {"messages": {total, pages, currentPage, records: [...]}}.
+	// O array cru é aceito como fallback (versões/formatos diferentes).
+	var envelope struct {
+		Messages *struct {
+			Total       int                `json:"total"`
+			Pages       int                `json:"pages"`
+			CurrentPage int                `json:"currentPage"`
+			Records     []evolutionMessage `json:"records"`
+		} `json:"messages"`
+	}
+	raw := make([]evolutionMessage, 0, 50)
+	if err := json.Unmarshal(bodyBytes, &envelope); err == nil && envelope.Messages != nil {
+		raw = envelope.Messages.Records
+	} else if err := json.Unmarshal(bodyBytes, &raw); err != nil {
+		return nil, fmt.Errorf("resposta do findMessages em formato inesperado: %w", err)
 	}
 
 	messages := make([]WhatsAppChatMessage, 0, len(raw))
@@ -211,6 +224,15 @@ func (m evolutionMessage) toChatMessage() WhatsAppChatMessage {
 	msg.Text = extractMessageText(m.Message)
 	if m.ContextInfo != nil && len(m.ContextInfo.QuotedMessage) > 0 {
 		msg.QuotedText = extractMessageText(m.ContextInfo.QuotedMessage)
+	}
+	if msg.QuotedText == "" {
+		// Fallback: algumas versões aninham o contextInfo dentro de message.<subtype>.
+		for _, sub := range messageSubtypePriority(subtypesOf(m.Message)) {
+			if quoted, _ := extractQuotedContext(subtypesOf(m.Message)[sub]); quoted != "" {
+				msg.QuotedText = quoted
+				break
+			}
+		}
 	}
 	return msg
 }

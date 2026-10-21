@@ -47,7 +47,6 @@ func TestAuthService_RegisterAndLogin(t *testing.T) {
 		t.Errorf("expected ErrUserAlreadyExists, got: %v", err)
 	}
 
-
 	// 3. Login com senha correta
 	loggedUser, loginToken, err := authSvc.Login("andre@vito.local", "senha12345")
 	if err != nil {
@@ -182,4 +181,3 @@ func TestAuthService_RevokeAllSessions(t *testing.T) {
 		t.Errorf("token2 deveria ter token_version %d, obteve %d", dbUserAfter.TokenVersion, claims2.TokenVersion)
 	}
 }
-

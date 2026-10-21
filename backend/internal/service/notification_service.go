@@ -96,7 +96,6 @@ func (s *NotificationService) UnregisterDeviceToken(userID, token string) error 
 	return s.tokenRepo.Delete(userID, trimmedToken)
 }
 
-
 // SendPushToUser despacha uma notificação push para todos os dispositivos registrados do usuário.
 func (s *NotificationService) SendPushToUser(userID, title, body, priority string, data map[string]interface{}) (int, error) {
 	tokens, err := s.tokenRepo.FindByUserID(userID)

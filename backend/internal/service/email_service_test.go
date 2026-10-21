@@ -130,4 +130,3 @@ func TestGenerateICS(t *testing.T) {
 		t.Errorf("DTSTART incorreto no ICS: %s", ics)
 	}
 }
-

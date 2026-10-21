@@ -149,4 +149,3 @@ func isExplicitDeleteConfirmation(text string) bool {
 	}
 	return false
 }
-

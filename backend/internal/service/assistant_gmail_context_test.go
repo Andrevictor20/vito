@@ -216,4 +216,3 @@ func TestAssistantContext_SelectiveMailboxQuery(t *testing.T) {
 		t.Errorf("esperava query com is:unread 'in:inbox category:primary is:unread', obteve %q", lastQueryCaptured)
 	}
 }
-

@@ -10,9 +10,9 @@ import (
 
 func TestParseMoneyValue(t *testing.T) {
 	cases := []struct {
-		in    string
-		want  float64
-		ok    bool
+		in   string
+		want float64
+		ok   bool
 	}{
 		{"R$ 3.500,99", 3500.99, true},
 		{"R$ 3.500", 3500, true},

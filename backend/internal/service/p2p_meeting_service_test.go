@@ -142,7 +142,7 @@ func TestP2PMeetingService_FindMutualSlots(t *testing.T) {
 		t.Fatalf("falha ao criar u2: %v", err)
 	}
 
-	baseDay := time.Now().UTC().Truncate(24*time.Hour).Add(24 * time.Hour)
+	baseDay := time.Now().UTC().Truncate(24 * time.Hour).Add(24 * time.Hour)
 	dayStart := baseDay.Add(9 * time.Hour)
 	dayEnd := baseDay.Add(18 * time.Hour)
 

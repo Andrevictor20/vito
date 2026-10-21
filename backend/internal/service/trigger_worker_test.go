@@ -225,12 +225,12 @@ func TestTriggerWorker_CheckAndEvaluateTriggers(t *testing.T) {
 				NextCheckAt:   &dueTime,
 			},
 			{
-				ID:            "trig-2",
-				UserID:        "user-1",
-				Title:         "Concursos TI",
-				Query:         "Edital TI Bacen",
-				Status:        domain.TriggerStatusPaused,
-				NextCheckAt:   &dueTime,
+				ID:          "trig-2",
+				UserID:      "user-1",
+				Title:       "Concursos TI",
+				Query:       "Edital TI Bacen",
+				Status:      domain.TriggerStatusPaused,
+				NextCheckAt: &dueTime,
 			},
 		},
 	}
