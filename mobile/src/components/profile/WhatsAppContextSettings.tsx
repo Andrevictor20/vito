@@ -16,6 +16,7 @@ import {
   WHATSAPP_CONTEXT_SCOPES,
   WHATSAPP_CONTEXT_WINDOW_SIZES,
   WhatsAppContextScope,
+  WhatsAppContextPreview,
 } from '../../services/api/whatsappContextApi';
 import { BottomSheetModal } from '../ui/BottomSheetModal';
 
@@ -34,6 +35,18 @@ export const WhatsAppContextSettings: React.FC<WhatsAppContextSettingsProps> = (
   const [isSaving, setIsSaving] = useState(false);
   const [scope, setScope] = useState<WhatsAppContextScope>('all');
   const [windowSize, setWindowSize] = useState(12);
+  const [preview, setPreview] = useState<WhatsAppContextPreview | null>(null);
+
+  const loadPreview = useCallback(async () => {
+    try {
+      const data = await api.getWhatsAppContextPreview();
+      if (data) {
+        setPreview(data);
+      }
+    } catch (err: any) {
+      console.warn('[WhatsAppContextSettings] Falha ao carregar a prévia do contexto:', err);
+    }
+  }, []);
 
   const loadSettings = useCallback(async () => {
     setIsLoading(true);
@@ -48,8 +61,9 @@ export const WhatsAppContextSettings: React.FC<WhatsAppContextSettingsProps> = (
       Alert.alert('Não foi possível carregar', 'Tente novamente em instantes.');
     } finally {
       setIsLoading(false);
+      loadPreview();
     }
-  }, []);
+  }, [loadPreview]);
 
   useEffect(() => {
     if (visible) {
@@ -65,6 +79,7 @@ export const WhatsAppContextSettings: React.FC<WhatsAppContextSettingsProps> = (
     setIsSaving(true);
     try {
       await api.updateWhatsAppContextSettings(nextScope, nextWindow);
+      loadPreview();
     } catch (err: any) {
       setScope(previousScope);
       setWindowSize(previousWindow);
@@ -86,6 +101,7 @@ export const WhatsAppContextSettings: React.FC<WhatsAppContextSettingsProps> = (
           onPress: async () => {
             try {
               await api.purgeWhatsAppContextMessages();
+              loadPreview();
               Alert.alert('Histórico limpo', 'O Vito não tem mais contexto de conversas anteriores.');
             } catch (err: any) {
               Alert.alert('Não foi possível limpar', err?.message || 'Tente novamente em instantes.');
@@ -195,9 +211,51 @@ export const WhatsAppContextSettings: React.FC<WhatsAppContextSettingsProps> = (
 
             {activeScope && (
               <Text style={[styles.footerHint, { color: colors.onSurfaceVariant }]}>
-                O contexto só vale nas conversas pessoais. Em grupos com outras pessoas e em chats de
+                Vale também para o chat do app e do desktop. No WhatsApp, o contexto entre conversas
+                só é liberado nas suas conversas pessoais — em grupos com outras pessoas e em chats de
                 terceiros, o Vito nunca usa mensagens de outros chats.
               </Text>
+            )}
+
+            {preview && (
+              <>
+                <Text style={[styles.sectionTitle, { color: colors.textMuted, marginTop: tokens.spacing.lg }]}>
+                  O QUE O VITO ESTÁ VENDO AGORA
+                </Text>
+                <View style={[styles.previewBox, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
+                  <Text style={[styles.previewLine, { color: colors.onSurface }]}>
+                    {preview.archived_total} mensagem(ns) arquivada(s) · {preview.window_messages} na janela
+                  </Text>
+                  <Text style={[styles.previewMeta, { color: colors.onSurfaceVariant }]}>
+                    Horizonte de {preview.max_age_days} dias · janela de {preview.window_size}
+                  </Text>
+                  {preview.chats.length > 0 && (
+                    <View style={styles.chatChipsRow}>
+                      {preview.chats.map((chat) => (
+                        <View
+                          key={chat}
+                          style={[styles.chatChip, { backgroundColor: colors.surfaceContainerHigh }]}
+                        >
+                          <Text style={[styles.chatChipText, { color: colors.onSurface }]}>{chat}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                  {preview.sample.length > 0 && (
+                    <View style={styles.sampleBlock}>
+                      {preview.sample.map((line, index) => (
+                        <Text
+                          key={`${index}-${line.slice(0, 12)}`}
+                          style={[styles.sampleLine, { color: colors.onSurfaceVariant }]}
+                          numberOfLines={2}
+                        >
+                          • {line}
+                        </Text>
+                      ))}
+                    </View>
+                  )}
+                </View>
+              </>
             )}
 
             <TouchableOpacity
@@ -282,6 +340,42 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 17,
     marginTop: tokens.spacing.lg,
+  },
+  previewBox: {
+    borderWidth: 1,
+    borderRadius: tokens.radii.md,
+    padding: tokens.spacing.md,
+    gap: tokens.spacing.xs,
+  },
+  previewLine: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  previewMeta: {
+    fontSize: 11,
+  },
+  chatChipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: tokens.spacing.xs,
+    marginTop: tokens.spacing.xs,
+  },
+  chatChip: {
+    borderRadius: tokens.radii.sm,
+    paddingHorizontal: tokens.spacing.sm,
+    paddingVertical: 4,
+  },
+  chatChipText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  sampleBlock: {
+    marginTop: tokens.spacing.xs,
+    gap: 3,
+  },
+  sampleLine: {
+    fontSize: 11,
+    lineHeight: 15,
   },
   dangerButton: {
     flexDirection: 'row',

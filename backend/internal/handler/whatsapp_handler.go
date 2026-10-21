@@ -210,6 +210,27 @@ func (h *WhatsAppHandler) UpdateContextSettings(w http.ResponseWriter, r *http.R
 	})
 }
 
+// GetContextPreview mostra ao usuário o que o Vito está enxergando agora:
+// quantas mensagens estão arquivadas, quantas entram na janela e de quais chats.
+func (h *WhatsAppHandler) GetContextPreview(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "não autorizado"})
+		return
+	}
+	if h.contextSvc == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "contexto do WhatsApp indisponível"})
+		return
+	}
+
+	preview, err := h.contextSvc.Preview(r.Context(), userID)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "falha ao montar a prévia do contexto"})
+		return
+	}
+	writeJSON(w, http.StatusOK, preview)
+}
+
 // PurgeContextMessages apaga todo o histórico de conversa arquivado do WhatsApp.
 func (h *WhatsAppHandler) PurgeContextMessages(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())

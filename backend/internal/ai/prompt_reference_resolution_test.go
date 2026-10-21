@@ -71,3 +71,21 @@ func TestBuildSystemPromptFromInput_NoWhatsAppDirectivesWithoutContext(t *testin
 		t.Error("o bloco de contexto do WhatsApp não deve aparecer sem contexto")
 	}
 }
+
+// O Vito não pode responder "não sei" quando o contexto entregue tem a resposta.
+func TestBuildSystemPromptFromInput_WhatsAppDirectiveForbidsDontKnow(t *testing.T) {
+	prompt := ai.BuildSystemPromptFromInput(ai.UserInput{
+		Now:                time.Date(2026, 10, 21, 12, 0, 0, 0, time.UTC),
+		Timezone:           "America/Sao_Paulo",
+		QuotedContext:      "algo citado",
+		ConversationWindow: []ai.ChatMessageContext{{Sender: "Ana", Text: "reuniao quinta 10h", Chat: "Ana"}},
+	})
+
+	// Fragmentos ASCII: a diretiva precisa mandar o Vito varrer o bloco antes de
+	// dizer que nao sabe, e tratar o contexto como memoria (nao como ruido).
+	for _, expected := range []string{"CONT", "A RESPOSTA", "varra o bloco", "um erro"} {
+		if !strings.Contains(prompt, expected) {
+			t.Errorf("esperava o fragmento %q na diretiva de contexto", expected)
+		}
+	}
+}

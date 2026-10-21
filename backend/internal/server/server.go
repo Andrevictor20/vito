@@ -307,6 +307,7 @@ func (s *Server) registerRoutes() {
 						wr.Get("/contacts", s.whatsappHandler.GetContacts)
 						wr.Get("/context-settings", s.whatsappHandler.GetContextSettings)
 						wr.Put("/context-settings", s.whatsappHandler.UpdateContextSettings)
+						wr.Get("/context-preview", s.whatsappHandler.GetContextPreview)
 						wr.Delete("/context-messages", s.whatsappHandler.PurgeContextMessages)
 					})
 				}

@@ -7,6 +7,17 @@ export interface WhatsAppContextSettings {
   window_size: number;
 }
 
+/** Prévia do que o Vito está enxergando agora (janela de contexto montada). */
+export interface WhatsAppContextPreview {
+  scope: WhatsAppContextScope;
+  window_size: number;
+  max_age_days: number;
+  archived_total: number;
+  window_messages: number;
+  chats: string[];
+  sample: string[];
+}
+
 export const WHATSAPP_CONTEXT_SCOPES: { value: WhatsAppContextScope; label: string; hint: string }[] = [
   { value: 'off', label: 'Desligado', hint: 'O Vito não recebe nenhum contexto do WhatsApp.' },
   {
@@ -46,5 +57,9 @@ export class WhatsAppContextApi {
     return this.client.request<{ message: string }>('/api/v1/integrations/whatsapp/context-messages', {
       method: 'DELETE',
     });
+  }
+
+  async getPreview(): Promise<WhatsAppContextPreview> {
+    return this.client.request<WhatsAppContextPreview>('/api/v1/integrations/whatsapp/context-preview');
   }
 }

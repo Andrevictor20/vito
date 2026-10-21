@@ -90,6 +90,8 @@ type WhatsAppConversationRepository interface {
 	SaveMessage(ctx context.Context, msg *WhatsAppConversationMessage) error
 	RecentMessages(ctx context.Context, userID, chatJID string, limit int, since time.Time) ([]WhatsAppConversationMessage, error)
 	RecentMessagesAcrossChats(ctx context.Context, userID string, limit int, since time.Time) ([]WhatsAppConversationMessage, error)
+	RecentMessagesByKind(ctx context.Context, userID, chatKind string, limit int, since time.Time) ([]WhatsAppConversationMessage, error)
+	CountMessages(ctx context.Context, userID string, since time.Time) (int64, error)
 	GetContextSettings(ctx context.Context, userID string) (*WhatsAppContextSettings, error)
 	SaveContextSettings(ctx context.Context, settings *WhatsAppContextSettings) error
 	DeleteMessages(ctx context.Context, userID string) error

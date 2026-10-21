@@ -90,6 +90,41 @@ func (r *WhatsAppConversationRepositorySQLite) RecentMessagesAcrossChats(ctx con
 	return scanConversationMessages(rows)
 }
 
+// RecentMessagesByKind retorna as mensagens recentes de um tipo de chat
+// (self = conversa "Você"; group/direct = demais conversas).
+func (r *WhatsAppConversationRepositorySQLite) RecentMessagesByKind(ctx context.Context, userID, chatKind string, limit int, since time.Time) ([]domain.WhatsAppConversationMessage, error) {
+	if userID == "" || chatKind == "" || limit <= 0 {
+		return []domain.WhatsAppConversationMessage{}, nil
+	}
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT `+waConversationColumns+`
+		FROM whatsapp_conversation_messages
+		WHERE user_id = ? AND chat_kind = ? AND message_timestamp >= ?
+		ORDER BY message_timestamp DESC
+		LIMIT ?
+	`, userID, chatKind, since, limit)
+	if err != nil {
+		return nil, err
+	}
+	return scanConversationMessages(rows)
+}
+
+// CountMessages conta as mensagens arquivadas do usuário dentro da janela de idade.
+func (r *WhatsAppConversationRepositorySQLite) CountMessages(ctx context.Context, userID string, since time.Time) (int64, error) {
+	if userID == "" {
+		return 0, nil
+	}
+	var total int64
+	err := r.db.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM whatsapp_conversation_messages
+		WHERE user_id = ? AND message_timestamp >= ?
+	`, userID, since).Scan(&total)
+	if err != nil {
+		return 0, err
+	}
+	return total, nil
+}
+
 // GetContextSettings retorna as preferências de escopo do usuário (nil se nunca configuradas).
 func (r *WhatsAppConversationRepositorySQLite) GetContextSettings(ctx context.Context, userID string) (*domain.WhatsAppContextSettings, error) {
 	if userID == "" {

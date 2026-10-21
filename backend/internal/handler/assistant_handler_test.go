@@ -8,12 +8,17 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/andrevmp/vito/backend/internal/ai"
+	"github.com/andrevmp/vito/backend/internal/database"
+	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/handler"
 	"github.com/andrevmp/vito/backend/internal/handler/middleware"
+	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/andrevmp/vito/backend/internal/service"
 )
 
@@ -412,5 +417,85 @@ func TestAssistantHandler_ChatWithHistory(t *testing.T) {
 	}
 	if mockAI.capturedInput.ConversationHistory[0].Text != "Quero estudar cálculo" {
 		t.Errorf("expected history item text 'Quero estudar cálculo', got: %s", mockAI.capturedInput.ConversationHistory[0].Text)
+	}
+}
+
+// O chat do APP também recebe o contexto do WhatsApp: o ajuste de escopo no
+// Perfil precisa valer em todas as surfaces, senão o Vito responde "não sei"
+// sobre as conversas mesmo com "Todos os meus chats" ligado.
+func TestAssistantHandler_Chat_ReceivesWhatsAppContext(t *testing.T) {
+	db, err := database.Open(filepath.Join(t.TempDir(), "assistant_ctx.db"))
+	if err != nil {
+		t.Fatalf("erro ao abrir banco: %v", err)
+	}
+	defer db.Close()
+
+	userRepo := repository.NewUserRepository(db)
+	if err := userRepo.Create(&domain.User{
+		ID:        "user-chat-1",
+		Email:     "chat-ctx@vito.local",
+		Name:      "Contexto",
+		CreatedAt: time.Now().UTC(),
+		UpdatedAt: time.Now().UTC(),
+	}); err != nil {
+		t.Fatalf("erro ao criar usuário: %v", err)
+	}
+
+	convRepo := repository.NewWhatsAppConversationRepository(db)
+	ctxSvc := service.NewWhatsAppContextService(convRepo, service.DefaultWhatsAppContextConfig())
+
+	if err := convRepo.SaveMessage(context.Background(), &domain.WhatsAppConversationMessage{
+		ID:               "ctx-1",
+		UserID:           "user-chat-1",
+		InstanceName:     "vito_ctx",
+		ChatJID:          "5511999998888@s.whatsapp.net",
+		ChatKind:         domain.WhatsAppChatKindSelf,
+		ChatLabel:        "Você",
+		SenderName:       "André",
+		Text:             "lembrei da reuniao com a Ana quinta as 10h",
+		MessageTimestamp: time.Now().UTC(),
+		CreatedAt:        time.Now().UTC(),
+	}); err != nil {
+		t.Fatalf("SaveMessage: %v", err)
+	}
+
+	mockAI := &mockAIGateway{
+		intent: &ai.ParsedIntent{
+			Action:       ai.ActionGeneralChat,
+			Message:      "Entendi.",
+			ProviderUsed: "MockAI",
+		},
+	}
+	astSvc := service.NewAssistantService(mockAI, nil, nil, nil)
+	astHandler := handler.NewAssistantHandler(astSvc, nil)
+	astHandler.SetContextService(ctxSvc)
+
+	bodyBytes, _ := json.Marshal(map[string]string{
+		"text":     "lembra da reuniao com a Ana?",
+		"timezone": "America/Sao_Paulo",
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/assistant/chat", bytes.NewReader(bodyBytes))
+	req.Header.Set("Content-Type", "application/json")
+	req = req.WithContext(context.WithValue(req.Context(), middleware.UserIDKey, "user-chat-1"))
+
+	rr := httptest.NewRecorder()
+	astHandler.Chat(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("esperava 200, obteve %d: %s", rr.Code, rr.Body.String())
+	}
+
+	window := mockAI.capturedInput.ConversationWindow
+	if len(window) == 0 {
+		t.Fatal("esperava que o chat do app recebesse o contexto do WhatsApp")
+	}
+	found := false
+	for _, m := range window {
+		if strings.Contains(m.Text, "reuniao com a Ana") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("a mensagem da Ana não chegou na janela do app: %+v", window)
 	}
 }

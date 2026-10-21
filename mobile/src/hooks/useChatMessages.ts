@@ -210,7 +210,7 @@ export function useChatMessages(
       isUserStoppedRef.current = false;
 
       try {
-        const recentHistory = messages.slice(-6).map((m) => ({
+        const recentHistory = messages.slice(-12).map((m) => ({
           sender: m.sender === 'user' ? ('user' as const) : ('vito' as const),
           text: m.text,
         }));
@@ -280,7 +280,7 @@ export function useChatMessages(
 
       try {
         const previousSlice = messages.slice(0, targetIdx);
-        const recentHistory = previousSlice.slice(-6).map((m) => ({
+        const recentHistory = previousSlice.slice(-12).map((m) => ({
           sender: m.sender === 'user' ? ('user' as const) : ('vito' as const),
           text: m.text,
         }));
@@ -351,7 +351,7 @@ export function useChatMessages(
       setLoading(true);
 
       try {
-        const recentHistory = messages.slice(-6).map((m) => ({
+        const recentHistory = messages.slice(-12).map((m) => ({
           sender: m.sender === 'user' ? ('user' as const) : ('vito' as const),
           text: m.text,
         }));

@@ -41,6 +41,7 @@ type Config struct {
 	WhatsAppContextScope         string
 	WhatsAppContextWindowSize    int
 	WhatsAppContextRetentionDays int
+	WhatsAppContextMaxAgeDays    int
 	WhatsAppBackfillEnabled      bool
 }
 
@@ -159,7 +160,11 @@ func Load() *Config {
 		WhatsAppContextScope:         getEnvOrDefault("WHATSAPP_CONTEXT_SCOPE_DEFAULT", "all"),
 		WhatsAppContextWindowSize:    getEnvIntDefault("WHATSAPP_CONTEXT_WINDOW_DEFAULT", 12),
 		WhatsAppContextRetentionDays: getEnvIntDefault("WHATSAPP_CONTEXT_RETENTION_DAYS", 30),
-		WhatsAppBackfillEnabled:      getEnvBoolDefault("WHATSAPP_BACKFILL_ENABLED", true),
+		// A janela de contexto precisa enxergar pelo menos o mesmo período que o
+		// backfill importa (30 dias); senão o histórico importado é filtrado
+		// fora e o Vito "não sabe" de nada.
+		WhatsAppContextMaxAgeDays: getEnvIntDefault("WHATSAPP_CONTEXT_MAX_AGE_DAYS", 30),
+		WhatsAppBackfillEnabled:   getEnvBoolDefault("WHATSAPP_BACKFILL_ENABLED", true),
 	}
 }
 

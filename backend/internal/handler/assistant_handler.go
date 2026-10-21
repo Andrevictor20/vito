@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -19,6 +20,7 @@ import (
 type AssistantHandler struct {
 	astSvc      *service.AssistantService
 	transcriber ai.AudioTranscriber
+	contextSvc  *service.WhatsAppContextService
 }
 
 func NewAssistantHandler(astSvc *service.AssistantService, transcriber ai.AudioTranscriber) *AssistantHandler {
@@ -26,6 +28,25 @@ func NewAssistantHandler(astSvc *service.AssistantService, transcriber ai.AudioT
 		astSvc:      astSvc,
 		transcriber: transcriber,
 	}
+}
+
+// SetContextService injeta o contexto conversacional do WhatsApp.
+//
+// O app e o desktop também se beneficiam do shadow inbox: a resposta é vista
+// apenas pelo próprio usuário, então o escopo "Todos os meus chats" pode ser
+// aplicado com segurança nessas surfaces (no WhatsApp ele é restrito a
+// conversas pessoais, porque a resposta seria entregue a terceiros).
+func (h *AssistantHandler) SetContextService(contextSvc *service.WhatsAppContextService) {
+	h.contextSvc = contextSvc
+}
+
+// whatsappWindow monta a janela de contexto do WhatsApp para as surfaces do
+// app/desktop. Falha de leitura nunca impede a resposta (fail-open).
+func (h *AssistantHandler) whatsappWindow(ctx context.Context, userID, currentText string) []ai.ChatMessageContext {
+	if h.contextSvc == nil {
+		return nil
+	}
+	return h.contextSvc.SelfWindow(ctx, userID, currentText)
 }
 
 type ChatMessagePayload struct {
@@ -115,6 +136,7 @@ func (h *AssistantHandler) Chat(w http.ResponseWriter, r *http.Request) {
 		Timezone:            tz,
 		Now:                 nowRef,
 		ConversationHistory: convHistory,
+		ConversationWindow:  h.whatsappWindow(r.Context(), userID, rawText),
 		FocusMode:           req.FocusMode,
 	}
 
@@ -241,6 +263,7 @@ func (h *AssistantHandler) AudioChat(w http.ResponseWriter, r *http.Request) {
 			Now:      nowRef,
 		}
 	}
+	input.ConversationWindow = h.whatsappWindow(r.Context(), userID, input.Text)
 
 	resp, err := h.astSvc.Process(r.Context(), userID, input)
 	if err != nil {
@@ -363,6 +386,7 @@ func (h *AssistantHandler) VisionChat(w http.ResponseWriter, r *http.Request) {
 		Timezone:  tzVision,
 		Now:       nowRef,
 	}
+	input.ConversationWindow = h.whatsappWindow(r.Context(), userID, prompt)
 
 	resp, err := h.astSvc.Process(r.Context(), userID, input)
 	if err != nil {

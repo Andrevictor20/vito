@@ -54,6 +54,7 @@ func WhatsAppContextDirectives(quoted string, window []ChatMessageContext) strin
 	return `
 DIRETRIZ DE CONTEXTO DO WHATSAPP (RESOLVER REFERÊNCIA E AGIR):
 - A MENSAGEM CITADA e o CONTEXTO RECENTE DO WHATSAPP são a fonte de verdade sobre o que o usuário está falando. Resolva por eles pronomes e referências ("isso", "aquilo", "esse", "essa", "ele", "ela", "aí", "isso aqui", "o de ontem", "a que falei").
+- O CONTEXTO RECENTE CONTÉM A RESPOSTA quando ela existe. Antes de dizer que não sabe, varra o bloco: mensagens de outros chats podem ser exatamente o que o usuário está retomando ("a reunião que falei com a Ana"). Responder "não sei" com o contexto disponível é um erro — o bloco é a memória do usuário, não ruído.
 - Ao decidir se falta informação, considere SEMPRE: texto atual + HISTÓRICO RECENTE + MENSAGEM CITADA + CONTEXTO RECENTE DO WHATSAPP. A coleta progressiva só se aplica ao que NENHUM deles responde.
 - NUNCA peça para o usuário repetir, copiar ou colar um conteúdo que já está na MENSAGEM CITADA ou no CONTEXTO RECENTE. A pergunta "sobre o que devo agir?" só é válida se o contexto realmente não resolver.
 - INFERIR AÇÃO PELO CONTEÚDO: se a mensagem (ou a citada) trouxer data/horário e descrever um compromisso -> CREATE_EVENT; se for lembrete/tarefa -> CREATE_TODO; se for pergunta sobre a agenda -> QUERY_SCHEDULE; se for pedido de vigilância -> CREATE_TRIGGER.

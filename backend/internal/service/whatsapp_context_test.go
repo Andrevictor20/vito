@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -657,5 +658,166 @@ func TestWhatsAppContext_OwnerJIDIdentifiesSelfChat(t *testing.T) {
 	}
 	if !found {
 		t.Errorf("esperava a mensagem de outro chat na janela cross-chat, obteve %+v", fx.gateway.lastInput().ConversationWindow)
+	}
+}
+
+// archiveMessage grava uma mensagem no shadow inbox com um timestamp arbitrário.
+func archiveMessage(t *testing.T, fx *contextualFixture, id, chatJID, chatKind, label, text string, ts time.Time) {
+	t.Helper()
+	if err := fx.repo.SaveMessage(context.Background(), &domain.WhatsAppConversationMessage{
+		ID:               id,
+		UserID:           "user-ctx-1",
+		InstanceName:     "vito_ctx_user",
+		ChatJID:          chatJID,
+		ChatKind:         chatKind,
+		ChatLabel:        label,
+		SenderName:       "André",
+		Text:             text,
+		MessageTimestamp: ts,
+		CreatedAt:        ts,
+	}); err != nil {
+		t.Fatalf("SaveMessage: %v", err)
+	}
+}
+
+// A janela precisa enxergar o MESMO período que o backfill importa (30 dias).
+// Com 72h o histórico importado era filtrado fora e o Vito respondia "não sei".
+func TestWhatsAppContext_WindowCoversBackfillHorizon(t *testing.T) {
+	fx := setupContextualWhatsApp(t)
+	now := time.Now().UTC()
+
+	archiveMessage(t, fx, "msg-20d", friendJID(), domain.WhatsAppChatKindDirect, "Ana", "conversa de vinte dias atras", now.AddDate(0, 0, -20))
+	archiveMessage(t, fx, "msg-40d", friendJID(), domain.WhatsAppChatKindDirect, "Ana", "conversa de quarenta dias atras", now.AddDate(0, 0, -40))
+
+	window := fx.contextSvc.SelfWindow(context.Background(), "user-ctx-1", "")
+	joined := ""
+	for _, m := range window {
+		joined += m.Text + " | "
+	}
+	if !strings.Contains(joined, "vinte dias atras") {
+		t.Errorf("mensagem de 20 dias deveria entrar na janela, obteve: %q", joined)
+	}
+	if strings.Contains(joined, "quarenta dias atras") {
+		t.Errorf("mensagem de 40 dias está fora do horizonte de 30 dias, obteve: %q", joined)
+	}
+}
+
+// Marcadores de recuperação de memória exigem a janela completa.
+func TestWhatsAppContext_RecallIntentUsesFullWindow(t *testing.T) {
+	recalls := []string{
+		"lembra da reunião com a Ana?",
+		"o que eu falei com a Ana?",
+		"aquela conversa de ontem",
+		"sobre o que a gente conversou?",
+	}
+	for _, text := range recalls {
+		if !service.NeedsFullWindow(text) {
+			t.Errorf("esperava janela completa para %q", text)
+		}
+	}
+
+	// Comandos autocontidos continuam usando a janela mínima.
+	autocontidos := []string{
+		"cria uma tarefa para revisar o contrato do cliente até sexta-feira",
+		"agenda uma reunião de alinhamento com o time às quinze horas de amanhã",
+	}
+	for _, text := range autocontidos {
+		if service.NeedsFullWindow(text) {
+			t.Errorf("esperava janela mínima para %q", text)
+		}
+	}
+}
+
+// O chat ativo não pode expulsar as demais conversas da janela cross-chat.
+func TestWhatsAppContext_CrossChatKeepsDiversity(t *testing.T) {
+	fx := setupContextualWhatsApp(t)
+	now := time.Now().UTC()
+
+	// 10 mensagens no chat atual (o "Você") e 4 na conversa com a Ana.
+	for i := 0; i < 10; i++ {
+		archiveMessage(t, fx, fmt.Sprintf("msg-self-%02d", i), selfJID(), domain.WhatsAppChatKindSelf, "Você",
+			fmt.Sprintf("mensagem do chat atual %d", i), now.Add(-time.Duration(i)*time.Minute))
+	}
+	for i := 0; i < 4; i++ {
+		archiveMessage(t, fx, fmt.Sprintf("msg-ana-%02d", i), friendJID(), domain.WhatsAppChatKindDirect, "Ana",
+			fmt.Sprintf("mensagem da Ana %d", i), now.Add(-time.Duration(i+20)*time.Minute))
+	}
+
+	window := fx.contextSvc.SelfWindow(context.Background(), "user-ctx-1", "")
+	if len(window) == 0 {
+		t.Fatal("esperava janela com mensagens")
+	}
+
+	hasAna := false
+	for _, m := range window {
+		if strings.Contains(m.Text, "mensagem da Ana") {
+			hasAna = true
+			break
+		}
+	}
+	if !hasAna {
+		t.Errorf("a conversa com a Ana foi expulsa da janela pelo chat atual: %+v", window)
+	}
+}
+
+// O app e o desktop recebem o mesmo contexto; com escopo "chat" só a conversa "Você".
+func TestWhatsAppContext_SelfWindowRespectsScope(t *testing.T) {
+	fx := setupContextualWhatsApp(t)
+	now := time.Now().UTC()
+	ctx := context.Background()
+
+	archiveMessage(t, fx, "msg-self-x", selfJID(), domain.WhatsAppChatKindSelf, "Você", "conversa do proprio usuario", now)
+	archiveMessage(t, fx, "msg-ana-x", friendJID(), domain.WhatsAppChatKindDirect, "Ana", "conversa da Ana", now)
+
+	// scope=all => todos os chats
+	window := fx.contextSvc.SelfWindow(ctx, "user-ctx-1", "")
+	if len(window) != 2 {
+		t.Fatalf("esperava 2 mensagens com scope=all, obteve %d", len(window))
+	}
+
+	// scope=chat => apenas a conversa "Você"
+	if _, err := fx.contextSvc.UpdateSettings(ctx, "user-ctx-1", domain.WhatsAppContextScopeChat, 12); err != nil {
+		t.Fatalf("UpdateSettings: %v", err)
+	}
+	window = fx.contextSvc.SelfWindow(ctx, "user-ctx-1", "")
+	if len(window) != 1 {
+		t.Fatalf("esperava 1 mensagem com scope=chat, obteve %d", len(window))
+	}
+	if !strings.Contains(window[0].Text, "conversa do proprio usuario") {
+		t.Errorf("esperava a conversa 'Você', obteve %q", window[0].Text)
+	}
+
+	// scope=off => nada
+	if _, err := fx.contextSvc.UpdateSettings(ctx, "user-ctx-1", domain.WhatsAppContextScopeOff, 12); err != nil {
+		t.Fatalf("UpdateSettings: %v", err)
+	}
+	if window := fx.contextSvc.SelfWindow(ctx, "user-ctx-1", ""); len(window) != 0 {
+		t.Errorf("esperava janela vazia com scope=off, obteve %d", len(window))
+	}
+}
+
+// A prévia mostra o que o Vito está enxergando agora.
+func TestWhatsAppContext_PreviewReportsWhatVitoSees(t *testing.T) {
+	fx := setupContextualWhatsApp(t)
+	now := time.Now().UTC()
+
+	archiveMessage(t, fx, "msg-p1", friendJID(), domain.WhatsAppChatKindDirect, "Ana", "aqui esta a reunion com a Ana", now)
+	archiveMessage(t, fx, "msg-p2", selfJID(), domain.WhatsAppChatKindSelf, "Você", "ok combinado", now)
+
+	preview, err := fx.contextSvc.Preview(context.Background(), "user-ctx-1")
+	if err != nil {
+		t.Fatalf("Preview: %v", err)
+	}
+	if preview.ArchivedTotal != 2 {
+		t.Errorf("esperava 2 mensagens arquivadas, obteve %d", preview.ArchivedTotal)
+	}
+	if preview.WindowMessages != 2 {
+		t.Errorf("esperava 2 mensagens na janela, obteve %d", preview.WindowMessages)
+	}
+	if preview.MaxAgeDays != 30 {
+		t.Errorf("esperava horizonte de 30 dias, obteve %d", preview.MaxAgeDays)
+	}
+	if len(preview.Chats) == 0 {
+		t.Error("esperava a lista de chats da janela")
 	}
 }

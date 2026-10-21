@@ -53,6 +53,30 @@ describe('WhatsAppContextApi Unit Tests', () => {
     assert.ok(res.message.length > 0);
   });
 
+
+  test('getPreview busca o endpoint de previa do contexto', async () => {
+    const { client, calls } = mockClient({
+      scope: 'all',
+      window_size: 12,
+      max_age_days: 30,
+      archived_total: 271,
+      window_messages: 12,
+      chats: ['Você', 'Ana'],
+      sample: ['reuniao com a Ana quinta 10h'],
+    });
+
+    const api = new WhatsAppContextApi(client);
+    const res = await api.getPreview();
+
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].ep, '/api/v1/integrations/whatsapp/context-preview');
+    assert.equal(res.archived_total, 271);
+    assert.equal(res.window_messages, 12);
+    assert.equal(res.max_age_days, 30);
+    assert.deepEqual(res.chats, ['Você', 'Ana']);
+    assert.equal(res.sample.length, 1);
+  });
+
   test('catálogo de escopos cobre off, quoted, chat e all', () => {
     const values = WHATSAPP_CONTEXT_SCOPES.map((s) => s.value);
     assert.deepEqual(values, ['off', 'quoted', 'chat', 'all']);

@@ -134,22 +134,22 @@ func main() {
 	chatRepo := repository.NewChatRepository(db)
 
 	// 3. Provedores de IA & AI Gateway com Failover.
-	// Ordem: Groq primário (free generoso: 30 RPM/1000 RPD), Gemini como
-	// fallback de qualidade (+grounding) e OpenRouter por último.
+	// Ordem: Gemini 2.5 Flash primário (forte em resolução de referência e
+	// diretivas de contexto), Groq/Mistral como fallback de cota e OpenRouter por
+	// último. O modelo pequeno do Groq (gpt-oss-20b) ignorava o bloco de
+	// contexto e respondia "não sei" mesmo com a janela montada.
 	var aiProviders []ai.Provider
-	var geminiProv *ai.GeminiProvider
+	if cfg.GeminiAPIKey != "" {
+		log.Printf("🤖 [AI Provider] Google AI Studio primário (%s).", cfg.GeminiModel)
+		aiProviders = append(aiProviders, ai.NewGeminiProvider(cfg.GeminiAPIKey, cfg.GeminiModel))
+	}
 	if cfg.GroqAPIKey != "" {
-		log.Printf("🤖 [AI Provider] Groq Cloud primário (%s).", cfg.GroqModel)
+		log.Printf("🤖 [AI Provider] Groq Cloud como fallback (%s).", cfg.GroqModel)
 		aiProviders = append(aiProviders, ai.NewGroqProvider(cfg.GroqAPIKey, cfg.GroqModel))
 	}
 	if cfg.MistralAPIKey != "" {
-		log.Printf("🤖 [AI Provider] Mistral La Plateforme (%s).", cfg.MistralModel)
+		log.Printf("🤖 [AI Provider] Mistral La Plateforme como fallback (%s).", cfg.MistralModel)
 		aiProviders = append(aiProviders, ai.NewMistralProvider(cfg.MistralAPIKey, cfg.MistralModel))
-	}
-	if cfg.GeminiAPIKey != "" {
-		log.Printf("🤖 [AI Provider] Google AI Studio como fallback (%s).", cfg.GeminiModel)
-		geminiProv = ai.NewGeminiProvider(cfg.GeminiAPIKey, cfg.GeminiModel)
-		aiProviders = append(aiProviders, geminiProv)
 	}
 	if cfg.OpenRouterAPIKey != "" {
 		log.Printf("🤖 [AI Provider] OpenRouter ativado como fallback (%s).", cfg.OpenRouterModel)
@@ -373,6 +373,10 @@ func main() {
 	if cfg.WhatsAppContextWindowSize > 0 {
 		waContextCfg.WindowDefault = cfg.WhatsAppContextWindowSize
 	}
+	if cfg.WhatsAppContextMaxAgeDays > 0 {
+		// A janela precisa cobrir o mesmo período que o backfill importa.
+		waContextCfg.MaxAge = time.Duration(cfg.WhatsAppContextMaxAgeDays) * 24 * time.Hour
+	}
 	waContextSvc := service.NewWhatsAppContextService(waConvRepo, waContextCfg)
 	waGroupMeta := service.NewWhatsAppGroupMeta(evoClient, time.Hour, 24*time.Hour)
 	waOwnerCache := service.NewWhatsAppOwnerCache(evoClient, time.Hour)
@@ -392,6 +396,9 @@ func main() {
 
 	whatsappHandler := handler.NewWhatsAppHandler(waSvc)
 	whatsappHandler.SetContextService(waContextSvc)
+	// O app e o desktop também recebem o contexto do WhatsApp (a resposta só é
+	// vista pelo usuário, então o escopo "todos os chats" é seguro nessas surfaces).
+	astHandler.SetContextService(waContextSvc)
 
 	// Gmail Conector & Scanner
 	gmailRepo := repository.NewGmailRepository(db)
