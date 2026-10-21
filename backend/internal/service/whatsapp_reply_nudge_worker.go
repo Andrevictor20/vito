@@ -23,7 +23,7 @@ import (
 type WhatsAppReplyNudgeWorker struct {
 	directory     *WhatsAppDirectoryService
 	waRepo        domain.WhatsAppRepository
-	notifSvc      *NotificationService
+	notifSvc      NotificationSender
 	threshold     time.Duration
 	cooldown      time.Duration
 	checkInterval time.Duration
@@ -37,7 +37,7 @@ type WhatsAppReplyNudgeWorker struct {
 func NewWhatsAppReplyNudgeWorker(
 	directory *WhatsAppDirectoryService,
 	waRepo domain.WhatsAppRepository,
-	notifSvc *NotificationService,
+	notifSvc NotificationSender,
 	threshold time.Duration,
 	cooldown time.Duration,
 	checkInterval ...time.Duration,
@@ -76,7 +76,7 @@ func (w *WhatsAppReplyNudgeWorker) Start() {
 	w.wg.Add(1)
 	go func() {
 		defer w.wg.Done()
-		w.runOnce()
+		w.RunOnce()
 		ticker := time.NewTicker(w.checkInterval)
 		defer ticker.Stop()
 		for {
@@ -84,7 +84,7 @@ func (w *WhatsAppReplyNudgeWorker) Start() {
 			case <-w.stopCh:
 				return
 			case <-ticker.C:
-				w.runOnce()
+				w.RunOnce()
 			}
 		}
 	}()
@@ -104,7 +104,8 @@ func (w *WhatsAppReplyNudgeWorker) Stop() {
 }
 
 // runOnce varre as pendências de todos os usuários conectados e cobra as frias.
-func (w *WhatsAppReplyNudgeWorker) runOnce() {
+// RunOnce executa uma varredura (exportada para disparo manual em testes/ops).
+func (w *WhatsAppReplyNudgeWorker) RunOnce() {
 	if w.directory == nil || w.waRepo == nil || w.notifSvc == nil {
 		return
 	}
