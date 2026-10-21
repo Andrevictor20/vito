@@ -42,10 +42,18 @@ services:
       - SMTP_FROM=${SMTP_FROM:-}
       - EVOLUTION_API_URL=${EVOLUTION_API_URL:-http://evolution-api:8085}
       - EVOLUTION_API_KEY=${EVOLUTION_API_KEY:-vito_evo_key_default_change_in_prod}
+      # Teto de heap do Go: evita que o backend engula a RAM do Pi e o kernel mate o Postgres (256M).
+      - GOMEMLIMIT=${GOMEMLIMIT:-256MiB}
     volumes:
       - vito_data:/app/data
     networks:
       - vito_net
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 128M
 
   # Banco PostgreSQL dedicado para a Evolution API v2 (Prisma ORM)
   evolution-postgres:

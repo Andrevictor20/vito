@@ -37,7 +37,61 @@ type WhatsAppRepository interface {
 	GetByInstanceName(ctx context.Context, instanceName string) (*WhatsAppIntegration, error)
 	GetByPhone(ctx context.Context, phone string) (*WhatsAppIntegration, error)
 	FindConnectedInstance(ctx context.Context) (*WhatsAppIntegration, error)
+	ListAll(ctx context.Context) ([]WhatsAppIntegration, error)
 	Upsert(ctx context.Context, integration *WhatsAppIntegration) error
 	UpdateStatus(ctx context.Context, id string, status string, lastConnectedAt *time.Time) error
 	Delete(ctx context.Context, userID string) error
+}
+
+// Tipos de conversa: definem quais contextos podem ser cruzados (ver SPEC §2.1).
+const (
+	WhatsAppChatKindSelf      = "self"       // conversa comigo mesmo ("Você")
+	WhatsAppChatKindSelfGroup = "self_group" // grupo do WhatsApp com apenas o usuário
+	WhatsAppChatKindGroup     = "group"      // grupo com outras pessoas
+	WhatsAppChatKindDirect    = "direct"     // 1-on-1 com terceiro
+)
+
+// Escopos de contexto configuráveis pelo usuário (SPEC §6.2).
+const (
+	WhatsAppContextScopeOff    = "off"    // nenhum contexto
+	WhatsAppContextScopeQuoted = "quoted" // apenas a mensagem citada
+	WhatsAppContextScopeChat   = "chat"   // apenas o chat atual
+	WhatsAppContextScopeAll    = "all"    // chat atual + demais chats
+)
+
+// WhatsAppConversationMessage é uma mensagem arquivada do WhatsApp (shadow inbox).
+type WhatsAppConversationMessage struct {
+	ID               string    `json:"id"`
+	UserID           string    `json:"user_id"`
+	InstanceName     string    `json:"instance_name"`
+	ChatJID          string    `json:"chat_jid"`
+	ChatKind         string    `json:"chat_kind"`
+	ChatLabel        string    `json:"chat_label"`
+	SenderJID        string    `json:"sender_jid"`
+	SenderName       string    `json:"sender_name"`
+	FromMe           bool      `json:"from_me"`
+	Kind             string    `json:"kind"`
+	Text             string    `json:"text"`
+	QuotedText       string    `json:"quoted_text"`
+	MessageTimestamp time.Time `json:"message_timestamp"`
+	CreatedAt        time.Time `json:"created_at"`
+}
+
+// WhatsAppContextSettings guarda as preferências de contexto do usuário.
+type WhatsAppContextSettings struct {
+	UserID     string    `json:"user_id"`
+	Scope      string    `json:"scope"`
+	WindowSize int       `json:"window_size"`
+	UpdatedAt  time.Time `json:"updated_at"`
+}
+
+// WhatsAppConversationRepository persiste as mensagens arquivadas e as preferências de escopo.
+type WhatsAppConversationRepository interface {
+	SaveMessage(ctx context.Context, msg *WhatsAppConversationMessage) error
+	RecentMessages(ctx context.Context, userID, chatJID string, limit int, since time.Time) ([]WhatsAppConversationMessage, error)
+	RecentMessagesAcrossChats(ctx context.Context, userID string, limit int, since time.Time) ([]WhatsAppConversationMessage, error)
+	GetContextSettings(ctx context.Context, userID string) (*WhatsAppContextSettings, error)
+	SaveContextSettings(ctx context.Context, settings *WhatsAppContextSettings) error
+	DeleteMessages(ctx context.Context, userID string) error
+	PruneOlderThan(ctx context.Context, cutoff time.Time) (int64, error)
 }

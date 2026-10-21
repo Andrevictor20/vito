@@ -1,15 +1,14 @@
 package service
 
 import (
-	"bytes"
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -41,6 +40,10 @@ type WhatsAppService struct {
 	audioTranscriber ai.AudioTranscriber
 	userRepo         domain.UserRepository
 	memory           *WhatsAppConversationMemory
+	contextSvc       *WhatsAppContextService
+	groupMeta        *WhatsAppGroupMeta
+	labelsMu         sync.RWMutex
+	chatLabels       map[string]string
 }
 
 // NewWhatsAppService instancia o serviço do WhatsApp.
@@ -72,6 +75,16 @@ func (s *WhatsAppService) SetAudioTranscriber(transcriber ai.AudioTranscriber) {
 // SetUserRepo injeta o repositório de usuários para discovery social de contatos.
 func (s *WhatsAppService) SetUserRepo(userRepo domain.UserRepository) {
 	s.userRepo = userRepo
+}
+
+// SetContextService injeta o serviço de contexto conversacional do WhatsApp.
+func (s *WhatsAppService) SetContextService(contextSvc *WhatsAppContextService) {
+	s.contextSvc = contextSvc
+}
+
+// SetGroupMeta injeta o cache de metadados de grupo (participantes e nomes).
+func (s *WhatsAppService) SetGroupMeta(groupMeta *WhatsAppGroupMeta) {
+	s.groupMeta = groupMeta
 }
 
 // SanitizePhoneNumber limpa e normaliza o número para o padrão internacional E.164 sem o '+'.
@@ -331,150 +344,7 @@ func (s *WhatsAppService) HandleWebhook(ctx context.Context, eventType string, p
 	}
 
 	if strings.Contains(event, "messages") {
-		var msgData struct {
-			Key struct {
-				RemoteJid string `json:"remoteJid"`
-				FromMe    bool   `json:"fromMe"`
-				ID        string `json:"id"`
-			} `json:"key"`
-			MessageType string `json:"messageType"`
-			Message     struct {
-				Conversation        string                 `json:"conversation"`
-				ExtendedTextMessage struct {
-					Text string `json:"text"`
-				} `json:"extendedTextMessage"`
-				AudioMessage map[string]interface{} `json:"audioMessage"`
-			} `json:"message"`
-		}
-		if err := json.Unmarshal(base.Data, &msgData); err != nil {
-			return err
-		}
-
-		rawText := msgData.Message.Conversation
-		if rawText == "" {
-			rawText = msgData.Message.ExtendedTextMessage.Text
-		}
-
-		// Se for áudio e tiver transcritor disponível (Groq Whisper), baixa e transcreve
-		isAudio := msgData.MessageType == "audioMessage" || msgData.Message.AudioMessage != nil
-		if strings.TrimSpace(rawText) == "" && isAudio && s.audioTranscriber != nil {
-			b64, err := s.client.GetMediaBase64(ctx, base.Instance, base.Data)
-			if err == nil && b64 != "" {
-				audioBytes, decodeErr := base64.StdEncoding.DecodeString(b64)
-				if decodeErr == nil && len(audioBytes) > 0 {
-					transcribed, trErr := s.audioTranscriber.Transcribe(ctx, bytes.NewReader(audioBytes), "audio.ogg")
-					if trErr == nil && strings.TrimSpace(transcribed) != "" {
-						rawText = strings.TrimSpace(transcribed)
-					}
-				}
-			}
-		}
-
-		rawText = strings.TrimSpace(rawText)
-		if rawText == "" {
-			return nil
-		}
-
-		// Anti-loop: se a mensagem começou com a assinatura do Vito, é uma resposta gerada pelo próprio bot
-		if strings.HasPrefix(rawText, "💼 Vito:") || strings.HasPrefix(rawText, "🎩 Vito:") || strings.HasPrefix(rawText, "Vito diz:") || strings.HasPrefix(rawText, "Vito:") {
-			return nil
-		}
-
-		reVito := regexp.MustCompile(`(?i)(@vito|!vito|/vito|vito:)\s*`)
-		hasVitoTrigger := reVito.MatchString(rawText)
-
-		isGroup := strings.HasSuffix(msgData.Key.RemoteJid, "@g.us")
-		if isGroup {
-			if !hasVitoTrigger {
-				// Privacidade em grupos: ignora conversas onde o Vito não foi mencionado
-				return nil
-			}
-			rawText = strings.TrimSpace(reVito.ReplaceAllString(rawText, ""))
-			if rawText == "" {
-				rawText = "olá"
-			}
-		} else {
-			// Em chats privados (1-on-1):
-			// Se for o chat consigo mesmo ("Você" / seu próprio número), processa diretamente qualquer mensagem.
-			// Se for chat privado com amigos/família/terceiros, só processa se contiver gatilho do Vito.
-			integration, err := s.repo.GetByInstanceName(ctx, base.Instance)
-			if err != nil || integration == nil {
-				return nil
-			}
-			cleanJid := strings.Split(msgData.Key.RemoteJid, "@")[0]
-			isSelfChat := isMatchingPhone(cleanJid, integration.Phone)
-
-			if !isSelfChat && !hasVitoTrigger {
-				return nil
-			}
-			if hasVitoTrigger {
-				rawText = strings.TrimSpace(reVito.ReplaceAllString(rawText, ""))
-				if rawText == "" {
-					rawText = "olá"
-				}
-			}
-		}
-
-		integration, err := s.repo.GetByInstanceName(ctx, base.Instance)
-		if err != nil || integration == nil {
-			return nil
-		}
-
-		if s.assistantSvc == nil {
-			return nil
-		}
-
-		// Feedback visual imediato: reagir com olhinho 👀 para confirmar leitura
-		if msgData.Key.ID != "" && msgData.Key.RemoteJid != "" {
-			_ = s.client.SendReaction(ctx, base.Instance, msgData.Key.RemoteJid, msgData.Key.ID, "👀")
-		}
-
-		// Contexto conversacional multi-turn por conversa no WhatsApp
-		if s.memory == nil {
-			s.memory = NewWhatsAppConversationMemory()
-		}
-		convKey := fmt.Sprintf("%s:%s", base.Instance, msgData.Key.RemoteJid)
-		history := s.memory.GetHistory(convKey)
-
-		resp, err := s.assistantSvc.Process(ctx, integration.UserID, ai.UserInput{
-			Text:                rawText,
-			ConversationHistory: history,
-		})
-		if err != nil {
-			log.Printf("⚠️ [WhatsAppService] Erro ao processar mensagem do WhatsApp: %v", err)
-			return nil
-		}
-
-		s.memory.AddMessage(convKey, "user", rawText)
-
-		replyText := resp.Reply
-		if replyText == "" {
-			replyText = resp.Message
-		}
-		if replyText != "" {
-			s.memory.AddMessage(convKey, "vito", replyText)
-
-			formattedReply := fmt.Sprintf("💼 Vito:\n\n%s", replyText)
-			if isGroup && msgData.Key.ID != "" {
-				_ = s.client.SendTextWithQuoted(ctx, base.Instance, msgData.Key.RemoteJid, formattedReply, msgData.Key.ID)
-			} else {
-				_ = s.client.SendText(ctx, base.Instance, msgData.Key.RemoteJid, formattedReply)
-			}
-
-			if s.notifSender != nil {
-				notifBody := replyText
-				if isGroup {
-					notifBody = fmt.Sprintf("Respondeu no grupo: %s", replyText)
-				}
-				if len(notifBody) > 150 {
-					notifBody = notifBody[:147] + "..."
-				}
-				_, _ = s.notifSender.SendPushToUser(integration.UserID, "💬 Vito (WhatsApp)", notifBody, "default", map[string]interface{}{
-					"type":      "whatsapp_response",
-					"remoteJid": msgData.Key.RemoteJid,
-				})
-			}
-		}
+		return s.handleMessagesEvent(ctx, base.Instance, base.Data)
 	}
 
 	return nil

@@ -241,3 +241,14 @@ func stringsReader(s string) *bytes.Reader {
 	return bytes.NewReader([]byte(s))
 }
 
+func (m *mockEvolutionAPIClientForHandler) FindMessages(ctx context.Context, in service.EvolutionFindMessagesInput) ([]service.WhatsAppChatMessage, error) {
+	return nil, nil
+}
+
+func (m *mockEvolutionAPIClientForHandler) FindGroups(ctx context.Context, instanceName string) ([]service.WhatsAppGroup, error) {
+	return nil, nil
+}
+
+func (m *mockEvolutionAPIClientForHandler) FindParticipants(ctx context.Context, instanceName, groupJid string) ([]string, error) {
+	return nil, nil
+}

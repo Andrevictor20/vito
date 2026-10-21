@@ -307,6 +307,9 @@ func (s *Server) registerRoutes() {
 						wr.Post("/pairing-code", s.whatsappHandler.RequestPairingCode)
 						wr.Delete("/disconnect", s.whatsappHandler.Disconnect)
 						wr.Get("/contacts", s.whatsappHandler.GetContacts)
+					wr.Get("/context-settings", s.whatsappHandler.GetContextSettings)
+					wr.Put("/context-settings", s.whatsappHandler.UpdateContextSettings)
+					wr.Delete("/context-messages", s.whatsappHandler.PurgeContextMessages)
 					})
 				}
 

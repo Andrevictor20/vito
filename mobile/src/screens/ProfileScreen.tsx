@@ -24,6 +24,8 @@ import { ConnectedDevicesModal } from '../components/profile/ConnectedDevicesMod
 import { WhatsAppConnectModal } from '../components/profile/WhatsAppConnectModal';
 import { GmailConnectModal } from '../components/profile/GmailConnectModal';
 import { IntegrationsModal } from '../components/profile/IntegrationsModal';
+import { WhatsAppContextSettings } from '../components/profile/WhatsAppContextSettings';
+import { WhatsAppContextScope } from '../services/api/whatsappContextApi';
 import { api } from '../services/api';
 import { calendarSyncService } from '../services/calendarSyncService';
 import type { AutonomyMode } from '../types';
@@ -52,6 +54,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const [whatsAppStatus, setWhatsAppStatus] = useState<'disconnected' | 'connecting' | 'connected' | null>(null);
   const [gmailVisible, setGmailVisible] = useState(false);
   const [gmailStatus, setGmailStatus] = useState<{ connected: boolean; email?: string } | null>(null);
+  const [whatsAppContextVisible, setWhatsAppContextVisible] = useState(false);
+  const [whatsAppContextScope, setWhatsAppContextScope] = useState<WhatsAppContextScope>('all');
   const [userPhone, setUserPhone] = useState(user?.phone || '');
   const [checking, setChecking] = useState(false);
 
@@ -106,6 +110,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
       setGmailStatus(gm);
     } catch {
       setGmailStatus({ connected: false });
+    }
+    try {
+      const ctx = await api.getWhatsAppContextSettings();
+      if (ctx?.scope) setWhatsAppContextScope(ctx.scope);
+    } catch {
+      // Mantém o default; o modal mostra o erro ao abrir.
     }
   }, [userPhone]);
 
@@ -170,11 +180,20 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         onOpenAISettings={() => setAiVisible(true)}
         onOpenContactsSync={() => setContactsVisible(true)}
         onOpenIntegrations={() => setIntegrationsVisible(true)}
+        onOpenWhatsAppContext={() => setWhatsAppContextVisible(true)}
+        whatsAppContextScope={whatsAppContextScope}
         autonomyMode={autonomyMode}
         calendarsActive={calendarsActive}
         integrationsActiveCount={integrationsActiveCount}
       />
 
+      <WhatsAppContextSettings
+        visible={whatsAppContextVisible}
+        onClose={() => {
+          setWhatsAppContextVisible(false);
+          loadStatuses();
+        }}
+      />
       <AISettingsModal
         visible={aiVisible}
         onClose={() => setAiVisible(false)}

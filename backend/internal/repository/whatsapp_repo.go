@@ -196,6 +196,44 @@ func (r *WhatsAppRepositorySQLite) FindConnectedInstance(ctx context.Context) (*
 	return &w, nil
 }
 
+// ListAll retorna todas as integrações do WhatsApp (usado pelo backfill de contexto).
+func (r *WhatsAppRepositorySQLite) ListAll(ctx context.Context) ([]domain.WhatsAppIntegration, error) {
+	query := `
+		SELECT id, user_id, instance_name, phone, status, pairing_code, last_connected_at, created_at, updated_at
+		FROM whatsapp_integrations
+		ORDER BY COALESCE(last_connected_at, updated_at) DESC
+	`
+	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := make([]domain.WhatsAppIntegration, 0, 4)
+	for rows.Next() {
+		var w domain.WhatsAppIntegration
+		var phoneCol, pairingCode sql.NullString
+		var lastConnectedAt sql.NullTime
+		if err := rows.Scan(
+			&w.ID, &w.UserID, &w.InstanceName, &phoneCol, &w.Status,
+			&pairingCode, &lastConnectedAt, &w.CreatedAt, &w.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		if phoneCol.Valid {
+			w.Phone = phoneCol.String
+		}
+		if pairingCode.Valid {
+			w.PairingCode = pairingCode.String
+		}
+		if lastConnectedAt.Valid {
+			w.LastConnectedAt = &lastConnectedAt.Time
+		}
+		result = append(result, w)
+	}
+	return result, rows.Err()
+}
+
 // Upsert salva ou atualiza o registro de integração do WhatsApp.
 func (r *WhatsAppRepositorySQLite) Upsert(ctx context.Context, i *domain.WhatsAppIntegration) error {
 	now := time.Now().UTC()

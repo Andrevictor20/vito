@@ -121,7 +121,15 @@ type mockExtendedEvolutionClient struct {
 		QuotedID string
 	}
 	mediaDownloadedCount int
-	findContactsCount   int
+	findContactsCount    int
+	mockMessages         []service.WhatsAppChatMessage
+	mockFindMessagesErr  error
+	mockGroups           []service.WhatsAppGroup
+	mockFindGroupsErr    error
+	mockParticipants     []string
+	mockFindParticErr    error
+	findMessagesCount    int
+	findParticipantsCnt  int
 }
 
 func (m *mockExtendedEvolutionClient) CreateInstance(ctx context.Context, instanceName, phone string) error {
@@ -335,4 +343,18 @@ func TestWhatsAppService_MatchWhatsAppContacts(t *testing.T) {
 	if matched[0].Name != "Amigo Vito" {
 		t.Errorf("esperava Name 'Amigo Vito', obteve '%s'", matched[0].Name)
 	}
+}
+
+func (m *mockExtendedEvolutionClient) FindMessages(ctx context.Context, in service.EvolutionFindMessagesInput) ([]service.WhatsAppChatMessage, error) {
+	m.findMessagesCount++
+	return m.mockMessages, m.mockFindMessagesErr
+}
+
+func (m *mockExtendedEvolutionClient) FindGroups(ctx context.Context, instanceName string) ([]service.WhatsAppGroup, error) {
+	return m.mockGroups, m.mockFindGroupsErr
+}
+
+func (m *mockExtendedEvolutionClient) FindParticipants(ctx context.Context, instanceName, groupJid string) ([]string, error) {
+	m.findParticipantsCnt++
+	return m.mockParticipants, m.mockFindParticErr
 }

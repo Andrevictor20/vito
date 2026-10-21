@@ -39,6 +39,10 @@ type Config struct {
 	SMTPFrom           string
 	EvolutionAPIURL    string
 	EvolutionAPIKey    string
+	WhatsAppContextScope        string
+	WhatsAppContextWindowSize   int
+	WhatsAppContextRetentionDays int
+	WhatsAppBackfillEnabled     bool
 }
 
 // Load carrega a configuração a partir de variáveis de ambiente com fallbacks seguros.
@@ -153,6 +157,33 @@ func Load() *Config {
 		SMTPFrom:           smtpFrom,
 		EvolutionAPIURL:    getEnvOrDefault("EVOLUTION_API_URL", "http://127.0.0.1:8085"),
 		EvolutionAPIKey:    getEnvOrDefault("EVOLUTION_API_KEY", "vito_evo_key_default_change_in_prod"),
+		WhatsAppContextScope:         getEnvOrDefault("WHATSAPP_CONTEXT_SCOPE_DEFAULT", "all"),
+		WhatsAppContextWindowSize:    getEnvIntDefault("WHATSAPP_CONTEXT_WINDOW_DEFAULT", 12),
+		WhatsAppContextRetentionDays: getEnvIntDefault("WHATSAPP_CONTEXT_RETENTION_DAYS", 30),
+		WhatsAppBackfillEnabled:      getEnvBoolDefault("WHATSAPP_BACKFILL_ENABLED", true),
+	}
+}
+
+func getEnvIntDefault(key string, fallback int) int {
+	v := os.Getenv(key)
+	if v == "" {
+		return fallback
+	}
+	parsed, err := strconv.Atoi(v)
+	if err != nil {
+		return fallback
+	}
+	return parsed
+}
+
+func getEnvBoolDefault(key string, fallback bool) bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(key))) {
+	case "1", "true", "yes", "on":
+		return true
+	case "0", "false", "no", "off":
+		return false
+	default:
+		return fallback
 	}
 }
 

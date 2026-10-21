@@ -211,3 +211,15 @@ func TestWhatsAppAuthHandler_RequestAndVerify(t *testing.T) {
 		t.Errorf("esperava status 401 para código inválido, obteve %d", wBad.Code)
 	}
 }
+
+func (m *mockEvolutionClientForAuthHandler) FindMessages(ctx context.Context, in service.EvolutionFindMessagesInput) ([]service.WhatsAppChatMessage, error) {
+	return nil, nil
+}
+
+func (m *mockEvolutionClientForAuthHandler) FindGroups(ctx context.Context, instanceName string) ([]service.WhatsAppGroup, error) {
+	return nil, nil
+}
+
+func (m *mockEvolutionClientForAuthHandler) FindParticipants(ctx context.Context, instanceName, groupJid string) ([]string, error) {
+	return nil, nil
+}

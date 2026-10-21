@@ -12,12 +12,18 @@ import (
 
 // WhatsAppHandler gerencia as rotas HTTP de integração com o WhatsApp.
 type WhatsAppHandler struct {
-	waSvc *service.WhatsAppService
+	waSvc      *service.WhatsAppService
+	contextSvc *service.WhatsAppContextService
 }
 
 // NewWhatsAppHandler instancia o handler para rotas de WhatsApp.
 func NewWhatsAppHandler(waSvc *service.WhatsAppService) *WhatsAppHandler {
 	return &WhatsAppHandler{waSvc: waSvc}
+}
+
+// SetContextService injeta o serviço de contexto conversacional do WhatsApp.
+func (h *WhatsAppHandler) SetContextService(contextSvc *service.WhatsAppContextService) {
+	h.contextSvc = contextSvc
 }
 
 type requestPairingCodeInput struct {
@@ -145,4 +151,80 @@ func (h *WhatsAppHandler) Webhook(w http.ResponseWriter, r *http.Request) {
 	_ = h.waSvc.HandleWebhook(r.Context(), eventType, body)
 
 	writeJSON(w, http.StatusOK, map[string]string{"status": "received"})
+}
+
+type contextSettingsInput struct {
+	Scope      string `json:"scope"`
+	WindowSize int    `json:"window_size"`
+}
+
+// GetContextSettings devolve o escopo e o tamanho da janela de contexto do WhatsApp.
+func (h *WhatsAppHandler) GetContextSettings(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "não autorizado"})
+		return
+	}
+	if h.contextSvc == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "contexto do WhatsApp indisponível"})
+		return
+	}
+
+	settings, err := h.contextSvc.Settings(r.Context(), userID)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "falha ao ler as preferências de contexto"})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"scope":       settings.Scope,
+		"window_size": settings.WindowSize,
+	})
+}
+
+// UpdateContextSettings atualiza o escopo e o tamanho da janela de contexto.
+func (h *WhatsAppHandler) UpdateContextSettings(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "não autorizado"})
+		return
+	}
+	if h.contextSvc == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "contexto do WhatsApp indisponível"})
+		return
+	}
+
+	var input contextSettingsInput
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "payload JSON inválido"})
+		return
+	}
+
+	settings, err := h.contextSvc.UpdateSettings(r.Context(), userID, input.Scope, input.WindowSize)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"scope":       settings.Scope,
+		"window_size": settings.WindowSize,
+	})
+}
+
+// PurgeContextMessages apaga todo o histórico de conversa arquivado do WhatsApp.
+func (h *WhatsAppHandler) PurgeContextMessages(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "não autorizado"})
+		return
+	}
+	if h.contextSvc == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "contexto do WhatsApp indisponível"})
+		return
+	}
+
+	if err := h.contextSvc.PurgeMessages(r.Context(), userID); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "falha ao limpar o histórico do WhatsApp"})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"message": "Histórico do WhatsApp limpo com sucesso"})
 }

@@ -13,6 +13,11 @@ import { P2PMeetingsApi } from './p2pMeetingsApi';
 import { NotificationsApi } from './notificationsApi';
 import { WhatsAppApi, WhatsAppIntegrationStatus } from './whatsappApi';
 import {
+  WhatsAppContextApi,
+  WhatsAppContextScope,
+  WhatsAppContextSettings,
+} from './whatsappContextApi';
+import {
   GmailApi,
   GmailStatusResponse,
   GmailScanResult,
@@ -101,6 +106,7 @@ export class ApiService extends ApiClient {
   private whatsappApi = new WhatsAppApi(this);
   private gmailApi = new GmailApi(this);
   private whatsappAuthApi = new WhatsAppAuthApi(this);
+  private whatsappContextApi = new WhatsAppContextApi(this);
 
   // Auth & Sessions
   login(email: string, password: string): Promise<AuthResponse> {
@@ -432,6 +438,18 @@ export class ApiService extends ApiClient {
   }
   getWhatsAppContacts(): Promise<{ contacts: import('./whatsappApi').WhatsAppMatchedContact[]; count: number }> {
     return this.whatsappApi.getContacts();
+  }
+  getWhatsAppContextSettings(): Promise<WhatsAppContextSettings> {
+    return this.whatsappContextApi.getSettings();
+  }
+  updateWhatsAppContextSettings(
+    scope: WhatsAppContextScope,
+    windowSize: number,
+  ): Promise<WhatsAppContextSettings> {
+    return this.whatsappContextApi.updateSettings(scope, windowSize);
+  }
+  purgeWhatsAppContextMessages(): Promise<{ message: string }> {
+    return this.whatsappContextApi.purgeMessages();
   }
   get whatsapp(): WhatsAppApi {
     return this.whatsappApi;

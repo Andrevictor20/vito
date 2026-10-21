@@ -308,7 +308,33 @@ func main() {
 	if cfg.GroqAPIKey != "" {
 		waSvc.SetAudioTranscriber(ai.NewGroqWhisper(cfg.GroqAPIKey))
 	}
+
+	// Contexto conversacional do WhatsApp (mensagem citada + janela de chats).
+	waConvRepo := repository.NewWhatsAppConversationRepository(db)
+	waContextCfg := service.DefaultWhatsAppContextConfig()
+	if cfg.WhatsAppContextScope != "" {
+		waContextCfg.ScopeDefault = cfg.WhatsAppContextScope
+	}
+	if cfg.WhatsAppContextWindowSize > 0 {
+		waContextCfg.WindowDefault = cfg.WhatsAppContextWindowSize
+	}
+	waContextSvc := service.NewWhatsAppContextService(waConvRepo, waContextCfg)
+	waGroupMeta := service.NewWhatsAppGroupMeta(evoClient, time.Hour, 24*time.Hour)
+	waSvc.SetContextService(waContextSvc)
+	waSvc.SetGroupMeta(waGroupMeta)
+	accountCleanupWorker.SetContextService(waContextSvc, cfg.WhatsAppContextRetentionDays)
+
+	// Backfill do contexto do WhatsApp: importa o histórico recente da Evolution API.
+	// Roda em background (nunca no caminho quente) e é idempotente.
+	if cfg.WhatsAppBackfillEnabled {
+		waBackfill := service.NewWhatsAppBackfillService(evoClient, waContextSvc, waGroupMeta, waRepo, service.DefaultWhatsAppBackfillConfig())
+		waBackfillWorker := service.NewWhatsAppBackfillWorker(waBackfill, waGroupMeta, 6*time.Hour)
+		waBackfillWorker.Start()
+		defer waBackfillWorker.Stop()
+	}
+
 	whatsappHandler := handler.NewWhatsAppHandler(waSvc)
+	whatsappHandler.SetContextService(waContextSvc)
 
 	// Gmail Conector & Scanner
 	gmailRepo := repository.NewGmailRepository(db)

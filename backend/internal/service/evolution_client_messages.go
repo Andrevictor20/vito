@@ -1,0 +1,266 @@
+package service
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"strings"
+	"time"
+)
+
+// WhatsAppChatMessage é uma mensagem obtida da Evolution API (backfill / janela).
+type WhatsAppChatMessage struct {
+	ID               string
+	RemoteJID        string
+	FromMe           bool
+	Participant      string
+	PushName         string
+	MessageType      string
+	Text             string
+	QuotedText       string
+	MessageTimestamp time.Time
+}
+
+// WhatsAppGroup é um grupo retornado pela Evolution API.
+type WhatsAppGroup struct {
+	ID      string
+	Subject string
+	Size    int
+}
+
+// EvolutionFindMessagesInput parametriza a busca de mensagens na Evolution API v2.
+type EvolutionFindMessagesInput struct {
+	InstanceName string
+	RemoteJID    string // vazio = todos os chats
+	From         time.Time
+	To           time.Time
+	Page         int
+	Offset       int
+}
+
+// FindMessages busca mensagens persistidas na Evolution API.
+//
+// Contrato verificado no fonte da Evolution API v2.3.7 (tag `2.3.7`):
+//   - `POST /chat/findMessages/{instance}` com `where.key` ausente devolve TODOS os chats;
+//   - `where.key.remoteJid` filtra um chat e `remoteJidAlt` também é considerado (tolerância a @lid);
+//   - `where.messageTimestamp` só é aplicado quando `gte` E `lte` vêm juntos;
+//   - a resposta vem em ordem decrescente por `messageTimestamp` e inclui `contextInfo`.
+func (c *DefaultEvolutionClient) FindMessages(ctx context.Context, in EvolutionFindMessagesInput) ([]WhatsAppChatMessage, error) {
+	if in.InstanceName == "" {
+		return nil, fmt.Errorf("instância do Evolution API obrigatória")
+	}
+	offset := in.Offset
+	if offset <= 0 {
+		offset = 50
+	}
+	page := in.Page
+	if page <= 0 {
+		page = 1
+	}
+
+	where := map[string]interface{}{}
+	if in.RemoteJID != "" {
+		where["key"] = map[string]interface{}{"remoteJid": in.RemoteJID}
+	}
+	// A Evolution só aplica o filtro temporal quando gte E lte estão presentes.
+	if !in.From.IsZero() && !in.To.IsZero() {
+		where["messageTimestamp"] = map[string]interface{}{
+			"gte": in.From.UTC().Format(time.RFC3339),
+			"lte": in.To.UTC().Format(time.RFC3339),
+		}
+	}
+
+	payload := map[string]interface{}{
+		"where":  where,
+		"page":   page,
+		"offset": offset,
+	}
+
+	path := fmt.Sprintf("/chat/findMessages/%s", in.InstanceName)
+	resp, err := c.doRequest(ctx, http.MethodPost, path, payload)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("evolution api findMessages falhou (status %d): %s", resp.StatusCode, truncateForError(string(bodyBytes)))
+	}
+
+	var raw []evolutionMessage
+	if err := json.Unmarshal(bodyBytes, &raw); err != nil {
+		return nil, err
+	}
+
+	messages := make([]WhatsAppChatMessage, 0, len(raw))
+	for _, m := range raw {
+		messages = append(messages, m.toChatMessage())
+	}
+	return messages, nil
+}
+
+// FindGroups lista os grupos da instância com subject e número de participantes.
+func (c *DefaultEvolutionClient) FindGroups(ctx context.Context, instanceName string) ([]WhatsAppGroup, error) {
+	if instanceName == "" {
+		return nil, fmt.Errorf("instância do Evolution API obrigatória")
+	}
+	path := fmt.Sprintf("/group/fetchAllGroups/%s", instanceName)
+	resp, err := c.doRequest(ctx, http.MethodGet, path, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("evolution api fetchAllGroups falhou (status %d): %s", resp.StatusCode, truncateForError(string(bodyBytes)))
+	}
+
+	var raw []struct {
+		ID      string `json:"id"`
+		Subject string `json:"subject"`
+		Size    int    `json:"size"`
+	}
+	if err := json.Unmarshal(bodyBytes, &raw); err != nil {
+		return nil, err
+	}
+
+	groups := make([]WhatsAppGroup, 0, len(raw))
+	for _, g := range raw {
+		groups = append(groups, WhatsAppGroup{ID: g.ID, Subject: g.Subject, Size: g.Size})
+	}
+	return groups, nil
+}
+
+// FindParticipants retorna a lista de participantes de um grupo.
+// `len(participants) == 1` caracteriza um grupo do WhatsApp com apenas o usuário.
+func (c *DefaultEvolutionClient) FindParticipants(ctx context.Context, instanceName, groupJID string) ([]string, error) {
+	if instanceName == "" || groupJID == "" {
+		return nil, fmt.Errorf("instância e grupo obrigatórios")
+	}
+	path := fmt.Sprintf("/group/participants/%s?groupId=%s", instanceName, url.QueryEscape(groupJID))
+	resp, err := c.doRequest(ctx, http.MethodGet, path, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("evolution api findParticipants falhou (status %d): %s", resp.StatusCode, truncateForError(string(bodyBytes)))
+	}
+
+	var raw struct {
+		Participants []struct {
+			ID   string `json:"id"`
+			Name string `json:"name"`
+		} `json:"participants"`
+	}
+	if err := json.Unmarshal(bodyBytes, &raw); err != nil {
+		return nil, err
+	}
+
+	participants := make([]string, 0, len(raw.Participants))
+	for _, p := range raw.Participants {
+		participants = append(participants, p.ID)
+	}
+	return participants, nil
+}
+
+// evolutionMessage é o formato cru devolvido por findMessages.
+type evolutionMessage struct {
+	ID  string `json:"id"`
+	Key struct {
+		ID          string `json:"id"`
+		RemoteJID   string `json:"remoteJid"`
+		FromMe      bool   `json:"fromMe"`
+		Participant string `json:"participant"`
+	} `json:"key"`
+	PushName         string          `json:"pushName"`
+	MessageType      string          `json:"messageType"`
+	Message          json.RawMessage `json:"message"`
+	MessageTimestamp int64           `json:"messageTimestamp"`
+	ContextInfo      *struct {
+		QuotedMessage json.RawMessage `json:"quotedMessage"`
+	} `json:"contextInfo"`
+}
+
+func (m evolutionMessage) toChatMessage() WhatsAppChatMessage {
+	msg := WhatsAppChatMessage{
+		ID:               firstNonEmpty(m.ID, m.Key.ID),
+		RemoteJID:        m.Key.RemoteJID,
+		FromMe:           m.Key.FromMe,
+		Participant:      m.Key.Participant,
+		PushName:         m.PushName,
+		MessageType:      m.MessageType,
+		MessageTimestamp: time.Unix(m.MessageTimestamp, 0).UTC(),
+	}
+	msg.Text = extractMessageText(m.Message)
+	if m.ContextInfo != nil && len(m.ContextInfo.QuotedMessage) > 0 {
+		msg.QuotedText = extractMessageText(m.ContextInfo.QuotedMessage)
+	}
+	return msg
+}
+
+// extractMessageText extrai o texto de qualquer subtipo de mensagem da Evolution.
+func extractMessageText(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	var payload struct {
+		Conversation        string `json:"conversation"`
+		ExtendedTextMessage struct {
+			Text string `json:"text"`
+		} `json:"extendedTextMessage"`
+		ImageMessage struct {
+			Caption string `json:"caption"`
+		} `json:"imageMessage"`
+		VideoMessage struct {
+			Caption string `json:"caption"`
+		} `json:"videoMessage"`
+	}
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return ""
+	}
+	for _, candidate := range []string{
+		payload.Conversation,
+		payload.ExtendedTextMessage.Text,
+		payload.ImageMessage.Caption,
+		payload.VideoMessage.Caption,
+	} {
+		if trimmed := strings.TrimSpace(candidate); trimmed != "" {
+			return trimmed
+		}
+	}
+	return ""
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, v := range values {
+		if strings.TrimSpace(v) != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+func truncateForError(s string) string {
+	const max = 240
+	if len(s) <= max {
+		return s
+	}
+	return s[:max] + "..."
+}

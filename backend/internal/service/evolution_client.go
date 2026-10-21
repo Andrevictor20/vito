@@ -34,6 +34,9 @@ type EvolutionAPIClient interface {
 	GetMediaBase64(ctx context.Context, instanceName string, messagePayload interface{}) (string, error)
 	FindContacts(ctx context.Context, instanceName string) ([]WhatsAppContact, error)
 	SendReaction(ctx context.Context, instanceName, remoteJid, messageID, reaction string) error
+	FindMessages(ctx context.Context, in EvolutionFindMessagesInput) ([]WhatsAppChatMessage, error)
+	FindGroups(ctx context.Context, instanceName string) ([]WhatsAppGroup, error)
+	FindParticipants(ctx context.Context, instanceName, groupJid string) ([]string, error)
 }
 
 // DefaultEvolutionClient implementa EvolutionAPIClient via chamadas REST para a Evolution API.
@@ -399,5 +402,3 @@ func (c *DefaultEvolutionClient) SendReaction(ctx context.Context, instanceName,
 	bodyBytes, _ := io.ReadAll(resp.Body)
 	return fmt.Errorf("evolution api sendReaction falhou (status %d): %s", resp.StatusCode, string(bodyBytes))
 }
-
-

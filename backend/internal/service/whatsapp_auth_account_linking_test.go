@@ -255,3 +255,11 @@ func TestWhatsAppAuth_RequestOTP_UsesConnectedInstanceFallback(t *testing.T) {
 		t.Errorf("esperado destinatário '+5511988887777', obteve '%s'", evoClient.sentTo)
 	}
 }
+
+func (m *MockWhatsAppRepoForLinking) ListAll(ctx context.Context) ([]domain.WhatsAppIntegration, error) {
+	list := make([]domain.WhatsAppIntegration, 0, len(m.integrations))
+	for _, it := range m.integrations {
+		list = append(list, *it)
+	}
+	return list, nil
+}

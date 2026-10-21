@@ -26,7 +26,13 @@ type mockEvolutionClient struct {
 		To       string
 		Text     string
 	}
-	sentReactions []struct {
+	mockMessages            []service.WhatsAppChatMessage
+	mockFindMessagesErr     error
+	mockGroups              []service.WhatsAppGroup
+	mockFindGroupsErr       error
+	mockParticipants        []string
+	mockFindParticipantsErr error
+	sentReactions           []struct {
 		Instance  string
 		RemoteJid string
 		MessageID string
@@ -696,3 +702,14 @@ func TestWhatsAppService_Webhook_SendsReadReactionAndRetainsContext(t *testing.T
 	}
 }
 
+func (m *mockEvolutionClient) FindMessages(ctx context.Context, in service.EvolutionFindMessagesInput) ([]service.WhatsAppChatMessage, error) {
+	return m.mockMessages, m.mockFindMessagesErr
+}
+
+func (m *mockEvolutionClient) FindGroups(ctx context.Context, instanceName string) ([]service.WhatsAppGroup, error) {
+	return m.mockGroups, m.mockFindGroupsErr
+}
+
+func (m *mockEvolutionClient) FindParticipants(ctx context.Context, instanceName, groupJid string) ([]string, error) {
+	return m.mockParticipants, m.mockFindParticipantsErr
+}

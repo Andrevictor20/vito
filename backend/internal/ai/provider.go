@@ -34,8 +34,9 @@ const (
 
 // ChatMessageContext representa uma mensagem no histórico da conversa para contexto multi-turn.
 type ChatMessageContext struct {
-	Sender string `json:"sender"` // "user" ou "vito"
-	Text   string `json:"text"`
+	Sender string `json:"sender"`         // "user" ou "vito"
+	Text   string `json:"text"`           //
+	Chat   string `json:"chat,omitempty"` // rótulo do chat de origem (WhatsApp)
 }
 
 // UserInput encapsula a mensagem de entrada do usuário (texto ou áudio em base64).
@@ -56,6 +57,8 @@ type UserInput struct {
 	ActiveBookings      []string             `json:"active_bookings,omitempty"`      // Links de agendamento do usuário
 	UpcomingAppointments []string             `json:"upcoming_appointments,omitempty"` // Agendamentos recebidos de convidados
 	ConversationHistory []ChatMessageContext `json:"conversation_history,omitempty"` // Histórico recente da conversa multi-turn
+	QuotedContext      string               `json:"quoted_context,omitempty"`      // Texto da mensagem citada/respondida no WhatsApp
+	ConversationWindow []ChatMessageContext `json:"conversation_window,omitempty"`  // Janela recente de chats do WhatsApp
 	UserName            string               `json:"user_name,omitempty"`            // Nome do usuário para personalização
 	AutonomyMode        string               `json:"autonomy_mode,omitempty"`        // "assisted" (padrão) | "proactive"
 	AppStateFlags       []string             `json:"app_state_flags,omitempty"`      // §8.5 telemetria compacta

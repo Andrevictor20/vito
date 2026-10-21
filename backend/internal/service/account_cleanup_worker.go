@@ -10,6 +10,8 @@ import (
 // AccountCleanupWorker executa periodicamente a limpeza de contas placeholder órfãs.
 type AccountCleanupWorker struct {
 	cleanupSvc    *AccountCleanupService
+	contextSvc    *WhatsAppContextService
+	retentionDays int
 	checkInterval time.Duration
 	stopCh        chan struct{}
 	wg            sync.WaitGroup
@@ -27,6 +29,17 @@ func NewAccountCleanupWorker(cleanupSvc *AccountCleanupService, checkInterval ..
 		cleanupSvc:    cleanupSvc,
 		checkInterval: interval,
 		stopCh:        make(chan struct{}),
+	}
+}
+
+// SetContextService injeta o serviço de contexto do WhatsApp para podar o shadow inbox.
+// Reutiliza o mesmo ticker de 15 min, sem criar uma goroutine nova.
+func (w *AccountCleanupWorker) SetContextService(contextSvc *WhatsAppContextService, retentionDays int) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.contextSvc = contextSvc
+	if retentionDays > 0 {
+		w.retentionDays = retentionDays
 	}
 }
 
@@ -71,18 +84,41 @@ func (w *AccountCleanupWorker) Stop() {
 }
 
 func (w *AccountCleanupWorker) runOnce() {
-	if w.cleanupSvc == nil {
-		return
-	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	purged, err := w.cleanupSvc.PurgeOrphanPlaceholderAccounts(ctx)
-	if err != nil {
-		log.Printf("[account-cleanup-worker] erro na limpeza: %v", err)
+	if w.cleanupSvc != nil {
+		purged, err := w.cleanupSvc.PurgeOrphanPlaceholderAccounts(ctx)
+		if err != nil {
+			log.Printf("[account-cleanup-worker] erro na limpeza: %v", err)
+		} else if purged > 0 {
+			log.Printf("[account-cleanup-worker] %d conta(s) placeholder órfã(s) removida(s)", purged)
+		}
+	}
+
+	w.pruneWhatsAppContext(ctx)
+}
+
+// pruneWhatsAppContext remove as mensagens do shadow inbox fora da retenção configurada.
+func (w *AccountCleanupWorker) pruneWhatsAppContext(ctx context.Context) {
+	w.mu.Lock()
+	contextSvc := w.contextSvc
+	retentionDays := w.retentionDays
+	w.mu.Unlock()
+
+	if contextSvc == nil {
 		return
 	}
-	if purged > 0 {
-		log.Printf("[account-cleanup-worker] %d conta(s) placeholder órfã(s) removida(s)", purged)
+	if retentionDays <= 0 {
+		retentionDays = 30
+	}
+	cutoff := time.Now().UTC().AddDate(0, 0, -retentionDays)
+	removed, err := contextSvc.PruneOlderThan(ctx, cutoff)
+	if err != nil {
+		log.Printf("[account-cleanup-worker] erro ao podar contexto do WhatsApp: %v", err)
+		return
+	}
+	if removed > 0 {
+		log.Printf("[account-cleanup-worker] %d mensagem(s) antiga(s) do contexto do WhatsApp removida(s)", removed)
 	}
 }
