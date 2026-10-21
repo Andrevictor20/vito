@@ -1,6 +1,7 @@
 package service
 
 import (
+	"regexp"
 	"strings"
 
 	"github.com/andrevmp/vito/backend/internal/domain"
@@ -30,10 +31,50 @@ func ClassifyChat(remoteJID, myPhone string, groupParticipants int, participants
 	}
 
 	cleanJID := strings.Split(jid, "@")[0]
-	if myPhone != "" && isMatchingPhone(cleanJID, myPhone) {
+	if myPhone != "" && IsSelfChatJID(cleanJID, myPhone) {
 		return domain.WhatsAppChatKindSelf
 	}
 	return domain.WhatsAppChatKindDirect
+}
+
+// IsSelfChatJID informa se um JID pertence à conversa do próprio usuário ("Você").
+//
+// O WhatsApp endereça a conversa consigo mesmo com um **prefixo** sobre o número
+// (observado em produção: `047559884097322@s.whatsapp.net` para o número
+// `559884097322`). Por isso a comparação é feita por **sufixo**, tolerando ainda
+// a diferença do 9º dígito brasileiro.
+func IsSelfChatJID(jid, phone string) bool {
+	j := phoneDigits(jid)
+	p := phoneDigits(phone)
+	if j == "" || p == "" {
+		return false
+	}
+	if j == p {
+		return true
+	}
+	// Prefixo do note-to-self: o JID termina com o número do usuário.
+	if strings.HasSuffix(j, p) {
+		return true
+	}
+	// Tolerância do 9º dígito brasileiro, nos dois sentidos.
+	jCanon, pCanon := canonicalBRPhone(j), canonicalBRPhone(p)
+	if jCanon == pCanon {
+		return true
+	}
+	return strings.HasSuffix(j, pCanon)
+}
+
+// canonicalBRPhone remove o 9º dígito de um celular brasileiro (DDI 55 + DDD + 9 + 8).
+func canonicalBRPhone(digits string) string {
+	if len(digits) == 13 && strings.HasPrefix(digits, "55") {
+		return digits[:4] + digits[5:]
+	}
+	return digits
+}
+
+// phoneDigits extrai apenas os dígitos de um JID/telefone.
+func phoneDigits(raw string) string {
+	return regexp.MustCompile(`\D+`).ReplaceAllString(raw, "")
 }
 
 // AllowsCrossChat informa se o Vito pode consultar mensagens de OUTROS chats.

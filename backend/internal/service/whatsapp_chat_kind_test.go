@@ -15,6 +15,44 @@ func TestClassifyChat_SelfDetectedByPhone(t *testing.T) {
 	}
 }
 
+// O JID do chat "Você" carrega um prefixo sobre o número (observado em produção:
+// "047559884097322@s.whatsapp.net" para o número "559884097322").
+func TestClassifyChat_SelfChatWithPrefixedJID(t *testing.T) {
+	cases := []struct {
+		name  string
+		jid   string
+		phone string
+	}{
+		{"prefixo do note-to-self", "047559884097322@s.whatsapp.net", "559884097322"},
+		{"prefixo + 9o digito no telefone", "047559884097322@s.whatsapp.net", "5598984097322"},
+		{"numero com 9o digito", "5598984097322@s.whatsapp.net", "559884097322"},
+		{"numero simples", "559884097322@s.whatsapp.net", "559884097322"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			kind := service.ClassifyChat(tc.jid, tc.phone, 0, false)
+			if kind != domain.WhatsAppChatKindSelf {
+				t.Errorf("esperava %q, obteve %q", domain.WhatsAppChatKindSelf, kind)
+			}
+		})
+	}
+}
+
+// Um contato cujo número NÃO é o do usuário nunca pode ser classificado como "self".
+func TestClassifyChat_ThirdPartyIsNeverSelf(t *testing.T) {
+	cases := []string{
+		"5511888887777@s.whatsapp.net",
+		"471331507024120@lid",
+		"276041859870765@lid",
+	}
+	for _, jid := range cases {
+		kind := service.ClassifyChat(jid, "559884097322", 0, false)
+		if kind == domain.WhatsAppChatKindSelf {
+			t.Errorf("JID de terceiro %q foi classificado como self", jid)
+		}
+	}
+}
+
 func TestClassifyChat_SelfGroupOnlyWhenSingleParticipantIsFresh(t *testing.T) {
 	cases := []struct {
 		name         string
