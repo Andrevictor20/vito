@@ -167,6 +167,39 @@ func (m *BackupManager) CreateEncryptedSnapshot(ctx context.Context) (string, er
 	return encPath, nil
 }
 
+// InvalidateSnapshots apaga TODOS os snapshots criptografados.
+//
+// Usado quando o usuário apaga dados que não podem sobreviver em cópia
+// (ex.: "Limpar histórico" do WhatsApp): como o backup é de arquivo, as cópias
+// criptografadas continuariam contendo as mensagens apagadas. Destroying-as
+// é a única forma de a promessa de privacidade valer — o próximo snapshot
+// (a cada 6 h) recria o ponto de recuperação com os dados já removidos.
+func (m *BackupManager) InvalidateSnapshots() (int, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	entries, err := os.ReadDir(m.backupDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return 0, nil
+		}
+		return 0, err
+	}
+
+	removed := 0
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".db.enc") {
+			continue
+		}
+		if err := os.Remove(filepath.Join(m.backupDir, entry.Name())); err != nil {
+			log.Printf("⚠️ [BackupManager] falha ao invalidar snapshot %s: %v", entry.Name(), err)
+			continue
+		}
+		removed++
+	}
+	return removed, nil
+}
+
 func (m *BackupManager) pruneOldBackups() error {
 	entries, err := os.ReadDir(m.backupDir)
 	if err != nil {

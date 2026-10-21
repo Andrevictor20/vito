@@ -18,6 +18,20 @@ export interface WhatsAppContextPreview {
   sample: string[];
 }
 
+/** Conversa do WhatsApp resumida (diretório de contatos / pendências). */
+export interface WhatsAppChatContact {
+  name: string;
+  preview?: string;
+  age?: string;
+  pending?: boolean;
+}
+
+/** Diretório de contatos + conversas que esperam resposta do usuário. */
+export interface WhatsAppDirectory {
+  contacts: WhatsAppChatContact[];
+  pending: WhatsAppChatContact[];
+}
+
 export const WHATSAPP_CONTEXT_SCOPES: { value: WhatsAppContextScope; label: string; hint: string }[] = [
   { value: 'off', label: 'Desligado', hint: 'O Vito não recebe nenhum contexto do WhatsApp.' },
   {
@@ -61,5 +75,9 @@ export class WhatsAppContextApi {
 
   async getPreview(): Promise<WhatsAppContextPreview> {
     return this.client.request<WhatsAppContextPreview>('/api/v1/integrations/whatsapp/context-preview');
+  }
+
+  async getDirectory(): Promise<WhatsAppDirectory> {
+    return this.client.request<WhatsAppDirectory>('/api/v1/integrations/whatsapp/context-directory');
   }
 }

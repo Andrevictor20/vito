@@ -17,6 +17,7 @@ import {
   WHATSAPP_CONTEXT_WINDOW_SIZES,
   WhatsAppContextScope,
   WhatsAppContextPreview,
+  WhatsAppDirectory,
 } from '../../services/api/whatsappContextApi';
 import { BottomSheetModal } from '../ui/BottomSheetModal';
 
@@ -36,6 +37,7 @@ export const WhatsAppContextSettings: React.FC<WhatsAppContextSettingsProps> = (
   const [scope, setScope] = useState<WhatsAppContextScope>('all');
   const [windowSize, setWindowSize] = useState(12);
   const [preview, setPreview] = useState<WhatsAppContextPreview | null>(null);
+  const [directory, setDirectory] = useState<WhatsAppDirectory | null>(null);
 
   const loadPreview = useCallback(async () => {
     try {
@@ -45,6 +47,14 @@ export const WhatsAppContextSettings: React.FC<WhatsAppContextSettingsProps> = (
       }
     } catch (err: any) {
       console.warn('[WhatsAppContextSettings] Falha ao carregar a prévia do contexto:', err);
+    }
+    try {
+      const dir = await api.getWhatsAppDirectory();
+      if (dir) {
+        setDirectory(dir);
+      }
+    } catch (err: any) {
+      console.warn('[WhatsAppContextSettings] Falha ao carregar o diretório de conversas:', err);
     }
   }, []);
 
@@ -217,6 +227,62 @@ export const WhatsAppContextSettings: React.FC<WhatsAppContextSettingsProps> = (
               </Text>
             )}
 
+            {directory && (
+              <>
+                <Text style={[styles.sectionTitle, { color: colors.textMuted, marginTop: tokens.spacing.lg }]}>
+                  PENDÊNCIAS DE RESPOSTA
+                </Text>
+                {directory.pending.length === 0 ? (
+                  <Text style={[styles.previewMeta, { color: colors.onSurfaceVariant }]}>
+                    Nenhuma conversa esperando resposta.
+                  </Text>
+                ) : (
+                  <View style={[styles.previewBox, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
+                    {directory.pending.map((c) => (
+                      <View key={c.name} style={styles.pendingRow}>
+                        <View style={styles.pendingHead}>
+                          <Text style={[styles.previewLine, { color: colors.onSurface }]}>{c.name}</Text>
+                          {!!c.age && (
+                            <Text style={[styles.previewMeta, { color: colors.onSurfaceVariant }]}>{c.age}</Text>
+                          )}
+                        </View>
+                        {!!c.preview && (
+                          <Text style={[styles.sampleLine, { color: colors.onSurfaceVariant }]} numberOfLines={2}>
+                            {c.preview}
+                          </Text>
+                        )}
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                {directory.contacts.length > 0 && (
+                  <>
+                    <Text style={[styles.sectionTitle, { color: colors.textMuted, marginTop: tokens.spacing.lg }]}>
+                      SEUS CONTATOS
+                    </Text>
+                    <View style={[styles.previewBox, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
+                      {directory.contacts.map((c) => (
+                        <View key={c.name} style={styles.pendingRow}>
+                          <View style={styles.pendingHead}>
+                            <Text style={[styles.previewLine, { color: colors.onSurface }]}>{c.name}</Text>
+                            {!!c.age && (
+                              <Text style={[styles.previewMeta, { color: colors.onSurfaceVariant }]}>{c.age}</Text>
+                            )}
+                          </View>
+                          {!!c.preview && (
+                            <Text style={[styles.sampleLine, { color: colors.onSurfaceVariant }]} numberOfLines={1}>
+                              {c.preview}
+                            </Text>
+                          )}
+                        </View>
+                      ))}
+                    </View>
+                  </>
+                )}
+              </>
+            )}
+
             {preview && (
               <>
                 <Text style={[styles.sectionTitle, { color: colors.textMuted, marginTop: tokens.spacing.lg }]}>
@@ -350,6 +416,15 @@ const styles = StyleSheet.create({
   previewLine: {
     fontSize: 13,
     fontWeight: '700',
+  },
+  pendingRow: {
+    marginBottom: tokens.spacing.sm,
+  },
+  pendingHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: tokens.spacing.sm,
   },
   previewMeta: {
     fontSize: 11,

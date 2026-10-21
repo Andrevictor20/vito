@@ -34,12 +34,13 @@ func DefaultWhatsAppBackfillConfig() WhatsAppBackfillConfig {
 // PostgreSQL dividem a CPU/RAM do Raspberry Pi com o backend (SPEC §10.2 P5/P6).
 // A importação é idempotente (upsert por id da mensagem), então pode rodar várias vezes.
 type WhatsAppBackfillService struct {
-	client     EvolutionAPIClient
-	contextSvc *WhatsAppContextService
-	groupMeta  *WhatsAppGroupMeta
-	ownerCache *WhatsAppOwnerCache
-	waRepo     domain.WhatsAppRepository
-	cfg        WhatsAppBackfillConfig
+	client        EvolutionAPIClient
+	contextSvc    *WhatsAppContextService
+	groupMeta     *WhatsAppGroupMeta
+	ownerCache    *WhatsAppOwnerCache
+	contactsCache *WhatsAppContactsCache
+	waRepo        domain.WhatsAppRepository
+	cfg           WhatsAppBackfillConfig
 }
 
 // NewWhatsAppBackfillService cria o serviço de backfill.
@@ -48,6 +49,7 @@ func NewWhatsAppBackfillService(
 	contextSvc *WhatsAppContextService,
 	groupMeta *WhatsAppGroupMeta,
 	ownerCache *WhatsAppOwnerCache,
+	contactsCache *WhatsAppContactsCache,
 	waRepo domain.WhatsAppRepository,
 	cfg WhatsAppBackfillConfig,
 ) *WhatsAppBackfillService {
@@ -61,12 +63,13 @@ func NewWhatsAppBackfillService(
 		cfg.LookbackDay = 30
 	}
 	return &WhatsAppBackfillService{
-		client:     client,
-		contextSvc: contextSvc,
-		groupMeta:  groupMeta,
-		ownerCache: ownerCache,
-		waRepo:     waRepo,
-		cfg:        cfg,
+		client:        client,
+		contextSvc:    contextSvc,
+		groupMeta:     groupMeta,
+		ownerCache:    ownerCache,
+		contactsCache: contactsCache,
+		waRepo:        waRepo,
+		cfg:           cfg,
 	}
 }
 
@@ -114,6 +117,14 @@ func (s *WhatsAppBackfillService) runForInstance(ctx context.Context, integratio
 		}
 	}
 
+	// Nomes dos contatos: os chats @lid chegam sem pushName e ficariam como
+	// "Contato" no diretório (o Vito não conseguiria dizer "a Ana te espera").
+	if s.contactsCache != nil {
+		if _, err := s.contactsCache.Fetch(ctx, integration.InstanceName); err != nil {
+			log.Printf("⚠️ [WhatsAppBackfill] falha ao buscar contatos: %v", err)
+		}
+	}
+
 	labels := make(map[string]string)
 	imported := 0
 	page := 1
@@ -147,6 +158,16 @@ func (s *WhatsAppBackfillService) runForInstance(ctx context.Context, integratio
 		}
 		page++
 	}
+
+	// Reetiqueta o histórico com os nomes reais dos contatos.
+	if s.contactsCache != nil && s.contextSvc != nil {
+		if updated, err := s.contextSvc.Relabel(ctx, integration.UserID, s.contactsCache.Names()); err != nil {
+			log.Printf("⚠️ [WhatsAppBackfill] falha ao reetiquetar conversas: %v", err)
+		} else if updated > 0 {
+			log.Printf("[WhatsAppBackfill] %d mensagem(ns) reetiquetada(s) com o nome do contato", updated)
+		}
+	}
+
 	return imported, nil
 }
 

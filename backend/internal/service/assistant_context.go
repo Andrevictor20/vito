@@ -46,6 +46,8 @@ func (s *AssistantService) enrichInputContext(ctx context.Context, userID string
 	needBookings := len(input.ActiveBookings) == 0 && s.bookingSvc != nil
 	needAppointments := len(input.UpcomingAppointments) == 0 && s.bookingSvc != nil
 	needGmail := s.gmailSvc != nil && len(input.RecentEmails) == 0
+	needDirectory := s.waDirectory != nil && input.WhatsAppPrivateScope && len(input.ContactDirectory) == 0
+	needPending := s.waDirectory != nil && input.WhatsAppPrivateScope && len(input.PendingConversations) == 0
 
 	var (
 		autonomyMode      string
@@ -61,6 +63,8 @@ func (s *AssistantService) enrichInputContext(ctx context.Context, userID string
 		activeBookings    []string
 		upcomingAppts     []string
 		recentEmailLines  []string
+		contactDirectory  []ai.ChatContactSummary
+		pendingChats      []ai.ChatContactSummary
 		gmailFlag         string
 		wg                sync.WaitGroup
 	)
@@ -218,6 +222,26 @@ func (s *AssistantService) enrichInputContext(ctx context.Context, userID string
 		}()
 	}
 
+	if needDirectory {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if dir, err := s.waDirectory.Directory(ctx, userID); err == nil {
+				contactDirectory = dir
+			}
+		}()
+	}
+
+	if needPending {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if pend, err := s.waDirectory.PendingSummaries(ctx, userID); err == nil {
+				pendingChats = pend
+			}
+		}()
+	}
+
 	if needGmail {
 		wg.Add(1)
 		go func() {
@@ -370,6 +394,12 @@ func (s *AssistantService) enrichInputContext(ctx context.Context, userID string
 	}
 	if len(recentEmailLines) > 0 {
 		input.RecentEmails = recentEmailLines
+	}
+	if len(contactDirectory) > 0 {
+		input.ContactDirectory = contactDirectory
+	}
+	if len(pendingChats) > 0 {
+		input.PendingConversations = pendingChats
 	}
 	if gmailFlag != "" {
 		input.AppStateFlags = append(input.AppStateFlags, gmailFlag)

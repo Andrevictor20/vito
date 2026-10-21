@@ -412,6 +412,10 @@ func (s *AssistantService) executeAction(ctx context.Context, userID string, int
 	case ai.ActionCancelBookingAppointment:
 		return s.executeCancelBookingAppointment(ctx, userID, intent, input, res)
 
+	case ai.ActionQueryConversation, ai.ActionListPendingConversations, ai.ActionDraftReply,
+		ai.ActionSendWhatsAppMessage, ai.ActionCreateReplyReminder:
+		return s.executeWhatsAppAction(ctx, userID, intent, input, res)
+
 	case ai.ActionCreateMeeting:
 		return s.executeCreateMeeting(ctx, userID, intent, input, res)
 

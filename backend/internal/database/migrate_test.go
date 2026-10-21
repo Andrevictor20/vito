@@ -16,8 +16,11 @@ func TestVersionedMigrations_FreshDB(t *testing.T) {
 	if err := db.QueryRow(`SELECT COUNT(*) FROM schema_migrations`).Scan(&count); err != nil {
 		t.Fatal(err)
 	}
-	if count != 15 {
-		t.Fatalf("esperava 15 migrações registradas, vieram %d", count)
+	if count != 16 {
+		t.Fatalf("esperava 16 migrações registradas, vieram %d", count)
+	}
+	if !hasTable(db, "whatsapp_pending_state") {
+		t.Fatal("016 deveria criar whatsapp_pending_state")
 	}
 	if !hasTable(db, "whatsapp_conversation_messages") || !hasTable(db, "whatsapp_context_settings") {
 		t.Fatal("015 deveria criar whatsapp_conversation_messages e whatsapp_context_settings")
@@ -80,8 +83,8 @@ func TestVersionedMigrations_LegacyDB(t *testing.T) {
 	if err := db2.QueryRow(`SELECT COUNT(*) FROM schema_migrations`).Scan(&count); err != nil {
 		t.Fatal(err)
 	}
-	if count != 15 {
-		t.Fatalf("base legada deveria ser carimbada com 15, veio %d", count)
+	if count != 16 {
+		t.Fatalf("base legada deveria ser carimbada com 16, veio %d", count)
 	}
 }
 

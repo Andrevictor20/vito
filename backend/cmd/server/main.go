@@ -95,6 +95,7 @@ func main() {
 	defer writerQueue.Close()
 	database.SetDefaultWriterQueue(writerQueue)
 
+	var bkpMgr *database.BackupManager
 	if cfg.DBPath != ":memory:" && len(cfg.DataEncryptionKey) >= 16 {
 		backupDir := os.Getenv("BACKUP_DIR")
 		if backupDir == "" {
@@ -103,16 +104,20 @@ func main() {
 				backupDir = "./backups"
 			}
 		}
-		if bkpMgr, bkpErr := database.NewBackupManager(database.BackupConfig{
+		var bkpErr error
+		bkpMgr, bkpErr = database.NewBackupManager(database.BackupConfig{
 			DB:         db,
 			BackupDir:  backupDir,
 			MasterKey:  cfg.DataEncryptionKey,
 			MaxBackups: 7,
 			Interval:   6 * time.Hour,
-		}); bkpErr == nil {
+		})
+		if bkpErr == nil {
 			bkpMgr.Start()
 			defer bkpMgr.Stop()
 			log.Printf("🔒 [BackupWorker] Rotina de backup criptografado AES-256-GCM ativa (%s).", backupDir)
+		} else {
+			log.Printf("⚠️ [BackupWorker] backup desativado: %v", bkpErr)
 		}
 	}
 	log.Println("✅ [Vito DB] Banco SQLite e migrações aplicadas com sucesso.")
@@ -364,42 +369,26 @@ func main() {
 		waSvc.SetAudioTranscriber(ai.NewGroqWhisper(cfg.GroqAPIKey))
 	}
 
-	// Contexto conversacional do WhatsApp (mensagem citada + janela de chats).
-	waConvRepo := repository.NewWhatsAppConversationRepository(db)
-	waContextCfg := service.DefaultWhatsAppContextConfig()
-	if cfg.WhatsAppContextScope != "" {
-		waContextCfg.ScopeDefault = cfg.WhatsAppContextScope
-	}
-	if cfg.WhatsAppContextWindowSize > 0 {
-		waContextCfg.WindowDefault = cfg.WhatsAppContextWindowSize
-	}
-	if cfg.WhatsAppContextMaxAgeDays > 0 {
-		// A janela precisa cobrir o mesmo período que o backfill importa.
-		waContextCfg.MaxAge = time.Duration(cfg.WhatsAppContextMaxAgeDays) * 24 * time.Hour
-	}
-	waContextSvc := service.NewWhatsAppContextService(waConvRepo, waContextCfg)
-	waGroupMeta := service.NewWhatsAppGroupMeta(evoClient, time.Hour, 24*time.Hour)
-	waOwnerCache := service.NewWhatsAppOwnerCache(evoClient, time.Hour)
-	waSvc.SetContextService(waContextSvc)
-	waSvc.SetGroupMeta(waGroupMeta)
-	waSvc.SetOwnerCache(waOwnerCache)
-	waSvc.SetContextDebugLog(cfg.WhatsAppContextDebugLog)
-	accountCleanupWorker.SetContextService(waContextSvc, cfg.WhatsAppContextRetentionDays)
-
-	// Backfill do contexto do WhatsApp: importa o histórico recente da Evolution API.
-	// Roda em background (nunca no caminho quente) e é idempotente.
-	if cfg.WhatsAppBackfillEnabled {
-		waBackfill := service.NewWhatsAppBackfillService(evoClient, waContextSvc, waGroupMeta, waOwnerCache, waRepo, service.DefaultWhatsAppBackfillConfig())
-		waBackfillWorker := service.NewWhatsAppBackfillWorker(waBackfill, waGroupMeta, 6*time.Hour)
-		waBackfillWorker.Start()
-		defer waBackfillWorker.Stop()
+	// Assistente de WhatsApp: contexto, diretório de contatos, pendências, Radar e backfill.
+	waWiring := setupWhatsAppAssistant(cfg, db, waRepo, evoClient, waSvc, astSvc, notifSvc, accountCleanupWorker)
+	waNudgeWorker := waWiring.NudgeWorker
+	waNudgeWorker.Start()
+	defer waNudgeWorker.Stop()
+	if waWiring.BackfillWorker != nil {
+		defer waWiring.BackfillWorker.Stop()
 	}
 
 	whatsappHandler := handler.NewWhatsAppHandler(waSvc)
-	whatsappHandler.SetContextService(waContextSvc)
+	whatsappHandler.SetContextService(waWiring.ContextSvc)
+	whatsappHandler.SetDirectoryService(waWiring.Directory)
+	if bkpMgr != nil {
+		// "Limpar histórico" invalida os snapshots: as cópias criptografadas
+		// também continham as mensagens apagadas.
+		whatsappHandler.SetBackupManager(bkpMgr)
+	}
 	// O app e o desktop também recebem o contexto do WhatsApp (a resposta só é
 	// vista pelo usuário, então o escopo "todos os chats" é seguro nessas surfaces).
-	astHandler.SetContextService(waContextSvc)
+	astHandler.SetContextService(waWiring.ContextSvc)
 
 	// Gmail Conector & Scanner
 	gmailRepo := repository.NewGmailRepository(db)

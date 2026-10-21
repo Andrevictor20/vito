@@ -17,6 +17,7 @@ import {
   WhatsAppContextScope,
   WhatsAppContextSettings,
   WhatsAppContextPreview,
+  WhatsAppDirectory,
 } from './whatsappContextApi';
 import {
   GmailApi,
@@ -445,6 +446,9 @@ export class ApiService extends ApiClient {
   }
   getWhatsAppContextPreview(): Promise<WhatsAppContextPreview> {
     return this.whatsappContextApi.getPreview();
+  }
+  getWhatsAppDirectory(): Promise<WhatsAppDirectory> {
+    return this.whatsappContextApi.getDirectory();
   }
   updateWhatsAppContextSettings(
     scope: WhatsAppContextScope,

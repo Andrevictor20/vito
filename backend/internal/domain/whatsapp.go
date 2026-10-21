@@ -85,13 +85,43 @@ type WhatsAppContextSettings struct {
 	UpdatedAt  time.Time `json:"updated_at"`
 }
 
+// WhatsAppChatSummary resume uma conversa do WhatsApp (última mensagem + volume)
+// para o diretório de contatos e a lista de pendências.
+type WhatsAppChatSummary struct {
+	ChatJID      string    `json:"chat_jid"`
+	ChatLabel    string    `json:"chat_label"`
+	ChatKind     string    `json:"chat_kind"`
+	LastText     string    `json:"last_text"`
+	LastSender   string    `json:"last_sender"`
+	LastFromMe   bool      `json:"last_from_me"`
+	LastAt       time.Time `json:"last_at"`
+	MessageCount int       `json:"message_count"`
+}
+
+// WhatsAppPendingState controla a cobrança de uma pendência de resposta.
+//
+// A pendência em si é DERIVADA (última mensagem do chat não é do usuário);
+// aqui fica só o estado de cobrança, para não martelar o mesmo assunto.
+type WhatsAppPendingState struct {
+	UserID       string     `json:"user_id"`
+	ChatJID      string     `json:"chat_jid"`
+	LastNudgedAt *time.Time `json:"last_nudged_at,omitempty"`
+	SnoozedUntil *time.Time `json:"snoozed_until,omitempty"`
+	DismissedAt  *time.Time `json:"dismissed_at,omitempty"`
+	UpdatedAt    time.Time  `json:"updated_at"`
+}
+
 // WhatsAppConversationRepository persiste as mensagens arquivadas e as preferências de escopo.
 type WhatsAppConversationRepository interface {
 	SaveMessage(ctx context.Context, msg *WhatsAppConversationMessage) error
 	RecentMessages(ctx context.Context, userID, chatJID string, limit int, since time.Time) ([]WhatsAppConversationMessage, error)
 	RecentMessagesAcrossChats(ctx context.Context, userID string, limit int, since time.Time) ([]WhatsAppConversationMessage, error)
 	RecentMessagesByKind(ctx context.Context, userID, chatKind string, limit int, since time.Time) ([]WhatsAppConversationMessage, error)
+	RecentChats(ctx context.Context, userID string, since time.Time, limit int) ([]WhatsAppChatSummary, error)
 	CountMessages(ctx context.Context, userID string, since time.Time) (int64, error)
+	UpdateChatLabels(ctx context.Context, userID string, labels map[string]string) (int64, error)
+	GetPendingState(ctx context.Context, userID, chatJID string) (*WhatsAppPendingState, error)
+	SavePendingState(ctx context.Context, state *WhatsAppPendingState) error
 	GetContextSettings(ctx context.Context, userID string) (*WhatsAppContextSettings, error)
 	SaveContextSettings(ctx context.Context, settings *WhatsAppContextSettings) error
 	DeleteMessages(ctx context.Context, userID string) error

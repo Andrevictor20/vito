@@ -60,6 +60,8 @@ type AssistantService struct {
 	userRepo        domain.UserRepository
 	aiSettingsRepo  domain.AISettingsRepository
 	gmailSvc        *GmailService
+	waDirectory     *WhatsAppDirectoryService
+	waSender        WhatsAppMessageSender
 }
 
 // NewAssistantService instancia o serviço do assistente.
@@ -110,6 +112,17 @@ func (s *AssistantService) SetAISettingsRepository(repo domain.AISettingsReposit
 // SetGmailService injeta o serviço de integração com Gmail.
 func (s *AssistantService) SetGmailService(svc *GmailService) {
 	s.gmailSvc = svc
+}
+
+// SetWhatsAppDirectory injeta o diretório de conversas do WhatsApp.
+// Habilita as ações de consulta de conversas, pendências, rascunho e envio.
+func (s *AssistantService) SetWhatsAppDirectory(dir *WhatsAppDirectoryService) {
+	s.waDirectory = dir
+}
+
+// SetWhatsAppSender injeta o enviado de mensagens do WhatsApp.
+func (s *AssistantService) SetWhatsAppSender(sender WhatsAppMessageSender) {
+	s.waSender = sender
 }
 
 // Process recebe o input (voz/texto), invoca a IA e aplica a ação no banco de dados.

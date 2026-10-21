@@ -109,6 +109,73 @@ func (r *WhatsAppConversationRepositorySQLite) RecentMessagesByKind(ctx context.
 	return scanConversationMessages(rows)
 }
 
+// RecentChats devolve um resumo por conversa (última mensagem + volume),
+// do mais recente para o mais antigo. É a base do diretório de contatos e
+// da lista de pendências de resposta.
+func (r *WhatsAppConversationRepositorySQLite) RecentChats(ctx context.Context, userID string, since time.Time, limit int) ([]domain.WhatsAppChatSummary, error) {
+	if userID == "" || limit <= 0 {
+		return []domain.WhatsAppChatSummary{}, nil
+	}
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT chat_jid, chat_label, chat_kind, text, sender_name, from_me, message_timestamp, total
+		FROM (
+			SELECT
+				chat_jid, chat_label, chat_kind, text, sender_name, from_me, message_timestamp,
+				ROW_NUMBER() OVER (PARTITION BY chat_jid ORDER BY message_timestamp DESC) AS rn,
+				COUNT(*) OVER (PARTITION BY chat_jid) AS total
+			FROM whatsapp_conversation_messages
+			WHERE user_id = ? AND message_timestamp >= ?
+		)
+		WHERE rn = 1
+		ORDER BY message_timestamp DESC
+		LIMIT ?
+	`, userID, since, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := make([]domain.WhatsAppChatSummary, 0, 16)
+	for rows.Next() {
+		var s domain.WhatsAppChatSummary
+		var fromMe int
+		if err := rows.Scan(
+			&s.ChatJID, &s.ChatLabel, &s.ChatKind, &s.LastText, &s.LastSender,
+			&fromMe, &s.LastAt, &s.MessageCount,
+		); err != nil {
+			return nil, err
+		}
+		s.LastFromMe = fromMe != 0
+		result = append(result, s)
+	}
+	return result, rows.Err()
+}
+
+// UpdateChatLabels reetiqueta as conversas do usuário (usado para resolver os
+// nomes dos chats @lid, que chegam sem pushName).
+func (r *WhatsAppConversationRepositorySQLite) UpdateChatLabels(ctx context.Context, userID string, labels map[string]string) (int64, error) {
+	if userID == "" || len(labels) == 0 {
+		return 0, nil
+	}
+	var updated int64
+	for chatJID, label := range labels {
+		if chatJID == "" || label == "" {
+			continue
+		}
+		res, err := r.db.ExecContext(ctx, `
+			UPDATE whatsapp_conversation_messages
+			SET chat_label = ?
+			WHERE user_id = ? AND chat_jid = ? AND chat_label <> ?
+		`, label, userID, chatJID, label)
+		if err != nil {
+			return updated, err
+		}
+		affected, _ := res.RowsAffected()
+		updated += affected
+	}
+	return updated, nil
+}
+
 // CountMessages conta as mensagens arquivadas do usuário dentro da janela de idade.
 func (r *WhatsAppConversationRepositorySQLite) CountMessages(ctx context.Context, userID string, since time.Time) (int64, error) {
 	if userID == "" {
@@ -123,6 +190,59 @@ func (r *WhatsAppConversationRepositorySQLite) CountMessages(ctx context.Context
 		return 0, err
 	}
 	return total, nil
+}
+
+// GetPendingState devolve o estado de cobrança de uma pendência (nil se nunca cobrada).
+func (r *WhatsAppConversationRepositorySQLite) GetPendingState(ctx context.Context, userID, chatJID string) (*domain.WhatsAppPendingState, error) {
+	if userID == "" || chatJID == "" {
+		return nil, nil
+	}
+	var st domain.WhatsAppPendingState
+	var lastNudged, snoozed, dismissed sql.NullTime
+	err := r.db.QueryRowContext(ctx, `
+		SELECT user_id, chat_jid, last_nudged_at, snoozed_until, dismissed_at, updated_at
+		FROM whatsapp_pending_state
+		WHERE user_id = ? AND chat_jid = ?
+	`, userID, chatJID).Scan(&st.UserID, &st.ChatJID, &lastNudged, &snoozed, &dismissed, &st.UpdatedAt)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	if lastNudged.Valid {
+		st.LastNudgedAt = &lastNudged.Time
+	}
+	if snoozed.Valid {
+		st.SnoozedUntil = &snoozed.Time
+	}
+	if dismissed.Valid {
+		st.DismissedAt = &dismissed.Time
+	}
+	return &st, nil
+}
+
+// SavePendingState cria ou atualiza o estado de cobrança de uma pendência.
+func (r *WhatsAppConversationRepositorySQLite) SavePendingState(ctx context.Context, state *domain.WhatsAppPendingState) error {
+	if state == nil || state.UserID == "" || state.ChatJID == "" {
+		return errors.New("estado de pendência inválido")
+	}
+	if state.UpdatedAt.IsZero() {
+		state.UpdatedAt = time.Now().UTC()
+	}
+	return database.WithBusyRetry(4, func() error {
+		_, err := r.db.ExecContext(ctx, `
+			INSERT INTO whatsapp_pending_state
+				(user_id, chat_jid, last_nudged_at, snoozed_until, dismissed_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?)
+			ON CONFLICT(user_id, chat_jid) DO UPDATE SET
+				last_nudged_at = excluded.last_nudged_at,
+				snoozed_until  = excluded.snoozed_until,
+				dismissed_at   = excluded.dismissed_at,
+				updated_at     = excluded.updated_at
+		`, state.UserID, state.ChatJID, state.LastNudgedAt, state.SnoozedUntil, state.DismissedAt, state.UpdatedAt)
+		return err
+	})
 }
 
 // GetContextSettings retorna as preferências de escopo do usuário (nil se nunca configuradas).

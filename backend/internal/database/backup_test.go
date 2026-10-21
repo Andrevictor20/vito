@@ -111,3 +111,56 @@ func TestBackupManager_EncryptedSnapshotRoundtripAndRotation(t *testing.T) {
 		t.Fatalf("esperava exatamente 2 backups retidos após rotação, encontrou %d", count)
 	}
 }
+
+// "Limpar histórico" precisa invalidar as cópias criptografadas: o backup é de
+// arquivo, então as mensagens apagadas continuariam existindo nos snapshots.
+func TestBackupManager_InvalidateSnapshotsRemovesEncryptedCopies(t *testing.T) {
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "vito.db")
+	backupDir := filepath.Join(tmpDir, "backups")
+
+	db, err := Open(dbPath)
+	if err != nil {
+		t.Fatalf("falha ao abrir sqlite: %v", err)
+	}
+	defer db.Close()
+
+	masterKey := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	mgr, err := NewBackupManager(BackupConfig{
+		DB:         db,
+		BackupDir:  backupDir,
+		MasterKey:  masterKey,
+		MaxBackups: 7,
+		Interval:   time.Hour,
+	})
+	if err != nil {
+		t.Fatalf("falha ao criar BackupManager: %v", err)
+	}
+
+	if _, err := mgr.CreateEncryptedSnapshot(context.Background()); err != nil {
+		t.Fatalf("falha ao criar snapshot: %v", err)
+	}
+	entries, err := os.ReadDir(backupDir)
+	if err != nil {
+		t.Fatalf("falha ao ler dir de backups: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("esperava 1 snapshot criado, obteve %d", len(entries))
+	}
+
+	removed, err := mgr.InvalidateSnapshots()
+	if err != nil {
+		t.Fatalf("falha ao invalidar snapshots: %v", err)
+	}
+	if removed != 1 {
+		t.Fatalf("esperava 1 snapshot invalidado, obteve %d", removed)
+	}
+
+	entries, err = os.ReadDir(backupDir)
+	if err != nil {
+		t.Fatalf("falha ao reler dir de backups: %v", err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("esperava o dir de backups vazio, restaram %d arquivos", len(entries))
+	}
+}

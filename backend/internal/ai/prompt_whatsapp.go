@@ -44,6 +44,84 @@ func ConversationWindowBlock(window []ChatMessageContext) string {
 	return b.String()
 }
 
+// ContactDirectoryBlock lista os contatos recentes do WhatsApp.
+//
+// Sem isso o Vito não sabe com quem o usuário está falando: os chats "@lid"
+// chegam sem nome e o rótulo genérico "Contato" não permite resolver
+// "as mensagens da Ana" nem dizer "a Ana te espera".
+func ContactDirectoryBlock(directory []ChatContactSummary) string {
+	if len(directory) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString("\n<SEUS CONTATOS — conversas recentes do WhatsApp. É daqui que saem os nomes que o usuário usa ao se referir a alguém.>\n")
+	for _, c := range directory {
+		name := strings.TrimSpace(c.Name)
+		if name == "" {
+			continue
+		}
+		preview := strings.TrimSpace(c.Preview)
+		age := strings.TrimSpace(c.Age)
+		line := "- " + name
+		if age != "" {
+			line += " (" + age + ")"
+		}
+		if preview != "" {
+			line += ": " + preview
+		}
+		b.WriteString(line + "\n")
+	}
+	b.WriteString("</SEUS CONTATOS>\n")
+	return b.String()
+}
+
+// PendingConversationsBlock lista as conversas que esperam resposta do usuário.
+func PendingConversationsBlock(pending []ChatContactSummary) string {
+	if len(pending) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString("\n<PENDÊNCIAS DE RESPOSTA — conversas em que a última mensagem NÃO foi sua.>\n")
+	for _, c := range pending {
+		name := strings.TrimSpace(c.Name)
+		if name == "" {
+			continue
+		}
+		preview := strings.TrimSpace(c.Preview)
+		age := strings.TrimSpace(c.Age)
+		line := "- " + name
+		if age != "" {
+			line += " (" + age + ")"
+		}
+		if preview != "" {
+			line += ": " + preview
+		}
+		b.WriteString(line + "\n")
+	}
+	b.WriteString("</PENDÊNCIAS DE RESPOSTA>\n")
+	return b.String()
+}
+
+// WhatsAppAssistantDirectives descreve as ações do assistente de WhatsApp.
+//
+// Emitida só quando há diretório ou pendências, para não poluir o prompt das
+// outras surfaces.
+func WhatsAppAssistantDirectives(directory, pending []ChatContactSummary) string {
+	if len(directory) == 0 && len(pending) == 0 {
+		return ""
+	}
+	return `
+DIRETRIZ DE ASSISTENTE DE WHATSAPP (consultar conversas, responder, lembrar):
+- Você tem acesso às conversas do WhatsApp do usuário (SEUS CONTATOS e PENDÊNCIAS DE RESPOSTA). Quando ele perguntar sobre uma conversa ("quais as últimas mensagens que a Ana enviou", "o que o João quer"), use "action": "QUERY_CONVERSATION" com o nome do contato e "limit" (padrão 10) — a resposta vem das mensagens reais, não da sua memória.
+- "quem está me esperando" / "minhas pendências" / "com quem eu preciso falar" -> "action": "LIST_PENDING_CONVERSATIONS".
+- "me ajuda a responder a Ana" / "o que eu respondo pro João" -> "action": "DRAFT_REPLY" com o texto pronto no campo "message" (aqui você escreve como se fosse o usuário, e o Vito mostra o rascunho). NÃO envie sem pedido explícito.
+- "manda pra Ana" / "envia isso pra João" -> "action": "SEND_WHATSAPP_MESSAGE" com "whatsapp_message": {"chat": "Ana", "text": "..."}. Só use quando o usuário mandar ENVIAR de forma explícita; se o alvo estiver ambíguo, devolva a lista de candidatos.
+- "me lembra de responder a Ana amanhã às 9h" -> "action": "CREATE_REPLY_REMINDER" com "reply_reminder": {"chat": "Ana", "when": "amanhã às 9h", "note": "..."}.
+- Ao responder sobre conversas, cite o NOME do contato como o usuário o conhece (o bloco SEUS CONTATOS traz o nome) e diga de onde veio a informação.
+- Nunca invente conteúdo de conversa: se a conversa não estiver no diretório, pergunte o nome do contato.
+`
+}
+
 // WhatsAppContextDirectives devolve as diretivas de resolução de referência e ação
 // aplicáveis à superfície do WhatsApp. Só é emitida quando há contexto de verdade,
 // para não alterar o comportamento dos demais canais (app e desktop).

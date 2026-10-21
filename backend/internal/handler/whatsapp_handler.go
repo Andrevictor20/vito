@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/andrevmp/vito/backend/internal/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/handler/middleware"
 	"github.com/andrevmp/vito/backend/internal/service"
@@ -12,8 +13,10 @@ import (
 
 // WhatsAppHandler gerencia as rotas HTTP de integração com o WhatsApp.
 type WhatsAppHandler struct {
-	waSvc      *service.WhatsAppService
-	contextSvc *service.WhatsAppContextService
+	waSvc        *service.WhatsAppService
+	contextSvc   *service.WhatsAppContextService
+	directorySvc *service.WhatsAppDirectoryService
+	backupMgr    *database.BackupManager
 }
 
 // NewWhatsAppHandler instancia o handler para rotas de WhatsApp.
@@ -24,6 +27,20 @@ func NewWhatsAppHandler(waSvc *service.WhatsAppService) *WhatsAppHandler {
 // SetContextService injeta o serviço de contexto conversacional do WhatsApp.
 func (h *WhatsAppHandler) SetContextService(contextSvc *service.WhatsAppContextService) {
 	h.contextSvc = contextSvc
+}
+
+// SetDirectoryService injeta o diretório de conversas do WhatsApp.
+func (h *WhatsAppHandler) SetDirectoryService(directorySvc *service.WhatsAppDirectoryService) {
+	h.directorySvc = directorySvc
+}
+
+// SetBackupManager injeta o gerenciador de backups.
+//
+// Necessário para a privacidade: o backup é de arquivo, então as cópias
+// criptografadas continuariam contendo as mensagens que o usuário mandou
+// apagar. "Limpar histórico" invalida os snapshots.
+func (h *WhatsAppHandler) SetBackupManager(backupMgr *database.BackupManager) {
+	h.backupMgr = backupMgr
 }
 
 type requestPairingCodeInput struct {
@@ -231,6 +248,26 @@ func (h *WhatsAppHandler) GetContextPreview(w http.ResponseWriter, r *http.Reque
 	writeJSON(w, http.StatusOK, preview)
 }
 
+// GetContextDirectory devolve o diretório de contatos e as pendências de resposta.
+func (h *WhatsAppHandler) GetContextDirectory(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "não autorizado"})
+		return
+	}
+	if h.directorySvc == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "diretório do WhatsApp indisponível"})
+		return
+	}
+
+	preview, err := h.directorySvc.Preview(r.Context(), userID)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "falha ao montar o diretório de conversas"})
+		return
+	}
+	writeJSON(w, http.StatusOK, preview)
+}
+
 // PurgeContextMessages apaga todo o histórico de conversa arquivado do WhatsApp.
 func (h *WhatsAppHandler) PurgeContextMessages(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
@@ -247,5 +284,16 @@ func (h *WhatsAppHandler) PurgeContextMessages(w http.ResponseWriter, r *http.Re
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "falha ao limpar o histórico do WhatsApp"})
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"message": "Histórico do WhatsApp limpo com sucesso"})
+
+	// As cópias criptografadas do banco também continham as mensagens apagadas.
+	invalidated := 0
+	if h.backupMgr != nil {
+		if n, err := h.backupMgr.InvalidateSnapshots(); err == nil {
+			invalidated = n
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"message":             "Histórico do WhatsApp limpo com sucesso",
+		"backups_invalidated": invalidated,
+	})
 }

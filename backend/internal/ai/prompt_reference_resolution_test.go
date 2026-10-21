@@ -89,3 +89,51 @@ func TestBuildSystemPromptFromInput_WhatsAppDirectiveForbidsDontKnow(t *testing.
 		}
 	}
 }
+
+// O prompt leva o diretório de contatos e as pendências de resposta.
+func TestBuildSystemPromptFromInput_ContactDirectoryAndPendingBlocks(t *testing.T) {
+	prompt := ai.BuildSystemPromptFromInput(ai.UserInput{
+		Now:      time.Date(2026, 10, 21, 12, 0, 0, 0, time.UTC),
+		Timezone: "America/Sao_Paulo",
+		ContactDirectory: []ai.ChatContactSummary{
+			{Name: "Ana", Preview: "pode ser quinta as 10h", Age: "ha 2h"},
+			{Name: "ALVIMAR", Preview: "manda o contrato", Age: "ontem"},
+		},
+		PendingConversations: []ai.ChatContactSummary{
+			{Name: "Ana", Preview: "pode ser quinta as 10h", Age: "ha 2h", Pending: true},
+		},
+	})
+
+	for _, expected := range []string{
+		"SEUS CONTATOS",
+		"Ana",
+		"ALVIMAR",
+		"PEND",
+	} {
+		if !strings.Contains(prompt, expected) {
+			t.Errorf("esperava o fragmento %q no prompt", expected)
+		}
+	}
+
+	// As diretivas do assistente de WhatsApp descrevem as novas ações.
+	for _, expected := range []string{"QUERY_CONVERSATION", "LIST_PENDING_CONVERSATIONS", "DRAFT_REPLY", "SEND_WHATSAPP_MESSAGE", "CREATE_REPLY_REMINDER"} {
+		if !strings.Contains(prompt, expected) {
+			t.Errorf("esperava a acao %q no prompt", expected)
+		}
+	}
+}
+
+// Sem diretório nem pendências, as diretivas do WhatsApp não aparecem.
+func TestBuildSystemPromptFromInput_NoWhatsAppAssistantDirectivesWithoutData(t *testing.T) {
+	prompt := ai.BuildSystemPromptFromInput(ai.UserInput{
+		Now:      time.Date(2026, 10, 21, 12, 0, 0, 0, time.UTC),
+		Timezone: "America/Sao_Paulo",
+		Text:     "olá",
+	})
+	if strings.Contains(prompt, "SEUS CONTATOS") {
+		t.Error("o bloco de contatos não deve aparecer sem diretório")
+	}
+	if strings.Contains(prompt, "DIRETRIZ DE ASSISTENTE DE WHATSAPP") {
+		t.Error("as diretivas do assistente de WhatsApp não devem aparecer sem dados")
+	}
+}

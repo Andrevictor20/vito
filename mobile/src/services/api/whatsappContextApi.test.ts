@@ -77,6 +77,24 @@ describe('WhatsAppContextApi Unit Tests', () => {
     assert.equal(res.sample.length, 1);
   });
 
+
+  test('getDirectory busca o endpoint do diretorio de conversas', async () => {
+    const { client, calls } = mockClient({
+      contacts: [{ name: 'Ana', preview: 'pode ser quinta as 10h', age: 'ha 2h' }],
+      pending: [{ name: 'Ana', preview: 'pode ser quinta as 10h', age: 'ha 2h', pending: true }],
+    });
+
+    const api = new WhatsAppContextApi(client);
+    const res = await api.getDirectory();
+
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].ep, '/api/v1/integrations/whatsapp/context-directory');
+    assert.equal(res.contacts.length, 1);
+    assert.equal(res.contacts[0].name, 'Ana');
+    assert.equal(res.pending.length, 1);
+    assert.equal(res.pending[0].pending, true);
+  });
+
   test('catálogo de escopos cobre off, quoted, chat e all', () => {
     const values = WHATSAPP_CONTEXT_SCOPES.map((s) => s.value);
     assert.deepEqual(values, ['off', 'quoted', 'chat', 'all']);

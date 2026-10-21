@@ -42,6 +42,8 @@ type Config struct {
 	WhatsAppContextWindowSize    int
 	WhatsAppContextRetentionDays int
 	WhatsAppContextMaxAgeDays    int
+	WhatsAppBackfillLookbackDays int
+	WhatsAppBackfillMaxMessages  int
 	WhatsAppContextDebugLog      bool
 	WhatsAppBackfillEnabled      bool
 }
@@ -160,11 +162,15 @@ func Load() *Config {
 		EvolutionAPIKey:              getEnvOrDefault("EVOLUTION_API_KEY", "vito_evo_key_default_change_in_prod"),
 		WhatsAppContextScope:         getEnvOrDefault("WHATSAPP_CONTEXT_SCOPE_DEFAULT", "all"),
 		WhatsAppContextWindowSize:    getEnvIntDefault("WHATSAPP_CONTEXT_WINDOW_DEFAULT", 12),
-		WhatsAppContextRetentionDays: getEnvIntDefault("WHATSAPP_CONTEXT_RETENTION_DAYS", 30),
+		WhatsAppContextRetentionDays: getEnvIntDefault("WHATSAPP_CONTEXT_RETENTION_DAYS", 90),
 		// A janela de contexto precisa enxergar pelo menos o mesmo período que o
 		// backfill importa (30 dias); senão o histórico importado é filtrado
 		// fora e o Vito "não sabe" de nada.
-		WhatsAppContextMaxAgeDays: getEnvIntDefault("WHATSAPP_CONTEXT_MAX_AGE_DAYS", 30),
+		WhatsAppContextMaxAgeDays: getEnvIntDefault("WHATSAPP_CONTEXT_MAX_AGE_DAYS", 90),
+		// O backfill busca as mensagens MAIS RECENTES (ordem desc). Com 90 dias de
+		// histórico, 300 mensagens não cobririam o período: precisa paginar fundo.
+		WhatsAppBackfillLookbackDays: getEnvIntDefault("WHATSAPP_BACKFILL_LOOKBACK_DAYS", 90),
+		WhatsAppBackfillMaxMessages:  getEnvIntDefault("WHATSAPP_BACKFILL_MAX_MESSAGES", 2000),
 		// O conteúdo da janela pode conter dados sensíveis: o log é opt-in.
 		WhatsAppContextDebugLog: getEnvBoolDefault("WHATSAPP_CONTEXT_DEBUG_LOG", false),
 		WhatsAppBackfillEnabled: getEnvBoolDefault("WHATSAPP_BACKFILL_ENABLED", true),

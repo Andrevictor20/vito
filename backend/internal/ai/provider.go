@@ -28,9 +28,23 @@ const (
 	ActionCancelBookingAppointment IntentAction = "CANCEL_BOOKING_APPOINTMENT"
 	ActionCreateMeeting            IntentAction = "CREATE_MEETING"
 	ActionGeneralChat              IntentAction = "GENERAL_CHAT"
+	ActionQueryConversation        IntentAction = "QUERY_CONVERSATION"
+	ActionListPendingConversations IntentAction = "LIST_PENDING_CONVERSATIONS"
+	ActionDraftReply               IntentAction = "DRAFT_REPLY"
+	ActionSendWhatsAppMessage      IntentAction = "SEND_WHATSAPP_MESSAGE"
+	ActionCreateReplyReminder      IntentAction = "CREATE_REPLY_REMINDER"
 	ActionNeedsClarification       IntentAction = "NEEDS_CLARIFICATION"
 	ActionOutOfScope               IntentAction = "OUT_OF_SCOPE"
 )
+
+// ChatContactSummary resume uma conversa do WhatsApp para o diretório de
+// contatos e a lista de pendências que entram no prompt.
+type ChatContactSummary struct {
+	Name    string `json:"name"`              // nome do contato (ou o rótulo do chat)
+	Preview string `json:"preview,omitempty"` // prévia da última mensagem
+	Age     string `json:"age,omitempty"`     // "há 2h", "ontem"
+	Pending bool   `json:"pending,omitempty"` //true = esperando resposta do usuário
+}
 
 // ChatMessageContext representa uma mensagem no histórico da conversa para contexto multi-turn.
 type ChatMessageContext struct {
@@ -59,12 +73,19 @@ type UserInput struct {
 	ConversationHistory  []ChatMessageContext `json:"conversation_history,omitempty"`  // Histórico recente da conversa multi-turn
 	QuotedContext        string               `json:"quoted_context,omitempty"`        // Texto da mensagem citada/respondida no WhatsApp
 	ConversationWindow   []ChatMessageContext `json:"conversation_window,omitempty"`   // Janela recente de chats do WhatsApp
-	UserName             string               `json:"user_name,omitempty"`             // Nome do usuário para personalização
-	AutonomyMode         string               `json:"autonomy_mode,omitempty"`         // "assisted" (padrão) | "proactive"
-	AppStateFlags        []string             `json:"app_state_flags,omitempty"`       // §8.5 telemetria compacta
-	CoreProfile          []string             `json:"core_profile,omitempty"`          // §8.2 Camada 1 (8-10 itens)
-	RecentEmails         []string             `json:"recent_emails,omitempty"`         // E-mails recentes / faturas / voos do Gmail
-	FocusMode            string               `json:"focus_mode,omitempty"`            // calendar, tasks, triggers, meetings, briefing, memory
+	ContactDirectory     []ChatContactSummary `json:"contact_directory,omitempty"`     // Diretório de contatos do WhatsApp
+	PendingConversations []ChatContactSummary `json:"pending_conversations,omitempty"` // Conversas que esperam resposta do usuário
+	// WhatsAppPrivateScope marca que a RESPOSTA fica visível apenas para o
+	// usuário (chat "Você", app ou desktop). Só nesse escopo o diretório de
+	// contatos e as pendências podem ser injetados — em conversa com terceiro
+	// isso revelaria "a Ana te espera" para o João.
+	WhatsAppPrivateScope bool     `json:"whatsapp_private_scope,omitempty"`
+	UserName             string   `json:"user_name,omitempty"`       // Nome do usuário para personalização
+	AutonomyMode         string   `json:"autonomy_mode,omitempty"`   // "assisted" (padrão) | "proactive"
+	AppStateFlags        []string `json:"app_state_flags,omitempty"` // §8.5 telemetria compacta
+	CoreProfile          []string `json:"core_profile,omitempty"`    // §8.2 Camada 1 (8-10 itens)
+	RecentEmails         []string `json:"recent_emails,omitempty"`   // E-mails recentes / faturas / voos do Gmail
+	FocusMode            string   `json:"focus_mode,omitempty"`      // calendar, tasks, triggers, meetings, briefing, memory
 }
 
 // ParsedEvent dados extraídos para criação, atualização ou remoção de evento.
@@ -151,22 +172,44 @@ type ParsedMeeting struct {
 	Slots           []ParsedMeetingSlot `json:"slots,omitempty"`
 }
 
+// ParsedConversationQuery é uma consulta às mensagens de uma conversa do WhatsApp.
+type ParsedConversationQuery struct {
+	Chat  string `json:"chat"`            // nome do contato (como o usuário chamou)
+	Limit int    `json:"limit,omitempty"` // quantas mensagens brings (default 10)
+}
+
+// ParsedWhatsAppMessage é uma mensagem a ser enviada a um contato.
+type ParsedWhatsAppMessage struct {
+	Chat string `json:"chat"` // nome do contato de destino
+	Text string `json:"text"` // texto a enviar
+}
+
+// ParsedReplyReminder é um lembrete de resposta a uma conversa.
+type ParsedReplyReminder struct {
+	Chat string    `json:"chat"`           // nome do contato
+	When time.Time `json:"when,omitempty"` // quando cobrar (hora local, sem offset)
+	Note string    `json:"note,omitempty"` // o que foi prometido / pendente
+}
+
 // ParsedIntent resultado normalizado da interpretação do assistente Toki-like.
 type ParsedIntent struct {
-	Action            IntentAction   `json:"action"`
-	Thought           string         `json:"thought,omitempty"`      // §8.6 CoT: raciocínio guiado obrigatório
-	ContextUsed       []string       `json:"context_used,omitempty"` // §8.6 CoT: memórias/entidades usadas
-	Message           string         `json:"message"`                // Resposta amigável da secretária
-	Event             *ParsedEvent   `json:"event,omitempty"`
-	Todo              *ParsedTodo    `json:"todo,omitempty"`
-	Trigger           *ParsedTrigger `json:"trigger,omitempty"`
-	Pending           *ParsedPending `json:"pending,omitempty"`
-	Booking           *ParsedBooking `json:"booking,omitempty"`
-	Meeting           *ParsedMeeting `json:"meeting,omitempty"`
-	MemoryContent     string         `json:"memory_content,omitempty"`
-	MemoryCategory    string         `json:"memory_category,omitempty"`
-	AdditionalActions []ParsedIntent `json:"additional_actions,omitempty"` // Ações encadeadas no mesmo turno (até 3)
-	ProviderUsed      string         `json:"provider_used,omitempty"`
+	Action            IntentAction             `json:"action"`
+	Thought           string                   `json:"thought,omitempty"`      // §8.6 CoT: raciocínio guiado obrigatório
+	ContextUsed       []string                 `json:"context_used,omitempty"` // §8.6 CoT: memórias/entidades usadas
+	Message           string                   `json:"message"`                // Resposta amigável da secretária
+	Event             *ParsedEvent             `json:"event,omitempty"`
+	Todo              *ParsedTodo              `json:"todo,omitempty"`
+	Trigger           *ParsedTrigger           `json:"trigger,omitempty"`
+	Pending           *ParsedPending           `json:"pending,omitempty"`
+	Booking           *ParsedBooking           `json:"booking,omitempty"`
+	Meeting           *ParsedMeeting           `json:"meeting,omitempty"`
+	Conversation      *ParsedConversationQuery `json:"conversation,omitempty"`
+	WhatsAppMessage   *ParsedWhatsAppMessage   `json:"whatsapp_message,omitempty"`
+	ReplyReminder     *ParsedReplyReminder     `json:"reply_reminder,omitempty"`
+	MemoryContent     string                   `json:"memory_content,omitempty"`
+	MemoryCategory    string                   `json:"memory_category,omitempty"`
+	AdditionalActions []ParsedIntent           `json:"additional_actions,omitempty"` // Ações encadeadas no mesmo turno (até 3)
+	ProviderUsed      string                   `json:"provider_used,omitempty"`
 }
 
 // IsEmpty detecta resposta vazia (bug §8.7/9): Reply em branco e nenhuma ação.
@@ -180,6 +223,7 @@ func (p *ParsedIntent) IsEmpty() bool {
 	}
 	return p.Event == nil && p.Todo == nil && p.Trigger == nil &&
 		p.Pending == nil && p.Booking == nil && p.Meeting == nil &&
+		p.Conversation == nil && p.WhatsAppMessage == nil && p.ReplyReminder == nil &&
 		len(p.AdditionalActions) == 0 &&
 		strings.TrimSpace(p.MemoryContent) == ""
 }

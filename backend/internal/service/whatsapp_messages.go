@@ -87,6 +87,11 @@ func (s *WhatsAppService) handleMessagesEvent(ctx context.Context, instanceName 
 		_ = s.client.SendReaction(ctx, instanceName, msg.RemoteJID, msg.MessageID, "👀")
 	}
 
+	// O diretório de contatos e as pendências só podem entrar no prompt quando a
+	// resposta fica visível apenas para o usuário (chat "Você" ou grupo só dele).
+	// Em conversa com terceiro, isso revelaria "a Ana te espera" para o João.
+	privateScope := chatKind == domain.WhatsAppChatKindSelf || chatKind == domain.WhatsAppChatKindSelfGroup
+
 	quoted, window := s.buildContext(ctx, integration.UserID, msg, chatKind, rawText)
 
 	// Métricas do contexto (SPEC §10.2 P7): permitem auditar no Pi o que o Vito
@@ -105,10 +110,11 @@ func (s *WhatsAppService) handleMessagesEvent(ctx context.Context, instanceName 
 	}
 
 	resp, err := s.assistantSvc.Process(ctx, integration.UserID, ai.UserInput{
-		Text:                rawText,
-		ConversationHistory: history,
-		QuotedContext:       quoted,
-		ConversationWindow:  window,
+		Text:                 rawText,
+		ConversationHistory:  history,
+		QuotedContext:        quoted,
+		ConversationWindow:   window,
+		WhatsAppPrivateScope: privateScope,
 	})
 	if err != nil {
 		log.Printf("⚠️ [WhatsAppService] Erro ao processar mensagem do WhatsApp: %v", err)
@@ -270,6 +276,13 @@ func (s *WhatsAppService) resolveChatLabel(chatKind string, msg *inboundMessage)
 		if label, ok := s.chatLabels[msg.RemoteJID]; ok {
 			return label
 		}
+		// Chats @lid chegam sem pushName: o nome vem do cache de contatos.
+		if s.contactsCache != nil {
+			if name := s.contactsCache.Name(msg.RemoteJID); name != "" {
+				s.chatLabels[msg.RemoteJID] = name
+				return name
+			}
+		}
 		return "Contato"
 	}
 }
@@ -286,4 +299,27 @@ func messageKind(msg *inboundMessage) string {
 	default:
 		return "other"
 	}
+}
+
+// WhatsAppMessageSender envia uma mensagem do WhatsApp em nome do usuário.
+//
+// Interface (e não o tipo concreto) para o AssistantService não depender do
+// WhatsAppService — que já depende do AssistantService.
+type WhatsAppMessageSender interface {
+	SendWhatsAppMessage(ctx context.Context, userID, chatJID, text string) error
+}
+
+// SendWhatsAppMessage envia uma mensagem a uma conversa, em nome do usuário.
+func (s *WhatsAppService) SendWhatsAppMessage(ctx context.Context, userID, chatJID, text string) error {
+	if strings.TrimSpace(chatJID) == "" || strings.TrimSpace(text) == "" {
+		return fmt.Errorf("conversa e texto são obrigatórios")
+	}
+	integration, err := s.repo.GetByUserID(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if integration == nil || integration.Status != domain.WhatsAppStatusConnected {
+		return fmt.Errorf("WhatsApp não está conectado")
+	}
+	return s.client.SendText(ctx, integration.InstanceName, chatJID, text)
 }

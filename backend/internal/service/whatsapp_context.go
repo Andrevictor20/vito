@@ -129,6 +129,14 @@ func (s *WhatsAppContextService) Archive(ctx context.Context, msg *domain.WhatsA
 	return s.repo.SaveMessage(ctx, msg)
 }
 
+// Relabel reetiqueta as conversas arquivadas (nomes dos chats @lid).
+func (s *WhatsAppContextService) Relabel(ctx context.Context, userID string, labels map[string]string) (int64, error) {
+	if s.repo == nil {
+		return 0, nil
+	}
+	return s.repo.UpdateChatLabels(ctx, userID, labels)
+}
+
 // PruneOlderThan remove mensagens fora da retenção configurada.
 func (s *WhatsAppContextService) PruneOlderThan(ctx context.Context, cutoff time.Time) (int64, error) {
 	if s.repo == nil {

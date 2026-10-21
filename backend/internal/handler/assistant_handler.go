@@ -129,15 +129,16 @@ func (h *AssistantHandler) Chat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	input := ai.UserInput{
-		Text:                rawText,
-		AudioB64:            req.AudioB64,
-		AudioMime:           req.AudioMime,
-		ImageB64:            req.ImageB64,
-		Timezone:            tz,
-		Now:                 nowRef,
-		ConversationHistory: convHistory,
-		ConversationWindow:  h.whatsappWindow(r.Context(), userID, rawText),
-		FocusMode:           req.FocusMode,
+		Text:                 rawText,
+		AudioB64:             req.AudioB64,
+		AudioMime:            req.AudioMime,
+		ImageB64:             req.ImageB64,
+		Timezone:             tz,
+		Now:                  nowRef,
+		ConversationHistory:  convHistory,
+		ConversationWindow:   h.whatsappWindow(r.Context(), userID, rawText),
+		WhatsAppPrivateScope: true, // o chat do app e do desktop e privado
+		FocusMode:            req.FocusMode,
 	}
 
 	resp, err := h.astSvc.Process(r.Context(), userID, input)
@@ -264,6 +265,7 @@ func (h *AssistantHandler) AudioChat(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	input.ConversationWindow = h.whatsappWindow(r.Context(), userID, input.Text)
+	input.WhatsAppPrivateScope = true
 
 	resp, err := h.astSvc.Process(r.Context(), userID, input)
 	if err != nil {
@@ -387,6 +389,7 @@ func (h *AssistantHandler) VisionChat(w http.ResponseWriter, r *http.Request) {
 		Now:       nowRef,
 	}
 	input.ConversationWindow = h.whatsappWindow(r.Context(), userID, prompt)
+	input.WhatsAppPrivateScope = true
 
 	resp, err := h.astSvc.Process(r.Context(), userID, input)
 	if err != nil {

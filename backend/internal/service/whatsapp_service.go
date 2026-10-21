@@ -43,6 +43,7 @@ type WhatsAppService struct {
 	contextSvc       *WhatsAppContextService
 	groupMeta        *WhatsAppGroupMeta
 	ownerCache       *WhatsAppOwnerCache
+	contactsCache    *WhatsAppContactsCache
 	contextDebugLog  bool
 	labelsMu         sync.RWMutex
 	chatLabels       map[string]string
@@ -92,6 +93,11 @@ func (s *WhatsAppService) SetGroupMeta(groupMeta *WhatsAppGroupMeta) {
 // SetOwnerCache injeta o cache do JID do owner (número realmente pareado).
 func (s *WhatsAppService) SetOwnerCache(ownerCache *WhatsAppOwnerCache) {
 	s.ownerCache = ownerCache
+}
+
+// SetContactsCache injeta o cache de nomes de contato ( chats @lid chegam sem pushName).
+func (s *WhatsAppService) SetContactsCache(cache *WhatsAppContactsCache) {
+	s.contactsCache = cache
 }
 
 // SetContextDebugLog habilita o log do CONTEÚDO da janela de contexto.
