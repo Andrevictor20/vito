@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"sync"
 	"time"
@@ -400,6 +401,10 @@ func (s *AssistantService) enrichInputContext(ctx context.Context, userID string
 	}
 	if len(pendingChats) > 0 {
 		input.PendingConversations = pendingChats
+	}
+	if len(contactDirectory) > 0 || len(pendingChats) > 0 {
+		log.Printf("🧠 [WhatsAppContext] diretório=%d contato(s) pendências=%d conversa(s) (escopo privado=%v)",
+			len(contactDirectory), len(pendingChats), input.WhatsAppPrivateScope)
 	}
 	if gmailFlag != "" {
 		input.AppStateFlags = append(input.AppStateFlags, gmailFlag)
