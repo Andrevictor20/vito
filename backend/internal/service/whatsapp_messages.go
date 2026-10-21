@@ -84,6 +84,10 @@ func (s *WhatsAppService) handleMessagesEvent(ctx context.Context, instanceName 
 
 	quoted, window := s.buildContext(ctx, integration.UserID, msg, chatKind, rawText)
 
+	// Métricas do contexto (SPEC §10.2 P7): permitem auditar no Pi o que o Vito enxergou.
+	log.Printf("🧠 [WhatsAppContext] kind=%s janela=%d cross_chat=%v citada=%v msg_id=%s",
+		chatKind, len(window), AllowsCrossChat(chatKind), quoted != "", msg.MessageID)
+
 	convKey := fmt.Sprintf("%s:%s", instanceName, msg.RemoteJID)
 	history := s.memory.GetHistory(convKey)
 	if len(window) > 0 {

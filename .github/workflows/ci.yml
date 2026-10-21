@@ -208,3 +208,29 @@ jobs:
           docker logs --tail 80 vito-evolution-postgres || true
           exit 1
 
+
+  # Diagnóstico on-demand no Pi: roda APENAS via workflow_dispatch e NÃO redeploya.
+  # Uso: gh workflow run ci.yml  → mede RAM/CPU (AC-P5), mostra o log do contexto
+  # do WhatsApp e o tamanho do shadow inbox.
+  diagnostics:
+    name: Diagnostics on Raspberry Pi 4
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: [self-hosted, linux, arm64]
+    steps:
+      - name: Resource usage of containers
+        run: |
+          echo "== Uso de memória/CPU dos containers (teto do box: 8 GB) =="
+          docker stats --no-stream --format "table {{.Name}}\t{{.MemUsage}}\t{{.CPUPerc}}"
+
+      - name: WhatsApp context logs
+        run: |
+          echo "== Contexto do WhatsApp (últimos 200 logs filtrados) =="
+          docker logs --tail 400 vito-backend 2>&1 | grep -E 'WhatsAppContext|WhatsAppBackfill|WhatsAppGroupMeta|Teto de heap' | tail -25 || echo "(sem linhas de contexto)"
+          echo ""
+          echo "== Últimas linhas do backend =="
+          docker logs --tail 15 vito-backend 2>&1 || true
+
+      - name: Shadow inbox size
+        run: |
+          echo "== Tamanho do banco (shadow inbox incluído) =="
+          docker exec vito-backend sh -c 'ls -l /app/data/vito.db' 2>/dev/null || echo "(não foi possível inspecionar o volume)"
