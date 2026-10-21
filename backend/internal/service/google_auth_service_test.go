@@ -272,8 +272,15 @@ func TestGoogleAuthService_GetAuthURL(t *testing.T) {
 	if qCal.Get("scope") != expectedCalScope {
 		t.Errorf("scope de calendário esperado '%s', obteve: '%s'", expectedCalScope, qCal.Get("scope"))
 	}
-	if qCal.Get("prompt") != "consent" {
-		t.Errorf("prompt esperado 'consent' no modo calendar, obteve: %s", qCal.Get("prompt"))
+	if qCal.Get("prompt") != "select_account" {
+		t.Errorf("prompt esperado 'select_account' no modo calendar, obteve: %s", qCal.Get("prompt"))
+	}
+	if qCal.Get("include_granted_scopes") != "true" {
+		t.Errorf("include_granted_scopes esperado 'true' no modo calendar, obteve: %q", qCal.Get("include_granted_scopes"))
+	}
+	// O modo login não deve reaproveitar escopos amplos (Princípio do Menor Privilégio)
+	if q.Get("include_granted_scopes") != "" {
+		t.Errorf("modo login não deve enviar include_granted_scopes, obteve: %q", q.Get("include_granted_scopes"))
 	}
 
 	// Teste URL para gmail
@@ -287,8 +294,11 @@ func TestGoogleAuthService_GetAuthURL(t *testing.T) {
 	if qGmail.Get("scope") != expectedGmailScope {
 		t.Errorf("scope de gmail esperado '%s', obteve: '%s'", expectedGmailScope, qGmail.Get("scope"))
 	}
-	if qGmail.Get("prompt") != "consent" {
-		t.Errorf("prompt esperado 'consent' no modo gmail, obteve: %s", qGmail.Get("prompt"))
+	if qGmail.Get("prompt") != "select_account" {
+		t.Errorf("prompt esperado 'select_account' no modo gmail, obteve: %s", qGmail.Get("prompt"))
+	}
+	if qGmail.Get("include_granted_scopes") != "true" {
+		t.Errorf("include_granted_scopes esperado 'true' no modo gmail, obteve: %q", qGmail.Get("include_granted_scopes"))
 	}
 }
 

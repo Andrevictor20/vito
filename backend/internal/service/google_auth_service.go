@@ -231,11 +231,20 @@ func (s *GoogleAuthService) GetAuthURLWithDevice(mode, userID, redirectScheme, d
 	params.Set("response_type", "code")
 	params.Set("scope", scope)
 	params.Set("access_type", "offline")
+
+	// `prompt=select_account` (nunca `consent`): o Google reaproveita as concessões já feitas
+	// e só exibe a tela de consentimento quando entra um escopo novo. Com `prompt=consent`
+	// o usuário recebia o e-mail "você compartilhou alguns dados" do Google toda vez que
+	// conectava/reconectava a Agenda ou o Gmail.
 	prompt := "select_account"
-	if mode == "calendar" || mode == "gmail" {
-		prompt = "consent"
-	}
 	params.Set("prompt", prompt)
+
+	// Nos modos com escopos extras (calendar/gmail), incluímos as concessões anteriores:
+	// assim o Google não reconsente o que já foi autorizado.
+	if mode == "calendar" || mode == "gmail" {
+		params.Set("include_granted_scopes", "true")
+	}
+
 	params.Set("state", state)
 
 	return s.cfg.AuthURL + "?" + params.Encode(), nil

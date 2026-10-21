@@ -14,10 +14,11 @@ import {
   isUserCancellation,
   normalizeGoogleSignInErrorCode,
 } from './googleSignInErrors';
+import { GOOGLE_SIGN_IN_OPTIONS } from './googleSignInOptions';
 
 export { getMobileDeviceName, IN_APP_BROWSER_OPTIONS, IN_APP_BROWSER_OPTIONS_WITH_PROXY };
 
-const GOOGLE_WEB_CLIENT_ID = '125131803371-im5dtmilhasug6spdhc50pr0ssb4l92b.apps.googleusercontent.com';
+const GOOGLE_WEB_CLIENT_ID = GOOGLE_SIGN_IN_OPTIONS.webClientId;
 
 // Carregamento defensivo do módulo nativo GoogleSignin (Google Play Services nativo One Tap)
 let GoogleSignin: any = null;
@@ -27,11 +28,10 @@ try {
   GoogleSignin = gModule.GoogleSignin;
   statusCodes = gModule.statusCodes;
   if (GoogleSignin && typeof GoogleSignin.configure === 'function') {
-    GoogleSignin.configure({
-      webClientId: GOOGLE_WEB_CLIENT_ID,
-      offlineAccess: true,
-      forceCodeForRefreshToken: true,
-    });
+    // Sem `offlineAccess`/`forceCodeForRefreshToken`: o Play Services deixa de forçar a tela
+    // de consentimento a cada login (que gerava o e-mail do Google e mostrava só a última
+    // conta). A sessão do Vito é emitida pelo backend a partir do ID token.
+    GoogleSignin.configure(GOOGLE_SIGN_IN_OPTIONS);
     console.log('[googleAuthService] GoogleSignin configurado com sucesso', { 
       hasStatusCodes: !!statusCodes,
       statusCodesKeys: statusCodes ? Object.keys(statusCodes) : [],
