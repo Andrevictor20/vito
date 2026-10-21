@@ -181,6 +181,9 @@ func setupWhatsAppServiceTest(t *testing.T) (*service.WhatsAppService, *reposito
 	svc := service.NewWhatsAppService(service.WhatsAppServiceConfig{
 		WebhookBaseURL: "https://vito.rasppi.cloud",
 	}, waRepo, mockClient, assistantSvc)
+	// Runner síncrono: mantém as asserções determinísticas (em produção o
+	// processamento com IA roda em background).
+	svc.SetAsyncRunner(func(fn func()) { fn() })
 
 	return svc, waRepo, mockClient
 }

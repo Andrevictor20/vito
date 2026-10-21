@@ -18,6 +18,13 @@ import (
 // reVitoTrigger detecta menções explícitas ao Vito nas mensagens.
 var reVitoTrigger = regexp.MustCompile(`(?i)(@vito|!vito|/vito|vito:)\s*`)
 
+// imageAnalysisPrompt é o pedido padrão quando a imagem chega sem legenda.
+const imageAnalysisPrompt = "Analise esta imagem e me diga o que ela contém. Se for um documento, recibo, comprovante ou evento, extraia os dados (datas, valores, títulos) e sugira a ação correspondente."
+
+// imageUnavailablePrompt é usado quando a mídia não pôde ser baixada: o Vito
+// avisa em vez de inventar o conteúdo da imagem.
+const imageUnavailablePrompt = "Não consegui baixar a imagem desta mensagem. Responda ao usuário, de forma breve, que não foi possível ler a imagem e sugira reenviá-la."
+
 // handleMessagesEvent processa um evento `messages.upsert` da Evolution API.
 //
 // Fluxo (SPEC §5):
@@ -36,7 +43,8 @@ func (s *WhatsAppService) handleMessagesEvent(ctx context.Context, instanceName 
 	if rawText == "" && msg.IsAudio && s.audioTranscriber != nil {
 		rawText = s.transcribeAudio(ctx, instanceName, data)
 	}
-	if rawText == "" {
+	// Imagem sem legenda é uma mensagem válida: o Vito precisa "enxergar" o arquivo.
+	if rawText == "" && !msg.IsImage {
 		return nil
 	}
 
@@ -92,6 +100,69 @@ func (s *WhatsAppService) handleMessagesEvent(ctx context.Context, instanceName 
 	// Em conversa com terceiro, isso revelaria "a Ana te espera" para o João.
 	privateScope := chatKind == domain.WhatsAppChatKindSelf || chatKind == domain.WhatsAppChatKindSelfGroup
 
+	// O processamento com IA roda em BACKGROUND: analisar uma imagem pode levar
+	// dezenas de segundos e acontece dentro do handler HTTP do webhook. Processar
+	// ali estouraria o timeout do webhook da Evolution, que reenviaria a mensagem
+	// e faria o Vito responder duas vezes.
+	pending := &pendingMessage{
+		ctx:          context.WithoutCancel(ctx),
+		integration:  integration,
+		instanceName: instanceName,
+		msg:          msg,
+		chatKind:     chatKind,
+		text:         rawText,
+		privateScope: privateScope,
+		mediaPayload: data,
+	}
+	s.runAsync(func() { _ = s.processPendingMessage(pending) })
+
+	return nil
+}
+
+// pendingMessage carrega o que o processamento em background precisa.
+type pendingMessage struct {
+	ctx          context.Context
+	integration  *domain.WhatsAppIntegration
+	instanceName string
+	msg          *inboundMessage
+	chatKind     string
+	text         string
+	privateScope bool
+	mediaPayload json.RawMessage
+}
+
+// processPendingMessage monta o contexto, chama o assistente e responde.
+func (s *WhatsAppService) processPendingMessage(pending *pendingMessage) error {
+	ctx := pending.ctx
+	integration := pending.integration
+	instanceName := pending.instanceName
+	msg := pending.msg
+	rawText := pending.text
+	chatKind := pending.chatKind
+	privateScope := pending.privateScope
+
+	// A imagem é baixada AQUI (depois das regras de gatilho): em grupo ou
+	// conversa de terceiro sem menção, a mídia nem chega a ser baixada.
+	var imageB64, imageMime string
+	imageFailed := false
+	if msg.IsImage {
+		imageB64, imageMime = s.downloadImage(ctx, instanceName, pending.mediaPayload, msg.ImageMime)
+		if imageB64 == "" {
+			imageFailed = true
+			log.Printf("⚠️ [WhatsAppService] não foi possível obter a imagem da mensagem %s", msg.MessageID)
+		} else {
+			log.Printf("🖼️ [WhatsAppContext] imagem recebida: mime=%s base64=%d bytes", imageMime, len(imageB64))
+		}
+	}
+	switch {
+	case imageFailed:
+		// Sem a imagem, o Vito não pode descrever nada — melhor uma resposta
+		// honesta do que uma descrição inventada.
+		rawText = imageUnavailablePrompt
+	case strings.TrimSpace(rawText) == "":
+		rawText = imageAnalysisPrompt
+	}
+
 	quoted, window := s.buildContext(ctx, integration.UserID, msg, chatKind, rawText)
 
 	// Métricas do contexto (SPEC §10.2 P7): permitem auditar no Pi o que o Vito
@@ -115,6 +186,8 @@ func (s *WhatsAppService) handleMessagesEvent(ctx context.Context, instanceName 
 		QuotedContext:        quoted,
 		ConversationWindow:   window,
 		WhatsAppPrivateScope: privateScope,
+		ImageB64:             imageB64,
+		ImageMime:            imageMime,
 	})
 	if err != nil {
 		log.Printf("⚠️ [WhatsAppService] Erro ao processar mensagem do WhatsApp: %v", err)
@@ -172,6 +245,29 @@ func (s *WhatsAppService) transcribeAudio(ctx context.Context, instanceName stri
 		return ""
 	}
 	return strings.TrimSpace(transcribed)
+}
+
+// downloadImage baixa a imagem da Evolution API e normaliza o payload.
+//
+// O reuso do GetMediaBase64 (o mesmo caminho do áudio) evita uma segunda
+// integração com a Evolution. A normalização corrige o mime real e reduz o
+// tamanho — fotos do WhatsApp chegam com 16MB, acima do limite de payload do
+// provedor de IA.
+func (s *WhatsAppService) downloadImage(ctx context.Context, instanceName string, data json.RawMessage, mime string) (string, string) {
+	b64, err := s.client.GetMediaBase64(ctx, instanceName, data)
+	if err != nil {
+		log.Printf("⚠️ [WhatsAppService] falha ao baixar a imagem: %v", err)
+		return "", ""
+	}
+	if strings.TrimSpace(b64) == "" {
+		return "", ""
+	}
+	prepared, preparedMime, err := ai.PrepareImage(b64, mime)
+	if err != nil {
+		log.Printf("⚠️ [WhatsAppService] imagem não pôde ser preparada: %v", err)
+		return "", ""
+	}
+	return prepared, preparedMime
 }
 
 // classifyChat classifica a conversa e agenda a atualização do cache de participantes.

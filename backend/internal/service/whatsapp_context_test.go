@@ -113,6 +113,10 @@ func setupContextualWhatsApp(t *testing.T) *contextualFixture {
 	svc.SetUserRepo(userRepo)
 	svc.SetContextService(contextSvc)
 	svc.SetGroupMeta(groupMeta)
+	// Runner síncrono: em produção o processamento roda em background (a análise
+	// de imagem pode levar dezenas de segundos); nos testes mantemos a
+	// asserção determinística logo após o HandleWebhook.
+	svc.SetAsyncRunner(func(fn func()) { fn() })
 
 	return &contextualFixture{
 		svc:        svc,

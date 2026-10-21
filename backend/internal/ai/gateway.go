@@ -11,10 +11,37 @@ import (
 	"github.com/andrevmp/vito/backend/internal/domain"
 )
 
+// Janelas de tempo por tentativa.
+//
+// A latência real difere muito entre texto e mídia: medido em produção, o texto
+// responde em 2-6s e a análise de imagem em 57-62s. Com a janela única de 15s a
+// requisição era cancelada antes de o modelo responder — era a causa raiz da
+// falha de leitura de imagem no app.
+const (
+	attemptTimeoutText  = 15 * time.Second
+	attemptTimeoutMedia = 45 * time.Second
+	// mediaTotalBudget limita a cascata multimodal inteira: o Cloudflare Tunnel
+	// corta requisições em ~100s, então a soma das tentativas precisa caber.
+	mediaTotalBudget = 85 * time.Second
+)
+
 // attemptCtx isola cada tentativa com timeout próprio (bug §8.7/10): um ctx
 // expirado pelo provedor anterior não aborta os próximos instantaneamente.
 func attemptCtx(parent context.Context) (context.Context, context.CancelFunc) {
-	return context.WithTimeout(context.WithoutCancel(parent), 15*time.Second)
+	return context.WithTimeout(context.WithoutCancel(parent), attemptTimeoutText)
+}
+
+// attemptTimeoutFor devolve a janela de tempo adequada à modalidade da entrada.
+func attemptTimeoutFor(input UserInput) time.Duration {
+	if input.ImageB64 != "" || input.AudioB64 != "" {
+		return attemptTimeoutMedia
+	}
+	return attemptTimeoutText
+}
+
+// isMultimodal informa se a entrada carrega mídia.
+func isMultimodal(input UserInput) bool {
+	return input.ImageB64 != "" || input.AudioB64 != ""
 }
 
 // Gateway orquestra múltiplos provedores de IA aplicando failover em cascata.
@@ -69,9 +96,29 @@ func (g *Gateway) ParseIntent(ctx context.Context, input UserInput) (*ParsedInte
 		return nil, errors.New("nenhum provedor de IA compatível configurado no gateway")
 	}
 
+	// A cascata multimodal tem orçamento total: cada tentativa pode durar até
+	// 45s e, sem teto, a soma estouraria o limite do túnel (100s) devolvendo 524.
+	multimodal := isMultimodal(input)
+	var budget time.Time
+	if multimodal {
+		budget = time.Now().Add(mediaTotalBudget)
+	}
+
 	var lastErr error
 	for _, provider := range candidates {
-		attempt, cancel := attemptCtx(ctx)
+		timeout := attemptTimeoutFor(input)
+		if multimodal {
+			remaining := time.Until(budget)
+			if remaining <= 0 {
+				lastErr = fmt.Errorf("orçamento de tempo esgotado antes do provedor '%s' (último erro: %w)", provider.Name(), lastErr)
+				break
+			}
+			if remaining < timeout {
+				timeout = remaining
+			}
+		}
+
+		attempt, cancel := context.WithTimeout(context.WithoutCancel(ctx), timeout)
 		intent, err := provider.ParseIntent(attempt, input)
 		cancel()
 		// Resposta vazia com err == nil conta como falha (bug §8.7/9).

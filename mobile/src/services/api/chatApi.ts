@@ -161,20 +161,28 @@ export class ChatApi {
     prompt?: string,
     filename: string = 'image.jpg',
     timezone?: string,
-    base64Override?: string
+    base64Override?: string,
+    mimeType?: string
   ): Promise<AssistantChatResponse> {
     const tz = timezone || this.getUserTimezone();
     const currentLocalTime = this.getCurrentLocalTimeISO();
-    const mimeType = filename.endsWith('.png') ? 'image/png' : 'image/jpeg';
+    // Mime real da imagem: enviar "image/jpeg" para um PNG/WEBP/HEIC fazia o
+    // backend receber um tipo incompatível com os bytes.
+    const resolvedMime =
+      mimeType || (filename.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg');
+    // Análise de imagem leva dezenas de segundos (o modelo precisa "olhar" a
+    // imagem): 60s cortava a requisição no meio. O túnel corta em ~100s.
+    const visionTimeoutMs = 90000;
 
     try {
       const b64 = base64Override || (await fileUriToBase64(imageUri));
       if (b64 && b64.length > 0) {
         return await this.client.request<AssistantChatResponse>('/api/v1/assistant/vision', {
           method: 'POST',
+          timeoutMs: visionTimeoutMs,
           body: JSON.stringify({
             image_b64: b64,
-            image_mime: mimeType,
+            image_mime: resolvedMime,
             prompt,
             timezone: tz,
             current_local_time: currentLocalTime,
@@ -194,7 +202,7 @@ export class ChatApi {
     formData.append('image', {
       uri: cleanUri,
       name: filename,
-      type: mimeType,
+      type: resolvedMime,
     } as unknown as Blob);
 
     if (prompt) {
@@ -212,7 +220,7 @@ export class ChatApi {
     }
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 60000);
+    const timeoutId = setTimeout(() => controller.abort(), visionTimeoutMs);
 
     try {
       const res = await fetch(`${this.client.getBaseUrl()}/api/v1/assistant/vision`, {
@@ -230,7 +238,9 @@ export class ChatApi {
       return res.json();
     } catch (err: any) {
       if (err.name === 'AbortError') {
-        throw new Error(`Tempo limite esgotado (60s) ao processar imagem no servidor (${this.client.getBaseUrl()}).`);
+        throw new Error(
+          `Tempo limite esgotado (${Math.round(visionTimeoutMs / 1000)}s) ao processar imagem no servidor (${this.client.getBaseUrl()}).`
+        );
       }
       throw err;
     } finally {

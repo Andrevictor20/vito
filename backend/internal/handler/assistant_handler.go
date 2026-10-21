@@ -379,6 +379,19 @@ func (h *AssistantHandler) VisionChat(w http.ResponseWriter, r *http.Request) {
 		prompt = "Analise esta imagem e extraia eventos para a agenda ou tarefas a realizar."
 	}
 
+	// Normaliza a imagem: mime real (o app mandava "image/jpeg" fixo, mesmo para
+	// PNG/WEBP/HEIC) e tamanho (fotos de celular viravam payload de vários MB).
+	preparedB64, preparedMime, err := ai.PrepareImage(imageB64, mime)
+	if err != nil {
+		log.Printf("❌ [Assistant] imagem inválida (user=%s): %v", userID, err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "Não consegui ler esta imagem. Envie um arquivo de imagem válido (JPG, PNG ou WEBP)."})
+		return
+	}
+	imageB64 = preparedB64
+	mime = preparedMime
+
 	nowRef, tzVision := parseClientNow(clientTime, tzVal)
 
 	input := ai.UserInput{

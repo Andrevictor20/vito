@@ -74,6 +74,9 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
   const [inputText, setInputText] = useState('');
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
   const [selectedImageBase64, setSelectedImageBase64] = useState<string | null>(null);
+  // Mime real da imagem escolhida: enviar "image/jpeg" para um PNG/WEBP/HEIC
+  // fazia o backend receber um tipo incompatível com os bytes da imagem.
+  const [selectedImageMime, setSelectedImageMime] = useState<string | null>(null);
   const [selectedFocus, setSelectedFocus] = useState<FocusMode | null>(null);
   const [focusModalVisible, setFocusModalVisible] = useState(false);
   const [historyVisible, setHistoryVisible] = useState(false);
@@ -187,6 +190,7 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
         if (!result.canceled && result.assets && result.assets.length > 0) {
           setSelectedImageUri(result.assets[0].uri);
           setSelectedImageBase64(result.assets[0].base64 || null);
+          setSelectedImageMime(result.assets[0].mimeType || null);
         }
       } else {
         const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -205,6 +209,7 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
         if (!result.canceled && result.assets && result.assets.length > 0) {
           setSelectedImageUri(result.assets[0].uri);
           setSelectedImageBase64(result.assets[0].base64 || null);
+          setSelectedImageMime(result.assets[0].mimeType || null);
         }
       }
     } catch (e) {
@@ -241,11 +246,13 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
     if (selectedImageUri) {
       const uri = selectedImageUri;
       const b64 = selectedImageBase64 || undefined;
+      const mime = selectedImageMime || undefined;
       const prompt = inputText.trim() || undefined;
       setSelectedImageUri(null);
       setSelectedImageBase64(null);
+      setSelectedImageMime(null);
       setInputText('');
-      sendImage(uri, prompt, b64);
+      sendImage(uri, prompt, b64, mime);
     } else {
       const text = inputText;
       setInputText('');

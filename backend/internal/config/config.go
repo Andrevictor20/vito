@@ -19,6 +19,7 @@ type Config struct {
 	GeminiModel                  string
 	OpenRouterAPIKey             string
 	OpenRouterModel              string
+	OpenRouterVisionModel        string
 	GroqAPIKey                   string
 	GroqModel                    string
 	MistralAPIKey                string
@@ -93,6 +94,13 @@ func Load() *Config {
 	if openRouterModel == "" {
 		openRouterModel = "nvidia/nemotron-3.5-lightning:free"
 	}
+	// Elo de VISÃO via OpenRouter: a cota do Google AI Studio (20 req/dia no
+	// free tier) é compartilhada por todos os modelos do Gemini, então o
+	// OpenRouter é a única redundância real para leitura de imagens.
+	openRouterVisionModel := os.Getenv("OPENROUTER_VISION_MODEL")
+	if openRouterVisionModel == "" {
+		openRouterVisionModel = "google/gemini-3.5-flash-lite"
+	}
 	// Mistral La Plateforme (4º elo): default pequeno e rápido (IDs 2512 válidos).
 	mistralModel := os.Getenv("MISTRAL_MODEL")
 	if mistralModel == "" {
@@ -141,6 +149,7 @@ func Load() *Config {
 		GeminiModel:                  geminiModel,
 		OpenRouterAPIKey:             os.Getenv("OPENROUTER_API_KEY"),
 		OpenRouterModel:              openRouterModel,
+		OpenRouterVisionModel:        openRouterVisionModel,
 		GroqAPIKey:                   os.Getenv("GROQ_API_KEY"),
 		GroqModel:                    groqModel,
 		MistralAPIKey:                os.Getenv("MISTRAL_API_KEY"),

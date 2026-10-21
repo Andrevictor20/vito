@@ -47,7 +47,12 @@ type WhatsAppService struct {
 	contextDebugLog  bool
 	labelsMu         sync.RWMutex
 	chatLabels       map[string]string
+	// runAsync executa o processamento com IA em background.
+	runAsync AsyncRunner
 }
+
+// AsyncRunner executa uma tarefa em background (ou de forma síncrona, em testes).
+type AsyncRunner func(func())
 
 // NewWhatsAppService instancia o serviço do WhatsApp.
 func NewWhatsAppService(
@@ -62,7 +67,27 @@ func NewWhatsAppService(
 		client:       client,
 		assistantSvc: assistantSvc,
 		memory:       NewWhatsAppConversationMemory(),
+		runAsync:     func(fn func()) { go fn() },
 	}
+}
+
+// SetAssistantService injeta o serviço de assistente (usado em testes e recargas).
+func (s *WhatsAppService) SetAssistantService(assistantSvc *AssistantService) {
+	s.assistantSvc = assistantSvc
+}
+
+// SetAsyncRunner injeta o executor de tarefas em background.
+//
+// O processamento com IA pode levar dezenas de segundos (análise de imagem) e
+// acontece DENTRO do handler HTTP do webhook: processar ali estouraria o
+// timeout do webhook da Evolution, que reenviaria a mensagem e faria o Vito
+// responder duas vezes. Em produção o runner padrão é uma goroutine; nos
+// testes o runner é síncrono para manter as asserções determinísticas.
+func (s *WhatsAppService) SetAsyncRunner(runner AsyncRunner) {
+	if runner == nil {
+		return
+	}
+	s.runAsync = runner
 }
 
 // SetNotificationSender injeta o serviço de notificações push no WhatsAppService.

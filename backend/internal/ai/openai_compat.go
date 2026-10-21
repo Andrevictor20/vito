@@ -20,6 +20,10 @@ type OpenAICompatProvider struct {
 	apiKey       string
 	model        string
 	httpClient   *http.Client
+	// visionCapable marca a instância como capaz de ler imagens. Só o elo de
+	// visão (OpenRouter servindo um modelo multimodal) recebe a marca: Groq e
+	// Mistral devolveram 404 para os modelos de visão disponíveis.
+	visionCapable bool
 }
 
 // NewOpenRouterProvider instancia o provedor para o OpenRouter (com modelos :free).
@@ -34,6 +38,21 @@ func NewOpenRouterProvider(apiKey, model string) *OpenAICompatProvider {
 		model:        model,
 		httpClient:   &http.Client{Timeout: 30 * time.Second},
 	}
+}
+
+// NewOpenRouterVisionProvider instancia o elo de visão via OpenRouter.
+//
+// Existe para dar redundância real à leitura de imagens: a cota do Google AI
+// Studio (20 req/dia no free tier) é compartilhada por todos os modelos do
+// Gemini, enquanto o OpenRouter tem cota própria.
+func NewOpenRouterVisionProvider(apiKey, model string) *OpenAICompatProvider {
+	if model == "" {
+		model = "google/gemini-3.5-flash-lite"
+	}
+	p := NewOpenRouterProvider(apiKey, model)
+	p.providerName = "OpenRouter Visão (" + model + ")"
+	p.visionCapable = true
+	return p
 }
 
 // NewGroqProvider instancia o provedor para o Groq Cloud.
@@ -86,7 +105,7 @@ func (p *OpenAICompatProvider) Name() string {
 }
 
 func (p *OpenAICompatProvider) SupportsVision() bool {
-	return false
+	return p.visionCapable
 }
 
 func (p *OpenAICompatProvider) SupportsAudio() bool {
@@ -126,6 +145,14 @@ func (p *OpenAICompatProvider) ParseIntent(ctx context.Context, input UserInput)
 	userContent := SanitizeUntrustedInput(input.Text)
 	if userContent == "" && input.AudioB64 != "" {
 		return nil, errors.New("áudio direto não suportado por este provedor, requer transcrição prévia")
+	}
+
+	// Elo de visão: imagem vai no formato multimodal da API (data URL).
+	if input.ImageB64 != "" {
+		if !p.visionCapable {
+			return nil, errors.New("imagem não suportada por este provedor: " + p.providerName)
+		}
+		return p.parseVisionIntent(ctx, systemPrompt, userContent, input.ImageB64, input.ImageMime)
 	}
 
 	reqBody := openAIChatRequest{

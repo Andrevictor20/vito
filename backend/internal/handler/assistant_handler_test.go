@@ -3,6 +3,7 @@ package handler_test
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"mime/multipart"
@@ -134,6 +135,10 @@ func TestAssistantHandler_AudioChat_FallbackToNative(t *testing.T) {
 	}
 }
 
+// imagemValidaBase64 é um PNG 1x1 real: o handler valida o payload antes de
+// enviar à IA (payload inválido agora devolve 400 com mensagem clara).
+const imagemValidaBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY44YAAAAASUVORK5CYII="
+
 func TestAssistantHandler_VisionChat(t *testing.T) {
 	mockAI := &mockAIGateway{
 		intent: &ai.ParsedIntent{
@@ -150,11 +155,15 @@ func TestAssistantHandler_VisionChat(t *testing.T) {
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
 	_ = writer.WriteField("prompt", "Extraia os itens deste recibo")
-	part, err := writer.CreateFormFile("image", "receipt.jpg")
+	part, err := writer.CreateFormFile("image", "receipt.png")
 	if err != nil {
 		t.Fatalf("failed to create image form file: %v", err)
 	}
-	_, _ = part.Write([]byte("fake-jpeg-data"))
+	imagemBytes, err := base64.StdEncoding.DecodeString(imagemValidaBase64)
+	if err != nil {
+		t.Fatalf("base64 de teste inválido: %v", err)
+	}
+	_, _ = part.Write(imagemBytes)
 	_ = writer.Close()
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/assistant/vision", body)
@@ -347,7 +356,8 @@ func TestAssistantHandler_VisionChat_JSON(t *testing.T) {
 
 	// Simula payload JSON com image_b64 (sem multipart)
 	jsonPayload := map[string]string{
-		"image_b64":          "LzlqLzRBQVFza1pJRmdBQkFRRUFTQUJJQUFE...",
+		"image_b64":          imagemValidaBase64,
+		"image_mime":         "image/png",
 		"prompt":             "Analise o convite",
 		"timezone":           "America/Sao_Paulo",
 		"current_local_time": "2026-10-08T19:00:00-03:00",

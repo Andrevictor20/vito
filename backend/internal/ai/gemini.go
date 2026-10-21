@@ -29,7 +29,10 @@ func NewGeminiProvider(apiKey, model string) *GeminiProvider {
 		apiKey: apiKey,
 		model:  model,
 		httpClient: &http.Client{
-			Timeout: 45 * time.Second,
+			// A janela real é dada pelo contexto da tentativa (attemptTimeoutFor);
+			// este teto só evita conexões penduradas. Medido em produção: análise de
+			// imagem levou 57s a 62s, contra 2-6s do texto.
+			Timeout: 60 * time.Second,
 		},
 	}
 }
@@ -73,8 +76,64 @@ type geminiTool struct {
 // multiplica a latência de uma resposta de chat (19s medidos em produção) sem
 // ganho para um assistente que deve responder em segundos. No chat o thinking é
 // desligado; a avaliação de radares, que roda em background, mantém o padrão.
+//
+// O parâmetro só é aceito pela família 2.5: enviar para gemini-3.5-flash-lite
+// devolve HTTP 400.
 type geminiThinkingConfig struct {
 	ThinkingBudget int `json:"thinkingBudget"`
+}
+
+// thinkingConfigFor devolve a configuração de thinking aceita pelo modelo.
+func thinkingConfigFor(model string) *geminiThinkingConfig {
+	if strings.Contains(model, "2.5") {
+		return &geminiThinkingConfig{ThinkingBudget: 0}
+	}
+	return nil
+}
+
+// geminiModelChain devolve a cadeia de modelos a testar, em ordem de preferência.
+//
+// Cada modelo tem sua própria cota no Google AI Studio: em 21/10/2026 o
+// gemini-2.5-flash respondia HTTP 429 (cota free tier esgotada) enquanto o
+// gemini-3.5-flash-lite respondia normalmente. Uma cadeia de UM único modelo
+// (o caso do 2.5-flash, que era o padrão) matava a análise de imagem sem
+// nenhuma alternativa.
+func geminiModelChain(primary string) []string {
+	candidates := []string{
+		primary,
+		"gemini-2.5-flash",
+		"gemini-3.5-flash-lite",
+		"gemini-flash-latest",
+		"gemini-3.8-flash",
+	}
+	chain := make([]string, 0, len(candidates))
+	seen := make(map[string]bool, len(candidates))
+	for _, model := range candidates {
+		model = strings.TrimSpace(model)
+		if model == "" || seen[model] {
+			continue
+		}
+		seen[model] = true
+		chain = append(chain, model)
+	}
+	return chain
+}
+
+// isRetryableModelStatus indica erros que valem trocar de modelo.
+//
+// 429 (cota), 5xx (capacidade) e 404 (modelo indisponível) são transitórios no
+// lado do Google: outro modelo do mesmo provedor normalmente responde.
+func isRetryableModelStatus(code int) bool {
+	switch code {
+	case http.StatusTooManyRequests,
+		http.StatusNotFound,
+		http.StatusInternalServerError,
+		http.StatusBadGateway,
+		http.StatusServiceUnavailable,
+		http.StatusGatewayTimeout:
+		return true
+	}
+	return false
 }
 
 type geminiRequest struct {
@@ -159,22 +218,21 @@ func (p *GeminiProvider) ParseIntent(ctx context.Context, input UserInput) (*Par
 		},
 	}
 	reqBody.GenerationConfig.ResponseMimeType = "application/json"
-	// Chat: sem thinking, para responder em segundos.
-	reqBody.GenerationConfig.ThinkingConfig = &geminiThinkingConfig{ThinkingBudget: 0}
 
-	jsonBytes, err := json.Marshal(reqBody)
-	if err != nil {
-		return nil, err
-	}
-
-	// Lista de modelos a testar: modelo atual + fallback seguro gemini-2.5-flash
-	modelsToTry := []string{p.model}
-	if p.model != "gemini-2.5-flash" {
-		modelsToTry = append(modelsToTry, "gemini-2.5-flash")
-	}
+	// Cadeia de modelos: cada um tem cota própria no Google AI Studio.
+	modelsToTry := geminiModelChain(p.model)
 
 	var lastErr error
 	for _, modelName := range modelsToTry {
+		// O `thinkingConfig` só é aceito pela família 2.5 — enviar para os demais
+		// devolve HTTP 400 e mataria a tentativa.
+		reqBody.GenerationConfig.ThinkingConfig = thinkingConfigFor(modelName)
+
+		jsonBytes, err := json.Marshal(reqBody)
+		if err != nil {
+			return nil, err
+		}
+
 		url := fmt.Sprintf("%s/v1beta/models/%s:generateContent?key=%s", base, modelName, p.apiKey)
 
 		req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonBytes))
@@ -196,9 +254,9 @@ func (p *GeminiProvider) ParseIntent(ctx context.Context, input UserInput) (*Par
 			continue
 		}
 
-		// Se o modelo responder 503 (sobrecarga) ou 404 (descontinuado) e houver próximo, tenta o próximo
-		if (resp.StatusCode == http.StatusServiceUnavailable || resp.StatusCode == http.StatusNotFound) && len(modelsToTry) > 1 {
-			lastErr = fmt.Errorf("gemini api error (status %d): %s", resp.StatusCode, string(bodyBytes))
+		// Erros transitórios (cota, capacidade, modelo fora do ar) → próximo modelo.
+		if resp.StatusCode != http.StatusOK && isRetryableModelStatus(resp.StatusCode) {
+			lastErr = fmt.Errorf("gemini api error (status %d, modelo %s): %s", resp.StatusCode, modelName, string(bodyBytes))
 			continue
 		}
 
@@ -274,7 +332,7 @@ func (p *GeminiProvider) GenerateText(ctx context.Context, systemPrompt, userPro
 		return "", err
 	}
 
-	modelsToTry := []string{p.model, "gemini-flash-latest", "gemini-2.5-flash"}
+	modelsToTry := geminiModelChain(p.model)
 	var lastErr error
 
 	for _, m := range modelsToTry {

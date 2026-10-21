@@ -89,7 +89,7 @@ export interface UseChatMessagesResult {
   editAndResendMessage: (messageId: string, newText: string, focusMode?: string) => Promise<void>;
   stopGeneration: () => void;
   sendAudio: (audioUri: string, focusMode?: string) => Promise<void>;
-  sendImage: (imageUri: string, prompt?: string, base64Override?: string) => Promise<void>;
+  sendImage: (imageUri: string, prompt?: string, base64Override?: string, mimeType?: string) => Promise<void>;
   clearHistory: () => Promise<void>;
 }
 
@@ -397,7 +397,7 @@ export function useChatMessages(
   );
 
   const sendImage = useCallback(
-    async (imageUri: string, prompt?: string, base64Override?: string) => {
+    async (imageUri: string, prompt?: string, base64Override?: string, mimeType?: string) => {
       if (loading) return;
 
       const userMsg: ChatMessage = {
@@ -414,7 +414,7 @@ export function useChatMessages(
       setLoading(true);
 
       try {
-        const res = await api.assistantVision(imageUri, prompt, 'image.jpg', undefined, base64Override);
+        const res = await api.assistantVision(imageUri, prompt, 'image.jpg', undefined, base64Override, mimeType);
         const vitoMsg = buildAssistantMessage('vito-img', res, 'Imagem analisada com sucesso.');
 
         const withVito = [...withUser, vitoMsg];

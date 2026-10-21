@@ -46,6 +46,8 @@ type inboundMessage struct {
 	QuotedAuthor string
 	Timestamp    time.Time
 	IsAudio      bool
+	IsImage      bool
+	ImageMime    string
 	MediaPayload interface{}
 }
 
@@ -85,8 +87,8 @@ func parseInboundMessage(data json.RawMessage) (*inboundMessage, error) {
 		msg.Timestamp = time.Unix(raw.MessageTimestamp, 0).UTC()
 	}
 
+	subtypes := subtypesOf(raw.Message)
 	if len(raw.Message) > 0 {
-		subtypes := subtypesOf(raw.Message)
 		for _, name := range messageSubtypePriority(subtypes) {
 			sub := subtypes[name]
 			if text := extractMessageText(sub); text != "" && msg.Text == "" {
@@ -108,10 +110,55 @@ func parseInboundMessage(data json.RawMessage) (*inboundMessage, error) {
 		}
 	}
 
-	_, hasAudio := subtypesOf(raw.Message)["audioMessage"]
+	_, hasAudio := subtypes["audioMessage"]
 	msg.IsAudio = hasAudio || strings.EqualFold(raw.MessageType, "audioMessage")
 
+	msg.IsImage, msg.ImageMime = detectInboundImage(subtypes, raw.MessageType)
+
 	return msg, nil
+}
+
+// detectInboundImage identifica mensagens de imagem e o mime da mídia.
+//
+// A Evolution entrega a imagem em `imageMessage`; fotos enviadas "uma vez" vêm
+// aninhadas em `viewOnceMessage`; e uma foto enviada como documento chega em
+// `documentMessage` com mime de imagem.
+func detectInboundImage(subtypes map[string]json.RawMessage, messageType string) (bool, string) {
+	if raw, ok := subtypes["imageMessage"]; ok {
+		return true, mediaMimeOf(raw)
+	}
+	if raw, ok := subtypes["viewOnceMessage"]; ok {
+		// {"message": {"imageMessage": {...}}}
+		var wrapper struct {
+			Message map[string]json.RawMessage `json:"message"`
+		}
+		if err := json.Unmarshal(raw, &wrapper); err == nil {
+			if inner, ok := wrapper.Message["imageMessage"]; ok {
+				return true, mediaMimeOf(inner)
+			}
+		}
+	}
+	if raw, ok := subtypes["documentMessage"]; ok {
+		mime := mediaMimeOf(raw)
+		if strings.HasPrefix(strings.ToLower(mime), "image/") {
+			return true, mime
+		}
+	}
+	if strings.Contains(strings.ToLower(messageType), "image") {
+		return true, ""
+	}
+	return false, ""
+}
+
+// mediaMimeOf lê o mime declarado pela Evolution na mídia.
+func mediaMimeOf(raw json.RawMessage) string {
+	var payload struct {
+		MimeType string `json:"mimetype"`
+	}
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return ""
+	}
+	return strings.TrimSpace(payload.MimeType)
 }
 
 // subtypesOf devolve as sub-mensagens do payload `message` por nome.

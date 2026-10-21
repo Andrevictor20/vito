@@ -106,6 +106,9 @@ func setupConversationalWhatsAppTest(t *testing.T) (*service.WhatsAppService, *m
 
 	svc := service.NewWhatsAppService(cfg, waRepo, mockClient, assistantSvc)
 	svc.SetUserRepo(userRepo)
+	// Runner síncrono: mantém as asserções determinísticas (em produção o
+	// processamento com IA roda em background).
+	svc.SetAsyncRunner(func(fn func()) { fn() })
 
 	return svc, mockClient, waRepo, userRepo
 }

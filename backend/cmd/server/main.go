@@ -159,6 +159,10 @@ func main() {
 	if cfg.OpenRouterAPIKey != "" {
 		log.Printf("🤖 [AI Provider] OpenRouter ativado como fallback (%s).", cfg.OpenRouterModel)
 		aiProviders = append(aiProviders, ai.NewOpenRouterProvider(cfg.OpenRouterAPIKey, cfg.OpenRouterModel))
+		// Elo de VISÃO: cota separada da do Google AI Studio, garante que a
+		// leitura de imagens continue funcionando quando a cota do Gemini acaba.
+		log.Printf("🤖 [AI Provider] OpenRouter Visão ativado como fallback de imagem (%s).", cfg.OpenRouterVisionModel)
+		aiProviders = append(aiProviders, ai.NewOpenRouterVisionProvider(cfg.OpenRouterAPIKey, cfg.OpenRouterVisionModel))
 	}
 
 	aiGateway := ai.NewGateway(aiProviders...)

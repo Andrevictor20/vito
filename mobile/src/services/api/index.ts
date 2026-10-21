@@ -212,9 +212,10 @@ export class ApiService extends ApiClient {
     prompt?: string,
     filename: string = 'image.jpg',
     timezone?: string,
-    base64Override?: string
+    base64Override?: string,
+    mimeType?: string
   ): Promise<AssistantChatResponse> {
-    return this.chatApi.assistantVision(imageUri, prompt, filename, timezone, base64Override);
+    return this.chatApi.assistantVision(imageUri, prompt, filename, timezone, base64Override, mimeType);
   }
   getChatSessions(): Promise<ConversationSession[]> {
     return this.chatApi.getChatSessions();
