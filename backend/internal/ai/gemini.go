@@ -67,12 +67,23 @@ type geminiTool struct {
 	GoogleSearch *geminiGoogleSearch `json:"google_search,omitempty"`
 }
 
+// geminiThinkingConfig controla o "thinking" do Gemini 2.5.
+//
+// Por padrão o 2.5 Flash raciocina antes de responder (thinking dinâmico), o que
+// multiplica a latência de uma resposta de chat (19s medidos em produção) sem
+// ganho para um assistente que deve responder em segundos. No chat o thinking é
+// desligado; a avaliação de radares, que roda em background, mantém o padrão.
+type geminiThinkingConfig struct {
+	ThinkingBudget int `json:"thinkingBudget"`
+}
+
 type geminiRequest struct {
 	SystemInstruction *geminiContent  `json:"systemInstruction,omitempty"`
 	Contents          []geminiContent `json:"contents"`
 	Tools             []geminiTool    `json:"tools,omitempty"`
 	GenerationConfig  struct {
-		ResponseMimeType string `json:"responseMimeType,omitempty"`
+		ResponseMimeType string                `json:"responseMimeType,omitempty"`
+		ThinkingConfig   *geminiThinkingConfig `json:"thinkingConfig,omitempty"`
 	} `json:"generationConfig"`
 }
 
@@ -148,6 +159,8 @@ func (p *GeminiProvider) ParseIntent(ctx context.Context, input UserInput) (*Par
 		},
 	}
 	reqBody.GenerationConfig.ResponseMimeType = "application/json"
+	// Chat: sem thinking, para responder em segundos.
+	reqBody.GenerationConfig.ThinkingConfig = &geminiThinkingConfig{ThinkingBudget: 0}
 
 	jsonBytes, err := json.Marshal(reqBody)
 	if err != nil {
