@@ -164,8 +164,9 @@ jobs:
 
       - name: Report WhatsApp Context Diagnostics
         run: |
-          # O backfill roda ~45s após o boot (espera a Evolution API subir).
-          sleep 55
+          # O backfill roda a partir de ~45s após o boot, com backoff até ~7 min
+          # (a Evolution API leva ~2 min para subir no Pi).
+          sleep 160
           echo "== Backfill / contexto do WhatsApp =="
           docker logs vito-backend 2>&1 | grep -E 'WhatsAppBackfill|WhatsAppGroupMeta|Teto de heap' | tail -12 || echo "(sem linhas de backfill)"
           echo ""

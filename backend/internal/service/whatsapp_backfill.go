@@ -281,8 +281,10 @@ func (w *WhatsAppBackfillWorker) runOnce() {
 	if w.backfill == nil {
 		return
 	}
-	// A Evolution API pode ainda estar subindo (Prisma + Postgres no Pi): poucas tentativas com backoff.
-	delays := []time.Duration{0, 30 * time.Second, 60 * time.Second}
+	// A Evolution API (Prisma + Postgres) leva ~2 min para ficar pronta no boot
+	// do Pi, e o backend sobe antes dela. Backoff paciente: 45s, 75s, 135s,
+	// 255s e 435s após o boot.
+	delays := []time.Duration{0, 30 * time.Second, 60 * time.Second, 120 * time.Second, 180 * time.Second}
 	for attempt, delay := range delays {
 		if delay > 0 {
 			select {
