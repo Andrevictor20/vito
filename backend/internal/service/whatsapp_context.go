@@ -268,3 +268,21 @@ func windowChatLabel(m domain.WhatsAppConversationMessage) string {
 		return "Grupo"
 	}
 }
+
+// describeWindowChats lista os chats presentes na janela (para o log de diagnóstico).
+func describeWindowChats(window []ai.ChatMessageContext) string {
+	if len(window) == 0 {
+		return "-"
+	}
+	seen := make(map[string]bool, 4)
+	labels := make([]string, 0, 4)
+	for _, m := range window {
+		label := strings.TrimSpace(m.Chat)
+		if label == "" || seen[label] {
+			continue
+		}
+		seen[label] = true
+		labels = append(labels, label)
+	}
+	return strings.Join(labels, ",")
+}
