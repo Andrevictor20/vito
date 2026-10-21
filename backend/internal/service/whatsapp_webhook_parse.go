@@ -89,17 +89,7 @@ func parseInboundMessage(data json.RawMessage) (*inboundMessage, error) {
 		subtypes := subtypesOf(raw.Message)
 		for _, name := range messageSubtypePriority(subtypes) {
 			sub := subtypes[name]
-			var text string
-			if name == "conversation" {
-				// Na Evolution v2, `conversation` é o próprio texto (string), não um objeto.
-				var plain string
-				if err := json.Unmarshal(sub, &plain); err == nil {
-					text = plain
-				}
-			} else {
-				text = extractMessageText(sub)
-			}
-			if text != "" && msg.Text == "" {
+			if text := extractMessageText(sub); text != "" && msg.Text == "" {
 				msg.Text = text
 			}
 			quoted, author := extractQuotedContext(sub)

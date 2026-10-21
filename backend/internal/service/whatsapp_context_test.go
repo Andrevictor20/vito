@@ -508,3 +508,91 @@ func TestWhatsAppContext_ScopeOffDisablesContext(t *testing.T) {
 		t.Errorf("esperava contexto citado vazio com scope=off, obteve %q", input.QuotedContext)
 	}
 }
+
+// Regressão: a Evolution entrega texto em `extendedTextMessage` (sem `conversation`).
+// Antes o texto vinha VAZIO e o Vito nunca respondia nesse formato.
+func TestWhatsAppContext_ReadsExtendedTextMessageFormat(t *testing.T) {
+	fx := setupContextualWhatsApp(t)
+
+	payload := []byte(`{
+		"event": "messages.upsert",
+		"instance": "vito_ctx_user",
+		"data": {
+			"key": {"remoteJid": "5511999998888@s.whatsapp.net", "fromMe": true, "id": "msg-ext-1"},
+			"pushName": "André",
+			"messageType": "extendedTextMessage",
+			"message": {"extendedTextMessage": {"text": "o que eu falei antes sobre a Ana?"}}
+		}
+	}`)
+
+	if err := fx.svc.HandleWebhook(context.Background(), "messages.upsert", payload); err != nil {
+		t.Fatalf("HandleWebhook: %v", err)
+	}
+	if len(fx.client.sentMessages) != 1 {
+		t.Fatalf("esperava resposta do Vito no formato extendedTextMessage, obteve %d", len(fx.client.sentMessages))
+	}
+	input := fx.gateway.lastInput()
+	if input.Text != "o que eu falei antes sobre a Ana?" {
+		t.Errorf("texto recebido pela IA incorreto: %q", input.Text)
+	}
+}
+
+// Regressão: o JID prefixado do chat "Você" deve ser classificado como self,
+// liberando o cross-chat e dispensando o @vito.
+func TestWhatsAppContext_PrefixedSelfJIDEnablesCrossChat(t *testing.T) {
+	fx := setupContextualWhatsApp(t)
+
+	// Integra o usuário com o número real (o JID do "Você" carrega o prefixo 047).
+	integration, err := fx.waRepo.GetByInstanceName(context.Background(), "vito_ctx_user")
+	if err != nil || integration == nil {
+		t.Fatalf("integração não encontrada: %v", err)
+	}
+	integration.Phone = "559884097322"
+	if err := fx.waRepo.Upsert(context.Background(), integration); err != nil {
+		t.Fatalf("Upsert: %v", err)
+	}
+
+	// Mensagem em outro chat (LID de contato) — arquivada, sem acionar o Vito.
+	otherChat := []byte(`{
+		"event": "messages.upsert",
+		"instance": "vito_ctx_user",
+		"data": {
+			"key": {"remoteJid": "471331507024120@lid", "fromMe": false, "id": "msg-lid-1"},
+			"pushName": "Ana",
+			"messageType": "extendedTextMessage",
+			"message": {"extendedTextMessage": {"text": "pode ser quinta às 10h"}}
+		}
+	}`)
+	if err := fx.svc.HandleWebhook(context.Background(), "messages.upsert", otherChat); err != nil {
+		t.Fatalf("HandleWebhook: %v", err)
+	}
+
+	// No chat "Você" (JID prefixado), sem @vito: o Vito responde e enxerga o outro chat.
+	selfChat := []byte(`{
+		"event": "messages.upsert",
+		"instance": "vito_ctx_user",
+		"data": {
+			"key": {"remoteJid": "047559884097322@s.whatsapp.net", "fromMe": true, "id": "msg-self-2"},
+			"pushName": "André",
+			"messageType": "extendedTextMessage",
+			"message": {"extendedTextMessage": {"text": "lembra da reunião com a Ana?"}}
+		}
+	}`)
+	if err := fx.svc.HandleWebhook(context.Background(), "messages.upsert", selfChat); err != nil {
+		t.Fatalf("HandleWebhook: %v", err)
+	}
+
+	if len(fx.client.sentMessages) != 1 {
+		t.Fatalf("esperava resposta no chat Você sem @vito, obteve %d", len(fx.client.sentMessages))
+	}
+	window := fx.gateway.lastInput().ConversationWindow
+	found := false
+	for _, m := range window {
+		if strings.Contains(m.Text, "pode ser quinta às 10h") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("esperava a mensagem de outro chat na janela cross-chat, obteve %+v", window)
+	}
+}

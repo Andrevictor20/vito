@@ -237,12 +237,27 @@ func (m evolutionMessage) toChatMessage() WhatsAppChatMessage {
 	return msg
 }
 
-// extractMessageText extrai o texto de qualquer subtipo de mensagem da Evolution.
+// extractMessageText extrai o texto de uma mensagem da Evolution, tolerando os
+// formatos que a API usa:
+//
+//	"texto simples"                                   -> string crua
+//	{"conversation": "texto"}                          -> texto simples
+//	{"extendedTextMessage": {"text": "texto"}}         -> texto formatado
+//	{"text": "texto"}                                  -> conteúdo de um subtipo
+//	{"imageMessage": {"caption": "legenda"}}            -> legenda de mídia
 func extractMessageText(raw json.RawMessage) string {
 	if len(raw) == 0 {
 		return ""
 	}
-	var payload struct {
+
+	// 1) String crua (formato `conversation`).
+	var plain string
+	if err := json.Unmarshal(raw, &plain); err == nil {
+		return strings.TrimSpace(plain)
+	}
+
+	// 2) Estrutura completa de mensagem.
+	var full struct {
 		Conversation        string `json:"conversation"`
 		ExtendedTextMessage struct {
 			Text string `json:"text"`
@@ -254,19 +269,33 @@ func extractMessageText(raw json.RawMessage) string {
 			Caption string `json:"caption"`
 		} `json:"videoMessage"`
 	}
-	if err := json.Unmarshal(raw, &payload); err != nil {
-		return ""
-	}
-	for _, candidate := range []string{
-		payload.Conversation,
-		payload.ExtendedTextMessage.Text,
-		payload.ImageMessage.Caption,
-		payload.VideoMessage.Caption,
-	} {
-		if trimmed := strings.TrimSpace(candidate); trimmed != "" {
-			return trimmed
+	if err := json.Unmarshal(raw, &full); err == nil {
+		for _, candidate := range []string{
+			full.Conversation,
+			full.ExtendedTextMessage.Text,
+			full.ImageMessage.Caption,
+			full.VideoMessage.Caption,
+		} {
+			if trimmed := strings.TrimSpace(candidate); trimmed != "" {
+				return trimmed
+			}
 		}
 	}
+
+	// 3) Conteúdo de um subtipo ({text} | {caption} | {title}).
+	var subtype struct {
+		Text    string `json:"text"`
+		Caption string `json:"caption"`
+		Title   string `json:"title"`
+	}
+	if err := json.Unmarshal(raw, &subtype); err == nil {
+		for _, candidate := range []string{subtype.Text, subtype.Caption, subtype.Title} {
+			if trimmed := strings.TrimSpace(candidate); trimmed != "" {
+				return trimmed
+			}
+		}
+	}
+
 	return ""
 }
 
