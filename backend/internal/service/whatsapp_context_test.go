@@ -852,3 +852,26 @@ func TestWhatsAppContext_SecretsNeverEnterTheWindow(t *testing.T) {
 		t.Errorf("a mensagem legitima deveria estar na janela, obteve %q", window[0].Text)
 	}
 }
+
+// O filtro de segredo não pode descartar mensagens legítimas que têm números:
+// datas, valores e horários continuam entrando na janela.
+func TestWhatsAppContext_LegitimateNumbersAreNotFiltered(t *testing.T) {
+	fx := setupContextualWhatsApp(t)
+	now := time.Now().UTC()
+	ctx := context.Background()
+
+	legit := []string{
+		"reuniao 12 10 15",
+		"ganhei 1000000",
+		"paguei R$ 2500",
+		"quinta 10h com a Ana",
+	}
+	for i, text := range legit {
+		archiveMessage(t, fx, fmt.Sprintf("msg-legit-%02d", i), selfJID(), domain.WhatsAppChatKindSelf, "Você", text, now)
+	}
+
+	window := fx.contextSvc.SelfWindow(ctx, "user-ctx-1", "")
+	if len(window) != len(legit) {
+		t.Fatalf("esperava %d mensagens na janela, obteve %d: %+v", len(legit), len(window), window)
+	}
+}

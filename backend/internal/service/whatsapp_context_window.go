@@ -26,15 +26,28 @@ func isSensitiveContextMessage(text string) bool {
 	if sensitiveContextPattern.MatchString(trimmed) {
 		return true
 	}
-	// Código isolado ("216637" ou "seu código: 216637") — texto curto majoritariamente numérico.
-	if len([]rune(trimmed)) <= 32 {
-		digits := 0
+	// Código isolado ("216637", "ok 216637", "216 637"): a mensagem é
+	// essencialmente um bloco de 4 a 8 dígitos. A regra usa o MAIOR bloco
+	// CONTÍGUO de dígitos — assim "12 10 15" (data) e "ganhei 1000000"
+	// (valor em reais) continuam sendo mensagens legítimas.
+	if len([]rune(trimmed)) <= 24 && !strings.Contains(trimmed, "R$") {
+		maxRun, letters := 0, 0
+		run := 0
 		for _, r := range trimmed {
-			if r >= '0' && r <= '9' {
-				digits++
+			switch {
+			case r >= '0' && r <= '9':
+				run++
+				if run > maxRun {
+					maxRun = run
+				}
+			case (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z'):
+				letters++
+				run = 0
+			default:
+				run = 0
 			}
 		}
-		if digits >= 4 && digits*10 >= len([]rune(trimmed))*6 {
+		if letters <= 3 && maxRun >= 4 && maxRun <= 8 {
 			return true
 		}
 	}
