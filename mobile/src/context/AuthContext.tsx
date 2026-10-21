@@ -268,6 +268,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await api.setAuthTokens(null, null, null);
       await secureStorage.removeItem(USER_KEY);
       setUser(null);
+
+      // 5. Limpa a sessão do Google Play Services: sem isso o Play Services mantém a conta
+      //    como padrão do app e o próximo login entra direto nela, sem mostrar as opções.
+      await googleAuthService.signOut().catch(() => {});
     } finally {
       setIsLoading(false);
     }

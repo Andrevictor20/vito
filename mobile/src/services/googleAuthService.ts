@@ -211,6 +211,27 @@ export const googleAuthService = {
   },
 
   /**
+   * Encerra a sessão do Google Play Services no aparelho.
+   *
+   * Sem isso, o Play Services guarda a conta usada como "padrão" do app e passa a fazer
+   * sign-in silencioso: o usuário encerra a sessão e, ao logar novamente, entra direto na
+   * última conta — sem ver as opções. O signOut (local) limpa essa preferência e faz o
+   * seletor de contas voltar a listar **todas** as contas. A concessão OAuth do Google
+   * permanece no servidor (sem nova tela de consentimento e sem novo e-mail).
+   */
+  async signOut(): Promise<void> {
+    if (!GoogleSignin || typeof GoogleSignin.signOut !== 'function') {
+      return;
+    }
+    try {
+      await GoogleSignin.signOut();
+      console.log('[googleAuthService] Sessão do Google Play Services encerrada (seletor de contas será exibido).');
+    } catch (e) {
+      console.warn('[googleAuthService] Falha ao encerrar sessão do Google Play Services:', e);
+    }
+  },
+
+  /**
    * Inicia o fluxo de Login / Cadastro via Google OAuth2.
    * Prioriza o Google Play Services nativo (sem navegador).
    * Caso o módulo nativo não esteja presente ou ocorra erro de Play Services/configuração,
