@@ -5,6 +5,7 @@ import { api } from './api';
 import { NotificationPriority, NotificationSettings, ScheduleNotificationParams, Event } from '../types';
 import { isAllDayEvent, parseSafeDate } from '../utils/calendarDateUtils';
 import { findOrphanNotificationIds, shouldSkipReschedulingEvent } from '../utils/notificationReconcile';
+import { decideNotificationPermissionRequest } from '../utils/notificationPermissionPolicy';
 
 const SETTINGS_STORAGE_KEY = '@vito_notification_settings';
 const PUSH_TOKEN_SECURE_KEY = '@vito_push_token';
@@ -278,7 +279,38 @@ export const notificationService = {
   },
 
   /**
+   * Verifica se o diálogo nativo de permissão já foi exibido nesta instalação.
+   * O flag é persistido nos dois storages (AsyncStorage + SecureStore) para sobreviver
+   * à limpeza parcial de caches — objetivo: nunca repetir o pedido ao usuário.
+   */
+  async hasAlreadyPrompted(): Promise<boolean> {
+    try {
+      const fromAsync = await AsyncStorage.getItem(PROMPTED_ONCE_KEY);
+      if (fromAsync === 'true') return true;
+    } catch {}
+    try {
+      const fromSecure = await secureStorage.getItem(PROMPTED_ONCE_KEY);
+      if (fromSecure === 'true') return true;
+    } catch {}
+    return false;
+  },
+
+  /** Registra que o diálogo nativo já foi exibido (nos dois storages). */
+  async markPrompted(): Promise<void> {
+    try {
+      await AsyncStorage.setItem(PROMPTED_ONCE_KEY, 'true');
+    } catch {}
+    try {
+      await secureStorage.setItem(PROMPTED_ONCE_KEY, 'true');
+    } catch {}
+  },
+
+  /**
    * Solicita permissões nativas e registra o Push Token.
+   *
+   * A política (decideNotificationPermissionRequest) garante que o diálogo do sistema
+   * apareça **uma única vez por instalação**: no primeiro login ou quando o usuário
+   * age explicitamente (toggle no Perfil). Logins seguintes nunca repetem o pedido.
    */
   async requestPermissions(userInitiated: boolean = false): Promise<{ granted: boolean; pushToken: string | null; canAskAgain: boolean }> {
     if (!this.isAvailable()) {
@@ -298,14 +330,21 @@ export const notificationService = {
     let finalStatus = existingStatus;
 
     if (existingStatus !== 'granted') {
-      const alreadyPrompted = await AsyncStorage.getItem(PROMPTED_ONCE_KEY);
-      // Se não for iniciado pelo usuário e já foi solicitado anteriormente, não reabre diálogo nativo
-      if (!userInitiated && alreadyPrompted === 'true') {
+      const alreadyAsked = await this.hasAlreadyPrompted();
+      const decision = decideNotificationPermissionRequest({
+        status: existingStatus as 'granted' | 'denied' | 'undetermined',
+        canAskAgain,
+        alreadyAsked,
+        userInitiated,
+      });
+
+      if (decision.action === 'skip') {
+        console.log(`[NotificationService] Pedido de permissão dispensado (${decision.reason}).`);
         return { granted: false, pushToken: null, canAskAgain };
       }
 
       // Dispara solicitação nativa e registra que já foi solicitado
-      await AsyncStorage.setItem(PROMPTED_ONCE_KEY, 'true');
+      await this.markPrompted();
       const { status } = await Notifications.requestPermissionsAsync();
       finalStatus = status;
     }
