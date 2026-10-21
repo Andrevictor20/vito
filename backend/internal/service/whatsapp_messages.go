@@ -51,6 +51,11 @@ func (s *WhatsAppService) handleMessagesEvent(ctx context.Context, instanceName 
 		s.groupMeta.EnsureLabels(ctx, instanceName)
 	}
 
+	// Diagnóstico de entrada: expõe o JID, o telefone da integração e o tipo de chat
+	// classificado (essencial para auditar a classificação do chat "Você").
+	log.Printf("🧭 [WhatsAppContext] instance=%s jid=%s phone=%s kind=%s tipo=%s texto=%d citada=%v",
+		instanceName, msg.RemoteJID, integration.Phone, chatKind, msg.MessageType, len(rawText), msg.QuotedText != "")
+
 	// Mensagem gerada pelo próprio Vito: arquiva (faz parte do contexto) e encerra (anti-loop).
 	if IsVitoMessage(rawText) {
 		clean, _ := StripVitoSignature(rawText)

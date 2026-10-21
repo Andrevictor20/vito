@@ -237,3 +237,6 @@ jobs:
           echo ""
           echo "== Chat JIDs / telefones presentes no shadow inbox =="
           docker exec vito-backend sh -c "grep -aoE '[0-9]{11,15}@s\.whatsapp\.net|[0-9]{10,15}@g\.us|[0-9]{10,15}@lid' /app/data/vito.db | sort | uniq -c | sort -rn | head -20" 2>/dev/null || echo "(não foi possível inspecionar os JIDs)"
+          echo ""
+          echo "== Telefones puros gravados (users.phone / whatsapp_integrations.phone) =="
+          docker exec vito-backend sh -c "grep -aoE '\+?55[0-9]{10,12}' /app/data/vito.db | sort | uniq -c | sort -rn | head -12" 2>/dev/null || echo "(não foi possível inspecionar os telefones)"
