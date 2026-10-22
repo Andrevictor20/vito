@@ -44,17 +44,17 @@ export const ChatHistoryPanel: React.FC<ChatHistoryPanelProps> = ({
       </div>
 
       {/* Scrollable Groups List */}
-      <div className="flex-1 overflow-y-auto p-3.5 space-y-5">
+      <div className="flex-1 overflow-y-auto p-2.5 space-y-4">
         {conversations.length === 0 ? (
-          <div className="py-16 text-center px-4">
-            <MessageSquare size={28} className="mx-auto text-zinc-300 dark:text-zinc-600 mb-2.5" />
+          <div className="py-12 text-center px-3">
+            <MessageSquare size={24} className="mx-auto text-zinc-300 dark:text-zinc-600 mb-2" />
             <p className="text-sm font-semibold text-zinc-500 dark:text-zinc-400">Nenhuma conversa salva</p>
             <p className="text-xs text-zinc-400 mt-1">Inicie um novo chat com o Vito</p>
           </div>
         ) : (
           groups.map((group) => (
-            <div key={group.key} className="space-y-1.5">
-              <div className="px-2.5 py-1 text-[11px] font-bold text-zinc-400 uppercase tracking-wider">
+            <div key={group.key} className="space-y-1">
+              <div className="px-2 py-0.5 text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
                 {group.title}
               </div>
 
@@ -64,22 +64,22 @@ export const ChatHistoryPanel: React.FC<ChatHistoryPanelProps> = ({
                   <div
                     key={session.id}
                     onClick={() => onSelectConversation(session.id)}
-                    className={`group relative flex items-center justify-between p-3 rounded-2xl cursor-pointer transition-all ${
+                    className={`group relative flex items-center justify-between p-2 rounded-xl cursor-pointer transition-all ${
                       isActive
                         ? 'bg-zinc-200 dark:bg-[#1C2026] text-zinc-900 dark:text-white shadow-xs'
                         : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-white/5 hover:text-zinc-900 dark:hover:text-white'
                     }`}
                   >
-                    <div className="flex items-center gap-3 min-w-0 pr-6">
+                    <div className="flex items-center gap-2.5 min-w-0 pr-5">
                       <MessageSquare
-                        size={17}
+                        size={15}
                         className={`shrink-0 ${isActive ? 'text-zinc-900 dark:text-white' : 'text-zinc-400'}`}
                       />
                       <div className="min-w-0">
                         <p className="text-sm font-semibold truncate leading-snug">
                           {session.title || 'Conversa sem título'}
                         </p>
-                        <p className="text-xs text-zinc-400 truncate mt-0.5">
+                        <p className="text-[11px] text-zinc-400 truncate mt-0.5">
                           {session.preview || 'Sem mensagens recentes'}
                         </p>
                       </div>
@@ -90,10 +90,10 @@ export const ChatHistoryPanel: React.FC<ChatHistoryPanelProps> = ({
                         e.stopPropagation();
                         onDeleteConversation(session.id);
                       }}
-                      className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-red-500/10 hover:text-red-500 text-zinc-400 transition-all shrink-0"
+                      className="opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-red-500/10 hover:text-red-500 text-zinc-400 transition-all shrink-0"
                       title="Excluir conversa"
                     >
-                      <Trash2 size={14} />
+                      <Trash2 size={12} />
                     </button>
                   </div>
                 );

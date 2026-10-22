@@ -255,102 +255,159 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
                 key={msg.id}
                 className={`flex gap-4 group ${isUser ? 'justify-end' : 'justify-start'}`}
               >
-                {!isUser && (
-                  <div className="shrink-0 mt-0.5">
-                    <div className="w-11 h-11 rounded-2xl bg-zinc-100 dark:bg-[#1C2026] border border-zinc-200 dark:border-[#262B33] flex items-center justify-center shadow-sm">
-                      <VitoMascot size={32} />
+                {isUser ? (
+                  // User message: bubble on the right
+                  <div className="max-w-[85%] rounded-[26px] p-6 transition-all shadow-sm bg-zinc-900 dark:bg-[#1C2026] text-white border border-transparent dark:border-[#262B33] rounded-tr-md">
+                    <div className="text-base leading-relaxed whitespace-pre-wrap font-sans">
+                      {msg.text}
+                    </div>
+
+                    {/* Inline Actionable Cards */}
+                    {msg.todo && (
+                      <div 
+                        onClick={() => onNavigateTab?.('tasks')}
+                        className="mt-3.5 p-3.5 rounded-xl bg-zinc-50 dark:bg-[#0B0D10] border border-zinc-200 dark:border-[#222730] flex items-center justify-between gap-3 cursor-pointer hover:border-zinc-400 dark:hover:border-zinc-600 transition-colors"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <Circle size={16} className="text-zinc-400 shrink-0" />
+                          <span className="text-xs font-semibold text-zinc-900 dark:text-white truncate">
+                            {msg.todo.title}
+                          </span>
+                        </div>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 uppercase shrink-0">
+                          {msg.todo.priority || 'MÉDIA'}
+                        </span>
+                      </div>
+                    )}
+
+                    {msg.event && (
+                      <div 
+                        onClick={() => onNavigateTab?.('calendar')}
+                        className="mt-3.5 p-3.5 rounded-xl bg-zinc-50 dark:bg-[#0B0D10] border border-zinc-200 dark:border-[#222730] flex items-center justify-between gap-3 cursor-pointer hover:border-zinc-400 dark:hover:border-zinc-600 transition-colors"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <Calendar size={16} className="text-indigo-500 shrink-0" />
+                          <div>
+                            <p className="text-xs font-semibold text-zinc-900 dark:text-white truncate">
+                              {msg.event.title}
+                            </p>
+                            <p className="text-[10px] text-zinc-400">
+                              {new Date(msg.event.start_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                          </div>
+                        </div>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20 uppercase shrink-0">
+                          {msg.event.category || 'EVENTO'}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Footer with timestamp and copy */}
+                    <div className="mt-3.5 pt-2.5 border-t border-black/5 dark:border-white/5 flex items-center justify-between text-xs text-zinc-400 dark:text-zinc-500">
+                      <span className="font-mono">{msg.timestamp}</span>
+
+                      <button
+                        onClick={() => handleCopyText(msg.id, msg.text)}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity hover:text-zinc-700 dark:hover:text-zinc-300 flex items-center gap-1.5 py-0.5 px-2 rounded hover:bg-zinc-100 dark:hover:bg-white/5"
+                        title="Copiar texto"
+                      >
+                        {copiedId === msg.id ? (
+                          <>
+                            <Check size={13} className="text-[#10B981]" />
+                            <span>Copiado</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy size={13} />
+                            <span>Copiar</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  // Vito response: plain text/markdown flowing on the left, no bubble
+                  <div className="max-w-[85%] px-2">
+                    <div className="text-base leading-relaxed whitespace-pre-wrap font-sans text-zinc-900 dark:text-[#FAFAFA] prose prose-zinc dark:prose-invert max-w-none">
+                      {msg.text}
+                    </div>
+
+                    {/* Inline Actionable Cards for Vito responses */}
+                    {msg.todo && (
+                      <div 
+                        onClick={() => onNavigateTab?.('tasks')}
+                        className="mt-3.5 p-3.5 rounded-xl bg-zinc-50 dark:bg-[#0B0D10] border border-zinc-200 dark:border-[#222730] flex items-center justify-between gap-3 cursor-pointer hover:border-zinc-400 dark:hover:border-zinc-600 transition-colors"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <Circle size={16} className="text-zinc-400 shrink-0" />
+                          <span className="text-xs font-semibold text-zinc-900 dark:text-white truncate">
+                            {msg.todo.title}
+                          </span>
+                        </div>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 uppercase shrink-0">
+                          {msg.todo.priority || 'MÉDIA'}
+                        </span>
+                      </div>
+                    )}
+
+                    {msg.event && (
+                      <div 
+                        onClick={() => onNavigateTab?.('calendar')}
+                        className="mt-3.5 p-3.5 rounded-xl bg-zinc-50 dark:bg-[#0B0D10] border border-zinc-200 dark:border-[#222730] flex items-center justify-between gap-3 cursor-pointer hover:border-zinc-400 dark:hover:border-zinc-600 transition-colors"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <Calendar size={16} className="text-indigo-500 shrink-0" />
+                          <div>
+                            <p className="text-xs font-semibold text-zinc-900 dark:text-white truncate">
+                              {msg.event.title}
+                            </p>
+                            <p className="text-[10px] text-zinc-400">
+                              {new Date(msg.event.start_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                          </div>
+                        </div>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20 uppercase shrink-0">
+                          {msg.event.category || 'EVENTO'}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Footer with timestamp and copy for Vito messages */}
+                    <div className="mt-3.5 pt-2.5 border-t border-black/5 dark:border-white/5 flex items-center justify-start text-xs text-zinc-400 dark:text-zinc-500 gap-3">
+                      <span className="font-mono">{msg.timestamp}</span>
+
+                      <button
+                        onClick={() => handleCopyText(msg.id, msg.text)}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity hover:text-zinc-700 dark:hover:text-zinc-300 flex items-center gap-1.5 py-0.5 px-2 rounded hover:bg-zinc-100 dark:hover:bg-white/5"
+                        title="Copiar texto"
+                      >
+                        {copiedId === msg.id ? (
+                          <>
+                            <Check size={13} className="text-[#10B981]" />
+                            <span>Copiado</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy size={13} />
+                            <span>Copiar</span>
+                          </>
+                        )}
+                      </button>
                     </div>
                   </div>
                 )}
-
-                <div
-                  className={`max-w-[85%] rounded-[26px] p-6 transition-all shadow-sm ${
-                    isUser
-                      ? 'bg-zinc-900 dark:bg-[#1C2026] text-white border border-transparent dark:border-[#262B33] rounded-tr-md'
-                      : 'bg-white dark:bg-[#14171C] text-zinc-900 dark:text-[#FAFAFA] border border-zinc-200 dark:border-[#222730] rounded-tl-md'
-                  }`}
-                >
-                  {/* Message Text with formatting */}
-                  <div className="text-base leading-relaxed whitespace-pre-wrap font-sans">
-                    {msg.text}
-                  </div>
-
-                  {/* Inline Actionable Cards (se retornado pela IA) */}
-                  {msg.todo && (
-                    <div 
-                      onClick={() => onNavigateTab?.('tasks')}
-                      className="mt-3.5 p-3.5 rounded-xl bg-zinc-50 dark:bg-[#0B0D10] border border-zinc-200 dark:border-[#222730] flex items-center justify-between gap-3 cursor-pointer hover:border-zinc-400 dark:hover:border-zinc-600 transition-colors"
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <Circle size={16} className="text-zinc-400 shrink-0" />
-                        <span className="text-xs font-semibold text-zinc-900 dark:text-white truncate">
-                          {msg.todo.title}
-                        </span>
-                      </div>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 uppercase shrink-0">
-                        {msg.todo.priority || 'MÉDIA'}
-                      </span>
-                    </div>
-                  )}
-
-                  {msg.event && (
-                    <div 
-                      onClick={() => onNavigateTab?.('calendar')}
-                      className="mt-3.5 p-3.5 rounded-xl bg-zinc-50 dark:bg-[#0B0D10] border border-zinc-200 dark:border-[#222730] flex items-center justify-between gap-3 cursor-pointer hover:border-zinc-400 dark:hover:border-zinc-600 transition-colors"
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <Calendar size={16} className="text-indigo-500 shrink-0" />
-                        <div>
-                          <p className="text-xs font-semibold text-zinc-900 dark:text-white truncate">
-                            {msg.event.title}
-                          </p>
-                          <p className="text-[10px] text-zinc-400">
-                            {new Date(msg.event.start_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                          </p>
-                        </div>
-                      </div>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20 uppercase shrink-0">
-                        {msg.event.category || 'EVENTO'}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Footer da mensagem com timestamp e copiar */}
-                  <div className="mt-3.5 pt-2.5 border-t border-black/5 dark:border-white/5 flex items-center justify-between text-xs text-zinc-400 dark:text-zinc-500">
-                    <span className="font-mono">{msg.timestamp}</span>
-
-                    <button
-                      onClick={() => handleCopyText(msg.id, msg.text)}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity hover:text-zinc-700 dark:hover:text-zinc-300 flex items-center gap-1.5 py-0.5 px-2 rounded hover:bg-zinc-100 dark:hover:bg-white/5"
-                      title="Copiar texto"
-                    >
-                      {copiedId === msg.id ? (
-                        <>
-                          <Check size={13} className="text-[#10B981]" />
-                          <span>Copiado</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy size={13} />
-                          <span>Copiar</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
               </div>
             );
           })}
 
           {/* Typing Indicator */}
           {loading && (
-            <div className="flex gap-4 items-center">
-              <div className="w-11 h-11 rounded-2xl bg-zinc-100 dark:bg-[#1C2026] border border-zinc-200 dark:border-[#262B33] flex items-center justify-center shadow-sm shrink-0">
-                <VitoMascot size={32} className="animate-pulse" />
-              </div>
-              <div className="p-4 rounded-[22px] bg-white dark:bg-[#14171C] border border-zinc-200 dark:border-[#222730] flex items-center gap-2.5 text-sm font-medium text-zinc-600 dark:text-zinc-300 shadow-xs">
-                <Loader2 size={16} className="animate-spin text-zinc-900 dark:text-white" />
-                <span>Vito está processando...</span>
+            <div className="flex gap-4 items-start">
+              <div className="max-w-[85%] px-2">
+                <div className="p-4 rounded-[22px] bg-zinc-100 dark:bg-[#1C2026] border border-zinc-200 dark:border-[#262B33] flex items-center gap-2.5 text-sm font-medium text-zinc-600 dark:text-zinc-300 shadow-xs animate-pulse">
+                  <Loader2 size={16} className="animate-spin text-zinc-900 dark:text-white" />
+                  <span>Vito está processando...</span>
+                </div>
               </div>
             </div>
           )}
