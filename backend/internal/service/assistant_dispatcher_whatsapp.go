@@ -159,8 +159,12 @@ func (s *AssistantService) actionQueryConversation(ctx context.Context, userID s
 
 	chat, err := s.waDirectory.ResolveChat(ctx, userID, intent.Conversation.Chat)
 	if err != nil {
+		// Não conhecia o nome pedido: o Vito pergunta ao usuário. Quando ele
+		// responder ("é a Bella"), o apelido é aprendido na próxima chamada.
+		s.rememberUnknownContact(userID, intent.Conversation.Chat)
 		return s.replyChatResolutionError(intent, err), nil
 	}
+	s.learnContactAlias(ctx, userID, intent.Conversation.Chat, chat.ChatJID)
 
 	limit := intent.Conversation.Limit
 	if limit <= 0 {
@@ -187,6 +191,46 @@ func (s *AssistantService) actionQueryConversation(ctx context.Context, userID s
 	res.Message = summary
 	res.Reply = summary
 	return res, nil
+}
+
+// rememberUnknownContact guarda o nome que o Vito não conseguiu resolver.
+//
+// O fluxo: o usuário pergunta "o que a Isa mandou?" → o Vito não conhece "Isa"
+// → pergunta "não encontrei, qual o nome?" → o usuário responde "a Bella" → o
+// Vito resolve "Bella" e, com isso, APRENDE que "Isa" é a Bella.
+func (s *AssistantService) rememberUnknownContact(userID, query string) {
+	if s == nil || userID == "" || strings.TrimSpace(query) == "" {
+		return
+	}
+	s.aliasMu.Lock()
+	defer s.aliasMu.Unlock()
+	s.pendingAlias = &pendingContactAlias{userID: userID, query: strings.TrimSpace(query)}
+}
+
+// learnContactAlias grava o apelido aprendido (query → chat).
+func (s *AssistantService) learnContactAlias(ctx context.Context, userID, query, chatJID string) {
+	query = strings.TrimSpace(query)
+	if s == nil || userID == "" || query == "" || chatJID == "" {
+		return
+	}
+	s.aliasMu.Lock()
+	pending := s.pendingAlias
+	s.pendingAlias = nil
+	s.aliasMu.Unlock()
+	if pending == nil || pending.userID != userID || pending.query == "" {
+		return
+	}
+	if strings.EqualFold(pending.query, query) {
+		return // o próprio nome resolveu: nada a aprender
+	}
+	if s.waDirectory == nil {
+		return
+	}
+	if err := s.waDirectory.SaveAlias(ctx, userID, chatJID, pending.query); err != nil {
+		log.Printf("⚠️ [AssistantService] falha ao aprender o apelido %q: %v", pending.query, err)
+		return
+	}
+	log.Printf("🏷️ [AssistantService] apelido aprendido: %q -> %s", pending.query, chatJID)
 }
 
 // actionListPendingConversations lista as conversas que esperam resposta.

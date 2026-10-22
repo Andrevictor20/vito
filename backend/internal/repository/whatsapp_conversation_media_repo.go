@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/andrevmp/vito/backend/internal/database"
@@ -162,4 +163,44 @@ func (r *WhatsAppConversationRepositorySQLite) SearchMessages(ctx context.Contex
 		return nil, err
 	}
 	return scanConversationMessages(rows)
+}
+
+// SaveAlias grava um apelido aprendido pelo dono para um contato.
+func (r *WhatsAppConversationRepositorySQLite) SaveAlias(ctx context.Context, userID, chatJID, alias string) error {
+	if userID == "" || chatJID == "" || strings.TrimSpace(alias) == "" {
+		return errors.New("apelido inválido")
+	}
+	return database.WithBusyRetry(4, func() error {
+		_, err := r.db.ExecContext(ctx, `
+			INSERT INTO whatsapp_contact_aliases (user_id, chat_jid, alias, created_at)
+			VALUES (?, ?, ?, ?)
+			ON CONFLICT(user_id, chat_jid, alias) DO NOTHING
+		`, userID, chatJID, strings.TrimSpace(alias), time.Now().UTC())
+		return err
+	})
+}
+
+// AliasesByName devolve os JIDs que respondem a um apelido aprendido.
+func (r *WhatsAppConversationRepositorySQLite) AliasesByName(ctx context.Context, userID, alias string) ([]string, error) {
+	if userID == "" || strings.TrimSpace(alias) == "" {
+		return nil, nil
+	}
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT chat_jid FROM whatsapp_contact_aliases
+		WHERE user_id = ? AND LOWER(alias) = LOWER(?)
+	`, userID, strings.TrimSpace(alias))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make([]string, 0, 2)
+	for rows.Next() {
+		var chatJID string
+		if err := rows.Scan(&chatJID); err != nil {
+			return nil, err
+		}
+		out = append(out, chatJID)
+	}
+	return out, rows.Err()
 }

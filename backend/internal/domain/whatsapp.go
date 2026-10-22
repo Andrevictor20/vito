@@ -162,6 +162,10 @@ type WhatsAppConversationRepository interface {
 	// chat. É a fonte confiável do nome que a pessoa escolheu no WhatsApp — o
 	// `findContacts` da Evolution costuma devolver o pushName vazio.
 	SenderNamesByChat(ctx context.Context, userID string, since time.Time) (map[string]string, error)
+	// SaveAlias grava um apelido aprendido (o nome que o dono usa para o contato).
+	SaveAlias(ctx context.Context, userID, chatJID, alias string) error
+	// AliasesByName devolve os JIDs que respondem a um apelido.
+	AliasesByName(ctx context.Context, userID, alias string) ([]string, error)
 	GetPendingState(ctx context.Context, userID, chatJID string) (*WhatsAppPendingState, error)
 	SavePendingState(ctx context.Context, state *WhatsAppPendingState) error
 	GetContextSettings(ctx context.Context, userID string) (*WhatsAppContextSettings, error)

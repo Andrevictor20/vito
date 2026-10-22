@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/andrevmp/vito/backend/internal/ai"
@@ -62,6 +63,16 @@ type AssistantService struct {
 	gmailSvc        *GmailService
 	waDirectory     *WhatsAppDirectoryService
 	waSender        WhatsAppMessageSender
+	// pendingAlias guarda o nome de contato que o Vito não conseguiu resolver
+	// (para aprender o apelido quando o usuário confirmar a quem se refere).
+	aliasMu      sync.Mutex
+	pendingAlias *pendingContactAlias
+}
+
+// pendingContactAlias é o nome de contato ainda não resolvido.
+type pendingContactAlias struct {
+	userID string
+	query  string
 }
 
 // NewAssistantService instancia o serviço do assistente.
@@ -112,6 +123,11 @@ func (s *AssistantService) SetAISettingsRepository(repo domain.AISettingsReposit
 // SetGmailService injeta o serviço de integração com Gmail.
 func (s *AssistantService) SetGmailService(svc *GmailService) {
 	s.gmailSvc = svc
+}
+
+// AIGatewayForTest expõe o gateway de IA (usado nos testes).
+func (s *AssistantService) AIGatewayForTest() AIParsingGateway {
+	return s.aiGateway
 }
 
 // SetWhatsAppDirectory injeta o diretório de conversas do WhatsApp.

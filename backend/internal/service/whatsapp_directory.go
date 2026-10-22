@@ -177,6 +177,13 @@ func (s *WhatsAppDirectoryService) ResolveChat(ctx context.Context, userID, name
 			return &chats[i], nil
 		}
 	}
+	// 1b) Apelido aprendido: o nome que o dono usa para o contato ("isa"),
+	//     aprendido quando ele respondou "é a Bella" numa consulta anterior.
+	if aliased, err := s.aliasChats(ctx, userID, query); err == nil && len(aliased) == 1 {
+		return &aliased[0], nil
+	} else if err == nil && len(aliased) > 1 {
+		return nil, s.ambiguousError(query, aliased)
+	}
 	// 2) Rótulo exato (sem diferenciar caixa). Vários chats com o mesmo rótulo
 	//    são AMBÍGUOS — não pode escolher o primeiro no silêncio.
 	exact := make([]domain.WhatsAppChatSummary, 0, 2)
@@ -271,6 +278,39 @@ var contactAccents = map[rune]rune{
 	'ó': 'o', 'ò': 'o', 'ô': 'o', 'õ': 'o', 'ö': 'o',
 	'ú': 'u', 'ù': 'u', 'û': 'u', 'ü': 'u',
 	'ç': 'c', 'ñ': 'n',
+}
+
+// SaveAlias grava um apelido aprendido (o nome que o dono usa para o contato).
+func (s *WhatsAppDirectoryService) SaveAlias(ctx context.Context, userID, chatJID, alias string) error {
+	if s == nil || s.repo == nil {
+		return nil
+	}
+	return s.repo.SaveAlias(ctx, userID, chatJID, alias)
+}
+
+// aliasChats devolve as conversas que respondem a um apelido aprendido.
+func (s *WhatsAppDirectoryService) aliasChats(ctx context.Context, userID, alias string) ([]domain.WhatsAppChatSummary, error) {
+	if s.repo == nil {
+		return nil, nil
+	}
+	jids, err := s.repo.AliasesByName(ctx, userID, alias)
+	if err != nil || len(jids) == 0 {
+		return nil, err
+	}
+	chats, err := s.Chats(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]domain.WhatsAppChatSummary, 0, len(jids))
+	for _, jid := range jids {
+		for i := range chats {
+			if chats[i].ChatJID == jid {
+				out = append(out, chats[i])
+				break
+			}
+		}
+	}
+	return out, nil
 }
 
 // ambiguousError monta o erro de ambiguidade com os nomes dos candidatos.
