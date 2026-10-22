@@ -37,6 +37,12 @@ type WhatsAppContactsCache struct {
 	byJID      map[string]WhatsAppContactNames
 	fetchedAt  time.Time
 	refreshing bool
+	// lastFetch guarda o resultado da última busca na Evolution (quantos
+	// contatos vieram e com que nomes) — é o diagnóstico de por que o nome
+	// SALVO do contato não chega ao Vito.
+	lastFetch    int
+	lastFetchErr string
+	lastFetchRaw []WhatsAppContact
 }
 
 // NewWhatsAppContactsCache cria o cache de nomes de contato.
@@ -182,6 +188,11 @@ func (c *WhatsAppContactsCache) Snapshot() map[string]interface{} {
 		"com_os_dois":   both,
 		"amostra":       sample,
 		"atualizado_em": c.fetchedAt.Format(time.RFC3339),
+		"evolution": map[string]interface{}{
+			"contatos": c.lastFetch,
+			"erro":     c.lastFetchErr,
+			"amostra":  c.lastFetchRaw,
+		},
 	}
 }
 
@@ -293,8 +304,21 @@ func (c *WhatsAppContactsCache) Fetch(ctx context.Context, instanceName string) 
 	}
 	contacts, err := c.client.FindContacts(ctx, instanceName)
 	if err != nil {
+		c.mu.Lock()
+		c.lastFetchErr = err.Error()
+		c.mu.Unlock()
 		return 0, err
 	}
+
+	c.mu.Lock()
+	c.lastFetch = len(contacts)
+	c.lastFetchErr = ""
+	// Amostra do retorno cru: mostra exatamente o que a Evolution entrega.
+	c.lastFetchRaw = append([]WhatsAppContact{}, contacts...)
+	if len(c.lastFetchRaw) > 5 {
+		c.lastFetchRaw = c.lastFetchRaw[:5]
+	}
+	c.mu.Unlock()
 
 	resolved := 0
 	withSaved, withProfile, distinct := 0, 0, 0
