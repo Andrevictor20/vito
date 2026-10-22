@@ -146,6 +146,26 @@ func (c *WhatsAppContactsCache) SetProfile(jid, profile string) {
 	c.byJID[jid] = names
 }
 
+// SetProfiles registra o nome de perfil (pushName) de vários contatos de uma vez.
+func (c *WhatsAppContactsCache) SetProfiles(profiles map[string]string) {
+	if c == nil || len(profiles) == 0 {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for jid, profile := range profiles {
+		profile = strings.TrimSpace(profile)
+		if jid == "" || profile == "" {
+			continue
+		}
+		names := c.byJID[jid]
+		if names.Profile == "" {
+			names.Profile = profile
+		}
+		c.byJID[jid] = names
+	}
+}
+
 // Names devolve a cópia do mapa de nomes (usada para reetiquetar o histórico).
 func (c *WhatsAppContactsCache) Names() map[string]string {
 	if c == nil {

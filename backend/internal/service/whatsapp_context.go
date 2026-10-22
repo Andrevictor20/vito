@@ -169,6 +169,14 @@ func (s *WhatsAppContextService) PendingMedia(ctx context.Context, userID string
 	return s.repo.PendingMedia(ctx, userID, limit, since)
 }
 
+// SenderNames devolve o nome de perfil (pushName) mais recente de cada chat.
+func (s *WhatsAppContextService) SenderNames(ctx context.Context, userID string, since time.Time) (map[string]string, error) {
+	if s.repo == nil {
+		return map[string]string{}, nil
+	}
+	return s.repo.SenderNamesByChat(ctx, userID, since)
+}
+
 // MediaStatus conta as mídias do usuário por estado de enriquecimento.
 func (s *WhatsAppContextService) MediaStatus(ctx context.Context, userID string, since time.Time) (map[string]int64, error) {
 	if s.repo == nil {
