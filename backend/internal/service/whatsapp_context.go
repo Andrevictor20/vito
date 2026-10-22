@@ -169,6 +169,14 @@ func (s *WhatsAppContextService) PendingMedia(ctx context.Context, userID string
 	return s.repo.PendingMedia(ctx, userID, limit, since)
 }
 
+// SaveSavedNames persiste o nome salvo no rótulo das conversas (sobrevive ao restart).
+func (s *WhatsAppContextService) SaveSavedNames(ctx context.Context, userID string, names map[string]string) (int64, error) {
+	if s.repo == nil {
+		return 0, nil
+	}
+	return s.repo.SaveSavedNames(ctx, userID, names)
+}
+
 // SenderNames devolve o nome de perfil (pushName) mais recente de cada chat.
 func (s *WhatsAppContextService) SenderNames(ctx context.Context, userID string, since time.Time) (map[string]string, error) {
 	if s.repo == nil {

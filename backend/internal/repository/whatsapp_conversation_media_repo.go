@@ -204,3 +204,59 @@ func (r *WhatsAppConversationRepositorySQLite) AliasesByName(ctx context.Context
 	}
 	return out, rows.Err()
 }
+
+// SaveSavedNames persiste o nome salvo no rótulo das conversas cujo número bate.
+//
+// O cache de nomes vive em RAM (e se perde a cada deploy); gravar o rótulo no
+// shadow inbox faz o nome salvo sobreviver ao reinício — e o backfill deixa de
+// sobrescrevê-lo (o Relabel só troca rótulos vazios/genéricos).
+func (r *WhatsAppConversationRepositorySQLite) SaveSavedNames(ctx context.Context, userID string, names map[string]string) (int64, error) {
+	if userID == "" || len(names) == 0 {
+		return 0, nil
+	}
+	// Telefone (só dígitos) -> nome salvo.
+	byNumber := make(map[string]string, len(names))
+	for number, name := range names {
+		digits := strings.TrimSpace(number)
+		if digits == "" {
+			continue
+		}
+		byNumber[digits] = name
+	}
+	if len(byNumber) == 0 {
+		return 0, nil
+	}
+
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT chat_jid FROM whatsapp_conversation_messages
+		WHERE user_id = ? AND chat_jid LIKE '%@s.whatsapp.net'
+	`, userID)
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+
+	var updated int64
+	for rows.Next() {
+		var chatJID string
+		if err := rows.Scan(&chatJID); err != nil {
+			return updated, err
+		}
+		digits := strings.TrimSuffix(chatJID, "@s.whatsapp.net")
+		name, ok := byNumber[digits]
+		if !ok || name == "" {
+			continue
+		}
+		if err := database.WithBusyRetry(4, func() error {
+			_, execErr := r.db.ExecContext(ctx, `
+				UPDATE whatsapp_conversation_messages SET chat_label = ?
+				WHERE user_id = ? AND chat_jid = ?
+			`, name, userID, chatJID)
+			return execErr
+		}); err != nil {
+			return updated, err
+		}
+		updated++
+	}
+	return updated, rows.Err()
+}

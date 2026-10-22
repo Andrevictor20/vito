@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/andrevmp/vito/backend/internal/database"
@@ -380,7 +381,21 @@ func (h *WhatsAppHandler) ImportContactNames(w http.ResponseWriter, r *http.Requ
 		}
 	}
 	imported := h.contactsCache.ImportSavedNames(r.Context(), instanceName, input.Names)
-	writeJSON(w, http.StatusOK, map[string]interface{}{"imported": imported})
+
+	// Persiste no shadow inbox: o cache vive em RAM e se perde a cada deploy.
+	byNumber := make(map[string]string, len(input.Names))
+	for _, n := range input.Names {
+		if strings.TrimSpace(n.Phone) != "" && strings.TrimSpace(n.Name) != "" {
+			byNumber[n.Phone] = n.Name
+		}
+	}
+	persisted := int64(0)
+	if h.contextSvc != nil {
+		if n, err := h.contextSvc.SaveSavedNames(r.Context(), userID, byNumber); err == nil {
+			persisted = n
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"imported": imported, "persisted": persisted})
 }
 
 // GetContactsCache mostra o estado do cache de nomes dos contatos.
