@@ -89,7 +89,7 @@
       [
         "expo-calendar",
         {
-          "calendarPermission": "O Vito precisa acessar seus calendários para sincronizar compromissos."
+          "calendarPermission": "O Vito precisa acessar seus calend\u00e1rios para sincronizar compromissos."
         }
       ],
       [
@@ -102,7 +102,7 @@
       [
         "expo-contacts",
         {
-          "contactsPermission": "O Vito precisa acessar seus contatos para encontrar amigos e colegas e agendar reuniões com consenso mútuo."
+          "contactsPermission": "O Vito precisa acessar seus contatos para encontrar amigos e colegas e agendar reuni\u00f5es com consenso m\u00fatuo."
         }
       ],
       "expo-web-browser",
@@ -115,5 +115,14 @@
       }
     },
     "owner": "andrevictor007"
+  },
+  "runtimeVersion": {
+    "policy": "version",
+    "version": "65f941181a36aa3a202039fd4e9b65b06ea7420e"
+  },
+  "extra": {
+    "eas": {
+      "projectId": "b376b3f5-a93f-4f3e-a262-ddded8f96586"
+    }
   }
 }

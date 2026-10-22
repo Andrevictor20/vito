@@ -1,0 +1,127 @@
+{
+  "expo": {
+    "name": "Vito",
+    "slug": "vito",
+    "scheme": "vito",
+    "version": "0.1.15",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#121214"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.andrevmp.vito",
+      "associatedDomains": [
+        "applinks:vito.rasppi.cloud"
+      ]
+    },
+    "android": {
+      "package": "com.andrevmp.vito",
+      "versionCode": 15,
+      "googleServicesFile": "./google-services.json",
+      "softwareKeyboardLayoutMode": "resize",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#FFFFFF"
+      },
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "vito.rasppi.cloud",
+              "pathPrefix": "/"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ],
+      "permissions": [
+        "RECORD_AUDIO",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.VIBRATE",
+        "android.permission.SCHEDULE_EXACT_ALARM",
+        "READ_CALENDAR",
+        "WRITE_CALENDAR",
+        "READ_CONTACTS",
+        "android.permission.READ_CONTACTS"
+      ]
+    },
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/b376b3f5-a93f-4f3e-a262-ddded8f96586",
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0,
+      "requestHeaders": {
+        "expo-channel-name": "preview"
+      }
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "notification": {
+      "icon": "./assets/notification-icon.png",
+      "color": "#1A1A1E"
+    },
+    "plugins": [
+      "expo-asset",
+      "expo-audio",
+      "expo-updates",
+      "expo-secure-store",
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "O Vito precisa acessar seus calend\u00e1rios para sincronizar compromissos."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#1A1A1E"
+        }
+      ],
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "O Vito precisa acessar seus contatos para encontrar amigos e colegas e agendar reuni\u00f5es com consenso m\u00fatuo."
+        }
+      ],
+      "expo-web-browser",
+      "expo-font",
+      "@react-native-google-signin/google-signin"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "b376b3f5-a93f-4f3e-a262-ddded8f96586"
+      }
+    },
+    "owner": "andrevictor007"
+  },
+  "runtimeVersion": {
+    "policy": "fingerprint"
+  },
+  "extra": {
+    "eas": {
+      "projectId": "b376b3f5-a93f-4f3e-a262-ddded8f96586"
+    }
+  }
+}
