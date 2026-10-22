@@ -128,7 +128,8 @@ func (c *WhatsAppContactsCache) Set(jid, saved, profile string) {
 // no WhatsApp), sem tocar no nome salvo.
 //
 // O pushName chega em toda mensagem recebida — é uma fonte mais confiável que
-// o `findContacts` (que às vezes devolve o pushName vazio).
+// o `findContacts` (que às vezes devolve o pushName vazio ou trocado). Por isso
+// ele SOBRESCREVE o perfil vindo da Evolution.
 func (c *WhatsAppContactsCache) SetProfile(jid, profile string) {
 	if c == nil || jid == "" {
 		return
@@ -140,9 +141,7 @@ func (c *WhatsAppContactsCache) SetProfile(jid, profile string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	names := c.byJID[jid]
-	if names.Profile == "" {
-		names.Profile = profile
-	}
+	names.Profile = profile
 	c.byJID[jid] = names
 }
 
@@ -159,9 +158,7 @@ func (c *WhatsAppContactsCache) SetProfiles(profiles map[string]string) {
 			continue
 		}
 		names := c.byJID[jid]
-		if names.Profile == "" {
-			names.Profile = profile
-		}
+		names.Profile = profile
 		c.byJID[jid] = names
 	}
 }
@@ -260,10 +257,20 @@ func (c *WhatsAppContactsCache) Fetch(ctx context.Context, instanceName string) 
 	}
 
 	resolved := 0
+	withSaved, withProfile, distinct := 0, 0, 0
 	c.mu.Lock()
 	for _, contact := range contacts {
 		saved := strings.TrimSpace(contact.Name)
 		profile := strings.TrimSpace(contact.PushName)
+		if saved != "" {
+			withSaved++
+		}
+		if profile != "" {
+			withProfile++
+		}
+		if saved != "" && profile != "" && !strings.EqualFold(saved, profile) {
+			distinct++
+		}
 		if saved == "" && profile == "" {
 			saved = strings.TrimSpace(contact.Number)
 		}
@@ -275,5 +282,10 @@ func (c *WhatsAppContactsCache) Fetch(ctx context.Context, instanceName string) 
 	}
 	c.fetchedAt = time.Now()
 	c.mu.Unlock()
+
+	// Diagnóstico (sem PII): o `findContacts` da Evolution às vezes devolve o
+	// pushName vazio — o que faz o nome SALVO pelo dono não chegar ao cache.
+	log.Printf("[WhatsAppContactsCache] %d contato(s) da Evolution | com nome salvo: %d | com perfil: %d | nomes diferentes: %d",
+		len(contacts), withSaved, withProfile, distinct)
 	return resolved, nil
 }
