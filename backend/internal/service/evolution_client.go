@@ -355,7 +355,13 @@ func (c *DefaultEvolutionClient) GetMediaBase64(ctx context.Context, instanceNam
 
 func (c *DefaultEvolutionClient) FindContacts(ctx context.Context, instanceName string) ([]WhatsAppContact, error) {
 	path := fmt.Sprintf("/chat/findContacts/%s", instanceName)
-	resp, err := c.doRequest(ctx, http.MethodPost, path, map[string]interface{}{})
+	// O `where` é OBRIGATÓRIO no contrato da Evolution (Chat Controller v2):
+	// sem ele a API devolve lista vazia — e é assim que o nome SALVO do contato
+	// (o nome que o dono dá na agenda) nunca chegava ao Vito.
+	// `where: {}` = sem filtro (todos os contatos da instância).
+	resp, err := c.doRequest(ctx, http.MethodPost, path, map[string]interface{}{
+		"where": map[string]interface{}{},
+	})
 	if err != nil {
 		return nil, err
 	}

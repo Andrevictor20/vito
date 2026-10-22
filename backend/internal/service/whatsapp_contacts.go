@@ -327,5 +327,8 @@ func (c *WhatsAppContactsCache) Fetch(ctx context.Context, instanceName string) 
 	// pushName vazio — o que faz o nome SALVO pelo dono não chegar ao cache.
 	log.Printf("[WhatsAppContactsCache] %d contato(s) da Evolution | com nome salvo: %d | com perfil: %d | nomes diferentes: %d",
 		len(contacts), withSaved, withProfile, distinct)
+	if len(contacts) == 0 {
+		log.Printf("⚠️ [WhatsAppContactsCache] a Evolution devolveu 0 contato(s) — o nome salvo do contato não está disponível por esta via")
+	}
 	return resolved, nil
 }
