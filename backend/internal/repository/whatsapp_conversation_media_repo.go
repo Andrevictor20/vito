@@ -205,6 +205,25 @@ func (r *WhatsAppConversationRepositorySQLite) AliasesByName(ctx context.Context
 	return out, rows.Err()
 }
 
+// phoneDigits extrai apenas os dígitos de um telefone.
+func phoneDigits(raw string) string {
+	digits := make([]rune, 0, len(raw))
+	for _, r := range raw {
+		if r >= '0' && r <= '9' {
+			digits = append(digits, r)
+		}
+	}
+	return string(digits)
+}
+
+// canonicalBRPhone remove o 9º dígito de um celular brasileiro (DDI 55 + DDD + 9 + 8).
+func canonicalBRPhone(digits string) string {
+	if len(digits) == 13 && strings.HasPrefix(digits, "55") {
+		return digits[:4] + digits[5:]
+	}
+	return digits
+}
+
 // SaveSavedNames persiste o nome salvo no rótulo das conversas cujo número bate.
 //
 // O cache de nomes vive em RAM (e se perde a cada deploy); gravar o rótulo no
@@ -214,14 +233,15 @@ func (r *WhatsAppConversationRepositorySQLite) SaveSavedNames(ctx context.Contex
 	if userID == "" || len(names) == 0 {
 		return 0, nil
 	}
-	// Telefone (só dígitos) -> nome salvo.
-	byNumber := make(map[string]string, len(names))
+	// Telefone normalizado (só dígitos, com e sem o 9º dígito) -> nome salvo.
+	byNumber := make(map[string]string, len(names)*2)
 	for number, name := range names {
-		digits := strings.TrimSpace(number)
-		if digits == "" {
+		digits := phoneDigits(number)
+		if digits == "" || strings.TrimSpace(name) == "" {
 			continue
 		}
 		byNumber[digits] = name
+		byNumber[canonicalBRPhone(digits)] = name
 	}
 	if len(byNumber) == 0 {
 		return 0, nil
