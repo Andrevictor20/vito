@@ -170,6 +170,31 @@ func (s *WhatsAppBackfillService) runForInstance(ctx context.Context, integratio
 		page++
 	}
 
+	// Rótulos e nomes de perfil do histórico arquivado.
+	//
+	// O `Relabel` sobrescreve o rótulo da conversa — se rodasse com o nome de
+	// PERFIL, ele apagaria o nome SALVO que o app tinha importado. Por isso a
+	// ordem importa: primeiro entra o rótulo já persistido (que pode ser um nome
+	// salvo) como `Saved`, depois o pushName como `Profile`, e só então o
+	// `Relabel` roda — com o `Saved` presente, ele reescreve o mesmo valor.
+	var profiles map[string]string
+	if s.contextSvc != nil {
+		if p, err := s.contextSvc.SenderNames(ctx, integration.UserID, from); err == nil {
+			profiles = p
+		}
+	}
+	if s.contactsCache != nil {
+		if len(profiles) > 0 {
+			s.contactsCache.SetProfiles(profiles)
+		}
+		// Rótulos já persistidos que diferem do pushName são nomes salvos.
+		if s.contextSvc != nil {
+			if labels, err := s.contextSvc.ChatLabels(ctx, integration.UserID); err == nil && len(labels) > 0 {
+				s.contactsCache.SetSavedFromLabels(labels, profiles)
+			}
+		}
+	}
+
 	// Reetiqueta o histórico com os nomes reais dos contatos.
 	if s.contactsCache != nil && s.contextSvc != nil {
 		if updated, err := s.contextSvc.Relabel(ctx, integration.UserID, s.contactsCache.Names()); err != nil {
@@ -177,14 +202,8 @@ func (s *WhatsAppBackfillService) runForInstance(ctx context.Context, integratio
 		} else if updated > 0 {
 			log.Printf("[WhatsAppBackfill] %d mensagem(ns) reetiquetada(s) com o nome do contato", updated)
 		}
-		// O nome de PERFIL (pushName) não vem do findContacts — ele vem das
-		// mensagens. O histórico já arquivado é a fonte para completar o alias
-		// ("isa" salvo + "bella" no perfil = a mesma pessoa para o Vito).
-		if s.contextSvc != nil {
-			if profiles, err := s.contextSvc.SenderNames(ctx, integration.UserID, from); err == nil && len(profiles) > 0 {
-				s.contactsCache.SetProfiles(profiles)
-				log.Printf("[WhatsAppBackfill] %d contato(s) com nome de perfil registrado", len(profiles))
-			}
+		if len(profiles) > 0 {
+			log.Printf("[WhatsAppBackfill] %d contato(s) com nome de perfil registrado", len(profiles))
 		}
 	}
 

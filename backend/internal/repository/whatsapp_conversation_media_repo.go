@@ -280,3 +280,29 @@ func (r *WhatsAppConversationRepositorySQLite) SaveSavedNames(ctx context.Contex
 	}
 	return updated, rows.Err()
 }
+
+// ChatLabels devolve o rótulo atual de cada conversa (JID -> chat_label).
+func (r *WhatsAppConversationRepositorySQLite) ChatLabels(ctx context.Context, userID string) (map[string]string, error) {
+	if userID == "" {
+		return map[string]string{}, nil
+	}
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT chat_jid, chat_label FROM whatsapp_conversation_messages
+		WHERE user_id = ?
+		GROUP BY chat_jid
+	`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make(map[string]string, 16)
+	for rows.Next() {
+		var chatJID, label string
+		if err := rows.Scan(&chatJID, &label); err != nil {
+			return nil, err
+		}
+		out[chatJID] = label
+	}
+	return out, rows.Err()
+}

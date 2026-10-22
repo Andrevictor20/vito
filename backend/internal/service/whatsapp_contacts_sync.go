@@ -134,3 +134,31 @@ func (c *WhatsAppContactsCache) NumbersKnown() []string {
 	}
 	return out
 }
+
+// SetSavedFromLabels registra como nome SALVO os rótulos já persistidos que
+// diferem do nome de perfil.
+//
+// O rótulo do shadow inbox guarda o nome salvo quando o app o importou (o
+// `Relabel` do backfill mantém). Quando ele difere do pushName, é o nome que o
+// dono usa — e precisa voltar ao cache para o Vito reconhecê-lo.
+func (c *WhatsAppContactsCache) SetSavedFromLabels(labels, profiles map[string]string) {
+	if c == nil || len(labels) == 0 {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for jid, label := range labels {
+		label = strings.TrimSpace(label)
+		if label == "" || label == "Contato" || label == "Grupo" || label == "Você" {
+			continue
+		}
+		if profile := strings.TrimSpace(profiles[jid]); profile != "" && strings.EqualFold(label, profile) {
+			continue // é só o nome de perfil
+		}
+		names := c.byJID[jid]
+		if names.Saved == "" {
+			names.Saved = label
+		}
+		c.byJID[jid] = names
+	}
+}

@@ -169,6 +169,14 @@ func (s *WhatsAppContextService) PendingMedia(ctx context.Context, userID string
 	return s.repo.PendingMedia(ctx, userID, limit, since)
 }
 
+// ChatLabels devolve o rótulo atual de cada conversa.
+func (s *WhatsAppContextService) ChatLabels(ctx context.Context, userID string) (map[string]string, error) {
+	if s.repo == nil {
+		return map[string]string{}, nil
+	}
+	return s.repo.ChatLabels(ctx, userID)
+}
+
 // SaveSavedNames persiste o nome salvo no rótulo das conversas (sobrevive ao restart).
 func (s *WhatsAppContextService) SaveSavedNames(ctx context.Context, userID string, names map[string]string) (int64, error) {
 	if s.repo == nil {

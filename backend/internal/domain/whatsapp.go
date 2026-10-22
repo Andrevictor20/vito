@@ -166,6 +166,8 @@ type WhatsAppConversationRepository interface {
 	SaveAlias(ctx context.Context, userID, chatJID, alias string) error
 	// AliasesByName devolve os JIDs que respondem a um apelido.
 	AliasesByName(ctx context.Context, userID, alias string) ([]string, error)
+	// ChatLabels devolve o rótulo atual de cada conversa (JID -> chat_label).
+	ChatLabels(ctx context.Context, userID string) (map[string]string, error)
 	// SaveSavedNames persiste o nome SALVO no rótulo das conversas cujo número
 	// bate (sobrevive a reinício — o cache de nomes é em RAM).
 	SaveSavedNames(ctx context.Context, userID string, names map[string]string) (int64, error)
