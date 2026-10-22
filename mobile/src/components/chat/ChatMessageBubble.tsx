@@ -14,7 +14,6 @@ import { BookingInlineCard } from './cards/BookingInlineCard';
 import { MeetingInlineCard } from './cards/MeetingInlineCard';
 import { DestructiveConfirmationCard } from './cards/DestructiveConfirmationCard';
 import { FormattedChatMessageText } from './FormattedChatMessageText';
-import { VitoMascot } from '../common/VitoMascot';
 import { preparePlainTextForCopy } from '../../utils/chatActions';
 
 interface ChatMessageBubbleProps {
@@ -81,140 +80,220 @@ export const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
 
   return (
     <View style={[styles.messageRow, isUser ? styles.messageRowUser : styles.messageRowVito]}>
-      {!isUser && (
-        <View style={[styles.vitoAvatar, { backgroundColor: colors.surfaceContainerHigh, borderWidth: 1, borderColor: colors.outlineVariant }]}>
-          <VitoMascot size={26} animated={false} />
-        </View>
-      )}
-
-      <View
-        style={[
-          styles.bubble,
-          isUser
-            ? [
-                styles.bubbleUser,
-                {
-                  backgroundColor: isDark ? colors.surfaceContainerHigh : colors.primary,
-                  borderWidth: 1,
-                  borderColor: isDark ? colors.outlineVariant : colors.primary,
-                },
-              ]
-            : [
-                styles.bubbleVito,
-                {
-                  backgroundColor: colors.surfaceContainer,
-                  borderColor: colors.outlineVariant,
-                  borderWidth: 1,
-                },
-              ],
-        ]}
-      >
-        {message.imageUri && (
-          <Image source={{ uri: message.imageUri }} style={styles.imageAttachment} resizeMode="cover" />
-        )}
-        {isUser && isEditing ? (
-          <View style={styles.inlineEditContainer}>
-            <TextInput
-              style={[
-                styles.inlineEditInput,
-                {
-                  color: isDark ? '#FAFAFA' : '#FFFFFF',
-                  borderColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.4)',
-                },
-              ]}
-              value={draftText}
-              onChangeText={setDraftText}
-              multiline
-              autoFocus
-              maxLength={1000}
-              placeholderTextColor={isDark ? '#A1A1AA' : '#E0E7FF'}
-            />
-            <View style={styles.inlineEditActions}>
-              <TouchableOpacity
-                style={[styles.inlineEditButton, styles.inlineEditCancelButton]}
-                onPress={handleCancelEdit}
-                activeOpacity={0.7}
-                accessibilityLabel="Cancelar edição"
-              >
-                <MaterialIcons name="close" size={14} color={isDark ? '#A1A1AA' : '#E0E7FF'} />
-                <Text style={[styles.inlineEditButtonText, { color: isDark ? '#A1A1AA' : '#E0E7FF' }]}>
-                  Cancelar
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
+      {isUser ? (
+        // USER MESSAGE: bubble on the right
+        <View
+          style={[
+            styles.bubble,
+            styles.bubbleUser,
+            {
+              backgroundColor: isDark ? colors.surfaceContainerHigh : colors.primary,
+              borderWidth: 1,
+              borderColor: isDark ? colors.outlineVariant : colors.primary,
+            },
+          ]}
+        >
+          {message.imageUri && (
+            <Image source={{ uri: message.imageUri }} style={styles.imageAttachment} resizeMode="cover" />
+          )}
+          {isEditing ? (
+            <View style={styles.inlineEditContainer}>
+              <TextInput
                 style={[
-                  styles.inlineEditButton,
-                  styles.inlineEditSaveButton,
-                  { backgroundColor: isDark ? colors.primary : '#FFFFFF' },
+                  styles.inlineEditInput,
+                  {
+                    color: isDark ? '#FAFAFA' : '#FFFFFF',
+                    borderColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.4)',
+                  },
                 ]}
-                onPress={handleConfirmEdit}
+                value={draftText}
+                onChangeText={setDraftText}
+                multiline
+                autoFocus
+                maxLength={1000}
+                placeholderTextColor={isDark ? '#A1A1AA' : '#E0E7FF'}
+              />
+              <View style={styles.inlineEditActions}>
+                <TouchableOpacity
+                  style={[styles.inlineEditButton, styles.inlineEditCancelButton]}
+                  onPress={handleCancelEdit}
+                  activeOpacity={0.7}
+                  accessibilityLabel="Cancelar edição"
+                >
+                  <MaterialIcons name="close" size={14} color={isDark ? '#A1A1AA' : '#E0E7FF'} />
+                  <Text style={[styles.inlineEditButtonText, { color: isDark ? '#A1A1AA' : '#E0E7FF' }]}>
+                    Cancelar
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.inlineEditButton,
+                    styles.inlineEditSaveButton,
+                    { backgroundColor: isDark ? colors.primary : '#FFFFFF' },
+                  ]}
+                  onPress={handleConfirmEdit}
+                  activeOpacity={0.7}
+                  accessibilityLabel="Salvar e reenviar mensagem"
+                >
+                  <MaterialIcons
+                    name="send"
+                    size={14}
+                    color={isDark ? colors.onPrimary : colors.primary}
+                  />
+                  <Text
+                    style={[
+                      styles.inlineEditButtonText,
+                      { color: isDark ? colors.onPrimary : colors.primary, fontWeight: '700' },
+                    ]}
+                  >
+                    Salvar e Enviar
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : (
+            <View style={message.id.includes('audio') ? styles.voiceTextRow : undefined}>
+              {message.id.includes('audio') && (
+                <MaterialIcons
+                  name="mic"
+                  size={16}
+                  color={isDark ? '#FAFAFA' : '#FFFFFF'}
+                  style={{ marginRight: 6, marginTop: 2 }}
+                />
+              )}
+              <FormattedChatMessageText
+                text={message.text}
+                isUser={isUser}
+                textColor={isDark ? '#FAFAFA' : '#FFFFFF'}
+                style={[
+                  styles.messageText,
+                  message.id.includes('audio') && { flexShrink: 1 },
+                  styles.messageTextUser,
+                ]}
+              />
+            </View>
+          )}
+
+          {/* Cards Estruturados Modulares - mensagem do usuário */}
+          {message.event && <EventInlineCard event={message.event} />}
+          {message.conflict?.has_conflict && (
+            <ConflictInlineCard
+              conflict={message.conflict}
+              onSelectSlot={(slot) => onSelectSlot?.(slot, message)}
+            />
+          )}
+          {message.todo && <TodoInlineCard todo={message.todo} />}
+          {message.pending && <PendingInlineCard pending={message.pending} />}
+          {message.trigger && <TriggerInlineCard trigger={message.trigger} />}
+          {message.booking && <BookingInlineCard booking={message.booking} />}
+          {message.meeting && <MeetingInlineCard meeting={message.meeting} />}
+          {message.pending_confirmation && (
+            <DestructiveConfirmationCard
+              confirmation={message.pending_confirmation}
+              onConfirm={onConfirmAction}
+              disabled={disabled}
+            />
+          )}
+
+          <View style={styles.metaRow}>
+            {/* Botão Editar Mensagem do Usuário */}
+            {isUser && (onSaveEdit || onEditMessage) && !isEditing && (
+              <TouchableOpacity
+                style={[styles.actionButton, disabled && { opacity: 0.5 }]}
+                onPress={handleStartEdit}
+                disabled={disabled}
+                hitSlop={tokens.hitSlop.sm}
                 activeOpacity={0.7}
-                accessibilityLabel="Salvar e reenviar mensagem"
+                accessibilityLabel="Editar e reenviar mensagem"
               >
                 <MaterialIcons
-                  name="send"
-                  size={14}
-                  color={isDark ? colors.onPrimary : colors.primary}
+                  name="edit"
+                  size={13}
+                  color={isDark ? '#A1A1AA' : 'rgba(255,255,255,0.75)'}
                 />
                 <Text
                   style={[
-                    styles.inlineEditButtonText,
-                    { color: isDark ? colors.onPrimary : colors.primary, fontWeight: '700' },
+                    styles.actionButtonText,
+                    { color: isDark ? '#A1A1AA' : 'rgba(255,255,255,0.75)' },
                   ]}
                 >
-                  Salvar e Enviar
+                  Editar
                 </Text>
               </TouchableOpacity>
-            </View>
+            )}
+
+            <Text
+              style={[
+                styles.timestamp,
+                { color: isDark ? '#A1A1AA' : 'rgba(255,255,255,0.7)' },
+              ]}
+            >
+              {new Date(message.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+            </Text>
+            {isUser && (
+              <MaterialIcons
+                name="done-all"
+                size={13}
+                color={isDark ? '#FAFAFA' : 'rgba(255,255,255,0.85)'}
+              />
+            )}
           </View>
-        ) : (
+        </View>
+      ) : (
+        // VITO RESPONSE: plain text, no bubble, no avatar - traditional AI chat style
+        <View style={styles.vitoResponseContainer}>
+          {message.imageUri && (
+            <Image source={{ uri: message.imageUri }} style={styles.imageAttachment} resizeMode="cover" />
+          )}
           <View style={message.id.includes('audio') ? styles.voiceTextRow : undefined}>
             {message.id.includes('audio') && (
               <MaterialIcons
                 name="mic"
                 size={16}
-                color={isUser ? (isDark ? '#FAFAFA' : '#FFFFFF') : colors.primary}
+                color={colors.primary}
                 style={{ marginRight: 6, marginTop: 2 }}
               />
             )}
             <FormattedChatMessageText
               text={message.text}
               isUser={isUser}
-              textColor={isUser ? (isDark ? '#FAFAFA' : '#FFFFFF') : colors.onSurface}
+              textColor={colors.onSurface}
               style={[
                 styles.messageText,
                 message.id.includes('audio') && { flexShrink: 1 },
-                isUser ? styles.messageTextUser : styles.messageTextVito,
+                styles.messageTextVito,
               ]}
             />
           </View>
-        )}
 
-        {/* Cards Estruturados Modulares */}
-        {message.event && <EventInlineCard event={message.event} />}
-        {message.conflict?.has_conflict && (
-          <ConflictInlineCard
-            conflict={message.conflict}
-            onSelectSlot={(slot) => onSelectSlot?.(slot, message)}
-          />
-        )}
-        {message.todo && <TodoInlineCard todo={message.todo} />}
-        {message.pending && <PendingInlineCard pending={message.pending} />}
-        {message.trigger && <TriggerInlineCard trigger={message.trigger} />}
-        {message.booking && <BookingInlineCard booking={message.booking} />}
-        {message.meeting && <MeetingInlineCard meeting={message.meeting} />}
-        {message.pending_confirmation && (
-          <DestructiveConfirmationCard
-            confirmation={message.pending_confirmation}
-            onConfirm={onConfirmAction}
-            disabled={disabled}
-          />
-        )}
+          {/* Cards Estruturados Modulares - resposta do Vito */}
+          {message.event && <EventInlineCard event={message.event} />}
+          {message.conflict?.has_conflict && (
+            <ConflictInlineCard
+              conflict={message.conflict}
+              onSelectSlot={(slot) => onSelectSlot?.(slot, message)}
+            />
+          )}
+          {message.todo && <TodoInlineCard todo={message.todo} />}
+          {message.pending && <PendingInlineCard pending={message.pending} />}
+          {message.trigger && <TriggerInlineCard trigger={message.trigger} />}
+          {message.booking && <BookingInlineCard booking={message.booking} />}
+          {message.meeting && <MeetingInlineCard meeting={message.meeting} />}
+          {message.pending_confirmation && (
+            <DestructiveConfirmationCard
+              confirmation={message.pending_confirmation}
+              onConfirm={onConfirmAction}
+              disabled={disabled}
+            />
+          )}
 
-        <View style={styles.metaRow}>
-          {/* Botão Copiar Resposta do Vito */}
-          {!isUser && (
+          {/* Footer: timestamp + copy */}
+          <View style={styles.vitoMetaRow}>
+            <Text style={[styles.timestamp, styles.timestampVito]}>
+              {new Date(message.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+            </Text>
+
             <TouchableOpacity
               style={[
                 styles.actionButton,
@@ -239,51 +318,9 @@ export const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
                 {copied ? 'Copiado' : 'Copiar'}
               </Text>
             </TouchableOpacity>
-          )}
-
-          {/* Botão Editar Mensagem do Usuário */}
-          {isUser && (onSaveEdit || onEditMessage) && !isEditing && (
-            <TouchableOpacity
-              style={[styles.actionButton, disabled && { opacity: 0.5 }]}
-              onPress={handleStartEdit}
-              disabled={disabled}
-              hitSlop={tokens.hitSlop.sm}
-              activeOpacity={0.7}
-              accessibilityLabel="Editar e reenviar mensagem"
-            >
-              <MaterialIcons
-                name="edit"
-                size={13}
-                color={isDark ? '#A1A1AA' : 'rgba(255,255,255,0.75)'}
-              />
-              <Text
-                style={[
-                  styles.actionButtonText,
-                  { color: isDark ? '#A1A1AA' : 'rgba(255,255,255,0.75)' },
-                ]}
-              >
-                Editar
-              </Text>
-            </TouchableOpacity>
-          )}
-
-          <Text
-            style={[
-              styles.timestamp,
-              { color: isUser ? (isDark ? '#A1A1AA' : 'rgba(255,255,255,0.7)') : colors.textMuted },
-            ]}
-          >
-            {new Date(message.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-          </Text>
-          {isUser && (
-            <MaterialIcons
-              name="done-all"
-              size={13}
-              color={isDark ? '#FAFAFA' : 'rgba(255,255,255,0.85)'}
-            />
-          )}
+          </View>
         </View>
-      </View>
+      )}
     </View>
   );
 };
@@ -299,6 +336,11 @@ const styles = StyleSheet.create({
   },
   messageRowVito: {
     justifyContent: 'flex-start',
+  },
+  vitoResponseContainer: {
+    maxWidth: '92%',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
   },
   vitoAvatar: {
     width: 32,
