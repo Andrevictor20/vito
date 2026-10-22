@@ -96,6 +96,21 @@ func (s *WhatsAppService) SetAsyncRunner(runner AsyncRunner) {
 	s.runAsync = runner
 }
 
+// InstanceNameOf devolve o nome da instância da Evolution do usuário.
+func (s *WhatsAppService) InstanceNameOf(ctx context.Context, userID string) (string, error) {
+	if s == nil || s.repo == nil || userID == "" {
+		return "", nil
+	}
+	integration, err := s.repo.GetByUserID(ctx, userID)
+	if err != nil {
+		return "", err
+	}
+	if integration == nil {
+		return "", nil
+	}
+	return integration.InstanceName, nil
+}
+
 // SetMediaEnricher injeta o enriquecedor de mídia (áudio/imagem do histórico).
 func (s *WhatsAppService) SetMediaEnricher(enricher *WhatsAppMediaEnricher) {
 	s.enricher = enricher

@@ -21,6 +21,7 @@ import {
 } from '../../services/api/whatsappContextApi';
 import { BottomSheetModal } from '../ui/BottomSheetModal';
 import { WhatsAppMediaStatusBlock } from './WhatsAppMediaStatus';
+import { WhatsAppContactNamesImport } from './WhatsAppContactNamesImport';
 
 interface WhatsAppContextSettingsProps {
   visible: boolean;
@@ -324,6 +325,8 @@ export const WhatsAppContextSettings: React.FC<WhatsAppContextSettingsProps> = (
                 </View>
               </>
             )}
+
+            <WhatsAppContactNamesImport onImported={loadPreview} />
 
             <WhatsAppMediaStatusBlock refreshKey={preview?.archived_total} />
 

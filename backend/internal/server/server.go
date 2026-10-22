@@ -311,6 +311,7 @@ func (s *Server) registerRoutes() {
 						wr.Get("/context-directory", s.whatsappHandler.GetContextDirectory)
 						wr.Get("/media-status", s.whatsappHandler.GetMediaStatus)
 						wr.Get("/contacts-cache", s.whatsappHandler.GetContactsCache)
+						wr.Post("/contact-names", s.whatsappHandler.ImportContactNames)
 						wr.Post("/media-process", s.whatsappHandler.ProcessMedia)
 						wr.Delete("/context-messages", s.whatsappHandler.PurgeContextMessages)
 					})

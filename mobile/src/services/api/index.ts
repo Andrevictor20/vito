@@ -447,6 +447,9 @@ export class ApiService extends ApiClient {
   purgeWhatsAppContextMessages = (): Promise<{ message: string }> => this.whatsappContextApi.purgeMessages();
   getWhatsAppMediaStatus = (): Promise<WhatsAppMediaStatus> => this.whatsappContextApi.getMediaStatus();
   processWhatsAppMedia = (limit = 5): Promise<{ enriched: number }> => this.whatsappContextApi.processMedia(limit);
+  importWhatsAppContactNames = (
+    names: { phone: string; name: string }[],
+  ): Promise<{ imported: number }> => this.whatsappContextApi.importContactNames(names);
   get whatsapp(): WhatsAppApi {
     return this.whatsappApi;
   }

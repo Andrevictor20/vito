@@ -19,7 +19,10 @@ type WhatsAppHandler struct {
 	directorySvc  *service.WhatsAppDirectoryService
 	mediaEnricher *service.WhatsAppMediaEnricher
 	contactsCache *service.WhatsAppContactsCache
-	backupMgr     *database.BackupManager
+	// contactsInstance é o nome da instância da Evolution (para as buscas por
+	// contato da agenda).
+	contactsInstance string
+	backupMgr        *database.BackupManager
 }
 
 // NewWhatsAppHandler instancia o handler para rotas de WhatsApp.
@@ -38,8 +41,9 @@ func (h *WhatsAppHandler) SetDirectoryService(directorySvc *service.WhatsAppDire
 }
 
 // SetContactsCache injeta o cache de nomes dos contatos (diagnóstico).
-func (h *WhatsAppHandler) SetContactsCache(cache *service.WhatsAppContactsCache) {
+func (h *WhatsAppHandler) SetContactsCache(cache *service.WhatsAppContactsCache, instanceName string) {
 	h.contactsCache = cache
+	h.contactsInstance = instanceName
 }
 
 // SetMediaEnricher injeta o enriquecedor de mídia (áudio/imagem do histórico).
@@ -334,6 +338,49 @@ func (h *WhatsAppHandler) ProcessMedia(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]interface{}{"enriched": enriched})
+}
+
+// ImportContactNames recebe os nomes SALVOS dos contatos (lidos pela agenda do
+// celular pelo app) para o Vito reconhecer o contato como o usuário o salvou.
+//
+// Necessário porque o nome salvo vive no celular: a Evolution nem sempre
+// expõe a agenda (no Pi devolvia 0 contato), então era a única via de o Vito
+// entender "isa" quando o perfil do WhatsApp é "bella".
+func (h *WhatsAppHandler) ImportContactNames(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "não autorizado"})
+		return
+	}
+	if h.contactsCache == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "cache de contatos indisponível"})
+		return
+	}
+
+	var input struct {
+		Names []service.SavedContactName `json:"names"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "payload inválido"})
+		return
+	}
+	if len(input.Names) == 0 {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "envie ao menos um contato"})
+		return
+	}
+	if len(input.Names) > 5000 {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "limite de 5000 contatos por envio"})
+		return
+	}
+
+	instanceName := h.contactsInstance
+	if h.waSvc != nil {
+		if resolved, err := h.waSvc.InstanceNameOf(r.Context(), userID); err == nil && resolved != "" {
+			instanceName = resolved
+		}
+	}
+	imported := h.contactsCache.ImportSavedNames(r.Context(), instanceName, input.Names)
+	writeJSON(w, http.StatusOK, map[string]interface{}{"imported": imported})
 }
 
 // GetContactsCache mostra o estado do cache de nomes dos contatos.

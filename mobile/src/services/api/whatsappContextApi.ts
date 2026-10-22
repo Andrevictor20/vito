@@ -101,4 +101,18 @@ export class WhatsAppContextApi {
       timeoutMs: 120000,
     });
   }
+
+  /**
+   * Envia os nomes SALVOS dos contatos (lidos da agenda do celular).
+   *
+   * O nome salvo ("isa") vive no celular — a Evolution não expõe a agenda —, então
+   * é a única via de o Vito reconhecer o contato como o usuário o salvou.
+   */
+  async importContactNames(names: { phone: string; name: string }[]): Promise<{ imported: number }> {
+    return this.client.request<{ imported: number }>('/api/v1/integrations/whatsapp/contact-names', {
+      method: 'POST',
+      body: JSON.stringify({ names }),
+      timeoutMs: 120000,
+    });
+  }
 }
