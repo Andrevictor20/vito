@@ -85,6 +85,10 @@ func main() {
 
 	// 1. Conexão ao SQLite com WAL mode, Single-Writer Queue e Migrações
 	log.Printf("📦 [Vito DB] Inicializando banco SQLite em '%s'...", cfg.DBPath)
+
+	// Auto-cura: banco corrompido é restaurado do último snapshot ANTES de abrir.
+	bootstrapDatabaseIntegrity(cfg)
+
 	db, err := database.Open(cfg.DBPath)
 	if err != nil {
 		log.Fatalf("❌ Falha crítica ao inicializar banco de dados: %v", err)
