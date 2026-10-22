@@ -110,6 +110,13 @@ func setupConversationalWhatsAppTest(t *testing.T) (*service.WhatsAppService, *m
 	// (janela + citada) fica vazio.
 	convRepo := repository.NewWhatsAppConversationRepository(db)
 	svc.SetContextService(service.NewWhatsAppContextService(convRepo, service.DefaultWhatsAppContextConfig()))
+	// Cache de nomes de contato: resolve os chats @lid e dá o nome SALVO
+	// pelo dono (tem prioridade sobre o nome de perfil).
+	contactsCache := service.NewWhatsAppContactsCache(mockClient, time.Hour)
+	if _, err := contactsCache.Fetch(context.Background(), "vito_conv_user"); err != nil {
+		t.Fatalf("erro ao preencher o cache de contatos: %v", err)
+	}
+	svc.SetContactsCache(contactsCache)
 	// Runner síncrono: mantém as asserções determinísticas (em produção o
 	// processamento com IA roda em background).
 	svc.SetAsyncRunner(func(fn func()) { fn() })

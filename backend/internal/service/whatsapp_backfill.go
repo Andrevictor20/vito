@@ -209,10 +209,21 @@ func (s *WhatsAppBackfillService) importMessage(ctx context.Context, integration
 			}
 		}
 	default:
-		// Em conversa direta, o rótulo é o nome do contato (primeira mensagem recebida).
+		// Em conversa direta, o rótulo é o nome do contato. O nome SALVO pelo
+		// dono tem prioridade sobre o nome de perfil (que é o que vem nas
+		// mensagens) — é o nome pelo qual o usuário fala da pessoa.
 		if known, ok := labels[m.RemoteJID]; ok {
 			label = known
+		} else if s.contactsCache != nil {
+			if name := s.contactsCache.Name(m.RemoteJID); name != "" {
+				label = name
+				labels[m.RemoteJID] = name
+			}
 		} else if !m.FromMe && strings.TrimSpace(m.PushName) != "" {
+			label = m.PushName
+			labels[m.RemoteJID] = m.PushName
+		}
+		if label == "Contato" && !m.FromMe && strings.TrimSpace(m.PushName) != "" {
 			label = m.PushName
 			labels[m.RemoteJID] = m.PushName
 		}

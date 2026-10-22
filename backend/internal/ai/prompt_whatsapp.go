@@ -63,6 +63,12 @@ func ContactDirectoryBlock(directory []ChatContactSummary) string {
 		preview := strings.TrimSpace(c.Preview)
 		age := strings.TrimSpace(c.Age)
 		line := "- " + name
+		// O alias é o outro nome do mesmo contato (salvo pelo dono x perfil do
+		// WhatsApp). Listar os dois evita o "não sei": o usuário pode chamar a
+		// pessoa por qualquer um dos dois.
+		if alias := strings.TrimSpace(c.Alias); alias != "" {
+			line += " (" + alias + ")"
+		}
 		if age != "" {
 			line += " (" + age + ")"
 		}

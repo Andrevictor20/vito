@@ -45,6 +45,10 @@ type ChatContactSummary struct {
 	Preview string `json:"preview,omitempty"` // prévia da última mensagem
 	Age     string `json:"age,omitempty"`     // "há 2h", "ontem"
 	Pending bool   `json:"pending,omitempty"` //true = esperando resposta do usuário
+	// Alias é o OUTRO nome do mesmo contato: o nome de perfil no WhatsApp
+	// ("bella") quando o principal é o nome salvo pelo dono ("isa"). O Vito
+	// precisa entender as duas formas de chamar a mesma pessoa.
+	Alias string `json:"alias,omitempty"`
 }
 
 // ChatMessageContext representa uma mensagem no histórico da conversa para contexto multi-turn.

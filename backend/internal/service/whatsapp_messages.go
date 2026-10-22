@@ -404,6 +404,20 @@ func (s *WhatsAppService) resolveChatLabel(chatKind string, msg *inboundMessage)
 		}
 		return "Grupo"
 	default:
+		// O nome SALVO pelo dono tem prioridade sobre o nome de perfil: é o nome
+		// pelo qual o usuário fala da pessoa ("isa", não "bella"). O nome de
+		// perfil (pushName da mensagem) fica como segundo rótulo.
+		if s.contactsCache != nil {
+			if name := s.contactsCache.Name(msg.RemoteJID); name != "" {
+				s.labelsMu.Lock()
+				if s.chatLabels == nil {
+					s.chatLabels = make(map[string]string)
+				}
+				s.chatLabels[msg.RemoteJID] = name
+				s.labelsMu.Unlock()
+				return name
+			}
+		}
 		s.labelsMu.Lock()
 		defer s.labelsMu.Unlock()
 		if s.chatLabels == nil {
@@ -414,13 +428,6 @@ func (s *WhatsAppService) resolveChatLabel(chatKind string, msg *inboundMessage)
 		}
 		if label, ok := s.chatLabels[msg.RemoteJID]; ok {
 			return label
-		}
-		// Chats @lid chegam sem pushName: o nome vem do cache de contatos.
-		if s.contactsCache != nil {
-			if name := s.contactsCache.Name(msg.RemoteJID); name != "" {
-				s.chatLabels[msg.RemoteJID] = name
-				return name
-			}
 		}
 		return "Contato"
 	}

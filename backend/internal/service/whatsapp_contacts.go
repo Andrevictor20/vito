@@ -8,6 +8,19 @@ import (
 	"time"
 )
 
+// WhatsAppContactNames guarda os DOIS nomes de um contato:
+//
+//   - Saved:   o nome que o DONO salvou na agenda do WhatsApp ("isa")
+//   - Profile: o nome de perfil que a pessoa escolheu no WhatsApp ("bella")
+//
+// Os dois importam: o usuário chama a pessoa pelo nome que salvou, mas o
+// WhatsApp mostra (e traz no webhook) o nome de perfil. Sem guardar os dois,
+// o Vito reconhecia "bella" e ignorava "isa" — o nome que o dono usa.
+type WhatsAppContactNames struct {
+	Saved   string `json:"saved,omitempty"`
+	Profile string `json:"profile,omitempty"`
+}
+
 // WhatsAppContactsCache guarda o nome de cada contato do WhatsApp (JID -> nome).
 //
 // Por que existe: os chats "@lid" (padrão novo do WhatsApp/Evolution v2) chegam
@@ -21,7 +34,7 @@ type WhatsAppContactsCache struct {
 	ttl    time.Duration
 
 	mu         sync.RWMutex
-	byJID      map[string]string
+	byJID      map[string]WhatsAppContactNames
 	fetchedAt  time.Time
 	refreshing bool
 }
@@ -34,28 +47,81 @@ func NewWhatsAppContactsCache(client EvolutionAPIClient, ttl time.Duration) *Wha
 	return &WhatsAppContactsCache{
 		client: client,
 		ttl:    ttl,
-		byJID:  make(map[string]string),
+		byJID:  make(map[string]WhatsAppContactNames),
 	}
 }
 
-// Name devolve o nome conhecido do contato (vazio se desconhecido).
+// Name devolve o nome principal do contato: o salvo pelo dono, com o nome de
+// perfil como fallback.
+//
+// O nome salvo tem prioridade porque é o nome pelo qual o usuário fala da
+// pessoa ("isa"). O fallback numérico evita rótulos feios como "559884097322"
+// (contatos salvos só pelo telefone).
 func (c *WhatsAppContactsCache) Name(jid string) string {
 	if c == nil || jid == "" {
 		return ""
 	}
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	return c.byJID[jid]
+	names := c.byJID[jid]
+	if saved := strings.TrimSpace(names.Saved); saved != "" && !looksLikePhone(saved) {
+		return saved
+	}
+	if profile := strings.TrimSpace(names.Profile); profile != "" {
+		return profile
+	}
+	if saved := strings.TrimSpace(names.Saved); saved != "" {
+		return saved
+	}
+	return ""
 }
 
-// Set registra o nome de um contato.
-func (c *WhatsAppContactsCache) Set(jid, name string) {
-	if c == nil || jid == "" || strings.TrimSpace(name) == "" {
+// ProfileName devolve o nome de perfil escolhido pela pessoa no WhatsApp.
+func (c *WhatsAppContactsCache) ProfileName(jid string) string {
+	if c == nil || jid == "" {
+		return ""
+	}
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return strings.TrimSpace(c.byJID[jid].Profile)
+}
+
+// Alias devolve o OUTRO nome do contato (o que não é o principal), para o Vito
+// entender "isa" e "bella" como a mesma pessoa.
+func (c *WhatsAppContactsCache) Alias(jid, principal string) string {
+	if c == nil || jid == "" {
+		return ""
+	}
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	names := c.byJID[jid]
+	saved := strings.TrimSpace(names.Saved)
+	profile := strings.TrimSpace(names.Profile)
+	if !strings.EqualFold(principal, saved) && saved != "" && !looksLikePhone(saved) {
+		return saved
+	}
+	if !strings.EqualFold(principal, profile) && profile != "" {
+		return profile
+	}
+	return ""
+}
+
+// Set registra os nomes de um contato.
+func (c *WhatsAppContactsCache) Set(jid, saved, profile string) {
+	if c == nil || jid == "" {
+		return
+	}
+	saved = strings.TrimSpace(saved)
+	profile = strings.TrimSpace(profile)
+	if saved == "" && profile == "" {
 		return
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.byJID[jid] = strings.TrimSpace(name)
+	names := c.byJID[jid]
+	names.Saved = saved
+	names.Profile = profile
+	c.byJID[jid] = names
 }
 
 // Names devolve a cópia do mapa de nomes (usada para reetiquetar o histórico).
@@ -66,10 +132,40 @@ func (c *WhatsAppContactsCache) Names() map[string]string {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	out := make(map[string]string, len(c.byJID))
-	for jid, name := range c.byJID {
-		out[jid] = name
+	for jid, names := range c.byJID {
+		saved := strings.TrimSpace(names.Saved)
+		profile := strings.TrimSpace(names.Profile)
+		switch {
+		case saved != "" && !looksLikePhone(saved):
+			out[jid] = saved
+		case profile != "":
+			out[jid] = profile
+		case saved != "":
+			out[jid] = saved
+		}
 	}
 	return out
+}
+
+// looksLikePhone informa se o texto parece um telefone.
+//
+// Muitos contatos são salvos só pelo número ("559884097322"). Usar isso como
+// nome no prompt é ilegível — nesses casos o nome de perfil é o melhor rótulo.
+func looksLikePhone(name string) bool {
+	trimmed := strings.TrimSpace(name)
+	if trimmed == "" {
+		return false
+	}
+	digits, letters := 0, 0
+	for _, r := range trimmed {
+		switch {
+		case r >= '0' && r <= '9':
+			digits++
+		case (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z'):
+			letters++
+		}
+	}
+	return digits >= 8 && letters <= 3
 }
 
 // Ensure agenda a atualização do cache em background (nunca bloqueia o webhook).
@@ -124,17 +220,15 @@ func (c *WhatsAppContactsCache) Fetch(ctx context.Context, instanceName string) 
 	resolved := 0
 	c.mu.Lock()
 	for _, contact := range contacts {
-		name := strings.TrimSpace(contact.PushName)
-		if name == "" {
-			name = strings.TrimSpace(contact.Name)
+		saved := strings.TrimSpace(contact.Name)
+		profile := strings.TrimSpace(contact.PushName)
+		if saved == "" && profile == "" {
+			saved = strings.TrimSpace(contact.Number)
 		}
-		if name == "" {
-			name = strings.TrimSpace(contact.Number)
-		}
-		if contact.ID == "" || name == "" {
+		if contact.ID == "" || (saved == "" && profile == "") {
 			continue
 		}
-		c.byJID[contact.ID] = name
+		c.byJID[contact.ID] = WhatsAppContactNames{Saved: saved, Profile: profile}
 		resolved++
 	}
 	c.fetchedAt = time.Now()

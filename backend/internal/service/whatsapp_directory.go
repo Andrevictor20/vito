@@ -85,13 +85,26 @@ func (s *WhatsAppDirectoryService) Directory(ctx context.Context, userID string)
 	}
 	out := make([]ai.ChatContactSummary, 0, len(chats))
 	for _, c := range chats {
+		label := s.labelOf(c)
 		out = append(out, ai.ChatContactSummary{
-			Name:    s.labelOf(c),
+			Name:    label,
+			Alias:   s.aliasOf(c, label),
 			Preview: TruncateContextText(c.LastText, 90),
 			Age:     humanizeChatAge(c.LastAt),
 		})
 	}
 	return out, nil
+}
+
+// aliasOf devolve o OUTRO nome do contato (o que não é o rótulo principal).
+//
+// Ex.: o contato está salvo como "isa" mas o perfil dela é "bella" — o Vito
+// precisa entender as duas formas de chamar a mesma pessoa.
+func (s *WhatsAppDirectoryService) aliasOf(c domain.WhatsAppChatSummary, label string) string {
+	if s.contacts == nil {
+		return ""
+	}
+	return s.contacts.Alias(c.ChatJID, label)
 }
 
 // PendingSummaries devolve as pendências no formato do prompt.
@@ -102,8 +115,10 @@ func (s *WhatsAppDirectoryService) PendingSummaries(ctx context.Context, userID 
 	}
 	out := make([]ai.ChatContactSummary, 0, len(pending))
 	for _, c := range pending {
+		label := s.labelOf(c)
 		out = append(out, ai.ChatContactSummary{
-			Name:    s.labelOf(c),
+			Name:    label,
+			Alias:   s.aliasOf(c, label),
 			Preview: TruncateContextText(c.LastText, 90),
 			Age:     humanizeChatAge(c.LastAt),
 			Pending: true,
@@ -121,14 +136,17 @@ func (s *WhatsAppDirectoryService) LabelOf(c *domain.WhatsAppChatSummary) string
 }
 
 // labelOf devolve o rótulo legível da conversa (nome do contato quando existe).
+//
+// O nome SALVO pelo dono tem prioridade sobre o rótulo guardado no shadow
+// inbox (que pode ser o nome de perfil vindo das mensagens antigas).
 func (s *WhatsAppDirectoryService) labelOf(c domain.WhatsAppChatSummary) string {
-	if label := strings.TrimSpace(c.ChatLabel); label != "" && label != "Contato" {
-		return label
-	}
 	if s.contacts != nil {
 		if name := s.contacts.Name(c.ChatJID); name != "" {
 			return name
 		}
+	}
+	if label := strings.TrimSpace(c.ChatLabel); label != "" && label != "Contato" {
+		return label
 	}
 	if label := strings.TrimSpace(c.ChatLabel); label != "" {
 		return label
@@ -167,10 +185,12 @@ func (s *WhatsAppDirectoryService) ResolveChat(ctx context.Context, userID, name
 			exact = append(exact, chats[i])
 		}
 	}
-	// 3) Nome do cache de contatos (cobre o rótulo genérico "Contato").
+	// 3) Nomes do cache de contatos: o SALVO pelo dono ("isa") e o de PERFIL
+	//    ("bella") — os dois precisam ser reconhecidos, é o mesmo contato.
 	if len(exact) == 0 && s.contacts != nil {
 		for i := range chats {
-			if strings.EqualFold(s.contacts.Name(chats[i].ChatJID), query) {
+			if contactNameMatches(s.contacts.Name(chats[i].ChatJID), query) ||
+				contactNameMatches(s.contacts.ProfileName(chats[i].ChatJID), query) {
 				exact = append(exact, chats[i])
 			}
 		}
@@ -183,16 +203,24 @@ func (s *WhatsAppDirectoryService) ResolveChat(ctx context.Context, userID, name
 	default:
 		return nil, s.ambiguousError(query, exact)
 	}
-	// 4) Contém (prefixo do nome também vale).
+	// 4) Contém (prefixo do nome também vale) — com acento e caixa normalizados.
 	matches := make([]domain.WhatsAppChatSummary, 0, 2)
 	for i := range chats {
 		label := strings.TrimSpace(chats[i].ChatLabel)
 		if label == "" {
 			continue
 		}
-		if strings.Contains(strings.ToLower(label), strings.ToLower(query)) ||
-			strings.HasPrefix(strings.ToLower(label), strings.ToLower(query)) {
+		normalizedLabel := normalizeContactName(label)
+		normalizedQuery := normalizeContactName(query)
+		if strings.Contains(normalizedLabel, normalizedQuery) {
 			matches = append(matches, chats[i])
+			continue
+		}
+		if s.contacts != nil {
+			if contactNameMatches(s.contacts.Name(chats[i].ChatJID), query) ||
+				contactNameMatches(s.contacts.ProfileName(chats[i].ChatJID), query) {
+				matches = append(matches, chats[i])
+			}
 		}
 	}
 	switch len(matches) {
@@ -203,6 +231,46 @@ func (s *WhatsAppDirectoryService) ResolveChat(ctx context.Context, userID, name
 	default:
 		return nil, s.ambiguousError(query, matches)
 	}
+}
+
+// contactNameMatches compara um nome de contato com o termo pedido, ignorando
+// caixa e acentos ("Isa" ≈ "isa", "José" ≈ "jose").
+func contactNameMatches(name, query string) bool {
+	name = strings.TrimSpace(name)
+	query = strings.TrimSpace(query)
+	if name == "" || query == "" {
+		return false
+	}
+	if strings.EqualFold(name, query) {
+		return true
+	}
+	return normalizeContactName(name) == normalizeContactName(query)
+}
+
+// normalizeContactName normaliza um nome para comparação: minúsculas e sem
+// acentos (o conjunto de acentos do português).
+func normalizeContactName(name string) string {
+	lower := strings.ToLower(strings.TrimSpace(name))
+	var b strings.Builder
+	b.Grow(len(lower))
+	for _, r := range lower {
+		if repl, ok := contactAccents[r]; ok {
+			b.WriteRune(repl)
+			continue
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
+}
+
+// contactAccents mapeia os acentos do português para a letra base.
+var contactAccents = map[rune]rune{
+	'á': 'a', 'à': 'a', 'â': 'a', 'ã': 'a', 'ä': 'a',
+	'é': 'e', 'è': 'e', 'ê': 'e', 'ë': 'e',
+	'í': 'i', 'ì': 'i', 'î': 'i', 'ï': 'i',
+	'ó': 'o', 'ò': 'o', 'ô': 'o', 'õ': 'o', 'ö': 'o',
+	'ú': 'u', 'ù': 'u', 'û': 'u', 'ü': 'u',
+	'ç': 'c', 'ñ': 'n',
 }
 
 // ambiguousError monta o erro de ambiguidade com os nomes dos candidatos.
