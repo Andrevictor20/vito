@@ -27,6 +27,7 @@ export interface UseChatSessionsResult {
   startNewConversation: () => void;
   switchConversation: (id: string) => Promise<ChatMessage[] | null>;
   deleteConversation: (id: string) => Promise<ChatMessage[]>;
+  togglePinConversation: (id: string) => void;
 }
 
 /**
@@ -229,6 +230,16 @@ export function useChatSessions(currentUserId?: string): UseChatSessionsResult {
     return nextMessages;
   }, [sessions, keys]);
 
+  const togglePinConversation = useCallback((id: string) => {
+    setSessions((prev) => {
+      const next = prev.map((s) =>
+        s.id === id ? { ...s, pinned: !s.pinned, timestamp: new Date().toISOString() } : s
+      );
+      writeSessions(keys, next);
+      return next;
+    });
+  }, [keys]);
+
   const sessionsWithActive = sessions.map((s) => ({
     ...s,
     active: s.id === activeSessionId,
@@ -244,5 +255,6 @@ export function useChatSessions(currentUserId?: string): UseChatSessionsResult {
     startNewConversation,
     switchConversation,
     deleteConversation,
+    togglePinConversation,
   };
 }

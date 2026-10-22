@@ -165,6 +165,7 @@ export interface ConversationSession {
   timestamp: string;
   messages?: ChatMessage[];
   active?: boolean;
+  pinned?: boolean;
 }
 
 export interface WhatsAppStatus {

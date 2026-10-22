@@ -26,6 +26,7 @@ import { BookingAppointmentCard } from "../components/booking/BookingAppointment
 import { MeetingCard } from "../components/booking/MeetingCard";
 import { MeetingPollDetailView } from "../components/booking/MeetingPollDetailView";
 import { BookingTypeModal } from "../components/booking/BookingTypeModal";
+import { CollapsibleSection } from "../components/booking/CollapsibleSection";
 import {
   computeBookingTabCounts,
   extractGroupedMeetingPolls,
@@ -342,6 +343,10 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ createRequestId, o
     );
   }
 
+  // Separar reuniões e links individuais
+  const groupMeetings = meetings.filter((m) => (m.slots && m.slots.length > 0));
+  const individualTypes = types;
+
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.surface }]}>
       <StatusBar style={isDark ? "light" : "dark"} />
@@ -447,56 +452,58 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ createRequestId, o
               </View>
             ) : (
               <View style={styles.cardsList}>
-                {meetings.length > 0 && (
-                  <View style={{ marginBottom: 8 }}>
-                    <Text style={[styles.sectionHeaderLabel, { color: colors.textSecondary }]}>
-                      Reuniões em Grupo & Consenso ({meetings.length})
-                    </Text>
-                    {meetings.map((m) => (
-                      <MeetingCard
-                        key={m.id}
-                        meeting={m}
-                        isCopied={copiedSlug === m.id}
-                        onCopyLink={handleCopyMeetingLink}
-                        onOpenDetail={(target) => setSelectedMeetingForDetail(target)}
-                        onEdit={(target) => {
-                          setEditingType(null);
-                          setEditingMeeting(target);
-                          setCreateModalVisible(true);
-                        }}
-                        onConfirmSlot={handleConfirmMeetingSlot}
-                        confirmingSlotId={confirmingSlotId}
-                        onDelete={handleDeleteMeeting}
-                      />
-                    ))}
-                  </View>
-                )}
+                {/* Seção: Reuniões em Grupo */}
+                <CollapsibleSection
+                  title="Reuniões em Grupo"
+                  count={groupMeetings.length}
+                  icon="how-to-vote"
+                  storageKey="group_meetings"
+                  defaultExpanded={groupMeetings.length > 0}
+                >
+                  {groupMeetings.map((m) => (
+                    <MeetingCard
+                      key={m.id}
+                      meeting={m}
+                      isCopied={copiedSlug === m.id}
+                      onCopyLink={handleCopyMeetingLink}
+                      onOpenDetail={(target) => setSelectedMeetingForDetail(target)}
+                      onEdit={(target) => {
+                        setEditingType(null);
+                        setEditingMeeting(target);
+                        setCreateModalVisible(true);
+                      }}
+                      onConfirmSlot={handleConfirmMeetingSlot}
+                      confirmingSlotId={confirmingSlotId}
+                      onDelete={handleDeleteMeeting}
+                    />
+                  ))}
+                </CollapsibleSection>
 
-                {types.length > 0 && (
-                  <View style={{ gap: 12 }}>
-                    {meetings.length > 0 && (
-                      <Text style={[styles.sectionHeaderLabel, { color: colors.textSecondary }]}>
-                        Links Individuais (1-on-1) ({types.length})
-                      </Text>
-                    )}
-                    {(types || []).map((bt) => (
-                      <BookingCard
-                        key={bt.id}
-                        type={bt}
-                        isCopied={copiedSlug === bt.slug}
-                        onCopyLink={handleCopyLink}
-                        onToggleActive={handleToggleActive}
-                        onEdit={(t) => {
-                          setEditingMeeting(null);
-                          setEditingType(t);
-                          setCreateModalVisible(true);
-                        }}
-                        onDelete={handleDeleteType}
-                        username={bookingUsername}
-                      />
-                    ))}
-                  </View>
-                )}
+                {/* Seção: Links Individuais (1-on-1) */}
+                <CollapsibleSection
+                  title="Links Individuais (1-on-1)"
+                  count={individualTypes.length}
+                  icon="link"
+                  storageKey="individual_links"
+                  defaultExpanded={individualTypes.length > 0}
+                >
+                  {individualTypes.map((bt) => (
+                    <BookingCard
+                      key={bt.id}
+                      type={bt}
+                      isCopied={copiedSlug === bt.slug}
+                      onCopyLink={handleCopyLink}
+                      onToggleActive={handleToggleActive}
+                      onEdit={(t) => {
+                        setEditingMeeting(null);
+                        setEditingType(t);
+                        setCreateModalVisible(true);
+                      }}
+                      onDelete={handleDeleteType}
+                      username={bookingUsername}
+                    />
+                  ))}
+                </CollapsibleSection>
               </View>
             )
           ) : tabCounts.receivedCount === 0 ? (
@@ -513,163 +520,165 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({ createRequestId, o
             </View>
           ) : (
             <View style={styles.cardsList}>
-              {groupedPolls.length > 0 && (
-                <View style={{ gap: 10, marginBottom: 8 }}>
-                  <Text style={[styles.sectionHeaderLabel, { color: colors.textSecondary }]}>
-                    Votações em Grupo ({groupedPolls.length})
-                  </Text>
-                  {groupedPolls.map((item) => (
-                    <View
-                      key={item.meetingId}
-                      style={[
-                        styles.voteActivityCard,
-                        {
-                          backgroundColor: colors.surface,
-                          borderColor: colors.outlineVariant,
-                        },
-                      ]}
-                    >
-                      <View style={styles.voteActivityHeader}>
-                        <View style={{ flex: 1 }}>
-                          <Text style={[styles.voterNameTitle, { color: colors.onSurface }]}>
-                            {item.meetingTitle}
-                          </Text>
-                          <Text style={[styles.voterMeetingSubtitle, { color: colors.onSurfaceVariant }]}>
-                            {item.totalParticipants} {item.totalParticipants === 1 ? "participante votou" : "participantes votaram"}
-                          </Text>
-                        </View>
-                        <View
+              {/* Seção: Votações em Grupo */}
+              <CollapsibleSection
+                title="Votações em Grupo"
+                count={groupedPolls.length}
+                icon="how-to-vote"
+                storageKey="group_polls"
+                defaultExpanded={groupedPolls.length > 0}
+              >
+                {groupedPolls.map((item) => (
+                  <View
+                    key={item.meetingId}
+                    style={[
+                      styles.voteActivityCard,
+                      {
+                        backgroundColor: colors.surface,
+                        borderColor: colors.outlineVariant,
+                      },
+                    ]}
+                  >
+                    <View style={styles.voteActivityHeader}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.voterNameTitle, { color: colors.onSurface }]}>
+                          {item.meetingTitle}
+                        </Text>
+                        <Text style={[styles.voterMeetingSubtitle, { color: colors.onSurfaceVariant }]}>
+                          {item.totalParticipants} {item.totalParticipants === 1 ? "participante votou" : "participantes votaram"}
+                        </Text>
+                      </View>
+                      <View
+                        style={[
+                          styles.voteBadgePill,
+                          {
+                            backgroundColor: item.isConfirmed
+                              ? "rgba(46, 125, 50, 0.14)"
+                              : colors.surfaceContainerHigh,
+                          },
+                        ]}
+                      >
+                        <Text
                           style={[
-                            styles.voteBadgePill,
+                            styles.voteBadgePillText,
                             {
-                              backgroundColor: item.isConfirmed
-                                ? "rgba(46, 125, 50, 0.14)"
-                                : colors.surfaceContainerHigh,
+                              color: item.isConfirmed ? "#2e7d32" : colors.primary,
                             },
                           ]}
                         >
-                          <Text
+                          {item.isConfirmed ? "✓ Confirmada" : "● Em Votação"}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {item.participantNames.length > 0 && (
+                      <View style={styles.votedSlotsChipsWrap}>
+                        {item.participantNames.map((name, idx) => (
+                          <View
+                            key={`${item.meetingId}_p_${idx}`}
                             style={[
-                              styles.voteBadgePillText,
+                              styles.votedSlotPill,
                               {
-                                color: item.isConfirmed ? "#2e7d32" : colors.primary,
+                                backgroundColor: colors.surfaceContainerHigh,
+                                borderColor: colors.outlineVariant,
                               },
                             ]}
                           >
-                            {item.isConfirmed ? "✓ Confirmada" : "● Em Votação"}
-                          </Text>
-                        </View>
-                      </View>
-
-                      {item.participantNames.length > 0 && (
-                        <View style={styles.votedSlotsChipsWrap}>
-                          {item.participantNames.map((name, idx) => (
-                            <View
-                              key={`${item.meetingId}_p_${idx}`}
-                              style={[
-                                styles.votedSlotPill,
-                                {
-                                  backgroundColor: colors.surfaceContainerHigh,
-                                  borderColor: colors.outlineVariant,
-                                },
-                              ]}
-                            >
-                              <MaterialIcons name="person" size={13} color={colors.primary} />
-                              <Text style={[styles.votedSlotPillText, { color: colors.onSurface }]}>
-                                {name}
-                              </Text>
-                            </View>
-                          ))}
-                        </View>
-                      )}
-
-                      {item.isConfirmed && item.confirmedSlotLabel ? (
-                        <View
-                          style={[
-                            styles.leadingConsensusBox,
-                            { backgroundColor: "rgba(46, 125, 50, 0.08)", borderColor: "rgba(46, 125, 50, 0.25)" },
-                          ]}
-                        >
-                          <MaterialIcons name="check-circle" size={16} color="#2e7d32" />
-                          <Text style={[styles.leadingConsensusText, { color: colors.onSurface }]}>
-                            Consenso Fechado: <Text style={{ fontWeight: "700" }}>{item.confirmedSlotLabel}</Text>
-                          </Text>
-                        </View>
-                      ) : item.leadingSlot?.formatted ? (
-                        <View
-                          style={[
-                            styles.leadingConsensusBox,
-                            { backgroundColor: colors.surfaceContainerHigh, borderColor: colors.outlineVariant },
-                          ]}
-                        >
-                          <MaterialIcons name="star" size={16} color="#eab308" />
-                          <View style={{ flex: 1 }}>
-                            <Text style={[styles.leadingConsensusText, { color: colors.onSurface }]}>
-                              Líder: <Text style={{ fontWeight: "700" }}>{item.leadingSlot.formatted.compactLabel}</Text>
-                              {" "}({item.leadingSlot.votesCount} {item.leadingSlot.votesCount === 1 ? "voto" : "votos"} • {item.leadingSlot.percentage}%)
+                            <MaterialIcons name="person" size={13} color={colors.primary} />
+                            <Text style={[styles.votedSlotPillText, { color: colors.onSurface }]}>
+                              {name}
                             </Text>
                           </View>
-                        </View>
-                      ) : null}
+                        ))}
+                      </View>
+                    )}
 
-                      <View style={{ flexDirection: "row", gap: 8, marginTop: 4 }}>
+                    {item.isConfirmed && item.confirmedSlotLabel ? (
+                      <View
+                        style={[
+                          styles.leadingConsensusBox,
+                          { backgroundColor: "rgba(46, 125, 50, 0.08)", borderColor: "rgba(46, 125, 50, 0.25)" },
+                        ]}
+                      >
+                        <MaterialIcons name="check-circle" size={16} color="#2e7d32" />
+                        <Text style={[styles.leadingConsensusText, { color: colors.onSurface }]}>
+                          Consenso Fechado: <Text style={{ fontWeight: "700" }}>{item.confirmedSlotLabel}</Text>
+                        </Text>
+                      </View>
+                    ) : item.leadingSlot?.formatted ? (
+                      <View
+                        style={[
+                          styles.leadingConsensusBox,
+                          { backgroundColor: colors.surfaceContainerHigh, borderColor: colors.outlineVariant },
+                        ]}
+                      >
+                        <MaterialIcons name="star" size={16} color="#eab308" />
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.leadingConsensusText, { color: colors.onSurface }]}>
+                            Líder: <Text style={{ fontWeight: "700" }}>{item.leadingSlot.formatted.compactLabel}</Text>
+                            {" "}({item.leadingSlot.votesCount} {item.leadingSlot.votesCount === 1 ? "voto" : "votos"} • {item.leadingSlot.percentage}%)
+                          </Text>
+                        </View>
+                      </View>
+                    ) : null}
+
+                    <View style={{ flexDirection: "row", gap: 8, marginTop: 4 }}>
+                      <TouchableOpacity
+                        style={[
+                          styles.quickViewDetailBtn,
+                          {
+                            backgroundColor: colors.surfaceContainerHigh,
+                            borderColor: colors.outlineVariant,
+                            flex: item.isConfirmed || !item.leadingSlot?.slot?.id ? 1 : undefined,
+                          },
+                        ]}
+                        onPress={() => setSelectedMeetingForDetail(item.meeting)}
+                        activeOpacity={0.8}
+                      >
+                        <MaterialIcons name="how-to-vote" size={14} color={colors.primary} />
+                        <Text style={[styles.quickViewDetailText, { color: colors.onSurface }]}>
+                          Ver Detalhes da Votação
+                        </Text>
+                      </TouchableOpacity>
+
+                      {!item.isConfirmed && item.leadingSlot?.slot?.id && (
                         <TouchableOpacity
                           style={[
-                            styles.quickViewDetailBtn,
-                            {
-                              backgroundColor: colors.surfaceContainerHigh,
-                              borderColor: colors.outlineVariant,
-                              flex: item.isConfirmed || !item.leadingSlot?.slot?.id ? 1 : undefined,
-                            },
+                            styles.quickConfirmConsensusBtn,
+                            { backgroundColor: colors.primary, flex: 1 },
                           ]}
-                          onPress={() => setSelectedMeetingForDetail(item.meeting)}
+                          onPress={() => handleConfirmMeetingSlot(item.meetingId, item.leadingSlot.slot!.id)}
+                          disabled={Boolean(confirmingSlotId)}
                           activeOpacity={0.8}
                         >
-                          <MaterialIcons name="how-to-vote" size={14} color={colors.primary} />
-                          <Text style={[styles.quickViewDetailText, { color: colors.onSurface }]}>
-                            Ver Detalhes da Votação
+                          <MaterialIcons name="event-available" size={14} color={colors.onPrimary} />
+                          <Text style={[styles.quickConfirmConsensusText, { color: colors.onPrimary }]} numberOfLines={1}>
+                            Confirmar Líder
                           </Text>
                         </TouchableOpacity>
-
-                        {!item.isConfirmed && item.leadingSlot?.slot?.id && (
-                          <TouchableOpacity
-                            style={[
-                              styles.quickConfirmConsensusBtn,
-                              { backgroundColor: colors.primary, flex: 1 },
-                            ]}
-                            onPress={() => handleConfirmMeetingSlot(item.meetingId, item.leadingSlot.slot!.id)}
-                            disabled={Boolean(confirmingSlotId)}
-                            activeOpacity={0.8}
-                          >
-                            <MaterialIcons name="event-available" size={14} color={colors.onPrimary} />
-                            <Text style={[styles.quickConfirmConsensusText, { color: colors.onPrimary }]} numberOfLines={1}>
-                              Confirmar Líder
-                            </Text>
-                          </TouchableOpacity>
-                        )}
-                      </View>
+                      )}
                     </View>
-                  ))}
-                </View>
-              )}
+                  </View>
+                ))}
+              </CollapsibleSection>
 
-              {(appointments || []).length > 0 && (
-                <View style={{ gap: 10 }}>
-                  {groupedPolls.length > 0 && (
-                    <Text style={[styles.sectionHeaderLabel, { color: colors.textSecondary }]}>
-                      Reservas 1-on-1 Confirmadas ({appointments.length})
-                    </Text>
-                  )}
-                  {(appointments || []).map((appt) => (
-                    <BookingAppointmentCard
-                      key={appt.id}
-                      appointment={appt}
-                      isDeleting={deletingAppointmentId === appt.id}
-                      onCancel={handleDeleteAppointment}
-                    />
-                  ))}
-                </View>
-              )}
+              {/* Seção: Reservas 1-on-1 Confirmadas */}
+              <CollapsibleSection
+                title="Reservas 1-on-1 Confirmadas"
+                count={appointments.length}
+                icon="event-available"
+                storageKey="appointments"
+                defaultExpanded={appointments.length > 0}
+              >
+                {appointments.map((appt) => (
+                  <BookingAppointmentCard
+                    key={appt.id}
+                    appointment={appt}
+                    isDeleting={deletingAppointmentId === appt.id}
+                    onCancel={handleDeleteAppointment}
+                  />
+                ))}
+              </CollapsibleSection>
             </View>
           )}
         </ScrollView>
@@ -744,7 +753,7 @@ const styles = StyleSheet.create({
     paddingBottom: 120,
   },
   cardsList: {
-    gap: 12,
+    gap: 8,
   },
   sectionHeaderLabel: {
     fontSize: 12,

@@ -419,6 +419,21 @@ export const tokens = {
     sm: { top: 8, bottom: 8, left: 8, right: 8 },
     md: { top: 12, bottom: 12, left: 12, right: 12 },
   },
+
+  // 7. Booking / Agendamento — Cards Compactos Padronizados
+  booking: {
+    cardPadding: 12,
+    cardGap: 8,
+    sectionGap: 6,
+    actionHeight: 32,
+    iconSize: 14,
+    titleSize: 14,
+    metaSize: 11,
+    statusPillHeight: 20,
+    statusPillRadius: 6,
+    avatarSize: 32,
+    dividerOpacity: 0.08,
+  },
 };
 
 export const getThemeTokens = (isDark: boolean) => ({

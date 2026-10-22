@@ -184,6 +184,7 @@ export interface ConversationSession {
   timestamp: string;
   messages: ChatMessage[];
   active?: boolean;
+  pinned?: boolean;
 }
 
 export type NotificationPriority = 'silent' | 'default';

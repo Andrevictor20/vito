@@ -21,6 +21,7 @@ export function useChat(onDataChanged?: () => void, currentUserId?: string) {
     startNewConversation: startSession,
     switchConversation: switchSession,
     deleteConversation: deleteSession,
+    togglePinConversation,
   } = useChatSessions(currentUserId);
 
   const {
@@ -90,5 +91,6 @@ export function useChat(onDataChanged?: () => void, currentUserId?: string) {
     startNewConversation,
     switchConversation,
     deleteConversation,
+    togglePinConversation,
   };
 }

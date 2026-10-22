@@ -95,6 +95,14 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
     }
   };
 
+  const handleTogglePin = (id: string) => {
+    setConversations((prev) =>
+      prev.map((c) =>
+        c.id === id ? { ...c, pinned: !c.pinned, timestamp: new Date().toISOString() } : c
+      )
+    );
+  };
+
   const handleSendPrompt = async (textToSend: string) => {
     if (!textToSend.trim() || loading) return;
 
@@ -189,6 +197,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
           activeSessionId={activeSessionId}
           onSelectConversation={handleSelectConversation}
           onDeleteConversation={handleDeleteConversation}
+          onTogglePin={handleTogglePin}
           onNewChat={handleStartNewChat}
         />
       )}

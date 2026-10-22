@@ -69,6 +69,7 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
     startNewConversation,
     switchConversation,
     deleteConversation,
+    togglePinConversation,
   } = useChat(onDataChanged, user?.id);
 
   const [inputText, setInputText] = useState('');
@@ -423,6 +424,7 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
         conversations={sessions}
         onSelectConversation={switchConversation}
         onDeleteConversation={deleteConversation}
+        onTogglePin={togglePinConversation}
       />
       <FocusMenuModal
         visible={focusModalVisible}

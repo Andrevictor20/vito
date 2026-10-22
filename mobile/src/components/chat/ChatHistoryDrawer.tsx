@@ -12,7 +12,9 @@ import {
   Platform,
   StatusBar as RNStatusBar,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import {
+  MaterialIcons,
+} from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { tokens, MD3Shapes } from '../../theme/tokens';
 import { ConversationSession } from '../../types';
@@ -27,6 +29,7 @@ interface ChatHistoryDrawerProps {
   conversations: ConversationSession[];
   onSelectConversation: (id: string) => void;
   onDeleteConversation?: (id: string) => void;
+  onTogglePin?: (id: string) => void;
   pendingCount?: number;
   onRetrySync?: () => void;
 }
@@ -41,6 +44,7 @@ export const ChatHistoryDrawer: React.FC<ChatHistoryDrawerProps> = ({
   conversations,
   onSelectConversation,
   onDeleteConversation,
+  onTogglePin,
   pendingCount,
   onRetrySync,
 }) => {
@@ -48,6 +52,10 @@ export const ChatHistoryDrawer: React.FC<ChatHistoryDrawerProps> = ({
   const insets = useSafeAreaInsets();
   const slide = useRef(new Animated.Value(-PANEL_WIDTH)).current;
   const groups = groupSessionsByDate(conversations);
+  const pinnedConversations = conversations.filter((c) => c.pinned);
+  const unpinnedConversations = conversations.filter((c) => !c.pinned);
+  const pinnedGroups = pinnedConversations.length > 0 ? [{ key: 'pinned', title: 'Fixados', sessions: pinnedConversations }] : [];
+  const unpinnedGroups = groupSessionsByDate(unpinnedConversations);
   const showPending = (pendingCount ?? 0) > 0;
 
   useEffect(() => {
@@ -145,93 +153,232 @@ export const ChatHistoryDrawer: React.FC<ChatHistoryDrawerProps> = ({
                   </Text>
                 </View>
               ) : (
-                groups.map((group) => (
-                  <View key={group.key}>
-                    <Text
-                      style={[styles.groupHeader, { color: colors.textMuted }]}
-                      accessibilityRole="header"
-                    >
-                      {group.title}
-                    </Text>
-                    {group.sessions.map((conv) => {
-                      const isActive = !!conv.active;
-                      return (
-                        <TouchableOpacity
-                          key={conv.id}
-                          style={[
-                            styles.convCard,
-                            {
-                              backgroundColor: isActive
-                                ? colors.surfaceContainerHighest
-                                : colors.surfaceContainerLow,
-                              borderColor: isActive ? colors.primary : colors.outlineVariant,
-                            },
-                          ]}
-                          onPress={() => {
-                            onSelectConversation(conv.id);
-                            onClose();
-                          }}
-                          activeOpacity={0.75}
-                          accessibilityLabel={`Abrir conversa ${conv.title || 'Conversa'}`}
-                          hitSlop={tokens.hitSlop.sm}
+                <>
+                  {pinnedGroups.map((group) => (
+                    <View key={group.key}>
+                      <View style={styles.pinnedHeader}>
+                        <Text
+                          style={[styles.groupHeader, { color: colors.textMuted }]}
+                          accessibilityRole="header"
                         >
-                          <View
+                          {group.title}
+                        </Text>
+                        <MaterialIcons name="bookmark" size={14} color={colors.primary} />
+                      </View>
+                      {group.sessions.map((conv) => {
+                        const isActive = !!conv.active;
+                        return (
+                          <TouchableOpacity
+                            key={conv.id}
                             style={[
-                              styles.convIcon,
+                              styles.convCard,
                               {
-                                backgroundColor: isActive ? colors.primary : colors.surfaceContainerHighest,
+                                backgroundColor: isActive
+                                  ? colors.surfaceContainerHighest
+                                  : colors.surfaceContainerLow,
+                                borderColor: isActive ? colors.primary : colors.outlineVariant,
                               },
                             ]}
+                            onPress={() => {
+                              onSelectConversation(conv.id);
+                              onClose();
+                            }}
+                            activeOpacity={0.75}
+                            accessibilityLabel={`Abrir conversa ${conv.title || 'Conversa'}`}
+                            hitSlop={tokens.hitSlop.sm}
                           >
-                            <MaterialIcons
-                              name="chat-bubble-outline"
-                              size={18}
-                              color={isActive ? colors.onPrimary : colors.textPrimary}
-                            />
-                          </View>
+                            <View
+                              style={[
+                                styles.convIcon,
+                                {
+                                  backgroundColor: isActive ? colors.primary : colors.surfaceContainerHighest,
+                                },
+                              ]}
+                            >
+                              <MaterialIcons
+                                name="chat-bubble-outline"
+                                size={16}
+                                color={isActive ? colors.onPrimary : colors.textPrimary}
+                              />
+                            </View>
 
-                          <View style={styles.convDetails}>
-                            <View style={styles.convTitleRow}>
+                            <View style={styles.convDetails}>
+                              <View style={styles.convTitleRow}>
+                                <Text
+                                  style={[
+                                    styles.convTitle,
+                                    {
+                                      color: colors.onSurface,
+                                      fontWeight: '700',
+                                    },
+                                  ]}
+                                  numberOfLines={1}
+                                >
+                                  {conv.title || 'Conversa'}
+                                </Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                  <MaterialIcons name="bookmark" size={12} color={colors.primary} />
+                                  <Text style={[styles.convTime, { color: colors.textMuted }]}>
+                                    {formatGroupTimestamp(conv.timestamp)}
+                                  </Text>
+                                </View>
+                              </View>
                               <Text
-                                style={[
-                                  styles.convTitle,
-                                  {
-                                    color: colors.onSurface,
-                                    fontWeight: '700',
-                                  },
-                                ]}
+                                style={[styles.convPreview, { color: colors.textSecondary }]}
                                 numberOfLines={1}
                               >
-                                {conv.title || 'Conversa'}
-                              </Text>
-                              <Text style={[styles.convTime, { color: colors.textMuted }]}>
-                                {formatGroupTimestamp(conv.timestamp)}
+                                {humanizePreview(conv.preview)}
                               </Text>
                             </View>
-                            <Text
-                              style={[styles.convPreview, { color: colors.textSecondary }]}
-                              numberOfLines={1}
-                            >
-                              {humanizePreview(conv.preview)}
-                            </Text>
-                          </View>
 
-                          {onDeleteConversation && conversations.length > 1 && (
-                            <TouchableOpacity
-                              style={styles.deleteBtn}
-                              onPress={() => onDeleteConversation(conv.id)}
-                              hitSlop={tokens.hitSlop.md}
-                              accessibilityLabel="Excluir conversa"
-                              accessibilityRole="button"
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                              <TouchableOpacity
+                                style={styles.actionBtn}
+                                onPress={(e) => {
+                                  e.stopPropagation();
+                                  onTogglePin?.(conv.id);
+                                }}
+                                hitSlop={tokens.hitSlop.md}
+                                accessibilityLabel={conv.pinned ? 'Desfixar conversa' : 'Fixar conversa'}
+                                accessibilityRole="button"
+                              >
+                                <MaterialIcons
+                                  name={conv.pinned ? 'bookmark' : 'bookmark-outline'}
+                                  size={18}
+                                  color={conv.pinned ? colors.primary : colors.outline}
+                                />
+                              </TouchableOpacity>
+
+                              {onDeleteConversation && conversations.length > 1 && (
+                                <TouchableOpacity
+                                  style={styles.actionBtn}
+                                  onPress={(e) => {
+                                    e.stopPropagation();
+                                    onDeleteConversation(conv.id);
+                                  }}
+                                  hitSlop={tokens.hitSlop.md}
+                                  accessibilityLabel="Excluir conversa"
+                                  accessibilityRole="button"
+                                >
+                                  <MaterialIcons name="delete-outline" size={18} color={colors.outline} />
+                                </TouchableOpacity>
+                              )}
+                            </View>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  ))}
+                  {unpinnedGroups.map((group) => (
+                    <View key={group.key}>
+                      <Text
+                        style={[styles.groupHeader, { color: colors.textMuted }]}
+                        accessibilityRole="header"
+                      >
+                        {group.title}
+                      </Text>
+                      {group.sessions.map((conv) => {
+                        const isActive = !!conv.active;
+                        return (
+                          <TouchableOpacity
+                            key={conv.id}
+                            style={[
+                              styles.convCard,
+                              {
+                                backgroundColor: isActive
+                                  ? colors.surfaceContainerHighest
+                                  : colors.surfaceContainerLow,
+                                borderColor: isActive ? colors.primary : colors.outlineVariant,
+                              },
+                            ]}
+                            onPress={() => {
+                              onSelectConversation(conv.id);
+                              onClose();
+                            }}
+                            activeOpacity={0.75}
+                            accessibilityLabel={`Abrir conversa ${conv.title || 'Conversa'}`}
+                            hitSlop={tokens.hitSlop.sm}
+                          >
+                            <View
+                              style={[
+                                styles.convIcon,
+                                {
+                                  backgroundColor: isActive ? colors.primary : colors.surfaceContainerHighest,
+                                },
+                              ]}
                             >
-                              <MaterialIcons name="delete-outline" size={18} color={colors.outline} />
-                            </TouchableOpacity>
-                          )}
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                ))
+                              <MaterialIcons
+                                name="chat-bubble-outline"
+                                size={16}
+                                color={isActive ? colors.onPrimary : colors.textPrimary}
+                              />
+                            </View>
+
+                            <View style={styles.convDetails}>
+                              <View style={styles.convTitleRow}>
+                                <Text
+                                  style={[
+                                    styles.convTitle,
+                                    {
+                                      color: colors.onSurface,
+                                      fontWeight: '700',
+                                    },
+                                  ]}
+                                  numberOfLines={1}
+                                >
+                                  {conv.title || 'Conversa'}
+                                </Text>
+                                <Text style={[styles.convTime, { color: colors.textMuted }]}>
+                                  {formatGroupTimestamp(conv.timestamp)}
+                                </Text>
+                              </View>
+                              <Text
+                                style={[styles.convPreview, { color: colors.textSecondary }]}
+                                numberOfLines={1}
+                              >
+                                {humanizePreview(conv.preview)}
+                              </Text>
+                            </View>
+
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                              <TouchableOpacity
+                                style={styles.actionBtn}
+                                onPress={(e) => {
+                                  e.stopPropagation();
+                                  onTogglePin?.(conv.id);
+                                }}
+                                hitSlop={tokens.hitSlop.md}
+                                accessibilityLabel={conv.pinned ? 'Desfixar conversa' : 'Fixar conversa'}
+                                accessibilityRole="button"
+                              >
+                                <MaterialIcons
+                                  name={conv.pinned ? 'bookmark' : 'bookmark-outline'}
+                                  size={18}
+                                  color={conv.pinned ? colors.primary : colors.outline}
+                                />
+                              </TouchableOpacity>
+
+                              {onDeleteConversation && conversations.length > 1 && (
+                                <TouchableOpacity
+                                  style={styles.actionBtn}
+                                  onPress={(e) => {
+                                    e.stopPropagation();
+                                    onDeleteConversation(conv.id);
+                                  }}
+                                  hitSlop={tokens.hitSlop.md}
+                                  accessibilityLabel="Excluir conversa"
+                                  accessibilityRole="button"
+                                >
+                                  <MaterialIcons name="delete-outline" size={18} color={colors.outline} />
+                                </TouchableOpacity>
+                              )}
+                            </View>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  ))}
+                </>
               )}
             </ScrollView>
 
@@ -326,7 +473,7 @@ const styles = StyleSheet.create({
     borderRadius: MD3Shapes.large,
     borderWidth: 1,
     marginBottom: tokens.spacing.sm,
-    minHeight: 48,
+    minHeight: 44,
   },
   pendingText: {
     flex: 1,
@@ -356,24 +503,40 @@ const styles = StyleSheet.create({
     marginBottom: tokens.spacing.xs,
     paddingHorizontal: tokens.spacing.xs,
   },
+  pinnedHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: tokens.spacing.sm,
+    marginBottom: tokens.spacing.xs,
+    paddingHorizontal: tokens.spacing.xs,
+  },
   convCard: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: tokens.spacing.md,
-    padding: tokens.spacing.md,
+    paddingVertical: tokens.spacing.sm,
+    paddingHorizontal: tokens.spacing.md,
     borderRadius: MD3Shapes.large,
     borderWidth: 1,
     backgroundColor: tokens.colors.surfaceContainerLow,
-    minHeight: 48,
-    marginBottom: tokens.spacing.sm,
+    minHeight: 44,
+    marginBottom: tokens.spacing.xs,
   },
   convIcon: {
-    width: 40,
-    height: 40,
+    width: 36,
+    height: 36,
     borderRadius: MD3Shapes.medium,
     backgroundColor: tokens.colors.primaryContainer,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  actionBtn: {
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 2,
   },
   convDetails: {
     flex: 1,
