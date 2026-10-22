@@ -419,6 +419,39 @@ func (s *AssistantService) executeAction(ctx context.Context, userID string, int
 	case ai.ActionCreateMeeting:
 		return s.executeCreateMeeting(ctx, userID, intent, input, res)
 
+	case ai.ActionListBookings:
+		return s.executeListBookings(ctx, userID, intent, res)
+
+	case ai.ActionUpdateBooking:
+		return s.executeUpdateBooking(ctx, userID, intent, res)
+
+	case ai.ActionQueryTriggers:
+		return s.executeQueryTriggers(ctx, userID, intent, res)
+
+	case ai.ActionListMeetings:
+		return s.executeListMeetings(ctx, userID, intent, res)
+
+	case ai.ActionUpdateMeeting:
+		return s.executeUpdateMeeting(ctx, userID, intent, res)
+
+	case ai.ActionDeleteMeeting:
+		return s.executeDeleteMeeting(ctx, userID, intent, res)
+
+	case ai.ActionQueryPending:
+		return s.executeQueryPending(ctx, userID, intent, res)
+
+	case ai.ActionQueryMemory:
+		return s.executeQueryMemory(ctx, userID, intent, res)
+
+	case ai.ActionUpdateMemory:
+		return s.executeUpdateMemory(ctx, userID, intent, res)
+
+	case ai.ActionDeleteMemory:
+		return s.executeDeleteMemory(ctx, userID, intent, res)
+
+	case ai.ActionListContacts:
+		return s.executeListContacts(ctx, userID, intent, res)
+
 	default:
 		if res.Message == "" {
 			res.Message = "Não entendi bem o pedido. Pode dizer de novo com mais detalhes? Ex: 'Criar evento Dentista amanhã às 14h', 'Criar tarefa Comprar café até sexta' ou 'Criar radar da PETR3 todo dia às 08:30'."

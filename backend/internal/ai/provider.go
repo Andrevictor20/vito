@@ -36,6 +36,19 @@ const (
 	ActionCreateReplyReminder      IntentAction = "CREATE_REPLY_REMINDER"
 	ActionNeedsClarification       IntentAction = "NEEDS_CLARIFICATION"
 	ActionOutOfScope               IntentAction = "OUT_OF_SCOPE"
+
+	// CRUD Actions - Read/Update/Delete para features
+	ActionQueryTriggers            IntentAction = "QUERY_TRIGGERS"
+	ActionListBookings             IntentAction = "LIST_BOOKINGS"
+	ActionUpdateBooking            IntentAction = "UPDATE_BOOKING"
+	ActionListMeetings             IntentAction = "LIST_MEETINGS"
+	ActionUpdateMeeting            IntentAction = "UPDATE_MEETING"
+	ActionDeleteMeeting            IntentAction = "DELETE_MEETING"
+	ActionQueryPending             IntentAction = "QUERY_PENDING"
+	ActionQueryMemory              IntentAction = "QUERY_MEMORY"
+	ActionUpdateMemory             IntentAction = "UPDATE_MEMORY"
+	ActionDeleteMemory             IntentAction = "DELETE_MEMORY"
+	ActionListContacts             IntentAction = "LIST_CONTACTS"
 )
 
 // ChatContactSummary resume uma conversa do WhatsApp para o diretório de
@@ -205,25 +218,114 @@ type ParsedReplyReminder struct {
 	Note string    `json:"note,omitempty"` // o que foi prometido / pendente
 }
 
+// ParsedTriggerQuery para listar/consultar radares.
+type ParsedTriggerQuery struct {
+	Category string `json:"category,omitempty"` // filtrar por categoria
+	Status   string `json:"status,omitempty"`   // active, paused, all
+}
+
+// ParsedBookingQuery para listar/atualizar bookings.
+type ParsedBookingQuery struct {
+	TargetQuery string `json:"target_query,omitempty"` // ID, slug ou título
+	Status     string `json:"status,omitempty"`        // active, paused, all
+}
+
+// ParsedBookingUpdate para atualizar booking.
+type ParsedBookingUpdate struct {
+	TargetQuery     string `json:"target_query,omitempty"`
+	Title           string `json:"title,omitempty"`
+	Description     string `json:"description,omitempty"`
+	DurationMinutes int    `json:"duration_minutes,omitempty"`
+	BufferMinutes   int    `json:"buffer_minutes,omitempty"`
+	StartHour       string `json:"start_hour,omitempty"`
+	EndHour         string `json:"end_hour,omitempty"`
+	DaysOfWeek      string `json:"days_of_week,omitempty"`
+	IsActive        *bool  `json:"is_active,omitempty"`
+	ValidUntil      string `json:"valid_until,omitempty"` // YYYY-MM-DD
+}
+
+// ParsedMeetingQuery para listar reuniões.
+type ParsedMeetingQuery struct {
+	TargetQuery string `json:"target_query,omitempty"`
+	Status     string `json:"status,omitempty"` // confirmed, voting, cancelled, all
+}
+
+// ParsedMeetingUpdate para atualizar reunião.
+type ParsedMeetingUpdate struct {
+	TargetQuery     string              `json:"target_query,omitempty"`
+	Title           string              `json:"title,omitempty"`
+	Description     string              `json:"description,omitempty"`
+	DurationMinutes int                 `json:"duration_minutes,omitempty"`
+	Mode            string              `json:"mode,omitempty"` // one_on_one | group_consensus
+	Slots           []ParsedMeetingSlot `json:"slots,omitempty"`
+	Status          string              `json:"status,omitempty"`
+}
+
+// ParsedPendingQuery para listar pendências.
+type ParsedPendingQuery struct {
+	Status     string `json:"status,omitempty"` // inbox, scheduled, completed, all
+	Category   string `json:"category,omitempty"`
+	Limit      int    `json:"limit,omitempty"`
+}
+
+// ParsedMemoryQuery para buscar memórias.
+type ParsedMemoryQuery struct {
+	Query   string `json:"query,omitempty"`   // termo de busca
+	Category string `json:"category,omitempty"`
+	Limit    int    `json:"limit,omitempty"`
+}
+
+// ParsedMemoryUpdate para atualizar memória.
+type ParsedMemoryUpdate struct {
+	ID         string `json:"id,omitempty"`         // ID exato da memória
+	TargetQuery string `json:"target_query,omitempty"` // busca por conteúdo
+	Category   string `json:"category,omitempty"`
+	Content    string `json:"content,omitempty"`
+}
+
+// ParsedMemoryDelete para deletar memória.
+type ParsedMemoryDelete struct {
+	ID         string `json:"id,omitempty"`
+	TargetQuery string `json:"target_query,omitempty"`
+	Category   string `json:"category,omitempty"`
+}
+
+// ParsedContactsQuery para listar contatos.
+type ParsedContactsQuery struct {
+	Query  string `json:"query,omitempty"`
+	Limit  int    `json:"limit,omitempty"`
+	Scope  string `json:"scope,omitempty"` // private, all
+}
+
 // ParsedIntent resultado normalizado da interpretação do assistente Toki-like.
 type ParsedIntent struct {
-	Action            IntentAction             `json:"action"`
-	Thought           string                   `json:"thought,omitempty"`      // §8.6 CoT: raciocínio guiado obrigatório
-	ContextUsed       []string                 `json:"context_used,omitempty"` // §8.6 CoT: memórias/entidades usadas
-	Message           string                   `json:"message"`                // Resposta amigável da secretária
-	Event             *ParsedEvent             `json:"event,omitempty"`
-	Todo              *ParsedTodo              `json:"todo,omitempty"`
-	Trigger           *ParsedTrigger           `json:"trigger,omitempty"`
-	Pending           *ParsedPending           `json:"pending,omitempty"`
-	Booking           *ParsedBooking           `json:"booking,omitempty"`
-	Meeting           *ParsedMeeting           `json:"meeting,omitempty"`
-	Conversation      *ParsedConversationQuery `json:"conversation,omitempty"`
-	WhatsAppMessage   *ParsedWhatsAppMessage   `json:"whatsapp_message,omitempty"`
-	ReplyReminder     *ParsedReplyReminder     `json:"reply_reminder,omitempty"`
-	MemoryContent     string                   `json:"memory_content,omitempty"`
-	MemoryCategory    string                   `json:"memory_category,omitempty"`
-	AdditionalActions []ParsedIntent           `json:"additional_actions,omitempty"` // Ações encadeadas no mesmo turno (até 3)
-	ProviderUsed      string                   `json:"provider_used,omitempty"`
+	Action            IntentAction               `json:"action"`
+	Thought           string                     `json:"thought,omitempty"`      // §8.6 CoT: raciocínio guiado obrigatório
+	ContextUsed       []string                   `json:"context_used,omitempty"` // §8.6 CoT: memórias/entidades usadas
+	Message           string                     `json:"message"`                // Resposta amigável da secretária
+	Event             *ParsedEvent               `json:"event,omitempty"`
+	Todo              *ParsedTodo                `json:"todo,omitempty"`
+	Trigger           *ParsedTrigger             `json:"trigger,omitempty"`
+	Pending           *ParsedPending             `json:"pending,omitempty"`
+	Booking           *ParsedBooking             `json:"booking,omitempty"`
+	BookingQuery      *ParsedBookingQuery        `json:"booking_query,omitempty"`
+	BookingUpdate     *ParsedBookingUpdate       `json:"booking_update,omitempty"`
+	Meeting           *ParsedMeeting             `json:"meeting,omitempty"`
+	MeetingQuery      *ParsedMeetingQuery        `json:"meeting_query,omitempty"`
+	MeetingUpdate     *ParsedMeetingUpdate       `json:"meeting_update,omitempty"`
+	Conversation      *ParsedConversationQuery   `json:"conversation,omitempty"`
+	WhatsAppMessage   *ParsedWhatsAppMessage     `json:"whatsapp_message,omitempty"`
+	ReplyReminder     *ParsedReplyReminder       `json:"reply_reminder,omitempty"`
+	TriggerQuery      *ParsedTriggerQuery        `json:"trigger_query,omitempty"`
+	PendingQuery      *ParsedPendingQuery        `json:"pending_query,omitempty"`
+	MemoryQuery       *ParsedMemoryQuery         `json:"memory_query,omitempty"`
+	MemoryUpdate      *ParsedMemoryUpdate        `json:"memory_update,omitempty"`
+	MemoryDelete      *ParsedMemoryDelete        `json:"memory_delete,omitempty"`
+	ContactsQuery     *ParsedContactsQuery       `json:"contacts_query,omitempty"`
+	MemoryContent     string                     `json:"memory_content,omitempty"`
+	MemoryCategory    string                     `json:"memory_category,omitempty"`
+	AdditionalActions []ParsedIntent             `json:"additional_actions,omitempty"` // Ações encadeadas no mesmo turno (até 3)
+	ProviderUsed      string                     `json:"provider_used,omitempty"`
 }
 
 // IsEmpty detecta resposta vazia (bug §8.7/9): Reply em branco e nenhuma ação.
@@ -237,7 +339,12 @@ func (p *ParsedIntent) IsEmpty() bool {
 	}
 	return p.Event == nil && p.Todo == nil && p.Trigger == nil &&
 		p.Pending == nil && p.Booking == nil && p.Meeting == nil &&
+		p.BookingQuery == nil && p.BookingUpdate == nil &&
+		p.MeetingQuery == nil && p.MeetingUpdate == nil &&
 		p.Conversation == nil && p.WhatsAppMessage == nil && p.ReplyReminder == nil &&
+		p.TriggerQuery == nil && p.PendingQuery == nil &&
+		p.MemoryQuery == nil && p.MemoryUpdate == nil && p.MemoryDelete == nil &&
+		p.ContactsQuery == nil &&
 		len(p.AdditionalActions) == 0 &&
 		strings.TrimSpace(p.MemoryContent) == ""
 }
