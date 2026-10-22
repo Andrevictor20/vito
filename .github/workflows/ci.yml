@@ -230,7 +230,7 @@ jobs:
       - name: WhatsApp context logs
         run: |
           echo "== Contexto do WhatsApp (últimos 200 logs filtrados) =="
-          docker logs --tail 400 vito-backend 2>&1 | grep -E 'WhatsAppContext|WhatsAppBackfill|WhatsAppGroupMeta|WhatsAppReplyNudge|Teto de heap' | tail -25 || echo "(sem linhas de contexto)"
+          docker logs --tail 400 vito-backend 2>&1 | grep -E 'WhatsAppContext|WhatsAppBackfill|WhatsAppGroupMeta|WhatsAppReplyNudge|WhatsAppContactsCache|WhatsAppMedia|Vito DB|Teto de heap' | tail -25 || echo "(sem linhas de contexto)"
           echo ""
           echo "== Últimas linhas do backend =="
           docker logs --tail 15 vito-backend 2>&1 || true
