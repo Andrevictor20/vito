@@ -82,6 +82,10 @@ func contactIDVariants(phone string) []string {
 // O nome salvo pelo dono vive na agenda do CELULAR (a Evolution nem sempre
 // expõe a agenda). O app lê a agenda e envia aqui; o nome é indexado pelo
 // número e também pelo JID derivado dele — cobrindo os chats @s.whatsapp.net.
+//
+// Atenção ao 9º dígito: o celular entrega o número com o 9º dígito
+// ("5511888196462") e o WhatsApp endereça o chat sem ele ("559888196462") —
+// as DUAS variantes precisam ser indexadas, senão o nome salvo nunca casa.
 func (c *WhatsAppContactsCache) SetSavedByNumber(number, name string) {
 	if c == nil {
 		return
@@ -95,9 +99,19 @@ func (c *WhatsAppContactsCache) SetSavedByNumber(number, name string) {
 	if digits == "" {
 		return
 	}
+	canonical := canonicalBRPhone(digits)
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	for _, jid := range []string{number, digits + "@s.whatsapp.net"} {
+	for _, jid := range []string{
+		number,
+		digits,
+		digits + "@s.whatsapp.net",
+		canonical,
+		canonical + "@s.whatsapp.net",
+	} {
+		if jid == "" {
+			continue
+		}
 		names := c.byJID[jid]
 		names.Saved = name
 		c.byJID[jid] = names
