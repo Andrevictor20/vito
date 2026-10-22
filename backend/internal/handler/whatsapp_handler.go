@@ -415,6 +415,35 @@ func (h *WhatsAppHandler) GetContactsCache(w http.ResponseWriter, r *http.Reques
 	writeJSON(w, http.StatusOK, h.contactsCache.Snapshot())
 }
 
+// UpdateContactProfile permite sobrescrever manualmente o nome de perfil de um contato.
+func (h *WhatsAppHandler) UpdateContactProfile(w http.ResponseWriter, r *http.Request) {
+	_, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "não autorizado"})
+		return
+	}
+	if h.contactsCache == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "cache de contatos indisponível"})
+		return
+	}
+
+	var input struct {
+		JID     string `json:"jid"`
+		Profile string `json:"profile"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "payload inválido"})
+		return
+	}
+	if strings.TrimSpace(input.JID) == "" || strings.TrimSpace(input.Profile) == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "jid e profile são obrigatórios"})
+		return
+	}
+
+	h.contactsCache.SetProfile(input.JID, input.Profile)
+	writeJSON(w, http.StatusOK, map[string]string{"message": "perfil atualizado"})
+}
+
 // PurgeContextMessages apaga todo o histórico de conversa arquivado do WhatsApp.
 func (h *WhatsAppHandler) PurgeContextMessages(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
