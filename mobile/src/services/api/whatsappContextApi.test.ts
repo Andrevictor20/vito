@@ -95,6 +95,35 @@ describe('WhatsAppContextApi Unit Tests', () => {
     assert.equal(res.pending[0].pending, true);
   });
 
+  test('getMediaStatus busca o estado do enriquecimento de midia', async () => {
+    const { client, calls } = mockClient({ pending: 3, done: 12, failed: 1 });
+
+    const api = new WhatsAppContextApi(client);
+    const res = await api.getMediaStatus();
+
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].ep, '/api/v1/integrations/whatsapp/media-status');
+    assert.equal(res.pending, 3);
+    assert.equal(res.done, 12);
+    assert.equal(res.failed, 1);
+  });
+
+  test('processMedia dispara o enriquecimento sob demanda com timeout maior', async () => {
+    const { client, calls } = mockClient({ enriched: 2 });
+
+    const api = new WhatsAppContextApi(client);
+    const res = await api.processMedia(5);
+
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].ep, '/api/v1/integrations/whatsapp/media-process');
+    assert.equal(calls[0].opt?.method, 'POST');
+    assert.equal(calls[0].opt?.body, JSON.stringify({ limit: 5 }));
+    // A analise de imagem pode levar dezenas de segundos: o timeout precisa
+    // ser maior que o padrao de 60s do cliente.
+    assert.ok((calls[0].opt?.timeoutMs ?? 0) > 60000);
+    assert.equal(res.enriched, 2);
+  });
+
   test('catálogo de escopos cobre off, quoted, chat e all', () => {
     const values = WHATSAPP_CONTEXT_SCOPES.map((s) => s.value);
     assert.deepEqual(values, ['off', 'quoted', 'chat', 'all']);

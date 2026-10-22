@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/config"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/repository"
@@ -20,10 +21,13 @@ type whatsappWiring struct {
 	GroupMeta      *service.WhatsAppGroupMeta
 	NudgeWorker    *service.WhatsAppReplyNudgeWorker
 	BackfillWorker *service.WhatsAppBackfillWorker
+	MediaEnricher  *service.WhatsAppMediaEnricher
+	MediaWorker    *service.WhatsAppMediaWorker
 }
 
 // setupWhatsAppAssistant monta o assistente de WhatsApp (contexto, diretório de
-// contatos, cache de nomes, owner JID, Radar de pendências e backfill).
+// contatos, cache de nomes, owner JID, Radar de pendências, backfill e
+// enriquecimento de mídia).
 func setupWhatsAppAssistant(
 	cfg *config.Config,
 	db *sql.DB,
@@ -33,6 +37,8 @@ func setupWhatsAppAssistant(
 	astSvc *service.AssistantService,
 	notifSvc *service.NotificationService,
 	accountCleanupWorker *service.AccountCleanupWorker,
+	visionProvider ai.ImageDescriber,
+	audioTranscriber ai.AudioTranscriber,
 ) *whatsappWiring {
 	waConvRepo := repository.NewWhatsAppConversationRepository(db)
 
@@ -93,6 +99,23 @@ func setupWhatsAppAssistant(
 		backfillWorker := service.NewWhatsAppBackfillWorker(backfill, groupMeta, 6*time.Hour)
 		backfillWorker.Start()
 		wiring.BackfillWorker = backfillWorker
+	}
+
+	// Enriquecimento de mídia (áudio/imagem do histórico): é o que faz o Vito
+	// "ler" mensagens que já passaram. O provider de visão é o OpenRouter (cota
+	// separada) — o Gemini free tier fica reservado ao chat.
+	if cfg.WhatsAppMediaEnrichEnabled {
+		enricherCfg := service.DefaultWhatsAppMediaEnricherConfig()
+		if cfg.WhatsAppMediaMaxAgeDays > 0 {
+			enricherCfg.MaxAge = time.Duration(cfg.WhatsAppMediaMaxAgeDays) * 24 * time.Hour
+		}
+		enricher := service.NewWhatsAppMediaEnricher(evoClient, contextSvc, audioTranscriber, visionProvider, enricherCfg)
+		waSvc.SetMediaEnricher(enricher)
+		wiring.MediaEnricher = enricher
+
+		mediaWorker := service.NewWhatsAppMediaWorker(enricher, waRepo, cfg.WhatsAppMediaEnrichPerCycle, time.Duration(cfg.WhatsAppMediaEnrichIntervalMin)*time.Minute)
+		mediaWorker.Start()
+		wiring.MediaWorker = mediaWorker
 	}
 
 	return wiring

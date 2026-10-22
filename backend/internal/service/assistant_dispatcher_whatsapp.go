@@ -19,6 +19,8 @@ func (s *AssistantService) executeWhatsAppAction(ctx context.Context, userID str
 	switch intent.Action {
 	case ai.ActionQueryConversation:
 		return s.actionQueryConversation(ctx, userID, intent, input, res)
+	case ai.ActionSearchConversations:
+		return s.actionSearchConversations(ctx, userID, intent, input, res)
 	case ai.ActionListPendingConversations:
 		return s.actionListPendingConversations(ctx, userID, intent, res)
 	case ai.ActionDraftReply:
@@ -29,6 +31,117 @@ func (s *AssistantService) executeWhatsAppAction(ctx context.Context, userID str
 		return s.actionCreateReplyReminder(ctx, userID, intent, res)
 	}
 	return res, nil
+}
+
+// actionSearchConversations busca no histórico do WhatsApp por conteúdo.
+//
+// É a resposta a "aquela mensagem da Ana sobre o contrato": a janela de contexto
+// só traz o mais recente e a conversa só devolvia as últimas mensagens. A
+// busca cobre o texto E a descrição das mídias (o que o Vito "viu" numa foto).
+func (s *AssistantService) actionSearchConversations(ctx context.Context, userID string, intent *ai.ParsedIntent, input ai.UserInput, res *AssistantResponse) (*AssistantResponse, error) {
+	if intent.Conversation == nil || strings.TrimSpace(intent.Conversation.Query) == "" {
+		return clarificationResponse(intent, "O que devo procurar no histórico? Me diga o assunto (ex: 'a mensagem sobre o contrato')."), nil
+	}
+	if s.waDirectory == nil {
+		res.Message = "Não consegui acessar seu histórico do WhatsApp agora."
+		res.Reply = res.Message
+		return res, nil
+	}
+
+	query := strings.TrimSpace(intent.Conversation.Query)
+	limit := intent.Conversation.Limit
+	if limit <= 0 {
+		limit = 8
+	}
+	messages, err := s.waDirectory.SearchMessages(ctx, userID, query, limit)
+	if err != nil {
+		log.Printf("⚠️ [AssistantService] falha ao buscar no histórico (user=%s): %v", userID, err)
+		res.Message = "Não consegui buscar no seu histórico agora. Tente de novo em instantes."
+		res.Reply = res.Message
+		return res, nil
+	}
+	if len(messages) == 0 {
+		res.Message = fmt.Sprintf("Não encontrei nada sobre %q no seu histórico do WhatsApp.", query)
+		res.Reply = res.Message
+		return res, nil
+	}
+
+	summary, sumErr := s.summarizeFoundMessages(ctx, input, query, messages)
+	if sumErr != nil || strings.TrimSpace(summary) == "" {
+		summary = formatFoundMessages(query, messages)
+	}
+	res.Message = summary
+	res.Reply = summary
+	return res, nil
+}
+
+// summarizeFoundMessages pede à IA um resumo dos trechos encontrados.
+func (s *AssistantService) summarizeFoundMessages(ctx context.Context, input ai.UserInput, query string, messages []domain.WhatsAppConversationMessage) (string, error) {
+	window := make([]ai.ChatMessageContext, 0, len(messages))
+	for _, m := range messages {
+		sender := "Contato"
+		switch {
+		case m.Kind == messageKindVito:
+			sender = "Vito"
+		case m.FromMe:
+			sender = "Você"
+		case strings.TrimSpace(m.SenderName) != "":
+			sender = m.SenderName
+		}
+		text := strings.TrimSpace(m.Text)
+		if text == "" {
+			text = strings.TrimSpace(m.MediaText)
+		}
+		if text == "" {
+			continue
+		}
+		window = append(window, ai.ChatMessageContext{
+			Sender: sender,
+			Text:   TruncateContextText(text, 400),
+			Chat:   windowChatLabel(m),
+			Kind:   m.Kind,
+		})
+	}
+	if len(window) == 0 {
+		return "", fmt.Errorf("nenhum trecho legível encontrado")
+	}
+
+	question := fmt.Sprintf("O que o usuário quis saber sobre %q? Responda com base nos trechos encontrados, citando o remetente e a data quando houver.", query)
+	out, err := s.aiGateway.ParseIntent(ctx, ai.UserInput{
+		Text:               question,
+		Timezone:           input.Timezone,
+		Now:                input.Now,
+		ConversationWindow: window,
+	})
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(out.Message), nil
+}
+
+// formatFoundMessages entrega os trechos reais quando a IA não conseguiu resumir.
+func formatFoundMessages(query string, messages []domain.WhatsAppConversationMessage) string {
+	var b strings.Builder
+	b.WriteString(fmt.Sprintf("Encontrei no histórico sobre %q:\n", query))
+	for _, m := range messages {
+		text := strings.TrimSpace(m.Text)
+		if text == "" {
+			text = strings.TrimSpace(m.MediaText)
+		}
+		if text == "" {
+			continue
+		}
+		sender := "Contato"
+		if m.Kind == messageKindVito {
+			sender = "Vito"
+		} else if m.FromMe {
+			sender = "Você"
+		} else if strings.TrimSpace(m.SenderName) != "" {
+			sender = m.SenderName
+		}
+		b.WriteString(fmt.Sprintf("- [%s] %s: %s\n", windowChatLabel(m), sender, TruncateContextText(text, 240)))
+	}
+	return strings.TrimSpace(b.String())
 }
 
 // actionQueryConversation lê as últimas mensagens de uma conversa e responde

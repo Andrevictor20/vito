@@ -18,6 +18,7 @@ import {
   WhatsAppContextSettings,
   WhatsAppContextPreview,
   WhatsAppDirectory,
+  WhatsAppMediaStatus,
 } from './whatsappContextApi';
 import {
   GmailApi,
@@ -430,36 +431,22 @@ export class ApiService extends ApiClient {
   }
 
   // WhatsApp (Evolution API v2)
-  getWhatsAppStatus(): Promise<WhatsAppIntegrationStatus> {
-    return this.whatsappApi.getStatus();
-  }
-  requestWhatsAppPairingCode(phone: string): Promise<{ pairing_code: string; status: string }> {
-    return this.whatsappApi.requestPairingCode(phone);
-  }
-  disconnectWhatsApp(): Promise<{ message: string; status: string }> {
-    return this.whatsappApi.disconnect();
-  }
-  getWhatsAppContacts(): Promise<{ contacts: import('./whatsappApi').WhatsAppMatchedContact[]; count: number }> {
-    return this.whatsappApi.getContacts();
-  }
-  getWhatsAppContextSettings(): Promise<WhatsAppContextSettings> {
-    return this.whatsappContextApi.getSettings();
-  }
-  getWhatsAppContextPreview(): Promise<WhatsAppContextPreview> {
-    return this.whatsappContextApi.getPreview();
-  }
-  getWhatsAppDirectory(): Promise<WhatsAppDirectory> {
-    return this.whatsappContextApi.getDirectory();
-  }
-  updateWhatsAppContextSettings(
+  getWhatsAppStatus = (): Promise<WhatsAppIntegrationStatus> => this.whatsappApi.getStatus();
+  requestWhatsAppPairingCode = (phone: string): Promise<{ pairing_code: string; status: string }> =>
+    this.whatsappApi.requestPairingCode(phone);
+  disconnectWhatsApp = (): Promise<{ message: string; status: string }> => this.whatsappApi.disconnect();
+  getWhatsAppContacts = (): Promise<{ contacts: import('./whatsappApi').WhatsAppMatchedContact[]; count: number }> =>
+    this.whatsappApi.getContacts();
+  getWhatsAppContextSettings = (): Promise<WhatsAppContextSettings> => this.whatsappContextApi.getSettings();
+  getWhatsAppContextPreview = (): Promise<WhatsAppContextPreview> => this.whatsappContextApi.getPreview();
+  getWhatsAppDirectory = (): Promise<WhatsAppDirectory> => this.whatsappContextApi.getDirectory();
+  updateWhatsAppContextSettings = (
     scope: WhatsAppContextScope,
     windowSize: number,
-  ): Promise<WhatsAppContextSettings> {
-    return this.whatsappContextApi.updateSettings(scope, windowSize);
-  }
-  purgeWhatsAppContextMessages(): Promise<{ message: string }> {
-    return this.whatsappContextApi.purgeMessages();
-  }
+  ): Promise<WhatsAppContextSettings> => this.whatsappContextApi.updateSettings(scope, windowSize);
+  purgeWhatsAppContextMessages = (): Promise<{ message: string }> => this.whatsappContextApi.purgeMessages();
+  getWhatsAppMediaStatus = (): Promise<WhatsAppMediaStatus> => this.whatsappContextApi.getMediaStatus();
+  processWhatsAppMedia = (limit = 5): Promise<{ enriched: number }> => this.whatsappContextApi.processMedia(limit);
   get whatsapp(): WhatsAppApi {
     return this.whatsappApi;
   }

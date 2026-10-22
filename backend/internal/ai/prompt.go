@@ -293,7 +293,7 @@ Responda EXCLUSIVAMENTE com um objeto JSON válido, sem backticks markdown ou te
 {
   "thought": "1. Verificar fuso/data atual; 2. Checar memórias relevantes; 3. Verificar conflitos; 4. Definir ação",
   "context_used": ["[categoria] trecho usado"],
-  "action": "CREATE_EVENT" | "UPDATE_EVENT" | "DELETE_EVENT" | "CREATE_TODO" | "COMPLETE_TODO" | "DELETE_TODO" | "CREATE_PENDING_ITEM" | "CONVERT_PENDING_TO_EVENT" | "QUERY_SCHEDULE" | "QUERY_TODOS" | "CREATE_TRIGGER" | "CREATE_BOOKING_LINK" | "CANCEL_BOOKING_APPOINTMENT" | "CREATE_MEETING" | "SAVE_MEMORY" | "QUERY_CONVERSATION" | "LIST_PENDING_CONVERSATIONS" | "DRAFT_REPLY" | "SEND_WHATSAPP_MESSAGE" | "CREATE_REPLY_REMINDER" | "NEEDS_CLARIFICATION" | "GENERAL_CHAT",
+  "action": "CREATE_EVENT" | "UPDATE_EVENT" | "DELETE_EVENT" | "CREATE_TODO" | "COMPLETE_TODO" | "DELETE_TODO" | "CREATE_PENDING_ITEM" | "CONVERT_PENDING_TO_EVENT" | "QUERY_SCHEDULE" | "QUERY_TODOS" | "CREATE_TRIGGER" | "CREATE_BOOKING_LINK" | "CANCEL_BOOKING_APPOINTMENT" | "CREATE_MEETING" | "SAVE_MEMORY" | "QUERY_CONVERSATION" | "SEARCH_CONVERSATIONS" | "LIST_PENDING_CONVERSATIONS" | "DRAFT_REPLY" | "SEND_WHATSAPP_MESSAGE" | "CREATE_REPLY_REMINDER" | "NEEDS_CLARIFICATION" | "GENERAL_CHAT",
   "message": "Mensagem calorosa, atenciosa, articulada, elegante e executiva do secretário Vito",
   "event": {
     "title": "Título conciso do evento",
@@ -363,6 +363,7 @@ Responda EXCLUSIVAMENTE com um objeto JSON válido, sem backticks markdown ou te
     { "action": "...", "event": {...}, "todo": {...} }
    Ações de WhatsApp:
     - "action": "QUERY_CONVERSATION", "conversation": {"chat": "Ana", "limit": 10}
+    - "action": "SEARCH_CONVERSATIONS", "conversation": {"query": "contrato do apartamento", "limit": 8}
     - "action": "LIST_PENDING_CONVERSATIONS"
     - "action": "DRAFT_REPLY"  (o rascunho vai no campo "message")
     - "action": "SEND_WHATSAPP_MESSAGE", "whatsapp_message": {"chat": "Ana", "text": "..."}

@@ -49,6 +49,8 @@ type WhatsAppService struct {
 	chatLabels       map[string]string
 	// runAsync executa o processamento com IA em background.
 	runAsync AsyncRunner
+	// enricher lê a mídia (áudio/imagem) das mensagens do WhatsApp.
+	enricher *WhatsAppMediaEnricher
 }
 
 // AsyncRunner executa uma tarefa em background (ou de forma síncrona, em testes).
@@ -88,6 +90,50 @@ func (s *WhatsAppService) SetAsyncRunner(runner AsyncRunner) {
 		return
 	}
 	s.runAsync = runner
+}
+
+// SetMediaEnricher injeta o enriquecedor de mídia (áudio/imagem do histórico).
+func (s *WhatsAppService) SetMediaEnricher(enricher *WhatsAppMediaEnricher) {
+	s.enricher = enricher
+}
+
+// ContextMessageByID devolve uma mensagem arquivada do shadow inbox.
+func (s *WhatsAppService) ContextMessageByID(ctx context.Context, userID, id string) (*domain.WhatsAppConversationMessage, error) {
+	if s.contextSvc == nil {
+		return nil, nil
+	}
+	return s.contextSvc.MessageByID(ctx, userID, id)
+}
+
+// QuotedContextOf devolve a mensagem marcada de uma mensagem arquivada.
+//
+// É o que permite ao Vito entender a que uma resposta se refere, mesmo quando
+// a citada é antiga ou é uma imagem/áudio. Devolve string vazia quando a
+// mensagem não tem citação (o texto da PRÓPRIA mensagem não é a citação).
+func (s *WhatsAppService) QuotedContextOf(ctx context.Context, userID, messageID string) string {
+	if s.contextSvc == nil || messageID == "" {
+		return ""
+	}
+	msg, err := s.contextSvc.MessageByID(ctx, userID, messageID)
+	if err != nil || msg == nil {
+		return ""
+	}
+	if msg.QuotedID != "" {
+		if cited, err := s.contextSvc.MessageByID(ctx, userID, msg.QuotedID); err == nil && cited != nil {
+			if text := quotedTextOf(cited); text != "" {
+				return text
+			}
+		}
+	}
+	return strings.TrimSpace(msg.QuotedText)
+}
+
+// MarkMediaAnalyzed grava o que o Vito leu de uma mídia (transcrição/descrição).
+func (s *WhatsAppService) MarkMediaAnalyzed(ctx context.Context, userID, id, text string) error {
+	if s.contextSvc == nil {
+		return nil
+	}
+	return s.contextSvc.SaveMediaText(ctx, userID, id, text)
 }
 
 // SetNotificationSender injeta o serviço de notificações push no WhatsAppService.

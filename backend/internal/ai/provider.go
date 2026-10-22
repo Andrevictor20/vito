@@ -29,6 +29,7 @@ const (
 	ActionCreateMeeting            IntentAction = "CREATE_MEETING"
 	ActionGeneralChat              IntentAction = "GENERAL_CHAT"
 	ActionQueryConversation        IntentAction = "QUERY_CONVERSATION"
+	ActionSearchConversations      IntentAction = "SEARCH_CONVERSATIONS"
 	ActionListPendingConversations IntentAction = "LIST_PENDING_CONVERSATIONS"
 	ActionDraftReply               IntentAction = "DRAFT_REPLY"
 	ActionSendWhatsAppMessage      IntentAction = "SEND_WHATSAPP_MESSAGE"
@@ -51,6 +52,12 @@ type ChatMessageContext struct {
 	Sender string `json:"sender"`         // "user" ou "vito"
 	Text   string `json:"text"`           //
 	Chat   string `json:"chat,omitempty"` // rótulo do chat de origem (WhatsApp)
+	// Quoted é a mensagem que o remetente marcou ("responder a esta mensagem").
+	// Sem isso o Vito perde o elo do que a mensagem atual responde.
+	Quoted string `json:"quoted,omitempty"`
+	// Kind é o tipo do conteúdo ("text", "image", "audio") — permite ao Vito
+	// dizer "a foto que você mandou" em vez de repetir o texto.
+	Kind string `json:"kind,omitempty"`
 }
 
 // UserInput encapsula a mensagem de entrada do usuário (texto ou áudio em base64).
@@ -176,6 +183,9 @@ type ParsedMeeting struct {
 type ParsedConversationQuery struct {
 	Chat  string `json:"chat"`            // nome do contato (como o usuário chamou)
 	Limit int    `json:"limit,omitempty"` // quantas mensagens brings (default 10)
+	// Query é o termo a BUSCAR no histórico ("aquela sobre o contrato"). Vazio
+	// = listar as últimas mensagens da conversa.
+	Query string `json:"query,omitempty"`
 }
 
 // ParsedWhatsAppMessage é uma mensagem a ser enviada a um contato.
@@ -237,6 +247,14 @@ type Provider interface {
 // VisionCapable indica se o provedor suporta processamento direto de imagens.
 type VisionCapable interface {
 	SupportsVision() bool
+}
+
+// ImageDescriber descreve uma imagem em texto puro.
+//
+// Separado do ParseIntent (que devolve JSON de ação) porque o enriquecimento do
+// histórico do WhatsApp precisa da DESCRIÇÃO, não de uma ação.
+type ImageDescriber interface {
+	DescribeImage(ctx context.Context, imageB64, imageMime, prompt string) (string, error)
 }
 
 // AudioCapable indica se o provedor suporta processamento direto de áudio.

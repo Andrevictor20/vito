@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/andrevmp/vito/backend/internal/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
@@ -13,10 +14,11 @@ import (
 
 // WhatsAppHandler gerencia as rotas HTTP de integração com o WhatsApp.
 type WhatsAppHandler struct {
-	waSvc        *service.WhatsAppService
-	contextSvc   *service.WhatsAppContextService
-	directorySvc *service.WhatsAppDirectoryService
-	backupMgr    *database.BackupManager
+	waSvc         *service.WhatsAppService
+	contextSvc    *service.WhatsAppContextService
+	directorySvc  *service.WhatsAppDirectoryService
+	mediaEnricher *service.WhatsAppMediaEnricher
+	backupMgr     *database.BackupManager
 }
 
 // NewWhatsAppHandler instancia o handler para rotas de WhatsApp.
@@ -32,6 +34,11 @@ func (h *WhatsAppHandler) SetContextService(contextSvc *service.WhatsAppContextS
 // SetDirectoryService injeta o diretório de conversas do WhatsApp.
 func (h *WhatsAppHandler) SetDirectoryService(directorySvc *service.WhatsAppDirectoryService) {
 	h.directorySvc = directorySvc
+}
+
+// SetMediaEnricher injeta o enriquecedor de mídia (áudio/imagem do histórico).
+func (h *WhatsAppHandler) SetMediaEnricher(enricher *service.WhatsAppMediaEnricher) {
+	h.mediaEnricher = enricher
 }
 
 // SetBackupManager injeta o gerenciador de backups.
@@ -266,6 +273,61 @@ func (h *WhatsAppHandler) GetContextDirectory(w http.ResponseWriter, r *http.Req
 		return
 	}
 	writeJSON(w, http.StatusOK, preview)
+}
+
+// GetMediaStatus mostra o estado do enriquecimento de mídia do histórico:
+// quantas imagens/áudios já foram lidos pelo Vito e quantas faltam.
+func (h *WhatsAppHandler) GetMediaStatus(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "não autorizado"})
+		return
+	}
+	if h.contextSvc == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "contexto do WhatsApp indisponível"})
+		return
+	}
+
+	since := time.Now().UTC().Add(-90 * 24 * time.Hour)
+	counts, err := h.contextSvc.MediaStatus(r.Context(), userID, since)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "falha ao contar as mídias do WhatsApp"})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"pending": counts[domain.WhatsAppMediaStatusPending],
+		"done":    counts[domain.WhatsAppMediaStatusDone],
+		"failed":  counts[domain.WhatsAppMediaStatusFailed],
+	})
+}
+
+// ProcessMedia dispara o enriquecimento de mídia sob demanda (o usuário pede
+// "analisar agora" em vez de esperar o worker de background).
+func (h *WhatsAppHandler) ProcessMedia(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "não autorizado"})
+		return
+	}
+	if h.mediaEnricher == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "enriquecimento de mídia indisponível"})
+		return
+	}
+
+	var input struct {
+		Limit int `json:"limit"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&input)
+	if input.Limit <= 0 || input.Limit > 20 {
+		input.Limit = 5
+	}
+
+	enriched, err := h.mediaEnricher.EnrichPending(r.Context(), userID, input.Limit)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "falha ao analisar as mídias do WhatsApp"})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"enriched": enriched})
 }
 
 // PurgeContextMessages apaga todo o histórico de conversa arquivado do WhatsApp.

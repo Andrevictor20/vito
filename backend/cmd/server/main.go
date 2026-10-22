@@ -369,22 +369,38 @@ func main() {
 	}, waRepo, evoClient, astSvc)
 	waSvc.SetNotificationSender(notifSvc)
 	waSvc.SetUserRepo(userRepo)
+	var audioTranscriber ai.AudioTranscriber
 	if cfg.GroqAPIKey != "" {
-		waSvc.SetAudioTranscriber(ai.NewGroqWhisper(cfg.GroqAPIKey))
+		audioTranscriber = ai.NewGroqWhisper(cfg.GroqAPIKey)
+		waSvc.SetAudioTranscriber(audioTranscriber)
 	}
 
-	// Assistente de WhatsApp: contexto, diretório de contatos, pendências, Radar e backfill.
-	waWiring := setupWhatsAppAssistant(cfg, db, waRepo, evoClient, waSvc, astSvc, notifSvc, accountCleanupWorker)
+	// Elo de VISÃO para o enriquecimento da mídia do histórico: OpenRouter tem
+	// cota separada da do Google AI Studio (que é compartilhada por todos os
+	// modelos do Gemini e já esgotou o free tier).
+	var mediaVision ai.ImageDescriber
+	if cfg.OpenRouterAPIKey != "" {
+		mediaVision = ai.NewOpenRouterVisionProvider(cfg.OpenRouterAPIKey, cfg.WhatsAppMediaVisionModel)
+		log.Printf("🖼️ [AI Provider] Visão do histórico do WhatsApp via %s.", cfg.WhatsAppMediaVisionModel)
+	}
+
+	// Assistente de WhatsApp: contexto, diretório de contatos, pendências, Radar,
+	// backfill e enriquecimento de mídia.
+	waWiring := setupWhatsAppAssistant(cfg, db, waRepo, evoClient, waSvc, astSvc, notifSvc, accountCleanupWorker, mediaVision, audioTranscriber)
 	waNudgeWorker := waWiring.NudgeWorker
 	waNudgeWorker.Start()
 	defer waNudgeWorker.Stop()
 	if waWiring.BackfillWorker != nil {
 		defer waWiring.BackfillWorker.Stop()
 	}
+	if waWiring.MediaWorker != nil {
+		defer waWiring.MediaWorker.Stop()
+	}
 
 	whatsappHandler := handler.NewWhatsAppHandler(waSvc)
 	whatsappHandler.SetContextService(waWiring.ContextSvc)
 	whatsappHandler.SetDirectoryService(waWiring.Directory)
+	whatsappHandler.SetMediaEnricher(waWiring.MediaEnricher)
 	if bkpMgr != nil {
 		// "Limpar histórico" invalida os snapshots: as cópias criptografadas
 		// também continham as mensagens apagadas.

@@ -47,6 +47,12 @@ type Config struct {
 	WhatsAppBackfillMaxMessages  int
 	WhatsAppContextDebugLog      bool
 	WhatsAppBackfillEnabled      bool
+	// Enriquecimento de mídia do histórico (áudio/imagem que já passaram).
+	WhatsAppMediaEnrichEnabled     bool
+	WhatsAppMediaEnrichPerCycle    int
+	WhatsAppMediaEnrichIntervalMin int
+	WhatsAppMediaMaxAgeDays        int
+	WhatsAppMediaVisionModel       string
 }
 
 // Load carrega a configuração a partir de variáveis de ambiente com fallbacks seguros.
@@ -183,6 +189,16 @@ func Load() *Config {
 		// O conteúdo da janela pode conter dados sensíveis: o log é opt-in.
 		WhatsAppContextDebugLog: getEnvBoolDefault("WHATSAPP_CONTEXT_DEBUG_LOG", false),
 		WhatsAppBackfillEnabled: getEnvBoolDefault("WHATSAPP_BACKFILL_ENABLED", true),
+		// Enriquecimento de mídia: o Vito passa a ler áudio e imagem das
+		// mensagens que JÁ PASSARAM. O teto por ciclo é o que segura o custo
+		// (a visão consome cota do provedor).
+		WhatsAppMediaEnrichEnabled:     getEnvBoolDefault("WHATSAPP_MEDIA_ENRICH_ENABLED", true),
+		WhatsAppMediaEnrichPerCycle:    getEnvIntDefault("WHATSAPP_MEDIA_ENRICH_PER_CYCLE", 3),
+		WhatsAppMediaEnrichIntervalMin: getEnvIntDefault("WHATSAPP_MEDIA_ENRICH_INTERVAL_MIN", 15),
+		WhatsAppMediaMaxAgeDays:        getEnvIntDefault("WHATSAPP_MEDIA_MAX_AGE_DAYS", 90),
+		// Visão via OpenRouter: cota separada da do Google AI Studio (que é
+		// compartilhada por todos os modelos do Gemini e é o gargalo do chat).
+		WhatsAppMediaVisionModel: getEnvDefault("WHATSAPP_MEDIA_VISION_MODEL", "google/gemini-3.5-flash-lite"),
 	}
 }
 
@@ -196,6 +212,14 @@ func getEnvIntDefault(key string, fallback int) int {
 		return fallback
 	}
 	return parsed
+}
+
+// getEnvDefault lê uma string do ambiente com fallback.
+func getEnvDefault(key, fallback string) string {
+	if v := strings.TrimSpace(os.Getenv(key)); v != "" {
+		return v
+	}
+	return fallback
 }
 
 func getEnvBoolDefault(key string, fallback bool) bool {

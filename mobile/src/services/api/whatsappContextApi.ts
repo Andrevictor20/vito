@@ -32,6 +32,13 @@ export interface WhatsAppDirectory {
   pending: WhatsAppChatContact[];
 }
 
+/** Estado do enriquecimento de mídia (áudio/imagem) do histórico. */
+export interface WhatsAppMediaStatus {
+  pending: number;
+  done: number;
+  failed: number;
+}
+
 export const WHATSAPP_CONTEXT_SCOPES: { value: WhatsAppContextScope; label: string; hint: string }[] = [
   { value: 'off', label: 'Desligado', hint: 'O Vito não recebe nenhum contexto do WhatsApp.' },
   {
@@ -79,5 +86,19 @@ export class WhatsAppContextApi {
 
   async getDirectory(): Promise<WhatsAppDirectory> {
     return this.client.request<WhatsAppDirectory>('/api/v1/integrations/whatsapp/context-directory');
+  }
+
+  /** Estado do enriquecimento de mídia do histórico (o Vito já leu as imagens/áudios?). */
+  async getMediaStatus(): Promise<WhatsAppMediaStatus> {
+    return this.client.request<WhatsAppMediaStatus>('/api/v1/integrations/whatsapp/media-status');
+  }
+
+  /** Dispara o enriquecimento de mídia sob demanda ("analisar agora"). */
+  async processMedia(limit = 5): Promise<{ enriched: number }> {
+    return this.client.request<{ enriched: number }>('/api/v1/integrations/whatsapp/media-process', {
+      method: 'POST',
+      body: JSON.stringify({ limit }),
+      timeoutMs: 120000,
+    });
   }
 }

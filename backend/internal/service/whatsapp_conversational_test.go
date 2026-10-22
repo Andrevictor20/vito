@@ -106,6 +106,10 @@ func setupConversationalWhatsAppTest(t *testing.T) (*service.WhatsAppService, *m
 
 	svc := service.NewWhatsAppService(cfg, waRepo, mockClient, assistantSvc)
 	svc.SetUserRepo(userRepo)
+	// Shadow inbox: sem ele as mensagens não são arquivadas e o contexto
+	// (janela + citada) fica vazio.
+	convRepo := repository.NewWhatsAppConversationRepository(db)
+	svc.SetContextService(service.NewWhatsAppContextService(convRepo, service.DefaultWhatsAppContextConfig()))
 	// Runner síncrono: mantém as asserções determinísticas (em produção o
 	// processamento com IA roda em background).
 	svc.SetAsyncRunner(func(fn func()) { fn() })

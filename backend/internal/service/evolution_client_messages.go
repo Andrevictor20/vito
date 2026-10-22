@@ -9,6 +9,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/andrevmp/vito/backend/internal/domain"
 )
 
 // WhatsAppChatMessage é uma mensagem obtida da Evolution API (backfill / janela).
@@ -22,6 +24,14 @@ type WhatsAppChatMessage struct {
 	Text             string
 	QuotedText       string
 	MessageTimestamp time.Time
+	// QuotedID é o stanzaId da mensagem citada (contextInfo.stanzaId).
+	QuotedID string
+	// MediaKind/MediaMime descrevem a mídia da mensagem (image, audio).
+	MediaKind string
+	MediaMime string
+	// MediaPayload é o envelope {key,message} serializado — o que permite
+	// baixar a mídia DEPOIS (sem ele, uma foto antiga é ilegível para sempre).
+	MediaPayload string
 }
 
 // WhatsAppGroup é um grupo retornado pela Evolution API.
@@ -286,6 +296,7 @@ type evolutionMessage struct {
 	MessageTimestamp int64           `json:"messageTimestamp"`
 	ContextInfo      *struct {
 		QuotedMessage json.RawMessage `json:"quotedMessage"`
+		StanzaID      string          `json:"stanzaId"`
 	} `json:"contextInfo"`
 }
 
@@ -303,6 +314,9 @@ func (m evolutionMessage) toChatMessage() WhatsAppChatMessage {
 	if m.ContextInfo != nil && len(m.ContextInfo.QuotedMessage) > 0 {
 		msg.QuotedText = extractMessageText(m.ContextInfo.QuotedMessage)
 	}
+	if m.ContextInfo != nil {
+		msg.QuotedID = strings.TrimSpace(m.ContextInfo.StanzaID)
+	}
 	if msg.QuotedText == "" {
 		// Fallback: algumas versões aninham o contextInfo dentro de message.<subtype>.
 		for _, sub := range messageSubtypePriority(subtypesOf(m.Message)) {
@@ -312,7 +326,65 @@ func (m evolutionMessage) toChatMessage() WhatsAppChatMessage {
 			}
 		}
 	}
+	msg.MediaKind, msg.MediaMime = detectMediaKind(m.Message, m.MessageType)
+	msg.MediaPayload = buildMediaPayload(m)
 	return msg
+}
+
+// detectMediaKind identifica a mídia da mensagem (image/audio) e o seu mime.
+func detectMediaKind(message json.RawMessage, messageType string) (string, string) {
+	subtypes := subtypesOf(message)
+	if raw, ok := subtypes["imageMessage"]; ok {
+		return domain.WhatsAppMediaKindImage, mediaMimeOf(raw)
+	}
+	if raw, ok := subtypes["viewOnceMessage"]; ok {
+		var wrapper struct {
+			Message map[string]json.RawMessage `json:"message"`
+		}
+		if err := json.Unmarshal(raw, &wrapper); err == nil {
+			if inner, ok := wrapper.Message["imageMessage"]; ok {
+				return domain.WhatsAppMediaKindImage, mediaMimeOf(inner)
+			}
+		}
+	}
+	if raw, ok := subtypes["audioMessage"]; ok {
+		return domain.WhatsAppMediaKindAudio, mediaMimeOf(raw)
+	}
+	if raw, ok := subtypes["documentMessage"]; ok {
+		if mime := mediaMimeOf(raw); strings.HasPrefix(strings.ToLower(mime), "image/") {
+			return domain.WhatsAppMediaKindImage, mime
+		}
+	}
+	switch {
+	case strings.Contains(strings.ToLower(messageType), "image"):
+		return domain.WhatsAppMediaKindImage, ""
+	case strings.Contains(strings.ToLower(messageType), "audio"):
+		return domain.WhatsAppMediaKindAudio, ""
+	}
+	return "", ""
+}
+
+// buildMediaPayload monta o envelope {key, message} que a Evolution API usa para
+// baixar a mídia (POST /chat/getBase64FromMediaMessage). Sem esse envelope a
+// mídia do histórico é irrecuperável.
+func buildMediaPayload(m evolutionMessage) string {
+	if detectKind, _ := detectMediaKind(m.Message, m.MessageType); detectKind == "" {
+		return ""
+	}
+	envelope := map[string]interface{}{
+		"key": map[string]interface{}{
+			"id":          firstNonEmpty(m.ID, m.Key.ID),
+			"remoteJid":   m.Key.RemoteJID,
+			"fromMe":      m.Key.FromMe,
+			"participant": m.Key.Participant,
+		},
+		"message": m.Message,
+	}
+	raw, err := json.Marshal(envelope)
+	if err != nil {
+		return ""
+	}
+	return string(raw)
 }
 
 // extractMessageText extrai o texto de uma mensagem da Evolution, tolerando os

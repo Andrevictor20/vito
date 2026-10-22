@@ -227,6 +227,18 @@ func (s *WhatsAppDirectoryService) MessagesOf(ctx context.Context, userID, chatJ
 	return s.repo.RecentMessages(ctx, userID, chatJID, limit, since)
 }
 
+// SearchMessages busca no histórico do WhatsApp por conteúdo (texto + descrição
+// de mídia). É o que responde a "aquela mensagem da Ana sobre o contrato".
+func (s *WhatsAppDirectoryService) SearchMessages(ctx context.Context, userID, query string, limit int) ([]domain.WhatsAppConversationMessage, error) {
+	if s == nil || s.repo == nil {
+		return nil, nil
+	}
+	if limit <= 0 || limit > 30 {
+		limit = 8
+	}
+	return s.repo.SearchMessages(ctx, userID, query, limit)
+}
+
 // WhatsAppDirectoryPreview é o diretório de contatos + as pendências de resposta,
 // no formato que a tela do app consome.
 type WhatsAppDirectoryPreview struct {

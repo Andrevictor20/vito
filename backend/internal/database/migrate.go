@@ -268,6 +268,61 @@ func runVersionedMigrations(db *sql.DB) error {
 			}
 			continue
 		}
+		if version == "017_whatsapp_media.sql" {
+			// Mídia rastreável do WhatsApp: cada coluna tem guarda individual
+			// (o ALTER falha se a coluna já existir).
+			cols := []struct{ name, ddl string }{
+				{"media_kind", "ALTER TABLE whatsapp_conversation_messages ADD COLUMN media_kind TEXT NOT NULL DEFAULT ''"},
+				{"media_mime", "ALTER TABLE whatsapp_conversation_messages ADD COLUMN media_mime TEXT NOT NULL DEFAULT ''"},
+				{"media_status", "ALTER TABLE whatsapp_conversation_messages ADD COLUMN media_status TEXT NOT NULL DEFAULT ''"},
+				{"media_text", "ALTER TABLE whatsapp_conversation_messages ADD COLUMN media_text TEXT NOT NULL DEFAULT ''"},
+				{"media_payload", "ALTER TABLE whatsapp_conversation_messages ADD COLUMN media_payload TEXT NOT NULL DEFAULT ''"},
+				{"quoted_id", "ALTER TABLE whatsapp_conversation_messages ADD COLUMN quoted_id TEXT NOT NULL DEFAULT ''"},
+			}
+			for _, c := range cols {
+				if !hasColumn(db, "whatsapp_conversation_messages", c.name) {
+					if _, err := db.Exec(c.ddl); err != nil {
+						return err
+					}
+				}
+			}
+			if _, err := db.Exec(`
+				CREATE INDEX IF NOT EXISTS idx_wa_conv_media_pending
+					ON whatsapp_conversation_messages (user_id, media_status, message_timestamp ASC);
+				CREATE INDEX IF NOT EXISTS idx_wa_conv_quoted
+					ON whatsapp_conversation_messages (user_id, quoted_id);
+			`); err != nil {
+				return err
+			}
+			if err := recordMigration(db, version); err != nil {
+				return err
+			}
+			continue
+		}
+		if version == "018_whatsapp_search.sql" {
+			// Índice full-text do histórico do WhatsApp. Precisa existir DEPOIS
+			// da 017 (as colunas media_text/quoted_id são indexadas).
+			content, err := migrationFS.ReadFile(name)
+			if err != nil {
+				return err
+			}
+			if _, err := db.Exec(string(content)); err != nil {
+				return err
+			}
+			// Retro-preenche o índice com o que já está arquivado.
+			if _, err := db.Exec(`
+				INSERT INTO whatsapp_messages_fts(rowid, text, media_text, chat_label, sender_name)
+				SELECT rowid, text, media_text, chat_label, sender_name
+				FROM whatsapp_conversation_messages
+				WHERE rowid NOT IN (SELECT rowid FROM whatsapp_messages_fts)
+			`); err != nil {
+				return err
+			}
+			if err := recordMigration(db, version); err != nil {
+				return err
+			}
+			continue
+		}
 		content, err := migrationFS.ReadFile(name)
 		if err != nil {
 			return err

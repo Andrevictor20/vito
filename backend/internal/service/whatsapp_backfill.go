@@ -225,6 +225,18 @@ func (s *WhatsAppBackfillService) importMessage(ctx context.Context, integration
 		text = clean
 		kind = messageKindVito
 	}
+	// A mídia do histórico precisa de duas coisas para ser lida depois: o tipo e
+	// o envelope de download da Evolution (sem ele, a foto antiga é ilegível).
+	mediaKind := m.MediaKind
+	mediaStatus := domain.WhatsAppMediaStatusNone
+	if mediaKind != "" && m.MediaPayload != "" {
+		mediaStatus = domain.WhatsAppMediaStatusPending
+		if mediaKind == domain.WhatsAppMediaKindImage {
+			kind = "image"
+		} else if mediaKind == domain.WhatsAppMediaKindAudio {
+			kind = "audio"
+		}
+	}
 
 	timestamp := m.MessageTimestamp
 	if timestamp.IsZero() {
@@ -244,6 +256,11 @@ func (s *WhatsAppBackfillService) importMessage(ctx context.Context, integration
 		Kind:             kind,
 		Text:             text,
 		QuotedText:       strings.TrimSpace(m.QuotedText),
+		QuotedID:         strings.TrimSpace(m.QuotedID),
+		MediaKind:        mediaKind,
+		MediaMime:        m.MediaMime,
+		MediaStatus:      mediaStatus,
+		MediaPayload:     m.MediaPayload,
 		MessageTimestamp: timestamp,
 		CreatedAt:        time.Now().UTC(),
 	})

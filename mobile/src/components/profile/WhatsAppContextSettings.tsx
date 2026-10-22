@@ -20,6 +20,7 @@ import {
   WhatsAppDirectory,
 } from '../../services/api/whatsappContextApi';
 import { BottomSheetModal } from '../ui/BottomSheetModal';
+import { WhatsAppMediaStatusBlock } from './WhatsAppMediaStatus';
 
 interface WhatsAppContextSettingsProps {
   visible: boolean;
@@ -323,6 +324,8 @@ export const WhatsAppContextSettings: React.FC<WhatsAppContextSettingsProps> = (
                 </View>
               </>
             )}
+
+            <WhatsAppMediaStatusBlock refreshKey={preview?.archived_total} />
 
             <TouchableOpacity
               style={[styles.dangerButton, { borderColor: colors.error }]}

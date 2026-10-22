@@ -75,7 +75,33 @@ type WhatsAppConversationMessage struct {
 	QuotedText       string    `json:"quoted_text"`
 	MessageTimestamp time.Time `json:"message_timestamp"`
 	CreatedAt        time.Time `json:"created_at"`
+	// MediaKind/MediaMime descrevem a mídia da mensagem (image, audio, ...).
+	MediaKind string `json:"media_kind,omitempty"`
+	MediaMime string `json:"media_mime,omitempty"`
+	// MediaStatus marca o estado do enriquecimento: none | pending | done | failed.
+	MediaStatus string `json:"media_status,omitempty"`
+	// MediaText é o conteúdo lido da mídia: transcrição (áudio) ou descrição (imagem).
+	MediaText string `json:"media_text,omitempty"`
+	// MediaPayload é o envelope {key,message} da Evolution — o que permite
+	// baixar a mídia DEPOIS (a foto antiga só é legível se a referência for guardada).
+	MediaPayload string `json:"media_payload,omitempty"`
+	// QuotedID é o stanzaId da mensagem citada ("responder a esta mensagem").
+	QuotedID string `json:"quoted_id,omitempty"`
 }
+
+// Estados do enriquecimento de mídia do WhatsApp.
+const (
+	WhatsAppMediaStatusNone    = ""
+	WhatsAppMediaStatusPending = "pending"
+	WhatsAppMediaStatusDone    = "done"
+	WhatsAppMediaStatusFailed  = "failed"
+)
+
+// Tipos de mídia reconhecidos no WhatsApp.
+const (
+	WhatsAppMediaKindImage = "image"
+	WhatsAppMediaKindAudio = "audio"
+)
 
 // WhatsAppContextSettings guarda as preferências de contexto do usuário.
 type WhatsAppContextSettings struct {
@@ -120,6 +146,18 @@ type WhatsAppConversationRepository interface {
 	RecentChats(ctx context.Context, userID string, since time.Time, limit int) ([]WhatsAppChatSummary, error)
 	CountMessages(ctx context.Context, userID string, since time.Time) (int64, error)
 	UpdateChatLabels(ctx context.Context, userID string, labels map[string]string) (int64, error)
+	// MessageByID busca uma mensagem arquivada pelo id (usado para resolver a
+	// mensagem citada/"responder a esta mensagem").
+	MessageByID(ctx context.Context, userID, id string) (*WhatsAppConversationMessage, error)
+	// PendingMedia devolve mensagens com mídia ainda não analisada, mais antigas
+	// primeiro (o worker de enriquecimento consome nessa ordem).
+	PendingMedia(ctx context.Context, userID string, limit int, since time.Time) ([]WhatsAppConversationMessage, error)
+	// MediaStatus conta as mídias do usuário por estado (none/pending/done/failed).
+	MediaStatus(ctx context.Context, userID string, since time.Time) (map[string]int64, error)
+	// UpdateMediaResult grava o resultado do enriquecimento de uma mídia.
+	UpdateMediaResult(ctx context.Context, userID, id, status, text string) error
+	// SearchMessages busca no histórico por conteúdo (texto + descrição de mídia).
+	SearchMessages(ctx context.Context, userID, query string, limit int) ([]WhatsAppConversationMessage, error)
 	GetPendingState(ctx context.Context, userID, chatJID string) (*WhatsAppPendingState, error)
 	SavePendingState(ctx context.Context, state *WhatsAppPendingState) error
 	GetContextSettings(ctx context.Context, userID string) (*WhatsAppContextSettings, error)

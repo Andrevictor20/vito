@@ -48,6 +48,7 @@ type inboundMessage struct {
 	IsAudio      bool
 	IsImage      bool
 	ImageMime    string
+	QuotedID     string
 	MediaPayload interface{}
 }
 
@@ -69,6 +70,10 @@ func parseInboundMessage(data json.RawMessage) (*inboundMessage, error) {
 		MessageType      string          `json:"messageType"`
 		Message          json.RawMessage `json:"message"`
 		MessageTimestamp int64           `json:"messageTimestamp"`
+		ContextInfo      *struct {
+			StanzaID      string          `json:"stanzaId"`
+			QuotedMessage json.RawMessage `json:"quotedMessage"`
+		} `json:"contextInfo"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return nil, err
@@ -99,6 +104,20 @@ func parseInboundMessage(data json.RawMessage) (*inboundMessage, error) {
 				msg.QuotedText = quoted
 				msg.QuotedAuthor = author
 			}
+			if msg.QuotedID == "" {
+				msg.QuotedID = extractQuotedID(sub)
+			}
+		}
+		// O `contextInfo` também pode vir no nível de `message` (irmão do
+		// subtipo) — é assim que a Evolution entrega em conversa simples.
+		if msg.QuotedID == "" {
+			msg.QuotedID = extractQuotedID(raw.Message)
+		}
+		if msg.QuotedText == "" {
+			if quoted, author := extractQuotedContext(raw.Message); quoted != "" {
+				msg.QuotedText = quoted
+				msg.QuotedAuthor = author
+			}
 		}
 		if msg.MessageType == "" {
 			for _, name := range []string{"audioMessage", "imageMessage", "videoMessage", "extendedTextMessage", "conversation"} {
@@ -114,6 +133,16 @@ func parseInboundMessage(data json.RawMessage) (*inboundMessage, error) {
 	msg.IsAudio = hasAudio || strings.EqualFold(raw.MessageType, "audioMessage")
 
 	msg.IsImage, msg.ImageMime = detectInboundImage(subtypes, raw.MessageType)
+
+	// O `contextInfo` pode vir no topo do payload (não aninhado em message.<subtype>).
+	if raw.ContextInfo != nil {
+		if msg.QuotedID == "" {
+			msg.QuotedID = strings.TrimSpace(raw.ContextInfo.StanzaID)
+		}
+		if msg.QuotedText == "" && len(raw.ContextInfo.QuotedMessage) > 0 {
+			msg.QuotedText = extractMessageText(raw.ContextInfo.QuotedMessage)
+		}
+	}
 
 	return msg, nil
 }
@@ -217,4 +246,21 @@ func extractQuotedContext(raw json.RawMessage) (string, string) {
 	}
 	text := extractMessageText(payload.ContextInfo.QuotedMessage)
 	return text, strings.TrimSpace(payload.ContextInfo.Participant)
+}
+
+// extractQuotedID lê o `contextInfo.stanzaId` — a identidade da mensagem citada.
+//
+// É o que permite resolver a mensagem marcada ("responder a esta mensagem")
+// mesmo quando ela é antiga, ou quando é uma imagem/áudio (o texto citado é
+// vazio e só o id permite achar a mensagem arquivada).
+func extractQuotedID(raw json.RawMessage) string {
+	var payload struct {
+		ContextInfo *struct {
+			StanzaID string `json:"stanzaId"`
+		} `json:"contextInfo"`
+	}
+	if err := json.Unmarshal(raw, &payload); err != nil || payload.ContextInfo == nil {
+		return ""
+	}
+	return strings.TrimSpace(payload.ContextInfo.StanzaID)
 }

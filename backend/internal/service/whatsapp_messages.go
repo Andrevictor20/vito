@@ -163,6 +163,10 @@ func (s *WhatsAppService) processPendingMessage(pending *pendingMessage) error {
 		rawText = imageAnalysisPrompt
 	}
 
+	// Enriquecimento SOB DEMANDA: a mídia da mensagem atual (ou da citada) que
+	// ainda não foi lida é analisada agora, para o Vito responder com base no
+	// que ela realmente diz.
+	s.enrichOnDemand(ctx, integration.UserID, msg)
 	quoted, window := s.buildContext(ctx, integration.UserID, msg, chatKind, rawText)
 
 	// Métricas do contexto (SPEC §10.2 P7): permitem auditar no Pi o que o Vito
@@ -247,29 +251,6 @@ func (s *WhatsAppService) transcribeAudio(ctx context.Context, instanceName stri
 	return strings.TrimSpace(transcribed)
 }
 
-// downloadImage baixa a imagem da Evolution API e normaliza o payload.
-//
-// O reuso do GetMediaBase64 (o mesmo caminho do áudio) evita uma segunda
-// integração com a Evolution. A normalização corrige o mime real e reduz o
-// tamanho — fotos do WhatsApp chegam com 16MB, acima do limite de payload do
-// provedor de IA.
-func (s *WhatsAppService) downloadImage(ctx context.Context, instanceName string, data json.RawMessage, mime string) (string, string) {
-	b64, err := s.client.GetMediaBase64(ctx, instanceName, data)
-	if err != nil {
-		log.Printf("⚠️ [WhatsAppService] falha ao baixar a imagem: %v", err)
-		return "", ""
-	}
-	if strings.TrimSpace(b64) == "" {
-		return "", ""
-	}
-	prepared, preparedMime, err := ai.PrepareImage(b64, mime)
-	if err != nil {
-		log.Printf("⚠️ [WhatsAppService] imagem não pôde ser preparada: %v", err)
-		return "", ""
-	}
-	return prepared, preparedMime
-}
-
 // classifyChat classifica a conversa e agenda a atualização do cache de participantes.
 //
 // A referência para reconhecer o chat "Você" é o **JID do owner** da instância
@@ -310,6 +291,29 @@ func (s *WhatsAppService) archiveMessage(ctx context.Context, userID, instanceNa
 		fromMe = true
 		kind = messageKindVito
 	}
+
+	// Mídia: o tipo, o mime e o envelope de download (a Evolution precisa dele
+	// para devolver a mídia quando o Vito for enricher a mensagem).
+	mediaKind := ""
+	mediaMime := ""
+	mediaStatus := domain.WhatsAppMediaStatusNone
+	mediaPayload := ""
+	switch {
+	case msg.IsImage:
+		mediaKind = domain.WhatsAppMediaKindImage
+		mediaMime = msg.ImageMime
+	case msg.IsAudio:
+		mediaKind = domain.WhatsAppMediaKindAudio
+	}
+	if mediaKind != "" {
+		if raw, ok := msg.MediaPayload.(json.RawMessage); ok {
+			mediaPayload = string(raw)
+		}
+		if mediaPayload != "" {
+			mediaStatus = domain.WhatsAppMediaStatusPending
+		}
+	}
+
 	entry := &domain.WhatsAppConversationMessage{
 		ID:               msg.MessageID,
 		UserID:           userID,
@@ -323,6 +327,11 @@ func (s *WhatsAppService) archiveMessage(ctx context.Context, userID, instanceNa
 		Kind:             kind,
 		Text:             text,
 		QuotedText:       strings.TrimSpace(msg.QuotedText),
+		QuotedID:         strings.TrimSpace(msg.QuotedID),
+		MediaKind:        mediaKind,
+		MediaMime:        mediaMime,
+		MediaStatus:      mediaStatus,
+		MediaPayload:     mediaPayload,
 		MessageTimestamp: timestamp,
 		CreatedAt:        time.Now().UTC(),
 	}
@@ -342,10 +351,30 @@ func (s *WhatsAppService) buildContext(ctx context.Context, userID string, msg *
 	}
 	quoted := ""
 	if settings.Scope != domain.WhatsAppContextScopeOff {
-		quoted = strings.TrimSpace(msg.QuotedText)
+		quoted = s.resolveQuoted(ctx, userID, msg)
 	}
 	window := s.contextSvc.Window(ctx, userID, msg.RemoteJID, chatKind, text, msg.MessageID)
 	return quoted, window
+}
+
+// resolveQuoted resolve a mensagem marcada ("responder a esta mensagem").
+//
+// A resolução é por ID (contextInfo.stanzaId) e não só pelo texto embutido:
+//   - a citada pode ser antiga (o texto inline vem junto, mas o id é o elo real);
+//   - a citada pode ser uma imagem/áudio — nesses casos o texto inline é VAZIO
+//     e só o id permite achar a mensagem arquivada (e o que o Vito viu nela).
+func (s *WhatsAppService) resolveQuoted(ctx context.Context, userID string, msg *inboundMessage) string {
+	if msg == nil {
+		return ""
+	}
+	if s.contextSvc != nil && msg.QuotedID != "" {
+		if archived, err := s.contextSvc.MessageByID(ctx, userID, msg.QuotedID); err == nil && archived != nil {
+			if text := quotedTextOf(archived); text != "" {
+				return text
+			}
+		}
+	}
+	return strings.TrimSpace(msg.QuotedText)
 }
 
 // resolveChatLabel define o rótulo do chat exibido no contexto (ex.: "Você", "Família", "Ana").

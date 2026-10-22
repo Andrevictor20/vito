@@ -113,6 +113,7 @@ func WhatsAppAssistantDirectives(directory, pending []ChatContactSummary) string
 	return `
 DIRETRIZ DE ASSISTENTE DE WHATSAPP (consultar conversas, responder, lembrar):
 - Você tem acesso às conversas do WhatsApp do usuário (SEUS CONTATOS e PENDÊNCIAS DE RESPOSTA). Quando ele perguntar sobre uma conversa ("quais as últimas mensagens que a Ana enviou", "o que o João quer"), use "action": "QUERY_CONVERSATION" com o nome do contato e "limit" (padrão 10) — a resposta vem das mensagens reais, não da sua memória.
+- Quando ele procurar algo ESPECÍFICO no histórico ("aquela mensagem sobre o contrato", "aquela foto do recibo", "aquele áudio que a Ana mandou"), use "action": "SEARCH_CONVERSATIONS" com "conversation": {"query": "<assunto>", "limit": 8}. A busca cobre também a descrição das imagens e a transcrição dos áudios. NÃO responda "não sei" sem tentar essa busca quando o usuário citar um assunto do passado.
 - "quem está me esperando" / "minhas pendências" / "com quem eu preciso falar" -> "action": "LIST_PENDING_CONVERSATIONS".
 - "me ajuda a responder a Ana" / "o que eu respondo pro João" -> "action": "DRAFT_REPLY" com o texto pronto no campo "message" (aqui você escreve como se fosse o usuário, e o Vito mostra o rascunho). NÃO envie sem pedido explícito.
 - "manda pra Ana" / "envia isso pra João" -> "action": "SEND_WHATSAPP_MESSAGE" com "whatsapp_message": {"chat": "Ana", "text": "..."}. Só use quando o usuário mandar ENVIAR de forma explícita; se o alvo estiver ambíguo, devolva a lista de candidatos.

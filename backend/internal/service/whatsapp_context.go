@@ -137,6 +137,46 @@ func (s *WhatsAppContextService) Relabel(ctx context.Context, userID string, lab
 	return s.repo.UpdateChatLabels(ctx, userID, labels)
 }
 
+// MessageByID devolve uma mensagem arquivada pelo id (resolve a citada).
+func (s *WhatsAppContextService) MessageByID(ctx context.Context, userID, id string) (*domain.WhatsAppConversationMessage, error) {
+	if s.repo == nil {
+		return nil, nil
+	}
+	return s.repo.MessageByID(ctx, userID, id)
+}
+
+// SaveMediaText grava o que o Vito leu de uma mídia (transcrição ou descrição).
+func (s *WhatsAppContextService) SaveMediaText(ctx context.Context, userID, id, text string) error {
+	if s.repo == nil {
+		return nil
+	}
+	return s.repo.UpdateMediaResult(ctx, userID, id, domain.WhatsAppMediaStatusDone, text)
+}
+
+// SaveMediaStatus grava o estado do enriquecimento (done/failed).
+func (s *WhatsAppContextService) SaveMediaStatus(ctx context.Context, userID, id, status string) error {
+	if s.repo == nil {
+		return nil
+	}
+	return s.repo.UpdateMediaResult(ctx, userID, id, status, "")
+}
+
+// PendingMedia devolve as mídias ainda não analisadas (mais antigas primeiro).
+func (s *WhatsAppContextService) PendingMedia(ctx context.Context, userID string, limit int, since time.Time) ([]domain.WhatsAppConversationMessage, error) {
+	if s.repo == nil {
+		return nil, nil
+	}
+	return s.repo.PendingMedia(ctx, userID, limit, since)
+}
+
+// MediaStatus conta as mídias do usuário por estado de enriquecimento.
+func (s *WhatsAppContextService) MediaStatus(ctx context.Context, userID string, since time.Time) (map[string]int64, error) {
+	if s.repo == nil {
+		return map[string]int64{}, nil
+	}
+	return s.repo.MediaStatus(ctx, userID, since)
+}
+
 // PruneOlderThan remove mensagens fora da retenção configurada.
 func (s *WhatsAppContextService) PruneOlderThan(ctx context.Context, cutoff time.Time) (int64, error) {
 	if s.repo == nil {
@@ -194,6 +234,11 @@ func (s *WhatsAppContextService) Window(ctx context.Context, userID, chatJID, ch
 		}
 		text := strings.TrimSpace(m.Text)
 		if text == "" {
+			// Mensagem de mídia sem descrição ainda: entra só se o Vito já a leu
+			// (media_text) — senão não há nada a dizer sobre ela.
+			text = strings.TrimSpace(m.MediaText)
+		}
+		if text == "" {
 			continue
 		}
 		if isSensitiveContextMessage(text) {
@@ -203,9 +248,30 @@ func (s *WhatsAppContextService) Window(ctx context.Context, userID, chatJID, ch
 			Sender: windowSender(m),
 			Text:   TruncateContextText(text, s.cfg.TruncChars),
 			Chat:   windowChatLabel(m),
+			Quoted: TruncateContextText(quotedTextOf(&m), 160),
+			Kind:   m.Kind,
 		})
 	}
 	return window
+}
+
+// quotedTextOf devolve o conteúdo legível de uma mensagem citada.
+//
+// Uma imagem citada não tem texto: o que o Vito "viu" nela é a descrição
+// (media_text). Sem ela, o bloco da citação sairia vazio e o Vito não
+// entenderia a que a mensagem se refere.
+func quotedTextOf(m *domain.WhatsAppConversationMessage) string {
+	if m == nil {
+		return ""
+	}
+	if media := strings.TrimSpace(m.MediaText); media != "" {
+		label := "imagem"
+		if m.MediaKind == domain.WhatsAppMediaKindAudio {
+			label = "áudio"
+		}
+		return fmt.Sprintf("[%s] %s", label, media)
+	}
+	return strings.TrimSpace(m.Text)
 }
 
 // minTier0Window é o piso da janela quando a mensagem é autocontida.

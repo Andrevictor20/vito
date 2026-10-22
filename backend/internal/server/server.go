@@ -309,6 +309,8 @@ func (s *Server) registerRoutes() {
 						wr.Put("/context-settings", s.whatsappHandler.UpdateContextSettings)
 						wr.Get("/context-preview", s.whatsappHandler.GetContextPreview)
 						wr.Get("/context-directory", s.whatsappHandler.GetContextDirectory)
+						wr.Get("/media-status", s.whatsappHandler.GetMediaStatus)
+						wr.Post("/media-process", s.whatsappHandler.ProcessMedia)
 						wr.Delete("/context-messages", s.whatsappHandler.PurgeContextMessages)
 					})
 				}
