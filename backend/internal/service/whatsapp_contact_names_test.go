@@ -151,6 +151,24 @@ func TestWhatsAppService_RotuloDoUsaNomeSalvo(t *testing.T) {
 	}
 }
 
+// TestWhatsAppContactsCache_SetProfilePreservaOSalvo: o pushName visto nas
+// mensagens completa o alias sem sobrescrever o nome salvo.
+func TestWhatsAppContactsCache_SetProfilePreservaOSalvo(t *testing.T) {
+	cache := service.NewWhatsAppContactsCache(nil, time.Hour)
+	cache.Set(jidIsaSalvo, nomeSalvoIsa, "")
+	cache.SetProfile(jidIsaSalvo, nomePerfilBel)
+
+	if got := cache.Name(jidIsaSalvo); got != nomeSalvoIsa {
+		t.Errorf("o nome salvo não pode ser sobrescrito pelo perfil, obteve %q", got)
+	}
+	if got := cache.ProfileName(jidIsaSalvo); got != nomePerfilBel {
+		t.Errorf("esperava o perfil %q, obteve %q", nomePerfilBel, got)
+	}
+	if got := cache.Alias(jidIsaSalvo, nomeSalvoIsa); got != nomePerfilBel {
+		t.Errorf("esperava o alias %q, obteve %q", nomePerfilBel, got)
+	}
+}
+
 // openShadowInboxDB abre um shadow inbox isolado para os testes.
 func openShadowInboxDB(t *testing.T) (*sql.DB, error) {
 	t.Helper()

@@ -124,6 +124,28 @@ func (c *WhatsAppContactsCache) Set(jid, saved, profile string) {
 	c.byJID[jid] = names
 }
 
+// SetProfile registra o nome de PERFIL de um contato (o que a pessoa escolheu
+// no WhatsApp), sem tocar no nome salvo.
+//
+// O pushName chega em toda mensagem recebida — é uma fonte mais confiável que
+// o `findContacts` (que às vezes devolve o pushName vazio).
+func (c *WhatsAppContactsCache) SetProfile(jid, profile string) {
+	if c == nil || jid == "" {
+		return
+	}
+	profile = strings.TrimSpace(profile)
+	if profile == "" {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	names := c.byJID[jid]
+	if names.Profile == "" {
+		names.Profile = profile
+	}
+	c.byJID[jid] = names
+}
+
 // Names devolve a cópia do mapa de nomes (usada para reetiquetar o histórico).
 func (c *WhatsAppContactsCache) Names() map[string]string {
 	if c == nil {

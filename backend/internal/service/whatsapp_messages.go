@@ -425,6 +425,9 @@ func (s *WhatsAppService) resolveChatLabel(chatKind string, msg *inboundMessage)
 		}
 		if !msg.FromMe && strings.TrimSpace(msg.PushName) != "" {
 			s.chatLabels[msg.RemoteJID] = msg.PushName
+			// O nome de perfil vira ALIAS do contato salvo: é o que permite ao
+			// Vito entender "isa" e "bella" como a mesma pessoa.
+			s.contactsCache.SetProfile(msg.RemoteJID, msg.PushName)
 		}
 		if label, ok := s.chatLabels[msg.RemoteJID]; ok {
 			return label

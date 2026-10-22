@@ -227,6 +227,11 @@ func (s *WhatsAppBackfillService) importMessage(ctx context.Context, integration
 			label = m.PushName
 			labels[m.RemoteJID] = m.PushName
 		}
+		// O pushName das mensagens é a fonte mais confiável do nome de perfil
+		// (o findContacts às vezes o devolve vazio) — vira o alias do contato.
+		if s.contactsCache != nil && !m.FromMe && strings.TrimSpace(m.PushName) != "" {
+			s.contactsCache.SetProfile(m.RemoteJID, m.PushName)
+		}
 	}
 
 	text := m.Text
