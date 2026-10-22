@@ -240,6 +240,16 @@ jobs:
           echo "== Tamanho do banco (shadow inbox incluído) =="
           docker exec vito-backend sh -c 'ls -l /app/data/vito.db' 2>/dev/null || echo "(não foi possível inspecionar o volume)"
           echo ""
+          echo "== Integridade do SQLite (SQLITE_CORRUPT = 267) =="
+          docker exec vito-backend sh -c 'ls /app/data/*.db' 2>/dev/null | head -5
+          for db in $(docker exec vito-backend sh -c 'ls /app/data/*.db' 2>/dev/null); do
+            echo "-- $db --"
+            docker exec vito-backend sh -c "sqlite3 '$db' 'PRAGMA integrity_check;' 2>&1 | head -5" 2>/dev/null || echo "(sem cliente sqlite3 no container)"
+          done
+          echo ""
+          echo "== Espaço em disco (o DB corrompido costuma ser disco cheio) =="
+          docker exec vito-backend sh -c 'df -h /app/data 2>/dev/null | tail -2' 2>/dev/null || echo "(não foi possível ler o disco)"
+          echo ""
           echo "== Chat JIDs / telefones presentes no shadow inbox =="
           docker exec vito-backend sh -c "grep -aoE '[0-9]{11,15}@s\.whatsapp\.net|[0-9]{10,15}@g\.us|[0-9]{10,15}@lid' /app/data/vito.db | sort | uniq -c | sort -rn | head -20" 2>/dev/null || echo "(não foi possível inspecionar os JIDs)"
           echo ""
