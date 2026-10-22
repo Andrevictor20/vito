@@ -51,6 +51,10 @@ type WhatsAppService struct {
 	runAsync AsyncRunner
 	// enricher lê a mídia (áudio/imagem) das mensagens do WhatsApp.
 	enricher *WhatsAppMediaEnricher
+	// blockedReplies guarda a última resposta educativa enviada por conversa
+	// (cooldown: "spam de @vito" não pode virar spam no grupo).
+	blockedMu      sync.Mutex
+	blockedReplies map[string]time.Time
 }
 
 // AsyncRunner executa uma tarefa em background (ou de forma síncrona, em testes).

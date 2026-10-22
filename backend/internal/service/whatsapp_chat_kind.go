@@ -91,3 +91,23 @@ func AllowsCrossChat(chatKind string) bool {
 func RequiresTrigger(chatKind string) bool {
 	return chatKind == domain.WhatsAppChatKindGroup || chatKind == domain.WhatsAppChatKindDirect
 }
+
+// CanActOnMessage informa se o Vito pode executar comandos a partir desta
+// mensagem.
+//
+// REGRA DE OURO: só o DONO da instância dá comandos ao Vito.
+//
+// Sem isso, qualquer pessoa num grupo (ou num 1-on-1) podia escrever
+// "@vito cria uma reunião amanhã" e o Vito criava o evento NA CONTA DO DONO —
+// além de poder responder pelo WhatsApp dele (SEND_WHATSAPP_MESSAGE).
+//
+// A exceção é o chat "Você" (`self`) e o grupo só dele (`self_group`): por
+// construção não há terceiros ali — o ClassifyChat cai sempre no tipo mais
+// restritivo (`group`) quando os participantes são desconhecidos, e o
+// fallback de `CanActOnMessage` mantém o dono com acesso.
+func CanActOnMessage(chatKind string, fromMe bool) bool {
+	if fromMe {
+		return true
+	}
+	return chatKind == domain.WhatsAppChatKindSelf || chatKind == domain.WhatsAppChatKindSelfGroup
+}

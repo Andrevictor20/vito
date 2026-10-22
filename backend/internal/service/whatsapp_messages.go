@@ -61,8 +61,10 @@ func (s *WhatsAppService) handleMessagesEvent(ctx context.Context, instanceName 
 
 	// Diagnóstico de entrada: expõe o JID, o telefone da integração e o tipo de chat
 	// classificado (essencial para auditar a classificação do chat "Você").
-	log.Printf("🧭 [WhatsAppContext] instance=%s jid=%s phone=%s kind=%s tipo=%s texto=%d citada=%v",
-		instanceName, msg.RemoteJID, integration.Phone, chatKind, msg.MessageType, len(rawText), msg.QuotedText != "")
+	// O `fromMe` é o que separa o DONO de um terceiro — é a base da blindagem
+	// (só o dono dá comandos ao Vito).
+	log.Printf("🧭 [WhatsAppContext] instance=%s jid=%s phone=%s kind=%s tipo=%s texto=%d citada=%v fromMe=%v",
+		instanceName, msg.RemoteJID, integration.Phone, chatKind, msg.MessageType, len(rawText), msg.QuotedText != "", msg.FromMe)
 
 	// Mensagem gerada pelo próprio Vito: arquiva (faz parte do contexto) e encerra (anti-loop).
 	if IsVitoMessage(rawText) {
@@ -82,6 +84,18 @@ func (s *WhatsAppService) handleMessagesEvent(ctx context.Context, instanceName 
 		if rawText == "" {
 			rawText = "olá"
 		}
+	}
+
+	// Blindagem: só o DONO da instância dá comandos ao Vito. Uma mensagem de
+	// terceiro é arquivada (o Vito continua enxergando a conversa) mas NÃO aciona
+	// a IA — nem executa agenda/tarefa, nem responde pelo WhatsApp do dono.
+	if !CanActOnMessage(chatKind, msg.FromMe) {
+		s.archiveMessage(ctx, integration.UserID, instanceName, msg, chatKind, rawText, "user")
+		log.Printf("🛡️ [WhatsAppContext] comando de terceiro bloqueado (kind=%s jid=%s fromMe=false)", chatKind, msg.RemoteJID)
+		if hasTrigger {
+			s.replyOnlyOwnerCanCommand(ctx, instanceName, msg, chatKind)
+		}
+		return nil
 	}
 
 	s.archiveMessage(ctx, integration.UserID, instanceName, msg, chatKind, rawText, "user")

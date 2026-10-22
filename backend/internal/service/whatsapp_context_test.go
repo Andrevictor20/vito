@@ -284,7 +284,8 @@ func TestWhatsAppContext_SelfGroupRespondsWithoutMention(t *testing.T) {
 	}
 }
 
-// AC-F17 — grupo com outras pessoas exige @vito.
+// AC-F17 — grupo com outras pessoas exige @vito; e, mesmo com @vito, um
+// TERCEIRO não comanda o Vito (blindagem: só o dono dá comandos).
 func TestWhatsAppContext_GroupWithOthersRequiresMention(t *testing.T) {
 	fx := setupContextualWhatsApp(t)
 	fx.groupMeta.SetParticipants(groupJID(), 3)
@@ -297,12 +298,16 @@ func TestWhatsAppContext_GroupWithOthersRequiresMention(t *testing.T) {
 		t.Fatalf("o Vito não deve responder em grupo sem menção")
 	}
 
+	// Com menção, mas de TERCEIRO (fromMe=false): o Vito não executa o comando.
 	if err := fx.svc.HandleWebhook(context.Background(), "messages.upsert",
 		buildPayload(groupJID(), "msg-grp-3", "@vito meus compromissos de amanhã")); err != nil {
 		t.Fatalf("HandleWebhook: %v", err)
 	}
 	if len(fx.client.sentMessages) != 1 {
-		t.Fatalf("esperava 1 resposta após menção, obteve %d", len(fx.client.sentMessages))
+		t.Fatalf("esperava 1 resposta (recusativa) para terceiro, obteve %d", len(fx.client.sentMessages))
+	}
+	if !strings.Contains(strings.ToLower(fx.client.sentMessages[0].Text), "dono") {
+		t.Errorf("a resposta a terceiro deve explicar que só o dono dá comandos, obteve: %s", fx.client.sentMessages[0].Text)
 	}
 }
 
