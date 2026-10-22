@@ -117,12 +117,15 @@
     "owner": "andrevictor007"
   },
   "runtimeVersion": {
-    "policy": "version",
-    "version": "65f941181a36aa3a202039fd4e9b65b06ea7420e"
+    "policy": "fingerprint"
   },
   "extra": {
     "eas": {
       "projectId": "b376b3f5-a93f-4f3e-a262-ddded8f96586"
     }
+  },
+  "version": "0.1.16",
+  "android": {
+    "versionCode": 16
   }
 }
