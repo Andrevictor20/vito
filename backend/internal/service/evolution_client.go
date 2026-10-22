@@ -354,13 +354,32 @@ func (c *DefaultEvolutionClient) GetMediaBase64(ctx context.Context, instanceNam
 }
 
 func (c *DefaultEvolutionClient) FindContacts(ctx context.Context, instanceName string) ([]WhatsAppContact, error) {
+	contacts, err := c.findContacts(ctx, instanceName, map[string]interface{}{})
+	if err != nil {
+		return nil, err
+	}
+	if len(contacts) > 0 {
+		return contacts, nil
+	}
+	// Sem filtro a Evolution devolve lista vazia. O contrato do Chat Controller
+	// aceita `where: {id}` (o identificador do contato) — é a outra via para
+	// alcançar o nome SALVO na agenda.
+	return c.findContacts(ctx, instanceName, map[string]interface{}{"id": ""})
+}
+
+// FindContactsByID busca um contato específico (o `where.id` do contrato).
+func (c *DefaultEvolutionClient) FindContactsByID(ctx context.Context, instanceName, id string) ([]WhatsAppContact, error) {
+	return c.findContacts(ctx, instanceName, map[string]interface{}{"id": id})
+}
+
+// findContacts chama o endpoint de contatos com o `where` informado.
+func (c *DefaultEvolutionClient) findContacts(ctx context.Context, instanceName string, where map[string]interface{}) ([]WhatsAppContact, error) {
 	path := fmt.Sprintf("/chat/findContacts/%s", instanceName)
 	// O `where` é OBRIGATÓRIO no contrato da Evolution (Chat Controller v2):
 	// sem ele a API devolve lista vazia — e é assim que o nome SALVO do contato
 	// (o nome que o dono dá na agenda) nunca chegava ao Vito.
-	// `where: {}` = sem filtro (todos os contatos da instância).
 	resp, err := c.doRequest(ctx, http.MethodPost, path, map[string]interface{}{
-		"where": map[string]interface{}{},
+		"where": where,
 	})
 	if err != nil {
 		return nil, err

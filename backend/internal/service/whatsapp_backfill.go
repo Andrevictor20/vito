@@ -119,8 +119,19 @@ func (s *WhatsAppBackfillService) runForInstance(ctx context.Context, integratio
 
 	// Nomes dos contatos: os chats @lid chegam sem pushName e ficariam como
 	// "Contato" no diretório (o Vito não conseguiria dizer "a Ana te espera").
+	//
+	// Os JIDs conhecidos vêm do shadow inbox: são eles que permitem tentar a
+	// busca por id (a via que traz o nome SALVO do contato).
+	knownJIDs := []string{}
+	if s.contextSvc != nil {
+		if profiles, err := s.contextSvc.SenderNames(ctx, integration.UserID, from); err == nil {
+			for jid := range profiles {
+				knownJIDs = append(knownJIDs, jid)
+			}
+		}
+	}
 	if s.contactsCache != nil {
-		if _, err := s.contactsCache.Fetch(ctx, integration.InstanceName); err != nil {
+		if _, err := s.contactsCache.Fetch(ctx, integration.InstanceName, knownJIDs...); err != nil {
 			log.Printf("⚠️ [WhatsAppBackfill] falha ao buscar contatos: %v", err)
 		}
 	}

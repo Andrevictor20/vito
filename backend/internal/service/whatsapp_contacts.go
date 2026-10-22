@@ -112,6 +112,37 @@ func (c *WhatsAppContactsCache) Alias(jid, principal string) string {
 	return ""
 }
 
+// fetchByID tenta a outra variante do contrato (`where.id`) para cada JID
+// conhecido. É a via capaz de trazer o nome salvo do contato.
+//
+// O diagnóstico de cada tentativa é essential: sem ele não se sabe se a
+// Evolution tem a agenda ou não.
+func (c *WhatsAppContactsCache) fetchByID(ctx context.Context, instanceName string, jids []string) []WhatsAppContact {
+	byJID, ok := c.client.(interface {
+		FindContactsByID(ctx context.Context, instanceName, id string) ([]WhatsAppContact, error)
+	})
+	if !ok || len(jids) == 0 {
+		return nil
+	}
+	var all []WhatsAppContact
+	for i, jid := range jids {
+		if i >= 8 {
+			break // teto: são chamadas HTTP à Evolution
+		}
+		if strings.TrimSpace(jid) == "" {
+			continue
+		}
+		contacts, err := byJID.FindContactsByID(ctx, instanceName, jid)
+		if err != nil {
+			log.Printf("[WhatsAppContactsCache] busca por id %s falhou: %v", jid, err)
+			continue
+		}
+		log.Printf("[WhatsAppContactsCache] busca por id %s devolveu %d contato(s)", jid, len(contacts))
+		all = append(all, contacts...)
+	}
+	return all
+}
+
 // Set registra os nomes de um contato.
 func (c *WhatsAppContactsCache) Set(jid, saved, profile string) {
 	if c == nil || jid == "" {
@@ -298,7 +329,11 @@ func (c *WhatsAppContactsCache) Ensure(ctx context.Context, instanceName string)
 
 // Fetch busca os contatos da instância de forma síncrona e preenche o cache.
 // Devolve quantos nomes foram resolvidos.
-func (c *WhatsAppContactsCache) Fetch(ctx context.Context, instanceName string) (int, error) {
+//
+// A Evolution nem sempre devolve a agenda: quando a chamada sem filtro volta
+// vazia, tenta o `where.id` (o outro formato do contrato) para os JIDs
+// conhecidos — é a via que pode trazer o nome SALVO do contato.
+func (c *WhatsAppContactsCache) Fetch(ctx context.Context, instanceName string, knownJIDs ...string) (int, error) {
 	if c == nil || c.client == nil {
 		return 0, nil
 	}
@@ -319,6 +354,10 @@ func (c *WhatsAppContactsCache) Fetch(ctx context.Context, instanceName string) 
 		c.lastFetchRaw = c.lastFetchRaw[:5]
 	}
 	c.mu.Unlock()
+
+	if len(contacts) == 0 {
+		contacts = c.fetchByID(ctx, instanceName, knownJIDs)
+	}
 
 	resolved := 0
 	withSaved, withProfile, distinct := 0, 0, 0
