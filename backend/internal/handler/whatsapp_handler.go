@@ -18,6 +18,7 @@ type WhatsAppHandler struct {
 	contextSvc    *service.WhatsAppContextService
 	directorySvc  *service.WhatsAppDirectoryService
 	mediaEnricher *service.WhatsAppMediaEnricher
+	contactsCache *service.WhatsAppContactsCache
 	backupMgr     *database.BackupManager
 }
 
@@ -34,6 +35,11 @@ func (h *WhatsAppHandler) SetContextService(contextSvc *service.WhatsAppContextS
 // SetDirectoryService injeta o diretório de conversas do WhatsApp.
 func (h *WhatsAppHandler) SetDirectoryService(directorySvc *service.WhatsAppDirectoryService) {
 	h.directorySvc = directorySvc
+}
+
+// SetContactsCache injeta o cache de nomes dos contatos (diagnóstico).
+func (h *WhatsAppHandler) SetContactsCache(cache *service.WhatsAppContactsCache) {
+	h.contactsCache = cache
 }
 
 // SetMediaEnricher injeta o enriquecedor de mídia (áudio/imagem do histórico).
@@ -328,6 +334,23 @@ func (h *WhatsAppHandler) ProcessMedia(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]interface{}{"enriched": enriched})
+}
+
+// GetContactsCache mostra o estado do cache de nomes dos contatos.
+//
+// Diagnóstico: o Vito precisa reconhecer o contato pelo nome SALVO pelo dono
+// ("isa") e também pelo nome de perfil do WhatsApp ("bella"). Este endpoint
+// mostra de onde cada nome veio.
+func (h *WhatsAppHandler) GetContactsCache(w http.ResponseWriter, r *http.Request) {
+	if _, ok := middleware.UserIDFromContext(r.Context()); !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "não autorizado"})
+		return
+	}
+	if h.contactsCache == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "cache de contatos indisponível"})
+		return
+	}
+	writeJSON(w, http.StatusOK, h.contactsCache.Snapshot())
 }
 
 // PurgeContextMessages apaga todo o histórico de conversa arquivado do WhatsApp.

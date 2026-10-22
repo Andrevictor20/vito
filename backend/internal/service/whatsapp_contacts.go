@@ -145,6 +145,46 @@ func (c *WhatsAppContactsCache) SetProfile(jid, profile string) {
 	c.byJID[jid] = names
 }
 
+// Snapshot devolve o estado do cache de nomes (diagnóstico).
+//
+// O Vito precisa reconhecer o contato pelo nome SALVO pelo dono ("isa") e
+// também pelo nome de perfil do WhatsApp ("bella"). Este retrato mostra de
+// onde cada nome veio — é o que revela se a Evolution entrega o nome salvo.
+func (c *WhatsAppContactsCache) Snapshot() map[string]interface{} {
+	if c == nil {
+		return map[string]interface{}{"total": 0}
+	}
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	withSaved, withProfile, both := 0, 0, 0
+	sample := make([]map[string]string, 0, 12)
+	for jid, names := range c.byJID {
+		saved := strings.TrimSpace(names.Saved)
+		profile := strings.TrimSpace(names.Profile)
+		if saved != "" {
+			withSaved++
+		}
+		if profile != "" {
+			withProfile++
+		}
+		if saved != "" && profile != "" {
+			both++
+		}
+		if len(sample) < 12 {
+			sample = append(sample, map[string]string{"jid": jid, "saved": saved, "profile": profile})
+		}
+	}
+	return map[string]interface{}{
+		"total":         len(c.byJID),
+		"com_salvo":     withSaved,
+		"com_perfil":    withProfile,
+		"com_os_dois":   both,
+		"amostra":       sample,
+		"atualizado_em": c.fetchedAt.Format(time.RFC3339),
+	}
+}
+
 // SetProfiles registra o nome de perfil (pushName) de vários contatos de uma vez.
 func (c *WhatsAppContactsCache) SetProfiles(profiles map[string]string) {
 	if c == nil || len(profiles) == 0 {

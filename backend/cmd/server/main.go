@@ -405,6 +405,7 @@ func main() {
 	whatsappHandler.SetContextService(waWiring.ContextSvc)
 	whatsappHandler.SetDirectoryService(waWiring.Directory)
 	whatsappHandler.SetMediaEnricher(waWiring.MediaEnricher)
+	whatsappHandler.SetContactsCache(waWiring.ContactsCache)
 	if bkpMgr != nil {
 		// "Limpar histórico" invalida os snapshots: as cópias criptografadas
 		// também continham as mensagens apagadas.
