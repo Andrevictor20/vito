@@ -175,23 +175,43 @@ func (c *WhatsAppContactsCache) ImportSavedNames(ctx context.Context, instanceNa
 		c.SetSavedByNumber(phone, name)
 		imported++
 
-		// Ponte para o @lid: a Evolution sabe o id (lid) do contato.
+		// Ponte para o @lid: a Evolution sabe o id (lid) do contato — mas só
+		// responde quando o `where.id` é o identificador no formato dela.
 		if !hasByID || instanceName == "" {
 			continue
 		}
-		contacts, err := byID.FindContactsByID(ctx, instanceName, phone)
-		if err != nil || len(contacts) == 0 {
-			continue
-		}
-		for _, contact := range contacts {
-			if contact.ID == "" {
+		for _, variant := range contactIDVariants(phone) {
+			contacts, err := byID.FindContactsByID(ctx, instanceName, variant)
+			if err != nil || len(contacts) == 0 {
 				continue
 			}
-			c.Set(contact.ID, name, strings.TrimSpace(contact.PushName))
+			log.Printf("[WhatsAppContactsCache] contato '%s' encontrado pelo id '%s' (%d registro(s))", name, variant, len(contacts))
+			for _, contact := range contacts {
+				if contact.ID == "" {
+					continue
+				}
+				c.Set(contact.ID, name, strings.TrimSpace(contact.PushName))
+			}
+			break
 		}
 	}
 	log.Printf("[WhatsAppContactsCache] %d nome(s) salvo(s) importado(s) da agenda", imported)
 	return imported
+}
+
+// contactIDVariants devolve as formas de identificar o contato que a Evolution
+// aceita no `where.id` (o formato dela é o do identificador do WhatsApp).
+func contactIDVariants(phone string) []string {
+	digits := phoneDigits(phone)
+	variants := []string{}
+	if digits != "" {
+		variants = append(variants, digits, digits+"@s.whatsapp.net")
+	}
+	trimmed := strings.TrimSpace(phone)
+	if trimmed != "" && trimmed != digits {
+		variants = append(variants, trimmed)
+	}
+	return variants
 }
 
 // SetSavedByNumber registra o nome SALVO de um contato a partir do seu número.
