@@ -11,6 +11,12 @@ import (
 )
 
 // SenderNamesByChat devolve o nome de perfil (pushName) mais recente de cada chat.
+// SenderNamesByChat devolve o nome de PERFIL (pushName) mais recente de cada chat.
+//
+// IMPORTANTE: Considera apenas mensagens RECEBIDAS (from_me = false), pois o
+// pushName da mensagem é o nome do REMETENTE. Se considerarmos mensagens
+// enviadas pelo próprio usuário (from_me = true), o sender_name será o nome
+// do próprio usuário ("André Victor"), não o nome do contato ("Bella").
 func (r *WhatsAppConversationRepositorySQLite) SenderNamesByChat(ctx context.Context, userID string, since time.Time) (map[string]string, error) {
 	if userID == "" {
 		return map[string]string{}, nil
@@ -21,7 +27,7 @@ func (r *WhatsAppConversationRepositorySQLite) SenderNamesByChat(ctx context.Con
 			SELECT chat_jid, sender_name,
 				ROW_NUMBER() OVER (PARTITION BY chat_jid ORDER BY message_timestamp DESC) AS rn
 			FROM whatsapp_conversation_messages
-			WHERE user_id = ? AND message_timestamp >= ? AND sender_name <> ''
+			WHERE user_id = ? AND message_timestamp >= ? AND sender_name <> '' AND from_me = false
 		)
 		WHERE rn = 1
 	`, userID, since)
