@@ -227,13 +227,25 @@ jobs:
           echo "== Uso de memória/CPU dos containers (teto do box: 8 GB) =="
           docker stats --no-stream --format "table {{.Name}}\t{{.MemUsage}}\t{{.CPUPerc}}"
 
+      - name: AI Gateway & Outbound Connectivity
+        run: |
+          echo "== AI Gateway logs =="
+          docker logs --tail 250 vito-backend 2>&1 | grep -iE 'AI Gateway|Assistant|AI Provider' || true
+          echo ""
+          echo "== Variáveis de ambiente de IA dentro do container =="
+          docker exec vito-backend env | grep -E 'GEMINI|GROQ|OPENROUTER|MISTRAL' | sed -E 's/=(.{4}).*/=\1...[REDACTED]/' || true
+          echo ""
+          echo "== Teste de conectividade externa do container com Gemini =="
+          docker exec vito-backend wget -qO- --timeout=5 https://generativelanguage.googleapis.com 2>&1 || echo "Wget falhou no Gemini"
+          echo "== Teste de conectividade externa do container com Groq =="
+          docker exec vito-backend wget -qO- --timeout=5 https://api.groq.com 2>&1 || echo "Wget falhou no Groq"
+          echo "== Teste de conectividade externa do container com OpenRouter =="
+          docker exec vito-backend wget -qO- --timeout=5 https://openrouter.ai 2>&1 || echo "Wget falhou no OpenRouter"
+
       - name: WhatsApp context logs
         run: |
           echo "== Contexto do WhatsApp (últimos 200 logs filtrados) =="
           docker logs --tail 400 vito-backend 2>&1 | grep -E 'WhatsAppContext|WhatsAppBackfill|WhatsAppGroupMeta|WhatsAppReplyNudge|WhatsAppContactsCache|WhatsAppMedia|Vito DB|Teto de heap' | tail -25 || echo "(sem linhas de contexto)"
-          echo ""
-          echo "== Últimas linhas do backend =="
-          docker logs --tail 15 vito-backend 2>&1 || true
 
       - name: Shadow inbox size
         run: |

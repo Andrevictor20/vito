@@ -123,6 +123,7 @@ type openAIChatRequest struct {
 	ResponseFormat *struct {
 		Type string `json:"type"`
 	} `json:"response_format,omitempty"`
+	MaxTokens int `json:"max_tokens,omitempty"`
 }
 
 type openAIChatResponse struct {
@@ -164,6 +165,7 @@ func (p *OpenAICompatProvider) ParseIntent(ctx context.Context, input UserInput)
 		ResponseFormat: &struct {
 			Type string `json:"type"`
 		}{Type: "json_object"},
+		MaxTokens: 2048,
 	}
 
 	jsonBytes, err := json.Marshal(reqBody)
@@ -290,6 +292,7 @@ Analise o cenário, verifique se a condição foi atingida ou se há fatos relev
 		ResponseFormat: &struct {
 			Type string `json:"type"`
 		}{Type: "json_object"},
+		MaxTokens: 2048,
 	}
 
 	jsonBytes, err := json.Marshal(reqBody)
@@ -347,6 +350,7 @@ func (p *OpenAICompatProvider) GenerateText(ctx context.Context, systemPrompt, u
 			{Role: "system", Content: systemPrompt},
 			{Role: "user", Content: userPrompt},
 		},
+		MaxTokens: 2048,
 	}
 
 	jsonBytes, err := json.Marshal(reqBody)
