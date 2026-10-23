@@ -7,6 +7,7 @@ import { BottomSheetModal } from '../ui/BottomSheetModal';
 import { hapticFeedback } from '../../theme/motion';
 import { api } from '../../services/api';
 import { syncAndMatchDeviceContacts, MatchedContactItem } from '../../services/contactMatchingService';
+import { WhatsAppContactNamesImport } from './WhatsAppContactNamesImport';
 import { formatPhoneNumber } from '../../utils/phoneFormat';
 
 interface ContactsSyncModalProps {
@@ -33,6 +34,7 @@ export const ContactsSyncModal: React.FC<ContactsSyncModalProps> = ({
   const [waMatches, setWaMatches] = useState<MatchedContactItem[]>([]);
   const [waHasScanned, setWaHasScanned] = useState(false);
   const [waConnected, setWaConnected] = useState<boolean | null>(null);
+  const [waNamesImported, setWaNamesImported] = useState(false);
 
   React.useEffect(() => {
     if (visible) {
@@ -55,13 +57,14 @@ export const ContactsSyncModal: React.FC<ContactsSyncModalProps> = ({
       }));
       setWaMatches(mapped);
       setWaHasScanned(true);
+      setWaNamesImported(mapped.length > 0);
       hapticFeedback.success();
     } catch (err: any) {
       console.error('Erro ao sincronizar contatos do WhatsApp:', err);
-      Alert.alert(
-        'Falha no WhatsApp',
-        'Não foi possível consultar os contatos do WhatsApp. Verifique se o WhatsApp está conectado no seu perfil.'
-      );
+      // Só mostra alerta de falha se for erro real de rede/servidor, não quando
+      // o WhatsApp está conectado mas ainda não há nomes importados (cache vazio).
+      setWaHasScanned(true);
+      setWaNamesImported(false);
       hapticFeedback.medium();
     } finally {
       setWaLoading(false);
@@ -331,6 +334,12 @@ export const ContactsSyncModal: React.FC<ContactsSyncModalProps> = ({
                   )}
                 </TouchableOpacity>
 
+                {!waNamesImported && (
+                  <View style={[styles.importBox, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
+                    <WhatsAppContactNamesImport onImported={() => setWaNamesImported(true)} />
+                  </View>
+                )}
+
                 {waHasScanned && (
                   <View style={styles.resultsArea}>
                     <View style={styles.resultsHeader}>
@@ -490,5 +499,10 @@ const styles = StyleSheet.create({
   meetingActionText: {
     fontSize: tokens.typography.size.labelSmall,
     fontWeight: tokens.typography.weight.semibold,
+  },
+  importBox: {
+    padding: tokens.spacing.md,
+    marginTop: tokens.spacing.md,
+    borderRadius: MD3Shapes.medium,
   },
 });

@@ -377,6 +377,7 @@ func (s *WhatsAppService) MatchWhatsAppContacts(ctx context.Context, userID stri
 	if s.contactsCache != nil {
 		contactsByNumber = s.contactsCache.SavedContactsByNumber()
 	}
+	log.Printf("[WhatsAppService] MatchWhatsAppContacts user=%s cache_entries=%d", userID, len(contactsByNumber))
 
 	var results []domain.ContactMatchResult
 	seenUserIDs := make(map[string]bool)
@@ -384,6 +385,7 @@ func (s *WhatsAppService) MatchWhatsAppContacts(ctx context.Context, userID stri
 	for rawPhone, savedName := range contactsByNumber {
 		cleanPhone, err := SanitizePhoneNumber(rawPhone)
 		if err != nil || cleanPhone == "" {
+			log.Printf("[WhatsAppService] MatchWhatsAppContacts ignorando telefone invalido '%s': %v", rawPhone, err)
 			continue
 		}
 
@@ -408,6 +410,7 @@ func (s *WhatsAppService) MatchWhatsAppContacts(ctx context.Context, userID stri
 	if results == nil {
 		results = []domain.ContactMatchResult{}
 	}
+	log.Printf("[WhatsAppService] MatchWhatsAppContacts user=%s matches=%d", userID, len(results))
 	return results, nil
 }
 
