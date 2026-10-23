@@ -135,6 +135,32 @@ func (c *WhatsAppContactsCache) NumbersKnown() []string {
 	return out
 }
 
+// SavedContactsByNumber devolve os números de telefone (dígitos, sem sufixo
+// @s.whatsapp.net) dos contatos cuja agenda foi importada pelo app e seu nome
+// salvo pelo dono. É a fonte confiável de quem o usuário tem no WhatsApp — a
+// Evolution não expõe a agenda (findContacts devolve 0 contato), então o
+// matching "quem usa Vito" deve cruzar esta lista com a base de usuários.
+func (c *WhatsAppContactsCache) SavedContactsByNumber() map[string]string {
+	if c == nil {
+		return nil
+	}
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	out := make(map[string]string, len(c.byJID))
+	for jid, names := range c.byJID {
+		saved := strings.TrimSpace(names.Saved)
+		if saved == "" {
+			continue
+		}
+		digits := phoneDigits(jid)
+		if digits == "" {
+			continue
+		}
+		out[digits] = saved
+	}
+	return out
+}
+
 // SetSavedFromLabels registra como nome SALVO os rótulos já persistidos que
 // diferem do nome de perfil.
 //

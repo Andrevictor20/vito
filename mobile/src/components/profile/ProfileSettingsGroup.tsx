@@ -4,16 +4,11 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { tokens } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import type { AutonomyMode } from '../../types';
-import { WHATSAPP_CONTEXT_SCOPES, WhatsAppContextScope } from '../../services/api/whatsappContextApi';
-
 interface ProfileSettingsGroupProps {
   onOpenCalendarSync?: () => void;
   onOpenAISettings?: () => void;
   onOpenContactsSync?: () => void;
   onOpenIntegrations?: () => void;
-  onOpenWhatsAppContext?: () => void;
-  /** Escopo de contexto do WhatsApp atual (para o status da linha). */
-  whatsAppContextScope?: WhatsAppContextScope;
   /** Modo de autonomia atual (para o status da linha). */
   autonomyMode?: AutonomyMode;
   /** Nº de calendários conectados (null = desconhecido). */
@@ -41,16 +36,12 @@ export const ProfileSettingsGroup: React.FC<ProfileSettingsGroupProps> = ({
   onOpenAISettings,
   onOpenContactsSync,
   onOpenIntegrations,
-  onOpenWhatsAppContext,
-  whatsAppContextScope = 'all',
   autonomyMode = 'assisted',
   calendarsActive = null,
   integrationsActiveCount = 0,
 }) => {
   const { colors, isDark, toggleTheme } = useTheme();
   const proactive = autonomyMode === 'proactive';
-  const contextScopeLabel =
-    WHATSAPP_CONTEXT_SCOPES.find((s) => s.value === whatsAppContextScope)?.label ?? 'Desligado';
 
   return (
     <View style={[styles.groupCard, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
@@ -177,30 +168,6 @@ export const ProfileSettingsGroup: React.FC<ProfileSettingsGroupProps> = ({
                 : 'Conectar'
             }
           />
-          <RowChevron />
-        </View>
-      </TouchableOpacity>
-
-      <View style={[styles.divider, { backgroundColor: colors.outlineVariant }]} />
-
-      {/* Contexto do WhatsApp */}
-      <TouchableOpacity
-        style={styles.groupItem}
-        onPress={onOpenWhatsAppContext}
-        activeOpacity={0.7}
-        accessibilityLabel="Abrir contexto do WhatsApp"
-        accessibilityRole="button"
-      >
-        <View style={styles.itemLeft}>
-          <View style={[styles.itemIconBox, { backgroundColor: colors.surfaceContainerHigh }]}>
-            <MaterialIcons name="forum" size={18} color={colors.primary} />
-          </View>
-          <Text style={[styles.itemTitle, { color: colors.onSurface }]} numberOfLines={1}>
-            Contexto do WhatsApp
-          </Text>
-        </View>
-        <View style={styles.itemRight}>
-          <StatusValue label={contextScopeLabel} />
           <RowChevron />
         </View>
       </TouchableOpacity>

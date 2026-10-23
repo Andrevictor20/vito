@@ -305,8 +305,8 @@ export const UnifiedBookingCard: React.FC<UnifiedBookingCardProps> = ({
         activeOpacity={0.8}
         disabled={isConfirming}
       >
-        <MaterialIcons name={isCopied ? 'check' : 'content-copy'} size={12} color={isCopied ? '#FFFFFF' : colors.onSurface} />
-        <Text style={[styles.copyButtonText, { color: isCopied ? '#FFFFFF' : colors.onSurface }]}>{isCopied ? 'Copiado' : 'Copiar'}</Text>
+        <MaterialIcons name={isCopied ? 'check' : 'content-copy'} size={12} color={isCopied ? '#FFFFFF' : colors.onPrimary} />
+        <Text style={[styles.copyButtonText, { color: isCopied ? '#FFFFFF' : colors.onPrimary }]}>{isCopied ? 'Copiado' : 'Copiar'}</Text>
       </TouchableOpacity>
     );
 

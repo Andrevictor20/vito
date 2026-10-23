@@ -354,7 +354,13 @@ func (s *WhatsAppService) Disconnect(ctx context.Context, userID string) error {
 	return s.repo.UpdateStatus(ctx, integration.ID, domain.WhatsAppStatusDisconnected, nil)
 }
 
-// MatchWhatsAppContacts consulta os contatos da Evolution API e cruza com a base de usuários do Vito.
+// MatchWhatsAppContacts cruza os contatos da agenda do WhatsApp (importados pelo
+// app via POST /contact-names e persistidos no contactsCache) com a base de
+// usuários do Vito.
+//
+// A Evolution não expõe a agenda do celular: findContacts devolve 0 contato,
+// então nunca houve matches por esta via. A fonte confiável é o contactsCache,
+// populado pelo próprio usuário quando importa a agenda do aparelho.
 func (s *WhatsAppService) MatchWhatsAppContacts(ctx context.Context, userID string) ([]domain.ContactMatchResult, error) {
 	integration, err := s.repo.GetByUserID(ctx, userID)
 	if err != nil {
@@ -367,19 +373,16 @@ func (s *WhatsAppService) MatchWhatsAppContacts(ctx context.Context, userID stri
 		return []domain.ContactMatchResult{}, nil
 	}
 
-	contacts, err := s.client.FindContacts(ctx, integration.InstanceName)
-	if err != nil {
-		return nil, err
+	contactsByNumber := map[string]string{}
+	if s.contactsCache != nil {
+		contactsByNumber = s.contactsCache.SavedContactsByNumber()
 	}
 
 	var results []domain.ContactMatchResult
 	seenUserIDs := make(map[string]bool)
 
-	for _, contact := range contacts {
-		cleanPhone, err := SanitizePhoneNumber(contact.Number)
-		if err != nil {
-			cleanPhone, err = SanitizePhoneNumber(contact.ID)
-		}
+	for rawPhone, savedName := range contactsByNumber {
+		cleanPhone, err := SanitizePhoneNumber(rawPhone)
 		if err != nil || cleanPhone == "" {
 			continue
 		}
@@ -388,10 +391,7 @@ func (s *WhatsAppService) MatchWhatsAppContacts(ctx context.Context, userID stri
 			user, err := s.userRepo.GetByPhone(cleanPhone)
 			if err == nil && user != nil && user.ID != userID && !seenUserIDs[user.ID] {
 				seenUserIDs[user.ID] = true
-				contactName := contact.Name
-				if contactName == "" {
-					contactName = contact.PushName
-				}
+				contactName := savedName
 				if contactName == "" {
 					contactName = user.Name
 				}
