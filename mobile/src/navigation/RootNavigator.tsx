@@ -2,7 +2,7 @@ import React from 'react';
 import { createNativeStackNavigator, type NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { createNavigationContainerRef } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
-import { AuthScreen } from '../screens/AuthScreen';
+import { LoginScreen } from '../components/login/LoginScreen';
 import { MainTabs } from './MainTabs';
 import { HomeDataProvider } from './HomeDataProvider';
 import type { RootStackParamList } from '../AppRoot';
@@ -24,7 +24,7 @@ export const RootNavigator: React.FC<RootNavigatorProps> = ({ serverUrl, onToggl
     return (
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="auth">
-          {() => <AuthScreen serverUrl={serverUrl} onToggleServer={onToggleServer} />}
+          {() => <LoginScreen serverUrl={serverUrl} onToggleServer={onToggleServer} />}
         </Stack.Screen>
       </Stack.Navigator>
     );

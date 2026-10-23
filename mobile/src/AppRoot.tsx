@@ -96,7 +96,7 @@ const MainNavigator: React.FC = () => {
   );
 };
 
-import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
+import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold, Inter_800ExtraBold } from '@expo-google-fonts/inter';
 
 export const AppRoot: React.FC = () => {
   const [fontsLoaded] = useFonts({
@@ -104,6 +104,7 @@ export const AppRoot: React.FC = () => {
     Inter_500Medium,
     Inter_600SemiBold,
     Inter_700Bold,
+    Inter_800ExtraBold,
   });
 
   if (!fontsLoaded) {
