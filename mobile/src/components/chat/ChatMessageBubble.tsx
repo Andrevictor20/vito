@@ -289,7 +289,7 @@ export const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
           )}
 
           {/* Footer: timestamp + copy */}
-          <View style={styles.vitoMetaRow}>
+          <View style={styles.metaRow}>
             <Text style={[styles.timestamp, styles.timestampVito]}>
               {new Date(message.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
             </Text>
