@@ -197,6 +197,11 @@ func (s *WhatsAppService) SetContextDebugLog(enabled bool) {
 	s.contextDebugLog = enabled
 }
 
+// ContextSvcForTest expõe o serviço de contexto apenas para testes.
+func (s *WhatsAppService) ContextSvcForTest() *WhatsAppContextService {
+	return s.contextSvc
+}
+
 // SanitizePhoneNumber limpa e normaliza o número para o padrão internacional E.164 sem o '+'.
 func SanitizePhoneNumber(raw string) (string, error) {
 	re := regexp.MustCompile(`\D+`)

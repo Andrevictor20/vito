@@ -353,7 +353,9 @@ func TestWhatsAppService_Webhook_GroupPrivacy(t *testing.T) {
 		t.Fatalf("mensagem de grupo sem menção deveria ter sido ignorada, mas disparou envio")
 	}
 
-	// 2. Mensagem de grupo COM @vito -> Deve ser respondida
+	// 2. Mensagem de grupo COM @vito de TERCEIRO (fromMe=false) -> o Vito não
+	// executa o comando e, em grupo, NÃO envia recusativa (silencioso, para não
+	// poluir o chat quando 2 pessoas têm o Vito instalado).
 	payloadRespond := map[string]interface{}{
 		"event":    "messages.upsert",
 		"instance": "vito_user_100",
@@ -373,11 +375,8 @@ func TestWhatsAppService_Webhook_GroupPrivacy(t *testing.T) {
 	if err != nil {
 		t.Fatalf("erro no webhook: %v", err)
 	}
-	if len(mockClient.sentMessages) != 1 {
-		t.Fatalf("esperava 1 mensagem enviada, obteve %d", len(mockClient.sentMessages))
-	}
-	if !strings.Contains(mockClient.sentMessages[0].Text, "Vito") {
-		t.Errorf("resposta não continha texto do assistente: %s", mockClient.sentMessages[0].Text)
+	if len(mockClient.sentMessages) != 0 {
+		t.Fatalf("terceiro em grupo não deveria gerar resposta, obteve %d", len(mockClient.sentMessages))
 	}
 }
 

@@ -83,16 +83,14 @@ func TestWhatsAppService_TerceiroNoGrupoNaoExecutaComando(t *testing.T) {
 	if gateway.input.Text != "" {
 		t.Errorf("a IA não deveria ser acionada por terceiro, obteve: %q", gateway.input.Text)
 	}
-	// A resposta é a educada (e não uma resposta de comando).
-	if len(mockClient.sentMessages) != 1 {
-		t.Fatalf("esperava 1 resposta educativa, obteve %d", len(mockClient.sentMessages))
+	// Em grupo, terceiro (fromMe=false) NÃO recebe recusa educada (silencioso,
+	// para não poluir o chat quando 2 pessoas têm o Vito instalado).
+	if len(mockClient.sentMessages) != 0 {
+		t.Fatalf("terceiro em grupo não deveria gerar resposta, obteve %d: %v",
+			len(mockClient.sentMessages), mockClient.sentMessages)
 	}
-	resposta := mockClient.sentMessages[0].Text
-	if !strings.Contains(strings.ToLower(resposta), "dono") {
-		t.Errorf("resposta deveria explicar que só o dono dá comandos, obteve: %s", resposta)
-	}
-	if strings.Contains(strings.ToLower(resposta), "criei") || strings.Contains(strings.ToLower(resposta), "agendei") {
-		t.Errorf("a resposta não pode afirmar que executou o comando: %s", resposta)
+	if strings.Contains(strings.ToLower(gateway.input.Text), "criei") || strings.Contains(strings.ToLower(gateway.input.Text), "agendei") {
+		t.Errorf("a IA não deveria ter executado o comando de terceiro: %s", gateway.input.Text)
 	}
 }
 
@@ -255,8 +253,62 @@ func TestWhatsAppService_ApenasUmVitoPorMensagem(t *testing.T) {
 	}
 }
 
-// TestWhatsAppService_RespostaEducativaTemCooldown: "spam de @vito" não pode
-// virar spam de resposta no grupo (e nem push no celular do dono).
+// TestWhatsAppService_TerceiroEmGrupoNaoRecebeRecusa: quando 2 pessoas têm o
+// Vito instalado no mesmo grupo e uma chama @vito, o Vito da OUTRA pessoa
+// (fromMe=false) NÃO envia a recusa educada — apenas arquiva a mensagem.
+// Isso evita duplicar a resposta e poluir o visual do grupo.
+func TestWhatsAppService_TerceiroEmGrupoNaoRecebeRecusa(t *testing.T) {
+	svc, mockClient, _, _ := setupConversationalWhatsAppTest(t)
+
+	gateway := &mockGatewayCapturador{}
+	svc.SetAssistantService(service.NewAssistantService(gateway, nil, nil, nil))
+	svc.SetAsyncRunner(func(fn func()) { fn() })
+
+	// Mensagem de TERCEIRO (fromMe=false) num GRUPO (@g.us) com menção @vito.
+	if err := svc.HandleWebhook(context.Background(), "messages.upsert",
+		payloadComVito("12036300112233@g.us", "msg-terceiro-grupo-sem-recusa",
+			"@vito cria uma reunião amanhã", false)); err != nil {
+		t.Fatalf("HandleWebhook retornou erro: %v", err)
+	}
+
+	// A IA não deve ser acionada (não executa comando de terceiro).
+	if gateway.input.Text != "" {
+		t.Errorf("a IA não deveria ser acionada por terceiro, obteve: %q", gateway.input.Text)
+	}
+	// NÃO deve haver resposta educada (silencioso no grupo para terceiro).
+	if len(mockClient.sentMessages) != 0 {
+		t.Errorf("terceiro em grupo não deveria gerar recusa educada, obteve %d mensagem(ns): %v",
+			len(mockClient.sentMessages), mockClient.sentMessages)
+	}
+}
+
+// TestWhatsAppService_RecusaEducadaMantidaEmChatPrivado: terceiro em chat
+// privado 1-1 continua recebendo a recusa educada (comportamento atual mantido).
+func TestWhatsAppService_RecusaEducadaMantidaEmChatPrivado(t *testing.T) {
+	svc, mockClient, _, _ := setupConversationalWhatsAppTest(t)
+
+	gateway := &mockGatewayCapturador{}
+	svc.SetAssistantService(service.NewAssistantService(gateway, nil, nil, nil))
+	svc.SetAsyncRunner(func(fn func()) { fn() })
+
+	if err := svc.HandleWebhook(context.Background(), "messages.upsert",
+		payloadComVito("5511988887777@s.whatsapp.net", "msg-terceiro-privado-com-recusa",
+			"@vito manda uma mensagem pra Ana", false)); err != nil {
+		t.Fatalf("HandleWebhook retornou erro: %v", err)
+	}
+
+	if gateway.input.Text != "" {
+		t.Errorf("a IA não deveria ser acionada por terceiro, obteve: %q", gateway.input.Text)
+	}
+	if len(mockClient.sentMessages) != 1 {
+		t.Fatalf("esperava 1 resposta educativa em chat privado, obteve %d", len(mockClient.sentMessages))
+	}
+	resposta := mockClient.sentMessages[0].Text
+	if !strings.Contains(strings.ToLower(resposta), "dono") {
+		t.Errorf("resposta deveria explicar que só o dono dá comandos, obteve: %s", resposta)
+	}
+}
+
 func TestWhatsAppService_RespostaEducativaTemCooldown(t *testing.T) {
 	svc, mockClient, _, _ := setupConversationalWhatsAppTest(t)
 

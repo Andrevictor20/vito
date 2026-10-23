@@ -298,16 +298,15 @@ func TestWhatsAppContext_GroupWithOthersRequiresMention(t *testing.T) {
 		t.Fatalf("o Vito não deve responder em grupo sem menção")
 	}
 
-	// Com menção, mas de TERCEIRO (fromMe=false): o Vito não executa o comando.
+	// Com menção, mas de TERCEIRO (fromMe=false): o Vito não executa o comando
+	// e, em grupo, NÃO envia recusa educada (silencioso, para não poluir o chat
+	// quando 2 pessoas têm o Vito instalado).
 	if err := fx.svc.HandleWebhook(context.Background(), "messages.upsert",
 		buildPayload(groupJID(), "msg-grp-3", "@vito meus compromissos de amanhã")); err != nil {
 		t.Fatalf("HandleWebhook: %v", err)
 	}
-	if len(fx.client.sentMessages) != 1 {
-		t.Fatalf("esperava 1 resposta (recusativa) para terceiro, obteve %d", len(fx.client.sentMessages))
-	}
-	if !strings.Contains(strings.ToLower(fx.client.sentMessages[0].Text), "dono") {
-		t.Errorf("a resposta a terceiro deve explicar que só o dono dá comandos, obteve: %s", fx.client.sentMessages[0].Text)
+	if len(fx.client.sentMessages) != 0 {
+		t.Fatalf("terceiro em grupo não deveria gerar resposta, obteve %d", len(fx.client.sentMessages))
 	}
 }
 

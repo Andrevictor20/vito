@@ -92,7 +92,12 @@ func (s *WhatsAppService) handleMessagesEvent(ctx context.Context, instanceName 
 	if !CanActOnMessage(chatKind, msg.FromMe) {
 		s.archiveMessage(ctx, integration.UserID, instanceName, msg, chatKind, rawText, "user")
 		log.Printf("🛡️ [WhatsAppContext] comando de terceiro bloqueado (kind=%s jid=%s fromMe=false)", chatKind, msg.RemoteJID)
-		if hasTrigger {
+		// Em grupo, um terceiro (fromMe=false) que chama @vito não recebe a
+		// recusa educada: como cada participante tem o seu próprio Vito
+		// instalado, isso evitaria duplicar a resposta e poluir o chat.
+		// O Vito continua arquivando a mensagem e enxergando a conversa.
+		isGroup := strings.HasSuffix(msg.RemoteJID, "@g.us")
+		if hasTrigger && !isGroup {
 			s.replyOnlyOwnerCanCommand(ctx, instanceName, msg, chatKind)
 		}
 		return nil
@@ -223,7 +228,8 @@ func (s *WhatsAppService) processPendingMessage(pending *pendingMessage) error {
 	}
 	s.memory.AddMessage(convKey, "vito", replyText)
 
-	formattedReply := fmt.Sprintf("💼 Vito:\n\n%s", replyText)
+	assinatura := VitoSignature(ctx, s.contextSvc, integration.UserID, msg.RemoteJID, msg.PushName)
+	formattedReply := fmt.Sprintf("%s\n\n%s", assinatura, replyText)
 	isGroup := strings.HasSuffix(msg.RemoteJID, "@g.us")
 	if isGroup && msg.MessageID != "" {
 		_ = s.client.SendTextWithQuoted(ctx, instanceName, msg.RemoteJID, formattedReply, msg.MessageID)

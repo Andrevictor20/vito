@@ -28,7 +28,14 @@ func (s *WhatsAppService) replyOnlyOwnerCanCommand(ctx context.Context, instance
 	if !s.allowBlockedReply(msg.RemoteJID) {
 		return
 	}
-	formatted := "💼 Vito:\n\n" + onlyOwnerCanCommandMessage
+	// Busca o userID da instância para montar a assinatura com nome (quando
+	// houver 2+ chamadores distintos no chat).
+	userID := ""
+	if integration, err := s.repo.GetByInstanceName(ctx, instanceName); err == nil && integration != nil {
+		userID = integration.UserID
+	}
+	assinatura := VitoSignature(ctx, s.contextSvc, userID, msg.RemoteJID, msg.PushName)
+	formatted := assinatura + "\n\n" + onlyOwnerCanCommandMessage
 	isGroup := strings.HasSuffix(msg.RemoteJID, "@g.us")
 	if isGroup && msg.MessageID != "" {
 		_ = s.client.SendTextWithQuoted(ctx, instanceName, msg.RemoteJID, formatted, msg.MessageID)
@@ -60,4 +67,25 @@ func (s *WhatsAppService) blockedReplyCount() int {
 	s.blockedMu.Lock()
 	defer s.blockedMu.Unlock()
 	return len(s.blockedReplies)
+}
+
+// VitoSignature monta a assinatura da resposta do Vito.
+//
+// Padrão: "💼 Vito:". Quando há 2 ou mais chamadores distintos no mesmo chat
+// (Detectado via DistinctVitoCallers), usa "💼 Vito(Nome):" para distinguir
+// qual instância do Vito está respondendo, evitando confusão quando 2 pessoas
+// têm o Vito instalado no mesmo grupo.
+func VitoSignature(ctx context.Context, contextSvc *WhatsAppContextService, userID, chatJID, senderName string) string {
+	if contextSvc == nil || userID == "" || chatJID == "" {
+		return "💼 Vito:"
+	}
+	chamadores, err := contextSvc.DistinctVitoCallers(ctx, userID, chatJID)
+	if err != nil || chamadores < 2 {
+		return "💼 Vito:"
+	}
+	nome := strings.TrimSpace(senderName)
+	if nome == "" {
+		return "💼 Vito:"
+	}
+	return "💼 Vito(" + nome + "):"
 }

@@ -423,3 +423,42 @@ func describeWindowChats(window []ai.ChatMessageContext) string {
 	}
 	return strings.Join(labels, ",")
 }
+
+// DistinctVitoCallers conta quantos autores distintos (usuários, não o Vito)
+// já chamaram o Vito neste chat (mensagens com menção @vito / !vito / /vito).
+//
+// Usado para decidir se a assinatura da resposta deve incluir o nome de quem
+// está sendo atendido ("💼 Vito(André):") quando 2 ou mais pessoas chamam o
+// Vito no mesmo chat, evitando confusão entre as instâncias de cada pessoa.
+func (s *WhatsAppContextService) DistinctVitoCallers(ctx context.Context, userID, chatJID string) (int, error) {
+	if s.repo == nil || userID == "" || chatJID == "" {
+		return 0, nil
+	}
+	since := time.Now().UTC().Add(-s.cfg.MaxAge)
+	mensagens, err := s.repo.RecentMessages(ctx, userID, chatJID, 100, since)
+	if err != nil {
+		return 0, err
+	}
+	chamadores := make(map[string]bool)
+	for _, m := range mensagens {
+		// Ignora mensagens efetivamente do próprio Vito (anti-duplicação).
+		// Mensagens de USUÁRIO que citam "@vito" NÃO são ignoradas: elas são
+		// exatamente as chamadas que queremos contar.
+		if m.Kind == messageKindVito {
+			continue
+		}
+		// Só conta mensagens de usuário que realmente chamaram o Vito.
+		if !reVitoTrigger.MatchString(m.Text) {
+			continue
+		}
+		id := strings.TrimSpace(m.SenderJID)
+		if id == "" {
+			id = strings.TrimSpace(m.SenderName)
+		}
+		if id == "" {
+			continue
+		}
+		chamadores[id] = true
+	}
+	return len(chamadores), nil
+}

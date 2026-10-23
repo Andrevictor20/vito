@@ -306,8 +306,9 @@ func TestWhatsAppService_GroupMentions_RespondsWithQuoted(t *testing.T) {
 	}
 
 	// Caso 2: Mensagem de TERCEIRO com !vito no grupo -> o Vito NÃO executa o
-	// comando (blindagem: só o dono dá comandos) e responde com a recusativa,
-	// citando a mensagem.
+	// comando (blindagem: só o dono dá comandos) e, em grupo, NÃO envia
+	// recusativa (silencioso, para não poluir o chat quando 2 pessoas têm o Vito
+	// instalado).
 	withMentionPayload := map[string]interface{}{
 		"event":    "messages.upsert",
 		"instance": "vito_conv_user",
@@ -328,16 +329,8 @@ func TestWhatsAppService_GroupMentions_RespondsWithQuoted(t *testing.T) {
 		t.Fatalf("HandleWebhook erro: %v", err)
 	}
 
-	if len(mockClient.sentMessages) != 1 {
-		t.Fatalf("esperava 1 resposta (recusativa) para terceiro, obteve %d", len(mockClient.sentMessages))
-	}
-
-	sent := mockClient.sentMessages[0]
-	if sent.QuotedID != "msg-group-2" {
-		t.Errorf("esperava quotedID 'msg-group-2', obteve '%s'", sent.QuotedID)
-	}
-	if !strings.Contains(strings.ToLower(sent.Text), "dono") {
-		t.Errorf("a resposta a terceiro deve explicar que só o dono dá comandos, obteve: %s", sent.Text)
+	if len(mockClient.sentMessages) != 0 {
+		t.Fatalf("terceiro em grupo não deveria gerar resposta, obteve %d", len(mockClient.sentMessages))
 	}
 }
 
