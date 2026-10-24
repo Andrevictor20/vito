@@ -67,10 +67,10 @@ export const IDEA_CARDS: IdeaCard[] = [
 ];
 
 export const CAROUSEL_TIMING = {
-  durationMs: 480,
+  durationMs: 380,
   bezier: [0.2, 0.8, 0.2, 1] as const,
-  swipeThresholdPx: 35,
-  dragScalePx: 160,
+  swipeThresholdPx: 26,
+  dragScalePx: 155,
   spring: {
     damping: 22,
     stiffness: 240,
@@ -90,12 +90,12 @@ export function getCardVisualSpec(effDistance: number) {
   if (effDistance === 0) {
     return { tx: 0, rot: '0deg', scale: 1.0, op: 1.0 };
   } else if (effDistance === 1) {
-    return { tx: 48, rot: '5deg', scale: 0.92, op: 0.8 };
+    return { tx: 58, rot: '5deg', scale: 0.93, op: 1.0 };
   } else if (effDistance === -1) {
-    return { tx: -48, rot: '-5deg', scale: 0.92, op: 0.8 };
+    return { tx: -58, rot: '-5deg', scale: 0.93, op: 1.0 };
   } else if (effDistance >= 2) {
-    return { tx: 80, rot: '8deg', scale: 0.85, op: 0.0 };
+    return { tx: 86, rot: '8deg', scale: 0.86, op: 0.0 };
   } else {
-    return { tx: -80, rot: '-8deg', scale: 0.85, op: 0.0 };
+    return { tx: -86, rot: '-8deg', scale: 0.86, op: 0.0 };
   }
 }

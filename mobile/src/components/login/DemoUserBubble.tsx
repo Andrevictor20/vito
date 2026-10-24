@@ -1,55 +1,45 @@
-import React, { useCallback, useEffect, useRef, useMemo } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import {
   Animated,
   StyleSheet,
   View,
   Text,
-  Dimensions,
   type ViewStyle,
   type TextStyle,
 } from 'react-native'
 import { useTheme } from '../../context/ThemeContext'
-import { type ThemeTokens } from '../../theme/tokens'
-
-const { width: windowWidth } = Dimensions.get('window')
+import { loginPalette } from './loginPalette'
 
 export interface DemoUserBubbleProps {
   text: string
   typed: string
   complete: boolean
   photo?: boolean
-  colors: ThemeTokens['colors']
 }
 
 /**
- * Bolha do usuário à direita (seção 4 do prompt).
- * - Fundo ink (primary), texto na cor do fundo, raios 20/20/5/20 (inf. direito = 5),
- *   padding 10×14, fonte 15, largura máxima 82%.
- * - Técnica anti-salto: renderiza o texto completo invisível para reservar
- *   espaço final; sobrepõe o texto digitado em posição absoluta.
- * - Aparece após 350 ms (fade + subida 10dp).
+ * Bolha do usuário alinhada à direita em paridade com login-vito.html:
+ * .user{
+ *   max-width:82%; background:var(--ink); color:var(--bg);
+ *   padding:10px 14px; border-radius:20px 20px 5px 20px; font-size:15px; line-height:1.35;
+ * }
+ * .user.show{opacity:1; animation:rise .35s ease both}
+ * Miniatura do documento/boleto com listras horizontais (#b9ae93) quando photo === true.
  */
 export const DemoUserBubble: React.FC<DemoUserBubbleProps> = ({
   text,
   typed,
   complete,
   photo = false,
-  colors,
 }) => {
-  const bubbleWidth = useMemo(
-    () => Math.min(windowWidth * 0.82, 280),
-    [windowWidth],
-  )
+  const { isDark } = useTheme()
+  const palette = loginPalette(isDark)
 
   const opacity = useRef(new Animated.Value(0)).current
   const translateY = useRef(new Animated.Value(10)).current
-  const cursor = useRef(new Animated.Value(1)).current
-
-  const isDark = colors.primary === '#FFFFFF'
-  const textColor = isDark ? '#FAFAFA' : '#FFFFFF'
+  const [caretVisible, setCaretVisible] = useState(true)
 
   useEffect(() => {
-    // Aparece após 350 ms: fade + subida 10dp.
     Animated.parallel([
       Animated.timing(opacity, {
         toValue: 1,
@@ -62,126 +52,146 @@ export const DemoUserBubble: React.FC<DemoUserBubbleProps> = ({
         useNativeDriver: true,
       }),
     ]).start()
+  }, [opacity, translateY])
 
-    // Cursor piscando enquanto digita.
-    if (!complete) {
-      const id = setInterval(() => {
-        Animated.sequence([
-          Animated.timing(cursor, {
-            toValue: 0,
-            duration: 400,
-            useNativeDriver: true,
-          }),
-          Animated.timing(cursor, {
-            toValue: 1,
-            duration: 400,
-            useNativeDriver: true,
-          }),
-        ]).start()
-      }, 800)
-      return () => clearInterval(id)
+  // Caret piscando enquanto digita
+  useEffect(() => {
+    if (complete) {
+      setCaretVisible(false)
+      return
     }
-  }, [opacity, translateY, cursor, complete])
+    setCaretVisible(true)
+    const interval = setInterval(() => {
+      setCaretVisible((v) => !v)
+    }, 400)
+    return () => clearInterval(interval)
+  }, [complete])
 
   return (
-    <View style={[styles.row, { alignItems: 'flex-end' }]}>
-      <Animated.View
-        style={[
-          styles.bubbleContainer,
-          {
-            opacity,
-            transform: [{ translateY }],
-            width: bubbleWidth,
-          },
-        ]}
-      >
+    <Animated.View
+      style={[
+        styles.userBubble,
+        {
+          backgroundColor: palette.ink,
+          opacity,
+          transform: [{ translateY }],
+        },
+      ]}
+    >
+      {photo && (
         <View
           style={[
-            styles.bubble,
-            {
-              backgroundColor: isDark
-                ? colors.surfaceContainerHigh
-                : colors.primary,
-            },
+            styles.photoCard,
+            { backgroundColor: palette.photoPaper },
           ]}
         >
-          {photo && <View style={styles.photoPlaceholder} />}
-
-          {/* Texto completo invisível — reserva largura/altura finais. */}
-          <Text style={[styles.fullText, { color: textColor }]}>{text}</Text>
-
-          {/* Texto digitado visível, sobreposto em absoluto. */}
-          <View style={styles.typedWrap}>
-            <Animated.Text
-              style={[
-                styles.typedText,
-                { color: textColor, opacity },
-              ]}
-            >
-              {typed}
-            </Animated.Text>
-            {!complete && (
-              <Animated.Text style={[styles.cursor, { opacity: cursor }]}>
-                ▋
-              </Animated.Text>
-            )}
-          </View>
+          <View
+            style={[
+              styles.photoLine,
+              styles.photoLine1,
+              { backgroundColor: palette.photoLine },
+            ]}
+          />
+          <View
+            style={[
+              styles.photoLine,
+              styles.photoLine2,
+              { backgroundColor: palette.photoLine },
+            ]}
+          />
+          <View
+            style={[
+              styles.photoLine,
+              styles.photoLine3,
+              { backgroundColor: palette.photoLine },
+            ]}
+          />
         </View>
-      </Animated.View>
-    </View>
+      )}
+
+      {/* Container com texto: o fantasma transparente reserva largura e altura exatas */}
+      <View style={styles.textStack}>
+        <Text
+          style={[styles.ghostText, { color: palette.bg }]}
+          accessible={false}
+        >
+          {text}
+        </Text>
+
+        <View style={styles.liveContainer}>
+          <Text style={[styles.bubbleText, { color: palette.bg }]}>
+            {typed}
+            {!complete && (
+              <Text
+                style={[
+                  styles.caret,
+                  { color: palette.bg, opacity: caretVisible ? 1 : 0 },
+                ]}
+              >
+                |
+              </Text>
+            )}
+          </Text>
+        </View>
+      </View>
+    </Animated.View>
   )
 }
 
 const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginBottom: 12,
-  },
-  bubbleContainer: {
-    alignItems: 'flex-end',
-  },
-  bubble: {
+  userBubble: {
+    alignSelf: 'flex-end',
     maxWidth: '82%',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
     borderRadius: 20,
     borderBottomRightRadius: 5,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    minHeight: 44,
-  },
-  fullText: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    right: 0,
-    bottom: 0,
-    opacity: 0,
-    fontFamily: 'Inter_400Regular',
-    fontSize: 15,
-    lineHeight: 20,
-  },
-  typedWrap: {
-    position: 'relative',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  typedText: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 15,
-    lineHeight: 20,
-  },
-  cursor: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 15,
-    lineHeight: 20,
-  },
-  photoPlaceholder: {
+  } as ViewStyle,
+  photoCard: {
     width: 92,
     height: 58,
     borderRadius: 9,
-    backgroundColor: '#EDE7D2',
     marginBottom: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+    padding: 10,
+    position: 'relative',
+    justifyContent: 'space-between',
+  } as ViewStyle,
+  photoLine: {
+    height: 4,
+    borderRadius: 2,
+  } as ViewStyle,
+  photoLine1: {
+    width: 44,
+  } as ViewStyle,
+  photoLine2: {
+    width: 62,
+  } as ViewStyle,
+  photoLine3: {
+    width: 62,
+  } as ViewStyle,
+  textStack: {
+    position: 'relative',
+  } as ViewStyle,
+  ghostText: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 15,
+    lineHeight: 20.25, // 15px * 1.35
+    opacity: 0,
+  } as TextStyle,
+  liveContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  } as ViewStyle,
+  bubbleText: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 15,
+    lineHeight: 20.25,
+  } as TextStyle,
+  caret: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 15,
+  } as TextStyle,
 })

@@ -2,11 +2,26 @@ import type { LoginPalette } from './loginPalette'
 
 export type DemoTone = 'blue' | 'red' | 'orange' | 'acc' | 'purple'
 
+export type DemoCardKind =
+  | 'agenda'
+  | 'email'
+  | 'radar'
+  | 'whatsapp'
+  | 'email-draft'
+  | 'tarefa'
+  | 'boleto'
+
 export interface DemoSceneCardChip {
-  kind: 'agenda' | 'radar' | 'tarefa' | 'boleto'
+  kind: DemoCardKind
   title: string
-  subtitle: string
-  trailing: 'check' | 'chart' | 'pills' | 'tag'
+  subtitle?: string
+  trailing?: 'check' | 'chart' | 'pills' | 'tag'
+  tagLabel?: string
+  tagTone?: 'red' | 'purple' | 'green'
+  bubbleTitle?: string
+  bubbleText?: string
+  bubbleTone?: 'green' | 'red'
+  isCol?: boolean
 }
 
 export interface DemoScene {
@@ -16,7 +31,7 @@ export interface DemoScene {
   userText: string
   vitoText: string
   card: DemoSceneCardChip
-  /** Cena 4 exibe miniatura de boleto acima do texto na bolha do usuário. */
+  /** Cena de boleto exibe miniatura de documento acima do texto na bolha do usuário. */
   photo?: boolean
 }
 
@@ -46,7 +61,7 @@ export function headlineColor(tone: DemoTone, palette: LoginPalette): string {
 }
 
 /**
- * Quatro cenas da demonstração animada da tela de login.
+ * Seis cenas da demonstração animada da tela de login, em paridade exata com login-vito.html.
  * Dados estáticos, sem rede, sem store, sem analytics.
  */
 export const DEMO_SCENES: readonly DemoScene[] = [
@@ -61,6 +76,21 @@ export const DEMO_SCENES: readonly DemoScene[] = [
       title: 'Dentista',
       subtitle: 'Terça, 15:00 · Google Agenda',
       trailing: 'check',
+    },
+  },
+  {
+    id: 'emails',
+    headline: 'ler seus e-mails',
+    tone: 'red',
+    userText: 'Tem e-mail importante hoje?',
+    vitoText: '3 novos. O da Ana pede resposta até hoje.',
+    card: {
+      kind: 'email',
+      title: 'Ana Souza · Proposta',
+      subtitle: 'Pede resposta hoje · Gmail',
+      trailing: 'tag',
+      tagLabel: 'Urgente',
+      tagTone: 'red',
     },
   },
   {
@@ -83,10 +113,28 @@ export const DEMO_SCENES: readonly DemoScene[] = [
     userText: 'Responde a Isa que chego às 19h',
     vitoText: 'Rascunho pronto. Quer que eu envie?',
     card: {
-      kind: 'tarefa',
-      title: 'Resposta para Isa · WhatsApp',
-      subtitle: 'Oi! Chego às 19h.',
+      kind: 'whatsapp',
+      title: 'Para Isa · WhatsApp',
+      bubbleText: 'Oi! Chego às 19h.',
       trailing: 'pills',
+      bubbleTone: 'green',
+      isCol: true,
+    },
+  },
+  {
+    id: 'escrever-email',
+    headline: 'escrever e-mails',
+    tone: 'red',
+    userText: 'Escreve pro Carlos confirmando a reunião de quinta',
+    vitoText: 'Rascunho pronto no seu Gmail.',
+    card: {
+      kind: 'email-draft',
+      title: 'Para Carlos · E-mail',
+      bubbleTitle: 'Confirmação da reunião',
+      bubbleText: 'Oi Carlos, confirmo nossa reunião de quinta às 10h.',
+      trailing: 'pills',
+      bubbleTone: 'red',
+      isCol: true,
     },
   },
   {
@@ -100,6 +148,8 @@ export const DEMO_SCENES: readonly DemoScene[] = [
       title: 'Pagar boleto · R$ 248,90',
       subtitle: 'Vence sexta · prioridade alta',
       trailing: 'tag',
+      tagLabel: 'Tarefa',
+      tagTone: 'purple',
     },
     photo: true,
   },

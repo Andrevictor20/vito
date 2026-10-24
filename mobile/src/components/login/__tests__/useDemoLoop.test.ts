@@ -10,21 +10,27 @@ import {
 describe('useDemoLoop — máquina de estados da demonstração', () => {
   it('inicia na cena 0 com fase showing-user e nada digitado', () => {
     const m = createDemoMachine()
-    const s = m.state
-    assert.equal(s.sceneIndex, 0)
-    assert.equal(s.phase, 'showing-user')
-    assert.equal(s.userTyped, '')
-    assert.equal(s.userComplete, false)
-    assert.equal(s.vitoVisible, false)
-    assert.equal(s.cardVisible, false)
-    assert.equal(s.dotsVisible, false)
-    m.dispose()
+    try {
+      const s = m.state
+      assert.equal(s.sceneIndex, 0)
+      assert.equal(s.phase, 'showing-user')
+      assert.equal(s.userTyped, '')
+      assert.equal(s.userComplete, false)
+      assert.equal(s.vitoVisible, false)
+      assert.equal(s.cardVisible, false)
+      assert.equal(s.dotsVisible, false)
+    } finally {
+      m.dispose()
+    }
   })
 
   it('initialState() equivale ao estado inicial da máquina', () => {
     const m = createDemoMachine()
-    assert.deepEqual(m.state, initialState())
-    m.dispose()
+    try {
+      assert.deepEqual(m.state, initialState())
+    } finally {
+      m.dispose()
+    }
   })
 
   it('DEMO_TIMING respeita os valores do protótipo (ms)', () => {
@@ -38,57 +44,62 @@ describe('useDemoLoop — máquina de estados da demonstração', () => {
     assert.equal(DEMO_TIMING.pauseMs, 3300)
   })
 
-  it('advanceScene avança a cena e reinicia a fase', () => {
+  it('advanceScene avança as 6 cenas e reinicia a fase ao voltar ao zero', () => {
     const m = createDemoMachine()
-    m.advanceScene()
-    let s = m.state
-    assert.equal(s.sceneIndex, 1)
-    assert.equal(s.phase, 'showing-user')
-    assert.equal(s.userTyped, '')
+    try {
+      for (let i = 1; i <= 5; i += 1) {
+        m.advanceScene()
+        const s = m.state
+        assert.equal(s.sceneIndex, i)
+        assert.equal(s.phase, 'showing-user')
+        assert.equal(s.userTyped, '')
+      }
 
-    m.advanceScene()
-    s = m.state
-    assert.equal(s.sceneIndex, 2)
-
-    m.advanceScene()
-    s = m.state
-    assert.equal(s.sceneIndex, 3)
-
-    // volta ao zero após a última
-    m.advanceScene()
-    s = m.state
-    assert.equal(s.sceneIndex, 0)
-    m.dispose()
+      // volta ao zero após a sexta cena (índice 5)
+      m.advanceScene()
+      const s = m.state
+      assert.equal(s.sceneIndex, 0)
+    } finally {
+      m.dispose()
+    }
   })
 
   it('goToScene define cena específica e reinicia fase', () => {
     const m = createDemoMachine()
-    m.advanceScene()
-    m.goToScene(0)
-    const s = m.state
-    assert.equal(s.sceneIndex, 0)
-    assert.equal(s.phase, 'showing-user')
-    m.dispose()
+    try {
+      m.advanceScene()
+      m.goToScene(0)
+      const s = m.state
+      assert.equal(s.sceneIndex, 0)
+      assert.equal(s.phase, 'showing-user')
+    } finally {
+      m.dispose()
+    }
   })
 
   it('reduceMotion desativa a sequência automática de animação', () => {
     const m = createDemoMachine()
-    m.setReduceMotion(true)
-    // Em reduzir movimento não há timers criados; o estado inicial persiste.
-    assert.equal(m.state.sceneIndex, 0)
-    assert.equal(m.state.phase, 'showing-user')
-    m.dispose()
+    try {
+      m.setReduceMotion(true)
+      assert.equal(m.state.sceneIndex, 0)
+      assert.equal(m.state.phase, 'showing-user')
+    } finally {
+      m.dispose()
+    }
   })
 
-  it('todas as cenas têm estado inicial válido', () => {
-    for (let i = 0; i < 4; i += 1) {
+  it('todas as 6 cenas têm estado inicial válido', () => {
+    for (let i = 0; i < 6; i += 1) {
       const m = createDemoMachine()
-      for (let j = 0; j < i; j += 1) m.advanceScene()
-      const s: DemoLoopState = m.state
-      assert.ok(s.scene, `cena ${i}`)
-      assert.equal(s.sceneIndex, i)
-      assert.equal(s.phase, 'showing-user')
-      m.dispose()
+      try {
+        for (let j = 0; j < i; j += 1) m.advanceScene()
+        const s: DemoLoopState = m.state
+        assert.ok(s.scene, `cena ${i}`)
+        assert.equal(s.sceneIndex, i)
+        assert.equal(s.phase, 'showing-user')
+      } finally {
+        m.dispose()
+      }
     }
   })
 })

@@ -110,3 +110,29 @@ export class TabNavigationBus {
 }
 
 export const tabNavigationBus = new TabNavigationBus();
+
+// Barramento de bloqueio temporário de swipe do Pager/FlatList durante gestos em carrosséis internos (ex.: ChatIdeasDeck).
+type PagerSwipeLockCallback = (locked: boolean) => void;
+
+export class PagerSwipeLockBus {
+  private listeners = new Set<PagerSwipeLockCallback>();
+
+  subscribe(cb: PagerSwipeLockCallback): () => void {
+    this.listeners.add(cb);
+    return () => {
+      this.listeners.delete(cb);
+    };
+  }
+
+  notify(locked: boolean): void {
+    this.listeners.forEach((cb) => {
+      try {
+        cb(locked);
+      } catch (err) {
+        console.warn('[pagerSwipeLockBus] Erro no listener:', err);
+      }
+    });
+  }
+}
+
+export const pagerSwipeLockBus = new PagerSwipeLockBus();

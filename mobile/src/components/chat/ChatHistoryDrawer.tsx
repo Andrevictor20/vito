@@ -1,26 +1,28 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  StyleSheet,
-  View,
-  Text,
-  Modal,
-  SafeAreaView,
-  TouchableOpacity,
-  ScrollView,
   Animated,
   Dimensions,
+  Easing,
+  Modal,
   Platform,
+  ScrollView,
   StatusBar as RNStatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import {
-  MaterialIcons,
-} from '@expo/vector-icons';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { tokens, MD3Shapes } from '../../theme/tokens';
 import { ConversationSession } from '../../types';
-import { humanizePreview } from '../../utils/chatPreview';
-import { formatGroupTimestamp, groupSessionsByDate } from '../../utils/chatHistoryGrouping';
+import {
+  filterSessionsByQuery,
+  findEmptyOrErrorSessions,
+  groupSessionsByDate,
+} from '../../utils/chatHistoryGrouping';
 import { useTheme } from '../../context/ThemeContext';
+import { SwipeableConversationRow } from './SwipeableConversationRow';
 
 interface ChatHistoryDrawerProps {
   visible: boolean;
@@ -34,9 +36,13 @@ interface ChatHistoryDrawerProps {
   onRetrySync?: () => void;
 }
 
-const PANEL_WIDTH = Math.min(Dimensions.get('window').width * 0.84, 340);
+const PANEL_WIDTH = Math.min(Dimensions.get('window').width * 0.86, 340);
 
-/** Gaveta lateral de histórico do chat (100% JS, sem lib de drawer nativa). */
+/**
+ * Gaveta lateral de conversas fiel ao protótipo `<aside class="drawer" id="drawer">`
+ * de `vito-telas.html`, com busca em tempo real, sugestão inteligente de limpeza
+ * e gesto de deslizar para fixar ou excluir.
+ */
 export const ChatHistoryDrawer: React.FC<ChatHistoryDrawerProps> = ({
   visible,
   onClose,
@@ -51,22 +57,79 @@ export const ChatHistoryDrawer: React.FC<ChatHistoryDrawerProps> = ({
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const slide = useRef(new Animated.Value(-PANEL_WIDTH)).current;
-  const groups = groupSessionsByDate(conversations);
-  const pinnedConversations = conversations.filter((c) => c.pinned);
-  const unpinnedConversations = conversations.filter((c) => !c.pinned);
-  const pinnedGroups = pinnedConversations.length > 0 ? [{ key: 'pinned', title: 'Fixados', sessions: pinnedConversations }] : [];
-  const unpinnedGroups = groupSessionsByDate(unpinnedConversations);
-  const showPending = (pendingCount ?? 0) > 0;
+  const backdropOpacity = useRef(new Animated.Value(0)).current;
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [cleanupDismissed, setCleanupDismissed] = useState(false);
+  const [rowSwiping, setRowSwiping] = useState(false);
 
   useEffect(() => {
-    Animated.timing(slide, {
-      toValue: visible ? 0 : -PANEL_WIDTH,
-      duration: 220,
-      useNativeDriver: true,
-    }).start();
-  }, [visible, slide]);
+    if (visible) {
+      Animated.parallel([
+        Animated.timing(slide, {
+          toValue: 0,
+          duration: 340,
+          easing: Easing.bezier(0.2, 0.8, 0.2, 1),
+          useNativeDriver: true,
+        }),
+        Animated.timing(backdropOpacity, {
+          toValue: 1,
+          duration: 240,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      slide.setValue(-PANEL_WIDTH);
+      backdropOpacity.setValue(0);
+    }
+  }, [visible, slide, backdropOpacity]);
+
+  const filteredConversations = useMemo(
+    () => filterSessionsByQuery(conversations, searchQuery),
+    [conversations, searchQuery],
+  );
+
+  const pinnedConversations = useMemo(
+    () => filteredConversations.filter((c) => c.pinned),
+    [filteredConversations],
+  );
+  const unpinnedConversations = useMemo(
+    () => filteredConversations.filter((c) => !c.pinned),
+    [filteredConversations],
+  );
+  const unpinnedGroups = useMemo(
+    () => groupSessionsByDate(unpinnedConversations),
+    [unpinnedConversations],
+  );
+
+  const emptyOrErrorSessions = useMemo(
+    () => findEmptyOrErrorSessions(conversations),
+    [conversations],
+  );
+
+  const showCleanupBanner =
+    !cleanupDismissed &&
+    !!onDeleteConversation &&
+    emptyOrErrorSessions.length > 0 &&
+    conversations.length > emptyOrErrorSessions.length;
+
+  const showPending = (pendingCount ?? 0) > 0;
+  const canDeleteRow = !!onDeleteConversation && conversations.length > 1;
+
+  const handleCleanEmptyConversations = () => {
+    if (!onDeleteConversation) return;
+    emptyOrErrorSessions.forEach((session) => {
+      onDeleteConversation(session.id);
+    });
+    setCleanupDismissed(true);
+  };
 
   if (!visible) return null;
+
+  const topPad =
+    Platform.OS === 'android'
+      ? Math.max((RNStatusBar.currentHeight || 0) + 12, 36)
+      : Math.max(insets.top + 8, 36);
 
   return (
     <Modal
@@ -78,337 +141,264 @@ export const ChatHistoryDrawer: React.FC<ChatHistoryDrawerProps> = ({
       <View style={styles.root}>
         <Animated.View
           style={[
-            styles.panel,
-            { width: PANEL_WIDTH, backgroundColor: colors.surface, transform: [{ translateX: slide }] },
+            styles.backdrop,
+            {
+              opacity: backdropOpacity,
+            },
           ]}
         >
-          <SafeAreaView
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={onClose}
+            accessibilityLabel="Fechar histórico"
+          />
+        </Animated.View>
+
+        <Animated.View
+          style={[
+            styles.panel,
+            {
+              width: PANEL_WIDTH,
+              backgroundColor: colors.bg,
+              paddingTop: topPad,
+              paddingBottom: Math.max(insets.bottom, 16),
+              transform: [{ translateX: slide }],
+            },
+          ]}
+        >
+          {/* Cabeçalho .drawer h2 + .sub */}
+          <View style={styles.headerRow}>
+            <View style={styles.headerTextCol}>
+              <Text style={[styles.headerTitle, { color: colors.ink }]}>Conversas</Text>
+              <Text style={[styles.headerSub, { color: colors.muted }]}>
+                {conversations.length} {conversations.length === 1 ? 'conversa' : 'conversas'}
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.closeBtn, { backgroundColor: colors.surf }]}
+              onPress={onClose}
+              activeOpacity={0.75}
+              accessibilityLabel="Fechar conversas"
+              accessibilityRole="button"
+            >
+              <MaterialIcons name="close" size={18} color={colors.ink} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Busca .dsearch */}
+          <View
             style={[
-              styles.safeArea,
+              styles.searchBox,
               {
-                backgroundColor: colors.surface,
-                paddingTop: Platform.OS === 'android' ? Math.max((RNStatusBar.currentHeight || 0) + 6, 12) : 0,
+                backgroundColor: colors.surf,
+                borderColor: colors.line,
               },
             ]}
           >
-            <View style={[styles.header, { borderBottomColor: colors.outlineVariant }]}>
+            <TextInput
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="Buscar conversas"
+              placeholderTextColor={colors.muted}
+              style={[styles.searchInput, { color: colors.ink }]}
+              returnKeyType="search"
+              autoCorrect={false}
+              accessibilityLabel="Buscar conversas"
+            />
+            {searchQuery.length > 0 && (
               <TouchableOpacity
-                style={[styles.closeBtn, { backgroundColor: colors.surfaceContainerLow }]}
-                onPress={onClose}
-                activeOpacity={0.7}
-                accessibilityLabel="Fechar histórico"
-                hitSlop={tokens.hitSlop.md}
+                onPress={() => setSearchQuery('')}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityLabel="Limpar busca"
+                accessibilityRole="button"
               >
-                <MaterialIcons name="menu" size={22} color={colors.onSurface} />
+                <MaterialIcons name="close" size={16} color={colors.muted} />
               </TouchableOpacity>
+            )}
+          </View>
 
-              <View style={styles.headerTextCol}>
-                <Text style={[styles.headerTitle, { color: colors.onSurface }]}>Conversas</Text>
-                <Text style={[styles.headerSub, { color: colors.textSecondary }]}>
-                  Continue de onde parou ({conversations.length})
+          {/* Alerta de sincronização pendente (se houver) */}
+          {showPending && (
+            <View
+              style={[
+                styles.suggestionCard,
+                { backgroundColor: colors.surf, borderColor: colors.line },
+              ]}
+              accessibilityRole="alert"
+            >
+              <View style={styles.suggestionBody}>
+                <Text style={[styles.suggestionText, { color: colors.ink }]}>
+                  Sincronização pendente ({pendingCount})
                 </Text>
+                {onRetrySync && (
+                  <View style={styles.suggestionActions}>
+                    <TouchableOpacity
+                      style={[
+                        styles.suggestionBtnPrimary,
+                        { backgroundColor: colors.ink, borderColor: colors.ink },
+                      ]}
+                      onPress={onRetrySync}
+                      activeOpacity={0.82}
+                      accessibilityRole="button"
+                      accessibilityLabel="Reenviar sincronização pendente"
+                    >
+                      <Text style={[styles.suggestionBtnPrimaryText, { color: colors.bg }]}>
+                        Reenviar
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
             </View>
+          )}
 
-            <ScrollView
-              contentContainerStyle={styles.listContent}
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
+          {/* Sugestão inteligente .vsug#dclean de vito-telas.html */}
+          {showCleanupBanner && (
+            <View
+              style={[
+                styles.suggestionCard,
+                { backgroundColor: colors.surf, borderColor: colors.line },
+              ]}
             >
-              {showPending && (
-                <View
-                  style={[styles.pendingCard, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}
-                  accessibilityRole="alert"
-                  accessibilityLabel={`Sincronização pendente, ${pendingCount} conversas`}
-                >
-                  <MaterialIcons name="sync-problem" size={20} color={colors.onSurface} />
-                  <Text style={[styles.pendingText, { color: colors.onSurface }]}>
-                    Sincronização pendente ({pendingCount})
-                  </Text>
-                  {onRetrySync && (
-                    <TouchableOpacity
-                      style={[styles.retryBtn, { backgroundColor: colors.surfaceContainerHighest }]}
-                      onPress={onRetrySync}
-                      activeOpacity={0.75}
-                      accessibilityLabel="Reenviar sincronização pendente"
-                      accessibilityRole="button"
-                      hitSlop={tokens.hitSlop.md}
-                    >
-                      <MaterialIcons name="refresh" size={18} color={colors.onSurface} />
-                      <Text style={[styles.retryText, { color: colors.onSurface }]}>Reenviar</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              )}
-              {conversations.length === 0 ? (
-                <View style={styles.emptyContainer}>
-                  <View style={[styles.emptyIconBox, { backgroundColor: colors.surfaceContainer }]}>
-                    <MaterialIcons name="chat" size={32} color={colors.outline} />
-                  </View>
-                  <Text style={[styles.emptyTitle, { color: colors.onSurface }]}>
-                    Nenhuma conversa encontrada
-                  </Text>
-                  <Text style={[styles.emptySub, { color: colors.textMuted }]}>
-                    Suas trocas de mensagens com o Vito aparecerão listadas aqui para você retomar quando quiser.
-                  </Text>
-                </View>
-              ) : (
-                <>
-                  {pinnedGroups.map((group) => (
-                    <View key={group.key}>
-                      <View style={styles.pinnedHeader}>
-                        <Text
-                          style={[styles.groupHeader, { color: colors.textMuted }]}
-                          accessibilityRole="header"
-                        >
-                          {group.title}
-                        </Text>
-                        <MaterialIcons name="bookmark" size={14} color={colors.primary} />
-                      </View>
-                      {group.sessions.map((conv) => {
-                        const isActive = !!conv.active;
-                        return (
-                          <TouchableOpacity
-                            key={conv.id}
-                            style={[
-                              styles.convCard,
-                              {
-                                backgroundColor: isActive
-                                  ? colors.surfaceContainerHighest
-                                  : colors.surfaceContainerLow,
-                                borderColor: isActive ? colors.primary : colors.outlineVariant,
-                              },
-                            ]}
-                            onPress={() => {
-                              onSelectConversation(conv.id);
-                              onClose();
-                            }}
-                            activeOpacity={0.75}
-                            accessibilityLabel={`Abrir conversa ${conv.title || 'Conversa'}`}
-                            hitSlop={tokens.hitSlop.sm}
-                          >
-                            <View
-                              style={[
-                                styles.convIcon,
-                                {
-                                  backgroundColor: isActive ? colors.primary : colors.surfaceContainerHighest,
-                                },
-                              ]}
-                            >
-                              <MaterialIcons
-                                name="chat-bubble-outline"
-                                size={16}
-                                color={isActive ? colors.onPrimary : colors.textPrimary}
-                              />
-                            </View>
-
-                            <View style={styles.convDetails}>
-                              <View style={styles.convTitleRow}>
-                                <Text
-                                  style={[
-                                    styles.convTitle,
-                                    {
-                                      color: colors.onSurface,
-                                      fontWeight: '700',
-                                    },
-                                  ]}
-                                  numberOfLines={1}
-                                >
-                                  {conv.title || 'Conversa'}
-                                </Text>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                                  <MaterialIcons name="bookmark" size={12} color={colors.primary} />
-                                  <Text style={[styles.convTime, { color: colors.textMuted }]}>
-                                    {formatGroupTimestamp(conv.timestamp)}
-                                  </Text>
-                                </View>
-                              </View>
-                              <Text
-                                style={[styles.convPreview, { color: colors.textSecondary }]}
-                                numberOfLines={1}
-                              >
-                                {humanizePreview(conv.preview)}
-                              </Text>
-                            </View>
-
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                              <TouchableOpacity
-                                style={styles.actionBtn}
-                                onPress={(e) => {
-                                  e.stopPropagation();
-                                  onTogglePin?.(conv.id);
-                                }}
-                                hitSlop={tokens.hitSlop.md}
-                                accessibilityLabel={conv.pinned ? 'Desfixar conversa' : 'Fixar conversa'}
-                                accessibilityRole="button"
-                              >
-                                <MaterialIcons
-                                  name={conv.pinned ? 'bookmark' : 'bookmark-outline'}
-                                  size={18}
-                                  color={conv.pinned ? colors.primary : colors.outline}
-                                />
-                              </TouchableOpacity>
-
-                              {onDeleteConversation && conversations.length > 1 && (
-                                <TouchableOpacity
-                                  style={styles.actionBtn}
-                                  onPress={(e) => {
-                                    e.stopPropagation();
-                                    onDeleteConversation(conv.id);
-                                  }}
-                                  hitSlop={tokens.hitSlop.md}
-                                  accessibilityLabel="Excluir conversa"
-                                  accessibilityRole="button"
-                                >
-                                  <MaterialIcons name="delete-outline" size={18} color={colors.outline} />
-                                </TouchableOpacity>
-                              )}
-                            </View>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-                  ))}
-                  {unpinnedGroups.map((group) => (
-                    <View key={group.key}>
-                      <Text
-                        style={[styles.groupHeader, { color: colors.textMuted }]}
-                        accessibilityRole="header"
-                      >
-                        {group.title}
-                      </Text>
-                      {group.sessions.map((conv) => {
-                        const isActive = !!conv.active;
-                        return (
-                          <TouchableOpacity
-                            key={conv.id}
-                            style={[
-                              styles.convCard,
-                              {
-                                backgroundColor: isActive
-                                  ? colors.surfaceContainerHighest
-                                  : colors.surfaceContainerLow,
-                                borderColor: isActive ? colors.primary : colors.outlineVariant,
-                              },
-                            ]}
-                            onPress={() => {
-                              onSelectConversation(conv.id);
-                              onClose();
-                            }}
-                            activeOpacity={0.75}
-                            accessibilityLabel={`Abrir conversa ${conv.title || 'Conversa'}`}
-                            hitSlop={tokens.hitSlop.sm}
-                          >
-                            <View
-                              style={[
-                                styles.convIcon,
-                                {
-                                  backgroundColor: isActive ? colors.primary : colors.surfaceContainerHighest,
-                                },
-                              ]}
-                            >
-                              <MaterialIcons
-                                name="chat-bubble-outline"
-                                size={16}
-                                color={isActive ? colors.onPrimary : colors.textPrimary}
-                              />
-                            </View>
-
-                            <View style={styles.convDetails}>
-                              <View style={styles.convTitleRow}>
-                                <Text
-                                  style={[
-                                    styles.convTitle,
-                                    {
-                                      color: colors.onSurface,
-                                      fontWeight: '700',
-                                    },
-                                  ]}
-                                  numberOfLines={1}
-                                >
-                                  {conv.title || 'Conversa'}
-                                </Text>
-                                <Text style={[styles.convTime, { color: colors.textMuted }]}>
-                                  {formatGroupTimestamp(conv.timestamp)}
-                                </Text>
-                              </View>
-                              <Text
-                                style={[styles.convPreview, { color: colors.textSecondary }]}
-                                numberOfLines={1}
-                              >
-                                {humanizePreview(conv.preview)}
-                              </Text>
-                            </View>
-
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                              <TouchableOpacity
-                                style={styles.actionBtn}
-                                onPress={(e) => {
-                                  e.stopPropagation();
-                                  onTogglePin?.(conv.id);
-                                }}
-                                hitSlop={tokens.hitSlop.md}
-                                accessibilityLabel={conv.pinned ? 'Desfixar conversa' : 'Fixar conversa'}
-                                accessibilityRole="button"
-                              >
-                                <MaterialIcons
-                                  name={conv.pinned ? 'bookmark' : 'bookmark-outline'}
-                                  size={18}
-                                  color={conv.pinned ? colors.primary : colors.outline}
-                                />
-                              </TouchableOpacity>
-
-                              {onDeleteConversation && conversations.length > 1 && (
-                                <TouchableOpacity
-                                  style={styles.actionBtn}
-                                  onPress={(e) => {
-                                    e.stopPropagation();
-                                    onDeleteConversation(conv.id);
-                                  }}
-                                  hitSlop={tokens.hitSlop.md}
-                                  accessibilityLabel="Excluir conversa"
-                                  accessibilityRole="button"
-                                >
-                                  <MaterialIcons name="delete-outline" size={18} color={colors.outline} />
-                                </TouchableOpacity>
-                              )}
-                            </View>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-                  ))}
-                </>
-              )}
-            </ScrollView>
-
-            <View style={[styles.footer, { borderTopColor: colors.outlineVariant, paddingBottom: Math.max(insets.bottom, 0) + tokens.spacing.md }]}>
-              <TouchableOpacity
-                style={[styles.newChatBtn, { backgroundColor: colors.primary }]}
-                onPress={() => {
-                  onClose();
-                  onNewChat();
-                }}
-                activeOpacity={0.85}
-                accessibilityLabel="Iniciar nova conversa"
-                accessibilityRole="button"
-                hitSlop={tokens.hitSlop.sm}
-              >
-                <MaterialIcons name="add" size={20} color={colors.onPrimary} />
-                <Text style={[styles.newChatBtnText, { color: colors.onPrimary }]}>
-                  Nova conversa
+              <View style={[styles.vitoBadge, { backgroundColor: colors.ink }]}>
+                <Text style={[styles.vitoBadgeText, { color: colors.bg }]}>v</Text>
+              </View>
+              <View style={styles.suggestionBody}>
+                <Text style={[styles.suggestionText, { color: colors.ink }]}>
+                  <Text style={styles.suggestionBold}>
+                    {emptyOrErrorSessions.length}{' '}
+                    {emptyOrErrorSessions.length === 1
+                      ? 'conversa vazia ou com erro.'
+                      : 'conversas vazias ou com erro.'}
+                  </Text>{' '}
+                  Quer que eu limpe?
                 </Text>
-              </TouchableOpacity>
+                <View style={styles.suggestionActions}>
+                  <TouchableOpacity
+                    style={[
+                      styles.suggestionBtnPrimary,
+                      { backgroundColor: colors.ink, borderColor: colors.ink },
+                    ]}
+                    onPress={handleCleanEmptyConversations}
+                    activeOpacity={0.82}
+                    accessibilityRole="button"
+                    accessibilityLabel="Limpar conversas vazias"
+                  >
+                    <Text style={[styles.suggestionBtnPrimaryText, { color: colors.bg }]}>
+                      Limpar
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.suggestionBtnSecondary, { borderColor: colors.line }]}
+                    onPress={() => setCleanupDismissed(true)}
+                    activeOpacity={0.75}
+                    accessibilityRole="button"
+                    accessibilityLabel="Agora não"
+                  >
+                    <Text style={[styles.suggestionBtnSecondaryText, { color: colors.ink }]}>
+                      Agora não
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
             </View>
-          </SafeAreaView>
-        </Animated.View>
+          )}
 
-        <TouchableOpacity
-          style={styles.backdrop}
-          activeOpacity={1}
-          onPress={onClose}
-          accessibilityLabel="Fechar histórico"
-        />
+          {/* Lista .cvl */}
+          <ScrollView
+            style={styles.listScroll}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            scrollEnabled={!rowSwiping}
+          >
+            {filteredConversations.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Text style={[styles.emptyTitle, { color: colors.ink }]}>
+                  {searchQuery.trim()
+                    ? 'Nenhuma conversa encontrada'
+                    : 'Você ainda não tem conversas'}
+                </Text>
+                <Text style={[styles.emptySub, { color: colors.muted }]}>
+                  {searchQuery.trim()
+                    ? 'Tente buscar por outro termo ou assunto.'
+                    : 'Suas trocas de mensagens com o Vito aparecerão listadas aqui.'}
+                </Text>
+              </View>
+            ) : (
+              <>
+                {pinnedConversations.length > 0 && (
+                  <View>
+                    <Text
+                      style={[styles.groupHeader, { color: colors.muted }]}
+                      accessibilityRole="header"
+                    >
+                      Fixadas
+                    </Text>
+                    {pinnedConversations.map((conv) => (
+                      <SwipeableConversationRow
+                        key={conv.id}
+                        conversation={conv}
+                        canDelete={canDeleteRow}
+                        onSelect={(id) => {
+                          onSelectConversation(id);
+                          onClose();
+                        }}
+                        onTogglePin={onTogglePin}
+                        onDelete={onDeleteConversation}
+                        onSwipeStateChange={setRowSwiping}
+                      />
+                    ))}
+                  </View>
+                )}
+
+                {unpinnedGroups.map((group) => (
+                  <View key={group.key}>
+                    <Text
+                      style={[styles.groupHeader, { color: colors.muted }]}
+                      accessibilityRole="header"
+                    >
+                      {group.title}
+                    </Text>
+                    {group.sessions.map((conv) => (
+                      <SwipeableConversationRow
+                        key={conv.id}
+                        conversation={conv}
+                        canDelete={canDeleteRow}
+                        onSelect={(id) => {
+                          onSelectConversation(id);
+                          onClose();
+                        }}
+                        onTogglePin={onTogglePin}
+                        onDelete={onDeleteConversation}
+                        onSwipeStateChange={setRowSwiping}
+                      />
+                    ))}
+                  </View>
+                ))}
+              </>
+            )}
+          </ScrollView>
+
+          {/* Rodapé .dhint + .cta2 */}
+          <Text style={[styles.swipeHint, { color: colors.muted }]}>
+            Deslize para fixar ou excluir
+          </Text>
+
+          <TouchableOpacity
+            style={[styles.newChatBtn, { backgroundColor: colors.ink }]}
+            onPress={() => {
+              onClose();
+              onNewChat();
+            }}
+            activeOpacity={0.86}
+            accessibilityLabel="Iniciar nova conversa"
+            accessibilityRole="button"
+          >
+            <Text style={[styles.newChatBtnText, { color: colors.bg }]}>+ Nova conversa</Text>
+          </TouchableOpacity>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -418,191 +408,147 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     flexDirection: 'row',
-    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(11, 13, 18, 0.35)',
   },
   panel: {
     height: '100%',
-    borderTopRightRadius: 20,
-    borderBottomRightRadius: 20,
+    borderTopRightRadius: 28,
+    borderBottomRightRadius: 28,
+    paddingHorizontal: 16,
     overflow: 'hidden',
-    elevation: 8,
+    elevation: 12,
   },
-  safeArea: {
-    flex: 1,
-  },
-  backdrop: {
-    flex: 1,
-  },
-  header: {
+  headerRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: tokens.spacing.md,
-    paddingHorizontal: tokens.spacing.md,
-    paddingVertical: tokens.spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: tokens.colors.outlineVariant,
-  },
-  closeBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 12,
   },
   headerTextCol: {
     flex: 1,
   },
   headerTitle: {
-    fontSize: tokens.typography.size.titleLarge,
-    fontWeight: tokens.typography.weight.bold,
-    color: tokens.colors.onSurface,
+    fontFamily: 'Montserrat_800ExtraBold',
+    fontSize: 24,
+    fontWeight: '800',
+    letterSpacing: -0.48,
   },
   headerSub: {
-    fontSize: tokens.typography.size.labelSmall,
-    color: tokens.colors.textMuted,
-  },
-  listContent: {
-    padding: tokens.spacing.md,
-    gap: tokens.spacing.sm,
-  },
-  pendingCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: tokens.spacing.sm,
-    padding: tokens.spacing.md,
-    borderRadius: MD3Shapes.large,
-    borderWidth: 1,
-    marginBottom: tokens.spacing.sm,
-    minHeight: 44,
-  },
-  pendingText: {
-    flex: 1,
-    fontSize: tokens.typography.size.bodyMedium,
-    fontWeight: tokens.typography.weight.semibold,
-  },
-  retryBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    minWidth: 48,
-    minHeight: 48,
-    justifyContent: 'center',
-    paddingHorizontal: tokens.spacing.md,
-    borderRadius: MD3Shapes.full,
-  },
-  retryText: {
-    fontSize: tokens.typography.size.labelLarge,
-    fontWeight: tokens.typography.weight.bold,
-  },
-  groupHeader: {
-    fontSize: tokens.typography.size.labelMedium,
-    fontWeight: tokens.typography.weight.bold,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginTop: tokens.spacing.sm,
-    marginBottom: tokens.spacing.xs,
-    paddingHorizontal: tokens.spacing.xs,
-  },
-  pinnedHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: tokens.spacing.sm,
-    marginBottom: tokens.spacing.xs,
-    paddingHorizontal: tokens.spacing.xs,
-  },
-  convCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: tokens.spacing.md,
-    paddingVertical: tokens.spacing.sm,
-    paddingHorizontal: tokens.spacing.md,
-    borderRadius: MD3Shapes.large,
-    borderWidth: 1,
-    backgroundColor: tokens.colors.surfaceContainerLow,
-    minHeight: 44,
-    marginBottom: tokens.spacing.xs,
-  },
-  convIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: MD3Shapes.medium,
-    backgroundColor: tokens.colors.primaryContainer,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  actionBtn: {
-    minWidth: 44,
-    minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 2,
-  },
-  convDetails: {
-    flex: 1,
-  },
-  convTitleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  convTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: tokens.colors.onSurface,
-    flex: 1,
-    marginRight: tokens.spacing.xs,
-  },
-  convTime: {
-    fontSize: 10,
-    color: tokens.colors.textMuted,
-  },
-  convPreview: {
-    fontSize: tokens.typography.size.labelSmall,
-    color: tokens.colors.textMuted,
+    fontSize: 13,
     marginTop: 2,
   },
-  footer: {
-    padding: tokens.spacing.md,
-    // Folga da barra de gestos do Android (o botão invadia a gesture bar).
-    paddingBottom: Platform.OS === 'android' ? tokens.spacing.md + 12 : tokens.spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: tokens.colors.outlineVariant,
+  closeBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  newChatBtn: {
+  searchBox: {
+    marginTop: 12,
+    height: 42,
+    borderRadius: 21,
+    borderWidth: 1,
+    paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     gap: 8,
-    backgroundColor: tokens.colors.primary,
-    borderRadius: MD3Shapes.full,
-    paddingVertical: 14,
-    minHeight: 48,
-    ...tokens.shadows.level2,
   },
-  newChatBtnText: {
-    color: tokens.colors.onPrimary,
-    fontSize: tokens.typography.size.labelLarge,
-    fontWeight: tokens.typography.weight.bold,
+  searchInput: {
+    flex: 1,
+    fontSize: 14.5,
+    paddingVertical: 0,
+  },
+  suggestionCard: {
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  vitoBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  vitoBadgeText: {
+    fontFamily: 'Montserrat_800ExtraBold',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  suggestionBody: {
+    flex: 1,
+    minWidth: 0,
+  },
+  suggestionText: {
+    fontSize: 13,
+    lineHeight: 17.5,
+  },
+  suggestionBold: {
+    fontWeight: '600',
+  },
+  suggestionActions: {
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: 8,
+  },
+  suggestionBtnPrimary: {
+    height: 28,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  suggestionBtnPrimaryText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  suggestionBtnSecondary: {
+    height: 28,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  suggestionBtnSecondaryText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  listScroll: {
+    flex: 1,
+    marginTop: 10,
+  },
+  listContent: {
+    paddingBottom: 12,
+  },
+  groupHeader: {
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 0.72,
+    textTransform: 'uppercase',
+    marginTop: 16,
+    marginBottom: 6,
+    marginHorizontal: 4,
   },
   emptyContainer: {
+    paddingVertical: 44,
+    paddingHorizontal: 16,
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 48,
-    paddingHorizontal: 24,
-    gap: 8,
-  },
-  emptyIconBox: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 4,
+    gap: 6,
   },
   emptyTitle: {
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 15,
+    fontWeight: '600',
     textAlign: 'center',
   },
   emptySub: {
@@ -610,11 +556,20 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 18,
   },
-  deleteBtn: {
-    minWidth: 48,
-    minHeight: 48,
+  swipeHint: {
+    textAlign: 'center',
+    fontSize: 12,
+    marginVertical: 8,
+  },
+  newChatBtn: {
+    height: 50,
+    borderRadius: 25,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 4,
+    marginTop: 4,
+  },
+  newChatBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
   },
 });

@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Animated,
+  Easing,
+  Platform,
   StyleSheet,
   View,
   useWindowDimensions,
@@ -12,6 +14,7 @@ import { GradientOverlay } from './GradientOverlay'
 import { useDemoLoop, DemoLoopState } from './useDemoLoop'
 import { DemoExchange } from './DemoExchange'
 import { useTheme } from '../../context/ThemeContext'
+import { loginPalette } from './loginPalette'
 
 export interface DemoStageProps {
   onAdvance: () => void
@@ -22,12 +25,13 @@ export interface DemoStageProps {
 }
 
 /**
- * Palco da demonstração animada (seção 4 do prompt).
- * - flex: 1, conversa ancorada na parte de baixo.
- * - Máximo 2 trocas visíveis; a mais antiga some com fade (400 ms).
- * - Degradê no topo (transparente → opaco nos primeiros 22% da altura).
- * - Toque avança para a próxima cena.
- * - Reduzir movimento: duas trocas estáticas, sem timers.
+ * Palco da demonstração animada em paridade exata com login-vito.html:
+ * - flex: 1, cursor pointer / toque avança para a próxima cena.
+ * - .feed com overflow:hidden e degradê suave no topo (as mensagens antigas somem suavemente).
+ * - .inner ancorado na parte inferior com gap de 16px.
+ * - Quando uma nova cena entra, o container executa uma transição física de subida
+ *   suave com Easing.bezier(0.2, 0.8, 0.2, 1) em 500ms, empurrando a troca anterior para cima.
+ * - A troca anterior desaparece com fade-out suave em 400ms.
  */
 export const DemoStage: React.FC<DemoStageProps> = ({
   onAdvance,
@@ -36,7 +40,8 @@ export const DemoStage: React.FC<DemoStageProps> = ({
   advanceScene: externalAdvance,
   reduceMotion: externalReduceMotion,
 }) => {
-  const { colors, isDark } = useTheme()
+  const { isDark } = useTheme()
+  const palette = loginPalette(isDark)
   const internalLoop = useDemoLoop()
   const state = externalState ?? internalLoop.state
   const advanceScene = externalAdvance ?? internalLoop.advanceScene
@@ -47,119 +52,155 @@ export const DemoStage: React.FC<DemoStageProps> = ({
   const [exiting, setExiting] = useState(false)
   const [prevScene, setPrevScene] = useState<DemoScene | null>(null)
 
-  // Quando o índice da cena muda, marca a troca anterior como saindo (fade-out 400 ms).
+  const innerTranslateY = useRef(new Animated.Value(0)).current
+
+  // Quando o índice da cena muda, executa o empurrão suave (push) da conversa para cima
   useEffect(() => {
     if (state.sceneIndex !== prevIndexRef.current) {
       setPrevScene(DEMO_SCENES[prevIndexRef.current])
       setExiting(true)
       prevIndexRef.current = state.sceneIndex
-      const t = setTimeout(() => setExiting(false), 400)
+
+      if (!reduceMotion) {
+        // Empurrão físico suave: translateY +90 -> 0 com bezier cúbico (500ms)
+        innerTranslateY.setValue(90)
+        Animated.timing(innerTranslateY, {
+          toValue: 0,
+          duration: 500,
+          easing: Easing.bezier(0.2, 0.8, 0.2, 1),
+          useNativeDriver: true,
+        }).start()
+      }
+
+      const t = setTimeout(() => {
+        setExiting(false)
+        setPrevScene(null)
+      }, 420)
+
       return () => clearTimeout(t)
     }
-  }, [state.sceneIndex])
-
-  const containerStyle = useMemo(
-    () => ({
-      flex: 1,
-      backgroundColor: colors.bg,
-      ...style,
-    }),
-    [colors.bg, style],
-  )
-
-  // Degradê topo: transparente → opaco nos primeiros 22% da altura.
-  // Usa GradientOverlay (JS-puro, sem dependência nativa).
+  }, [state.sceneIndex, reduceMotion, innerTranslateY])
 
   const handlePress = useCallback(() => {
     advanceScene()
     onAdvance()
   }, [advanceScene, onAdvance])
 
+  // Na Web, aplica máscara CSS nativa de linear-gradient para o desvanecimento perfeito
+  const webMaskStyle: ViewStyle = useMemo(() => {
+    if (Platform.OS === 'web') {
+      return {
+        WebkitMaskImage: 'linear-gradient(to bottom, transparent, #000000 22%)',
+        maskImage: 'linear-gradient(to bottom, transparent, #000000 22%)',
+      } as any
+    }
+    return {}
+  }, [])
+
   if (reduceMotion) {
     return (
-      <Animated.View
-        style={containerStyle}
+      <View
+        style={[styles.stage, { backgroundColor: palette.bg }, style]}
         accessible={false}
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"
       >
-        <View style={styles.feed}>
-          {DEMO_SCENES.slice(0, 2).map((s) => (
-            <DemoExchange
-              key={s.id}
-              scene={s}
-              phase="showing-card"
-              userTyped={s.userText}
-              userComplete
-              vitoVisible
-              cardVisible
-              dotsVisible={false}
-            />
-          ))}
+        <View style={[styles.feed, webMaskStyle]}>
+          <View style={styles.inner}>
+            {DEMO_SCENES.slice(0, 2).map((s) => (
+              <DemoExchange
+                key={s.id}
+                scene={s}
+                phase="showing-card"
+                userTyped={s.userText}
+                userComplete
+                vitoVisible
+                cardVisible
+                dotsVisible={false}
+                reduceMotion
+              />
+            ))}
+          </View>
         </View>
-      </Animated.View>
+      </View>
     )
   }
 
   const currentScene = DEMO_SCENES[state.sceneIndex]
+  const gradientHeight = Math.max(80, windowHeight * 0.22)
 
   return (
-    <Animated.View
-      style={containerStyle}
+    <View
+      style={[styles.stage, { backgroundColor: palette.bg }, style]}
       accessible
-      accessibilityLabel="Exemplos do que o Vito faz: marcar compromissos, criar radares de preço, rascunhar respostas no WhatsApp e transformar fotos de boletos em tarefas"
+      accessibilityLabel="Demonstração interativa do Vito. Toque para ver o próximo exemplo."
       importantForAccessibility="yes"
       onStartShouldSetResponder={() => true}
       onResponderGrant={handlePress}
     >
-      <GradientOverlay
-        height={windowHeight * 0.22}
-        isDark={isDark}
-        opacity={0.9}
-        pointerEvents="none"
-        style={styles.gradientTop}
-      />
-      <View style={styles.feed}>
-        {prevScene && exiting && (
+      <View style={[styles.feed, webMaskStyle]}>
+        <Animated.View
+          style={[
+            styles.inner,
+            { transform: [{ translateY: innerTranslateY }] },
+          ]}
+        >
+          {prevScene && exiting && (
+            <DemoExchange
+              key={`prev-${prevScene.id}`}
+              scene={prevScene}
+              phase="showing-card"
+              userTyped={prevScene.userText}
+              userComplete
+              vitoVisible
+              cardVisible
+              dotsVisible={false}
+              exiting
+            />
+          )}
+
           <DemoExchange
-            key="prev"
-            scene={prevScene}
-            phase="showing-card"
-            userTyped={prevScene.userText}
-            userComplete
-            vitoVisible
-            cardVisible
-            dotsVisible={false}
-            exiting
+            key={`scene-${currentScene.id}`}
+            scene={currentScene}
+            phase={state.phase}
+            userTyped={state.userTyped}
+            userComplete={state.userComplete}
+            vitoVisible={state.vitoVisible}
+            cardVisible={state.cardVisible}
+            dotsVisible={state.dotsVisible}
           />
-        )}
-        <DemoExchange
-          key={`scene-${state.sceneIndex}`}
-          scene={currentScene}
-          phase={state.phase}
-          userTyped={state.userTyped}
-          userComplete={state.userComplete}
-          vitoVisible={state.vitoVisible}
-          cardVisible={state.cardVisible}
-          dotsVisible={state.dotsVisible}
+        </Animated.View>
+
+        {/* Degradê sobreposto no topo com as mensagens sumindo suavemente */}
+        <GradientOverlay
+          height={gradientHeight}
+          isDark={isDark}
+          pointerEvents="none"
         />
       </View>
-    </Animated.View>
+    </View>
   )
 }
 
 const styles = StyleSheet.create({
-  gradientTop: {
-    position: 'absolute' as const,
-    top: 0,
-    left: 0,
-    right: 0,
-  },
+  stage: {
+    flex: 1,
+    minHeight: 0,
+    marginTop: 2,
+  } as ViewStyle,
   feed: {
     flex: 1,
-    paddingHorizontal: 16,
-    paddingBottom: 18,
-    justifyContent: 'flex-end',
+    minHeight: 0,
+    position: 'relative',
     overflow: 'hidden',
-  },
+    paddingHorizontal: 16,
+  } as ViewStyle,
+  inner: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    bottom: 18,
+    flexDirection: 'column',
+    gap: 16,
+  } as ViewStyle,
 })

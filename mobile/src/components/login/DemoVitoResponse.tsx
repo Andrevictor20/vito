@@ -1,42 +1,47 @@
-import React, { useCallback, useEffect, useRef } from 'react'
+import React, { useEffect, useRef } from 'react'
 import {
   Animated,
   StyleSheet,
   Text,
   View,
   type ViewStyle,
+  type TextStyle,
 } from 'react-native'
 import { useTheme } from '../../context/ThemeContext'
-import { type ThemeTokens } from '../../theme/tokens'
+import { loginPalette } from './loginPalette'
 
 export interface DemoVitoResponseProps {
   text: string
   visible: boolean
   dots: boolean
-  colors: ThemeTokens['colors']
 }
 
 /**
- * Resposta do Vito como texto fluido à esquerda (sem balão, fonte 15).
- * Três pontinhos de "pensando" pulando em sequência (1 s) até a revelação.
- * Fade + subida (400 ms) quando aparece.
+ * Resposta fluida do Vito à esquerda (sem balão, sem avatar)
+ * .vito{position:relative;font-size:15px;line-height:1.45}
+ * 3 pontinhos pulando sequencialmente quando em espera (`dots === true`).
+ * Animação suave rise (opacity 0->1, translateY 10->0 em 400ms) quando revelado.
  */
 export const DemoVitoResponse: React.FC<DemoVitoResponseProps> = ({
   text,
   visible,
   dots,
-  colors,
 }) => {
+  const { isDark } = useTheme()
+  const palette = loginPalette(isDark)
+
   const opacity = useRef(new Animated.Value(visible ? 1 : 0)).current
   const translateY = useRef(new Animated.Value(visible ? 0 : 10)).current
 
-  const dotAnims = useRef([
-    new Animated.Value(0),
-    new Animated.Value(0),
-    new Animated.Value(0),
-  ]).current
+  const dot1 = useRef(new Animated.Value(0)).current
+  const dot2 = useRef(new Animated.Value(0)).current
+  const dot3 = useRef(new Animated.Value(0)).current
 
-  // Fade + subida do texto do Vito (400 ms) quando aparece.
+  const dot1Opacity = useRef(new Animated.Value(0.3)).current
+  const dot2Opacity = useRef(new Animated.Value(0.3)).current
+  const dot3Opacity = useRef(new Animated.Value(0.3)).current
+
+  // Revelação suave do texto do Vito
   useEffect(() => {
     if (!visible) {
       opacity.setValue(0)
@@ -57,101 +62,146 @@ export const DemoVitoResponse: React.FC<DemoVitoResponseProps> = ({
     ]).start()
   }, [visible, opacity, translateY])
 
-  // Pontinhos pulando em sequência (1 s).
+  // Animação contínua dos pontinhos: pulam 3px e aumentam opacidade
   useEffect(() => {
     if (!dots) return
-    const step = () => {
+
+    const makeDotAnim = (animY: Animated.Value, animOp: Animated.Value) =>
       Animated.sequence([
-        Animated.timing(dotAnims[0], {
-          toValue: -3,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.timing(dotAnims[0], {
-          toValue: 0,
-          duration: 700,
-          useNativeDriver: true,
-        }),
-      ]).start()
-      Animated.sequence([
-        Animated.delay(150),
-        Animated.timing(dotAnims[1], {
-          toValue: -3,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.timing(dotAnims[1], {
-          toValue: 0,
-          duration: 700,
-          useNativeDriver: true,
-        }),
-      ]).start()
-      Animated.sequence([
-        Animated.delay(300),
-        Animated.timing(dotAnims[2], {
-          toValue: -3,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.timing(dotAnims[2], {
-          toValue: 0,
-          duration: 700,
-          useNativeDriver: true,
-        }),
-      ]).start()
+        Animated.parallel([
+          Animated.timing(animY, {
+            toValue: -3,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+          Animated.timing(animOp, {
+            toValue: 1,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+        ]),
+        Animated.parallel([
+          Animated.timing(animY, {
+            toValue: 0,
+            duration: 700,
+            useNativeDriver: true,
+          }),
+          Animated.timing(animOp, {
+            toValue: 0.3,
+            duration: 700,
+            useNativeDriver: true,
+          }),
+        ]),
+      ])
+
+    let active = true
+
+    const loop = () => {
+      if (!active) return
+      Animated.parallel([
+        makeDotAnim(dot1, dot1Opacity),
+        Animated.sequence([
+          Animated.delay(150),
+          makeDotAnim(dot2, dot2Opacity),
+        ]),
+        Animated.sequence([
+          Animated.delay(300),
+          makeDotAnim(dot3, dot3Opacity),
+        ]),
+      ]).start(() => {
+        if (active) loop()
+      })
     }
-    step()
-    const id = setInterval(step, 1000)
-    return () => clearInterval(id)
-  }, [dots, dotAnims])
+
+    loop()
+
+    return () => {
+      active = false
+      dot1.setValue(0)
+      dot2.setValue(0)
+      dot3.setValue(0)
+      dot1Opacity.setValue(0.3)
+      dot2Opacity.setValue(0.3)
+      dot3Opacity.setValue(0.3)
+    }
+  }, [dots, dot1, dot2, dot3, dot1Opacity, dot2Opacity, dot3Opacity])
+
+  if (dots) {
+    return (
+      <View style={styles.dotsContainer}>
+        <Animated.View
+          style={[
+            styles.dot,
+            {
+              backgroundColor: palette.muted,
+              opacity: dot1Opacity,
+              transform: [{ translateY: dot1 }],
+            },
+          ]}
+        />
+        <Animated.View
+          style={[
+            styles.dot,
+            {
+              backgroundColor: palette.muted,
+              opacity: dot2Opacity,
+              transform: [{ translateY: dot2 }],
+            },
+          ]}
+        />
+        <Animated.View
+          style={[
+            styles.dot,
+            {
+              backgroundColor: palette.muted,
+              opacity: dot3Opacity,
+              transform: [{ translateY: dot3 }],
+            },
+          ]}
+        />
+      </View>
+    )
+  }
+
+  if (!visible) return null
 
   return (
     <Animated.View
       style={[
-        styles.container,
-        { opacity, transform: [{ translateY }] },
+        styles.vitoContainer,
+        {
+          opacity,
+          transform: [{ translateY }],
+        },
       ]}
     >
-      {dots ? (
-        <View style={styles.dotsRow}>
-          {dotAnims.map((anim, i) => (
-            <Animated.View
-              key={i}
-              style={[styles.dot, { transform: [{ translateY: anim }] }]}
-            />
-          ))}
-        </View>
-      ) : text ? (
-        <Text style={[styles.text, { color: colors.onSurface }]}>
-          {text}
-        </Text>
-      ) : null}
+      <Text style={[styles.vitoText, { color: palette.ink }]}>
+        {text}
+      </Text>
     </Animated.View>
   )
 }
 
 const styles = StyleSheet.create({
-  container: {
-    // Texto fluido, sem balão - alinhado à esquerda
+  vitoContainer: {
     alignSelf: 'flex-start',
-    paddingHorizontal: 2,
-    paddingVertical: 2,
-  },
-  dotsRow: {
+    width: '100%',
+  } as ViewStyle,
+  vitoText: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 15,
+    lineHeight: 21.75, // 15px * 1.45
+  } as TextStyle,
+  dotsContainer: {
     flexDirection: 'row',
     gap: 4,
-    marginTop: 6,
-  },
+    height: 24,
+    alignItems: 'center',
+    paddingTop: 6,
+  } as ViewStyle,
   dot: {
     width: 7,
     height: 7,
-    borderRadius: 4,
-    backgroundColor: '#98A19D',
-  },
-  text: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 15,
-    lineHeight: 22,
-    color: '#09090B',
-  },
+    borderRadius: 3.5,
+  } as ViewStyle,
 })

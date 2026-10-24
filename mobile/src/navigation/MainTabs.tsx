@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { View, StyleSheet, Keyboard, Platform, BackHandler, useWindowDimensions } from 'react-native';
 import * as Notifications from 'expo-notifications';
-import { dataSync, chatPromptBus, tabNavigationBus } from '../services/dataSync';
+import { dataSync, chatPromptBus, tabNavigationBus, pagerSwipeLockBus } from '../services/dataSync';
 import { navigateToTab } from './navigationRef';
 import { FloatingTabBar } from '../components/common/FloatingTabBar';
 import { Header, HeaderPill, HeaderRoundButton } from '../components/common/Header';
@@ -235,6 +235,7 @@ export const MainTabs: React.FC<{ route?: any }> = ({ route }) => {
   const [showSummaries, setShowSummaries] = useState(false);
   const [inTriggersSubView, setInTriggersSubView] = useState(false);
   const [inBookingSubView, setInBookingSubView] = useState(false);
+  const [gestureSwipeLocked, setGestureSwipeLocked] = useState(false);
 
   const chatRef = useRef<ChatScreenRef>(null);
   const pagerRef = useRef<AdaptivePagerRef>(null);
@@ -284,6 +285,13 @@ export const MainTabs: React.FC<{ route?: any }> = ({ route }) => {
       handleSelectTab(tab);
     });
   }, [handleSelectTab]);
+
+  // Bloqueio temporário do pager quando carrossel interno (ChatIdeasDeck) está sendo arrastado
+  useEffect(() => {
+    return pagerSwipeLockBus.subscribe((locked) => {
+      setGestureSwipeLocked(locked);
+    });
+  }, []);
 
   // Prompts externos vindos dos radares (§9.4: cards acionáveis)
   useEffect(() => {
@@ -341,7 +349,7 @@ export const MainTabs: React.FC<{ route?: any }> = ({ route }) => {
     isKeyboardOpen: keyboardOpen,
     hasModal,
     hasSubScreen,
-  });
+  }) && !gestureSwipeLocked;
 
   return (
     <View

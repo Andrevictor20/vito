@@ -35,6 +35,7 @@ import { resolveKeyboardHeight } from '../utils/keyboardHeight';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { SafeAudioRecorder } from '../services/audioRecorder';
+import { pagerSwipeLockBus } from '../services/dataSync';
 
 export interface ChatScreenProps {
   onDataChanged?: () => void;
@@ -84,6 +85,13 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [deckGestureActive, setDeckGestureActive] = useState(false);
+
+  useEffect(() => {
+    return pagerSwipeLockBus.subscribe((locked) => {
+      setDeckGestureActive(locked);
+    });
+  }, []);
 
   const flatListRef = useRef<FlatList>(null);
   const inputRef = useRef<any>(null);
@@ -346,6 +354,7 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
         ref={flatListRef}
         style={styles.flatList}
         data={messages}
+        scrollEnabled={!deckGestureActive}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <ChatMessageBubble

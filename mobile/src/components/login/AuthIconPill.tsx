@@ -1,13 +1,15 @@
-import React, { useCallback, useMemo } from 'react'
+import React, { useCallback } from 'react'
 import {
+  StyleSheet,
   TouchableOpacity,
   View,
+  type StyleProp,
   type ViewStyle,
 } from 'react-native'
-import { MaterialIcons } from '@expo/vector-icons'
 import { GoogleIcon } from '../common/GoogleIcon'
+import { MailIcon, WhatsAppGlyph } from './DemoIcons'
 import { useTheme } from '../../context/ThemeContext'
-import { type ThemeTokens } from '../../theme/tokens'
+import { loginPalette } from './loginPalette'
 
 export type AuthIconKind = 'google' | 'whatsapp' | 'email'
 
@@ -18,44 +20,29 @@ export interface AuthIconPillProps {
   loading?: boolean
   iconSize?: number
   pillSize?: number
-  style?: ViewStyle | ViewStyle[] | null | undefined
+  style?: StyleProp<ViewStyle>
 }
 
 /**
- * Pílula flutuante com três botões circulares de ícone (só ícone, sem label):
- * Google, WhatsApp e E-mail. Reaproveita o GoogleIcon oficial do app.
- * Não altera a lógica de autenticação — apenas dispara os handlers existentes.
+ * Pílula com três botões circulares de ícone (Google, WhatsApp, E-mail)
+ * em paridade exata com login-vito.html:
+ * .pill{display:flex;gap:12px;padding:8px;background:var(--surf);border-radius:40px;box-shadow:var(--shadow)}
+ * .ib{width:58px;height:58px;border-radius:50%;border:0;display:grid;place-items:center}
+ * - Google: fundo branco, contorno linha 1px, ícone Google oficial.
+ * - WhatsApp: fundo verde (#25d366), glifo do WhatsApp vetorial oficial branco.
+ * - E-mail: fundo ink, ícone de e-mail vetorial na cor de fundo (bg).
  */
 export const AuthIconPill: React.FC<AuthIconPillProps> = ({
   onGoogle,
   onWhatsApp,
   onEmail,
   loading = false,
-  iconSize = 22,
-  pillSize = 52,
+  iconSize = 26,
+  pillSize = 58,
   style,
 }) => {
-  const { colors } = useTheme()
-
-  const styles = useMemo<{ pill: ViewStyle; iconButton: ViewStyle }>(
-    () => ({
-      pill: {
-        flexDirection: 'row',
-        gap: 12,
-        padding: 8,
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderRadius: 9999,
-        backgroundColor: colors.surfaceContainer,
-      },
-      iconButton: {
-        borderRadius: 9999,
-        alignItems: 'center',
-        justifyContent: 'center',
-      },
-    }),
-    [colors],
-  )
+  const { isDark } = useTheme()
+  const palette = loginPalette(isDark)
 
   const handlePress = useCallback(
     (kind: AuthIconKind, handler: () => void) => {
@@ -65,68 +52,99 @@ export const AuthIconPill: React.FC<AuthIconPillProps> = ({
     [loading],
   )
 
-  const iconButton = (
-    kind: AuthIconKind,
-    icon: React.ReactNode,
-    label: string,
-    bgColor: string,
-    iconColor: string,
-    borderColor?: string,
-  ) => {
-    const disabled = loading
-    const btnStyle: ViewStyle = {
-      ...styles.iconButton,
-      width: pillSize,
-      height: pillSize,
-      backgroundColor: disabled ? colors.surfaceContainerHighest : bgColor,
-      ...(borderColor ? { borderColor, borderWidth: 1 } : {}),
-    }
-    return (
-      <TouchableOpacity
-        key={kind}
-        style={btnStyle}
-        disabled={disabled}
-        activeOpacity={0.92}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        accessibilityRole="button"
-        accessibilityLabel={label}
-        onPress={() => {
-          if (kind === 'google') handlePress('google', onGoogle)
-          else if (kind === 'whatsapp') handlePress('whatsapp', onWhatsApp)
-          else handlePress('email', onEmail)
-        }}
-      >
-        {icon}
-      </TouchableOpacity>
-    )
-  }
-
-  const whatsAppBg = '#25D366'
-
   return (
-    <View style={[styles.pill, style]}>
-      {iconButton(
-        'google',
-        <GoogleIcon size={iconSize} />,
-        'Continuar com o Google',
-        '#FFFFFF',
-        colors.onSurface,
-        colors.outlineVariant,
-      )}
-      {iconButton(
-        'whatsapp',
-        <MaterialIcons name="chat" size={iconSize} color="#FFFFFF" />,
-        'Entrar com WhatsApp',
-        whatsAppBg,
-        '#FFFFFF',
-      )}
-      {iconButton(
-        'email',
-        <MaterialIcons name="email" size={iconSize} color={colors.onPrimary} />,
-        'Entrar com e-mail',
-        colors.primary,
-        colors.onPrimary,
-      )}
+    <View
+      style={[
+        styles.pill,
+        {
+          backgroundColor: palette.surf,
+          shadowColor: isDark ? '#000000' : '#141916',
+        },
+        style,
+      ]}
+      accessibilityRole="toolbar"
+      accessibilityLabel="Opções de login"
+    >
+      {/* Botão Google */}
+      <TouchableOpacity
+        style={[
+          styles.iconBtn,
+          {
+            width: pillSize,
+            height: pillSize,
+            borderRadius: pillSize / 2,
+            backgroundColor: '#FFFFFF',
+            borderWidth: 1,
+            borderColor: palette.line,
+          },
+        ]}
+        disabled={loading}
+        activeOpacity={0.85}
+        accessibilityRole="button"
+        accessibilityLabel="Continuar com o Google"
+        onPress={() => handlePress('google', onGoogle)}
+      >
+        <GoogleIcon size={iconSize} />
+      </TouchableOpacity>
+
+      {/* Botão WhatsApp */}
+      <TouchableOpacity
+        style={[
+          styles.iconBtn,
+          {
+            width: pillSize,
+            height: pillSize,
+            borderRadius: pillSize / 2,
+            backgroundColor: '#25D366',
+          },
+        ]}
+        disabled={loading}
+        activeOpacity={0.85}
+        accessibilityRole="button"
+        accessibilityLabel="Entrar com WhatsApp"
+        onPress={() => handlePress('whatsapp', onWhatsApp)}
+      >
+        <WhatsAppGlyph color="#FFFFFF" size={iconSize} />
+      </TouchableOpacity>
+
+      {/* Botão E-mail */}
+      <TouchableOpacity
+        style={[
+          styles.iconBtn,
+          {
+            width: pillSize,
+            height: pillSize,
+            borderRadius: pillSize / 2,
+            backgroundColor: palette.ink,
+          },
+        ]}
+        disabled={loading}
+        activeOpacity={0.85}
+        accessibilityRole="button"
+        accessibilityLabel="Entrar com e-mail"
+        onPress={() => handlePress('email', onEmail)}
+      >
+        <MailIcon color={palette.bg} size={iconSize} />
+      </TouchableOpacity>
     </View>
   )
 }
+
+const styles = StyleSheet.create({
+  pill: {
+    flexDirection: 'row',
+    gap: 12,
+    padding: 8,
+    borderRadius: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.14,
+    shadowRadius: 22,
+    elevation: 4,
+  } as ViewStyle,
+  iconBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  } as ViewStyle,
+})

@@ -1,16 +1,15 @@
-import React, { useCallback, useEffect, useMemo, useRef } from 'react'
+import React, { useEffect, useRef } from 'react'
 import {
   Animated,
   StyleSheet,
   View,
   type ViewStyle,
 } from 'react-native'
-import { DEMO_SCENES, DemoScene } from './demoScenes'
-import { DemoPhase, DemoLoopState } from './demoMachine'
+import type { DemoScene } from './demoScenes'
+import type { DemoPhase } from './demoMachine'
 import { DemoUserBubble } from './DemoUserBubble'
 import { DemoVitoResponse } from './DemoVitoResponse'
 import { DemoActionCard } from './DemoActionCard'
-import { useTheme } from '../../context/ThemeContext'
 
 export interface DemoExchangeProps {
   scene: DemoScene
@@ -20,15 +19,13 @@ export interface DemoExchangeProps {
   vitoVisible: boolean
   cardVisible: boolean
   dotsVisible: boolean
-  /** Quando verdadeiro, a troca está saindo (fade-out + subida). */
   exiting?: boolean
+  reduceMotion?: boolean
 }
 
 /**
- * Uma troca completa da demonstração:
- * - Bolha do usuário à direita
- * - Resposta do Vito como texto fluido à esquerda (SEM balão)
- * - Card de ação à esquerda
+ * Uma troca completa da demonstração (bolha do usuário + resposta do Vito + card de ação)
+ * .exch{display:flex;flex-direction:column;gap:12px;transition:opacity .4s}
  */
 export const DemoExchange: React.FC<DemoExchangeProps> = ({
   scene,
@@ -39,28 +36,21 @@ export const DemoExchange: React.FC<DemoExchangeProps> = ({
   cardVisible,
   dotsVisible,
   exiting = false,
+  reduceMotion = false,
 }) => {
-  const { colors } = useTheme()
-
   const opacity = useRef(new Animated.Value(exiting ? 0 : 1)).current
-  const translateY = useRef(new Animated.Value(exiting ? -30 : 0)).current
 
-  // Animação de saída: fade-out + subida suave (400 ms).
   useEffect(() => {
-    if (!exiting) return
-    Animated.parallel([
+    if (exiting) {
       Animated.timing(opacity, {
         toValue: 0,
         duration: 400,
         useNativeDriver: true,
-      }),
-      Animated.timing(translateY, {
-        toValue: -50,
-        duration: 500,
-        useNativeDriver: true,
-      }),
-    ]).start()
-  }, [exiting, opacity, translateY])
+      }).start()
+    } else {
+      opacity.setValue(1)
+    }
+  }, [exiting, opacity])
 
   const showUser = phase !== 'showing-user'
 
@@ -68,7 +58,7 @@ export const DemoExchange: React.FC<DemoExchangeProps> = ({
     <Animated.View
       style={[
         styles.container,
-        { opacity, transform: [{ translateY }] },
+        { opacity },
         exiting && { pointerEvents: 'none' as const },
       ]}
     >
@@ -79,23 +69,23 @@ export const DemoExchange: React.FC<DemoExchangeProps> = ({
             typed={userTyped}
             complete={userComplete}
             photo={Boolean(scene.photo)}
-            colors={colors}
           />
         </View>
       )}
-      {vitoVisible && (
+
+      {(vitoVisible || dotsVisible) && (
         <View style={styles.vitoRow}>
           <DemoVitoResponse
             text={scene.vitoText}
             visible={vitoVisible}
             dots={dotsVisible}
-            colors={colors}
           />
         </View>
       )}
+
       {cardVisible && (
         <View style={styles.cardRow}>
-          <DemoActionCard scene={scene} colors={colors} />
+          <DemoActionCard scene={scene} reduceMotion={reduceMotion} />
         </View>
       )}
     </Animated.View>
@@ -105,24 +95,17 @@ export const DemoExchange: React.FC<DemoExchangeProps> = ({
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'column',
-    gap: 8,
+    gap: 12,
     width: '100%',
-  },
+  } as ViewStyle,
   userRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
     width: '100%',
-  },
+  } as ViewStyle,
   vitoRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-start',
     width: '100%',
-    alignItems: 'flex-start',
-  },
+    minHeight: 24,
+  } as ViewStyle,
   cardRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-start',
     width: '100%',
-    alignItems: 'flex-start',
-  },
+  } as ViewStyle,
 })

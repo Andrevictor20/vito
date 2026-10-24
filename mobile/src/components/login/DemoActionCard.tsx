@@ -1,135 +1,301 @@
-import React, { useMemo } from 'react'
+import React, { useEffect, useRef } from 'react'
 import {
+  Animated,
   StyleSheet,
   View,
   Text,
   type ViewStyle,
   type TextStyle,
 } from 'react-native'
-import { MaterialIcons } from '@expo/vector-icons'
-import Svg, { Path } from 'react-native-svg'
-import { DEMO_SCENES, DemoScene } from './demoScenes'
+import type { DemoScene } from './demoScenes'
 import { useTheme } from '../../context/ThemeContext'
-import { type ThemeTokens } from '../../theme/tokens'
-
-type Trailing = 'check' | 'chart' | 'pills' | 'tag'
+import { loginPalette, type LoginPalette } from './loginPalette'
+import {
+  CalIcon,
+  MailIcon,
+  RadarIcon,
+  CheckCircleIcon,
+  Sparkline,
+} from './DemoIcons'
 
 export interface DemoActionCardProps {
   scene: DemoScene
-  colors: ThemeTokens['colors']
-}
-
-const CHIP_COLORS: Record<
-  DemoScene['card']['kind'],
-  { bg: string; icon: string }
-> = {
-  agenda: { bg: '#E4EFFB', icon: '#2B7FD4' }, // azul
-  radar: { bg: '#FBEBDB', icon: '#E07A2A' }, // laranja
-  tarefa: { bg: '#DDF4E8', icon: '#1FB97A' }, // verde
-  boleto: { bg: '#EEE8FD', icon: '#7A4FE0' }, // roxo
-}
-
-const ICON_BY_KIND: Record<DemoScene['card']['kind'], string> = {
-  agenda: 'event',
-  radar: 'blur-on', // MaterialIcons não tem 'radar'; usa ícone próximo
-  tarefa: 'check-circle',
-  boleto: 'check-circle',
+  reduceMotion?: boolean
 }
 
 export const DemoActionCard: React.FC<DemoActionCardProps> = ({
   scene,
-  colors,
+  reduceMotion = false,
 }) => {
+  const { isDark } = useTheme()
+  const palette = loginPalette(isDark)
   const card = scene.card
-  const chip = CHIP_COLORS[card.kind]
-  const iconName = ICON_BY_KIND[card.kind]
 
-  return (
-    <View
-      style={[
-        styles.card,
-        { borderColor: colors.outlineVariant, backgroundColor: colors.bg },
-      ]}
-    >
-      <View style={[styles.chip, { backgroundColor: chip.bg }]}>
-        <MaterialIcons name={iconName as any} size={20} color={chip.icon} />
-      </View>
-      <View style={styles.body}>
-        <Text style={[styles.title, { color: colors.onSurface }]}>
+  // Animação de entrada suave da cena: rise .45s .25s ease both
+  const opacity = useRef(new Animated.Value(reduceMotion ? 1 : 0)).current
+  const translateY = useRef(new Animated.Value(reduceMotion ? 0 : 10)).current
+
+  useEffect(() => {
+    if (reduceMotion) {
+      opacity.setValue(1)
+      translateY.setValue(0)
+      return
+    }
+    Animated.sequence([
+      Animated.delay(200),
+      Animated.parallel([
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 380,
+          useNativeDriver: true,
+        }),
+        Animated.timing(translateY, {
+          toValue: 0,
+          duration: 380,
+          useNativeDriver: true,
+        }),
+      ]),
+    ]).start()
+  }, [reduceMotion, opacity, translateY])
+
+  if (card.isCol) {
+    return (
+      <Animated.View
+        style={[
+          styles.card,
+          styles.cardCol,
+          {
+            backgroundColor: palette.bg,
+            borderColor: palette.line,
+            opacity,
+            transform: [{ translateY }],
+          },
+        ]}
+      >
+        <Text style={[styles.colHeader, { color: palette.muted }]}>
           {card.title}
         </Text>
-        <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-          {card.subtitle}
-        </Text>
-      </View>
-      <View style={styles.trailing}>{renderTrailing(card.trailing, colors)}</View>
-    </View>
-  )
-}
 
-function renderTrailing(kind: Trailing, colors: ThemeTokens['colors']) {
-  switch (kind) {
-    case 'check':
-      return (
-        <View style={styles.checkWrap}>
-          <MaterialIcons name="check" size={22} color={colors.success} />
+        <View
+          style={[
+            styles.waBubble,
+            {
+              backgroundColor:
+                card.bubbleTone === 'red' ? palette.redBg : palette.greenBg,
+            },
+          ]}
+        >
+          {card.bubbleTitle && (
+            <Text style={[styles.bubbleTitle, { color: palette.ink }]}>
+              {card.bubbleTitle}
+            </Text>
+          )}
+          <Text style={[styles.bubbleText, { color: palette.ink }]}>
+            {card.bubbleText}
+          </Text>
         </View>
-      )
-    case 'chart':
-      return (
-        <View style={styles.chartWrap}>
-          <LineChartMini />
-        </View>
-      )
-    case 'pills':
-      return (
-        <View style={styles.pillsRow}>
-          <View style={[styles.pill, { borderColor: colors.onSurface }]}>
-            <Text style={[styles.pillText, { color: colors.onSurface }]}>
+
+        <View style={styles.miniRow}>
+          <View
+            style={[
+              styles.miniBtn,
+              { backgroundColor: palette.ink, borderColor: palette.ink },
+            ]}
+          >
+            <Text style={[styles.miniBtnText, { color: palette.bg }]}>
               Enviar
             </Text>
           </View>
-          <View style={[styles.pill, { borderWidth: 1, borderColor: colors.onSurface }]}>
-            <Text style={[styles.pillText, { color: colors.onSurface }]}>
+          <View
+            style={[
+              styles.miniBtn,
+              styles.miniBtnOutline,
+              { borderColor: palette.ink },
+            ]}
+          >
+            <Text style={[styles.miniBtnText, { color: palette.ink }]}>
               Editar
             </Text>
           </View>
         </View>
-      )
-    case 'tag':
-      return (
-        <View style={[styles.tag, { backgroundColor: '#EEE8FD', borderColor: '#EEE8FD' }]}>
-          <Text style={[styles.tagText, { color: '#7A4FE0' }]}>Tarefa</Text>
-        </View>
-      )
+      </Animated.View>
+    )
+  }
+
+  return (
+    <Animated.View
+      style={[
+        styles.card,
+        {
+          backgroundColor: palette.bg,
+          borderColor: palette.line,
+          opacity,
+          transform: [{ translateY }],
+        },
+      ]}
+    >
+      <View
+        style={[
+          styles.chip,
+          { backgroundColor: getChipBg(card.kind, palette) },
+        ]}
+      >
+        {renderChipIcon(card.kind, palette)}
+      </View>
+
+      <View style={styles.body}>
+        <Text
+          style={[styles.title, { color: palette.ink }]}
+          numberOfLines={1}
+        >
+          {card.title}
+        </Text>
+        {card.subtitle && (
+          <Text
+            style={[styles.subtitle, { color: palette.muted }]}
+            numberOfLines={1}
+          >
+            {card.subtitle}
+          </Text>
+        )}
+      </View>
+
+      <View style={styles.trailing}>
+        {renderTrailing(card.trailing, card.tagLabel, card.tagTone, palette)}
+      </View>
+    </Animated.View>
+  )
+}
+
+function getChipBg(kind: string, palette: LoginPalette): string {
+  switch (kind) {
+    case 'agenda':
+      return palette.blueBg
+    case 'email':
+      return palette.redBg
+    case 'radar':
+      return palette.orangeBg
+    case 'boleto':
+    case 'tarefa':
+    default:
+      return palette.purpleBg
   }
 }
 
-function LineChartMini() {
-  return (
-    <Svg width={44} height={22} viewBox="0 0 44 22" fill="none">
-      <Path
-        d="M2 4l9 3 8 6 8-2 7 6 8 1"
-        stroke="#E07A2A"
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </Svg>
-  )
+function renderChipIcon(kind: string, palette: LoginPalette) {
+  switch (kind) {
+    case 'agenda':
+      return <CalIcon color={palette.blue} size={20} />
+    case 'email':
+      return <MailIcon color={palette.red} size={20} />
+    case 'radar':
+      return <RadarIcon color={palette.orange} size={20} />
+    case 'boleto':
+    case 'tarefa':
+    default:
+      return <CheckCircleIcon color={palette.purple} size={22} />
+  }
+}
+
+function renderTrailing(
+  trailing: 'check' | 'chart' | 'pills' | 'tag' | undefined,
+  tagLabel: string | undefined,
+  tagTone: 'red' | 'purple' | 'green' | undefined,
+  palette: LoginPalette,
+) {
+  switch (trailing) {
+    case 'check':
+      return <CheckCircleIcon color={palette.accent} size={22} />
+    case 'chart':
+      return <Sparkline color={palette.orange} />
+    case 'tag': {
+      const bg =
+        tagTone === 'red'
+          ? palette.redBg
+          : tagTone === 'purple'
+          ? palette.purpleBg
+          : palette.greenBg
+      const fg =
+        tagTone === 'red'
+          ? palette.red
+          : tagTone === 'purple'
+          ? palette.purple
+          : palette.accent
+      return (
+        <View style={[styles.tag, { backgroundColor: bg }]}>
+          <Text style={[styles.tagText, { color: fg }]}>
+            {tagLabel || 'Tarefa'}
+          </Text>
+        </View>
+      )
+    }
+    default:
+      return null
+  }
 }
 
 const styles = StyleSheet.create({
   card: {
     borderWidth: 1,
     borderRadius: 16,
-    padding: 14,
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     marginTop: 10,
+    width: '100%',
+    shadowColor: '#141916',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   } as ViewStyle,
+  cardCol: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    gap: 10,
+  } as ViewStyle,
+  colHeader: {
+    fontSize: 12.5,
+    fontFamily: 'Inter_600SemiBold',
+  } as TextStyle,
+  waBubble: {
+    borderRadius: 14,
+    borderBottomLeftRadius: 4,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    alignSelf: 'flex-start',
+  } as ViewStyle,
+  bubbleTitle: {
+    fontSize: 13,
+    fontFamily: 'Inter_600SemiBold',
+    marginBottom: 2,
+  } as TextStyle,
+  bubbleText: {
+    fontSize: 14,
+    fontFamily: 'Inter_400Regular',
+    lineHeight: 19,
+  } as TextStyle,
+  miniRow: {
+    flexDirection: 'row',
+    gap: 8,
+  } as ViewStyle,
+  miniBtn: {
+    height: 32,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  } as ViewStyle,
+  miniBtnOutline: {
+    backgroundColor: 'transparent',
+  } as ViewStyle,
+  miniBtnText: {
+    fontSize: 13,
+    fontFamily: 'Inter_600SemiBold',
+  } as TextStyle,
   chip: {
     width: 38,
     height: 38,
@@ -145,7 +311,6 @@ const styles = StyleSheet.create({
   title: {
     fontFamily: 'Inter_600SemiBold',
     fontSize: 14.5,
-    fontWeight: '600',
     lineHeight: 20,
   } as TextStyle,
   subtitle: {
@@ -155,42 +320,18 @@ const styles = StyleSheet.create({
   } as TextStyle,
   trailing: {
     alignItems: 'center',
+    justifyContent: 'center',
     flexShrink: 0,
   } as ViewStyle,
-  checkWrap: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  } as ViewStyle,
-  chartWrap: {
-    width: 44,
-    height: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  } as ViewStyle,
-  pillsRow: {
-    flexDirection: 'row',
-    gap: 6,
-  } as ViewStyle,
-  pill: {
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minWidth: 60,
-  } as ViewStyle,
-  pillText: {
-    fontSize: 12,
-    fontWeight: '600',
-  } as TextStyle,
   tag: {
     paddingHorizontal: 9,
     paddingVertical: 4,
     borderRadius: 10,
-    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   } as ViewStyle,
   tagText: {
     fontSize: 11.5,
-    fontWeight: '600',
+    fontFamily: 'Inter_600SemiBold',
   } as TextStyle,
 })
