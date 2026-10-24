@@ -1,7 +1,12 @@
 import type { AssistantChatResponse, ChatMessage } from '../types';
 import { notificationService } from '../services/notificationService';
 import { dataSync } from '../services/dataSync';
-import { toChatMeeting, toChatBooking } from '../utils/chatCards';
+import {
+  toChatMeeting,
+  toChatBooking,
+  toChatWhatsAppMessage,
+  toChatGmailMessage,
+} from '../utils/chatCards';
 
 export const buildAssistantMessage = (
   idPrefix: string,
@@ -19,6 +24,8 @@ export const buildAssistantMessage = (
   pending: res.pending,
   booking: toChatBooking(res),
   meeting: toChatMeeting(res),
+  whatsapp_message: toChatWhatsAppMessage(res),
+  gmail_message: toChatGmailMessage(res),
   conflict: res.conflict,
   pending_confirmation: res.pending_confirmation,
 });

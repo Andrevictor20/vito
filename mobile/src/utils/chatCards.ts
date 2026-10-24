@@ -1,4 +1,10 @@
-import type { ChatBooking, ChatMeeting, AssistantChatResponse } from '../types';
+import type {
+  ChatBooking,
+  ChatMeeting,
+  AssistantChatResponse,
+  ChatWhatsAppMessage,
+  ChatGmailMessage,
+} from '../types';
 
 // Helpers puros de formatação para os cards inline do chat (testáveis).
 
@@ -153,5 +159,49 @@ export const sanitizeErrorMessage = (err: unknown): string => {
     return msg;
   }
   return 'Não consegui processar agora por instabilidade temporária. Nada foi criado ou apagado. Tente de novo em instantes.';
+};
+
+export const getContactInitials = (name?: string): string => {
+  if (!name || !name.trim()) return '?';
+  const clean = name.trim();
+  const stopWords = new Set(['de', 'da', 'do', 'dos', 'das', 'e']);
+  const parts = clean.split(/\s+/).filter((p) => !stopWords.has(p.toLowerCase()));
+  if (parts.length === 0) return clean.slice(0, 1).toUpperCase();
+  if (parts.length === 1) return parts[0].slice(0, 1).toUpperCase();
+  return (parts[0][0] + parts[1][0]).toUpperCase();
+};
+
+export const formatRecipientPreview = (name?: string, destination?: string): string => {
+  const n = (name || '').trim();
+  const d = (destination || '').trim();
+  if (n && d) return `${n} · ${d}`;
+  if (n) return n;
+  if (d) return d;
+  return 'Destinatário';
+};
+
+export const formatMessageSnippet = (text?: string, maxLength = 80): string => {
+  const t = (text || '').trim();
+  if (!t) return '';
+  if (t.length <= maxLength) return t;
+  return `${t.slice(0, maxLength).trimEnd()}…`;
+};
+
+export const toChatWhatsAppMessage = (res: AssistantChatResponse): ChatWhatsAppMessage | undefined => {
+  if (!res.whatsapp_message) return undefined;
+  const wm = res.whatsapp_message;
+  return {
+    ...wm,
+    status: wm.status || 'ready',
+  };
+};
+
+export const toChatGmailMessage = (res: AssistantChatResponse): ChatGmailMessage | undefined => {
+  if (!res.gmail_message) return undefined;
+  const gm = res.gmail_message;
+  return {
+    ...gm,
+    status: gm.status || 'ready',
+  };
 };
 

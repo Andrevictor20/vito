@@ -160,6 +160,28 @@ export interface AssistantChatResponse {
   conflict?: ConflictInfo;
   pending_confirmation?: DestructiveConfirmation;
   provider_used?: string;
+  whatsapp_message?: ChatWhatsAppMessage;
+  gmail_message?: ChatGmailMessage;
+}
+
+export interface ChatWhatsAppMessage {
+  id?: string;
+  recipient_name: string;
+  recipient_phone?: string;
+  recipient_photo?: string;
+  message: string;
+  status?: 'draft' | 'ready' | 'sent' | 'cancelled';
+  sent_at?: string;
+}
+
+export interface ChatGmailMessage {
+  id?: string;
+  recipient_name?: string;
+  recipient_email: string;
+  subject: string;
+  body: string;
+  status?: 'draft' | 'ready' | 'sent' | 'cancelled';
+  sent_at?: string;
 }
 
 export interface ChatMessage {
@@ -177,6 +199,8 @@ export interface ChatMessage {
   meeting?: ChatMeeting;
   conflict?: ConflictInfo;
   pending_confirmation?: DestructiveConfirmation;
+  whatsapp_message?: ChatWhatsAppMessage;
+  gmail_message?: ChatGmailMessage;
 }
 
 export interface ConversationSession {

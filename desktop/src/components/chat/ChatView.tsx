@@ -6,6 +6,8 @@ import { VitoMascot } from '../common/VitoMascot';
 import { ChatHistoryPanel } from './ChatHistoryPanel';
 import { FocusMenu, FocusMode } from './FocusMenu';
 import { ChatQuickChips } from './ChatQuickChips';
+import { WhatsAppMessageCard } from './WhatsAppMessageCard';
+import { GmailMessageCard } from './GmailMessageCard';
 import { pickWelcomeGreeting } from '../../utils/chatGreetings';
 import {
   Send,
@@ -311,6 +313,18 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
                       </div>
                     )}
 
+                    {msg.whatsapp_message && (
+                      <WhatsAppMessageCard
+                        messageData={msg.whatsapp_message}
+                      />
+                    )}
+
+                    {msg.gmail_message && (
+                      <GmailMessageCard
+                        messageData={msg.gmail_message}
+                      />
+                    )}
+
                     {/* Footer with timestamp and copy */}
                     <div className="mt-3.5 pt-2.5 border-t border-black/5 dark:border-white/5 flex items-center justify-between text-xs text-zinc-400 dark:text-zinc-500">
                       <span className="font-mono">{msg.timestamp}</span>
@@ -379,6 +393,18 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
                           {msg.event.category || 'EVENTO'}
                         </span>
                       </div>
+                    )}
+
+                    {msg.whatsapp_message && (
+                      <WhatsAppMessageCard
+                        messageData={msg.whatsapp_message}
+                      />
+                    )}
+
+                    {msg.gmail_message && (
+                      <GmailMessageCard
+                        messageData={msg.gmail_message}
+                      />
                     )}
 
                     {/* Footer with timestamp and copy for Vito messages */}

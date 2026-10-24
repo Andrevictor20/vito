@@ -13,6 +13,11 @@ import {
   formatMeetingMode,
   meetingDisplayLink,
   toChatMeeting,
+  getContactInitials,
+  formatRecipientPreview,
+  formatMessageSnippet,
+  toChatWhatsAppMessage,
+  toChatGmailMessage,
 } from './chatCards';
 
 describe('Chat Cards helpers (TDD)', () => {
@@ -162,6 +167,91 @@ describe('Chat Cards helpers (TDD)', () => {
     it('retorna undefined quando não há meeting na resposta', () => {
       const cm = toChatMeeting({ intent: 'general_chat', reply: 'Olá' } as any);
       assert.equal(cm, undefined);
+    });
+  });
+
+  describe('getContactInitials', () => {
+    it('extrai as iniciais de nomes simples e compostos', () => {
+      assert.equal(getContactInitials('Mariana Silva'), 'MS');
+      assert.equal(getContactInitials('Carlos'), 'C');
+      assert.equal(getContactInitials('André Victor Magalhães'), 'AV');
+      assert.equal(getContactInitials('joão da silva'), 'JS');
+    });
+
+    it('trata valores vazios ou nulos', () => {
+      assert.equal(getContactInitials(''), '?');
+      assert.equal(getContactInitials(undefined), '?');
+      assert.equal(getContactInitials('   '), '?');
+    });
+  });
+
+  describe('formatRecipientPreview', () => {
+    it('formata destinatário com nome e destino', () => {
+      assert.equal(
+        formatRecipientPreview('Mariana Silva', '+55 11 99999-9999'),
+        'Mariana Silva · +55 11 99999-9999'
+      );
+      assert.equal(
+        formatRecipientPreview('Mariana Silva', 'mariana@empresa.com'),
+        'Mariana Silva · mariana@empresa.com'
+      );
+    });
+
+    it('lida com apenas nome ou apenas destino', () => {
+      assert.equal(formatRecipientPreview('Mariana Silva', undefined), 'Mariana Silva');
+      assert.equal(formatRecipientPreview(undefined, '+55 11 99999-9999'), '+55 11 99999-9999');
+      assert.equal(formatRecipientPreview(undefined, undefined), 'Destinatário');
+    });
+  });
+
+  describe('formatMessageSnippet', () => {
+    it('trunca mensagens longas preservando palavras', () => {
+      const longText = 'Olá Mariana, estou confirmando nossa reunião de alinhamento estratégico para a próxima quinta-feira às 14h.';
+      const snippet = formatMessageSnippet(longText, 40);
+      assert.ok(snippet.length <= 41, `esperado <= 41 mas recebeu ${snippet.length}`);
+      assert.ok(snippet.endsWith('…'));
+    });
+
+    it('mantém mensagens curtas sem truncar', () => {
+      assert.equal(formatMessageSnippet('Tudo certo!'), 'Tudo certo!');
+    });
+  });
+
+  describe('toChatWhatsAppMessage & toChatGmailMessage', () => {
+    it('extrai whatsapp_message de resposta estruturada', () => {
+      const res = {
+        intent: 'send_whatsapp',
+        reply: 'Mensagem pronta',
+        whatsapp_message: {
+          recipient_name: 'Dra. Camila',
+          recipient_phone: '+55 98 98888-7777',
+          recipient_photo: 'https://cdn.example.com/camila.jpg',
+          message: 'Olá Dra., confirmo a consulta de amanhã às 10h.',
+        },
+      };
+      const wa = toChatWhatsAppMessage(res as any);
+      assert.ok(wa);
+      assert.equal(wa?.recipient_name, 'Dra. Camila');
+      assert.equal(wa?.recipient_photo, 'https://cdn.example.com/camila.jpg');
+      assert.equal(wa?.status, 'ready');
+    });
+
+    it('extrai gmail_message de resposta estruturada', () => {
+      const res = {
+        intent: 'send_email',
+        reply: 'E-mail preparado',
+        gmail_message: {
+          recipient_name: 'Roberto Costa',
+          recipient_email: 'roberto@acme.com',
+          subject: 'Relatório Semanal de Desempenho',
+          body: 'Prezado Roberto, segue em anexo a prévia do relatório semanal.',
+        },
+      };
+      const gm = toChatGmailMessage(res as any);
+      assert.ok(gm);
+      assert.equal(gm?.recipient_email, 'roberto@acme.com');
+      assert.equal(gm?.subject, 'Relatório Semanal de Desempenho');
+      assert.equal(gm?.status, 'ready');
     });
   });
 });

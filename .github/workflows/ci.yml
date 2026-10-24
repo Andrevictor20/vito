@@ -149,10 +149,10 @@ jobs:
           git fetch origin main
           git reset --hard origin/main
           # Encerra contêineres presos com timeout curto para liberar o dockerd imediatamente
-          docker stop -t 5 vito-evolution-api vito-backend vito-desktop || docker kill vito-evolution-api vito-backend vito-desktop || true
-          docker compose pull --quiet backend evolution-api desktop || docker compose build desktop
+          docker stop -t 5 vito-evolution-api vito-backend vito-desktop vito-searxng || docker kill vito-evolution-api vito-backend vito-desktop vito-searxng || true
+          docker compose pull --quiet backend evolution-api desktop searxng || docker compose build desktop
           docker compose run -T --rm --no-deps --user 0:0 --entrypoint sh backend -c "mkdir -p /app/data /app/data/backups /app/backups && chown -R 10001:10001 /app/data /app/backups && chmod 0700 /app/data /app/backups" || true
-          docker compose up -d --force-recreate --remove-orphans evolution-postgres backend evolution-api desktop
+          docker compose up -d --force-recreate --remove-orphans evolution-postgres searxng backend evolution-api desktop
           docker image prune -f
 
       - name: Report Orphan Account Cleanup
@@ -201,6 +201,14 @@ jobs:
           for i in $(seq 1 15); do
             if wget -qO- http://localhost:8190/ > /dev/null 2>&1 || curl -sf http://localhost:8190/ > /dev/null 2>&1; then
               echo "✅ Desktop Web Vito OK on attempt $i"
+              break
+            fi
+            sleep 2
+          done
+          echo "Verificando SearXNG (porta 8185)..."
+          for i in $(seq 1 15); do
+            if wget -qO- http://localhost:8185/ > /dev/null 2>&1 || curl -sf http://localhost:8185/ > /dev/null 2>&1; then
+              echo "✅ SearXNG OK on attempt $i"
               exit 0
             fi
             sleep 2
@@ -210,6 +218,7 @@ jobs:
           docker logs --tail 80 vito-backend || true
           docker logs --tail 80 vito-evolution-api || true
           docker logs --tail 80 vito-desktop || true
+          docker logs --tail 80 vito-searxng || true
           docker logs --tail 80 vito-evolution-postgres || true
           exit 1
 

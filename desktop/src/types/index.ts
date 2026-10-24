@@ -143,6 +143,26 @@ export interface Meeting {
   created_at?: string;
 }
 
+export interface ChatWhatsAppMessage {
+  id?: string;
+  recipient_name: string;
+  recipient_phone?: string;
+  recipient_photo?: string;
+  message: string;
+  status?: 'draft' | 'ready' | 'sent' | 'cancelled';
+  sent_at?: string;
+}
+
+export interface ChatGmailMessage {
+  id?: string;
+  recipient_name?: string;
+  recipient_email: string;
+  subject: string;
+  body: string;
+  status?: 'draft' | 'ready' | 'sent' | 'cancelled';
+  sent_at?: string;
+}
+
 export interface ChatMessage {
   id: string;
   sender: 'user' | 'vito';
@@ -156,6 +176,8 @@ export interface ChatMessage {
   trigger?: Trigger;
   booking?: BookingType;
   meeting?: Meeting;
+  whatsapp_message?: ChatWhatsAppMessage;
+  gmail_message?: ChatGmailMessage;
 }
 
 export interface ConversationSession {

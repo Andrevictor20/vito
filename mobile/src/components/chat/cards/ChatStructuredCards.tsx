@@ -7,6 +7,8 @@ import { PendingInlineCard } from './PendingInlineCard';
 import { TriggerInlineCard } from './TriggerInlineCard';
 import { BookingInlineCard } from './BookingInlineCard';
 import { MeetingInlineCard } from './MeetingInlineCard';
+import { WhatsAppMessageInlineCard } from './WhatsAppMessageInlineCard';
+import { GmailMessageInlineCard } from './GmailMessageInlineCard';
 import { DestructiveConfirmationCard } from './DestructiveConfirmationCard';
 import { SmoothCardEntrance } from './SmoothCardEntrance';
 
@@ -65,6 +67,22 @@ export const ChatStructuredCards: React.FC<ChatStructuredCardsProps> = ({
       {message.meeting && (
         <SmoothCardEntrance>
           <MeetingInlineCard meeting={message.meeting} />
+        </SmoothCardEntrance>
+      )}
+      {message.whatsapp_message && (
+        <SmoothCardEntrance>
+          <WhatsAppMessageInlineCard
+            messageData={message.whatsapp_message}
+            disabled={disabled}
+          />
+        </SmoothCardEntrance>
+      )}
+      {message.gmail_message && (
+        <SmoothCardEntrance>
+          <GmailMessageInlineCard
+            messageData={message.gmail_message}
+            disabled={disabled}
+          />
         </SmoothCardEntrance>
       )}
       {message.pending_confirmation && (

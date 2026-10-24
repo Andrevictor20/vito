@@ -49,6 +49,9 @@ services:
       - GOMEMLIMIT=${GOMEMLIMIT:-256MiB}
     volumes:
       - vito_data:/app/data
+    depends_on:
+      searxng:
+        condition: service_started
     networks:
       - vito_net
     deploy:
