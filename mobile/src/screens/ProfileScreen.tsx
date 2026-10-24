@@ -24,6 +24,7 @@ import { ContactsSyncModal } from '../components/profile/ContactsSyncModal';
 import { ConnectedDevicesModal } from '../components/profile/ConnectedDevicesModal';
 import { WhatsAppConnectModal } from '../components/profile/WhatsAppConnectModal';
 import { GmailConnectModal } from '../components/profile/GmailConnectModal';
+import { VoiceActivationSettings } from '../components/profile/VoiceActivationSettings';
 import { api } from '../services/api';
 import { calendarSyncService } from '../services/calendarSyncService';
 import { hapticFeedback } from '../theme/motion';
@@ -49,6 +50,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const [aiVisible, setAiVisible] = useState(false);
   const [phoneVisible, setPhoneVisible] = useState(false);
   const [contactsVisible, setContactsVisible] = useState(false);
+  const [voiceVisible, setVoiceVisible] = useState(false);
   const [devicesVisible, setDevicesVisible] = useState(false);
   const [whatsAppVisible, setWhatsAppVisible] = useState(false);
   const [whatsAppStatus, setWhatsAppStatus] = useState<'disconnected' | 'connecting' | 'connected' | null>(null);
@@ -246,6 +248,22 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           <Text style={[styles.liMeta, { color: colors.muted }]}>Ver e editar</Text>
           <MaterialIcons name="chevron-right" size={18} color={colors.muted} />
         </TouchableOpacity>
+
+        <View style={[styles.divider, { backgroundColor: colors.line }]} />
+
+        {/* Ativação por Voz (Ei Vito / Assistente Nativo) */}
+        <TouchableOpacity
+          style={styles.li}
+          onPress={() => setVoiceVisible(true)}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.liIconBox, { backgroundColor: colors.bg }]}>
+            <MaterialIcons name="mic" size={18} color={colors.ink} />
+          </View>
+          <Text style={[styles.liTitle, { color: colors.ink }]}>Ativação por voz</Text>
+          <Text style={[styles.liMeta, { color: colors.muted }]}>Modos e hotword</Text>
+          <MaterialIcons name="chevron-right" size={18} color={colors.muted} />
+        </TouchableOpacity>
       </View>
 
       {/* Seção Sistema (.lbl + .lst) */}
@@ -374,6 +392,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           onDataChanged?.();
         }}
       />
+      <VoiceActivationSettings
+        visible={voiceVisible}
+        onClose={() => setVoiceVisible(false)}
+      />
     </ScrollView>
   );
 };
@@ -451,30 +473,9 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontWeight: '600',
   },
-  out: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 22,
-  },
-  outBtn: {
-    flex: 1,
-    height: 46,
-    borderRadius: 23,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  outBtnDanger: {
-    backgroundColor: 'transparent',
-  },
-  outBtnText: {
-    fontSize: 14,
-    fontWeight: '600',
-    fontFamily: tokens.typography.family.medium,
-  },
-  ver: {
-    textAlign: 'center',
-    fontSize: 12,
-    marginTop: 16,
-  },
+  out: { flexDirection: 'row', gap: 10, marginTop: 22 },
+  outBtn: { flex: 1, height: 46, borderRadius: 23, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  outBtnDanger: { backgroundColor: 'transparent' },
+  outBtnText: { fontSize: 14, fontWeight: '600', fontFamily: tokens.typography.family.medium },
+  ver: { textAlign: 'center', fontSize: 12, marginTop: 16 },
 });

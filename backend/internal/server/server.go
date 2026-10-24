@@ -39,6 +39,7 @@ type Server struct {
 	whatsappHandler     *handler.WhatsAppHandler
 	gmailHandler        *handler.GmailHandler
 	whatsappAuthHandler *handler.WhatsAppAuthHandler
+	voiceHandler        *handler.VoiceStreamHandler
 	authSvc             *service.AuthService
 }
 
@@ -64,6 +65,7 @@ type Config struct {
 	WhatsAppHandler     *handler.WhatsAppHandler
 	GmailHandler        *handler.GmailHandler
 	WhatsAppAuthHandler *handler.WhatsAppAuthHandler
+	VoiceHandler        *handler.VoiceStreamHandler
 	AuthSvc             *service.AuthService
 	// AllowedOrigins restringe o CORS (SEC-03). Vazio = ["*"] apenas fora
 	// de produção (dev/testes); em produção, vazio nega origens (fail-closed).
@@ -97,6 +99,7 @@ func New(cfg ...Config) *Server {
 		s.whatsappHandler = cfg[0].WhatsAppHandler
 		s.gmailHandler = cfg[0].GmailHandler
 		s.whatsappAuthHandler = cfg[0].WhatsAppAuthHandler
+		s.voiceHandler = cfg[0].VoiceHandler
 		s.authSvc = cfg[0].AuthSvc
 	}
 
@@ -147,6 +150,11 @@ func (s *Server) registerRoutes() {
 	s.router.Get("/.well-known/assetlinks.json", s.handleAssetLinks)
 	s.router.Get("/.well-known/apple-app-site-association", s.handleAppleAppSiteAssociation)
 	s.router.Get("/apple-app-site-association", s.handleAppleAppSiteAssociation)
+
+	if s.voiceHandler != nil {
+		s.router.Handle("/v1/voice/stream", s.voiceHandler.Handler())
+		s.router.Handle("/api/v1/voice/stream", s.voiceHandler.Handler())
+	}
 
 	bookingLimiter := middleware.NewRateLimiter(60, 1*time.Minute)
 	if s.bookingHandler != nil {

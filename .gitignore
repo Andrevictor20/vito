@@ -12,6 +12,9 @@
 *.cert
 *firebase-adminsdk*.json
 mobile/google-services.json
+Arquitetura de Ativação por Voz no Android - Vito AI.md
+*Ativação por Voz*.md
+*Vito AI*.md
 
 # Dependências & Gerenciadores de Pacotes
 node_modules/
