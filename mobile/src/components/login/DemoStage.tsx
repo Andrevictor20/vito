@@ -16,6 +16,9 @@ import { useTheme } from '../../context/ThemeContext'
 export interface DemoStageProps {
   onAdvance: () => void
   style?: StyleProp<ViewStyle>
+  state?: DemoLoopState
+  advanceScene?: () => void
+  reduceMotion?: boolean
 }
 
 /**
@@ -26,9 +29,18 @@ export interface DemoStageProps {
  * - Toque avança para a próxima cena.
  * - Reduzir movimento: duas trocas estáticas, sem timers.
  */
-export const DemoStage: React.FC<DemoStageProps> = ({ onAdvance, style }) => {
+export const DemoStage: React.FC<DemoStageProps> = ({
+  onAdvance,
+  style,
+  state: externalState,
+  advanceScene: externalAdvance,
+  reduceMotion: externalReduceMotion,
+}) => {
   const { colors, isDark } = useTheme()
-  const { state, advanceScene, reduceMotion } = useDemoLoop()
+  const internalLoop = useDemoLoop()
+  const state = externalState ?? internalLoop.state
+  const advanceScene = externalAdvance ?? internalLoop.advanceScene
+  const reduceMotion = externalReduceMotion ?? internalLoop.reduceMotion
   const { height: windowHeight } = useWindowDimensions()
 
   const prevIndexRef = useRef<number>(state.sceneIndex)

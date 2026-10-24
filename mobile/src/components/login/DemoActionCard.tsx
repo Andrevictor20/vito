@@ -26,7 +26,7 @@ const CHIP_COLORS: Record<
   agenda: { bg: '#E4EFFB', icon: '#2B7FD4' }, // azul
   radar: { bg: '#FBEBDB', icon: '#E07A2A' }, // laranja
   tarefa: { bg: '#DDF4E8', icon: '#1FB97A' }, // verde
-  boleto: { bg: '#DDF4E8', icon: '#1FB97A' }, // verde (check)
+  boleto: { bg: '#EEE8FD', icon: '#7A4FE0' }, // roxo
 }
 
 const ICON_BY_KIND: Record<DemoScene['card']['kind'], string> = {
@@ -98,8 +98,8 @@ function renderTrailing(kind: Trailing, colors: ThemeTokens['colors']) {
       )
     case 'tag':
       return (
-        <View style={[styles.tag, { borderColor: colors.success }]}>
-          <Text style={[styles.tagText, { color: '#1FB97A' }]}>Tarefa</Text>
+        <View style={[styles.tag, { backgroundColor: '#EEE8FD', borderColor: '#EEE8FD' }]}>
+          <Text style={[styles.tagText, { color: '#7A4FE0' }]}>Tarefa</Text>
         </View>
       )
   }

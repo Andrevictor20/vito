@@ -20,6 +20,9 @@ import { LoginHeader } from './LoginHeader'
 import { DemoStage } from './DemoStage'
 import { AuthIconPill } from './AuthIconPill'
 import { EmailSheet } from './EmailSheet'
+import { useDemoLoop } from './useDemoLoop'
+import { DEMO_SCENES } from './demoScenes'
+import { loginPalette } from './loginPalette'
 
 export interface LoginScreenProps {
   serverUrl?: string
@@ -42,6 +45,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   const { login, register, loginWithGoogle, loginWithWhatsApp, isLoading } =
     useAuth()
   const { isDark, toggleTheme } = useTheme()
+  const { state: demoState, advanceScene, reduceMotion } = useDemoLoop()
+  const currentScene = DEMO_SCENES[demoState.sceneIndex]
+  const palette = loginPalette(isDark)
   const [isRegister, setIsRegister] = useState(false)
   const [emailSheetVisible, setEmailSheetVisible] = useState(false)
   const [whatsappAuthVisible, setWhatsappAuthVisible] = useState(false)
@@ -164,10 +170,19 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           <LoginHeader
             isDark={isDark}
             toggleTheme={toggleTheme}
+            currentHeadline={currentScene?.headline}
+            currentTone={currentScene?.tone}
+            reduceMotion={reduceMotion}
             style={headerStyle}
           />
 
-          <DemoStage onAdvance={handleDemoAdvance} style={{ flex: 1 }} />
+          <DemoStage
+            state={demoState}
+            advanceScene={advanceScene}
+            reduceMotion={reduceMotion}
+            onAdvance={handleDemoAdvance}
+            style={{ flex: 1 }}
+          />
 
           <View style={styles.authFooter}>
             <AuthIconPill
@@ -184,7 +199,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               accessibilityLabel="Não tem conta? Cadastre-se"
             >
               <View style={styles.signupWrap}>
-                <Text style={[styles.signupText, { color: colors.onSurface }]}>
+                <Text style={[styles.signupText, { color: palette.ink }]}>
                   {isRegister
                     ? 'Já possui uma conta? Faça login'
                     : 'Não tem conta? Cadastre-se'}

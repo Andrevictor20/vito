@@ -1,3 +1,7 @@
+import type { LoginPalette } from './loginPalette'
+
+export type DemoTone = 'blue' | 'red' | 'orange' | 'acc' | 'purple'
+
 export interface DemoSceneCardChip {
   kind: 'agenda' | 'radar' | 'tarefa' | 'boleto'
   title: string
@@ -7,11 +11,38 @@ export interface DemoSceneCardChip {
 
 export interface DemoScene {
   id: string
+  headline: string
+  tone: DemoTone
   userText: string
   vitoText: string
   card: DemoSceneCardChip
   /** Cena 4 exibe miniatura de boleto acima do texto na bolha do usuário. */
   photo?: boolean
+}
+
+export const DEMO_HEADLINES = [
+  'organizar a agenda',
+  'ler seus e-mails',
+  'monitorar preços',
+  'cuidar do WhatsApp',
+  'escrever e-mails',
+  'não perder prazos',
+] as const
+
+export function headlineColor(tone: DemoTone, palette: LoginPalette): string {
+  switch (tone) {
+    case 'blue':
+      return palette.blue
+    case 'red':
+      return palette.red
+    case 'orange':
+      return palette.orange
+    case 'purple':
+      return palette.purple
+    case 'acc':
+    default:
+      return palette.acc
+  }
 }
 
 /**
@@ -21,6 +52,8 @@ export interface DemoScene {
 export const DEMO_SCENES: readonly DemoScene[] = [
   {
     id: 'dentista',
+    headline: 'organizar a agenda',
+    tone: 'blue',
     userText: 'Dentista terça às 15h',
     vitoText: 'Marcado. Sem conflitos na sua agenda.',
     card: {
@@ -32,6 +65,8 @@ export const DEMO_SCENES: readonly DemoScene[] = [
   },
   {
     id: 'voo-rio',
+    headline: 'monitorar preços',
+    tone: 'orange',
     userText: 'Me avisa se o voo pro Rio baixar de R$ 600',
     vitoText: 'Radar criado. Eu confiro todo dia.',
     card: {
@@ -43,6 +78,8 @@ export const DEMO_SCENES: readonly DemoScene[] = [
   },
   {
     id: 'isa-whatsapp',
+    headline: 'cuidar do WhatsApp',
+    tone: 'acc',
     userText: 'Responde a Isa que chego às 19h',
     vitoText: 'Rascunho pronto. Quer que eu envie?',
     card: {
@@ -54,6 +91,8 @@ export const DEMO_SCENES: readonly DemoScene[] = [
   },
   {
     id: 'boleto',
+    headline: 'não perder prazos',
+    tone: 'purple',
     userText: 'Paga esse boleto até sexta',
     vitoText: 'Li o boleto e criei a tarefa.',
     card: {

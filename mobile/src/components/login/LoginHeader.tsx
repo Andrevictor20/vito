@@ -4,33 +4,43 @@ import {
   View,
   Text,
   TouchableOpacity,
-  useWindowDimensions,
   StyleSheet,
   type StyleProp,
   type ViewStyle,
 } from 'react-native'
 import { MaterialIcons } from '@expo/vector-icons'
-import { VitoMascot } from '../common/VitoMascot'
-import { useTheme } from '../../context/ThemeContext'
+import { VitoLoginMark } from './VitoLoginMark'
+import { HeadlineReel } from './HeadlineReel'
+import { loginPalette } from './loginPalette'
+import { headlineColor, type DemoTone } from './demoScenes'
 
-const MASCOT_SIZE = 52
-const MASCOT_SIZE_SMALL = 44
 const THEME_BTN_SIZE = 34
 
 export interface LoginHeaderProps {
   isDark: boolean
   toggleTheme: () => void
+  currentHeadline?: string
+  currentTone?: DemoTone
+  reduceMotion?: boolean
   style?: StyleProp<ViewStyle>
 }
 
+/**
+ * Cabeçalho da tela de login v2 (fidelidade a login-vito.html).
+ * - Brand horizontal: VitoLoginMark (SVG com olhos animados) + wordmark "vito" em Montserrat 800.
+ * - Botão de alternar tema claro/escuro à direita.
+ * - H1 em Montserrat 800: "Seu assistente para" + HeadlineReel (roleta com as cenas do protótipo).
+ */
 export const LoginHeader: React.FC<LoginHeaderProps> = ({
   isDark,
   toggleTheme,
+  currentHeadline = 'organizar a agenda',
+  currentTone = 'blue',
+  reduceMotion = false,
   style,
 }) => {
-  const { height: windowHeight } = useWindowDimensions()
-  const isSmall = windowHeight < 700
-  const mascotSize = isSmall ? MASCOT_SIZE_SMALL : MASCOT_SIZE
+  const palette = loginPalette(isDark)
+  const activeColor = headlineColor(currentTone, palette)
   const iconName = isDark ? 'light-mode' : 'dark-mode'
 
   const handleThemePress = useCallback(() => {
@@ -38,86 +48,98 @@ export const LoginHeader: React.FC<LoginHeaderProps> = ({
   }, [toggleTheme])
 
   return (
-    <View style={[styles.container, style]}>
+    <View style={[styles.hero, style]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
-      <TouchableOpacity
-        style={[
-          styles.themeButton,
-          { backgroundColor: isDark ? '#191C1E' : '#F2F4F3' },
-        ]}
-        onPress={handleThemePress}
-        activeOpacity={0.75}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        accessibilityRole="button"
-        accessibilityLabel={isDark ? 'Mudar para tema claro' : 'Mudar para tema escuro'}
-      >
-        <MaterialIcons
-          name={iconName}
-          size={18}
-          color={isDark ? '#FAFAFA' : '#09090B'}
-        />
-      </TouchableOpacity>
+      <View style={styles.topRow}>
+        <View style={styles.brand}>
+          <VitoLoginMark
+            color={palette.ink}
+            width={40}
+            height={42}
+          />
+          <Text
+            style={[styles.wordmark, { color: palette.ink }]}
+            maxFontSizeMultiplier={1.3}
+          >
+            vito
+          </Text>
+        </View>
 
-      <View style={styles.brand}>
-        <VitoMascot size={mascotSize} animated state="idle" />
-        <Text
-          style={[styles.wordmark, { color: isDark ? '#FAFAFA' : '#17191b' }]}
-          maxFontSizeMultiplier={1.3}
+        <TouchableOpacity
+          style={[
+            styles.themeButton,
+            { backgroundColor: palette.surf },
+          ]}
+          onPress={handleThemePress}
+          activeOpacity={0.75}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel={isDark ? 'Mudar para tema claro' : 'Mudar para tema escuro'}
         >
-          vito
-        </Text>
+          <MaterialIcons
+            name={iconName}
+            size={18}
+            color={palette.ink}
+          />
+        </TouchableOpacity>
       </View>
 
-      <Text
-        style={[styles.title, { color: isDark ? '#FAFAFA' : '#17191b' }]}
-        maxFontSizeMultiplier={1.3}
-      >
-        Seu secretário pessoal com IA
-      </Text>
+      <View style={styles.titleBlock}>
+        <Text
+          style={[styles.l1, { color: palette.ink }]}
+          maxFontSizeMultiplier={1.3}
+        >
+          Seu assistente para
+        </Text>
+        <HeadlineReel
+          word={currentHeadline}
+          color={activeColor}
+          palette={palette}
+          reduceMotion={reduceMotion}
+        />
+      </View>
     </View>
   )
 }
 
 const styles = StyleSheet.create({
-  container: {
-    paddingHorizontal: 16,
-    paddingTop: 6,
-    minHeight: 56,
+  hero: {
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 4,
+  },
+  topRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  brand: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  wordmark: {
+    fontFamily: 'Montserrat_800ExtraBold',
+    fontSize: 22,
+    letterSpacing: -0.66,
   },
   themeButton: {
-    position: 'absolute',
-    top: 6,
-    right: 16,
     width: THEME_BTN_SIZE,
     height: THEME_BTN_SIZE,
     borderRadius: THEME_BTN_SIZE / 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  brand: {
-    alignItems: 'center',
-    flexDirection: 'column',
-    marginTop: 4,
+  titleBlock: {
+    alignItems: 'flex-start',
   },
-  wordmark: {
-    fontFamily: 'Inter_700Bold',
-    fontWeight: '800',
-    fontSize: 18,
-    letterSpacing: -0.02,
-    marginTop: 4,
-    lineHeight: 22,
-  },
-  title: {
-    fontFamily: 'Inter_700Bold',
-    fontWeight: '700',
-    fontSize: 15,
-    lineHeight: 20,
-    letterSpacing: -0.01,
-    textAlign: 'center',
-    marginHorizontal: 24,
-    marginTop: 2,
+  l1: {
+    fontFamily: 'Montserrat_800ExtraBold',
+    fontSize: 26,
+    lineHeight: 34,
+    letterSpacing: -0.65,
+    textAlign: 'left',
   },
 })

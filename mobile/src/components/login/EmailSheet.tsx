@@ -178,11 +178,11 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   title: {
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Montserrat_800ExtraBold',
     fontSize: 22,
     letterSpacing: -0.6,
     marginBottom: 14,
-    textAlign: 'center',
+    textAlign: 'left',
   },
   inputContainer: {
     gap: 12,
