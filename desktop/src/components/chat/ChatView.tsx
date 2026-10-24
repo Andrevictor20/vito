@@ -8,6 +8,7 @@ import { FocusMenu, FocusMode } from './FocusMenu';
 import { ChatQuickChips } from './ChatQuickChips';
 import { WhatsAppMessageCard } from './WhatsAppMessageCard';
 import { GmailMessageCard } from './GmailMessageCard';
+import { ChatThinkingIndicator } from './ChatThinkingIndicator';
 import { pickWelcomeGreeting } from '../../utils/chatGreetings';
 import {
   Send,
@@ -438,11 +439,8 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
           {/* Typing Indicator */}
           {loading && (
             <div className="flex gap-4 items-start">
-              <div className="max-w-[85%] px-2">
-                <div className="p-4 rounded-[22px] bg-zinc-100 dark:bg-[#1C2026] border border-zinc-200 dark:border-[#262B33] flex items-center gap-2.5 text-sm font-medium text-zinc-600 dark:text-zinc-300 shadow-xs animate-pulse">
-                  <Loader2 size={16} className="animate-spin text-zinc-900 dark:text-white" />
-                  <span>Vito está processando...</span>
-                </div>
+              <div className="max-w-[85%]">
+                <ChatThinkingIndicator />
               </div>
             </div>
           )}

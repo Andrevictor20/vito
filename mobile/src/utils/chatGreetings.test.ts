@@ -1,7 +1,12 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 // @ts-ignore
-import { getDayPeriod, pickWelcomeGreeting } from './chatGreetings';
+import {
+  getDayPeriod,
+  pickWelcomeGreeting,
+  THINKING_PHRASES,
+  getNextThinkingPhrase,
+} from './chatGreetings';
 
 describe('Chat Greetings Sorteadas (TDD)', () => {
   describe('getDayPeriod', () => {
@@ -73,6 +78,25 @@ describe('Chat Greetings Sorteadas (TDD)', () => {
       for (let h = 0; h < 24; h++) {
         assert.equal(emoji.test(pickWelcomeGreeting('André', h, () => 0.3)), false);
       }
+    });
+  });
+
+  describe('THINKING_PHRASES & getNextThinkingPhrase', () => {
+    it('contém frases executivas naturais sem emojis e sem sobreposição pesada', () => {
+      assert.ok(THINKING_PHRASES.length >= 3);
+      const emoji = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u;
+      for (const phrase of THINKING_PHRASES) {
+        assert.equal(emoji.test(phrase), false);
+        assert.ok(phrase.endsWith('...'));
+      }
+    });
+
+    it('avança ciclicamente pelas frases de pensamento', () => {
+      const p1 = getNextThinkingPhrase(0);
+      assert.equal(p1, THINKING_PHRASES[1]);
+      const lastIndex = THINKING_PHRASES.length - 1;
+      const wrapped = getNextThinkingPhrase(lastIndex);
+      assert.equal(wrapped, THINKING_PHRASES[0]);
     });
   });
 });

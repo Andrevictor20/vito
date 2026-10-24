@@ -26,6 +26,7 @@ import { ChatQuickChips } from '../components/chat/ChatQuickChips';
 import { ChatInputDock } from '../components/chat/ChatInputDock';
 import { ChatHistoryDrawer } from '../components/chat/ChatHistoryDrawer';
 import { ChatEmptyWelcome } from '../components/chat/ChatEmptyWelcome';
+import { ChatThinkingIndicator } from '../components/chat/ChatThinkingIndicator';
 import { FocusMenuModal } from '../components/chat/FocusMenuModal';
 import { FocusMode } from '../types/focus';
 import { prepareEditDraft } from '../utils/chatActions';
@@ -391,12 +392,7 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
           />
         }
         ListFooterComponent={
-          loading ? (
-            <View style={[styles.loadingBubble, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
-              <ActivityIndicator size="small" color={colors.primary} />
-              <Text style={[styles.loadingText, { color: colors.onSurfaceVariant }]}>Vito está organizando...</Text>
-            </View>
-          ) : null
+          loading ? <ChatThinkingIndicator /> : null
         }
       />
 

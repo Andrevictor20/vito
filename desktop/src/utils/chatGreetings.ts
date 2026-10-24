@@ -55,3 +55,16 @@ export const pickWelcomeGreeting = (
   }
   return template.anonymous;
 };
+
+export const THINKING_PHRASES: string[] = [
+  'Pensando...',
+  'Conectando contexto...',
+  'Estruturando plano...',
+  'Sintetizando resposta...',
+  'Quase pronto...',
+];
+
+export const getNextThinkingPhrase = (currentIndex: number): string => {
+  if (currentIndex < 0 || currentIndex >= THINKING_PHRASES.length) return THINKING_PHRASES[0];
+  return THINKING_PHRASES[(currentIndex + 1) % THINKING_PHRASES.length];
+};
