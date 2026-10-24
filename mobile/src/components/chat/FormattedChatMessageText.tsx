@@ -1,14 +1,12 @@
 import React from 'react';
 import { StyleSheet, View, Text } from 'react-native';
 
-const renderInlineFormatted = (raw: string, textColor: string) => {
+const renderInlineFormatted = (raw: string, textColor: string, isDark: boolean) => {
   if (!raw) return null;
 
-  // Remove caracteres markdown crus residuais como hashtags soltas
-  const clean = raw.replace(/^#+\s*/, '');
-
-  // Divide por delimitadores de negrito **
-  const parts = clean.split(/(\*\*[^*]+?\*\*)/g);
+  // Regex para capturar tanto negrito **bold** quanto código inline `code`
+  const tokenRegex = /(\*\*[^*]+?\*\*|`[^`]+?`)/g;
+  const parts = raw.split(tokenRegex);
 
   return parts.map((part, idx) => {
     if (part.startsWith('**') && part.endsWith('**') && part.length >= 4) {
@@ -19,7 +17,24 @@ const renderInlineFormatted = (raw: string, textColor: string) => {
         </Text>
       );
     }
-    // Remove asteriscos soltos indesejados da parte comum
+    if (part.startsWith('`') && part.endsWith('`') && part.length >= 2) {
+      const codeText = part.slice(1, -1);
+      return (
+        <Text
+          key={idx}
+          style={[
+            styles.inlineCode,
+            {
+              backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.06)',
+              color: textColor,
+            },
+          ]}
+        >
+          {codeText}
+        </Text>
+      );
+    }
+    // Remove asteriscos soltos indesejados
     const sanitizedPart = part.replace(/\*/g, '');
     return (
       <Text key={idx} style={{ color: textColor }}>
@@ -34,6 +49,7 @@ export interface FormattedChatMessageTextProps {
   isUser: boolean;
   style?: any;
   textColor: string;
+  isDark?: boolean;
 }
 
 export const FormattedChatMessageText: React.FC<FormattedChatMessageTextProps> = ({
@@ -41,6 +57,7 @@ export const FormattedChatMessageText: React.FC<FormattedChatMessageTextProps> =
   isUser,
   style,
   textColor,
+  isDark = false,
 }) => {
   if (!text) return null;
 
@@ -49,80 +66,167 @@ export const FormattedChatMessageText: React.FC<FormattedChatMessageTextProps> =
   }
 
   const lines = text.split('\n');
+  let insideCodeBlock = false;
+  let codeBlockBuffer: string[] = [];
+  const renderedElements: React.ReactNode[] = [];
 
-  return (
-    <View style={styles.formattedContainer}>
-      {lines.map((line, lineIdx) => {
-        const trimmed = line.trim();
+  lines.forEach((line, lineIdx) => {
+    const trimmed = line.trim();
 
-        if (!trimmed) {
-          return <View key={lineIdx} style={styles.paragraphSpacer} />;
-        }
-
-        // Títulos Markdown (# Título, ## Subtítulo)
-        if (/^#{1,4}\s+/.test(trimmed)) {
-          const headerClean = trimmed.replace(/^#{1,4}\s+/, '').trim();
-          return (
-            <Text key={lineIdx} style={[style, styles.headerLine, { color: textColor }]}>
-              {renderInlineFormatted(headerClean, textColor)}
+    // Tratamento de bloco de código ```
+    if (trimmed.startsWith('```')) {
+      if (insideCodeBlock) {
+        // Fecha o bloco de código
+        const codeContent = codeBlockBuffer.join('\n');
+        renderedElements.push(
+          <View
+            key={`code-block-${lineIdx}`}
+            style={[
+              styles.codeBlock,
+              {
+                backgroundColor: isDark ? '#141618' : '#F4F5F4',
+                borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
+              },
+            ]}
+          >
+            <Text style={[styles.codeBlockText, { color: textColor }]}>
+              {codeContent}
             </Text>
-          );
-        }
-
-        // Marcadores de lista (* Item, - Item, + Item)
-        if (/^[\*\-\+]\s+/.test(trimmed)) {
-          const bulletClean = trimmed.replace(/^[\*\-\+]\s+/, '').trim();
-          return (
-            <View key={lineIdx} style={styles.bulletRow}>
-              <Text style={[styles.bulletSymbol, { color: textColor }]}>•</Text>
-              <Text style={[style, styles.bulletContent, { color: textColor }]}>
-                {renderInlineFormatted(bulletClean, textColor)}
-              </Text>
-            </View>
-          );
-        }
-
-        // Linha normal
-        return (
-          <Text key={lineIdx} style={[style, styles.normalLine, { color: textColor }]}>
-            {renderInlineFormatted(line, textColor)}
-          </Text>
+          </View>
         );
-      })}
-    </View>
-  );
+        codeBlockBuffer = [];
+        insideCodeBlock = false;
+      } else {
+        // Abre o bloco de código
+        insideCodeBlock = true;
+      }
+      return;
+    }
+
+    if (insideCodeBlock) {
+      codeBlockBuffer.push(line);
+      return;
+    }
+
+    // Linha em branco -> espaçamento de parágrafo editorial
+    if (!trimmed) {
+      renderedElements.push(
+        <View key={`space-${lineIdx}`} style={styles.paragraphSpacer} />
+      );
+      return;
+    }
+
+    // Títulos Markdown (# Título, ## Subtítulo, ### Seção)
+    if (/^#{1,4}\s+/.test(trimmed)) {
+      const headerClean = trimmed.replace(/^#{1,4}\s+/, '').trim();
+      renderedElements.push(
+        <Text key={`header-${lineIdx}`} style={[style, styles.headerLine, { color: textColor }]}>
+          {renderInlineFormatted(headerClean, textColor, isDark)}
+        </Text>
+      );
+      return;
+    }
+
+    // Marcadores de lista não numerada (* Item, - Item, • Item)
+    if (/^[\*\-\+•]\s+/.test(trimmed)) {
+      const bulletClean = trimmed.replace(/^[\*\-\+•]\s+/, '').trim();
+      renderedElements.push(
+        <View key={`bullet-${lineIdx}`} style={styles.bulletRow}>
+          <Text style={[styles.bulletSymbol, { color: textColor }]}>•</Text>
+          <Text style={[style, styles.bulletContent, { color: textColor }]}>
+            {renderInlineFormatted(bulletClean, textColor, isDark)}
+          </Text>
+        </View>
+      );
+      return;
+    }
+
+    // Marcadores de lista numerada (1. Item, 2) Item)
+    const numberedMatch = trimmed.match(/^(\d+)[\.\)]\s+(.*)/);
+    if (numberedMatch) {
+      const number = numberedMatch[1];
+      const content = numberedMatch[2];
+      renderedElements.push(
+        <View key={`num-${lineIdx}`} style={styles.bulletRow}>
+          <Text style={[styles.numberedSymbol, { color: textColor }]}>{number}.</Text>
+          <Text style={[style, styles.bulletContent, { color: textColor }]}>
+            {renderInlineFormatted(content, textColor, isDark)}
+          </Text>
+        </View>
+      );
+      return;
+    }
+
+    // Linha de texto normal com entrelinha espaçosa
+    renderedElements.push(
+      <Text key={`normal-${lineIdx}`} style={[style, styles.normalLine, { color: textColor }]}>
+        {renderInlineFormatted(line, textColor, isDark)}
+      </Text>
+    );
+  });
+
+  return <View style={styles.formattedContainer}>{renderedElements}</View>;
 };
 
 const styles = StyleSheet.create({
   formattedContainer: {
     gap: 3,
+    width: '100%',
   },
   paragraphSpacer: {
-    height: 8,
+    height: 10,
   },
   headerLine: {
     fontWeight: '700',
-    fontSize: 15,
-    marginTop: 4,
-    marginBottom: 2,
+    fontSize: 17,
+    lineHeight: 26,
+    marginTop: 8,
+    marginBottom: 4,
+    letterSpacing: -0.2,
   },
   bulletRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     paddingLeft: 2,
-    marginVertical: 1.5,
+    marginVertical: 2,
   },
   bulletSymbol: {
-    fontSize: 14,
-    lineHeight: 20,
-    marginRight: 6,
+    fontSize: 16,
+    lineHeight: 25,
+    marginRight: 8,
     fontWeight: '700',
+  },
+  numberedSymbol: {
+    fontSize: 15,
+    lineHeight: 25,
+    marginRight: 6,
+    fontWeight: '600',
   },
   bulletContent: {
     flex: 1,
-    lineHeight: 20,
+    lineHeight: 25,
+    fontSize: 16,
   },
   normalLine: {
+    lineHeight: 25,
+    fontSize: 16,
+  },
+  inlineCode: {
+    fontFamily: 'monospace',
+    fontSize: 14,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  codeBlock: {
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 12,
+    marginVertical: 6,
+  },
+  codeBlockText: {
+    fontFamily: 'monospace',
+    fontSize: 13.5,
     lineHeight: 20,
   },
 });

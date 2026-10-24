@@ -16,7 +16,7 @@ import (
 // consultar conversas, listar pendências, rascunhar respostas, enviar
 // mensagens em nome do usuário e criar lembretes de resposta.
 func (s *AssistantService) executeWhatsAppAction(ctx context.Context, userID string, intent *ai.ParsedIntent, input ai.UserInput, res *AssistantResponse) (*AssistantResponse, error) {
-	if intent.Action != ai.ActionQueryConversation {
+	if intent.Action != ai.ActionQueryConversation && intent.Action != ai.ActionSendWhatsAppMessage && intent.Action != ai.ActionDraftReply {
 		s.clearPendingContactAlias()
 	}
 	switch intent.Action {
@@ -289,8 +289,10 @@ func (s *AssistantService) actionSendWhatsAppMessage(ctx context.Context, userID
 
 	chat, err := s.waDirectory.ResolveChat(ctx, userID, intent.WhatsAppMessage.Chat)
 	if err != nil {
+		s.rememberUnknownContact(userID, intent.WhatsAppMessage.Chat)
 		return s.replyChatResolutionError(intent, err), nil
 	}
+	s.learnContactAlias(ctx, userID, intent.WhatsAppMessage.Text, intent.WhatsAppMessage.Chat, chat.ChatJID)
 	if err := s.waSender.SendWhatsAppMessage(ctx, userID, chat.ChatJID, intent.WhatsAppMessage.Text); err != nil {
 		log.Printf("⚠️ [AssistantService] falha ao enviar mensagem do WhatsApp (user=%s, chat=%s): %v", userID, chat.ChatJID, err)
 		res.Message = "Não consegui enviar a mensagem agora. Nada foi enviado — tenta de novo em instantes."

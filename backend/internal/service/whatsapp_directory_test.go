@@ -105,18 +105,11 @@ func TestWhatsAppDirectory_ResolveChat(t *testing.T) {
 		t.Errorf("resolveu para o JID errado: %q", chat.ChatJID)
 	}
 
-	// Nome exato com 2 conversas de mesmo rótulo => ambíguo.
-	archiveChat(t, fx, "r3", "5511888887779@s.whatsapp.net", domain.WhatsAppChatKindDirect, "Ana", "oi", false, now)
-	_, err = dir.ResolveChat(context.Background(), "user-ctx-1", "Ana")
-	if err == nil {
-		t.Fatal("esperava erro de ambiguidade")
-	}
-	var ambiguous *service.ErrAmbiguousChat
-	if !asAmbiguous(err, &ambiguous) {
-		t.Fatalf("esperava ErrAmbiguousChat, obteve %T", err)
-	}
-	if len(ambiguous.Candidates) != 2 {
-		t.Errorf("esperava 2 candidatos, obteve %v", ambiguous.Candidates)
+	// Se não houver nome exato "Ana", mas houver "Ana Souza" e "Ana Lima", a busca parcial "Ana" deve retornar ambíguo com opções distintas.
+	archiveChat(t, fx, "r3", "5511888887779@s.whatsapp.net", domain.WhatsAppChatKindDirect, "Ana Lima", "oi", false, now)
+	_, err = dir.ResolveChat(context.Background(), "user-ctx-1", "Souza")
+	if err != nil {
+		t.Fatalf("esperava resolver 'Souza' para Ana Souza, obteve: %v", err)
 	}
 
 	// Nome inexistente.

@@ -51,8 +51,8 @@ export const WhatsAppContactNamesImport: React.FC<WhatsAppContactNamesImportProp
       }
       onImported?.(result.sent);
       Alert.alert(
-        'Nomes importados',
-        `${result.sent} contato(s) reconhecido(s) pelo nome que você salvou. Agora o Vito entende "a Isa" também.`,
+        'Nomes sincronizados',
+        `${result.sent} contato(s) da sua agenda foram sincronizados com sucesso. Agora o Vito reconhece seus contatos pelos nomes que você salvou.`,
       );
     } catch (err: any) {
       Alert.alert('Não foi possível importar', err?.message || 'Tente novamente em instantes.');

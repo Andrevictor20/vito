@@ -88,3 +88,51 @@ func TestWhatsAppDirectory_ResolveChatFromSyncedContactsSemHistorico(t *testing.
 		t.Errorf("esperava label 'Dr. Roberto', obteve %q", chat.ChatLabel)
 	}
 }
+
+// TestWhatsAppDirectory_DirectoryIncluiContatosSincronizados:
+// O diretório deve enriquecer os contatos com a agenda (synced_contacts) para
+// que a IA saiba imediatamente que "Isa" é a "Bella" e também veja contatos
+// salvos mesmo que não tenham mensagens recentes.
+func TestWhatsAppDirectory_DirectoryIncluiContatosSincronizados(t *testing.T) {
+	ctx := context.Background()
+
+	contactRepo := &mockSyncedContactRepo{
+		contacts: []domain.SyncedContact{
+			{
+				UserID:      "u1",
+				Phone:       "+55 21 99999-8888",
+				PhoneDigits: "5521999998888",
+				JID:         "5521999998888@s.whatsapp.net",
+				LID:         "471331507024120@lid",
+				SavedName:   "Isa",
+				ProfileName: "Bella",
+				Source:      "phonebook",
+			},
+		},
+	}
+
+	dir := service.NewWhatsAppDirectoryService(nil, service.WhatsAppContextConfig{MaxAge: 30 * 24 * time.Hour}, nil)
+	dir.SetContactRepository(contactRepo)
+
+	entries, err := dir.Directory(ctx, "u1")
+	if err != nil {
+		t.Fatalf("Directory falhou: %v", err)
+	}
+	if len(entries) == 0 {
+		t.Fatal("esperava que o diretório contivesse ao menos 1 contato vindo de synced_contacts")
+	}
+
+	found := false
+	for _, e := range entries {
+		if e.Name == "Isa" {
+			found = true
+			if e.Alias != "Bella" {
+				t.Errorf("esperava Alias 'Bella', obteve %q", e.Alias)
+			}
+		}
+	}
+	if !found {
+		t.Errorf("contato 'Isa' não encontrado no diretório: %+v", entries)
+	}
+}
+

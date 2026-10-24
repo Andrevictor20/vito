@@ -133,9 +133,19 @@ func isDirectContactClarification(userInput, resolvedName string) bool {
 		"o nome é ", "nome é ", "o nome dela é ", "o nome dele é ",
 		"ela é a ", "ele é o ", "ela é ", "ele é ",
 		"na verdade é ", "me refiro a ", "falei de ", "quis dizer ",
+		"isso, ", "isso mesmo, ", "isso ", "isso mesmo ",
+		"sim, ", "sim ", "exato, ", "exato ", "correto, ", "correto ",
+		"pode ser a ", "pode ser o ", "pode ser ",
 	}
 	for _, p := range confirmPrefixes {
 		if strings.HasPrefix(lower, p) {
+			return true
+		}
+	}
+
+	// Suporte a sentenças de equivalência com 'é' (ex: "Bella é a Isa", "a Isa é a Bella")
+	if strings.Contains(lower, " é ") || strings.Contains(lower, " e ") {
+		if contactNameMatches(lower, resolvedName) || strings.Contains(lower, strings.ToLower(resolvedName)) {
 			return true
 		}
 	}

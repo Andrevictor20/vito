@@ -100,7 +100,7 @@ func (s *WhatsAppDirectoryService) Directory(ctx context.Context, userID string)
 			Age:     humanizeChatAge(c.LastAt),
 		})
 	}
-	return out, nil
+	return s.enrichDirectoryWithSyncedContacts(ctx, userID, chats, out), nil
 }
 
 // aliasOf devolve o OUTRO nome do contato (o que não é o rótulo principal).
@@ -202,25 +202,30 @@ func (s *WhatsAppDirectoryService) ResolveChat(ctx context.Context, userID, name
 			}
 		}
 	}
-	switch len(exact) {
-	case 1:
-		// Limpa qualquer alias espúrio pré-existente cujo nome colida com este contato real.
-		if s.repo != nil {
-			_ = s.repo.DeleteAliasesByName(ctx, userID, query)
+	if len(exact) > 0 {
+		resolved, err := DeduplicateCandidates(query, exact, s.labelOf)
+		if err != nil {
+			return nil, err
 		}
-		return &exact[0], nil
-	case 0:
-		// segue para os apelidos aprendidos
-	default:
-		return nil, s.ambiguousError(query, exact)
+		if resolved != nil {
+			// Limpa qualquer alias espúrio pré-existente cujo nome colida com este contato real.
+			if s.repo != nil {
+				_ = s.repo.DeleteAliasesByName(ctx, userID, query)
+			}
+			return resolved, nil
+		}
 	}
 
 	// 3) Apelido aprendido: o nome que o dono usa para o contato ("isa"),
 	//    aprendido quando ele confirmou desambiguação em consulta anterior.
-	if aliased, err := s.aliasChats(ctx, userID, query); err == nil && len(aliased) == 1 {
-		return &aliased[0], nil
-	} else if err == nil && len(aliased) > 1 {
-		return nil, s.ambiguousError(query, aliased)
+	if aliased, err := s.aliasChats(ctx, userID, query); err == nil && len(aliased) > 0 {
+		resolved, err := DeduplicateCandidates(query, aliased, s.labelOf)
+		if err != nil {
+			return nil, err
+		}
+		if resolved != nil {
+			return resolved, nil
+		}
 	}
 
 	// 4) Contém (prefixo do nome também vale) — com acento e caixa normalizados.
@@ -243,14 +248,16 @@ func (s *WhatsAppDirectoryService) ResolveChat(ctx context.Context, userID, name
 			}
 		}
 	}
-	switch len(matches) {
-	case 1:
-		return &matches[0], nil
-	case 0:
-		return s.resolveFromSyncedContacts(ctx, userID, query)
-	default:
-		return nil, s.ambiguousError(query, matches)
+	if len(matches) > 0 {
+		resolved, err := DeduplicateCandidates(query, matches, s.labelOf)
+		if err != nil {
+			return nil, err
+		}
+		if resolved != nil {
+			return resolved, nil
+		}
 	}
+	return s.resolveFromSyncedContacts(ctx, userID, query)
 }
 
 // contactNameMatches compara um nome de contato com o termo pedido, ignorando
@@ -372,11 +379,20 @@ func (s *WhatsAppDirectoryService) aliasChats(ctx context.Context, userID, alias
 	return out, nil
 }
 
-// ambiguousError monta o erro de ambiguidade com os nomes dos candidatos.
+// ambiguousError monta o erro de ambiguidade com os nomes únicos dos candidatos.
 func (s *WhatsAppDirectoryService) ambiguousError(query string, matches []domain.WhatsAppChatSummary) *ErrAmbiguousChat {
+	_, err := DeduplicateCandidates(query, matches, s.labelOf)
+	if amb, ok := err.(*ErrAmbiguousChat); ok {
+		return amb
+	}
+	seen := make(map[string]bool, len(matches))
 	names := make([]string, 0, len(matches))
 	for i := range matches {
-		names = append(names, s.labelOf(matches[i]))
+		lbl := s.labelOf(matches[i])
+		if !seen[lbl] {
+			seen[lbl] = true
+			names = append(names, lbl)
+		}
 	}
 	sort.Strings(names)
 	return &ErrAmbiguousChat{Query: query, Candidates: names}
