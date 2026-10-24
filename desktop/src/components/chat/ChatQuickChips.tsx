@@ -42,7 +42,7 @@ interface ChatQuickChipsProps {
 
 export const ChatQuickChips: React.FC<ChatQuickChipsProps> = ({ onSelectPrompt, disabled }) => {
   return (
-    <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+    <div className="flex items-center gap-2.5 overflow-x-auto pb-2 scrollbar-none">
       {QUICK_PROMPTS.map((item, idx) => {
         const Icon = item.icon;
         return (
@@ -51,9 +51,9 @@ export const ChatQuickChips: React.FC<ChatQuickChipsProps> = ({ onSelectPrompt, 
             type="button"
             onClick={() => onSelectPrompt(item.prompt)}
             disabled={disabled}
-            className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-zinc-100 dark:bg-[#1C2026] hover:bg-zinc-200 dark:hover:bg-[#262B33] border border-zinc-200 dark:border-[#262B33] text-xs font-medium text-zinc-800 dark:text-zinc-200 transition-colors shadow-xs shrink-0 disabled:opacity-50 cursor-pointer"
+            className="flex items-center gap-2.5 px-4 py-2 rounded-full bg-zinc-100 dark:bg-[#1C2026] hover:bg-zinc-200 dark:hover:bg-[#262B33] border border-zinc-200 dark:border-[#262B33] text-sm font-semibold text-zinc-800 dark:text-zinc-200 transition-all shadow-xs shrink-0 disabled:opacity-50 cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
           >
-            <Icon size={14} className={item.iconColor} />
+            <Icon size={16} className={item.iconColor} />
             <span>{item.label}</span>
           </button>
         );

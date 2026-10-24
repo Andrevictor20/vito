@@ -5,17 +5,18 @@ import { ChatMessage, ConversationSession } from '../../types';
 import { VitoMascot } from '../common/VitoMascot';
 import { ChatHistoryPanel } from './ChatHistoryPanel';
 import { FocusMode } from './FocusMenu';
-import { ChatQuickChips } from './ChatQuickChips';
 import { WhatsAppMessageCard } from './WhatsAppMessageCard';
 import { GmailMessageCard } from './GmailMessageCard';
 import { ChatThinkingIndicator } from './ChatThinkingIndicator';
 import { ChatInputDock } from './ChatInputDock';
+import { ChatIdeasDeck } from './ChatIdeasDeck';
+import { FormattedChatMessageText } from './FormattedChatMessageText';
+import { ChatMessageActionBar } from './ChatMessageActionBar';
+import { TodoInlineCard } from './cards/TodoInlineCard';
+import { EventInlineCard } from './cards/EventInlineCard';
+import { toChatGmailMessage, toChatWhatsAppMessage } from '../../utils/chatCardExtractors';
 import { pickWelcomeGreeting } from '../../utils/chatGreetings';
 import {
-  Calendar,
-  Circle,
-  Copy,
-  Check,
   PanelLeftClose,
   PanelLeft,
   Plus,
@@ -34,7 +35,6 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const welcomeGreeting = React.useMemo(() => {
@@ -140,8 +140,8 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
         event: res.event,
         trigger: res.trigger,
         booking: res.booking,
-        whatsapp_message: res.whatsapp_message,
-        gmail_message: res.gmail_message,
+        whatsapp_message: toChatWhatsAppMessage(res, textToSend),
+        gmail_message: toChatGmailMessage(res, textToSend),
       };
 
       const updated = [...messages, userMsg, vitoMsg];
@@ -174,10 +174,18 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
     }
   };
 
-  const handleCopyText = (id: string, text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
+  const handleConfirmEmail = (updated: any) => {
+    handleSendPrompt(
+      `Enviar e-mail para ${updated.recipient_email} com assunto "${updated.subject}": "${updated.body}"`,
+      null
+    );
+  };
+
+  const handleConfirmWhatsApp = (updated: any) => {
+    handleSendPrompt(
+      `Enviar mensagem WhatsApp para ${updated.recipient_name}: "${updated.message}"`,
+      null
+    );
   };
 
   const handleStartNewChat = () => {
@@ -186,7 +194,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
   };
 
   return (
-    <div className="flex-1 h-screen flex bg-[#F8F9FA] dark:bg-[#0B0D10] text-[#17191b] dark:text-[#f1f3f2] overflow-hidden select-none transition-colors duration-200">
+    <div className="flex-1 h-screen flex bg-[#FAFAFA] dark:bg-[#0B0D10] text-[#17191b] dark:text-[#f1f3f2] overflow-hidden select-none transition-colors duration-200">
       {/* Drawer de Histórico no estilo Toki / Mobile */}
       {historyOpen && (
         <ChatHistoryPanel
@@ -201,8 +209,8 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
 
       {/* Workspace Principal de Conversa */}
       <div className="flex-1 flex flex-col h-full overflow-hidden relative">
-        {/* Top Header Minimalista com Avatar Oficial do Vito */}
-        <header className="h-16 px-6 border-b border-zinc-200/80 dark:border-[#222730] flex items-center justify-between bg-white/70 dark:bg-[#14171C]/70 backdrop-blur-md z-10 shrink-0">
+        {/* Top Header Minimalista Estilo Gemini / Claude */}
+        <header className="h-14 px-6 border-b border-zinc-200/70 dark:border-[#1E2228] flex items-center justify-between bg-white/80 dark:bg-[#0B0D10]/80 backdrop-blur-md z-10 shrink-0">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setHistoryOpen(!historyOpen)}
@@ -212,167 +220,126 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
               {historyOpen ? <PanelLeftClose size={18} /> : <PanelLeft size={18} />}
             </button>
 
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-full bg-zinc-100 dark:bg-[#1C2026] border border-zinc-200 dark:border-[#262B33] flex items-center justify-center shadow-xs">
-                <VitoMascot size={26} />
-              </div>
-              <div className="flex flex-col">
-                <div className="flex items-center gap-1.5 leading-none">
-                  <span className="text-sm font-extrabold tracking-tight text-[#17191b] dark:text-[#f1f3f2]">vito</span>
-                  <span className="w-2 h-2 rounded-full bg-[#00E599] shadow-[0_0_8px_#00E599] animate-pulse" />
-                </div>
-                <span className="text-[10px] text-zinc-400 font-medium mt-0.5">Assistente Executivo</span>
-              </div>
+            <div className="flex items-center gap-2">
+              <span className="text-base font-extrabold tracking-tight text-[#17191b] dark:text-[#f1f3f2]">vito</span>
+              <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-zinc-100 dark:bg-[#181C20] text-zinc-500 dark:text-zinc-400 border border-zinc-200/60 dark:border-white/5">
+                Executivo
+              </span>
             </div>
           </div>
 
           <button
             onClick={handleStartNewChat}
-            className="flex items-center gap-2 px-4 py-2 rounded-full bg-zinc-100 hover:bg-zinc-200 dark:bg-[#1C2026] dark:hover:bg-[#262B33] border border-zinc-200 dark:border-[#222730] text-xs font-semibold text-zinc-700 dark:text-zinc-300 transition-colors shadow-xs"
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-zinc-100 hover:bg-zinc-200 dark:bg-[#181C20] dark:hover:bg-[#22272E] border border-zinc-200 dark:border-[#222730] text-xs font-semibold text-zinc-700 dark:text-zinc-300 transition-colors shadow-2xs"
           >
-            <Plus size={15} />
+            <Plus size={14} />
             <span>Nova Conversa</span>
           </button>
         </header>
 
         {/* Main Messages Scroll Area */}
-        <div className="flex-1 overflow-y-auto px-6 py-8 scroll-smooth flex flex-col">
-          <div className="max-w-6xl mx-auto space-y-7 flex-1 w-full flex flex-col justify-center">
-            {/* Mobile-Identical Empty State */}
-            {messages.length === 0 && (
-              <div className="my-auto py-12 flex flex-col items-center justify-center text-center space-y-4">
-                <div className="w-20 h-20 rounded-3xl bg-zinc-100 dark:bg-[#1C2026] border border-zinc-200 dark:border-[#262B33] flex items-center justify-center shadow-md">
-                  <VitoMascot size={64} />
-                </div>
-                <h1 className="font-display font-extrabold text-2xl sm:text-3xl tracking-tight text-[#17191b] dark:text-[#f1f3f2] max-w-xl">
-                  {welcomeGreeting}
-                </h1>
-                <p className="text-sm sm:text-base text-zinc-500 dark:text-zinc-400 max-w-md mx-auto">
-                  Clique numa sugestão abaixo ou me diga o que precisa
-                </p>
+        <div className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-6 scroll-smooth flex flex-col">
+          {messages.length === 0 ? (
+            /* Mobile-Identical Empty State com Mascote Animado e Carrossel 3D de Ideias */
+            <div className="max-w-3xl lg:max-w-4xl mx-auto my-auto w-full flex flex-col items-center justify-center text-center space-y-3 py-4">
+              <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-[28px] bg-white dark:bg-[#191c1e] border border-zinc-200 dark:border-[#262B33] flex items-center justify-center shadow-lg p-2 hover:scale-105 transition-all duration-300">
+                <VitoMascot size={80} animated={true} state={loading ? 'thinking' : 'idle'} />
               </div>
-            )}
+              <h1 className="font-display font-extrabold text-2xl sm:text-3xl lg:text-4xl tracking-tight text-[#17191b] dark:text-[#f1f3f2] max-w-2xl leading-tight">
+                {welcomeGreeting}
+              </h1>
+              <p className="text-sm sm:text-base text-zinc-500 dark:text-zinc-400 max-w-lg mx-auto">
+                Toque numa sugestão abaixo ou me diga o que precisa
+              </p>
 
-            {/* Messages Stream */}
-            {messages.map((msg) => {
-              const isUser = msg.sender === 'user';
-              return (
-                <div
-                  key={msg.id}
-                  className={`flex gap-4 group ${isUser ? 'justify-end' : 'justify-start'}`}
-                >
-                  {isUser ? (
-                    <div className="max-w-[85%] rounded-[24px] p-5 transition-all shadow-sm bg-[#17191b] dark:bg-[#1C2026] text-white border border-transparent dark:border-[#262B33] rounded-tr-md">
-                      <div className="text-sm sm:text-base leading-relaxed whitespace-pre-wrap font-sans">
-                        {msg.text}
-                      </div>
-                      <div className="mt-3 pt-2 border-t border-white/10 flex items-center justify-end text-[11px] text-zinc-400">
-                        <span className="font-mono">{msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ''}</span>
+              {/* Carrossel 3D de Ideias Canônico do Mobile */}
+              <ChatIdeasDeck
+                onUseIdea={(prompt) => handleSendPrompt(prompt, null)}
+                disabled={loading}
+              />
+            </div>
+          ) : (
+            /* Stream Editorial Borderless Estilo Claude / Gemini (Largura Consistente max-w-3xl/4xl) */
+            <div className="max-w-3xl lg:max-w-4xl mx-auto w-full flex-1 flex flex-col justify-start space-y-7 pb-6">
+              {messages.map((msg) => {
+                const isUser = msg.sender === 'user';
+                if (isUser) {
+                  return (
+                    <div key={msg.id} className="flex justify-end w-full">
+                      <div className="max-w-[85%] sm:max-w-[75%] md:max-w-[70%] rounded-[24px] px-5 py-3.5 bg-[#F0F2F1] dark:bg-[#1E2024] text-[#17191b] dark:text-[#f1f3f2] border border-black/5 dark:border-white/5 shadow-2xs">
+                        <div className="text-[15px] sm:text-base leading-relaxed whitespace-pre-wrap font-sans">
+                          {msg.text}
+                        </div>
                       </div>
                     </div>
-                  ) : (
-                    <div className="max-w-[85%] px-2">
-                      <div className="text-sm sm:text-base leading-relaxed whitespace-pre-wrap font-sans text-[#17191b] dark:text-[#f1f3f2]">
-                        {msg.text}
-                      </div>
+                  );
+                }
 
-                      {/* Inline Actionable Cards */}
-                      {msg.todo && (
-                        <div
-                          onClick={() => onNavigateTab?.('tasks')}
-                          className="mt-3.5 p-3.5 rounded-xl bg-white dark:bg-[#14171C] border border-zinc-200 dark:border-[#222730] flex items-center justify-between gap-3 cursor-pointer hover:border-zinc-400 dark:hover:border-zinc-600 transition-colors shadow-sm"
-                        >
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <Circle size={16} className="text-zinc-400 shrink-0" />
-                            <span className="text-xs font-semibold text-zinc-900 dark:text-white truncate">
-                              {msg.todo.title}
-                            </span>
-                          </div>
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 uppercase shrink-0">
-                            {msg.todo.priority || 'MÉDIA'}
-                          </span>
-                        </div>
-                      )}
-
-                      {msg.event && (
-                        <div
-                          onClick={() => onNavigateTab?.('calendar')}
-                          className="mt-3.5 p-3.5 rounded-xl bg-white dark:bg-[#14171C] border border-zinc-200 dark:border-[#222730] flex items-center justify-between gap-3 cursor-pointer hover:border-zinc-400 dark:hover:border-zinc-600 transition-colors shadow-sm"
-                        >
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <Calendar size={16} className="text-[#2b7fd4] shrink-0" />
-                            <div>
-                              <p className="text-xs font-semibold text-zinc-900 dark:text-white truncate">
-                                {msg.event.title}
-                              </p>
-                              <p className="text-[10px] text-zinc-400">
-                                {new Date(msg.event.start_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                              </p>
-                            </div>
-                          </div>
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20 uppercase shrink-0">
-                            {msg.event.category || 'EVENTO'}
-                          </span>
-                        </div>
-                      )}
-
-                      {msg.whatsapp_message && (
-                        <WhatsAppMessageCard messageData={msg.whatsapp_message} />
-                      )}
-
-                      {msg.gmail_message && (
-                        <GmailMessageCard messageData={msg.gmail_message} />
-                      )}
-
-                      {/* Footer with copy button */}
-                      <div className="mt-3 pt-2 border-t border-black/5 dark:border-white/5 flex items-center justify-start text-xs text-zinc-400 gap-3">
-                        <span className="font-mono text-[11px]">{msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ''}</span>
-                        <button
-                          onClick={() => handleCopyText(msg.id, msg.text)}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity hover:text-zinc-700 dark:hover:text-zinc-300 flex items-center gap-1.5 py-0.5 px-2 rounded hover:bg-zinc-100 dark:hover:bg-white/5"
-                          title="Copiar resposta"
-                        >
-                          {copiedId === msg.id ? (
-                            <>
-                              <Check size={13} className="text-[#00E599]" />
-                              <span>Copiado</span>
-                            </>
-                          ) : (
-                            <>
-                              <Copy size={13} />
-                              <span>Copiar</span>
-                            </>
-                          )}
-                        </button>
-                      </div>
+                return (
+                  <div key={msg.id} className="w-full flex flex-col space-y-3 pt-1">
+                    {/* Texto Editorial Borderless (Sem balão, sem avatar lateral, leitura fluida como Claude/Gemini) */}
+                    <div className="text-[15.5px] sm:text-base text-[#17191b] dark:text-[#f1f3f2] leading-relaxed">
+                      <FormattedChatMessageText text={msg.text} isUser={false} />
                     </div>
-                  )}
-                </div>
-              );
-            })}
 
-            {loading && (
-              <div className="flex gap-4 items-start">
-                <div className="max-w-[85%]">
+                    {/* Cards Estruturados Modulares Canônicos na Largura Total */}
+                    {msg.gmail_message && (
+                      <GmailMessageCard
+                        messageData={msg.gmail_message}
+                        onConfirmSend={handleConfirmEmail}
+                      />
+                    )}
+
+                    {msg.whatsapp_message && (
+                      <WhatsAppMessageCard
+                        messageData={msg.whatsapp_message}
+                        onConfirmSend={handleConfirmWhatsApp}
+                      />
+                    )}
+
+                    {msg.todo && (
+                      <TodoInlineCard
+                        todo={msg.todo}
+                        onNavigateTab={onNavigateTab}
+                      />
+                    )}
+
+                    {msg.event && (
+                      <EventInlineCard
+                        event={msg.event}
+                        onNavigateTab={onNavigateTab}
+                      />
+                    )}
+
+                    {/* Barra de Ações Minimalista Estilo Claude / Gemini */}
+                    <ChatMessageActionBar
+                      messageText={msg.text}
+                      timestamp={msg.timestamp}
+                    />
+                  </div>
+                );
+              })}
+
+              {/* Indicador de Pensamento Ancorado sem Avatar Lateral (Estilo Claude / Gemini) */}
+              {loading && (
+                <div className="w-full pt-2">
                   <ChatThinkingIndicator />
                 </div>
-              </div>
-            )}
+              )}
 
-            <div ref={messagesEndRef} />
-          </div>
+              <div ref={messagesEndRef} />
+            </div>
+          )}
         </div>
 
-        {/* Input Dock (Memoizado contra digitação) */}
-        <div className="p-5 bg-white/90 dark:bg-[#0B0D10]/90 border-t border-zinc-200/80 dark:border-[#222730] backdrop-blur-md">
-          <div className="max-w-6xl mx-auto">
-            {messages.length <= 2 && (
-              <div className="mb-3">
-                <ChatQuickChips onSelectPrompt={(p) => handleSendPrompt(p, null)} disabled={loading} />
-              </div>
-            )}
-
+        {/* Input Dock Toki / Claude Style (Centrado na Mesma Largura das Mensagens) */}
+        <div className="p-4 sm:p-6 bg-transparent shrink-0">
+          <div className="max-w-3xl lg:max-w-4xl mx-auto w-full">
             <ChatInputDock onSendMessage={handleSendPrompt} loading={loading} />
+
+            <div className="mt-2.5 text-center text-[11px] sm:text-[11.5px] text-zinc-400 dark:text-zinc-500 font-sans select-none tracking-normal">
+              O Vito pode cometer erros. Verifique informações importantes.
+            </div>
           </div>
         </div>
       </div>

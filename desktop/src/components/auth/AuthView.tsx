@@ -147,7 +147,7 @@ export const AuthView: React.FC = () => {
         </section>
 
         {/* COLUNA DIREITA: Demonstração Interativa DemoStage (7 Colunas Widescreen) */}
-        <section className="lg:col-span-7 p-6 sm:p-10 lg:p-12 bg-[#dde1df]/40 dark:bg-[#050606]/60 flex items-center justify-center relative">
+        <section className="lg:col-span-7 p-6 sm:p-10 lg:p-12 bg-[#f2f4f3] dark:bg-[#050606] flex items-center justify-center relative">
           <div className="w-full max-w-[560px]">
             <DemoStage
               currentIndex={currentSceneIndex}

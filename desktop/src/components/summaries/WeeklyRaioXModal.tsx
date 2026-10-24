@@ -18,16 +18,16 @@ export const WeeklyRaioXModal: React.FC<WeeklyRaioXModalProps> = ({ summary, ope
         <div className="flex items-center justify-between border-b border-zinc-100 dark:border-[#222730] pb-4">
           <div>
             <div className="flex items-center gap-2">
-              <span className="px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-xs font-bold uppercase tracking-wider">
+              <span className="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-bold uppercase tracking-wider">
                 Raio-X Semanal
               </span>
               {summary.isCurrentWeek && (
-                <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-bold uppercase">
+                <span className="px-2.5 py-0.5 rounded-full bg-[#17191b] dark:bg-white text-white dark:text-[#0d0f10] text-xs font-bold uppercase">
                   Em Andamento
                 </span>
               )}
             </div>
-            <h3 className="text-xl sm:text-2xl font-black text-zinc-900 dark:text-white mt-1.5">
+            <h3 className="text-xl sm:text-2xl font-black text-zinc-900 dark:text-white mt-1.5 font-display">
               {summary.period}
             </h3>
             <p className="text-sm font-semibold text-zinc-500 dark:text-zinc-400">
@@ -44,19 +44,19 @@ export const WeeklyRaioXModal: React.FC<WeeklyRaioXModalProps> = ({ summary, ope
 
         {/* Métricas Principais em Destaque */}
         <div className="grid grid-cols-3 gap-4">
-          <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-[#0E1015] border border-zinc-200/80 dark:border-[#222730] text-center">
+          <div className="p-4.5 rounded-2xl bg-zinc-50 dark:bg-[#0E1015] border border-zinc-200/80 dark:border-[#222730] text-center">
             <span className="text-2xl sm:text-3xl font-black text-zinc-900 dark:text-white">
               {summary.hours}h
             </span>
             <p className="text-xs sm:text-sm font-bold text-zinc-500 dark:text-zinc-400 mt-1">Horas</p>
           </div>
-          <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-[#0E1015] border border-zinc-200/80 dark:border-[#222730] text-center">
+          <div className="p-4.5 rounded-2xl bg-zinc-50 dark:bg-[#0E1015] border border-zinc-200/80 dark:border-[#222730] text-center">
             <span className="text-2xl sm:text-3xl font-black text-zinc-900 dark:text-white">
               {summary.eventsCount}
             </span>
             <p className="text-xs sm:text-sm font-bold text-zinc-500 dark:text-zinc-400 mt-1">Eventos</p>
           </div>
-          <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-[#0E1015] border border-zinc-200/80 dark:border-[#222730] text-center">
+          <div className="p-4.5 rounded-2xl bg-zinc-50 dark:bg-[#0E1015] border border-zinc-200/80 dark:border-[#222730] text-center">
             <span className="text-2xl sm:text-3xl font-black text-zinc-900 dark:text-white">
               {summary.completedTodosCount}
             </span>
@@ -65,8 +65,8 @@ export const WeeklyRaioXModal: React.FC<WeeklyRaioXModalProps> = ({ summary, ope
         </div>
 
         {/* Análise de IA Narrativa */}
-        <div className="p-5 rounded-2xl bg-zinc-50 dark:bg-[#0E1015] border border-zinc-200/80 dark:border-[#222730] space-y-2">
-          <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 text-xs sm:text-sm font-bold uppercase tracking-wider">
+        <div className="p-5.5 rounded-2xl bg-zinc-50 dark:bg-[#0E1015] border border-zinc-200/80 dark:border-[#222730] space-y-2">
+          <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 text-xs sm:text-sm font-bold uppercase tracking-wider">
             <Sparkles size={16} />
             <span>Análise Cognitiva Vito</span>
           </div>

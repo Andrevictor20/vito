@@ -16,7 +16,13 @@ func isExplicitSendConfirmation(input ai.UserInput) bool {
 	if strings.HasPrefix(lower, "enviar e-mail para ") ||
 		strings.HasPrefix(lower, "enviar email para ") ||
 		strings.HasPrefix(lower, "enviar mensagem whatsapp para ") ||
-		strings.HasPrefix(lower, "enviar whatsapp para ") {
+		strings.HasPrefix(lower, "enviar whatsapp para ") ||
+		strings.HasPrefix(lower, "confirmar e enviar whatsapp para ") ||
+		strings.HasPrefix(lower, "confirmar e enviar mensagem whatsapp para ") ||
+		strings.HasPrefix(lower, "confirmar e enviar e-mail para ") ||
+		strings.HasPrefix(lower, "confirmar e enviar email para ") ||
+		strings.HasPrefix(lower, "confirmar envio de ") ||
+		strings.HasPrefix(lower, "confirmar envio para ") {
 		return true
 	}
 
@@ -24,10 +30,11 @@ func isExplicitSendConfirmation(input ai.UserInput) bool {
 	explicitPhrases := []string{
 		"sim, pode enviar", "sim pode enviar", "pode enviar", "pode mandar",
 		"pode disparar", "sim, pode mandar", "sim pode mandar", "confirmo o envio",
-		"confirmar envio", "aprovo o envio", "aprovado, envie", "está aprovado, pode mandar",
-		"envie agora", "mande agora", "dispare agora", "envia agora", "manda agora",
-		"pode enviar a mensagem", "pode enviar o e-mail", "pode enviar o email",
-		"pode mandar o email", "pode mandar o e-mail", "pode mandar a mensagem",
+		"confirmar envio", "confirmar e enviar", "aprovo o envio", "aprovado, envie",
+		"está aprovado, pode mandar", "envie agora", "mande agora", "dispare agora",
+		"envia agora", "manda agora", "pode enviar a mensagem", "pode enviar o e-mail",
+		"pode enviar o email", "pode mandar o email", "pode mandar o e-mail",
+		"pode mandar a mensagem",
 	}
 	for _, phrase := range explicitPhrases {
 		if strings.Contains(lower, phrase) {

@@ -135,6 +135,7 @@ export interface Meeting {
   status: 'open' | 'confirmed' | 'expired' | 'cancelled';
   short_url?: string;
   public_url?: string;
+  confirmed_slot_id?: string;
   confirmed_slot_start?: string;
   confirmed_slot_end?: string;
   slots_count?: number;
@@ -201,4 +202,55 @@ export interface GmailStatus {
   connected: boolean;
   email?: string;
   last_scanned_at?: string;
+}
+
+export interface GmailDraftInput {
+  to: string;
+  subject: string;
+  body: string;
+}
+
+export interface GmailDraftResponse {
+  draft_id: string;
+  message_id?: string;
+}
+
+export interface GmailSendResponse {
+  message_id: string;
+  thread_id?: string;
+}
+
+export interface PendingItem {
+  id: string;
+  user_id?: string;
+  title: string;
+  description?: string;
+  source: string;
+  status: 'pending' | 'scheduled' | 'completed' | 'dismissed';
+  category?: string;
+  priority?: 'low' | 'medium' | 'high' | 'urgent';
+  due_date?: string;
+  scheduled_date?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface AISettings {
+  autonomy_mode: 'assisted' | 'proactive';
+  auto_focus_blocks?: boolean;
+  personality_tone?: string;
+}
+
+export interface MorningBriefingSettings {
+  enabled: boolean;
+  delivery_time: string;
+  whatsapp_enabled?: boolean;
+  push_enabled?: boolean;
+}
+
+export interface WhatsAppMatchedContact {
+  phone: string;
+  name?: string;
+  push_name?: string;
+  is_saved: boolean;
 }

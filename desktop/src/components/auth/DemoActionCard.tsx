@@ -1,6 +1,7 @@
 import React from 'react';
 import { DemoSceneCardChip } from './demoScenes';
 import { useTheme } from '../../context/ThemeContext';
+import { loginPalette } from './loginPalette';
 
 interface DemoActionCardProps {
   card: DemoSceneCardChip;
@@ -8,36 +9,37 @@ interface DemoActionCardProps {
 
 export const DemoActionCard: React.FC<DemoActionCardProps> = ({ card }) => {
   const { isDark } = useTheme();
+  const palette = loginPalette(isDark);
 
   const getChipStyle = () => {
     switch (card.kind) {
       case 'agenda':
         return {
-          bg: isDark ? 'rgba(90, 162, 238, 0.16)' : '#e4effb',
-          fg: isDark ? '#5aa2ee' : '#2b7fd4',
+          bg: palette.blueBg,
+          fg: palette.blue,
         };
       case 'email':
       case 'email-draft':
         return {
-          bg: isDark ? 'rgba(255, 107, 138, 0.16)' : '#fde6ec',
-          fg: isDark ? '#ff6b8a' : '#d6355a',
+          bg: palette.redBg,
+          fg: palette.red,
         };
       case 'radar':
         return {
-          bg: isDark ? 'rgba(255, 154, 82, 0.16)' : '#fbebdb',
-          fg: isDark ? '#ff9a52' : '#d9681a',
+          bg: palette.orangeBg,
+          fg: palette.orange,
         };
       case 'boleto':
       case 'tarefa':
         return {
-          bg: isDark ? 'rgba(165, 139, 255, 0.16)' : '#eee8fd',
-          fg: isDark ? '#a58bff' : '#7a4fe0',
+          bg: palette.purpleBg,
+          fg: palette.purple,
         };
       case 'whatsapp':
       default:
         return {
-          bg: isDark ? 'rgba(52, 211, 153, 0.16)' : '#ddf4e8',
-          fg: isDark ? '#34d399' : '#0b9a5f',
+          bg: palette.greenBg,
+          fg: palette.acc,
         };
     }
   };
@@ -46,17 +48,23 @@ export const DemoActionCard: React.FC<DemoActionCardProps> = ({ card }) => {
 
   if (card.isCol) {
     return (
-      <div className="mt-2.5 p-3.5 bg-white dark:bg-[#14171C] border border-[#d2d7d4] dark:border-[#2c3134] rounded-2xl shadow-sm flex flex-col gap-2.5 select-none">
-        <b className="text-[12.5px] text-[#69706d] dark:text-[#98a19d] font-semibold">
+      <div
+        style={{
+          backgroundColor: palette.bg,
+          borderColor: palette.line,
+        }}
+        className="mt-2.5 p-3.5 border rounded-2xl shadow-sm flex flex-col gap-2.5 select-none transition-colors"
+      >
+        <b style={{ color: palette.muted }} className="text-[12.5px] font-semibold">
           {card.title}
         </b>
 
         <div
-          className={`px-3 py-2.5 rounded-2xl text-sm leading-relaxed max-w-[92%] ${
-            card.bubbleTone === 'red'
-              ? 'bg-[#fde6ec] dark:bg-[#3a1620] text-[#17191b] dark:text-[#f1f3f2]'
-              : 'bg-[#ddf4e8] dark:bg-[#12302a] text-[#17191b] dark:text-[#f1f3f2]'
-          }`}
+          style={{
+            backgroundColor: card.bubbleTone === 'red' ? palette.redBg : palette.greenBg,
+            color: palette.ink,
+          }}
+          className="px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed max-w-[92%]"
         >
           {card.bubbleTitle && (
             <div className="font-semibold text-xs mb-0.5">{card.bubbleTitle}</div>
@@ -65,10 +73,16 @@ export const DemoActionCard: React.FC<DemoActionCardProps> = ({ card }) => {
         </div>
 
         <div className="flex items-center gap-2 mt-0.5">
-          <span className="h-8 px-4 rounded-full flex items-center justify-center text-xs font-semibold bg-[#17191b] dark:bg-white text-white dark:text-[#09090B] shadow-sm cursor-pointer hover:opacity-90 transition-opacity">
+          <span
+            style={{ backgroundColor: palette.ink, color: palette.bg }}
+            className="h-8 px-4 rounded-full flex items-center justify-center text-xs font-semibold shadow-sm cursor-pointer hover:opacity-90 transition-opacity"
+          >
             Enviar
           </span>
-          <span className="h-8 px-4 rounded-full flex items-center justify-center text-xs font-semibold border border-[#d2d7d4] dark:border-[#2c3134] text-[#17191b] dark:text-[#f1f3f2] cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
+          <span
+            style={{ borderColor: palette.line, color: palette.ink }}
+            className="h-8 px-4 rounded-full flex items-center justify-center text-xs font-semibold border cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+          >
             Editar
           </span>
         </div>
@@ -77,7 +91,13 @@ export const DemoActionCard: React.FC<DemoActionCardProps> = ({ card }) => {
   }
 
   return (
-    <div className="mt-2.5 p-3.5 bg-white dark:bg-[#14171C] border border-[#d2d7d4] dark:border-[#2c3134] rounded-2xl shadow-sm flex items-center gap-3 select-none">
+    <div
+      style={{
+        backgroundColor: palette.bg,
+        borderColor: palette.line,
+      }}
+      className="mt-2.5 p-3.5 border rounded-2xl shadow-sm flex items-center gap-3 select-none transition-colors"
+    >
       {/* Icon Chip */}
       <div
         style={{ backgroundColor: chipColors.bg, color: chipColors.fg }}
@@ -112,11 +132,11 @@ export const DemoActionCard: React.FC<DemoActionCardProps> = ({ card }) => {
 
       {/* Info Body */}
       <div className="flex-1 min-w-0">
-        <b className="block text-sm font-semibold text-[#17191b] dark:text-[#f1f3f2] truncate">
+        <b style={{ color: palette.ink }} className="block text-sm font-semibold truncate">
           {card.title}
         </b>
         {card.subtitle && (
-          <small className="block text-xs text-[#69706d] dark:text-[#98a19d] mt-0.5 truncate">
+          <small style={{ color: palette.muted }} className="block text-xs mt-0.5 truncate">
             {card.subtitle}
           </small>
         )}
@@ -124,7 +144,7 @@ export const DemoActionCard: React.FC<DemoActionCardProps> = ({ card }) => {
 
       {/* Trailing Elements */}
       {card.trailing === 'check' && (
-        <span className="text-[#0b9a5f] dark:text-[#34d399] shrink-0">
+        <span style={{ color: palette.accent }} className="shrink-0">
           <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="9" />
             <path d="M8 12.5l3 3 5-6" />
@@ -133,18 +153,18 @@ export const DemoActionCard: React.FC<DemoActionCardProps> = ({ card }) => {
       )}
 
       {card.trailing === 'chart' && (
-        <svg className="w-11 h-6 shrink-0" viewBox="0 0 44 22" fill="none" stroke="#d9681a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg className="w-11 h-6 shrink-0" viewBox="0 0 44 22" fill="none" stroke={palette.orange} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M2 4l9 3 8 6 8-2 7 6 8 1" />
         </svg>
       )}
 
       {card.trailing === 'tag' && (
         <span
-          className={`text-[11.5px] font-semibold px-2.5 py-1 rounded-xl shrink-0 ${
-            card.tagTone === 'red'
-              ? 'bg-[#fde6ec] dark:bg-[#3a1620] text-[#d6355a] dark:text-[#ff6b8a]'
-              : 'bg-[#eee8fd] dark:bg-[#241a42] text-[#7a4fe0] dark:text-[#a58bff]'
-          }`}
+          style={{
+            backgroundColor: card.tagTone === 'red' ? palette.redBg : palette.purpleBg,
+            color: card.tagTone === 'red' ? palette.red : palette.purple,
+          }}
+          className="text-[11.5px] font-semibold px-2.5 py-1 rounded-xl shrink-0"
         >
           {card.tagLabel}
         </span>
