@@ -7,7 +7,7 @@ import {
   BackHandler,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { MD3Shapes } from '../theme/tokens';
+import { MD3Shapes, tokens } from '../theme/tokens';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { useTriggers } from '../hooks/useTriggers';
@@ -162,60 +162,42 @@ export const TriggersScreen: React.FC<{
 
   return (
     <View style={[styles.container, { backgroundColor: colors.surface }]}>
-      {/* Segmented Control: Minhas Vigílias vs Explore por Área */}
+      {/* Segmented Control .seg: Minhas vigílias [N] | Explorar por área */}
       <View style={styles.segmentContainer}>
-        <View
-          style={[
-            styles.segmentTrack,
-            {
-              backgroundColor: isDark ? colors.surfaceContainerLow : '#F4F4F5',
-              borderColor: colors.outlineVariant,
-            },
-          ]}
-        >
+        <View style={[styles.segmentTrack, { backgroundColor: colors.surf }]}>
           <TouchableOpacity
             style={[
               styles.segmentTab,
               activeTab === 'my_triggers' && [
                 styles.segmentTabActive,
-                {
-                  backgroundColor: isDark ? colors.surfaceContainerHighest : '#FFFFFF',
-                  borderColor: isDark ? colors.outlineVariant : 'rgba(0,0,0,0.06)',
-                },
+                { backgroundColor: colors.bg },
               ],
             ]}
             onPress={() => setActiveTab('my_triggers')}
             activeOpacity={0.8}
             accessibilityRole="tab"
             accessibilityState={{ selected: activeTab === 'my_triggers' }}
-            accessibilityLabel="Ver Minhas Vigílias"
+            accessibilityLabel="Minhas vigílias"
           >
-            <MaterialIcons
-              name="radar"
-              size={16}
-              color={activeTab === 'my_triggers' ? colors.primary : colors.onSurfaceVariant}
-            />
             <Text
               style={[
                 styles.segmentTabText,
                 {
-                  color: activeTab === 'my_triggers' ? colors.onSurface : colors.onSurfaceVariant,
-                  fontWeight: activeTab === 'my_triggers' ? '700' : '500',
+                  color: activeTab === 'my_triggers' ? colors.ink : colors.muted,
+                  fontFamily: activeTab === 'my_triggers'
+                    ? tokens.typography.family.semibold
+                    : tokens.typography.family.medium,
                 },
               ]}
             >
-              Minhas Vigílias
+              Minhas vigílias
             </Text>
             {allTriggers.length > 0 && (
               <View
                 style={[
                   styles.badge,
                   {
-                    backgroundColor: activeTab === 'my_triggers'
-                      ? colors.primaryContainer
-                      : isDark
-                      ? 'rgba(255,255,255,0.08)'
-                      : 'rgba(0,0,0,0.06)',
+                    backgroundColor: activeTab === 'my_triggers' ? colors.surf : 'rgba(0,0,0,0.06)',
                   },
                 ]}
               >
@@ -223,9 +205,8 @@ export const TriggersScreen: React.FC<{
                   style={[
                     styles.badgeText,
                     {
-                      color: activeTab === 'my_triggers'
-                        ? colors.onPrimaryContainer
-                        : colors.onSurfaceVariant,
+                      color: colors.muted,
+                      fontFamily: tokens.typography.family.semibold,
                     },
                   ]}
                 >
@@ -240,33 +221,27 @@ export const TriggersScreen: React.FC<{
               styles.segmentTab,
               activeTab === 'explore' && [
                 styles.segmentTabActive,
-                {
-                  backgroundColor: isDark ? colors.surfaceContainerHighest : '#FFFFFF',
-                  borderColor: isDark ? colors.outlineVariant : 'rgba(0,0,0,0.06)',
-                },
+                { backgroundColor: colors.bg },
               ],
             ]}
             onPress={() => setActiveTab('explore')}
             activeOpacity={0.8}
             accessibilityRole="tab"
             accessibilityState={{ selected: activeTab === 'explore' }}
-            accessibilityLabel="Explorar catálogo de vigílias proativas por área"
+            accessibilityLabel="Explorar por área"
           >
-            <MaterialIcons
-              name="auto-awesome"
-              size={16}
-              color={activeTab === 'explore' ? colors.primary : colors.onSurfaceVariant}
-            />
             <Text
               style={[
                 styles.segmentTabText,
                 {
-                  color: activeTab === 'explore' ? colors.onSurface : colors.onSurfaceVariant,
-                  fontWeight: activeTab === 'explore' ? '700' : '500',
+                  color: activeTab === 'explore' ? colors.ink : colors.muted,
+                  fontFamily: activeTab === 'explore'
+                    ? tokens.typography.family.semibold
+                    : tokens.typography.family.medium,
                 },
               ]}
             >
-              Explore por Área
+              Explorar por área
             </Text>
           </TouchableOpacity>
         </View>
@@ -338,37 +313,34 @@ const styles = StyleSheet.create({
   },
   segmentTrack: {
     flexDirection: 'row',
-    borderRadius: MD3Shapes.full,
-    padding: 3,
-    borderWidth: 1,
+    borderRadius: 22,
+    padding: 4,
   },
   segmentTab: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 7,
-    borderRadius: MD3Shapes.full,
+    height: 38,
+    borderRadius: 18,
     gap: 6,
   },
   segmentTabActive: {
-    borderWidth: 1,
-    shadowColor: '#000',
+    shadowColor: 'rgba(20,25,22,0.14)',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 2,
-    elevation: 1,
+    shadowOpacity: 1,
+    shadowRadius: 6,
+    elevation: 2,
   },
   segmentTabText: {
-    fontSize: 13,
+    fontSize: 13.5,
   },
   badge: {
-    paddingHorizontal: 6,
+    paddingHorizontal: 7,
     paddingVertical: 1,
-    borderRadius: 10,
+    borderRadius: 9,
   },
   badgeText: {
-    fontSize: 11,
-    fontWeight: '700',
+    fontSize: 11.5,
   },
 });

@@ -4,7 +4,7 @@ import * as Notifications from 'expo-notifications';
 import { dataSync, chatPromptBus, tabNavigationBus } from '../services/dataSync';
 import { navigateToTab } from './navigationRef';
 import { FloatingTabBar } from '../components/common/FloatingTabBar';
-import { Header, HeaderPill } from '../components/common/Header';
+import { Header, HeaderPill, HeaderRoundButton } from '../components/common/Header';
 import { AdaptivePager, AdaptivePagerRef } from '../components/common/AdaptivePager';
 import { ChatScreen, ChatScreenRef } from '../screens/ChatScreen';
 import { TasksScreen } from '../screens/TasksScreen';
@@ -86,6 +86,9 @@ const TasksTabScreen: React.FC = () => {
   const pendingTodos = home.todos.filter((t) => t.status !== 'completed');
   const completedList = home.todos.filter((t) => t.status === 'completed');
   const [createRequestId, setCreateRequestId] = useState(0);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
   const now = Date.now();
   const dayStart = new Date(now);
   dayStart.setHours(0, 0, 0, 0);
@@ -102,11 +105,18 @@ const TasksTabScreen: React.FC = () => {
         activeTab="tasks"
         align="left"
         subtitle={subtitle}
+        showSearchButton={true}
+        searchOpen={searchOpen}
+        onToggleSearch={() => setSearchOpen((prev) => !prev)}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        searchPlaceholder="Pesquisar tarefas..."
         contextualActions={
-          <HeaderPill
-            label="Nova tarefa"
+          <HeaderRoundButton
+            icon="add"
+            variant="primary"
             onPress={() => setCreateRequestId((n) => n + 1)}
-            accessibilityLabel="Criar nova tarefa"
+            accessibilityLabel="Nova tarefa"
           />
         }
       />
@@ -127,6 +137,9 @@ const TasksTabScreen: React.FC = () => {
         onUpdateTodoFull={home.handleUpdateTodo}
         onOpenEventCreate={() => {}}
         createRequestId={createRequestId}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        searchOpen={searchOpen}
       />
     </View>
   );
@@ -151,10 +164,11 @@ const TriggersTabScreen: React.FC<{
         hideTitle={inSubView}
         contextualActions={
           inSubView ? undefined : (
-            <HeaderPill
-              label="Novo"
+            <HeaderRoundButton
+              icon="add"
+              variant="primary"
               onPress={() => setCreateRequestId((n) => n + 1)}
-              accessibilityLabel="Criar novo radar"
+              accessibilityLabel="Novo radar"
             />
           )
         }
@@ -183,10 +197,11 @@ const BookingTabScreen: React.FC<{
         hideTitle={inSubView}
         contextualActions={
           inSubView ? undefined : (
-            <HeaderPill
-              label="Novo Link"
+            <HeaderRoundButton
+              icon="add"
+              variant="primary"
               onPress={() => setCreateRequestId((n) => n + 1)}
-              accessibilityLabel="Criar novo link de agendamento"
+              accessibilityLabel="Novo link"
             />
           )
         }

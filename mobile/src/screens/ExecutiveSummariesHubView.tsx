@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   StyleSheet,
   View,
@@ -10,31 +10,31 @@ import {
   SafeAreaView,
   Share,
   BackHandler,
-} from "react-native";
-import { StatusBar } from "expo-status-bar";
-import { MaterialIcons } from "@expo/vector-icons";
-import { tokens, MD3Shapes } from "../theme/tokens";
-import { useTheme } from "../context/ThemeContext";
-import { hapticFeedback } from "../theme/motion";
-import { api } from "../services/api";
-import { Event, Todo } from "../types";
+} from 'react-native';
+import { StatusBar } from 'expo-status-bar';
+import { MaterialIcons } from '@expo/vector-icons';
+import { tokens } from '../theme/tokens';
+import { useTheme } from '../context/ThemeContext';
+import { hapticFeedback } from '../theme/motion';
+import { api } from '../services/api';
+import { Event, Todo } from '../types';
 import {
   calculateWeeklySummaries,
   WeeklySummaryItem,
-} from "../utils/weeklySummaryCalculator";
-import { isAllDayEvent } from "../utils/calendarDateUtils";
-import { DailySummarySection } from "../components/summaries/DailySummarySection";
-import { WeeklySummarySection } from "../components/summaries/WeeklySummarySection";
-import { MonthlySummarySection } from "../components/summaries/MonthlySummarySection";
-import { WeeklyRaioXModal } from "../components/summaries/WeeklyRaioXModal";
-import { MonthlyRaioXModal } from "../components/summaries/MonthlyRaioXModal";
+} from '../utils/weeklySummaryCalculator';
+import { isAllDayEvent } from '../utils/calendarDateUtils';
+import { DailySummarySection } from '../components/summaries/DailySummarySection';
+import { WeeklySummarySection } from '../components/summaries/WeeklySummarySection';
+import { MonthlySummarySection } from '../components/summaries/MonthlySummarySection';
+import { WeeklyRaioXModal } from '../components/summaries/WeeklyRaioXModal';
+import { MonthlyRaioXModal } from '../components/summaries/MonthlyRaioXModal';
 
 interface ExecutiveSummariesHubViewProps {
   onBack: () => void;
   onOpenChatWithPrompt?: (prompt: string) => void;
 }
 
-type SummaryHorizon = "daily" | "weekly" | "monthly";
+type SummaryHorizon = 'daily' | 'weekly' | 'monthly';
 
 export const ExecutiveSummariesHubView: React.FC<ExecutiveSummariesHubViewProps> = ({
   onBack,
@@ -42,7 +42,7 @@ export const ExecutiveSummariesHubView: React.FC<ExecutiveSummariesHubViewProps>
 }) => {
   const { colors, isDark } = useTheme();
 
-  const [horizon, setHorizon] = useState<SummaryHorizon>("daily");
+  const [horizon, setHorizon] = useState<SummaryHorizon>('daily');
   const [events, setEvents] = useState<Event[]>([]);
   const [todos, setTodos] = useState<Todo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -64,7 +64,7 @@ export const ExecutiveSummariesHubView: React.FC<ExecutiveSummariesHubViewProps>
       return true;
     };
 
-    const subscription = BackHandler.addEventListener("hardwareBackPress", onBackPress);
+    const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
     return () => subscription.remove();
   }, [onBack, selectedWeekModal, showMonthlyModal]);
 
@@ -78,7 +78,7 @@ export const ExecutiveSummariesHubView: React.FC<ExecutiveSummariesHubViewProps>
       setEvents(fetchedEvents || []);
       setTodos(fetchedTodos || []);
     } catch (err) {
-      console.warn("[ExecutiveSummariesHubView] Erro ao carregar dados:", err);
+      console.warn('[ExecutiveSummariesHubView] Erro ao carregar dados:', err);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -99,10 +99,10 @@ export const ExecutiveSummariesHubView: React.FC<ExecutiveSummariesHubViewProps>
   }, [events, todos]);
 
   const todayMetrics = useMemo(() => {
-    const todayStr = new Date().toISOString().split("T")[0];
+    const todayStr = new Date().toISOString().split('T')[0];
     const todayEvents = events.filter((e) => e.start_at.startsWith(todayStr));
     const todayTodos = todos.filter((t) => !t.due_date || t.due_date.startsWith(todayStr));
-    const completedTodos = todayTodos.filter((t) => t.status === "completed");
+    const completedTodos = todayTodos.filter((t) => t.status === 'completed');
 
     let totalMinutes = 0;
     todayEvents.forEach((e) => {
@@ -110,8 +110,8 @@ export const ExecutiveSummariesHubView: React.FC<ExecutiveSummariesHubViewProps>
       const s = new Date(e.start_at).getTime();
       const end = new Date(e.end_at).getTime();
       if (end > s && (end - s) / (1000 * 60 * 60) >= 23) return;
-      const cat = (e.category || "").toLowerCase();
-      if (cat === "holiday" || cat === "feriado") return;
+      const cat = (e.category || '').toLowerCase();
+      if (cat === 'holiday' || cat === 'feriado') return;
       if (end > s) {
         totalMinutes += Math.round((end - s) / (1000 * 60));
       }
@@ -144,7 +144,7 @@ export const ExecutiveSummariesHubView: React.FC<ExecutiveSummariesHubViewProps>
       return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
     });
 
-    const completedCount = monthTodos.filter((t) => t.status === "completed").length;
+    const completedCount = monthTodos.filter((t) => t.status === 'completed').length;
     const taskCompletionRate =
       monthTodos.length > 0 ? Math.round((completedCount / monthTodos.length) * 100) : 100;
 
@@ -157,13 +157,13 @@ export const ExecutiveSummariesHubView: React.FC<ExecutiveSummariesHubViewProps>
       const s = new Date(e.start_at).getTime();
       const end = new Date(e.end_at).getTime();
       if (end > s && (end - s) / (1000 * 60 * 60) >= 23) return;
-      const catCheck = (e.category || "").toLowerCase();
-      if (catCheck === "holiday" || catCheck === "feriado") return;
+      const catCheck = (e.category || '').toLowerCase();
+      if (catCheck === 'holiday' || catCheck === 'feriado') return;
       const dur = end > s ? Math.round((end - s) / (1000 * 60)) : 60;
       totalMonthMinutes += dur;
 
-      const cat = (e.category || "").toLowerCase();
-      if (cat.includes("trab") || cat.includes("work") || cat.includes("reuni")) {
+      const cat = (e.category || '').toLowerCase();
+      if (cat.includes('trab') || cat.includes('work') || cat.includes('reuni')) {
         workMinutes += dur;
       } else {
         personalMinutes += dur;
@@ -193,98 +193,138 @@ export const ExecutiveSummariesHubView: React.FC<ExecutiveSummariesHubViewProps>
     const openTodos = totalTodos - completedTodos;
 
     if (eventsCount === 0 && totalTodos === 0) {
-      return "Sua agenda e lista de tarefas estão totalmente livres hoje. Momento propício para descanso, planejamento estratégico ou adiantar projetos de longo prazo.";
+      return 'Sua agenda e lista de tarefas estão totalmente livres hoje. Momento propício para descanso, planejamento estratégico ou adiantar projetos.';
     }
     if (eventsCount === 0) {
-      const pendentes = openTodos === 1 ? "1 tarefa pendente" : `${openTodos} tarefas pendentes`;
-      return `Dia sem compromissos fixos agendados. Você possui ${pendentes} — oportunidade excelente para blocos de foco contínuo e resolução profunda de prioridades.`;
+      const pendentes = openTodos === 1 ? '1 tarefa pendente' : `${openTodos} tarefas pendentes`;
+      return `Dia sem compromissos fixos agendados. Você possui ${pendentes} — boa hora para avançar nas tarefas.`;
     }
-    if (committed >= 5) {
-      return `Dia de alta intensidade executiva com ${committed}h em compromissos. Recomendo proteger os ${free}h livres para intervalos de recuperação cognitiva e manter o foco nas entregas essenciais.`;
-    }
-    const compromissos = eventsCount === 1 ? "1 compromisso" : `${eventsCount} compromissos`;
-    return `Agenda moderada com ${compromissos} (${committed}h). Você conta com ${free}h de blocos livres para avanço substancial nas suas tarefas do dia.`;
+    const compromissos = eventsCount === 1 ? '1 compromisso' : `${eventsCount} compromissos`;
+    return `Dia com ${compromissos} (${committed}h) e ${free}h livres. Boa hora para avançar nas ${openTodos} tarefas que faltam.`;
   }, [todayMetrics]);
 
   const monthlyDiagnosisText = useMemo(() => {
     const rate = monthlyMetrics.completionRate;
     const work = monthlyMetrics.workRatio;
     if (rate >= 80 && work <= 65) {
-      return "Excelente cadência operacional e equilíbrio preservado. Você mantém alta resolução com espaço saudável para vida pessoal.";
+      return 'Excelente cadência operacional e equilíbrio preservado. Você mantém alta resolução com espaço saudável para vida pessoal.';
     }
     if (work > 70) {
-      return "Foco muito concentrado em trabalho neste ciclo. Recomendo planejar blocos intencionais de recuperação nas próximas semanas.";
+      return 'Foco muito concentrado em trabalho neste ciclo. Recomendo planejar blocos intencionais de recuperação nas próximas semanas.';
     }
-    return "Ciclo com demandas ativas. Mantenha o alinhamento semanal com o Vito para priorizar o que realmente move o ponteiro.";
+    return 'Ciclo com demandas ativas. Mantenha o alinhamento semanal para priorizar o que realmente move o ponteiro.';
   }, [monthlyMetrics]);
 
   const monthlyTips = useMemo(() => {
     return [
       {
-        category: "Tempo",
-        text: "Proteja pelo menos um bloco de foco profundo (90min) sem interrupções por dia.",
+        category: 'Tempo',
+        text: 'Proteja pelo menos um bloco de foco profundo (90min) sem interrupções por dia.',
       },
       {
-        category: "Equilíbrio",
-        text: "Mantenha a proporção entre compromissos de trabalho e bem-estar abaixo de 70/30.",
+        category: 'Equilíbrio',
+        text: 'Mantenha a proporção entre compromissos de trabalho e bem-estar abaixo de 70/30.',
       },
       {
-        category: "Execução",
-        text: "Feche o dia revisando pendências para iniciar a manhã com clareza imediata.",
+        category: 'Execução',
+        text: 'Feche o dia revisando pendências para iniciar a manhã com clareza imediata.',
       },
     ];
   }, []);
 
   const handleShareHorizon = () => {
     hapticFeedback.light();
-    const now = new Date();
-    const monthNames = [
-      "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-      "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
-    ];
-    let shareText = "";
-    if (horizon === "daily") {
-      shareText = `📋 *Resumo Executivo Diário — Vito*\n${now.toLocaleDateString("pt-BR")}\n\n• Horas Comprometidas: ${todayMetrics.committedHours}h\n• Blocos Livres: ${todayMetrics.freeHours}h\n• Compromissos: ${todayMetrics.eventsCount}\n• Tarefas Finalizadas: ${todayMetrics.completedTodos}/${todayMetrics.totalTodos}\n\n_${dailySynthesisText}_`;
-    } else if (horizon === "weekly") {
-      shareText = `📊 *Resumo Executivo Semanal — Vito*\n${weeklySummaries[0]?.period || ""}\n\n• Horas Reais: ${weeklySummaries[0]?.hours || 0}h\n• Compromissos: ${weeklySummaries[0]?.eventsCount || 0}\n• Conclusão: ${((weeklySummaries[0]?.totalTodosCount || 0) > 0 ? Math.round(((weeklySummaries[0]?.completedTodosCount || 0) / (weeklySummaries[0]?.totalTodosCount || 1)) * 100) : 100)}%`;
+    let shareText = '';
+    if (horizon === 'daily') {
+      shareText = `📋 *Resumo Diário — Vito*\n${todayMetrics.freeHours}h livres · ${todayMetrics.committedHours}h em compromissos\n${todayMetrics.eventsCount} compromissos · ${todayMetrics.completedTodos}/${todayMetrics.totalTodos} tarefas\n\n${dailySynthesisText}`;
+    } else if (horizon === 'weekly') {
+      shareText = `📊 *Resumo Semanal — Vito*\n${weeklySummaries[0]?.period || ''}\n${weeklySummaries[0]?.hours || 0}h em compromissos · ${weeklySummaries[0]?.eventsCount || 0} eventos`;
     } else {
-      shareText = `📈 *Resumo Executivo Mensal — Vito*\n${monthNames[now.getMonth()]} de ${now.getFullYear()}\n\n• Total de Horas: ${monthlyMetrics.totalHours}h\n• Taxa de Resolução: ${monthlyMetrics.completionRate}%\n• Trabalho vs Pessoal: ${monthlyMetrics.workRatio}% / ${monthlyMetrics.personalRatio}%`;
+      shareText = `📈 *Resumo Mensal — Vito*\n${monthlyMetrics.totalHours}h em compromissos · ${monthlyMetrics.completionRate}% de eficácia\nTrabalho ${monthlyMetrics.workRatio}% / Pessoal ${monthlyMetrics.personalRatio}%`;
     }
     Share.share({ message: shareText });
   };
 
   const hasFreeWindow = parseFloat(todayMetrics.freeHours) >= 2;
 
-  return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.surface }]}>
-      <StatusBar style={isDark ? "light" : "dark"} />
+  const horizonSubtitles: Record<SummaryHorizon, string> = {
+    daily: 'Visão diária',
+    weekly: 'Ciclos semanais',
+    monthly: 'Visão mensal',
+  };
 
-      <View style={[styles.topBar, { backgroundColor: colors.surface, borderBottomColor: colors.outlineVariant }]}>
+  return (
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.bg }]}>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
+
+      {/* Barra Superior .sbar fiel a vito-telas.html */}
+      <View style={[styles.sbar, { backgroundColor: colors.bg }]}>
         <TouchableOpacity
-          style={styles.backButton}
+          style={[styles.rb, { backgroundColor: colors.bg, borderColor: colors.line }]}
           onPress={() => {
             hapticFeedback.light();
             onBack();
           }}
           activeOpacity={0.7}
+          accessibilityLabel="Voltar"
         >
-          <MaterialIcons name="arrow-back" size={24} color={colors.onSurface} />
+          <MaterialIcons name="arrow-back" size={20} color={colors.ink} />
         </TouchableOpacity>
 
-        <View style={styles.topBarTitleContainer}>
-          <Text style={[styles.topBarTitle, { color: colors.onSurface }]}>Resumos Executivos</Text>
-          <Text style={[styles.topBarSubtitle, { color: colors.onSurfaceVariant }]}>
-            {horizon === "daily" ? "Visão Diária" : horizon === "weekly" ? "Ciclos Semanais" : "Visão Mensal"}
+        <View style={styles.ttl}>
+          <Text style={[styles.h1, { color: colors.ink }]}>Resumos</Text>
+          <Text style={[styles.sub, { color: colors.muted }]}>
+            {horizonSubtitles[horizon]}
           </Text>
         </View>
 
         <TouchableOpacity
-          style={styles.shareBtn}
+          style={[styles.rb, { backgroundColor: colors.bg, borderColor: colors.line }]}
           onPress={handleShareHorizon}
           activeOpacity={0.7}
+          accessibilityLabel="Compartilhar resumo"
         >
-          <MaterialIcons name="share" size={20} color={colors.onSurface} />
+          <MaterialIcons name="share" size={20} color={colors.ink} />
         </TouchableOpacity>
+      </View>
+
+      {/* Segmented Control .seg ("Diário", "Semanal", "Mensal") */}
+      <View style={styles.segWrapper}>
+        <View style={[styles.seg, { backgroundColor: colors.surf }]}>
+          {(['daily', 'weekly', 'monthly'] as SummaryHorizon[]).map((h) => {
+            const isActive = horizon === h;
+            const labels: Record<SummaryHorizon, string> = {
+              daily: 'Diário',
+              weekly: 'Semanal',
+              monthly: 'Mensal',
+            };
+
+            return (
+              <TouchableOpacity
+                key={h}
+                style={[
+                  styles.segBtn,
+                  isActive && [styles.segBtnActive, { backgroundColor: colors.ink }],
+                ]}
+                onPress={() => {
+                  hapticFeedback.selection();
+                  setHorizon(h);
+                }}
+                activeOpacity={0.8}
+              >
+                <Text
+                  style={[
+                    styles.segBtnText,
+                    { color: isActive ? colors.bg : colors.muted },
+                    isActive && styles.segBtnTextActive,
+                  ]}
+                >
+                  {labels[h]}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
       </View>
 
       <ScrollView
@@ -295,89 +335,24 @@ export const ExecutiveSummariesHubView: React.FC<ExecutiveSummariesHubViewProps>
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={colors.primary}
-            colors={[colors.primary]}
+            tintColor={colors.ink}
+            colors={[colors.ink]}
           />
         }
       >
-        <View style={styles.horizonSelectorContainer}>
-          <View
-            style={[
-              styles.horizonPill,
-              {
-                backgroundColor: colors.surfaceContainerLow,
-                borderColor: colors.outlineVariant,
-              },
-            ]}
-          >
-            {(["daily", "weekly", "monthly"] as SummaryHorizon[]).map((h) => {
-              const isActive = horizon === h;
-              const labels: Record<SummaryHorizon, string> = {
-                daily: "Diário",
-                weekly: "Semanal",
-                monthly: "Mensal",
-              };
-              const icons: Record<SummaryHorizon, "wb-sunny" | "bar-chart" | "calendar-month"> = {
-                daily: "wb-sunny",
-                weekly: "bar-chart",
-                monthly: "calendar-month",
-              };
-
-              return (
-                <TouchableOpacity
-                  key={h}
-                  style={[
-                    styles.horizonTab,
-                    isActive && [
-                      styles.horizonTabActive,
-                      { backgroundColor: isDark ? colors.surfaceContainerHighest : colors.primary },
-                    ],
-                  ]}
-                  onPress={() => {
-                    hapticFeedback.selection();
-                    setHorizon(h);
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.horizonTabInner}>
-                    <MaterialIcons
-                      name={icons[h]}
-                      size={14}
-                      color={isActive ? (isDark ? colors.onSurface : colors.onPrimary) : colors.onSurfaceVariant}
-                    />
-                    <Text
-                      style={[
-                        styles.horizonLabel,
-                        {
-                          color: isActive
-                            ? isDark
-                              ? colors.onSurface
-                              : colors.onPrimary
-                            : colors.onSurfaceVariant,
-                          fontWeight: isActive ? "600" : "500",
-                        },
-                      ]}
-                    >
-                      {labels[h]}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-
         {loading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="small" color={colors.primary} />
+            <ActivityIndicator size="small" color={colors.ink} />
           </View>
-        ) : horizon === "daily" ? (
+        ) : horizon === 'daily' ? (
           <DailySummarySection
             metrics={todayMetrics}
             hasFreeWindow={hasFreeWindow}
             synthesisText={dailySynthesisText}
+            onReserveFocus={() => onOpenChatWithPrompt?.('Reserve um bloco de foco de 2h para mim hoje')}
+            onViewTasks={() => onOpenChatWithPrompt?.('Quais são as minhas prioridades de hoje?')}
           />
-        ) : horizon === "weekly" ? (
+        ) : horizon === 'weekly' ? (
           <WeeklySummarySection
             summaries={weeklySummaries}
             onSelectWeek={setSelectedWeekModal}
@@ -387,10 +362,12 @@ export const ExecutiveSummariesHubView: React.FC<ExecutiveSummariesHubViewProps>
             metrics={monthlyMetrics}
             diagnosisText={monthlyDiagnosisText}
             onOpenRaioX={() => setShowMonthlyModal(true)}
+            onAlignWeek={() => onOpenChatWithPrompt?.('Vamos fazer o alinhamento semanal?')}
           />
         )}
       </ScrollView>
 
+      {/* Modais de Raio-X */}
       <WeeklyRaioXModal
         visible={selectedWeekModal !== null}
         selectedWeek={selectedWeekModal}
@@ -414,31 +391,65 @@ export const ExecutiveSummariesHubView: React.FC<ExecutiveSummariesHubViewProps>
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    paddingTop: 0,
   },
-  topBar: {
-    height: 48,
-    flexDirection: "row",
-    alignItems: "center",
+  sbar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
     paddingHorizontal: tokens.spacing.md,
-    borderBottomWidth: 1,
+    paddingVertical: 10,
   },
-  backButton: {
-    padding: tokens.spacing.xs,
-    marginRight: tokens.spacing.sm,
+  rb: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  topBarTitleContainer: {
+  ttl: {
     flex: 1,
   },
-  topBarTitle: {
-    fontSize: 16,
-    fontWeight: "600",
+  h1: {
+    fontSize: 26,
+    fontFamily: tokens.typography.family.montserratBold,
+    fontWeight: '800',
+    letterSpacing: -0.5,
   },
-  topBarSubtitle: {
-    fontSize: 12,
+  sub: {
+    fontSize: 13,
+    marginTop: 1,
   },
-  shareBtn: {
-    padding: tokens.spacing.xs,
+  segWrapper: {
+    paddingHorizontal: tokens.spacing.md,
+    marginBottom: 4,
+  },
+  seg: {
+    flexDirection: 'row',
+    borderRadius: 14,
+    padding: 3,
+  },
+  segBtn: {
+    flex: 1,
+    height: 36,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  segBtnActive: {
+    shadowColor: '#141916',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  segBtnText: {
+    fontSize: 13.5,
+    fontWeight: '500',
+    fontFamily: tokens.typography.family.medium,
+  },
+  segBtnTextActive: {
+    fontWeight: '700',
   },
   container: {
     flex: 1,
@@ -447,39 +458,8 @@ const styles = StyleSheet.create({
     padding: tokens.spacing.md,
     paddingBottom: 120,
   },
-  horizonSelectorContainer: {
-    marginBottom: tokens.spacing.md,
-  },
-  horizonPill: {
-    flexDirection: "row",
-    borderRadius: MD3Shapes.full,
-    borderWidth: 1,
-    padding: 3,
-  },
-  horizonTab: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 7,
-    borderRadius: MD3Shapes.full,
-  },
-  horizonTabActive: {
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  horizonTabInner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  horizonLabel: {
-    fontSize: 12,
-  },
   loadingContainer: {
-    paddingVertical: 40,
-    alignItems: "center",
+    paddingVertical: 60,
+    alignItems: 'center',
   },
 });

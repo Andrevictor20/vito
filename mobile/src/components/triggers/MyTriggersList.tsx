@@ -9,7 +9,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { MD3Shapes } from '../../theme/tokens';
+import { tokens } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { Trigger, TriggerCategory } from '../../types';
 import { TriggerCard } from './TriggerCard';
@@ -37,15 +37,15 @@ export const MyTriggersList: React.FC<MyTriggersListProps> = ({
   onPress,
   onExplorePress,
 }) => {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
   const [showPaused, setShowPaused] = useState(false);
 
   if (loading && !refreshing) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={[styles.loadingText, { color: colors.onSurfaceVariant }]}>
-          Atualizando seus radares...
+        <ActivityIndicator size="large" color={colors.ink} />
+        <Text style={[styles.loadingText, { color: colors.muted }]}>
+          Carregando suas vigílias...
         </Text>
       </View>
     );
@@ -58,6 +58,26 @@ export const MyTriggersList: React.FC<MyTriggersListProps> = ({
       data={activeTriggers}
       keyboardShouldPersistTaps="handled"
       keyExtractor={(item) => item.id}
+      ListHeaderComponent={
+        allCount > 0 ? (
+          <View style={styles.sec}>
+            <Text
+              style={[
+                styles.secTitle,
+                {
+                  color: colors.ink,
+                  fontFamily: tokens.typography.family.montserratBold,
+                },
+              ]}
+            >
+              Ativos
+            </Text>
+            <Text style={[styles.cnt, { color: colors.muted }]}>
+              {activeTriggers.length} de {allCount}
+            </Text>
+          </View>
+        ) : null
+      }
       renderItem={({ item }) => (
         <TriggerCard
           trigger={item}
@@ -72,8 +92,8 @@ export const MyTriggersList: React.FC<MyTriggersListProps> = ({
               style={[
                 styles.pausedSectionToggle,
                 {
-                  backgroundColor: isDark ? colors.surfaceContainerLow : '#F4F4F5',
-                  borderColor: colors.outlineVariant,
+                  backgroundColor: colors.surf,
+                  borderColor: colors.line,
                 },
               ]}
               onPress={() => setShowPaused(!showPaused)}
@@ -85,16 +105,16 @@ export const MyTriggersList: React.FC<MyTriggersListProps> = ({
                 <MaterialIcons
                   name="pause-circle-outline"
                   size={16}
-                  color={colors.onSurfaceVariant}
+                  color={colors.muted}
                 />
-                <Text style={[styles.pausedToggleText, { color: colors.onSurfaceVariant }]}>
+                <Text style={[styles.pausedToggleText, { color: colors.muted }]}>
                   Pausados ({pausedTriggers.length})
                 </Text>
               </View>
               <MaterialIcons
                 name={showPaused ? 'expand-less' : 'expand-more'}
                 size={20}
-                color={colors.onSurfaceVariant}
+                color={colors.muted}
               />
             </TouchableOpacity>
 
@@ -121,7 +141,7 @@ export const MyTriggersList: React.FC<MyTriggersListProps> = ({
         <RefreshControl
           refreshing={refreshing}
           onRefresh={onRefresh}
-          tintColor={colors.primary}
+          tintColor={colors.ink}
         />
       }
       ListEmptyComponent={
@@ -131,38 +151,46 @@ export const MyTriggersList: React.FC<MyTriggersListProps> = ({
               style={[
                 styles.emptyIconCircle,
                 {
-                  backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+                  backgroundColor: colors.surf,
                 },
               ]}
             >
               <MaterialIcons
                 name="radar"
                 size={32}
-                color={isDark ? '#71717A' : '#9CA3AF'}
+                color={colors.muted}
               />
             </View>
-            <Text style={[styles.emptyTitle, { color: colors.onSurface }]}>
+            <Text
+              style={[
+                styles.emptyTitle,
+                {
+                  color: colors.ink,
+                  fontFamily: tokens.typography.family.montserratBold,
+                },
+              ]}
+            >
               {selectedCategory === 'all'
                 ? 'Nenhum radar ativo por enquanto'
                 : 'Nenhum radar nesta categoria'}
             </Text>
-            <Text style={[styles.emptySubtitle, { color: colors.onSurfaceVariant }]}>
-              Digite acima o que você quer acompanhar ou toque em "Explore por Área" para ativar com 1 toque.
+            <Text style={[styles.emptySubtitle, { color: colors.muted }]}>
+              Digite acima o que você quer acompanhar ou explore por área para ativar com 1 toque.
             </Text>
             <TouchableOpacity
-              style={[styles.emptyExploreButton, { backgroundColor: colors.primaryContainer }]}
+              style={[styles.emptyExploreButton, { backgroundColor: colors.ink }]}
               onPress={onExplorePress}
               activeOpacity={0.8}
             >
-              <MaterialIcons name="auto-awesome" size={16} color={colors.onPrimaryContainer} />
-              <Text style={[styles.emptyExploreButtonText, { color: colors.onPrimaryContainer }]}>
-                Ver Sugestões por Área
+              <MaterialIcons name="auto-awesome" size={16} color={colors.bg} />
+              <Text style={[styles.emptyExploreButtonText, { color: colors.bg }]}>
+                Explorar por Área
               </Text>
             </TouchableOpacity>
           </View>
         ) : (
           <View style={styles.noActiveNote}>
-            <Text style={[styles.noActiveNoteText, { color: colors.onSurfaceVariant }]}>
+            <Text style={[styles.noActiveNoteText, { color: colors.muted }]}>
               Nenhum radar ativo no momento. Veja os pausados abaixo.
             </Text>
           </View>
@@ -182,11 +210,30 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 14,
+    fontFamily: tokens.typography.family.regular,
   },
   listContent: {
     paddingHorizontal: 16,
-    paddingTop: 8,
+    paddingTop: 4,
     paddingBottom: 120,
+  },
+  listEmptyContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+  },
+  sec: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 14,
+    marginBottom: 10,
+  },
+  secTitle: {
+    fontSize: 16,
+  },
+  cnt: {
+    fontSize: 12.5,
+    fontFamily: tokens.typography.family.medium,
   },
   pausedSectionWrapper: {
     marginTop: 12,
@@ -198,7 +245,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 14,
     paddingVertical: 10,
-    borderRadius: MD3Shapes.large,
+    borderRadius: 14,
     borderWidth: 1,
   },
   pausedToggleLeft: {
@@ -208,28 +255,16 @@ const styles = StyleSheet.create({
   },
   pausedToggleText: {
     fontSize: 13,
-    fontWeight: '600',
+    fontFamily: tokens.typography.family.medium,
   },
   pausedListWrapper: {
-    marginTop: 8,
-  },
-  noActiveNote: {
-    paddingVertical: 20,
-    alignItems: 'center',
-  },
-  noActiveNoteText: {
-    fontSize: 13,
-    fontStyle: 'italic',
-  },
-  listEmptyContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
+    marginTop: 10,
   },
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 40,
-    gap: 8,
+    paddingVertical: 48,
+    paddingHorizontal: 24,
   },
   emptyIconCircle: {
     width: 64,
@@ -237,30 +272,38 @@ const styles = StyleSheet.create({
     borderRadius: 32,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8,
+    marginBottom: 16,
   },
   emptyTitle: {
     fontSize: 16,
-    fontWeight: '700',
     textAlign: 'center',
+    marginBottom: 8,
   },
   emptySubtitle: {
-    fontSize: 13,
+    fontSize: 13.5,
     textAlign: 'center',
-    lineHeight: 18,
-    maxWidth: 280,
+    lineHeight: 19,
+    fontFamily: tokens.typography.family.regular,
+    marginBottom: 20,
   },
   emptyExploreButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: MD3Shapes.medium,
-    marginTop: 12,
-    gap: 6,
+    gap: 8,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 20,
   },
   emptyExploreButtonText: {
+    fontSize: 13.5,
+    fontFamily: tokens.typography.family.semibold,
+  },
+  noActiveNote: {
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  noActiveNoteText: {
     fontSize: 13,
-    fontWeight: '700',
+    fontFamily: tokens.typography.family.regular,
   },
 });

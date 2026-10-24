@@ -15,7 +15,8 @@ import { tokens } from '../theme/tokens';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { ProfileUserCard } from '../components/profile/ProfileUserCard';
-import { ProfileSettingsGroup } from '../components/profile/ProfileSettingsGroup';
+import { ProfileConnectionsGrid } from '../components/profile/ProfileConnectionsGrid';
+import { ProfileAutonomyCard } from '../components/profile/ProfileAutonomyCard';
 import { CalendarSyncSettingsModal } from '../components/profile/CalendarSyncSettingsModal';
 import { AISettingsModal } from '../components/profile/AISettingsModal';
 import { PhoneEditModal } from '../components/profile/PhoneEditModal';
@@ -23,9 +24,9 @@ import { ContactsSyncModal } from '../components/profile/ContactsSyncModal';
 import { ConnectedDevicesModal } from '../components/profile/ConnectedDevicesModal';
 import { WhatsAppConnectModal } from '../components/profile/WhatsAppConnectModal';
 import { GmailConnectModal } from '../components/profile/GmailConnectModal';
-import { IntegrationsModal } from '../components/profile/IntegrationsModal';
 import { api } from '../services/api';
 import { calendarSyncService } from '../services/calendarSyncService';
+import { hapticFeedback } from '../theme/motion';
 import type { AutonomyMode } from '../types';
 import appJson from '../../app.json';
 
@@ -41,8 +42,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   onDataChanged,
 }) => {
   const { user, logout } = useAuth();
-  const { colors } = useTheme();
-  const [integrationsVisible, setIntegrationsVisible] = useState(false);
+  const { colors, themeMode, setThemeMode } = useTheme();
+
+  // Modais
   const [syncVisible, setSyncVisible] = useState(false);
   const [aiVisible, setAiVisible] = useState(false);
   const [phoneVisible, setPhoneVisible] = useState(false);
@@ -59,26 +61,20 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     if (user?.phone) setUserPhone(user.phone);
   }, [user?.phone]);
 
+  const name = user?.name || 'André Victor';
+  const email = user?.email || 'victorandre280@gmail.com';
+  const appVersion = (appJson as { expo?: { version?: string; android?: { versionCode?: number } } })?.expo?.version ?? '1.0.0';
 
-  const name = user?.name || 'Andre Victor';
-  const email = user?.email || 'andre@vito.ai';
-  const appVersion = (appJson as { expo?: { version?: string; android?: { versionCode?: number } } })?.expo?.version ?? '';
-  const appBuild = (appJson as { expo?: { version?: string; android?: { versionCode?: number } } })?.expo?.android?.versionCode;
-
-  // Statuses vivos das linhas (mesmas fontes dos modais).
-  const [autonomyMode, setAutonomyMode] = useState<AutonomyMode>('assisted');
+  const [autonomyMode, setAutonomyMode] = useState<AutonomyMode>('autonomous');
   const [calendarsActive, setCalendarsActive] = useState<number | null>(null);
   const [sessionsCount, setSessionsCount] = useState<number | null>(null);
-
-  const integrationsActiveCount =
-    (whatsAppStatus === 'connected' ? 1 : 0) + (gmailStatus?.connected ? 1 : 0);
 
   const loadStatuses = useCallback(async () => {
     try {
       const s = await api.getAISettings();
       if (s?.autonomy_mode) setAutonomyMode(s.autonomy_mode);
     } catch {
-      // Mantém default assistido; modal mostra o erro ao abrir.
+      // Mantém default
     }
     try {
       const list = await calendarSyncService.listIntegrations();
@@ -113,6 +109,15 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     loadStatuses();
   }, [loadStatuses]);
 
+  const handleUpdateAutonomy = async (mode: AutonomyMode) => {
+    setAutonomyMode(mode);
+    try {
+      await api.updateAISettings({ autonomy_mode: mode });
+    } catch (e) {
+      console.warn('[Profile] Erro ao atualizar autonomia:', e);
+    }
+  };
+
   const handleCheckUpdate = async () => {
     setChecking(true);
     try {
@@ -146,49 +151,173 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
   return (
     <ScrollView
-      style={[styles.scroll, { backgroundColor: colors.surface }]}
+      style={[styles.scroll, { backgroundColor: colors.bg }]}
       contentContainerStyle={styles.content}
       keyboardShouldPersistTaps="handled"
       refreshControl={
-        onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} /> : undefined
+        onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.ink} /> : undefined
       }
     >
+      {/* Card de Usuário (.pf) */}
       <ProfileUserCard
         name={name}
         email={email}
         phone={userPhone}
         onEditPhone={() => setPhoneVisible(true)}
-        quotaPercentage={18.5}
       />
 
-      <View style={styles.sectionHeader}>
-        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>ASSISTENTE EXECUTIVO & IA</Text>
+      {/* Seção Conexões (.lbl + .cn) */}
+      <Text style={[styles.lbl, { color: colors.muted }]}>CONEXÕES</Text>
+      <ProfileConnectionsGrid
+        onPressCalendar={() => setSyncVisible(true)}
+        onPressGmail={() => setGmailVisible(true)}
+        onPressWhatsApp={() => setWhatsAppVisible(true)}
+        calendarActive={calendarsActive !== null ? calendarsActive > 0 : true}
+        gmailActive={gmailStatus?.connected ?? true}
+        whatsAppActive={whatsAppStatus === 'connected'}
+      />
+
+      {/* Seção Autonomia do Vito (.lbl + .aut) */}
+      <Text style={[styles.lbl, { color: colors.muted }]}>AUTONOMIA DO VITO</Text>
+      <ProfileAutonomyCard
+        mode={autonomyMode}
+        onSelectMode={handleUpdateAutonomy}
+      />
+
+      {/* Seção Preferências (.lbl + .lst) */}
+      <Text style={[styles.lbl, { color: colors.muted }]}>PREFERÊNCIAS</Text>
+      <View style={[styles.lst, { backgroundColor: colors.surf, borderColor: colors.line }]}>
+        {/* Linha Tema com Segmented Control */}
+        <View style={styles.li}>
+          <View style={[styles.liIconBox, { backgroundColor: colors.bg }]}>
+            <MaterialIcons name="wb-sunny" size={18} color={colors.ink} />
+          </View>
+          <Text style={[styles.liTitle, { color: colors.ink }]}>Tema</Text>
+          <View style={[styles.themeSeg, { backgroundColor: colors.bg, borderColor: colors.line }]}>
+            {(['light', 'dark', 'system'] as const).map((mode) => {
+              const active = themeMode === mode;
+              const labels = { light: 'Claro', dark: 'Escuro', system: 'Sistema' };
+              return (
+                <TouchableOpacity
+                  key={mode}
+                  style={[styles.themeBtn, active && [styles.themeBtnActive, { backgroundColor: colors.ink }]]}
+                  onPress={() => {
+                    hapticFeedback.selection();
+                    setThemeMode(mode);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.themeBtnText, { color: active ? colors.bg : colors.ink }]}>
+                    {labels[mode]}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
+        <View style={[styles.divider, { backgroundColor: colors.line }]} />
+
+        {/* Agenda de Contatos */}
+        <TouchableOpacity
+          style={styles.li}
+          onPress={() => setContactsVisible(true)}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.liIconBox, { backgroundColor: colors.bg }]}>
+            <MaterialIcons name="contacts" size={18} color={colors.ink} />
+          </View>
+          <Text style={[styles.liTitle, { color: colors.ink }]}>Agenda de contatos</Text>
+          <MaterialIcons name="chevron-right" size={18} color={colors.muted} />
+        </TouchableOpacity>
+
+        <View style={[styles.divider, { backgroundColor: colors.line }]} />
+
+        {/* Memória do Vito */}
+        <TouchableOpacity
+          style={styles.li}
+          onPress={() => setAiVisible(true)}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.liIconBox, { backgroundColor: colors.bg }]}>
+            <MaterialIcons name="psychology" size={18} color={colors.ink} />
+          </View>
+          <Text style={[styles.liTitle, { color: colors.ink }]}>Memória do Vito</Text>
+          <Text style={[styles.liMeta, { color: colors.muted }]}>Ver e editar</Text>
+          <MaterialIcons name="chevron-right" size={18} color={colors.muted} />
+        </TouchableOpacity>
       </View>
 
-      <ProfileSettingsGroup
-        onOpenCalendarSync={() => setSyncVisible(true)}
-        onOpenAISettings={() => setAiVisible(true)}
-        onOpenContactsSync={() => setContactsVisible(true)}
-        onOpenIntegrations={() => setIntegrationsVisible(true)}
-        autonomyMode={autonomyMode}
-        calendarsActive={calendarsActive}
-        integrationsActiveCount={integrationsActiveCount}
-      />
+      {/* Seção Sistema (.lbl + .lst) */}
+      <Text style={[styles.lbl, { color: colors.muted }]}>SISTEMA</Text>
+      <View style={[styles.lst, { backgroundColor: colors.surf, borderColor: colors.line }]}>
+        <TouchableOpacity
+          style={styles.li}
+          onPress={() => setDevicesVisible(true)}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.liIconBox, { backgroundColor: colors.bg }]}>
+            <MaterialIcons name="devices" size={18} color={colors.ink} />
+          </View>
+          <Text style={[styles.liTitle, { color: colors.ink }]}>Dispositivos conectados</Text>
+          <Text style={[styles.liMeta, { color: colors.muted }]}>
+            {sessionsCount !== null ? `${sessionsCount} ativos` : '2 ativos'}
+          </Text>
+          <MaterialIcons name="chevron-right" size={18} color={colors.muted} />
+        </TouchableOpacity>
 
+        <View style={[styles.divider, { backgroundColor: colors.line }]} />
+
+        <TouchableOpacity
+          style={styles.li}
+          onPress={handleCheckUpdate}
+          disabled={checking}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.liIconBox, { backgroundColor: colors.bg }]}>
+            <MaterialIcons name="refresh" size={18} color={colors.ink} />
+          </View>
+          <Text style={[styles.liTitle, { color: colors.ink }]}>Atualizações</Text>
+          {checking ? (
+            <ActivityIndicator size="small" color={colors.ink} />
+          ) : (
+            <Text style={[styles.liMeta, { color: colors.muted }]}>Atualizado</Text>
+          )}
+          <MaterialIcons name="chevron-right" size={18} color={colors.muted} />
+        </TouchableOpacity>
+      </View>
+
+      {/* Botões de Ação (.out) */}
+      <View style={styles.out}>
+        <TouchableOpacity
+          style={[styles.outBtn, { borderColor: colors.line }]}
+          onPress={logout}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.outBtnText, { color: colors.ink }]}>Trocar de conta</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.outBtn, styles.outBtnDanger, { borderColor: colors.red }]}
+          onPress={logout}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.outBtnText, { color: colors.red }]}>Encerrar sessão</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Versão (.ver) */}
+      <Text style={[styles.ver, { color: colors.muted }]}>
+        Vito · build OTA {appVersion}
+      </Text>
+
+      {/* Modais */}
       <AISettingsModal
         visible={aiVisible}
         onClose={() => setAiVisible(false)}
         onSettingsUpdated={(s) => {
           if (s?.autonomy_mode) setAutonomyMode(s.autonomy_mode);
         }}
-      />
-      <IntegrationsModal
-        visible={integrationsVisible}
-        onClose={() => setIntegrationsVisible(false)}
-        whatsAppStatus={whatsAppStatus}
-        gmailStatus={gmailStatus}
-        onOpenWhatsApp={() => setWhatsAppVisible(true)}
-        onOpenGmail={() => setGmailVisible(true)}
       />
       <CalendarSyncSettingsModal
         visible={syncVisible}
@@ -245,146 +374,107 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           onDataChanged?.();
         }}
       />
-
-      <View style={styles.sectionHeader}>
-        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>SISTEMA & SESSÃO</Text>
-      </View>
-
-      <View style={[styles.groupCard, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
-        <TouchableOpacity
-          style={styles.groupItem}
-          onPress={() => setDevicesVisible(true)}
-          activeOpacity={0.8}
-          accessibilityLabel="Dispositivos conectados"
-          accessibilityRole="button"
-        >
-          <View style={styles.actionLeft}>
-            <View style={[styles.itemIconBox, { backgroundColor: colors.surfaceContainerHigh }]}>
-              <MaterialIcons name="devices" size={18} color={colors.primary} />
-            </View>
-            <Text style={[styles.actionText, { color: colors.onSurface }]}>Dispositivos Conectados</Text>
-          </View>
-          <View style={styles.itemRight}>
-            {sessionsCount !== null && (
-              <Text style={[styles.statusText, { color: colors.onSurfaceVariant }]}>
-                {sessionsCount} {sessionsCount === 1 ? 'ativo' : 'ativos'}
-              </Text>
-            )}
-            <MaterialIcons name="chevron-right" size={20} color={colors.outline} />
-          </View>
-        </TouchableOpacity>
-
-        <View style={[styles.divider, { backgroundColor: colors.outlineVariant }]} />
-
-        <TouchableOpacity
-          style={styles.groupItem}
-          onPress={handleCheckUpdate}
-          activeOpacity={0.8}
-          disabled={checking}
-          accessibilityLabel="Buscar atualizações"
-          accessibilityRole="button"
-        >
-          <View style={styles.actionLeft}>
-            <View style={[styles.itemIconBox, { backgroundColor: colors.surfaceContainerHigh }]}>
-              <MaterialIcons name="refresh" size={18} color={colors.primary} />
-            </View>
-            <Text style={[styles.actionText, { color: colors.onSurface }]}>Buscar Atualizações</Text>
-          </View>
-          <View style={styles.itemRight}>
-            {checking ? (
-              <ActivityIndicator size="small" color={colors.primary} />
-            ) : (
-              <>
-                <Text style={[styles.statusText, { color: colors.onSurfaceVariant }]}>Atualizado</Text>
-                <MaterialIcons name="chevron-right" size={20} color={colors.outline} />
-              </>
-            )}
-          </View>
-        </TouchableOpacity>
-
-        <View style={[styles.divider, { backgroundColor: colors.outlineVariant }]} />
-
-        <TouchableOpacity
-          style={styles.groupItem}
-          onPress={logout}
-          activeOpacity={0.8}
-          accessibilityLabel="Trocar de conta"
-          accessibilityRole="button"
-        >
-          <View style={styles.actionLeft}>
-            <View style={[styles.itemIconBox, { backgroundColor: colors.surfaceContainerHigh }]}>
-              <MaterialIcons name="switch-account" size={18} color={colors.primary} />
-            </View>
-            <Text style={[styles.actionText, { color: colors.onSurface }]}>Trocar de Conta</Text>
-          </View>
-          <MaterialIcons name="chevron-right" size={20} color={colors.outline} />
-        </TouchableOpacity>
-
-        <View style={[styles.divider, { backgroundColor: colors.outlineVariant }]} />
-
-        <TouchableOpacity
-          style={styles.groupItem}
-          onPress={logout}
-          activeOpacity={0.8}
-          accessibilityLabel="Encerrar sessão"
-          accessibilityRole="button"
-        >
-          <View style={styles.actionLeft}>
-            <View style={[styles.itemIconBox, { backgroundColor: colors.surfaceContainerHigh }]}>
-              <MaterialIcons name="logout" size={18} color={colors.danger} />
-            </View>
-            <Text style={[styles.actionText, styles.logoutText]}>Encerrar Sessão</Text>
-          </View>
-          <MaterialIcons name="chevron-right" size={20} color={colors.danger} />
-        </TouchableOpacity>
-      </View>
     </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
   scroll: { flex: 1 },
-  content: { padding: tokens.spacing.md, paddingBottom: 110 },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: tokens.spacing.md,
-    marginBottom: tokens.spacing.xs,
-    paddingHorizontal: 2,
-  },
-  sectionTitle: {
-    fontSize: 11,
+  content: { padding: tokens.spacing.md, paddingBottom: 120 },
+  lbl: {
+    fontFamily: tokens.typography.family.semibold,
+    fontSize: 12,
     fontWeight: '600',
     letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    marginTop: 22,
+    marginBottom: 8,
+    marginHorizontal: 2,
   },
-  groupCard: {
-    borderRadius: 20,
+  lst: {
+    borderRadius: 18,
     borderWidth: 1,
     overflow: 'hidden',
+    marginBottom: 8,
   },
-  groupItem: {
+  li: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: tokens.spacing.md,
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    minHeight: 56,
   },
-  divider: {
-    height: 1,
-    marginHorizontal: tokens.spacing.md,
-  },
-  itemIconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+  liIconBox: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  actionLeft: { flexDirection: 'row', alignItems: 'center', gap: tokens.spacing.sm, flex: 1 },
-  itemTextCol: { flex: 1 },
-  itemSub: { fontSize: 12, marginTop: 1 },
-  itemRight: { flexDirection: 'row', alignItems: 'center', gap: 2, flexShrink: 0, marginLeft: 8 },
-  statusText: { fontSize: 13, fontWeight: '600' },
-  actionText: { fontSize: 15, fontWeight: '700', letterSpacing: -0.1 },
-  logoutText: { color: '#EF4444' },
+  liTitle: {
+    flex: 1,
+    fontSize: 14.5,
+    fontWeight: '500',
+    fontFamily: tokens.typography.family.medium,
+  },
+  liMeta: {
+    fontSize: 13,
+    marginRight: 2,
+  },
+  divider: {
+    height: 1,
+    marginLeft: 60,
+  },
+  themeSeg: {
+    flexDirection: 'row',
+    borderRadius: 10,
+    borderWidth: 1,
+    padding: 2,
+    width: 190,
+  },
+  themeBtn: {
+    flex: 1,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+  },
+  themeBtnActive: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  themeBtnText: {
+    fontSize: 11.5,
+    fontWeight: '600',
+  },
+  out: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 22,
+  },
+  outBtn: {
+    flex: 1,
+    height: 46,
+    borderRadius: 23,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  outBtnDanger: {
+    backgroundColor: 'transparent',
+  },
+  outBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    fontFamily: tokens.typography.family.medium,
+  },
+  ver: {
+    textAlign: 'center',
+    fontSize: 12,
+    marginTop: 16,
+  },
 });

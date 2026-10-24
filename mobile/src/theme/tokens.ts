@@ -1,7 +1,7 @@
 import { TextStyle } from 'react-native';
 
 // Google Material Design 3 (M3 / Material You) Design Tokens
-// Paleta tonal calibrada para Dark Theme Executivo (WCAG AA)
+// Paleta tonal calibrada para Dark Theme Executivo e Light Theme Vito (vito-telas.html)
 
 export const MD3Shapes = {
   none: 0,
@@ -70,173 +70,212 @@ export const harmonicAccentsDark = {
 
 export const lightColors = {
   accents: harmonicAccentsLight,
+  // Tokens exatos de vito-telas.html (Light)
+  page: '#dde1df',
+  bg: '#ffffff',
+  surf: '#f2f4f3',
+  ink: '#17191b',
+  muted: '#69706d',
+  line: '#d2d7d4',
+  blue: '#2b7fd4',
+  blueBg: '#e4effb',
+  red: '#d6355a',
+  redBg: '#fde6ec',
+  purple: '#7a4fe0',
+  purpleBg: '#eee8fd',
+  acc: '#0b9a5f',
+  greenBg: '#ddf4e8',
+  orange: '#d9681a',
+  orangeBg: '#fbebdb',
+  teal: '#0e8f9b',
+  tealBg: '#dff3f5',
+
   // M3 Primary
-  primary: '#18181B', // Zinc 900
-  onPrimary: '#FFFFFF',
-  primaryContainer: '#E4E4E7', // Zinc 200
-  onPrimaryContainer: '#09090B',
-  primaryHover: '#27272A',
-  primaryLight: 'rgba(24, 24, 27, 0.08)',
-  cobalt: '#18181B',
-  cobaltGlow: 'rgba(24, 24, 27, 0.12)',
+  primary: '#17191b', // ink
+  onPrimary: '#ffffff', // bg
+  primaryContainer: '#f2f4f3', // surf
+  onPrimaryContainer: '#17191b',
+  primaryHover: '#27272a',
+  primaryLight: 'rgba(23, 25, 27, 0.08)',
+  cobalt: '#17191b',
+  cobaltGlow: 'rgba(23, 25, 27, 0.12)',
 
   // M3 Secondary
-  secondary: '#52525B', // Zinc 600
-  onSecondary: '#FFFFFF',
-  secondaryContainer: '#F4F4F5', // Zinc 100
-  onSecondaryContainer: '#18181B',
+  secondary: '#69706d', // muted
+  onSecondary: '#ffffff',
+  secondaryContainer: '#f2f4f3',
+  onSecondaryContainer: '#17191b',
 
   // M3 Tertiary
-  tertiary: '#27272A',
-  onTertiary: '#FFFFFF',
-  tertiaryContainer: '#E4E4E7',
-  onTertiaryContainer: '#09090B',
+  tertiary: '#2b7fd4', // blue
+  onTertiary: '#ffffff',
+  tertiaryContainer: '#e4effb', // blueBg
+  onTertiaryContainer: '#17191b',
 
   // M3 Surface
-  surface: '#FFFFFF',
-  onSurface: '#09090B',
-  surfaceVariant: '#F4F4F5',
-  onSurfaceVariant: '#52525B',
+  surface: '#ffffff', // bg
+  onSurface: '#17191b', // ink
+  surfaceVariant: '#f2f4f3', // surf
+  onSurfaceVariant: '#69706d', // muted
 
-  // M3 Surface Containers — light: canvas #F8F9FA, card #FFFFFF
-  surfaceContainerLowest: '#FFFFFF',
-  surfaceContainerLow: '#FFFFFF',
-  surfaceContainer: '#F4F4F5',
-  surfaceContainerHigh: '#F4F4F5',
-  surfaceContainerHighest: '#E4E4E7',
-  surfaceDim: '#F8F9FA',
-  surfaceBright: '#FFFFFF',
-  surfaceSubtle: '#F8F9FA',
-  surfaceElevated: '#FFFFFF',
+  // M3 Surface Containers
+  surfaceContainerLowest: '#ffffff',
+  surfaceContainerLow: '#ffffff',
+  surfaceContainer: '#f2f4f3',
+  surfaceContainerHigh: '#f2f4f3',
+  surfaceContainerHighest: '#d2d7d4',
+  surfaceDim: '#dde1df',
+  surfaceBright: '#ffffff',
+  surfaceSubtle: '#f2f4f3',
+  surfaceElevated: '#ffffff',
   surfaceGlass: 'rgba(255, 255, 255, 0.85)',
   glassBorder: 'rgba(0, 0, 0, 0.06)',
 
-  // M3 Outlines & Borders — card borda #EAECEF
-  outline: '#71717A',
-  outlineVariant: '#EAECEF',
+  // M3 Outlines & Borders
+  outline: '#69706d',
+  outlineVariant: '#d2d7d4', // line
 
   // M3 Error
-  error: '#EF4444',
-  onError: '#FFFFFF',
-  errorContainer: '#FEE2E2',
-  onErrorContainer: '#7F1D1D',
-  danger: '#EF4444',
-  dangerContainer: '#FEE2E2',
-  dangerLight: 'rgba(239, 68, 68, 0.12)',
+  error: '#d6355a', // red
+  onError: '#ffffff',
+  errorContainer: '#fde6ec', // redBg
+  onErrorContainer: '#d6355a',
+  danger: '#d6355a',
+  dangerContainer: '#fde6ec',
+  dangerLight: 'rgba(214, 53, 90, 0.12)',
 
-  // Custom Premium Utilities
-  bg: '#F8F9FA', // canvas claro
-  canvas: '#F8F9FA',
-  success: '#10B981',
-  onSuccess: '#FFFFFF',
-  successContainer: '#D1FAE5',
-  onSuccessContainer: '#064E3B',
-  successLight: 'rgba(16, 185, 129, 0.12)',
-  warning: '#F59E0B',
-  warningLight: 'rgba(245, 158, 11, 0.12)',
-  statusOnline: '#10B981',
-  
+  // Custom Utilities
+  canvas: '#dde1df',
+  success: '#0b9a5f', // acc
+  onSuccess: '#ffffff',
+  successContainer: '#ddf4e8', // greenBg
+  onSuccessContainer: '#0b9a5f',
+  successLight: 'rgba(11, 154, 95, 0.12)',
+  warning: '#d9681a', // orange
+  warningLight: 'rgba(217, 104, 26, 0.12)',
+  statusOnline: '#0b9a5f',
+
   // Custom Background categories
-  categoryBirthdayBg: '#FEF3C7',
-  categoryBirthdayText: '#92400E',
-  categoryPartyBg: '#E0E7FF',
-  categoryPartyText: '#3730A3',
-  categoryBbqBg: '#FEE2E2',
-  categoryBbqText: '#991B1B',
-  
-  // Backward compatibility (to be removed gradually)
-  textPrimary: '#09090B',
-  textSecondary: '#52525B',
-  textMuted: '#A1A1AA',
-  surfaceBorder: '#EAECEF',
-  structuralBorder: '#EAECEF',
-  accent: '#18181B',
-  accentLight: 'rgba(24, 24, 27, 0.08)',
+  categoryBirthdayBg: '#fbebdb',
+  categoryBirthdayText: '#d9681a',
+  categoryPartyBg: '#eee8fd',
+  categoryPartyText: '#7a4fe0',
+  categoryBbqBg: '#fde6ec',
+  categoryBbqText: '#d6355a',
+
+  // Backward compatibility
+  textPrimary: '#17191b',
+  textSecondary: '#69706d',
+  textMuted: '#69706d',
+  surfaceBorder: '#d2d7d4',
+  structuralBorder: '#d2d7d4',
+  accent: '#17191b',
+  accentLight: 'rgba(23, 25, 27, 0.08)',
 };
 
 export const darkColors = {
   accents: harmonicAccentsDark,
+  // Tokens exatos de vito-telas.html (Dark)
+  page: '#050606',
+  bg: '#0d0f10',
+  surf: '#191c1e',
+  ink: '#f1f3f2',
+  muted: '#98a19d',
+  line: '#2c3134',
+  blue: '#5aa2ee',
+  blueBg: '#16283b',
+  red: '#ff6b8a',
+  redBg: '#3a1620',
+  purple: '#a58bff',
+  purpleBg: '#241a42',
+  acc: '#34d399',
+  greenBg: '#12302a',
+  orange: '#ff9a52',
+  orangeBg: '#35230f',
+  teal: '#3cc4d0',
+  tealBg: '#10343a',
+
   // M3 Primary
-  primary: '#FFFFFF',
-  onPrimary: '#09090B',
-  primaryContainer: '#27272A',
-  onPrimaryContainer: '#FAFAFA',
-  primaryHover: '#E4E4E7',
-  primaryLight: 'rgba(255, 255, 255, 0.08)',
-  cobalt: '#FFFFFF',
-  cobaltGlow: 'rgba(255, 255, 255, 0.12)',
+  primary: '#f1f3f2', // ink
+  onPrimary: '#0d0f10', // bg
+  primaryContainer: '#191c1e', // surf
+  onPrimaryContainer: '#f1f3f2',
+  primaryHover: '#e4e4e7',
+  primaryLight: 'rgba(241, 243, 242, 0.08)',
+  cobalt: '#f1f3f2',
+  cobaltGlow: 'rgba(241, 243, 242, 0.12)',
 
   // M3 Secondary
-  secondary: '#A1A1AA',
-  onSecondary: '#09090B',
-  secondaryContainer: '#27272A',
-  onSecondaryContainer: '#FAFAFA',
+  secondary: '#98a19d', // muted
+  onSecondary: '#0d0f10',
+  secondaryContainer: '#191c1e',
+  onSecondaryContainer: '#f1f3f2',
 
   // M3 Tertiary
-  tertiary: '#E4E4E7',
-  onTertiary: '#09090B',
-  tertiaryContainer: '#27272A',
-  onTertiaryContainer: '#FAFAFA',
+  tertiary: '#5aa2ee', // blue
+  onTertiary: '#0d0f10',
+  tertiaryContainer: '#16283b', // blueBg
+  onTertiaryContainer: '#f1f3f2',
 
-  // M3 Surface — dark OLED: fundo #0B0D10, surface #14171C, elevated #1C2026
-  surface: '#14171C',
-  onSurface: '#FAFAFA',
-  surfaceVariant: '#14171C', // Zinc 900
-  onSurfaceVariant: '#A1A1AA',
+  // M3 Surface
+  surface: '#0d0f10', // bg
+  onSurface: '#f1f3f2', // ink
+  surfaceVariant: '#191c1e', // surf
+  onSurfaceVariant: '#98a19d', // muted
 
-  // M3 Surface Containers — OLED
-  surfaceContainerLowest: '#0B0D10',
-  surfaceContainerLow: '#14171C',
-  surfaceContainer: '#14171C',
-  surfaceContainerHigh: '#1C2026',
-  surfaceContainerHighest: '#1C2026',
-  surfaceDim: '#0B0D10',
-  surfaceBright: '#1C2026',
-  surfaceSubtle: '#14171C',
-  surfaceElevated: '#1C2026',
-
-  surfaceGlass: 'rgba(24, 24, 27, 0.85)',
+  // M3 Surface Containers
+  surfaceContainerLowest: '#050606',
+  surfaceContainerLow: '#0d0f10',
+  surfaceContainer: '#191c1e',
+  surfaceContainerHigh: '#191c1e',
+  surfaceContainerHighest: '#2c3134',
+  surfaceDim: '#050606',
+  surfaceBright: '#191c1e',
+  surfaceSubtle: '#0d0f10',
+  surfaceElevated: '#191c1e',
+  surfaceGlass: 'rgba(13, 15, 16, 0.85)',
   glassBorder: 'rgba(255, 255, 255, 0.08)',
 
-  // M3 Outlines & Borders — dark borda #262B33
-  outline: '#71717A',
-  outlineVariant: '#262B33',
+  // M3 Outlines & Borders
+  outline: '#98a19d',
+  outlineVariant: '#2c3134', // line
 
   // M3 Error
-  error: '#F87171',
-  onError: '#450A0A',
-  errorContainer: '#7F1D1D',
-  onErrorContainer: '#FEE2E2',
-  danger: '#F87171',
-  dangerContainer: '#7F1D1D',
-  dangerLight: 'rgba(248, 113, 113, 0.16)',
+  error: '#ff6b8a', // red
+  onError: '#3a1620',
+  errorContainer: '#3a1620',
+  onErrorContainer: '#ff6b8a',
+  danger: '#ff6b8a',
+  dangerContainer: '#3a1620',
+  dangerLight: 'rgba(255, 107, 138, 0.16)',
 
-  // Custom Premium Utilities
-  bg: '#0B0D10',
-  canvas: '#0B0D10',
-  success: '#34D399',
-  onSuccess: '#064E3B',
-  successContainer: '#065F46',
-  onSuccessContainer: '#A7F3D0',
+  // Custom Utilities
+  canvas: '#050606',
+  success: '#34d399', // acc
+  onSuccess: '#12302a',
+  successContainer: '#12302a',
+  onSuccessContainer: '#34d399',
   successLight: 'rgba(52, 211, 153, 0.16)',
-  warning: '#FBBF24',
-  warningLight: 'rgba(251, 191, 36, 0.16)',
-  statusOnline: '#34D399',
+  warning: '#ff9a52', // orange
+  warningLight: 'rgba(255, 154, 82, 0.16)',
+  statusOnline: '#34d399',
 
-  categoryBirthdayBg: '#451A03',
-  categoryBirthdayText: '#FDE68A',
-  categoryPartyBg: '#1E1B4B',
-  categoryPartyText: '#C7D2FE',
-  categoryBbqBg: '#450A0A',
-  categoryBbqText: '#FECACA',
+  // Custom Background categories
+  categoryBirthdayBg: '#35230f',
+  categoryBirthdayText: '#ff9a52',
+  categoryPartyBg: '#241a42',
+  categoryPartyText: '#a58bff',
+  categoryBbqBg: '#3a1620',
+  categoryBbqText: '#ff6b8a',
 
-  textPrimary: '#FAFAFA',
-  textSecondary: '#A1A1AA',
-  textMuted: '#52525B',
-  surfaceBorder: '#262B33',
-  structuralBorder: '#262B33',
-  accent: '#FAFAFA',
-  accentLight: 'rgba(250, 250, 250, 0.12)',
+  // Backward compatibility
+  textPrimary: '#f1f3f2',
+  textSecondary: '#98a19d',
+  textMuted: '#98a19d',
+  surfaceBorder: '#2c3134',
+  structuralBorder: '#2c3134',
+  accent: '#f1f3f2',
+  accentLight: 'rgba(241, 243, 242, 0.12)',
 };
 
 export type ThemeColors = typeof lightColors;
@@ -252,6 +291,10 @@ export const tokens = {
       medium: 'Inter_500Medium',
       semibold: 'Inter_600SemiBold',
       bold: 'Inter_700Bold',
+      montserratBold: 'Montserrat_800ExtraBold',
+      montserratSemiBold: 'Montserrat_600SemiBold',
+      interBold: 'Inter_700Bold',
+      interExtraBold: 'Inter_800ExtraBold',
     },
     size: {
       displayLarge: 57,
@@ -269,7 +312,6 @@ export const tokens = {
       labelLarge: 14,
       labelMedium: 12,
       labelSmall: 11,
-      // Chaves retrocompatíveis
       xs: 11,
       sm: 13,
       md: 15,
@@ -294,7 +336,6 @@ export const tokens = {
       labelLarge: 20,
       labelMedium: 16,
       labelSmall: 16,
-      // Chaves retrocompatíveis
       xs: 14,
       sm: 18,
       md: 22,
@@ -337,7 +378,6 @@ export const tokens = {
     lg: 20,
     xl: MD3Shapes.extraLarge,
     full: MD3Shapes.full,
-    // Aliases explícitos M3
     extraSmall: MD3Shapes.extraSmall,
     small: MD3Shapes.small,
     medium: MD3Shapes.medium,
@@ -398,7 +438,6 @@ export const tokens = {
       shadowRadius: 14,
       elevation: 12,
     },
-    // Chaves retrocompatíveis
     subtle: {
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 2 },
@@ -447,8 +486,4 @@ export const tabularNumbers: TextStyle = {
   fontVariant: ['tabular-nums'],
 };
 
-/**
- * Distância de segurança para conteúdo rolável em relação à barra de navegação flutuante inferior.
- * Conforme recomendado na auditoria de UI/UX (Seção 10.3).
- */
 export const BOTTOM_NAV_CLEARANCE = 100;

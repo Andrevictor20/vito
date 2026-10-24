@@ -1,11 +1,25 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, TextInput, TouchableOpacity } from 'react-native';
+import {
+  StyleSheet,
+  View,
+  Text,
+  TouchableOpacity,
+  LayoutAnimation,
+  Platform,
+  UIManager,
+} from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { hapticFeedback } from '../../theme/motion';
 import type { PendingItem, Subtask } from '../../types';
 import type { UnifiedRow } from '../../utils/unifiedTasks';
+import { formatRelativeTaskDate, getTaskDiffDays } from '../../utils/taskBuckets';
+import { TaskSubtasksInline } from './TaskSubtasksInline';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 export const isoDay = (offset: number) => {
   const d = new Date();
@@ -16,9 +30,7 @@ export const isoDay = (offset: number) => {
 export const formatRowDate = (row: UnifiedRow): string | null => {
   const src = row.sourceTodo?.due_date || row.sourcePending?.scheduled_date;
   if (!src) return null;
-  const d = new Date(src.length === 10 ? `${src}T12:00:00` : src);
-  if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+  return formatRelativeTaskDate(src);
 };
 
 interface TaskRowProps {
@@ -28,7 +40,7 @@ interface TaskRowProps {
   onEdit?: () => void;
   onSchedule?: (dateStr: string) => void;
   onReminder?: () => void;
-  /** Última linha do grupo: sem divisor inferior. */
+  isFirst?: boolean;
   isLast?: boolean;
   subtasks?: Subtask[];
   onToggleSubtask?: (subtaskId: string) => void;
@@ -36,11 +48,14 @@ interface TaskRowProps {
   onDeleteSubtask?: (subtaskId: string) => void;
 }
 
-const PRIORITY_LABEL: Record<string, string> = { high: 'ALTA', medium: 'MÉDIA', low: 'BAIXA' };
-
-/** Linha única p/ tarefa e pendência: mesmo checkbox, título, meta e ações. */
-const PRIORITY_DOT: Record<string, 'error' | 'warning' | 'muted'> = { high: 'error', medium: 'warning', low: 'muted' };
-
+/**
+ * Linha de tarefa (.task) fiel a vito-telas.html.
+ * - Checkbox circular .chk (26x26px) que preenche de roxo (colors.purple)
+ * - Título em 15.5px semibold (Inter_600SemiBold)
+ * - Pill de prazo relativo (vermelho se atrasada)
+ * - Mini barra de progresso para subtarefas (.prog: 34x4px)
+ * - Ícone de sino de lembrete em pill
+ */
 export const TaskRow: React.FC<TaskRowProps> = ({
   row,
   onToggle,
@@ -48,7 +63,7 @@ export const TaskRow: React.FC<TaskRowProps> = ({
   onEdit,
   onSchedule,
   onReminder,
-  isLast = false,
+  isFirst = false,
   subtasks,
   onToggleSubtask,
   onAddSubtask,
@@ -56,160 +71,201 @@ export const TaskRow: React.FC<TaskRowProps> = ({
 }) => {
   const { colors } = useTheme();
   const [expanded, setExpanded] = useState(false);
-  const [draft, setDraft] = useState('');
   const isTodo = row.kind === 'todo';
   const todo = row.sourceTodo;
   const pending: PendingItem | undefined = row.sourcePending;
-  const dateLabel = formatRowDate(row);
+
+  const dateRaw = todo?.due_date || pending?.scheduled_date;
+  const relDate = formatRelativeTaskDate(dateRaw);
+  const diffDays = getTaskDiffDays(dateRaw);
+  const isOverdue = diffDays !== null && diffDays < 0;
+
   const showSchedule = !isTodo && !row.done && pending?.status !== 'scheduled' && onSchedule;
   const hasReminder = !!pending?.remind_at || !!todo?.remind_at;
 
-  const submitSubtask = () => {
-    if (!draft.trim() || !onAddSubtask) return;
-    onAddSubtask(draft.trim());
-    setDraft('');
+  const totalSubs = subtasks?.length || 0;
+  const doneSubs = subtasks?.filter((s) => s.completed).length || 0;
+  const subPercent = totalSubs > 0 ? (doneSubs / totalSubs) * 100 : 0;
+
+  const toggleSubtasks = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setExpanded((prev) => !prev);
   };
 
-  const dotKind = PRIORITY_DOT[todo?.priority || 'medium'] || 'muted';
-  const dotColor = dotKind === 'error' ? colors.error : dotKind === 'warning' ? colors.warning : colors.onSurfaceVariant;
-
   return (
-    <View style={[styles.row, !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.outlineVariant }]}>
+    <View
+      style={[
+        styles.row,
+        !isFirst && { borderTopWidth: 1, borderTopColor: colors.line },
+      ]}
+    >
+      {/* Checkbox circular .chk 26x26px */}
       <TouchableOpacity
         style={[
-          styles.checkCircle,
-          { borderColor: row.done ? colors.primary : colors.outline },
-          row.done && { backgroundColor: colors.primary, borderColor: colors.primary },
+          styles.chk,
+          {
+            borderColor: row.done ? colors.purple : colors.muted,
+            backgroundColor: row.done ? colors.purple : 'transparent',
+          },
         ]}
         onPress={() => {
           hapticFeedback.selection();
           onToggle();
         }}
         activeOpacity={0.7}
+        hitSlop={tokens.hitSlop.sm}
         accessibilityRole="checkbox"
         accessibilityState={{ checked: row.done }}
-        accessibilityLabel={row.done ? 'Reabrir (desfazer conclusão)' : 'Concluir'}
+        accessibilityLabel={row.done ? 'Reabrir tarefa' : 'Concluir tarefa'}
       >
-        {row.done && <MaterialIcons name="check" size={16} color={colors.onPrimary} />}
+        {row.done && <MaterialIcons name="check" size={14} color="#ffffff" />}
       </TouchableOpacity>
 
+      {/* Conteúdo da tarefa */}
       <View style={styles.body}>
-        <Text style={[styles.title, { color: colors.onSurface }, row.done && styles.struck]} numberOfLines={3}>
-          {row.title}
-        </Text>
+        <TouchableOpacity
+          onPress={onEdit}
+          activeOpacity={0.75}
+          accessibilityRole="button"
+          accessibilityLabel={`Editar tarefa: ${row.title}`}
+        >
+          <Text
+            style={[
+              styles.title,
+              {
+                color: colors.ink,
+                fontFamily: tokens.typography.family.semibold,
+              },
+              row.done && styles.struck,
+            ]}
+            numberOfLines={3}
+          >
+            {row.title}
+          </Text>
+        </TouchableOpacity>
 
-        <View style={styles.meta}>
-          {isTodo && todo ? (
-            <View style={[styles.badge, { backgroundColor: colors.secondaryContainer }]}>
-              <View style={[styles.dot, { backgroundColor: dotColor }]} />
-              <Text style={[styles.badgeText, { color: colors.onSecondaryContainer }]}>
-                {PRIORITY_LABEL[todo.priority] || 'MÉDIA'}
-              </Text>
-            </View>
-          ) : (
-            <View style={[styles.badge, { backgroundColor: colors.tertiaryContainer }]}>
-              <Text style={[styles.badgeText, { color: colors.onTertiaryContainer }]}>Pendência</Text>
-            </View>
-          )}
-          {dateLabel ? (
-            <Text style={[styles.dateText, { color: row.overdue ? colors.error : colors.onSurfaceVariant }]}>
-              {row.overdue ? `Atrasada · ${dateLabel}` : dateLabel}
-            </Text>
-          ) : (
-            <Text style={[styles.dateText, { color: colors.onSurfaceVariant }]}>Sem data</Text>
-          )}
-          {hasReminder && !row.done && (
-            <MaterialIcons name="notifications-active" size={14} color={colors.primary} />
-          )}
-          {isTodo && ((subtasks?.length || 0) > 0 || onAddSubtask) ? (
-            <TouchableOpacity
-              onPress={() => setExpanded(!expanded)}
-              hitSlop={tokens.hitSlop.sm}
-              activeOpacity={0.7}
-              accessibilityLabel={expanded ? 'Ocultar subtarefas' : 'Ver subtarefas'}
-            >
-              <Text style={[styles.subCount, { color: colors.primary }]}>
-                {(subtasks?.length || 0) > 0
-                  ? `${subtasks?.filter((s) => s.completed).length || 0}/${subtasks?.length || 0}`
-                  : '+ subtarefas'}
-              </Text>
-            </TouchableOpacity>
-          ) : null}
-        </View>
-
-        {showSchedule && (
-          <View style={styles.quickSchedule}>
-            <TouchableOpacity
-              style={[styles.schedChip, { borderColor: colors.outlineVariant }]}
-              onPress={() => onSchedule(isoDay(0))}
-              activeOpacity={0.7}
-              accessibilityLabel="Agendar para hoje"
-            >
-              <Text style={[styles.schedChipText, { color: colors.primary }]}>Hoje</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.schedChip, { borderColor: colors.outlineVariant }]}
-              onPress={() => onSchedule(isoDay(1))}
-              activeOpacity={0.7}
-              accessibilityLabel="Agendar para amanhã"
-            >
-              <Text style={[styles.schedChipText, { color: colors.primary }]}>Amanhã</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {isTodo && expanded && (
-          <View style={styles.subList}>
-            {(subtasks || []).map((s) => (
-              <View key={s.id} style={styles.subRow}>
-                <TouchableOpacity
-                  style={[
-                    styles.subCheck,
-                    { borderColor: colors.outline },
-                    s.completed && { backgroundColor: colors.primary, borderColor: colors.primary },
-                  ]}
-                  onPress={() => onToggleSubtask?.(s.id)}
-                  activeOpacity={0.7}
-                  accessibilityLabel={s.completed ? 'Reabrir subtarefa' : 'Concluir subtarefa'}
-                >
-                  {s.completed && <MaterialIcons name="check" size={12} color={colors.onPrimary} />}
-                </TouchableOpacity>
+        {/* Metadados: prazo relativo, subtarefas, sino */}
+        {(relDate || totalSubs > 0 || hasReminder || onAddSubtask) && (
+          <View style={styles.metaRow}>
+            {relDate ? (
+              <View
+                style={[
+                  styles.pill,
+                  {
+                    backgroundColor: isOverdue ? colors.redBg : colors.surf,
+                  },
+                ]}
+              >
                 <Text
-                  style={[styles.subTitle, { color: colors.onSurfaceVariant }, s.completed && styles.struck]}
-                  numberOfLines={2}
+                  style={[
+                    styles.pillText,
+                    {
+                      color: isOverdue ? colors.red : colors.muted,
+                      fontFamily: tokens.typography.family.semibold,
+                    },
+                  ]}
                 >
-                  {s.title}
+                  {relDate}
                 </Text>
-                <TouchableOpacity
-                  onPress={() => onDeleteSubtask?.(s.id)}
-                  hitSlop={tokens.hitSlop.sm}
-                  accessibilityLabel="Excluir subtarefa"
-                >
-                  <MaterialIcons name="close" size={14} color={colors.onSurfaceVariant} />
-                </TouchableOpacity>
               </View>
-            ))}
-            {onAddSubtask && (
-              <View style={styles.subAddRow}>
-                <TextInput
-                  style={[styles.subInput, { color: colors.onSurface }]}
-                  placeholder="Adicionar subtarefa"
-                  placeholderTextColor={colors.onSurfaceVariant}
-                  value={draft}
-                  onChangeText={setDraft}
-                  onSubmitEditing={submitSubtask}
-                  returnKeyType="done"
-                  accessibilityLabel="Nova subtarefa"
-                />
-                <TouchableOpacity onPress={submitSubtask} hitSlop={tokens.hitSlop.sm} accessibilityLabel="Adicionar subtarefa">
-                  <MaterialIcons name="add" size={18} color={colors.primary} />
-                </TouchableOpacity>
+            ) : null}
+
+            {/* Mini barra de progresso para subtarefas (.prog: 34x4px) */}
+            {isTodo && (totalSubs > 0 || onAddSubtask) ? (
+              <TouchableOpacity
+                style={styles.progContainer}
+                onPress={toggleSubtasks}
+                activeOpacity={0.7}
+                hitSlop={tokens.hitSlop.sm}
+                accessibilityRole="button"
+                accessibilityLabel={`${doneSubs} de ${totalSubs} subtarefas`}
+              >
+                {totalSubs > 0 ? (
+                  <>
+                    <View style={[styles.progTrack, { backgroundColor: colors.line }]}>
+                      <View
+                        style={[
+                          styles.progBar,
+                          {
+                            width: `${subPercent}%`,
+                            backgroundColor: colors.purple,
+                          },
+                        ]}
+                      />
+                    </View>
+                    <Text
+                      style={[
+                        styles.progText,
+                        {
+                          color: colors.muted,
+                          fontFamily: tokens.typography.family.semibold,
+                        },
+                      ]}
+                    >
+                      {doneSubs}/{totalSubs}
+                    </Text>
+                  </>
+                ) : (
+                  <View style={[styles.pill, { backgroundColor: colors.surf }]}>
+                    <Text
+                      style={[
+                        styles.pillText,
+                        {
+                          color: colors.muted,
+                          fontFamily: tokens.typography.family.semibold,
+                        },
+                      ]}
+                    >
+                      + subtarefas
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            ) : null}
+
+            {/* Sino de lembrete */}
+            {hasReminder && !row.done && (
+              <View style={[styles.pill, styles.bellPill, { backgroundColor: colors.surf }]}>
+                <MaterialIcons name="notifications" size={12} color={colors.purple} />
               </View>
             )}
           </View>
         )}
+
+        {/* Agendamento rápido de pendências */}
+        {showSchedule && (
+          <View style={styles.quickSchedule}>
+            <TouchableOpacity
+              style={[styles.schedChip, { borderColor: colors.line, backgroundColor: colors.bg }]}
+              onPress={() => onSchedule(isoDay(0))}
+              activeOpacity={0.7}
+              accessibilityLabel="Agendar para hoje"
+            >
+              <Text style={[styles.schedChipText, { color: colors.ink }]}>Hoje</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.schedChip, { borderColor: colors.line, backgroundColor: colors.bg }]}
+              onPress={() => onSchedule(isoDay(1))}
+              activeOpacity={0.7}
+              accessibilityLabel="Agendar para amanhã"
+            >
+              <Text style={[styles.schedChipText, { color: colors.ink }]}>Amanhã</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Subtarefas inline */}
+        {isTodo && expanded && (
+          <TaskSubtasksInline
+            subtasks={subtasks}
+            onToggleSubtask={onToggleSubtask}
+            onAddSubtask={onAddSubtask}
+            onDeleteSubtask={onDeleteSubtask}
+          />
+        )}
       </View>
 
+      {/* Ações laterais discretas */}
       <View style={styles.actions}>
         {onReminder && !row.done && (
           <TouchableOpacity
@@ -220,21 +276,10 @@ export const TaskRow: React.FC<TaskRowProps> = ({
             accessibilityLabel={hasReminder ? 'Editar lembrete' : 'Configurar lembrete'}
           >
             <MaterialIcons
-              name={hasReminder ? 'notifications-active' : 'notifications-none'}
-              size={20}
-              color={hasReminder ? colors.primary : colors.onSurfaceVariant}
+              name={hasReminder ? 'notifications' : 'notifications-none'}
+              size={18}
+              color={hasReminder ? colors.purple : colors.muted}
             />
-          </TouchableOpacity>
-        )}
-        {onEdit && !row.done && (
-          <TouchableOpacity
-            style={styles.actionBtn}
-            onPress={onEdit}
-            hitSlop={tokens.hitSlop.sm}
-            activeOpacity={0.7}
-            accessibilityLabel="Editar item"
-          >
-            <MaterialIcons name="edit" size={20} color={colors.onSurfaceVariant} />
           </TouchableOpacity>
         )}
         <TouchableOpacity
@@ -242,9 +287,9 @@ export const TaskRow: React.FC<TaskRowProps> = ({
           onPress={onDelete}
           hitSlop={tokens.hitSlop.sm}
           activeOpacity={0.7}
-          accessibilityLabel="Excluir item"
+          accessibilityLabel="Excluir tarefa"
         >
-          <MaterialIcons name="delete-outline" size={20} color={colors.onSurfaceVariant} />
+          <MaterialIcons name="delete-outline" size={18} color={colors.muted} />
         </TouchableOpacity>
       </View>
     </View>
@@ -255,26 +300,27 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    paddingHorizontal: 12,
     paddingVertical: 12,
+    paddingHorizontal: 20,
     gap: 12,
   },
-  checkCircle: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+  chk: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 2,
+    marginTop: 1,
+    flexShrink: 0,
   },
   body: {
     flex: 1,
-    gap: 6,
+    minWidth: 0,
   },
   title: {
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 15.5,
+    fontWeight: '600',
     lineHeight: 21,
     letterSpacing: -0.1,
   },
@@ -282,92 +328,74 @@ const styles = StyleSheet.create({
     textDecorationLine: 'line-through',
     opacity: 0.6,
   },
-  meta: {
+  metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
     gap: 8,
+    marginTop: 7,
   },
-  badge: {
+  pill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    borderRadius: 9999,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    gap: 4,
+    paddingVertical: 3,
+    paddingHorizontal: 9,
+    borderRadius: 10,
   },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+  bellPill: {
+    paddingHorizontal: 7,
   },
-  actionBtn: {
-    minWidth: 32,
-    minHeight: 32,
+  pillText: {
+    fontSize: 12,
+    fontWeight: '600',
+    lineHeight: 15,
+  },
+  progContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 6,
   },
-  badgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
+  progTrack: {
+    width: 34,
+    height: 4,
+    borderRadius: 2,
+    overflow: 'hidden',
   },
-  dateText: {
+  progBar: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  progText: {
     fontSize: 12,
-    fontWeight: '500',
-  },
-  subCount: {
-    fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '600',
+    lineHeight: 15,
   },
   quickSchedule: {
     flexDirection: 'row',
     gap: 8,
+    marginTop: 8,
   },
   schedChip: {
     borderRadius: 12,
     borderWidth: 1,
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 4,
   },
   schedChipText: {
     fontSize: 12,
-    fontWeight: '700',
-  },
-  subList: {
-    gap: 8,
-    marginTop: 2,
-  },
-  subRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  subCheck: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  subTitle: {
-    flex: 1,
-    fontSize: 13,
-  },
-  subAddRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  subInput: {
-    flex: 1,
-    fontSize: 13,
-    paddingVertical: 6,
+    fontWeight: '600',
   },
   actions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 2,
+    marginTop: 1,
+  },
+  actionBtn: {
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

@@ -1,35 +1,35 @@
 import React from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { tokens, MD3Shapes } from '../../theme/tokens';
+import { tokens } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
+import { hapticFeedback } from '../../theme/motion';
 
 interface PromptChipItem {
   icon: keyof typeof MaterialIcons.glyphMap;
   label: string;
   prompt: string;
+  colorKey: 'blue' | 'purple' | 'orange' | 'acc';
 }
 
 const QUICK_PROMPTS: PromptChipItem[] = [
   {
     icon: 'calendar-month',
     label: 'O que tenho hoje?',
-    prompt: 'O que tenho na agenda hoje?',
+    prompt: 'O que tenho hoje?',
+    colorKey: 'blue',
   },
   {
-    icon: 'check-circle',
+    icon: 'check-circle-outline',
     label: 'Minhas tarefas',
-    prompt: 'Listar tarefas pendentes e prazos',
+    prompt: 'Minhas tarefas',
+    colorKey: 'purple',
   },
   {
     icon: 'local-cafe',
-    label: 'Almoço amanhã 12h',
-    prompt: 'Agendar almoço amanhã às 12h',
-  },
-  {
-    icon: 'bolt',
-    label: 'Briefing diário',
-    prompt: 'Faça um briefing executivo das minhas prioridades',
+    label: 'Almoço amanhã',
+    prompt: 'Almoço amanhã',
+    colorKey: 'orange',
   },
 ];
 
@@ -49,25 +49,27 @@ export const ChatQuickChips: React.FC<ChatQuickChipsProps> = ({ onSelectPrompt, 
         contentContainerStyle={styles.scrollList}
       >
         {QUICK_PROMPTS.map((item, idx) => {
-          const iconColor =
-            item.icon === 'calendar-month'
-              ? colors.accents.sky
-              : item.icon === 'check-circle'
-              ? colors.accents.emerald
-              : item.icon === 'local-cafe'
-              ? colors.accents.orange
-              : colors.accents.amber;
+          const iconColor = colors[item.colorKey] || colors.ink;
 
           return (
             <TouchableOpacity
               key={idx}
-              style={[styles.chip, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}
-              onPress={() => onSelectPrompt(item.prompt)}
+              style={[
+                styles.chip,
+                {
+                  backgroundColor: colors.surf,
+                  borderColor: colors.line,
+                },
+              ]}
+              onPress={() => {
+                hapticFeedback.light();
+                onSelectPrompt(item.prompt);
+              }}
               disabled={disabled}
               activeOpacity={0.75}
             >
               <MaterialIcons name={item.icon} size={15} color={iconColor} />
-              <Text style={[styles.chipLabel, { color: colors.onSurface }]}>{item.label}</Text>
+              <Text style={[styles.chipLabel, { color: colors.ink }]}>{item.label}</Text>
             </TouchableOpacity>
           );
         })}
@@ -78,27 +80,24 @@ export const ChatQuickChips: React.FC<ChatQuickChipsProps> = ({ onSelectPrompt, 
 
 const styles = StyleSheet.create({
   container: {
-    marginVertical: tokens.spacing.xs,
+    marginVertical: 4,
   },
   scrollList: {
     paddingHorizontal: tokens.spacing.md,
-    gap: tokens.spacing.sm,
+    gap: 8,
   },
-  // M3 Suggestion Chip (8dp radius)
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    backgroundColor: tokens.colors.surfaceContainerLow,
-    paddingHorizontal: tokens.spacing.md - 2,
-    paddingVertical: 6,
-    borderRadius: MD3Shapes.small,
+    gap: 7,
+    paddingHorizontal: 13,
+    paddingVertical: 9,
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: tokens.colors.outlineVariant,
   },
   chipLabel: {
-    color: tokens.colors.onSurfaceVariant,
-    fontSize: tokens.typography.size.labelMedium,
-    fontWeight: tokens.typography.weight.medium,
+    fontSize: 13,
+    fontWeight: '500',
+    fontFamily: tokens.typography.family.medium,
   },
 });

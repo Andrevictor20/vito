@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, Platform } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, Platform } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
@@ -34,19 +34,20 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
         style={[
           styles.dockPill,
           {
-            backgroundColor: colors.surfaceGlass || (isDark ? 'rgba(24, 24, 27, 0.88)' : 'rgba(255, 255, 255, 0.88)'),
-            borderColor: colors.glassBorder || colors.outlineVariant,
+            backgroundColor: colors.surf,
+            borderColor: colors.line,
+            shadowColor: isDark ? '#000000' : '#141916',
           },
         ]}
         accessibilityRole="tablist"
       >
-        {/* Item 1: Chat IA */}
+        {/* Item 1: Chat */}
         <TouchableOpacity
           style={[
             styles.tabButton,
             activeTab === 'chat' && [
               styles.tabButtonActive,
-              { backgroundColor: isDark ? colors.surfaceContainerHighest : colors.primary },
+              { backgroundColor: colors.ink },
             ],
           ]}
           onPress={() => handleTabPress('chat')}
@@ -59,17 +60,17 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
           <MaterialIcons
             name={activeTab === 'chat' ? 'chat' : 'chat-bubble-outline'}
             size={24}
-            color={activeTab === 'chat' ? (isDark ? colors.onSurface : colors.onPrimary) : colors.onSurfaceVariant}
+            color={activeTab === 'chat' ? colors.bg : colors.muted}
           />
         </TouchableOpacity>
 
-        {/* Item 2: Calendário & Tarefas */}
+        {/* Item 2: Agenda */}
         <TouchableOpacity
           style={[
             styles.tabButton,
             activeTab === 'calendar' && [
               styles.tabButtonActive,
-              { backgroundColor: isDark ? colors.surfaceContainerHighest : colors.primary },
+              { backgroundColor: colors.ink },
             ],
           ]}
           onPress={() => handleTabPress('calendar')}
@@ -77,22 +78,22 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
           hitSlop={tokens.hitSlop.sm}
           accessibilityRole="tab"
           accessibilityState={{ selected: activeTab === 'calendar' }}
-          accessibilityLabel="Aba Calendário e Tarefas"
+          accessibilityLabel="Aba Agenda"
         >
           <MaterialIcons
             name={activeTab === 'calendar' ? 'event' : 'calendar-today'}
             size={24}
-            color={activeTab === 'calendar' ? (isDark ? colors.onSurface : colors.onPrimary) : colors.onSurfaceVariant}
+            color={activeTab === 'calendar' ? colors.bg : colors.muted}
           />
         </TouchableOpacity>
 
-        {/* Item 3: Tarefas e Pendências */}
+        {/* Item 3: Tarefas */}
         <TouchableOpacity
           style={[
             styles.tabButton,
             activeTab === 'tasks' && [
               styles.tabButtonActive,
-              { backgroundColor: isDark ? colors.surfaceContainerHighest : colors.primary },
+              { backgroundColor: colors.ink },
             ],
           ]}
           onPress={() => handleTabPress('tasks')}
@@ -100,12 +101,12 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
           hitSlop={tokens.hitSlop.sm}
           accessibilityRole="tab"
           accessibilityState={{ selected: activeTab === 'tasks' }}
-          accessibilityLabel="Aba Tarefas e Pendências"
+          accessibilityLabel="Aba Tarefas"
         >
           <MaterialIcons
             name={activeTab === 'tasks' ? 'task-alt' : 'checklist'}
             size={24}
-            color={activeTab === 'tasks' ? (isDark ? colors.onSurface : colors.onPrimary) : colors.onSurfaceVariant}
+            color={activeTab === 'tasks' ? colors.bg : colors.muted}
           />
         </TouchableOpacity>
 
@@ -115,7 +116,7 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
             styles.tabButton,
             activeTab === 'triggers' && [
               styles.tabButtonActive,
-              { backgroundColor: isDark ? colors.surfaceContainerHighest : colors.primary },
+              { backgroundColor: colors.ink },
             ],
           ]}
           onPress={() => handleTabPress('triggers')}
@@ -123,22 +124,22 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
           hitSlop={tokens.hitSlop.sm}
           accessibilityRole="tab"
           accessibilityState={{ selected: activeTab === 'triggers' }}
-          accessibilityLabel="Aba Radares e Alertas"
+          accessibilityLabel="Aba Radares"
         >
           <MaterialIcons
             name={activeTab === 'triggers' ? 'radar' : 'track-changes'}
             size={24}
-            color={activeTab === 'triggers' ? (isDark ? colors.onSurface : colors.onPrimary) : colors.onSurfaceVariant}
+            color={activeTab === 'triggers' ? colors.bg : colors.muted}
           />
         </TouchableOpacity>
 
-        {/* Item 5: Vito Booking */}
+        {/* Item 5: Booking */}
         <TouchableOpacity
           style={[
             styles.tabButton,
             activeTab === 'booking' && [
               styles.tabButtonActive,
-              { backgroundColor: isDark ? colors.surfaceContainerHighest : colors.primary },
+              { backgroundColor: colors.ink },
             ],
           ]}
           onPress={() => handleTabPress('booking')}
@@ -146,22 +147,22 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
           hitSlop={tokens.hitSlop.sm}
           accessibilityRole="tab"
           accessibilityState={{ selected: activeTab === 'booking' }}
-          accessibilityLabel="Aba Vito Booking"
+          accessibilityLabel="Aba Booking"
         >
           <MaterialIcons
             name={activeTab === 'booking' ? 'event-available' : 'link'}
             size={24}
-            color={activeTab === 'booking' ? (isDark ? colors.onSurface : colors.onPrimary) : colors.onSurfaceVariant}
+            color={activeTab === 'booking' ? colors.bg : colors.muted}
           />
         </TouchableOpacity>
 
-        {/* Item 6: Perfil e Configurações */}
+        {/* Item 6: Perfil */}
         <TouchableOpacity
           style={[
             styles.tabButton,
             activeTab === 'profile' && [
               styles.tabButtonActive,
-              { backgroundColor: isDark ? colors.surfaceContainerHighest : colors.primary },
+              { backgroundColor: colors.ink },
             ],
           ]}
           onPress={() => handleTabPress('profile')}
@@ -169,12 +170,12 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
           hitSlop={tokens.hitSlop.sm}
           accessibilityRole="tab"
           accessibilityState={{ selected: activeTab === 'profile' }}
-          accessibilityLabel="Aba Perfil e Configurações"
+          accessibilityLabel="Aba Perfil"
         >
           <MaterialIcons
             name={activeTab === 'profile' ? 'person' : 'person-outline'}
             size={24}
-            color={activeTab === 'profile' ? (isDark ? colors.onSurface : colors.onPrimary) : colors.onSurfaceVariant}
+            color={activeTab === 'profile' ? colors.bg : colors.muted}
           />
         </TouchableOpacity>
       </View>
@@ -185,7 +186,7 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
 const styles = StyleSheet.create({
   floatingWrapper: {
     position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 24 : 26,
+    bottom: Platform.OS === 'ios' ? 20 : 18,
     left: 0,
     right: 0,
     alignItems: 'center',
@@ -196,27 +197,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 32,
+    padding: 8,
+    borderRadius: 40,
     borderWidth: 1,
     gap: 6,
     elevation: 10,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.18,
-    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.14,
+    shadowRadius: 22,
   },
   tabButton: {
-    width: 48,
-    height: 44,
-    borderRadius: 22,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     alignItems: 'center',
     justifyContent: 'center',
   },
   tabButtonActive: {
-    elevation: 3,
+    width: 60,
+    borderRadius: 30,
+    elevation: 4,
   },
 });
-
-

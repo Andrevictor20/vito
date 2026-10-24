@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import {
   StyleSheet,
   View,
@@ -6,20 +6,39 @@ import {
   ScrollView,
   RefreshControl,
   ActivityIndicator,
-  TouchableOpacity,
   TextInput,
+  TouchableOpacity,
+  LayoutAnimation,
+  Platform,
+  UIManager,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens } from '../theme/tokens';
 import { useTheme } from '../context/ThemeContext';
-import { Todo, PendingItem } from '../types';
+import { hapticFeedback } from '../theme/motion';
+import type { Todo, PendingItem } from '../types';
 import { TaskRow } from '../components/tasks/TaskRow';
 import { TaskSheet, TaskPayload } from '../components/tasks/TaskSheet';
-import { BottomSheetModal } from '../components/ui/BottomSheetModal';
+import { TaskFilterChips } from '../components/tasks/TaskFilterChips';
+import { VitoSuggestionCard } from '../components/tasks/VitoSuggestionCard';
+import { TaskGroupHeader } from '../components/tasks/TaskGroupHeader';
+import { CompletedAccordion } from '../components/tasks/CompletedAccordion';
+import { TaskFilterModal, PriorityFilter } from '../components/tasks/TaskFilterModal';
 import { usePendingItems } from '../hooks/usePendingItems';
-import { toUnifiedRows, sortUnifiedRows, filterUnifiedRows, TaskFilter, TaskSort } from '../utils/unifiedTasks';
+import { toUnifiedRows, sortUnifiedRows, TaskSort, UnifiedRow } from '../utils/unifiedTasks';
+import {
+  TaskFilterType,
+  computeChipCounts,
+  groupTasksByBucket,
+  getRowDateStr,
+  getTaskBucket,
+} from '../utils/taskBuckets';
 
-interface TasksScreenProps {
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
+export interface TasksScreenProps {
   todos: Todo[];
   pendingTodos: Todo[];
   completedTodosList: Todo[];
@@ -51,31 +70,11 @@ interface TasksScreenProps {
     remind_advance_minutes?: number;
   }) => Promise<any>;
   onOpenEventCreate?: (title: string, date?: string) => void;
-  /** Sinal do Header (+ Nova tarefa): incrementa para abrir o sheet em criação. */
   createRequestId?: number;
+  searchQuery?: string;
+  onSearchChange?: (text: string) => void;
+  searchOpen?: boolean;
 }
-
-const FILTERS: Array<{ id: TaskFilter; label: string }> = [
-  { id: 'all', label: 'Todas' },
-  { id: 'today', label: 'Hoje' },
-  { id: 'overdue', label: 'Atrasadas' },
-  { id: 'nodate', label: 'Sem data' },
-];
-
-const SORTS: Array<{ id: TaskSort; label: string }> = [
-  { id: 'date', label: 'Prazo' },
-  { id: 'priority', label: 'Prioridade' },
-  { id: 'alpha', label: 'A–Z' },
-];
-
-type PriorityFilter = 'all' | 'low' | 'medium' | 'high';
-
-const PRIORITY_FILTERS: Array<{ id: PriorityFilter; label: string }> = [
-  { id: 'all', label: 'Todas as prioridades' },
-  { id: 'high', label: '• Alta Prioridade' },
-  { id: 'medium', label: '• Média Prioridade' },
-  { id: 'low', label: '• Baixa Prioridade' },
-];
 
 export const TasksScreen: React.FC<TasksScreenProps> = ({
   todos,
@@ -93,24 +92,37 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
   onUpdateTodoFull,
   onOpenEventCreate,
   createRequestId,
+  searchQuery: externalSearchQuery,
+  onSearchChange: externalOnSearchChange,
+  searchOpen: externalSearchOpen,
 }) => {
   const { colors, isDark } = useTheme();
-  const [showCompleted, setShowCompleted] = useState(false);
-  const [filter, setFilter] = useState<TaskFilter>('all');
-  const [sort, setSort] = useState<TaskSort>('date');
+
+  const [activeFilter, setActiveFilter] = useState<TaskFilterType>('all');
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterVisible, setFilterVisible] = useState(false);
+  const [sort, setSort] = useState<TaskSort>('date');
+  const [internalQuery, setInternalQuery] = useState('');
+  const [internalSearchOpen, setInternalSearchOpen] = useState(false);
+  const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [sheetVisible, setSheetVisible] = useState(false);
   const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
-  // Pendência legada em conversão para tarefa unificada.
   const [convertingPending, setConvertingPending] = useState<PendingItem | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [vitoDismissed, setVitoDismissed] = useState(false);
+  const [rescheduling, setRescheduling] = useState(false);
 
   const pending = usePendingItems(onOpenEventCreate);
 
-  // CTA do Header (+ Nova tarefa): abre o sheet em modo criação.
+  const query = (externalSearchQuery !== undefined ? externalSearchQuery : internalQuery).trim().toLowerCase();
+  const isSearchOpen = externalSearchOpen !== undefined ? externalSearchOpen : internalSearchOpen;
+
+  const handleQueryChange = (text: string) => {
+    if (externalOnSearchChange) externalOnSearchChange(text);
+    else setInternalQuery(text);
+  };
+
+  // CTA (+ Nova tarefa): abre o sheet em modo criação
   const firstCreateRender = useRef(true);
   useEffect(() => {
     if (firstCreateRender.current) {
@@ -125,94 +137,108 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
     }
   }, [createRequestId]);
 
-  const rows = useMemo(
-    () => toUnifiedRows([...pendingTodos, ...completedTodosList], pending.items, Date.now()),
-    [pendingTodos, completedTodosList, pending.items],
-  );
   const now = Date.now();
-  const query = searchQuery.trim().toLowerCase();
-  const baseRows = useMemo(
-    () => sortUnifiedRows(filterUnifiedRows(rows, filter, now), sort),
-    [rows, filter, sort],
+  const rawRows = useMemo(
+    () => toUnifiedRows([...pendingTodos, ...completedTodosList], pending.items, now),
+    [pendingTodos, completedTodosList, pending.items, now],
   );
+
   const activeRows = useMemo(() => {
-    let list = baseRows;
+    let list = rawRows.filter((r) => !r.done);
     if (priorityFilter !== 'all') {
       list = list.filter((r) => r.priority === priorityFilter);
     }
-    if (query) {
-      list = list.filter(
-        (r) =>
-          r.title.toLowerCase().includes(query) ||
-          r.detail.toLowerCase().includes(query)
-      );
+    if (sort !== 'date') {
+      list = sortUnifiedRows(list, sort);
     }
     return list;
-  }, [baseRows, priorityFilter, query]);
-  // Contagens vivas por período (para o sheet de filtro).
-  const counts = useMemo(() => {
-    const c: Record<TaskFilter, number> = { all: 0, today: 0, overdue: 0, nodate: 0 };
-    (Object.keys(c) as TaskFilter[]).forEach((f) => {
-      c[f] = filterUnifiedRows(rows, f, now).length;
-    });
-    return c;
-  }, [rows, now]);
-  const doneRows = useMemo(() => rows.filter((r) => r.done), [rows]);
+  }, [rawRows, priorityFilter, sort]);
 
-  const renderRow = (row: (typeof activeRows)[number], isLast = false) => {
+  const doneRows = useMemo(() => rawRows.filter((r) => r.done), [rawRows]);
+
+  const chipCounts = useMemo(() => computeChipCounts(rawRows, now), [rawRows, now]);
+
+  const taskGroups = useMemo(
+    () => groupTasksByBucket(activeRows, activeFilter, query, now),
+    [activeRows, activeFilter, query, now],
+  );
+
+  const overdueRows = useMemo(
+    () => activeRows.filter((r) => getTaskBucket(getRowDateStr(r), now) === 'atr'),
+    [activeRows, now],
+  );
+
+  const showVitoSuggestion =
+    !vitoDismissed &&
+    overdueRows.length > 0 &&
+    activeFilter === 'all' &&
+    !query;
+
+  // Reagendar todas as tarefas atrasadas para a data de hoje
+  const handleRescheduleAllOverdue = useCallback(async () => {
+    setRescheduling(true);
+    try {
+      const todayISO = new Date().toISOString().split('T')[0];
+      const updates = overdueRows.map(async (row) => {
+        if (row.kind === 'todo' && row.sourceTodo) {
+          return onUpdateTodoFull(row.sourceTodo.id, { due_date: todayISO });
+        }
+        if (row.sourcePending) {
+          return pending.schedule(row.sourcePending, todayISO);
+        }
+      });
+      await Promise.all(updates);
+      setVitoDismissed(true);
+      hapticFeedback.success();
+    } catch (err) {
+      console.warn('[TasksScreen] Falha ao reagendar atrasadas:', err);
+    } finally {
+      setRescheduling(false);
+    }
+  }, [overdueRows, onUpdateTodoFull, pending]);
+
+  const handleOpenEdit = useCallback((row: UnifiedRow) => {
     if (row.kind === 'todo' && row.sourceTodo) {
-      const t = row.sourceTodo;
-      return (
-        <TaskRow
-          key={`todo-${row.id}`}
-          row={row}
-          isLast={isLast}
-          onToggle={() => onToggleTodo(t.id)}
-          onDelete={() => onDeleteTodo(t.id)}
-          onEdit={() => { setEditingTodo(t); setConvertingPending(null); setSaveError(null); setSheetVisible(true); }}
-          onReminder={undefined}
-          subtasks={t.subtasks}
-          onToggleSubtask={(sid) => onToggleSubtask(t.id, sid)}
-          onAddSubtask={(title) => onAddSubtask(t.id, title)}
-          onDeleteSubtask={(sid) => onDeleteSubtask(t.id, sid)}
-        />
-      );
-    }
-    if (row.sourcePending) {
+      setEditingTodo(row.sourceTodo);
+      setConvertingPending(null);
+      setSaveError(null);
+      setSheetVisible(true);
+    } else if (row.sourcePending) {
       const p = row.sourcePending;
-      return (
-        <TaskRow
-          key={`pending-${row.id}`}
-          row={row}
-          isLast={isLast}
-          onToggle={() => pending.toggleComplete(p)}
-          onDelete={() => pending.remove(p.id)}
-          onEdit={() => {
-            // Converte pendência legada: preenche o sheet unificado.
-            setConvertingPending(p);
-            setEditingTodo({
-              id: p.id,
-              user_id: '',
-              title: p.title,
-              priority: 'medium',
-              category: p.category || 'geral',
-              status: 'pending',
-              due_date: p.scheduled_date ? `${p.scheduled_date}T09:00:00` : undefined,
-              remind_at: p.remind_at || undefined,
-              remind_repeat: p.remind_repeat || 'none',
-              remind_advance_minutes: p.remind_advance_minutes || 0,
-              created_at: '',
-            } as Todo);
-            setSaveError(null);
-            setSheetVisible(true);
-          }}
-          onSchedule={(dateStr) => pending.schedule(p, dateStr)}
-          onReminder={undefined}
-        />
-      );
+      setConvertingPending(p);
+      setEditingTodo({
+        id: p.id,
+        user_id: '',
+        title: p.title,
+        priority: 'medium',
+        category: p.category || 'geral',
+        status: 'pending',
+        due_date: p.scheduled_date ? `${p.scheduled_date}T09:00:00` : undefined,
+        remind_at: p.remind_at || undefined,
+        remind_repeat: p.remind_repeat || 'none',
+        remind_advance_minutes: p.remind_advance_minutes || 0,
+        created_at: '',
+      } as Todo);
+      setSaveError(null);
+      setSheetVisible(true);
     }
-    return null;
-  };
+  }, []);
+
+  const handleToggleRow = useCallback((row: UnifiedRow) => {
+    if (row.kind === 'todo' && row.sourceTodo) {
+      onToggleTodo(row.sourceTodo.id);
+    } else if (row.sourcePending) {
+      pending.toggleComplete(row.sourcePending);
+    }
+  }, [onToggleTodo, pending]);
+
+  const handleDeleteRow = useCallback((row: UnifiedRow) => {
+    if (row.kind === 'todo' && row.sourceTodo) {
+      onDeleteTodo(row.sourceTodo.id);
+    } else if (row.sourcePending) {
+      pending.remove(row.sourcePending.id);
+    }
+  }, [onDeleteTodo, pending]);
 
   const handleSave = async (payload: TaskPayload) => {
     setSaving(true);
@@ -230,7 +256,6 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
       if (editingTodo && !convertingPending) {
         await onUpdateTodoFull(editingTodo.id, input);
       } else if (convertingPending) {
-        // Migração on-the-fly: cria tarefa unificada e apaga a pendência legada.
         await onSaveTodoFull(input);
         await pending.remove(convertingPending.id);
       } else {
@@ -247,7 +272,7 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDeleteSheet = async (id: string) => {
     try {
       if (convertingPending) await pending.remove(convertingPending.id);
       else onDeleteTodo(id);
@@ -262,10 +287,45 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
   const initialLoading = loading && todos.length === 0 && pending.loading && pending.items.length === 0;
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.surface }]}>
+    <View style={[styles.container, { backgroundColor: colors.bg }]}>
+      {/* Barra de busca retrátil se não fornecida externamente */}
+      {isSearchOpen && externalSearchOpen === undefined && (
+        <View style={styles.searchSection}>
+          <View style={[styles.searchBar, { backgroundColor: colors.surf, borderColor: colors.line }]}>
+            <MaterialIcons name="search" size={20} color={colors.muted} />
+            <TextInput
+              style={[styles.searchInput, { color: colors.ink }]}
+              value={internalQuery}
+              onChangeText={handleQueryChange}
+              placeholder="Pesquisar tarefas..."
+              placeholderTextColor={colors.muted}
+              returnKeyType="search"
+              accessibilityLabel="Pesquisar tarefas"
+              autoFocus
+            />
+            {internalQuery.length > 0 && (
+              <TouchableOpacity
+                onPress={() => handleQueryChange('')}
+                hitSlop={tokens.hitSlop.sm}
+                accessibilityLabel="Limpar busca"
+              >
+                <MaterialIcons name="close" size={18} color={colors.muted} />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      )}
+
+      {/* Faixa de chips horizontais (.chips) */}
+      <TaskFilterChips
+        selectedFilter={activeFilter}
+        onSelectFilter={setActiveFilter}
+        counts={chipCounts}
+      />
+
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
         refreshControl={
           <RefreshControl
@@ -274,274 +334,98 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
               onRefresh();
               pending.refresh();
             }}
-            tintColor={colors.primary}
+            tintColor={colors.ink}
           />
         }
       >
-        <View style={styles.searchRow}>
-          <View style={[styles.searchBox, { backgroundColor: colors.surfaceContainerLow, borderColor: colors.outlineVariant }]}>
-            <MaterialIcons name="search" size={18} color={colors.onSurfaceVariant} />
-            <TextInput
-              style={[styles.searchInput, { color: colors.onSurface }]}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              placeholder="Pesquisar tarefas..."
-              placeholderTextColor={colors.textMuted}
-              returnKeyType="search"
-              accessibilityLabel="Pesquisar tarefas"
-            />
-            {searchQuery.length > 0 && (
-              <TouchableOpacity
-                onPress={() => setSearchQuery('')}
-                hitSlop={tokens.hitSlop.sm}
-                accessibilityLabel="Limpar busca"
-                accessibilityRole="button"
-              >
-                <MaterialIcons name="close" size={18} color={colors.onSurfaceVariant} />
-              </TouchableOpacity>
-            )}
-          </View>
-          <TouchableOpacity
-            style={[
-              styles.filterBtn,
-              {
-                backgroundColor: (filter !== 'all' || priorityFilter !== 'all' || sort !== 'date')
-                  ? colors.primary
-                  : colors.surfaceContainerLow,
-                borderColor: colors.outlineVariant,
-              },
-            ]}
-            onPress={() => setFilterVisible(true)}
-            activeOpacity={0.8}
-            hitSlop={tokens.hitSlop.sm}
-            accessibilityLabel="Filtrar e ordenar tarefas"
-            accessibilityRole="button"
-          >
-            <MaterialIcons
-              name="filter-list"
-              size={20}
-              color={(filter !== 'all' || priorityFilter !== 'all' || sort !== 'date') ? colors.onPrimary : colors.onSurface}
-            />
-          </TouchableOpacity>
-        </View>
-
-        {(filter !== 'all' || priorityFilter !== 'all' || !!query) && (
-          <Text style={[styles.activeFilterLine, { color: colors.textMuted }]}>
-            {activeRows.length} {activeRows.length === 1 ? 'tarefa' : 'tarefas'}
-            {query ? ` para "${searchQuery.trim()}"` : ''}
-          </Text>
+        {/* Card de sugestão inteligente do Vito (.vsug) */}
+        {showVitoSuggestion && (
+          <VitoSuggestionCard
+            overdueCount={overdueRows.length}
+            onReschedule={handleRescheduleAllOverdue}
+            onDismiss={() => setVitoDismissed(true)}
+            loading={rescheduling}
+          />
         )}
 
-        {!!pending.error && pending.items.length === 0 && (
-          <View style={[styles.errorCard, { backgroundColor: colors.errorContainer, borderColor: colors.error }]}>
-            <Text style={[styles.errorText, { color: colors.onErrorContainer }]}>{pending.error}</Text>
-            <TouchableOpacity onPress={pending.retry} activeOpacity={0.7} accessibilityLabel="Tentar carregar de novo">
-              <Text style={[styles.retryText, { color: colors.error }]}>Tentar de novo</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
+        {/* Indicador de carregamento */}
         {initialLoading ? (
-          <ActivityIndicator color={colors.primary} style={{ marginVertical: 20 }} />
-        ) : activeRows.length === 0 ? (
-          <View style={[styles.emptyCard, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
-            <View style={[styles.emptyIconContainer, { backgroundColor: 'rgba(52, 211, 153, 0.15)' }]}>
-              <MaterialIcons name={query ? 'search-off' : 'done-all'} size={20} color={colors.success} />
-            </View>
-            <View style={styles.emptyContent}>
-              <Text style={[styles.emptyTitle, { color: colors.onSurface }]}>
-                {query ? `Nada para "${searchQuery.trim()}"` : 'Tudo em Dia'}
-              </Text>
-              <Text style={[styles.emptySub, { color: colors.onSurfaceVariant }]}>
-                {query ? 'Tente outro termo ou limpe a busca.' : 'Nenhuma tarefa neste filtro.'}
-              </Text>
-              {query ? (
-                <TouchableOpacity onPress={() => setSearchQuery('')} activeOpacity={0.7} accessibilityLabel="Limpar busca">
-                  <Text style={[styles.retryText, { color: colors.primary }]}>Limpar busca</Text>
-                </TouchableOpacity>
-              ) : null}
-            </View>
+          <ActivityIndicator color={colors.ink} style={{ marginVertical: 32 }} />
+        ) : taskGroups.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Text style={[styles.emptyText, { color: colors.muted }]}>
+              {query ? 'Nenhuma tarefa encontrada para esta busca.' : 'Nenhuma tarefa aqui.'}
+            </Text>
           </View>
         ) : (
-          <View style={[styles.checklistCard, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant, borderWidth: 1 }]}>
-            {activeRows.map((r, i) => renderRow(r, i === activeRows.length - 1))}
-          </View>
-        )}
-
-        {doneRows.length > 0 && (
-          <View style={styles.completedSectionWrapper}>
-            <TouchableOpacity
-              style={[
-                styles.completedSectionToggle,
-                {
-                  backgroundColor: isDark ? colors.surfaceContainerLow : '#F4F4F5',
-                  borderColor: colors.outlineVariant,
-                },
-              ]}
-              onPress={() => setShowCompleted(!showCompleted)}
-              activeOpacity={0.7}
-              accessibilityRole="button"
-              accessibilityLabel="Alternar concluídas (toque para reabrir)"
-            >
-              <View style={styles.completedToggleLeft}>
-                <MaterialIcons name="done-all" size={16} color={colors.accents.emerald} />
-                <Text style={[styles.completedToggleText, { color: colors.onSurfaceVariant }]}>
-                  Concluídas ({doneRows.length})
-                </Text>
-              </View>
-              <MaterialIcons
-                name={showCompleted ? 'expand-less' : 'expand-more'}
-                size={20}
-                color={colors.onSurfaceVariant}
+          /* Grupos por prazo (.grp) */
+          taskGroups.map((group) => (
+            <View key={`group-${group.bucket}`} style={styles.groupBlock}>
+              <TaskGroupHeader
+                bucket={group.bucket}
+                title={group.label}
+                count={group.rows.length}
               />
-            </TouchableOpacity>
-
-            {showCompleted && (
-              <View
-                style={[
-                  styles.checklistCard,
-                  {
-                    backgroundColor: colors.surfaceContainer,
-                    borderColor: colors.outlineVariant,
-                    borderWidth: 1,
-                    marginTop: 8,
-                    opacity: 0.85,
-                  },
-                ]}
-              >
-                {doneRows.map((r, i) => renderRow(r, i === doneRows.length - 1))}
+              <View style={styles.groupList}>
+                {group.rows.map((row, idx) => (
+                  <TaskRow
+                    key={`task-${row.kind}-${row.id}`}
+                    row={row}
+                    isFirst={idx === 0}
+                    onToggle={() => handleToggleRow(row)}
+                    onDelete={() => handleDeleteRow(row)}
+                    onEdit={() => handleOpenEdit(row)}
+                    subtasks={row.sourceTodo?.subtasks}
+                    onToggleSubtask={(sid) => row.sourceTodo && onToggleSubtask(row.sourceTodo.id, sid)}
+                    onAddSubtask={(title) => row.sourceTodo && onAddSubtask(row.sourceTodo.id, title)}
+                    onDeleteSubtask={(sid) => row.sourceTodo && onDeleteSubtask(row.sourceTodo.id, sid)}
+                    onSchedule={(dateStr) => row.sourcePending && pending.schedule(row.sourcePending, dateStr)}
+                  />
+                ))}
               </View>
-            )}
-          </View>
+            </View>
+          ))
         )}
+
+        {/* Acordeão de tarefas concluídas (.dn e .dl) */}
+        <CompletedAccordion
+          completedRows={doneRows}
+          onToggleRow={handleToggleRow}
+          onEditRow={handleOpenEdit}
+          onDeleteRow={handleDeleteRow}
+        />
       </ScrollView>
 
-      {/* CTA vive no Header (+ Nova tarefa); sem FAB sobre a lista. */}
-      <BottomSheetModal
-        visible={filterVisible}
-        onClose={() => setFilterVisible(false)}
-        title="Filtrar e Ordenar"
-        subtitle="Refine sua visualização de tarefas ativas"
-      >
-        <Text style={[styles.sheetGroupLabel, { color: colors.textMuted }]}>PERÍODO / STATUS</Text>
-        <View style={styles.sheetGrid}>
-          {FILTERS.map((f) => {
-            const active = filter === f.id;
-            return (
-              <TouchableOpacity
-                key={f.id}
-                style={[
-                  styles.sheetChip,
-                  {
-                    backgroundColor: active ? colors.primary : colors.surfaceContainerLow,
-                    borderColor: colors.outlineVariant,
-                  },
-                ]}
-                onPress={() => setFilter(f.id)}
-                activeOpacity={0.8}
-                hitSlop={tokens.hitSlop.sm}
-                accessibilityRole="button"
-                accessibilityState={{ selected: active }}
-                accessibilityLabel={`Filtrar ${f.label}`}
-              >
-                <Text style={[styles.sheetChipText, { color: active ? colors.onPrimary : colors.onSurface }]}>
-                  {f.label} ({counts[f.id]})
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+      {/* Modal de filtros adicionais (Prioridade e Ordenação) */}
+      <TaskFilterModal
+        visible={filterModalVisible}
+        onClose={() => setFilterModalVisible(false)}
+        priorityFilter={priorityFilter}
+        onSelectPriority={setPriorityFilter}
+        sort={sort}
+        onSelectSort={setSort}
+        onReset={() => {
+          setPriorityFilter('all');
+          setSort('date');
+          setActiveFilter('all');
+          handleQueryChange('');
+        }}
+        activeCount={activeRows.length}
+      />
 
-        <Text style={[styles.sheetGroupLabel, { color: colors.textMuted }]}>PRIORIDADE</Text>
-        <View style={styles.sheetGrid}>
-          {PRIORITY_FILTERS.map((p) => {
-            const active = priorityFilter === p.id;
-            return (
-              <TouchableOpacity
-                key={p.id}
-                style={[
-                  styles.sheetChip,
-                  {
-                    backgroundColor: active ? colors.primary : colors.surfaceContainerLow,
-                    borderColor: colors.outlineVariant,
-                  },
-                ]}
-                onPress={() => setPriorityFilter(p.id)}
-                activeOpacity={0.8}
-                hitSlop={tokens.hitSlop.sm}
-                accessibilityRole="button"
-                accessibilityState={{ selected: active }}
-                accessibilityLabel={`Prioridade ${p.label}`}
-              >
-                <Text style={[styles.sheetChipText, { color: active ? colors.onPrimary : colors.onSurface }]}>
-                  {p.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        <Text style={[styles.sheetGroupLabel, { color: colors.textMuted }]}>ORDENAR LISTA POR</Text>
-        <View style={styles.sheetGrid}>
-          {SORTS.map((s) => {
-            const active = sort === s.id;
-            return (
-              <TouchableOpacity
-                key={s.id}
-                style={[
-                  styles.sheetChip,
-                  {
-                    backgroundColor: active ? colors.primary : colors.surfaceContainerLow,
-                    borderColor: colors.outlineVariant,
-                  },
-                ]}
-                onPress={() => setSort(s.id)}
-                activeOpacity={0.8}
-                hitSlop={tokens.hitSlop.sm}
-                accessibilityRole="button"
-                accessibilityState={{ selected: active }}
-                accessibilityLabel={`Ordenar por ${s.label}`}
-              >
-                <Text style={[styles.sheetChipText, { color: active ? colors.onPrimary : colors.onSurface }]}>
-                  {s.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        <View style={styles.sheetFooter}>
-          <TouchableOpacity
-            style={[styles.sheetClearBtn, { borderColor: colors.outlineVariant }]}
-            onPress={() => { setFilter('all'); setPriorityFilter('all'); setSort('date'); setSearchQuery(''); }}
-            activeOpacity={0.8}
-            accessibilityLabel="Limpar filtros"
-            accessibilityRole="button"
-          >
-            <Text style={[styles.sheetClearText, { color: colors.onSurface }]}>Limpar</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.sheetApplyBtn, { backgroundColor: colors.primary }]}
-            onPress={() => setFilterVisible(false)}
-            activeOpacity={0.85}
-            accessibilityLabel={`Mostrar ${activeRows.length} tarefas`}
-            accessibilityRole="button"
-          >
-            <Text style={[styles.sheetApplyText, { color: colors.onPrimary }]}>
-              Mostrar {activeRows.length} tarefas
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </BottomSheetModal>
-
+      {/* Sheet de Criação / Edição de Tarefas */}
       <TaskSheet
         visible={sheetVisible}
         editingTodo={editingTodo}
         saving={saving}
         error={saveError}
-        onClose={() => { setSheetVisible(false); setEditingTodo(null); setConvertingPending(null); }}
+        onClose={() => {
+          setSheetVisible(false);
+          setEditingTodo(null);
+          setConvertingPending(null);
+        }}
         onSave={handleSave}
-        onDelete={handleDelete}
+        onDelete={handleDeleteSheet}
       />
     </View>
   );
@@ -554,231 +438,44 @@ const styles = StyleSheet.create({
   scroll: {
     flex: 1,
   },
-  content: {
-    paddingHorizontal: tokens.spacing.md,
-    paddingBottom: 150,
+  scrollContent: {
+    paddingBottom: 140,
   },
-  sectionHeader: {
-    marginTop: tokens.spacing.sm,
-    marginBottom: tokens.spacing.sm,
+  searchSection: {
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 4,
   },
-  searchRow: {
+  searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginTop: tokens.spacing.sm,
-    marginBottom: tokens.spacing.xs,
-  },
-  searchBox: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
+    height: 44,
+    borderRadius: 22,
     borderWidth: 1,
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    minHeight: 48,
-    gap: 8,
+    paddingHorizontal: 16,
+    gap: 10,
   },
   searchInput: {
     flex: 1,
-    fontSize: 14,
-    paddingVertical: 10,
-  },
-  filterBtn: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  activeFilterLine: {
-    fontSize: 12,
-    marginBottom: tokens.spacing.xs,
-  },
-  sheetGroupLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.6,
-    marginTop: tokens.spacing.md,
-    marginBottom: tokens.spacing.xs,
-  },
-  sheetGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  sheetChip: {
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    minHeight: 44,
-    justifyContent: 'center',
-  },
-  sheetChipText: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  sheetFooter: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: tokens.spacing.lg,
-  },
-  sheetClearBtn: {
-    flex: 1,
-    borderWidth: 1,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 48,
-  },
-  sheetClearText: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  sheetApplyBtn: {
-    flex: 2,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 48,
-  },
-  sheetApplyText: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  checklistSubtitle: {
-    fontSize: 12,
-    marginTop: 2,
-  },
-  segmented: {
-    flexDirection: 'row',
-    borderWidth: 1,
-    borderRadius: 14,
-    padding: 3,
-    gap: 2,
-    marginBottom: tokens.spacing.xs,
-  },
-  segmentBtn: {
-    flex: 1,
-    borderRadius: 11,
+    fontSize: 15,
+    fontFamily: tokens.typography.family.regular,
     paddingVertical: 8,
+  },
+  groupBlock: {
+    marginTop: 6,
+  },
+  groupList: {
+    marginTop: 4,
+  },
+  emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 48,
+    paddingHorizontal: 20,
   },
-  segmentText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  sortRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: tokens.spacing.sm,
-  },
-  sortLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  sortChip: {
-    borderWidth: 1,
-    borderRadius: 9999,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  sortChipText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  checklistCard: {
-    borderRadius: 20,
-    overflow: 'hidden',
-  },
-  errorCard: {
-    borderRadius: 12,
-    borderWidth: 1,
-    padding: 12,
-    marginBottom: tokens.spacing.sm,
-    gap: 6,
-  },
-  errorText: {
-    fontSize: 13,
-  },
-  retryText: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  emptyCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 20,
-    borderWidth: 1,
-    padding: tokens.spacing.md,
-    gap: 12,
-  },
-  emptyIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyContent: {
-    flex: 1,
-  },
-  emptyTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    lineHeight: 21,
-  },
-  emptySub: {
-    fontSize: 12,
-    marginTop: 2,
-  },
-  completedSectionWrapper: {
-    marginTop: tokens.spacing.md,
-  },
-  completedSectionToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  completedToggleLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  completedToggleText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  fabOverlay: {
-    position: 'absolute',
-    right: 16,
-    bottom: 96,
-    zIndex: 50,
-    alignItems: 'flex-end',
-  },
-  fab: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 9999,
-    paddingHorizontal: 18,
-    paddingVertical: 13,
-    gap: 6,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.22,
-    shadowRadius: 6,
-  },
-  fabText: {
+  emptyText: {
     fontSize: 14,
-    fontWeight: '700',
+    textAlign: 'center',
+    fontFamily: tokens.typography.family.regular,
   },
 });

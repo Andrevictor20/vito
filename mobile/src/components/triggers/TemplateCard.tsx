@@ -1,9 +1,9 @@
 import React from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { tokens, MD3Shapes } from '../../theme/tokens';
+import { tokens } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
-import { TriggerTemplate, TriggerCategory, TRIGGER_CATEGORIES } from '../../types';
+import { TriggerTemplate, TRIGGER_CATEGORIES } from '../../types';
 
 interface TemplateCardProps {
   template: TriggerTemplate;
@@ -22,249 +22,114 @@ export const TemplateCard: React.FC<TemplateCardProps> = ({
     id: template.category,
     label: template.category,
     icon: 'auto-awesome' as const,
-    colorLight: '#6B7280',
-    colorDark: '#9CA3AF',
-    bgLight: '#F3F4F6',
-    bgDark: '#1F2937',
+    colorLight: colors.blue,
+    colorDark: colors.blue,
+    bgLight: colors.blueBg,
+    bgDark: 'rgba(43, 127, 212, 0.18)',
     placeholder: '',
   };
 
-  const scheduleText =
-    template.frequency === 'immediate'
-      ? 'Em tempo real'
-      : template.scheduled_time
-      ? `Diário às ${template.scheduled_time}`
-      : template.frequency === 'daily_evening'
-      ? 'Diário ao entardecer (18:00)'
-      : 'Diário pela manhã (08:30)';
-
-  const getConnectorStyle = (connector: string) => {
-    switch (connector.toLowerCase()) {
-      case 'gmail':
-        return {
-          icon: 'mail-outline' as const,
-          label: 'Gmail',
-          color: '#EF4444',
-          bg: isDark ? 'rgba(239, 68, 68, 0.18)' : '#FEE2E2',
-          border: isDark ? 'rgba(239, 68, 68, 0.35)' : '#FECACA',
-        };
-      case 'calendar':
-        return {
-          icon: 'event' as const,
-          label: 'Agenda',
-          color: '#3B82F6',
-          bg: isDark ? 'rgba(59, 130, 246, 0.18)' : '#DBEAFE',
-          border: isDark ? 'rgba(59, 130, 246, 0.35)' : '#BFDBFE',
-        };
-      case 'web':
-        return {
-          icon: 'language' as const,
-          label: 'Web Search',
-          color: '#10B981',
-          bg: isDark ? 'rgba(168, 85, 247, 0.18)' : '#D1FAE5',
-          border: isDark ? 'rgba(16, 185, 129, 0.35)' : '#A7F3D0',
-        };
-      case 'profile':
-        return {
-          icon: 'person-outline' as const,
-          label: 'Perfil',
-          color: '#A855F7',
-          bg: isDark ? 'rgba(168, 85, 247, 0.18)' : '#F3E8FF',
-          border: isDark ? 'rgba(168, 85, 247, 0.35)' : '#E9D5FF',
-        };
-      default:
-        return {
-          icon: 'link' as const,
-          label: connector,
-          color: colors.onSurfaceVariant,
-          bg: isDark ? colors.surfaceContainerHighest : '#F4F4F5',
-          border: colors.outlineVariant,
-        };
-    }
-  };
+  const categoryColor = isDark ? catMeta.colorDark : catMeta.colorLight;
+  const categoryBg = isDark ? catMeta.bgDark : catMeta.bgLight;
 
   return (
-    <View
+    <TouchableOpacity
       style={[
-        styles.card,
+        styles.tile,
         {
-          backgroundColor: colors.surfaceContainer,
-          borderColor: colors.outlineVariant,
+          backgroundColor: colors.bg,
+          borderColor: colors.line,
         },
       ]}
+      onPress={() => onActivate(template)}
+      activeOpacity={0.7}
+      disabled={isActivating}
+      accessibilityRole="button"
+      accessibilityLabel={`Ativar vigília ${template.title}: ${template.description}`}
     >
-      <View style={styles.cardHeaderRow}>
-        <View
+      <View style={[styles.chip, { backgroundColor: categoryBg }]}>
+        <MaterialIcons name={catMeta.icon} size={20} color={categoryColor} />
+      </View>
+
+      <View style={styles.content}>
+        <Text
           style={[
-            styles.categoryBadge,
-            { backgroundColor: isDark ? catMeta.bgDark : catMeta.bgLight },
+            styles.title,
+            {
+              color: colors.ink,
+              fontFamily: tokens.typography.family.semibold,
+            },
           ]}
+          numberOfLines={2}
         >
-          <MaterialIcons
-            name={catMeta.icon}
-            size={13}
-            color={isDark ? catMeta.colorDark : catMeta.colorLight}
-          />
-          <Text
-            style={[
-              styles.categoryBadgeText,
-              { color: isDark ? catMeta.colorDark : catMeta.colorLight },
-            ]}
-          >
-            {catMeta.label}
-          </Text>
-        </View>
-
-        <View style={styles.scheduleRow}>
-          <MaterialIcons name="schedule" size={13} color={colors.onSurfaceVariant} />
-          <Text style={[styles.scheduleText, { color: colors.onSurfaceVariant }]}>
-            {scheduleText}
-          </Text>
-        </View>
-      </View>
-
-      <Text style={[styles.cardTitle, { color: colors.onSurface }]}>{template.title}</Text>
-      <Text style={[styles.cardDescription, { color: colors.onSurfaceVariant }]}>
-        {template.description}
-      </Text>
-
-      <View style={styles.connectorsSection}>
-        <Text style={[styles.connectorsLabel, { color: colors.onSurfaceVariant }]}>
-          Fontes cruzadas:
+          {template.title}
         </Text>
-        <View style={styles.connectorsRow}>
-          {template.connectors.map((connector) => {
-            const conf = getConnectorStyle(connector);
-            return (
-              <View
-                key={connector}
-                style={[
-                  styles.connectorBadge,
-                  { backgroundColor: conf.bg, borderColor: conf.border },
-                ]}
-              >
-                <MaterialIcons name={conf.icon} size={12} color={conf.color} />
-                <Text style={[styles.connectorBadgeText, { color: conf.color }]}>
-                  {conf.label}
-                </Text>
-              </View>
-            );
-          })}
-        </View>
+        <Text
+          style={[
+            styles.description,
+            {
+              color: colors.muted,
+              fontFamily: tokens.typography.family.regular,
+            },
+          ]}
+          numberOfLines={2}
+        >
+          {template.description}
+        </Text>
       </View>
 
-      <TouchableOpacity
-        style={[
-          styles.activateButton,
-          { backgroundColor: colors.primary },
-          isActivating && { opacity: 0.7 },
-        ]}
-        onPress={() => onActivate(template)}
-        disabled={isActivating}
-        activeOpacity={0.8}
-        accessibilityRole="button"
-        accessibilityLabel={`Ativar vigília ${template.title}`}
-      >
-        {isActivating ? (
-          <>
-            <ActivityIndicator size="small" color={colors.onPrimary} />
-            <Text style={[styles.activateButtonText, { color: colors.onPrimary }]}>
-              Ativando vigília...
-            </Text>
-          </>
-        ) : (
-          <>
-            <MaterialIcons name="bolt" size={18} color={colors.onPrimary} />
-            <Text style={[styles.activateButtonText, { color: colors.onPrimary }]}>
-              Ativar com 1 Toque
-            </Text>
-          </>
-        )}
-      </TouchableOpacity>
-    </View>
+      {isActivating && (
+        <View style={styles.activatingOverlay}>
+          <ActivityIndicator size="small" color={categoryColor} />
+        </View>
+      )}
+    </TouchableOpacity>
   );
 };
 
 const styles = StyleSheet.create({
-  card: {
-    borderRadius: MD3Shapes.large,
+  tile: {
+    flex: 1,
     borderWidth: 1,
-    padding: 16,
-    gap: 10,
-  },
-  cardHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    borderRadius: 18,
+    padding: 14,
+    minHeight: 140,
     justifyContent: 'space-between',
+    margin: 5,
+    shadowColor: 'rgba(20,25,22,0.04)',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 1,
   },
-  categoryBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: MD3Shapes.small,
-    gap: 4,
-  },
-  categoryBadgeText: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  scheduleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  scheduleText: {
-    fontSize: 11,
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    lineHeight: 22,
-  },
-  cardDescription: {
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  connectorsSection: {
-    marginTop: 2,
-    gap: 6,
-  },
-  connectorsLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  connectorsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  connectorBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: MD3Shapes.small,
-    borderWidth: 1,
-    gap: 4,
-  },
-  connectorBadgeText: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  activateButton: {
-    flexDirection: 'row',
+  chip: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 11,
-    borderRadius: MD3Shapes.medium,
-    marginTop: 4,
-    gap: 6,
   },
-  activateButtonText: {
-    fontSize: 13,
-    fontWeight: '700',
+  content: {
+    marginTop: 10,
+    gap: 3,
+  },
+  title: {
+    fontSize: 14.5,
+    lineHeight: 18,
+  },
+  description: {
+    fontSize: 12.5,
+    lineHeight: 16,
+  },
+  activatingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255,255,255,0.7)',
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

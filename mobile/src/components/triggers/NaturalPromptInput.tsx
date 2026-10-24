@@ -7,10 +7,12 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Keyboard,
+  ScrollView,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { tokens, MD3Shapes } from '../../theme/tokens';
+import { tokens } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
+import { VitoMascot } from '../common/VitoMascot';
 import { RadarFilterButton } from './RadarFilterButton';
 import { TriggerCategory, TRIGGER_CATEGORIES } from '../../types';
 import { api } from '../../services/api';
@@ -29,6 +31,13 @@ interface NaturalPromptInputProps {
   }) => Promise<any>;
 }
 
+const EXAMPLES = [
+  { label: 'Preço de voo', prompt: 'Avisar quando o voo para o Rio baixar de R$ 600' },
+  { label: 'Edital', prompt: 'Novos editais de concurso na minha área' },
+  { label: 'Fatura', prompt: 'Lembrar da fatura do cartão todo mês' },
+  { label: 'Notícias de IA', prompt: 'Resumo diário de notícias sobre IA' },
+];
+
 export const NaturalPromptInput: React.FC<NaturalPromptInputProps> = ({
   selectedCategory,
   onCategoryChange,
@@ -37,21 +46,21 @@ export const NaturalPromptInput: React.FC<NaturalPromptInputProps> = ({
   filteredCount,
   onCreateFromPrompt,
 }) => {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
   const [naturalPrompt, setNaturalPrompt] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [promptError, setPromptError] = useState<string | null>(null);
 
-  const handleSubmit = async () => {
-    const trimmed = naturalPrompt.trim();
-    if (!trimmed) return;
+  const handleSubmit = async (overridePrompt?: string) => {
+    const text = (overridePrompt ?? naturalPrompt).trim();
+    if (!text) return;
 
     setIsSubmitting(true);
     setPromptError(null);
     Keyboard.dismiss();
 
     try {
-      const parsed = await api.parseTriggerPrompt(trimmed);
+      const parsed = await api.parseTriggerPrompt(text);
       const parsedCondition = parsed.condition_type;
       const conditionType =
         parsedCondition === 'price_above' ||
@@ -62,9 +71,9 @@ export const NaturalPromptInput: React.FC<NaturalPromptInputProps> = ({
           : 'daily_brief';
 
       await onCreateFromPrompt({
-        title: parsed.suggested_title || trimmed,
+        title: parsed.suggested_title || text,
         category: parsed.category,
-        query: trimmed,
+        query: text,
         condition_type: conditionType,
       });
       setNaturalPrompt('');
@@ -76,52 +85,67 @@ export const NaturalPromptInput: React.FC<NaturalPromptInputProps> = ({
     }
   };
 
+  const handleSelectExample = (prompt: string) => {
+    setNaturalPrompt(prompt);
+  };
+
   const selectedCategoryLabel =
     selectedCategory === 'all'
       ? null
       : TRIGGER_CATEGORIES.find((c) => c.id === selectedCategory)?.label ?? selectedCategory;
 
+  const hasText = !!naturalPrompt.trim();
+
   return (
-    <View style={styles.inputSection}>
-      <View style={styles.inputRow}>
-        <View
+    <View style={styles.container}>
+      {/* Barra de input .ask2 */}
+      <View
+        style={[
+          styles.ask2,
+          {
+            backgroundColor: colors.bg,
+            borderColor: colors.line,
+          },
+        ]}
+      >
+        <View style={styles.mascotWrapper}>
+          <VitoMascot size={26} state={isSubmitting ? 'thinking' : 'idle'} animated={true} />
+        </View>
+
+        <TextInput
+          style={[styles.input, { color: colors.ink }]}
+          value={naturalPrompt}
+          onChangeText={setNaturalPrompt}
+          placeholder="No que quer ficar de olho?"
+          placeholderTextColor={colors.muted}
+          onSubmitEditing={() => handleSubmit()}
+          returnKeyType="send"
+          editable={!isSubmitting}
+        />
+
+        <TouchableOpacity
           style={[
-            styles.inputCard,
+            styles.sendButton,
             {
-              backgroundColor: isDark ? colors.surfaceContainerLow : '#FFFFFF',
-              borderColor: isDark ? colors.outlineVariant : 'rgba(0,0,0,0.08)',
+              backgroundColor: hasText ? colors.ink : colors.line,
             },
           ]}
+          onPress={() => handleSubmit()}
+          disabled={!hasText || isSubmitting}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Criar radar"
         >
-          <MaterialIcons name="auto-awesome" size={20} color={colors.primary} />
-          <TextInput
-            style={[styles.naturalInput, { color: colors.onSurface }]}
-            value={naturalPrompt}
-            onChangeText={setNaturalPrompt}
-            placeholder="No que quer ficar de olho?"
-            placeholderTextColor={colors.onSurfaceVariant}
-            onSubmitEditing={handleSubmit}
-            returnKeyType="send"
-            editable={!isSubmitting}
-          />
-          <TouchableOpacity
-            style={[
-              styles.sendButton,
-              { backgroundColor: colors.primary },
-              (!naturalPrompt.trim() || isSubmitting) && { opacity: 0.5 },
-            ]}
-            onPress={handleSubmit}
-            disabled={!naturalPrompt.trim() || isSubmitting}
-            accessibilityRole="button"
-            accessibilityLabel="Criar radar a partir do texto"
-          >
-            {isSubmitting ? (
-              <ActivityIndicator size="small" color={colors.onPrimary} />
-            ) : (
-              <MaterialIcons name="arrow-forward" size={16} color={colors.onPrimary} />
-            )}
-          </TouchableOpacity>
-        </View>
+          {isSubmitting ? (
+            <ActivityIndicator size="small" color={hasText ? colors.bg : colors.muted} />
+          ) : (
+            <MaterialIcons
+              name="arrow-upward"
+              size={18}
+              color={hasText ? colors.bg : colors.muted}
+            />
+          )}
+        </TouchableOpacity>
 
         <RadarFilterButton
           selected={selectedCategory}
@@ -132,11 +156,37 @@ export const NaturalPromptInput: React.FC<NaturalPromptInputProps> = ({
         />
       </View>
 
-      {!!promptError && <Text style={styles.inputErrorText}>{promptError}</Text>}
+      {/* Chips de exemplos .ex */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.exContainer}
+      >
+        {EXAMPLES.map((ex, index) => (
+          <TouchableOpacity
+            key={index}
+            style={[
+              styles.exChip,
+              {
+                backgroundColor: colors.bg,
+                borderColor: colors.line,
+              },
+            ]}
+            onPress={() => handleSelectExample(ex.prompt)}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={`Exemplo: ${ex.label}`}
+          >
+            <Text style={[styles.exChipText, { color: colors.ink }]}>{ex.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      {!!promptError && <Text style={[styles.inputErrorText, { color: colors.red }]}>{promptError}</Text>}
 
       {!!selectedCategoryLabel && (
         <View style={styles.activeFilterRow}>
-          <Text style={[styles.activeFilterText, { color: colors.textMuted }]}>
+          <Text style={[styles.activeFilterText, { color: colors.muted }]}>
             {selectedCategoryLabel} · {filteredCount} {filteredCount === 1 ? 'radar' : 'radares'}
           </Text>
           <TouchableOpacity
@@ -145,7 +195,7 @@ export const NaturalPromptInput: React.FC<NaturalPromptInputProps> = ({
             accessibilityLabel="Limpar filtro de categoria"
             accessibilityRole="button"
           >
-            <Text style={[styles.activeFilterClear, { color: colors.primary }]}>Limpar</Text>
+            <Text style={[styles.activeFilterClear, { color: colors.acc }]}>Limpar</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -154,56 +204,84 @@ export const NaturalPromptInput: React.FC<NaturalPromptInputProps> = ({
 };
 
 const styles = StyleSheet.create({
-  inputSection: {
+  container: {
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingTop: 8,
+    paddingBottom: 4,
   },
-  inputRow: {
+  ask2: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 24,
+    borderWidth: 1,
+    paddingLeft: 12,
+    paddingRight: 6,
+    paddingVertical: 5,
+    gap: 8,
+    shadowColor: 'rgba(20,25,22,0.06)',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  mascotWrapper: {
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  input: {
+    flex: 1,
+    fontSize: 15,
+    fontFamily: tokens.typography.family.regular,
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+  },
+  sendButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  exContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    paddingTop: 10,
+    paddingBottom: 2,
+  },
+  exChip: {
+    borderWidth: 1,
+    borderRadius: 16,
+    height: 32,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  exChipText: {
+    fontFamily: tokens.typography.family.medium,
+    fontSize: 13,
   },
   activeFilterRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 4,
-    paddingTop: 6,
+    paddingTop: 8,
   },
   activeFilterText: {
     fontSize: 12,
-    fontWeight: '500',
+    fontFamily: tokens.typography.family.medium,
   },
   activeFilterClear: {
     fontSize: 12,
-    fontWeight: '700',
-  },
-  inputCard: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: MD3Shapes.largeIncreased,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    gap: 10,
-  },
-  naturalInput: {
-    flex: 1,
-    fontSize: 14,
-    paddingVertical: 4,
-  },
-  sendButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
+    fontFamily: tokens.typography.family.bold,
   },
   inputErrorText: {
-    color: '#EF4444',
     fontSize: 12,
     marginTop: 6,
-    marginLeft: 4,
+    paddingHorizontal: 4,
+    fontFamily: tokens.typography.family.regular,
   },
 });

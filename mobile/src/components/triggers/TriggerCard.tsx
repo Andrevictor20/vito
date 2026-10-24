@@ -1,10 +1,11 @@
 import React from 'react';
 import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { MD3Shapes } from '../../theme/tokens';
+import Svg, { Path } from 'react-native-svg';
+import { tokens } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { Trigger, TRIGGER_CATEGORIES, TriggerCategory } from '../../types';
-import { M3Switch } from '../ui/M3Switch';
+import { VitoSwitch } from '../ui/VitoSwitch';
 
 interface TriggerCardProps {
   trigger: Trigger;
@@ -22,11 +23,11 @@ export const TriggerCard: React.FC<TriggerCardProps> = ({
   const categoryMeta = TRIGGER_CATEGORIES.find((c) => c.id === trigger.category) || {
     id: trigger.category as TriggerCategory,
     label: 'Geral',
-    icon: 'tune',
-    colorLight: '#4B5563',
-    colorDark: '#9CA3AF',
-    bgLight: '#F3F4F6',
-    bgDark: '#1F2937',
+    icon: 'tune' as const,
+    colorLight: colors.blue,
+    colorDark: colors.blue,
+    bgLight: colors.blueBg,
+    bgDark: 'rgba(43, 127, 212, 0.18)',
     placeholder: '',
   };
 
@@ -51,123 +52,170 @@ export const TriggerCard: React.FC<TriggerCardProps> = ({
     }
   };
 
+  const getLastInfo = () => {
+    if (trigger.current_value && trigger.target_value) {
+      return `R$ ${trigger.current_value} hoje · alvo R$ ${trigger.target_value}`;
+    }
+    if (trigger.last_run_status) {
+      return trigger.last_run_status;
+    }
+    if (trigger.last_checked_at) {
+      try {
+        const d = new Date(trigger.last_checked_at);
+        const time = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        return `Última checagem hoje às ${time}`;
+      } catch {
+        // fallback
+      }
+    }
+    return 'O Vito está vigiando ativamente este radar';
+  };
+
+  const hasSparkline =
+    trigger.condition_type === 'price_below' ||
+    trigger.condition_type === 'price_above' ||
+    trigger.category === 'travel' ||
+    trigger.category === 'finance' ||
+    trigger.category === 'shopping' ||
+    Boolean(trigger.current_value);
+
   return (
     <TouchableOpacity
       style={[
-        styles.card,
+        styles.rcard,
         {
-          backgroundColor: colors.surfaceContainer,
-          borderColor: colors.outlineVariant,
-          opacity: isActive ? 1 : 0.75,
+          backgroundColor: colors.bg,
+          borderColor: colors.line,
         },
+        !isActive && styles.rcardOff,
       ]}
       onPress={() => onPress(trigger)}
       activeOpacity={0.7}
-      accessibilityLabel={`Radar ${trigger.title}. Toque para ver relatórios e histórico.`}
+      accessibilityRole="button"
+      accessibilityLabel={`Radar ${trigger.title}. ${isActive ? 'Ativo' : 'Pausado'}. Toque para ver detalhes.`}
     >
-      <View style={styles.contentRow}>
-        {/* Ícone da Categoria com container circular tonal */}
-        <View style={[styles.iconCircle, { backgroundColor: categoryBg }]}>
-          <MaterialIcons name={categoryMeta.icon} size={18} color={categoryColor} />
+      {/* Topo do card: Chip + Título & Meta + Switch customizado */}
+      <View style={styles.rtop}>
+        <View style={[styles.chip, { backgroundColor: categoryBg }]}>
+          <MaterialIcons name={categoryMeta.icon} size={20} color={categoryColor} />
         </View>
 
-        {/* Informações Centrais: Título (2 linhas) + Meta (Categoria • Horário) */}
         <View style={styles.textContainer}>
           <Text
-            style={[styles.title, { color: colors.onSurface }]}
+            style={[
+              styles.title,
+              { color: colors.ink, fontFamily: tokens.typography.family.semibold },
+            ]}
             numberOfLines={2}
-            ellipsizeMode="tail"
           >
             {trigger.title}
           </Text>
-          <View style={styles.metaRow}>
-            <Text
-              style={[styles.categoryLabel, { color: categoryColor }]}
-              numberOfLines={1}
-            >
+          <View style={styles.meta}>
+            <Text style={[styles.catText, { color: categoryColor }]} numberOfLines={1}>
               {categoryMeta.label}
             </Text>
-            <Text style={[styles.metaDot, { color: colors.onSurfaceVariant }]}>•</Text>
-            <MaterialIcons name="schedule" size={11} color={colors.onSurfaceVariant} />
-            <Text style={[styles.timeText, { color: colors.onSurfaceVariant }]} numberOfLines={1}>
+            <Text style={[styles.metaText, { color: colors.muted }]} numberOfLines={1}>
+              {' · '}
               {getFrequencyLabel()}
             </Text>
           </View>
         </View>
 
-        {/* Só o Switch: editar/excluir vivem na tela de detalhes (toque no card) */}
-        <View style={styles.actionsRight}>
-          <View style={styles.switchWrapper}>
-            <M3Switch value={isActive} onValueChange={() => onToggle(trigger.id)} />
+        <VitoSwitch value={isActive} onValueChange={() => onToggle(trigger.id)} />
+      </View>
+
+      {/* Divisória tracejada com última atualização e sparkline SVG */}
+      <View style={[styles.lastRow, { borderTopColor: colors.line }]}>
+        <View style={[styles.lastDot, { backgroundColor: categoryColor }]} />
+        <Text style={[styles.lastText, { color: colors.ink }]} numberOfLines={1}>
+          {getLastInfo()}
+        </Text>
+
+        {hasSparkline && (
+          <View style={styles.sparkWrapper}>
+            <Svg width={44} height={22} viewBox="0 0 44 22" fill="none">
+              <Path
+                d="M2 4l9 3 8 6 8-2 7 6 8 1"
+                stroke={categoryColor}
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </Svg>
           </View>
-        </View>
+        )}
       </View>
     </TouchableOpacity>
   );
 };
 
 const styles = StyleSheet.create({
-  card: {
-    borderRadius: MD3Shapes.largeIncreased,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginBottom: 8,
+  rcard: {
     borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 4,
+    borderRadius: 18,
+    padding: 14,
+    marginBottom: 10,
+    shadowColor: 'rgba(20,25,22,0.04)',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
     elevation: 1,
-    minHeight: 58,
-    justifyContent: 'center',
   },
-  contentRow: {
+  rcardOff: {
+    opacity: 0.55,
+  },
+  rtop: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 12,
   },
-  iconCircle: {
-    width: 34,
-    height: 34,
-    borderRadius: MD3Shapes.full,
+  chip: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
   textContainer: {
     flex: 1,
-    marginHorizontal: 10,
-    justifyContent: 'center',
   },
   title: {
-    fontSize: 16,
-    fontWeight: '700',
-    letterSpacing: -0.1,
-    lineHeight: 21,
+    fontSize: 15.5,
+    lineHeight: 20,
     marginBottom: 2,
   },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  categoryLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-  },
-  metaDot: {
-    fontSize: 10,
-    opacity: 0.6,
-  },
-  timeText: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  actionsRight: {
+  meta: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  switchWrapper: {
-    transform: [{ scale: 0.85 }],
+  catText: {
+    fontSize: 12.5,
+    fontFamily: tokens.typography.family.medium,
+  },
+  metaText: {
+    fontSize: 12.5,
+    fontFamily: tokens.typography.family.regular,
+  },
+  lastRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderStyle: 'dashed',
+  },
+  lastDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  lastText: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: tokens.typography.family.regular,
+  },
+  sparkWrapper: {
+    marginLeft: 'auto',
   },
 });

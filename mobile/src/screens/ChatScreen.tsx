@@ -364,7 +364,12 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
         ]}
         keyboardShouldPersistTaps="handled"
         ListEmptyComponent={
-          <ChatEmptyWelcome welcomeGreeting={welcomeGreeting} loading={loading} />
+          <ChatEmptyWelcome
+            userName={firstName}
+            welcomeGreeting={welcomeGreeting}
+            loading={loading}
+            onSelectIdea={handleQuickPrompt}
+          />
         }
         ListFooterComponent={
           loading ? (

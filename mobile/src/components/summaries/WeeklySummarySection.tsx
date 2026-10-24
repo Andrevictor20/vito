@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { MD3Shapes, tabularNumbers } from '../../theme/tokens';
+import { tokens } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { hapticFeedback } from '../../theme/motion';
 import { WeeklySummaryItem } from '../../utils/weeklySummaryCalculator';
@@ -15,174 +15,267 @@ export const WeeklySummarySection: React.FC<WeeklySummarySectionProps> = ({
   summaries,
   onSelectWeek,
 }) => {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
+  // Semana expandida por padrão é a mais recente (semana atual)
+  const [expandedId, setExpandedId] = useState<string | null>(
+    summaries[0]?.id || null
+  );
+
+  const toggleExpand = (id: string) => {
+    hapticFeedback.selection();
+    setExpandedId((prev) => (prev === id ? null : id));
+  };
+
+  // Cálculo de delta vs semana anterior
+  const deltaHours = React.useMemo(() => {
+    if (summaries.length < 2) return null;
+    const curH = summaries[0]?.hours || 0;
+    const prevH = summaries[1]?.hours || 0;
+    const diff = curH - prevH;
+    const sign = diff >= 0 ? '+' : '';
+    return `${sign}${diff.toFixed(1)}h vs semana anterior`;
+  }, [summaries]);
+
+  // Altura máxima para as barras
+  const maxBarH = 72;
+  const maxHoursInList = Math.max(1, ...summaries.map((s) => s.hours || 0));
+
+  // Ordenação cronológica para o gráfico de barras (da esquerda para direita)
+  const chronological = React.useMemo(() => {
+    return [...summaries].reverse();
+  }, [summaries]);
 
   return (
-    <View style={styles.weeklyList}>
-      {summaries.map((item) => (
-        <TouchableOpacity
-          key={item.id}
-          style={[
-            styles.weeklyCard,
-            {
-              backgroundColor: colors.surfaceContainer,
-              borderColor: colors.outlineVariant,
-            },
-          ]}
-          onPress={() => {
-            hapticFeedback.selection();
-            onSelectWeek(item);
-          }}
-          activeOpacity={0.75}
-        >
-          <View style={styles.weeklyCardHeader}>
-            <Text style={[styles.weeklyRange, { color: colors.onSurface }]}>
-              {item.isCurrentWeek ? `Ciclo Atual · ${item.period}` : item.period}
-            </Text>
-            {item.isCurrentWeek && (
-              <View
-                style={[
-                  styles.currentBadge,
-                  { backgroundColor: colors.surfaceContainerHighest },
-                ]}
-              >
-                <Text style={[styles.currentBadgeText, { color: colors.primary }]}>
-                  EM ANDAMENTO
+    <View style={styles.container}>
+      {/* Card 1 (.card2): Gráfico de Barras de Horas por Semana */}
+      <View style={[styles.card2, { backgroundColor: colors.bg, borderColor: colors.line }]}>
+        <View style={styles.eyebrowRow}>
+          <MaterialIcons name="calendar-month" size={15} color={colors.blue} />
+          <Text style={[styles.eyebrow, { color: colors.muted }]}>
+            Horas em compromissos por semana
+          </Text>
+        </View>
+
+        {/* Gráfico de Colunas (.cols) */}
+        <View style={styles.cols}>
+          {chronological.map((w) => {
+            const h = w.hours || 0;
+            const barHeight = Math.max(8, (h / maxHoursInList) * maxBarH);
+            const isCur = w.isCurrentWeek;
+
+            return (
+              <View key={w.id} style={styles.colItem}>
+                <Text style={[styles.colValue, { color: colors.ink }]}>
+                  {h.toFixed(1)}h
+                </Text>
+                <View
+                  style={[
+                    styles.colBar,
+                    {
+                      height: barHeight,
+                      backgroundColor: isCur ? colors.blue : colors.line,
+                    },
+                  ]}
+                />
+                <Text style={[styles.colLabel, { color: colors.muted }]} numberOfLines={1}>
+                  {w.period.split(' ')[0] || w.period}
                 </Text>
               </View>
-            )}
-          </View>
+            );
+          })}
+        </View>
 
-          <Text style={[styles.weeklyTheme, { color: colors.textMuted }]}>
-            {item.title}
-          </Text>
-
-          <View style={[styles.cardAiSnippet, { backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)' }]}>
-            <View style={styles.snippetHeaderRow}>
-              <MaterialIcons name="auto-awesome" size={13} color={colors.primary} />
-              <Text style={[styles.snippetTag, { color: colors.primary }]}>ANÁLISE DE IA</Text>
-            </View>
-            <Text style={[styles.snippetText, { color: colors.onSurface }]} numberOfLines={2}>
-              {item.narrative}
-            </Text>
-          </View>
-
-          <View style={styles.weeklyStatsRow}>
-            <View style={styles.weeklyStat}>
-              <Text style={[styles.weeklyStatVal, tabularNumbers, { color: colors.onSurface }]}>
-                {item.hours}h
-              </Text>
-              <Text style={[styles.weeklyStatLbl, { color: colors.textMuted }]}>Horas</Text>
-            </View>
-
-            <View style={styles.weeklyStat}>
-              <Text style={[styles.weeklyStatVal, tabularNumbers, { color: colors.onSurface }]}>
-                {item.eventsCount}
-              </Text>
-              <Text style={[styles.weeklyStatLbl, { color: colors.textMuted }]}>Eventos</Text>
-            </View>
-
-            <View style={styles.weeklyStat}>
-              <Text style={[styles.weeklyStatVal, tabularNumbers, { color: colors.onSurface }]}>
-                {item.completedTodosCount}
-              </Text>
-              <Text style={[styles.weeklyStatLbl, { color: colors.textMuted }]}>Tarefas</Text>
+        {/* Pill delta */}
+        {deltaHours && (
+          <View style={styles.deltaWrapper}>
+            <View style={[styles.pillst, { backgroundColor: colors.surf, borderColor: colors.line }]}>
+              <Text style={[styles.pillstText, { color: colors.ink }]}>{deltaHours}</Text>
             </View>
           </View>
+        )}
+      </View>
 
-          <View style={[styles.cardClickHintRow, { borderTopColor: colors.outlineVariant }]}>
-            <Text style={[styles.cardClickHintText, { color: colors.primary }]}>
-              Toque para abrir o Raio-X
-            </Text>
-            <MaterialIcons name="chevron-right" size={16} color={colors.primary} />
-          </View>
-        </TouchableOpacity>
-      ))}
+      {/* Ciclos Semanais Expansíveis (.cyc) */}
+      <View style={styles.cyclesList}>
+        {summaries.map((item) => {
+          const isOpen = expandedId === item.id;
+
+          return (
+            <View
+              key={item.id}
+              style={[
+                styles.cyc,
+                { backgroundColor: colors.bg, borderColor: colors.line },
+              ]}
+            >
+              <TouchableOpacity
+                style={styles.cycHeader}
+                onPress={() => toggleExpand(item.id)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.cycTitleCol}>
+                  <View style={styles.cycTitleRow}>
+                    <Text style={[styles.cycTitle, { color: colors.ink }]}>
+                      {item.period}
+                    </Text>
+                    {item.isCurrentWeek && (
+                      <View style={[styles.pillst, { backgroundColor: colors.greenBg, borderColor: colors.greenBg }]}>
+                        <Text style={[styles.pillstText, { color: colors.acc }]}>
+                          Em andamento
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={[styles.cycMeta, { color: colors.muted }]}>
+                    {item.hours.toFixed(1)}h · {item.eventsCount} eventos · {item.completedTodosCount}/{item.totalTodosCount || 0} tarefas
+                  </Text>
+                </View>
+
+                <MaterialIcons
+                  name="chevron-right"
+                  size={20}
+                  color={colors.muted}
+                  style={{ transform: [{ rotate: isOpen ? '90deg' : '0deg' }] }}
+                />
+              </TouchableOpacity>
+
+              {isOpen && (
+                <View style={styles.cycBody}>
+                  <Text style={[styles.cycNarrative, { color: colors.ink }]}>
+                    {item.narrative}
+                  </Text>
+
+                  <TouchableOpacity
+                    style={[styles.lnk, { borderTopColor: colors.line }]}
+                    onPress={() => {
+                      hapticFeedback.light();
+                      onSelectWeek(item);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.lnkText, { color: colors.ink }]}>
+                      Abrir Raio-X
+                    </Text>
+                    <MaterialIcons name="chevron-right" size={16} color={colors.muted} />
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          );
+        })}
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  weeklyList: {
+  container: {
     gap: 12,
   },
-  weeklyCard: {
-    padding: 14,
-    borderRadius: MD3Shapes.large,
+  card2: {
+    borderRadius: 20,
     borderWidth: 1,
-    gap: 8,
+    padding: 16,
   },
-  weeklyCardHeader: {
+  eyebrowRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
-  weeklyRange: {
-    fontSize: 15,
+  eyebrow: {
+    fontSize: 11.5,
     fontWeight: '600',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+  },
+  cols: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 12,
+    marginTop: 18,
+    height: 110,
+    paddingHorizontal: 4,
+  },
+  colItem: {
     flex: 1,
-  },
-  currentBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: MD3Shapes.extraSmall,
-  },
-  currentBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  weeklyTheme: {
-    fontSize: 13,
-  },
-  cardAiSnippet: {
-    padding: 8,
-    borderRadius: MD3Shapes.small,
-    marginVertical: 4,
-    gap: 4,
-  },
-  snippetHeaderRow: {
-    flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    justifyContent: 'flex-end',
+    gap: 6,
   },
-  snippetTag: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  snippetText: {
-    fontSize: 12,
-    lineHeight: 16,
-  },
-  weeklyStatsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingTop: 8,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(128,128,128,0.2)',
-  },
-  weeklyStat: {
-    alignItems: 'center',
-  },
-  weeklyStatVal: {
-    fontSize: 16,
+  colValue: {
+    fontSize: 11.5,
     fontWeight: '600',
   },
-  weeklyStatLbl: {
+  colBar: {
+    width: '100%',
+    borderRadius: 6,
+  },
+  colLabel: {
     fontSize: 11,
     marginTop: 2,
   },
-  cardClickHintRow: {
+  deltaWrapper: {
+    marginTop: 14,
+    alignItems: 'flex-start',
+  },
+  pillst: {
+    borderRadius: 12,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderWidth: 1,
+  },
+  pillstText: {
+    fontSize: 11.5,
+    fontWeight: '600',
+  },
+  cyclesList: {
+    gap: 10,
+  },
+  cyc: {
+    borderRadius: 18,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  cycHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+  },
+  cycTitleCol: {
+    flex: 1,
+  },
+  cycTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  cycTitle: {
+    fontSize: 15.5,
+    fontWeight: '700',
+  },
+  cycMeta: {
+    fontSize: 12.5,
+    marginTop: 4,
+  },
+  cycBody: {
+    paddingHorizontal: 14,
+    paddingBottom: 14,
+  },
+  cycNarrative: {
+    fontSize: 13.5,
+    lineHeight: 19,
+  },
+  lnk: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 8,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    marginTop: 2,
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
   },
-  cardClickHintText: {
-    fontSize: 12,
+  lnkText: {
+    fontSize: 13.5,
     fontWeight: '600',
   },
 });

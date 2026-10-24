@@ -496,7 +496,7 @@ export const TRIGGER_CATEGORIES: CategoryMeta[] = [
   },
 ];
 
-export type AutonomyMode = 'assisted' | 'proactive';
+export type AutonomyMode = 'assisted' | 'proactive' | 'low' | 'autonomous';
 
 export interface AISettings {
   user_id: string;

@@ -10,7 +10,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { MD3Shapes } from '../../theme/tokens';
+import { tokens } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { TriggerTemplate, TriggerCategory } from '../../types';
 import { api } from '../../services/api';
@@ -30,20 +30,106 @@ interface CategoryFilterOption {
 
 const CATEGORY_FILTERS: CategoryFilterOption[] = [
   { id: 'all', label: 'Todas', icon: 'auto-awesome' },
-  { id: 'career', label: 'Carreiras', category: 'career', icon: 'work-outline' },
-  { id: 'public_exams', label: 'Concursos', category: 'public_exams', icon: 'gavel' },
-  { id: 'real_estate', label: 'Imóveis', category: 'real_estate', icon: 'apartment' },
-  { id: 'finance', label: 'Finanças', category: 'finance', icon: 'trending-up' },
-  { id: 'travel', label: 'Viagens', category: 'travel', icon: 'flight' },
-  { id: 'news', label: 'Trabalho & Setor', category: 'news', icon: 'newspaper' },
-  { id: 'tech', label: 'Estudos', category: 'tech', icon: 'school' },
+  { id: 'travel', label: 'Voos & Viagens', category: 'travel', icon: 'flight' },
+  { id: 'shopping', label: 'Preços & Ofertas', category: 'shopping', icon: 'local-offer' },
+  { id: 'public_exams', label: 'Concursos & Editais', category: 'public_exams', icon: 'description' },
+  { id: 'finance', label: 'Faturas & Boletos', category: 'finance', icon: 'receipt' },
+  { id: 'news', label: 'Notícias', category: 'news', icon: 'article' },
+  { id: 'events_sports', label: 'Eventos & Jogos', category: 'events_sports', icon: 'sports-soccer' },
+];
+
+const DEFAULT_TEMPLATES: TriggerTemplate[] = [
+  {
+    id: 'tpl_flights',
+    title: 'Voos e passagens',
+    description: 'Avisa quando o preço cair',
+    category: 'travel',
+    area: 'travel',
+    icon: 'flight',
+    connectors: ['web'],
+    query: 'Passagens aéreas em promoção',
+    user_intent: 'Monitorar preço de passagens',
+    condition_type: 'price_below',
+    target_value: '600',
+    frequency: 'daily_morning',
+  },
+  {
+    id: 'tpl_prices',
+    title: 'Preços e ofertas',
+    description: 'Acompanha produtos e promoções',
+    category: 'shopping',
+    area: 'shopping',
+    icon: 'local-offer',
+    connectors: ['web'],
+    query: 'Monitoramento de ofertas',
+    user_intent: 'Alerta de redução de preço',
+    condition_type: 'price_below',
+    target_value: '0',
+    frequency: 'daily_morning',
+  },
+  {
+    id: 'tpl_exams',
+    title: 'Concursos e editais',
+    description: 'Novos editais da sua área',
+    category: 'public_exams',
+    area: 'public_exams',
+    icon: 'description',
+    connectors: ['web'],
+    query: 'Novos concursos públicos e editais abertos',
+    user_intent: 'Notificar sobre novos editais',
+    condition_type: 'change_detected',
+    target_value: '',
+    frequency: 'daily_morning',
+  },
+  {
+    id: 'tpl_bills',
+    title: 'Faturas e boletos',
+    description: 'Vencimentos vindos dos seus e-mails',
+    category: 'finance',
+    area: 'finance',
+    icon: 'receipt',
+    connectors: ['gmail'],
+    query: 'Faturas de cartão e boletos a vencer',
+    user_intent: 'Lembrar de pagamentos',
+    condition_type: 'event_upcoming',
+    target_value: '',
+    frequency: 'daily_morning',
+  },
+  {
+    id: 'tpl_news',
+    title: 'Notícias',
+    description: 'Resumo diário de um assunto',
+    category: 'news',
+    area: 'news',
+    icon: 'article',
+    connectors: ['web'],
+    query: 'Resumo diário de notícias sobre tecnologia e negócios',
+    user_intent: 'Briefing diário de notícias',
+    condition_type: 'daily_brief',
+    target_value: '',
+    frequency: 'daily_morning',
+  },
+  {
+    id: 'tpl_sports',
+    title: 'Eventos e jogos',
+    description: 'Datas e horários do seu time',
+    category: 'events_sports',
+    area: 'events_sports',
+    icon: 'sports-soccer',
+    connectors: ['web'],
+    query: 'Próximos jogos do Flamengo e horários',
+    user_intent: 'Acompanhar jogos e transmissões',
+    condition_type: 'event_upcoming',
+    target_value: '',
+    frequency: 'daily_morning',
+  },
 ];
 
 export const ExploreTemplatesSection: React.FC<ExploreTemplatesSectionProps> = ({
   onActivate,
   activatingId,
 }) => {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
   const [templates, setTemplates] = useState<TriggerTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -60,10 +146,14 @@ export const ExploreTemplatesSection: React.FC<ExploreTemplatesSectionProps> = (
 
     try {
       const data = await api.getTriggerTemplates();
-      setTemplates(data);
+      if (data && data.length > 0) {
+        setTemplates(data);
+      } else {
+        setTemplates(DEFAULT_TEMPLATES);
+      }
     } catch (err: any) {
-      console.error('[ExploreTemplatesSection] Erro ao carregar templates:', err);
-      setErrorMessage(err?.message || 'Falha ao carregar catálogo de vigílias.');
+      console.warn('[ExploreTemplatesSection] Usando catálogo padrão:', err?.message);
+      setTemplates(DEFAULT_TEMPLATES);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -75,8 +165,9 @@ export const ExploreTemplatesSection: React.FC<ExploreTemplatesSectionProps> = (
   }, [fetchTemplates]);
 
   const filteredTemplates = useMemo(() => {
-    if (selectedFilter === 'all') return templates;
-    return templates.filter((t) => {
+    const list = templates.length > 0 ? templates : DEFAULT_TEMPLATES;
+    if (selectedFilter === 'all') return list;
+    return list.filter((t) => {
       const option = CATEGORY_FILTERS.find((f) => f.id === selectedFilter);
       if (!option || !option.category) return true;
       return t.category === option.category || t.area === selectedFilter;
@@ -86,9 +177,9 @@ export const ExploreTemplatesSection: React.FC<ExploreTemplatesSectionProps> = (
   if (loading && !refreshing) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={[styles.loadingText, { color: colors.onSurfaceVariant }]}>
-          Carregando catálogo de vigílias proativas...
+        <ActivityIndicator size="large" color={colors.ink} />
+        <Text style={[styles.loadingText, { color: colors.muted }]}>
+          Carregando catálogo de vigílias...
         </Text>
       </View>
     );
@@ -111,12 +202,8 @@ export const ExploreTemplatesSection: React.FC<ExploreTemplatesSectionProps> = (
                 style={[
                   styles.filterPill,
                   {
-                    backgroundColor: isSelected
-                      ? colors.primary
-                      : isDark
-                      ? colors.surfaceContainerLow
-                      : '#F4F4F5',
-                    borderColor: isSelected ? colors.primary : colors.outlineVariant,
+                    backgroundColor: isSelected ? colors.ink : colors.surf,
+                    borderColor: isSelected ? colors.ink : colors.line,
                   },
                 ]}
                 onPress={() => setSelectedFilter(filter.id)}
@@ -128,14 +215,16 @@ export const ExploreTemplatesSection: React.FC<ExploreTemplatesSectionProps> = (
                 <MaterialIcons
                   name={filter.icon}
                   size={14}
-                  color={isSelected ? colors.onPrimary : colors.onSurfaceVariant}
+                  color={isSelected ? colors.bg : colors.muted}
                 />
                 <Text
                   style={[
                     styles.filterPillText,
                     {
-                      color: isSelected ? colors.onPrimary : colors.onSurface,
-                      fontWeight: isSelected ? '700' : '500',
+                      color: isSelected ? colors.bg : colors.ink,
+                      fontFamily: isSelected
+                        ? tokens.typography.family.semibold
+                        : tokens.typography.family.medium,
                     },
                   ]}
                 >
@@ -147,51 +236,20 @@ export const ExploreTemplatesSection: React.FC<ExploreTemplatesSectionProps> = (
         </ScrollView>
       </View>
 
-      {/* Lista de Templates de Vigília */}
+      {/* Grid de 2 colunas .tiles com cards .tile */}
       <FlatList
         data={filteredTemplates}
         keyExtractor={(item) => item.id}
+        numColumns={2}
         contentContainerStyle={styles.listContent}
+        columnWrapperStyle={styles.columnWrapper}
         keyboardShouldPersistTaps="handled"
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={() => fetchTemplates(true)}
-            tintColor={colors.primary}
+            tintColor={colors.ink}
           />
-        }
-        ListHeaderComponent={
-          <View
-            style={[
-              styles.heroBanner,
-              {
-                backgroundColor: isDark ? colors.surfaceContainerLow : '#F8FAFC',
-                borderColor: isDark ? colors.outlineVariant : 'rgba(0,0,0,0.06)',
-              },
-            ]}
-          >
-            <View style={styles.heroBannerHeader}>
-              <View
-                style={[
-                  styles.heroBannerIconWrap,
-                  { backgroundColor: isDark ? 'rgba(59, 130, 246, 0.16)' : '#EFF6FF' },
-                ]}
-              >
-                <MaterialIcons name="radar" size={20} color={colors.primary} />
-              </View>
-              <View style={styles.heroBannerTextCol}>
-                <Text style={[styles.heroBannerTitle, { color: colors.onSurface }]}>
-                  Vigílias Inteligentes & Proativas
-                </Text>
-                <Text style={[styles.heroBannerSubtitle, { color: colors.onSurfaceVariant }]}>
-                  Ative monitores com 1 toque. O Vito cruza suas fontes e te avisa no WhatsApp e no app antes de você precisar perguntar.
-                </Text>
-              </View>
-            </View>
-            {!!errorMessage && (
-              <Text style={styles.errorBannerText}>{errorMessage}</Text>
-            )}
-          </View>
         }
         renderItem={({ item }) => (
           <TemplateCard
@@ -202,12 +260,20 @@ export const ExploreTemplatesSection: React.FC<ExploreTemplatesSectionProps> = (
         )}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <MaterialIcons name="search-off" size={40} color={colors.onSurfaceVariant} />
-            <Text style={[styles.emptyTitle, { color: colors.onSurface }]}>
+            <MaterialIcons name="search-off" size={40} color={colors.muted} />
+            <Text
+              style={[
+                styles.emptyTitle,
+                {
+                  color: colors.ink,
+                  fontFamily: tokens.typography.family.montserratBold,
+                },
+              ]}
+            >
               Nenhuma vigília nesta área
             </Text>
-            <Text style={[styles.emptySubtitle, { color: colors.onSurfaceVariant }]}>
-              Escolha outra categoria acima ou crie uma personalizada pelo campo de busca.
+            <Text style={[styles.emptySubtitle, { color: colors.muted }]}>
+              Escolha outra categoria acima ou digite o que quer acompanhar.
             </Text>
           </View>
         }
@@ -229,7 +295,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 14,
-    textAlign: 'center',
+    fontFamily: tokens.typography.family.regular,
   },
   filterSection: {
     paddingVertical: 8,
@@ -243,7 +309,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 12,
     paddingVertical: 7,
-    borderRadius: MD3Shapes.full,
+    borderRadius: 18,
     borderWidth: 1,
     gap: 6,
   },
@@ -251,45 +317,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   listContent: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 11,
     paddingTop: 4,
     paddingBottom: 120,
-    gap: 14,
   },
-  heroBanner: {
-    borderRadius: MD3Shapes.large,
-    borderWidth: 1,
-    padding: 14,
-    marginBottom: 6,
-  },
-  heroBannerHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
-  },
-  heroBannerIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  heroBannerTextCol: {
-    flex: 1,
-  },
-  heroBannerTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  heroBannerSubtitle: {
-    fontSize: 12,
-    lineHeight: 17,
-  },
-  errorBannerText: {
-    color: '#EF4444',
-    fontSize: 12,
-    marginTop: 8,
+  columnWrapper: {
+    justifyContent: 'space-between',
   },
   emptyContainer: {
     alignItems: 'center',
@@ -299,12 +332,11 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: 15,
-    fontWeight: '700',
   },
   emptySubtitle: {
-    fontSize: 12,
+    fontSize: 12.5,
     textAlign: 'center',
     lineHeight: 17,
-    maxWidth: 260,
+    fontFamily: tokens.typography.family.regular,
   },
 });

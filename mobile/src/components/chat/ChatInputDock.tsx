@@ -1,18 +1,18 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import {
   StyleSheet,
   View,
   Text,
   TextInput,
   TouchableOpacity,
-  ActivityIndicator,
   Image,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { tokens, MD3Shapes } from '../../theme/tokens';
+import { tokens } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { shouldTriggerSend } from '../../utils/chatSendGuard';
 import { FocusMode } from '../../types/focus';
+import { hapticFeedback } from '../../theme/motion';
 
 interface ChatInputDockProps {
   value: string;
@@ -51,15 +51,9 @@ export const ChatInputDock: React.FC<ChatInputDockProps> = ({
   onPressFocus,
   onClearFocus,
 }) => {
-
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
   const canSend = (value.trim().length > 0 || !!selectedImageUri) && !loading;
-
-  // Disparo único por toque: onPress exclusivo (sem onPressIn duplicado) com
-  // guarda pura por timestamp. Layout estável: o botão limpar ocupa espaço
-  // fixo sempre (só alterna opacidade), então o botão enviar nunca se move
-  // entre toques — causa raiz do "1º toque só fecha o teclado".
-  const lastSentAtRef = React.useRef(0);
+  const lastSentAtRef = useRef(0);
 
   const handleTriggerSend = () => {
     const decision = shouldTriggerSend({
@@ -73,6 +67,7 @@ export const ChatInputDock: React.FC<ChatInputDockProps> = ({
       return;
     }
     lastSentAtRef.current = decision.sentAt;
+    hapticFeedback.medium();
     onSend();
   };
 
@@ -83,52 +78,51 @@ export const ChatInputDock: React.FC<ChatInputDockProps> = ({
         <View style={styles.imagePreviewContainer}>
           <Image source={{ uri: selectedImageUri }} style={styles.previewImage} />
           <TouchableOpacity
-            style={styles.removeImageButton}
+            style={[styles.removeImageButton, { backgroundColor: colors.ink }]}
             onPress={onClearImage}
             hitSlop={tokens.hitSlop.sm}
             accessibilityLabel="Remover foto anexada"
           >
-            <MaterialIcons name="close" size={14} color="#FFF" />
+            <MaterialIcons name="close" size={13} color={colors.bg} />
           </TouchableOpacity>
         </View>
       )}
 
-      {/* Barra de Chat Expandida M3 (com Ações e Foco em Embutidos) */}
+      {/* Composer arredondado .cmp fiel a vito-telas.html */}
       <View
         style={[
-          styles.capsule,
+          styles.cmp,
           {
-            backgroundColor: colors.surfaceContainerHigh,
-            borderColor: colors.outlineVariant,
+            backgroundColor: colors.surf,
+            borderColor: colors.line,
           },
         ]}
       >
-        {/* Linha Superior Interna: Ações Rápidas & Foco em */}
-        <View style={styles.capsuleHeader}>
-          {/* Botão de Anexo / Foto (+) */}
+        {/* Linha Superior (.crow): Anexo (+) e Foco em */}
+        <View style={styles.crowTop}>
           {onPressAttach && !isRecording && (
             <TouchableOpacity
               style={[
-                styles.attachButton,
-                { backgroundColor: colors.surfaceContainerHighest },
+                styles.circ,
+                { backgroundColor: colors.bg, borderColor: colors.line },
               ]}
               onPress={onPressAttach}
               activeOpacity={0.7}
               hitSlop={tokens.hitSlop.sm}
               accessibilityLabel="Anexar imagem ou documento"
             >
-              <MaterialIcons name="add" size={18} color={colors.onSurfaceVariant} />
+              <MaterialIcons name="add" size={20} color={colors.ink} />
             </TouchableOpacity>
           )}
 
-          {/* Botão Foco em Embutido */}
+          {/* Foco em (.focus) */}
           {onPressFocus && (
             selectedFocus ? (
               <View
                 style={[
                   styles.focusPillActive,
                   {
-                    backgroundColor: isDark ? 'rgba(99, 102, 241, 0.18)' : 'rgba(99, 102, 241, 0.12)',
+                    backgroundColor: colors.bg,
                     borderColor: colors.primary,
                   },
                 ]}
@@ -137,59 +131,58 @@ export const ChatInputDock: React.FC<ChatInputDockProps> = ({
                   style={styles.focusPillTouchable}
                   onPress={onPressFocus}
                   activeOpacity={0.7}
-                  accessibilityLabel={`Foco em: ${selectedFocus.title}. Toque para alterar.`}
+                  accessibilityLabel={`Foco em: ${selectedFocus.title}`}
                 >
-                  <MaterialIcons name={selectedFocus.iconName as any} size={14} color={colors.primary} />
-                  <Text style={[styles.focusPillTextActive, { color: colors.primary }]} numberOfLines={1}>
-                    Foco: {selectedFocus.title}
+                  <MaterialIcons name={selectedFocus.iconName as any} size={13} color={colors.primary} />
+                  <Text style={[styles.focusTextActive, { color: colors.primary }]} numberOfLines={1}>
+                    {selectedFocus.title}
                   </Text>
                 </TouchableOpacity>
                 {onClearFocus && (
                   <TouchableOpacity
-                    style={styles.focusPillClear}
+                    style={styles.focusClear}
                     onPress={onClearFocus}
-                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                    hitSlop={tokens.hitSlop.sm}
                     accessibilityLabel="Remover foco"
                   >
-                    <MaterialIcons name="close" size={13} color={colors.primary} />
+                    <MaterialIcons name="close" size={12} color={colors.primary} />
                   </TouchableOpacity>
                 )}
               </View>
             ) : (
               <TouchableOpacity
                 style={[
-                  styles.focusPillInactive,
+                  styles.focusPill,
                   {
-                    backgroundColor: colors.surfaceContainerHighest,
-                    borderColor: colors.outlineVariant,
+                    backgroundColor: colors.bg,
+                    borderColor: colors.line,
                   },
                 ]}
                 onPress={onPressFocus}
                 activeOpacity={0.7}
                 accessibilityLabel="Selecionar foco de IA"
               >
-                <MaterialIcons name="tune" size={14} color={colors.onSurfaceVariant} />
-                <Text style={[styles.focusPillTextInactive, { color: colors.onSurfaceVariant }]}>
+                <MaterialIcons name="tune" size={13} color={colors.ink} />
+                <Text style={[styles.focusText, { color: colors.ink }]}>
                   Foco em
                 </Text>
-                <MaterialIcons name="keyboard-arrow-down" size={14} color={colors.onSurfaceVariant} />
+                <MaterialIcons name="keyboard-arrow-down" size={13} color={colors.muted} />
               </TouchableOpacity>
             )
           )}
         </View>
 
-        {/* Linha Principal: Campo de Digitação Amplo e Controles */}
-        <View style={styles.capsuleMainRow}>
-          {/* Campo de Entrada de Texto M3 */}
+        {/* Linha Inferior (.crow): Campo de Texto + Mic + Enviar */}
+        <View style={styles.crowBottom}>
           <TextInput
             ref={inputRef}
-            style={[styles.input, { color: colors.onSurface }]}
+            style={[styles.fieldInput, { color: colors.ink }]}
             placeholder={
               isRecording
                 ? 'Gravando áudio... Conclua ou cancele'
                 : 'Instrua o Vito ou pergunte algo...'
             }
-            placeholderTextColor={isRecording ? colors.error : colors.onSurfaceVariant}
+            placeholderTextColor={isRecording ? colors.red : colors.muted}
             value={value}
             onChangeText={onChangeText}
             multiline
@@ -198,86 +191,85 @@ export const ChatInputDock: React.FC<ChatInputDockProps> = ({
             returnKeyType="default"
           />
 
-          {/* Grupo de Ações à Direita */}
-          <View style={styles.actionGroupRight}>
-            {/* Botão de Limpar: visível apenas quando há texto */}
-            {value.length > 0 && !loading && (
-              <TouchableOpacity
-                style={styles.clearButton}
-                onPress={() => onChangeText('')}
-                hitSlop={tokens.hitSlop.sm}
-                accessibilityLabel="Limpar texto digitado"
-              >
-                <MaterialIcons name="close" size={18} color={colors.onSurfaceVariant} />
-              </TouchableOpacity>
-            )}
-
-            {/* Cancelar Gravação (Descartar áudio sem enviar) */}
-            {isRecording && onCancelRecording && (
-              <TouchableOpacity
-                style={[styles.iconButton, { backgroundColor: 'rgba(239, 68, 68, 0.12)' }]}
-                onPress={onCancelRecording}
-                activeOpacity={0.7}
-                hitSlop={tokens.hitSlop.sm}
-                accessibilityLabel="Cancelar gravação de áudio"
-              >
-                <MaterialIcons name="delete-outline" size={20} color={colors.error} />
-              </TouchableOpacity>
-            )}
-
-            {/* Botão de Microfone / Ditado Whisper */}
+          {/* Botão limpar texto */}
+          {value.length > 0 && !loading && (
             <TouchableOpacity
-              style={[
-                styles.iconButton,
-                isRecording ? styles.micButtonRecording : { backgroundColor: colors.surfaceContainerHighest },
-              ]}
-              onPress={onPressMic}
+              style={styles.clearBtn}
+              onPress={() => onChangeText('')}
+              hitSlop={tokens.hitSlop.sm}
+              accessibilityLabel="Limpar texto digitado"
+            >
+              <MaterialIcons name="close" size={16} color={colors.muted} />
+            </TouchableOpacity>
+          )}
+
+          {/* Cancelar Gravação */}
+          {isRecording && onCancelRecording && (
+            <TouchableOpacity
+              style={[styles.circ, { backgroundColor: colors.redBg, borderColor: colors.red }]}
+              onPress={onCancelRecording}
               activeOpacity={0.7}
               hitSlop={tokens.hitSlop.sm}
-              accessibilityLabel={isRecording ? 'Concluir e enviar áudio' : 'Gravar áudio com Vito'}
+              accessibilityLabel="Cancelar gravação"
+            >
+              <MaterialIcons name="delete-outline" size={18} color={colors.red} />
+            </TouchableOpacity>
+          )}
+
+          {/* Botão Microfone (.circ) */}
+          <TouchableOpacity
+            style={[
+              styles.circ,
+              { backgroundColor: colors.bg, borderColor: colors.line },
+              isRecording && { backgroundColor: colors.red, borderColor: colors.red },
+            ]}
+            onPress={onPressMic}
+            activeOpacity={0.7}
+            hitSlop={tokens.hitSlop.sm}
+            accessibilityLabel={isRecording ? 'Concluir gravação' : 'Gravar áudio com Vito'}
+          >
+            <MaterialIcons
+              name={isRecording ? 'check' : 'mic'}
+              size={19}
+              color={isRecording ? '#ffffff' : colors.ink}
+            />
+          </TouchableOpacity>
+
+          {/* Botão Enviar / Parar (.circ.send) */}
+          {loading ? (
+            <TouchableOpacity
+              style={[styles.circ, styles.sendBtn, { backgroundColor: colors.red, borderColor: colors.red, opacity: 1 }]}
+              onPress={() => onStop?.()}
+              activeOpacity={0.8}
+              hitSlop={tokens.hitSlop.sm}
+              accessibilityLabel="Interromper geração"
+            >
+              <MaterialIcons name="stop" size={19} color="#ffffff" />
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={[
+                styles.circ,
+                styles.sendBtn,
+                {
+                  backgroundColor: colors.ink,
+                  borderColor: colors.ink,
+                  opacity: canSend ? 1 : 0.35,
+                },
+              ]}
+              onPress={handleTriggerSend}
+              disabled={!canSend}
+              activeOpacity={0.8}
+              hitSlop={tokens.hitSlop.sm}
+              accessibilityLabel="Enviar mensagem"
             >
               <MaterialIcons
-                name={isRecording ? 'check' : 'mic'}
-                size={20}
-                color={isRecording ? '#FFFFFF' : colors.primary}
+                name="arrow-upward"
+                size={19}
+                color={colors.bg}
               />
             </TouchableOpacity>
-
-            {/* Botão Primário: Enviar ou Interromper */}
-            {loading ? (
-              <TouchableOpacity
-                style={[
-                  styles.sendButton,
-                  { backgroundColor: colors.error || '#EF4444' },
-                ]}
-                onPress={() => onStop?.()}
-                activeOpacity={0.8}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                accessibilityLabel="Interromper geração de resposta"
-              >
-                <MaterialIcons name="stop" size={20} color="#FFFFFF" />
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity
-                style={[
-                  styles.sendButton,
-                  canSend
-                    ? { backgroundColor: colors.primary }
-                    : { backgroundColor: colors.surfaceContainerHighest, shadowOpacity: 0, elevation: 0 },
-                ]}
-                onPress={handleTriggerSend}
-                activeOpacity={0.8}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                accessibilityLabel="Enviar mensagem"
-              >
-                <MaterialIcons
-                  name="arrow-upward"
-                  size={20}
-                  color={canSend ? colors.onPrimary : colors.outline}
-                />
-              </TouchableOpacity>
-            )}
-          </View>
+          )}
         </View>
       </View>
     </View>
@@ -287,7 +279,7 @@ export const ChatInputDock: React.FC<ChatInputDockProps> = ({
 const styles = StyleSheet.create({
   dockWrapper: {
     paddingHorizontal: tokens.spacing.md,
-    paddingVertical: tokens.spacing.xs + 2,
+    paddingVertical: 4,
     backgroundColor: 'transparent',
   },
   imagePreviewContainer: {
@@ -296,140 +288,98 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   previewImage: {
-    width: 64,
-    height: 64,
-    borderRadius: MD3Shapes.medium,
-    borderWidth: 1.5,
-    borderColor: tokens.colors.primary,
+    width: 60,
+    height: 60,
+    borderRadius: 14,
   },
   removeImageButton: {
     position: 'absolute',
-    top: -5,
-    right: -5,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: tokens.colors.error,
-    justifyContent: 'center',
+    top: -6,
+    right: -6,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     alignItems: 'center',
-    elevation: 3,
+    justifyContent: 'center',
   },
-  // Barra de Chat Ampliada M3 (26dp radius, layout de dois níveis)
-  capsule: {
-    flexDirection: 'column',
-    backgroundColor: tokens.colors.surfaceContainerHigh,
-    borderRadius: 26,
-    paddingHorizontal: 12,
-    paddingTop: 10,
-    paddingBottom: 8,
+  // .cmp arredondado de 28px
+  cmp: {
+    borderRadius: 28,
     borderWidth: 1,
-    borderColor: tokens.colors.outlineVariant,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.22,
-    shadowRadius: 10,
-    elevation: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    shadowColor: '#141916',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 24,
+    elevation: 4,
   },
-  capsuleHeader: {
+  crowTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 6,
+  },
+  crowBottom: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    paddingHorizontal: 2,
-    paddingBottom: 6,
   },
-  attachButton: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+  circ: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  sendBtn: {
+    marginLeft: 2,
+  },
+  focusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  focusText: {
+    fontSize: 12.5,
+    fontWeight: '600',
   },
   focusPillActive: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 4,
-    paddingHorizontal: 9,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     borderRadius: 14,
-    borderWidth: 1,
-    gap: 5,
+    borderWidth: 1.5,
+    gap: 6,
   },
   focusPillTouchable: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
   },
-  focusPillTextActive: {
-    fontSize: 12,
-    fontWeight: '600',
+  focusTextActive: {
+    fontSize: 12.5,
+    fontWeight: '700',
   },
-  focusPillClear: {
+  focusClear: {
     padding: 2,
-    marginLeft: 2,
   },
-  focusPillInactive: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: 14,
-    borderWidth: 1,
-    gap: 4,
-  },
-  focusPillTextInactive: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  capsuleMainRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 6,
-  },
-  input: {
+  fieldInput: {
     flex: 1,
-    color: tokens.colors.onSurface,
-    fontFamily: tokens.typography.family.regular,
+    minHeight: 36,
+    maxHeight: 110,
     fontSize: 15,
-    lineHeight: 22,
-    letterSpacing: -0.15,
-    paddingHorizontal: 8,
-    paddingVertical: 8,
-    minHeight: 46,
-    maxHeight: 120,
+    lineHeight: 20,
+    paddingVertical: 6,
+    paddingHorizontal: 4,
   },
-  actionGroupRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingBottom: 4,
-  },
-  clearButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  iconButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  micButtonRecording: {
-    backgroundColor: tokens.colors.errorContainer,
-  },
-  sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: tokens.colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
+  clearBtn: {
+    padding: 6,
   },
 });
