@@ -1,6 +1,6 @@
 import React from 'react'
-import { StyleSheet, type StyleProp, type ViewStyle } from 'react-native'
-import { LinearGradient } from 'expo-linear-gradient'
+import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native'
+import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg'
 import { useTheme } from '../../context/ThemeContext'
 import { loginPalette } from './loginPalette'
 
@@ -13,13 +13,14 @@ export interface GradientOverlayProps {
 
 /**
  * Sobreposição de degradê suave no topo do palco de demonstração.
- * Em paridade com login-vito.html:
- * .feed{ -webkit-mask-image: linear-gradient(transparent, #000 22%); mask-image: linear-gradient(transparent, #000 22%) }
- * O topo é 100% opaco na cor do fundo (palette.bg) e vai suavemente até transparente,
- * fazendo com que as mensagens que sobem desapareçam gradualmente de forma fluida.
+ * Implementado com `react-native-svg` (nativo no APK 0.1.16, sem depender de
+ * `expo-linear-gradient`), reproduzindo exatamente a rampa linear de 22% da altura do `.feed`
+ * (`mask-image: linear-gradient(transparent, #000 22%)`) de `login-vito.html`:
+ * o topo começa em `stopOpacity="1"` na cor de fundo (`palette.bg`) logo abaixo do título
+ * e desce linearmente até `stopOpacity="0"`.
  */
 export const GradientOverlay: React.FC<GradientOverlayProps> = ({
-  height = 90,
+  height = 96,
   isDark: propIsDark,
   pointerEvents = 'none',
   style,
@@ -27,53 +28,32 @@ export const GradientOverlay: React.FC<GradientOverlayProps> = ({
   const { isDark: themeIsDark } = useTheme()
   const isDark = propIsDark ?? themeIsDark
   const palette = loginPalette(isDark)
-
   const bg = palette.bg
 
-  // Degradê suave multi-stop a partir da cor de fundo exata
-  const colors = [
-    bg,
-    hexToRgba(bg, 0.98),
-    hexToRgba(bg, 0.9),
-    hexToRgba(bg, 0.72),
-    hexToRgba(bg, 0.45),
-    hexToRgba(bg, 0.18),
-    'transparent',
-  ] as const
-
-  const locations = [0, 0.2, 0.4, 0.6, 0.8, 0.92, 1] as const
-
   return (
-    <LinearGradient
-      colors={colors}
-      locations={locations}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 0, y: 1 }}
+    <View
       pointerEvents={pointerEvents}
-      style={[
-        styles.overlay,
-        { height },
-        style,
-      ]}
-    />
+      style={[styles.overlay, { height }, style]}
+    >
+      <Svg width="100%" height="100%" preserveAspectRatio="none">
+        <Defs>
+          <LinearGradient id="vitoLoginTopFade" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0%" stopColor={bg} stopOpacity="1" />
+            <Stop offset="35%" stopColor={bg} stopOpacity="0.65" />
+            <Stop offset="70%" stopColor={bg} stopOpacity="0.25" />
+            <Stop offset="100%" stopColor={bg} stopOpacity="0" />
+          </LinearGradient>
+        </Defs>
+        <Rect
+          x="0"
+          y="0"
+          width="100%"
+          height="100%"
+          fill="url(#vitoLoginTopFade)"
+        />
+      </Svg>
+    </View>
   )
-}
-
-function hexToRgba(hex: string, alpha: number): string {
-  const cleanHex = hex.replace('#', '')
-  let r = 255
-  let g = 255
-  let b = 255
-  if (cleanHex.length === 6) {
-    r = parseInt(cleanHex.substring(0, 2), 16)
-    g = parseInt(cleanHex.substring(2, 4), 16)
-    b = parseInt(cleanHex.substring(4, 6), 16)
-  } else if (cleanHex.length === 3) {
-    r = parseInt(cleanHex.charAt(0) + cleanHex.charAt(0), 16)
-    g = parseInt(cleanHex.charAt(1) + cleanHex.charAt(1), 16)
-    b = parseInt(cleanHex.charAt(2) + cleanHex.charAt(2), 16)
-  }
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`
 }
 
 const styles = StyleSheet.create({

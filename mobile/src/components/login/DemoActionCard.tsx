@@ -20,43 +20,46 @@ import {
 
 export interface DemoActionCardProps {
   scene: DemoScene
+  visible?: boolean
   reduceMotion?: boolean
 }
 
 export const DemoActionCard: React.FC<DemoActionCardProps> = ({
   scene,
+  visible = true,
   reduceMotion = false,
 }) => {
   const { isDark } = useTheme()
   const palette = loginPalette(isDark)
   const card = scene.card
 
-  // Animação de entrada suave da cena: rise .45s .25s ease both
-  const opacity = useRef(new Animated.Value(reduceMotion ? 1 : 0)).current
-  const translateY = useRef(new Animated.Value(reduceMotion ? 0 : 10)).current
+  const opacity = useRef(new Animated.Value(visible && reduceMotion ? 1 : 0)).current
+  const translateY = useRef(new Animated.Value(visible && reduceMotion ? 0 : 10)).current
 
   useEffect(() => {
+    if (!visible) {
+      opacity.setValue(0)
+      translateY.setValue(10)
+      return
+    }
     if (reduceMotion) {
       opacity.setValue(1)
       translateY.setValue(0)
       return
     }
-    Animated.sequence([
-      Animated.delay(200),
-      Animated.parallel([
-        Animated.timing(opacity, {
-          toValue: 1,
-          duration: 380,
-          useNativeDriver: true,
-        }),
-        Animated.timing(translateY, {
-          toValue: 0,
-          duration: 380,
-          useNativeDriver: true,
-        }),
-      ]),
+    Animated.parallel([
+      Animated.timing(opacity, {
+        toValue: 1,
+        duration: 450,
+        useNativeDriver: true,
+      }),
+      Animated.timing(translateY, {
+        toValue: 0,
+        duration: 450,
+        useNativeDriver: true,
+      }),
     ]).start()
-  }, [reduceMotion, opacity, translateY])
+  }, [visible, reduceMotion, opacity, translateY])
 
   if (card.isCol) {
     return (

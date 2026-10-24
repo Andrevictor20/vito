@@ -25,7 +25,11 @@ export interface DemoExchangeProps {
 
 /**
  * Uma troca completa da demonstração (bolha do usuário + resposta do Vito + card de ação)
- * .exch{display:flex;flex-direction:column;gap:12px;transition:opacity .4s}
+ * em paridade exata com `exch(s, show)` de `login-vito.html`:
+ * - `.exch{display:flex;flex-direction:column;gap:12px;transition:opacity .4s}`
+ * - Mantém `.user`, `.vito` e `.card` sempre montados no fluxo (com `opacity: 0` enquanto
+ *   aguardam sua vez), reservando a altura total da troca desde o frame 0 para que o
+ *   empurrão (`push`) posicione as mensagens anteriores suavemente sob o degradê do topo.
  */
 export const DemoExchange: React.FC<DemoExchangeProps> = ({
   scene,
@@ -38,7 +42,7 @@ export const DemoExchange: React.FC<DemoExchangeProps> = ({
   exiting = false,
   reduceMotion = false,
 }) => {
-  const opacity = useRef(new Animated.Value(exiting ? 0 : 1)).current
+  const opacity = useRef(new Animated.Value(1)).current
 
   useEffect(() => {
     if (exiting) {
@@ -62,32 +66,31 @@ export const DemoExchange: React.FC<DemoExchangeProps> = ({
         exiting && { pointerEvents: 'none' as const },
       ]}
     >
-      {showUser && (
-        <View style={styles.userRow}>
-          <DemoUserBubble
-            text={scene.userText}
-            typed={userTyped}
-            complete={userComplete}
-            photo={Boolean(scene.photo)}
-          />
-        </View>
-      )}
+      <View style={styles.userRow}>
+        <DemoUserBubble
+          text={scene.userText}
+          typed={userTyped}
+          complete={userComplete}
+          photo={Boolean(scene.photo)}
+          visible={showUser}
+          reduceMotion={reduceMotion}
+        />
+      </View>
 
-      {(vitoVisible || dotsVisible) && (
-        <View style={styles.vitoRow}>
-          <DemoVitoResponse
-            text={scene.vitoText}
-            visible={vitoVisible}
-            dots={dotsVisible}
-          />
-        </View>
-      )}
+      <View style={styles.vitoBlock}>
+        <DemoVitoResponse
+          text={scene.vitoText}
+          visible={vitoVisible}
+          dots={dotsVisible}
+          reduceMotion={reduceMotion}
+        />
 
-      {cardVisible && (
-        <View style={styles.cardRow}>
-          <DemoActionCard scene={scene} reduceMotion={reduceMotion} />
-        </View>
-      )}
+        <DemoActionCard
+          scene={scene}
+          visible={cardVisible}
+          reduceMotion={reduceMotion}
+        />
+      </View>
     </Animated.View>
   )
 }
@@ -101,11 +104,7 @@ const styles = StyleSheet.create({
   userRow: {
     width: '100%',
   } as ViewStyle,
-  vitoRow: {
-    width: '100%',
-    minHeight: 24,
-  } as ViewStyle,
-  cardRow: {
+  vitoBlock: {
     width: '100%',
   } as ViewStyle,
 })

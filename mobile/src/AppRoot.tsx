@@ -100,7 +100,7 @@ import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_7
 import { Montserrat_600SemiBold, Montserrat_800ExtraBold } from '@expo-google-fonts/montserrat';
 
 export const AppRoot: React.FC = () => {
-  const [fontsLoaded] = useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     Inter_400Regular,
     Inter_500Medium,
     Inter_600SemiBold,
@@ -109,8 +109,15 @@ export const AppRoot: React.FC = () => {
     Montserrat_600SemiBold,
     Montserrat_800ExtraBold,
   });
+  const [fontTimedOut, setFontTimedOut] = useState(false);
 
-  if (!fontsLoaded) {
+  useEffect(() => {
+    if (fontsLoaded || fontError) return;
+    const t = setTimeout(() => setFontTimedOut(true), 1500);
+    return () => clearTimeout(t);
+  }, [fontsLoaded, fontError]);
+
+  if (!fontsLoaded && !fontError && !fontTimedOut) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: '#18181B' }]}>
         <ActivityIndicator size="large" color="#FFFFFF" />

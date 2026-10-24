@@ -15,31 +15,45 @@ export interface DemoUserBubbleProps {
   typed: string
   complete: boolean
   photo?: boolean
+  visible?: boolean
+  reduceMotion?: boolean
 }
 
 /**
  * Bolha do usuário alinhada à direita em paridade com login-vito.html:
  * .user{
- *   max-width:82%; background:var(--ink); color:var(--bg);
+ *   opacity:0; align-self:flex-end; max-width:82%; background:var(--ink); color:var(--bg);
  *   padding:10px 14px; border-radius:20px 20px 5px 20px; font-size:15px; line-height:1.35;
  * }
  * .user.show{opacity:1; animation:rise .35s ease both}
- * Miniatura do documento/boleto com listras horizontais (#b9ae93) quando photo === true.
+ * Permanece no fluxo com opacity:0 antes de `.show` para reservar a altura exata da cena desde o início.
  */
 export const DemoUserBubble: React.FC<DemoUserBubbleProps> = ({
   text,
   typed,
   complete,
   photo = false,
+  visible = true,
+  reduceMotion = false,
 }) => {
   const { isDark } = useTheme()
   const palette = loginPalette(isDark)
 
-  const opacity = useRef(new Animated.Value(0)).current
-  const translateY = useRef(new Animated.Value(10)).current
+  const opacity = useRef(new Animated.Value(reduceMotion && visible ? 1 : 0)).current
+  const translateY = useRef(new Animated.Value(reduceMotion && visible ? 0 : 10)).current
   const [caretVisible, setCaretVisible] = useState(true)
 
   useEffect(() => {
+    if (!visible) {
+      opacity.setValue(0)
+      translateY.setValue(10)
+      return
+    }
+    if (reduceMotion) {
+      opacity.setValue(1)
+      translateY.setValue(0)
+      return
+    }
     Animated.parallel([
       Animated.timing(opacity, {
         toValue: 1,
@@ -52,11 +66,11 @@ export const DemoUserBubble: React.FC<DemoUserBubbleProps> = ({
         useNativeDriver: true,
       }),
     ]).start()
-  }, [opacity, translateY])
+  }, [visible, reduceMotion, opacity, translateY])
 
   // Caret piscando enquanto digita
   useEffect(() => {
-    if (complete) {
+    if (!visible || complete) {
       setCaretVisible(false)
       return
     }
@@ -65,7 +79,7 @@ export const DemoUserBubble: React.FC<DemoUserBubbleProps> = ({
       setCaretVisible((v) => !v)
     }, 400)
     return () => clearInterval(interval)
-  }, [complete])
+  }, [visible, complete])
 
   return (
     <Animated.View
@@ -121,7 +135,7 @@ export const DemoUserBubble: React.FC<DemoUserBubbleProps> = ({
         <View style={styles.liveContainer}>
           <Text style={[styles.bubbleText, { color: palette.bg }]}>
             {typed}
-            {!complete && (
+            {visible && !complete && (
               <Text
                 style={[
                   styles.caret,
@@ -175,7 +189,7 @@ const styles = StyleSheet.create({
   ghostText: {
     fontFamily: 'Inter_400Regular',
     fontSize: 15,
-    lineHeight: 20.25, // 15px * 1.35
+    lineHeight: 20.25,
     opacity: 0,
   } as TextStyle,
   liveContainer: {

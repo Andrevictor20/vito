@@ -24,14 +24,28 @@ export interface DemoStageProps {
   reduceMotion?: boolean
 }
 
+function getWrappedScene(index: number): DemoScene {
+  const total = DEMO_SCENES.length
+  const normalized = ((index % total) + total) % total
+  return DEMO_SCENES[normalized]
+}
+
+function estimateSceneHeight(scene: DemoScene): number {
+  const userH = scene.photo ? 116 : 44
+  const cardH = scene.card.isCol ? 138 : 66
+  return userH + 12 + 22 + 10 + cardH + 16
+}
+
 /**
- * Palco da demonstração animada em paridade exata com login-vito.html:
- * - flex: 1, cursor pointer / toque avança para a próxima cena.
- * - .feed com overflow:hidden e degradê suave no topo (as mensagens antigas somem suavemente).
- * - .inner ancorado na parte inferior com gap de 16px.
- * - Quando uma nova cena entra, o container executa uma transição física de subida
- *   suave com Easing.bezier(0.2, 0.8, 0.2, 1) em 500ms, empurrando a troca anterior para cima.
- * - A troca anterior desaparece com fade-out suave em 400ms.
+ * Palco da demonstração animada em paridade exata com `login-vito.html`:
+ * - `.feed` com `overflow: hidden` e degradê superior de 22% da altura do feed
+ *   (`mask-image: linear-gradient(transparent, #000 22%)` + `GradientOverlay` SVG),
+ *   criando a transição suave entre o título (`HeadlineReel`) e as mensagens empilhadas.
+ * - `.inner` ancorado na parte inferior (`bottom: 18px`) mantendo múltiplas trocas
+ *   empilhadas simultaneamente (trocas anteriores completas acima + troca ativa embaixo),
+ *   de modo que a conversa preenche todo o palco até o degradê abaixo do título.
+ * - Quando avança de cena, executa `push(e)`: `translateY(h -> 0)` em `500ms`
+ *   `Easing.bezier(0.2, 0.8, 0.2, 1)` enquanto a troca mais antiga no topo faz fade-out (`400ms`).
  */
 export const DemoStage: React.FC<DemoStageProps> = ({
   onAdvance,
@@ -49,21 +63,23 @@ export const DemoStage: React.FC<DemoStageProps> = ({
   const { height: windowHeight } = useWindowDimensions()
 
   const prevIndexRef = useRef<number>(state.sceneIndex)
-  const [exiting, setExiting] = useState(false)
-  const [prevScene, setPrevScene] = useState<DemoScene | null>(null)
-
+  const [exitingScene, setExitingScene] = useState<DemoScene | null>(null)
   const innerTranslateY = useRef(new Animated.Value(0)).current
 
-  // Quando o índice da cena muda, executa o empurrão suave (push) da conversa para cima
+  const currentScene = DEMO_SCENES[state.sceneIndex]
+  const prevScene = getWrappedScene(state.sceneIndex - 1)
+  const olderScene = getWrappedScene(state.sceneIndex - 2)
+
+  // Quando o índice da cena muda, empurra a pilha de mensagens para cima (`push(el)`)
   useEffect(() => {
     if (state.sceneIndex !== prevIndexRef.current) {
-      setPrevScene(DEMO_SCENES[prevIndexRef.current])
-      setExiting(true)
+      const outgoingOldest = getWrappedScene(prevIndexRef.current - 2)
+      setExitingScene(outgoingOldest)
       prevIndexRef.current = state.sceneIndex
 
       if (!reduceMotion) {
-        // Empurrão físico suave: translateY +90 -> 0 com bezier cúbico (500ms)
-        innerTranslateY.setValue(90)
+        const pushDistance = estimateSceneHeight(DEMO_SCENES[state.sceneIndex])
+        innerTranslateY.setValue(pushDistance)
         Animated.timing(innerTranslateY, {
           toValue: 0,
           duration: 500,
@@ -73,8 +89,7 @@ export const DemoStage: React.FC<DemoStageProps> = ({
       }
 
       const t = setTimeout(() => {
-        setExiting(false)
-        setPrevScene(null)
+        setExitingScene(null)
       }, 420)
 
       return () => clearTimeout(t)
@@ -86,16 +101,7 @@ export const DemoStage: React.FC<DemoStageProps> = ({
     onAdvance()
   }, [advanceScene, onAdvance])
 
-  // Na Web, aplica máscara CSS nativa de linear-gradient para o desvanecimento perfeito
-  const webMaskStyle: ViewStyle = useMemo(() => {
-    if (Platform.OS === 'web') {
-      return {
-        WebkitMaskImage: 'linear-gradient(to bottom, transparent, #000000 22%)',
-        maskImage: 'linear-gradient(to bottom, transparent, #000000 22%)',
-      } as any
-    }
-    return {}
-  }, [])
+  const gradientHeight = Math.max(88, Math.round(windowHeight * 0.12))
 
   if (reduceMotion) {
     return (
@@ -105,11 +111,11 @@ export const DemoStage: React.FC<DemoStageProps> = ({
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"
       >
-        <View style={[styles.feed, webMaskStyle]}>
+        <View style={styles.feed}>
           <View style={styles.inner}>
-            {DEMO_SCENES.slice(0, 2).map((s) => (
+            {[olderScene, prevScene, currentScene].map((s) => (
               <DemoExchange
-                key={s.id}
+                key={`static-${s.id}`}
                 scene={s}
                 phase="showing-card"
                 userTyped={s.userText}
@@ -121,13 +127,15 @@ export const DemoStage: React.FC<DemoStageProps> = ({
               />
             ))}
           </View>
+          <GradientOverlay
+            height={gradientHeight}
+            isDark={isDark}
+            pointerEvents="none"
+          />
         </View>
       </View>
     )
   }
-
-  const currentScene = DEMO_SCENES[state.sceneIndex]
-  const gradientHeight = Math.max(80, windowHeight * 0.22)
 
   return (
     <View
@@ -138,29 +146,54 @@ export const DemoStage: React.FC<DemoStageProps> = ({
       onStartShouldSetResponder={() => true}
       onResponderGrant={handlePress}
     >
-      <View style={[styles.feed, webMaskStyle]}>
+      <View style={styles.feed}>
         <Animated.View
           style={[
             styles.inner,
             { transform: [{ translateY: innerTranslateY }] },
           ]}
         >
-          {prevScene && exiting && (
+          {exitingScene && (
             <DemoExchange
-              key={`prev-${prevScene.id}`}
-              scene={prevScene}
+              key={`exiting-${exitingScene.id}`}
+              scene={exitingScene}
               phase="showing-card"
-              userTyped={prevScene.userText}
+              userTyped={exitingScene.userText}
               userComplete
               vitoVisible
               cardVisible
               dotsVisible={false}
               exiting
+              reduceMotion
             />
           )}
 
           <DemoExchange
-            key={`scene-${currentScene.id}`}
+            key={`older-${olderScene.id}`}
+            scene={olderScene}
+            phase="showing-card"
+            userTyped={olderScene.userText}
+            userComplete
+            vitoVisible
+            cardVisible
+            dotsVisible={false}
+            reduceMotion
+          />
+
+          <DemoExchange
+            key={`prev-${prevScene.id}`}
+            scene={prevScene}
+            phase="showing-card"
+            userTyped={prevScene.userText}
+            userComplete
+            vitoVisible
+            cardVisible
+            dotsVisible={false}
+            reduceMotion
+          />
+
+          <DemoExchange
+            key={`current-${currentScene.id}`}
             scene={currentScene}
             phase={state.phase}
             userTyped={state.userTyped}
@@ -171,7 +204,7 @@ export const DemoStage: React.FC<DemoStageProps> = ({
           />
         </Animated.View>
 
-        {/* Degradê sobreposto no topo com as mensagens sumindo suavemente */}
+        {/* Degradê entre o título e as mensagens empilhadas */}
         <GradientOverlay
           height={gradientHeight}
           isDark={isDark}

@@ -14,18 +14,22 @@ export interface DemoVitoResponseProps {
   text: string
   visible: boolean
   dots: boolean
+  reduceMotion?: boolean
 }
 
 /**
- * Resposta fluida do Vito à esquerda (sem balão, sem avatar)
+ * Resposta fluida do Vito à esquerda (sem balão, sem avatar) em paridade com login-vito.html:
  * .vito{position:relative;font-size:15px;line-height:1.45}
- * 3 pontinhos pulando sequencialmente quando em espera (`dots === true`).
- * Animação suave rise (opacity 0->1, translateY 10->0 em 400ms) quando revelado.
+ * .vito .body{visibility:hidden}
+ * .vito.on .body{visibility:visible;animation:rise .4s ease both}
+ * .vito .dots{position:absolute;left:0;top:6px;display:none;gap:4px}
+ * O texto permanece sempre no fluxo (com opacity 0 quando !visible) para reservar a altura exata.
  */
 export const DemoVitoResponse: React.FC<DemoVitoResponseProps> = ({
   text,
   visible,
   dots,
+  reduceMotion = false,
 }) => {
   const { isDark } = useTheme()
   const palette = loginPalette(isDark)
@@ -41,11 +45,15 @@ export const DemoVitoResponse: React.FC<DemoVitoResponseProps> = ({
   const dot2Opacity = useRef(new Animated.Value(0.3)).current
   const dot3Opacity = useRef(new Animated.Value(0.3)).current
 
-  // Revelação suave do texto do Vito
   useEffect(() => {
     if (!visible) {
       opacity.setValue(0)
       translateY.setValue(10)
+      return
+    }
+    if (reduceMotion) {
+      opacity.setValue(1)
+      translateY.setValue(0)
       return
     }
     Animated.parallel([
@@ -60,9 +68,8 @@ export const DemoVitoResponse: React.FC<DemoVitoResponseProps> = ({
         useNativeDriver: true,
       }),
     ]).start()
-  }, [visible, opacity, translateY])
+  }, [visible, reduceMotion, opacity, translateY])
 
-  // Animação contínua dos pontinhos: pulam 3px e aumentam opacidade
   useEffect(() => {
     if (!dots) return
 
@@ -126,63 +133,65 @@ export const DemoVitoResponse: React.FC<DemoVitoResponseProps> = ({
     }
   }, [dots, dot1, dot2, dot3, dot1Opacity, dot2Opacity, dot3Opacity])
 
-  if (dots) {
-    return (
-      <View style={styles.dotsContainer}>
-        <Animated.View
-          style={[
-            styles.dot,
-            {
-              backgroundColor: palette.muted,
-              opacity: dot1Opacity,
-              transform: [{ translateY: dot1 }],
-            },
-          ]}
-        />
-        <Animated.View
-          style={[
-            styles.dot,
-            {
-              backgroundColor: palette.muted,
-              opacity: dot2Opacity,
-              transform: [{ translateY: dot2 }],
-            },
-          ]}
-        />
-        <Animated.View
-          style={[
-            styles.dot,
-            {
-              backgroundColor: palette.muted,
-              opacity: dot3Opacity,
-              transform: [{ translateY: dot3 }],
-            },
-          ]}
-        />
-      </View>
-    )
-  }
-
-  if (!visible) return null
-
   return (
-    <Animated.View
-      style={[
-        styles.vitoContainer,
-        {
-          opacity,
-          transform: [{ translateY }],
-        },
-      ]}
-    >
-      <Text style={[styles.vitoText, { color: palette.ink }]}>
-        {text}
-      </Text>
-    </Animated.View>
+    <View style={styles.wrapper}>
+      {dots && (
+        <View style={styles.dotsContainer}>
+          <Animated.View
+            style={[
+              styles.dot,
+              {
+                backgroundColor: palette.muted,
+                opacity: dot1Opacity,
+                transform: [{ translateY: dot1 }],
+              },
+            ]}
+          />
+          <Animated.View
+            style={[
+              styles.dot,
+              {
+                backgroundColor: palette.muted,
+                opacity: dot2Opacity,
+                transform: [{ translateY: dot2 }],
+              },
+            ]}
+          />
+          <Animated.View
+            style={[
+              styles.dot,
+              {
+                backgroundColor: palette.muted,
+                opacity: dot3Opacity,
+                transform: [{ translateY: dot3 }],
+              },
+            ]}
+          />
+        </View>
+      )}
+
+      <Animated.View
+        style={[
+          styles.vitoContainer,
+          {
+            opacity,
+            transform: [{ translateY }],
+          },
+        ]}
+      >
+        <Text style={[styles.vitoText, { color: palette.ink }]}>
+          {text}
+        </Text>
+      </Animated.View>
+    </View>
   )
 }
 
 const styles = StyleSheet.create({
+  wrapper: {
+    position: 'relative',
+    width: '100%',
+  } as ViewStyle,
   vitoContainer: {
     alignSelf: 'flex-start',
     width: '100%',
@@ -190,14 +199,16 @@ const styles = StyleSheet.create({
   vitoText: {
     fontFamily: 'Inter_400Regular',
     fontSize: 15,
-    lineHeight: 21.75, // 15px * 1.45
+    lineHeight: 21.75,
   } as TextStyle,
   dotsContainer: {
+    position: 'absolute',
+    left: 0,
+    top: 6,
     flexDirection: 'row',
     gap: 4,
-    height: 24,
     alignItems: 'center',
-    paddingTop: 6,
+    zIndex: 2,
   } as ViewStyle,
   dot: {
     width: 7,
