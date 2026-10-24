@@ -1,24 +1,48 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import { type EmailSheetProps } from '../EmailSheet'
+import { validateEmailAuth } from '../emailAuth'
 
-describe('EmailSheet — bottom sheet de login por e-mail', () => {
-  it('expõe props de abertura/fechamento e handler de login', () => {
-    let calledWith: { email: string; password: string } | null = null
+describe('EmailSheet — bottom sheet de login e cadastro por e-mail', () => {
+  it('expõe props de abertura/fechamento, modo login/register e handlers', () => {
+    let calledLogin: { email: string; password: string } | null = null
+    let calledRegister: { name: string; email: string; password: string } | null = null
+    let switchedMode: 'login' | 'register' | null = null
+
     const props: EmailSheetProps = {
       visible: true,
+      mode: 'register',
       onClose: () => {},
       onLogin: (email, password) => {
-        calledWith = { email, password }
+        calledLogin = { email, password }
+      },
+      onRegister: (name, email, password) => {
+        calledRegister = { name, email, password }
+      },
+      onSwitchMode: (nextMode) => {
+        switchedMode = nextMode
       },
     }
 
     assert.equal(props.visible, true)
+    assert.equal(props.mode, 'register')
     assert.equal(typeof props.onClose, 'function')
     assert.equal(typeof props.onLogin, 'function')
+    assert.equal(typeof props.onRegister, 'function')
+    assert.equal(typeof props.onSwitchMode, 'function')
 
     props.onLogin('andre@vito.local', 'senha123')
-    assert.deepEqual(calledWith, { email: 'andre@vito.local', password: 'senha123' })
+    assert.deepEqual(calledLogin, { email: 'andre@vito.local', password: 'senha123' })
+
+    props.onRegister?.('André Victor', 'andre@vito.local', 'senha123')
+    assert.deepEqual(calledRegister, {
+      name: 'André Victor',
+      email: 'andre@vito.local',
+      password: 'senha123',
+    })
+
+    props.onSwitchMode?.('login')
+    assert.equal(switchedMode, 'login')
   })
 
   it('onClose é chamado ao fechar (scrim, alça ou voltar)', () => {
@@ -34,31 +58,28 @@ describe('EmailSheet — bottom sheet de login por e-mail', () => {
     assert.equal(closed, true)
   })
 
-  it('validação mínima: e-mail e senha são obrigatórios (regras do app)', () => {
-    const validate = (email: string, password: string): string[] => {
-      const errors: string[] = []
-      if (!email || !password)
-        errors.push('Preencha todos os campos obrigatórios.')
-      if (email && (!email.includes('@') || !email.includes('.')))
-        errors.push('Informe um endereço de e-mail válido.')
-      if (password && password.length < 6)
-        errors.push('A senha deve ter no mínimo 6 caracteres.')
-      return errors
-    }
-
-    assert.deepEqual(validate('', ''), [
+  it('validação de login e cadastro: exige nome no modo register e e-mail/senha válidos', () => {
+    assert.equal(
+      validateEmailAuth({ email: '', password: '', isRegister: false }),
       'Preencha todos os campos obrigatórios.',
-    ])
-    assert.deepEqual(validate('andre', '123456'), [
-      'Informe um endereço de e-mail válido.',
-    ])
-    assert.deepEqual(validate('andre@vito.local', '123'), [
-      'A senha deve ter no mínimo 6 caracteres.',
-    ])
-    assert.deepEqual(
-      validate('andre@vito.local', ''),
-      ['Preencha todos os campos obrigatórios.'],
     )
-    assert.deepEqual(validate('andre@vito.local', 'senha123'), [])
+    assert.equal(
+      validateEmailAuth({
+        email: 'andre@vito.local',
+        password: 'senha123',
+        name: '',
+        isRegister: true,
+      }),
+      'Preencha todos os campos obrigatórios.',
+    )
+    assert.equal(
+      validateEmailAuth({
+        email: 'andre@vito.local',
+        password: 'senha123',
+        name: 'André Victor',
+        isRegister: true,
+      }),
+      null,
+    )
   })
 })

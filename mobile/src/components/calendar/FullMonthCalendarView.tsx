@@ -13,6 +13,7 @@ import { tokens, MD3Shapes } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { TokiMonthBlock } from './TokiMonthBlock';
 import { TokiDensitySlider } from './TokiDensitySlider';
+import { SelectedDayInspector } from './SelectedDayInspector';
 import { generateMonthRange } from '../../utils/tokiCalendarUtils';
 import type { Event } from '../../types';
 
@@ -30,38 +31,46 @@ interface FullMonthCalendarViewProps {
   onCreateEvent?: () => void;
 }
 
-const WEEKDAY_LABELS = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
-
 export const FullMonthCalendarView: React.FC<FullMonthCalendarViewProps> = ({
   selectedDate,
   onSelectDate,
   onBack,
   events,
+  dayEvents,
+  totalTodos,
+  completedTodos,
+  onEditEvent,
+  onDeleteEvent,
   onCreateEvent,
 }) => {
   const { colors, isDark } = useTheme();
   const today = useMemo(() => new Date(), []);
   const todayMonthId = useMemo(
     () => `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`,
-    [today]
+    [today],
   );
   const [isExpanded, setIsExpanded] = useState<boolean>(true);
+  const [inspectingDay, setInspectingDay] = useState<boolean>(false);
   const scrollViewRef = useRef<ScrollView>(null);
   const monthOffsets = useRef<{ [key: string]: number }>({});
   const hasInitialScrolled = useRef<boolean>(false);
 
-  // Gera intervalo continuo de meses centrado na data selecionada (3 anteriores e 11 futuros)
+  // Gera intervalo contínuo de meses centrado na data selecionada (3 anteriores e 11 futuros)
   const months = useMemo(() => {
     return generateMonthRange(selectedDate, 3, 11);
   }, [selectedDate]);
 
   useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (inspectingDay) {
+        setInspectingDay(false);
+        return true;
+      }
       onBack();
       return true;
     });
     return () => subscription.remove();
-  }, [onBack]);
+  }, [onBack, inspectingDay]);
 
   const scrollToMonth = (targetDate: Date, animated = true) => {
     const targetId = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}`;
@@ -86,45 +95,56 @@ export const FullMonthCalendarView: React.FC<FullMonthCalendarViewProps> = ({
   const weekdayNames = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.surface }]} edges={['top', 'bottom']}>
-      {/* Header Estilo Toki */}
-      <View style={[styles.header, { borderBottomColor: colors.outlineVariant }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]} edges={['top', 'bottom']}>
+      {/* Header Calendário Infinito */}
+      <View style={[styles.header, { borderBottomColor: colors.line }]}>
         <View style={styles.headerLeft}>
           <TouchableOpacity
-            style={[styles.backButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }]}
+            style={[styles.backButton, { backgroundColor: colors.surf }]}
             onPress={onBack}
             accessibilityRole="button"
             accessibilityLabel="Voltar para a agenda"
           >
-            <MaterialIcons name="arrow-back" size={22} color={colors.onSurface} />
+            <MaterialIcons name="arrow-back" size={20} color={colors.ink} />
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.onSurface }]}>
+          <Text style={[styles.headerTitle, { color: colors.ink }]}>
             {currentMonthTitle}
           </Text>
         </View>
 
         <View style={styles.headerRight}>
           <TouchableOpacity
-            style={[styles.todayButton, { backgroundColor: colors.primaryContainer }]}
+            style={[styles.todayButton, { backgroundColor: colors.surf }]}
             onPress={handleGoToday}
             accessibilityRole="button"
             accessibilityLabel="Ir para hoje"
           >
-            <Text style={[styles.todayButtonText, { color: colors.onPrimaryContainer }]}>
+            <Text style={[styles.todayButtonText, { color: colors.ink }]}>
               Hoje
             </Text>
           </TouchableOpacity>
+
+          {onCreateEvent && (
+            <TouchableOpacity
+              style={[styles.addBtn, { backgroundColor: colors.ink }]}
+              onPress={onCreateEvent}
+              accessibilityRole="button"
+              accessibilityLabel="Novo evento"
+            >
+              <MaterialIcons name="add" size={20} color={colors.bg} />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
       {/* Barra Fixa dos Dias da Semana */}
-      <View style={[styles.weekdayHeader, { borderBottomColor: colors.outlineVariant, backgroundColor: colors.surface }]}>
+      <View style={[styles.weekdayHeader, { borderBottomColor: colors.line, backgroundColor: colors.bg }]}>
         {weekdayNames.map((name, index) => (
           <View key={index} style={styles.weekdayCol}>
             <Text
               style={[
                 styles.weekdayText,
-                { color: index === 0 || index === 6 ? colors.textMuted : colors.onSurfaceVariant },
+                { color: index === 0 || index === 6 ? colors.muted : colors.ink },
               ]}
             >
               {name}
@@ -133,7 +153,7 @@ export const FullMonthCalendarView: React.FC<FullMonthCalendarViewProps> = ({
         ))}
       </View>
 
-      {/* Rolagem Contínua Vertical de Meses (Estilo Toki) */}
+      {/* Rolagem Contínua Vertical de Meses */}
       <ScrollView
         ref={scrollViewRef}
         style={styles.scrollContainer}
@@ -160,11 +180,50 @@ export const FullMonthCalendarView: React.FC<FullMonthCalendarViewProps> = ({
               selectedDate={selectedDate}
               todayDate={today}
               isExpanded={isExpanded}
-              onSelectDay={onSelectDate}
+              onSelectDay={(date) => {
+                onSelectDate(date);
+                setInspectingDay(true);
+              }}
             />
           </View>
         ))}
       </ScrollView>
+
+      {/* Painel inferior de inspeção rápida do dia selecionado */}
+      {inspectingDay && (
+        <View
+          style={[
+            styles.inspectorSheet,
+            {
+              backgroundColor: colors.bg,
+              borderTopColor: colors.line,
+              shadowColor: isDark ? '#000' : '#141916',
+            },
+          ]}
+        >
+          <View style={styles.inspectorHeaderBar}>
+            <View style={[styles.inspectorHandle, { backgroundColor: colors.line }]} />
+            <TouchableOpacity
+              onPress={() => setInspectingDay(false)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel="Fechar detalhes do dia"
+            >
+              <MaterialIcons name="close" size={18} color={colors.muted} />
+            </TouchableOpacity>
+          </View>
+          <SelectedDayInspector
+            selectedDate={selectedDate}
+            selectedDayEvents={dayEvents}
+            totalTodos={totalTodos}
+            completedTodos={completedTodos}
+            onBack={onBack}
+            onEditEvent={onEditEvent}
+            onDeleteEvent={onDeleteEvent}
+            onCreateEvent={onCreateEvent}
+          />
+        </View>
+      )}
 
       {/* Slider Vertical Flutuante de Densidade (Zoom Toki) */}
       <TokiDensitySlider
@@ -194,30 +253,40 @@ const styles = StyleSheet.create({
     gap: tokens.spacing.sm,
   },
   backButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerTitle: {
+    fontFamily: 'Montserrat_800ExtraBold',
     fontSize: 18,
-    fontWeight: '700',
-    letterSpacing: -0.3,
+    fontWeight: '800',
+    letterSpacing: -0.36,
   },
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: tokens.spacing.xs,
+    gap: 8,
   },
   todayButton: {
-    paddingHorizontal: tokens.spacing.sm,
-    paddingVertical: 6,
+    height: 34,
+    paddingHorizontal: 14,
     borderRadius: MD3Shapes.full,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   todayButtonText: {
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  addBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   weekdayHeader: {
     flexDirection: 'row',
@@ -238,6 +307,32 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 130, // Garante que o último mês/dia não seja coberto pela FloatingTabBar
+    paddingBottom: 140,
+  },
+  inspectorSheet: {
+    borderTopWidth: 1,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 96,
+    maxHeight: '48%',
+    elevation: 12,
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+  },
+  inspectorHeaderBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  inspectorHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    marginLeft: 'auto',
+    marginRight: 'auto',
   },
 });

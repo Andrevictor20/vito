@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -17,11 +17,17 @@ import {
 import { useTheme } from '../../context/ThemeContext'
 import { loginPalette } from './loginPalette'
 import { EyeIcon } from './DemoIcons'
+import { normalizeEmail, validateEmailAuth } from './emailAuth'
+
+export type EmailSheetMode = 'login' | 'register'
 
 export interface EmailSheetProps {
   visible: boolean
+  mode?: EmailSheetMode
   onClose: () => void
   onLogin: (email: string, password: string) => void
+  onRegister?: (name: string, email: string, password: string) => void
+  onSwitchMode?: (mode: EmailSheetMode) => void
   isLoading?: boolean
   error?: string | null
   style?: StyleProp<ViewStyle>
@@ -31,35 +37,70 @@ const INPUT_HEIGHT = 54
 const CTA_HEIGHT = 52
 
 /**
- * Bottom sheet de login por e-mail em paridade visual exata com login-vito.html:
- * - Ancorado na parte inferior (justifyContent: 'flex-end')
- * - Borda superior arredondada 28px, handle centralizado 38x4px
- * - Título "Entrar com e-mail" em Montserrat 800 22px
- * - Inputs de 54px com borda 1.5px muted, fundo surf, raio 10px e EyeIcon
- * - Botão CTA "Entrar" em pílula de 52px na cor ink
- * - Link "Esqueci a senha" centralizado abaixo
+ * Bottom sheet de login e criação de conta por e-mail em paridade visual com login-vito.html:
+ * - Suporta dois modos: `'login'` ("Entrar com e-mail") e `'register'` ("Criar conta com e-mail")
+ * - No modo `'register'`, exibe campo de Nome completo + E-mail + Senha com validação imediata
+ * - Permite alternar entre Login e Cadastro diretamente dentro do modal
  */
 export const EmailSheet: React.FC<EmailSheetProps> = ({
   visible,
+  mode = 'login',
   onClose,
   onLogin,
+  onRegister,
+  onSwitchMode,
   isLoading = false,
   error = null,
   style,
 }) => {
   const { isDark, colors } = useTheme()
   const palette = loginPalette(isDark)
+  const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [localError, setLocalError] = useState<string | null>(null)
 
-  const handleLoginPress = useCallback(() => {
-    onLogin(email, password)
-  }, [email, password, onLogin])
+  const isRegister = mode === 'register'
+
+  useEffect(() => {
+    setLocalError(null)
+  }, [mode, visible])
+
+  const handleSubmit = useCallback(() => {
+    const validationErr = validateEmailAuth({
+      email,
+      password,
+      name,
+      isRegister,
+    })
+    if (validationErr) {
+      setLocalError(validationErr)
+      return
+    }
+    setLocalError(null)
+    const normalizedEmail = normalizeEmail(email)
+    if (isRegister) {
+      if (onRegister) {
+        onRegister(name.trim(), normalizedEmail, password)
+      } else {
+        onLogin(normalizedEmail, password)
+      }
+    } else {
+      onLogin(normalizedEmail, password)
+    }
+  }, [email, password, name, isRegister, onRegister, onLogin])
 
   const handleTogglePassword = useCallback(() => {
     setShowPassword((prev) => !prev)
   }, [])
+
+  const handleToggleMode = useCallback(() => {
+    setLocalError(null)
+    onSwitchMode?.(isRegister ? 'login' : 'register')
+  }, [isRegister, onSwitchMode])
+
+  const displayedError = localError || error
 
   return (
     <Modal
@@ -98,15 +139,43 @@ export const EmailSheet: React.FC<EmailSheetProps> = ({
           </TouchableOpacity>
 
           <Text style={[styles.title, { color: palette.ink }]}>
-            Entrar com e-mail
+            {isRegister ? 'Criar conta com e-mail' : 'Entrar com e-mail'}
           </Text>
+
+          {isRegister && (
+            <View style={styles.inpWrap}>
+              <RNTextInput
+                placeholder="Seu nome"
+                placeholderTextColor={palette.muted}
+                value={name}
+                onChangeText={(v) => {
+                  setName(v)
+                  if (localError) setLocalError(null)
+                }}
+                autoCapitalize="words"
+                autoComplete="name"
+                accessibilityLabel="Seu nome"
+                style={[
+                  styles.input,
+                  {
+                    borderColor: palette.muted,
+                    backgroundColor: palette.surf,
+                    color: palette.ink,
+                  },
+                ]}
+              />
+            </View>
+          )}
 
           <View style={styles.inpWrap}>
             <RNTextInput
               placeholder="E-mail"
               placeholderTextColor={palette.muted}
               value={email}
-              onChangeText={setEmail}
+              onChangeText={(v) => {
+                setEmail(v)
+                if (localError) setLocalError(null)
+              }}
               autoCapitalize="none"
               keyboardType="email-address"
               autoComplete="email"
@@ -124,12 +193,15 @@ export const EmailSheet: React.FC<EmailSheetProps> = ({
 
           <View style={styles.inpWrap}>
             <RNTextInput
-              placeholder="Senha"
+              placeholder={isRegister ? 'Criar senha (mín. 6 caracteres)' : 'Senha'}
               placeholderTextColor={palette.muted}
               value={password}
-              onChangeText={setPassword}
+              onChangeText={(v) => {
+                setPassword(v)
+                if (localError) setLocalError(null)
+              }}
               secureTextEntry={!showPassword}
-              autoComplete="current-password"
+              autoComplete={isRegister ? 'new-password' : 'current-password'}
               accessibilityLabel="Senha"
               style={[
                 styles.input,
@@ -153,40 +225,64 @@ export const EmailSheet: React.FC<EmailSheetProps> = ({
             </TouchableOpacity>
           </View>
 
-          {!!error && (
+          {!!displayedError && (
             <Text style={[styles.errorText, { color: colors.error }]}>
-              {error}
+              {displayedError}
             </Text>
           )}
 
           <TouchableOpacity
-            onPress={handleLoginPress}
+            onPress={handleSubmit}
             activeOpacity={0.85}
             disabled={isLoading}
             accessibilityRole="button"
-            accessibilityLabel="Entrar"
+            accessibilityLabel={isRegister ? 'Criar conta' : 'Entrar'}
             style={[styles.cta, { backgroundColor: palette.ink }]}
           >
             {isLoading ? (
               <ActivityIndicator size="small" color={palette.bg} />
             ) : (
               <Text style={[styles.ctaText, { color: palette.bg }]}>
-                Entrar
+                {isRegister ? 'Criar conta' : 'Entrar'}
               </Text>
             )}
           </TouchableOpacity>
 
-          <TouchableOpacity
-            onPress={onClose}
-            activeOpacity={0.75}
-            style={styles.forgotWrap}
-            accessibilityRole="button"
-            accessibilityLabel="Esqueci a senha"
-          >
-            <Text style={[styles.forgotText, { color: palette.ink }]}>
-              Esqueci a senha
-            </Text>
-          </TouchableOpacity>
+          <View style={styles.footerLinks}>
+            {onSwitchMode && (
+              <TouchableOpacity
+                onPress={handleToggleMode}
+                activeOpacity={0.75}
+                style={styles.switchModeBtn}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  isRegister
+                    ? 'Já tem uma conta? Entrar'
+                    : 'Não tem conta? Cadastre-se'
+                }
+              >
+                <Text style={[styles.switchModeText, { color: palette.ink }]}>
+                  {isRegister
+                    ? 'Já tem uma conta? Entrar'
+                    : 'Não tem conta? Cadastre-se'}
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            {!isRegister && (
+              <TouchableOpacity
+                onPress={onClose}
+                activeOpacity={0.75}
+                style={styles.forgotWrap}
+                accessibilityRole="button"
+                accessibilityLabel="Esqueci a senha"
+              >
+                <Text style={[styles.forgotText, { color: palette.muted }]}>
+                  Esqueci a senha
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       </KeyboardAvoidingView>
     </Modal>
@@ -266,13 +362,24 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_600SemiBold',
     fontSize: 16,
   } as TextStyle,
-  forgotWrap: {
+  footerLinks: {
     alignItems: 'center',
     marginTop: 12,
+    gap: 6,
+  } as ViewStyle,
+  switchModeBtn: {
+    paddingVertical: 4,
+  } as ViewStyle,
+  switchModeText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 14,
+  } as TextStyle,
+  forgotWrap: {
+    alignItems: 'center',
     paddingVertical: 4,
   } as ViewStyle,
   forgotText: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 13.5,
+    fontFamily: 'Inter_500Medium',
+    fontSize: 13,
   } as TextStyle,
 })

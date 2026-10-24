@@ -191,6 +191,16 @@ export const AgendaWeekStrip: React.FC<AgendaWeekStripProps> = ({
               {isMonthView ? 'Semana' : 'Mês'}
             </Text>
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.miniSq, { backgroundColor: colors.surf }]}
+            onPress={onExpandCalendar}
+            activeOpacity={0.7}
+            accessibilityLabel="Abrir calendário infinito"
+            accessibilityRole="button"
+          >
+            <MaterialIcons name="open-in-full" size={16} color={colors.ink} />
+          </TouchableOpacity>
         </View>
       </View>
 

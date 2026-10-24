@@ -16,7 +16,7 @@ import { WhatsAppAuthModal } from '../auth/WhatsAppAuthModal'
 import { LoginHeader } from './LoginHeader'
 import { DemoStage } from './DemoStage'
 import { AuthIconPill } from './AuthIconPill'
-import { EmailSheet } from './EmailSheet'
+import { EmailSheet, type EmailSheetMode } from './EmailSheet'
 import { useDemoLoop } from './useDemoLoop'
 import { DEMO_SCENES } from './demoScenes'
 import { loginPalette } from './loginPalette'
@@ -30,10 +30,11 @@ const LONG_PRESS_MS = 600
 
 /**
  * Tela de login do Vito v2 em paridade total com login-vito.html.
- * Layout em coluna flexível estrita (sem ScrollView bloqueando o flex:1 do palco):
+ * Layout em coluna flexível estrita:
  * 1. Hero (Logo animada + Título com HeadlineReel colorido)
- * 2. Stage (Palco com feed ancorado embaixo, empurrão físico suave e degradê superior onde as mensagens somem)
- * 3. Auth Footer (Pílula com 3 botões circulares de 58px + link Cadastre-se)
+ * 2. Stage (Palco com trocas empilhadas e degradê superior sob o título)
+ * 3. Auth Footer (Pílula com 3 botões circulares de 58px + link "Não tem conta? Cadastre-se"
+ *    que abre o modal de criação de conta por e-mail)
  */
 export const LoginScreen: React.FC<LoginScreenProps> = () => {
   const { login, register, loginWithGoogle, isLoading } = useAuth()
@@ -43,7 +44,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
   const currentScene = DEMO_SCENES[demoState.sceneIndex]
   const palette = loginPalette(isDark)
 
-  const [isRegister, setIsRegister] = useState(false)
+  const [sheetMode, setSheetMode] = useState<EmailSheetMode>('login')
   const [emailSheetVisible, setEmailSheetVisible] = useState(false)
   const [whatsappAuthVisible, setWhatsappAuthVisible] = useState(false)
   const [sheetError, setSheetError] = useState<string | null>(null)
@@ -59,24 +60,43 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
     setWhatsappAuthVisible(true)
   }, [])
 
-  const handleEmailLogin = useCallback(
-    (email: string, password: string) => {
-      const name = isRegister ? email.split('@')[0] : ''
-      if (isRegister) {
-        register(name, email, password)
-      } else {
-        login(email, password)
-      }
-      setEmailSheetVisible(false)
-    },
-    [login, register, isRegister],
-  )
-
-  const handleSignupPress = useCallback(() => {
-    setIsRegister((prev) => !prev)
+  const handleOpenEmailLogin = useCallback(() => {
+    setSheetMode('login')
     setSheetError(null)
     setEmailSheetVisible(true)
   }, [])
+
+  const handleSignupPress = useCallback(() => {
+    setSheetMode('register')
+    setSheetError(null)
+    setEmailSheetVisible(true)
+  }, [])
+
+  const handleEmailLogin = useCallback(
+    async (email: string, password: string) => {
+      setSheetError(null)
+      try {
+        await login(email, password)
+        setEmailSheetVisible(false)
+      } catch (err: any) {
+        setSheetError(err?.message || 'Não foi possível entrar. Verifique seu e-mail e senha.')
+      }
+    },
+    [login],
+  )
+
+  const handleEmailRegister = useCallback(
+    async (name: string, email: string, password: string) => {
+      setSheetError(null)
+      try {
+        await register(name, email, password)
+        setEmailSheetVisible(false)
+      } catch (err: any) {
+        setSheetError(err?.message || 'Não foi possível criar sua conta. Tente novamente.')
+      }
+    },
+    [register],
+  )
 
   const handleManualCheckUpdate = useCallback(async () => {
     try {
@@ -177,7 +197,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
         <AuthIconPill
           onGoogle={handleGoogleLogin}
           onWhatsApp={handleWhatsAppLogin}
-          onEmail={() => setEmailSheetVisible(true)}
+          onEmail={handleOpenEmailLogin}
           loading={isLoading}
         />
 
@@ -190,17 +210,21 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
           style={styles.signupWrap}
         >
           <Text style={[styles.signupText, { color: palette.ink }]}>
-            {isRegister
-              ? 'Já possui uma conta? Faça login'
-              : 'Não tem conta? Cadastre-se'}
+            Não tem conta? Cadastre-se
           </Text>
         </TouchableOpacity>
       </View>
 
       <EmailSheet
         visible={emailSheetVisible}
+        mode={sheetMode}
         onClose={() => setEmailSheetVisible(false)}
         onLogin={handleEmailLogin}
+        onRegister={handleEmailRegister}
+        onSwitchMode={(nextMode) => {
+          setSheetError(null)
+          setSheetMode(nextMode)
+        }}
         isLoading={isLoading}
         error={sheetError}
       />
@@ -210,7 +234,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
         onClose={() => setWhatsappAuthVisible(false)}
         onPhoneNotLinked={(message) => {
           setWhatsappAuthVisible(false)
-          setIsRegister(true)
+          setSheetMode('register')
           setSheetError(
             `${message} Crie sua conta com e-mail ou Google para continuar e vincule seu WhatsApp depois (Perfil → Conectar WhatsApp).`,
           )
