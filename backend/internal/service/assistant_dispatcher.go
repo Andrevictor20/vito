@@ -417,7 +417,7 @@ func (s *AssistantService) executeAction(ctx context.Context, userID string, int
 		return s.executeWhatsAppAction(ctx, userID, intent, input, res)
 
 	case ai.ActionDraftEmail, ai.ActionSendEmail:
-		return s.executeGmailAction(ctx, userID, intent, res)
+		return s.executeGmailAction(ctx, userID, intent, input, res)
 
 	case ai.ActionRefineMessage:
 		return s.executeRefineMessage(ctx, userID, intent, input, res)

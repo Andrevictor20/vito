@@ -69,7 +69,7 @@ services:
     ports:
       - "8185:8080"
     volumes:
-      - ./backend/configs/searxng:/etc/searxng:rw
+      - ./backend/configs/searxng:/etc/searxng:ro
     environment:
       - SEARXNG_PORT=8080
       - UWSGI_WORKERS=2
@@ -170,9 +170,7 @@ services:
   # Serviço Web Desktop (porta 8190 no Raspberry Pi 4)
   desktop:
     image: ghcr.io/andrevictor20/vito-desktop:latest
-    build:
-      context: ./desktop
-      dockerfile: Dockerfile
+    pull_policy: always
     container_name: vito-desktop
     restart: unless-stopped
     ports:

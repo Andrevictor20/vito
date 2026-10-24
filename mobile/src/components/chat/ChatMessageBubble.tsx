@@ -36,6 +36,18 @@ export const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
     setDraftText(message.text);
   }, [message.text]);
 
+  const displayText = React.useMemo(() => {
+    if (!message.whatsapp_message && !message.gmail_message) {
+      return message.text;
+    }
+    const lines = message.text.split('\n').filter((l) => l.trim().length > 0);
+    const firstLine = lines[0] || '';
+    if (message.text.includes('Posso enviar?') && lines.length > 1) {
+      return `${firstLine}\n\nPosso enviar?`;
+    }
+    return firstLine;
+  }, [message.text, message.whatsapp_message, message.gmail_message]);
+
   const handleStartEdit = () => {
     if (disabled) return;
     setDraftText(message.text);
@@ -207,7 +219,7 @@ export const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
               />
             )}
             <FormattedChatMessageText
-              text={message.text}
+              text={displayText}
               isUser={isUser}
               textColor={colors.onSurface}
               isDark={isDark}

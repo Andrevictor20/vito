@@ -1,13 +1,12 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { StyleSheet, View, Text, Animated, Easing } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { useTheme } from '../../context/ThemeContext';
-import { THINKING_PHRASES } from '../../utils/chatGreetings';
 
 /**
- * Micro-ícone de fagulha/inteligência orgânica (Sparkle) com pulso suave de escala e opacidade.
+ * Micro-ícone de inteligência orgânica (Sparkle) com pulso calmo e contínuo.
  */
-function SparkleIcon({ color, size = 15 }: { color: string; size?: number }) {
+function SparkleIcon({ color, size = 14 }: { color: string; size?: number }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Path
@@ -22,15 +21,15 @@ function SparkleIcon({ color, size = 15 }: { color: string; size?: number }) {
 }
 
 /**
- * Indicador de pensamento do Vito no Chat (estilo Claude / Toki / Gemini).
- * - Sem qualquer faixa de cor sobreposta ou borda retangular pesada.
- * - Onda suave e fluida de 3 pontos com interpolação de escala e translação vertical (60fps).
- * - Transição tipográfica gradual e progressiva de frases contextuais.
+ * Indicador de pensamento do Vito no Chat (estilo editorial Claude / Gemini).
+ * - Sem loops frenéticos de frases mockadas.
+ * - Estado sóbrio e contínuo com "Pensando..." discreto.
+ * - Onda suave e fluida de 3 pontos com interpolação de escala e translação vertical a 60fps.
  */
 export const ChatThinkingIndicator: React.FC = () => {
   const { colors } = useTheme();
 
-  // Animação de fagulha (pulso suave)
+  // Animação de respiração orgânica da fagulha (pulso suave)
   const pulseAnim = useRef(new Animated.Value(0.7)).current;
 
   // Animações dos 3 pontos ondulantes (staggered wave)
@@ -38,23 +37,19 @@ export const ChatThinkingIndicator: React.FC = () => {
   const dot2 = useRef(new Animated.Value(0)).current;
   const dot3 = useRef(new Animated.Value(0)).current;
 
-  // Transição suave de fade entre frases
-  const [phraseIndex, setPhraseIndex] = useState(0);
-  const textFadeAnim = useRef(new Animated.Value(1)).current;
-
   useEffect(() => {
-    // 1. Loop contínuo da fagulha/spark
+    // 1. Pulso suave e contínuo da fagulha
     const pulseLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {
           toValue: 1,
-          duration: 900,
+          duration: 1000,
           easing: Easing.inOut(Easing.ease),
           useNativeDriver: true,
         }),
         Animated.timing(pulseAnim, {
-          toValue: 0.65,
-          duration: 900,
+          toValue: 0.6,
+          duration: 1000,
           easing: Easing.inOut(Easing.ease),
           useNativeDriver: true,
         }),
@@ -62,30 +57,30 @@ export const ChatThinkingIndicator: React.FC = () => {
     );
     pulseLoop.start();
 
-    // 2. Onda contínua dos 3 pontos
+    // 2. Onda contínua e calma dos 3 pontos (60fps)
     const createDotAnimation = (anim: Animated.Value, delay: number) =>
       Animated.loop(
         Animated.sequence([
           Animated.delay(delay),
           Animated.timing(anim, {
             toValue: 1,
-            duration: 360,
+            duration: 420,
             easing: Easing.out(Easing.cubic),
             useNativeDriver: true,
           }),
           Animated.timing(anim, {
             toValue: 0,
-            duration: 360,
+            duration: 420,
             easing: Easing.in(Easing.cubic),
             useNativeDriver: true,
           }),
-          Animated.delay(Math.max(0, 360 - delay)),
+          Animated.delay(Math.max(0, 420 - delay)),
         ])
       );
 
     const wave1 = createDotAnimation(dot1, 0);
-    const wave2 = createDotAnimation(dot2, 140);
-    const wave3 = createDotAnimation(dot3, 280);
+    const wave2 = createDotAnimation(dot2, 160);
+    const wave3 = createDotAnimation(dot3, 320);
 
     wave1.start();
     wave2.start();
@@ -99,36 +94,12 @@ export const ChatThinkingIndicator: React.FC = () => {
     };
   }, [pulseAnim, dot1, dot2, dot3]);
 
-  // Ciclo das frases executivas (cross-fade a cada 2.4s)
-  useEffect(() => {
-    const timer = setInterval(() => {
-      Animated.timing(textFadeAnim, {
-        toValue: 0,
-        duration: 180,
-        easing: Easing.out(Easing.ease),
-        useNativeDriver: true,
-      }).start(() => {
-        setPhraseIndex((prev) => (prev + 1) % THINKING_PHRASES.length);
-        Animated.timing(textFadeAnim, {
-          toValue: 1,
-          duration: 240,
-          easing: Easing.in(Easing.ease),
-          useNativeDriver: true,
-        }).start();
-      });
-    }, 2400);
-
-    return () => clearInterval(timer);
-  }, [textFadeAnim]);
-
-  const currentPhrase = THINKING_PHRASES[phraseIndex] || THINKING_PHRASES[0];
-
   return (
     <View
       style={styles.container}
       accessible
       accessibilityRole="progressbar"
-      accessibilityLabel={`Vito está ${currentPhrase}`}
+      accessibilityLabel="Vito está pensando"
     >
       {/* Ícone de fagulha com respiração orgânica */}
       <Animated.View
@@ -148,7 +119,7 @@ export const ChatThinkingIndicator: React.FC = () => {
         {[dot1, dot2, dot3].map((anim, idx) => {
           const translateY = anim.interpolate({
             inputRange: [0, 1],
-            outputRange: [0, -4.5],
+            outputRange: [0, -4],
           });
           const opacity = anim.interpolate({
             inputRange: [0, 1],
@@ -175,17 +146,15 @@ export const ChatThinkingIndicator: React.FC = () => {
         })}
       </View>
 
-      {/* Frase dinâmica em cross-fade suave */}
-      <Animated.View style={{ opacity: textFadeAnim }}>
-        <Text
-          style={[
-            styles.phraseText,
-            { color: colors.onSurfaceVariant || colors.muted },
-          ]}
-        >
-          {currentPhrase}
-        </Text>
-      </Animated.View>
+      {/* Texto sóbrio e calmo constante */}
+      <Text
+        style={[
+          styles.phraseText,
+          { color: colors.onSurfaceVariant || colors.muted },
+        ]}
+      >
+        Pensando...
+      </Text>
     </View>
   );
 };

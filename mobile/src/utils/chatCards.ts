@@ -188,20 +188,61 @@ export const formatMessageSnippet = (text?: string, maxLength = 80): string => {
 };
 
 export const toChatWhatsAppMessage = (res: AssistantChatResponse): ChatWhatsAppMessage | undefined => {
-  if (!res.whatsapp_message) return undefined;
-  const wm = res.whatsapp_message;
-  return {
-    ...wm,
-    status: wm.status || 'ready',
-  };
+  if (res.whatsapp_message) {
+    const wm = res.whatsapp_message;
+    return {
+      ...wm,
+      status: wm.status || 'ready',
+    };
+  }
+
+  // Fallback heurístico resiliente para textos planos do backend
+  const text = (res.reply || res.message || '').trim();
+  const match = text.match(/(?:Enviei para|Preparei a mensagem para|Preparei o rascunho para|Rascunho para)\s+([^:\n]+)[:\n]+([\s\S]+)/i);
+  if (match) {
+    const rawRecipient = match[1].trim();
+    let body = match[2].trim();
+    // Remove "Posso enviar?" do corpo da mensagem se presente no final
+    body = body.replace(/[\n\s]*Posso enviar\?[\s\S]*$/i, '').trim();
+    const isSent = text.toLowerCase().includes('enviei para');
+    return {
+      recipient_name: rawRecipient,
+      message: body,
+      status: isSent ? 'sent' : 'ready',
+      sent_at: isSent ? new Date().toISOString() : undefined,
+    };
+  }
+
+  return undefined;
 };
 
 export const toChatGmailMessage = (res: AssistantChatResponse): ChatGmailMessage | undefined => {
-  if (!res.gmail_message) return undefined;
-  const gm = res.gmail_message;
-  return {
-    ...gm,
-    status: gm.status || 'ready',
-  };
+  if (res.gmail_message) {
+    const gm = res.gmail_message;
+    return {
+      ...gm,
+      status: gm.status || 'ready',
+    };
+  }
+
+  // Fallback heurístico resiliente para e-mails em texto plano
+  const text = (res.reply || res.message || '').trim();
+  const match = text.match(/(?:E-mail enviado com sucesso para|Preparei o rascunho do e-mail para|Criei o rascunho no seu Gmail para|Ajustei o e-mail para)\s+([^\s(]+)(?:\s*\(Assunto:\s*"([^"]+)"\))?[:\n\s]*([\s\S]*)/i);
+  if (match) {
+    const email = match[1].trim();
+    const subject = match[2] ? match[2].trim() : 'Sem assunto';
+    let body = (match[3] || '').trim();
+    body = body.replace(/[\n\s]*Posso enviar\?[\s\S]*$/i, '').trim();
+    const isSent = text.toLowerCase().includes('e-mail enviado com sucesso');
+    return {
+      recipient_email: email,
+      subject,
+      body: body || text,
+      status: isSent ? 'sent' : 'ready',
+      sent_at: isSent ? new Date().toISOString() : undefined,
+    };
+  }
+
+  return undefined;
 };
 

@@ -45,6 +45,8 @@ type AssistantResponse struct {
 	MeetingWhatsApp     string                     `json:"meeting_whatsapp_url,omitempty"`
 	PendingConfirmation *DestructiveConfirmation   `json:"pending_confirmation,omitempty"`
 	ProviderUsed        string                     `json:"provider_used,omitempty"`
+	WhatsAppMessage     *domain.ChatWhatsAppMessage `json:"whatsapp_message,omitempty"`
+	GmailMessage        *domain.ChatGmailMessage    `json:"gmail_message,omitempty"`
 }
 
 // AssistantService orquestra o parsing de IA com os serviços de calendário, tarefas, memórias e disparadores.

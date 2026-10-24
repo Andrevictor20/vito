@@ -146,11 +146,17 @@ jobs:
       - name: Sync docker-compose and Recreate Container
         run: |
           cd ~/vito
+          git config --global --add safe.directory /home/andre/vito || true
+          git config --global --add safe.directory '*' || true
+          rm -f ~/vito/.git/index.lock || true
+          # Encerra contêineres e libera volumes ANTES do git reset para evitar travas de arquivos
+          docker stop -t 5 vito-evolution-api vito-backend vito-desktop vito-searxng || docker kill vito-evolution-api vito-backend vito-desktop vito-searxng || true
+          # Garante propriedade do repositório para o runner antes do reset
+          sudo chown -R $(id -un):$(id -gn) ~/vito 2>/dev/null || true
+          chmod -R u+w ~/vito 2>/dev/null || true
           git fetch origin main
           git reset --hard origin/main
-          # Encerra contêineres presos com timeout curto para liberar o dockerd imediatamente
-          docker stop -t 5 vito-evolution-api vito-backend vito-desktop vito-searxng || docker kill vito-evolution-api vito-backend vito-desktop vito-searxng || true
-          docker compose pull --quiet backend evolution-api desktop searxng || docker compose build desktop
+          docker compose pull --quiet backend evolution-api desktop searxng evolution-postgres
           docker compose run -T --rm --no-deps --user 0:0 --entrypoint sh backend -c "mkdir -p /app/data /app/data/backups /app/backups && chown -R 10001:10001 /app/data /app/backups && chmod 0700 /app/data /app/backups" || true
           docker compose up -d --force-recreate --remove-orphans evolution-postgres searxng backend evolution-api desktop
           docker image prune -f

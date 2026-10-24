@@ -6,13 +6,15 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/domain"
 )
 
 // executeGmailAction despacha as ações de escrita de rascunho (DRAFT_EMAIL) e envio direto de e-mail (SEND_EMAIL) via Gmail.
-func (s *AssistantService) executeGmailAction(ctx context.Context, userID string, intent *ai.ParsedIntent, res *AssistantResponse) (*AssistantResponse, error) {
+// REGRA DE OURO: A IA NUNCA envia e-mails sem confirmação expressa prévia do usuário.
+func (s *AssistantService) executeGmailAction(ctx context.Context, userID string, intent *ai.ParsedIntent, input ai.UserInput, res *AssistantResponse) (*AssistantResponse, error) {
 	if s.gmailSvc == nil {
 		res.Message = "Não consegui acessar a integração com o Gmail agora. Nada foi enviado."
 		res.Reply = res.Message
@@ -34,8 +36,8 @@ func (s *AssistantService) executeGmailAction(ctx context.Context, userID string
 		subject = deriveDefaultEmailSubject(body)
 	}
 
-	switch intent.Action {
-	case ai.ActionDraftEmail:
+	// 1. Ação de Rascunho explícita
+	if intent.Action == ai.ActionDraftEmail {
 		_, err := s.gmailSvc.CreateDraft(ctx, userID, to, subject, body)
 		if err != nil {
 			log.Printf("⚠️ [AssistantService] falha ao criar rascunho no Gmail (user=%s, to=%s): %v", userID, to, err)
@@ -43,13 +45,40 @@ func (s *AssistantService) executeGmailAction(ctx context.Context, userID string
 			res.Reply = res.Message
 			return res, nil
 		}
-		if res.Message == "" || res.Message == defaultMessageFor(ai.ActionDraftEmail) {
-			res.Message = fmt.Sprintf("Criei o rascunho no seu Gmail para %s com o assunto \"%s\".\n\n%s", to, subject, body)
+		res.GmailMessage = &domain.ChatGmailMessage{
+			RecipientEmail: to,
+			Subject:        subject,
+			Body:           body,
+			Status:         "ready",
 		}
+		res.Message = fmt.Sprintf("Criei o rascunho no seu Gmail para %s (Assunto: \"%s\").\n\nPosso enviar?", to, subject)
 		res.Reply = res.Message
 		return res, nil
+	}
 
-	case ai.ActionSendEmail:
+	// 2. Ação de Envio (SEND_EMAIL): Valida trava de confirmação humana
+	if intent.Action == ai.ActionSendEmail {
+		if !isExplicitSendConfirmation(input) {
+			// Rebaixa para rascunho seguro e card no chat com botão de envio
+			_, err := s.gmailSvc.CreateDraft(ctx, userID, to, subject, body)
+			if err != nil {
+				log.Printf("⚠️ [AssistantService] falha ao criar rascunho seguro no Gmail (user=%s, to=%s): %v", userID, to, err)
+				res.Message = formatGmailActionError("criar o rascunho", err)
+				res.Reply = res.Message
+				return res, nil
+			}
+			res.GmailMessage = &domain.ChatGmailMessage{
+				RecipientEmail: to,
+				Subject:        subject,
+				Body:           body,
+				Status:         "ready",
+			}
+			res.Message = fmt.Sprintf("Preparei o rascunho do e-mail para %s (Assunto: \"%s\").\n\nPosso enviar?", to, subject)
+			res.Reply = res.Message
+			return res, nil
+		}
+
+		// Usuário confirmou expressamente -> realiza o envio real
 		_, err := s.gmailSvc.SendEmail(ctx, userID, to, subject, body)
 		if err != nil {
 			log.Printf("⚠️ [AssistantService] falha ao enviar e-mail pelo Gmail (user=%s, to=%s): %v", userID, to, err)
@@ -57,9 +86,14 @@ func (s *AssistantService) executeGmailAction(ctx context.Context, userID string
 			res.Reply = res.Message
 			return res, nil
 		}
-		if res.Message == "" || res.Message == defaultMessageFor(ai.ActionSendEmail) {
-			res.Message = fmt.Sprintf("E-mail enviado com sucesso para %s (Assunto: \"%s\").\n\n%s", to, subject, body)
+		res.GmailMessage = &domain.ChatGmailMessage{
+			RecipientEmail: to,
+			Subject:        subject,
+			Body:           body,
+			Status:         "sent",
+			SentAt:         time.Now().Format(time.RFC3339),
 		}
+		res.Message = fmt.Sprintf("E-mail enviado com sucesso para %s (Assunto: \"%s\").", to, subject)
 		res.Reply = res.Message
 		return res, nil
 	}

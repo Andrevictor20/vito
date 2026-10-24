@@ -29,7 +29,7 @@ func (s *AssistantService) executeWhatsAppAction(ctx context.Context, userID str
 	case ai.ActionDraftReply:
 		return s.actionDraftReply(ctx, userID, intent, res)
 	case ai.ActionSendWhatsAppMessage:
-		return s.actionSendWhatsAppMessage(ctx, userID, intent, res)
+		return s.actionSendWhatsAppMessage(ctx, userID, intent, input, res)
 	case ai.ActionCreateReplyReminder:
 		return s.actionCreateReplyReminder(ctx, userID, intent, res)
 	}
@@ -261,23 +261,32 @@ func (s *AssistantService) actionDraftReply(ctx context.Context, userID string, 
 		return clarificationResponse(intent, "Quer que eu escreva o rascunho? Me diga para quem e sobre o quê (ex: 'rascunhe uma resposta pra Ana sobre o contrato')."), nil
 	}
 	target := ""
+	var chatJID string
 	if s.waDirectory != nil {
-		if chat, err := s.waDirectory.ResolveChat(ctx, userID, intent.Conversation.Chat); err == nil {
+		if chat, err := s.waDirectory.ResolveChat(ctx, userID, intent.Conversation.Chat); err == nil && chat != nil {
 			target = s.waDirectory.LabelOf(chat)
+			chatJID = chat.ChatJID
 		}
 	}
+	res.WhatsAppMessage = &domain.ChatWhatsAppMessage{
+		RecipientName:  target,
+		RecipientPhone: chatJID,
+		Message:        draft,
+		Status:         "ready",
+	}
 	if target == "" {
-		res.Message = "Rascunho pronto (não enviei):\n\n" + draft
+		res.Message = "Preparei o rascunho da mensagem:\n\n" + draft + "\n\nPosso enviar?"
 		res.Reply = res.Message
 		return res, nil
 	}
-	res.Message = fmt.Sprintf("Rascunho para %s (não enviei):\n\n%s", target, draft)
+	res.Message = fmt.Sprintf("Preparei o rascunho para %s:\n\n%s\n\nPosso enviar?", target, draft)
 	res.Reply = res.Message
 	return res, nil
 }
 
 // actionSendWhatsAppMessage envia a mensagem em nome do usuário.
-func (s *AssistantService) actionSendWhatsAppMessage(ctx context.Context, userID string, intent *ai.ParsedIntent, res *AssistantResponse) (*AssistantResponse, error) {
+// REGRA DE OURO: Apenas dispara se houver confirmação expressa do usuário.
+func (s *AssistantService) actionSendWhatsAppMessage(ctx context.Context, userID string, intent *ai.ParsedIntent, input ai.UserInput, res *AssistantResponse) (*AssistantResponse, error) {
 	if intent.WhatsAppMessage == nil || strings.TrimSpace(intent.WhatsAppMessage.Text) == "" {
 		return clarificationResponse(intent, "O que eu devo enviar? Me diga o texto e para quem (ex: 'manda pra Ana que quinta está bom')."), nil
 	}
@@ -292,6 +301,22 @@ func (s *AssistantService) actionSendWhatsAppMessage(ctx context.Context, userID
 		s.rememberUnknownContact(userID, intent.WhatsAppMessage.Chat)
 		return s.replyChatResolutionError(intent, err), nil
 	}
+	label := s.waDirectory.LabelOf(chat)
+	msgText := strings.TrimSpace(intent.WhatsAppMessage.Text)
+
+	// Validação da trava de confirmação humana
+	if !isExplicitSendConfirmation(input) {
+		res.WhatsAppMessage = &domain.ChatWhatsAppMessage{
+			RecipientName:  label,
+			RecipientPhone: chat.ChatJID,
+			Message:        msgText,
+			Status:         "ready",
+		}
+		res.Message = fmt.Sprintf("Preparei a mensagem para %s:\n\n%s\n\nPosso enviar?", label, msgText)
+		res.Reply = res.Message
+		return res, nil
+	}
+
 	s.learnContactAlias(ctx, userID, intent.WhatsAppMessage.Text, intent.WhatsAppMessage.Chat, chat.ChatJID)
 	if err := s.waSender.SendWhatsAppMessage(ctx, userID, chat.ChatJID, intent.WhatsAppMessage.Text); err != nil {
 		log.Printf("⚠️ [AssistantService] falha ao enviar mensagem do WhatsApp (user=%s, chat=%s): %v", userID, chat.ChatJID, err)
@@ -299,7 +324,14 @@ func (s *AssistantService) actionSendWhatsAppMessage(ctx context.Context, userID
 		res.Reply = res.Message
 		return res, nil
 	}
-	res.Message = fmt.Sprintf("Enviei para %s:\n\n%s", s.waDirectory.LabelOf(chat), strings.TrimSpace(intent.WhatsAppMessage.Text))
+	res.WhatsAppMessage = &domain.ChatWhatsAppMessage{
+		RecipientName:  label,
+		RecipientPhone: chat.ChatJID,
+		Message:        msgText,
+		Status:         "sent",
+		SentAt:         time.Now().Format(time.RFC3339),
+	}
+	res.Message = fmt.Sprintf("Enviei para %s:\n\n%s", label, msgText)
 	res.Reply = res.Message
 	return res, nil
 }

@@ -253,5 +253,30 @@ describe('Chat Cards helpers (TDD)', () => {
       assert.equal(gm?.subject, 'Relatório Semanal de Desempenho');
       assert.equal(gm?.status, 'ready');
     });
+
+    it('extrai whatsapp_message por fallback heurístico de texto plano', () => {
+      const res = {
+        intent: 'send_whatsapp',
+        reply: 'Preparei a mensagem para Camila:\n\nOlá Camila, tudo bem?\n\nPosso enviar?',
+      };
+      const wa = toChatWhatsAppMessage(res as any);
+      assert.ok(wa);
+      assert.equal(wa?.recipient_name, 'Camila');
+      assert.equal(wa?.message, 'Olá Camila, tudo bem?');
+      assert.equal(wa?.status, 'ready');
+    });
+
+    it('extrai gmail_message por fallback heurístico de texto plano do screenshot do usuário', () => {
+      const res = {
+        intent: 'send_email',
+        reply: 'E-mail enviado com sucesso para andrevictor8@gmail.com (Assunto: "Consulta sobre o repositório do aplicativo Vito").\n\nPrezado(a),\n\nEspero que este e-mail o(a) encontre bem.',
+      };
+      const gm = toChatGmailMessage(res as any);
+      assert.ok(gm);
+      assert.equal(gm?.recipient_email, 'andrevictor8@gmail.com');
+      assert.equal(gm?.subject, 'Consulta sobre o repositório do aplicativo Vito');
+      assert.ok(gm?.body.includes('Prezado(a)'));
+      assert.equal(gm?.status, 'sent');
+    });
   });
 });

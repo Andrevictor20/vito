@@ -95,7 +95,7 @@ func TestAssistantGmailActions_DraftAndSendEmail(t *testing.T) {
 		t.Errorf("esperava confirmação do rascunho na mensagem, obteve: %s", resp.Message)
 	}
 
-	// 2. SEND_EMAIL
+	// 2. SEND_EMAIL (Primeiro turno -> Rascunho seguro e card 'ready', sem envio direto)
 	gw.intent = &ai.ParsedIntent{
 		Action:  ai.ActionSendEmail,
 		Message: "",
@@ -105,15 +105,39 @@ func TestAssistantGmailActions_DraftAndSendEmail(t *testing.T) {
 			Body:    "Confirmado para amanhã às 14h.",
 		},
 	}
-	respSend, err := astSvc.Process(context.Background(), userID, ai.UserInput{
+	respSafe, err := astSvc.Process(context.Background(), userID, ai.UserInput{
 		Text:     "envie um email para parceiro@empresa.com confirmando a reunião",
 		Timezone: "America/Sao_Paulo",
 	})
 	if err != nil {
 		t.Fatalf("send process err: %v", err)
 	}
+	if sendCalled {
+		t.Error("REGRA DE OURO: não deveria enviar e-mail sem aprovação explícita prévia")
+	}
+	if respSafe.GmailMessage == nil || respSafe.GmailMessage.Status != "ready" {
+		t.Errorf("esperava card do Gmail pronto para envio com status 'ready', obteve: %+v", respSafe.GmailMessage)
+	}
+	if !strings.Contains(respSafe.Message, "Posso enviar?") {
+		t.Errorf("esperava pergunta 'Posso enviar?', obteve: %s", respSafe.Message)
+	}
+
+	// 2.1 SEND_EMAIL (Com confirmação explícita -> envio efetivo no endpoint /messages/send)
+	respSend, err := astSvc.Process(context.Background(), userID, ai.UserInput{
+		Text:     "sim, pode enviar",
+		Timezone: "America/Sao_Paulo",
+		ConversationHistory: []ai.ChatMessageContext{
+			{Sender: "vito", Text: "Preparei o rascunho do e-mail para parceiro@empresa.com. Posso enviar?"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("send confirmed err: %v", err)
+	}
 	if !sendCalled {
-		t.Error("esperava chamada ao endpoint /gmail/v1/users/me/messages/send")
+		t.Error("esperava chamada ao endpoint /gmail/v1/users/me/messages/send após confirmação")
+	}
+	if respSend.GmailMessage == nil || respSend.GmailMessage.Status != "sent" {
+		t.Errorf("esperava card com status 'sent', obteve: %+v", respSend.GmailMessage)
 	}
 	if !strings.Contains(respSend.Message, "parceiro@empresa.com") {
 		t.Errorf("esperava confirmação de envio na mensagem, obteve: %s", respSend.Message)
