@@ -1,26 +1,24 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/api';
 import { ChatMessage, ConversationSession } from '../../types';
 import { VitoMascot } from '../common/VitoMascot';
 import { ChatHistoryPanel } from './ChatHistoryPanel';
-import { FocusMenu, FocusMode } from './FocusMenu';
+import { FocusMode } from './FocusMenu';
 import { ChatQuickChips } from './ChatQuickChips';
 import { WhatsAppMessageCard } from './WhatsAppMessageCard';
 import { GmailMessageCard } from './GmailMessageCard';
 import { ChatThinkingIndicator } from './ChatThinkingIndicator';
+import { ChatInputDock } from './ChatInputDock';
 import { pickWelcomeGreeting } from '../../utils/chatGreetings';
 import {
-  Send,
-  Mic,
-  Plus,
   Calendar,
-  Loader2,
   Circle,
   Copy,
   Check,
   PanelLeftClose,
   PanelLeft,
+  Plus,
 } from 'lucide-react';
 
 interface ChatViewProps {
@@ -33,10 +31,8 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
   const [conversations, setConversations] = useState<ConversationSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | undefined>();
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [selectedFocus, setSelectedFocus] = useState<FocusMode | null>(null);
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [inputValue, setInputValue] = useState('');
   const [loading, setLoading] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -46,17 +42,17 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
     return pickWelcomeGreeting(firstName, new Date().getHours());
   }, [user?.name]);
 
-  const scrollToBottom = () => {
+  const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  }, []);
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, loading]);
+  }, [messages, loading, scrollToBottom]);
 
   useEffect(() => {
     if (initialPrompt && initialPrompt.trim()) {
-      handleSendPrompt(initialPrompt.trim());
+      handleSendPrompt(initialPrompt.trim(), null);
     }
   }, [initialPrompt]);
 
@@ -106,7 +102,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
     );
   };
 
-  const handleSendPrompt = async (textToSend: string) => {
+  const handleSendPrompt = async (textToSend: string, focus: FocusMode | null = null) => {
     if (!textToSend.trim() || loading) return;
 
     const userMsg: ChatMessage = {
@@ -117,7 +113,6 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
     };
 
     setMessages((prev) => [...prev, userMsg]);
-    setInputValue('');
     setLoading(true);
 
     try {
@@ -130,19 +125,23 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
         history: historyPayload,
       };
 
-      if (selectedFocus) {
-        contextPayload.focus_mode = selectedFocus.id;
-        contextPayload.system_instruction_override = `Foco ativo do usuário: ${selectedFocus.title} - ${selectedFocus.description}.`;
+      if (focus) {
+        contextPayload.focus_mode = focus.id;
+        contextPayload.system_instruction_override = `Foco ativo do usuário: ${focus.title} - ${focus.description}.`;
       }
 
       const res = await api.askAssistant(textToSend, contextPayload);
       const vitoMsg: ChatMessage = {
         id: `vito-${Date.now()}`,
         sender: 'vito',
-        text: res.reply || 'Instrução recebida e processada com sucesso.',
+        text: res.reply || res.message || 'Instrução recebida e processada com sucesso.',
         timestamp: new Date().toISOString(),
         todo: res.todo,
         event: res.event,
+        trigger: res.trigger,
+        booking: res.booking,
+        whatsapp_message: res.whatsapp_message,
+        gmail_message: res.gmail_message,
       };
 
       const updated = [...messages, userMsg, vitoMsg];
@@ -175,11 +174,6 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
     }
   };
 
-  const handleFormSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    handleSendPrompt(inputValue);
-  };
-
   const handleCopyText = (id: string, text: string) => {
     navigator.clipboard.writeText(text);
     setCopiedId(id);
@@ -192,7 +186,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
   };
 
   return (
-    <div className="flex-1 h-screen flex bg-[#F8F9FA] dark:bg-[#0B0D10] text-zinc-900 dark:text-[#FAFAFA] overflow-hidden select-none transition-colors duration-200">
+    <div className="flex-1 h-screen flex bg-[#F8F9FA] dark:bg-[#0B0D10] text-[#17191b] dark:text-[#f1f3f2] overflow-hidden select-none transition-colors duration-200">
       {/* Drawer de Histórico no estilo Toki / Mobile */}
       {historyOpen && (
         <ChatHistoryPanel
@@ -224,8 +218,8 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
               </div>
               <div className="flex flex-col">
                 <div className="flex items-center gap-1.5 leading-none">
-                  <span className="text-sm font-extrabold tracking-tight text-zinc-900 dark:text-white">vito</span>
-                  <span className="w-2 h-2 rounded-full bg-[#10B981] shadow-[0_0_8px_#10B981] animate-pulse" />
+                  <span className="text-sm font-extrabold tracking-tight text-[#17191b] dark:text-[#f1f3f2]">vito</span>
+                  <span className="w-2 h-2 rounded-full bg-[#00E599] shadow-[0_0_8px_#00E599] animate-pulse" />
                 </div>
                 <span className="text-[10px] text-zinc-400 font-medium mt-0.5">Assistente Executivo</span>
               </div>
@@ -241,278 +235,147 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
           </button>
         </header>
 
-      {/* Main Messages Scroll Area */}
-      <div className="flex-1 overflow-y-auto px-6 py-8 scroll-smooth flex flex-col">
-        <div className="max-w-6xl mx-auto space-y-7 flex-1 w-full flex flex-col justify-center">
-          {/* Mobile-Identical Empty State: Limpo, centralizado, mascote Vito e saudação sem emojis */}
-          {messages.length === 0 && (
-            <div className="my-auto py-12 flex flex-col items-center justify-center text-center space-y-4">
-              <div className="w-20 h-20 rounded-3xl bg-zinc-100 dark:bg-[#1C2026] border border-zinc-200 dark:border-[#262B33] flex items-center justify-center shadow-md">
-                <VitoMascot size={64} />
+        {/* Main Messages Scroll Area */}
+        <div className="flex-1 overflow-y-auto px-6 py-8 scroll-smooth flex flex-col">
+          <div className="max-w-6xl mx-auto space-y-7 flex-1 w-full flex flex-col justify-center">
+            {/* Mobile-Identical Empty State */}
+            {messages.length === 0 && (
+              <div className="my-auto py-12 flex flex-col items-center justify-center text-center space-y-4">
+                <div className="w-20 h-20 rounded-3xl bg-zinc-100 dark:bg-[#1C2026] border border-zinc-200 dark:border-[#262B33] flex items-center justify-center shadow-md">
+                  <VitoMascot size={64} />
+                </div>
+                <h1 className="font-display font-extrabold text-2xl sm:text-3xl tracking-tight text-[#17191b] dark:text-[#f1f3f2] max-w-xl">
+                  {welcomeGreeting}
+                </h1>
+                <p className="text-sm sm:text-base text-zinc-500 dark:text-zinc-400 max-w-md mx-auto">
+                  Clique numa sugestão abaixo ou me diga o que precisa
+                </p>
               </div>
-              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-zinc-900 dark:text-white max-w-xl">
-                {welcomeGreeting}
-              </h1>
-              <p className="text-sm sm:text-base text-zinc-500 dark:text-zinc-400 max-w-md mx-auto">
-                Clique numa sugestão abaixo ou me diga o que precisa
-              </p>
-            </div>
-          )}
+            )}
 
-          {/* Messages Stream */}
-          {messages.map((msg) => {
-            const isUser = msg.sender === 'user';
-            return (
-              <div
-                key={msg.id}
-                className={`flex gap-4 group ${isUser ? 'justify-end' : 'justify-start'}`}
-              >
-                {isUser ? (
-                  // User message: bubble on the right
-                  <div className="max-w-[85%] rounded-[26px] p-6 transition-all shadow-sm bg-zinc-900 dark:bg-[#1C2026] text-white border border-transparent dark:border-[#262B33] rounded-tr-md">
-                    <div className="text-base leading-relaxed whitespace-pre-wrap font-sans">
-                      {msg.text}
+            {/* Messages Stream */}
+            {messages.map((msg) => {
+              const isUser = msg.sender === 'user';
+              return (
+                <div
+                  key={msg.id}
+                  className={`flex gap-4 group ${isUser ? 'justify-end' : 'justify-start'}`}
+                >
+                  {isUser ? (
+                    <div className="max-w-[85%] rounded-[24px] p-5 transition-all shadow-sm bg-[#17191b] dark:bg-[#1C2026] text-white border border-transparent dark:border-[#262B33] rounded-tr-md">
+                      <div className="text-sm sm:text-base leading-relaxed whitespace-pre-wrap font-sans">
+                        {msg.text}
+                      </div>
+                      <div className="mt-3 pt-2 border-t border-white/10 flex items-center justify-end text-[11px] text-zinc-400">
+                        <span className="font-mono">{msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                      </div>
                     </div>
+                  ) : (
+                    <div className="max-w-[85%] px-2">
+                      <div className="text-sm sm:text-base leading-relaxed whitespace-pre-wrap font-sans text-[#17191b] dark:text-[#f1f3f2]">
+                        {msg.text}
+                      </div>
 
-                    {/* Inline Actionable Cards */}
-                    {msg.todo && (
-                      <div 
-                        onClick={() => onNavigateTab?.('tasks')}
-                        className="mt-3.5 p-3.5 rounded-xl bg-zinc-50 dark:bg-[#0B0D10] border border-zinc-200 dark:border-[#222730] flex items-center justify-between gap-3 cursor-pointer hover:border-zinc-400 dark:hover:border-zinc-600 transition-colors"
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <Circle size={16} className="text-zinc-400 shrink-0" />
-                          <span className="text-xs font-semibold text-zinc-900 dark:text-white truncate">
-                            {msg.todo.title}
+                      {/* Inline Actionable Cards */}
+                      {msg.todo && (
+                        <div
+                          onClick={() => onNavigateTab?.('tasks')}
+                          className="mt-3.5 p-3.5 rounded-xl bg-white dark:bg-[#14171C] border border-zinc-200 dark:border-[#222730] flex items-center justify-between gap-3 cursor-pointer hover:border-zinc-400 dark:hover:border-zinc-600 transition-colors shadow-sm"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <Circle size={16} className="text-zinc-400 shrink-0" />
+                            <span className="text-xs font-semibold text-zinc-900 dark:text-white truncate">
+                              {msg.todo.title}
+                            </span>
+                          </div>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 uppercase shrink-0">
+                            {msg.todo.priority || 'MÉDIA'}
                           </span>
                         </div>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 uppercase shrink-0">
-                          {msg.todo.priority || 'MÉDIA'}
-                        </span>
-                      </div>
-                    )}
+                      )}
 
-                    {msg.event && (
-                      <div 
-                        onClick={() => onNavigateTab?.('calendar')}
-                        className="mt-3.5 p-3.5 rounded-xl bg-zinc-50 dark:bg-[#0B0D10] border border-zinc-200 dark:border-[#222730] flex items-center justify-between gap-3 cursor-pointer hover:border-zinc-400 dark:hover:border-zinc-600 transition-colors"
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <Calendar size={16} className="text-indigo-500 shrink-0" />
-                          <div>
-                            <p className="text-xs font-semibold text-zinc-900 dark:text-white truncate">
-                              {msg.event.title}
-                            </p>
-                            <p className="text-[10px] text-zinc-400">
-                              {new Date(msg.event.start_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                            </p>
+                      {msg.event && (
+                        <div
+                          onClick={() => onNavigateTab?.('calendar')}
+                          className="mt-3.5 p-3.5 rounded-xl bg-white dark:bg-[#14171C] border border-zinc-200 dark:border-[#222730] flex items-center justify-between gap-3 cursor-pointer hover:border-zinc-400 dark:hover:border-zinc-600 transition-colors shadow-sm"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <Calendar size={16} className="text-[#2b7fd4] shrink-0" />
+                            <div>
+                              <p className="text-xs font-semibold text-zinc-900 dark:text-white truncate">
+                                {msg.event.title}
+                              </p>
+                              <p className="text-[10px] text-zinc-400">
+                                {new Date(msg.event.start_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                              </p>
+                            </div>
                           </div>
-                        </div>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20 uppercase shrink-0">
-                          {msg.event.category || 'EVENTO'}
-                        </span>
-                      </div>
-                    )}
-
-                    {msg.whatsapp_message && (
-                      <WhatsAppMessageCard
-                        messageData={msg.whatsapp_message}
-                      />
-                    )}
-
-                    {msg.gmail_message && (
-                      <GmailMessageCard
-                        messageData={msg.gmail_message}
-                      />
-                    )}
-
-                    {/* Footer with timestamp and copy */}
-                    <div className="mt-3.5 pt-2.5 border-t border-black/5 dark:border-white/5 flex items-center justify-between text-xs text-zinc-400 dark:text-zinc-500">
-                      <span className="font-mono">{msg.timestamp}</span>
-
-                      <button
-                        onClick={() => handleCopyText(msg.id, msg.text)}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity hover:text-zinc-700 dark:hover:text-zinc-300 flex items-center gap-1.5 py-0.5 px-2 rounded hover:bg-zinc-100 dark:hover:bg-white/5"
-                        title="Copiar texto"
-                      >
-                        {copiedId === msg.id ? (
-                          <>
-                            <Check size={13} className="text-[#10B981]" />
-                            <span>Copiado</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy size={13} />
-                            <span>Copiar</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  // Vito response: plain text/markdown flowing on the left, no bubble
-                  <div className="max-w-[85%] px-2">
-                    <div className="text-base leading-relaxed whitespace-pre-wrap font-sans text-zinc-900 dark:text-[#FAFAFA] prose prose-zinc dark:prose-invert max-w-none">
-                      {msg.text}
-                    </div>
-
-                    {/* Inline Actionable Cards for Vito responses */}
-                    {msg.todo && (
-                      <div 
-                        onClick={() => onNavigateTab?.('tasks')}
-                        className="mt-3.5 p-3.5 rounded-xl bg-zinc-50 dark:bg-[#0B0D10] border border-zinc-200 dark:border-[#222730] flex items-center justify-between gap-3 cursor-pointer hover:border-zinc-400 dark:hover:border-zinc-600 transition-colors"
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <Circle size={16} className="text-zinc-400 shrink-0" />
-                          <span className="text-xs font-semibold text-zinc-900 dark:text-white truncate">
-                            {msg.todo.title}
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20 uppercase shrink-0">
+                            {msg.event.category || 'EVENTO'}
                           </span>
                         </div>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 uppercase shrink-0">
-                          {msg.todo.priority || 'MÉDIA'}
-                        </span>
+                      )}
+
+                      {msg.whatsapp_message && (
+                        <WhatsAppMessageCard messageData={msg.whatsapp_message} />
+                      )}
+
+                      {msg.gmail_message && (
+                        <GmailMessageCard messageData={msg.gmail_message} />
+                      )}
+
+                      {/* Footer with copy button */}
+                      <div className="mt-3 pt-2 border-t border-black/5 dark:border-white/5 flex items-center justify-start text-xs text-zinc-400 gap-3">
+                        <span className="font-mono text-[11px]">{msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                        <button
+                          onClick={() => handleCopyText(msg.id, msg.text)}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity hover:text-zinc-700 dark:hover:text-zinc-300 flex items-center gap-1.5 py-0.5 px-2 rounded hover:bg-zinc-100 dark:hover:bg-white/5"
+                          title="Copiar resposta"
+                        >
+                          {copiedId === msg.id ? (
+                            <>
+                              <Check size={13} className="text-[#00E599]" />
+                              <span>Copiado</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy size={13} />
+                              <span>Copiar</span>
+                            </>
+                          )}
+                        </button>
                       </div>
-                    )}
-
-                    {msg.event && (
-                      <div 
-                        onClick={() => onNavigateTab?.('calendar')}
-                        className="mt-3.5 p-3.5 rounded-xl bg-zinc-50 dark:bg-[#0B0D10] border border-zinc-200 dark:border-[#222730] flex items-center justify-between gap-3 cursor-pointer hover:border-zinc-400 dark:hover:border-zinc-600 transition-colors"
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <Calendar size={16} className="text-indigo-500 shrink-0" />
-                          <div>
-                            <p className="text-xs font-semibold text-zinc-900 dark:text-white truncate">
-                              {msg.event.title}
-                            </p>
-                            <p className="text-[10px] text-zinc-400">
-                              {new Date(msg.event.start_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                            </p>
-                          </div>
-                        </div>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20 uppercase shrink-0">
-                          {msg.event.category || 'EVENTO'}
-                        </span>
-                      </div>
-                    )}
-
-                    {msg.whatsapp_message && (
-                      <WhatsAppMessageCard
-                        messageData={msg.whatsapp_message}
-                      />
-                    )}
-
-                    {msg.gmail_message && (
-                      <GmailMessageCard
-                        messageData={msg.gmail_message}
-                      />
-                    )}
-
-                    {/* Footer with timestamp and copy for Vito messages */}
-                    <div className="mt-3.5 pt-2.5 border-t border-black/5 dark:border-white/5 flex items-center justify-start text-xs text-zinc-400 dark:text-zinc-500 gap-3">
-                      <span className="font-mono">{msg.timestamp}</span>
-
-                      <button
-                        onClick={() => handleCopyText(msg.id, msg.text)}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity hover:text-zinc-700 dark:hover:text-zinc-300 flex items-center gap-1.5 py-0.5 px-2 rounded hover:bg-zinc-100 dark:hover:bg-white/5"
-                        title="Copiar texto"
-                      >
-                        {copiedId === msg.id ? (
-                          <>
-                            <Check size={13} className="text-[#10B981]" />
-                            <span>Copiado</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy size={13} />
-                            <span>Copiar</span>
-                          </>
-                        )}
-                      </button>
                     </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
+                  )}
+                </div>
+              );
+            })}
 
-          {/* Typing Indicator */}
-          {loading && (
-            <div className="flex gap-4 items-start">
-              <div className="max-w-[85%]">
-                <ChatThinkingIndicator />
+            {loading && (
+              <div className="flex gap-4 items-start">
+                <div className="max-w-[85%]">
+                  <ChatThinkingIndicator />
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          <div ref={messagesEndRef} />
+            <div ref={messagesEndRef} />
+          </div>
         </div>
-      </div>
 
-      {/* Input Dock */}
-      <div className="p-5 bg-white/90 dark:bg-[#0B0D10]/90 border-t border-zinc-200/80 dark:border-[#222730] backdrop-blur-md">
-        <div className="max-w-6xl mx-auto">
-          {/* Chips Rápidos de Sugestões Executivas (Início do Chat) */}
-          {messages.length <= 2 && (
-            <div className="mb-3">
-              <ChatQuickChips onSelectPrompt={handleSendPrompt} disabled={loading} />
-            </div>
-          )}
-
-          {/* Input Dock com Botão Foco em */}
-          <div className="rounded-[26px] bg-white dark:bg-[#14171C] border border-zinc-200 dark:border-[#222730] p-3.5 shadow-md focus-within:border-zinc-400 dark:focus-within:border-zinc-500 transition-all">
-            <div className="flex items-center gap-2.5 px-1.5 pb-2">
-              <button
-                type="button"
-                className="p-1.5 rounded-full text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/5 transition-colors"
-                title="Anexar arquivo ou imagem"
-              >
-                <Plus size={17} />
-              </button>
-
-              {/* Botão Foco em */}
-              <FocusMenu selectedFocus={selectedFocus} onSelectFocus={setSelectedFocus} />
-            </div>
-
-            <div className="flex items-end gap-3">
-              <textarea
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleFormSubmit(e);
-                  }
-                }}
-                rows={2}
-                placeholder="Diga ao Vito o que você precisa..."
-                disabled={loading}
-                className="flex-1 bg-transparent border-none text-base text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none resize-none px-2 py-1 leading-relaxed"
-              />
-
-              <div className="flex items-center gap-2 pb-1 shrink-0">
-                <button
-                  type="button"
-                  className="p-2.5 rounded-full text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/10 transition-colors"
-                  title="Comando de voz (Whisper)"
-                >
-                  <Mic size={20} />
-                </button>
-
-                <button
-                  onClick={handleFormSubmit}
-                  disabled={!inputValue.trim() || loading}
-                  className="p-3 rounded-full bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-200 text-white dark:text-[#09090B] disabled:opacity-30 shadow-sm transition-all"
-                  title="Enviar mensagem (Enter)"
-                >
-                  {loading ? <Loader2 size={17} className="animate-spin" /> : <Send size={16} />}
-                </button>
+        {/* Input Dock (Memoizado contra digitação) */}
+        <div className="p-5 bg-white/90 dark:bg-[#0B0D10]/90 border-t border-zinc-200/80 dark:border-[#222730] backdrop-blur-md">
+          <div className="max-w-6xl mx-auto">
+            {messages.length <= 2 && (
+              <div className="mb-3">
+                <ChatQuickChips onSelectPrompt={(p) => handleSendPrompt(p, null)} disabled={loading} />
               </div>
-            </div>
+            )}
+
+            <ChatInputDock onSendMessage={handleSendPrompt} loading={loading} />
           </div>
         </div>
       </div>
     </div>
-  </div>
   );
 };

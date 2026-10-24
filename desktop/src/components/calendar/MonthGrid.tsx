@@ -52,8 +52,8 @@ export const MonthGrid: React.FC<MonthGridProps> = ({
     }
     if (cat.includes('ESTUD') || cat.includes('AULA') || title.includes('AULA') || title.includes('CURSO')) {
       return {
-        bg: 'bg-indigo-500/10 dark:bg-indigo-500/15 border-indigo-500/20 text-indigo-700 dark:text-indigo-300',
-        dot: 'bg-indigo-500',
+        bg: 'bg-purple-500/10 dark:bg-purple-500/15 border-purple-500/20 text-purple-700 dark:text-purple-300',
+        dot: 'bg-purple-500',
         isHoliday: false,
       };
     }

@@ -4,9 +4,56 @@
 
 @layer base {
   :root {
-    --bg-base: #0B0D10;
-    --bg-surface: #14171C;
-    --bg-surface-elevated: #1C2026;
+    --page: #dde1df;
+    --bg: #ffffff;
+    --surf: #f2f4f3;
+    --ink: #17191b;
+    --muted: #69706d;
+    --line: #d2d7d4;
+    --acc: #0b9a5f;
+    --accent: #1fb97a;
+    --blue: #2b7fd4;
+    --blue-bg: #e4effb;
+    --green-bg: #ddf4e8;
+    --orange: #d9681a;
+    --orange-bg: #fbebdb;
+    --red: #d6355a;
+    --red-bg: #fde6ec;
+    --purple: #7a4fe0;
+    --purple-bg: #eee8fd;
+    --teal: #0e8f9b;
+    --teal-bg: #dff3f5;
+
+    --bg-base: #dde1df;
+    --bg-surface: #ffffff;
+    --bg-surface-elevated: #f2f4f3;
+    --border-hairline: rgba(0, 0, 0, 0.08);
+  }
+
+  .dark {
+    --page: #050606;
+    --bg: #0d0f10;
+    --surf: #191c1e;
+    --ink: #f1f3f2;
+    --muted: #98a19d;
+    --line: #2c3134;
+    --acc: #34d399;
+    --accent: #34d399;
+    --blue: #5aa2ee;
+    --blue-bg: #16283b;
+    --green-bg: #12302a;
+    --orange: #ff9a52;
+    --orange-bg: #35230f;
+    --red: #ff6b8a;
+    --red-bg: #3a1620;
+    --purple: #a58bff;
+    --purple-bg: #241a42;
+    --teal: #3cc4d0;
+    --teal-bg: #10343a;
+
+    --bg-base: #050606;
+    --bg-surface: #0d0f10;
+    --bg-surface-elevated: #191c1e;
     --border-hairline: rgba(255, 255, 255, 0.08);
   }
 
@@ -33,4 +80,38 @@
 
 .tabular-nums {
   font-variant-numeric: tabular-nums;
+}
+
+/* Caret de digitação simulada */
+.caret-cursor::after {
+  content: "";
+  display: inline-block;
+  width: 2px;
+  height: 1.05em;
+  background-color: currentColor;
+  margin-left: 2px;
+  vertical-align: -2px;
+  animation: cur 0.8s steps(1) infinite;
+}
+
+@keyframes cur {
+  50% { opacity: 0; }
+}
+
+@keyframes dot {
+  0%, 60%, 100% { opacity: 0.3; transform: none; }
+  30% { opacity: 1; transform: translateY(-3px); }
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+
+.animate-dot {
+  animation: dot 1s infinite;
+}
+
+.animate-rise {
+  animation: rise 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }

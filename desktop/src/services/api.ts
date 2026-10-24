@@ -242,7 +242,17 @@ class ApiService {
   }
 
   // --- Assistant Chat & History Endpoints ---
-  async askAssistant(prompt: string, context?: any): Promise<{ reply: string; actions?: any[]; event?: CalendarEvent; todo?: Todo }> {
+  async askAssistant(prompt: string, context?: any): Promise<{
+    reply: string;
+    message?: string;
+    actions?: any[];
+    event?: CalendarEvent;
+    todo?: Todo;
+    trigger?: any;
+    booking?: any;
+    whatsapp_message?: any;
+    gmail_message?: any;
+  }> {
     const res = await this.request<any>('/api/v1/assistant/chat', {
       method: 'POST',
       body: JSON.stringify({
@@ -254,9 +264,14 @@ class ApiService {
     });
     return {
       reply: res.reply || res.message || res.text || '',
+      message: res.message || res.reply || '',
       actions: res.actions,
       event: res.event,
       todo: res.todo,
+      trigger: res.trigger,
+      booking: res.booking,
+      whatsapp_message: res.whatsapp_message,
+      gmail_message: res.gmail_message,
     };
   }
 
