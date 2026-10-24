@@ -42,6 +42,9 @@ services:
       - SMTP_FROM=${SMTP_FROM:-}
       - EVOLUTION_API_URL=${EVOLUTION_API_URL:-http://evolution-api:8085}
       - EVOLUTION_API_KEY=${EVOLUTION_API_KEY:-vito_evo_key_default_change_in_prod}
+      - SEARXNG_URL=${SEARXNG_URL:-http://searxng:8080}
+      - BRAPI_TOKEN=${BRAPI_TOKEN:-}
+      - SERPER_API_KEY=${SERPER_API_KEY:-}
       # Teto de heap do Go: evita que o backend engula a RAM do Pi e o kernel mate o Postgres (256M).
       - GOMEMLIMIT=${GOMEMLIMIT:-256MiB}
     volumes:
@@ -54,6 +57,34 @@ services:
           memory: 512M
         reservations:
           memory: 128M
+
+  # Metabuscador unificado SearXNG para os Radares e Motor de Busca com IA (porta 8185 externa)
+  searxng:
+    image: searxng/searxng:latest
+    container_name: vito-searxng
+    restart: unless-stopped
+    ports:
+      - "8185:8080"
+    volumes:
+      - ./backend/configs/searxng:/etc/searxng:rw
+    environment:
+      - SEARXNG_PORT=8080
+      - UWSGI_WORKERS=2
+      - UWSGI_THREADS=2
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+    networks:
+      - vito_net
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 64M
 
   # Banco PostgreSQL dedicado para a Evolution API v2 (Prisma ORM)
   evolution-postgres:

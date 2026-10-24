@@ -64,6 +64,12 @@ func (m *mockTriggerRepoForHandler) UpdateRunResult(id string, currentValue stri
 }
 
 func (m *mockTriggerRepoForHandler) UpdateLastError(id string, errMsg string) error { return nil }
+func (m *mockTriggerRepoForHandler) UpdateFingerprintsAndMetric(id string, seenFingerprintsJSON string, lastMetricValue *float64) error {
+	return nil
+}
+func (m *mockTriggerRepoForHandler) UpdateSearchConfig(id string, searchConfigJSON string) error {
+	return nil
+}
 
 func (m *mockTriggerRepoForHandler) GetLastNotifiedAt(id string) (*time.Time, error) {
 	return nil, nil

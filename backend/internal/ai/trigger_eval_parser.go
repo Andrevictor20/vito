@@ -23,6 +23,7 @@ var (
 
 type rawEvalResult struct {
 	ConditionMet          json.RawMessage `json:"condition_met"`
+	MatchedEvidenceIDs    json.RawMessage `json:"matched_evidence_ids"`
 	CurrentData           json.RawMessage `json:"current_data"`
 	Summary               string          `json:"summary"`
 	MetricLabel           string          `json:"metric_label"`
@@ -38,7 +39,8 @@ type rawEvalResult struct {
 
 // ParseTriggerEvalResult interpreta de forma defensiva e polimórfica a resposta de avaliação da IA,
 // blindando contra arrays em current_data, formatações heterogêneas e vazamento de JSON bruto na UI.
-func ParseTriggerEvalResult(rawText string, t *domain.Trigger) (*domain.TriggerTestResult, error) {
+// Se totalEvidenceCount for informado (>0), aplica Citation-Locked Grounding estrito.
+func ParseTriggerEvalResult(rawText string, t *domain.Trigger, totalEvidenceCount ...int) (*domain.TriggerTestResult, error) {
 	cleanJSON := strings.TrimSpace(rawText)
 	if start := strings.Index(cleanJSON, "{"); start != -1 {
 		if end := strings.LastIndex(cleanJSON, "}"); end != -1 && end > start {
@@ -108,8 +110,50 @@ func ParseTriggerEvalResult(rawText string, t *domain.Trigger) (*domain.TriggerT
 		res.SimulatedNotification = fmt.Sprintf("Alerta Vito: Vigília de '%s' atualizada.", t.Title)
 	}
 
+	// Citation-Locked Grounding: Se houver total de evidências no contexto (>0) e condition_met=true
+	if len(totalEvidenceCount) > 0 && totalEvidenceCount[0] > 0 && res.ConditionMet {
+		matchedIDs := parseMatchedEvidenceIDs(raw.MatchedEvidenceIDs)
+		if len(matchedIDs) == 0 {
+			res.ConditionMet = false
+			res.WhyRelevant = "Disparo anulado: modelo indicou gatilho positivo sem referenciar nenhum ID de evidência comprovada."
+		} else {
+			total := totalEvidenceCount[0]
+			for _, id := range matchedIDs {
+				if id <= 0 || id > total {
+					res.ConditionMet = false
+					res.WhyRelevant = fmt.Sprintf("Disparo anulado: modelo referenciou ID de evidência inexistente (%d de %d).", id, total)
+					break
+				}
+			}
+		}
+	}
+
 	res.EnforceConfidenceGate()
 	return res, nil
+}
+
+func parseMatchedEvidenceIDs(raw json.RawMessage) []int {
+	if len(raw) == 0 {
+		return nil
+	}
+	var ids []int
+	if err := json.Unmarshal(raw, &ids); err == nil {
+		return ids
+	}
+	var single int
+	if err := json.Unmarshal(raw, &single); err == nil {
+		return []int{single}
+	}
+	var strIDs []string
+	if err := json.Unmarshal(raw, &strIDs); err == nil {
+		for _, s := range strIDs {
+			if num, errN := strconv.Atoi(strings.TrimSpace(s)); errN == nil {
+				ids = append(ids, num)
+			}
+		}
+		return ids
+	}
+	return nil
 }
 
 func parseConfidence(raw json.RawMessage) int {

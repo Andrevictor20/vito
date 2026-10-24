@@ -96,6 +96,25 @@ func TestTriggerRepository_Lifecycle(t *testing.T) {
 		t.Errorf("expected current value 36.20 and triggered, got %+v", gotEvaluated)
 	}
 
+	// 5.1 Update Search Config & Fingerprints/Metric
+	if err := triggerRepo.UpdateSearchConfig("trig-1", `{"queries":["petr3 cotacao","petrobras b3"]}`); err != nil {
+		t.Fatalf("falha ao atualizar search config: %v", err)
+	}
+	metricVal := 36.20
+	if err := triggerRepo.UpdateFingerprintsAndMetric("trig-1", `["hash1","hash2"]`, &metricVal); err != nil {
+		t.Fatalf("falha ao atualizar fingerprints e metrica: %v", err)
+	}
+	gotConfig, _ := triggerRepo.GetByID("trig-1", "user-trig-1")
+	if gotConfig.SearchConfigJSON != `{"queries":["petr3 cotacao","petrobras b3"]}` {
+		t.Errorf("search config divergente: %s", gotConfig.SearchConfigJSON)
+	}
+	if gotConfig.SeenFingerprintsJSON != `["hash1","hash2"]` {
+		t.Errorf("seen fingerprints divergentes: %s", gotConfig.SeenFingerprintsJSON)
+	}
+	if gotConfig.LastMetricValue == nil || *gotConfig.LastMetricValue != 36.20 {
+		t.Errorf("metrica divergente: %v", gotConfig.LastMetricValue)
+	}
+
 	// 6. Logs de disparo
 	log := &domain.TriggerLog{
 		ID:          "log-1",

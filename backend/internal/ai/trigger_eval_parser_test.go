@@ -185,3 +185,53 @@ func TestParseTriggerEvalResult_BulletsSourcesAndMetrics(t *testing.T) {
 		t.Errorf("esperava urgency 'breaking', obteve %q", res.Urgency)
 	}
 }
+
+func TestParseTriggerEvalResult_CitationLockedGrounding(t *testing.T) {
+	trig := &domain.Trigger{
+		ID:    "trig-grounding",
+		Title: "Concurso INSS",
+		Query: "edital publicado",
+	}
+
+	// 1. LLM diz condition_met = true, mas matched_evidence_ids é vazio -> Grounding anula (false)
+	rawAlucinacao := `{
+		"condition_met": true,
+		"confidence": 95,
+		"matched_evidence_ids": [],
+		"summary": "Edital do INSS foi publicado com 1000 vagas",
+		"why_relevant": "Edital na praça"
+	}`
+	res, err := ParseTriggerEvalResult(rawAlucinacao, trig, 3)
+	if err != nil {
+		t.Fatalf("erro inesperado: %v", err)
+	}
+	if res.ConditionMet {
+		t.Errorf("esperava condition_met = false por falta de evidência citada")
+	}
+
+	// 2. LLM cita ID inexistente (ex: id 99 quando só havia 3 evidências) -> Grounding anula (false)
+	rawIDInexistente := `{
+		"condition_met": true,
+		"confidence": 90,
+		"matched_evidence_ids": [99],
+		"summary": "Edital confirmado",
+		"why_relevant": "Citação"
+	}`
+	res2, _ := ParseTriggerEvalResult(rawIDInexistente, trig, 3)
+	if res2.ConditionMet {
+		t.Errorf("esperava condition_met = false para ID inexistente")
+	}
+
+	// 3. LLM cita ID válido (id 2 de 3) -> condition_met preservado (true)
+	rawValido := `{
+		"condition_met": true,
+		"confidence": 92,
+		"matched_evidence_ids": [2],
+		"summary": "Edital confirmado no Diário Oficial",
+		"why_relevant": "Publicação oficial comprovada"
+	}`
+	res3, _ := ParseTriggerEvalResult(rawValido, trig, 3)
+	if !res3.ConditionMet {
+		t.Errorf("esperava condition_met = true para ID válido")
+	}
+}

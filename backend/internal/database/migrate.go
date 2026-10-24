@@ -323,6 +323,27 @@ func runVersionedMigrations(db *sql.DB) error {
 			}
 			continue
 		}
+		if version == "021_trigger_search_config.sql" {
+			if !hasColumn(db, "triggers", "search_config_json") {
+				if _, err := db.Exec("ALTER TABLE triggers ADD COLUMN search_config_json TEXT NOT NULL DEFAULT '{}'"); err != nil {
+					return err
+				}
+			}
+			if !hasColumn(db, "triggers", "seen_fingerprints_json") {
+				if _, err := db.Exec("ALTER TABLE triggers ADD COLUMN seen_fingerprints_json TEXT NOT NULL DEFAULT '[]'"); err != nil {
+					return err
+				}
+			}
+			if !hasColumn(db, "triggers", "last_metric_value") {
+				if _, err := db.Exec("ALTER TABLE triggers ADD COLUMN last_metric_value REAL"); err != nil {
+					return err
+				}
+			}
+			if err := recordMigration(db, version); err != nil {
+				return err
+			}
+			continue
+		}
 		content, err := migrationFS.ReadFile(name)
 		if err != nil {
 			return err

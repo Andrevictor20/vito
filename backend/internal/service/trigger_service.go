@@ -1,6 +1,7 @@
 package service
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/domain"
 )
 
@@ -238,25 +240,37 @@ func (s *TriggerService) CreateTrigger(userID string, input domain.CreateTrigger
 	loc := time.FixedZone("BRT", -3*3600)
 	nextCheck := CalculateNextCheck(scheduledTime, frequency, now, loc)
 
+	plan := ai.BuildTriggerSearchPlan(input.Title, input.Query, category)
+	planBytes, _ := json.Marshal(plan)
+	searchConfigJSON := string(planBytes)
+
+	targetVal := input.TargetValue
+	if targetVal == "" && plan.TargetValue != nil {
+		targetVal = fmt.Sprintf("%.2f", *plan.TargetValue)
+	}
+
 	trigger := &domain.Trigger{
-		ID:             uuid.New().String(),
-		UserID:         userID,
-		Title:          input.Title,
-		Category:       category,
-		Query:          expandedQuery,
-		UserIntent:     userIntent,
-		SearchKeywords: searchKeywords,
-		ConditionType:  conditionType,
-		TargetValue:    input.TargetValue,
-		CurrentValue:   "",
-		Status:         domain.TriggerStatusActive,
-		Frequency:      frequency,
-		ScheduledTime:  scheduledTime,
-		DaysOfWeek:     daysOfWeek,
-		LastRunStatus:  "",
-		NextCheckAt:    &nextCheck,
-		CreatedAt:      now,
-		UpdatedAt:      now,
+		ID:                   uuid.New().String(),
+		UserID:               userID,
+		Title:                input.Title,
+		Category:             category,
+		Query:                expandedQuery,
+		UserIntent:           userIntent,
+		SearchKeywords:       searchKeywords,
+		SearchConfigJSON:     searchConfigJSON,
+		SeenFingerprintsJSON: "[]",
+		LastMetricValue:      plan.TargetValue,
+		ConditionType:        conditionType,
+		TargetValue:          targetVal,
+		CurrentValue:         "",
+		Status:               domain.TriggerStatusActive,
+		Frequency:            frequency,
+		ScheduledTime:        scheduledTime,
+		DaysOfWeek:           daysOfWeek,
+		LastRunStatus:        "",
+		NextCheckAt:          &nextCheck,
+		CreatedAt:            now,
+		UpdatedAt:            now,
 	}
 
 	if err := s.repo.Create(trigger); err != nil {

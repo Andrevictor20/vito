@@ -62,26 +62,43 @@ const (
 
 // Trigger representa uma regra de vigília/monitoramento autônomo cadastrada pelo usuário.
 type Trigger struct {
-	ID             string               `json:"id"`
-	UserID         string               `json:"user_id"`
-	Title          string               `json:"title"`
-	Category       TriggerCategory      `json:"category"`
-	Query          string               `json:"query"`
-	UserIntent     string               `json:"user_intent,omitempty"`
-	SearchKeywords string               `json:"search_keywords,omitempty"`
-	ConditionType  TriggerConditionType `json:"condition_type"`
-	TargetValue    string               `json:"target_value"`
-	CurrentValue   string               `json:"current_value"`
-	Status         TriggerStatus        `json:"status"`
-	Frequency      TriggerFrequency     `json:"frequency"`
-	ScheduledTime  string               `json:"scheduled_time,omitempty"`
-	DaysOfWeek     string               `json:"days_of_week,omitempty"`
-	LastRunStatus  string               `json:"last_run_status,omitempty"`
-	LastError      string               `json:"last_error,omitempty"`
-	LastCheckedAt  *time.Time           `json:"last_checked_at,omitempty"`
-	NextCheckAt    *time.Time           `json:"next_check_at,omitempty"`
-	CreatedAt      time.Time            `json:"created_at"`
-	UpdatedAt      time.Time            `json:"updated_at"`
+	ID                   string               `json:"id"`
+	UserID               string               `json:"user_id"`
+	Title                string               `json:"title"`
+	Category             TriggerCategory      `json:"category"`
+	Query                string               `json:"query"`
+	UserIntent           string               `json:"user_intent,omitempty"`
+	SearchKeywords       string               `json:"search_keywords,omitempty"`
+	SearchConfigJSON     string               `json:"search_config_json,omitempty"`
+	SeenFingerprintsJSON string               `json:"seen_fingerprints_json,omitempty"`
+	LastMetricValue      *float64             `json:"last_metric_value,omitempty"`
+	ConditionType        TriggerConditionType `json:"condition_type"`
+	TargetValue          string               `json:"target_value"`
+	CurrentValue         string               `json:"current_value"`
+	Status               TriggerStatus        `json:"status"`
+	Frequency            TriggerFrequency     `json:"frequency"`
+	ScheduledTime        string               `json:"scheduled_time,omitempty"`
+	DaysOfWeek           string               `json:"days_of_week,omitempty"`
+	LastRunStatus        string               `json:"last_run_status,omitempty"`
+	LastError            string               `json:"last_error,omitempty"`
+	LastCheckedAt        *time.Time           `json:"last_checked_at,omitempty"`
+	NextCheckAt          *time.Time           `json:"next_check_at,omitempty"`
+	CreatedAt            time.Time            `json:"created_at"`
+	UpdatedAt            time.Time            `json:"updated_at"`
+}
+
+// TriggerSearchConfig armazena o plano inteligente de buscas segmentadas e filtros.
+type TriggerSearchConfig struct {
+	Queries          []string `json:"queries"`
+	MustIncludeTerms []string `json:"must_include_terms,omitempty"`
+	ExcludeTerms     []string `json:"exclude_terms,omitempty"`
+	Ticker           string   `json:"ticker,omitempty"`
+	TargetValue      *float64 `json:"target_value,omitempty"`
+	ComparisonOp     string   `json:"comparison_op,omitempty"` // "lt", "lte", "gt", "gte", "change_pct"
+	OriginIATA       string   `json:"origin_iata,omitempty"`
+	DestinationIATA  string   `json:"destination_iata,omitempty"`
+	FlightNumber     string   `json:"flight_number,omitempty"`
+	MaxAgeHours      int      `json:"max_age_hours,omitempty"`
 }
 
 // TriggerLog registra cada disparo/alerta acionado pelo monitoramento.
@@ -175,6 +192,10 @@ type TriggerRepository interface {
 	UpdateRunResult(id string, currentValue string, status TriggerStatus, lastRunStatus string, lastChecked time.Time, nextCheck *time.Time) error
 	// UpdateLastError persiste o erro da última coleta (visível no app).
 	UpdateLastError(id string, errMsg string) error
+	// UpdateFingerprintsAndMetric atualiza fingerprints deduplicadas e última métrica numérica apurada.
+	UpdateFingerprintsAndMetric(id string, seenFingerprintsJSON string, lastMetricValue *float64) error
+	// UpdateSearchConfig atualiza o plano estruturado de queries e termos de exclusão.
+	UpdateSearchConfig(id string, searchConfigJSON string) error
 	// GetLastNotifiedAt/UpdateLastNotifiedAt sustentam o cooldown do push (Fase 1).
 	GetLastNotifiedAt(id string) (*time.Time, error)
 	UpdateLastNotifiedAt(id string, t time.Time) error

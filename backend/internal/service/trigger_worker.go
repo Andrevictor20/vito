@@ -313,6 +313,7 @@ func (w *TriggerWorker) checkPriceFastPath(ctx context.Context, now time.Time, t
 	if err := w.triggerRepo.CreateLog(logEntry); err != nil {
 		log.Printf("[TriggerWorker] Erro ao gravar log de preço do disparador %s: %v", t.ID, err)
 	}
+	_ = w.triggerRepo.UpdateFingerprintsAndMetric(t.ID, t.SeenFingerprintsJSON, &current)
 	if w.notifSvc != nil && t.UserID != "" {
 		pushData := map[string]interface{}{
 			"type":         "RADAR_TRIGGERED",
@@ -426,6 +427,11 @@ func (w *TriggerWorker) CheckAndEvaluateTriggers(now time.Time) (int, error) {
 		// 4. Atualiza o status e próxima checagem do disparador
 		if err := w.triggerRepo.UpdateRunResult(t.ID, summary, t.Status, runStatus, now.UTC(), &nextCheck); err != nil {
 			log.Printf("[TriggerWorker] Erro ao atualizar próxima checagem do disparador %s: %v", t.ID, err)
+		}
+
+		// 5. Persiste fingerprints e métrica atualizada se houve disparo positivo
+		if evalErr == nil && sig.allowsNotify() {
+			_ = w.triggerRepo.UpdateFingerprintsAndMetric(t.ID, t.SeenFingerprintsJSON, t.LastMetricValue)
 		}
 
 		evaluatedCount++

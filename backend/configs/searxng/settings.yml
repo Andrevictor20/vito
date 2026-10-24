@@ -1,0 +1,43 @@
+use_default_settings: true
+
+general:
+  instance_name: "Vito Search Engine"
+  enable_metrics: false
+
+search:
+  safe_search: 0
+  autocomplete: ""
+  default_lang: "pt-BR"
+  formats:
+    - html
+    - json
+
+server:
+  port: 8080
+  bind_address: "0.0.0.0"
+  secret_key: "vito-searxng-internal-secret-key-change-me"
+  limiter: false
+  image_proxy: false
+
+outgoing:
+  request_timeout: 6.0
+  max_request_timeout: 10.0
+  useragent_suffix: "VitoRadarBot/2.0"
+
+engines:
+  - name: google
+    engine: google
+    shortcut: g
+    use_mobile_ui: false
+  - name: google news
+    engine: google_news
+    shortcut: gn
+  - name: bing
+    engine: bing
+    shortcut: b
+  - name: bing news
+    engine: bing_news
+    shortcut: bn
+  - name: duckduckgo
+    engine: duckduckgo
+    shortcut: ddg

@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/andrevmp/vito/backend/internal/domain"
@@ -234,15 +235,51 @@ func (s *WeatherSource) Fetch(ctx context.Context, t *domain.Trigger) ([]Trigger
 	}}, nil
 }
 
+var (
+	defaultSearXNGClientMu sync.RWMutex
+	defaultSearXNGClient   *SearXNGClient
+)
+
+// SetDefaultSearXNGClient registra o cliente global do metabuscador SearXNG.
+func SetDefaultSearXNGClient(client *SearXNGClient) {
+	defaultSearXNGClientMu.Lock()
+	defer defaultSearXNGClientMu.Unlock()
+	defaultSearXNGClient = client
+}
+
+// DefaultSearXNGClient retorna o cliente padrão registrado.
+func DefaultSearXNGClient() *SearXNGClient {
+	defaultSearXNGClientMu.RLock()
+	defer defaultSearXNGClientMu.RUnlock()
+	return defaultSearXNGClient
+}
+
 // RouteTriggerSource escolhe o conector especializado ou o padrão (§9.2).
 func RouteTriggerSource(t *domain.Trigger) TriggerDataSource {
-	fin := &FinanceSource{}
+	sClient := DefaultSearXNGClient()
+
+	fin := &FinanceCollector{}
 	if fin.Supports(t) {
 		return fin
+	}
+	shop := &ShoppingCollector{SearXNG: sClient}
+	if shop.Supports(t) {
+		return shop
+	}
+	jobs := &JobsCollector{SearXNG: sClient}
+	if jobs.Supports(t) {
+		return jobs
+	}
+	tender := &TenderCollector{SearXNG: sClient}
+	if tender.Supports(t) {
+		return tender
 	}
 	w := &WeatherSource{}
 	if w.Supports(t) {
 		return w
+	}
+	if sClient != nil {
+		return &NewsCollector{SearXNG: sClient}
 	}
 	return &GoogleNewsSource{}
 }

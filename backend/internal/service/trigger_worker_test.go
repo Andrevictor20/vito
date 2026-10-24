@@ -113,6 +113,27 @@ func (m *mockTriggerRepo) UpdateLastError(id string, errMsg string) error {
 	return domain.ErrTriggerNotFound
 }
 
+func (m *mockTriggerRepo) UpdateFingerprintsAndMetric(id string, seenFingerprintsJSON string, lastMetricValue *float64) error {
+	for i, trig := range m.triggers {
+		if trig.ID == id {
+			m.triggers[i].SeenFingerprintsJSON = seenFingerprintsJSON
+			m.triggers[i].LastMetricValue = lastMetricValue
+			return nil
+		}
+	}
+	return domain.ErrTriggerNotFound
+}
+
+func (m *mockTriggerRepo) UpdateSearchConfig(id string, searchConfigJSON string) error {
+	for i, trig := range m.triggers {
+		if trig.ID == id {
+			m.triggers[i].SearchConfigJSON = searchConfigJSON
+			return nil
+		}
+	}
+	return domain.ErrTriggerNotFound
+}
+
 func (m *mockTriggerRepo) GetLastNotifiedAt(id string) (*time.Time, error) {
 	return m.lastNotifiedAt, nil
 }
