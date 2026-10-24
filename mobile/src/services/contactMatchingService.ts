@@ -1,7 +1,19 @@
 import { toE164Phone } from '../utils/phoneFormat';
 import { P2PMeetingsApi } from './api/p2pMeetingsApi';
 
-async function loadExpoContacts() {
+async function loadExpoContacts(): Promise<any> {
+  // Expo SDK 52+ expõe a API funcional clássica em 'expo-contacts/legacy'
+  // e avisa para usá-lo em runtime quando invocado via getContactsAsync.
+  // Tentamos legacy primeiro; se não existir, recorremos ao módulo raiz.
+  try {
+    const legacy = await import('expo-contacts/legacy');
+    if (legacy && (typeof legacy.getContactsAsync === 'function' || typeof legacy.requestPermissionsAsync === 'function')) {
+      return legacy;
+    }
+  } catch {
+    // Continua para o módulo base
+  }
+
   try {
     return await import('expo-contacts');
   } catch {
@@ -62,9 +74,16 @@ export async function computeHmacSha256(salt: string, message: string): Promise<
 export async function requestContactsPermission(): Promise<boolean> {
   try {
     const Contacts = await loadExpoContacts();
-    if (!Contacts?.requestPermissionsAsync) return false;
-    const { status } = await Contacts.requestPermissionsAsync();
-    return status === 'granted';
+    if (!Contacts) return false;
+    if (typeof Contacts.requestPermissionsAsync === 'function') {
+      const { status } = await Contacts.requestPermissionsAsync();
+      return status === 'granted';
+    }
+    if (Contacts.Contact?.requestPermissionsAsync) {
+      const { status } = await Contacts.Contact.requestPermissionsAsync();
+      return status === 'granted';
+    }
+    return false;
   } catch (err) {
     console.warn('Erro ao solicitar permissão de contatos:', err);
     return false;
@@ -77,23 +96,80 @@ export async function requestContactsPermission(): Promise<boolean> {
 export async function getDeviceContacts(): Promise<LocalContactRecord[]> {
   try {
     const Contacts = await loadExpoContacts();
-    if (!Contacts?.getContactsAsync) return [];
-    const response = await Contacts.getContactsAsync({
-      fields: [Contacts.Fields.PhoneNumbers, Contacts.Fields.Emails],
-    });
-
-    if (!response || !Array.isArray(response.data)) {
+    if (!Contacts) {
+      console.warn('[ContactSync] Módulo expo-contacts indisponível.');
       return [];
     }
 
-    return response.data.map(c => ({
-      id: c.id || String(Math.random()),
-      name: c.name || [c.firstName, c.lastName].filter(Boolean).join(' ') || 'Sem Nome',
-      phoneNumbers: (c.phoneNumbers || []).map(p => p.number).filter((n): n is string => Boolean(n)),
-      emails: (c.emails || []).map(e => e.email).filter((e): e is string => Boolean(e)),
-    }));
+    let rawList: any[] = [];
+
+    // Estratégia 1: API Funcional (expo-contacts/legacy ou legado direto)
+    if (typeof Contacts.getContactsAsync === 'function') {
+      try {
+        const fields = [
+          Contacts.Fields?.PhoneNumbers || 'phoneNumbers',
+          Contacts.Fields?.Emails || 'emails',
+          Contacts.Fields?.Name || 'name',
+          Contacts.Fields?.FirstName || 'firstName',
+          Contacts.Fields?.LastName || 'lastName',
+        ];
+        const response = await Contacts.getContactsAsync({ fields });
+        if (response && Array.isArray(response.data)) {
+          rawList = response.data;
+        }
+      } catch (legacyErr) {
+        console.warn('[ContactSync] getContactsAsync falhou, tentando fallback moderno:', legacyErr);
+      }
+    }
+
+    // Estratégia 2: Nova API baseada em classes (Expo SDK 52+ Contact.getAll / Contact.getAllDetails)
+    if (rawList.length === 0 && Contacts.Contact) {
+      try {
+        if (typeof Contacts.Contact.getAllDetails === 'function') {
+          rawList = await Contacts.Contact.getAllDetails(['name', 'phones', 'emails']);
+        } else if (typeof Contacts.Contact.getAll === 'function') {
+          rawList = await Contacts.Contact.getAll();
+        }
+      } catch (modernErr) {
+        console.warn('[ContactSync] API moderna Contact falhou:', modernErr);
+      }
+    }
+
+    if (!Array.isArray(rawList)) {
+      console.warn('[ContactSync] Nenhum contato retornado pelo aparelho.');
+      return [];
+    }
+
+    const parsed: LocalContactRecord[] = rawList.map((c: any) => {
+      const rawName =
+        c.name ||
+        [c.firstName || c.givenName, c.lastName || c.familyName].filter(Boolean).join(' ') ||
+        c.nickname ||
+        c.company ||
+        '';
+
+      const phoneEntries = c.phoneNumbers || c.phones || [];
+      const phoneNumbers: string[] = (Array.isArray(phoneEntries) ? phoneEntries : [])
+        .map((p: any) => (typeof p === 'string' ? p : p?.number || p?.digits || p?.formattedNumber || ''))
+        .filter((n: string): n is string => Boolean(n && n.trim()));
+
+      const emailEntries = c.emails || [];
+      const emails: string[] = (Array.isArray(emailEntries) ? emailEntries : [])
+        .map((e: any) => (typeof e === 'string' ? e : e?.email || e?.address || ''))
+        .filter((e: string): e is string => Boolean(e && e.trim()));
+
+      return {
+        id: c.id || String(Math.random()),
+        name: rawName.trim() || 'Sem Nome',
+        phoneNumbers,
+        emails,
+      };
+    });
+
+    console.log(`[ContactSync] ${parsed.length} contato(s) lido(s) do aparelho.`);
+    return parsed;
   } catch (err) {
-    console.warn('Erro ao ler contatos do aparelho:', err);
+    console.warn('[ContactSync] Erro inesperado ao ler contatos:', err);
     return [];
   }
 }

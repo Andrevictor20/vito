@@ -60,10 +60,26 @@ export const toE164Phone = (raw: string): string => {
   if (!digits) return '';
 
   if (hasPlus) {
+    // Normaliza +55 0XX... removendo zero residual entre DDI e DDD
+    if (digits.startsWith('550') && (digits.length === 13 || digits.length === 14)) {
+      digits = '55' + digits.slice(3);
+    }
     if (digits.length >= 8 && digits.length <= 15) {
       return `+${digits}`;
     }
     return '';
+  }
+
+  // Remove prefixo de saída internacional comum (0055... -> 55...)
+  if (digits.startsWith('00') && digits.length >= 12) {
+    digits = digits.slice(2);
+  }
+
+  // Remove código de operadora brasileira (CSP) no formato 0 + [CSP 2 dígitos] + [DDD 2 dígitos] + [número 8 ou 9 dígitos]
+  // Exemplo: 021 21 98765-4321 -> 14 dígitos (slice(3) -> 21987654321)
+  // Exemplo: 031 31 3333-4444 -> 13 dígitos (slice(3) -> 3133334444)
+  if (digits.startsWith('0') && (digits.length === 13 || digits.length === 14)) {
+    digits = digits.slice(3);
   }
 
   // Remove zero à esquerda no DDD nacional (ex: 011987654321 -> 11987654321)
@@ -79,6 +95,11 @@ export const toE164Phone = (raw: string): string => {
   // Se tem 10 ou 11 dígitos nacionais (DDD + número)
   if (digits.length === 10 || digits.length === 11) {
     return `+55${digits}`;
+  }
+
+  // Outros números internacionais já com DDI mas salvos sem o '+'
+  if (digits.length >= 12 && digits.length <= 15) {
+    return `+${digits}`;
   }
 
   return '';

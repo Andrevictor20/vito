@@ -28,6 +28,16 @@ describe('buildSavedNames Unit Tests', () => {
     assert.equal(names.length, 2);
   });
 
+  test('reconhece telefones com código de operadora CSP e limpa o prefixo', () => {
+    const names = buildSavedNames([
+      { name: 'Pai', phoneNumbers: ['021 21 98841-7165'] },
+      { name: 'Mãe', phoneNumbers: ['015 11 98765-4321'] },
+    ]);
+    assert.equal(names.length, 2);
+    assert.equal(names[0].phone, '+5521988417165');
+    assert.equal(names[1].phone, '+5511987654321');
+  });
+
   test('aceita agenda vazia', () => {
     assert.equal(buildSavedNames([]).length, 0);
   });

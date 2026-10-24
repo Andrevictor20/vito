@@ -36,7 +36,17 @@ export const WhatsAppContactNamesImport: React.FC<WhatsAppContactNamesImportProp
         return;
       }
       if (result.usable === 0) {
-        Alert.alert('Nada para importar', 'Nenhum contato da sua agenda tem nome e telefone.');
+        if (result.totalFound === 0) {
+          Alert.alert(
+            'Nenhum contato encontrado',
+            'Não foi possível ler contatos da agenda deste aparelho. Verifique se a permissão de Contatos está ativa nas configurações do Android e se há contatos salvos no telefone.',
+          );
+        } else {
+          Alert.alert(
+            'Nenhum telefone válido',
+            `Lemos ${result.totalFound} contato(s) da agenda, mas nenhum deles continha um número de telefone com formato reconhecível.`,
+          );
+        }
         return;
       }
       onImported?.(result.sent);

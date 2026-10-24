@@ -29,6 +29,15 @@ describe('Phone format helpers (TDD)', () => {
     assert.equal(toE164Phone('+55 11 98765-4321'), '+5511987654321');
     // Internacional genérico
     assert.equal(toE164Phone('+1 415 555 2671'), '+14155552671');
+    // Nacional com código de operadora CSP (ex: 021 Claro, 015 Vivo, 031 Oi, 041 TIM)
+    assert.equal(toE164Phone('021 21 98765-4321'), '+5521987654321');
+    assert.equal(toE164Phone('015 11 98765-4321'), '+5511987654321');
+    assert.equal(toE164Phone('031 31 3333-4444'), '+553133334444');
+    // Nacional com 55 prefixado sem o +
+    assert.equal(toE164Phone('5521987654321'), '+5521987654321');
+    assert.equal(toE164Phone('552133334444'), '+552133334444');
+    // Com +55 e zero redundante após o DDI (+55 021...)
+    assert.equal(toE164Phone('+55 021 98765-4321'), '+5521987654321');
     // Inválido ou vazio
     assert.equal(toE164Phone(''), '');
     assert.equal(toE164Phone('123'), '');
