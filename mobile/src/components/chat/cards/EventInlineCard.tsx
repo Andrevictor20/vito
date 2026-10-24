@@ -1,101 +1,117 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
-import { tokens, MD3Shapes } from '../../../theme/tokens';
 import { useTheme } from '../../../context/ThemeContext';
 import { Event } from '../../../types';
-import { formatEventDuration, formatRecurrenceLabel } from '../../../utils/chatCards';
+import { formatEventDuration } from '../../../utils/chatCards';
+import { CalIcon } from '../../login/DemoIcons';
+import { tabNavigationBus, chatPromptBus } from '../../../services/dataSync';
+import { hapticFeedback } from '../../../theme/motion';
 
 interface EventInlineCardProps {
   event: Event;
   onPressDetail?: () => void;
+  onUndo?: () => void;
 }
 
-export const EventInlineCard: React.FC<EventInlineCardProps> = ({ event, onPressDetail }) => {
+/**
+ * Card in-chat de criação de evento/agendamento alinhado ao protótipo `vito-telas.html`:
+ * - Card arredondado com chip azul 44x44px e ícone de calendário.
+ * - Título em Inter 600 SemiBold e subtítulo com dia da semana, horário e integração.
+ * - Botões de ação em pílula abaixo do card: "Desfazer" (outline) e "Ver agenda" (solid ink).
+ */
+export const EventInlineCard: React.FC<EventInlineCardProps> = ({ event, onPressDetail, onUndo }) => {
   const { colors } = useTheme();
-  const startDate = new Date(event.start_at);
-  const endDate = new Date(event.end_at);
+  const [undone, setUndone] = useState(false);
 
+  const startDate = new Date(event.start_at);
   const formattedDate = startDate.toLocaleDateString('pt-BR', {
     weekday: 'short',
     day: '2-digit',
     month: 'short',
   });
   const startTime = startDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-  const endTime = endDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   const duration = formatEventDuration(event.start_at, event.end_at);
-  const recurrenceLabel = formatRecurrenceLabel(event.recurrence);
-  const dayNumber = startDate.getDate().toString().padStart(2, '0');
-  const monthShort = startDate.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
+  const subtitleText = `${formattedDate}, ${startTime}${duration ? ` (${duration})` : ''} · Google Agenda`;
+
+  const handleUndo = () => {
+    hapticFeedback.light();
+    setUndone(true);
+    if (onUndo) {
+      onUndo();
+    } else {
+      chatPromptBus.notify(`Desfazer evento "${event.title}"`);
+    }
+  };
+
+  const handleViewAgenda = () => {
+    hapticFeedback.selection();
+    if (onPressDetail) {
+      onPressDetail();
+    } else {
+      tabNavigationBus.notify('calendar');
+    }
+  };
 
   return (
-    <View style={[styles.card, { backgroundColor: colors.surfaceContainerHigh, borderColor: colors.outlineVariant }]}>
-      <View style={[styles.accentBar, { backgroundColor: event.color || colors.primary }]} />
-
-      {/* Header do Card */}
-      <View style={styles.topRow}>
-        <View style={styles.headerLeft}>
-          <View style={[styles.dateBadge, { backgroundColor: colors.surfaceContainerHighest }]}>
-            <Text style={[styles.dateBadgeDay, { color: event.color || colors.primary }]}>{dayNumber}</Text>
-            <Text style={[styles.dateBadgeMonth, { color: colors.onSurfaceVariant }]}>{monthShort}</Text>
-          </View>
-          <View style={styles.titleCol}>
-            <Text style={[styles.title, { color: colors.onSurface }]} numberOfLines={1}>{event.title}</Text>
-            <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-              {formattedDate}{duration ? ` • ${duration}` : ''} • Salvo na Agenda
-            </Text>
-          </View>
+    <View style={styles.wrapper}>
+      {/* Card Principal */}
+      <View
+        style={[
+          styles.card,
+          {
+            backgroundColor: colors.bg,
+            borderColor: colors.line,
+          },
+          undone && { opacity: 0.5 },
+        ]}
+      >
+        {/* Chip Azul 44x44 com CalIcon */}
+        <View style={[styles.chip, { backgroundColor: colors.blueBg }]}>
+          <CalIcon color={colors.blue} size={22} />
         </View>
 
-        <View style={[styles.statusPill, { backgroundColor: colors.successLight }]}>
-          <View style={[styles.statusDot, { backgroundColor: colors.success }]} />
-          <Text style={[styles.statusText, { color: colors.success }]}>Confirmado</Text>
-        </View>
-      </View>
-
-      {event.description ? (
-        <Text style={[styles.description, { color: colors.onSurfaceVariant }]} numberOfLines={2}>
-          {event.description}
-        </Text>
-      ) : null}
-
-      {/* Grid de Detalhes de Horário e Local */}
-      <View style={styles.detailsGrid}>
-        <View style={styles.detailItem}>
-          <MaterialIcons name="schedule" size={14} color={colors.onSurfaceVariant} />
-          <Text style={[styles.detailText, { color: colors.onSurfaceVariant }]}>{startTime} - {endTime}</Text>
-        </View>
-        {event.location ? (
-          <View style={styles.detailItem}>
-            <MaterialIcons name="place" size={14} color={colors.onSurfaceVariant} />
-            <Text style={[styles.detailText, { color: colors.onSurfaceVariant }]} numberOfLines={1}>{event.location}</Text>
-          </View>
-        ) : recurrenceLabel ? (
-          <View style={styles.detailItem}>
-            <MaterialIcons name="sync" size={14} color={colors.onSurfaceVariant} />
-            <Text style={[styles.detailText, { color: colors.onSurfaceVariant }]} numberOfLines={1}>
-              {recurrenceLabel}
-            </Text>
-          </View>
-        ) : (
-          <View style={styles.detailItem}>
-            <MaterialIcons name="check-circle" size={14} color={colors.onSurfaceVariant} />
-            <Text style={[styles.detailText, { color: colors.onSurfaceVariant }]} numberOfLines={1}>
-              Evento único
-            </Text>
-          </View>
-        )}
-      </View>
-
-      {onPressDetail && (
-        <View style={styles.actionRow}>
-          <TouchableOpacity
-            style={[styles.tonalButton, { backgroundColor: colors.surfaceContainerHighest }]}
-            onPress={onPressDetail}
-            activeOpacity={0.8}
+        {/* Informações do Evento */}
+        <View style={styles.titleCol}>
+          <Text
+            style={[styles.title, { color: colors.ink }]}
+            numberOfLines={2}
           >
-            <Text style={[styles.tonalButtonText, { color: colors.onSurface }]}>Ver detalhes</Text>
-            <MaterialIcons name="arrow-forward" size={14} color={colors.onSurface} />
+            {event.title}
+          </Text>
+          <Text
+            style={[styles.subtitle, { color: colors.muted }]}
+            numberOfLines={1}
+          >
+            {subtitleText}
+          </Text>
+        </View>
+      </View>
+
+      {/* Botões de Ação Abaixo do Card */}
+      {!undone && (
+        <View style={styles.actionsRow}>
+          <TouchableOpacity
+            style={[styles.btnOutline, { borderColor: colors.ink }]}
+            onPress={handleUndo}
+            activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityLabel="Desfazer evento"
+          >
+            <Text style={[styles.btnOutlineText, { color: colors.ink }]}>
+              Desfazer
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.btnFill, { backgroundColor: colors.ink }]}
+            onPress={handleViewAgenda}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Ver agenda"
+          >
+            <Text style={[styles.btnFillText, { color: colors.bg }]}>
+              Ver agenda
+            </Text>
           </TouchableOpacity>
         </View>
       )}
@@ -104,164 +120,78 @@ export const EventInlineCard: React.FC<EventInlineCardProps> = ({ event, onPress
 };
 
 const styles = StyleSheet.create({
-  // Card M3 Filled/Elevated (Surface Container High, 16dp radius)
+  wrapper: {
+    marginTop: 8,
+    width: '100%',
+  },
   card: {
-    backgroundColor: tokens.colors.surfaceContainerHigh,
-    borderRadius: MD3Shapes.large,
-    padding: tokens.spacing.md,
-    marginTop: tokens.spacing.xs,
-    position: 'relative',
-    overflow: 'hidden',
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: tokens.colors.outlineVariant,
-    gap: tokens.spacing.sm,
-  },
-  accentBar: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: 4,
-    backgroundColor: tokens.colors.primary,
-  },
-  topRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: tokens.spacing.sm,
-  },
-  headerLeft: {
+    paddingVertical: 12,
+    paddingHorizontal: 14,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: tokens.spacing.sm,
-    flex: 1,
+    gap: 12,
+    shadowColor: '#141916',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  iconBox: {
-    width: 32,
-    height: 32,
-    borderRadius: MD3Shapes.small,
-    backgroundColor: tokens.colors.surfaceContainerHighest,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dateBadge: {
-    width: 40,
+  chip: {
+    width: 44,
     height: 44,
-    borderRadius: MD3Shapes.small,
-    backgroundColor: tokens.colors.surfaceContainerHighest,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 2,
-  },
-  dateBadgeDay: {
-    fontSize: 17,
-    fontWeight: tokens.typography.weight.bold,
-    lineHeight: 20,
-    letterSpacing: -0.4,
-    fontVariant: ['tabular-nums'],
-  },
-  dateBadgeMonth: {
-    fontSize: 10,
-    fontWeight: tokens.typography.weight.bold,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    lineHeight: 12,
-  },
-  description: {
-    fontSize: tokens.typography.size.bodySmall,
-    lineHeight: 18,
+    flexShrink: 0,
   },
   titleCol: {
     flex: 1,
+    minWidth: 0,
+    justifyContent: 'center',
   },
   title: {
-    color: tokens.colors.onSurface,
-    fontSize: tokens.typography.size.titleSmall,
-    fontWeight: tokens.typography.weight.semibold,
-    letterSpacing: -0.2,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 15.5,
+    fontWeight: '600',
+    lineHeight: 20,
   },
   subtitle: {
-    color: tokens.colors.onSurfaceVariant,
-    fontSize: tokens.typography.size.labelSmall,
-    letterSpacing: -0.05,
-    marginTop: 1,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 13,
+    marginTop: 3,
   },
-  // Status Pill M3 com Success Container
-  statusPill: {
+  actionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: tokens.colors.successContainer,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: MD3Shapes.full,
+    gap: 10,
+    marginTop: 10,
   },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: MD3Shapes.full,
-    backgroundColor: tokens.colors.onSuccessContainer,
-  },
-  statusText: {
-    color: tokens.colors.onSuccessContainer,
-    fontSize: tokens.typography.size.labelSmall,
-    fontWeight: tokens.typography.weight.semibold,
-  },
-  detailsGrid: {
-    flexDirection: 'row',
-    gap: tokens.spacing.sm,
-    backgroundColor: tokens.colors.surfaceContainerLowest,
-    padding: tokens.spacing.xs + 2,
-    borderRadius: MD3Shapes.small,
-  },
-  detailItem: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  detailText: {
-    color: tokens.colors.onSurface,
-    fontSize: tokens.typography.size.labelSmall,
-    fontWeight: tokens.typography.weight.medium,
-  },
-  actionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 2,
-  },
-  attendeesRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  avatarBubble: {
-    width: 22,
-    height: 22,
-    borderRadius: MD3Shapes.full,
+  btnOutline: {
+    height: 36,
+    paddingHorizontal: 18,
+    borderRadius: 18,
+    borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: tokens.colors.surfaceContainerHigh,
+    backgroundColor: 'transparent',
   },
-  avatarBubbleText: {
-    color: tokens.colors.onSurface,
-    fontSize: 9,
-    fontWeight: tokens.typography.weight.bold,
+  btnOutlineText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 13.5,
+    fontWeight: '600',
   },
-  // M3 Tonal Button
-  tonalButton: {
-    flexDirection: 'row',
+  btnFill: {
+    height: 36,
+    paddingHorizontal: 18,
+    borderRadius: 18,
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: tokens.colors.secondaryContainer,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: MD3Shapes.full,
+    justifyContent: 'center',
   },
-  tonalButtonText: {
-    color: tokens.colors.onSecondaryContainer,
-    fontSize: tokens.typography.size.labelSmall,
-    fontWeight: tokens.typography.weight.semibold,
+  btnFillText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 13.5,
+    fontWeight: '600',
   },
 });

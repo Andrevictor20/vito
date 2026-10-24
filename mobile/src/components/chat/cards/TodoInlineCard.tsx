@@ -1,152 +1,194 @@
 import React, { useState } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
-import { tokens, MD3Shapes } from '../../../theme/tokens';
 import { useTheme } from '../../../context/ThemeContext';
 import { Todo } from '../../../types';
 import { formatTodoDue } from '../../../utils/chatCards';
+import { CheckCircleIcon } from '../../login/DemoIcons';
+import { tabNavigationBus, chatPromptBus } from '../../../services/dataSync';
+import { hapticFeedback } from '../../../theme/motion';
 
 interface TodoInlineCardProps {
   todo: Todo;
   onToggle?: (id: string) => void;
+  onUndo?: () => void;
 }
 
-export const TodoInlineCard: React.FC<TodoInlineCardProps> = ({ todo, onToggle }) => {
-  const { colors, isDark } = useTheme();
-  const [completed, setCompleted] = useState(todo.status === 'completed');
+/**
+ * Card in-chat de criação de tarefa alinhado ao protótipo `vito-telas.html`:
+ * - Card arredondado com chip roxo 44x44px e ícone de check.
+ * - Título da tarefa em Inter 600 SemiBold e subtítulo contextual (data, prioridade, categoria).
+ * - Botões de ação em formato pílula abaixo do card: "Desfazer" (outline) e "Ver tarefas" (solid ink).
+ */
+export const TodoInlineCard: React.FC<TodoInlineCardProps> = ({ todo, onToggle, onUndo }) => {
+  const { colors } = useTheme();
+  const [undone, setUndone] = useState(false);
 
-  const handleToggle = () => {
-    const next = !completed;
-    setCompleted(next);
-    if (onToggle) {
-      onToggle(todo.id);
+  const priorityLabel =
+    todo.priority === 'high'
+      ? 'prioridade alta'
+      : todo.priority === 'medium'
+      ? 'prioridade média'
+      : 'prioridade baixa';
+
+  const dateLabel = formatTodoDue(todo.due_date);
+  const subtitleParts = [dateLabel !== 'Sem prazo' ? dateLabel : null, priorityLabel, todo.category || 'Tarefas'].filter(Boolean);
+  const subtitleText = subtitleParts.join(' · ');
+
+  const handleUndo = () => {
+    hapticFeedback.light();
+    setUndone(true);
+    if (onUndo) {
+      onUndo();
+    } else {
+      chatPromptBus.notify(`Desfazer criação da tarefa "${todo.title}"`);
     }
   };
 
-  const priorityColor =
-    todo.priority === 'high'
-      ? { bg: colors.errorContainer, text: colors.onErrorContainer, label: 'ALTA' }
-      : todo.priority === 'medium'
-      ? { bg: isDark ? 'rgba(251, 191, 36, 0.18)' : 'rgba(245, 158, 11, 0.12)', text: colors.warning, label: 'MÉDIA' }
-      : { bg: colors.surfaceContainerHighest, text: colors.onSurfaceVariant, label: 'BAIXA' };
+  const handleViewTasks = () => {
+    hapticFeedback.selection();
+    tabNavigationBus.notify('tasks');
+  };
 
   return (
-    <View
-      style={[
-        styles.card,
-        { backgroundColor: colors.surfaceContainerHigh, borderColor: colors.outlineVariant },
-        completed && [styles.cardCompleted, { backgroundColor: colors.surfaceContainerLow }],
-      ]}
-    >
-      <View style={styles.leftGroup}>
-        {/* Checkbox Circular M3 */}
-        <TouchableOpacity
-          style={[
-            styles.checkbox,
-            { borderColor: completed ? colors.primary : colors.outline },
-            completed && { backgroundColor: colors.primary },
-          ]}
-          onPress={handleToggle}
-          activeOpacity={0.8}
-          accessibilityRole="checkbox"
-          accessibilityState={{ checked: completed }}
-        >
-          {completed && (
-            <MaterialIcons name="done" size={14} color={colors.onPrimary} />
-          )}
-        </TouchableOpacity>
+    <View style={styles.wrapper}>
+      {/* Card Principal */}
+      <View
+        style={[
+          styles.card,
+          {
+            backgroundColor: colors.bg,
+            borderColor: colors.line,
+          },
+          undone && { opacity: 0.5 },
+        ]}
+      >
+        {/* Chip Roxo 44x44 com CheckCircleIcon */}
+        <View style={[styles.chip, { backgroundColor: colors.purpleBg }]}>
+          <CheckCircleIcon color={colors.purple} size={22} />
+        </View>
 
+        {/* Informações da Tarefa */}
         <View style={styles.titleCol}>
           <Text
-            style={[
-              styles.title,
-              { color: completed ? colors.textMuted : colors.onSurface },
-            ]}
-            numberOfLines={1}
+            style={[styles.title, { color: colors.ink }]}
+            numberOfLines={2}
           >
             {todo.title}
           </Text>
-          <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-            {completed ? 'Concluída com sucesso' : formatTodoDue(todo.due_date)}
+          <Text
+            style={[styles.subtitle, { color: colors.muted }]}
+            numberOfLines={1}
+          >
+            {subtitleText}
           </Text>
         </View>
       </View>
 
-      {/* Tag Tonal M3 de Urgência */}
-      <View style={[styles.priorityBadge, { backgroundColor: priorityColor.bg }]}>
-        <Text style={[styles.priorityBadgeText, { color: priorityColor.text }]}>
-          {priorityColor.label}
-        </Text>
-      </View>
+      {/* Botões de Ação Abaixo do Card */}
+      {!undone && (
+        <View style={styles.actionsRow}>
+          <TouchableOpacity
+            style={[styles.btnOutline, { borderColor: colors.ink }]}
+            onPress={handleUndo}
+            activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityLabel="Desfazer criação da tarefa"
+          >
+            <Text style={[styles.btnOutlineText, { color: colors.ink }]}>
+              Desfazer
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.btnFill, { backgroundColor: colors.ink }]}
+            onPress={handleViewTasks}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Ver tarefas"
+          >
+            <Text style={[styles.btnFillText, { color: colors.bg }]}>
+              Ver tarefas
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  // Card M3 Outlined (Borda em outline-variant, fundo surface-container)
+  wrapper: {
+    marginTop: 8,
+    width: '100%',
+  },
   card: {
-    backgroundColor: tokens.colors.surfaceContainer,
-    borderRadius: MD3Shapes.medium,
-    padding: tokens.spacing.md,
-    marginTop: tokens.spacing.xs,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: tokens.colors.outlineVariant,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: tokens.spacing.sm,
+    gap: 12,
+    shadowColor: '#141916',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  cardCompleted: {
-    opacity: 0.7,
-    backgroundColor: tokens.colors.surfaceContainerLow,
-  },
-  leftGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: tokens.spacing.sm,
-    flex: 1,
-  },
-  checkbox: {
-    width: 22,
-    height: 22,
-    borderRadius: MD3Shapes.full,
-    borderWidth: 1.5,
-    borderColor: tokens.colors.outline,
-    backgroundColor: 'transparent',
+  chip: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  checkboxCompleted: {
-    backgroundColor: tokens.colors.primary,
-    borderColor: tokens.colors.primary,
+    flexShrink: 0,
   },
   titleCol: {
     flex: 1,
+    minWidth: 0,
+    justifyContent: 'center',
   },
   title: {
-    color: tokens.colors.onSurface,
-    fontSize: tokens.typography.size.titleSmall,
-    fontWeight: tokens.typography.weight.semibold,
-    letterSpacing: -0.2,
-  },
-  titleCompleted: {
-    textDecorationLine: 'line-through',
-    color: tokens.colors.onSurfaceVariant,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 15.5,
+    fontWeight: '600',
+    lineHeight: 20,
   },
   subtitle: {
-    color: tokens.colors.onSurfaceVariant,
-    fontSize: tokens.typography.size.labelSmall,
-    letterSpacing: -0.05,
-    marginTop: 1,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 13,
+    marginTop: 3,
   },
-  priorityBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: MD3Shapes.small,
+  actionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 10,
   },
-  priorityBadgeText: {
-    fontSize: 10,
-    fontWeight: tokens.typography.weight.bold,
-    letterSpacing: 0.6,
+  btnOutline: {
+    height: 36,
+    paddingHorizontal: 18,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+  },
+  btnOutlineText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 13.5,
+    fontWeight: '600',
+  },
+  btnFill: {
+    height: 36,
+    paddingHorizontal: 18,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  btnFillText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 13.5,
+    fontWeight: '600',
   },
 });

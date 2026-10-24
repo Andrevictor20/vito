@@ -1,37 +1,38 @@
-import React from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, Linking, Share } from 'react-native';
+import React, { useState } from 'react';
+import { StyleSheet, View, Text, TouchableOpacity, Share } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
-import { tokens, MD3Shapes } from '../../../theme/tokens';
 import { useTheme } from '../../../context/ThemeContext';
 import { ChatMeeting } from '../../../types';
 import { formatMeetingMode, meetingDisplayLink } from '../../../utils/chatCards';
+import { tabNavigationBus } from '../../../services/dataSync';
+import { hapticFeedback } from '../../../theme/motion';
 
 interface MeetingInlineCardProps {
   meeting: ChatMeeting;
 }
 
+/**
+ * Card in-chat de reunião P2P / consenso alinhado ao protótipo `vito-telas.html`:
+ * - Card arredondado com chip verde 44x44px e ícone de reunião/consenso.
+ * - Título em Inter 600 SemiBold e subtítulo com modo de agendamento.
+ * - Botões de ação em pílula abaixo do card: "Copiar link" (outline) e "Ver reuniões" (solid ink).
+ */
 export const MeetingInlineCard: React.FC<MeetingInlineCardProps> = ({ meeting }) => {
   const { colors } = useTheme();
-  const [copied, setCopied] = React.useState(false);
+  const [copied, setCopied] = useState(false);
   const link = meetingDisplayLink(meeting);
 
   const handleCopy = async () => {
     if (!link) return;
     try {
       await Clipboard.setStringAsync(link);
+      hapticFeedback.success();
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setTimeout(() => setCopied(false), 2200);
     } catch (e) {
       console.warn('[MeetingInlineCard] Falha ao copiar link:', e);
     }
-  };
-
-  const handleOpen = () => {
-    if (!link) return;
-    Linking.openURL(link).catch((e) => {
-      console.warn('[MeetingInlineCard] Falha ao abrir link:', e);
-    });
   };
 
   const handleShare = async () => {
@@ -47,81 +48,71 @@ export const MeetingInlineCard: React.FC<MeetingInlineCardProps> = ({ meeting })
     }
   };
 
-  const isConsensus = meeting.mode === 'group_consensus';
+  const handleViewMeetings = () => {
+    hapticFeedback.selection();
+    tabNavigationBus.notify('booking');
+  };
+
+  const subtitleText = `${formatMeetingMode(meeting.mode)} · Link ativo`;
 
   return (
-    <View style={[styles.card, { backgroundColor: colors.surfaceContainerHigh, borderColor: colors.outlineVariant }]}>
-      <View style={[styles.accentBar, { backgroundColor: isConsensus ? colors.tertiary || colors.primary : colors.primary }]} />
-
-      <View style={styles.topRow}>
-        <View style={styles.headerLeft}>
-          <View style={[styles.iconBox, { backgroundColor: colors.surfaceContainerHighest }]}>
-            <MaterialIcons name={isConsensus ? 'how-to-vote' : 'groups'} size={18} color={colors.primary} />
-          </View>
-          <View style={styles.titleCol}>
-            <Text style={[styles.title, { color: colors.onSurface }]} numberOfLines={1}>
-              {meeting.title}
-            </Text>
-            <Text style={[styles.subtitle, { color: colors.textMuted }]} numberOfLines={1}>
-              {formatMeetingMode(meeting.mode)} · {meeting.duration_minutes} min{meeting.slots_count ? ` · ${meeting.slots_count} opções` : ''}
-            </Text>
-          </View>
+    <View style={styles.wrapper}>
+      {/* Card Principal */}
+      <View
+        style={[
+          styles.card,
+          {
+            backgroundColor: colors.bg,
+            borderColor: colors.line,
+          },
+        ]}
+      >
+        {/* Chip Verde 44x44 com Ícone de Grupos */}
+        <View style={[styles.chip, { backgroundColor: colors.greenBg }]}>
+          <MaterialIcons name="groups" size={24} color={colors.acc} />
         </View>
 
-        <View style={[styles.statusPill, { backgroundColor: colors.successLight }]}>
-          <View style={[styles.statusDot, { backgroundColor: colors.success }]} />
-          <Text style={[styles.statusText, { color: colors.success }]}>
-            {meeting.status === 'confirmed' ? 'Confirmada' : 'Aberta'}
+        {/* Informações da Reunião */}
+        <View style={styles.titleCol}>
+          <Text
+            style={[styles.title, { color: colors.ink }]}
+            numberOfLines={1}
+          >
+            {meeting.title}
+          </Text>
+          <Text
+            style={[styles.subtitle, { color: colors.muted }]}
+            numberOfLines={1}
+          >
+            {subtitleText}
           </Text>
         </View>
       </View>
 
-      {link ? (
-        <View style={[styles.linkBox, { backgroundColor: colors.surfaceContainerLowest }]}>
-          <MaterialIcons name="public" size={14} color={colors.onSurfaceVariant} />
-          <Text style={[styles.linkText, { color: colors.onSurfaceVariant }]} numberOfLines={1}>
-            {link}
-          </Text>
-        </View>
-      ) : null}
-
-      <View style={styles.actionRow}>
+      {/* Botões de Ação Abaixo do Card */}
+      <View style={styles.actionsRow}>
         <TouchableOpacity
-          style={[
-            styles.actionButton,
-            { backgroundColor: copied ? colors.successLight : colors.surfaceContainerHighest },
-          ]}
+          style={[styles.btnOutline, { borderColor: colors.ink }]}
           onPress={handleCopy}
-          disabled={!link}
-          activeOpacity={0.8}
+          activeOpacity={0.75}
+          accessibilityRole="button"
           accessibilityLabel="Copiar link da reunião"
         >
-          <MaterialIcons name={copied ? 'check' : 'content-copy'} size={14} color={copied ? colors.success : colors.onSurface} />
-          <Text style={[styles.actionButtonText, { color: copied ? colors.success : colors.onSurface }]}>
-            {copied ? 'Copiado' : 'Copiar'}
+          <Text style={[styles.btnOutlineText, { color: colors.ink }]}>
+            {copied ? 'Copiado!' : 'Copiar link'}
           </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.actionButton, { backgroundColor: colors.surfaceContainerHighest }]}
-          onPress={handleShare}
-          disabled={!link}
+          style={[styles.btnFill, { backgroundColor: colors.ink }]}
+          onPress={handleViewMeetings}
           activeOpacity={0.8}
-          accessibilityLabel="Compartilhar link da reunião"
+          accessibilityRole="button"
+          accessibilityLabel="Ver reuniões"
         >
-          <MaterialIcons name="share" size={14} color={colors.onSurface} />
-          <Text style={[styles.actionButtonText, { color: colors.onSurface }]}>Compartilhar</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.actionButton, { backgroundColor: colors.primary }]}
-          onPress={handleOpen}
-          disabled={!link}
-          activeOpacity={0.8}
-          accessibilityLabel="Abrir link da reunião"
-        >
-          <MaterialIcons name="open-in-new" size={14} color={colors.onPrimary} />
-          <Text style={[styles.actionButtonText, { color: colors.onPrimary }]}>Abrir</Text>
+          <Text style={[styles.btnFillText, { color: colors.bg }]}>
+            Ver reuniões
+          </Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -129,106 +120,78 @@ export const MeetingInlineCard: React.FC<MeetingInlineCardProps> = ({ meeting })
 };
 
 const styles = StyleSheet.create({
-  card: {
-    borderRadius: MD3Shapes.extraSmall,
-    borderWidth: 1,
-    overflow: 'hidden',
+  wrapper: {
     marginTop: 8,
-    position: 'relative',
-    maxWidth: '100%',
+    width: '100%',
   },
-  accentBar: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 3,
-  },
-  topRow: {
+  card: {
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    paddingTop: 12,
-    paddingBottom: 8,
+    gap: 12,
+    shadowColor: '#141916',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    marginRight: 8,
-  },
-  iconBox: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
+  chip: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 10,
+    flexShrink: 0,
   },
   titleCol: {
     flex: 1,
+    minWidth: 0,
+    justifyContent: 'center',
   },
   title: {
-    fontSize: 14,
-    fontWeight: '700',
-    fontFamily: tokens.typography.family.medium,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 15.5,
+    fontWeight: '600',
+    lineHeight: 20,
   },
   subtitle: {
-    fontSize: 12,
-    marginTop: 2,
-    fontFamily: tokens.typography.family.regular,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 13,
+    marginTop: 3,
   },
-  statusPill: {
+  actionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 12,
+    gap: 10,
+    marginTop: 10,
   },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginRight: 4,
-  },
-  statusText: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  linkBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: 12,
-    marginBottom: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 6,
-    gap: 6,
-  },
-  linkText: {
-    fontSize: 12,
-    fontFamily: tokens.typography.family.regular,
-    flex: 1,
-  },
-  actionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingBottom: 10,
-    gap: 8,
-  },
-  actionButton: {
-    flex: 1,
-    flexDirection: 'row',
+  btnOutline: {
+    height: 36,
+    paddingHorizontal: 18,
+    borderRadius: 18,
+    borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 8,
-    borderRadius: 8,
-    gap: 4,
+    backgroundColor: 'transparent',
   },
-  actionButtonText: {
-    fontSize: 12,
+  btnOutlineText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 13.5,
+    fontWeight: '600',
+  },
+  btnFill: {
+    height: 36,
+    paddingHorizontal: 18,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  btnFillText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 13.5,
     fontWeight: '600',
   },
 });

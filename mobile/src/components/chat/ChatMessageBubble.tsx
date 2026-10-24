@@ -5,14 +5,7 @@ import * as Clipboard from 'expo-clipboard';
 import { tokens, MD3Shapes } from '../../theme/tokens';
 import { ChatMessage } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
-import { EventInlineCard } from './cards/EventInlineCard';
-import { ConflictInlineCard } from './cards/ConflictInlineCard';
-import { TodoInlineCard } from './cards/TodoInlineCard';
-import { PendingInlineCard } from './cards/PendingInlineCard';
-import { TriggerInlineCard } from './cards/TriggerInlineCard';
-import { BookingInlineCard } from './cards/BookingInlineCard';
-import { MeetingInlineCard } from './cards/MeetingInlineCard';
-import { DestructiveConfirmationCard } from './cards/DestructiveConfirmationCard';
+import { ChatStructuredCards } from './cards/ChatStructuredCards';
 import { FormattedChatMessageText } from './FormattedChatMessageText';
 import { preparePlainTextForCopy } from '../../utils/chatActions';
 
@@ -176,25 +169,12 @@ export const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
           )}
 
           {/* Cards Estruturados Modulares - mensagem do usuário */}
-          {message.event && <EventInlineCard event={message.event} />}
-          {message.conflict?.has_conflict && (
-            <ConflictInlineCard
-              conflict={message.conflict}
-              onSelectSlot={(slot) => onSelectSlot?.(slot, message)}
-            />
-          )}
-          {message.todo && <TodoInlineCard todo={message.todo} />}
-          {message.pending && <PendingInlineCard pending={message.pending} />}
-          {message.trigger && <TriggerInlineCard trigger={message.trigger} />}
-          {message.booking && <BookingInlineCard booking={message.booking} />}
-          {message.meeting && <MeetingInlineCard meeting={message.meeting} />}
-          {message.pending_confirmation && (
-            <DestructiveConfirmationCard
-              confirmation={message.pending_confirmation}
-              onConfirm={onConfirmAction}
-              disabled={disabled}
-            />
-          )}
+          <ChatStructuredCards
+            message={message}
+            onSelectSlot={onSelectSlot}
+            onConfirmAction={onConfirmAction}
+            disabled={disabled}
+          />
 
           <View style={styles.metaRow}>
             {/* Botão Editar Mensagem do Usuário */}
@@ -267,26 +247,13 @@ export const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
             />
           </View>
 
-          {/* Cards Estruturados Modulares - resposta do Vito */}
-          {message.event && <EventInlineCard event={message.event} />}
-          {message.conflict?.has_conflict && (
-            <ConflictInlineCard
-              conflict={message.conflict}
-              onSelectSlot={(slot) => onSelectSlot?.(slot, message)}
-            />
-          )}
-          {message.todo && <TodoInlineCard todo={message.todo} />}
-          {message.pending && <PendingInlineCard pending={message.pending} />}
-          {message.trigger && <TriggerInlineCard trigger={message.trigger} />}
-          {message.booking && <BookingInlineCard booking={message.booking} />}
-          {message.meeting && <MeetingInlineCard meeting={message.meeting} />}
-          {message.pending_confirmation && (
-            <DestructiveConfirmationCard
-              confirmation={message.pending_confirmation}
-              onConfirm={onConfirmAction}
-              disabled={disabled}
-            />
-          )}
+          {/* Cards Estruturados Modulares com entrada suave - resposta do Vito */}
+          <ChatStructuredCards
+            message={message}
+            onSelectSlot={onSelectSlot}
+            onConfirmAction={onConfirmAction}
+            disabled={disabled}
+          />
 
           {/* Footer: timestamp + copy */}
           <View style={styles.metaRow}>

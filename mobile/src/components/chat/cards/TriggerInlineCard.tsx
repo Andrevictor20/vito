@@ -1,152 +1,185 @@
-import React from 'react';
-import { StyleSheet, View, Text } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
-import { tokens, MD3Shapes } from '../../../theme/tokens';
+import React, { useState } from 'react';
+import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import { useTheme } from '../../../context/ThemeContext';
-import { TRIGGER_CATEGORIES, Trigger } from '../../../types';
-import { formatTriggerSchedule } from '../../../utils/chatCards';
+import { Trigger } from '../../../types';
+import { RadarIcon } from '../../login/DemoIcons';
+import { tabNavigationBus, chatPromptBus } from '../../../services/dataSync';
+import { hapticFeedback } from '../../../theme/motion';
 
 interface TriggerInlineCardProps {
   trigger: Trigger;
+  onUndo?: () => void;
 }
 
-export const TriggerInlineCard: React.FC<TriggerInlineCardProps> = ({ trigger }) => {
+/**
+ * Card in-chat de criação de radar alinhado ao protótipo `vito-telas.html`:
+ * - Card arredondado com chip laranja 44x44px e ícone de radar.
+ * - Título em Inter 600 SemiBold e subtítulo contextual da busca ou alerta.
+ * - Botões de ação em pílula abaixo do card: "Desfazer" (outline) e "Ver radares" (solid ink).
+ */
+export const TriggerInlineCard: React.FC<TriggerInlineCardProps> = ({ trigger, onUndo }) => {
   const { colors } = useTheme();
-  const categoryLabel =
-    TRIGGER_CATEGORIES.find((c) => c.id === trigger.category)?.label ?? 'Radar';
+  const [undone, setUndone] = useState(false);
+
+  const subtitleText = trigger.query
+    ? `${trigger.query} · Radar ativo`
+    : 'Monitorando diariamente · Alerta ativo';
+
+  const handleUndo = () => {
+    hapticFeedback.light();
+    setUndone(true);
+    if (onUndo) {
+      onUndo();
+    } else {
+      chatPromptBus.notify(`Desfazer radar "${trigger.title}"`);
+    }
+  };
+
+  const handleViewRadars = () => {
+    hapticFeedback.selection();
+    tabNavigationBus.notify('triggers');
+  };
 
   return (
-    <View style={[styles.card, { backgroundColor: colors.surfaceContainerHigh, borderColor: colors.outlineVariant }]}>
-      <View style={[styles.accentBar, { backgroundColor: colors.success }]} />
-
-      <View style={styles.topRow}>
-        <View style={styles.headerLeft}>
-          <View style={[styles.iconBox, { backgroundColor: colors.surfaceContainerHighest }]}>
-            <MaterialIcons name="track-changes" size={18} color={colors.success} />
-          </View>
-          <View style={styles.titleCol}>
-            <Text style={[styles.title, { color: colors.onSurface }]} numberOfLines={1}>
-              {trigger.title}
-            </Text>
-            <Text style={[styles.subtitle, { color: colors.textMuted }]} numberOfLines={2}>
-              {trigger.query}
-            </Text>
-          </View>
+    <View style={styles.wrapper}>
+      {/* Card Principal */}
+      <View
+        style={[
+          styles.card,
+          {
+            backgroundColor: colors.bg,
+            borderColor: colors.line,
+          },
+          undone && { opacity: 0.5 },
+        ]}
+      >
+        {/* Chip Laranja 44x44 com RadarIcon */}
+        <View style={[styles.chip, { backgroundColor: colors.orangeBg }]}>
+          <RadarIcon color={colors.orange} size={22} />
         </View>
 
-        <View style={[styles.categoryPill, { backgroundColor: colors.surfaceContainerHighest }]}>
-          <Text style={[styles.categoryText, { color: colors.onSurfaceVariant }]} numberOfLines={1}>
-            {categoryLabel}
+        {/* Informações do Radar */}
+        <View style={styles.titleCol}>
+          <Text
+            style={[styles.title, { color: colors.ink }]}
+            numberOfLines={2}
+          >
+            {trigger.title}
+          </Text>
+          <Text
+            style={[styles.subtitle, { color: colors.muted }]}
+            numberOfLines={1}
+          >
+            {subtitleText}
           </Text>
         </View>
       </View>
 
-      <View style={[styles.scheduleRow, { backgroundColor: colors.surfaceContainerLowest }]}>
-        <MaterialIcons name="schedule" size={14} color={colors.onSurfaceVariant} />
-        <Text style={[styles.scheduleText, { color: colors.onSurfaceVariant }]} numberOfLines={1}>
-          {formatTriggerSchedule(trigger.frequency, trigger.scheduled_time)}
-        </Text>
-        {trigger.target_value ? (
-          <Text style={[styles.targetText, { color: colors.onSurface }]} numberOfLines={1}>
-            · {trigger.target_value}
-          </Text>
-        ) : null}
-      </View>
+      {/* Botões de Ação Abaixo do Card */}
+      {!undone && (
+        <View style={styles.actionsRow}>
+          <TouchableOpacity
+            style={[styles.btnOutline, { borderColor: colors.ink }]}
+            onPress={handleUndo}
+            activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityLabel="Desfazer radar"
+          >
+            <Text style={[styles.btnOutlineText, { color: colors.ink }]}>
+              Desfazer
+            </Text>
+          </TouchableOpacity>
 
-      <View style={styles.activeRow}>
-        <MaterialIcons name="radar" size={13} color={colors.success} style={{ marginRight: 4 }} />
-        <Text style={[styles.activeText, { color: colors.success }]}>Radar ativo no Vito</Text>
-      </View>
+          <TouchableOpacity
+            style={[styles.btnFill, { backgroundColor: colors.ink }]}
+            onPress={handleViewRadars}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Ver radares"
+          >
+            <Text style={[styles.btnFillText, { color: colors.bg }]}>
+              Ver radares
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  wrapper: {
+    marginTop: 8,
+    width: '100%',
+  },
   card: {
-    backgroundColor: tokens.colors.surfaceContainerHigh,
-    borderRadius: MD3Shapes.large,
-    padding: tokens.spacing.md,
-    marginTop: tokens.spacing.xs,
-    position: 'relative',
-    overflow: 'hidden',
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: tokens.colors.outlineVariant,
-    gap: tokens.spacing.sm,
-  },
-  accentBar: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: 4,
-  },
-  topRow: {
+    paddingVertical: 12,
+    paddingHorizontal: 14,
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: tokens.spacing.sm,
+    alignItems: 'center',
+    gap: 12,
+    shadowColor: '#141916',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: tokens.spacing.sm,
-    flex: 1,
-  },
-  iconBox: {
-    width: 32,
-    height: 32,
-    borderRadius: MD3Shapes.small,
-    backgroundColor: tokens.colors.surfaceContainerHighest,
+  chip: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   titleCol: {
     flex: 1,
+    minWidth: 0,
+    justifyContent: 'center',
   },
   title: {
-    color: tokens.colors.onSurface,
-    fontSize: tokens.typography.size.titleSmall,
-    fontWeight: tokens.typography.weight.semibold,
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 15.5,
+    fontWeight: '600',
+    lineHeight: 20,
   },
   subtitle: {
-    color: tokens.colors.onSurfaceVariant,
-    fontSize: tokens.typography.size.labelSmall,
-    marginTop: 1,
+    fontFamily: 'Inter_400Regular',
+    fontSize: 13,
+    marginTop: 3,
   },
-  categoryPill: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: MD3Shapes.full,
-    maxWidth: 110,
-  },
-  categoryText: {
-    fontSize: tokens.typography.size.labelSmall,
-    fontWeight: tokens.typography.weight.semibold,
-  },
-  scheduleRow: {
+  actionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderRadius: MD3Shapes.small,
+    gap: 10,
+    marginTop: 10,
   },
-  scheduleText: {
-    fontSize: tokens.typography.size.labelSmall,
-    fontWeight: tokens.typography.weight.medium,
-    flexShrink: 1,
-  },
-  targetText: {
-    fontSize: tokens.typography.size.labelSmall,
-    fontWeight: tokens.typography.weight.semibold,
-    flexShrink: 1,
-  },
-  activeRow: {
-    flexDirection: 'row',
+  btnOutline: {
+    height: 36,
+    paddingHorizontal: 18,
+    borderRadius: 18,
+    borderWidth: 1.5,
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
   },
-  activeText: {
-    fontSize: 11,
+  btnOutlineText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 13.5,
+    fontWeight: '600',
+  },
+  btnFill: {
+    height: 36,
+    paddingHorizontal: 18,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  btnFillText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 13.5,
     fontWeight: '600',
   },
 });

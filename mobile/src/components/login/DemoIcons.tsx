@@ -1,9 +1,9 @@
 import React from 'react'
 import Svg, { Circle, Path, Rect } from 'react-native-svg'
 
-export function CalIcon({ color }: { color: string }) {
+export function CalIcon({ color, size = 20 }: { color: string; size?: number }) {
   return (
-    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Rect x="3" y="5" width="18" height="16" rx="3" stroke={color} strokeWidth={2} />
       <Path d="M8 3v4M16 3v4M3 10h18" stroke={color} strokeWidth={2} strokeLinecap="round" />
     </Svg>
@@ -19,9 +19,9 @@ export function MailIcon({ color, size = 20 }: { color: string; size?: number })
   )
 }
 
-export function RadarIcon({ color }: { color: string }) {
+export function RadarIcon({ color, size = 20 }: { color: string; size?: number }) {
   return (
-    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Circle cx="12" cy="12" r="9" stroke={color} strokeWidth={2} />
       <Circle cx="12" cy="12" r="5" stroke={color} strokeWidth={2} />
       <Circle cx="12" cy="12" r="1" stroke={color} strokeWidth={2} />
@@ -29,9 +29,9 @@ export function RadarIcon({ color }: { color: string }) {
   )
 }
 
-export function CheckCircleIcon({ color }: { color: string }) {
+export function CheckCircleIcon({ color, size = 22 }: { color: string; size?: number }) {
   return (
-    <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Circle cx="12" cy="12" r="9" stroke={color} strokeWidth={2.4} />
       <Path d="M8 12.5l3 3 5-6" stroke={color} strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" />
     </Svg>
