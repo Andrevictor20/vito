@@ -146,6 +146,11 @@ func fetchGoogleNewsFromURL(ctx context.Context, targetURL string, client *http.
 			title = strings.TrimSpace(title[:idx])
 		}
 
+		// Filtra fontes espúrias conhecidas de afiliados e caça-cliques
+		if IsSpuriousNewsSource(source, title) {
+			continue
+		}
+
 		items = append(items, NewsItem{
 			Title:       title,
 			Source:      source,
@@ -164,6 +169,111 @@ func fetchGoogleNewsFromURL(ctx context.Context, targetURL string, client *http.
 	}
 
 	return items, nil
+}
+
+// Portais de afiliados caça-cliques, concursos públicos ou agregadores espúrios
+// que publicam matérias com falsas ofertas de celulares e eletrônicos.
+var spuriousNewsSources = []string{
+	"jc concursos",
+	"ciclovivo",
+	"distrito online",
+	"edital concursos brasil",
+	"notícias concursos",
+	"noticias concursos",
+	"catraca livre",
+	"mix vale",
+	"pronatec",
+	"fdr",
+	"bons investimentos",
+	"remessa conforme",
+	"folha financeira",
+	"monitordomercado",
+	"click petroleo",
+}
+
+// IsSpuriousNewsSource detecta se o portal é um site caça-cliques de afiliados/concursos.
+func IsSpuriousNewsSource(source, title string) bool {
+	s := strings.ToLower(strings.TrimSpace(source))
+	t := strings.ToLower(strings.TrimSpace(title))
+	for _, spurious := range spuriousNewsSources {
+		if strings.Contains(s, spurious) || strings.Contains(t, spurious) {
+			return true
+		}
+	}
+	return false
+}
+
+// Portais de tecnologia, comparadores e e-commerces certificados para consultas de preço.
+var trustedTechShoppingSources = []string{
+	"tudocelular",
+	"techtudo",
+	"canaltech",
+	"tecmundo",
+	"oficina da net",
+	"zoom",
+	"buscapé",
+	"buscape",
+	"adrenaline",
+	"macmagazine",
+	"olhar digital",
+	"gizmodo",
+	"mercado livre",
+	"amazon",
+	"kabum",
+	"magalu",
+	"magazine luiza",
+	"shopee",
+	"casas bahia",
+	"pichau",
+	"terabyte",
+	"fast shop",
+	"pelando",
+	"promobit",
+}
+
+// IsTrustedShoppingSource valida se a fonte é um comparador, loja ou portal técnico de hardware/eletrônicos.
+func IsTrustedShoppingSource(source string) bool {
+	s := strings.ToLower(strings.TrimSpace(source))
+	for _, trusted := range trustedTechShoppingSources {
+		if strings.Contains(s, trusted) {
+			return true
+		}
+	}
+	return false
+}
+
+var shoppingKeywords = []string{
+	"preço", "preco", "comprar", "oferta", "promoção", "promocao",
+	"desconto", "valor", "smartphone", "celular", "iphone", "poco",
+	"pocophone", "xiaomi", "galaxy", "motorola", "notebook", "tv", "fone",
+}
+
+// IsShoppingOrPriceQuery identifica se a consulta é de produto, preço ou compras.
+func IsShoppingOrPriceQuery(query, title, category string) bool {
+	if strings.EqualFold(category, "shopping") {
+		return true
+	}
+	combined := strings.ToLower(query + " " + title)
+	for _, kw := range shoppingKeywords {
+		if strings.Contains(combined, kw) {
+			return true
+		}
+	}
+	return false
+}
+
+// FilterShoppingNews garante que, para produtos e compras, apenas fontes técnicas ou de e-commerce sejam aceitas.
+func FilterShoppingNews(items []NewsItem, isShopping bool) []NewsItem {
+	if !isShopping || len(items) == 0 {
+		return items
+	}
+	var filtered []NewsItem
+	for _, it := range items {
+		if IsTrustedShoppingSource(it.Source) {
+			filtered = append(filtered, it)
+		}
+	}
+	return filtered
 }
 
 // FormatNewsFeed formata a lista de notícias no padrão executivo de feed para a IA e o radar.

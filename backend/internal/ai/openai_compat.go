@@ -228,6 +228,8 @@ func (p *OpenAICompatProvider) EvaluateTrigger(ctx context.Context, t *domain.Tr
 	nowStr := now.Format("02/01/2006 às 15:04")
 	currentMonthYear := now.Format("01/2006")
 
+	isShopping := IsShoppingOrPriceQuery(t.Query, t.Title, string(t.Category))
+
 	var realtimeFeed string
 	var collectedNews []NewsItem
 	searchQuery := CleanSearchQuery(t.Query, string(t.Category))
@@ -235,11 +237,11 @@ func (p *OpenAICompatProvider) EvaluateTrigger(ctx context.Context, t *domain.Tr
 		searchQuery = CleanSearchQuery(t.Title, string(t.Category))
 	}
 	if items, err := FetchGoogleNews(ctx, searchQuery, 6, p.httpClient); err == nil && len(items) > 0 {
-		collectedNews = items
-		realtimeFeed = FormatNewsFeed(items)
+		collectedNews = FilterShoppingNews(items, isShopping)
+		realtimeFeed = FormatNewsFeed(collectedNews)
 	} else if items, err := FetchGoogleNews(ctx, t.Title, 6, p.httpClient); err == nil && len(items) > 0 {
-		collectedNews = items
-		realtimeFeed = FormatNewsFeed(items)
+		collectedNews = FilterShoppingNews(items, isShopping)
+		realtimeFeed = FormatNewsFeed(collectedNews)
 	}
 
 	realtimeBlock := ""
@@ -257,10 +259,14 @@ DIRETRIZES DE LOCALIZAÇÃO, IDIOMA E ATUALIDADE:
    - Priorize OBRIGATORIAMENTE o ÚLTIMO JOGO DISPUTADO com placar exato (ex: "Flamengo 2 x 1 Racing", data e campeonato).
    - Defina "metric_label": "Último Jogo" e "metric_value": "Time X x Y Adversário" com o placar concreto.
    - Traga também a data/horário do PRÓXIMO jogo se disponível.
-4. SE FOR MONITORAMENTO DE PRODUTO OU PREÇO:
-   - Pesquise exclusivamente lojas confiáveis que operam no Brasil (ex: Mercado Livre, Amazon Brasil, KaBuM!, Magazine Luiza).
-   - Discrimine o menor preço à vista no PIX com desconto e opções de parcelamento sem juros.
-   - Defina "metric_label": "Menor Preço" e "metric_value": valor em R$.
+4. SE FOR MONITORAMENTO DE PRODUTO, APARELHO OU PREÇO (ex: smartphone, Poco X8 Pro Max, eletrônicos):
+   - BASEIE-SE EXCLUSIVAMENTE em preços reais de venda dos principais marketplaces e e-commerces brasileiros (Mercado Livre, KaBuM!, Amazon Brasil, Magazine Luiza, Casas Bahia, Shopee).
+   - SANIDADE DE PREÇO E ANTI-ANOMALIA:
+     a) O preço DEVE ser do APARELHO PRINCIPAL (novo, original e lacrado). NUNCA traga preços de capas, películas, carregadores, cabos, peças de reposição ou aparelhos recondicionados/usados.
+     b) Jamais aceite valores discrepantes fora da realidade de mercado (ex: R$ 1.199 para um smartphone intermediário-premium/topo como Poco X8 Pro Max, cuja faixa de mercado real é de R$ 2.600 a R$ 3.900). Se encontrar ofertas irreais de sites de concursos ou blogs caça-cliques, IGNORE-AS categoricamente.
+     c) Defina "metric_label": "Menor Preço" e "metric_value": valor em R$ (ex: "R$ 3.128" ou "R$ 3.249").
+     d) No array "bullets", liste os preços concretos nas lojas pesquisadas com as condições reais (ex: "A partir de R$ 3.128 no Mercado Livre à vista no Pix", "R$ 3.300 na KaBuM! com parcelamento em 10x sem juros", "R$ 3.468 na Amazon Brasil").
+     e) Em "sources", inclua as lojas reais com nomes e URLs legítimas.
 5. ESCANEABILIDADE E ZERO PAREDES DE TEXTO:
    - "summary": manchete executiva principal em 1 linha (máx 100 caracteres).
    - "bullets": array com 2 a 3 tópicos factuais curtos e diretos (máximo 120 caracteres por item). PROIBIDO parágrafos longos ou texto corrido maçante.
@@ -270,14 +276,17 @@ Responda EXCLUSIVAMENTE em formato JSON puro, sem markdown delimitador:
 {
   "condition_met": true,
   "summary": "manchete executiva principal em 1 frase em português do Brasil",
-  "metric_label": "rótulo curto como Último Jogo, Preço Atual, Status",
-  "metric_value": "valor ou placar em destaque como Flamengo 2 x 1 Adversário ou R$ 589",
+  "metric_label": "rótulo curto como Último Jogo, Menor Preço, Status",
+  "metric_value": "valor ou placar em destaque como Flamengo 2 x 1 Adversário ou R$ 3.128",
   "bullets": ["tópico factual 1 (máx 120 chars)", "tópico factual 2 (máx 120 chars)"],
   "current_data": "dados resumidos em tópicos factuais",
   "simulated_notification": "título curto e impactante da notificação de alerta",
   "confidence": 0-100,
   "why_relevant": "1 frase explicando por que é relevante para a vigília em português",
-  "urgency": "breaking ou high se for gol, vitória/derrota recente, queda histórica de preço ou notícia urgente; senão low"
+  "urgency": "breaking ou high se for gol, vitória/derrota recente, queda histórica de preço ou notícia urgente; senão low",
+  "sources": [
+    {"name": "Mercado Livre", "title": "Xiaomi Poco X8 Pro Max", "url": "https://www.mercadolivre.com.br"}
+  ]
 }`, nowStr, currentMonthYear, currentMonthYear)
 
 	userPrompt := fmt.Sprintf(`Avalie esta vigília/radar do usuário:
@@ -348,13 +357,15 @@ Analise o cenário, verifique se a condição foi atingida ou se há fatos relev
 	if err != nil {
 		return nil, err
 	}
-	if len(res.Sources) == 0 && len(collectedNews) > 0 {
+	if len(res.Sources) == 0 && len(collectedNews) > 0 && !isShopping {
 		for _, n := range collectedNews {
-			res.Sources = append(res.Sources, domain.TriggerSourceItem{
-				Title: n.Title,
-				Name:  n.Source,
-				URL:   n.Link,
-			})
+			if !IsSpuriousNewsSource(n.Source, n.Title) {
+				res.Sources = append(res.Sources, domain.TriggerSourceItem{
+					Title: n.Title,
+					Name:  n.Source,
+					URL:   n.Link,
+				})
+			}
 		}
 	}
 	return res, nil

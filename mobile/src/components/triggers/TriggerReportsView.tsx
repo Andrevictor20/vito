@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { tokens } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { Trigger, TriggerLog, TRIGGER_CATEGORIES } from '../../types';
 import { api } from '../../services/api';
@@ -24,6 +25,7 @@ import {
   extractRadarBullets,
 } from '../../utils/radarReportUtils';
 import { computeSubViewBottomPadding } from '../../utils/keyboardHeight';
+import { VitoSwitch } from '../ui/VitoSwitch';
 import { TriggerReportsHeader } from './TriggerReportsHeader';
 import { TriggerReportCard } from './TriggerReportCard';
 
@@ -54,6 +56,8 @@ export const TriggerReportsView: React.FC<TriggerReportsViewProps> = ({
   const [topMenuVisible, setTopMenuVisible] = useState(false);
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
 
+  const isActive = trigger.status === 'active';
+
   const fetchLogs = useCallback(async (isRefresh = false) => {
     if (isRefresh) {
       setRefreshing(true);
@@ -77,16 +81,18 @@ export const TriggerReportsView: React.FC<TriggerReportsViewProps> = ({
     fetchLogs();
   }, [fetchLogs]);
 
-  const categoryMeta = TRIGGER_CATEGORIES.find((c) => c.id === trigger.category) || {
-    id: trigger.category,
-    label: 'Geral',
-    icon: 'tune',
-    colorLight: colors.blue,
-    colorDark: colors.blue,
-    bgLight: colors.blueBg,
-    bgDark: 'rgba(43, 127, 212, 0.18)',
-    placeholder: '',
-  };
+  const categoryMeta = useMemo(() => {
+    return TRIGGER_CATEGORIES.find((c) => c.id === trigger.category) || {
+      id: trigger.category,
+      label: 'Geral',
+      icon: 'tune' as const,
+      colorLight: colors.blue,
+      colorDark: colors.blue,
+      bgLight: colors.blueBg,
+      bgDark: 'rgba(43, 127, 212, 0.18)',
+      placeholder: '',
+    };
+  }, [trigger.category, colors]);
 
   const categoryColor = isDark ? categoryMeta.colorDark : categoryMeta.colorLight;
   const categoryBg = isDark ? categoryMeta.bgDark : categoryMeta.bgLight;
@@ -133,8 +139,8 @@ export const TriggerReportsView: React.FC<TriggerReportsViewProps> = ({
   const latestLog = logs.length > 0 ? logs[0] : null;
   const lastCheckSource = latestLog?.triggered_at || trigger.last_checked_at;
   const lastCheckLabel = lastCheckSource
-    ? `Última verificação hoje`
-    : 'Nenhuma checagem realizada ainda';
+    ? 'Última checagem hoje'
+    : 'Nenhuma checagem recente';
 
   const handleAction = (
     kind: 'chat' | 'task' | 'schedule',
@@ -184,7 +190,7 @@ export const TriggerReportsView: React.FC<TriggerReportsViewProps> = ({
 
     Alert.alert(
       'Excluir Vigília',
-      `Deseja parar de monitorar e excluir o radar "${trigger.title}"?`,
+      `Deseja parar de monitorar e excluir a vigília "${trigger.title}"?`,
       [
         { text: 'Cancelar', style: 'cancel' },
         { text: 'Excluir', style: 'destructive', onPress: doDelete },
@@ -194,6 +200,67 @@ export const TriggerReportsView: React.FC<TriggerReportsViewProps> = ({
 
   return (
     <View style={[styles.container, { backgroundColor: colors.page }]}>
+      {/* 1. Top Bar Pinned com Botões Circulares e Safe-Area */}
+      <View
+        style={[
+          styles.topBar,
+          {
+            backgroundColor: colors.bg,
+            borderBottomColor: colors.line,
+            paddingTop: Math.max(insets.top, 12),
+          },
+        ]}
+      >
+        <View style={styles.topBarContent}>
+          <TouchableOpacity
+            style={[styles.circleButton, { backgroundColor: colors.surf, borderColor: colors.line }]}
+            onPress={onBack}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel="Voltar"
+          >
+            <MaterialIcons name="arrow-back" size={20} color={colors.ink} />
+          </TouchableOpacity>
+
+          <View style={styles.titleContainer}>
+            <Text
+              style={[
+                styles.topTitle,
+                { color: colors.ink, fontFamily: tokens.typography.family.semibold },
+              ]}
+              numberOfLines={1}
+            >
+              {trigger.title}
+            </Text>
+            <View style={styles.metaRow}>
+              <View style={[styles.categoryBadge, { backgroundColor: categoryBg }]}>
+                <Text style={[styles.categoryBadgeText, { color: categoryColor }]}>
+                  {categoryMeta.label}
+                </Text>
+              </View>
+              <Text style={[styles.frequencyText, { color: colors.muted }]} numberOfLines={1}>
+                {frequencyLabel}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.topRightActions}>
+            {onToggle && (
+              <VitoSwitch value={isActive} onValueChange={() => onToggle(trigger.id)} />
+            )}
+            <TouchableOpacity
+              style={[styles.circleButton, { backgroundColor: colors.surf, borderColor: colors.line }]}
+              onPress={() => setTopMenuVisible(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Opções da vigília"
+            >
+              <MaterialIcons name="more-vert" size={20} color={colors.ink} />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+
+      {/* 2. FlatList com Header e Cards Fluidos */}
       <FlatList
         data={logs}
         keyExtractor={(item) => item.id}
@@ -221,11 +288,8 @@ export const TriggerReportsView: React.FC<TriggerReportsViewProps> = ({
             logsCount={logs.length}
             loading={loading}
             refreshing={refreshing}
-            onBack={onBack}
             onRunNow={handleRunPress}
             onRetry={handleRunPress}
-            onToggle={onToggle ? () => onToggle(trigger.id) : undefined}
-            onOpenTopMenu={() => setTopMenuVisible(true)}
           />
         }
         renderItem={({ item }) => {
@@ -243,9 +307,16 @@ export const TriggerReportsView: React.FC<TriggerReportsViewProps> = ({
         }}
         ListEmptyComponent={
           !loading ? (
-            <View style={styles.emptyContainer}>
-              <MaterialIcons name="radar" size={40} color={colors.muted} />
-              <Text style={[styles.emptyTitle, { color: colors.ink }]}>
+            <View style={[styles.emptyCard, { backgroundColor: colors.bg, borderColor: colors.line }]}>
+              <View style={[styles.emptyIconCircle, { backgroundColor: colors.surf }]}>
+                <MaterialIcons name="radar" size={32} color={colors.muted} />
+              </View>
+              <Text
+                style={[
+                  styles.emptyTitle,
+                  { color: colors.ink, fontFamily: tokens.typography.family.semibold },
+                ]}
+              >
                 Nenhum relatório gerado ainda
               </Text>
               <Text style={[styles.emptySub, { color: colors.muted }]}>
@@ -256,7 +327,7 @@ export const TriggerReportsView: React.FC<TriggerReportsViewProps> = ({
         }
       />
 
-      {/* Modal Superior de Opções do Radar */}
+      {/* 3. Modal de Opções Gerais da Vigília */}
       <Modal visible={topMenuVisible} transparent animationType="fade">
         <TouchableWithoutFeedback onPress={() => setTopMenuVisible(false)}>
           <View style={styles.modalOverlay}>
@@ -274,7 +345,7 @@ export const TriggerReportsView: React.FC<TriggerReportsViewProps> = ({
         </TouchableWithoutFeedback>
       </Modal>
 
-      {/* Modal de Opções do Card de Log */}
+      {/* 4. Modal de Opções do Relatório Específico */}
       <Modal visible={activeCardId !== null} transparent animationType="fade">
         <TouchableWithoutFeedback onPress={() => setActiveCardId(null)}>
           <View style={styles.modalOverlay}>
@@ -286,7 +357,9 @@ export const TriggerReportsView: React.FC<TriggerReportsViewProps> = ({
                 }}
               >
                 <MaterialIcons name="delete-outline" size={20} color={colors.red || '#d6355a'} />
-                <Text style={[styles.menuItemText, { color: colors.red || '#d6355a' }]}>Excluir este relatório</Text>
+                <Text style={[styles.menuItemText, { color: colors.red || '#d6355a' }]}>
+                  Excluir este relatório
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -300,55 +373,117 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  scrollContent: {
+  topBar: {
+    borderBottomWidth: 1,
     paddingHorizontal: 16,
-    paddingTop: 8,
+    paddingBottom: 12,
   },
-  emptyContainer: {
+  topBarContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  circleButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 40,
-    paddingHorizontal: 20,
+  },
+  titleContainer: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  topTitle: {
+    fontSize: 16,
+    letterSpacing: -0.2,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 2,
+  },
+  categoryBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 6,
+  },
+  categoryBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  frequencyText: {
+    fontSize: 11.5,
+    flexShrink: 1,
+  },
+  topRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+  },
+  emptyCard: {
+    borderWidth: 1,
+    borderRadius: 24,
+    paddingVertical: 36,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
     gap: 8,
   },
+  emptyIconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
+  },
   emptyTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    marginTop: 8,
+    fontSize: 15.5,
+    textAlign: 'center',
   },
   emptySub: {
     fontSize: 13,
     textAlign: 'center',
     lineHeight: 18,
+    maxWidth: 280,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    backgroundColor: 'rgba(0,0,0,0.38)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: 24,
   },
   menuSheet: {
-    width: '85%',
-    maxWidth: 300,
-    borderRadius: 18,
+    width: '100%',
+    maxWidth: 320,
+    borderRadius: 24,
     borderWidth: 1,
-    paddingVertical: 8,
-    shadowColor: 'rgba(0,0,0,0.2)',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 4,
+    paddingVertical: 10,
+    shadowColor: 'rgba(0,0,0,0.18)',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.16,
+    shadowRadius: 16,
+    elevation: 6,
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    gap: 14,
   },
   menuItemText: {
-    fontSize: 14,
+    fontSize: 14.5,
     fontWeight: '600',
   },
 });

@@ -10,7 +10,6 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { tokens } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { Trigger } from '../../types';
-import { VitoSwitch } from '../ui/VitoSwitch';
 
 interface TriggerReportsHeaderProps {
   trigger: Trigger;
@@ -24,11 +23,8 @@ interface TriggerReportsHeaderProps {
   logsCount: number;
   loading: boolean;
   refreshing: boolean;
-  onBack: () => void;
   onRunNow: () => void;
   onRetry: () => void;
-  onToggle?: (id: string) => void;
-  onOpenTopMenu: () => void;
 }
 
 export const TriggerReportsHeader: React.FC<TriggerReportsHeaderProps> = ({
@@ -36,77 +32,21 @@ export const TriggerReportsHeader: React.FC<TriggerReportsHeaderProps> = ({
   categoryMeta,
   categoryColor,
   categoryBg,
-  frequencyLabel,
   lastCheckLabel,
   runningNow,
   errorMessage,
   logsCount,
   loading,
   refreshing,
-  onBack,
   onRunNow,
   onRetry,
-  onToggle,
-  onOpenTopMenu,
 }) => {
   const { colors } = useTheme();
   const isActive = trigger.status === 'active';
 
   return (
     <View style={styles.container}>
-      {/* Top Bar em linha única: [← Voltar + título/meta] ...... [Switch + ⋯] */}
-      <View
-        style={[
-          styles.topBar,
-          {
-            backgroundColor: colors.bg,
-            borderBottomColor: colors.line,
-          },
-        ]}
-      >
-        <View style={styles.topLeft}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={onBack}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            accessibilityRole="button"
-            accessibilityLabel="Voltar"
-          >
-            <MaterialIcons name="arrow-back" size={22} color={colors.ink} />
-          </TouchableOpacity>
-
-          <View style={styles.titleBlock}>
-            <Text
-              style={[
-                styles.topTitle,
-                { color: colors.ink, fontFamily: tokens.typography.family.semibold },
-              ]}
-              numberOfLines={1}
-            >
-              {trigger.title}
-            </Text>
-            <Text style={[styles.topMeta, { color: colors.muted }]} numberOfLines={1}>
-              {`${categoryMeta.label} · ${frequencyLabel}`}
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.topRight}>
-          {onToggle && (
-            <VitoSwitch value={isActive} onValueChange={() => onToggle(trigger.id)} />
-          )}
-          <TouchableOpacity
-            style={[styles.moreButton, { borderColor: colors.line }]}
-            onPress={onOpenTopMenu}
-            accessibilityRole="button"
-            accessibilityLabel="Opções do radar"
-          >
-            <MaterialIcons name="more-vert" size={20} color={colors.ink} />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Hero Card Executivo */}
+      {/* 1. Hero Card Curvo Executivo (Concentric Shape Lock 24px) */}
       <View
         style={[
           styles.heroCard,
@@ -116,42 +56,81 @@ export const TriggerReportsHeader: React.FC<TriggerReportsHeaderProps> = ({
           },
         ]}
       >
-        <View style={styles.heroStatusRow}>
-          <View style={styles.statusIndicatorRow}>
+        {/* Linha Superior: Pílula de Status Viva + Horário da Checagem */}
+        <View style={styles.statusRow}>
+          <View
+            style={[
+              styles.statusPill,
+              {
+                backgroundColor: isActive
+                  ? (colors.greenBg || 'rgba(11, 154, 95, 0.14)')
+                  : colors.surf,
+              },
+            ]}
+          >
             <View
               style={[
                 styles.statusDot,
                 { backgroundColor: isActive ? (colors.acc || '#0b9a5f') : colors.muted },
               ]}
             />
-            <Text style={[styles.statusText, { color: colors.ink }]}>
+            <Text
+              style={[
+                styles.statusPillText,
+                { color: isActive ? (colors.acc || '#0b9a5f') : colors.muted },
+              ]}
+            >
               {isActive ? 'VIGÍLIA ATIVA' : 'VIGÍLIA PAUSADA'}
             </Text>
           </View>
 
-          <Text style={[styles.lastCheckText, { color: colors.muted }]}>
-            {lastCheckLabel}
-          </Text>
+          <View style={styles.lastCheckWrapper}>
+            <MaterialIcons name="schedule" size={13} color={colors.muted} />
+            <Text style={[styles.lastCheckText, { color: colors.muted }]}>
+              {lastCheckLabel}
+            </Text>
+          </View>
         </View>
 
-        {/* Botão de Verificação Imediata */}
+        {/* Linha Central: Chip Temático Grande + Título em Destaque */}
+        <View style={styles.heroMainRow}>
+          <View style={[styles.heroIconChip, { backgroundColor: categoryBg }]}>
+            <MaterialIcons name={categoryMeta.icon} size={22} color={categoryColor} />
+          </View>
+          <View style={styles.heroTextCol}>
+            <Text
+              style={[
+                styles.heroTitle,
+                { color: colors.ink, fontFamily: tokens.typography.family.montserratBold },
+              ]}
+              numberOfLines={2}
+            >
+              {trigger.title}
+            </Text>
+            <Text style={[styles.heroSub, { color: colors.muted }]} numberOfLines={1}>
+              {trigger.query || `Monitorando continuamente em ${categoryMeta.label.toLowerCase()}`}
+            </Text>
+          </View>
+        </View>
+
+        {/* Botão em Pílula "Verificar Agora" */}
         <TouchableOpacity
           style={[
             styles.runButton,
             { backgroundColor: colors.ink },
-            runningNow && { opacity: 0.75 },
+            runningNow && { opacity: 0.8 },
           ]}
           onPress={onRunNow}
           disabled={runningNow}
-          activeOpacity={0.8}
+          activeOpacity={0.85}
           accessibilityRole="button"
-          accessibilityLabel={runningNow ? 'Pesquisando notícias' : 'Verificar agora'}
+          accessibilityLabel={runningNow ? 'Pesquisando notícias e fatos' : 'Verificar agora'}
         >
           {runningNow ? (
             <>
               <ActivityIndicator size="small" color={colors.bg} />
               <Text style={[styles.runButtonText, { color: colors.bg }]}>
-                Buscando fatos recentes…
+                Varrendo fatos recentes…
               </Text>
             </>
           ) : (
@@ -164,39 +143,56 @@ export const TriggerReportsHeader: React.FC<TriggerReportsHeaderProps> = ({
           )}
         </TouchableOpacity>
 
-        {/* Mensagem de Erro (se houver) */}
+        {/* Caixa de Erro Fluida (se houver) */}
         {!!errorMessage && (
-          <View style={[styles.errorBox, { backgroundColor: colors.redBg || '#fde6ec' }]}>
-            <MaterialIcons name="error-outline" size={16} color={colors.red || '#d6355a'} />
-            <Text style={[styles.errorText, { color: colors.red || '#d6355a' }]} numberOfLines={2}>
+          <View
+            style={[
+              styles.errorBox,
+              { backgroundColor: colors.redBg || '#fde6ec', borderColor: colors.red || '#d6355a' },
+            ]}
+          >
+            <MaterialIcons name="error-outline" size={17} color={colors.red || '#d6355a'} />
+            <Text
+              style={[styles.errorText, { color: colors.red || '#d6355a' }]}
+              numberOfLines={2}
+            >
               {errorMessage}
             </Text>
-            <TouchableOpacity onPress={onRetry}>
+            <TouchableOpacity
+              onPress={onRetry}
+              style={[styles.errorRetryPill, { backgroundColor: colors.bg }]}
+            >
               <Text style={[styles.errorRetryText, { color: colors.red || '#d6355a' }]}>
-                Repetir
+                Tentar de novo
               </Text>
             </TouchableOpacity>
           </View>
         )}
       </View>
 
-      {/* Cabeçalho da Lista de Histórico */}
-      <View style={styles.historySectionHeader}>
-        <View style={styles.historyTitleRow}>
+      {/* 2. Cabeçalho Editorial da Seção de Histórico */}
+      <View style={styles.historyHeader}>
+        <View style={styles.historyHeaderLeft}>
           <Text
             style={[
               styles.historyTitle,
-              { color: colors.ink, fontFamily: tokens.typography.family.semibold },
+              { color: colors.ink, fontFamily: tokens.typography.family.montserratBold },
             ]}
           >
             Histórico de Notícias & Eventos
           </Text>
-          <View style={[styles.countBadge, { backgroundColor: colors.surf }]}>
+          <View
+            style={[
+              styles.countBadge,
+              { backgroundColor: colors.surf, borderColor: colors.line },
+            ]}
+          >
             <Text style={[styles.countBadgeText, { color: colors.muted }]}>
               {logsCount}
             </Text>
           </View>
         </View>
+
         {loading && !refreshing && (
           <ActivityIndicator size="small" color={colors.primary} />
         )}
@@ -207,126 +203,138 @@ export const TriggerReportsHeader: React.FC<TriggerReportsHeaderProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: 8,
-  },
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-  },
-  topLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    marginRight: 10,
-  },
-  backButton: {
-    paddingRight: 10,
-  },
-  titleBlock: {
-    flex: 1,
-  },
-  topTitle: {
-    fontSize: 16.5,
-    letterSpacing: -0.3,
-  },
-  topMeta: {
-    fontSize: 12,
-    marginTop: 1,
-  },
-  topRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  moreButton: {
-    padding: 6,
-    borderRadius: 10,
-  },
-  heroCard: {
-    margin: 16,
-    padding: 14,
-    borderRadius: 18,
-    borderWidth: 1,
-  },
-  heroStatusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     marginBottom: 12,
   },
-  statusIndicatorRow: {
+  heroCard: {
+    borderRadius: 24,
+    borderWidth: 1,
+    padding: 18,
+    marginBottom: 20,
+    shadowColor: 'rgba(20,25,22,0.06)',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  statusRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  statusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 4.5,
+    borderRadius: 14,
     gap: 6,
   },
   statusDot: {
-    width: 7,
-    height: 7,
+    width: 6.5,
+    height: 6.5,
     borderRadius: 3.5,
   },
-  statusText: {
+  statusPillText: {
     fontSize: 11,
     fontWeight: '800',
-    letterSpacing: 0.6,
+    letterSpacing: 0.5,
+  },
+  lastCheckWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   lastCheckText: {
     fontSize: 12,
+    fontWeight: '500',
+  },
+  heroMainRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 16,
+  },
+  heroIconChip: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  heroTextCol: {
+    flex: 1,
+  },
+  heroTitle: {
+    fontSize: 18.5,
+    lineHeight: 23,
+    letterSpacing: -0.3,
+  },
+  heroSub: {
+    fontSize: 12.5,
+    marginTop: 2,
   },
   runButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    height: 42,
-    borderRadius: 21,
-    gap: 6,
+    height: 46,
+    borderRadius: 23,
+    gap: 7,
   },
   runButtonText: {
-    fontSize: 13.5,
+    fontSize: 14,
     fontWeight: '700',
+    letterSpacing: -0.1,
   },
   errorBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 10,
-    borderRadius: 10,
-    marginTop: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 14,
+    marginTop: 12,
+    borderWidth: 1,
     gap: 8,
   },
   errorText: {
     flex: 1,
     fontSize: 12,
+    lineHeight: 16,
+  },
+  errorRetryPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
   },
   errorRetryText: {
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: '700',
-    textDecorationLine: 'underline',
   },
-  historySectionHeader: {
+  historyHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    marginBottom: 8,
+    paddingVertical: 4,
   },
-  historyTitleRow: {
+  historyHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
   historyTitle: {
-    fontSize: 15,
+    fontSize: 16.5,
+    letterSpacing: -0.2,
   },
   countBadge: {
-    paddingHorizontal: 7,
+    paddingHorizontal: 8,
     paddingVertical: 2,
-    borderRadius: 10,
+    borderRadius: 12,
+    borderWidth: 1,
   },
   countBadgeText: {
-    fontSize: 11,
+    fontSize: 11.5,
     fontWeight: '700',
   },
 });

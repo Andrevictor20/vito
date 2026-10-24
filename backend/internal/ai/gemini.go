@@ -146,15 +146,30 @@ type geminiRequest struct {
 	} `json:"generationConfig"`
 }
 
+type geminiGroundingChunk struct {
+	Web struct {
+		URI   string `json:"uri"`
+		Title string `json:"title"`
+	} `json:"web"`
+}
+
+type geminiGroundingMetadata struct {
+	WebSearchQueries []string               `json:"webSearchQueries"`
+	GroundingChunks  []geminiGroundingChunk `json:"groundingChunks"`
+}
+
+type geminiCandidate struct {
+	Content struct {
+		Parts []struct {
+			Text string `json:"text"`
+		} `json:"parts"`
+	} `json:"content"`
+	GroundingMetadata *geminiGroundingMetadata `json:"groundingMetadata,omitempty"`
+}
+
 type geminiResponse struct {
-	Candidates []struct {
-		Content struct {
-			Parts []struct {
-				Text string `json:"text"`
-			} `json:"parts"`
-		} `json:"content"`
-	} `json:"candidates"`
-	Error *struct {
+	Candidates []geminiCandidate `json:"candidates"`
+	Error      *struct {
 		Message string `json:"message"`
 		Code    int    `json:"code"`
 	} `json:"error,omitempty"`

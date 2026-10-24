@@ -77,3 +77,56 @@ func TestFetchGoogleNews_EmptyOrError(t *testing.T) {
 		t.Fatal("esperava erro para HTTP 404")
 	}
 }
+
+func TestIsSpuriousNewsSource(t *testing.T) {
+	cases := []struct {
+		source string
+		title  string
+		want   bool
+	}{
+		{"JC Concursos", "Melhores celulares em promoção", true},
+		{"CicloVivo", "Novo smartphone com desconto", true},
+		{"Distrito Online", "Poco X8 Pro Max por 1.199", true},
+		{"TudoCelular", "Poco X8 Pro Max chega ao Brasil", false},
+		{"TechTudo", "Review do Poco X8 Pro Max", false},
+		{"G1", "Economia brasileira cresce", false},
+	}
+
+	for _, c := range cases {
+		got := IsSpuriousNewsSource(c.source, c.title)
+		if got != c.want {
+			t.Errorf("IsSpuriousNewsSource(%q, %q) = %v; esperado %v", c.source, c.title, got, c.want)
+		}
+	}
+}
+
+func TestShoppingDetectionAndFiltering(t *testing.T) {
+	// 1. Detecção de compras/preço
+	if !IsShoppingOrPriceQuery("Preço pocophone x8 pro max", "Poco X8", "shopping") {
+		t.Error("esperava que consulta de pocophone fosse detectada como shopping")
+	}
+	if !IsShoppingOrPriceQuery("qual o valor do celular iphone", "iPhone 15", "tech") {
+		t.Error("esperava que consulta com 'valor do celular' fosse detectada como shopping")
+	}
+	if IsShoppingOrPriceQuery("próximos jogos do flamengo", "Flamengo", "sports") {
+		t.Error("não deveria detectar jogos de futebol como shopping")
+	}
+
+	// 2. Filtro de notícias de shopping
+	rawItems := []NewsItem{
+		{Title: "Poco X8 em oferta", Source: "TudoCelular"},
+		{Title: "Celular por 1000 reais", Source: "JC Concursos"},
+		{Title: "Poco X8 review", Source: "Canaltech"},
+		{Title: "Dicas de sustentabilidade", Source: "CicloVivo"},
+	}
+
+	filtered := FilterShoppingNews(rawItems, true)
+	if len(filtered) != 2 {
+		t.Fatalf("esperava 2 itens filtrados para shopping, obteve %d", len(filtered))
+	}
+	for _, it := range filtered {
+		if it.Source != "TudoCelular" && it.Source != "Canaltech" {
+			t.Errorf("fonte não confiável passou no filtro de shopping: %s", it.Source)
+		}
+	}
+}
