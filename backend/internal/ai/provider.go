@@ -36,10 +36,16 @@ const (
 	ActionCreateReplyReminder      IntentAction = "CREATE_REPLY_REMINDER"
 	ActionDraftEmail               IntentAction = "DRAFT_EMAIL"
 	ActionSendEmail                IntentAction = "SEND_EMAIL"
+	ActionRefineMessage            IntentAction = "REFINE_MESSAGE"
 	ActionNeedsClarification       IntentAction = "NEEDS_CLARIFICATION"
 	ActionOutOfScope               IntentAction = "OUT_OF_SCOPE"
 
 	// CRUD Actions - Read/Update/Delete para features
+	ActionUpdateTodo               IntentAction = "UPDATE_TODO"
+	ActionUpdateTrigger            IntentAction = "UPDATE_TRIGGER"
+	ActionDeleteTrigger            IntentAction = "DELETE_TRIGGER"
+	ActionDeleteBooking            IntentAction = "DELETE_BOOKING"
+	ActionUpdateProfile            IntentAction = "UPDATE_PROFILE"
 	ActionQueryTriggers            IntentAction = "QUERY_TRIGGERS"
 	ActionListBookings             IntentAction = "LIST_BOOKINGS"
 	ActionUpdateBooking            IntentAction = "UPDATE_BOOKING"
@@ -227,6 +233,17 @@ type ParsedReplyReminder struct {
 	Note string    `json:"note,omitempty"` // o que foi prometido / pendente
 }
 
+// ParsedMessageRefinement dados para aprimoramento e estilização de mensagens de WhatsApp e E-mail.
+type ParsedMessageRefinement struct {
+	Channel      string `json:"channel"`                 // "whatsapp" | "email"
+	Target       string `json:"target"`                  // nome do contato ou endereço de e-mail
+	Subject      string `json:"subject,omitempty"`       // assunto do e-mail (se e-mail)
+	Directive    string `json:"directive"`               // "formal" | "concise" | "expand" | "grammar" | "commercial" | "friendly"
+	OriginalText string `json:"original_text,omitempty"` // texto original a ser melhorado
+	RefinedText  string `json:"refined_text"`            // texto aprimorado final
+	SendNow      bool   `json:"send_now,omitempty"`      // true se o usuário comandou envio direto ("melhora e envia")
+}
+
 // ParsedTriggerQuery para listar/consultar radares.
 type ParsedTriggerQuery struct {
 	Category string `json:"category,omitempty"` // filtrar por categoria
@@ -306,6 +323,45 @@ type ParsedContactsQuery struct {
 	Scope  string `json:"scope,omitempty"` // private, all
 }
 
+// ParsedTodoUpdate para atualizar prazo, prioridade ou texto da tarefa.
+type ParsedTodoUpdate struct {
+	TargetQuery          string     `json:"target_query"` // ID ou título da tarefa
+	Title                string     `json:"title,omitempty"`
+	Priority             string     `json:"priority,omitempty"` // low, medium, high
+	DueDate              *time.Time `json:"due_date,omitempty"`
+	RemindAt             *time.Time `json:"remind_at,omitempty"`
+	RemindRepeat         string     `json:"remind_repeat,omitempty"` // none, daily, weekly
+	RemindAdvanceMinutes int        `json:"remind_advance_minutes,omitempty"`
+}
+
+// ParsedTriggerUpdate para atualizar horário, frequência ou pausar/retomar radar.
+type ParsedTriggerUpdate struct {
+	TargetQuery   string `json:"target_query"` // ID ou título do radar
+	Title         string `json:"title,omitempty"`
+	ScheduledTime string `json:"scheduled_time,omitempty"` // HH:MM
+	Frequency     string `json:"frequency,omitempty"`      // daily_morning, daily_evening, hourly, immediate
+	IsActive      *bool  `json:"is_active,omitempty"`      // true = ativo, false = pausado
+	TargetValue   string `json:"target_value,omitempty"`
+}
+
+// ParsedTriggerDelete para excluir um radar.
+type ParsedTriggerDelete struct {
+	TargetQuery string `json:"target_query"` // ID ou título do radar
+}
+
+// ParsedBookingDelete para excluir um link de agendamento.
+type ParsedBookingDelete struct {
+	TargetQuery string `json:"target_query"` // ID, slug ou título do link
+}
+
+// ParsedProfileUpdate para atualizar configurações ou perfil do usuário.
+type ParsedProfileUpdate struct {
+	Name                string `json:"name,omitempty"`
+	Phone               string `json:"phone,omitempty"`
+	AutonomyMode        string `json:"autonomy_mode,omitempty"` // assisted, proactive
+	CalendarSyncEnabled *bool  `json:"calendar_sync_enabled,omitempty"`
+}
+
 // ParsedIntent resultado normalizado da interpretação do assistente Toki-like.
 type ParsedIntent struct {
 	Action            IntentAction               `json:"action"`
@@ -314,11 +370,16 @@ type ParsedIntent struct {
 	Message           string                     `json:"message"`                // Resposta amigável da secretária
 	Event             *ParsedEvent               `json:"event,omitempty"`
 	Todo              *ParsedTodo                `json:"todo,omitempty"`
+	TodoUpdate        *ParsedTodoUpdate          `json:"todo_update,omitempty"`
 	Trigger           *ParsedTrigger             `json:"trigger,omitempty"`
+	TriggerUpdate     *ParsedTriggerUpdate       `json:"trigger_update,omitempty"`
+	TriggerDelete     *ParsedTriggerDelete       `json:"trigger_delete,omitempty"`
 	Pending           *ParsedPending             `json:"pending,omitempty"`
 	Booking           *ParsedBooking             `json:"booking,omitempty"`
 	BookingQuery      *ParsedBookingQuery        `json:"booking_query,omitempty"`
 	BookingUpdate     *ParsedBookingUpdate       `json:"booking_update,omitempty"`
+	BookingDelete     *ParsedBookingDelete       `json:"booking_delete,omitempty"`
+	ProfileUpdate     *ParsedProfileUpdate       `json:"profile_update,omitempty"`
 	Meeting           *ParsedMeeting             `json:"meeting,omitempty"`
 	MeetingQuery      *ParsedMeetingQuery        `json:"meeting_query,omitempty"`
 	MeetingUpdate     *ParsedMeetingUpdate       `json:"meeting_update,omitempty"`
@@ -326,6 +387,7 @@ type ParsedIntent struct {
 	WhatsAppMessage   *ParsedWhatsAppMessage     `json:"whatsapp_message,omitempty"`
 	EmailMessage      *ParsedEmailMessage        `json:"email_message,omitempty"`
 	ReplyReminder     *ParsedReplyReminder       `json:"reply_reminder,omitempty"`
+	RefinedMessage    *ParsedMessageRefinement   `json:"refined_message,omitempty"`
 	TriggerQuery      *ParsedTriggerQuery        `json:"trigger_query,omitempty"`
 	PendingQuery      *ParsedPendingQuery        `json:"pending_query,omitempty"`
 	MemoryQuery       *ParsedMemoryQuery         `json:"memory_query,omitempty"`
@@ -347,11 +409,14 @@ func (p *ParsedIntent) IsEmpty() bool {
 	if strings.TrimSpace(p.Message) != "" {
 		return false
 	}
-	return p.Event == nil && p.Todo == nil && p.Trigger == nil &&
-		p.Pending == nil && p.Booking == nil && p.Meeting == nil &&
+	return p.Event == nil && p.Todo == nil && p.TodoUpdate == nil &&
+		p.Trigger == nil && p.TriggerUpdate == nil && p.TriggerDelete == nil &&
+		p.Pending == nil && p.Booking == nil && p.BookingDelete == nil &&
+		p.ProfileUpdate == nil && p.Meeting == nil &&
 		p.BookingQuery == nil && p.BookingUpdate == nil &&
 		p.MeetingQuery == nil && p.MeetingUpdate == nil &&
 		p.Conversation == nil && p.WhatsAppMessage == nil && p.EmailMessage == nil && p.ReplyReminder == nil &&
+		p.RefinedMessage == nil &&
 		p.TriggerQuery == nil && p.PendingQuery == nil &&
 		p.MemoryQuery == nil && p.MemoryUpdate == nil && p.MemoryDelete == nil &&
 		p.ContactsQuery == nil &&

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"time"
 
@@ -17,6 +18,7 @@ type whatsappWiring struct {
 	ContextSvc     *service.WhatsAppContextService
 	Directory      *service.WhatsAppDirectoryService
 	ContactsCache  *service.WhatsAppContactsCache
+	ContactRepo    domain.SyncedContactRepository
 	OwnerCache     *service.WhatsAppOwnerCache
 	GroupMeta      *service.WhatsAppGroupMeta
 	NudgeWorker    *service.WhatsAppReplyNudgeWorker
@@ -57,8 +59,13 @@ func setupWhatsAppAssistant(
 	contextSvc := service.NewWhatsAppContextService(waConvRepo, waContextCfg)
 	groupMeta := service.NewWhatsAppGroupMeta(evoClient, time.Hour, 24*time.Hour)
 	ownerCache := service.NewWhatsAppOwnerCache(evoClient, time.Hour)
+	contactRepo := repository.NewContactRepository(db)
 	contactsCache := service.NewWhatsAppContactsCache(evoClient, time.Hour)
+	if allContacts, err := contactRepo.ListAll(context.Background()); err == nil && len(allContacts) > 0 {
+		contactsCache.HydrateFromContacts(allContacts)
+	}
 	directory := service.NewWhatsAppDirectoryService(waConvRepo, waContextCfg, contactsCache)
+	directory.SetContactRepository(contactRepo)
 
 	waSvc.SetContextService(contextSvc)
 	waSvc.SetGroupMeta(groupMeta)
@@ -80,6 +87,7 @@ func setupWhatsAppAssistant(
 		ContextSvc:    contextSvc,
 		Directory:     directory,
 		ContactsCache: contactsCache,
+		ContactRepo:   contactRepo,
 		OwnerCache:    ownerCache,
 		GroupMeta:     groupMeta,
 		NudgeWorker:   nudgeWorker,

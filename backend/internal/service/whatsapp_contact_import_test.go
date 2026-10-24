@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/service"
 )
 
@@ -45,13 +46,44 @@ func TestContactsCache_ImportSavedNamesIgnoraEntradasVazias(t *testing.T) {
 	}
 }
 
-// TestContactsCache_NomeSalvoNumericoNaoViraRotulo: contato salvo só pelo
-// telefone continua usando o nome de perfil como rótulo (legibilidade).
-func TestContactsCache_NomeSalvoNumericoNaoViraRotulo(t *testing.T) {
+// TestContactsCache_HydrateFromContacts: contatos do SQLite reidratam o cache no boot.
+func TestContactsCache_HydrateFromContacts(t *testing.T) {
 	cache := service.NewWhatsAppContactsCache(nil, 0)
-	cache.Set("559888196462@s.whatsapp.net", "559888196462", "Bella")
 
-	if got := cache.Name("559888196462@s.whatsapp.net"); got != "Bella" {
-		t.Errorf("esperava o nome de perfil 'Bella', obteve %q", got)
+	contacts := []domain.SyncedContact{
+		{
+			UserID:      "u1",
+			Phone:       "+55 (98) 98881-9646",
+			PhoneDigits: "5598988819646",
+			JID:         "5598988819646@s.whatsapp.net",
+			LID:         "25419827364@lid",
+			SavedName:   "Isa",
+			ProfileName: "Bella",
+		},
+		{
+			UserID:      "u1",
+			Phone:       "+55 11 97722-4455",
+			PhoneDigits: "5511977224455",
+			SavedName:   "Roberto Jr",
+		},
+	}
+
+	hydrated := cache.HydrateFromContacts(contacts)
+	if hydrated != 2 {
+		t.Fatalf("esperava 2 contatos reidratados, obteve %d", hydrated)
+	}
+
+	// Testa resolução por JID, LID e número
+	if got := cache.Name("5598988819646@s.whatsapp.net"); got != "Isa" {
+		t.Errorf("esperava 'Isa' para o JID, obteve %q", got)
+	}
+	if got := cache.Name("25419827364@lid"); got != "Isa" {
+		t.Errorf("esperava 'Isa' para o LID, obteve %q", got)
+	}
+	if got := cache.ProfileName("25419827364@lid"); got != "Bella" {
+		t.Errorf("esperava 'Bella' para o perfil no LID, obteve %q", got)
+	}
+	if got := cache.Name("5511977224455@s.whatsapp.net"); got != "Roberto Jr" {
+		t.Errorf("esperava 'Roberto Jr' para o JID do segundo contato, obteve %q", got)
 	}
 }

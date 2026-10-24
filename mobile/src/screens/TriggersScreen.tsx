@@ -1,10 +1,11 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import {
   StyleSheet,
   View,
   Text,
   TouchableOpacity,
   BackHandler,
+  Alert,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { MD3Shapes, tokens } from '../theme/tokens';
@@ -15,10 +16,9 @@ import { MyTriggersList } from '../components/triggers/MyTriggersList';
 import { TriggerReportsView } from '../components/triggers/TriggerReportsView';
 import { NaturalPromptInput } from '../components/triggers/NaturalPromptInput';
 import { ExploreTemplatesSection } from '../components/triggers/ExploreTemplatesSection';
-import { EditTriggerModal } from '../components/triggers/EditTriggerModal';
-import { CreateTriggerModal } from '../components/triggers/CreateTriggerModal';
 import { Trigger, TriggerTemplate } from '../types';
 import { countTriggersByCategory } from '../utils/radarFilter';
+import { chatPromptBus } from '../services/dataSync';
 
 type TriggersTab = 'my_triggers' | 'explore';
 
@@ -46,9 +46,36 @@ export const TriggersScreen: React.FC<{
 
   const [activeTab, setActiveTab] = useState<TriggersTab>('my_triggers');
   const [reportTrigger, setReportTrigger] = useState<Trigger | null>(null);
-  const [editTrigger, setEditTrigger] = useState<Trigger | null>(null);
-  const [createVisible, setCreateVisible] = useState<boolean>(false);
   const [activatingTemplateId, setActivatingTemplateId] = useState<string | null>(null);
+
+  // Ação contextual do radar (vito-telas.html radTap)
+  const handleRadarAction = useCallback((t: Trigger) => {
+    Alert.alert(
+      `Sobre "${t.title}":`,
+      'O que você quer fazer?',
+      [
+        {
+          text: t.status === 'active' ? 'Pausar vigília' : 'Retomar vigília',
+          onPress: () => chatPromptBus.askAssistant(
+            t.status === 'active'
+              ? `Você gostaria de pausar a vigília "${t.title}" temporariamente?`
+              : `Você gostaria de reativar a vigília "${t.title}"?`
+          ),
+        },
+        {
+          text: 'Mudar horário da checagem',
+          onPress: () => chatPromptBus.askAssistant(`Para qual horário você gostaria de ajustar a checagem da vigília "${t.title}"?`),
+        },
+        {
+          text: 'Excluir vigília',
+          style: 'destructive',
+          onPress: () => chatPromptBus.askAssistant(`Você quer realmente excluir a vigília "${t.title}"?`),
+        },
+        { text: 'Voltar', style: 'cancel' },
+      ]
+    );
+  }, []);
+
   const firstCreateRender = useRef(false);
 
   useEffect(() => {
@@ -61,22 +88,14 @@ export const TriggersScreen: React.FC<{
       return;
     }
     if ((createRequestId ?? 0) > 0) {
-      setCreateVisible(true);
+      chatPromptBus.askAssistant('O que você gostaria de monitorar ou receber alertas?');
     }
   }, [createRequestId]);
 
   useEffect(() => {
     const onBackPress = () => {
-      if (createVisible) {
-        setCreateVisible(false);
-        return true;
-      }
       if (reportTrigger) {
         setReportTrigger(null);
-        return true;
-      }
-      if (editTrigger) {
-        setEditTrigger(null);
         return true;
       }
       if (activeTab === 'explore') {
@@ -88,7 +107,7 @@ export const TriggersScreen: React.FC<{
 
     const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
     return () => subscription.remove();
-  }, [createVisible, reportTrigger, editTrigger, activeTab]);
+  }, [reportTrigger, activeTab]);
 
   const categoryCounts = useMemo(
     () => countTriggersByCategory(allTriggers),
@@ -122,7 +141,7 @@ export const TriggersScreen: React.FC<{
         <TriggerReportsView
           trigger={reportTrigger}
           onBack={() => setReportTrigger(null)}
-          onEdit={(t) => setEditTrigger(t)}
+          onEdit={handleRadarAction}
           onRunNow={handleRunTrigger}
           onToggle={async (id) => {
             await handleToggleTrigger(id);
@@ -138,22 +157,6 @@ export const TriggersScreen: React.FC<{
           onDeleteRadar={async (id) => {
             await handleDeleteTrigger(id);
             setReportTrigger(null);
-          }}
-        />
-
-        <EditTriggerModal
-          visible={editTrigger !== null}
-          trigger={editTrigger}
-          onClose={() => setEditTrigger(null)}
-          onDelete={async (id) => {
-            await handleDeleteTrigger(id);
-            setReportTrigger(null);
-          }}
-          onSave={async (id, updates) => {
-            const updated = await handleUpdateTrigger(id, updates);
-            if (reportTrigger && reportTrigger.id === id) {
-              setReportTrigger(updated);
-            }
           }}
         />
       </View>
@@ -277,27 +280,6 @@ export const TriggersScreen: React.FC<{
           />
         </>
       )}
-
-      {/* Modal de Edição */}
-      <EditTriggerModal
-        visible={editTrigger !== null}
-        trigger={editTrigger}
-        onClose={() => setEditTrigger(null)}
-        onDelete={handleDeleteTrigger}
-        onSave={async (id, updates) => {
-          await handleUpdateTrigger(id, updates);
-        }}
-      />
-
-      {/* Modal de Criação (+ Novo no Header) */}
-      <CreateTriggerModal
-        visible={createVisible}
-        onClose={() => setCreateVisible(false)}
-        onSubmit={async (input) => {
-          await handleCreateTrigger(input);
-          setCreateVisible(false);
-        }}
-      />
     </View>
   );
 };

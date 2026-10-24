@@ -1,17 +1,15 @@
 # Agenda
 
 ## O que é
-Aba 2. Mostra somente eventos (compromissos com dia e hora). Sincroniza nos dois
-sentidos com o Google Calendar.
+Aba 2 (ícone de calendário). Mostra exclusivamente compromissos e eventos com dia e hora. Sincroniza em tempo real nos dois sentidos com o Google Calendar.
 
-## Como usar
-- Ver: dias com bolinha têm compromisso; toque no dia para filtrar.
-- Criar: botão flutuante "Novo Evento", ou chat: "Marca dentista amanhã às 14h".
-- Foto de convite: anexe no chat que os dados entram sozinhos.
-- Reagendar: toque no evento ou diga "remarca o dentista para sexta às 10h".
-- Cancelar: "cancela o dentista" ou lixeira no detalhe do evento.
-- Evento recorrente: "aula de inglês todo sábado às 9h".
+## Como usar (Paradigma Conversacional)
+- **Visualização:** Faixa semanal no topo com dias circulares (dia com anel é hoje; dias com bolinhas possuem eventos); toque em qualquer dia para filtrar compromissos. Botão de busca retrátil com filtros avançados e botão de calendário infinito (15 meses).
+- **Criar evento:** Toque no botão circular primário com ícone **Spark** no cabeçalho. Ele abre imediatamente o chat com o Vito perguntando *"Qual próximo evento você quer adicionar na sua agenda?"*. Basta responder naturalmente com o título, dia e horário (ou enviar áudio ou foto de convite).
+- **Foto de convite ou recibo:** Anexe a imagem no chat; o Vito lê datas, locais e horários e cria o evento automaticamente.
+- **Reagendar / Remarcar:** Toque em qualquer evento na lista para abrir as opções contextuais e escolha *"Reagendar"*; o Vito pergunta *"Para quando você gostaria de reagendar o evento [Título]?"*, permitindo responder qualquer novo dia ou horário.
+- **Cancelar / Excluir:** Toque no evento e escolha *"Cancelar evento"* ou diga no chat *"Cancela o almoço de amanhã"*.
+- **Evento recorrente:** Peça no chat *"Academia toda segunda, quarta e sexta às 07h"* ou *"Alinhamento semanal toda terça às 10h até 20 de dezembro"*. Ao remarcar, o Vito pergunta se você deseja alterar só o dia ou a série inteira.
 
-## Lembretes
-Todo evento gera dois avisos automáticos: antecedência configurável
-(padrão 10 min) e alerta no horário de início.
+## Lembretes e Antecedência
+Todo evento gera alertas automáticos: aviso prévio no horário configurado (padrão 10 min) e notificação no horário exato de início.

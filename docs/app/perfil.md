@@ -1,39 +1,36 @@
-# Aba Perfil (Configurações e Preferências)
+# Aba Perfil (Configurações e Governança)
 
 A aba **Perfil** é a 6ª aba do aplicativo, localizada no **rodapé (barra inferior de navegação)**, identificada pelo ícone de pessoa/silhueta.
 
-> **Importante:** Não existe menu ou avatar no canto superior direito da tela. Todas as configurações do usuário e do aplicativo ficam centralizadas exclusivamente nesta 6ª aba.
+> **Importante:** Não existe menu ou avatar no canto superior direito da tela. Todas as configurações do usuário e do aplicativo ficam centralizadas exclusivamente nesta 6ª aba ou podem ser alteradas diretamente conversando com o Vito pelo chat.
 
 ## Seções disponíveis no Perfil
 
 ### 1. Cartão do Usuário
 - Exibe o nome do usuário e e-mail cadastrado.
-- Telefone verificado com WhatsApp (Anti-Spoofing P2P): permite editar o número e confirmar via WhatsApp para encontrar contatos e agendar reuniões com facilidade.
-- Sincronização de Contatos: modal seguro com pareamento bilateral.
+- Telefone verificado com WhatsApp (Anti-Spoofing P2P): pode ser editado pelo chat dizendo *"Muda meu telefone para (98) 98441-7165"*.
+- Atualização de nome: pode ser solicitada pelo chat dizendo *"Altera meu nome para André Victor"*.
 
 ### 2. Tema da Interface (Aparência)
-- O seletor de tema fica visível em destaque.
-- Permite alternar instantaneamente entre três modos:
+- Seletor visível em destaque com 3 opções:
   - **Claro:** tema clássico com fundo branco e contraste nítido.
   - **Escuro:** tema escuro OLED para economia de bateria e conforto visual à noite.
   - **Sistema (Automático):** acompanha as configurações de modo claro/escuro do próprio dispositivo.
 
-### 3. Autonomia da IA
-- **Assistido:** o Vito sempre pede confirmação antes de executar ações de calendário ou agendamento.
-- **Alto:** o Vito executa ações com maior autonomia para máxima produtividade executiva.
+### 3. Níveis de Autonomia da IA
+- **Nível 1 (Básico / Conservador):** O Vito sempre pede confirmação antes de qualquer criação ou exclusão.
+- **Nível 2 (Assistido):** Pede confirmação apenas para reagendamentos com impacto ou exclusões destrutivas.
+- **Nível 3 (Proativo):** O Vito tem autonomia para organizar a rotina, resolver conflitos menores e criar blocos de foco de forma independente, prestando contas das ações tomadas.
+- Pode ser alternado pelo seletor na tela ou dizendo no chat: *"Coloque a autonomia no nível 3 (proativo)"* ou *"Mudar autonomia para assistido"*.
 
-### 4. Notificações do Sistema
-- Exibe o status da permissão de notificações push.
-- Canais dedicados: radar (`vito_radar`), booking (`vito_booking`) e lembretes diários.
-- Diagnóstico de conexão push com o servidor e botão de teste em tempo real.
+### 4. Conexões e Integrações Ativas
+- **Google Calendar:** Conexão OAuth e sincronização bidirecional. Pode ser ativada/desativada no chat (*"Ativar sincronização do Google Calendar"*).
+- **WhatsApp:** Conexão para ler conversas, rascunhar e enviar mensagens.
+- **Gmail:** Leitura de faturas, recibos e envio de e-mails diretamente pelo chat.
 
-### 5. Sincronização de Calendários
-- Conexão e autorização OAuth com a conta do Google Calendar.
-- Status da última sincronização bidirecional de eventos.
+### 5. Atualizações OTA e Versão
+- Exibe a versão instalada do aplicativo (ex.: 0.1.16) e o identificador do build OTA ativo.
+- Botão "Buscar Atualizações": baixa e aplica pacotes OTA instantaneamente.
 
-### 6. Sistema e Atualizações (OTA)
-- Exibe a versão instalada do aplicativo (ex.: 0.1.9) e o identificador do build.
-- Botão "Buscar Atualizações": pesquisa e aplica atualizações over-the-air (OTA) instantaneamente sem precisar reinstalar o APK.
-
-### 7. Sessão
-- Botão para alternar de conta ou encerrar a sessão (Logout).
+### 6. Sessão
+- Opção para encerrar a sessão (Logout).

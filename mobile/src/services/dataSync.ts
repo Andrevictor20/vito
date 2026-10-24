@@ -59,8 +59,15 @@ export class DataSyncBus {
 
 export const dataSync = new DataSyncBus();
 
-// Barramento de prompt externo p/ o chat (§9.4: ações a partir dos radares).
-type ChatPromptCallback = (prompt: string) => void;
+export interface ChatContextualPrompt {
+  question: string;
+  focusMode?: string;
+  context?: 'agenda' | 'tasks' | 'triggers' | 'booking' | 'profile' | 'general';
+}
+
+export type ChatPromptItem = string | ChatContextualPrompt;
+
+type ChatPromptCallback = (payload: ChatPromptItem) => void;
 
 class ChatPromptBus {
   private listeners = new Set<ChatPromptCallback>();
@@ -72,7 +79,7 @@ class ChatPromptBus {
     };
   }
 
-  notify(prompt: string): void {
+  notify(prompt: ChatPromptItem): void {
     this.listeners.forEach((cb) => {
       try {
         cb(prompt);
@@ -80,6 +87,14 @@ class ChatPromptBus {
         console.warn('[chatPromptBus] Erro no listener:', err);
       }
     });
+  }
+
+  askAssistant(
+    question: string,
+    focusMode?: string,
+    context?: ChatContextualPrompt['context']
+  ): void {
+    this.notify({ question, focusMode, context });
   }
 }
 

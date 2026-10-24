@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import {
-  StyleSheet,
   View,
   Text,
   TouchableOpacity,
@@ -20,7 +19,7 @@ try {
 } catch (e) {
   ImagePicker = null;
 }
-import { tokens, MD3Shapes } from '../theme/tokens';
+import { tokens } from '../theme/tokens';
 import { useChat } from '../hooks/useChat';
 import { ChatMessageBubble } from '../components/chat/ChatMessageBubble';
 import { ChatQuickChips } from '../components/chat/ChatQuickChips';
@@ -36,6 +35,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { SafeAudioRecorder } from '../services/audioRecorder';
 import { pagerSwipeLockBus } from '../services/dataSync';
+import { styles } from './ChatScreen.styles';
 
 export interface ChatScreenProps {
   onDataChanged?: () => void;
@@ -47,6 +47,7 @@ export interface ChatScreenRef {
   openHistory: () => void;
   startNewChat: () => void;
   submitExternalPrompt: (text: string) => void;
+  askAssistantQuestion: (question: string, focusMode?: string) => void;
 }
 
 export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
@@ -62,6 +63,7 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
     loading,
     sessions,
     sendMessage,
+    appendAssistantMessage,
     editAndResendMessage,
     stopGeneration,
     sendAudio,
@@ -121,7 +123,15 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
         sendMessage(text.trim(), selectedFocus?.id);
       }
     },
-  }), [startNewConversation, sendMessage, selectedFocus?.id]);
+    askAssistantQuestion: (question: string) => {
+      const trimmed = question.trim();
+      if (!trimmed) return;
+      appendAssistantMessage(trimmed);
+      setTimeout(() => {
+        inputRef.current?.focus?.();
+      }, 150);
+    },
+  }), [startNewConversation, sendMessage, appendAssistantMessage, selectedFocus?.id]);
 
 
   useEffect(() => {
@@ -448,48 +458,5 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
       />
     </KeyboardAvoidingView>
   );
-});
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: tokens.colors.surface,
-  },
-  flatList: {
-    flex: 1,
-  },
-  messagesList: {
-    paddingHorizontal: tokens.spacing.md,
-    paddingTop: tokens.spacing.sm,
-  },
-  loadingBubble: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: tokens.spacing.sm,
-    alignSelf: 'flex-start',
-    backgroundColor: tokens.colors.surfaceContainer,
-    paddingHorizontal: tokens.spacing.md,
-    paddingVertical: tokens.spacing.sm,
-    borderRadius: MD3Shapes.large,
-    borderBottomLeftRadius: MD3Shapes.extraSmall,
-    marginBottom: tokens.spacing.md,
-    borderWidth: 1,
-    borderColor: tokens.colors.outlineVariant,
-  },
-  loadingText: {
-    color: tokens.colors.onSurfaceVariant,
-    fontSize: tokens.typography.size.bodySmall,
-  },
-  emptyMessagesList: {
-    flexGrow: 1,
-    justifyContent: 'center',
-  },
-  suggestionsWrapper: {
-    paddingBottom: 4,
-  },
-  dockContainer: {
-    backgroundColor: 'transparent',
-    paddingBottom: Platform.OS === 'android' ? 8 : 8,
-  },
 });
 

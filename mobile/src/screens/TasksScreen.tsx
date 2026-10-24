@@ -11,6 +11,7 @@ import {
   LayoutAnimation,
   Platform,
   UIManager,
+  Alert,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens } from '../theme/tokens';
@@ -18,7 +19,6 @@ import { useTheme } from '../context/ThemeContext';
 import { hapticFeedback } from '../theme/motion';
 import type { Todo, PendingItem } from '../types';
 import { TaskRow } from '../components/tasks/TaskRow';
-import { TaskSheet, TaskPayload } from '../components/tasks/TaskSheet';
 import { TaskFilterChips } from '../components/tasks/TaskFilterChips';
 import { VitoSuggestionCard } from '../components/tasks/VitoSuggestionCard';
 import { TaskGroupHeader } from '../components/tasks/TaskGroupHeader';
@@ -26,6 +26,7 @@ import { CompletedAccordion } from '../components/tasks/CompletedAccordion';
 import { TaskFilterModal, PriorityFilter } from '../components/tasks/TaskFilterModal';
 import { usePendingItems } from '../hooks/usePendingItems';
 import { toUnifiedRows, sortUnifiedRows, TaskSort, UnifiedRow } from '../utils/unifiedTasks';
+import { chatPromptBus } from '../services/dataSync';
 import {
   TaskFilterType,
   computeChipCounts,
@@ -104,11 +105,6 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
   const [internalQuery, setInternalQuery] = useState('');
   const [internalSearchOpen, setInternalSearchOpen] = useState(false);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
-  const [sheetVisible, setSheetVisible] = useState(false);
-  const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
-  const [convertingPending, setConvertingPending] = useState<PendingItem | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
   const [vitoDismissed, setVitoDismissed] = useState(false);
   const [rescheduling, setRescheduling] = useState(false);
 
@@ -121,21 +117,6 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
     if (externalOnSearchChange) externalOnSearchChange(text);
     else setInternalQuery(text);
   };
-
-  // CTA (+ Nova tarefa): abre o sheet em modo criação
-  const firstCreateRender = useRef(true);
-  useEffect(() => {
-    if (firstCreateRender.current) {
-      firstCreateRender.current = false;
-      return;
-    }
-    if ((createRequestId ?? 0) > 0) {
-      setEditingTodo(null);
-      setConvertingPending(null);
-      setSaveError(null);
-      setSheetVisible(true);
-    }
-  }, [createRequestId]);
 
   const now = Date.now();
   const rawRows = useMemo(
@@ -198,31 +179,40 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
   }, [overdueRows, onUpdateTodoFull, pending]);
 
   const handleOpenEdit = useCallback((row: UnifiedRow) => {
-    if (row.kind === 'todo' && row.sourceTodo) {
-      setEditingTodo(row.sourceTodo);
-      setConvertingPending(null);
-      setSaveError(null);
-      setSheetVisible(true);
-    } else if (row.sourcePending) {
-      const p = row.sourcePending;
-      setConvertingPending(p);
-      setEditingTodo({
-        id: p.id,
-        user_id: '',
-        title: p.title,
-        priority: 'medium',
-        category: p.category || 'geral',
-        status: 'pending',
-        due_date: p.scheduled_date ? `${p.scheduled_date}T09:00:00` : undefined,
-        remind_at: p.remind_at || undefined,
-        remind_repeat: p.remind_repeat || 'none',
-        remind_advance_minutes: p.remind_advance_minutes || 0,
-        created_at: '',
-      } as Todo);
-      setSaveError(null);
-      setSheetVisible(true);
-    }
-  }, []);
+    const title = row.kind === 'todo' && row.sourceTodo ? row.sourceTodo.title : row.sourcePending?.title || 'tarefa';
+    Alert.alert(
+      `Sobre "${title}":`,
+      'O que você quer fazer?',
+      [
+        {
+          text: 'Mover tarefa',
+          onPress: () => chatPromptBus.askAssistant(`Para qual dia ou horário você quer mover a tarefa "${title}"?`),
+        },
+        {
+          text: 'Marcar como concluída',
+          onPress: () => {
+            if (row.kind === 'todo' && row.sourceTodo) {
+              onToggleTodo(row.sourceTodo.id);
+            } else if (row.sourcePending) {
+              pending.toggleComplete(row.sourcePending);
+            }
+          },
+        },
+        {
+          text: 'Excluir',
+          style: 'destructive',
+          onPress: () => {
+            if (row.kind === 'todo' && row.sourceTodo) {
+              onDeleteTodo(row.sourceTodo.id);
+            } else if (row.sourcePending) {
+              pending.remove(row.sourcePending.id);
+            }
+          },
+        },
+        { text: 'Voltar', style: 'cancel' },
+      ]
+    );
+  }, [onToggleTodo, onDeleteTodo, pending]);
 
   const handleToggleRow = useCallback((row: UnifiedRow) => {
     if (row.kind === 'todo' && row.sourceTodo) {
@@ -239,50 +229,6 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
       pending.remove(row.sourcePending.id);
     }
   }, [onDeleteTodo, pending]);
-
-  const handleSave = async (payload: TaskPayload) => {
-    setSaving(true);
-    setSaveError(null);
-    try {
-      const input = {
-        title: payload.title,
-        priority: payload.priority,
-        category: payload.category,
-        due_date: payload.dateISO,
-        remind_at: payload.remind_at,
-        remind_repeat: payload.remind_repeat,
-        remind_advance_minutes: payload.remind_advance_minutes,
-      };
-      if (editingTodo && !convertingPending) {
-        await onUpdateTodoFull(editingTodo.id, input);
-      } else if (convertingPending) {
-        await onSaveTodoFull(input);
-        await pending.remove(convertingPending.id);
-      } else {
-        await onSaveTodoFull(input);
-      }
-      setSheetVisible(false);
-      setEditingTodo(null);
-      setConvertingPending(null);
-    } catch (err) {
-      console.warn('[TasksScreen] Falha ao salvar tarefa:', err);
-      setSaveError('Não foi possível salvar. Tente de novo.');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleDeleteSheet = async (id: string) => {
-    try {
-      if (convertingPending) await pending.remove(convertingPending.id);
-      else onDeleteTodo(id);
-      setSheetVisible(false);
-      setEditingTodo(null);
-      setConvertingPending(null);
-    } catch (err) {
-      setSaveError('Não foi possível excluir. Tente de novo.');
-    }
-  };
 
   const initialLoading = loading && todos.length === 0 && pending.loading && pending.items.length === 0;
 
@@ -411,21 +357,6 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
           handleQueryChange('');
         }}
         activeCount={activeRows.length}
-      />
-
-      {/* Sheet de Criação / Edição de Tarefas */}
-      <TaskSheet
-        visible={sheetVisible}
-        editingTodo={editingTodo}
-        saving={saving}
-        error={saveError}
-        onClose={() => {
-          setSheetVisible(false);
-          setEditingTodo(null);
-          setConvertingPending(null);
-        }}
-        onSave={handleSave}
-        onDelete={handleDeleteSheet}
       />
     </View>
   );

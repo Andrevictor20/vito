@@ -1,6 +1,6 @@
 import test, { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { DataSyncBus, SyncEventType, tabNavigationBus } from './dataSync';
+import { DataSyncBus, SyncEventType, tabNavigationBus, chatPromptBus } from './dataSync';
 
 describe('DataSyncBus - Reatividade e Barramento Bidirecional (TDD)', () => {
   it('notifica subscribers específicos e genéricos quando evento específico é disparado', () => {
@@ -121,6 +121,35 @@ describe('TabNavigationBus - Barramento de Navegação Lateral de Abas (TDD)', (
 
     unsub1();
     unsub2();
+  });
+});
+
+describe('ChatPromptBus - Barramento de Perguntas Proativas e Prompts do Chat (TDD)', () => {
+  it('notifica ouvintes com pergunta contextual ao chamar askAssistant', () => {
+    let receivedPayload: any = null;
+    const unsub = chatPromptBus.subscribe((payload) => {
+      receivedPayload = payload;
+    });
+
+    chatPromptBus.askAssistant('Qual próxima tarefa você quer organizar?');
+
+    assert.ok(receivedPayload);
+    assert.equal(typeof receivedPayload, 'object');
+    assert.equal(receivedPayload.question, 'Qual próxima tarefa você quer organizar?');
+
+    unsub();
+  });
+
+  it('notifica ouvintes com string ao chamar notify diretamente', () => {
+    let receivedPayload: any = null;
+    const unsub = chatPromptBus.subscribe((payload) => {
+      receivedPayload = payload;
+    });
+
+    chatPromptBus.notify('Prompt direto');
+
+    assert.equal(receivedPayload, 'Prompt direto');
+    unsub();
   });
 });
 

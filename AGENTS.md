@@ -24,11 +24,16 @@ Infer risk automatically (zero-prompt) and declare `Risco + Workflow` on the fir
 
 **Reasoning Effort:** L0/L1 direct & concise (`agy-effort low`); L2/L3 drafts spec plan, emits **⏸️ Stop Gate** requesting `high` effort, and pauses until human confirmation.
 
+- **Turn-1 Multi-Agent Dispatch (Zero-Prompt-Friction):** When the initial user prompt requests multi-agent execution (e.g. *"use múltiplos agentes"*, *"com subagentes"*, *"em equipe"*, *"em paralelo"*), multi-agent Boss-Worker dispatch is **MANDATORY** and overrides single-agent minimality. The orchestrator MUST dispatch subagents via `invoke_subagent` (or host CLI driver) immediately in **Turn 1**. NEVER stall or emit a blocking Stop Gate pause just to ask for confirmation or wait for a second user prompt to "remind" the AI. The initial prompt is the execution authorization.
+- **Multi-Agent Roster & Execution Reporting:**
+  - **At Start (Turn 1):** Display the roster header: subagent count (`👥 Agentes Escalados: N`), names (`[lista nominal]`), roles, and assigned models.
+  - **At Completion (Final Output):** Mandatorily include the **Relatório de Execução Multiagente**: subagent count (`👥 Agentes Utilizados: N`), names of all participating specialists, task outcomes (`PASS/GREEN`), and link to `.agents/mission-report.md`.
+
 ## 2. Specification, TDD & Anti-Test-Bypass
 
 **Contract Separation:** Human defines *WHAT* (AC → SbE → Gherkin), AI implements *HOW* (tests → code → refactor). `agy-conformance --spec ... --tests ...` derives the AC → test → status matrix; untested AC or failing test = `NON-COMPLIANT` = delivery **BLOCKED**.
 
-- **Anti-Self-Test:** Never define ACs and tests in L2/L3 without intermediate human Stop Gate approval.
+- **Anti-Self-Test:** Never define ACs and tests in L2/L3 without intermediate human Stop Gate approval, UNLESS explicit multi-agent execution was requested in the initial prompt (pre-authorized). In multi-agent mode, the orchestrator dispatches `navigator` and `test-guardian` immediately in Turn 1 without stalling.
 - **Strict TDD (`RED → GREEN → REFACTOR`):** No production code without a failing test first.
 - **Zero Tolerance:** Zero blind mocks (only 3rd-party I/O), zero empty assertions, zero `.skip`, **never delete/comment failing tests** (fix root cause), always assert concrete values.
 - **Surgical Execution:** Run only affected module tests (`python3 -m unittest tests/test_<mod>.py`). Full suite reserved for final L3 gate; L0 exempt. Details: `.agents/policies/{atdd-bdd-tdd,tdd,evidence}.md`.
@@ -37,10 +42,11 @@ Infer risk automatically (zero-prompt) and declare `Risco + Workflow` on the fir
 
 When a tool fails (`exit_code != 0`, traceback, test/lint error) or `[SELF-HEAL TRIGGER]` fires, **never stop or hand back a broken state**: isolate the root cause, fix the code, and re-verify automatically.
 
-Before emitting any final response for code tasks, execute the **3-Point Pre-Response Self-Audit**:
+Before emitting any final response for code tasks, execute the **4-Point Pre-Response Self-Audit**:
 1. **Goal Check:** Were 100% of the user's requested items addressed? If anything was missed, complete it now.
 2. **Green Check:** Were any files edited after the last test run (`dirty_code_untested`)? If yes, run the module test now.
-3. **Memory Check:** Was `.agents/memory/PROJECT_MEMORY.md` updated on disk?
+3. **Multi-Agent Roster Check:** If multi-agent execution was requested or used, is the agent count and names report (`👥 Relatório de Execução Multiagente`) present in the final response?
+4. **Memory Check:** Was `.agents/memory/PROJECT_MEMORY.md` updated on disk?
 
 ## 4. Token Economy & Mechanical Discipline
 

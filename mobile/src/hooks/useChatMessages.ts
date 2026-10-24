@@ -2,77 +2,26 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { AssistantChatResponse, ChatBooking, ChatMeeting, ChatMessage, ConversationSession } from '../types';
 import { api } from '../services/api';
-import { notificationService } from '../services/notificationService';
-import { dataSync } from '../services/dataSync';
 import { isAbortError, truncateMessagesForEdit } from '../utils/chatActions';
 import { humanizePreview, semanticTitle } from '../utils/chatPreview';
 import { toChatMeeting, toChatBooking, sanitizeErrorMessage } from '../utils/chatCards';
 import type { ChatStorageKeys } from '../services/chatStorageService';
 import { getChatStorageKeys } from '../services/chatStorageService';
+import {
+  buildAssistantMessage,
+  notifyAssistantResult,
+  handleAssistantSideEffects,
+} from './chatMessageEffects';
 
-export { toChatMeeting, toChatBooking, sanitizeErrorMessage };
-
-const buildAssistantMessage = (idPrefix: string, res: AssistantChatResponse, defaultReply: string): ChatMessage => ({
-  id: `${idPrefix}-${Date.now()}`,
-  sender: 'vito',
-  text: res.reply || res.message || defaultReply,
-  timestamp: new Date().toISOString(),
-  action_performed: res.action_performed,
-  event: res.event,
-  todo: res.todo,
-  trigger: res.trigger,
-  pending: res.pending,
-  booking: toChatBooking(res),
-  meeting: toChatMeeting(res),
-  conflict: res.conflict,
-  pending_confirmation: res.pending_confirmation,
-});
-
-export const notifyAssistantResult = (res: AssistantChatResponse) => {
-  const action = res.action_performed?.toLowerCase() || '';
-  if (res.event || action.includes('event')) {
-    dataSync.notify('refresh_events');
-  }
-  if (res.todo || action.includes('todo')) {
-    dataSync.notify('refresh_todos');
-  }
-  if (res.trigger || action.includes('trigger')) {
-    dataSync.notify('refresh_triggers');
-  }
-  if (res.booking || action.includes('booking')) {
-    dataSync.notify('refresh_bookings');
-  }
-  if (res.pending || action.includes('pending')) {
-    dataSync.notify('refresh_pending');
-  }
-  dataSync.notify('refresh_all');
+export {
+  toChatMeeting,
+  toChatBooking,
+  sanitizeErrorMessage,
+  buildAssistantMessage,
+  notifyAssistantResult,
+  handleAssistantSideEffects,
+  humanizePreview,
 };
-
-export const handleAssistantSideEffects = (
-  res: AssistantChatResponse,
-  onDataChanged?: () => void
-) => {
-  if (res.event) {
-    notificationService.scheduleEventDualReminders(res.event).catch(() => {});
-  }
-  if (res.todo) {
-    notificationService.scheduleTodoReminder(res.todo).catch(() => {});
-  }
-  if (res.pending) {
-    notificationService.schedulePendingReminder(res.pending).catch(() => {});
-    dataSync.notify('refresh_pending');
-  }
-  if (res.action_performed === 'delete_event' && res.event?.id) {
-    notificationService.cancelEventReminder(res.event.id).catch(() => {});
-  }
-  if (res.action_performed === 'delete_todo' && res.todo?.id) {
-    notificationService.cancelTodoReminder(res.todo.id).catch(() => {});
-  }
-  notifyAssistantResult(res);
-  onDataChanged?.();
-};
-
-export { humanizePreview };
 
 export interface UseChatMessagesOptions {
   keys?: ChatStorageKeys;
@@ -86,6 +35,7 @@ export interface UseChatMessagesResult {
   loading: boolean;
   saveMessages: (newMessages: ChatMessage[]) => void;
   sendMessage: (text: string, focusMode?: string) => Promise<void>;
+  appendAssistantMessage: (text: string) => void;
   editAndResendMessage: (messageId: string, newText: string, focusMode?: string) => Promise<void>;
   stopGeneration: () => void;
   sendAudio: (audioUri: string, focusMode?: string) => Promise<void>;
@@ -450,12 +400,32 @@ export function useChatMessages(
     saveMessages([]);
   }, [saveMessages]);
 
+  const appendAssistantMessage = useCallback(
+    (text: string) => {
+      const trimmed = text.trim();
+      if (!trimmed) return;
+      const vitoMsg: ChatMessage = {
+        id: `vito-init-${Date.now()}`,
+        sender: 'vito',
+        text: trimmed,
+        timestamp: new Date().toISOString(),
+      };
+      setMessages((prev) => {
+        const nextList = [...prev, vitoMsg];
+        saveMessages(nextList);
+        return nextList;
+      });
+    },
+    [saveMessages]
+  );
+
   return {
     messages,
     setMessages,
     loading,
     saveMessages,
     sendMessage,
+    appendAssistantMessage,
     editAndResendMessage,
     stopGeneration,
     sendAudio,

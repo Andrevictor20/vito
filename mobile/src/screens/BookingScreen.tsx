@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   AppState,
+  Alert,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useFocusEffect } from '@react-navigation/native';
@@ -13,11 +14,10 @@ import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { hapticFeedback } from '../theme/motion';
 import { api } from '../services/api';
-import { dataSync } from '../services/dataSync';
+import { dataSync, chatPromptBus } from '../services/dataSync';
 import {
   BookingType,
   BookingAppointment,
-  CreateBookingTypeInput,
   Meeting,
 } from '../types';
 import {
@@ -28,7 +28,6 @@ import {
 import { BookingLinksTab } from '../components/booking/BookingLinksTab';
 import { BookingReceivedTab } from '../components/booking/BookingReceivedTab';
 import { MeetingPollDetailView } from '../components/booking/MeetingPollDetailView';
-import { BookingTypeModal } from '../components/booking/BookingTypeModal';
 import { bookingStyles as styles } from './BookingScreen.styles';
 import { copyToClipboard } from '../utils/clipboard';
 
@@ -67,11 +66,12 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<'links' | 'appointments'>('links');
-  const [createModalVisible, setCreateModalVisible] = useState(false);
-  const [editingType, setEditingType] = useState<BookingType | null>(null);
-  const [editingMeeting, setEditingMeeting] = useState<Meeting | null>(null);
   const [confirmingSlotId, setConfirmingSlotId] = useState<string | null>(null);
   const [selectedMeetingForDetail, setSelectedMeetingForDetail] = useState<Meeting | null>(null);
+
+  const handleBookingPrompt = useCallback(() => {
+    chatPromptBus.askAssistant('Que tipo de reunião você quer criar? (Link individual 1-on-1 ou votação em grupo?)');
+  }, []);
 
   useEffect(() => {
     if (firstCreateRender.current) {
@@ -79,11 +79,9 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({
       return;
     }
     if ((createRequestId ?? 0) > 0) {
-      setEditingType(null);
-      setEditingMeeting(null);
-      setCreateModalVisible(true);
+      handleBookingPrompt();
     }
-  }, [createRequestId]);
+  }, [createRequestId, handleBookingPrompt]);
 
   useEffect(() => {
     onSubViewChange?.(Boolean(selectedMeetingForDetail));
@@ -230,19 +228,6 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({
     });
   };
 
-  const handleSaveType = async (payload: CreateBookingTypeInput) => {
-    if (editingType) {
-      const updated = await api.updateBookingType(editingType.id, payload);
-      setTypes((prev) =>
-        (prev || []).map((item) => (item.id === editingType.id ? { ...item, ...updated } : item))
-      );
-    } else {
-      const created = await api.createBookingType(payload);
-      setTypes((prev) => [...(prev || []), created]);
-    }
-    hapticFeedback.success();
-  };
-
   const handleConfirmMeetingSlot = async (meetingId: string, slotId: string) => {
     hapticFeedback.medium();
     setConfirmingSlotId(slotId);
@@ -264,9 +249,22 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({
         meeting={selectedMeetingForDetail}
         onBack={() => setSelectedMeetingForDetail(null)}
         onEdit={(target) => {
-          setEditingType(null);
-          setEditingMeeting(target);
-          setCreateModalVisible(true);
+          Alert.alert(
+            `Sobre "${target.title}":`,
+            'O que você quer fazer?',
+            [
+              {
+                text: 'Ajustar reunião',
+                onPress: () => chatPromptBus.askAssistant(`Como você gostaria de ajustar a reunião "${target.title}"?`),
+              },
+              {
+                text: 'Excluir reunião',
+                style: 'destructive',
+                onPress: () => handleDeleteMeeting(target.id),
+              },
+              { text: 'Voltar', style: 'cancel' },
+            ]
+          );
         }}
         onConfirmSlot={handleConfirmMeetingSlot}
         confirmingSlotId={confirmingSlotId}
@@ -413,24 +411,42 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({
           onRefresh={onRefresh}
           onCopyLink={handleCopyLink}
           onEditType={(bt) => {
-            setEditingMeeting(null);
-            setEditingType(bt);
-            setCreateModalVisible(true);
+            Alert.alert(
+              `Sobre "${bt.title}":`,
+              'O que você quer fazer?',
+              [
+                {
+                  text: 'Ajustar link',
+                  onPress: () => chatPromptBus.askAssistant(`Como você gostaria de personalizar ou ajustar o link "${bt.title}"?`),
+                },
+                {
+                  text: 'Duplicar link',
+                  onPress: () => chatPromptBus.askAssistant(`Deseja criar um novo link baseado em "${bt.title}" com quais alterações?`),
+                },
+                { text: 'Excluir link', style: 'destructive', onPress: () => handleDeleteType(bt.id) },
+                { text: 'Voltar', style: 'cancel' },
+              ]
+            );
           }}
           onEditMeeting={(m) => {
-            setEditingType(null);
-            setEditingMeeting(m);
-            setCreateModalVisible(true);
+            Alert.alert(
+              `Sobre "${m.title}":`,
+              'O que você quer fazer?',
+              [
+                {
+                  text: 'Ajustar reunião',
+                  onPress: () => chatPromptBus.askAssistant(`Como você gostaria de ajustar a votação/reunião "${m.title}"?`),
+                },
+                { text: 'Excluir reunião', style: 'destructive', onPress: () => handleDeleteMeeting(m.id) },
+                { text: 'Voltar', style: 'cancel' },
+              ]
+            );
           }}
           onDeleteType={handleDeleteType}
           onDeleteMeeting={handleDeleteMeeting}
           onOpenVotingDetail={(m) => setSelectedMeetingForDetail(m)}
           onToggleActiveType={handleToggleActive}
-          onCreateNew={() => {
-            setEditingType(null);
-            setEditingMeeting(null);
-            setCreateModalVisible(true);
-          }}
+          onCreateNew={handleBookingPrompt}
         />
       ) : (
         <BookingReceivedTab
@@ -442,26 +458,6 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({
           onCancelAppointment={handleCancelAppointment}
         />
       )}
-
-      {/* Modal de Criação / Edição */}
-      <BookingTypeModal
-        visible={createModalVisible}
-        editingType={editingType}
-        editingMeeting={editingMeeting}
-        onClose={() => {
-          setCreateModalVisible(false);
-          setEditingType(null);
-          setEditingMeeting(null);
-        }}
-        onSubmit={handleSaveType}
-        onMeetingCreated={(created) => setMeetings((prev) => [created, ...(prev || [])])}
-        onMeetingUpdated={(updated) =>
-          setMeetings((prev) =>
-            (prev || []).map((m) => (m.id === updated.id ? updated : m))
-          )
-        }
-        bookingUsername={bookingUsername}
-      />
     </View>
   );
 };

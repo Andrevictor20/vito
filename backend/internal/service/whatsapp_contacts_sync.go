@@ -4,7 +4,38 @@ import (
 	"context"
 	"log"
 	"strings"
+
+	"github.com/andrevmp/vito/backend/internal/domain"
 )
+
+// HydrateFromContacts carrega para o cache em memória contatos persistidos no banco de dados.
+func (c *WhatsAppContactsCache) HydrateFromContacts(contacts []domain.SyncedContact) int {
+	if c == nil || len(contacts) == 0 {
+		return 0
+	}
+	count := 0
+	for _, sc := range contacts {
+		savedName := strings.TrimSpace(sc.SavedName)
+		if savedName == "" {
+			continue
+		}
+		if sc.Phone != "" {
+			c.SetSavedByNumber(sc.Phone, savedName)
+		}
+		if sc.PhoneDigits != "" {
+			c.SetSavedByNumber(sc.PhoneDigits, savedName)
+		}
+		if sc.JID != "" {
+			c.Set(sc.JID, savedName, strings.TrimSpace(sc.ProfileName))
+		}
+		if sc.LID != "" {
+			c.Set(sc.LID, savedName, strings.TrimSpace(sc.ProfileName))
+		}
+		count++
+	}
+	log.Printf("[WhatsAppContactsCache] %d contato(s) reidratado(s) a partir do banco de dados", count)
+	return count
+}
 
 // SavedContactName é um nome SALVO pelo dono, com o telefone do contato.
 type SavedContactName struct {

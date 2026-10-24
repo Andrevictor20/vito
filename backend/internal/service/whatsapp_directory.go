@@ -36,9 +36,10 @@ func (e *ErrAmbiguousChat) Error() string {
 // Tudo é DERIVADO do shadow inbox — não há estado novo: uma conversa deixa de
 // ser pendência no instante em que o usuário responde.
 type WhatsAppDirectoryService struct {
-	repo     domain.WhatsAppConversationRepository
-	cfg      WhatsAppContextConfig
-	contacts *WhatsAppContactsCache
+	repo        domain.WhatsAppConversationRepository
+	cfg         WhatsAppContextConfig
+	contacts    *WhatsAppContactsCache
+	contactRepo domain.SyncedContactRepository
 }
 
 // NewWhatsAppDirectoryService cria o serviço de diretório e pendências.
@@ -174,7 +175,7 @@ func (s *WhatsAppDirectoryService) ResolveChat(ctx context.Context, userID, name
 		return nil, err
 	}
 	if len(chats) == 0 {
-		return nil, &ErrChatNotFound{Query: query}
+		return s.resolveFromSyncedContacts(ctx, userID, query)
 	}
 
 	// 1) JID exato.
@@ -246,7 +247,7 @@ func (s *WhatsAppDirectoryService) ResolveChat(ctx context.Context, userID, name
 	case 1:
 		return &matches[0], nil
 	case 0:
-		return nil, &ErrChatNotFound{Query: query}
+		return s.resolveFromSyncedContacts(ctx, userID, query)
 	default:
 		return nil, s.ambiguousError(query, matches)
 	}

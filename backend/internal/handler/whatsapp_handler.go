@@ -24,6 +24,7 @@ type WhatsAppHandler struct {
 	// contato da agenda).
 	contactsInstance string
 	backupMgr        *database.BackupManager
+	contactRepo      domain.SyncedContactRepository
 }
 
 // NewWhatsAppHandler instancia o handler para rotas de WhatsApp.
@@ -390,8 +391,11 @@ func (h *WhatsAppHandler) ImportContactNames(w http.ResponseWriter, r *http.Requ
 		}
 	}
 	persisted := int64(0)
+	if n := h.persistSyncedContacts(r.Context(), userID, input.Names); n > 0 {
+		persisted = n
+	}
 	if h.contextSvc != nil {
-		if n, err := h.contextSvc.SaveSavedNames(r.Context(), userID, byNumber); err == nil {
+		if n, err := h.contextSvc.SaveSavedNames(r.Context(), userID, byNumber); err == nil && persisted == 0 {
 			persisted = n
 		}
 	}

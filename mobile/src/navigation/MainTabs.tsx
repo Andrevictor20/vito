@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { View, StyleSheet, Keyboard, Platform, BackHandler, useWindowDimensions } from 'react-native';
+import { View, StyleSheet, Keyboard, Platform, BackHandler, useWindowDimensions, Alert } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { dataSync, chatPromptBus, tabNavigationBus, pagerSwipeLockBus } from '../services/dataSync';
 import { navigateToTab } from './navigationRef';
@@ -113,10 +113,11 @@ const TasksTabScreen: React.FC = () => {
         searchPlaceholder="Pesquisar tarefas..."
         contextualActions={
           <HeaderRoundButton
-            icon="add"
+            icon="auto-awesome"
             variant="primary"
-            onPress={() => setCreateRequestId((n) => n + 1)}
-            accessibilityLabel="Nova tarefa"
+            onPress={() => chatPromptBus.askAssistant('Qual próxima tarefa ou pendência você quer organizar?')}
+            accessibilityLabel="Pedir ao Vito: nova tarefa"
+            size={20}
           />
         }
       />
@@ -149,7 +150,6 @@ const TriggersTabScreen: React.FC<{
   onSubViewChange: (inSubView: boolean) => void;
 }> = ({ onSubViewChange }) => {
   const [inSubView, setInSubView] = useState(false);
-  const [createRequestId, setCreateRequestId] = useState(0);
 
   const handleSubViewChange = (sub: boolean) => {
     setInSubView(sub);
@@ -165,15 +165,16 @@ const TriggersTabScreen: React.FC<{
         contextualActions={
           inSubView ? undefined : (
             <HeaderRoundButton
-              icon="add"
+              icon="auto-awesome"
               variant="primary"
-              onPress={() => setCreateRequestId((n) => n + 1)}
-              accessibilityLabel="Novo radar"
+              onPress={() => chatPromptBus.askAssistant('O que você gostaria de monitorar ou receber alertas?')}
+              accessibilityLabel="Pedir ao Vito: novo radar"
+              size={20}
             />
           )
         }
       />
-      <TriggersScreen onSubViewChange={handleSubViewChange} createRequestId={createRequestId} />
+      <TriggersScreen onSubViewChange={handleSubViewChange} />
     </View>
   );
 };
@@ -182,7 +183,6 @@ const BookingTabScreen: React.FC<{
   onSubViewChange: (inSubView: boolean) => void;
 }> = ({ onSubViewChange }) => {
   const [inSubView, setInSubView] = useState(false);
-  const [createRequestId, setCreateRequestId] = useState(0);
 
   const handleSubViewChange = (sub: boolean) => {
     setInSubView(sub);
@@ -198,15 +198,16 @@ const BookingTabScreen: React.FC<{
         contextualActions={
           inSubView ? undefined : (
             <HeaderRoundButton
-              icon="add"
+              icon="auto-awesome"
               variant="primary"
-              onPress={() => setCreateRequestId((n) => n + 1)}
-              accessibilityLabel="Novo link"
+              onPress={() => chatPromptBus.askAssistant('Que tipo de reunião você quer criar? (Link individual 1-on-1 ou votação em grupo?)')}
+              accessibilityLabel="Pedir ao Vito: novo link"
+              size={20}
             />
           )
         }
       />
-      <BookingScreen onSubViewChange={handleSubViewChange} createRequestId={createRequestId} />
+      <BookingScreen onSubViewChange={handleSubViewChange} />
     </View>
   );
 };
@@ -293,10 +294,14 @@ export const MainTabs: React.FC<{ route?: any }> = ({ route }) => {
     });
   }, []);
 
-  // Prompts externos vindos dos radares (§9.4: cards acionáveis)
+  // Prompts externos vindos das abas / radares
   useEffect(() => {
     return chatPromptBus.subscribe((prompt) => {
-      chatRef.current?.submitExternalPrompt(prompt);
+      if (typeof prompt === 'string') {
+        chatRef.current?.submitExternalPrompt(prompt);
+      } else if (prompt && typeof prompt === 'object' && 'question' in prompt) {
+        chatRef.current?.askAssistantQuestion(prompt.question);
+      }
       handleSelectTab('chat');
     });
   }, [handleSelectTab]);

@@ -419,6 +419,9 @@ func (s *AssistantService) executeAction(ctx context.Context, userID string, int
 	case ai.ActionDraftEmail, ai.ActionSendEmail:
 		return s.executeGmailAction(ctx, userID, intent, res)
 
+	case ai.ActionRefineMessage:
+		return s.executeRefineMessage(ctx, userID, intent, input, res)
+
 	case ai.ActionCreateMeeting:
 		return s.executeCreateMeeting(ctx, userID, intent, input, res)
 
@@ -454,6 +457,21 @@ func (s *AssistantService) executeAction(ctx context.Context, userID string, int
 
 	case ai.ActionListContacts:
 		return s.executeListContacts(ctx, userID, intent, res)
+
+	case ai.ActionUpdateTodo:
+		return s.executeUpdateTodo(ctx, userID, intent, res)
+
+	case ai.ActionUpdateTrigger:
+		return s.executeUpdateTrigger(ctx, userID, intent, res)
+
+	case ai.ActionDeleteTrigger:
+		return s.executeDeleteTrigger(ctx, userID, intent, res)
+
+	case ai.ActionDeleteBooking:
+		return s.executeDeleteBooking(ctx, userID, intent, res)
+
+	case ai.ActionUpdateProfile:
+		return s.executeUpdateProfile(ctx, userID, intent, res)
 
 	default:
 		if res.Message == "" {
