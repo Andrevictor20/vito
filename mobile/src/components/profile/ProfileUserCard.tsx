@@ -20,20 +20,20 @@ export const ProfileUserCard: React.FC<ProfileUserCardProps> = ({
   onEditPhone,
 }) => {
   const { colors } = useTheme();
-  const initials = (name || 'AV')
+  const initials = (name || 'U')
     .split(' ')
     .filter(Boolean)
     .slice(0, 2)
     .map((n) => n[0])
     .join('')
-    .toUpperCase();
+    .toUpperCase() || 'U';
 
   return (
     <View style={[styles.pf, { backgroundColor: colors.surf, borderColor: colors.line }]}>
       {/* Avatar circular de 60px (.av) */}
       <View style={[styles.av, { backgroundColor: colors.ink }]}>
         <Text style={[styles.avText, { color: colors.bg }]}>
-          {initials || 'AV'}
+          {initials || 'U'}
         </Text>
       </View>
 

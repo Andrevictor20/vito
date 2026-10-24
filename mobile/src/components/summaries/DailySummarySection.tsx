@@ -4,6 +4,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { tokens } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { VitoMascot } from '../common/VitoMascot';
+import type { FocusBlock, TimelineSegment } from '../../utils/summaryCalculators';
 
 interface TodayMetrics {
   eventsCount: number;
@@ -20,6 +21,9 @@ interface DailySummarySectionProps {
   onReserveFocus?: () => void;
   onViewTasks?: () => void;
   nextEventTitle?: string;
+  focusBlocks?: FocusBlock[];
+  timelineSegments?: TimelineSegment[];
+  todayFormatted?: string;
 }
 
 export const DailySummarySection: React.FC<DailySummarySectionProps> = ({
@@ -29,32 +33,93 @@ export const DailySummarySection: React.FC<DailySummarySectionProps> = ({
   onReserveFocus,
   onViewTasks,
   nextEventTitle,
+  focusBlocks,
+  timelineSegments,
+  todayFormatted,
 }) => {
   const { colors } = useTheme();
 
-  // Data formatada para o cabeçalho
-  const todayFormatted = React.useMemo(() => {
+  // Data formatada para o cabeçalho (fallback local seguro)
+  const defaultTodayFormatted = React.useMemo(() => {
     const now = new Date();
-    const weekdays = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado'];
-    const months = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+    const weekdays = [
+      'domingo',
+      'segunda-feira',
+      'terça-feira',
+      'quarta-feira',
+      'quinta-feira',
+      'sexta-feira',
+      'sábado',
+    ];
+    const months = [
+      'janeiro',
+      'fevereiro',
+      'março',
+      'abril',
+      'maio',
+      'junho',
+      'julho',
+      'agosto',
+      'setembro',
+      'outubro',
+      'novembro',
+      'dezembro',
+    ];
     return `Hoje · ${weekdays[now.getDay()]}, ${now.getDate()} de ${months[now.getMonth()]}`;
   }, []);
 
+  const headerDate = todayFormatted || defaultTodayFormatted;
   const committedNum = parseFloat(metrics.committedHours) || 0;
-  const freeNum = parseFloat(metrics.freeHours) || 11;
+  const freeNum = parseFloat(metrics.freeHours) || 0;
   const taskProgress = metrics.totalTodos > 0 ? (metrics.completedTodos / metrics.totalTodos) * 100 : 0;
+
+  // Segmentos reais da timeline
+  const effectiveTimeline = React.useMemo<TimelineSegment[]>(() => {
+    if (timelineSegments && timelineSegments.length > 0) {
+      return timelineSegments;
+    }
+    if (committedNum === 0) {
+      return [{ flex: 12, type: 'free' }];
+    }
+    if (freeNum === 0) {
+      return [{ flex: Math.max(1, committedNum), type: 'committed' }];
+    }
+    return [
+      { flex: Math.max(0.5, freeNum / 2), type: 'free' },
+      { flex: Math.max(0.5, committedNum), type: 'committed' },
+      { flex: Math.max(0.5, freeNum / 2), type: 'free' },
+    ];
+  }, [timelineSegments, committedNum, freeNum]);
+
+  // Blocos de foco reais
+  const effectiveFocusBlocks = React.useMemo<FocusBlock[]>(() => {
+    if (focusBlocks !== undefined) {
+      return focusBlocks;
+    }
+    if (freeNum >= 1) {
+      return [
+        {
+          label: `Foco disponível · ${freeNum}h livres`,
+          duration: `${freeNum}h`,
+          startMinutes: 480,
+          endMinutes: 1200,
+        },
+      ];
+    }
+    return [];
+  }, [focusBlocks, freeNum]);
 
   return (
     <View style={styles.container}>
-      {/* Card 1 (.card2): Métricas Principais + Timeline */}
+      {/* Card 1 (.card2): Métricas Principais + Timeline Real */}
       <View style={[styles.card2, { backgroundColor: colors.bg, borderColor: colors.line }]}>
         <View style={styles.eyebrowRow}>
           <Text style={[styles.eyebrow, { color: colors.muted }]}>
-            {todayFormatted}
+            {headerDate}
           </Text>
         </View>
 
-        {/* Duas Colunas (.two): 11h livres vs 1h comprometida */}
+        {/* Duas Colunas (.two): horas livres vs horas comprometidas */}
         <View style={styles.two}>
           <View>
             <Text style={[styles.big, { color: colors.acc }]}>
@@ -70,32 +135,51 @@ export const DailySummarySection: React.FC<DailySummarySectionProps> = ({
           </View>
         </View>
 
-        {/* Timeline Horizontal (.tl) */}
+        {/* Timeline Horizontal Dinâmica (.tl) */}
         <View style={[styles.tl, { backgroundColor: colors.surf }]}>
-          <View style={[styles.tlSegment, { flex: Math.max(1, freeNum * 0.4), backgroundColor: colors.greenBg }]} />
-          <View style={[styles.tlSegment, { flex: Math.max(0.5, committedNum), backgroundColor: colors.blue }]} />
-          <View style={[styles.tlSegment, { flex: Math.max(1, freeNum * 0.6), backgroundColor: colors.greenBg }]} />
+          {effectiveTimeline.map((seg, idx) => (
+            <View
+              key={idx}
+              style={[
+                styles.tlSegment,
+                {
+                  flex: Math.max(0.1, seg.flex),
+                  backgroundColor: seg.type === 'free' ? colors.greenBg : colors.blue,
+                },
+              ]}
+            />
+          ))}
         </View>
 
         {/* Marcadores da Timeline (.tlb) */}
         <View style={styles.tlb}>
           <Text style={[styles.tlbText, { color: colors.muted }]}>08:00</Text>
-          <Text style={[styles.tlbText, { color: colors.muted }]}>12–13h</Text>
+          <Text style={[styles.tlbText, { color: colors.muted }]}>14:00</Text>
           <Text style={[styles.tlbText, { color: colors.muted }]}>20:00</Text>
         </View>
 
-        {/* Pílulas de Blocos de Foco (.wins) */}
+        {/* Pílulas de Blocos de Foco Reais (.wins) */}
         <View style={styles.wins}>
-          <View style={[styles.winPill, { backgroundColor: colors.greenBg }]}>
-            <Text style={[styles.winText, { color: colors.acc }]}>
-              Foco 08:00–12:00 · 4h
-            </Text>
-          </View>
-          <View style={[styles.winPill, { backgroundColor: colors.greenBg }]}>
-            <Text style={[styles.winText, { color: colors.acc }]}>
-              Foco 13:00–20:00 · 7h
-            </Text>
-          </View>
+          {effectiveFocusBlocks.length > 0 ? (
+            effectiveFocusBlocks.map((block, idx) => (
+              <View key={idx} style={[styles.winPill, { backgroundColor: colors.greenBg }]}>
+                <Text style={[styles.winText, { color: colors.acc }]}>
+                  {block.label}
+                </Text>
+              </View>
+            ))
+          ) : (
+            <View
+              style={[
+                styles.winPillEmpty,
+                { backgroundColor: colors.surf, borderColor: colors.line },
+              ]}
+            >
+              <Text style={[styles.winTextEmpty, { color: colors.muted }]}>
+                Nenhum bloco livre disponível hoje
+              </Text>
+            </View>
+          )}
         </View>
       </View>
 
@@ -114,7 +198,7 @@ export const DailySummarySection: React.FC<DailySummarySectionProps> = ({
             </Text>
           </Text>
           <Text style={[styles.metaText, { color: colors.muted }]} numberOfLines={1}>
-            {nextEventTitle || (metrics.eventsCount > 0 ? 'Almoço · 12:00' : 'Agenda livre hoje')}
+            {nextEventTitle || (metrics.eventsCount > 0 ? 'Compromissos agendados' : 'Sem compromissos no momento')}
           </Text>
         </View>
 
@@ -143,10 +227,13 @@ export const DailySummarySection: React.FC<DailySummarySectionProps> = ({
         <View style={styles.vsugBody}>
           <Text style={[styles.vsugEyebrow, { color: colors.muted }]}>VITO</Text>
           <Text style={[styles.vsugText, { color: colors.ink }]}>
-            {synthesisText || 'Dia leve: 1 compromisso (1h) e 11h livres. Boa hora para avançar nas tarefas que faltam.'}
+            {synthesisText ||
+              (metrics.eventsCount === 0 && metrics.totalTodos === 0
+                ? 'Sua agenda e lista de tarefas estão totalmente livres hoje. Momento propício para descanso, planejamento estratégico ou adiantar projetos.'
+                : `Dia com ${metrics.eventsCount} compromisso(s) e ${metrics.freeHours}h livres.`)}
           </Text>
           <View style={styles.vsugButtons}>
-            {onReserveFocus && (
+            {onReserveFocus && hasFreeWindow && (
               <TouchableOpacity
                 style={[styles.vsugBtnPrimary, { backgroundColor: colors.ink }]}
                 onPress={onReserveFocus}
@@ -247,6 +334,16 @@ const styles = StyleSheet.create({
   winText: {
     fontSize: 12.5,
     fontWeight: '600',
+  },
+  winPillEmpty: {
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  winTextEmpty: {
+    fontSize: 12.5,
+    fontFamily: tokens.typography.family.medium,
   },
   twoCards: {
     flexDirection: 'row',

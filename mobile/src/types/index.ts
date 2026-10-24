@@ -58,6 +58,7 @@ export interface Event {
   recurrence?: string;
   is_recurring?: boolean;
   created_at: string;
+  updated_at?: string;
 }
 
 export interface Subtask {
@@ -84,6 +85,7 @@ export interface Todo {
   event_title?: string;
   subtasks?: Subtask[];
   created_at: string;
+  updated_at?: string;
 }
 
 export interface ParsedIntent {

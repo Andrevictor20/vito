@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, Share } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import * as Clipboard from 'expo-clipboard';
+import { copyToClipboard } from '../../../utils/clipboard';
 import { useTheme } from '../../../context/ThemeContext';
 import { ChatMeeting } from '../../../types';
 import { formatMeetingMode, meetingDisplayLink } from '../../../utils/chatCards';
@@ -25,13 +25,11 @@ export const MeetingInlineCard: React.FC<MeetingInlineCardProps> = ({ meeting })
 
   const handleCopy = async () => {
     if (!link) return;
-    try {
-      await Clipboard.setStringAsync(link);
+    const ok = await copyToClipboard(link);
+    if (ok) {
       hapticFeedback.success();
       setCopied(true);
       setTimeout(() => setCopied(false), 2200);
-    } catch (e) {
-      console.warn('[MeetingInlineCard] Falha ao copiar link:', e);
     }
   };
 

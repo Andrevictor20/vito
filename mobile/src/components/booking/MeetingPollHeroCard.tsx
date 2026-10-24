@@ -5,6 +5,7 @@ import { MD3Shapes, tabularNumbers } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { Meeting } from '../../types';
 import { hapticFeedback } from '../../theme/motion';
+import { copyToClipboard } from '../../utils/clipboard';
 
 interface MeetingPollHeroCardProps {
   meeting: Meeting;
@@ -24,18 +25,12 @@ export const MeetingPollHeroCard: React.FC<MeetingPollHeroCardProps> = ({
 
   const handleCopyLink = async () => {
     if (!link) return;
-    try {
-      let ClipboardModule: any = null;
-      try {
-        ClipboardModule = require('expo-clipboard');
-      } catch {}
-      if (ClipboardModule?.setStringAsync) {
-        await ClipboardModule.setStringAsync(link);
-      }
+    const ok = await copyToClipboard(link);
+    if (ok) {
       hapticFeedback.success();
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
-    } catch {}
+    }
   };
 
   return (

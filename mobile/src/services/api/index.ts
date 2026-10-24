@@ -26,6 +26,7 @@ import {
   GmailScanResult,
   GmailDraftInput,
   GmailDraftResponse,
+  GmailSendResponse,
   ScannedBill,
   ScannedFlight,
   UrgentEmail,
@@ -88,6 +89,7 @@ export {
   GmailScanResult,
   GmailDraftInput,
   GmailDraftResponse,
+  GmailSendResponse,
   ScannedBill,
   ScannedFlight,
   UrgentEmail,
@@ -478,6 +480,7 @@ export class ApiService extends ApiClient {
   createGmailDraft(draft: GmailDraftInput): Promise<GmailDraftResponse> {
     return this.gmailApi.createDraft(draft);
   }
+  sendGmailEmail = (email: GmailDraftInput): Promise<GmailSendResponse> => this.gmailApi.sendEmail(email);
   get gmail(): GmailApi {
     return this.gmailApi;
   }

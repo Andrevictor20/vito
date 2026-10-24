@@ -13,13 +13,6 @@ import { BookingType, Meeting } from '../../types';
 import { meetingDisplayLink } from '../../utils/chatCards';
 import { buildMeetingShareMessage } from '../../utils/meetingPollUtils';
 
-let ClipboardModule: any = null;
-try {
-  ClipboardModule = require('expo-clipboard');
-} catch {
-  ClipboardModule = null;
-}
-
 export interface VitoBookingCardProps {
   item:
     | { kind: 'individual'; data: BookingType }

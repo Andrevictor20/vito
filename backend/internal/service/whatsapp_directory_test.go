@@ -158,3 +158,70 @@ func TestWhatsAppDirectory_MessagesOfReadsInbox(t *testing.T) {
 		t.Errorf("esperava a mensagem mais antiga no fim, obteve %q", messages[len(messages)-1].Text)
 	}
 }
+
+// Bug Beto Fantasma: status@broadcast e canais @newsletter nunca podem aparecer em Pending nem em Chats.
+func TestWhatsAppDirectory_PendingExcludesBroadcastAndNewsletter(t *testing.T) {
+	fx := setupContextualWhatsApp(t)
+	now := time.Now().UTC()
+	dir := service.NewWhatsAppDirectoryService(fx.repo, service.DefaultWhatsAppContextConfig(), nil)
+
+	// Status do WhatsApp (ex: Beto postou status)
+	archiveChat(t, fx, "b1", "status@broadcast", domain.WhatsAppChatKindBroadcast, "Beto", "novo status", false, now.Add(-5*time.Minute))
+	// Canal / newsletter
+	archiveChat(t, fx, "n1", "12036399999999@newsletter", domain.WhatsAppChatKindNewsletter, "Tech News", "noticia", false, now.Add(-10*time.Minute))
+	// Conversa direta real
+	archiveChat(t, fx, "d1", friendJID(), domain.WhatsAppChatKindDirect, "Ana", "preciso de ajuda", false, now.Add(-2*time.Minute))
+
+	pending, err := dir.Pending(context.Background(), "user-ctx-1")
+	if err != nil {
+		t.Fatalf("Pending: %v", err)
+	}
+	if len(pending) != 1 {
+		t.Fatalf("esperava apenas 1 pendencia real, obteve %d: %+v", len(pending), pending)
+	}
+	if pending[0].ChatJID != friendJID() {
+		t.Errorf("esperava pendencia de %s, obteve %s (%s)", friendJID(), pending[0].ChatJID, pending[0].ChatLabel)
+	}
+
+	chats, err := dir.Chats(context.Background(), "user-ctx-1")
+	if err != nil {
+		t.Fatalf("Chats: %v", err)
+	}
+	for _, c := range chats {
+		if c.ChatJID == "status@broadcast" || strings.HasSuffix(c.ChatJID, "@broadcast") || strings.HasSuffix(c.ChatJID, "@newsletter") {
+			t.Errorf("broadcast/newsletter %q nao deveria constar em Chats", c.ChatJID)
+		}
+	}
+}
+
+// Bug Isa -> Pai: contato real na agenda ou ChatLabel SEMPRE tem precedencia sobre apelido aprendido.
+func TestWhatsAppDirectory_ResolveChat_RealContactPrecedesLearnedAlias(t *testing.T) {
+	fx := setupContextualWhatsApp(t)
+	now := time.Now().UTC()
+
+	jidIsa := "5511999990001@s.whatsapp.net"
+	jidPai := "5511999990002@s.whatsapp.net"
+
+	archiveChat(t, fx, "msg-isa", jidIsa, domain.WhatsAppChatKindDirect, "Isa", "oi filho", false, now)
+	archiveChat(t, fx, "msg-pai", jidPai, domain.WhatsAppChatKindDirect, "Pai", "bênção", false, now)
+
+	// Grava um apelido espúrio "isa" apontando para o Pai
+	if err := fx.repo.SaveAlias(context.Background(), "user-ctx-1", jidPai, "isa"); err != nil {
+		t.Fatalf("SaveAlias: %v", err)
+	}
+
+	contacts := service.NewWhatsAppContactsCache(nil, time.Hour)
+	contacts.Set(jidIsa, "Isa", "isabella")
+	contacts.Set(jidPai, "Pai", "pai")
+
+	dir := service.NewWhatsAppDirectoryService(fx.repo, service.DefaultWhatsAppContextConfig(), contacts)
+
+	// Resolver "isa" DEVE trazer a Isa real, NUNCA o Pai!
+	resolved, err := dir.ResolveChat(context.Background(), "user-ctx-1", "isa")
+	if err != nil {
+		t.Fatalf("ResolveChat falhou: %v", err)
+	}
+	if resolved.ChatJID != jidIsa {
+		t.Fatalf("ESPERAVA JID DA ISA (%s), mas resolveu para %s (ChatLabel: %s)", jidIsa, resolved.ChatJID, resolved.ChatLabel)
+	}
+}

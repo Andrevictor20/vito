@@ -5,6 +5,7 @@ import { tokens } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { hapticFeedback } from '../../theme/motion';
 import { VitoMascot } from '../common/VitoMascot';
+import type { MonthWeekItem } from '../../utils/summaryCalculators';
 
 interface MonthlyMetrics {
   totalHours: string;
@@ -13,6 +14,8 @@ interface MonthlyMetrics {
   completionRate: number;
   workRatio: number;
   personalRatio: number;
+  weeks?: MonthWeekItem[];
+  hasData?: boolean;
 }
 
 interface MonthlySummarySectionProps {
@@ -20,6 +23,7 @@ interface MonthlySummarySectionProps {
   diagnosisText: string;
   onOpenRaioX: () => void;
   onAlignWeek?: () => void;
+  weeks?: MonthWeekItem[];
 }
 
 export const MonthlySummarySection: React.FC<MonthlySummarySectionProps> = ({
@@ -27,26 +31,41 @@ export const MonthlySummarySection: React.FC<MonthlySummarySectionProps> = ({
   diagnosisText,
   onOpenRaioX,
   onAlignWeek,
+  weeks,
 }) => {
   const { colors } = useTheme();
 
   const monthName = React.useMemo(() => {
-    const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+    const months = [
+      'Janeiro',
+      'Fevereiro',
+      'Março',
+      'Abril',
+      'Maio',
+      'Junho',
+      'Julho',
+      'Agosto',
+      'Setembro',
+      'Outubro',
+      'Novembro',
+      'Dezembro',
+    ];
     return months[new Date().getMonth()];
   }, []);
 
-  // Simulação / cálculo de semanas do mês para o gráfico de colunas
-  const monthWeeks = React.useMemo(() => {
-    const tot = parseFloat(metrics.totalHours) || 24;
-    return [
-      { l: 'Sem 1', h: Number((tot * 0.28).toFixed(1)) },
-      { l: 'Sem 2', h: Number((tot * 0.22).toFixed(1)) },
-      { l: 'Sem 3', h: Number((tot * 0.30).toFixed(1)), cur: true },
-      { l: 'Sem 4', h: Number((tot * 0.20).toFixed(1)) },
-    ];
-  }, [metrics.totalHours]);
+  const effectiveWeeks = React.useMemo<MonthWeekItem[]>(() => {
+    if (weeks && weeks.length > 0) return weeks;
+    if (metrics.weeks && metrics.weeks.length > 0) return metrics.weeks;
+    return [];
+  }, [weeks, metrics.weeks]);
 
-  const maxH = Math.max(1, ...monthWeeks.map((w) => w.h));
+  const hasData =
+    metrics.hasData ??
+    (parseFloat(metrics.totalHours) > 0 ||
+      metrics.totalEvents > 0 ||
+      effectiveWeeks.some((w) => w.h > 0));
+
+  const maxH = Math.max(1, ...effectiveWeeks.map((w) => w.h));
 
   return (
     <View style={styles.container}>
@@ -92,36 +111,48 @@ export const MonthlySummarySection: React.FC<MonthlySummarySectionProps> = ({
         </TouchableOpacity>
       </View>
 
-      {/* Card 2 (.card2): Horas por semana (.cols) */}
+      {/* Card 2 (.card2): Horas reais por semana */}
       <View style={[styles.card2, { backgroundColor: colors.bg, borderColor: colors.line }]}>
         <Text style={[styles.eyebrow, { color: colors.muted }]}>
           Horas por semana
         </Text>
 
-        <View style={styles.cols}>
-          {monthWeeks.map((w, idx) => {
-            const barHeight = Math.max(8, (w.h / maxH) * 64);
-            return (
-              <View key={idx} style={styles.colItem}>
-                <Text style={[styles.colValue, { color: colors.ink }]}>
-                  {w.h.toFixed(1)}h
-                </Text>
-                <View
-                  style={[
-                    styles.colBar,
-                    {
-                      height: barHeight,
-                      backgroundColor: w.cur ? colors.blue : colors.line,
-                    },
-                  ]}
-                />
-                <Text style={[styles.colLabel, { color: colors.muted }]}>
-                  {w.l}
-                </Text>
-              </View>
-            );
-          })}
-        </View>
+        {!hasData || effectiveWeeks.length === 0 || effectiveWeeks.every((w) => w.h === 0) ? (
+          <View style={styles.emptyWeeksContainer}>
+            <MaterialIcons name="bar-chart" size={28} color={colors.muted} />
+            <Text style={[styles.emptyWeeksTitle, { color: colors.ink }]}>
+              Dados insuficientes no ciclo
+            </Text>
+            <Text style={[styles.emptyWeeksSub, { color: colors.muted }]}>
+              Nenhum evento registrado com carga horária neste mês.
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.cols}>
+            {effectiveWeeks.map((w, idx) => {
+              const barHeight = w.h > 0 ? Math.max(8, (w.h / maxH) * 64) : 4;
+              return (
+                <View key={idx} style={styles.colItem}>
+                  <Text style={[styles.colValue, { color: colors.ink }]}>
+                    {w.h > 0 ? `${w.h.toFixed(1)}h` : '0h'}
+                  </Text>
+                  <View
+                    style={[
+                      styles.colBar,
+                      {
+                        height: barHeight,
+                        backgroundColor: w.cur ? colors.blue : w.h > 0 ? colors.ink : colors.line,
+                      },
+                    ]}
+                  />
+                  <Text style={[styles.colLabel, { color: colors.muted }]}>
+                    {w.l}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+        )}
       </View>
 
       {/* Card 3 (.card2): Equilíbrio de Vida (.tl + .leg) */}
@@ -171,7 +202,8 @@ export const MonthlySummarySection: React.FC<MonthlySummarySectionProps> = ({
         <View style={styles.vsugBody}>
           <Text style={[styles.vsugEyebrow, { color: colors.muted }]}>VITO</Text>
           <Text style={[styles.vsugText, { color: colors.ink }]}>
-            {diagnosisText || 'Ciclo com demandas ativas. Mantenha o alinhamento semanal para priorizar o que realmente move o ponteiro.'}
+            {diagnosisText ||
+              'Ciclo com demandas ativas. Mantenha o alinhamento semanal para priorizar o que realmente move o ponteiro.'}
           </Text>
           {onAlignWeek && (
             <View style={styles.vsugButtons}>
@@ -289,6 +321,21 @@ const styles = StyleSheet.create({
   colLabel: {
     fontSize: 11,
     marginTop: 2,
+  },
+  emptyWeeksContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
+    gap: 6,
+  },
+  emptyWeeksTitle: {
+    fontSize: 13.5,
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  emptyWeeksSub: {
+    fontSize: 12,
+    textAlign: 'center',
   },
   lifeBar: {
     flexDirection: 'row',

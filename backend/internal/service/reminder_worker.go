@@ -6,9 +6,19 @@ import (
 	"strings"
 	"sync"
 	"time"
+	_ "time/tzdata"
 
 	"github.com/andrevmp/vito/backend/internal/domain"
 )
+
+// defaultReminderLocation retorna o fuso de São Paulo com fallback para BRT fixo.
+func defaultReminderLocation() *time.Location {
+	loc, err := time.LoadLocation("America/Sao_Paulo")
+	if err != nil {
+		return time.FixedZone("BRT", -3*3600)
+	}
+	return loc
+}
 
 // ReminderWorker monitora compromissos iminentes e despacha notificações push ativas.
 type ReminderWorker struct {
@@ -108,7 +118,7 @@ func (w *ReminderWorker) CheckAndDispatchReminders(now time.Time) (int, error) {
 			if emoji != "" {
 				title = fmt.Sprintf("%s %s", emoji, event.Title)
 			}
-			timeStr := event.StartAt.Local().Format("15:04")
+			timeStr := event.StartAt.In(defaultReminderLocation()).Format("15:04")
 			body := fmt.Sprintf("Começa às %s", timeStr)
 			if event.Location != "" {
 				body += fmt.Sprintf(" em %s", event.Location)

@@ -311,7 +311,7 @@ func (s *CalendarSyncService) SyncIntegration(ctx context.Context, userID, provi
 				evt.Category = cat
 				evt.Color = col
 				evt.UpdatedAt = now
-				_ = s.eventRepo.Create(evt) // Inserção/atualização por ID
+				_ = s.eventRepo.Update(evt) // Inserção/atualização por ID
 			}
 
 			mapping.ContentHash = itemHash

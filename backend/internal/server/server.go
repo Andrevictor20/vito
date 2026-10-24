@@ -324,6 +324,7 @@ func (s *Server) registerRoutes() {
 						gr.Post("/scan", s.gmailHandler.ScanEmails)
 						gr.Delete("/disconnect", s.gmailHandler.Disconnect)
 						gr.Post("/draft", s.gmailHandler.CreateDraft)
+						gr.Post("/send", s.gmailHandler.SendEmail)
 					})
 				}
 

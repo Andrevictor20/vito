@@ -18,7 +18,7 @@ export const ProfileConnectionsGrid: React.FC<ProfileConnectionsGridProps> = ({
   onPressCalendar,
   onPressGmail,
   onPressWhatsApp,
-  calendarActive = true,
+  calendarActive = false,
   gmailActive = false,
   whatsAppActive = false,
 }) => {

@@ -225,3 +225,57 @@ func TestGmailHandler_CreateDraft(t *testing.T) {
 		t.Errorf("draft_id esperado 'draft-12345', obteve '%s'", resp.Data["draft_id"])
 	}
 }
+
+func TestGmailHandler_SendEmail(t *testing.T) {
+	h, repo, svc, userID := setupGmailHandlerTest(t)
+
+	mockGmail := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/gmail/v1/users/me/messages/send" || r.Method != http.MethodPost {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]string{
+			"id": "sent-12345",
+		})
+	}))
+	defer mockGmail.Close()
+
+	svc.SetBaseURL(mockGmail.URL)
+
+	credsPayload, _ := json.Marshal(map[string]interface{}{
+		"access_token": "valid-token",
+	})
+	encKey := "test-enc-key-32-chars-long-12345"
+	encCreds, _ := crypto.Encrypt(string(credsPayload), encKey)
+
+	_ = repo.Upsert(context.Background(), &domain.GmailIntegration{
+		ID:                   "g-send",
+		UserID:               userID,
+		AccountEmail:         "andre@gmail.com",
+		EncryptedCredentials: encCreds,
+		Status:               domain.GmailStatusActive,
+	})
+
+	bodyJSON := `{"to": "dest@example.com", "subject": "Teste Envio", "body": "Olá mundo enviado"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/integrations/gmail/send", bytes.NewBufferString(bodyJSON))
+	req.Header.Set("Content-Type", "application/json")
+	ctx := context.WithValue(req.Context(), middleware.UserIDKey, userID)
+	req = req.WithContext(ctx)
+	w := httptest.NewRecorder()
+
+	h.SendEmail(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("esperava status 200, obteve %d (%s)", w.Code, w.Body.String())
+	}
+
+	var resp struct {
+		MessageID string            `json:"message_id"`
+		Data      map[string]string `json:"data"`
+	}
+	_ = json.NewDecoder(w.Body).Decode(&resp)
+	if resp.MessageID != "sent-12345" || resp.Data["message_id"] != "sent-12345" {
+		t.Errorf("message_id esperado 'sent-12345', obteve '%s'", resp.Data["message_id"])
+	}
+}

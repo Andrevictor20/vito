@@ -54,6 +54,19 @@ type ChatMessagePayload struct {
 	Text   string `json:"text"`
 }
 
+func convertHistory(history []ChatMessagePayload) []ai.ChatMessageContext {
+	var convHistory []ai.ChatMessageContext
+	for _, h := range history {
+		if strings.TrimSpace(h.Text) != "" {
+			convHistory = append(convHistory, ai.ChatMessageContext{
+				Sender: h.Sender,
+				Text:   h.Text,
+			})
+		}
+	}
+	return convHistory
+}
+
 type assistantChatRequest struct {
 	Text             string               `json:"text,omitempty"`
 	Prompt           string               `json:"prompt,omitempty"`
@@ -117,16 +130,7 @@ func (h *AssistantHandler) Chat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	nowRef, tz := parseClientNow(req.CurrentLocalTime, req.Timezone)
-
-	var convHistory []ai.ChatMessageContext
-	for _, h := range req.History {
-		if strings.TrimSpace(h.Text) != "" {
-			convHistory = append(convHistory, ai.ChatMessageContext{
-				Sender: h.Sender,
-				Text:   h.Text,
-			})
-		}
-	}
+	convHistory := convertHistory(req.History)
 
 	input := ai.UserInput{
 		Text:                 rawText,
@@ -171,15 +175,19 @@ func (h *AssistantHandler) AudioChat(w http.ResponseWriter, r *http.Request) {
 	var mime string
 	var clientTime string
 	var tzVal string
+	var historyPayload []ChatMessagePayload
+	var focusMode string
 
 	contentType := r.Header.Get("Content-Type")
 	if strings.Contains(contentType, "application/json") {
 		var req struct {
-			AudioB64         string `json:"audio_b64"`
-			AudioMime        string `json:"audio_mime,omitempty"`
-			Filename         string `json:"filename,omitempty"`
-			Timezone         string `json:"timezone,omitempty"`
-			CurrentLocalTime string `json:"current_local_time,omitempty"`
+			AudioB64         string               `json:"audio_b64"`
+			AudioMime        string               `json:"audio_mime,omitempty"`
+			Filename         string               `json:"filename,omitempty"`
+			Timezone         string               `json:"timezone,omitempty"`
+			CurrentLocalTime string               `json:"current_local_time,omitempty"`
+			History          []ChatMessagePayload `json:"history,omitempty"`
+			FocusMode        string               `json:"focus_mode,omitempty"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, `{"error":"payload JSON inválido"}`, http.StatusBadRequest)
@@ -202,6 +210,8 @@ func (h *AssistantHandler) AudioChat(w http.ResponseWriter, r *http.Request) {
 		mime = req.AudioMime
 		clientTime = req.CurrentLocalTime
 		tzVal = req.Timezone
+		historyPayload = req.History
+		focusMode = req.FocusMode
 	} else {
 		if err := r.ParseMultipartForm(25 << 20); err != nil {
 			http.Error(w, `{"error":"falha ao processar formulário multipart: `+err.Error()+`"}`, http.StatusBadRequest)
@@ -228,6 +238,10 @@ func (h *AssistantHandler) AudioChat(w http.ResponseWriter, r *http.Request) {
 		mime = header.Header.Get("Content-Type")
 		clientTime = r.FormValue("current_local_time")
 		tzVal = r.FormValue("timezone")
+		focusMode = r.FormValue("focus_mode")
+		if rawHist := r.FormValue("history"); rawHist != "" {
+			_ = json.Unmarshal([]byte(rawHist), &historyPayload)
+		}
 	}
 
 	var transcript string
@@ -240,6 +254,7 @@ func (h *AssistantHandler) AudioChat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	nowRef, tz := parseClientNow(clientTime, tzVal)
+	convHistory := convertHistory(historyPayload)
 
 	if err != nil || strings.TrimSpace(transcript) == "" || strings.TrimSpace(transcript) == "." {
 		if err != nil {
@@ -251,17 +266,21 @@ func (h *AssistantHandler) AudioChat(w http.ResponseWriter, r *http.Request) {
 			mime = "audio/m4a"
 		}
 		input = ai.UserInput{
-			Text:      "Ouça atentamente esta mensagem de voz e extraia compromissos para a agenda ou tarefas a realizar.",
-			AudioB64:  base64.StdEncoding.EncodeToString(fileBytes),
-			AudioMime: mime,
-			Timezone:  tz,
-			Now:       nowRef,
+			Text:                "Ouça atentamente esta mensagem de voz e extraia compromissos para a agenda ou tarefas a realizar.",
+			AudioB64:            base64.StdEncoding.EncodeToString(fileBytes),
+			AudioMime:           mime,
+			Timezone:            tz,
+			Now:                 nowRef,
+			ConversationHistory: convHistory,
+			FocusMode:           focusMode,
 		}
 	} else {
 		input = ai.UserInput{
-			Text:     transcript,
-			Timezone: tz,
-			Now:      nowRef,
+			Text:                transcript,
+			Timezone:            tz,
+			Now:                 nowRef,
+			ConversationHistory: convHistory,
+			FocusMode:           focusMode,
 		}
 	}
 	input.ConversationWindow = h.whatsappWindow(r.Context(), userID, input.Text)
@@ -304,21 +323,24 @@ func (h *AssistantHandler) VisionChat(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, 25<<20) // 25MB
 
 	var imageB64 string
-
 	var mime string
 	var prompt string
 	var clientTime string
 	var tzVal string
+	var historyPayload []ChatMessagePayload
+	var focusMode string
 
 	contentType := r.Header.Get("Content-Type")
 	if strings.Contains(contentType, "application/json") {
 		var req struct {
-			ImageB64         string `json:"image_b64"`
-			ImageMime        string `json:"image_mime,omitempty"`
-			Prompt           string `json:"prompt,omitempty"`
-			Text             string `json:"text,omitempty"`
-			Timezone         string `json:"timezone,omitempty"`
-			CurrentLocalTime string `json:"current_local_time,omitempty"`
+			ImageB64         string               `json:"image_b64"`
+			ImageMime        string               `json:"image_mime,omitempty"`
+			Prompt           string               `json:"prompt,omitempty"`
+			Text             string               `json:"text,omitempty"`
+			Timezone         string               `json:"timezone,omitempty"`
+			CurrentLocalTime string               `json:"current_local_time,omitempty"`
+			History          []ChatMessagePayload `json:"history,omitempty"`
+			FocusMode        string               `json:"focus_mode,omitempty"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, `{"error":"payload JSON inválido"}`, http.StatusBadRequest)
@@ -339,6 +361,8 @@ func (h *AssistantHandler) VisionChat(w http.ResponseWriter, r *http.Request) {
 		}
 		clientTime = req.CurrentLocalTime
 		tzVal = req.Timezone
+		historyPayload = req.History
+		focusMode = req.FocusMode
 	} else {
 		// Limite de 15MB para upload de imagem multipart
 		if err := r.ParseMultipartForm(15 << 20); err != nil {
@@ -373,6 +397,10 @@ func (h *AssistantHandler) VisionChat(w http.ResponseWriter, r *http.Request) {
 		}
 		clientTime = r.FormValue("current_local_time")
 		tzVal = r.FormValue("timezone")
+		focusMode = r.FormValue("focus_mode")
+		if rawHist := r.FormValue("history"); rawHist != "" {
+			_ = json.Unmarshal([]byte(rawHist), &historyPayload)
+		}
 	}
 
 	if prompt == "" {
@@ -395,11 +423,13 @@ func (h *AssistantHandler) VisionChat(w http.ResponseWriter, r *http.Request) {
 	nowRef, tzVision := parseClientNow(clientTime, tzVal)
 
 	input := ai.UserInput{
-		Text:      prompt,
-		ImageB64:  imageB64,
-		ImageMime: mime,
-		Timezone:  tzVision,
-		Now:       nowRef,
+		Text:                prompt,
+		ImageB64:            imageB64,
+		ImageMime:           mime,
+		Timezone:            tzVision,
+		Now:                 nowRef,
+		ConversationHistory: convertHistory(historyPayload),
+		FocusMode:           focusMode,
 	}
 	input.ConversationWindow = h.whatsappWindow(r.Context(), userID, prompt)
 	input.WhatsAppPrivateScope = true

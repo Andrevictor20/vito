@@ -109,3 +109,23 @@ func TestRequiresTrigger_OnlyChatsWithThirdParties(t *testing.T) {
 		}
 	}
 }
+
+func TestClassifyChat_BroadcastAndNewsletter(t *testing.T) {
+	cases := []struct {
+		name     string
+		jid      string
+		expected string
+	}{
+		{"status do WhatsApp", "status@broadcast", domain.WhatsAppChatKindBroadcast},
+		{"lista de transmissao", "123456789@broadcast", domain.WhatsAppChatKindBroadcast},
+		{"canal newsletter", "120363123456789@newsletter", domain.WhatsAppChatKindNewsletter},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			kind := service.ClassifyChat(tc.jid, "5511999998888", 0, false)
+			if kind != tc.expected {
+				t.Errorf("esperava %q para %s, obteve %q", tc.expected, tc.jid, kind)
+			}
+		})
+	}
+}

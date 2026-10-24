@@ -28,7 +28,7 @@ func BuildSystemPromptFromInput(input UserInput) string {
 		input.AutonomyMode,
 	)
 	// §8.5–8.6: blocos cognitivos opcionais (retrocompatível: vazios = sem bloco).
-	extra := CoreProfileBlock(input.CoreProfile) + BuildAppStateBlock(input.AppStateFlags) + ManualModuleFor(input.Text) + TriggerAlertsBlock(input.ActiveTriggerAlerts) + RecentEmailsBlock(input.RecentEmails) + FocusModeBlock(input.FocusMode) + CoTInstruction()
+	extra := CoreProfileBlock(input.CoreProfile) + BuildAppStateBlock(input.AppStateFlags) + ManualModuleFor(input.Text) + TriggerAlertsBlock(input.ActiveTriggerAlerts) + RecentEmailsBlock(input.RecentEmails) + GmailAssistantDirectives(input.AppStateFlags, input.RecentEmails) + FocusModeBlock(input.FocusMode) + CoTInstruction()
 	extra += QuotedContextBlock(input.QuotedContext) + ConversationWindowBlock(input.ConversationWindow) + WhatsAppContextDirectives(input.QuotedContext, input.ConversationWindow)
 	extra += ContactDirectoryBlock(input.ContactDirectory) + PendingConversationsBlock(input.PendingConversations) + WhatsAppAssistantDirectives(input.ContactDirectory, input.PendingConversations)
 	if extra == CoTInstruction() {

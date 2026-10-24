@@ -23,6 +23,13 @@ func ClassifyChat(remoteJID, myPhone string, groupParticipants int, participants
 		return domain.WhatsAppChatKindDirect
 	}
 
+	if strings.HasSuffix(jid, "@broadcast") || jid == "status@broadcast" {
+		return domain.WhatsAppChatKindBroadcast
+	}
+	if strings.HasSuffix(jid, "@newsletter") {
+		return domain.WhatsAppChatKindNewsletter
+	}
+
 	if strings.HasSuffix(jid, "@g.us") {
 		if participantsFresh && groupParticipants == 1 {
 			return domain.WhatsAppChatKindSelfGroup

@@ -72,7 +72,7 @@ func (w *TodoReminderWorker) CheckAndDispatchReminders(now time.Time) (int, erro
 
 			timeStr := ""
 			if todo.DueDate != nil {
-				timeStr = todo.DueDate.Local().Format("15:04")
+				timeStr = todo.DueDate.In(defaultReminderLocation()).Format("15:04")
 			}
 			body := "Prazo se aproximando"
 			if timeStr != "" {

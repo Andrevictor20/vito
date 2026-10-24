@@ -2,6 +2,7 @@ package ai
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -198,4 +199,48 @@ func TestGeminiProvider_ParseIntent_AudioOnlyInjectsPrompt(t *testing.T) {
 		t.Errorf("ação esperada %s, obteve %s", ActionCreateEvent, intent.Action)
 	}
 	_ = capturedBody
+}
+
+func TestGeminiProvider_GenerateText_ThinkingBudgetZero(t *testing.T) {
+	var capturedReq geminiRequest
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&capturedReq)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{
+			"candidates": [
+				{
+					"content": {
+						"parts": [
+							{
+								"text": "Síntese executiva gerada com sucesso."
+							}
+						]
+					}
+				}
+			]
+		}`))
+	}))
+	defer server.Close()
+
+	p := &GeminiProvider{
+		apiKey:     "test-key",
+		model:      "gemini-2.5-flash",
+		baseURL:    server.URL,
+		httpClient: server.Client(),
+	}
+
+	res, err := p.GenerateText(context.Background(), "Você é um assistente executivo.", "Resuma as mensagens.")
+	if err != nil {
+		t.Fatalf("GenerateText falhou: %v", err)
+	}
+	if res != "Síntese executiva gerada com sucesso." {
+		t.Fatalf("resposta inesperada: %q", res)
+	}
+	if capturedReq.GenerationConfig.ThinkingConfig == nil {
+		t.Fatalf("esperava ThinkingConfig configurado para gemini-2.5-flash")
+	}
+	if capturedReq.GenerationConfig.ThinkingConfig.ThinkingBudget != 0 {
+		t.Errorf("esperava ThinkingBudget=0, obteve %d", capturedReq.GenerationConfig.ThinkingConfig.ThinkingBudget)
+	}
 }

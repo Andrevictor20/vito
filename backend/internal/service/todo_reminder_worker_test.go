@@ -187,3 +187,59 @@ func TestTodoReminderWorker_CheckAndDispatchReminders(t *testing.T) {
 		t.Errorf("esperava 0 lembretes na segunda execução, obteve %d", dispatchedSecond)
 	}
 }
+
+func TestTodoReminderWorker_NotificationTimezone_SaoPaulo(t *testing.T) {
+	var receivedMessages []service.PushMessage
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var msgs []service.PushMessage
+		if err := json.NewDecoder(r.Body).Decode(&msgs); err == nil {
+			receivedMessages = append(receivedMessages, msgs...)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"data":[{"status":"ok"}]}`))
+	}))
+	defer server.Close()
+
+	tokenRepo := &mockDeviceTokenRepo{
+		tokens: []domain.DeviceToken{
+			{ID: "dt-1", UserID: "user-1", Token: "ExponentPushToken[user1]", Platform: "android"},
+		},
+	}
+
+	notifSvc := service.NewNotificationService(tokenRepo, server.Client())
+	notifSvc.SetExpoAPIURL(server.URL)
+
+	// Prazo da tarefa às 12:00 BRT (15:00 UTC)
+	dueUTC := time.Date(2026, 10, 11, 15, 0, 0, 0, time.UTC)
+	now := dueUTC.Add(-10 * time.Minute) // 14:50 UTC
+
+	todoRepo := &mockReminderTodoRepo{
+		todos: []domain.Todo{
+			{
+				ID:        "todo-tz",
+				UserID:    "user-1",
+				Title:     "Enviar relatório financeiro",
+				DueDate:   &dueUTC,
+				Status:    domain.TodoStatusPending,
+				CreatedAt: now,
+				UpdatedAt: now,
+			},
+		},
+	}
+
+	worker := service.NewTodoReminderWorker(todoRepo, notifSvc, 15*time.Minute)
+	_, err := worker.CheckAndDispatchReminders(now)
+	if err != nil {
+		t.Fatalf("erro ao despachar: %v", err)
+	}
+
+	if len(receivedMessages) != 1 {
+		t.Fatalf("esperava 1 push, obteve %d", len(receivedMessages))
+	}
+
+	expectedBody := "Prazo às 12:00"
+	if receivedMessages[0].Body != expectedBody {
+		t.Errorf("esperava %q, obteve %q", expectedBody, receivedMessages[0].Body)
+	}
+}

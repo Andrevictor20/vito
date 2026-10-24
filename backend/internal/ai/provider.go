@@ -34,6 +34,8 @@ const (
 	ActionDraftReply               IntentAction = "DRAFT_REPLY"
 	ActionSendWhatsAppMessage      IntentAction = "SEND_WHATSAPP_MESSAGE"
 	ActionCreateReplyReminder      IntentAction = "CREATE_REPLY_REMINDER"
+	ActionDraftEmail               IntentAction = "DRAFT_EMAIL"
+	ActionSendEmail                IntentAction = "SEND_EMAIL"
 	ActionNeedsClarification       IntentAction = "NEEDS_CLARIFICATION"
 	ActionOutOfScope               IntentAction = "OUT_OF_SCOPE"
 
@@ -211,6 +213,13 @@ type ParsedWhatsAppMessage struct {
 	Text string `json:"text"` // texto a enviar
 }
 
+// ParsedEmailMessage representa um e-mail a ser rascunhado ou enviado via Gmail.
+type ParsedEmailMessage struct {
+	To      string `json:"to"`
+	Subject string `json:"subject"`
+	Body    string `json:"body"`
+}
+
 // ParsedReplyReminder é um lembrete de resposta a uma conversa.
 type ParsedReplyReminder struct {
 	Chat string    `json:"chat"`           // nome do contato
@@ -315,6 +324,7 @@ type ParsedIntent struct {
 	MeetingUpdate     *ParsedMeetingUpdate       `json:"meeting_update,omitempty"`
 	Conversation      *ParsedConversationQuery   `json:"conversation,omitempty"`
 	WhatsAppMessage   *ParsedWhatsAppMessage     `json:"whatsapp_message,omitempty"`
+	EmailMessage      *ParsedEmailMessage        `json:"email_message,omitempty"`
 	ReplyReminder     *ParsedReplyReminder       `json:"reply_reminder,omitempty"`
 	TriggerQuery      *ParsedTriggerQuery        `json:"trigger_query,omitempty"`
 	PendingQuery      *ParsedPendingQuery        `json:"pending_query,omitempty"`
@@ -341,7 +351,7 @@ func (p *ParsedIntent) IsEmpty() bool {
 		p.Pending == nil && p.Booking == nil && p.Meeting == nil &&
 		p.BookingQuery == nil && p.BookingUpdate == nil &&
 		p.MeetingQuery == nil && p.MeetingUpdate == nil &&
-		p.Conversation == nil && p.WhatsAppMessage == nil && p.ReplyReminder == nil &&
+		p.Conversation == nil && p.WhatsAppMessage == nil && p.EmailMessage == nil && p.ReplyReminder == nil &&
 		p.TriggerQuery == nil && p.PendingQuery == nil &&
 		p.MemoryQuery == nil && p.MemoryUpdate == nil && p.MemoryDelete == nil &&
 		p.ContactsQuery == nil &&

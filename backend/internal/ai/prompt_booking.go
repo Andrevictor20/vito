@@ -177,7 +177,7 @@ DIRETRIZ DE NÍVEL DE AUTONOMIA — ASSISTIDO (SECRETÁRIO CONSERVADOR):
 	sb.WriteString(`{
   "thought": "1. Verificar fuso/data atual; 2. Checar memórias relevantes; 3. Verificar conflitos; 4. Definir ação",
   "context_used": ["[categoria] trecho usado"],
-  "action": "CREATE_EVENT" | "UPDATE_EVENT" | "DELETE_EVENT" | "CREATE_TODO" | "COMPLETE_TODO" | "DELETE_TODO" | "CREATE_PENDING_ITEM" | "CONVERT_PENDING_TO_EVENT" | "QUERY_SCHEDULE" | "QUERY_TODOS" | "CREATE_TRIGGER" | "CREATE_BOOKING_LINK" | "CANCEL_BOOKING_APPOINTMENT" | "CREATE_MEETING" | "SAVE_MEMORY" | "QUERY_CONVERSATION" | "SEARCH_CONVERSATIONS" | "LIST_PENDING_CONVERSATIONS" | "DRAFT_REPLY" | "SEND_WHATSAPP_MESSAGE" | "CREATE_REPLY_REMINDER" | "NEEDS_CLARIFICATION" | "GENERAL_CHAT",
+  "action": "CREATE_EVENT" | "UPDATE_EVENT" | "DELETE_EVENT" | "CREATE_TODO" | "COMPLETE_TODO" | "DELETE_TODO" | "CREATE_PENDING_ITEM" | "CONVERT_PENDING_TO_EVENT" | "QUERY_SCHEDULE" | "QUERY_TODOS" | "CREATE_TRIGGER" | "CREATE_BOOKING_LINK" | "CANCEL_BOOKING_APPOINTMENT" | "CREATE_MEETING" | "SAVE_MEMORY" | "QUERY_CONVERSATION" | "SEARCH_CONVERSATIONS" | "LIST_PENDING_CONVERSATIONS" | "DRAFT_REPLY" | "SEND_WHATSAPP_MESSAGE" | "CREATE_REPLY_REMINDER" | "DRAFT_EMAIL" | "SEND_EMAIL" | "NEEDS_CLARIFICATION" | "GENERAL_CHAT",
   "event": {
     "title": "Título conciso do evento",
     "description": "Detalhes mencionados se houver",
@@ -299,6 +299,11 @@ DIRETRIZ DE NÍVEL DE AUTONOMIA — ASSISTIDO (SECRETÁRIO CONSERVADOR):
     "limit": número máximo (opcional),
     "scope": "private | all (opcional)"
   },
+  "email_message": {
+    "to": "destinatario@dominio.com",
+    "subject": "Assunto do e-mail",
+    "body": "Corpo completo do e-mail"
+  },
   "memory_category": "família" | "preferência" | "trabalho" | "saúde" | "rotina" | "geral",
   "memory_content": "Fato duradouro, preferência, rotina ou aprendizado sobre o usuário (ou vazio)",
   "additional_actions": [
@@ -387,11 +392,9 @@ DIRETRIZES DE AÇÃO OPERACIONAL:
        * "ative/desative o booking Café", "mude booking Reunião para 45 min", "estenda validade do link"
          => "UPDATE_BOOKING" + "booking_update": {target_query, is_active, duration_minutes, start_hour, end_hour, days_of_week, valid_until}
      - REGRAS CRÍTICAS:
-       * "booking" / "link" / "janela" / "disponibilizar" / "marquem comigo" = SEMPRE CREATE_BOOKING_LINK
-       * "reunião em grupo" / "votação" / "consenso" / "enquete" = SEMPRE CREATE_MEETING (mode=group_consensus)
-       * NUNCA use CREATE_EVENT para agendamento compartilhado/booking
-       * Default days_of_week = "[1,2,3,4,5,6,7]" (7 dias). "[1,2,3,4,5]" = dias úteis. "[6,7]" = fim de semana.
-       * Default duration_minutes = 30. Default valid_until = hoje + 7 dias.
+       * NUNCA use CREATE_EVENT para agendamento compartilhado/booking.
+       * Default days_of_week = "[1,2,3,4,5,6,7]" (7 dias; [1..5]=úteis; [6,7]=fim de semana).
+       * Default duration_minutes = 30; valid_until = hoje + 7 dias.
        * UPDATE_BOOKING: use target_query (nome/slug/ID) + campos a alterar.
 
   11. CONSULTA E ATUALIZAÇÃO DE RADARES (QUERY_TRIGGERS):

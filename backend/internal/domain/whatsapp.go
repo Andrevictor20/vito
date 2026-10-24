@@ -45,10 +45,12 @@ type WhatsAppRepository interface {
 
 // Tipos de conversa: definem quais contextos podem ser cruzados (ver SPEC §2.1).
 const (
-	WhatsAppChatKindSelf      = "self"       // conversa comigo mesmo ("Você")
-	WhatsAppChatKindSelfGroup = "self_group" // grupo do WhatsApp com apenas o usuário
-	WhatsAppChatKindGroup     = "group"      // grupo com outras pessoas
-	WhatsAppChatKindDirect    = "direct"     // 1-on-1 com terceiro
+	WhatsAppChatKindSelf       = "self"       // conversa comigo mesmo ("Você")
+	WhatsAppChatKindSelfGroup  = "self_group" // grupo do WhatsApp com apenas o usuário
+	WhatsAppChatKindGroup      = "group"      // grupo com outras pessoas
+	WhatsAppChatKindDirect     = "direct"     // 1-on-1 com terceiro
+	WhatsAppChatKindBroadcast  = "broadcast"  // status e listas de transmissão (@broadcast, status@broadcast)
+	WhatsAppChatKindNewsletter = "newsletter" // canais e newsletters (@newsletter)
 )
 
 // Escopos de contexto configuráveis pelo usuário (SPEC §6.2).
@@ -166,6 +168,10 @@ type WhatsAppConversationRepository interface {
 	SaveAlias(ctx context.Context, userID, chatJID, alias string) error
 	// AliasesByName devolve os JIDs que respondem a um apelido.
 	AliasesByName(ctx context.Context, userID, alias string) ([]string, error)
+	// DeleteAlias remove um apelido aprendido específico.
+	DeleteAlias(ctx context.Context, userID, chatJID, alias string) error
+	// DeleteAliasesByName remove apelidos aprendidos pelo nome do alias.
+	DeleteAliasesByName(ctx context.Context, userID, alias string) error
 	// ChatLabels devolve o rótulo atual de cada conversa (JID -> chat_label).
 	ChatLabels(ctx context.Context, userID string) (map[string]string, error)
 	// SaveSavedNames persiste o nome SALVO no rótulo das conversas cujo número

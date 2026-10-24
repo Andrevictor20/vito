@@ -148,11 +148,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose }) =
                 <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-[#181C22] border border-zinc-200 dark:border-[#262B33] flex items-center justify-between">
                   <div className="flex items-center gap-4">
                     <div className="w-14 h-14 rounded-full bg-indigo-600 text-white font-bold text-xl flex items-center justify-center shadow-md">
-                      {user?.name ? user.name[0].toUpperCase() : 'A'}
+                      {user?.name ? user.name[0].toUpperCase() : 'U'}
                     </div>
                     <div>
                       <h5 className="text-base font-bold text-zinc-900 dark:text-white">
-                        {user?.name || 'ANDRE VICTOR'}
+                        {user?.name || 'Usuário'}
                       </h5>
                       <p className="text-xs text-zinc-500 dark:text-zinc-400">
                         Seu perfil público e identificação no Vito
@@ -173,7 +173,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose }) =
                       <span>E-mail cadastrado</span>
                     </div>
                     <p className="text-sm font-semibold text-zinc-900 dark:text-white truncate">
-                      {user?.email || 'victorandre280@gmail.com'}
+                      {user?.email || 'Sem e-mail cadastrado'}
                     </p>
                   </div>
 
@@ -183,7 +183,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose }) =
                       <span>Nome de usuário</span>
                     </div>
                     <p className="text-sm font-semibold text-zinc-900 dark:text-white truncate">
-                      {(user?.email || 'victorandre280').split('@')[0]}@vito.ai
+                      {user?.email ? `${user.email.split('@')[0]}@vito.ai` : 'usuario@vito.ai'}
                     </p>
                   </div>
                 </div>
@@ -200,10 +200,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose }) =
                         <GoogleIcon size={18} />
                         <div>
                           <p className="text-xs font-semibold text-zinc-900 dark:text-white">Google OAuth</p>
-                          <p className="text-[11px] text-zinc-500 dark:text-zinc-400">{user?.email || 'victorandre280@gmail.com'}</p>
+                          <p className="text-[11px] text-zinc-500 dark:text-zinc-400">{user?.email || 'Login unificado com Google'}</p>
                         </div>
                       </div>
-                      <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">Conectado ✓</span>
+                      <span className={`text-xs font-medium ${user?.email ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-400'}`}>
+                        {user?.email ? 'Conectado ✓' : 'Não conectado'}
+                      </span>
                     </div>
 
                     <div className="p-3.5 flex items-center justify-between">
@@ -214,7 +216,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose }) =
                           <p className="text-[11px] text-zinc-500 dark:text-zinc-400">{user?.phone || 'Autenticação sem senha via código'}</p>
                         </div>
                       </div>
-                      <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Ativo</span>
+                      <span className={`text-xs font-medium ${user?.phone ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-400'}`}>
+                        {user?.phone ? 'Ativo' : 'Não vinculado'}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -246,10 +250,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose }) =
                       <GoogleIcon size={20} />
                       <div>
                         <p className="text-xs font-bold text-zinc-900 dark:text-white">Google Calendar</p>
-                        <p className="text-[11px] text-zinc-500 dark:text-zinc-400">{user?.email || 'victorandre280@gmail.com'}</p>
+                        <p className="text-[11px] text-zinc-500 dark:text-zinc-400">{user?.email || 'Não configurado'}</p>
                       </div>
                     </div>
-                    <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">1 Conectado</span>
+                    <span className={`text-xs font-bold ${user?.email ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-400'}`}>
+                      {user?.email ? '1 Conectado' : 'Desconectado'}
+                    </span>
                   </div>
                 </div>
 
@@ -264,11 +270,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose }) =
                       <div>
                         <p className="text-xs font-bold text-zinc-900 dark:text-white">Gmail (Boletos, Faturas & Voos)</p>
                         <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                          {gmailStatus?.email ? `Varredura ativa (${gmailStatus.email})` : 'Varredura ativa conectada ao Google'}
+                          {gmailStatus?.connected
+                            ? `Varredura ativa (${gmailStatus.email || user?.email || 'conectado'})`
+                            : 'Nenhum e-mail vinculado'}
                         </p>
                       </div>
                     </div>
-                    <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">Ativo</span>
+                    <span className={`text-xs font-bold ${gmailStatus?.connected ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-400'}`}>
+                      {gmailStatus?.connected ? 'Ativo' : 'Desconectado'}
+                    </span>
                   </div>
                 </div>
 
@@ -285,8 +295,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose }) =
                         <p className="text-[11px] text-zinc-500 dark:text-zinc-400">Pronto para responder menções em grupos e conversas privadas</p>
                       </div>
                     </div>
-                    <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                      {waStatus?.connected ? 'Conectado' : 'Conectado'}
+                    <span className={`text-xs font-bold ${waStatus?.connected ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-400'}`}>
+                      {waStatus?.connected ? 'Conectado' : 'Desconectado'}
                     </span>
                   </div>
                 </div>

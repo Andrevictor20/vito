@@ -1,9 +1,7 @@
 package service
 
 import (
-	"bytes"
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -427,69 +425,4 @@ func (s *GmailService) ScanEmailsWithOptions(ctx context.Context, userID string,
 // ScanEmails busca e faz a triagem padrão da Caixa Principal.
 func (s *GmailService) ScanEmails(ctx context.Context, userID string) (*domain.GmailScanResult, error) {
 	return s.ScanEmailsWithOptions(ctx, userID, ScanOptions{Folder: "primary"})
-}
-
-// CreateDraft cria um rascunho de e-mail na conta do Gmail do usuário.
-func (s *GmailService) CreateDraft(ctx context.Context, userID, to, subject, bodyText string) (string, error) {
-	accessToken, err := s.GetValidAccessToken(ctx, userID)
-	if err != nil {
-		return "", err
-	}
-
-	rawEmail := fmt.Sprintf("To: %s\r\nSubject: %s\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n%s",
-		to, subject, bodyText,
-	)
-	encodedRaw := base64.URLEncoding.EncodeToString([]byte(rawEmail))
-
-	payload := map[string]interface{}{
-		"message": map[string]string{
-			"raw": encodedRaw,
-		},
-	}
-	reqBytes, _ := json.Marshal(payload)
-
-	draftURL := fmt.Sprintf("%s/gmail/v1/users/me/drafts", s.baseURL)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, draftURL, bytes.NewReader(reqBytes))
-	if err != nil {
-		return "", err
-	}
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := s.httpClient.Do(req)
-	if err != nil {
-		return "", err
-	}
-
-	if resp.StatusCode == http.StatusUnauthorized {
-		resp.Body.Close()
-		refreshedToken, refErr := s.forceRefreshToken(ctx, userID)
-		if refErr != nil {
-			_ = s.repo.UpdateStatus(ctx, userID, domain.GmailStatusReauthRequired)
-			return "", domain.ErrGmailAuthFailed
-		}
-		accessToken = refreshedToken
-		req, err = http.NewRequestWithContext(ctx, http.MethodPost, draftURL, bytes.NewReader(reqBytes))
-		if err != nil {
-			return "", err
-		}
-		req.Header.Set("Authorization", "Bearer "+accessToken)
-		req.Header.Set("Content-Type", "application/json")
-		resp, err = s.httpClient.Do(req)
-		if err != nil {
-			return "", err
-		}
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		respBody, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("falha ao criar rascunho (status %d): %s", resp.StatusCode, string(respBody))
-	}
-
-	var draftResp struct {
-		ID string `json:"id"`
-	}
-	_ = json.NewDecoder(resp.Body).Decode(&draftResp)
-	return draftResp.ID, nil
 }

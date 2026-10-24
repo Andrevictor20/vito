@@ -123,4 +123,29 @@ describe('GmailApi Unit Tests', () => {
     assert.equal(calls[0].opt?.method, 'POST');
     assert.equal(res.id, 'draft-1');
   });
+
+  test('sendEmail envia e-mail via POST /api/v1/integrations/gmail/send e normaliza message_id', async () => {
+    const calls: { ep: string; opt?: any }[] = [];
+    const client = {
+      request: async (ep: string, opt?: any) => {
+        calls.push({ ep, opt });
+        return { data: { message_id: 'msg-sent-99', message: 'Enviado pelo servidor' } };
+      },
+    } as unknown as ApiClient;
+
+    const api = new GmailApi(client);
+    const payload = {
+      to: 'destinatario@exemplo.com',
+      subject: 'Assunto de Teste',
+      body: 'Corpo do e-mail',
+    };
+    const res = await api.sendEmail(payload);
+
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].ep, '/api/v1/integrations/gmail/send');
+    assert.equal(calls[0].opt?.method, 'POST');
+    assert.equal(calls[0].opt?.body, JSON.stringify(payload));
+    assert.equal(res.id, 'msg-sent-99');
+    assert.equal(res.message, 'Enviado pelo servidor');
+  });
 });

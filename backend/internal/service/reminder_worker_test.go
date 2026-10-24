@@ -151,6 +151,58 @@ func TestReminderWorker_CheckAndDispatchReminders(t *testing.T) {
 	}
 }
 
+func TestReminderWorker_NotificationTimezone_SaoPaulo(t *testing.T) {
+	var receivedPush []service.PushMessage
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var msgs []service.PushMessage
+		_ = json.NewDecoder(r.Body).Decode(&msgs)
+		receivedPush = append(receivedPush, msgs...)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"data":[{"status":"ok"}]}`))
+	}))
+	defer server.Close()
+
+	tokenRepo := &mockDeviceTokenRepo{
+		tokens: []domain.DeviceToken{
+			{ID: "tok-1", UserID: "user-1", Token: "ExponentPushToken[user1]", Platform: "android"},
+		},
+	}
+	notifSvc := service.NewNotificationService(tokenRepo, server.Client())
+	notifSvc.SetExpoAPIURL(server.URL)
+
+	// Almoço às 12:00 BRT (15:00 UTC)
+	lunchStartUTC := time.Date(2026, 10, 8, 15, 0, 0, 0, time.UTC)
+	now := lunchStartUTC.Add(-10 * time.Minute) // 14:50 UTC
+	lunchEvent := domain.Event{
+		ID:        "evt-lunch",
+		UserID:    "user-1",
+		Title:     "Almoço",
+		StartAt:   lunchStartUTC,
+		EndAt:     lunchStartUTC.Add(time.Hour),
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	eventRepo := &mockReminderEventRepo{
+		events: []domain.Event{lunchEvent},
+	}
+
+	worker := service.NewReminderWorker(eventRepo, notifSvc, 15*time.Minute)
+	_, err := worker.CheckAndDispatchReminders(now)
+	if err != nil {
+		t.Fatalf("erro inesperado: %v", err)
+	}
+
+	if len(receivedPush) != 1 {
+		t.Fatalf("esperava 1 push, obteve %d", len(receivedPush))
+	}
+
+	expectedBody := "Começa às 12:00"
+	if receivedPush[0].Body != expectedBody {
+		t.Errorf("esperava %q, obteve %q", expectedBody, receivedPush[0].Body)
+	}
+}
+
 func TestReminderWorker_DualNotification_AdvanceAndStart(t *testing.T) {
 	var receivedPush []service.PushMessage
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

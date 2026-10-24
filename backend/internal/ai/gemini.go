@@ -327,15 +327,17 @@ func (p *GeminiProvider) GenerateText(ctx context.Context, systemPrompt, userPro
 		},
 	}
 
-	jsonBytes, err := json.Marshal(reqBody)
-	if err != nil {
-		return "", err
-	}
-
 	modelsToTry := geminiModelChain(p.model)
 	var lastErr error
 
 	for _, m := range modelsToTry {
+		reqBody.GenerationConfig.ThinkingConfig = thinkingConfigFor(m)
+
+		jsonBytes, err := json.Marshal(reqBody)
+		if err != nil {
+			return "", err
+		}
+
 		url := fmt.Sprintf("%s/v1beta/models/%s:generateContent?key=%s", base, m, p.apiKey)
 		req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonBytes))
 		if err != nil {

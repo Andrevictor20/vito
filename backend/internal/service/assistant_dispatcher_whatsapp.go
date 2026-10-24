@@ -16,6 +16,9 @@ import (
 // consultar conversas, listar pendências, rascunhar respostas, enviar
 // mensagens em nome do usuário e criar lembretes de resposta.
 func (s *AssistantService) executeWhatsAppAction(ctx context.Context, userID string, intent *ai.ParsedIntent, input ai.UserInput, res *AssistantResponse) (*AssistantResponse, error) {
+	if intent.Action != ai.ActionQueryConversation {
+		s.clearPendingContactAlias()
+	}
 	switch intent.Action {
 	case ai.ActionQueryConversation:
 		return s.actionQueryConversation(ctx, userID, intent, input, res)
@@ -107,6 +110,26 @@ func (s *AssistantService) summarizeFoundMessages(ctx context.Context, input ai.
 	}
 
 	question := fmt.Sprintf("O que o usuário quis saber sobre %q? Responda com base nos trechos encontrados, citando o remetente e a data quando houver.", query)
+
+	if tg, ok := s.aiGateway.(interface {
+		GenerateText(ctx context.Context, systemPrompt, userPrompt string) (string, error)
+	}); ok {
+		var b strings.Builder
+		b.WriteString(fmt.Sprintf("Trechos encontrados sobre %q:\n", query))
+		for _, w := range window {
+			b.WriteString(fmt.Sprintf("- [%s] %s: %s\n", w.Chat, w.Sender, w.Text))
+		}
+		b.WriteString("\n" + question)
+		sysPrompt := "Você é o assistente executivo Vito. Responda de forma direta, clara e concisa em português com base exclusivamente nos trechos fornecidos."
+		out, err := tg.GenerateText(ctx, sysPrompt, b.String())
+		if err == nil && strings.TrimSpace(out) != "" {
+			return strings.TrimSpace(out), nil
+		}
+		if err != nil {
+			return "", err
+		}
+	}
+
 	out, err := s.aiGateway.ParseIntent(ctx, ai.UserInput{
 		Text:               question,
 		Timezone:           input.Timezone,
@@ -164,7 +187,7 @@ func (s *AssistantService) actionQueryConversation(ctx context.Context, userID s
 		s.rememberUnknownContact(userID, intent.Conversation.Chat)
 		return s.replyChatResolutionError(intent, err), nil
 	}
-	s.learnContactAlias(ctx, userID, intent.Conversation.Chat, chat.ChatJID)
+	s.learnContactAlias(ctx, userID, input.Text, intent.Conversation.Chat, chat.ChatJID)
 
 	limit := intent.Conversation.Limit
 	if limit <= 0 {
@@ -191,46 +214,6 @@ func (s *AssistantService) actionQueryConversation(ctx context.Context, userID s
 	res.Message = summary
 	res.Reply = summary
 	return res, nil
-}
-
-// rememberUnknownContact guarda o nome que o Vito não conseguiu resolver.
-//
-// O fluxo: o usuário pergunta "o que a Isa mandou?" → o Vito não conhece "Isa"
-// → pergunta "não encontrei, qual o nome?" → o usuário responde "a Bella" → o
-// Vito resolve "Bella" e, com isso, APRENDE que "Isa" é a Bella.
-func (s *AssistantService) rememberUnknownContact(userID, query string) {
-	if s == nil || userID == "" || strings.TrimSpace(query) == "" {
-		return
-	}
-	s.aliasMu.Lock()
-	defer s.aliasMu.Unlock()
-	s.pendingAlias = &pendingContactAlias{userID: userID, query: strings.TrimSpace(query)}
-}
-
-// learnContactAlias grava o apelido aprendido (query → chat).
-func (s *AssistantService) learnContactAlias(ctx context.Context, userID, query, chatJID string) {
-	query = strings.TrimSpace(query)
-	if s == nil || userID == "" || query == "" || chatJID == "" {
-		return
-	}
-	s.aliasMu.Lock()
-	pending := s.pendingAlias
-	s.pendingAlias = nil
-	s.aliasMu.Unlock()
-	if pending == nil || pending.userID != userID || pending.query == "" {
-		return
-	}
-	if strings.EqualFold(pending.query, query) {
-		return // o próprio nome resolveu: nada a aprender
-	}
-	if s.waDirectory == nil {
-		return
-	}
-	if err := s.waDirectory.SaveAlias(ctx, userID, chatJID, pending.query); err != nil {
-		log.Printf("⚠️ [AssistantService] falha ao aprender o apelido %q: %v", pending.query, err)
-		return
-	}
-	log.Printf("🏷️ [AssistantService] apelido aprendido: %q -> %s", pending.query, chatJID)
 }
 
 // actionListPendingConversations lista as conversas que esperam resposta.
@@ -403,6 +386,26 @@ func (s *AssistantService) summarizeConversation(ctx context.Context, userID str
 	if text == "" {
 		text = fmt.Sprintf("Quais as últimas mensagens que %s enviou?", chat.ChatLabel)
 	}
+
+	if tg, ok := s.aiGateway.(interface {
+		GenerateText(ctx context.Context, systemPrompt, userPrompt string) (string, error)
+	}); ok {
+		var b strings.Builder
+		b.WriteString(fmt.Sprintf("Mensagens recentes da conversa com %s:\n", chat.ChatLabel))
+		for _, w := range window {
+			b.WriteString(fmt.Sprintf("- %s: %s\n", w.Sender, w.Text))
+		}
+		b.WriteString("\n" + text)
+		sysPrompt := "Você é o assistente executivo Vito. Responda de forma direta, clara e concisa em português com base exclusivamente nas mensagens fornecidas."
+		out, err := tg.GenerateText(ctx, sysPrompt, b.String())
+		if err == nil && strings.TrimSpace(out) != "" {
+			return strings.TrimSpace(out), nil
+		}
+		if err != nil {
+			return "", err
+		}
+	}
+
 	out, err := s.aiGateway.ParseIntent(ctx, ai.UserInput{
 		Text:               text,
 		Timezone:           input.Timezone,

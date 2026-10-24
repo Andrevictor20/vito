@@ -112,6 +112,36 @@ func (c *WhatsAppContactsCache) Alias(jid, principal string) string {
 	return ""
 }
 
+// HasContactNamed informa se existe algum contato salvo ou de perfil com este nome.
+func (c *WhatsAppContactsCache) HasContactNamed(name string) bool {
+	if c == nil || strings.TrimSpace(name) == "" {
+		return false
+	}
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	for _, n := range c.byJID {
+		if contactNameMatches(n.Saved, name) || contactNameMatches(n.Profile, name) {
+			return true
+		}
+	}
+	return false
+}
+
+// HasSavedName informa se existe algum contato salvo na agenda com este nome.
+func (c *WhatsAppContactsCache) HasSavedName(name string) bool {
+	if c == nil || strings.TrimSpace(name) == "" {
+		return false
+	}
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	for _, n := range c.byJID {
+		if contactNameMatches(n.Saved, name) {
+			return true
+		}
+	}
+	return false
+}
+
 // fetchByID tenta a outra variante do contrato (`where.id`) para cada JID
 // conhecido. É a via capaz de trazer o nome salvo do contato.
 //

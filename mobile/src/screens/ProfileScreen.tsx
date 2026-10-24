@@ -61,8 +61,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     if (user?.phone) setUserPhone(user.phone);
   }, [user?.phone]);
 
-  const name = user?.name || 'André Victor';
-  const email = user?.email || 'victorandre280@gmail.com';
+  const name = user?.name?.trim() || 'Usuário';
+  const email = user?.email?.trim() || 'Sem e-mail cadastrado';
   const appVersion = (appJson as { expo?: { version?: string; android?: { versionCode?: number } } })?.expo?.version ?? '1.0.0';
 
   const [autonomyMode, setAutonomyMode] = useState<AutonomyMode>('autonomous');
@@ -172,8 +172,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         onPressCalendar={() => setSyncVisible(true)}
         onPressGmail={() => setGmailVisible(true)}
         onPressWhatsApp={() => setWhatsAppVisible(true)}
-        calendarActive={calendarsActive !== null ? calendarsActive > 0 : true}
-        gmailActive={gmailStatus?.connected ?? true}
+        calendarActive={Boolean(calendarsActive && calendarsActive > 0)}
+        gmailActive={Boolean(gmailStatus?.connected)}
         whatsAppActive={whatsAppStatus === 'connected'}
       />
 
@@ -261,7 +261,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           </View>
           <Text style={[styles.liTitle, { color: colors.ink }]}>Dispositivos conectados</Text>
           <Text style={[styles.liMeta, { color: colors.muted }]}>
-            {sessionsCount !== null ? `${sessionsCount} ativos` : '2 ativos'}
+            {sessionsCount !== null ? `${sessionsCount} ${sessionsCount === 1 ? 'ativo' : 'ativos'}` : '1 ativo'}
           </Text>
           <MaterialIcons name="chevron-right" size={18} color={colors.muted} />
         </TouchableOpacity>

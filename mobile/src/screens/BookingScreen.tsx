@@ -30,13 +30,7 @@ import { BookingReceivedTab } from '../components/booking/BookingReceivedTab';
 import { MeetingPollDetailView } from '../components/booking/MeetingPollDetailView';
 import { BookingTypeModal } from '../components/booking/BookingTypeModal';
 import { bookingStyles as styles } from './BookingScreen.styles';
-
-let ClipboardModule: any = null;
-try {
-  ClipboardModule = require('expo-clipboard');
-} catch {
-  ClipboardModule = null;
-}
+import { copyToClipboard } from '../utils/clipboard';
 
 let NotificationsModule: any = null;
 try {
@@ -182,9 +176,7 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({
 
   const handleCopyLink = async (url: string) => {
     hapticFeedback.medium();
-    if (ClipboardModule?.setStringAsync) {
-      await ClipboardModule.setStringAsync(url);
-    }
+    await copyToClipboard(url);
   };
 
   const handleToggleActive = async (bt: BookingType) => {

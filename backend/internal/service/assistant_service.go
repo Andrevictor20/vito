@@ -71,8 +71,9 @@ type AssistantService struct {
 
 // pendingContactAlias é o nome de contato ainda não resolvido.
 type pendingContactAlias struct {
-	userID string
-	query  string
+	userID    string
+	query     string
+	createdAt time.Time
 }
 
 // NewAssistantService instancia o serviço do assistente.

@@ -92,6 +92,109 @@ func TestAssistantService_AprendeApelidoQuandoUsuarioConfirma(t *testing.T) {
 	}
 }
 
+// Bug Isa -> Pai: O Vito NUNCA pode aprender apelido se o usuário simplesmente
+// mudou de assunto e perguntou por outro contato em vez de desambiguar.
+func TestAssistantService_NaoAprendeApelidoQuandoUsuarioPerguntaOutroContato(t *testing.T) {
+	ctx := context.Background()
+	dir, convRepo, cleanup := setupDiretorioComNomes(t, "bella", "bella")
+	defer cleanup()
+
+	// Adiciona a conversa do Pai
+	jidPai := "5511988887777@s.whatsapp.net"
+	now := time.Now().UTC()
+	if err := convRepo.SaveMessage(ctx, &domain.WhatsAppConversationMessage{
+		ID: "dir-msg-pai", UserID: "user-dir-1", InstanceName: "inst",
+		ChatJID: jidPai, ChatKind: domain.WhatsAppChatKindDirect,
+		ChatLabel: "Pai", SenderName: "Pai", Kind: "text",
+		Text: "bênção meu filho", MessageTimestamp: now,
+	}); err != nil {
+		t.Fatalf("falha ao arquivar mensagem do Pai: %v", err)
+	}
+
+	ast := service.NewAssistantService(&mockGatewayIntent{intent: &ai.ParsedIntent{
+		Action:       ai.ActionQueryConversation,
+		Conversation: &ai.ParsedConversationQuery{Chat: "isa"},
+		Message:      "o que ela mandou?",
+	}}, nil, nil, nil)
+	ast.SetWhatsAppDirectory(dir)
+
+	// 1ª rodada: "isa" não existe → o Vito pergunta quem é.
+	res, err := ast.Process(ctx, "user-dir-1", ai.UserInput{Text: "o que a isa mandou?"})
+	if err != nil {
+		t.Fatalf("Process falhou: %v", err)
+	}
+	if res.Message == "" {
+		t.Fatal("esperava resposta pedindo esclarecimento")
+	}
+
+	// 2ª rodada: o usuário NÃO desambiguou! Ele perguntou sobre OUTRO contato ("o que o Pai mandou?")
+	gateway, ok := ast.AIGatewayForTest().(*mockGatewayIntent)
+	if !ok {
+		t.Fatal("esperava o gateway de teste")
+	}
+	gateway.intent = &ai.ParsedIntent{
+		Action:       ai.ActionQueryConversation,
+		Conversation: &ai.ParsedConversationQuery{Chat: "Pai"},
+		Message:      "o que ele mandou?",
+	}
+	if _, err := ast.Process(ctx, "user-dir-1", ai.UserInput{Text: "o que o Pai mandou?"}); err != nil {
+		t.Fatalf("Process (2ª rodada) falhou: %v", err)
+	}
+
+	// O apelido "isa" NUNCA pode ter sido aprendido apontando para o Pai!
+	_, err = dir.ResolveChat(ctx, "user-dir-1", "isa")
+	if err == nil {
+		t.Fatal("ERRO GRAVE: 'isa' foi indevidamente associada ao Pai!")
+	}
+}
+
+// Filtra e rejeita apelidos que coincidem com contatos reais existentes.
+func TestWhatsAppDirectory_FiltraELimpaApelidosCoincidentesComContatosReais(t *testing.T) {
+	ctx := context.Background()
+	dir, convRepo, cleanup := setupDiretorioComNomes(t, "bella", "bella")
+	defer cleanup()
+
+	jidPai := "5511988887777@s.whatsapp.net"
+	now := time.Now().UTC()
+	if err := convRepo.SaveMessage(ctx, &domain.WhatsAppConversationMessage{
+		ID: "dir-msg-pai-2", UserID: "user-dir-1", InstanceName: "inst",
+		ChatJID: jidPai, ChatKind: domain.WhatsAppChatKindDirect,
+		ChatLabel: "Pai", SenderName: "Pai", Kind: "text",
+		Text: "oi", MessageTimestamp: now,
+	}); err != nil {
+		t.Fatalf("falha ao salvar: %v", err)
+	}
+
+	// Tentar salvar alias "Pai" para o chat da Isa/Bella deve ser ignorado/rejeitado
+	// porque "Pai" é o nome de um contato real já existente.
+	if err := dir.SaveAlias(ctx, "user-dir-1", jidIsaSalvo, "Pai"); err != nil {
+		t.Fatalf("SaveAlias erro: %v", err)
+	}
+
+	// Se salvarmos diretamente no banco um alias espúrio "Pai" apontando para jidIsaSalvo:
+	if err := convRepo.SaveAlias(ctx, "user-dir-1", jidIsaSalvo, "Pai"); err != nil {
+		t.Fatalf("SaveAlias direto no repo: %v", err)
+	}
+
+	// Ao resolver "Pai", DEVE resolver para jidPai, e limpar o alias espúrio!
+	chat, err := dir.ResolveChat(ctx, "user-dir-1", "Pai")
+	if err != nil {
+		t.Fatalf("ResolveChat falhou: %v", err)
+	}
+	if chat.ChatJID != jidPai {
+		t.Fatalf("esperava resolver para jidPai (%s), mas resolveu para %s", jidPai, chat.ChatJID)
+	}
+
+	// O alias espúrio foi limpo do banco
+	aliases, err := convRepo.AliasesByName(ctx, "user-dir-1", "Pai")
+	if err != nil {
+		t.Fatalf("AliasesByName: %v", err)
+	}
+	if len(aliases) > 0 {
+		t.Errorf("o alias espúrio deveria ter sido limpo, mas ainda existem %d registros", len(aliases))
+	}
+}
+
 // mockGatewayIntent devolve a intenção configurada (mutável entre rodadas).
 type mockGatewayIntent struct {
 	intent *ai.ParsedIntent

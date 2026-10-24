@@ -96,6 +96,9 @@ func (r *WhatsAppConversationRepositorySQLite) RecentMessagesAcrossChats(ctx con
 		SELECT `+waConversationColumns+`
 		FROM whatsapp_conversation_messages
 		WHERE user_id = ? AND message_timestamp >= ?
+			AND chat_jid NOT LIKE '%@broadcast'
+			AND chat_jid NOT LIKE '%@newsletter'
+			AND chat_kind NOT IN ('broadcast', 'newsletter')
 		ORDER BY message_timestamp DESC
 		LIMIT ?
 	`, userID, since, limit)
@@ -140,6 +143,9 @@ func (r *WhatsAppConversationRepositorySQLite) RecentChats(ctx context.Context, 
 				COUNT(*) OVER (PARTITION BY chat_jid) AS total
 			FROM whatsapp_conversation_messages
 			WHERE user_id = ? AND message_timestamp >= ?
+				AND chat_jid NOT LIKE '%@broadcast'
+				AND chat_jid NOT LIKE '%@newsletter'
+				AND chat_kind NOT IN ('broadcast', 'newsletter')
 		)
 		WHERE rn = 1
 		ORDER BY message_timestamp DESC

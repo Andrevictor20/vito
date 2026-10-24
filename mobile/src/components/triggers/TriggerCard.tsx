@@ -1,7 +1,6 @@
 import React from 'react';
 import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import Svg, { Path } from 'react-native-svg';
 import { tokens } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { Trigger, TRIGGER_CATEGORIES, TriggerCategory } from '../../types';
@@ -71,14 +70,6 @@ export const TriggerCard: React.FC<TriggerCardProps> = ({
     return 'O Vito está vigiando ativamente este radar';
   };
 
-  const hasSparkline =
-    trigger.condition_type === 'price_below' ||
-    trigger.condition_type === 'price_above' ||
-    trigger.category === 'travel' ||
-    trigger.category === 'finance' ||
-    trigger.category === 'shopping' ||
-    Boolean(trigger.current_value);
-
   return (
     <TouchableOpacity
       style={[
@@ -124,26 +115,22 @@ export const TriggerCard: React.FC<TriggerCardProps> = ({
         <VitoSwitch value={isActive} onValueChange={() => onToggle(trigger.id)} />
       </View>
 
-      {/* Divisória tracejada com última atualização e sparkline SVG */}
+      {/* Divisória com última atualização e indicador visual limpo */}
       <View style={[styles.lastRow, { borderTopColor: colors.line }]}>
         <View style={[styles.lastDot, { backgroundColor: categoryColor }]} />
         <Text style={[styles.lastText, { color: colors.ink }]} numberOfLines={1}>
           {getLastInfo()}
         </Text>
 
-        {hasSparkline && (
-          <View style={styles.sparkWrapper}>
-            <Svg width={44} height={22} viewBox="0 0 44 22" fill="none">
-              <Path
-                d="M2 4l9 3 8 6 8-2 7 6 8 1"
-                stroke={categoryColor}
-                strokeWidth={2}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </Svg>
+        {trigger.current_value && trigger.target_value ? (
+          <View style={[styles.targetBadge, { backgroundColor: categoryBg }]}>
+            <Text style={[styles.targetBadgeText, { color: categoryColor }]}>
+              Alvo: R$ {trigger.target_value}
+            </Text>
           </View>
-        )}
+        ) : isActive ? (
+          <MaterialIcons name="radar" size={16} color={categoryColor} />
+        ) : null}
       </View>
     </TouchableOpacity>
   );
@@ -215,7 +202,15 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: tokens.typography.family.regular,
   },
-  sparkWrapper: {
+  targetBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
     marginLeft: 'auto',
+  },
+  targetBadgeText: {
+    fontSize: 11,
+    fontFamily: tokens.typography.family.medium,
+    fontWeight: '600',
   },
 });

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import * as Clipboard from 'expo-clipboard';
+import { copyToClipboard } from '../../../utils/clipboard';
 import { useTheme } from '../../../context/ThemeContext';
 import { ChatBooking } from '../../../types';
 import { bookingDisplayLink } from '../../../utils/chatCards';
@@ -25,13 +25,11 @@ export const BookingInlineCard: React.FC<BookingInlineCardProps> = ({ booking })
 
   const handleCopy = async () => {
     if (!link) return;
-    try {
-      await Clipboard.setStringAsync(link);
+    const ok = await copyToClipboard(link);
+    if (ok) {
       hapticFeedback.success();
       setCopied(true);
       setTimeout(() => setCopied(false), 2200);
-    } catch (e) {
-      console.warn('[BookingInlineCard] Falha ao copiar link:', e);
     }
   };
 

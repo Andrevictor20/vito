@@ -22,6 +22,10 @@ import {
   calculateWeeklySummaries,
   WeeklySummaryItem,
 } from '../utils/weeklySummaryCalculator';
+import {
+  calculateDailySummary,
+  calculateMonthlyMetrics,
+} from '../utils/summaryCalculators';
 import { isAllDayEvent } from '../utils/calendarDateUtils';
 import { DailySummarySection } from '../components/summaries/DailySummarySection';
 import { WeeklySummarySection } from '../components/summaries/WeeklySummarySection';
@@ -98,110 +102,16 @@ export const ExecutiveSummariesHubView: React.FC<ExecutiveSummariesHubViewProps>
     return calculateWeeklySummaries(events, todos, 4);
   }, [events, todos]);
 
-  const todayMetrics = useMemo(() => {
-    const todayStr = new Date().toISOString().split('T')[0];
-    const todayEvents = events.filter((e) => e.start_at.startsWith(todayStr));
-    const todayTodos = todos.filter((t) => !t.due_date || t.due_date.startsWith(todayStr));
-    const completedTodos = todayTodos.filter((t) => t.status === 'completed');
-
-    let totalMinutes = 0;
-    todayEvents.forEach((e) => {
-      if (isAllDayEvent(e)) return;
-      const s = new Date(e.start_at).getTime();
-      const end = new Date(e.end_at).getTime();
-      if (end > s && (end - s) / (1000 * 60 * 60) >= 23) return;
-      const cat = (e.category || '').toLowerCase();
-      if (cat === 'holiday' || cat === 'feriado') return;
-      if (end > s) {
-        totalMinutes += Math.round((end - s) / (1000 * 60));
-      }
-    });
-
-    const hours = (totalMinutes / 60).toFixed(1);
-    const freeHours = Math.max(0, 12 - Number(hours)).toFixed(1);
-
-    return {
-      eventsCount: todayEvents.length,
-      committedHours: hours,
-      freeHours,
-      totalTodos: todayTodos.length,
-      completedTodos: completedTodos.length,
-    };
+  const dailySummary = useMemo(() => {
+    return calculateDailySummary(events, todos);
   }, [events, todos]);
 
   const monthlyMetrics = useMemo(() => {
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
-
-    const monthEvents = events.filter((e) => {
-      const d = new Date(e.start_at);
-      return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
-    });
-
-    const monthTodos = todos.filter((t) => {
-      const d = new Date(t.due_date || t.created_at || now);
-      return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
-    });
-
-    const completedCount = monthTodos.filter((t) => t.status === 'completed').length;
-    const taskCompletionRate =
-      monthTodos.length > 0 ? Math.round((completedCount / monthTodos.length) * 100) : 100;
-
-    let totalMonthMinutes = 0;
-    let workMinutes = 0;
-    let personalMinutes = 0;
-
-    monthEvents.forEach((e) => {
-      if (isAllDayEvent(e)) return;
-      const s = new Date(e.start_at).getTime();
-      const end = new Date(e.end_at).getTime();
-      if (end > s && (end - s) / (1000 * 60 * 60) >= 23) return;
-      const catCheck = (e.category || '').toLowerCase();
-      if (catCheck === 'holiday' || catCheck === 'feriado') return;
-      const dur = end > s ? Math.round((end - s) / (1000 * 60)) : 60;
-      totalMonthMinutes += dur;
-
-      const cat = (e.category || '').toLowerCase();
-      if (cat.includes('trab') || cat.includes('work') || cat.includes('reuni')) {
-        workMinutes += dur;
-      } else {
-        personalMinutes += dur;
-      }
-    });
-
-    const workRatio =
-      totalMonthMinutes > 0 ? Math.round((workMinutes / totalMonthMinutes) * 100) : 50;
-    const personalRatio = 100 - workRatio;
-
-    return {
-      totalHours: (totalMonthMinutes / 60).toFixed(0),
-      totalEvents: monthEvents.length,
-      totalTodos: monthTodos.length,
-      completionRate: taskCompletionRate,
-      workRatio,
-      personalRatio,
-    };
+    return calculateMonthlyMetrics(events, todos);
   }, [events, todos]);
 
-  const dailySynthesisText = useMemo(() => {
-    const committed = parseFloat(todayMetrics.committedHours) || 0;
-    const free = parseFloat(todayMetrics.freeHours) || 0;
-    const eventsCount = todayMetrics.eventsCount;
-    const totalTodos = todayMetrics.totalTodos;
-    const completedTodos = todayMetrics.completedTodos;
-    const openTodos = totalTodos - completedTodos;
-
-    if (eventsCount === 0 && totalTodos === 0) {
-      return 'Sua agenda e lista de tarefas estão totalmente livres hoje. Momento propício para descanso, planejamento estratégico ou adiantar projetos.';
-    }
-    if (eventsCount === 0) {
-      const pendentes = openTodos === 1 ? '1 tarefa pendente' : `${openTodos} tarefas pendentes`;
-      return `Dia sem compromissos fixos agendados. Você possui ${pendentes} — boa hora para avançar nas tarefas.`;
-    }
-    const compromissos = eventsCount === 1 ? '1 compromisso' : `${eventsCount} compromissos`;
-    return `Dia com ${compromissos} (${committed}h) e ${free}h livres. Boa hora para avançar nas ${openTodos} tarefas que faltam.`;
-  }, [todayMetrics]);
+  const todayMetrics = dailySummary.metrics;
+  const dailySynthesisText = dailySummary.synthesisText;
 
   const monthlyDiagnosisText = useMemo(() => {
     const rate = monthlyMetrics.completionRate;
@@ -346,9 +256,13 @@ export const ExecutiveSummariesHubView: React.FC<ExecutiveSummariesHubViewProps>
           </View>
         ) : horizon === 'daily' ? (
           <DailySummarySection
-            metrics={todayMetrics}
-            hasFreeWindow={hasFreeWindow}
-            synthesisText={dailySynthesisText}
+            metrics={dailySummary.metrics}
+            hasFreeWindow={dailySummary.hasFreeWindow}
+            synthesisText={dailySummary.synthesisText}
+            nextEventTitle={dailySummary.nextEventTitle}
+            focusBlocks={dailySummary.focusBlocks}
+            timelineSegments={dailySummary.timelineSegments}
+            todayFormatted={dailySummary.todayFormatted}
             onReserveFocus={() => onOpenChatWithPrompt?.('Reserve um bloco de foco de 2h para mim hoje')}
             onViewTasks={() => onOpenChatWithPrompt?.('Quais são as minhas prioridades de hoje?')}
           />
@@ -361,6 +275,7 @@ export const ExecutiveSummariesHubView: React.FC<ExecutiveSummariesHubViewProps>
           <MonthlySummarySection
             metrics={monthlyMetrics}
             diagnosisText={monthlyDiagnosisText}
+            weeks={monthlyMetrics.weeks}
             onOpenRaioX={() => setShowMonthlyModal(true)}
             onAlignWeek={() => onOpenChatWithPrompt?.('Vamos fazer o alinhamento semanal?')}
           />

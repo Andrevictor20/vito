@@ -139,13 +139,14 @@ func (r *MemoryRepositorySQLite) recentActive(userID string, limit int) ([]domai
 }
 
 // Reinforce aplica reforço por uso (Spaced Reinforcement, §8.3).
+// Não altera updated_at para evitar escritas desnecessárias e preservar a idade real da memória.
 func (r *MemoryRepositorySQLite) Reinforce(id, userID string) error {
 	_, err := r.db.Exec(`
 		UPDATE memories
 		SET access_count = COALESCE(access_count, 0) + 1,
-		    last_accessed_at = ?, updated_at = ?
+		    last_accessed_at = ?
 		WHERE id = ? AND user_id = ?
-	`, time.Now().UTC(), time.Now().UTC(), id, userID)
+	`, time.Now().UTC(), id, userID)
 	return err
 }
 

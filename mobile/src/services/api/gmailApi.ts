@@ -58,6 +58,11 @@ export interface GmailDraftResponse {
   thread_id: string;
 }
 
+export interface GmailSendResponse {
+  id: string;
+  message: string;
+}
+
 export class GmailApi {
   constructor(private client: ApiClient) {}
 
@@ -105,6 +110,18 @@ export class GmailApi {
     return {
       id: data?.id || (data?.draft_id ?? ''),
       thread_id: data?.thread_id ?? '',
+    };
+  }
+
+  async sendEmail(email: GmailDraftInput): Promise<GmailSendResponse> {
+    const raw = await this.client.request<any>('/api/v1/integrations/gmail/send', {
+      method: 'POST',
+      body: JSON.stringify(email),
+    });
+    const data = raw?.data ?? raw;
+    return {
+      id: data?.id || data?.message_id || '',
+      message: data?.message || 'E-mail enviado com sucesso',
     };
   }
 }

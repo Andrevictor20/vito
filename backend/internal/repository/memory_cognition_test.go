@@ -79,6 +79,12 @@ func TestSearchRelevant_ExcludesSuperseded(t *testing.T) {
 func TestReinforce_IncrementsAccess(t *testing.T) {
 	r, userID := openCognitionDB(t)
 	id := seedMemory(t, r, userID, "geral", "prefere café forte pela manhã", 3)
+	before, err := r.GetByID(id, userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	time.Sleep(10 * time.Millisecond)
 	if err := r.Reinforce(id, userID); err != nil {
 		t.Fatal(err)
 	}
@@ -88,5 +94,8 @@ func TestReinforce_IncrementsAccess(t *testing.T) {
 	}
 	if got.AccessCount != 1 || got.LastAccessedAt == nil {
 		t.Fatalf("reforço esperado, veio %+v", got)
+	}
+	if !got.UpdatedAt.Equal(before.UpdatedAt) {
+		t.Fatalf("updated_at não deve mudar no Reinforce: antes=%v, depois=%v", before.UpdatedAt, got.UpdatedAt)
 	}
 }

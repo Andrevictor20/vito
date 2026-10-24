@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, View, Text, Image, TouchableOpacity, TextInput } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import * as Clipboard from 'expo-clipboard';
+import { copyToClipboard } from '../../utils/clipboard';
 import { tokens, MD3Shapes } from '../../theme/tokens';
 import { ChatMessage } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
@@ -59,15 +59,13 @@ export const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
   };
 
   const handleCopy = async () => {
-    try {
-      const textToCopy = preparePlainTextForCopy(message.text);
-      await Clipboard.setStringAsync(textToCopy);
+    const textToCopy = preparePlainTextForCopy(message.text);
+    const ok = await copyToClipboard(textToCopy);
+    if (ok) {
       setCopied(true);
       setTimeout(() => {
         setCopied(false);
       }, 2000);
-    } catch (e) {
-      console.warn('[ChatMessageBubble] Falha ao copiar texto:', e);
     }
   };
 

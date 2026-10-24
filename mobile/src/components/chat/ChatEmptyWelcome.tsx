@@ -14,13 +14,15 @@ export interface ChatEmptyWelcomeProps {
 
 export const ChatEmptyWelcome: React.FC<ChatEmptyWelcomeProps> = ({
   welcomeGreeting,
-  userName = 'André',
+  userName,
   loading = false,
   onSelectIdea,
 }) => {
   const { colors } = useTheme();
 
-  const titleText = welcomeGreeting || `Vamos lá, ${userName}! Como posso ajudar hoje?`;
+  const titleText =
+    welcomeGreeting ||
+    (userName ? `Vamos lá, ${userName}! Como posso ajudar hoje?` : 'Como posso ajudar hoje?');
 
   return (
     <View style={styles.cheroContainer}>

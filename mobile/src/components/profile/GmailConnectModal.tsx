@@ -8,7 +8,7 @@ import {
   Alert,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import * as Clipboard from 'expo-clipboard';
+import { copyToClipboard } from '../../utils/clipboard';
 import { useTheme } from '../../context/ThemeContext';
 import { BottomSheetModal } from '../ui/BottomSheetModal';
 import { Button } from '../ui/Button';
@@ -128,10 +128,12 @@ export const GmailConnectModal: React.FC<GmailConnectModalProps> = ({
     }
   };
 
-  const copyToClipboard = async (code: string, id: string) => {
-    await Clipboard.setStringAsync(code);
-    setCopiedIndex(id);
-    setTimeout(() => setCopiedIndex(null), 2500);
+  const copyToClipboardHandler = async (code: string, id: string) => {
+    const ok = await copyToClipboard(code);
+    if (ok) {
+      setCopiedIndex(id);
+      setTimeout(() => setCopiedIndex(null), 2500);
+    }
   };
 
   const formatCurrency = (val: number) => {
@@ -291,7 +293,7 @@ export const GmailConnectModal: React.FC<GmailConnectModalProps> = ({
                         </Text>
                         <TouchableOpacity
                           style={styles.copyBtn}
-                          onPress={() => copyToClipboard(bill.linha_digitavel, bill.id)}
+                          onPress={() => copyToClipboardHandler(bill.linha_digitavel, bill.id)}
                         >
                           <MaterialIcons
                             name={copiedIndex === bill.id ? 'check' : 'content-copy'}

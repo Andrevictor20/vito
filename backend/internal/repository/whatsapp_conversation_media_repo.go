@@ -28,6 +28,9 @@ func (r *WhatsAppConversationRepositorySQLite) SenderNamesByChat(ctx context.Con
 				ROW_NUMBER() OVER (PARTITION BY chat_jid ORDER BY message_timestamp DESC) AS rn
 			FROM whatsapp_conversation_messages
 			WHERE user_id = ? AND message_timestamp >= ? AND sender_name <> '' AND from_me = false
+				AND chat_jid NOT LIKE '%@broadcast'
+				AND chat_jid NOT LIKE '%@newsletter'
+				AND chat_kind NOT IN ('broadcast', 'newsletter')
 		)
 		WHERE rn = 1
 	`, userID, since)
@@ -209,6 +212,34 @@ func (r *WhatsAppConversationRepositorySQLite) AliasesByName(ctx context.Context
 		out = append(out, chatJID)
 	}
 	return out, rows.Err()
+}
+
+// DeleteAlias remove um apelido específico gravado para um chat.
+func (r *WhatsAppConversationRepositorySQLite) DeleteAlias(ctx context.Context, userID, chatJID, alias string) error {
+	if userID == "" || chatJID == "" || strings.TrimSpace(alias) == "" {
+		return nil
+	}
+	return database.WithBusyRetry(4, func() error {
+		_, err := r.db.ExecContext(ctx, `
+			DELETE FROM whatsapp_contact_aliases
+			WHERE user_id = ? AND chat_jid = ? AND LOWER(alias) = LOWER(?)
+		`, userID, chatJID, strings.TrimSpace(alias))
+		return err
+	})
+}
+
+// DeleteAliasesByName remove todos os apelidos gravados com determinado nome.
+func (r *WhatsAppConversationRepositorySQLite) DeleteAliasesByName(ctx context.Context, userID, alias string) error {
+	if userID == "" || strings.TrimSpace(alias) == "" {
+		return nil
+	}
+	return database.WithBusyRetry(4, func() error {
+		_, err := r.db.ExecContext(ctx, `
+			DELETE FROM whatsapp_contact_aliases
+			WHERE user_id = ? AND LOWER(alias) = LOWER(?)
+		`, userID, strings.TrimSpace(alias))
+		return err
+	})
 }
 
 // phoneDigits extrai apenas os dígitos de um telefone.

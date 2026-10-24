@@ -68,14 +68,14 @@ export const ProfileView: React.FC = () => {
 
               <div>
                 <h3 className="text-base font-bold text-zinc-900 dark:text-white flex items-center gap-1.5">
-                  <span>{user?.name?.toUpperCase() || 'ANDRÉ VICTOR'}</span>
+                  <span>{user?.name?.toUpperCase() || 'USUÁRIO'}</span>
                   <BadgeCheck size={16} className="text-[#10B981] fill-current" />
                 </h3>
                 <p className="text-xs text-zinc-500 font-mono mt-0.5">
-                  {user?.email || 'victorandre280@gmail.com'}
+                  {user?.email || 'Sem e-mail cadastrado'}
                 </p>
                 <p className="text-xs text-zinc-400 flex items-center gap-1.5 mt-0.5">
-                  <span>{user?.phone || '+55 (98) 98441-7165'}</span>
+                  <span>{user?.phone || 'Sem telefone cadastrado'}</span>
                   <Pencil size={11} className="text-zinc-400 cursor-pointer hover:text-zinc-700 dark:hover:text-white" />
                 </p>
               </div>
@@ -212,7 +212,9 @@ export const ProfileView: React.FC = () => {
                   <div>
                     <p className="text-xs font-bold text-zinc-900 dark:text-white">Gmail</p>
                     <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                      {gmailStatus?.email ? `Varredura ativa (${gmailStatus.email})` : `Varredura ativa (${user?.email || 'victorandre280@gmail.com'})`}
+                      {gmailStatus?.connected
+                        ? `Varredura ativa (${gmailStatus.email || user?.email || 'conectado'})`
+                        : 'Desconectado'}
                     </p>
                   </div>
                 </div>

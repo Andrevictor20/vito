@@ -69,6 +69,12 @@ func (s *WhatsAppDirectoryService) Pending(ctx context.Context, userID string) (
 		if c.ChatKind != domain.WhatsAppChatKindDirect {
 			continue
 		}
+		if c.ChatKind == domain.WhatsAppChatKindBroadcast || c.ChatKind == domain.WhatsAppChatKindNewsletter {
+			continue
+		}
+		if strings.HasSuffix(c.ChatJID, "@broadcast") || strings.HasSuffix(c.ChatJID, "@newsletter") || c.ChatJID == "status@broadcast" {
+			continue
+		}
 		if c.LastFromMe {
 			continue
 		}
@@ -177,23 +183,16 @@ func (s *WhatsAppDirectoryService) ResolveChat(ctx context.Context, userID, name
 			return &chats[i], nil
 		}
 	}
-	// 1b) Apelido aprendido: o nome que o dono usa para o contato ("isa"),
-	//     aprendido quando ele respondou "é a Bella" numa consulta anterior.
-	if aliased, err := s.aliasChats(ctx, userID, query); err == nil && len(aliased) == 1 {
-		return &aliased[0], nil
-	} else if err == nil && len(aliased) > 1 {
-		return nil, s.ambiguousError(query, aliased)
-	}
-	// 2) Rótulo exato (sem diferenciar caixa). Vários chats com o mesmo rótulo
-	//    são AMBÍGUOS — não pode escolher o primeiro no silêncio.
+	// 2) Rótulo exato (sem diferenciar caixa) e nomes salvos no cache de contatos.
+	//    Contatos reais (salvos no contato/agenda ou no ChatLabel) SEMPRE têm
+	//    precedência sobre apelidos aprendidos.
 	exact := make([]domain.WhatsAppChatSummary, 0, 2)
 	for i := range chats {
-		if strings.EqualFold(strings.TrimSpace(chats[i].ChatLabel), query) {
+		label := strings.TrimSpace(chats[i].ChatLabel)
+		if label != "" && label != "Contato" && contactNameMatches(label, query) {
 			exact = append(exact, chats[i])
 		}
 	}
-	// 3) Nomes do cache de contatos: o SALVO pelo dono ("isa") e o de PERFIL
-	//    ("bella") — os dois precisam ser reconhecidos, é o mesmo contato.
 	if len(exact) == 0 && s.contacts != nil {
 		for i := range chats {
 			if contactNameMatches(s.contacts.Name(chats[i].ChatJID), query) ||
@@ -204,12 +203,25 @@ func (s *WhatsAppDirectoryService) ResolveChat(ctx context.Context, userID, name
 	}
 	switch len(exact) {
 	case 1:
+		// Limpa qualquer alias espúrio pré-existente cujo nome colida com este contato real.
+		if s.repo != nil {
+			_ = s.repo.DeleteAliasesByName(ctx, userID, query)
+		}
 		return &exact[0], nil
 	case 0:
-		// segue para a busca parcial
+		// segue para os apelidos aprendidos
 	default:
 		return nil, s.ambiguousError(query, exact)
 	}
+
+	// 3) Apelido aprendido: o nome que o dono usa para o contato ("isa"),
+	//    aprendido quando ele confirmou desambiguação em consulta anterior.
+	if aliased, err := s.aliasChats(ctx, userID, query); err == nil && len(aliased) == 1 {
+		return &aliased[0], nil
+	} else if err == nil && len(aliased) > 1 {
+		return nil, s.ambiguousError(query, aliased)
+	}
+
 	// 4) Contém (prefixo do nome também vale) — com acento e caixa normalizados.
 	matches := make([]domain.WhatsAppChatSummary, 0, 2)
 	for i := range chats {
@@ -280,9 +292,45 @@ var contactAccents = map[rune]rune{
 	'ç': 'c', 'ñ': 'n',
 }
 
+// IsRealContactName verifica se o nome coincide com algum contato real (agenda ou rótulo de conversa).
+func (s *WhatsAppDirectoryService) IsRealContactName(ctx context.Context, userID, name string) bool {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return false
+	}
+	if s.contacts != nil && (s.contacts.HasSavedName(name) || s.contacts.HasContactNamed(name)) {
+		return true
+	}
+	chats, err := s.Chats(ctx, userID)
+	if err != nil || len(chats) == 0 {
+		return false
+	}
+	for _, c := range chats {
+		label := strings.TrimSpace(c.ChatLabel)
+		if label != "" && label != "Contato" && contactNameMatches(label, name) {
+			return true
+		}
+		if s.contacts != nil {
+			if contactNameMatches(s.contacts.Name(c.ChatJID), name) ||
+				contactNameMatches(s.contacts.ProfileName(c.ChatJID), name) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // SaveAlias grava um apelido aprendido (o nome que o dono usa para o contato).
 func (s *WhatsAppDirectoryService) SaveAlias(ctx context.Context, userID, chatJID, alias string) error {
 	if s == nil || s.repo == nil {
+		return nil
+	}
+	alias = strings.TrimSpace(alias)
+	if alias == "" {
+		return nil
+	}
+	// NUNCA grava um apelido cujo nome já coincida com o nome salvo de outro contato real.
+	if s.IsRealContactName(ctx, userID, alias) {
 		return nil
 	}
 	return s.repo.SaveAlias(ctx, userID, chatJID, alias)
@@ -291,6 +339,16 @@ func (s *WhatsAppDirectoryService) SaveAlias(ctx context.Context, userID, chatJI
 // aliasChats devolve as conversas que respondem a um apelido aprendido.
 func (s *WhatsAppDirectoryService) aliasChats(ctx context.Context, userID, alias string) ([]domain.WhatsAppChatSummary, error) {
 	if s.repo == nil {
+		return nil, nil
+	}
+	alias = strings.TrimSpace(alias)
+	if alias == "" {
+		return nil, nil
+	}
+	// Se o apelido bate com o nome exato de um contato real já existente,
+	// limpe e filtre do banco para nunca desviar consultas para contatos errados.
+	if s.IsRealContactName(ctx, userID, alias) {
+		_ = s.repo.DeleteAliasesByName(ctx, userID, alias)
 		return nil, nil
 	}
 	jids, err := s.repo.AliasesByName(ctx, userID, alias)
