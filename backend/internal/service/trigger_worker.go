@@ -55,7 +55,8 @@ func parseEvalSignal(payload string) evalSignal {
 	if raw.Confidence != nil {
 		sig.confidence = *raw.Confidence
 	}
-	sig.urgent = strings.EqualFold(strings.TrimSpace(raw.Urgency), "high")
+	sig.urgent = strings.EqualFold(strings.TrimSpace(raw.Urgency), "high") ||
+		strings.EqualFold(strings.TrimSpace(raw.Urgency), "breaking")
 	return sig
 }
 
@@ -123,6 +124,10 @@ func (e *AITriggerEvaluator) Evaluate(ctx context.Context, t *domain.Trigger) (s
 				"status":                 "evaluated",
 				"condition_met":          res.ConditionMet,
 				"data":                   res.CurrentData,
+				"metric_label":           res.MetricLabel,
+				"metric_value":           res.MetricValue,
+				"bullets":                res.Bullets,
+				"sources":                res.Sources,
 				"paragraphs":             res.Paragraphs,
 				"simulated_notification": res.SimulatedNotification,
 				"confidence":             res.Confidence,
@@ -231,6 +236,11 @@ func (w *TriggerWorker) Start() {
 					log.Printf("⚠️ [TriggerWorker] Erro ao avaliar disparadores: %v", err)
 				} else if evaluated > 0 {
 					log.Printf("✨ [TriggerWorker] %d disparador(es) avaliado(s) com sucesso.", evaluated)
+				}
+
+				// Vigília contínua de notícias breaking / urgentes fora do horário habitual (Ponto 5)
+				if breakingCount, errB := w.CheckBreakingTriggers(tickTime); errB == nil && breakingCount > 0 {
+					log.Printf("🚨 [TriggerWorker] %d alerta(s) breaking disparado(s) com sucesso.", breakingCount)
 				}
 			}
 		}

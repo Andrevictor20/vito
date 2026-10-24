@@ -130,3 +130,58 @@ func TestParseTriggerEvalResult_MalformedJSONNeverDumpsJSONToParagraphs(t *testi
 	}
 	_ = time.Now()
 }
+
+func TestParseTriggerEvalResult_BulletsSourcesAndMetrics(t *testing.T) {
+	raw := `{
+  "condition_met": true,
+  "summary": "Flamengo vence o Racing por 2 a 1 no Maracanã",
+  "metric_label": "Último Jogo",
+  "metric_value": "Flamengo 2 x 1 Racing",
+  "bullets": [
+    "Pedro marcou aos 34' e Arrascaeta ampliou aos 68'.",
+    "Com o triunfo, o time garante vaga antecipada na semifinal.",
+    "Próximo jogo: domingo, 16h, contra o Palmeiras pelo Brasileirão."
+  ],
+  "sources": [
+    { "title": "Flamengo bate Racing no Maracanã", "name": "ge.globo", "url": "https://ge.globo.com/futebol/123" },
+    { "title": "Com gols de Pedro e Arrascaeta, Fla vence", "name": "UOL Esporte", "url": "https://uol.com.br/esporte/456" }
+  ],
+  "confidence": 95,
+  "why_relevant": "Resultado do último jogo do Flamengo com placar e próximo confronto.",
+  "urgency": "breaking"
+}`
+
+	trig := &domain.Trigger{
+		ID:       "trig-fla",
+		Title:    "Jogos do Flamengo",
+		Query:    "jogos do flamengo",
+		Category: domain.CategoryEventsSports,
+	}
+
+	res, err := ParseTriggerEvalResult(raw, trig)
+	if err != nil {
+		t.Fatalf("erro inesperado ao parsear: %v", err)
+	}
+
+	if res.MetricLabel != "Último Jogo" {
+		t.Errorf("esperava MetricLabel 'Último Jogo', obteve %q", res.MetricLabel)
+	}
+	if res.MetricValue != "Flamengo 2 x 1 Racing" {
+		t.Errorf("esperava MetricValue 'Flamengo 2 x 1 Racing', obteve %q", res.MetricValue)
+	}
+	if len(res.Bullets) != 3 {
+		t.Fatalf("esperava 3 bullets, obteve %d", len(res.Bullets))
+	}
+	if !strings.Contains(res.Bullets[0], "Pedro") {
+		t.Errorf("esperava menção a Pedro no primeiro bullet: %q", res.Bullets[0])
+	}
+	if len(res.Sources) != 2 {
+		t.Fatalf("esperava 2 fontes, obteve %d", len(res.Sources))
+	}
+	if res.Sources[0].Name != "ge.globo" {
+		t.Errorf("esperava fonte 'ge.globo', obteve %q", res.Sources[0].Name)
+	}
+	if res.Urgency != "breaking" {
+		t.Errorf("esperava urgency 'breaking', obteve %q", res.Urgency)
+	}
+}

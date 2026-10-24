@@ -4,6 +4,11 @@ import {
   extractReportParagraphs,
   detectPaymentAndMarketFeatures,
   buildRadarChatPrompt,
+  extractRadarBullets,
+  extractRadarSources,
+  extractDomain,
+  getFaviconUrl,
+  isRadarUrgentOrBreaking,
 } from './radarReportUtils';
 
 describe('radarReportUtils', () => {
@@ -59,5 +64,62 @@ describe('radarReportUtils', () => {
     assert.match(prompt, /Preço Poco X8/);
     assert.match(prompt, /Pix ou parcelado/);
     assert.match(prompt, /tarefa ou agendar no calendário/);
+  });
+
+  test('extractRadarBullets prioriza array bullets e limpa marcadores de listas', () => {
+    const parsed = {
+      bullets: [
+        '• Pedro marcou aos 34\' e garantiu a virada.',
+        '- Próximo confronto marcado para domingo às 16h.',
+        'Sem rodeios adicionais.',
+      ],
+    };
+    const bullets = extractRadarBullets('', parsed);
+    assert.equal(bullets.length, 3);
+    assert.equal(bullets[0], 'Pedro marcou aos 34\' e garantiu a virada.');
+    assert.equal(bullets[1], 'Próximo confronto marcado para domingo às 16h.');
+    assert.equal(bullets[2], 'Sem rodeios adicionais.');
+  });
+
+  test('extractRadarBullets divide parágrafos em bullets concisos quando bullets direto não existir', () => {
+    const parsed = {
+      paragraphs: [
+        'Dólar opera a R$ 5,72 em alta de 0,85% com tensões globais.',
+        'Recomenda-se cautela antes de fechar remessas hoje.',
+      ],
+    };
+    const bullets = extractRadarBullets('', parsed);
+    assert.equal(bullets.length, 2);
+    assert.equal(bullets[0], 'Dólar opera a R$ 5,72 em alta de 0,85% com tensões globais.');
+  });
+
+  test('extractDomain e getFaviconUrl extraem domínio limpo e endpoint Google Favicons', () => {
+    const domain = extractDomain('https://ge.globo.com/futebol/times/flamengo');
+    assert.equal(domain, 'ge.globo.com');
+    const favicon = getFaviconUrl('https://ge.globo.com/futebol/times/flamengo');
+    assert.match(favicon, /domain=ge\.globo\.com/);
+  });
+
+  test('extractRadarSources extrai fontes estruturadas com nomes e favicons', () => {
+    const parsed = {
+      sources: [
+        { name: 'ge.globo', url: 'https://ge.globo.com/futebol/123', title: 'Fla vence' },
+        { name: 'UOL', url: 'https://uol.com.br/esporte/456', title: 'Gols de Pedro' },
+      ],
+    };
+    const sources = extractRadarSources('', parsed);
+    assert.equal(sources.length, 2);
+    assert.equal(sources[0].name, 'ge.globo');
+    assert.equal(sources[0].domain, 'ge.globo.com');
+    assert.equal(sources[1].name, 'UOL');
+    assert.equal(sources[1].domain, 'uol.com.br');
+  });
+
+  test('isRadarUrgentOrBreaking identifica corretamente breaking news e urgência alta', () => {
+    assert.equal(isRadarUrgentOrBreaking('breaking', false), true);
+    assert.equal(isRadarUrgentOrBreaking('high', false), true);
+    assert.equal(isRadarUrgentOrBreaking('low', true), true);
+    assert.equal(isRadarUrgentOrBreaking('low', false, '🚨 URGENTE: Gol nos acréscimos'), true);
+    assert.equal(isRadarUrgentOrBreaking('low', false, 'Resumo diário estável'), false);
   });
 });

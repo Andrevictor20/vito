@@ -1,8 +1,21 @@
+export interface TriggerSourceItem {
+  title?: string;
+  name: string;
+  url: string;
+  domain?: string;
+}
+
 export interface ParsedReportData {
   status?: string;
   condition_met?: boolean;
   data?: string;
   paragraphs?: string[];
+  bullets?: string[];
+  metric_label?: string;
+  metric_value?: string;
+  sources?: TriggerSourceItem[];
+  urgency?: string;
+  is_breaking?: boolean;
   simulated_notification?: string;
   tested_at?: string;
   confidence?: number;
@@ -95,6 +108,133 @@ export function detectPaymentAndMarketFeatures(
     hasInstallments: /parcela|10x|12x|sem juros|no cartão|em até/i.test(combined),
     hasReal: /r\$|reais/i.test(combined),
   };
+}
+
+export function extractRadarBullets(
+  message?: string,
+  parsed?: ParsedReportData | null
+): string[] {
+  if (parsed?.bullets && Array.isArray(parsed.bullets) && parsed.bullets.length > 0) {
+    const cleaned = parsed.bullets
+      .map((b) => String(b).replace(/^[•\-\*]\s*/, '').trim())
+      .filter((b) => b.length > 0 && !b.startsWith('{') && !b.startsWith('{"'));
+    if (cleaned.length > 0) {
+      return cleaned.slice(0, 4);
+    }
+  }
+
+  const paras = extractReportParagraphs(message, parsed);
+  if (paras.length === 0) return [];
+
+  const bullets: string[] = [];
+  for (const p of paras) {
+    const lines = p.split(/\n+/).map((l) => l.replace(/^[•\-\*]\s*/, '').trim());
+    for (const line of lines) {
+      if (line.length > 0 && !line.startsWith('http://') && !line.startsWith('https://')) {
+        // Se a linha for muito longa, corta respeitando palavras
+        if (line.length > 150) {
+          bullets.push(line.slice(0, 147) + '…');
+        } else {
+          bullets.push(line);
+        }
+      }
+    }
+  }
+
+  return bullets.slice(0, 4);
+}
+
+export function extractDomain(urlStr: string): string {
+  try {
+    const match = urlStr.match(/^https?:\/\/([^/?#]+)(?:[/?#]|$)/i);
+    if (match && match[1]) {
+      return match[1].toLowerCase().replace(/^www\./, '');
+    }
+  } catch {
+    // fallback
+  }
+  return '';
+}
+
+export function getFaviconUrl(domainOrUrl: string): string {
+  const domain = domainOrUrl.includes('/') ? extractDomain(domainOrUrl) : domainOrUrl;
+  if (!domain) return '';
+  return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64`;
+}
+
+export function cleanSourceName(name?: string, domain?: string): string {
+  if (name && name.trim().length > 0) {
+    return name.trim();
+  }
+  if (!domain) return 'Fonte';
+  if (domain.includes('globo.com')) return 'ge.globo';
+  if (domain.includes('uol.com.br')) return 'UOL';
+  if (domain.includes('mercadolivre.com')) return 'Mercado Livre';
+  if (domain.includes('amazon.com')) return 'Amazon';
+  if (domain.includes('g1.globo')) return 'G1';
+  if (domain.includes('cnnbrasil')) return 'CNN Brasil';
+  if (domain.includes('valor.globo')) return 'Valor Econômico';
+  return domain;
+}
+
+export function extractRadarSources(
+  message?: string,
+  parsed?: ParsedReportData | null
+): TriggerSourceItem[] {
+  const out: TriggerSourceItem[] = [];
+  const seenUrls = new Set<string>();
+
+  // 1. Fontes estruturadas vindas do backend
+  if (parsed?.sources && Array.isArray(parsed.sources)) {
+    for (const s of parsed.sources) {
+      if (s && s.url && !seenUrls.has(s.url)) {
+        seenUrls.add(s.url);
+        const domain = s.domain || extractDomain(s.url);
+        out.push({
+          title: s.title || '',
+          name: cleanSourceName(s.name, domain),
+          url: s.url,
+          domain,
+        });
+      }
+    }
+  }
+
+  // 2. Fallback: extrai URLs no texto se não houver fontes estruturadas
+  if (out.length === 0) {
+    const raw = `${message || ''} ${parsed?.data || ''}`;
+    const urlMatches = raw.match(/https?:\/\/[^\s)"]+/g);
+    if (urlMatches) {
+      for (const rawUrl of urlMatches) {
+        const cleanUrl = rawUrl.replace(/[.,;!?]+$/, '');
+        if (!seenUrls.has(cleanUrl)) {
+          seenUrls.add(cleanUrl);
+          const domain = extractDomain(cleanUrl);
+          out.push({
+            name: cleanSourceName('', domain),
+            url: cleanUrl,
+            domain,
+          });
+        }
+      }
+    }
+  }
+
+  return out.slice(0, 4);
+}
+
+export function isRadarUrgentOrBreaking(
+  urgency?: string,
+  isBreaking?: boolean,
+  message?: string
+): boolean {
+  if (isBreaking) return true;
+  if (message && /🚨|urgente|breaking|alerta crítico|queda histórica/i.test(message)) {
+    return true;
+  }
+  if (!urgency) return false;
+  const u = urgency.toLowerCase().trim();
+  return u === 'breaking' || u === 'high' || u === 'urgent';
 }
 
 export function buildRadarChatPrompt(

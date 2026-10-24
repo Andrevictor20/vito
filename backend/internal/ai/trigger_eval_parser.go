@@ -25,6 +25,10 @@ type rawEvalResult struct {
 	ConditionMet          json.RawMessage `json:"condition_met"`
 	CurrentData           json.RawMessage `json:"current_data"`
 	Summary               string          `json:"summary"`
+	MetricLabel           string          `json:"metric_label"`
+	MetricValue           string          `json:"metric_value"`
+	Bullets               json.RawMessage `json:"bullets"`
+	Sources               json.RawMessage `json:"sources"`
 	Paragraphs            json.RawMessage `json:"paragraphs"`
 	SimulatedNotification string          `json:"simulated_notification"`
 	Confidence            json.RawMessage `json:"confidence"`
@@ -54,6 +58,8 @@ func ParseTriggerEvalResult(rawText string, t *domain.Trigger) (*domain.TriggerT
 		Title:                 t.Title,
 		Query:                 t.Query,
 		Summary:               strings.TrimSpace(raw.Summary),
+		MetricLabel:           strings.TrimSpace(raw.MetricLabel),
+		MetricValue:           strings.TrimSpace(raw.MetricValue),
 		SimulatedNotification: strings.TrimSpace(raw.SimulatedNotification),
 		WhyRelevant:           strings.TrimSpace(raw.WhyRelevant),
 		Urgency:               strings.TrimSpace(raw.Urgency),
@@ -82,9 +88,19 @@ func ParseTriggerEvalResult(rawText string, t *domain.Trigger) (*domain.TriggerT
 	// 4. Paragraphs (pode ser []string ou string)
 	res.Paragraphs = parseParagraphs(raw.Paragraphs, res.Summary, res.CurrentData)
 
-	// Se não veio summary, usa o primeiro parágrafo
-	if res.Summary == "" && len(res.Paragraphs) > 0 {
-		res.Summary = res.Paragraphs[0]
+	// 5. Bullets estruturados concisos (fatos objetivos)
+	res.Bullets = parseBullets(raw.Bullets, res.Paragraphs, res.CurrentData)
+
+	// 6. Fontes estruturadas (veículos jornalísticos / links)
+	res.Sources = parseSources(raw.Sources)
+
+	// Se não veio summary, usa o primeiro parágrafo ou primeiro bullet
+	if res.Summary == "" {
+		if len(res.Bullets) > 0 {
+			res.Summary = res.Bullets[0]
+		} else if len(res.Paragraphs) > 0 {
+			res.Summary = res.Paragraphs[0]
+		}
 	}
 
 	// Se não veio simulated notification, gera default executivo
@@ -153,6 +169,81 @@ func parseCurrentData(raw json.RawMessage) string {
 		return strings.Join(cleaned, "\n")
 	}
 	return strings.TrimSpace(string(raw))
+}
+
+func parseBullets(raw json.RawMessage, fallbackParagraphs []string, fallbackData string) []string {
+	if len(raw) > 0 {
+		var arr []string
+		if err := json.Unmarshal(raw, &arr); err == nil && len(arr) > 0 {
+			var out []string
+			for _, b := range arr {
+				trimmed := strings.TrimSpace(b)
+				trimmed = strings.TrimPrefix(trimmed, "•")
+				trimmed = strings.TrimPrefix(trimmed, "-")
+				trimmed = strings.TrimSpace(trimmed)
+				if trimmed != "" && !strings.HasPrefix(trimmed, `{"`) {
+					out = append(out, trimmed)
+				}
+			}
+			if len(out) > 0 {
+				return out
+			}
+		}
+	}
+
+	// Se não veio bullets direto, deriva dos parágrafos dividindo em tópicos
+	if len(fallbackParagraphs) > 0 {
+		var out []string
+		for _, p := range fallbackParagraphs {
+			trimmed := strings.TrimSpace(p)
+			if trimmed == "" || strings.HasPrefix(trimmed, `{"`) {
+				continue
+			}
+			// Se o parágrafo contém quebras de linha ou bullets internos
+			lines := strings.Split(trimmed, "\n")
+			for _, line := range lines {
+				l := strings.TrimSpace(line)
+				l = strings.TrimPrefix(l, "•")
+				l = strings.TrimPrefix(l, "-")
+				l = strings.TrimSpace(l)
+				if l != "" {
+					out = append(out, l)
+				}
+			}
+		}
+		if len(out) > 0 {
+			if len(out) > 4 {
+				return out[:4]
+			}
+			return out
+		}
+	}
+
+	if fallbackData != "" && !strings.HasPrefix(fallbackData, `{"`) {
+		return []string{fallbackData}
+	}
+	return nil
+}
+
+func parseSources(raw json.RawMessage) []domain.TriggerSourceItem {
+	if len(raw) == 0 {
+		return nil
+	}
+	var items []domain.TriggerSourceItem
+	if err := json.Unmarshal(raw, &items); err == nil && len(items) > 0 {
+		var valid []domain.TriggerSourceItem
+		for _, it := range items {
+			if strings.TrimSpace(it.Name) != "" || strings.TrimSpace(it.URL) != "" {
+				valid = append(valid, domain.TriggerSourceItem{
+					Title: strings.TrimSpace(it.Title),
+					Name:  strings.TrimSpace(it.Name),
+					URL:   strings.TrimSpace(it.URL),
+				})
+			}
+		}
+		return valid
+	}
+	return nil
 }
 
 func parseParagraphs(raw json.RawMessage, fallbackSummary, fallbackData string) []string {

@@ -94,19 +94,30 @@ type TriggerLog struct {
 	IsRead      bool      `json:"is_read"`
 }
 
+// TriggerSourceItem representa uma fonte com título, nome do veículo e URL para exibição de favicons.
+type TriggerSourceItem struct {
+	Title string `json:"title"`
+	Name  string `json:"name"`
+	URL   string `json:"url"`
+}
+
 // TriggerTestResult resultado de uma simulação ou teste sob demanda de disparador.
 type TriggerTestResult struct {
-	TriggerID             string   `json:"trigger_id"`
-	Title                 string   `json:"title"`
-	Query                 string   `json:"query"`
-	ConditionMet          bool     `json:"condition_met"`
-	CurrentData           string   `json:"current_data"`
-	Summary               string   `json:"summary"`
-	Paragraphs            []string `json:"paragraphs,omitempty"`
-	SimulatedNotification string   `json:"simulated_notification"`
-	Confidence            int      `json:"confidence"`
-	WhyRelevant           string   `json:"why_relevant"`
-	// Urgency indica breaking/imediato ("high") vs rotina ("low"/vazio) — Fase 2.
+	TriggerID             string              `json:"trigger_id"`
+	Title                 string              `json:"title"`
+	Query                 string              `json:"query"`
+	ConditionMet          bool                `json:"condition_met"`
+	CurrentData           string              `json:"current_data"`
+	Summary               string              `json:"summary"`
+	MetricLabel           string              `json:"metric_label,omitempty"`
+	MetricValue           string              `json:"metric_value,omitempty"`
+	Bullets               []string            `json:"bullets,omitempty"`
+	Sources               []TriggerSourceItem `json:"sources,omitempty"`
+	Paragraphs            []string            `json:"paragraphs,omitempty"`
+	SimulatedNotification string              `json:"simulated_notification"`
+	Confidence            int                 `json:"confidence"`
+	WhyRelevant           string              `json:"why_relevant"`
+	// Urgency indica breaking/imediato ("high"/"breaking") vs rotina ("low"/vazio) — Fase 2.
 	Urgency  string    `json:"urgency,omitempty"`
 	TestedAt time.Time `json:"tested_at"`
 }

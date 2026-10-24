@@ -93,13 +93,16 @@ func (p *GeminiProvider) TestEvaluateTrigger(ctx context.Context, t *domain.Trig
 	currentMonthYear := now.Format("01/2006")
 
 	var realtimeFeed string
+	var collectedNews []NewsItem
 	searchQuery := CleanSearchQuery(t.Query, string(t.Category))
 	if searchQuery == "" {
 		searchQuery = CleanSearchQuery(t.Title, string(t.Category))
 	}
 	if items, err := FetchGoogleNews(ctx, searchQuery, 6, p.httpClient); err == nil && len(items) > 0 {
+		collectedNews = items
 		realtimeFeed = FormatNewsFeed(items)
 	} else if items, err := FetchGoogleNews(ctx, t.Title, 6, p.httpClient); err == nil && len(items) > 0 {
+		collectedNews = items
 		realtimeFeed = FormatNewsFeed(items)
 	}
 
@@ -118,26 +121,31 @@ Avalie em tempo real este radar de monitoramento consultando dados atualizados d
 DIRETRIZES DE LOCALIZAÇÃO, IDIOMA E ATUALIDADE:
 1. IDIOMA E LOCALIZAÇÃO MANDATÓRIOS: Responda 100%% em PORTUGUÊS DO BRASIL (pt-BR). É EXPRESSAMENTE PROIBIDO gerar texto em inglês. Todos os preços DEVEM ser em Reais (R$) e voltados para o Brasil.
 2. ATENÇÃO AO CALENDÁRIO: Estamos em %s. As notícias e preços DEVEM ser de hoje ou dos últimos dias do mês atual. PROIBIDO trazer fatos antigos de meses anteriores.
-3. SE FOR MONITORAMENTO DE PRODUTO OU PREÇO:
-   - Pesquise exclusivamente lojas confiáveis que operam no Brasil (ex: Mercado Livre, Amazon Brasil, KaBuM!, Magazine Luiza, Casas Bahia, Fast Shop, Promobit).
-   - Discrimine obrigatoriamente: o menor preço à vista no PIX com desconto, preço no DÉBITO e opções de parcelamento sem juros no CARTÃO DE CRÉDITO (ex: até 10x ou 12x).
-4. ESTRUTURA DOS PARÁGRAFOS (campo "paragraphs"):
-   Gere de 2 a 3 parágrafos analíticos completos e substanciais:
-   - Parágrafo 1: Notícia e fato central do dia, contextualizando a vigília e variação em relação ao histórico.
-   - Parágrafo 2: Dados detalhados e concretos (se produto: lojas, preços Pix, débito e parcelado; se notícias/viagens: números, companhias, linhas ou datas de impacto).
-   - Parágrafo 3: Análise prática e recomendação executiva para o usuário (se vale a pena comprar hoje, esperar ou tomar uma ação preventiva).
-5. REGRA ANTI-SLOP ESTRITA: NUNCA use metalinguagem de IA (não diga "Conforme solicitado", "Identifiquei que", "A condição foi atendida"). Seja analítico e direto como um briefing executivo.
+3. SE FOR TIME OU EVENTO ESPORTIVO (ex: jogos do Flamengo, futebol):
+   - Priorize OBRIGATORIAMENTE o ÚLTIMO JOGO DISPUTADO com placar exato (ex: "Flamengo 2 x 1 Racing", data e campeonato).
+   - Defina "metric_label": "Último Jogo" e "metric_value": "Time X x Y Adversário" com o placar concreto.
+   - Traga também a data/horário do PRÓXIMO jogo se disponível.
+4. SE FOR MONITORAMENTO DE PRODUTO OU PREÇO:
+   - Pesquise exclusivamente lojas confiáveis que operam no Brasil (ex: Mercado Livre, Amazon Brasil, KaBuM!, Magazine Luiza).
+   - Discrimine o menor preço à vista no PIX com desconto e opções de parcelamento sem juros.
+   - Defina "metric_label": "Menor Preço" e "metric_value": valor em R$.
+5. ESCANEABILIDADE E ZERO PAREDES DE TEXTO:
+   - "summary": manchete executiva principal em 1 linha (máx 100 caracteres).
+   - "bullets": array com 2 a 3 tópicos factuais curtos e diretos (máximo 120 caracteres por item). PROIBIDO parágrafos longos ou texto corrido maçante.
+6. REGRA ANTI-SLOP ESTRITA: NUNCA use metalinguagem de IA (não diga "Conforme solicitado", "Identifiquei que", "A condição foi atendida"). Seja analítico e direto como um briefing executivo.
 
 Responda ESTRITAMENTE em formato JSON puro (sem marcações markdown extras):
 {
   "condition_met": boolean,
-  "summary": string (manchete executiva principal em 1 frase em português do Brasil),
-  "paragraphs": [string, string, string] (array de 2 a 3 parágrafos detalhados em português do Brasil),
+  "summary": string (manchete executiva concisa em 1 frase em português do Brasil),
+  "metric_label": string (rótulo curto como "Último Jogo", "Preço Atual", "Status"),
+  "metric_value": string (valor ou placar em destaque como "Flamengo 2 x 1 Adversário" ou "R$ 589"),
+  "bullets": [string, string, string] (array de 2 a 3 tópicos objetivos de até 120 caracteres),
   "current_data": string (dados resumidos em tópicos factuais),
   "simulated_notification": string (alerta curto e chamativo para push notification),
   "confidence": number (0-100),
   "why_relevant": string (1 frase explicando a relevância imediata para o usuário em português),
-  "urgency": string ("high" se for queda histórica de preço, cupom urgente ou notícia de impacto imediato; senão "low")
+  "urgency": string ("breaking" ou "high" se for gol, vitória/derrota recente, queda histórica de preço ou notícia urgente; senão "low")
 }`, t.Title, t.Query, t.Category, nowStr, currentMonthYear, realtimeBlock, currentMonthYear)
 
 	// Modelos prioritários com fallback resiliente para Grounding e geração
@@ -265,5 +273,18 @@ Responda ESTRITAMENTE em formato JSON puro (sem marcações markdown extras):
 		return nil, fmt.Errorf("falha ao avaliar vigília com gemini: %w", lastErr)
 	}
 
-	return ParseTriggerEvalResult(rawText, t)
+	res, err := ParseTriggerEvalResult(rawText, t)
+	if err != nil {
+		return nil, err
+	}
+	if len(res.Sources) == 0 && len(collectedNews) > 0 {
+		for _, n := range collectedNews {
+			res.Sources = append(res.Sources, domain.TriggerSourceItem{
+				Title: n.Title,
+				Name:  n.Source,
+				URL:   n.Link,
+			})
+		}
+	}
+	return res, nil
 }

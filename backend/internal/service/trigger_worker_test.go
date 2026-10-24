@@ -665,3 +665,47 @@ func TestTriggerWorker_NonUrgentPayloadPushesDefault(t *testing.T) {
 		t.Errorf("sem urgência o push deve ser default, veio %q", push.calls[0].priority)
 	}
 }
+
+func TestTriggerWorker_CheckBreakingTriggers_DispatchesBreakingNewsOutsideScheduledTime(t *testing.T) {
+	now := time.Date(2026, 10, 24, 15, 0, 0, 0, time.UTC)
+	futureCheck := now.Add(5 * time.Hour) // Próxima checagem só às 20h
+
+	repo := &mockTriggerRepo{
+		triggers: []domain.Trigger{
+			{
+				ID:            "trig-fla-breaking",
+				UserID:        "user-1",
+				Title:         "Jogos do Flamengo",
+				Status:        domain.TriggerStatusActive,
+				ScheduledTime: "20:00",
+				NextCheckAt:   &futureCheck,
+			},
+		},
+	}
+	push := &mockPushDispatcher{}
+	eval := &scriptedEvaluator{
+		payload: `{"status":"evaluated","condition_met":true,"confidence":98,"urgency":"breaking","summary":"Flamengo é campeão nos acréscimos!","data":"gol de Pedro"}`,
+	}
+
+	worker := service.NewTriggerWorker(repo, push, eval)
+	worker.SetDeltaFetcher(func(ctx context.Context, t *domain.Trigger) ([]string, []string, error) {
+		return []string{"hash-gol-breaking"}, []string{"hash-gol-breaking"}, nil
+	})
+
+	count, err := worker.CheckBreakingTriggers(now)
+	if err != nil {
+		t.Fatalf("erro ao checar breaking triggers: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("esperava 1 breaking trigger avaliado e despachado, obteve %d", count)
+	}
+	if len(repo.logs) != 1 {
+		t.Fatalf("esperava 1 log gravado, obteve %d", len(repo.logs))
+	}
+	if len(push.calls) != 1 {
+		t.Fatalf("esperava 1 push disparado imediatamente fora do horário, obteve %d", len(push.calls))
+	}
+	if push.calls[0].priority != "urgent" {
+		t.Errorf("esperava prioridade 'urgent', obteve %q", push.calls[0].priority)
+	}
+}

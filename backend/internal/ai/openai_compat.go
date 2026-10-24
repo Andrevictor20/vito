@@ -229,13 +229,16 @@ func (p *OpenAICompatProvider) EvaluateTrigger(ctx context.Context, t *domain.Tr
 	currentMonthYear := now.Format("01/2006")
 
 	var realtimeFeed string
+	var collectedNews []NewsItem
 	searchQuery := CleanSearchQuery(t.Query, string(t.Category))
 	if searchQuery == "" {
 		searchQuery = CleanSearchQuery(t.Title, string(t.Category))
 	}
 	if items, err := FetchGoogleNews(ctx, searchQuery, 6, p.httpClient); err == nil && len(items) > 0 {
+		collectedNews = items
 		realtimeFeed = FormatNewsFeed(items)
 	} else if items, err := FetchGoogleNews(ctx, t.Title, 6, p.httpClient); err == nil && len(items) > 0 {
+		collectedNews = items
 		realtimeFeed = FormatNewsFeed(items)
 	}
 
@@ -250,25 +253,31 @@ DATA ATUAL DO SISTEMA: %s (Mês/Ano: %s).
 DIRETRIZES DE LOCALIZAÇÃO, IDIOMA E ATUALIDADE:
 1. IDIOMA E LOCALIZAÇÃO MANDATÓRIOS: Responda 100%% em PORTUGUÊS DO BRASIL (pt-BR). É EXPRESSAMENTE PROIBIDO gerar texto em inglês. Todos os preços DEVEM ser em Reais (R$) e voltados para o mercado brasileiro.
 2. ATENÇÃO CRÍTICA À ATUALIDADE: Estamos em %s. As notícias e preços DEVEM ser de hoje ou dos últimos dias do mês atual. PROIBIDO trazer notícias de meses anteriores.
-3. SE FOR MONITORAMENTO DE PRODUTO OU PREÇO:
-   - Pesquise exclusivamente lojas confiáveis que operam no Brasil (ex: Mercado Livre, Amazon Brasil, KaBuM!, Magazine Luiza, Casas Bahia, Fast Shop, Promobit).
-   - Discrimine obrigatoriamente: o menor preço à vista no PIX com desconto, preço no DÉBITO e opções de parcelamento sem juros no CARTÃO DE CRÉDITO (ex: até 10x ou 12x).
-4. ESTRUTURA DOS PARÁGRAFOS (campo "paragraphs"):
-   Gere de 2 a 3 parágrafos analíticos completos e substanciais:
-   - Parágrafo 1: Notícia e fato central do dia, contextualizando a vigília e variação em relação ao histórico.
-   - Parágrafo 2: Dados detalhados e concretos (se produto: lojas, preços Pix, débito e parcelado; se notícias/viagens: números, companhias, linhas ou datas de impacto).
-   - Parágrafo 3: Análise prática e recomendação executiva para o usuário (se vale a pena comprar hoje, esperar ou tomar uma ação preventiva).
-5. REGRA ANTI-SLOP: NUNCA use metalinguagem de IA (não diga "Conforme monitorado", "A condição foi atendida").
+3. SE FOR TIME OU EVENTO ESPORTIVO (ex: jogos do Flamengo, futebol):
+   - Priorize OBRIGATORIAMENTE o ÚLTIMO JOGO DISPUTADO com placar exato (ex: "Flamengo 2 x 1 Racing", data e campeonato).
+   - Defina "metric_label": "Último Jogo" e "metric_value": "Time X x Y Adversário" com o placar concreto.
+   - Traga também a data/horário do PRÓXIMO jogo se disponível.
+4. SE FOR MONITORAMENTO DE PRODUTO OU PREÇO:
+   - Pesquise exclusivamente lojas confiáveis que operam no Brasil (ex: Mercado Livre, Amazon Brasil, KaBuM!, Magazine Luiza).
+   - Discrimine o menor preço à vista no PIX com desconto e opções de parcelamento sem juros.
+   - Defina "metric_label": "Menor Preço" e "metric_value": valor em R$.
+5. ESCANEABILIDADE E ZERO PAREDES DE TEXTO:
+   - "summary": manchete executiva principal em 1 linha (máx 100 caracteres).
+   - "bullets": array com 2 a 3 tópicos factuais curtos e diretos (máximo 120 caracteres por item). PROIBIDO parágrafos longos ou texto corrido maçante.
+6. REGRA ANTI-SLOP: NUNCA use metalinguagem de IA (não diga "Conforme monitorado", "A condição foi atendida"). Seja direto e conciso.
+
 Responda EXCLUSIVAMENTE em formato JSON puro, sem markdown delimitador:
 {
   "condition_met": true,
   "summary": "manchete executiva principal em 1 frase em português do Brasil",
-  "paragraphs": ["Parágrafo 1...", "Parágrafo 2...", "Parágrafo 3..."],
+  "metric_label": "rótulo curto como Último Jogo, Preço Atual, Status",
+  "metric_value": "valor ou placar em destaque como Flamengo 2 x 1 Adversário ou R$ 589",
+  "bullets": ["tópico factual 1 (máx 120 chars)", "tópico factual 2 (máx 120 chars)"],
   "current_data": "dados resumidos em tópicos factuais",
   "simulated_notification": "título curto e impactante da notificação de alerta",
   "confidence": 0-100,
   "why_relevant": "1 frase explicando por que é relevante para a vigília em português",
-  "urgency": "high se for queda histórica de preço, cupom urgente ou notícia de impacto imediato; senão low"
+  "urgency": "breaking ou high se for gol, vitória/derrota recente, queda histórica de preço ou notícia urgente; senão low"
 }`, nowStr, currentMonthYear, currentMonthYear)
 
 	userPrompt := fmt.Sprintf(`Avalie esta vigília/radar do usuário:
@@ -335,7 +344,20 @@ Analise o cenário, verifique se a condição foi atingida ou se há fatos relev
 	}
 
 	rawText := strings.TrimSpace(chatResp.Choices[0].Message.Content)
-	return ParseTriggerEvalResult(rawText, t)
+	res, err := ParseTriggerEvalResult(rawText, t)
+	if err != nil {
+		return nil, err
+	}
+	if len(res.Sources) == 0 && len(collectedNews) > 0 {
+		for _, n := range collectedNews {
+			res.Sources = append(res.Sources, domain.TriggerSourceItem{
+				Title: n.Title,
+				Name:  n.Source,
+				URL:   n.Link,
+			})
+		}
+	}
+	return res, nil
 }
 
 // GenerateText sintetiza textos e resumos executivos via OpenAICompatProvider.
