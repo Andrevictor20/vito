@@ -298,4 +298,18 @@ export class ChatApi {
       // Silencioso
     }
   }
+
+  async voiceTTS(
+    text: string,
+    voice?: string
+  ): Promise<{ audio_b64: string; mime: string; voice: string }> {
+    return this.client.request<{ audio_b64: string; mime: string; voice: string }>(
+      '/api/v1/voice/tts',
+      {
+        method: 'POST',
+        timeoutMs: 60000,
+        body: JSON.stringify({ text, voice }),
+      }
+    );
+  }
 }

@@ -21,6 +21,7 @@ interface ChatInputDockProps {
   loading?: boolean;
   onStop?: () => void;
   onPressMic?: () => void;
+  onPressLiveVoice?: () => void;
   isRecording?: boolean;
   onCancelRecording?: () => void;
   onPressAttach?: () => void;
@@ -40,6 +41,7 @@ export const ChatInputDock: React.FC<ChatInputDockProps> = ({
   loading = false,
   onStop,
   onPressMic,
+  onPressLiveVoice,
   isRecording = false,
   onCancelRecording,
   onPressAttach,
@@ -213,6 +215,22 @@ export const ChatInputDock: React.FC<ChatInputDockProps> = ({
               accessibilityLabel="Cancelar gravação"
             >
               <MaterialIcons name="delete-outline" size={18} color={colors.red} />
+            </TouchableOpacity>
+          )}
+
+          {/* Botão de Modo Conversação Contínua (Gemini Live) */}
+          {onPressLiveVoice && value.trim().length === 0 && !isRecording && (
+            <TouchableOpacity
+              style={[
+                styles.circ,
+                { backgroundColor: colors.bg, borderColor: colors.line },
+              ]}
+              onPress={onPressLiveVoice}
+              activeOpacity={0.7}
+              hitSlop={tokens.hitSlop.sm}
+              accessibilityLabel="Abrir modo de conversa contínua por voz"
+            >
+              <MaterialIcons name="graphic-eq" size={20} color={colors.primary} />
             </TouchableOpacity>
           )}
 

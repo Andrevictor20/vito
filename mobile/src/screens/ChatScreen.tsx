@@ -10,8 +10,10 @@ import {
   Keyboard,
   KeyboardEvent,
   Alert,
+  Modal,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { VitoVoiceOverlay } from '../overlay/VitoVoiceOverlay';
 
 let ImagePicker: any = null;
 try {
@@ -64,6 +66,7 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
     loading,
     sessions,
     sendMessage,
+    appendUserMessage,
     appendAssistantMessage,
     editAndResendMessage,
     stopGeneration,
@@ -87,6 +90,7 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
   const [historyVisible, setHistoryVisible] = useState(false);
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [isVoiceModeActive, setIsVoiceModeActive] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [deckGestureActive, setDeckGestureActive] = useState(false);
 
@@ -425,6 +429,7 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
           inputRef={inputRef}
           isRecording={isRecording}
           onPressMic={handleToggleRecording}
+          onPressLiveVoice={() => setIsVoiceModeActive(true)}
           onCancelRecording={handleCancelRecording}
           onPressAttach={handlePickImage}
           selectedImageUri={selectedImageUri}
@@ -452,6 +457,27 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
         selectedFocus={selectedFocus}
         onSelectFocus={setSelectedFocus}
       />
+      {isVoiceModeActive && (
+        <Modal
+          transparent
+          visible={isVoiceModeActive}
+          animationType="fade"
+          onRequestClose={() => setIsVoiceModeActive(false)}
+        >
+          <VitoVoiceOverlay
+            triggerSource="MANUAL"
+            onClose={() => setIsVoiceModeActive(false)}
+            onMessageExchange={(userText, aiReply) => {
+              if (userText?.trim()) {
+                appendUserMessage(userText.trim());
+              }
+              if (aiReply?.trim()) {
+                appendAssistantMessage(aiReply.trim());
+              }
+            }}
+          />
+        </Modal>
+      )}
     </KeyboardAvoidingView>
   );
 });

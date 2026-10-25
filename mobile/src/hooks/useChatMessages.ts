@@ -35,6 +35,7 @@ export interface UseChatMessagesResult {
   loading: boolean;
   saveMessages: (newMessages: ChatMessage[]) => void;
   sendMessage: (text: string, focusMode?: string) => Promise<void>;
+  appendUserMessage: (text: string) => void;
   appendAssistantMessage: (text: string) => void;
   editAndResendMessage: (messageId: string, newText: string, focusMode?: string) => Promise<void>;
   stopGeneration: () => void;
@@ -400,6 +401,25 @@ export function useChatMessages(
     saveMessages([]);
   }, [saveMessages]);
 
+  const appendUserMessage = useCallback(
+    (text: string) => {
+      const trimmed = text.trim();
+      if (!trimmed) return;
+      const userMsg: ChatMessage = {
+        id: `user-voice-${Date.now()}`,
+        sender: 'user',
+        text: trimmed,
+        timestamp: new Date().toISOString(),
+      };
+      setMessages((prev) => {
+        const nextList = [...prev, userMsg];
+        saveMessages(nextList);
+        return nextList;
+      });
+    },
+    [saveMessages]
+  );
+
   const appendAssistantMessage = useCallback(
     (text: string) => {
       const trimmed = text.trim();
@@ -425,6 +445,7 @@ export function useChatMessages(
     loading,
     saveMessages,
     sendMessage,
+    appendUserMessage,
     appendAssistantMessage,
     editAndResendMessage,
     stopGeneration,

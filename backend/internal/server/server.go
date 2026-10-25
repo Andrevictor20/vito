@@ -40,6 +40,7 @@ type Server struct {
 	gmailHandler        *handler.GmailHandler
 	whatsappAuthHandler *handler.WhatsAppAuthHandler
 	voiceHandler        *handler.VoiceStreamHandler
+	voiceTTSHandler     *handler.VoiceTTSHandler
 	authSvc             *service.AuthService
 }
 
@@ -66,6 +67,7 @@ type Config struct {
 	GmailHandler        *handler.GmailHandler
 	WhatsAppAuthHandler *handler.WhatsAppAuthHandler
 	VoiceHandler        *handler.VoiceStreamHandler
+	VoiceTTSHandler     *handler.VoiceTTSHandler
 	AuthSvc             *service.AuthService
 	// AllowedOrigins restringe o CORS (SEC-03). Vazio = ["*"] apenas fora
 	// de produção (dev/testes); em produção, vazio nega origens (fail-closed).
@@ -100,6 +102,7 @@ func New(cfg ...Config) *Server {
 		s.gmailHandler = cfg[0].GmailHandler
 		s.whatsappAuthHandler = cfg[0].WhatsAppAuthHandler
 		s.voiceHandler = cfg[0].VoiceHandler
+		s.voiceTTSHandler = cfg[0].VoiceTTSHandler
 		s.authSvc = cfg[0].AuthSvc
 	}
 
@@ -286,6 +289,10 @@ func (s *Server) registerRoutes() {
 						air.Post("/assistant/audio", s.astHandler.AudioChat)
 						air.Post("/assistant/vision", s.astHandler.VisionChat)
 					})
+				}
+
+				if s.voiceTTSHandler != nil {
+					protected.Post("/voice/tts", s.voiceTTSHandler.HandleTTS)
 				}
 
 				if s.notifHandler != nil {

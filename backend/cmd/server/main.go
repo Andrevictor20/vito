@@ -429,6 +429,12 @@ func main() {
 	waAuthSvc.SetWhatsAppRepo(waRepo)
 	whatsappAuthHandler := handler.NewWhatsAppAuthHandler(waAuthSvc)
 
+	// Síntese de fala neural (Edge-TTS pt-BR) com cache em disco e
+	// sintetizador no-op quando não disponível (fallback silencioso no Android).
+	ttsSvc := ai.NewTTSService(&ai.NoOpTTSynthesizer{}, cfg.TTSCacheDir, cfg.TTSVoice)
+	voiceTTSHandler := handler.NewVoiceTTSHandler(ttsSvc)
+	log.Printf("🗣️ [TTS] Síntese de fala habilitada (voz=%s, cache=%s).", cfg.TTSVoice, cfg.TTSCacheDir)
+
 	// 6. Servidor HTTP
 	srv := server.New(server.Config{
 		AuthHandler:         authHandler,
@@ -449,6 +455,8 @@ func main() {
 		WhatsAppHandler:     whatsappHandler,
 		GmailHandler:        gmailHandler,
 		WhatsAppAuthHandler: whatsappAuthHandler,
+		VoiceHandler:        nil,
+		VoiceTTSHandler:     voiceTTSHandler,
 		AuthSvc:             authSvc,
 		AllowedOrigins:      cfg.AllowedOrigins(),
 		Environment:         cfg.Environment,

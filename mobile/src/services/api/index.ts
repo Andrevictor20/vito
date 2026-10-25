@@ -233,6 +233,13 @@ export class ApiService extends ApiClient {
     return this.chatApi.deleteChatSession(id);
   }
 
+  voiceTTS(
+    text: string,
+    voice?: string
+  ): Promise<{ audio_b64: string; mime: string; voice: string }> {
+    return this.chatApi.voiceTTS(text, voice);
+  }
+
   // Triggers / Radares
   getTriggers(category?: TriggerCategory, status?: TriggerStatus): Promise<Trigger[]> {
     return this.triggersApi.getTriggers(category, status);

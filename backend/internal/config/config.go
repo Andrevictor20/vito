@@ -53,6 +53,10 @@ type Config struct {
 	WhatsAppMediaEnrichIntervalMin int
 	WhatsAppMediaMaxAgeDays        int
 	WhatsAppMediaVisionModel       string
+	// Síntese de fala neural (Edge-TTS pt-BR).
+	TTSVoice   string
+	TTSEnabled bool
+	TTSCacheDir string
 }
 
 // Load carrega a configuração a partir de variáveis de ambiente com fallbacks seguros.
@@ -199,6 +203,10 @@ func Load() *Config {
 		// Visão via OpenRouter: cota separada da do Google AI Studio (que é
 		// compartilhada por todos os modelos do Gemini e é o gargalo do chat).
 		WhatsAppMediaVisionModel: getEnvDefault("WHATSAPP_MEDIA_VISION_MODEL", "google/gemini-3.5-flash-lite"),
+		// Síntese de fala neural (Edge-TTS pt-BR).
+		TTSVoice:   getEnvDefault("TTS_VOICE", "pt-BR-AntonioNeural"),
+		TTSEnabled: getEnvBoolDefault("TTS_ENABLED", true),
+		TTSCacheDir: getEnvDefault("TTS_CACHE_DIR", "./data/tts_cache"),
 	}
 }
 

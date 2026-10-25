@@ -9,49 +9,75 @@ export interface HarmonicBarConfig {
 }
 
 export const DEFAULT_BAR_CONFIG: HarmonicBarConfig = {
-  minHeight: 8,
-  maxHeight: 38,
+  minHeight: 4,
+  maxHeight: 28,
 };
 
+export const GAUSSIAN_WEIGHTS_13 = [
+  0.22, 0.35, 0.50, 0.68, 0.85, 0.96, 1.00, 0.96, 0.85, 0.68, 0.50, 0.35, 0.22,
+];
+
 /**
- * Calcula a altura dos 5 seletores harmônicos do visualizador estilo Gemini.
- * Os índices 0 a 4 recebem multiplicadores harmônicos para criar uma curva suave e natural.
+ * Calcula a altura das 13 barras harmônicas do visualizador estilo Gemini.
+ * Utiliza distribuição gaussiana de sino com pico central no índice 6 (peso 1.00).
  */
 export function calculateHarmonicBarHeights(
   level: number, // 0.0 a 1.0
   state: ConversationState,
   phase: number = 0,
-  config: HarmonicBarConfig = DEFAULT_BAR_CONFIG
+  barCountOrConfig: number | HarmonicBarConfig = 13,
+  maybeConfig?: HarmonicBarConfig
 ): number[] {
+  const config =
+    (typeof barCountOrConfig === 'object' ? barCountOrConfig : maybeConfig) ||
+    DEFAULT_BAR_CONFIG;
   const { minHeight, maxHeight } = config;
   const clampedLevel = Math.max(0, Math.min(1, level));
   const range = maxHeight - minHeight;
+  const weights = GAUSSIAN_WEIGHTS_13;
 
   if (state === 'LISTENING') {
-    // Curva harmônica de sino (centro mais alto): [0.45, 0.8, 1.0, 0.8, 0.45]
-    const weights = [0.45, 0.82, 1.0, 0.78, 0.48];
     return weights.map((w, idx) => {
-      // Leve oscilação de repouso (fase) para não ficar estático quando em silêncio
-      const idleWave = Math.sin(phase + idx * 0.8) * 0.08;
+      const idleWave = Math.sin(phase + idx * 0.45) * 0.12;
       const effectiveLevel = Math.max(idleWave, clampedLevel);
       return Math.round(minHeight + effectiveLevel * range * w);
     });
   }
 
   if (state === 'THINKING') {
-    // Onda senoidal viajante suave
-    return [0, 1, 2, 3, 4].map((idx) => {
-      const sine = (Math.sin(phase * 4 + idx * 0.9) + 1) / 2; // 0..1
-      return Math.round(minHeight + (sine * range * 0.65));
+    return weights.map((w, idx) => {
+      const sine = (Math.sin(phase * 5 + idx * 0.65) + 1) / 2;
+      return Math.round(minHeight + sine * range * 0.65);
     });
   }
 
-  // SPEAKING: Dança harmônica mais vibrante
-  const danceWeights = [0.6, 0.95, 0.8, 1.0, 0.65];
-  return danceWeights.map((w, idx) => {
-    const wave = (Math.sin(phase * 6 + idx * 1.2) + 1) / 2;
-    return Math.round(minHeight + (wave * range * w));
+  // SPEAKING: Dança harmônica expressiva modulada pela curva gaussiana
+  return weights.map((w, idx) => {
+    const wave =
+      (Math.sin(phase * 7 + idx * 0.8) * 0.7 +
+        Math.cos(phase * 4 + idx * 1.2) * 0.3 +
+        1) /
+      2;
+    return Math.round(minHeight + wave * range * w);
   });
+}
+
+/**
+ * Identifica se a fala do usuário é uma despedida que deve fechar o assistente
+ */
+export function isGoodbyeUtterance(text?: string): boolean {
+  if (!text) return false;
+  const clean = text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+
+  const patterns = [
+    /\b(tchau|falou|valeu|brigado|obrigado|ate mais|ate logo|ate breve|so isso|pode fechar|fechar assistente|encerrar|dispensar)\b/i,
+  ];
+
+  return patterns.some((p) => p.test(clean));
 }
 
 /**

@@ -196,3 +196,28 @@ func TestBuildSystemPromptFromInput_FocusModes(t *testing.T) {
 		}
 	})
 }
+
+func TestBuildSystemPrompt_VoiceAndGeneralSearchAndScopeDirectives(t *testing.T) {
+	input := ai.UserInput{
+		Now:      time.Date(2026, 10, 25, 12, 0, 0, 0, time.UTC),
+		Timezone: "America/Sao_Paulo",
+	}
+	prompt := ai.BuildSystemPromptFromInput(input)
+
+	expectedDirectives := []string{
+		"MODO DE VOZ, PESQUISA GERAL E CONVERSAÇÃO CONTÍNUA",
+		"CONVERSAÇÃO HUMANA & FLUIDA",
+		"RESPOSTAS PARA MODO DE VOZ / ÁUDIO",
+		"PESQUISA DE ASSUNTOS GERAIS",
+		"FRONTEIRA ESTRITA DE ESCOPO (OUT_OF_SCOPE)",
+		"NUNCA redija monografias",
+		"NUNCA resolva cálculos avançados",
+		"NUNCA escreva, refatore ou depure códigos de programação",
+	}
+
+	for _, directive := range expectedDirectives {
+		if !strings.Contains(prompt, directive) {
+			t.Errorf("esperava diretriz %q no system prompt", directive)
+		}
+	}
+}
