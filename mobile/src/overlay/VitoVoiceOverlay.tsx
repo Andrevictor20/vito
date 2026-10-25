@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,354 +7,384 @@ import {
   NativeModules,
   Animated,
   Easing,
-  Dimensions,
+  DeviceEventEmitter,
+  BackHandler,
+  Linking,
 } from 'react-native';
+import api from '../services/api';
+import {
+  ConversationState,
+  calculateHarmonicBarHeights,
+  getAuraColor,
+  getStateLabel,
+  extractWhatsAppCardData,
+} from './voiceOverlayHelpers';
+import { WhatsAppInlineCard } from './WhatsAppInlineCard';
+import type { ChatWhatsAppMessage } from '../types';
 
-const { VitoAssistantModule, VitoDuplexAudioModule } = NativeModules;
-const { width } = Dimensions.get('window');
+const { VitoDuplexAudioModule } = NativeModules;
 
 export interface VitoVoiceOverlayProps {
   triggerSource?: 'WAKE_WORD' | 'DEFAULT_ASSISTANT' | 'MANUAL';
   screenContext?: string;
 }
 
-export type ConversationState = 'LISTENING' | 'THINKING' | 'SPEAKING';
-
 export function VitoVoiceOverlay({
-  triggerSource = 'MANUAL',
-  screenContext = '',
+  triggerSource = 'DEFAULT_ASSISTANT',
 }: VitoVoiceOverlayProps) {
   const [state, setState] = useState<ConversationState>('LISTENING');
-  const [transcript, setTranscript] = useState<string>('Estou ouvindo...');
-  const [completedTasks, setCompletedTasks] = useState<string[]>([]);
-  const wsRef = useRef<WebSocket | null>(null);
+  const [transcript, setTranscript] = useState<string>('Estou ouvindo... O que deseja fazer?');
+  const [audioLevel, setAudioLevel] = useState<number>(0);
+  const [whatsappCard, setWhatsappCard] = useState<ChatWhatsAppMessage | null>(null);
+  const [isSendingWhatsApp, setIsSendingWhatsApp] = useState<boolean>(false);
+  const [whatsAppSent, setWhatsAppSent] = useState<boolean>(false);
 
-  // Animação de pulso do orbe
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  const rotateAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(100)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const phaseRef = useRef<number>(0);
+  const [barHeights, setBarHeights] = useState<number[]>([12, 18, 26, 18, 12]);
 
-  useEffect(() => {
-    // Inicia loop de respiração do orbe
-    const pulseLoop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1.25,
-          duration: 1200,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 1200,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-      ])
-    );
-    pulseLoop.start();
+  const stateRef = useRef(state);
+  stateRef.current = state;
+  const audioLevelRef = useRef(audioLevel);
+  audioLevelRef.current = audioLevel;
 
-    // Inicializa módulo nativo duplex de áudio com AEC
-    if (VitoDuplexAudioModule?.startFullDuplexAudio) {
-      VitoDuplexAudioModule.startFullDuplexAudio().catch(() => {});
-    }
-
-    // Inicializa conexão de voz
-    connectVoiceStream();
-
-    return () => {
-      pulseLoop.stop();
-      cleanupSession();
-    };
-  }, []);
-
-  const connectVoiceStream = () => {
+  const handleClose = useCallback(() => {
     try {
-      const wsUrl = 'wss://vito.rasppi.cloud/v1/voice/stream';
-      const ws = new WebSocket(wsUrl);
-      wsRef.current = ws;
-
-      ws.onopen = () => {
-        // Envia frame de inicialização com metadados e contexto da tela
-        ws.send(
-          JSON.stringify({
-            trigger_source: triggerSource,
-            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-            screen_context: screenContext || '',
-          })
-        );
-      };
-
-      ws.onmessage = (event) => {
-        if (typeof event.data === 'string') {
-          try {
-            const msg = JSON.parse(event.data);
-            handleServerEvent(msg);
-          } catch {
-            // Ignora frames não-JSON
-          }
-        }
-      };
-
-      ws.onerror = () => {
-        setState('LISTENING');
-        setTranscript('Diga algo como "Marca dentista amanhã às 14h"...');
-      };
-    } catch {
-      // Falha graciosa
-    }
-  };
-
-  const handleServerEvent = (msg: { type: string; text?: string; summary?: string }) => {
-    switch (msg.type) {
-      case 'STATE_CHANGED':
-        if (msg.text === 'LISTENING' || msg.text === 'THINKING' || msg.text === 'SPEAKING') {
-          setState(msg.text as ConversationState);
-        }
-        break;
-
-      case 'BARGE_IN_STOP_AUDIO':
-        if (VitoDuplexAudioModule?.stopBotPlaybackImmediately) {
-          VitoDuplexAudioModule.stopBotPlaybackImmediately();
-        }
-        setState('LISTENING');
-        setTranscript('Ouvindo você...');
-        break;
-
-      case 'BOT_TRANSCRIPT':
-        setState('SPEAKING');
-        if (msg.text) setTranscript(msg.text);
-        break;
-
-      case 'TASK_EXECUTED':
-        if (msg.summary) {
-          setCompletedTasks((prev) => [...prev, msg.summary as string]);
-        }
-        break;
-
-      case 'END_CONVERSATION':
-        handleClose();
-        break;
-    }
-  };
-
-  const cleanupSession = async () => {
-    try {
-      wsRef.current?.close();
       if (VitoDuplexAudioModule?.releaseDuplexAudio) {
         VitoDuplexAudioModule.releaseDuplexAudio();
       }
+    } catch {}
+    BackHandler.exitApp();
+  }, []);
+
+  const finishRecordingAndProcess = useCallback(async () => {
+    if (stateRef.current !== 'LISTENING') return;
+    setState('THINKING');
+    setTranscript('Pensando...');
+
+    try {
+      let wavPath = '';
+      if (VitoDuplexAudioModule?.stopRecording) {
+        wavPath = await VitoDuplexAudioModule.stopRecording();
+      }
+
+      if (!wavPath) {
+        setTranscript('Não consegui captar o áudio. Tente novamente.');
+        setState('LISTENING');
+        return;
+      }
+
+      const res = await api.assistantAudio(wavPath, 'audio.wav');
+      const replyText = (res.reply || res.message || 'Comando executado.').trim();
+
+      setState('SPEAKING');
+      setTranscript(replyText);
+
+      const card = extractWhatsAppCardData(res);
+      if (card) {
+        setWhatsappCard(card);
+      }
+
+      if (VitoDuplexAudioModule?.speakText) {
+        VitoDuplexAudioModule.speakText(replyText).catch(() => {});
+      }
+    } catch (err: any) {
+      setState('SPEAKING');
+      setTranscript(err?.message || 'Erro ao processar áudio com o assistente.');
+    }
+  }, []);
+
+  const handleConfirmWhatsApp = useCallback(async () => {
+    if (!whatsappCard || isSendingWhatsApp || whatsAppSent) return;
+    setIsSendingWhatsApp(true);
+    try {
+      const phone = (whatsappCard.recipient_phone || '').replace(/\D/g, '');
+      const msg = encodeURIComponent(whatsappCard.message || '');
+      if (phone) {
+        await Linking.openURL(`https://wa.me/${phone}?text=${msg}`);
+      } else {
+        await Linking.openURL(`https://wa.me/?text=${msg}`);
+      }
+      setWhatsAppSent(true);
+      setTimeout(() => handleClose(), 1800);
     } catch {
-      // Ignora erro de cleanup
+      setIsSendingWhatsApp(false);
     }
-  };
+  }, [whatsappCard, isSendingWhatsApp, whatsAppSent, handleClose]);
 
-  const handleClose = () => {
-    cleanupSession();
-  };
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 260,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 220,
+        useNativeDriver: true,
+      }),
+    ]).start();
 
-  const getOrbColor = () => {
-    switch (state) {
-      case 'LISTENING':
-        return '#10B981'; // Esmeralda / Verde
-      case 'THINKING':
-        return '#3B82F6'; // Azul sereno
-      case 'SPEAKING':
-        return '#8B5CF6'; // Roxo vibrante
+    if (VitoDuplexAudioModule?.startRecording) {
+      VitoDuplexAudioModule.startRecording().catch(() => {});
     }
-  };
 
-  const getStateLabel = () => {
-    switch (state) {
-      case 'LISTENING':
-        return 'Ouvindo você...';
-      case 'THINKING':
-        return 'Pensando...';
-      case 'SPEAKING':
-        return 'Vito respondendo';
-    }
-  };
+    const sub = DeviceEventEmitter.addListener('onAudioLevel', (event: { level?: number }) => {
+      if (typeof event?.level === 'number') {
+        setAudioLevel(event.level);
+      }
+    });
+
+    const interval = setInterval(() => {
+      phaseRef.current += 0.12;
+      const heights = calculateHarmonicBarHeights(
+        audioLevelRef.current,
+        stateRef.current,
+        phaseRef.current
+      );
+      setBarHeights(heights);
+    }, 45);
+
+    return () => {
+      clearInterval(interval);
+      sub.remove();
+      try {
+        if (VitoDuplexAudioModule?.releaseDuplexAudio) {
+          VitoDuplexAudioModule.releaseDuplexAudio();
+        }
+      } catch {}
+    };
+  }, [slideAnim, fadeAnim]);
+
+  const auraColor = getAuraColor(state);
 
   return (
-    <View style={styles.backdrop}>
-      <View style={styles.sheet}>
-        {/* Header com indicador de gatilho */}
+    <View style={styles.container}>
+      <TouchableOpacity
+        style={styles.backdrop}
+        activeOpacity={1}
+        onPress={handleClose}
+      />
+
+      <Animated.View
+        style={[
+          styles.capsule,
+          {
+            borderColor: state === 'LISTENING' ? '#2A2E35' : auraColor,
+            transform: [{ translateY: slideAnim }],
+            opacity: fadeAnim,
+          },
+        ]}
+      >
+        <View style={[styles.glowLine, { backgroundColor: auraColor }]} />
+
         <View style={styles.header}>
           <View style={styles.badge}>
+            <View style={[styles.statusDot, { backgroundColor: auraColor }]} />
             <Text style={styles.badgeText}>
-              {triggerSource === 'WAKE_WORD'
-                ? 'Ei Vito'
-                : triggerSource === 'DEFAULT_ASSISTANT'
-                ? 'Assistente Nativo'
-                : 'Vito Voz'}
+              {triggerSource === 'DEFAULT_ASSISTANT' ? 'Vito Assistente' : 'Vito Voz'}
             </Text>
           </View>
-          <TouchableOpacity onPress={handleClose} style={styles.closeBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+          <TouchableOpacity
+            onPress={handleClose}
+            style={styles.closeBtn}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          >
             <Text style={styles.closeBtnText}>✕</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Orbe Central Animado */}
-        <View style={styles.orbContainer}>
-          <Animated.View
-            style={[
-              styles.orb,
-              {
-                backgroundColor: getOrbColor(),
-                transform: [{ scale: pulseAnim }],
-                shadowColor: getOrbColor(),
-              },
-            ]}
-          />
-          <Text style={[styles.stateLabel, { color: getOrbColor() }]}>
-            {getStateLabel()}
-          </Text>
+        <View style={styles.waveformContainer}>
+          {barHeights.map((h, i) => (
+            <View
+              key={i}
+              style={[
+                styles.waveformBar,
+                {
+                  height: h,
+                  backgroundColor: auraColor,
+                },
+              ]}
+            />
+          ))}
         </View>
 
-        {/* Transcrição / Resposta da IA */}
-        <Text style={styles.transcript} numberOfLines={4}>
+        <Text style={[styles.stateLabel, { color: auraColor }]}>
+          {getStateLabel(state)}
+        </Text>
+
+        <Text style={styles.transcript} numberOfLines={3}>
           {transcript}
         </Text>
 
-        {/* Lista de tarefas concluídas */}
-        {completedTasks.length > 0 && (
-          <View style={styles.tasksContainer}>
-            {completedTasks.map((t, idx) => (
-              <View key={idx} style={styles.taskCard}>
-                <Text style={styles.taskCheck}>✓</Text>
-                <Text style={styles.taskText}>{t}</Text>
-              </View>
-            ))}
-          </View>
+        {whatsappCard && (
+          <WhatsAppInlineCard
+            card={whatsappCard}
+            isSending={isSendingWhatsApp}
+            sent={whatsAppSent}
+            onConfirm={handleConfirmWhatsApp}
+          />
         )}
 
-        {/* Rodapé com botão Concluir */}
         <View style={styles.footer}>
-          <TouchableOpacity style={styles.actionBtn} onPress={handleClose}>
-            <Text style={styles.actionBtnText}>Concluir</Text>
-          </TouchableOpacity>
+          {state === 'LISTENING' ? (
+            <TouchableOpacity
+              style={[styles.actionBtn, { borderColor: auraColor }]}
+              onPress={finishRecordingAndProcess}
+            >
+              <View style={[styles.micIndicator, { backgroundColor: auraColor }]} />
+              <Text style={styles.actionBtnText}>Pronto</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity style={styles.dismissBtn} onPress={handleClose}>
+              <Text style={styles.dismissBtnText}>Concluir</Text>
+            </TouchableOpacity>
+          )}
         </View>
-      </View>
+      </Animated.View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
+  container: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.45)',
   },
-  sheet: {
-    backgroundColor: '#121214',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    paddingHorizontal: 24,
-    paddingTop: 20,
-    paddingBottom: 36,
-    borderWidth: 1,
-    borderColor: '#27272A',
+  backdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+  },
+  capsule: {
+    backgroundColor: '#16161A',
+    marginHorizontal: 14,
+    marginBottom: 20,
+    borderRadius: 26,
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    paddingBottom: 18,
+    borderWidth: 1.2,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.5,
+    shadowRadius: 18,
+    elevation: 12,
+  },
+  glowLine: {
+    position: 'absolute',
+    top: 0,
+    left: 48,
+    right: 48,
+    height: 2.5,
+    borderRadius: 2,
+    opacity: 0.85,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 10,
   },
   badge: {
-    backgroundColor: '#1C2026',
-    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1E2024',
+    paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#27272A',
+  },
+  statusDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    marginRight: 6,
   },
   badgeText: {
-    color: '#A1A1AA',
+    color: '#D4D4D8',
     fontSize: 12,
     fontWeight: '600',
   },
   closeBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#27272A',
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#24262B',
     justifyContent: 'center',
     alignItems: 'center',
   },
   closeBtnText: {
-    color: '#E4E4E7',
-    fontSize: 12,
+    color: '#A1A1AA',
+    fontSize: 11,
     fontWeight: '700',
   },
-  orbContainer: {
+  waveformContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 18,
+    justifyContent: 'center',
+    height: 44,
+    marginVertical: 4,
   },
-  orb: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.65,
-    shadowRadius: 18,
-    elevation: 8,
+  waveformBar: {
+    width: 4.5,
+    marginHorizontal: 3.5,
+    borderRadius: 3,
   },
   stateLabel: {
-    marginTop: 12,
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 6,
     letterSpacing: 0.3,
   },
   transcript: {
     color: '#FFFFFF',
-    fontSize: 16,
-    lineHeight: 24,
+    fontSize: 15,
+    lineHeight: 22,
     fontWeight: '500',
     textAlign: 'center',
-    minHeight: 48,
-    marginBottom: 16,
-  },
-  tasksContainer: {
-    marginBottom: 16,
-    gap: 8,
-  },
-  taskCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#18181B',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#27272A',
-  },
-  taskCheck: {
-    color: '#10B981',
-    fontWeight: '700',
-    marginRight: 10,
-  },
-  taskText: {
-    color: '#F4F4F5',
-    fontSize: 13.5,
-    fontWeight: '500',
-    flex: 1,
+    marginBottom: 12,
+    paddingHorizontal: 8,
   },
   footer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 8,
+    alignItems: 'center',
+    marginTop: 2,
   },
   actionBtn: {
-    backgroundColor: '#27272A',
-    paddingHorizontal: 28,
-    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#22252B',
+    paddingHorizontal: 22,
+    paddingVertical: 9,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#3F3F46',
+  },
+  micIndicator: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 8,
   },
   actionBtnText: {
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: 13.5,
+    fontWeight: '600',
+  },
+  dismissBtn: {
+    backgroundColor: '#24262B',
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 18,
+  },
+  dismissBtnText: {
+    color: '#D4D4D8',
+    fontSize: 13,
     fontWeight: '600',
   },
 });
