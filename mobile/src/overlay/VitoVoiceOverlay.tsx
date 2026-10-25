@@ -143,10 +143,6 @@ export function VitoVoiceOverlay({
       if (VitoDuplexAudioModule?.releaseDuplexAudio) {
         VitoDuplexAudioModule.releaseDuplexAudio();
       }
-      // Se acionado pelo Modo A ("Ei Vito"), reativa o Vosk em segundo plano ao fechar
-      if (triggerSource === 'WAKE_WORD' && VitoAssistantModule?.setActivationMode) {
-        await VitoAssistantModule.setActivationMode('COEXIST_WAKE_WORD');
-      }
     } catch {
       // Ignora erro de cleanup
     }
