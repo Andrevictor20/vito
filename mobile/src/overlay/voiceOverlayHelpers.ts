@@ -253,12 +253,16 @@ export function extractOverlayActionCard(
 }
 
 /**
- * Remove marcações de formatação markdown (asteriscos, negrito, itálico, títulos, etc.)
- * garantindo legendas e falas com texto humanizado e limpo, sem asteriscos aparentes.
+ * Remove marcações de formatação markdown, tabelas, barras (|), traços e delimitadores,
+ * garantindo legendas e falas com texto humanizado e limpo, sem asteriscos ou barras aparentes.
  */
 export function cleanVoiceText(text?: string): string {
   if (!text) return '';
   return text
+    .replace(/\[ID:\s*[^\]]+\]/gi, '')
+    .replace(/^\s*\|?[\s\-:|]+\|?\s*$/gm, '')
+    .replace(/\|/g, ' ')
+    .replace(/-{2,}/g, ' ')
     .replace(/\*\*([^*]+)\*\*/g, '$1')
     .replace(/\*([^*]+)\*/g, '$1')
     .replace(/__([^_]+)__/g, '$1')

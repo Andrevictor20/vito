@@ -55,6 +55,7 @@ export function VitoVoiceOverlay({
   const [screenContextVisible, setScreenContextVisible] = useState<boolean>(Boolean(initialScreenContext));
   const [actionCard, setActionCard] = useState<OverlayActionCardData | null>(null);
   const [whatsappCard, setWhatsappCard] = useState<ChatWhatsAppMessage | null>(null);
+  const [hasSources, setHasSources] = useState<boolean>(false);
   const [isSendingWhatsApp, setIsSendingWhatsApp] = useState<boolean>(false);
   const [whatsAppSent, setWhatsAppSent] = useState<boolean>(false);
   const [preferredVoice, setPreferredVoice] = useState<'puck' | 'kore'>('puck');
@@ -210,6 +211,7 @@ export function VitoVoiceOverlay({
 
       setWhatsappCard(extractWhatsAppCardData(resPayload));
       setActionCard(extractOverlayActionCard(resPayload));
+      setHasSources(Boolean(resPayload?.sources && resPayload.sources.length > 0));
 
       setState('SPEAKING');
       startWordHighlightProgress(cleanReply);
@@ -225,18 +227,19 @@ export function VitoVoiceOverlay({
         return;
       }
 
-      // Pequena drenagem acústica (120ms) para dissipar a reverberação do alto-falante viva-voz
+      // Drenagem acústica (120ms) para dissipar a reverberação do alto-falante viva-voz
       await new Promise((r) => setTimeout(r, 120));
 
-      const nextListenState: ConversationState = isCompact ? 'IDLE' : 'LISTENING';
-      setState(nextListenState);
-      if (!isCompact) setTranscript('Ouvindo você...');
-      resetInactivityTimer(nextListenState);
+      // Conversação Contínua Natural (Gemini Live / ChatGPT Voice):
+      // Retorna imediatamente para LISTENING permitindo turnos sequenciais por voz
+      setState('LISTENING');
+      setTranscript('Pode falar…');
+      resetInactivityTimer('LISTENING');
       if (!isMutedRef.current && VitoDuplexAudioModule?.startRecording) {
         await VitoDuplexAudioModule.startRecording().catch(() => {});
       }
     },
-    [isCompact, preferredVoice, onMessageExchange, startWordHighlightProgress, playNeuralVoiceReply, clearWordTimer, handleClose, resetInactivityTimer]
+    [preferredVoice, onMessageExchange, startWordHighlightProgress, playNeuralVoiceReply, clearWordTimer, handleClose, resetInactivityTimer]
   );
 
   const finishRecordingAndProcess = useCallback(async () => {
@@ -246,6 +249,10 @@ export function VitoVoiceOverlay({
     if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
     setState('THINKING');
     setTranscript('Pensando...');
+    setReplyText('');
+    setActionCard(null);
+    setWhatsappCard(null);
+    setHasSources(false);
 
     try {
       const wavPath = (await VitoDuplexAudioModule?.stopRecording?.()) || '';
@@ -341,11 +348,8 @@ export function VitoVoiceOverlay({
   }, []);
 
   const handleOpenInVito = useCallback(() => {
-    if (VitoAssistantModule?.openMainApp) {
-      VitoAssistantModule.openMainApp().catch(() => {});
-    } else {
-      handleClose();
-    }
+    if (VitoAssistantModule?.openMainApp) VitoAssistantModule.openMainApp().catch(() => {});
+    else handleClose();
   }, [handleClose]);
 
   const handleUndoAction = useCallback(() => {
@@ -388,7 +392,11 @@ export function VitoVoiceOverlay({
     });
     const speechStartSub = DeviceEventEmitter.addListener('onSpeechStart', () => {
       if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
-      if (stateRef.current === 'IDLE') setState('LISTENING');
+      if (stateRef.current === 'SPEAKING') {
+        clearWordTimer();
+        VitoDuplexAudioModule?.stopSpeaking?.();
+      }
+      if (stateRef.current !== 'LISTENING') setState('LISTENING');
     });
     const newIntentSub = DeviceEventEmitter.addListener('onVitoOverlayNewIntent', (payload: { screenContext?: string }) => {
       isClosingRef.current = false;
@@ -445,6 +453,7 @@ export function VitoVoiceOverlay({
         isSendingWhatsApp={isSendingWhatsApp}
         whatsAppSent={whatsAppSent}
         onConfirmWhatsApp={handleConfirmWhatsApp}
+        hasSources={hasSources}
       />
     );
   }

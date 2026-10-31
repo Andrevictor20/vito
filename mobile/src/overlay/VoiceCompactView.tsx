@@ -56,6 +56,7 @@ export interface VoiceCompactViewProps {
   isSendingWhatsApp?: boolean;
   whatsAppSent?: boolean;
   onConfirmWhatsApp?: () => void;
+  hasSources?: boolean;
 }
 
 const DEFAULT_SUGGESTIONS = [
@@ -90,6 +91,7 @@ export const VoiceCompactView: React.FC<VoiceCompactViewProps> = ({
   isSendingWhatsApp = false,
   whatsAppSent = false,
   onConfirmWhatsApp,
+  hasSources = false,
 }) => {
   const systemScheme = useColorScheme();
   let isDarkTheme = systemScheme === 'dark';
@@ -235,8 +237,29 @@ export const VoiceCompactView: React.FC<VoiceCompactViewProps> = ({
               </View>
             )}
 
-            {words.length > 0 && (
-              <Text style={styles.replyWordsText}>
+            {hasSources && (
+              <View style={[styles.searchBadge, { backgroundColor: theme.surf, borderColor: theme.line }]}>
+                <Text style={[styles.searchBadgeText, { color: theme.blue }]}>🔍 Pesquisa Web</Text>
+              </View>
+            )}
+
+            {/* Quando NÃO há card de ação, exibe o texto da resposta conciso (estilo Gemini/GPT) */}
+            {!actionCard && !whatsappCard && words.length > 0 && (
+              <Text style={styles.replyWordsText} numberOfLines={4} ellipsizeMode="tail">
+                {words.map((word, index) => (
+                  <Text
+                    key={`${word}-${index}`}
+                    style={{ color: index < highlightedWordCount ? theme.ink : theme.muted }}
+                  >
+                    {index === 0 ? word : ` ${word}`}
+                  </Text>
+                ))}
+              </Text>
+            )}
+
+            {/* Quando HÁ card de ação (evento/tarefa/whatsapp), exibe apenas fala curta como intro de 1 linha */}
+            {(Boolean(actionCard) || Boolean(whatsappCard)) && words.length > 0 && words.length <= 15 && (
+              <Text style={[styles.actionIntroText, { color: theme.muted }]} numberOfLines={1} ellipsizeMode="tail">
                 {words.map((word, index) => (
                   <Text
                     key={`${word}-${index}`}

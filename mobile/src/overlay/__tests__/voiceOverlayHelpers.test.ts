@@ -232,10 +232,12 @@ describe('voiceOverlayHelpers — Testes do Visualizador e Lógica de Voz', () =
     assert.deepStrictEqual(words, ['Pronto', '—', 'marquei', 'na', 'sua', 'agenda.']);
   });
 
-  it('cleanVoiceText remove asteriscos (**), itálicos (*), títulos e marcadores deixando texto limpo', () => {
+  it('cleanVoiceText remove asteriscos (**), itálicos (*), títulos, tabelas (|), traços e marcadores deixando texto limpo', () => {
     assert.strictEqual(cleanVoiceText('**Bom dia, André!** Você tem **2 reuniões** hoje.'), 'Bom dia, André! Você tem 2 reuniões hoje.');
     assert.strictEqual(cleanVoiceText('*Aviso:* Não esqueça do seu remédio.'), 'Aviso: Não esqueça do seu remédio.');
     assert.strictEqual(cleanVoiceText('### Título\n- Item 1\n- Item 2'), 'Título Item 1 Item 2');
+    assert.strictEqual(cleanVoiceText('| Evento | Hora |\n|---|---|\n| Reunião | 14:00 |'), 'Evento Hora Reunião 14:00');
+    assert.strictEqual(cleanVoiceText('Agenda | Evento | Data / Hora | --------- | ------------ | | Aula [ID: evt_1]'), 'Agenda Evento Data / Hora Aula');
     assert.strictEqual(cleanVoiceText(''), '');
     assert.strictEqual(cleanVoiceText(undefined), '');
   });

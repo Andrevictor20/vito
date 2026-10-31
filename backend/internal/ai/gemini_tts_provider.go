@@ -82,14 +82,24 @@ type geminiTTSResponse struct {
 }
 
 var (
-	markdownSymbolsRegex = regexp.MustCompile(`[*_~` + "`" + `#>\[\]\(\)]+`)
-	extraSpacesRegex     = regexp.MustCompile(`\s+`)
-	rateRegex            = regexp.MustCompile(`rate=(\d+)`)
+	idBracketRegex            = regexp.MustCompile(`(?i)\[ID:\s*[^\]]+\]`)
+	markdownTableDividerRegex = regexp.MustCompile(`(?m)^\s*\|?[\s\-:|]+\|?\s*$`)
+	pipeSymbolsRegex          = regexp.MustCompile(`\|+`)
+	repeatedDashesRegex       = regexp.MustCompile(`-{2,}`)
+	bulletPointsRegex         = regexp.MustCompile(`(?m)^\s*[-*+]\s+`)
+	markdownSymbolsRegex      = regexp.MustCompile(`[*_~` + "`" + `#>\[\]\(\)]+`)
+	extraSpacesRegex          = regexp.MustCompile(`\s+`)
+	rateRegex                 = regexp.MustCompile(`rate=(\d+)`)
 )
 
-// cleanTextForSpeech limpa marcações markdown para que a voz soe fluida e humana.
+// cleanTextForSpeech limpa marcações markdown, tabelas, barras e traços para que a voz soe fluida e humana.
 func cleanTextForSpeech(text string) string {
-	cleaned := markdownSymbolsRegex.ReplaceAllString(text, " ")
+	cleaned := idBracketRegex.ReplaceAllString(text, " ")
+	cleaned = markdownTableDividerRegex.ReplaceAllString(cleaned, " ")
+	cleaned = pipeSymbolsRegex.ReplaceAllString(cleaned, " ")
+	cleaned = repeatedDashesRegex.ReplaceAllString(cleaned, " ")
+	cleaned = bulletPointsRegex.ReplaceAllString(cleaned, " ")
+	cleaned = markdownSymbolsRegex.ReplaceAllString(cleaned, " ")
 	cleaned = extraSpacesRegex.ReplaceAllString(cleaned, " ")
 	return strings.TrimSpace(cleaned)
 }
