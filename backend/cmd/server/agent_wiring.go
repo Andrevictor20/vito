@@ -103,7 +103,7 @@ func setupAgentSubsystem(
 	if cfg.GroqAPIKey != "" {
 		groqModel := cfg.GroqModel
 		if groqModel == "" {
-			groqModel = "llama-3.3-70b-versatile"
+			groqModel = "qwen/qwen3.8-27b"
 		}
 		p := ai.NewOpenAICompatAgentProvider(
 			"Groq",

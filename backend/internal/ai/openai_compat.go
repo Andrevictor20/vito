@@ -58,8 +58,7 @@ func NewOpenRouterVisionProvider(apiKey, model string) *OpenAICompatProvider {
 // NewGroqProvider instancia o provedor para o Groq Cloud.
 func NewGroqProvider(apiKey, model string) *OpenAICompatProvider {
 	if model == "" {
-		// Mesmo default de GROQ_MODEL em config.go (llama-3.3 aposentado em 08/2026).
-		model = "openai/gpt-oss-20b"
+		model = "qwen/qwen3.8-27b"
 	}
 	return &OpenAICompatProvider{
 		providerName: "Groq (" + model + ")",
@@ -156,9 +155,13 @@ func (p *OpenAICompatProvider) ParseIntent(ctx context.Context, input UserInput)
 		return p.parseVisionIntent(ctx, systemPrompt, userContent, input.ImageB64, input.ImageMime)
 	}
 
-	// Proteção contra HTTP 413 no Groq (limite de 8000 TPM no tier gratuito).
-	if strings.Contains(strings.ToLower(p.baseURL), "groq.com") && len(systemPrompt) > 14000 {
-		systemPrompt = systemPrompt[:14000]
+	maxTokens := 1024
+	// Proteção contra limites no Groq (limite de 1000 OTPM e 8000 TPM no tier gratuito).
+	if strings.Contains(strings.ToLower(p.baseURL), "groq.com") {
+		maxTokens = 800
+		if len(systemPrompt) > 14000 {
+			systemPrompt = systemPrompt[:14000]
+		}
 	}
 
 	reqBody := openAIChatRequest{
@@ -170,7 +173,7 @@ func (p *OpenAICompatProvider) ParseIntent(ctx context.Context, input UserInput)
 		ResponseFormat: &struct {
 			Type string `json:"type"`
 		}{Type: "json_object"},
-		MaxTokens: 1024,
+		MaxTokens: maxTokens,
 	}
 
 	jsonBytes, err := json.Marshal(reqBody)

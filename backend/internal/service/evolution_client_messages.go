@@ -415,6 +415,9 @@ func extractMessageText(raw json.RawMessage) string {
 		VideoMessage struct {
 			Caption string `json:"caption"`
 		} `json:"videoMessage"`
+		DocumentMessage struct {
+			Caption string `json:"caption"`
+		} `json:"documentMessage"`
 	}
 	if err := json.Unmarshal(raw, &full); err == nil {
 		for _, candidate := range []string{
@@ -422,6 +425,7 @@ func extractMessageText(raw json.RawMessage) string {
 			full.ExtendedTextMessage.Text,
 			full.ImageMessage.Caption,
 			full.VideoMessage.Caption,
+			full.DocumentMessage.Caption,
 		} {
 			if trimmed := strings.TrimSpace(candidate); trimmed != "" {
 				return trimmed
@@ -429,14 +433,15 @@ func extractMessageText(raw json.RawMessage) string {
 		}
 	}
 
-	// 3) Conteúdo de um subtipo ({text} | {caption} | {title}).
+	// 3) Conteúdo de um subtipo ({text} | {caption}).
+	// Nomes de arquivo ou títulos de documento (title/fileName) NÃO são
+	// considerados comandos de texto do usuário a menos que haja legenda.
 	var subtype struct {
 		Text    string `json:"text"`
 		Caption string `json:"caption"`
-		Title   string `json:"title"`
 	}
 	if err := json.Unmarshal(raw, &subtype); err == nil {
-		for _, candidate := range []string{subtype.Text, subtype.Caption, subtype.Title} {
+		for _, candidate := range []string{subtype.Text, subtype.Caption} {
 			if trimmed := strings.TrimSpace(candidate); trimmed != "" {
 				return trimmed
 			}

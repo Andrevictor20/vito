@@ -79,3 +79,28 @@ func TestSanitizeAndExtractJSON(t *testing.T) {
 		})
 	}
 }
+
+func TestUnmarshalIntent_DaysOfWeekArrayTolerance(t *testing.T) {
+	rawJSON := `{
+		"action": "CREATE_BOOKING_LINK",
+		"message": "Link de agendamento criado",
+		"booking": {
+			"title": "Alinhamento Semanal",
+			"duration_minutes": 30,
+			"days_of_week": ["segunda", "terça", "quarta"]
+		}
+	}`
+
+	var intent ParsedIntent
+	if err := UnmarshalIntent(rawJSON, &intent); err != nil {
+		t.Fatalf("UnmarshalIntent falhou para days_of_week como array: %v", err)
+	}
+
+	if intent.Booking == nil {
+		t.Fatalf("esperava booking preenchido")
+	}
+
+	if intent.Booking.DaysOfWeek != "segunda, terça, quarta" {
+		t.Errorf("esperava days_of_week 'segunda, terça, quarta', obteve %q", intent.Booking.DaysOfWeek)
+	}
+}

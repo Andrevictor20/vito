@@ -94,11 +94,10 @@ func Load() *Config {
 	}
 
 	// Modelos de fallback via env (bug §8.7/8): sem IDs hardcoded inválidos.
-	// Groq aposentou llama-3.3-70b-versatile em 16/08/2026 (free/dev);
-	// default atual: openai/gpt-oss-20b (rápido, JSON object mode, free).
+	// Default Groq: qwen/qwen3.8-27b (alta capacidade em JSON, multilingue pt-BR e tier livre).
 	groqModel := os.Getenv("GROQ_MODEL")
 	if groqModel == "" {
-		groqModel = "openai/gpt-oss-20b"
+		groqModel = "qwen/qwen3.8-27b"
 	}
 	openRouterModel := os.Getenv("OPENROUTER_MODEL")
 	if openRouterModel == "" {

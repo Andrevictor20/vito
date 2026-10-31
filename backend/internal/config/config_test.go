@@ -74,8 +74,8 @@ func TestConfig_AllowedOrigins(t *testing.T) {
 func TestConfig_GroqDefaultModel(t *testing.T) {
 	t.Setenv("GROQ_MODEL", "")
 	cfg := config.Load()
-	if cfg.GroqModel != "openai/gpt-oss-20b" {
-		t.Errorf("default Groq deveria ser openai/gpt-oss-20b (llama-3.3 aposentado), veio %q", cfg.GroqModel)
+	if cfg.GroqModel != "qwen/qwen3.8-27b" {
+		t.Errorf("default Groq deveria ser qwen/qwen3.8-27b, veio %q", cfg.GroqModel)
 	}
 
 	t.Setenv("GROQ_MODEL", "custom/model")

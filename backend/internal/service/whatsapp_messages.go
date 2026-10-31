@@ -14,8 +14,8 @@ import (
 	"github.com/andrevmp/vito/backend/internal/domain"
 )
 
-// reVitoTrigger detecta menções ao Vito nas mensagens (com ou sem @, !, /, :).
-var reVitoTrigger = regexp.MustCompile(`(?i)(?:[@!/])?\bvito\b[:,!-]?\s*`)
+// reVitoTrigger detecta comandos ou menções explícitas ao Vito nas mensagens (@vito, /vito, !vito).
+var reVitoTrigger = regexp.MustCompile(`(?i)[@!/]vito\b[:,!-]?\s*`)
 
 // imageAnalysisPrompt é o pedido padrão quando a imagem chega sem legenda.
 const imageAnalysisPrompt = "Analise esta imagem e me diga o que ela contém. Se for um documento, recibo, comprovante ou evento, extraia os dados (datas, valores, títulos) e sugira a ação correspondente."

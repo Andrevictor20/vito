@@ -8,7 +8,30 @@ import (
 	"strings"
 )
 
-var trailingCommaRegex = regexp.MustCompile(`,\s*([}\]])`)
+var (
+	trailingCommaRegex = regexp.MustCompile(`,\s*([}\]])`)
+	reDaysOfWeekArray  = regexp.MustCompile(`"days_of_week"\s*:\s*\[([^\]]*)\]`)
+)
+
+// normalizeDaysOfWeekArray converte arrays `days_of_week: ["seg", "ter"]` para string plana.
+func normalizeDaysOfWeekArray(input []byte) []byte {
+	return reDaysOfWeekArray.ReplaceAllFunc(input, func(match []byte) []byte {
+		sub := reDaysOfWeekArray.FindSubmatch(match)
+		if len(sub) < 2 {
+			return match
+		}
+		rawItems := string(sub[1])
+		var items []string
+		for _, part := range strings.Split(rawItems, ",") {
+			cleaned := strings.Trim(strings.TrimSpace(part), `"' `)
+			if cleaned != "" {
+				items = append(items, cleaned)
+			}
+		}
+		joined := strings.Join(items, ", ")
+		return []byte(fmt.Sprintf(`"days_of_week": %q`, joined))
+	})
+}
 
 // SanitizeAndExtractJSON isola o bloco JSON mais interno, remove formatações markdown e corrige vírgulas sobressalentes.
 func SanitizeAndExtractJSON(raw string) ([]byte, error) {
@@ -59,6 +82,7 @@ func UnmarshalIntent(raw string, target *ParsedIntent) error {
 	if err != nil {
 		return err
 	}
+	cleanBytes = normalizeDaysOfWeekArray(cleanBytes)
 
 	if err := json.Unmarshal(cleanBytes, target); err != nil {
 		return fmt.Errorf("falha ao decodificar json estruturado da ia: %w (raw: %s)", err, string(cleanBytes))

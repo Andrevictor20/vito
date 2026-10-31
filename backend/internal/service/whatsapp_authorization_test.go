@@ -328,28 +328,109 @@ func TestWhatsAppService_RespostaEducativaTemCooldown(t *testing.T) {
 	}
 }
 
-func TestWhatsAppService_MencaoNaturalSemArrobaOuDoisPontos(t *testing.T) {
+func TestWhatsAppService_MencoesExplicitasEIgnoraSemPrefixo(t *testing.T) {
 	svc, mockClient, _, _ := setupConversationalWhatsAppTest(t)
 
 	gateway := &mockGatewayCapturador{}
 	svc.SetAssistantService(service.NewAssistantService(gateway, nil, nil, nil))
 	svc.SetAsyncRunner(func(fn func()) { fn() })
 
-	frases := []string{
-		"Vito, qual é minha agenda hoje?",
-		"oi vito me lembra de ligar pro banco",
-		"Fala Vito tudo bem?",
+	// Frases com prefixo explícito (@vito, /vito, !vito) devem acionar o bot
+	frasesValidas := []string{
+		"@vito, qual é minha agenda hoje?",
+		"/vito me lembra de ligar pro banco",
+		"!vito status",
+		"@Vito: reunião amanhã",
 	}
-	for i, frase := range frases {
+	for i, frase := range frasesValidas {
 		mockClient.sentMessages = nil
 		gateway.input = ai.UserInput{}
 		if err := svc.HandleWebhook(context.Background(), "messages.upsert",
-			payloadComVito("12036300112233@g.us", "msg-natural-"+string(rune('a'+i)), frase, true)); err != nil {
+			payloadComVito("12036300112233@g.us", "msg-valida-"+string(rune('a'+i)), frase, true)); err != nil {
 			t.Fatalf("HandleWebhook retornou erro para %q: %v", frase, err)
 		}
 		if len(mockClient.sentMessages) != 1 {
-			t.Fatalf("esperava 1 resposta para menção natural %q, obteve %d", frase, len(mockClient.sentMessages))
+			t.Fatalf("esperava 1 resposta para menção válida %q, obteve %d", frase, len(mockClient.sentMessages))
 		}
+	}
+
+	// Frases sem prefixo (@, /, !) NÃO devem acionar o bot em grupos ou conversas de terceiros
+	frasesIgnoradas := []string{
+		"Vito, qual é minha agenda hoje?",
+		"oi vito me lembra de ligar pro banco",
+		"Fala Vito tudo bem?",
+		"vito-0.1.22.apk",
+		"o vito tá online?",
+	}
+	for i, frase := range frasesIgnoradas {
+		mockClient.sentMessages = nil
+		gateway.input = ai.UserInput{}
+		if err := svc.HandleWebhook(context.Background(), "messages.upsert",
+			payloadComVito("12036300112233@g.us", "msg-ignora-"+string(rune('a'+i)), frase, true)); err != nil {
+			t.Fatalf("HandleWebhook retornou erro para %q: %v", frase, err)
+		}
+		if len(mockClient.sentMessages) != 0 {
+			t.Fatalf("esperava 0 respostas para frase sem prefixo %q, obteve %d", frase, len(mockClient.sentMessages))
+		}
+	}
+
+	// Documento/APK com nome contendo 'vito' sem legenda NÃO deve acionar o bot
+	docPayloadSemLegenda := map[string]interface{}{
+		"event":    "messages.upsert",
+		"instance": "vito_conv_user",
+		"data": map[string]interface{}{
+			"key": map[string]interface{}{
+				"remoteJid": "12036300112233@g.us",
+				"fromMe":    true,
+				"id":        "msg-doc-apk-1",
+			},
+			"messageType": "documentMessage",
+			"message": map[string]interface{}{
+				"documentMessage": map[string]interface{}{
+					"fileName": "vito-0.1.22.apk",
+					"title":    "vito-0.1.22.apk",
+					"mimetype": "application/vnd.android.package-archive",
+				},
+			},
+		},
+	}
+	bytesDoc, _ := json.Marshal(docPayloadSemLegenda)
+	mockClient.sentMessages = nil
+	if err := svc.HandleWebhook(context.Background(), "messages.upsert", bytesDoc); err != nil {
+		t.Fatalf("HandleWebhook falhou para documento: %v", err)
+	}
+	if len(mockClient.sentMessages) != 0 {
+		t.Fatalf("documento sem legenda não deveria acionar o Vito, obteve %d respostas", len(mockClient.sentMessages))
+	}
+
+	// Documento COM legenda explícita chamando o Vito DEVE acionar o bot
+	docPayloadComLegenda := map[string]interface{}{
+		"event":    "messages.upsert",
+		"instance": "vito_conv_user",
+		"data": map[string]interface{}{
+			"key": map[string]interface{}{
+				"remoteJid": "12036300112233@g.us",
+				"fromMe":    true,
+				"id":        "msg-doc-apk-2",
+			},
+			"messageType": "documentMessage",
+			"message": map[string]interface{}{
+				"documentMessage": map[string]interface{}{
+					"fileName": "vito-0.1.22.apk",
+					"title":    "vito-0.1.22.apk",
+					"caption":  "@vito o que é este arquivo?",
+					"mimetype": "application/vnd.android.package-archive",
+				},
+			},
+		},
+	}
+	bytesDocComLegenda, _ := json.Marshal(docPayloadComLegenda)
+	mockClient.sentMessages = nil
+	if err := svc.HandleWebhook(context.Background(), "messages.upsert", bytesDocComLegenda); err != nil {
+		t.Fatalf("HandleWebhook falhou para documento com legenda: %v", err)
+	}
+	if len(mockClient.sentMessages) != 1 {
+		t.Fatalf("documento com legenda explícita @vito deveria acionar o Vito, obteve %d respostas", len(mockClient.sentMessages))
 	}
 }
 
