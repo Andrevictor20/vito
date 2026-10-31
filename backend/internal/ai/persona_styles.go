@@ -3,6 +3,7 @@ package ai
 import (
 	"fmt"
 	"strings"
+	"time"
 )
 
 // PersonaStyleConfig define as regras de calibração para cada estilo do Vito.
@@ -68,8 +69,20 @@ func GetPersonaStyleConfig(style PersonaStyle) PersonaStyleConfig {
 
 // BuildPersonaSystemPrompt monta o bloco de persona que é injetado no system prompt.
 func BuildPersonaSystemPrompt(style PersonaStyle, userName string) string {
+	return BuildPersonaSystemPromptWithTime(style, userName, time.Now())
+}
+
+// BuildPersonaSystemPromptWithTime monta o bloco de persona com contexto temporal e diretrizes operacionais.
+func BuildPersonaSystemPromptWithTime(style PersonaStyle, userName string, now time.Time) string {
 	cfg := GetPersonaStyleConfig(style)
 	var sb strings.Builder
+
+	// Horário de Brasília (UTC-3)
+	loc, err := time.LoadLocation("America/Sao_Paulo")
+	if err != nil {
+		loc = time.FixedZone("BRT", -3*3600)
+	}
+	localNow := now.In(loc)
 
 	sb.WriteString("### PERSONA & DIRETRIZES DE ESTILO DO VITO\n")
 	sb.WriteString(fmt.Sprintf("- Você é o Vito, assistente pessoal e executivo inteligente de %s.\n", userName))
@@ -78,6 +91,32 @@ func BuildPersonaSystemPrompt(style PersonaStyle, userName string) string {
 	sb.WriteString(fmt.Sprintf("- Política de Emojis: %s\n", cfg.EmojiPolicy))
 	sb.WriteString(fmt.Sprintf("- Formatação: %s\n", cfg.FormattingRule))
 	sb.WriteString("- Princípio Fundamental: Separe falar de agir. Converse livremente em linguagem natural e markdown; invoque ferramentas estruturadas apenas quando for estritamente necessário consultar ou alterar o ambiente.\n")
+	sb.WriteString(fmt.Sprintf("- Contexto Temporal: Hoje é %s, %s (Horário de Brasília, UTC-3).\n",
+		formatPortugueseWeekday(localNow.Weekday()),
+		localNow.Format("02/01/2006 às 15:04")))
+	sb.WriteString("- Agendamento de Reuniões e Agenda: Ao agendar eventos, se o usuário não tiver informado data, horário ou título, pergunte com clareza em português ('Para qual dia e horário você deseja agendar a reunião?'). NUNCA gere mensagens técnicas em inglês como 'unsupported data' ou 'unsupported date'.\n")
+	sb.WriteString("- Idioma Obrigatório: Todas as respostas, diálogos e perguntas devem ser SEMPRE em português do Brasil.\n")
 
 	return sb.String()
+}
+
+func formatPortugueseWeekday(w time.Weekday) string {
+	switch w {
+	case time.Sunday:
+		return "domingo"
+	case time.Monday:
+		return "segunda-feira"
+	case time.Tuesday:
+		return "terça-feira"
+	case time.Wednesday:
+		return "quarta-feira"
+	case time.Thursday:
+		return "quinta-feira"
+	case time.Friday:
+		return "sexta-feira"
+	case time.Saturday:
+		return "sábado"
+	default:
+		return ""
+	}
 }

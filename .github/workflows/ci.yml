@@ -259,8 +259,20 @@ jobs:
 
       - name: WhatsApp context logs
         run: |
-          echo "== Contexto do WhatsApp (últimos 200 logs filtrados) =="
-          docker logs --tail 400 vito-backend 2>&1 | grep -E 'WhatsAppContext|WhatsAppBackfill|WhatsAppGroupMeta|WhatsAppReplyNudge|WhatsAppContactsCache|WhatsAppMedia|Vito DB|Teto de heap' | tail -25 || echo "(sem linhas de contexto)"
+          echo "== Últimos 100 logs do backend =="
+          docker logs --tail 100 vito-backend 2>&1
+          echo ""
+          echo "== Últimos 60 logs da Evolution API =="
+          docker logs --tail 60 vito-evolution-api 2>&1
+          echo ""
+          echo "== Últimas mensagens no SQLite =="
+          docker exec vito-backend sqlite3 /app/data/vito.db "SELECT id, chat_jid, sender_name, from_me, kind, substr(text, 1, 80), created_at FROM whatsapp_conversation_messages ORDER BY created_at DESC LIMIT 15;" 2>&1 || true
+          echo ""
+          echo "== Turnos recentes da conversa no SQLite =="
+          docker exec vito-backend sqlite3 /app/data/vito.db "SELECT id, channel, role, origin, substr(content, 1, 80), model_used, created_at FROM conversation_turns ORDER BY created_at DESC LIMIT 15;" 2>&1 || true
+          echo ""
+          echo "== Integração WhatsApp no SQLite =="
+          docker exec vito-backend sqlite3 /app/data/vito.db "SELECT id, user_id, instance_name, phone, status FROM whatsapp_integrations;" 2>&1 || true
 
       - name: Shadow inbox size
         run: |
