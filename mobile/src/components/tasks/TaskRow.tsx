@@ -7,6 +7,7 @@ import {
   LayoutAnimation,
   Platform,
   UIManager,
+  Alert,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens } from '../../theme/tokens';
@@ -38,6 +39,7 @@ interface TaskRowProps {
   onToggle: () => void;
   onDelete: () => void;
   onEdit?: () => void;
+  onAiAction?: () => void;
   onSchedule?: (dateStr: string) => void;
   onReminder?: () => void;
   isFirst?: boolean;
@@ -61,6 +63,7 @@ export const TaskRow: React.FC<TaskRowProps> = ({
   onToggle,
   onDelete,
   onEdit,
+  onAiAction,
   onSchedule,
   onReminder,
   isFirst = false,
@@ -74,6 +77,17 @@ export const TaskRow: React.FC<TaskRowProps> = ({
   const isTodo = row.kind === 'todo';
   const todo = row.sourceTodo;
   const pending: PendingItem | undefined = row.sourcePending;
+
+  const handleDeletePress = () => {
+    Alert.alert(
+      'Excluir tarefa',
+      `Deseja realmente excluir "${row.title}"?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Excluir', style: 'destructive', onPress: onDelete },
+      ]
+    );
+  };
 
   const dateRaw = todo?.due_date || pending?.scheduled_date;
   const relDate = formatRelativeTaskDate(dateRaw);
@@ -284,7 +298,16 @@ export const TaskRow: React.FC<TaskRowProps> = ({
         )}
         <TouchableOpacity
           style={styles.actionBtn}
-          onPress={onDelete}
+          onPress={onAiAction || onEdit}
+          hitSlop={tokens.hitSlop.sm}
+          activeOpacity={0.7}
+          accessibilityLabel="Ações inteligentes com Vito"
+        >
+          <MaterialIcons name="auto-awesome" size={17} color={colors.purple} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.actionBtn}
+          onPress={handleDeletePress}
           hitSlop={tokens.hitSlop.sm}
           activeOpacity={0.7}
           accessibilityLabel="Excluir tarefa"

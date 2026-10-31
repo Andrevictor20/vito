@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, Alert } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
@@ -10,6 +10,7 @@ export interface EventCardProps {
   event: Event;
   onDelete: (id: string, allSeries?: boolean) => void;
   onPress?: (event: Event) => void;
+  onAiAction?: (event: Event) => void;
   onRequestDelete?: (event: Event) => void;
   accentColor?: string;
   variant?: 'day' | 'next' | 'auto';
@@ -26,6 +27,7 @@ export const EventCard: React.FC<EventCardProps> = ({
   event,
   onDelete,
   onPress,
+  onAiAction,
   onRequestDelete,
   variant = 'auto',
   showDateBadge = false,
@@ -61,25 +63,7 @@ export const EventCard: React.FC<EventCardProps> = ({
     const text = `${event.title} ${event.description || ''}`.toLowerCase();
     const isHoliday =
       event.category === 'holiday' ||
-      (isAllDay &&
-        (text.includes('feriado') ||
-          text.includes('nossa senhora') ||
-          text.includes('aparecida') ||
-          text.includes('tiradentes') ||
-          text.includes('páscoa') ||
-          text.includes('pascoa') ||
-          text.includes('natal') ||
-          text.includes('ano novo') ||
-          text.includes('trabalho') ||
-          text.includes('independência') ||
-          text.includes('independencia') ||
-          text.includes('finados') ||
-          text.includes('república') ||
-          text.includes('republica') ||
-          text.includes('consciência') ||
-          text.includes('consciencia') ||
-          text.includes('carnaval') ||
-          text.includes('corpus christi')));
+      (isAllDay && /feriado|aparecida|tiradentes|p[aá]scoa|natal|ano novo|trabalho|independ[eê]ncia|finados|rep[uú]blica|consci[eê]ncia|carnaval|corpus/.test(text));
 
     if (isHoliday) {
       return {
@@ -92,34 +76,16 @@ export const EventCard: React.FC<EventCardProps> = ({
     }
 
     const catKey = (event.category || '').toLowerCase();
-    if (catKey === 'work' || catKey === 'trabalho') {
-      return { label: 'Trabalho', color: colors.teal, bg: isDark ? 'rgba(60, 196, 208, 0.14)' : colors.tealBg, border: colors.teal + '33', isHoliday: false };
-    }
-    if (catKey === 'personal' || catKey === 'pessoal') {
-      return { label: 'Pessoal', color: colors.purple, bg: isDark ? 'rgba(165, 139, 255, 0.14)' : colors.purpleBg, border: colors.purple + '33', isHoliday: false };
-    }
-    if (catKey === 'study' || catKey === 'estudo') {
-      return { label: 'Estudo', color: colors.orange, bg: isDark ? 'rgba(255, 154, 82, 0.14)' : colors.orangeBg, border: colors.orange + '33', isHoliday: false };
-    }
-    if (catKey === 'health' || catKey === 'saude' || catKey === 'saúde') {
-      return { label: 'Saúde', color: colors.blue, bg: isDark ? 'rgba(90, 162, 238, 0.14)' : colors.blueBg, border: colors.blue + '33', isHoliday: false };
-    }
-    if (catKey === 'leisure' || catKey === 'lazer') {
-      return { label: 'Lazer', color: colors.acc, bg: isDark ? 'rgba(52, 211, 153, 0.14)' : colors.greenBg, border: colors.acc + '33', isHoliday: false };
-    }
-    if (catKey === 'finance' || catKey === 'financas' || catKey === 'finanças' || catKey === 'financeiro') {
-      return { label: 'Finanças', color: colors.red, bg: isDark ? 'rgba(255, 107, 138, 0.14)' : colors.redBg, border: colors.red + '33', isHoliday: false };
-    }
+    if (catKey === 'work' || catKey === 'trabalho') return { label: 'Trabalho', color: colors.teal, bg: isDark ? 'rgba(60, 196, 208, 0.14)' : colors.tealBg, border: colors.teal + '33', isHoliday: false };
+    if (catKey === 'personal' || catKey === 'pessoal') return { label: 'Pessoal', color: colors.purple, bg: isDark ? 'rgba(165, 139, 255, 0.14)' : colors.purpleBg, border: colors.purple + '33', isHoliday: false };
+    if (catKey === 'study' || catKey === 'estudo') return { label: 'Estudo', color: colors.orange, bg: isDark ? 'rgba(255, 154, 82, 0.14)' : colors.orangeBg, border: colors.orange + '33', isHoliday: false };
+    if (catKey.includes('saud') || catKey.includes('saúd')) return { label: 'Saúde', color: colors.blue, bg: isDark ? 'rgba(90, 162, 238, 0.14)' : colors.blueBg, border: colors.blue + '33', isHoliday: false };
+    if (catKey === 'leisure' || catKey === 'lazer') return { label: 'Lazer', color: colors.acc, bg: isDark ? 'rgba(52, 211, 153, 0.14)' : colors.greenBg, border: colors.acc + '33', isHoliday: false };
+    if (catKey.includes('finan')) return { label: 'Finanças', color: colors.red, bg: isDark ? 'rgba(255, 107, 138, 0.14)' : colors.redBg, border: colors.red + '33', isHoliday: false };
 
-    if (text.includes('anivers') || text.includes('niver')) {
-      return { label: 'Aniversário', color: colors.orange, bg: isDark ? 'rgba(255, 154, 82, 0.14)' : colors.orangeBg, border: colors.orange + '33', isHoliday: false };
-    }
-    if (text.includes('churras') || text.includes('bbq')) {
-      return { label: 'Churrasco', color: colors.red, bg: isDark ? 'rgba(255, 107, 138, 0.14)' : colors.redBg, border: colors.red + '33', isHoliday: false };
-    }
-    if (text.includes('festa') || text.includes('party') || text.includes('balada')) {
-      return { label: 'Festa', color: colors.purple, bg: isDark ? 'rgba(165, 139, 255, 0.14)' : colors.purpleBg, border: colors.purple + '33', isHoliday: false };
-    }
+    if (text.includes('anivers') || text.includes('niver')) return { label: 'Aniversário', color: colors.orange, bg: isDark ? 'rgba(255, 154, 82, 0.14)' : colors.orangeBg, border: colors.orange + '33', isHoliday: false };
+    if (text.includes('churras') || text.includes('bbq')) return { label: 'Churrasco', color: colors.red, bg: isDark ? 'rgba(255, 107, 138, 0.14)' : colors.redBg, border: colors.red + '33', isHoliday: false };
+    if (text.includes('festa') || text.includes('party') || text.includes('balada')) return { label: 'Festa', color: colors.purple, bg: isDark ? 'rgba(165, 139, 255, 0.14)' : colors.purpleBg, border: colors.purple + '33', isHoliday: false };
 
     const defaultColor = event.color || colors.blue;
     return {
@@ -138,10 +104,42 @@ export const EventCard: React.FC<EventCardProps> = ({
   const canPress = !!onPress && !readOnly;
 
   const handleDeletePress = () => {
-    if (onRequestDelete) {
+    Alert.alert(
+      'Excluir compromisso',
+      `Deseja realmente excluir "${event.title}"?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        ...(isRecurring
+          ? [
+              {
+                text: 'Apenas este',
+                style: 'destructive' as const,
+                onPress: () => onDelete(event.id, false),
+              },
+              {
+                text: 'Toda a série',
+                style: 'destructive' as const,
+                onPress: () => onDelete(event.id, true),
+              },
+            ]
+          : [
+              {
+                text: 'Excluir',
+                style: 'destructive' as const,
+                onPress: () => onDelete(event.id, false),
+              },
+            ]),
+      ]
+    );
+  };
+
+  const handleAiPress = () => {
+    if (onAiAction) {
+      onAiAction(event);
+    } else if (onRequestDelete) {
       onRequestDelete(event);
-    } else {
-      onDelete(event.id);
+    } else if (onPress) {
+      onPress(event);
     }
   };
 
@@ -187,14 +185,24 @@ export const EventCard: React.FC<EventCardProps> = ({
         </View>
 
         {!readOnly && (
-          <TouchableOpacity
-            style={styles.deleteBtnSmall}
-            onPress={handleDeletePress}
-            hitSlop={tokens.hitSlop.sm}
-            accessibilityLabel="Excluir compromisso"
-          >
-            <MaterialIcons name="close" size={14} color={colors.muted} />
-          </TouchableOpacity>
+          <View style={styles.actionRowSmall}>
+            <TouchableOpacity
+              style={styles.aiSparkBtnSmall}
+              onPress={handleAiPress}
+              hitSlop={tokens.hitSlop.sm}
+              accessibilityLabel="Editar com IA"
+            >
+              <MaterialIcons name="auto-awesome" size={15} color={colors.purple} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.deleteBtnSmall}
+              onPress={handleDeletePress}
+              hitSlop={tokens.hitSlop.sm}
+              accessibilityLabel="Excluir compromisso"
+            >
+              <MaterialIcons name="delete-outline" size={16} color={colors.muted} />
+            </TouchableOpacity>
+          </View>
         )}
 
         <MaterialIcons name="chevron-right" size={18} color={colors.muted} style={{ marginLeft: 2 }} />
@@ -234,14 +242,24 @@ export const EventCard: React.FC<EventCardProps> = ({
         </Text>
 
         {!readOnly && (
-          <TouchableOpacity
-            style={styles.allDayDelete}
-            onPress={handleDeletePress}
-            hitSlop={tokens.hitSlop.sm}
-            accessibilityLabel="Excluir compromisso"
-          >
-            <MaterialIcons name="close" size={14} color={catInfo.color} />
-          </TouchableOpacity>
+          <View style={styles.actionRowSmall}>
+            <TouchableOpacity
+              style={styles.allDayBtn}
+              onPress={handleAiPress}
+              hitSlop={tokens.hitSlop.sm}
+              accessibilityLabel="Editar com IA"
+            >
+              <MaterialIcons name="auto-awesome" size={15} color={catInfo.color} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.allDayBtn}
+              onPress={handleDeletePress}
+              hitSlop={tokens.hitSlop.sm}
+              accessibilityLabel="Excluir compromisso"
+            >
+              <MaterialIcons name="delete-outline" size={16} color={catInfo.color} />
+            </TouchableOpacity>
+          </View>
         )}
       </TouchableOpacity>
     );
@@ -306,14 +324,24 @@ export const EventCard: React.FC<EventCardProps> = ({
 
         <View style={styles.evcActions}>
           {!readOnly && (
-            <TouchableOpacity
-              style={styles.deleteBtn}
-              onPress={handleDeletePress}
-              hitSlop={tokens.hitSlop.sm}
-              accessibilityLabel="Excluir compromisso"
-            >
-              <MaterialIcons name="close" size={15} color={colors.muted} />
-            </TouchableOpacity>
+            <>
+              <TouchableOpacity
+                style={styles.aiSparkBtn}
+                onPress={handleAiPress}
+                hitSlop={tokens.hitSlop.sm}
+                accessibilityLabel="Editar com IA"
+              >
+                <MaterialIcons name="auto-awesome" size={16} color={colors.purple} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.deleteBtn}
+                onPress={handleDeletePress}
+                hitSlop={tokens.hitSlop.sm}
+                accessibilityLabel="Excluir compromisso"
+              >
+                <MaterialIcons name="delete-outline" size={17} color={colors.muted} />
+              </TouchableOpacity>
+            </>
           )}
         </View>
       </TouchableOpacity>
@@ -339,6 +367,9 @@ const styles = StyleSheet.create({
     fontFamily: tokens.typography.family.semibold,
   },
   allDayDelete: {
+    padding: 2,
+  },
+  allDayBtn: {
     padding: 2,
   },
 
@@ -396,26 +427,21 @@ const styles = StyleSheet.create({
     marginTop: 4,
     flexWrap: 'wrap',
   },
-  metaCat: {
-    fontSize: 12,
-    fontFamily: tokens.typography.family.semibold,
-  },
-  metaText: {
-    fontSize: 12,
-    fontFamily: tokens.typography.family.regular,
-  },
-  inlineMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-  },
+  metaCat: { fontSize: 12, fontFamily: tokens.typography.family.semibold },
+  metaText: { fontSize: 12, fontFamily: tokens.typography.family.regular },
+  inlineMeta: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   evcActions: {
     marginLeft: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     alignSelf: 'flex-start',
   },
-  deleteBtn: {
-    padding: 2,
-  },
+  aiSparkBtn: { padding: 3 },
+  aiSparkBtnSmall: { padding: 2 },
+  actionRowSmall: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  deleteBtn: { padding: 3 },
+  deleteBtnSmall: { padding: 2 },
 
   // .next: linha de próximo evento
   nextRow: {
@@ -451,8 +477,5 @@ const styles = StyleSheet.create({
   nextTitle: {
     fontSize: 15,
     fontFamily: tokens.typography.family.semibold,
-  },
-  deleteBtnSmall: {
-    padding: 4,
   },
 });

@@ -41,6 +41,7 @@ export interface AgendaViewProps {
   isKeyboardOpen: boolean;
   onDeleteEvent: (id: string) => void;
   onEditEvent: (ev: Event) => void;
+  onAiEvent?: (ev: Event) => void;
   onCreateEvent: () => void;
   onOpenFullCalendar?: () => void;
   filters?: AgendaFilterState;
@@ -71,6 +72,7 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
   isTodaySelected,
   onDeleteEvent,
   onEditEvent,
+  onAiEvent,
   onOpenFullCalendar,
   filters: controlledFilters,
   onFiltersChange: controlledOnFiltersChange,
@@ -202,7 +204,7 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
                   showDateBadge={true}
                   onDelete={onDeleteEvent}
                   onPress={onEditEvent}
-                  onRequestDelete={onEditEvent}
+                  onAiAction={onAiEvent || onEditEvent}
                 />
               ))
             )}
@@ -230,7 +232,7 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
                 variant="day"
                 onDelete={onDeleteEvent}
                 onPress={onEditEvent}
-                onRequestDelete={onEditEvent}
+                onAiAction={onAiEvent || onEditEvent}
               />
             ))}
 
@@ -242,7 +244,7 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
                 variant="day"
                 onDelete={onDeleteEvent}
                 onPress={onEditEvent}
-                onRequestDelete={onEditEvent}
+                onAiAction={onAiEvent || onEditEvent}
               />
             ))}
 
@@ -347,7 +349,7 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
                     variant="next"
                     onDelete={onDeleteEvent}
                     onPress={onEditEvent}
-                    onRequestDelete={onEditEvent}
+                    onAiAction={onAiEvent || onEditEvent}
                   />
                 ))}
               </View>

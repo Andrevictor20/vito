@@ -135,14 +135,30 @@ func (t *TaskPendingToolset) Execute(ctx context.Context, execCtx *domain.ToolEx
 		}, nil
 
 	case "delete_todo":
-		if t.todoService != nil && params.TodoID != "" {
-			if err := t.todoService.DeleteTodo(ctx, params.TodoID, execCtx.UserID); err != nil {
+		todoID := strings.TrimSpace(params.TodoID)
+		if t.todoService != nil && todoID != "" {
+			err := t.todoService.DeleteTodo(ctx, todoID, execCtx.UserID)
+			if err != nil {
+				if todos, listErr := t.todoService.GetTodos(ctx, execCtx.UserID); listErr == nil {
+					targetLower := strings.ToLower(todoID)
+					for _, td := range todos {
+						if strings.Contains(strings.ToLower(td.Title), targetLower) || strings.EqualFold(td.ID, todoID) {
+							if delErr := t.todoService.DeleteTodo(ctx, td.ID, execCtx.UserID); delErr == nil {
+								todoID = td.ID
+								err = nil
+								break
+							}
+						}
+					}
+				}
+			}
+			if err != nil {
 				return nil, err
 			}
 		}
 		return &domain.ToolExecutionResult{
 			Status:        "COMPLETED",
-			SummaryForLLM: fmt.Sprintf("Tarefa %s excluída.", params.TodoID),
+			SummaryForLLM: fmt.Sprintf("Tarefa %s excluída.", todoID),
 		}, nil
 
 	default: // "list_todos"
@@ -154,7 +170,7 @@ func (t *TaskPendingToolset) Execute(ctx context.Context, execCtx *domain.ToolEx
 		var sb strings.Builder
 		sb.WriteString(fmt.Sprintf("Tarefas ativas (%d):\n", len(todos)))
 		for _, td := range todos {
-			sb.WriteString(fmt.Sprintf("- [%s] %s (%s)\n", td.Status, td.Title, td.Category))
+			sb.WriteString(fmt.Sprintf("- [%s] %s (%s) [ID: %s]\n", td.Status, td.Title, td.Category, td.ID))
 			cards = append(cards, domain.ChatCard{
 				ID:          td.ID,
 				Type:        "todo",

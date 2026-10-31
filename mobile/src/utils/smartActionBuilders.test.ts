@@ -31,6 +31,7 @@ describe('smartActionBuilders — Gerador de ações contextuais inteligentes (V
       let promptSent = '';
       let cancelSent = '';
       let editClicked = false;
+      let deleteClicked = false;
 
       const actions = buildAgendaSmartActions(
         { id: 'ev-1', title: 'Aula de inglês', start_time: '2026-10-31T08:00:00Z' },
@@ -40,10 +41,11 @@ describe('smartActionBuilders — Gerador de ações contextuais inteligentes (V
           onAskVitoBriefing: (p) => { promptSent = p; },
           onAskVitoCancel: (p) => { cancelSent = p; },
           onEditDirectly: () => { editClicked = true; },
+          onDeleteDirectly: () => { deleteClicked = true; },
         }
       );
 
-      assert.equal(actions.length, 5);
+      assert.equal(actions.length, 6);
 
       // 1. Reagendar com Vito (IA)
       assert.equal(actions[0].id, 'reschedule');
@@ -68,10 +70,17 @@ describe('smartActionBuilders — Gerador de ações contextuais inteligentes (V
       actions[3].onPress();
       assert.equal(editClicked, true);
 
-      // 5. Cancelar evento (Destrutivo)
-      assert.equal(actions[4].id, 'cancel');
+      // 5. Exclusão direta imediata
+      assert.equal(actions[4].id, 'delete_direct');
       assert.equal(actions[4].variant, 'destructive');
+      assert.equal(actions[4].icon, 'delete-outline');
       actions[4].onPress();
+      assert.equal(deleteClicked, true);
+
+      // 6. Cancelar evento com IA (Destrutivo)
+      assert.equal(actions[5].id, 'cancel');
+      assert.equal(actions[5].variant, 'destructive');
+      actions[5].onPress();
       assert.ok(cancelSent.includes('Cancela Aula de inglês'));
     });
   });

@@ -193,13 +193,33 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
     }
   }, [onToggleTodo, pending]);
 
-  const handleDeleteRow = useCallback((row: UnifiedRow) => {
-    if (row.kind === 'todo' && row.sourceTodo) {
-      onDeleteTodo(row.sourceTodo.id);
-    } else if (row.sourcePending) {
-      pending.remove(row.sourcePending.id);
-    }
-  }, [onDeleteTodo, pending]);
+  const handleDeleteRow = useCallback(
+    (row: UnifiedRow) => {
+      const normTitle = row.title.trim().toLowerCase();
+      if (row.kind === 'todo' && row.sourceTodo) {
+        onDeleteTodo(row.sourceTodo.id);
+      }
+      if (row.sourcePending) {
+        pending.remove(row.sourcePending.id);
+      }
+      // Purgar duplicatas cruzadas (pendência espelho ou todo homônimo)
+      if (normTitle) {
+        const dupPending = pending.items.find(
+          (p) => p.title.trim().toLowerCase() === normTitle && p.id !== row.sourcePending?.id
+        );
+        if (dupPending) {
+          pending.remove(dupPending.id);
+        }
+        const dupTodo = todos.find(
+          (t) => t.title.trim().toLowerCase() === normTitle && t.id !== row.sourceTodo?.id
+        );
+        if (dupTodo) {
+          onDeleteTodo(dupTodo.id);
+        }
+      }
+    },
+    [onDeleteTodo, pending, todos]
+  );
 
   const initialLoading = loading && todos.length === 0 && pending.loading && pending.items.length === 0;
 
@@ -292,6 +312,7 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
                     onToggle={() => handleToggleRow(row)}
                     onDelete={() => handleDeleteRow(row)}
                     onEdit={() => handleOpenEdit(row)}
+                    onAiAction={() => handleOpenEdit(row)}
                     subtasks={row.sourceTodo?.subtasks}
                     onToggleSubtask={(sid) => row.sourceTodo && onToggleSubtask(row.sourceTodo.id, sid)}
                     onAddSubtask={(title) => row.sourceTodo && onAddSubtask(row.sourceTodo.id, title)}

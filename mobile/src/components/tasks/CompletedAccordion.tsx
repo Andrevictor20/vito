@@ -7,6 +7,7 @@ import {
   LayoutAnimation,
   Platform,
   UIManager,
+  Alert,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
@@ -141,21 +142,41 @@ export const CompletedAccordion: React.FC<CompletedAccordionProps> = ({
                 </Text>
               </TouchableOpacity>
 
-              {onDeleteRow && (
-                <TouchableOpacity
-                  style={styles.deleteBtn}
-                  onPress={() => {
-                    hapticFeedback.selection();
-                    onDeleteRow(row);
-                  }}
-                  hitSlop={tokens.hitSlop.sm}
-                  activeOpacity={0.7}
-                  accessibilityLabel="Excluir tarefa"
-                  accessibilityRole="button"
-                >
-                  <MaterialIcons name="delete-outline" size={18} color={colors.muted} />
-                </TouchableOpacity>
-              )}
+              <View style={styles.completedActions}>
+                {onEditRow && (
+                  <TouchableOpacity
+                    style={styles.deleteBtn}
+                    onPress={() => onEditRow(row)}
+                    hitSlop={tokens.hitSlop.sm}
+                    activeOpacity={0.7}
+                    accessibilityLabel="Ações com IA"
+                  >
+                    <MaterialIcons name="auto-awesome" size={17} color={colors.purple} />
+                  </TouchableOpacity>
+                )}
+                {onDeleteRow && (
+                  <TouchableOpacity
+                    style={styles.deleteBtn}
+                    onPress={() => {
+                      hapticFeedback.selection();
+                      Alert.alert(
+                        'Excluir tarefa',
+                        `Deseja realmente excluir "${row.title}"?`,
+                        [
+                          { text: 'Cancelar', style: 'cancel' },
+                          { text: 'Excluir', style: 'destructive', onPress: () => onDeleteRow(row) },
+                        ]
+                      );
+                    }}
+                    hitSlop={tokens.hitSlop.sm}
+                    activeOpacity={0.7}
+                    accessibilityLabel="Excluir tarefa"
+                    accessibilityRole="button"
+                  >
+                    <MaterialIcons name="delete-outline" size={18} color={colors.muted} />
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
           ))}
         </View>
@@ -214,6 +235,11 @@ const styles = StyleSheet.create({
     fontSize: 14.5,
     textDecorationLine: 'line-through',
     opacity: 0.8,
+  },
+  completedActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   deleteBtn: {
     padding: 4,

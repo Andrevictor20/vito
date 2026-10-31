@@ -129,14 +129,33 @@ func (t *CalendarToolset) Execute(ctx context.Context, execCtx *domain.ToolExecu
 		}, nil
 
 	case "delete_event":
-		if t.calService != nil && params.EventID != "" {
-			if err := t.calService.DeleteEvent(ctx, params.EventID, execCtx.UserID); err != nil {
+		eventID := strings.TrimSpace(params.EventID)
+		if t.calService != nil && eventID != "" {
+			err := t.calService.DeleteEvent(ctx, eventID, execCtx.UserID)
+			if err != nil {
+				now := time.Now()
+				start := now.Add(-30 * 24 * time.Hour)
+				end := now.Add(90 * 24 * time.Hour)
+				if evts, listErr := t.calService.GetEvents(ctx, execCtx.UserID, start, end); listErr == nil {
+					targetLower := strings.ToLower(eventID)
+					for _, ev := range evts {
+						if strings.Contains(strings.ToLower(ev.Title), targetLower) || strings.EqualFold(ev.ID, eventID) {
+							if delErr := t.calService.DeleteEvent(ctx, ev.ID, execCtx.UserID); delErr == nil {
+								eventID = ev.ID
+								err = nil
+								break
+							}
+						}
+					}
+				}
+			}
+			if err != nil {
 				return nil, err
 			}
 		}
 		return &domain.ToolExecutionResult{
 			Status:        "COMPLETED",
-			SummaryForLLM: fmt.Sprintf("Evento %s removido com sucesso.", params.EventID),
+			SummaryForLLM: fmt.Sprintf("Evento %s removido com sucesso.", eventID),
 		}, nil
 
 	default: // "list_events"
@@ -151,7 +170,7 @@ func (t *CalendarToolset) Execute(ctx context.Context, execCtx *domain.ToolExecu
 		var sb strings.Builder
 		sb.WriteString(fmt.Sprintf("Eventos encontrados (%d):\n", len(evts)))
 		for _, e := range evts {
-			sb.WriteString(fmt.Sprintf("- %s: %s às %s\n", e.Title, e.StartAt.Format("02/01 15:04"), e.EndAt.Format("15:04")))
+			sb.WriteString(fmt.Sprintf("- %s: %s às %s [ID: %s]\n", e.Title, e.StartAt.Format("02/01 15:04"), e.EndAt.Format("15:04"), e.ID))
 			cards = append(cards, domain.ChatCard{
 				ID:          e.ID,
 				Type:        "event",

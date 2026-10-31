@@ -107,12 +107,21 @@ export function usePendingItems(onScheduled?: (title: string, dateStr: string) =
     }
   }, []);
 
-  const remove = useCallback(async (id: string) => {
-    hapticFeedback.light();
-    await api.deletePendingItem(id);
-    setItems((prev) => prev.filter((i) => i.id !== id));
-    notificationService.cancelPendingReminder(id).catch(() => {});
-  }, []);
+  const remove = useCallback(
+    async (id: string) => {
+      hapticFeedback.light();
+      // 1. Optimistic update instantâneo (< 16ms)
+      setItems((prev) => prev.filter((i) => i.id !== id));
+      notificationService.cancelPendingReminder(id).catch(() => {});
+      try {
+        await api.deletePendingItem(id);
+      } catch (err) {
+        console.error('[usePendingItems] Erro ao remover pendência:', err);
+        load(true);
+      }
+    },
+    [load]
+  );
 
   const updateReminder = useCallback(
     async (

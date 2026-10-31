@@ -38,12 +38,14 @@ export function toUnifiedRows(todos: Todo[], pendings: PendingItem[], now: numbe
   const today = startOfToday(now);
   const rows: UnifiedRow[] = [];
 
-  const seen = new Set<string>();
+  const seenIds = new Set<string>();
+  const todosByTitle = new Map<string, UnifiedRow>();
+
   for (const t of todos || []) {
     const key = toMs(t.due_date);
-    seen.add(t.id);
+    seenIds.add(t.id);
     const cat = (t as Todo).category || '';
-    rows.push({
+    const row: UnifiedRow = {
       kind: 'todo',
       id: t.id,
       title: t.title,
@@ -53,12 +55,24 @@ export function toUnifiedRows(todos: Todo[], pendings: PendingItem[], now: numbe
       done: t.status === 'completed',
       priority: t.priority || 'medium',
       sourceTodo: t,
-    });
+    };
+    rows.push(row);
+    const norm = t.title ? t.title.trim().toLowerCase() : '';
+    if (norm) {
+      todosByTitle.set(norm, row);
+    }
   }
 
-  // Dedupe: ids já migrados para todos não aparecem duas vezes (expand-and-contract).
+  // Dedupe: ids já migrados ou pendências homônimas já criadas em todos não aparecem duas vezes.
   for (const p of pendings || []) {
-    if (seen.has(p.id)) continue;
+    if (seenIds.has(p.id)) continue;
+    const norm = p.title ? p.title.trim().toLowerCase() : '';
+    const existing = norm ? todosByTitle.get(norm) : undefined;
+    if (existing && !existing.sourcePending) {
+      // Vincula a pendência espelhada ao todo para que ações limpem ambas
+      existing.sourcePending = p;
+      continue;
+    }
     const key = toMs(p.scheduled_date);
     rows.push({
       kind: 'pending',

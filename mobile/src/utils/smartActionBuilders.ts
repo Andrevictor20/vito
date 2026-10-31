@@ -57,6 +57,7 @@ export interface AgendaSmartActionsOptions {
   onAskVitoBriefing: (prompt: string) => void;
   onAskVitoCancel: (prompt: string) => void;
   onEditDirectly?: () => void;
+  onDeleteDirectly?: () => void;
 }
 
 export function buildAgendaSmartActions(
@@ -112,10 +113,21 @@ export function buildAgendaSmartActions(
     });
   }
 
+  if (options.onDeleteDirectly) {
+    actions.push({
+      id: 'delete_direct',
+      title: 'Excluir da agenda',
+      subtitle: 'Remover este compromisso imediatamente',
+      icon: 'delete-outline',
+      variant: 'destructive',
+      onPress: options.onDeleteDirectly,
+    });
+  }
+
   actions.push({
     id: 'cancel',
-    title: 'Cancelar compromisso',
-    subtitle: 'Remover este evento da agenda com auxílio da IA',
+    title: 'Cancelar compromisso com IA',
+    subtitle: 'Remover este evento da agenda com auxílio do Vito',
     icon: 'event-busy',
     variant: 'destructive',
     onPress: () => options.onAskVitoCancel(`Cancela ${event.title}`),

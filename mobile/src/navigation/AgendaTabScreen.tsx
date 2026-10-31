@@ -172,6 +172,7 @@ export const AgendaTabScreen: React.FC<AgendaTabScreenProps> = ({
         isKeyboardOpen={keyboardOpen}
         onDeleteEvent={home.handleDeleteEvent}
         onEditEvent={handleEventAction}
+        onAiEvent={handleEventAction}
         onCreateEvent={handleCreatePrompt}
         onOpenFullCalendar={() => setShowFullCalendar(true)}
         filters={filters}
@@ -212,6 +213,11 @@ export const AgendaTabScreen: React.FC<AgendaTabScreenProps> = ({
                 onAskVitoMoveTomorrow: (prompt) => chatPromptBus.notify(prompt),
                 onAskVitoBriefing: (prompt) => chatPromptBus.notify(prompt),
                 onAskVitoCancel: (prompt) => chatPromptBus.notify(prompt),
+                onDeleteDirectly: () => {
+                  const evId = actionEvent.id;
+                  setActionEvent(null);
+                  home.handleDeleteEvent(evId);
+                },
               })
             : []
         }

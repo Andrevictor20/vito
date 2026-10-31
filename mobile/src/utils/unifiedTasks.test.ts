@@ -68,6 +68,18 @@ describe('unifiedTasks', () => {
     assert.equal(rows.filter((r) => r.id === 'same').length, 1);
   });
 
+  it('dedupe: pendência homônima com mesmo título é unificada na mesma linha', () => {
+    const rows = toUnifiedRows(
+      [todo({ id: 'td-100', title: 'Avaliação do Poco X8 Pro Max' })],
+      [pending({ id: 'pend-200', title: 'Avaliação do Poco X8 Pro Max' })],
+      NOW,
+    );
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].id, 'td-100');
+    assert.equal(rows[0].sourceTodo?.id, 'td-100');
+    assert.equal(rows[0].sourcePending?.id, 'pend-200');
+  });
+
   it('filtra hoje/atrasadas/sem data e ordena por prioridade e A–Z', () => {
     const rows = toUnifiedRows(
       [
