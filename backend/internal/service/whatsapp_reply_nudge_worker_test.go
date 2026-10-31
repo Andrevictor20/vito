@@ -37,18 +37,13 @@ func (s *stubRepo) ListAll(ctx context.Context) ([]domain.WhatsAppIntegration, e
 	return s.integrations, nil
 }
 
-// O Radar só cobra conversas pendentes há mais de 24h, e no máximo 1x/dia.
+// Notificações automáticas de cobrança de contatos sem resposta no WhatsApp foram removidas.
 func TestWhatsAppReplyNudgeWorker_OnlyNudgesOldPendingOnce(t *testing.T) {
 	fx := setupContextualWhatsApp(t)
 	now := time.Now().UTC()
 
-	// 1) pendência antiga (30h) => deve ser cobrada
 	archiveChat(t, fx, "n1", friendJID(), domain.WhatsAppChatKindDirect, "Ana", "me ajuda com o contrato", false, now.Add(-30*time.Hour))
-	// 2) pendência nova (2h) => não é cobrada
 	archiveChat(t, fx, "n2", "5511888887778@s.whatsapp.net", domain.WhatsAppChatKindDirect, "João", "oi", false, now.Add(-2*time.Hour))
-	// 3) conversa respondida => não é pendência
-	archiveChat(t, fx, "n3", "5511888887779@s.whatsapp.net", domain.WhatsAppChatKindDirect, "Bia", "oi", false, now.Add(-40*time.Hour))
-	archiveChat(t, fx, "n4", "5511888887779@s.whatsapp.net", domain.WhatsAppChatKindDirect, "Bia", "valeu", true, now.Add(-39*time.Hour))
 
 	dir := service.NewWhatsAppDirectoryService(fx.repo, service.DefaultWhatsAppContextConfig(), nil)
 	notif := &nudgeCollector{}
@@ -61,21 +56,8 @@ func TestWhatsAppReplyNudgeWorker_OnlyNudgesOldPendingOnce(t *testing.T) {
 	worker := service.NewWhatsAppReplyNudgeWorker(dir, repo, notif, 24*time.Hour, 24*time.Hour)
 	worker.RunOnce()
 
-	if len(notif.pushes) != 1 {
-		t.Fatalf("esperava 1 cobrança, obteve %d: %+v", len(notif.pushes), notif.pushes)
-	}
-	push := notif.pushes[0]
-	if push.UserID != "user-ctx-1" {
-		t.Errorf("cobrança para o usuário errado: %q", push.UserID)
-	}
-	if !contains(push.Body, "Ana") || !contains(push.Body, "contrato") {
-		t.Errorf("a cobrança deveria citar a conversa pendente: %q", push.Body)
-	}
-
-	// Segunda rodada: a mesma conversa NÃO deve ser cobrada de novo (cooldown de 24h).
-	worker.RunOnce()
-	if len(notif.pushes) != 1 {
-		t.Fatalf("a cobrança repetiu dentro do cooldown: %d pushes", len(notif.pushes))
+	if len(notif.pushes) != 0 {
+		t.Fatalf("não deveria enviar notificações de cobrança de resposta no WhatsApp, obteve %d: %+v", len(notif.pushes), notif.pushes)
 	}
 }
 

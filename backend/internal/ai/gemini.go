@@ -289,25 +289,33 @@ func (p *GeminiProvider) ParseIntent(ctx context.Context, input UserInput) (*Par
 		}
 
 		if len(geminiResp.Candidates) == 0 || len(geminiResp.Candidates[0].Content.Parts) == 0 {
-			return nil, errors.New("resposta vazia retornada pelo gemini")
+			lastErr = fmt.Errorf("resposta vazia retornada pelo gemini (modelo %s)", modelName)
+			continue
 		}
 
-		// Extrai a parte que contém JSON, prevendo parts de raciocínio/pensamento
+		// Extrai a parte que contém JSON (de trás para frente, pois modelos 2.5
+		// colocam o bloco de pensamento antes da resposta final em JSON).
+		parts := geminiResp.Candidates[0].Content.Parts
 		var rawJSON string
-		for _, part := range geminiResp.Candidates[0].Content.Parts {
-			txt := part.Text
+		for i := len(parts) - 1; i >= 0; i-- {
+			txt := parts[i].Text
 			if len(txt) > 0 && (bytes.Contains([]byte(txt), []byte("{")) || bytes.Contains([]byte(txt), []byte("```"))) {
 				rawJSON = txt
 				break
 			}
 		}
-		if rawJSON == "" && len(geminiResp.Candidates[0].Content.Parts) > 0 {
-			rawJSON = geminiResp.Candidates[0].Content.Parts[0].Text
+		if rawJSON == "" && len(parts) > 0 {
+			rawJSON = parts[len(parts)-1].Text
 		}
 
 		var intent ParsedIntent
 		if err := UnmarshalIntent(rawJSON, &intent); err != nil {
-			return nil, fmt.Errorf("falha ao interpretar json do gemini: %w", err)
+			lastErr = fmt.Errorf("falha ao interpretar json do gemini (modelo %s): %w", modelName, err)
+			continue
+		}
+		if err := ValidateIntent(&intent); err != nil {
+			lastErr = fmt.Errorf("resposta inválida do gemini (modelo %s): %w", modelName, err)
+			continue
 		}
 
 		return &intent, nil

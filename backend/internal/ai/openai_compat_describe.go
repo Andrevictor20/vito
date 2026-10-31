@@ -11,7 +11,7 @@ import (
 )
 
 // describeMaxTokens limita a descrição em texto de uma imagem.
-const describeMaxTokens = 800
+const describeMaxTokens = 300
 
 // DescribeImage devolve a DESCRIÇÃO em texto de uma imagem.
 //

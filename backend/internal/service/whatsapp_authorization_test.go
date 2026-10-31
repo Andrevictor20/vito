@@ -328,5 +328,89 @@ func TestWhatsAppService_RespostaEducativaTemCooldown(t *testing.T) {
 	}
 }
 
+func TestWhatsAppService_MencaoNaturalSemArrobaOuDoisPontos(t *testing.T) {
+	svc, mockClient, _, _ := setupConversationalWhatsAppTest(t)
+
+	gateway := &mockGatewayCapturador{}
+	svc.SetAssistantService(service.NewAssistantService(gateway, nil, nil, nil))
+	svc.SetAsyncRunner(func(fn func()) { fn() })
+
+	frases := []string{
+		"Vito, qual é minha agenda hoje?",
+		"oi vito me lembra de ligar pro banco",
+		"Fala Vito tudo bem?",
+	}
+	for i, frase := range frases {
+		mockClient.sentMessages = nil
+		gateway.input = ai.UserInput{}
+		if err := svc.HandleWebhook(context.Background(), "messages.upsert",
+			payloadComVito("12036300112233@g.us", "msg-natural-"+string(rune('a'+i)), frase, true)); err != nil {
+			t.Fatalf("HandleWebhook retornou erro para %q: %v", frase, err)
+		}
+		if len(mockClient.sentMessages) != 1 {
+			t.Fatalf("esperava 1 resposta para menção natural %q, obteve %d", frase, len(mockClient.sentMessages))
+		}
+	}
+}
+
+func TestWhatsAppService_SelfGroupColdCacheBuscaParticipantesSincrono(t *testing.T) {
+	svc, mockClient, _, _ := setupConversationalWhatsAppTest(t)
+	mockClient.mockParticipants = []string{"5511999998888@s.whatsapp.net"}
+
+	groupMeta := service.NewWhatsAppGroupMeta(mockClient, time.Hour, 24*time.Hour)
+	svc.SetGroupMeta(groupMeta)
+
+	gateway := &mockGatewayCapturador{}
+	svc.SetAssistantService(service.NewAssistantService(gateway, nil, nil, nil))
+	svc.SetAsyncRunner(func(fn func()) { fn() })
+
+	// Primeira mensagem em grupo individual (sem @vito e com cache frio) deve
+	// buscar participantes sincronamente e responder como self_group.
+	if err := svc.HandleWebhook(context.Background(), "messages.upsert",
+		payloadComVito("12036399999999@g.us", "msg-cold-self-grp", "qual minha agenda de amanhã?", true)); err != nil {
+		t.Fatalf("HandleWebhook retornou erro: %v", err)
+	}
+	if len(mockClient.sentMessages) != 1 {
+		t.Fatalf("esperava 1 resposta no grupo individual mesmo com cache frio, obteve %d", len(mockClient.sentMessages))
+	}
+}
+
+func TestWhatsAppService_OwnerLIDSelfChatRecognition(t *testing.T) {
+	svc, mockClient, _, _ := setupConversationalWhatsAppTest(t)
+	ownerCache := service.NewWhatsAppOwnerCache(mockClient, time.Hour)
+	svc.SetOwnerCache(ownerCache)
+
+	gateway := &mockGatewayCapturador{}
+	svc.SetAssistantService(service.NewAssistantService(gateway, nil, nil, nil))
+	svc.SetAsyncRunner(func(fn func()) { fn() })
+
+	// 1) Aprende o LID do dono a partir de uma mensagem fromMe=true com participant=@lid
+	learnPayload := []byte(`{
+		"event": "messages.upsert",
+		"instance": "vito_conv_user",
+		"data": {
+			"key": {
+				"remoteJid": "182708445675538@lid",
+				"fromMe": true,
+				"id": "msg-lid-1",
+				"participant": "182708445675538@lid"
+			},
+			"messageType": "conversation",
+			"message": {"conversation": "qual minha agenda de hoje?"}
+		}
+	}`)
+	if err := svc.HandleWebhook(context.Background(), "messages.upsert", learnPayload); err != nil {
+		t.Fatalf("HandleWebhook retornou erro: %v", err)
+	}
+	if len(mockClient.sentMessages) != 1 {
+		t.Fatalf("esperava 1 resposta no chat @lid do próprio dono sem precisar de @vito, obteve %d", len(mockClient.sentMessages))
+	}
+
+	// 2) ResolveURL interna do Docker quando evolution-api está no mesmo compose
+	if got := service.ResolveWhatsAppWebhookBaseURL("https://vito.rasppi.cloud", "http://evolution-api:8080", "8180"); got != "http://backend:8180" {
+		t.Errorf("esperava http://backend:8180, obteve %q", got)
+	}
+}
+
 var _ = ai.ActionGeneralChat
 var _ = time.Now

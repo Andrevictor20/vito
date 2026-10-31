@@ -113,7 +113,7 @@ func TestEvolutionClient_FindMessages_ParsesEnvelope(t *testing.T) {
 // AC-F15/AC-F16 — participantes de um grupo (1 participante = grupo só do usuário).
 func TestEvolutionClient_FindParticipants_ParsesShape(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/group/participants/test_inst" {
+		if r.URL.Path == "/group/participants/test_inst" && r.URL.Query().Get("groupJid") == "12036300112233@g.us" {
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"participants":[{"id":"5511999998888@s.whatsapp.net","name":"André"}]}`))
 			return
@@ -136,10 +136,9 @@ func TestEvolutionClient_FindParticipants_ParsesShape(t *testing.T) {
 }
 
 // AC-F15 — os nomes dos grupos vêm com subject e size.
-// AC-F15 — os nomes dos grupos vêm com subject e size.
 func TestEvolutionClient_FindGroups_ParsesShape(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/group/fetchAllGroups/test_inst" {
+		if r.URL.Path == "/group/fetchAllGroups/test_inst" && r.URL.Query().Get("getParticipants") == "false" {
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`[{"id":"12036300112233@g.us","subject":"Familia","size":1}]`))
 			return

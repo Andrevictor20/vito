@@ -425,11 +425,15 @@ func (s *WhatsAppService) HandleWebhook(ctx context.Context, eventType string, p
 	var base struct {
 		Event    string          `json:"event"`
 		Instance string          `json:"instance"`
+		Sender   string          `json:"sender"`
 		Data     json.RawMessage `json:"data"`
 	}
 	if err := json.Unmarshal(payload, &base); err != nil {
 		log.Printf("❌ [WhatsAppWebhook] Erro no unmarshal base: %v", err)
 		return err
+	}
+	if s.ownerCache != nil && base.Instance != "" && strings.Contains(base.Sender, "@s.whatsapp.net") {
+		s.ownerCache.Set(base.Instance, strings.TrimSpace(base.Sender))
 	}
 
 	event := strings.ToLower(base.Event)

@@ -8,13 +8,14 @@ import (
 	"log"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/domain"
 )
 
-// reVitoTrigger detecta menções explícitas ao Vito nas mensagens.
-var reVitoTrigger = regexp.MustCompile(`(?i)(@vito|!vito|/vito|vito:)\s*`)
+// reVitoTrigger detecta menções ao Vito nas mensagens (com ou sem @, !, /, :).
+var reVitoTrigger = regexp.MustCompile(`(?i)(?:[@!/])?\bvito\b[:,!-]?\s*`)
 
 // imageAnalysisPrompt é o pedido padrão quando a imagem chega sem legenda.
 const imageAnalysisPrompt = "Analise esta imagem e me diga o que ela contém. Se for um documento, recibo, comprovante ou evento, extraia os dados (datas, valores, títulos) e sugira a ação correspondente."
@@ -70,6 +71,13 @@ func (s *WhatsAppService) handleMessagesEvent(ctx context.Context, instanceName 
 		return nil
 	}
 
+	// Quando o próprio dono envia mensagem (fromMe=true) e a Evolution API informa
+	// o participant em formato @lid, registramos o LID do dono para reconhecer o
+	// chat "Você" (@lid) e validar autoria mesmo quando fromMe vier false.
+	if msg.FromMe && strings.HasSuffix(msg.Participant, "@lid") && s.ownerCache != nil {
+		s.ownerCache.SetLID(instanceName, msg.Participant)
+	}
+
 	chatKind := s.classifyChat(ctx, instanceName, integration, msg.RemoteJID)
 	if strings.HasSuffix(msg.RemoteJID, "@g.us") && s.groupMeta != nil {
 		// Nomes dos grupos são buscados em background (1 chamada de avatar por grupo).
@@ -110,12 +118,15 @@ func (s *WhatsAppService) handleMessagesEvent(ctx context.Context, instanceName 
 	//  1) CanActOnMessage devolver true (fromMe=true ou chat pessoal self/self_group)
 	//  2) msg.Participant ou msg.RemoteJID corresponder ao número pareado/cadastrado
 	ownerJID := ""
+	ownerLID := ""
 	if s.ownerCache != nil {
 		ownerJID, _ = s.ownerCache.JID(instanceName)
+		ownerLID = s.ownerCache.LID(instanceName)
 	}
 	isOwner := CanActOnMessage(chatKind, msg.FromMe) ||
 		IsOwnerSender(msg.Participant, integration.Phone, ownerJID) ||
-		IsOwnerSender(msg.RemoteJID, integration.Phone, ownerJID)
+		IsOwnerSender(msg.RemoteJID, integration.Phone, ownerJID) ||
+		(ownerLID != "" && (strings.EqualFold(msg.Participant, ownerLID) || strings.EqualFold(msg.RemoteJID, ownerLID)))
 
 	if !isOwner {
 		s.archiveMessage(ctx, integration.UserID, instanceName, msg, chatKind, rawText, "user")
@@ -246,6 +257,14 @@ func (s *WhatsAppService) processPendingMessage(pending *pendingMessage) error {
 	})
 	if err != nil {
 		log.Printf("⚠️ [WhatsAppService] Erro ao processar mensagem do WhatsApp: %v", err)
+		assinatura := VitoSignature(ctx, s.contextSvc, integration.UserID, msg.RemoteJID, msg.PushName)
+		fallbackReply := fmt.Sprintf("%s\n\nEstou com uma instabilidade temporária nos meus provedores de IA agora. Pode tentar novamente em alguns instantes?", assinatura)
+		targetJID := NormalizeJIDForSend(msg.RemoteJID)
+		if strings.HasSuffix(msg.RemoteJID, "@g.us") && msg.MessageID != "" {
+			_ = s.client.SendTextWithQuoted(ctx, instanceName, targetJID, fallbackReply, msg.MessageID)
+		} else {
+			_ = s.client.SendText(ctx, instanceName, targetJID, fallbackReply)
+		}
 		return nil
 	}
 
@@ -309,15 +328,32 @@ func (s *WhatsAppService) classifyChat(ctx context.Context, instanceName string,
 	if strings.HasSuffix(remoteJID, "@g.us") && s.groupMeta != nil {
 		participants, fresh = s.groupMeta.ParticipantsCount(remoteJID)
 		if !fresh {
-			s.groupMeta.EnsureParticipants(ctx, instanceName, remoteJID)
+			if fetchedCount, ok := s.groupMeta.FetchParticipants(ctx, instanceName, remoteJID); ok {
+				participants, fresh = fetchedCount, true
+			} else {
+				s.groupMeta.EnsureParticipants(ctx, instanceName, remoteJID)
+			}
 		}
 	}
 
 	selfReference := integration.Phone
 	if s.ownerCache != nil {
-		if ownerJID, ownerFresh := s.ownerCache.JID(instanceName); ownerFresh {
+		if ownerLID := s.ownerCache.LID(instanceName); ownerLID != "" && strings.EqualFold(strings.TrimSpace(remoteJID), ownerLID) {
+			return domain.WhatsAppChatKindSelf
+		}
+		ownerJID, ownerFresh := s.ownerCache.JID(instanceName)
+		if ownerJID == "" {
+			fetchCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+			if fetched, err := s.ownerCache.Fetch(fetchCtx, instanceName); err == nil && fetched != "" {
+				ownerJID = fetched
+				ownerFresh = true
+			}
+			cancel()
+		}
+		if ownerJID != "" {
 			selfReference = ownerJID
-		} else {
+		}
+		if !ownerFresh {
 			s.ownerCache.Ensure(ctx, instanceName)
 		}
 	}

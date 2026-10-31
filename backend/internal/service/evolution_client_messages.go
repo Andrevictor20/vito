@@ -134,7 +134,7 @@ func (c *DefaultEvolutionClient) FindGroups(ctx context.Context, instanceName st
 	if instanceName == "" {
 		return nil, fmt.Errorf("instância do Evolution API obrigatória")
 	}
-	path := fmt.Sprintf("/group/fetchAllGroups/%s", instanceName)
+	path := fmt.Sprintf("/group/fetchAllGroups/%s?getParticipants=false", instanceName)
 	resp, err := c.doRequest(ctx, http.MethodGet, path, nil)
 	if err != nil {
 		return nil, err
@@ -171,7 +171,7 @@ func (c *DefaultEvolutionClient) FindParticipants(ctx context.Context, instanceN
 	if instanceName == "" || groupJID == "" {
 		return nil, fmt.Errorf("instância e grupo obrigatórios")
 	}
-	path := fmt.Sprintf("/group/participants/%s?groupId=%s", instanceName, url.QueryEscape(groupJID))
+	path := fmt.Sprintf("/group/participants/%s?groupJid=%s", instanceName, url.QueryEscape(groupJID))
 	resp, err := c.doRequest(ctx, http.MethodGet, path, nil)
 	if err != nil {
 		return nil, err

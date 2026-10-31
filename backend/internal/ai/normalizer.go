@@ -64,7 +64,22 @@ func UnmarshalIntent(raw string, target *ParsedIntent) error {
 		return fmt.Errorf("falha ao decodificar json estruturado da ia: %w (raw: %s)", err, string(cleanBytes))
 	}
 
-	target.Action = IntentAction(strings.ToUpper(string(target.Action)))
+	if strings.TrimSpace(target.Message) == "" {
+		var rawMap map[string]interface{}
+		if err := json.Unmarshal(cleanBytes, &rawMap); err == nil {
+			for _, key := range []string{"reply", "response", "text", "resposta", "answer", "content"} {
+				if val, ok := rawMap[key].(string); ok && strings.TrimSpace(val) != "" {
+					target.Message = strings.TrimSpace(val)
+					break
+				}
+			}
+		}
+	}
+
+	target.Action = IntentAction(strings.ToUpper(strings.TrimSpace(string(target.Action))))
+	if target.Action == "" && strings.TrimSpace(target.Message) != "" {
+		target.Action = ActionGeneralChat
+	}
 
 	return nil
 }

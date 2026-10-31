@@ -119,10 +119,12 @@ func unwrapMessageSubtypes(raw json.RawMessage) json.RawMessage {
 func parseInboundMessage(data json.RawMessage) (*inboundMessage, error) {
 	var raw struct {
 		Key struct {
-			RemoteJID   string `json:"remoteJid"`
-			FromMe      bool   `json:"fromMe"`
-			ID          string `json:"id"`
-			Participant string `json:"participant"`
+			RemoteJID      string `json:"remoteJid"`
+			RemoteJIDAlt   string `json:"remoteJidAlt"`
+			FromMe         bool   `json:"fromMe"`
+			ID             string `json:"id"`
+			Participant    string `json:"participant"`
+			ParticipantAlt string `json:"participantAlt"`
 		} `json:"key"`
 		PushName         string          `json:"pushName"`
 		MessageType      string          `json:"messageType"`
@@ -139,11 +141,20 @@ func parseInboundMessage(data json.RawMessage) (*inboundMessage, error) {
 
 	rawMessage := unwrapMessageSubtypes(raw.Message)
 
+	remoteJID := strings.TrimSpace(raw.Key.RemoteJID)
+	if strings.HasSuffix(remoteJID, "@lid") && strings.HasSuffix(strings.TrimSpace(raw.Key.RemoteJIDAlt), "@s.whatsapp.net") {
+		remoteJID = strings.TrimSpace(raw.Key.RemoteJIDAlt)
+	}
+	participant := strings.TrimSpace(raw.Key.Participant)
+	if strings.HasSuffix(participant, "@lid") && strings.HasSuffix(strings.TrimSpace(raw.Key.ParticipantAlt), "@s.whatsapp.net") {
+		participant = strings.TrimSpace(raw.Key.ParticipantAlt)
+	}
+
 	msg := &inboundMessage{
 		MessageID:    raw.Key.ID,
-		RemoteJID:    raw.Key.RemoteJID,
+		RemoteJID:    remoteJID,
 		FromMe:       raw.Key.FromMe,
-		Participant:  raw.Key.Participant,
+		Participant:  participant,
 		PushName:     strings.TrimSpace(raw.PushName),
 		MessageType:  raw.MessageType,
 		MediaPayload: data,

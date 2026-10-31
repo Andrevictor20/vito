@@ -125,6 +125,29 @@ func (g *WhatsAppGroupMeta) Subject(groupJID string) string {
 	return g.labels[groupJID]
 }
 
+// FetchParticipants busca de forma síncrona a contagem de participantes de um grupo
+// (com timeout curto) quando o cache ainda está frio, evitando que a primeira
+// mensagem em um grupo individual (self_group) seja descartada por falta de @vito.
+func (g *WhatsAppGroupMeta) FetchParticipants(ctx context.Context, instanceName, groupJID string) (int, bool) {
+	if g == nil || g.client == nil || instanceName == "" || groupJID == "" {
+		return 0, false
+	}
+	if count, fresh := g.ParticipantsCount(groupJID); fresh {
+		return count, true
+	}
+	timeoutCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+
+	participants, err := g.client.FindParticipants(timeoutCtx, instanceName, groupJID)
+	if err != nil {
+		log.Printf("⚠️ [WhatsAppGroupMeta] falha ao buscar participantes de %s: %v", groupJID, err)
+		return 0, false
+	}
+	count := len(participants)
+	g.SetParticipants(groupJID, count)
+	return count, true
+}
+
 // EnsureParticipants agenda a atualização do cache de participantes em background.
 // Nunca bloqueia o caminho quente: em cache miss o Vito usa o fallback restritivo.
 func (g *WhatsAppGroupMeta) EnsureParticipants(ctx context.Context, instanceName, groupJID string) {
@@ -177,6 +200,7 @@ func (g *WhatsAppGroupMeta) RefreshLabels(ctx context.Context, instanceName stri
 	if err != nil {
 		return err
 	}
+	now := time.Now()
 	g.mu.Lock()
 	g.labels = make(map[string]string, len(groups))
 	for _, grp := range groups {
@@ -185,8 +209,13 @@ func (g *WhatsAppGroupMeta) RefreshLabels(ctx context.Context, instanceName stri
 			subject = "Grupo"
 		}
 		g.labels[grp.ID] = subject
+		if grp.Size > 0 {
+			if _, exists := g.participants[grp.ID]; !exists {
+				g.participants[grp.ID] = groupParticipantInfo{count: grp.Size, fetchedAt: now}
+			}
+		}
 	}
-	g.labelsAt = time.Now()
+	g.labelsAt = now
 	g.mu.Unlock()
 	return nil
 }

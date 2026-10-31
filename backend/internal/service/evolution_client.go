@@ -358,13 +358,7 @@ func (c *DefaultEvolutionClient) FindContacts(ctx context.Context, instanceName 
 	if err != nil {
 		return nil, err
 	}
-	if len(contacts) > 0 {
-		return contacts, nil
-	}
-	// Sem filtro a Evolution devolve lista vazia. O contrato do Chat Controller
-	// aceita `where: {id}` (o identificador do contato) — é a outra via para
-	// alcançar o nome SALVO na agenda.
-	return c.findContacts(ctx, instanceName, map[string]interface{}{"id": ""})
+	return contacts, nil
 }
 
 // FindContactsByID busca um contato específico (o `where.id` do contrato).

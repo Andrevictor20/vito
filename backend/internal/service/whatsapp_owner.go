@@ -2,7 +2,9 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"strings"
 	"sync"
 	"time"
 )
@@ -28,6 +30,7 @@ type WhatsAppOwnerCache struct {
 
 type whatsappOwnerInfo struct {
 	jid       string
+	lid       string
 	fetchedAt time.Time
 }
 
@@ -45,6 +48,8 @@ func NewWhatsAppOwnerCache(client EvolutionAPIClient, ttl time.Duration) *WhatsA
 }
 
 // JID devolve o JID do owner da instância e se o dado é fresco.
+// Quando o TTL expira, ainda retorna o último JID conhecido com fresh=false
+// (stale-while-revalidate) para evitar perda de reconhecimento do chat "Você".
 func (o *WhatsAppOwnerCache) JID(instanceName string) (string, bool) {
 	if o == nil || instanceName == "" {
 		return "", false
@@ -56,19 +61,45 @@ func (o *WhatsAppOwnerCache) JID(instanceName string) (string, bool) {
 		return "", false
 	}
 	if time.Since(info.fetchedAt) > o.ttl {
-		return "", false
+		return info.jid, false
 	}
 	return info.jid, true
 }
 
-// Set registra o JID do owner conhecido (usado pelo backfill e pelos testes).
+// Set registra o JID do owner conhecido (usado pelo backfill, webhook e testes).
 func (o *WhatsAppOwnerCache) Set(instanceName, jid string) {
 	if o == nil || instanceName == "" || jid == "" {
 		return
 	}
 	o.mu.Lock()
 	defer o.mu.Unlock()
-	o.byInstance[instanceName] = whatsappOwnerInfo{jid: jid, fetchedAt: time.Now()}
+	prev := o.byInstance[instanceName]
+	prev.jid = jid
+	prev.fetchedAt = time.Now()
+	o.byInstance[instanceName] = prev
+}
+
+// SetLID registra o JID @lid do próprio dono da instância (aprendido quando
+// fromMe=true traz participant=@lid).
+func (o *WhatsAppOwnerCache) SetLID(instanceName, lid string) {
+	if o == nil || instanceName == "" || lid == "" {
+		return
+	}
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	prev := o.byInstance[instanceName]
+	prev.lid = lid
+	o.byInstance[instanceName] = prev
+}
+
+// LID devolve o JID @lid conhecido do dono da instância.
+func (o *WhatsAppOwnerCache) LID(instanceName string) string {
+	if o == nil || instanceName == "" {
+		return ""
+	}
+	o.mu.RLock()
+	defer o.mu.RUnlock()
+	return o.byInstance[instanceName].lid
 }
 
 // Fetch busca o JID do owner de forma síncrona (usado no backfill, em background).
@@ -121,4 +152,44 @@ func (o *WhatsAppOwnerCache) Ensure(ctx context.Context, instanceName string) {
 			log.Printf("🧭 [WhatsAppOwnerCache] owner da instância %s: %s", instanceName, jid)
 		}
 	}()
+}
+
+// ResolveWhatsAppWebhookBaseURL prefere a rede interna do Docker (http://backend:<port>)
+// quando a Evolution API roda no mesmo compose (evolution-api), evitando que os
+// webhooks saiam pela internet pública e passem pelo Cloudflare Tunnel.
+func ResolveWhatsAppWebhookBaseURL(publicBaseURL, evolutionAPIURL, port string) string {
+	if strings.Contains(strings.ToLower(evolutionAPIURL), "evolution-api") {
+		p := strings.TrimSpace(port)
+		if p == "" {
+			p = "8180"
+		}
+		return "http://backend:" + p
+	}
+	return publicBaseURL
+}
+
+// SyncConnectedWebhooks reaplica a URL de webhook em todas as instâncias cadastradas
+// no boot do servidor para migrar instâncias já pareadas para a rede interna do Docker.
+func (s *WhatsAppService) SyncConnectedWebhooks(ctx context.Context) {
+	if s == nil || s.repo == nil || s.client == nil || strings.TrimSpace(s.cfg.WebhookBaseURL) == "" {
+		return
+	}
+	timeoutCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+
+	integrations, err := s.repo.ListAll(timeoutCtx)
+	if err != nil {
+		return
+	}
+	webhookURL := fmt.Sprintf("%s/api/v1/integrations/whatsapp/webhook", strings.TrimRight(s.cfg.WebhookBaseURL, "/"))
+	for _, integ := range integrations {
+		if strings.TrimSpace(integ.InstanceName) == "" {
+			continue
+		}
+		if err := s.client.SetWebhook(timeoutCtx, integ.InstanceName, webhookURL); err != nil {
+			log.Printf("⚠️ [WhatsAppService] falha ao sincronizar webhook de %s: %v", integ.InstanceName, err)
+		} else {
+			log.Printf("🔗 [WhatsAppService] webhook sincronizado para %s -> %s", integ.InstanceName, webhookURL)
+		}
+	}
 }

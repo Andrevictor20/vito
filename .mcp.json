@@ -1,0 +1,21 @@
+{
+  "mcpServers": {
+    "open-design": {
+      "command": "od",
+      "args": [
+        "mcp",
+        "--daemon-url",
+        "http://127.0.0.1:7456"
+      ]
+    },
+    "code-review-graph": {
+      "command": "/home/andrevmp/.local/share/code-review-graph/.venv/bin/code-review-graph",
+      "args": [
+        "serve"
+      ],
+      "env": {
+        "CRG_TOOLS": "detect_changes_tool,get_minimal_context_tool,get_impact_radius_tool,query_graph_tool,get_review_context_tool,get_architecture_overview_tool,find_large_functions_tool,refactor_tool,list_flows_tool,get_affected_flows_tool"
+      }
+    }
+  }
+}

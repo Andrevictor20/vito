@@ -53,6 +53,9 @@ func ContactDirectoryBlock(directory []ChatContactSummary) string {
 	if len(directory) == 0 {
 		return ""
 	}
+	if len(directory) > 25 {
+		directory = directory[:25]
+	}
 	var b strings.Builder
 	b.WriteString("\n<SEUS CONTATOS — conversas recentes do WhatsApp. É daqui que saem os nomes que o usuário usa ao se referir a alguém.>\n")
 	for _, c := range directory {
@@ -85,6 +88,9 @@ func ContactDirectoryBlock(directory []ChatContactSummary) string {
 func PendingConversationsBlock(pending []ChatContactSummary) string {
 	if len(pending) == 0 {
 		return ""
+	}
+	if len(pending) > 10 {
+		pending = pending[:10]
 	}
 	var b strings.Builder
 	b.WriteString("\n<PENDÊNCIAS DE RESPOSTA — conversas em que a última mensagem NÃO foi sua.>\n")

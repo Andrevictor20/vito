@@ -156,6 +156,11 @@ func (p *OpenAICompatProvider) ParseIntent(ctx context.Context, input UserInput)
 		return p.parseVisionIntent(ctx, systemPrompt, userContent, input.ImageB64, input.ImageMime)
 	}
 
+	// Proteção contra HTTP 413 no Groq (limite de 8000 TPM no tier gratuito).
+	if strings.Contains(strings.ToLower(p.baseURL), "groq.com") && len(systemPrompt) > 14000 {
+		systemPrompt = systemPrompt[:14000]
+	}
+
 	reqBody := openAIChatRequest{
 		Model: p.model,
 		Messages: []openAIChatMessage{
@@ -165,7 +170,7 @@ func (p *OpenAICompatProvider) ParseIntent(ctx context.Context, input UserInput)
 		ResponseFormat: &struct {
 			Type string `json:"type"`
 		}{Type: "json_object"},
-		MaxTokens: 2048,
+		MaxTokens: 1024,
 	}
 
 	jsonBytes, err := json.Marshal(reqBody)

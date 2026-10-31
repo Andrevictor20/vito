@@ -21,7 +21,6 @@ type whatsappWiring struct {
 	ContactRepo    domain.SyncedContactRepository
 	OwnerCache     *service.WhatsAppOwnerCache
 	GroupMeta      *service.WhatsAppGroupMeta
-	NudgeWorker    *service.WhatsAppReplyNudgeWorker
 	BackfillWorker *service.WhatsAppBackfillWorker
 	MediaEnricher  *service.WhatsAppMediaEnricher
 	MediaWorker    *service.WhatsAppMediaWorker
@@ -80,8 +79,8 @@ func setupWhatsAppAssistant(
 
 	accountCleanupWorker.SetContextService(contextSvc, cfg.WhatsAppContextRetentionDays)
 
-	// Radar: cobra as conversas do WhatsApp que ficaram sem resposta (24h+).
-	nudgeWorker := service.NewWhatsAppReplyNudgeWorker(directory, waRepo, notifSvc, 24*time.Hour, 24*time.Hour, 15*time.Minute)
+	// Garante que instâncias já pareadas usem a URL de webhook interna do Docker.
+	go waSvc.SyncConnectedWebhooks(context.Background())
 
 	wiring := &whatsappWiring{
 		ContextSvc:    contextSvc,
@@ -90,7 +89,6 @@ func setupWhatsAppAssistant(
 		ContactRepo:   contactRepo,
 		OwnerCache:    ownerCache,
 		GroupMeta:     groupMeta,
-		NudgeWorker:   nudgeWorker,
 	}
 
 	// Backfill do contexto do WhatsApp: importa o histórico recente da Evolution API.

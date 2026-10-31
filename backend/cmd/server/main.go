@@ -313,7 +313,7 @@ func main() {
 
 	evoClient := service.NewDefaultEvolutionClient(cfg.EvolutionAPIURL, cfg.EvolutionAPIKey, nil)
 	waSvc := service.NewWhatsAppService(service.WhatsAppServiceConfig{
-		WebhookBaseURL:  cfg.PublicBaseURL,
+		WebhookBaseURL:  service.ResolveWhatsAppWebhookBaseURL(cfg.PublicBaseURL, cfg.EvolutionAPIURL, cfg.Port),
 		EvolutionAPIURL: cfg.EvolutionAPIURL,
 		EvolutionAPIKey: cfg.EvolutionAPIKey,
 	}, waRepo, evoClient, astSvc)
@@ -334,12 +334,8 @@ func main() {
 		log.Printf("🖼️ [AI Provider] Visão do histórico do WhatsApp via %s.", cfg.WhatsAppMediaVisionModel)
 	}
 
-	// Assistente de WhatsApp: contexto, diretório de contatos, pendências, Radar,
-	// backfill e enriquecimento de mídia.
+	// Assistente de WhatsApp: contexto, diretório de contatos, backfill e enriquecimento de mídia.
 	waWiring := setupWhatsAppAssistant(cfg, db, waRepo, evoClient, waSvc, astSvc, notifSvc, accountCleanupWorker, mediaVision, audioTranscriber)
-	waNudgeWorker := waWiring.NudgeWorker
-	waNudgeWorker.Start()
-	defer waNudgeWorker.Stop()
 	if waWiring.BackfillWorker != nil {
 		defer waWiring.BackfillWorker.Stop()
 	}
