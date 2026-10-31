@@ -26,7 +26,7 @@ type GeminiTTSProvider struct {
 // NewGeminiTTSProvider inicializa o provedor de voz do Gemini.
 func NewGeminiTTSProvider(apiKey, model string) *GeminiTTSProvider {
 	if model == "" || model == "gemini-2.5-flash" || model == "gemini-2.0-flash" || model == "gemini-1.5-flash" {
-		model = "gemini-3.1-flash-tts-preview"
+		model = "gemini-2.5-flash-preview-tts"
 	}
 	return &GeminiTTSProvider{
 		apiKey:  apiKey,
@@ -129,15 +129,16 @@ func (p *GeminiTTSProvider) Synthesize(text string, voice string) ([]byte, strin
 
 	geminiVoice := MapVoiceToGemini(voice)
 
-	// Modelos oficiais do Google AI Studio dedicados a síntese de áudio (TTS)
+	// Modelos oficiais do Google AI Studio dedicados a síntese de áudio (TTS).
+	// gemini-2.5-flash-preview-tts e gemini-3.8-flash-lite-tts são priorizados para menor latência (<1.2s).
 	models := []string{
+		"gemini-2.5-flash-preview-tts",
+		"gemini-3.8-flash-lite-tts",
 		"gemini-3.1-flash-tts-preview",
 		"gemini-3.8-flash-tts",
-		"gemini-3.8-flash-lite-tts",
-		"gemini-2.5-flash-preview-tts",
 		"gemini-2.5-pro-preview-tts",
 	}
-	if p.model != "" && p.model != "gemini-3.1-flash-tts-preview" && p.model != "gemini-2.5-flash-preview-tts" && p.model != "gemini-2.5-flash" && p.model != "gemini-2.0-flash" && p.model != "gemini-1.5-flash" {
+	if p.model != "" && p.model != "gemini-2.5-flash-preview-tts" && p.model != "gemini-3.1-flash-tts-preview" && p.model != "gemini-2.5-flash" && p.model != "gemini-2.0-flash" && p.model != "gemini-1.5-flash" {
 		models = append([]string{p.model}, models...)
 	}
 

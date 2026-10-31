@@ -194,7 +194,11 @@ func (s *BookingService) removeAppointmentEvent(userID string, appt *domain.Book
 			log.Printf("[BookingService] Falha ao propagar exclusão do evento '%s' para agenda remota: %v", eventID, err)
 		}
 	}
-	return s.eventRepo.Delete(eventID, userID)
+	err := s.eventRepo.Delete(eventID, userID)
+	if err == domain.ErrEventNotFound && s.syncPusher != nil {
+		return nil
+	}
+	return err
 }
 
 // findAppointmentEventID localiza o evento de um agendamento sem EventID

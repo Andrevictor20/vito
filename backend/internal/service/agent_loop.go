@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/andrevmp/vito/backend/internal/ai"
@@ -21,6 +22,8 @@ type AgentLoop struct {
 	confirmationGate *ConfirmationGateService
 	convRepo         *repository.ConversationStoreRepository
 	traceRecorder    ai.TraceRecorder
+	userRepo         domain.UserRepository
+	aiSettingsRepo   domain.AISettingsRepository
 }
 
 // NewAgentLoop inicializa o cérebro único do assistente.
@@ -40,6 +43,12 @@ func NewAgentLoop(
 		convRepo:         convRepo,
 		traceRecorder:    traceRecorder,
 	}
+}
+
+// SetUserRepositories injeta os repositórios para resolução do nome real e persona style do usuário.
+func (l *AgentLoop) SetUserRepositories(userRepo domain.UserRepository, aiSettingsRepo domain.AISettingsRepository) {
+	l.userRepo = userRepo
+	l.aiSettingsRepo = aiSettingsRepo
 }
 
 // Run executa o loop ReAct síncrono.
@@ -63,6 +72,9 @@ func (l *AgentLoop) RunStream(ctx context.Context, req domain.UnifiedAssistantRe
 		if err == nil && thread != nil {
 			threadID = thread.ID
 		}
+	} else if threadID != "" && l.convRepo != nil {
+		// Garante que a thread existe isolada no repositório
+		_, _ = l.convRepo.GetOrCreateThread(ctx, req.UserID, req.Channel, threadID)
 	}
 	if threadID == "" {
 		threadID = uuid.New().String()
@@ -87,12 +99,26 @@ func (l *AgentLoop) RunStream(ctx context.Context, req domain.UnifiedAssistantRe
 		}
 	}
 
-	// 3. Montagem do contexto e persona
-	style := ai.PersonaStyle(req.StyleOverride)
-	if style == "" {
-		style = ai.StyleBalanced
+	// 3. Montagem do contexto e persona humana real
+	userName := "você"
+	personaStyle := ai.StyleBalanced
+
+	if l.userRepo != nil && req.UserID != "" {
+		if u, err := l.userRepo.GetByID(req.UserID); err == nil && u != nil && u.Name != "" {
+			parts := strings.Fields(u.Name)
+			if len(parts) > 0 {
+				userName = parts[0]
+			}
+		}
 	}
-	systemPrompt := ai.BuildPersonaSystemPrompt(style, "Usuário")
+	if req.StyleOverride != "" {
+		personaStyle = ai.PersonaStyle(req.StyleOverride)
+	} else if l.aiSettingsRepo != nil && req.UserID != "" {
+		if s, err := l.aiSettingsRepo.GetSettings(req.UserID); err == nil && s != nil && s.PersonaStyle != "" {
+			personaStyle = ai.PersonaStyle(s.PersonaStyle)
+		}
+	}
+	systemPrompt := ai.BuildPersonaSystemPromptWithChannel(personaStyle, userName, time.Now(), req.Channel)
 
 	execCtx := &domain.ToolExecutionContext{
 		UserID:                  req.UserID,
@@ -105,9 +131,9 @@ func (l *AgentLoop) RunStream(ctx context.Context, req domain.UnifiedAssistantRe
 
 	// 4. Histórico da conversa em turnos reais
 	var messages []ai.TurnMessage
-	if l.convRepo != nil {
+	if l.convRepo != nil && threadID != "" {
 		recent, err := l.convRepo.GetRecentTurns(ctx, threadID, 12)
-		if err == nil {
+		if err == nil && len(recent) > 0 {
 			for _, t := range recent {
 				messages = append(messages, ai.TurnMessage{
 					Role:    ai.ChatRole(t.Role),
@@ -116,23 +142,29 @@ func (l *AgentLoop) RunStream(ctx context.Context, req domain.UnifiedAssistantRe
 			}
 		}
 	}
+
+	// Se a thread no SQLite é nova mas o cliente enviou req.History (mesma sessão no cliente)
+	if len(messages) == 0 && len(req.History) > 0 {
+		startIdx := 0
+		if len(req.History) > 8 {
+			startIdx = len(req.History) - 8
+		}
+		for _, h := range req.History[startIdx:] {
+			role := ai.RoleUser
+			if strings.EqualFold(h.Role, "assistant") || strings.EqualFold(h.Role, "model") {
+				role = ai.RoleAssistant
+			}
+			messages = append(messages, ai.TurnMessage{
+				Role:    role,
+				Content: h.Content,
+			})
+		}
+	}
+
 	messages = append(messages, ai.TurnMessage{
 		Role:    ai.RoleUser,
 		Content: req.Message,
 	})
-
-	// Grava o turno do usuário no repositório
-	if l.convRepo != nil {
-		_ = l.convRepo.CreateTurn(ctx, &repository.ConversationTurn{
-			ID:        turnID,
-			ThreadID:  threadID,
-			UserID:    req.UserID,
-			Channel:   req.Channel,
-			Role:      "user",
-			Content:   req.Message,
-			CreatedAt: time.Now().UTC(),
-		})
-	}
 
 	// 5. Ciclo ReAct (máx. 4 iterações)
 	maxSteps := 4
@@ -164,13 +196,32 @@ func (l *AgentLoop) RunStream(ctx context.Context, req domain.UnifiedAssistantRe
 		chosenProvider = provider
 
 		var stepResp *ai.AgentChatResponse
+		var stepErr error
+
 		if onDelta != nil && step == 0 {
-			stepResp, err = provider.StreamChat(ctx, stepReq, onDelta)
+			stepResp, stepErr = provider.StreamChat(ctx, stepReq, onDelta)
 		} else {
-			stepResp, err = provider.Chat(ctx, stepReq)
+			stepResp, stepErr = provider.Chat(ctx, stepReq)
 		}
-		if err != nil {
-			return nil, fmt.Errorf("erro na chamada ao provedor de IA (%s): %w", provider.Name(), err)
+
+		if stepErr != nil {
+			// Failover transparente para outros provedores aptos
+			fallbacks := l.router.SelectFallbackProviders(ctx, stepReq, provider.Name())
+			for _, fb := range fallbacks {
+				if onDelta != nil && step == 0 {
+					stepResp, stepErr = fb.StreamChat(ctx, stepReq, onDelta)
+				} else {
+					stepResp, stepErr = fb.Chat(ctx, stepReq)
+				}
+				if stepErr == nil && stepResp != nil {
+					chosenProvider = fb
+					break
+				}
+			}
+		}
+
+		if stepErr != nil {
+			return nil, fmt.Errorf("erro na chamada ao provedor de IA (%s): %w", chosenProvider.Name(), stepErr)
 		}
 
 		if len(stepResp.Reasoning) > 0 {
@@ -182,6 +233,15 @@ func (l *AgentLoop) RunStream(ctx context.Context, req domain.UnifiedAssistantRe
 			finalAnswer = stepResp.Text
 			break
 		}
+
+		// Protocolo ReAct Estrito: Anexa o turno RoleAssistant contendo ToolCalls
+		// (e ThoughtSignature) antes de alimentar as respostas das ferramentas (RoleTool)
+		messages = append(messages, ai.TurnMessage{
+			Role:      ai.RoleAssistant,
+			Content:   stepResp.Text,
+			Thought:   stepResp.Thought,
+			ToolCalls: stepResp.ToolCalls,
+		})
 
 		// Processa as ferramentas invocadas
 		hasSuspendedTool := false
@@ -296,8 +356,18 @@ func (l *AgentLoop) RunStream(ctx context.Context, req domain.UnifiedAssistantRe
 		}
 	}
 
-	// 6. Grava resposta do assistente no ConversationStore
+	// 6. Grava turnos do usuário e do assistente no ConversationStore
 	if l.convRepo != nil {
+		_ = l.convRepo.CreateTurn(ctx, &repository.ConversationTurn{
+			ID:        turnID,
+			ThreadID:  threadID,
+			UserID:    req.UserID,
+			Channel:   req.Channel,
+			Role:      "user",
+			Content:   req.Message,
+			CreatedAt: startTime,
+		})
+
 		cardsBytes, _ := json.Marshal(collectedCards)
 		toolsBytes, _ := json.Marshal(executedTools)
 		reasonBytes, _ := json.Marshal(collectedReasoning)
@@ -329,7 +399,7 @@ func (l *AgentLoop) RunStream(ctx context.Context, req domain.UnifiedAssistantRe
 		ToolCalls:        executedTools,
 		Cards:            collectedCards,
 		Sources:          collectedSources,
-		SuggestedActions: []string{"Ver tarefas", "Próximo compromisso"},
+		SuggestedActions: nil,
 		Telemetry: domain.TurnTelemetry{
 			ProviderUsed: chosenProvider.Name(),
 			ModelUsed:    chosenProvider.ModelName(),

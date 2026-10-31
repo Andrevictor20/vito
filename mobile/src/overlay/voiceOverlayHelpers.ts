@@ -147,7 +147,7 @@ export function getCompactStateCaption(
   if (isMuted) {
     return { label: 'Mudo', text: 'Microfone desligado' };
   }
-  const cleanLive = (liveText || '').trim();
+  const cleanLive = cleanVoiceText(liveText);
   switch (state) {
     case 'LISTENING':
       return {
@@ -253,12 +253,32 @@ export function extractOverlayActionCard(
 }
 
 /**
+ * Remove marcações de formatação markdown (asteriscos, negrito, itálico, títulos, etc.)
+ * garantindo legendas e falas com texto humanizado e limpo, sem asteriscos aparentes.
+ */
+export function cleanVoiceText(text?: string): string {
+  if (!text) return '';
+  return text
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/__([^_]+)__/g, '$1')
+    .replace(/_([^_]+)_/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/^#+\s+/gm, '')
+    .replace(/^\s*[-*+]\s+/gm, '')
+    .replace(/[*_~`#]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
  * Divide a resposta em palavras para destaque progressivo sincronizado com a fala (#rtxt span.on).
  */
 export function splitReplyWordsForHighlight(text?: string): string[] {
   if (!text) return [];
-  return text
-    .trim()
+  const cleaned = cleanVoiceText(text);
+  if (!cleaned) return [];
+  return cleaned
     .split(/\s+/)
     .filter((w) => w.length > 0);
 }

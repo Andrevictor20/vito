@@ -64,6 +64,8 @@ export class ChatApi {
       method: 'POST',
       signal: opts.signal,
       body: JSON.stringify({
+        thread_id: opts.thread_id,
+        channel: opts.channel || 'app_mobile',
         prompt,
         timezone: tz,
         current_local_time: currentLocalTime,
@@ -104,6 +106,8 @@ export class ChatApi {
           method: 'POST',
           timeoutMs: 60000,
           body: JSON.stringify({
+            thread_id: opts.thread_id,
+            channel: opts.channel || 'voice',
             audio_b64: b64,
             audio_mime: resolvedMime,
             filename: resolvedFilename,
@@ -132,6 +136,10 @@ export class ChatApi {
       name: resolvedFilename,
       type: resolvedMime,
     } as unknown as Blob);
+    if (opts.thread_id) {
+      formData.append('thread_id', opts.thread_id);
+    }
+    formData.append('channel', opts.channel || 'voice');
     formData.append('timezone', tz);
     formData.append('current_local_time', currentLocalTime);
     formData.append('include_tts', String(opts.include_tts ?? true));

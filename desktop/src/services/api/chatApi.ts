@@ -52,6 +52,8 @@ export class ChatApi {
     const res = await this.client.request<any>('/api/v1/assistant/chat', {
       method: 'POST',
       body: JSON.stringify({
+        thread_id: context?.thread_id,
+        channel: context?.channel || 'app_desktop',
         prompt,
         text: prompt,
         timezone: tz,

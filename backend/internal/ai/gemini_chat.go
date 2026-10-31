@@ -62,6 +62,8 @@ func (p *GeminiAgentProvider) MaxContextTokens() int { return 32768 }
 
 type geminiChatPart struct {
 	Text             string                  `json:"text,omitempty"`
+	Thought          bool                    `json:"thought,omitempty"`
+	ThoughtSignature string                  `json:"thoughtSignature,omitempty"`
 	InlineData       *geminiInlineData       `json:"inlineData,omitempty"`
 	FunctionCall     *geminiFunctionCallPart `json:"functionCall,omitempty"`
 	FunctionResponse *geminiFunctionRespPart `json:"functionResponse,omitempty"`
@@ -69,7 +71,7 @@ type geminiChatPart struct {
 
 type geminiFunctionCallPart struct {
 	Name string          `json:"name"`
-	Args json.RawMessage `json:"args,omitempty"`
+	Args json.RawMessage `json:"args"`
 }
 
 type geminiFunctionRespPart struct {
@@ -106,8 +108,10 @@ type geminiChatRequest struct {
 }
 
 type geminiCandidatePart struct {
-	Text         string                  `json:"text,omitempty"`
-	FunctionCall *geminiFunctionCallPart `json:"functionCall,omitempty"`
+	Text             string                  `json:"text,omitempty"`
+	Thought          bool                    `json:"thought,omitempty"`
+	ThoughtSignature string                  `json:"thoughtSignature,omitempty"`
+	FunctionCall     *geminiFunctionCallPart `json:"functionCall,omitempty"`
 }
 
 type geminiChatCandidate struct {
@@ -135,6 +139,10 @@ type geminiChatResponse struct {
 }
 
 func (p *GeminiAgentProvider) buildRequest(req AgentChatRequest) geminiChatRequest {
+	return p.buildRequestForModel(req, p.model)
+}
+
+func (p *GeminiAgentProvider) buildRequestForModel(req AgentChatRequest, modelName string) geminiChatRequest {
 	var gReq geminiChatRequest
 
 	if req.SystemPrompt != "" {
@@ -166,14 +174,25 @@ func (p *GeminiAgentProvider) buildRequest(req AgentChatRequest) geminiChatReque
 			}
 		case RoleAssistant:
 			content.Role = "model"
+			if m.Thought != "" {
+				content.Parts = append(content.Parts, geminiChatPart{
+					Text:    m.Thought,
+					Thought: true,
+				})
+			}
 			if m.Content != "" {
 				content.Parts = append(content.Parts, geminiChatPart{Text: m.Content})
 			}
 			for _, tc := range m.ToolCalls {
+				args := tc.Arguments
+				if len(bytes.TrimSpace(args)) == 0 {
+					args = json.RawMessage("{}")
+				}
 				content.Parts = append(content.Parts, geminiChatPart{
+					ThoughtSignature: tc.ThoughtSignature,
 					FunctionCall: &geminiFunctionCallPart{
 						Name: tc.Name,
-						Args: tc.Arguments,
+						Args: args,
 					},
 				})
 			}
@@ -220,7 +239,7 @@ func (p *GeminiAgentProvider) buildRequest(req AgentChatRequest) geminiChatReque
 
 	gReq.GenerationConfig.Temperature = req.Temperature
 	gReq.GenerationConfig.MaxOutputTokens = req.MaxTokens
-	if strings.Contains(p.model, "2.5") {
+	if strings.Contains(modelName, "2.5") {
 		gReq.GenerationConfig.ThinkingConfig = &geminiThinkingConfig{ThinkingBudget: 0}
 	}
 
@@ -251,16 +270,16 @@ func (p *GeminiAgentProvider) modelsChain() []string {
 // Chat executa uma chamada síncrona convertendo tools e responses do Gemini.
 func (p *GeminiAgentProvider) Chat(ctx context.Context, req AgentChatRequest) (*AgentChatResponse, error) {
 	start := time.Now()
-	gReq := p.buildRequest(req)
-	bodyBytes, err := json.Marshal(gReq)
-	if err != nil {
-		return nil, fmt.Errorf("falha ao serializar requisição gemini: %w", err)
-	}
-
 	var lastErr error
 	models := p.modelsChain()
 
 	for _, modelName := range models {
+		gReq := p.buildRequestForModel(req, modelName)
+		bodyBytes, err := json.Marshal(gReq)
+		if err != nil {
+			return nil, fmt.Errorf("falha ao serializar requisição gemini: %w", err)
+		}
+
 		reqURL := fmt.Sprintf("%s/v1beta/models/%s:generateContent?key=%s", p.baseURL, modelName, p.apiKey)
 		httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, reqURL, bytes.NewReader(bodyBytes))
 		if err != nil {
@@ -281,8 +300,8 @@ func (p *GeminiAgentProvider) Chat(ctx context.Context, req AgentChatRequest) (*
 			continue
 		}
 
-		// Se cota excedida (429) ou modelo indisponível (404), tenta o próximo modelo da cadeia
-		if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode == http.StatusNotFound {
+		// Se cota excedida (429), modelo indisponível (404), argumento rejeitado (400) ou erro de servidor (>=500), tenta o próximo modelo
+		if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusBadRequest || resp.StatusCode >= http.StatusInternalServerError {
 			lastErr = fmt.Errorf("gemini status %d em %s: %s", resp.StatusCode, modelName, string(respBytes))
 			continue
 		}
@@ -296,7 +315,7 @@ func (p *GeminiAgentProvider) Chat(ctx context.Context, req AgentChatRequest) (*
 			return nil, fmt.Errorf("falha ao decodificar json gemini: %w", err)
 		}
 		if gResp.Error != nil {
-			if gResp.Error.Code == 429 || gResp.Error.Code == 404 {
+			if gResp.Error.Code == 429 || gResp.Error.Code == 404 || gResp.Error.Code == 400 || gResp.Error.Code >= 500 {
 				lastErr = fmt.Errorf("gemini api error (%d): %s", gResp.Error.Code, gResp.Error.Message)
 				continue
 			}
@@ -317,14 +336,21 @@ func (p *GeminiAgentProvider) Chat(ctx context.Context, req AgentChatRequest) (*
 		if len(gResp.Candidates) > 0 {
 			cand := gResp.Candidates[0]
 			for i, part := range cand.Content.Parts {
-				if part.Text != "" {
+				if part.Thought {
+					agentResp.Thought = part.Text
+				} else if part.Text != "" {
 					agentResp.Text += part.Text
 				}
 				if part.FunctionCall != nil {
+					args := part.FunctionCall.Args
+					if len(bytes.TrimSpace(args)) == 0 {
+						args = json.RawMessage("{}")
+					}
 					agentResp.ToolCalls = append(agentResp.ToolCalls, ToolCall{
-						ID:        fmt.Sprintf("call_%s_%d", part.FunctionCall.Name, i+1),
-						Name:      part.FunctionCall.Name,
-						Arguments: part.FunctionCall.Args,
+						ID:               fmt.Sprintf("call_%s_%d", part.FunctionCall.Name, i+1),
+						Name:             part.FunctionCall.Name,
+						Arguments:        args,
+						ThoughtSignature: part.ThoughtSignature,
 					})
 				}
 			}
@@ -404,10 +430,15 @@ func (p *GeminiAgentProvider) StreamChat(ctx context.Context, req AgentChatReque
 				}
 				if part.FunctionCall != nil {
 					toolCallIdx++
+					args := part.FunctionCall.Args
+					if len(bytes.TrimSpace(args)) == 0 {
+						args = json.RawMessage("{}")
+					}
 					tc := ToolCall{
-						ID:        fmt.Sprintf("call_%s_%d", part.FunctionCall.Name, toolCallIdx),
-						Name:      part.FunctionCall.Name,
-						Arguments: part.FunctionCall.Args,
+						ID:               fmt.Sprintf("call_%s_%d", part.FunctionCall.Name, toolCallIdx),
+						Name:             part.FunctionCall.Name,
+						Arguments:        args,
+						ThoughtSignature: part.ThoughtSignature,
 					}
 					agentResp.ToolCalls = append(agentResp.ToolCalls, tc)
 					delta.ToolCalls = append(delta.ToolCalls, tc)

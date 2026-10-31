@@ -14,7 +14,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { hapticFeedback } from '../theme/motion';
 import { api } from '../services/api';
-import { dataSync, chatPromptBus } from '../services/dataSync';
+import { dataSync, chatPromptBus, tabNavigationBus } from '../services/dataSync';
 import {
   BookingType,
   BookingAppointment,
@@ -76,7 +76,7 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({
   } | null>(null);
 
   const handleBookingPrompt = useCallback(() => {
-    chatPromptBus.askAssistant('Que tipo de reunião você quer criar? (Link individual 1-on-1 ou votação em grupo?)');
+    tabNavigationBus.notify('chat');
   }, []);
 
   useEffect(() => {

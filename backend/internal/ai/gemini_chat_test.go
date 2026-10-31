@@ -184,3 +184,148 @@ func TestGeminiAgentProvider_ErrorResponse(t *testing.T) {
 		t.Fatal("esperava erro ao receber HTTP 429")
 	}
 }
+
+func TestGeminiAgentProvider_PreservesThoughtSignature(t *testing.T) {
+	var capturedBody string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintln(w, `{
+			"candidates": [{
+				"content": {
+					"parts": [{
+						"functionCall": {
+							"name": "web_and_vertical_search",
+							"args": {"query": "worlds lol"}
+						},
+						"thoughtSignature": "sig-gemini-25-test"
+					}],
+					"role": "model"
+				}
+			}]
+		}`)
+	}))
+	defer ts.Close()
+
+	provider := ai.NewGeminiAgentProviderForTest("test-key", "gemini-2.5-flash", ts.URL, ts.Client())
+	req := ai.AgentChatRequest{
+		Messages: []ai.TurnMessage{
+			{Role: ai.RoleUser, Content: "Notícias de Worlds"},
+		},
+		Tools: []ai.ToolDefinition{
+			{Name: "web_and_vertical_search", Description: "Busca web"},
+		},
+	}
+
+	resp, err := provider.Chat(context.Background(), req)
+	if err != nil {
+		t.Fatalf("falha no Chat: %v", err)
+	}
+
+	if len(resp.ToolCalls) != 1 {
+		t.Fatalf("esperava 1 tool call, obteve %d", len(resp.ToolCalls))
+	}
+	if resp.ToolCalls[0].ThoughtSignature != "sig-gemini-25-test" {
+		t.Fatalf("esperava ThoughtSignature 'sig-gemini-25-test', obteve %q", resp.ToolCalls[0].ThoughtSignature)
+	}
+
+	// Agora testa se ao reenviar RoleAssistant com ThoughtSignature, o payload enviado ao servidor preserva a assinatura
+	ts2 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		buf := make([]byte, r.ContentLength)
+		_, _ = r.Body.Read(buf)
+		capturedBody = string(buf)
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintln(w, `{
+			"candidates": [{
+				"content": {
+					"parts": [{"text": "Notícias encontradas com sucesso."}],
+					"role": "model"
+				}
+			}]
+		}`)
+	}))
+	defer ts2.Close()
+
+	provider2 := ai.NewGeminiAgentProviderForTest("test-key", "gemini-2.5-flash", ts2.URL, ts2.Client())
+	req2 := ai.AgentChatRequest{
+		Messages: []ai.TurnMessage{
+			{Role: ai.RoleUser, Content: "Notícias de Worlds"},
+			{
+				Role: ai.RoleAssistant,
+				ToolCalls: []ai.ToolCall{
+					{
+						ID:               "call_1",
+						Name:             "web_and_vertical_search",
+						Arguments:        []byte(`{"query":"worlds lol"}`),
+						ThoughtSignature: "sig-gemini-25-test",
+					},
+				},
+			},
+			{
+				Role:       ai.RoleTool,
+				Name:       "web_and_vertical_search",
+				ToolCallID: "call_1",
+				Content:    "T1 venceu a semifinal",
+			},
+		},
+	}
+
+	_, err = provider2.Chat(context.Background(), req2)
+	if err != nil {
+		t.Fatalf("falha no Chat passo 2: %v", err)
+	}
+
+	if capturedBody == "" || !containsStr(capturedBody, "sig-gemini-25-test") {
+		t.Errorf("corpo da requisição deve conter 'thoughtSignature': %s", capturedBody)
+	}
+}
+
+func TestGeminiAgentProvider_RetriesOn400AcrossChain(t *testing.T) {
+	attempt := 0
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempt++
+		if attempt == 1 {
+			// Primeiro modelo rejeita com 400 INVALID_ARGUMENT (ex: flag incompatível)
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintln(w, `{"error":{"code":400,"message":"Request contains an invalid argument.","status":"INVALID_ARGUMENT"}}`)
+			return
+		}
+		// Segundo modelo da cadeia aceita e responde com sucesso
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintln(w, `{
+			"candidates": [{
+				"content": {
+					"parts": [{"text": "Resposta recuperada via modelo de fallback."}],
+					"role": "model"
+				}
+			}]
+		}`)
+	}))
+	defer ts.Close()
+
+	provider := ai.NewGeminiAgentProviderForTest("test-key", "gemini-2.5-flash", ts.URL, ts.Client())
+	req := ai.AgentChatRequest{
+		Messages: []ai.TurnMessage{{Role: ai.RoleUser, Content: "Pergunta"}},
+	}
+
+	resp, err := provider.Chat(context.Background(), req)
+	if err != nil {
+		t.Fatalf("esperava recuperação no modelo seguinte em erro 400, obteve erro: %v", err)
+	}
+
+	if resp.Text != "Resposta recuperada via modelo de fallback." {
+		t.Errorf("resposta inesperada: %q", resp.Text)
+	}
+}
+
+func containsStr(s, sub string) bool {
+	return len(s) >= len(sub) && (s == sub || len(s) > 0 && containsSub(s, sub))
+}
+
+func containsSub(s, sub string) bool {
+	for i := 0; i+len(sub) <= len(s); i++ {
+		if s[i:i+len(sub)] == sub {
+			return true
+		}
+	}
+	return false
+}

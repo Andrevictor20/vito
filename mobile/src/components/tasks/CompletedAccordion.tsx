@@ -7,13 +7,13 @@ import {
   LayoutAnimation,
   Platform,
   UIManager,
-  Alert,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { tokens } from '../../theme/tokens';
 import { hapticFeedback } from '../../theme/motion';
 import type { UnifiedRow } from '../../utils/unifiedTasks';
+import { ConfirmDeleteModal } from '../ui/ConfirmDeleteModal';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -42,6 +42,7 @@ export const CompletedAccordion: React.FC<CompletedAccordionProps> = ({
 }) => {
   const { colors } = useTheme();
   const [isOpen, setIsOpen] = useState(false);
+  const [rowToDelete, setRowToDelete] = useState<UnifiedRow | null>(null);
 
   if (completedRows.length === 0) return null;
 
@@ -159,14 +160,7 @@ export const CompletedAccordion: React.FC<CompletedAccordionProps> = ({
                     style={styles.deleteBtn}
                     onPress={() => {
                       hapticFeedback.selection();
-                      Alert.alert(
-                        'Excluir tarefa',
-                        `Deseja realmente excluir "${row.title}"?`,
-                        [
-                          { text: 'Cancelar', style: 'cancel' },
-                          { text: 'Excluir', style: 'destructive', onPress: () => onDeleteRow(row) },
-                        ]
-                      );
+                      setRowToDelete(row);
                     }}
                     hitSlop={tokens.hitSlop.sm}
                     activeOpacity={0.7}
@@ -181,6 +175,19 @@ export const CompletedAccordion: React.FC<CompletedAccordionProps> = ({
           ))}
         </View>
       )}
+
+      <ConfirmDeleteModal
+        visible={!!rowToDelete}
+        title="Excluir tarefa"
+        message={rowToDelete ? `Deseja realmente excluir "${rowToDelete.title}"?` : ''}
+        onClose={() => setRowToDelete(null)}
+        onConfirm={() => {
+          if (rowToDelete && onDeleteRow) {
+            onDeleteRow(rowToDelete);
+          }
+          setRowToDelete(null);
+        }}
+      />
     </View>
   );
 };

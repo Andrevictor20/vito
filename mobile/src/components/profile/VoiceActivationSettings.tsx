@@ -6,31 +6,63 @@ import {
   TouchableOpacity,
   Modal,
   ActivityIndicator,
+  ScrollView,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { voiceActivationService } from '../../services/voice/voiceActivationService';
+import { VoiceSelector } from './VoiceSelector';
+import { api } from '../../services/api';
 
 interface VoiceActivationSettingsProps {
   visible: boolean;
   onClose: () => void;
+  preferredVoice?: 'puck' | 'kore';
+  onVoiceChanged?: (voice: 'puck' | 'kore') => void;
 }
 
-export function VoiceActivationSettings({ visible, onClose }: VoiceActivationSettingsProps) {
+export function VoiceActivationSettings({
+  visible,
+  onClose,
+  preferredVoice: initialVoice = 'puck',
+  onVoiceChanged,
+}: VoiceActivationSettingsProps) {
   const { colors } = useTheme();
   const [isDefault, setIsDefault] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [selectedVoice, setSelectedVoice] = useState<'puck' | 'kore'>(initialVoice);
 
   useEffect(() => {
     if (visible) {
       checkStatus();
+      api.getAISettings().then((s) => {
+        if (s?.preferred_voice) {
+          const v = s.preferred_voice.toLowerCase();
+          const voiceId = v.includes('kore') || v.includes('female') || v.includes('feminino') ? 'kore' : 'puck';
+          setSelectedVoice(voiceId);
+        }
+      }).catch(() => {});
     }
   }, [visible]);
+
+  useEffect(() => {
+    if (initialVoice) {
+      setSelectedVoice(initialVoice);
+    }
+  }, [initialVoice]);
 
   const checkStatus = async () => {
     const isDef = await voiceActivationService.isVitoDefaultAssistant();
     setIsDefault(isDef);
+  };
+
+  const handleVoiceChange = async (voice: 'puck' | 'kore') => {
+    setSelectedVoice(voice);
+    onVoiceChanged?.(voice);
+    try {
+      await api.updateAISettings({ preferred_voice: voice });
+    } catch {}
   };
 
   const handleRequestRole = async () => {
@@ -67,124 +99,141 @@ export function VoiceActivationSettings({ visible, onClose }: VoiceActivationSet
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.titleRow}>
-              <MaterialIcons name="assistant" size={22} color={colors.ink} />
-              <Text style={[styles.title, { color: colors.ink }]}>Assistente Digital Android</Text>
+              <MaterialIcons name="record-voice-over" size={22} color={colors.ink} />
+              <Text style={[styles.title, { color: colors.ink }]}>Voz e Ativação do Vito</Text>
             </View>
             <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
               <MaterialIcons name="close" size={20} color={colors.muted} />
             </TouchableOpacity>
           </View>
 
-          <Text style={[styles.subtitle, { color: colors.muted }]}>
-            Use o Vito a qualquer momento segurando o botão Liga/Desliga ou com o gesto do canto da tela.
-          </Text>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16 }}>
+            {/* Seletor de Voz Masculina/Feminina na Aba Perfil */}
+            <View style={{ marginBottom: 14 }}>
+              <VoiceSelector
+                value={selectedVoice}
+                onChange={handleVoiceChange}
+              />
+            </View>
 
-          {/* Card de Status */}
-          <View
-            style={[
-              styles.statusCard,
-              {
-                backgroundColor: colors.bg,
-                borderColor: isDefault ? '#10B981' : colors.line,
-              },
-            ]}
-          >
-            <View style={styles.statusHeader}>
-              <View
-                style={[
-                  styles.statusIconBox,
-                  { backgroundColor: isDefault ? 'rgba(16, 185, 129, 0.15)' : 'rgba(161, 161, 170, 0.15)' },
-                ]}
-              >
-                <MaterialIcons
-                  name={isDefault ? 'check-circle' : 'radio-button-unchecked'}
-                  size={24}
-                  color={isDefault ? '#10B981' : colors.muted}
-                />
-              </View>
-              <View style={styles.statusInfo}>
-                <View style={styles.badgeRow}>
-                  <Text style={[styles.statusTitle, { color: colors.ink }]}>
-                    {isDefault ? 'Vito é seu Assistente Padrão' : 'Assistente Não Configurado'}
-                  </Text>
-                  {isDefault && (
-                    <View style={styles.activeBadge}>
-                      <Text style={styles.activeBadgeText}>ATIVO</Text>
-                    </View>
-                  )}
+            <View style={{ height: 1, backgroundColor: colors.line, marginVertical: 14 }} />
+
+            <View style={[styles.titleRow, { marginBottom: 6 }]}>
+              <MaterialIcons name="assistant" size={20} color={colors.ink} />
+              <Text style={[styles.title, { fontSize: 15, color: colors.ink }]}>Assistente Digital Android</Text>
+            </View>
+
+            <Text style={[styles.subtitle, { color: colors.muted }]}>
+              Use o Vito a qualquer momento segurando o botão Liga/Desliga ou com o gesto do canto da tela.
+            </Text>
+
+            {/* Card de Status */}
+            <View
+              style={[
+                styles.statusCard,
+                {
+                  backgroundColor: colors.bg,
+                  borderColor: isDefault ? '#10B981' : colors.line,
+                },
+              ]}
+            >
+              <View style={styles.statusHeader}>
+                <View
+                  style={[
+                    styles.statusIconBox,
+                    { backgroundColor: isDefault ? 'rgba(16, 185, 129, 0.15)' : 'rgba(161, 161, 170, 0.15)' },
+                  ]}
+                >
+                  <MaterialIcons
+                    name={isDefault ? 'check-circle' : 'radio-button-unchecked'}
+                    size={24}
+                    color={isDefault ? '#10B981' : colors.muted}
+                  />
                 </View>
-                <Text style={[styles.statusDesc, { color: colors.muted }]}>
-                  {isDefault
-                    ? 'Pronto para uso! Segure o botão Power de qualquer lugar para falar com o Vito.'
-                    : 'Defina o Vito como seu aplicativo de assistência padrão no sistema Android.'}
+                <View style={styles.statusInfo}>
+                  <View style={styles.badgeRow}>
+                    <Text style={[styles.statusTitle, { color: colors.ink }]}>
+                      {isDefault ? 'Vito é seu Assistente Padrão' : 'Assistente Não Configurado'}
+                    </Text>
+                    {isDefault && (
+                      <View style={styles.activeBadge}>
+                        <Text style={styles.activeBadgeText}>ATIVO</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={[styles.statusDesc, { color: colors.muted }]}>
+                    {isDefault
+                      ? 'Pronto para uso! Segure o botão Power de qualquer lugar para falar com o Vito.'
+                      : 'Defina o Vito como seu aplicativo de assistência padrão no sistema Android.'}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Seção Explicativa: Como Funciona */}
+            <View style={[styles.infoBox, { backgroundColor: colors.bg, borderColor: colors.line }]}>
+              <View style={styles.infoRow}>
+                <MaterialIcons name="battery-charging-full" size={18} color="#10B981" />
+                <Text style={[styles.infoText, { color: colors.ink }]}>
+                  <Text style={styles.bold}>Zero bateria em segundo plano:</Text> O Vito só acorda quando você aciona o botão, sem microfone ouvindo 24/7.
+                </Text>
+              </View>
+              <View style={styles.infoRow}>
+                <MaterialIcons name="security" size={18} color="#3B82F6" />
+                <Text style={[styles.infoText, { color: colors.ink }]}>
+                  <Text style={styles.bold}>Privacidade total:</Text> Sem ponto verde de microfone na barra de notificações quando em repouso.
+                </Text>
+              </View>
+              <View style={styles.infoRow}>
+                <MaterialIcons name="touch-app" size={18} color="#8B5CF6" />
+                <Text style={[styles.infoText, { color: colors.ink }]}>
+                  <Text style={styles.bold}>Acesso instantâneo:</Text> Funciona sobre qualquer aplicativo ou com a tela bloqueada.
                 </Text>
               </View>
             </View>
-          </View>
 
-          {/* Seção Explicativa: Como Funciona */}
-          <View style={[styles.infoBox, { backgroundColor: colors.bg, borderColor: colors.line }]}>
-            <View style={styles.infoRow}>
-              <MaterialIcons name="battery-charging-full" size={18} color="#10B981" />
-              <Text style={[styles.infoText, { color: colors.ink }]}>
-                <Text style={styles.bold}>Zero bateria em segundo plano:</Text> O Vito só acorda quando você aciona o botão, sem microfone ouvindo 24/7.
-              </Text>
-            </View>
-            <View style={styles.infoRow}>
-              <MaterialIcons name="security" size={18} color="#3B82F6" />
-              <Text style={[styles.infoText, { color: colors.ink }]}>
-                <Text style={styles.bold}>Privacidade total:</Text> Sem ponto verde de microfone na barra de notificações quando em repouso.
-              </Text>
-            </View>
-            <View style={styles.infoRow}>
-              <MaterialIcons name="touch-app" size={18} color="#8B5CF6" />
-              <Text style={[styles.infoText, { color: colors.ink }]}>
-                <Text style={styles.bold}>Acesso instantâneo:</Text> Funciona sobre qualquer aplicativo ou com a tela bloqueada.
-              </Text>
-            </View>
-          </View>
-
-          {loading && (
-            <View style={styles.loadingBox}>
-              <ActivityIndicator color={colors.ink} size="small" />
-              <Text style={[styles.loadingText, { color: colors.muted }]}>Verificando com o sistema...</Text>
-            </View>
-          )}
-
-          {message && (
-            <Text style={[styles.feedbackMessage, { color: isDefault ? '#10B981' : '#3B82F6' }]}>{message}</Text>
-          )}
-
-          {/* Botões de Ação */}
-          <View style={styles.actionsContainer}>
-            {!isDefault ? (
-              <TouchableOpacity
-                style={[styles.primaryBtn, { backgroundColor: colors.ink }]}
-                onPress={handleRequestRole}
-                disabled={loading}
-              >
-                <MaterialIcons name="stars" size={18} color={colors.bg} style={{ marginRight: 6 }} />
-                <Text style={[styles.primaryBtnText, { color: colors.bg }]}>Definir como Assistente Padrão</Text>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity
-                style={[styles.primaryBtn, { backgroundColor: '#10B981' }]}
-                onPress={checkStatus}
-                disabled={loading}
-              >
-                <MaterialIcons name="refresh" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
-                <Text style={[styles.primaryBtnText, { color: '#FFFFFF' }]}>Atualizar Status</Text>
-              </TouchableOpacity>
+            {loading && (
+              <View style={styles.loadingBox}>
+                <ActivityIndicator color={colors.ink} size="small" />
+                <Text style={[styles.loadingText, { color: colors.muted }]}>Verificando com o sistema...</Text>
+              </View>
             )}
 
-            <TouchableOpacity
-              style={[styles.secondaryBtn, { borderColor: colors.line }]}
-              onPress={handleOpenSettings}
-              disabled={loading}
-            >
-              <Text style={[styles.secondaryBtnText, { color: colors.ink }]}>Abrir Configurações do Android</Text>
-            </TouchableOpacity>
-          </View>
+            {message && (
+              <Text style={[styles.feedbackMessage, { color: isDefault ? '#10B981' : '#3B82F6' }]}>{message}</Text>
+            )}
+
+            {/* Botões de Ação */}
+            <View style={styles.actionsContainer}>
+              {!isDefault ? (
+                <TouchableOpacity
+                  style={[styles.primaryBtn, { backgroundColor: colors.ink }]}
+                  onPress={handleRequestRole}
+                  disabled={loading}
+                >
+                  <MaterialIcons name="stars" size={18} color={colors.bg} style={{ marginRight: 6 }} />
+                  <Text style={[styles.primaryBtnText, { color: colors.bg }]}>Definir como Assistente Padrão</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={[styles.primaryBtn, { backgroundColor: '#10B981' }]}
+                  onPress={checkStatus}
+                  disabled={loading}
+                >
+                  <MaterialIcons name="refresh" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
+                  <Text style={[styles.primaryBtnText, { color: '#FFFFFF' }]}>Atualizar Status</Text>
+                </TouchableOpacity>
+              )}
+
+              <TouchableOpacity
+                style={[styles.secondaryBtn, { borderColor: colors.line }]}
+                onPress={handleOpenSettings}
+                disabled={loading}
+              >
+                <Text style={[styles.secondaryBtnText, { color: colors.ink }]}>Abrir Configurações do Android</Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
         </View>
       </View>
     </Modal>
@@ -202,6 +251,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 28,
     padding: 24,
     borderWidth: 1,
+    maxHeight: '90%',
   },
   header: {
     flexDirection: 'row',

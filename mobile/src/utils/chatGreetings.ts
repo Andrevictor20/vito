@@ -14,32 +14,28 @@ interface GreetingTemplate {
   anonymous: string;
 }
 
-// Frases de boas-vindas do Vito. Tom executivo e acolhedor, sem emojis
-// (a interface usa ícones vetoriais do Material Design).
+// Frases de boas-vindas do Vito. Tom humano, calmo e prestativo, sem pressão ou interrogatórios.
 const GREETINGS: GreetingTemplate[] = [
   // Manhã
-  { period: 'morning', withName: 'Bom dia, {name}! Vamos organizar o dia?', anonymous: 'Bom dia! Vamos organizar o dia?' },
-  { period: 'morning', withName: 'Bom dia, {name}! O que temos para hoje?', anonymous: 'Bom dia! O que temos para hoje?' },
-  { period: 'morning', withName: 'Bom dia, {name}! Quais são os eventos de hoje?', anonymous: 'Bom dia! Quais são os eventos de hoje?' },
-  { period: 'morning', withName: 'Bom dia, {name}! Pronto para planejar a agenda?', anonymous: 'Bom dia! Pronto para planejar a agenda?' },
+  { period: 'morning', withName: 'Bom dia, {name}.', anonymous: 'Bom dia.' },
+  { period: 'morning', withName: 'Bom dia, {name}! Tudo bem por aí?', anonymous: 'Bom dia! Tudo bem?' },
+  { period: 'morning', withName: 'Bom dia, {name}. Por aqui quando precisar.', anonymous: 'Bom dia. Por aqui quando precisar.' },
   // Tarde
-  { period: 'afternoon', withName: 'Boa tarde, {name}! Vamos lá?', anonymous: 'Boa tarde! Vamos lá?' },
-  { period: 'afternoon', withName: 'Boa tarde, {name}! Como está a agenda da tarde?', anonymous: 'Boa tarde! Como está a agenda da tarde?' },
-  { period: 'afternoon', withName: 'Boa tarde, {name}! Precisa reagendar algo?', anonymous: 'Boa tarde! Precisa reagendar algo?' },
-  { period: 'afternoon', withName: 'Boa tarde, {name}! O que posso adiantar para você?', anonymous: 'Boa tarde! O que posso adiantar para você?' },
+  { period: 'afternoon', withName: 'Boa tarde, {name}.', anonymous: 'Boa tarde.' },
+  { period: 'afternoon', withName: 'Boa tarde, {name}! Tudo bem?', anonymous: 'Boa tarde! Tudo bem?' },
+  { period: 'afternoon', withName: 'Boa tarde, {name}. Por aqui.', anonymous: 'Boa tarde. Por aqui.' },
   // Noite
-  { period: 'evening', withName: 'Boa noite, {name}! Vamos revisar o dia?', anonymous: 'Boa noite! Vamos revisar o dia?' },
-  { period: 'evening', withName: 'Boa noite, {name}! Quer planejar o amanhã?', anonymous: 'Boa noite! Quer planejar o amanhã?' },
-  { period: 'evening', withName: 'Boa noite, {name}! Algum compromisso para amanhã?', anonymous: 'Boa noite! Algum compromisso para amanhã?' },
+  { period: 'evening', withName: 'Boa noite, {name}.', anonymous: 'Boa noite.' },
+  { period: 'evening', withName: 'Boa noite, {name}! Tudo em ordem?', anonymous: 'Boa noite! Tudo em ordem?' },
+  { period: 'evening', withName: 'Boa noite, {name}. Por aqui quando precisar.', anonymous: 'Boa noite. Por aqui quando precisar.' },
   // Madrugada
-  { period: 'dawn', withName: 'Boa madrugada, {name}! Anotando algo para amanhã?', anonymous: 'Boa madrugada! Anotando algo para amanhã?' },
+  { period: 'dawn', withName: 'Boa madrugada, {name}.', anonymous: 'Boa madrugada.' },
+  { period: 'dawn', withName: 'Olá, {name}.', anonymous: 'Olá.' },
   // Neutras (valem para qualquer período)
-  { period: 'neutral', withName: 'Vamos lá, {name}! Como posso ajudar hoje?', anonymous: 'Como posso ajudar hoje?' },
-  { period: 'neutral', withName: 'Olá, {name}! O que vamos conquistar hoje?', anonymous: 'Olá! O que vamos conquistar hoje?' },
-  { period: 'neutral', withName: 'Oi, {name}! Agenda, tarefas ou um radar novo?', anonymous: 'Oi! Agenda, tarefas ou um radar novo?' },
-  { period: 'neutral', withName: 'Como posso ajudar hoje, {name}?', anonymous: 'Como posso ajudar hoje?' },
-  { period: 'neutral', withName: 'Pronto para organizar, {name}? Me diga o que precisa.', anonymous: 'Pronto para organizar? Me diga o que precisa.' },
-  { period: 'neutral', withName: '{name}, por aqui! Diga o que precisa.', anonymous: 'Por aqui! Diga o que precisa.' },
+  { period: 'neutral', withName: 'Oi, {name}.', anonymous: 'Oi.' },
+  { period: 'neutral', withName: 'Fala, {name}, tudo bem?', anonymous: 'Oi, tudo bem?' },
+  { period: 'neutral', withName: 'Por aqui, {name}.', anonymous: 'Por aqui quando precisar.' },
+  { period: 'neutral', withName: 'Olá, {name}.', anonymous: 'Olá.' },
 ];
 
 const hasUsableName = (firstName?: string): boolean =>

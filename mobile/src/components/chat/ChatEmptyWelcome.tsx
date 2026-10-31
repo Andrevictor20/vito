@@ -22,7 +22,7 @@ export const ChatEmptyWelcome: React.FC<ChatEmptyWelcomeProps> = ({
 
   const titleText =
     welcomeGreeting ||
-    (userName ? `Vamos lá, ${userName}! Como posso ajudar hoje?` : 'Como posso ajudar hoje?');
+    (userName ? `Olá, ${userName}!` : 'Olá!');
 
   return (
     <View style={styles.cheroContainer}>
@@ -38,7 +38,7 @@ export const ChatEmptyWelcome: React.FC<ChatEmptyWelcomeProps> = ({
 
       {/* Subtítulo */}
       <Text style={[styles.heroSubtitle, { color: colors.muted }]}>
-        Toque numa sugestão abaixo ou me diga o que precisa
+        Por aqui quando precisar de algo ou quiser bater um papo.
       </Text>
 
       {/* Carrossel 3D de Ideias */}

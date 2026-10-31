@@ -111,6 +111,28 @@ func (r *ModelRouter) SelectProvider(ctx context.Context, req AgentChatRequest) 
 	return chosen, nil
 }
 
+// SelectFallbackProviders retorna outros provedores aptos para a requisição, ordenados por qualidade, excluindo o provedor especificado.
+func (r *ModelRouter) SelectFallbackProviders(ctx context.Context, req AgentChatRequest, excludeProvider string) []AgentProvider {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	minTier := r.requiredMinTier(req)
+	var fallbacks []AgentProvider
+	for _, p := range r.providers {
+		if p.Name() == excludeProvider {
+			continue
+		}
+		if p.QualityTier() < minTier {
+			continue
+		}
+		if req.RequireTools && !p.SupportsTools() {
+			continue
+		}
+		fallbacks = append(fallbacks, p)
+	}
+	return fallbacks
+}
+
 // SetStickyThread fixa explicitamente uma thread a um provedor.
 func (r *ModelRouter) SetStickyThread(threadID, providerName string, duration time.Duration) {
 	r.mu.Lock()

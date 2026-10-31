@@ -16,6 +16,7 @@ import {
   extractWhatsAppCardData,
   extractOverlayActionCard,
   splitReplyWordsForHighlight,
+  cleanVoiceText,
   isGoodbyeUtterance,
 } from './voiceOverlayHelpers';
 import { VoiceFullscreenView } from './VoiceFullscreenView';
@@ -43,7 +44,7 @@ export function VitoVoiceOverlay({
   onSwitchToText,
 }: VitoVoiceOverlayProps) {
   const [state, setState] = useState<ConversationState>('LISTENING');
-  const [transcript, setTranscript] = useState<string>('Estou ouvindo... O que deseja fazer?');
+  const [transcript, setTranscript] = useState<string>('Ouvindo você...');
   const [userTranscript, setUserTranscript] = useState<string>('');
   const [replyText, setReplyText] = useState<string>('');
   const [highlightedWordCount, setHighlightedWordCount] = useState<number>(0);
@@ -69,6 +70,9 @@ export function VitoVoiceOverlay({
   const audioLevelRef = useRef(audioLevel);
   audioLevelRef.current = audioLevel;
   const isClosingRef = useRef<boolean>(false);
+  const voiceSessionIdRef = useRef<string>(
+    `voice-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
+  );
   const conversationHistoryRef = useRef<ChatHistoryItem[]>([]);
   const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
   const wordTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -118,14 +122,6 @@ export function VitoVoiceOverlay({
       if (idx >= words.length) clearWordTimer();
     }, 135);
   }, [clearWordTimer]);
-
-  const handleToggleVoice = useCallback(() => {
-    setPreferredVoice((prev) => {
-      const next = prev === 'puck' ? 'kore' : 'puck';
-      api.updateAISettings({ preferred_voice: next }).catch(() => {});
-      return next;
-    });
-  }, []);
 
   const handleClose = useCallback(() => {
     if (isClosingRef.current) return;
@@ -189,7 +185,21 @@ export function VitoVoiceOverlay({
 
   const handleAssistantTurnResult = useCallback(
     async (userText: string, rawReply: string, resPayload: any) => {
-      const cleanReply = (rawReply || 'Pronto.').trim();
+      const cleanReply = cleanVoiceText(rawReply || 'Pronto.');
+
+      // Sincronia de Voz e Texto: Se o áudio inline não veio no payload,
+      // busca o TTS ainda no estado THINKING para que texto e áudio iniciem juntos.
+      let audioB64 = resPayload?.tts_audio_b64;
+      if (!audioB64 && VitoDuplexAudioModule?.playTtsAudio) {
+        setTranscript('Sintetizando voz...');
+        try {
+          const tts = await api.voiceTTS(cleanReply, preferredVoice);
+          if (tts?.audio_b64) {
+            audioB64 = tts.audio_b64;
+          }
+        } catch {}
+      }
+
       setUserTranscript(userText);
       setReplyText(cleanReply);
       setTranscript(cleanReply);
@@ -205,7 +215,7 @@ export function VitoVoiceOverlay({
       startWordHighlightProgress(cleanReply);
 
       const isGoodbye = isGoodbyeUtterance(userText) || isGoodbyeUtterance(cleanReply);
-      await playNeuralVoiceReply(cleanReply, resPayload?.tts_audio_b64);
+      await playNeuralVoiceReply(cleanReply, audioB64);
       clearWordTimer();
       setHighlightedWordCount(splitReplyWordsForHighlight(cleanReply).length);
 
@@ -226,7 +236,7 @@ export function VitoVoiceOverlay({
         await VitoDuplexAudioModule.startRecording().catch(() => {});
       }
     },
-    [isCompact, onMessageExchange, startWordHighlightProgress, playNeuralVoiceReply, clearWordTimer, handleClose, resetInactivityTimer]
+    [isCompact, preferredVoice, onMessageExchange, startWordHighlightProgress, playNeuralVoiceReply, clearWordTimer, handleClose, resetInactivityTimer]
   );
 
   const finishRecordingAndProcess = useCallback(async () => {
@@ -247,6 +257,8 @@ export function VitoVoiceOverlay({
       }
 
       const res = await api.assistantAudio(wavPath, 'audio.wav', {
+        thread_id: voiceSessionIdRef.current,
+        channel: 'voice',
         history: conversationHistoryRef.current,
         screen_context: screenContextVisible ? screenContext : undefined,
         voice: preferredVoice,
@@ -258,7 +270,7 @@ export function VitoVoiceOverlay({
       await handleAssistantTurnResult(spokenUser, spokenReply, res);
     } catch (err: any) {
       if (isClosingRef.current) return;
-      const errMsg = err?.message || 'Não consegui processar o áudio agora. Pode repetir?';
+      const errMsg = cleanVoiceText(err?.message || 'Não consegui processar o áudio agora. Pode repetir?');
       setReplyText(errMsg);
       setTranscript(errMsg);
       setState('SPEAKING');
@@ -454,7 +466,6 @@ export function VitoVoiceOverlay({
       onConfirmWhatsApp={handleConfirmWhatsApp}
       screenContext={screenContext}
       voice={preferredVoice}
-      onToggleVoice={handleToggleVoice}
     />
   );
 }

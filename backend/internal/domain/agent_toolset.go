@@ -104,20 +104,28 @@ type ScopeGuard interface {
 	IsTainted(ctx context.Context, turnID string) bool
 }
 
+// ConversationHistoryItem representa uma mensagem passada enviada pelo cliente.
+type ConversationHistoryItem struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
 // UnifiedAssistantRequest é o contrato único de entrada para Mobile, Desktop, WhatsApp e Voz.
 type UnifiedAssistantRequest struct {
-	UserID           string `json:"user_id"`
-	ThreadID         string `json:"thread_id,omitempty"`
-	Channel          string `json:"channel"` // "app_mobile", "app_desktop", "whatsapp", "voice"
-	Message          string `json:"message"`
-	Prompt           string `json:"prompt,omitempty"` // Alias compatível com clientes legados
-	FocusMode        string `json:"focus_mode,omitempty"`
-	StyleOverride    string `json:"style_override,omitempty"`
-	ConfirmPendingID string `json:"confirm_pending_id,omitempty"`
-	RejectPendingID  string `json:"reject_pending_id,omitempty"`
-	QuotedContext    string `json:"quoted_context,omitempty"`
-	ImageB64         string `json:"image_b64,omitempty"`
-	ImageMime        string `json:"image_mime,omitempty"`
+	UserID           string                    `json:"user_id"`
+	ThreadID         string                    `json:"thread_id,omitempty"`
+	Channel          string                    `json:"channel"` // "app_mobile", "app_desktop", "whatsapp", "voice"
+	Message          string                    `json:"message"`
+	Prompt           string                    `json:"prompt,omitempty"` // Alias compatível com clientes legados
+	FocusMode        string                    `json:"focus_mode,omitempty"`
+	StyleOverride    string                    `json:"style_override,omitempty"`
+	ConfirmPendingID string                    `json:"confirm_pending_id,omitempty"`
+	RejectPendingID  string                    `json:"reject_pending_id,omitempty"`
+	QuotedContext    string                    `json:"quoted_context,omitempty"`
+	ImageB64         string                    `json:"image_b64,omitempty"`
+	ImageMime        string                    `json:"image_mime,omitempty"`
+	History          []ConversationHistoryItem `json:"history,omitempty"`
+	IsNewSession     bool                      `json:"is_new_session,omitempty"`
 }
 
 // UnifiedAssistantResponse é o contrato único de saída para todos os canais (§5.6.7).

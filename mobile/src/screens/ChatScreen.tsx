@@ -401,7 +401,7 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
       />
 
       {/* Chips Rápidos de Sugestões Executivas (Início do Chat) */}
-      {messages.length <= 2 && !isKeyboardOpen && (
+      {messages.length > 0 && messages.length <= 2 && !isKeyboardOpen && (
         <View style={styles.suggestionsWrapper}>
           <ChatQuickChips onSelectPrompt={handleQuickPrompt} disabled={loading} />
         </View>

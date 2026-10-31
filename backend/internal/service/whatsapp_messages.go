@@ -17,6 +17,30 @@ import (
 // reVitoTrigger detecta comandos ou menções explícitas ao Vito nas mensagens (@vito, /vito, !vito).
 var reVitoTrigger = regexp.MustCompile(`(?i)[@!/]vito\b[:,!-]?\s*`)
 
+// reNaturalVitoTrigger detecta chamadas naturais direcionadas ao Vito ("Vito, ...", "Oi Vito, ...", "Fala Vito, ...").
+var reNaturalVitoTrigger = regexp.MustCompile(`(?i)(?:^|[.!?]\s*)(?:(?:ol[áa]|oi|fala|ei|e\s*a[íi]|por\s+favor)\s+)?vito\b[:,!-]?\s*`)
+
+// hasVitoCall verifica se a mensagem chama explicitamente ou naturalmente o Vito.
+// - Em mensagens de áudio ou conversas pessoais (self/self_group): aceita menção natural ("Vito, ...", "Oi Vito, ...") ou com prefixo (@, !, /).
+// - Em conversas em grupo com terceiros: exige prefixo explícito (@vito, /vito, !vito) para texto/imagem, mas aceita chamada natural no áudio.
+func hasVitoCall(text string, isAudio bool, isPrivateChat bool) (bool, string) {
+	trimmed := strings.TrimSpace(text)
+	if trimmed == "" {
+		return false, ""
+	}
+	if reVitoTrigger.MatchString(trimmed) {
+		clean := strings.TrimSpace(reVitoTrigger.ReplaceAllString(trimmed, ""))
+		return true, clean
+	}
+	if isAudio || isPrivateChat {
+		if reNaturalVitoTrigger.MatchString(trimmed) {
+			clean := strings.TrimSpace(reNaturalVitoTrigger.ReplaceAllString(trimmed, ""))
+			return true, clean
+		}
+	}
+	return false, trimmed
+}
+
 // imageAnalysisPrompt é o pedido padrão quando a imagem chega sem legenda.
 const imageAnalysisPrompt = "Analise esta imagem e me diga o que ela contém. Se for um documento, recibo, comprovante ou evento, extraia os dados (datas, valores, títulos) e sugira a ação correspondente."
 
@@ -115,16 +139,53 @@ func (s *WhatsAppService) handleMessagesEvent(ctx context.Context, instanceName 
 		return nil
 	}
 
-	// Em grupos e conversas com terceiros o Vito só responde quando é citado.
-	hasTrigger := reVitoTrigger.MatchString(rawText)
-	if RequiresTrigger(chatKind) && !hasTrigger {
-		s.archiveMessage(ctx, integration.UserID, instanceName, msg, chatKind, rawText, "user")
-		return nil
+	isPrivateChat := chatKind == domain.WhatsAppChatKindSelf || chatKind == domain.WhatsAppChatKindSelfGroup
+	calledVito, cleanText := hasVitoCall(rawText, msg.IsAudio, isPrivateChat)
+
+	// Regra 1: Captura de tela / Imagem (msg.IsImage)
+	// O Vito NUNCA deve responder a prints ou fotos a menos que tenha sido chamado
+	// na legenda da imagem. Sem chamada, arquiva silenciosamente no shadow inbox.
+	if msg.IsImage {
+		if !calledVito {
+			s.archiveMessage(ctx, integration.UserID, instanceName, msg, chatKind, rawText, "user")
+			log.Printf("ℹ️ [WhatsAppInbound] imagem sem menção ao Vito arquivada silenciosamente (jid=%s)", msg.RemoteJID)
+			return nil
+		}
+		rawText = cleanText
+		if rawText == "" {
+			rawText = imageAnalysisPrompt
+		}
 	}
-	if hasTrigger {
-		rawText = strings.TrimSpace(reVitoTrigger.ReplaceAllString(rawText, ""))
+
+	// Regra 2: Áudio (msg.IsAudio)
+	// O áudio é transcrito e arquivado no shadow inbox. Porém, o Vito só deve responder
+	// se a fala tiver chamado o Vito ("Vito, ...", "Oi Vito, ...", "@vito...").
+	// Sem menção ao Vito, o áudio é arquivado silenciosamente sem reação nem resposta.
+	if msg.IsAudio {
+		if !calledVito {
+			s.archiveMessage(ctx, integration.UserID, instanceName, msg, chatKind, rawText, "user")
+			log.Printf("ℹ️ [WhatsAppInbound] áudio sem menção ao Vito arquivado silenciosamente (jid=%s)", msg.RemoteJID)
+			return nil
+		}
+		rawText = cleanText
 		if rawText == "" {
 			rawText = "olá"
+		}
+	}
+
+	// Regra 3: Texto comum (não imagem, não áudio)
+	// Em grupos ou conversas de terceiros, exige menção explícita (@vito, /vito, !vito).
+	// Em conversas pessoais (chat "Você" / self), conversa diretamente sem exigir menção.
+	if !msg.IsImage && !msg.IsAudio {
+		if RequiresTrigger(chatKind) && !calledVito {
+			s.archiveMessage(ctx, integration.UserID, instanceName, msg, chatKind, rawText, "user")
+			return nil
+		}
+		if calledVito {
+			rawText = cleanText
+			if rawText == "" {
+				rawText = "olá"
+			}
 		}
 	}
 
@@ -153,7 +214,7 @@ func (s *WhatsAppService) handleMessagesEvent(ctx context.Context, instanceName 
 		// instalado, isso evitaria duplicar a resposta e poluir o chat.
 		// O Vito continua arquivando a mensagem e enxergando a conversa.
 		isGroup := strings.HasSuffix(msg.RemoteJID, "@g.us")
-		if hasTrigger && !isGroup {
+		if calledVito && !isGroup {
 			s.replyOnlyOwnerCanCommand(ctx, instanceName, msg, chatKind)
 		}
 		return nil

@@ -218,7 +218,7 @@ export function useHomeData(currentUserId?: string) {
       if (seriesIds.length === 0) seriesIds = [id];
     }
 
-    // 1. Optimistic Update instantâneo (< 16ms)
+    // 1. Optimistic Update instantâneo (< 16ms) com atualização funcional
     let nextEvents: Event[];
     if (allSeries && targetEvent) {
       const targetTitle = targetEvent.title.trim().toLowerCase();
@@ -237,7 +237,12 @@ export function useHomeData(currentUserId?: string) {
       if (allSeries) {
         loadData(true);
       }
-    } catch (e) {
+    } catch (e: any) {
+      // Se o backend retornar 404 (já removido no banco/sync), mantém a exclusão otimista
+      if (e?.status === 404 || e?.message?.includes('404') || e?.message?.includes('não encontrado')) {
+        notificationService.cancelEventReminders(seriesIds).catch(() => {});
+        return;
+      }
       console.error('Erro ao deletar evento, revertendo:', e);
       setEvents(previousEvents);
       AsyncStorage.setItem(cacheKeys.eventsKey, JSON.stringify(previousEvents)).catch(() => {});

@@ -16,6 +16,7 @@ import {
   getCompactStateCaption,
   extractOverlayActionCard,
   splitReplyWordsForHighlight,
+  cleanVoiceText,
   inferAudioMimeType,
 } from '../voiceOverlayHelpers';
 
@@ -229,6 +230,19 @@ describe('voiceOverlayHelpers — Testes do Visualizador e Lógica de Voz', () =
   it('splitReplyWordsForHighlight divide texto em palavras para destaque progressivo (#rtxt span.on)', () => {
     const words = splitReplyWordsForHighlight('Pronto — marquei na sua agenda.');
     assert.deepStrictEqual(words, ['Pronto', '—', 'marquei', 'na', 'sua', 'agenda.']);
+  });
+
+  it('cleanVoiceText remove asteriscos (**), itálicos (*), títulos e marcadores deixando texto limpo', () => {
+    assert.strictEqual(cleanVoiceText('**Bom dia, André!** Você tem **2 reuniões** hoje.'), 'Bom dia, André! Você tem 2 reuniões hoje.');
+    assert.strictEqual(cleanVoiceText('*Aviso:* Não esqueça do seu remédio.'), 'Aviso: Não esqueça do seu remédio.');
+    assert.strictEqual(cleanVoiceText('### Título\n- Item 1\n- Item 2'), 'Título Item 1 Item 2');
+    assert.strictEqual(cleanVoiceText(''), '');
+    assert.strictEqual(cleanVoiceText(undefined), '');
+  });
+
+  it('splitReplyWordsForHighlight limpa asteriscos e divide em palavras puras', () => {
+    const words = splitReplyWordsForHighlight('**Bom dia** André!');
+    assert.deepStrictEqual(words, ['Bom', 'dia', 'André!']);
   });
 
   it('inferAudioMimeType detecta corretamente audio/wav vs audio/m4a', () => {

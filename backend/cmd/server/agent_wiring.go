@@ -34,6 +34,11 @@ func setupAgentSubsystem(
 	todoSvc *service.TodoService,
 	waSvc *service.WhatsAppService,
 	gmailSvc *service.GmailService,
+	userRepo domain.UserRepository,
+	aiSettingsRepo domain.AISettingsRepository,
+	triggerSvc *service.TriggerService,
+	bookingSvc *service.BookingService,
+	memoryRepo *repository.MemoryRepositorySQLite,
 ) *AgentSubsystem {
 	// 1. Repositórios e Serviços de Memória e Confirmação
 	convRepo := repository.NewConversationStoreRepository(db)
@@ -65,9 +70,21 @@ func setupAgentSubsystem(
 		searchSubagent.SetGeminiConfig(cfg.GeminiAPIKey, cfg.GeminiModel, "")
 	}
 	registry.Register(toolsets.NewSearchToolset(searchSubagent))
-	registry.Register(toolsets.NewMeetingBookingToolset())
-	registry.Register(toolsets.NewRadarTriggerToolset())
-	registry.Register(toolsets.NewMemoryProfileToolset())
+	if bookingSvc != nil {
+		registry.Register(toolsets.NewMeetingBookingToolset(&bookingServiceAdapter{bookingSvc}))
+	} else {
+		registry.Register(toolsets.NewMeetingBookingToolset())
+	}
+	if triggerSvc != nil {
+		registry.Register(toolsets.NewRadarTriggerToolset(&triggerServiceAdapter{triggerSvc}))
+	} else {
+		registry.Register(toolsets.NewRadarTriggerToolset())
+	}
+	if memoryRepo != nil {
+		registry.Register(toolsets.NewMemoryProfileToolset(memoryRepo))
+	} else {
+		registry.Register(toolsets.NewMemoryProfileToolset())
+	}
 
 	// 4. ModelRouter com provedores reais disponíveis
 	router := ai.NewModelRouter()
@@ -128,6 +145,9 @@ func setupAgentSubsystem(
 		convRepo,
 		traceRecorder,
 	)
+	if userRepo != nil && aiSettingsRepo != nil {
+		loop.SetUserRepositories(userRepo, aiSettingsRepo)
+	}
 
 	// 6. Worker de Consolidação com debounce de 150s
 	consolidationWorker := service.NewMemoryConsolidationWorker(convRepo, memRepo, 150*time.Second)
@@ -221,4 +241,63 @@ func (a *gmailServiceAdapter) SendEmail(ctx context.Context, userID, to, subject
 func (a *gmailServiceAdapter) CreateDraft(ctx context.Context, userID, to, subject, body string) error {
 	_, err := a.svc.CreateDraft(ctx, userID, to, subject, body)
 	return err
+}
+
+type bookingServiceAdapter struct {
+	svc *service.BookingService
+}
+
+func (a *bookingServiceAdapter) ListBookingTypes(ctx context.Context, userID string) ([]*domain.BookingType, error) {
+	list, err := a.svc.ListBookingTypes(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	var res []*domain.BookingType
+	for i := range list {
+		bt := list[i].BookingType
+		res = append(res, &bt)
+	}
+	return res, nil
+}
+
+func (a *bookingServiceAdapter) CreateBookingType(ctx context.Context, userID string, bt *domain.BookingType) (*domain.BookingType, string, error) {
+	created, err := a.svc.CreateBookingType(ctx, userID, bt)
+	if err != nil {
+		return nil, "", err
+	}
+	return &created.BookingType, created.PublicURL, nil
+}
+
+type triggerServiceAdapter struct {
+	svc *service.TriggerService
+}
+
+func (a *triggerServiceAdapter) ListTriggers(userID string) ([]*domain.Trigger, error) {
+	list, err := a.svc.ListTriggers(userID, "", "")
+	if err != nil {
+		return nil, err
+	}
+	var res []*domain.Trigger
+	for i := range list {
+		tr := list[i]
+		res = append(res, &tr)
+	}
+	return res, nil
+}
+
+func (a *triggerServiceAdapter) CreateTrigger(t *domain.Trigger) error {
+	input := domain.CreateTriggerInput{
+		Title:         t.Title,
+		Category:      domain.CategoryCustom,
+		Query:         t.UserIntent,
+		ConditionType: domain.ConditionChangeDetected,
+		TargetValue:   "alert",
+		Frequency:     domain.FrequencyDailyMorning,
+	}
+	_, err := a.svc.CreateTrigger(t.UserID, input)
+	return err
+}
+
+func (a *triggerServiceAdapter) DeleteTrigger(id, userID string) error {
+	return a.svc.DeleteTrigger(id, userID)
 }

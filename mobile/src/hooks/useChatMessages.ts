@@ -166,6 +166,8 @@ export function useChatMessages(
           text: m.text,
         }));
         const res = await api.assistantChat(text.trim(), {
+          thread_id: activeRef.current || activeSessionId,
+          channel: 'app_mobile',
           history: recentHistory,
           signal: controller.signal,
           focus_mode: focusMode,
@@ -237,6 +239,8 @@ export function useChatMessages(
         }));
 
         const res = await api.assistantChat(newText.trim(), {
+          thread_id: activeRef.current || activeSessionId,
+          channel: 'app_mobile',
           history: recentHistory,
           signal: controller.signal,
           focus_mode: focusMode,
@@ -307,6 +311,8 @@ export function useChatMessages(
           text: m.text,
         }));
         const res = await api.assistantAudio(audioUri, 'audio.m4a', {
+          thread_id: activeRef.current || activeSessionId,
+          channel: 'app_mobile',
           history: recentHistory,
           focus_mode: focusMode,
           include_tts: false,

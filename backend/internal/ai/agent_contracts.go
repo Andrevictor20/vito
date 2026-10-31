@@ -43,6 +43,7 @@ const (
 type TurnMessage struct {
 	Role       ChatRole        `json:"role"`
 	Content    string          `json:"content,omitempty"`
+	Thought    string          `json:"thought,omitempty"`
 	ToolCalls  []ToolCall      `json:"tool_calls,omitempty"`
 	ToolCallID string          `json:"tool_call_id,omitempty"`
 	Name       string          `json:"name,omitempty"`
@@ -59,9 +60,10 @@ type ToolDefinition struct {
 
 // ToolCall representa a solicitação do modelo para invocar uma Macro-Ferramenta.
 type ToolCall struct {
-	ID        string          `json:"id"`
-	Name      string          `json:"name"`
-	Arguments json.RawMessage `json:"arguments"`
+	ID               string          `json:"id"`
+	Name             string          `json:"name"`
+	Arguments        json.RawMessage `json:"arguments"`
+	ThoughtSignature string          `json:"thought_signature,omitempty"`
 }
 
 // AgentChatRequest encapsula a entrada padronizada independente de provedor.
@@ -81,6 +83,7 @@ type AgentChatRequest struct {
 // AgentChatResponse encapsula a resposta padronizada do provedor.
 type AgentChatResponse struct {
 	Text         string     `json:"text"`
+	Thought      string     `json:"thought,omitempty"`
 	Reasoning    []string   `json:"reasoning,omitempty"`
 	ToolCalls    []ToolCall `json:"tool_calls,omitempty"`
 	ProviderName string     `json:"provider_name"`

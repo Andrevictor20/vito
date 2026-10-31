@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/handler/middleware"
 	"github.com/andrevmp/vito/backend/internal/service"
+	"github.com/google/uuid"
 )
 
 // AssistantStreamHandler expõe os endpoints unificados REST, SSE e multimodais para o Loop de Agente.
@@ -55,7 +57,16 @@ func (h *AssistantStreamHandler) Chat(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := h.loop.Run(r.Context(), req)
 	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":%q}`, err.Error()), http.StatusInternalServerError)
+		log.Printf("❌ [AssistantStreamHandler] Erro no AgentLoop: %v", err)
+		friendly := ai.FriendlyAIMessage(ai.ClassifyAIError(err))
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"reply":   friendly,
+			"message": friendly,
+			"text":    friendly,
+			"error":   friendly,
+		})
 		return
 	}
 
@@ -163,11 +174,15 @@ func (h *AssistantStreamHandler) AudioChat(w http.ResponseWriter, r *http.Reques
 	var currentLocalTime string
 	var screenContext string
 	var voice string
+	var threadID string
+	channel := "voice"
 	includeTTS := true
 
 	contentType := r.Header.Get("Content-Type")
 	if strings.Contains(contentType, "application/json") {
 		var req struct {
+			ThreadID         string `json:"thread_id,omitempty"`
+			Channel          string `json:"channel,omitempty"`
 			AudioB64         string `json:"audio_b64"`
 			AudioMime        string `json:"audio_mime,omitempty"`
 			Filename         string `json:"filename,omitempty"`
@@ -199,6 +214,10 @@ func (h *AssistantStreamHandler) AudioChat(w http.ResponseWriter, r *http.Reques
 			} else {
 				filename = "audio.m4a"
 			}
+		}
+		threadID = strings.TrimSpace(req.ThreadID)
+		if c := strings.TrimSpace(req.Channel); c != "" {
+			channel = c
 		}
 		focusMode = req.FocusMode
 		timezone = req.Timezone
@@ -232,6 +251,10 @@ func (h *AssistantStreamHandler) AudioChat(w http.ResponseWriter, r *http.Reques
 		if filename == "" || (!strings.HasSuffix(strings.ToLower(filename), ".wav") && len(readBytes) >= 4 && string(readBytes[:4]) == "RIFF") {
 			filename = "audio.wav"
 		}
+		threadID = strings.TrimSpace(r.FormValue("thread_id"))
+		if c := strings.TrimSpace(r.FormValue("channel")); c != "" {
+			channel = c
+		}
 		focusMode = r.FormValue("focus_mode")
 		timezone = r.FormValue("timezone")
 		currentLocalTime = r.FormValue("current_local_time")
@@ -242,6 +265,11 @@ func (h *AssistantStreamHandler) AudioChat(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
+	// Isolamento estrito de contexto em modo voz: se nenhum thread_id foi enviado, gera um UUID isolado
+	if threadID == "" {
+		threadID = uuid.New().String()
+	}
+
 	var transcript string
 	var err error
 	if h.transcriber != nil {
@@ -250,8 +278,19 @@ func (h *AssistantStreamHandler) AudioChat(w http.ResponseWriter, r *http.Reques
 		err = errors.New("transcritor de áudio não configurado")
 	}
 
-	if err != nil || strings.TrimSpace(transcript) == "" || strings.TrimSpace(transcript) == "." {
-		transcript = "Mensagem de voz recebida. Por favor, analise as informações pendentes ou compromissos."
+	trimmedTranscript := strings.TrimSpace(transcript)
+	if err != nil || trimmedTranscript == "" || trimmedTranscript == "." {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		msg := "Não consegui captar sua voz com clareza. Pode falar de novo?"
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"reply":      msg,
+			"message":    msg,
+			"text":       msg,
+			"transcript": "",
+			"actions":    []any{},
+		})
+		return
 	}
 
 	var quotedParts []string
@@ -264,7 +303,8 @@ func (h *AssistantStreamHandler) AudioChat(w http.ResponseWriter, r *http.Reques
 
 	unifiedReq := domain.UnifiedAssistantRequest{
 		UserID:        userID,
-		Channel:       "voice",
+		ThreadID:      threadID,
+		Channel:       channel,
 		Message:       transcript,
 		FocusMode:     focusMode,
 		QuotedContext: strings.Join(quotedParts, "\n"),
@@ -272,8 +312,24 @@ func (h *AssistantStreamHandler) AudioChat(w http.ResponseWriter, r *http.Reques
 
 	resp, err := h.loop.Run(r.Context(), unifiedReq)
 	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":%q}`, err.Error()), http.StatusInternalServerError)
+		log.Printf("❌ [AssistantStreamHandler] Erro no AudioChat: %v", err)
+		friendly := ai.FriendlyAIMessage(ai.ClassifyAIError(err))
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"reply":      friendly,
+			"message":    friendly,
+			"text":       friendly,
+			"transcript": transcript,
+			"actions":    []any{},
+		})
 		return
+	}
+
+	// Sanitiza formatação markdown para canal de voz, eliminando asteriscos e títulos das legendas
+	cleanReplyText := resp.Text
+	if strings.Contains(strings.ToLower(channel), "voice") {
+		cleanReplyText = ai.StripMarkdownForSpeech(resp.Text)
 	}
 
 	var actions []map[string]any
@@ -288,9 +344,9 @@ func (h *AssistantStreamHandler) AudioChat(w http.ResponseWriter, r *http.Reques
 	}
 
 	result := map[string]any{
-		"reply":                   resp.Text,
-		"text":                    resp.Text,
-		"message":                 resp.Text,
+		"reply":                   cleanReplyText,
+		"text":                    cleanReplyText,
+		"message":                 cleanReplyText,
 		"transcript":              transcript,
 		"action_performed":        "VOICE_INPUT_PROCESSED",
 		"thread_id":               resp.ThreadID,
@@ -303,12 +359,14 @@ func (h *AssistantStreamHandler) AudioChat(w http.ResponseWriter, r *http.Reques
 		"pending_confirmation_id": resp.PendingConfirmationID,
 	}
 
-	if includeTTS && h.ttsService != nil && strings.TrimSpace(resp.Text) != "" {
-		speechText := ai.StripMarkdownForSpeech(resp.Text)
+	if includeTTS && h.ttsService != nil && strings.TrimSpace(cleanReplyText) != "" {
+		speechText := ai.StripMarkdownForSpeech(cleanReplyText)
 		if speechText != "" {
 			if audioBytes, audioMime, ttsErr := h.ttsService.Synthesize(r.Context(), speechText, voice); ttsErr == nil && len(audioBytes) > 0 {
 				result["tts_audio_b64"] = base64.StdEncoding.EncodeToString(audioBytes)
 				result["tts_audio_mime"] = audioMime
+			} else if ttsErr != nil {
+				log.Printf("⚠️ [AssistantStreamHandler] Falha na síntese TTS inline (voz=%s): %v", voice, ttsErr)
 			}
 		}
 	}

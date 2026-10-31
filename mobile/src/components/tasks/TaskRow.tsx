@@ -7,7 +7,6 @@ import {
   LayoutAnimation,
   Platform,
   UIManager,
-  Alert,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens } from '../../theme/tokens';
@@ -17,6 +16,7 @@ import type { PendingItem, Subtask } from '../../types';
 import type { UnifiedRow } from '../../utils/unifiedTasks';
 import { formatRelativeTaskDate, getTaskDiffDays } from '../../utils/taskBuckets';
 import { TaskSubtasksInline } from './TaskSubtasksInline';
+import { ConfirmDeleteModal } from '../ui/ConfirmDeleteModal';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -74,19 +74,13 @@ export const TaskRow: React.FC<TaskRowProps> = ({
 }) => {
   const { colors } = useTheme();
   const [expanded, setExpanded] = useState(false);
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const isTodo = row.kind === 'todo';
   const todo = row.sourceTodo;
   const pending: PendingItem | undefined = row.sourcePending;
 
   const handleDeletePress = () => {
-    Alert.alert(
-      'Excluir tarefa',
-      `Deseja realmente excluir "${row.title}"?`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Excluir', style: 'destructive', onPress: onDelete },
-      ]
-    );
+    setDeleteModalVisible(true);
   };
 
   const dateRaw = todo?.due_date || pending?.scheduled_date;
@@ -107,12 +101,13 @@ export const TaskRow: React.FC<TaskRowProps> = ({
   };
 
   return (
-    <View
-      style={[
-        styles.row,
-        !isFirst && { borderTopWidth: 1, borderTopColor: colors.line },
-      ]}
-    >
+    <>
+      <View
+        style={[
+          styles.row,
+          !isFirst && { borderTopWidth: 1, borderTopColor: colors.line },
+        ]}
+      >
       {/* Checkbox circular .chk 26x26px */}
       <TouchableOpacity
         style={[
@@ -316,6 +311,14 @@ export const TaskRow: React.FC<TaskRowProps> = ({
         </TouchableOpacity>
       </View>
     </View>
+    <ConfirmDeleteModal
+      visible={deleteModalVisible}
+      title="Excluir tarefa"
+      message={`Deseja realmente excluir "${row.title}"?`}
+      onClose={() => setDeleteModalVisible(false)}
+      onConfirm={onDelete}
+    />
+  </>
   );
 };
 

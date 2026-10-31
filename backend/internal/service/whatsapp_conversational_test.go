@@ -231,9 +231,10 @@ func (s *simpleTranscriber) Transcribe(ctx context.Context, audioReader io.Reade
 
 func TestWhatsAppService_AudioMessage_TranscribesWithGroqWhisper(t *testing.T) {
 	svc, mockClient, _, _ := setupConversationalWhatsAppTest(t)
+	svc.SetAsyncRunner(func(fn func()) { fn() })
 
 	mockTranscriber := &simpleTranscriber{
-		transcribedText: "Qual é a minha próxima reunião hoje?",
+		transcribedText: "Vito, qual é a minha próxima reunião hoje?",
 	}
 	svc.SetAudioTranscriber(mockTranscriber)
 
@@ -277,6 +278,50 @@ func TestWhatsAppService_AudioMessage_TranscribesWithGroqWhisper(t *testing.T) {
 	lastMsg := mockClient.sentMessages[len(mockClient.sentMessages)-1]
 	if !strings.Contains(lastMsg.Text, "Vito:") {
 		t.Errorf("resposta deve conter assinatura do Vito: %s", lastMsg.Text)
+	}
+}
+
+func TestWhatsAppService_AudioMessageSemMencaoAoVito_NaoGeraResposta(t *testing.T) {
+	svc, mockClient, _, _ := setupConversationalWhatsAppTest(t)
+	svc.SetAsyncRunner(func(fn func()) { fn() })
+
+	mockTranscriber := &simpleTranscriber{
+		transcribedText: "Oi mãe, cheguei no mercado agora e vou comprar as frutas.",
+	}
+	svc.SetAudioTranscriber(mockTranscriber)
+
+	webhookPayload := map[string]interface{}{
+		"event":    "messages.upsert",
+		"instance": "vito_conv_user",
+		"data": map[string]interface{}{
+			"key": map[string]interface{}{
+				"remoteJid": "5511999998888@s.whatsapp.net",
+				"fromMe":    false,
+				"id":        "msg-audio-sem-vito",
+			},
+			"messageType": "audioMessage",
+			"message": map[string]interface{}{
+				"audioMessage": map[string]interface{}{
+					"mimetype": "audio/ogg; codecs=opus",
+					"seconds":  4,
+				},
+			},
+		},
+	}
+	bytesPayload, _ := json.Marshal(webhookPayload)
+
+	err := svc.HandleWebhook(context.Background(), "messages.upsert", bytesPayload)
+	if err != nil {
+		t.Fatalf("HandleWebhook retornou erro: %v", err)
+	}
+
+	if !mockTranscriber.called {
+		t.Errorf("áudio deve ser transcrito para arquivamento no shadow inbox")
+	}
+
+	// NÃO deve responder ao áudio
+	if len(mockClient.sentMessages) != 0 {
+		t.Errorf("áudio sem menção ao Vito não deveria gerar resposta, obteve %d mensagens", len(mockClient.sentMessages))
 	}
 }
 

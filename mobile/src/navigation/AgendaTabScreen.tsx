@@ -9,7 +9,7 @@ import { SmartActionSheetModal } from '../components/ui/SmartActionSheetModal';
 import { buildAgendaSmartActions, formatEventSubtitle } from '../utils/smartActionBuilders';
 import { useHomeDataContext } from './HomeDataProvider';
 import { useTheme } from '../context/ThemeContext';
-import { chatPromptBus } from '../services/dataSync';
+import { chatPromptBus, tabNavigationBus } from '../services/dataSync';
 import { navigateToTab } from './navigationRef';
 import {
   AgendaFilterState,
@@ -68,7 +68,7 @@ export const AgendaTabScreen: React.FC<AgendaTabScreenProps> = ({
   }, []);
 
   const handleCreatePrompt = useCallback(() => {
-    chatPromptBus.askAssistant('Qual próximo evento você quer adicionar na sua agenda?');
+    tabNavigationBus.notify('chat');
   }, []);
 
   // Subtítulo editorial em português com a data de hoje: ex. "sexta-feira, 23 de outubro"

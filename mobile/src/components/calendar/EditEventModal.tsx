@@ -13,6 +13,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { tokens, MD3Shapes } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { BottomSheetModal } from '../ui/BottomSheetModal';
+import { ConfirmDeleteModal } from '../ui/ConfirmDeleteModal';
 import { Event } from '../../types';
 import { parseSafeDate, isHolidayReadOnly } from '../../utils/calendarDateUtils';
 
@@ -40,7 +41,7 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
   const [updateSeries, setUpdateSeries] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [deleteDialogVisible, setDeleteDialogVisible] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   const isRecurring = Boolean(event?.is_recurring || event?.recurrence);
 
@@ -50,7 +51,7 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
       setDescription(event.description || '');
       setLocation(event.location || '');
       setUpdateSeries(isRecurring);
-      setDeleteDialogVisible(false);
+      setDeleteConfirmOpen(false);
 
       try {
         const dStart = parseSafeDate(event.start_at);
@@ -122,7 +123,7 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
     setDeleting(true);
     try {
       await onDelete(event.id, allSeries);
-      setDeleteDialogVisible(false);
+      setDeleteConfirmOpen(false);
       onClose();
     } catch (e: any) {
       Alert.alert('Erro ao Excluir', e?.message || 'Falha ao remover o evento.');
@@ -132,14 +133,7 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
   };
 
   const handleDeleteInitial = () => {
-    if (isRecurring) {
-      setDeleteDialogVisible(true);
-    } else {
-      Alert.alert('Excluir Compromisso', `Deseja realmente remover '${event.title}'?`, [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Excluir', style: 'destructive', onPress: () => executeDelete(false) },
-      ]);
-    }
+    setDeleteConfirmOpen(true);
   };
 
   return (
@@ -320,40 +314,6 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
                     </View>
                   </View>
                 )}
-
-                {/* Diálogo Interno de Exclusão para Séries Recorrentes */}
-                {deleteDialogVisible && (
-                  <View style={[styles.deleteDialogBox, { backgroundColor: isDark ? '#2D1515' : '#FEE2E2', borderColor: colors.error }]}>
-                    <View style={styles.deleteDialogHeader}>
-                      <MaterialIcons name="delete-outline" size={18} color={colors.error} />
-                      <Text style={[styles.deleteDialogTitle, { color: colors.error }]}>
-                        Como deseja excluir este compromisso?
-                      </Text>
-                    </View>
-                    <Text style={[styles.deleteDialogText, { color: isDark ? '#FECACA' : '#991B1B' }]}>
-                      Este evento faz parte de uma série recorrente. Você pode remover apenas esta ocorrência ou cancelar toda a série.
-                    </Text>
-                    <View style={styles.deleteDialogButtons}>
-                      <TouchableOpacity
-                        style={[styles.deleteDialogBtn, { backgroundColor: colors.surfaceContainerHigh }]}
-                        onPress={() => executeDelete(false)}
-                        disabled={deleting}
-                      >
-                        <Text style={[styles.deleteDialogBtnText, { color: colors.onSurface }]}>Apenas este</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={[styles.deleteDialogBtn, { backgroundColor: colors.error }]}
-                        onPress={() => executeDelete(true)}
-                        disabled={deleting}
-                      >
-                        <Text style={[styles.deleteDialogBtnText, { color: '#FFFFFF', fontWeight: '700' }]}>
-                          Toda a série
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                )}
               </ScrollView>
 
               {/* Footer com Ações */}
@@ -397,6 +357,14 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
                   </TouchableOpacity>
                 </View>
               </View>
+      <ConfirmDeleteModal
+        visible={deleteConfirmOpen}
+        title="Excluir Compromisso"
+        message={event ? `Deseja realmente remover '${event.title}'?` : 'Deseja realmente remover este compromisso?'}
+        isRecurring={isRecurring}
+        onClose={() => setDeleteConfirmOpen(false)}
+        onConfirm={(allSeries) => executeDelete(allSeries ?? false)}
+      />
     </BottomSheetModal>
   );
 };
@@ -456,40 +424,6 @@ const styles = StyleSheet.create({
   },
   scopeChipText: {
     fontSize: tokens.typography.size.labelSmall,
-  },
-  deleteDialogBox: {
-    padding: tokens.spacing.md,
-    borderRadius: MD3Shapes.medium,
-    borderWidth: 1,
-    marginTop: 8,
-    gap: 8,
-  },
-  deleteDialogHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  deleteDialogTitle: {
-    fontSize: tokens.typography.size.labelLarge,
-    fontWeight: '700',
-  },
-  deleteDialogText: {
-    fontSize: tokens.typography.size.bodySmall,
-    lineHeight: 18,
-  },
-  deleteDialogButtons: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 8,
-    marginTop: 4,
-  },
-  deleteDialogBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: MD3Shapes.full,
-  },
-  deleteDialogBtnText: {
-    fontSize: tokens.typography.size.labelMedium,
   },
   footer: {
     flexDirection: 'row',

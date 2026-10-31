@@ -82,7 +82,7 @@ export const SmartActionSheetModal: React.FC<SmartActionSheetModalProps> = ({
     <Modal
       visible={visible}
       transparent
-      animationType="slide"
+      animationType="fade"
       statusBarTranslucent
       onRequestClose={onClose}
     >
@@ -92,20 +92,16 @@ export const SmartActionSheetModal: React.FC<SmartActionSheetModalProps> = ({
           <View style={[styles.overlay, { backgroundColor: overlayBg }]} />
         </TouchableWithoutFeedback>
 
-        {/* Bottom Sheet Container */}
+        {/* Modal Container Centralizado (Design do Vito) */}
         <View
           style={[
             styles.sheet,
             {
               backgroundColor: sheetBg,
-              borderTopColor: borderColor,
-              paddingBottom: Math.max(insets.bottom, 16) + 8,
+              borderColor: borderColor,
             },
           ]}
         >
-          {/* Pílula de puxar */}
-          <View style={[styles.handle, { backgroundColor: handleColor }]} />
-
           {/* Cabeçalho Contextual */}
           <View style={styles.header}>
             <View style={styles.headerMain}>
@@ -307,30 +303,31 @@ export const SmartActionSheetModal: React.FC<SmartActionSheetModalProps> = ({
 const styles = StyleSheet.create({
   modalRoot: {
     flex: 1,
-    justifyContent: 'flex-end',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
   },
   overlay: {
-    ...StyleSheet.absoluteFill,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   sheet: {
-    borderTopLeftRadius: 26,
-    borderTopRightRadius: 26,
-    borderTopWidth: 1,
-    paddingHorizontal: 16,
-    paddingTop: 10,
-    maxHeight: '85%',
+    width: '100%',
+    maxWidth: 420,
+    borderRadius: 24,
+    borderWidth: 1,
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 16,
+    maxHeight: '82%',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 20,
-  },
-  handle: {
-    alignSelf: 'center',
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    marginBottom: 12,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 24,
   },
   header: {
     flexDirection: 'row',

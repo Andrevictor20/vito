@@ -20,7 +20,7 @@ import { SmartActionSheetModal } from '../components/ui/SmartActionSheetModal';
 import { buildTriggerSmartActions } from '../utils/smartActionBuilders';
 import { Trigger, TriggerTemplate } from '../types';
 import { countTriggersByCategory } from '../utils/radarFilter';
-import { chatPromptBus } from '../services/dataSync';
+import { chatPromptBus, tabNavigationBus } from '../services/dataSync';
 
 type TriggersTab = 'my_triggers' | 'explore';
 
@@ -68,7 +68,7 @@ export const TriggersScreen: React.FC<{
       return;
     }
     if ((createRequestId ?? 0) > 0) {
-      chatPromptBus.askAssistant('O que você gostaria de monitorar ou receber alertas?');
+      tabNavigationBus.notify('chat');
     }
   }, [createRequestId]);
 

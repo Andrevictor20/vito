@@ -155,6 +155,19 @@ export const sanitizeErrorMessage = (err: unknown): string => {
   ) {
     return 'Oscilação temporária de conexão com o servidor. Verifique sua internet e tente novamente em instantes.';
   }
+  if (
+    lower.includes('invalid_argument') ||
+    lower.includes('status 400') ||
+    lower.includes('status 500') ||
+    lower.includes('provedor de ia') ||
+    lower.includes('api gemini retornou') ||
+    lower.includes('resource exhausted') ||
+    lower.includes('bad request') ||
+    lower.includes('internal server error') ||
+    msg.includes('{"error"')
+  ) {
+    return 'Tive uma instabilidade rápida na conexão com a inteligência. Pode tentar mandar de novo em alguns segundos?';
+  }
   if (msg && msg !== 'USER_CANCELLED' && !msg.startsWith('Error:') && !msg.includes('java.net')) {
     return msg;
   }

@@ -51,6 +51,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const [phoneVisible, setPhoneVisible] = useState(false);
   const [contactsVisible, setContactsVisible] = useState(false);
   const [voiceVisible, setVoiceVisible] = useState(false);
+  const [preferredVoice, setPreferredVoice] = useState<'puck' | 'kore'>('puck');
   const [devicesVisible, setDevicesVisible] = useState(false);
   const [whatsAppVisible, setWhatsAppVisible] = useState(false);
   const [whatsAppStatus, setWhatsAppStatus] = useState<'disconnected' | 'connecting' | 'connected' | null>(null);
@@ -75,6 +76,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     try {
       const s = await api.getAISettings();
       if (s?.autonomy_mode) setAutonomyMode(s.autonomy_mode);
+      if (s?.preferred_voice) {
+        const v = s.preferred_voice.toLowerCase();
+        setPreferredVoice(v.includes('kore') || v.includes('female') || v.includes('feminino') ? 'kore' : 'puck');
+      }
     } catch {
       // Mantém default
     }
@@ -251,17 +256,19 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
         <View style={[styles.divider, { backgroundColor: colors.line }]} />
 
-        {/* Ativação por Voz (Ei Vito / Assistente Nativo) */}
+        {/* Voz e Ativação (Voz Masculina/Feminina e Assistente Android) */}
         <TouchableOpacity
           style={styles.li}
           onPress={() => setVoiceVisible(true)}
           activeOpacity={0.7}
         >
           <View style={[styles.liIconBox, { backgroundColor: colors.bg }]}>
-            <MaterialIcons name="mic" size={18} color={colors.ink} />
+            <MaterialIcons name="record-voice-over" size={18} color={colors.ink} />
           </View>
-          <Text style={[styles.liTitle, { color: colors.ink }]}>Ativação por voz</Text>
-          <Text style={[styles.liMeta, { color: colors.muted }]}>Modos e hotword</Text>
+          <Text style={[styles.liTitle, { color: colors.ink }]}>Voz e Ativação</Text>
+          <Text style={[styles.liMeta, { color: colors.muted }]}>
+            {preferredVoice === 'kore' ? 'Voz Feminina (Kore)' : 'Voz Masculina (Puck)'}
+          </Text>
           <MaterialIcons name="chevron-right" size={18} color={colors.muted} />
         </TouchableOpacity>
       </View>
@@ -394,7 +401,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
       />
       <VoiceActivationSettings
         visible={voiceVisible}
-        onClose={() => setVoiceVisible(false)}
+        onClose={() => {
+          setVoiceVisible(false);
+          loadStatuses();
+        }}
+        preferredVoice={preferredVoice}
+        onVoiceChanged={(v) => setPreferredVoice(v)}
       />
     </ScrollView>
   );

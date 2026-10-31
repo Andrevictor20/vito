@@ -1,10 +1,11 @@
-import React from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, Alert } from 'react-native';
+import React, { useState } from 'react';
+import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { Event } from '../../types';
 import { isAllDayEvent, badgeDayMonthUTC, isHolidayReadOnly } from '../../utils/calendarDateUtils';
+import { ConfirmDeleteModal } from '../ui/ConfirmDeleteModal';
 
 export interface EventCardProps {
   event: Event;
@@ -102,35 +103,10 @@ export const EventCard: React.FC<EventCardProps> = ({
   const isRecurring = event.is_recurring || !!event.recurrence;
   const readOnly = isHolidayReadOnly(event);
   const canPress = !!onPress && !readOnly;
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
 
   const handleDeletePress = () => {
-    Alert.alert(
-      'Excluir compromisso',
-      `Deseja realmente excluir "${event.title}"?`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        ...(isRecurring
-          ? [
-              {
-                text: 'Apenas este',
-                style: 'destructive' as const,
-                onPress: () => onDelete(event.id, false),
-              },
-              {
-                text: 'Toda a série',
-                style: 'destructive' as const,
-                onPress: () => onDelete(event.id, true),
-              },
-            ]
-          : [
-              {
-                text: 'Excluir',
-                style: 'destructive' as const,
-                onPress: () => onDelete(event.id, false),
-              },
-            ]),
-      ]
-    );
+    setDeleteModalVisible(true);
   };
 
   const handleAiPress = () => {
@@ -143,131 +119,149 @@ export const EventCard: React.FC<EventCardProps> = ({
     }
   };
 
+  const renderDeleteModal = () => (
+    <ConfirmDeleteModal
+      visible={deleteModalVisible}
+      title="Excluir compromisso"
+      message={`Deseja realmente excluir "${event.title}"?`}
+      isRecurring={isRecurring}
+      onClose={() => setDeleteModalVisible(false)}
+      onConfirm={(allSeries) => onDelete(event.id, allSeries)}
+    />
+  );
+
   // 1. Apresentação "Em seguida" (.next) ou busca com data
   if (variant === 'next' || showDateBadge) {
     const timeRange = isAllDay ? 'Dia inteiro' : endTime ? `${startTime}–${endTime}` : startTime;
     return (
-      <TouchableOpacity
-        style={[styles.nextRow, { borderTopColor: colors.line }]}
-        activeOpacity={canPress ? 0.75 : 1}
-        onPress={canPress && onPress ? () => onPress(event) : undefined}
-        accessibilityRole={canPress ? 'button' : undefined}
-        accessibilityLabel={canPress ? `Abrir detalhes de ${event.title}` : event.title}
-      >
-        <View style={[styles.dbBadge, { backgroundColor: colors.surf }]}>
-          <Text style={[styles.dbDay, { color: colors.ink }]}>{dayNum}</Text>
-          <Text style={[styles.dbMonth, { color: colors.muted }]}>{monthShort}</Text>
-        </View>
+      <>
+        <TouchableOpacity
+          style={[styles.nextRow, { borderTopColor: colors.line }]}
+          activeOpacity={canPress ? 0.75 : 1}
+          onPress={canPress && onPress ? () => onPress(event) : undefined}
+          accessibilityRole={canPress ? 'button' : undefined}
+          accessibilityLabel={canPress ? `Abrir detalhes de ${event.title}` : event.title}
+        >
+          <View style={[styles.dbBadge, { backgroundColor: colors.surf }]}>
+            <Text style={[styles.dbDay, { color: colors.ink }]}>{dayNum}</Text>
+            <Text style={[styles.dbMonth, { color: colors.muted }]}>{monthShort}</Text>
+          </View>
 
-        <View style={styles.nextTextCol}>
-          <Text style={[styles.nextTitle, { color: colors.ink }]} numberOfLines={1}>
-            {event.title}
-          </Text>
-          <View style={styles.metaRow}>
-            <Text style={[styles.metaCat, { color: catInfo.color }]}>
-              {catInfo.label}
+          <View style={styles.nextTextCol}>
+            <Text style={[styles.nextTitle, { color: colors.ink }]} numberOfLines={1}>
+              {event.title}
             </Text>
-            <Text style={[styles.metaText, { color: colors.muted }]}>
-              · {timeRange}
-            </Text>
-            {isGoogle && (
-              <Text style={[styles.metaText, { color: colors.muted }]}>
-                · Google
+            <View style={styles.metaRow}>
+              <Text style={[styles.metaCat, { color: catInfo.color }]}>
+                {catInfo.label}
               </Text>
-            )}
-            {isRecurring && (
-              <View style={styles.inlineMeta}>
-                <Text style={[styles.metaText, { color: colors.muted }]}>·</Text>
-                <MaterialIcons name="repeat" size={11} color={colors.muted} />
-              </View>
-            )}
+              <Text style={[styles.metaText, { color: colors.muted }]}>
+                · {timeRange}
+              </Text>
+              {isGoogle && (
+                <Text style={[styles.metaText, { color: colors.muted }]}>
+                  · Google
+                </Text>
+              )}
+              {isRecurring && (
+                <View style={styles.inlineMeta}>
+                  <Text style={[styles.metaText, { color: colors.muted }]}>·</Text>
+                  <MaterialIcons name="repeat" size={11} color={colors.muted} />
+                </View>
+              )}
+            </View>
           </View>
-        </View>
 
-        {!readOnly && (
-          <View style={styles.actionRowSmall}>
-            <TouchableOpacity
-              style={styles.aiSparkBtnSmall}
-              onPress={handleAiPress}
-              hitSlop={tokens.hitSlop.sm}
-              accessibilityLabel="Editar com IA"
-            >
-              <MaterialIcons name="auto-awesome" size={15} color={colors.purple} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.deleteBtnSmall}
-              onPress={handleDeletePress}
-              hitSlop={tokens.hitSlop.sm}
-              accessibilityLabel="Excluir compromisso"
-            >
-              <MaterialIcons name="delete-outline" size={16} color={colors.muted} />
-            </TouchableOpacity>
-          </View>
-        )}
+          {!readOnly && (
+            <View style={styles.actionRowSmall}>
+              <TouchableOpacity
+                style={styles.aiSparkBtnSmall}
+                onPress={handleAiPress}
+                hitSlop={tokens.hitSlop.sm}
+                accessibilityLabel="Editar com IA"
+              >
+                <MaterialIcons name="auto-awesome" size={15} color={colors.purple} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.deleteBtnSmall}
+                onPress={handleDeletePress}
+                hitSlop={tokens.hitSlop.sm}
+                accessibilityLabel="Excluir compromisso"
+              >
+                <MaterialIcons name="delete-outline" size={16} color={colors.muted} />
+              </TouchableOpacity>
+            </View>
+          )}
 
-        <MaterialIcons name="chevron-right" size={18} color={colors.muted} style={{ marginLeft: 2 }} />
-      </TouchableOpacity>
+          <MaterialIcons name="chevron-right" size={18} color={colors.muted} style={{ marginLeft: 2 }} />
+        </TouchableOpacity>
+        {renderDeleteModal()}
+      </>
     );
   }
 
   // 2. Apresentação de dia inteiro (.allday)
   if (isAllDay) {
     return (
-      <TouchableOpacity
-        style={[
-          styles.allDayPill,
-          {
-            backgroundColor: catInfo.bg,
-            borderColor: catInfo.border,
-          },
-        ]}
-        activeOpacity={canPress ? 0.8 : 1}
-        onPress={canPress && onPress ? () => onPress(event) : undefined}
-        accessibilityRole={canPress ? 'button' : undefined}
-        accessibilityLabel={canPress ? `Abrir detalhes de ${event.title}` : `${event.title} (dia inteiro)`}
-      >
-        <MaterialIcons
-          name={isGoogle ? 'event' : 'event-available'}
-          size={16}
-          color={catInfo.color}
-        />
-        <Text
+      <>
+        <TouchableOpacity
           style={[
-            styles.allDayText,
-            { color: catInfo.color },
+            styles.allDayPill,
+            {
+              backgroundColor: catInfo.bg,
+              borderColor: catInfo.border,
+            },
           ]}
-          numberOfLines={1}
+          activeOpacity={canPress ? 0.8 : 1}
+          onPress={canPress && onPress ? () => onPress(event) : undefined}
+          accessibilityRole={canPress ? 'button' : undefined}
+          accessibilityLabel={canPress ? `Abrir detalhes de ${event.title}` : `${event.title} (dia inteiro)`}
         >
-          {event.title} · {catInfo.label}
-        </Text>
+          <MaterialIcons
+            name={isGoogle ? 'event' : 'event-available'}
+            size={16}
+            color={catInfo.color}
+          />
+          <Text
+            style={[
+              styles.allDayText,
+              { color: catInfo.color },
+            ]}
+            numberOfLines={1}
+          >
+            {event.title} · {catInfo.label}
+          </Text>
 
-        {!readOnly && (
-          <View style={styles.actionRowSmall}>
-            <TouchableOpacity
-              style={styles.allDayBtn}
-              onPress={handleAiPress}
-              hitSlop={tokens.hitSlop.sm}
-              accessibilityLabel="Editar com IA"
-            >
-              <MaterialIcons name="auto-awesome" size={15} color={catInfo.color} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.allDayBtn}
-              onPress={handleDeletePress}
-              hitSlop={tokens.hitSlop.sm}
-              accessibilityLabel="Excluir compromisso"
-            >
-              <MaterialIcons name="delete-outline" size={16} color={catInfo.color} />
-            </TouchableOpacity>
-          </View>
-        )}
-      </TouchableOpacity>
+          {!readOnly && (
+            <View style={styles.actionRowSmall}>
+              <TouchableOpacity
+                style={styles.allDayBtn}
+                onPress={handleAiPress}
+                hitSlop={tokens.hitSlop.sm}
+                accessibilityLabel="Editar com IA"
+              >
+                <MaterialIcons name="auto-awesome" size={15} color={catInfo.color} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.allDayBtn}
+                onPress={handleDeletePress}
+                hitSlop={tokens.hitSlop.sm}
+                accessibilityLabel="Excluir compromisso"
+              >
+                <MaterialIcons name="delete-outline" size={16} color={catInfo.color} />
+              </TouchableOpacity>
+            </View>
+          )}
+        </TouchableOpacity>
+        {renderDeleteModal()}
+      </>
     );
   }
 
   // 3. Apresentação padrão com hora (.ev com .tm e .evc)
   return (
-    <View style={styles.evRow}>
+    <>
+      <View style={styles.evRow}>
       <View style={styles.tmCol}>
         <Text style={[styles.tmStart, { color: colors.ink }]}>{startTime}</Text>
         {endTime ? (
@@ -346,6 +340,8 @@ export const EventCard: React.FC<EventCardProps> = ({
         </View>
       </TouchableOpacity>
     </View>
+    {renderDeleteModal()}
+  </>
   );
 };
 

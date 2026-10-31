@@ -115,7 +115,7 @@ const TasksTabScreen: React.FC = () => {
           <HeaderRoundButton
             icon="auto-awesome"
             variant="primary"
-            onPress={() => chatPromptBus.askAssistant('Qual próxima tarefa ou pendência você quer organizar?')}
+            onPress={() => tabNavigationBus.notify('chat')}
             accessibilityLabel="Pedir ao Vito: nova tarefa"
             size={20}
           />
@@ -167,7 +167,7 @@ const TriggersTabScreen: React.FC<{
             <HeaderRoundButton
               icon="auto-awesome"
               variant="primary"
-              onPress={() => chatPromptBus.askAssistant('O que você gostaria de monitorar ou receber alertas?')}
+              onPress={() => tabNavigationBus.notify('chat')}
               accessibilityLabel="Pedir ao Vito: novo radar"
               size={20}
             />
@@ -200,7 +200,7 @@ const BookingTabScreen: React.FC<{
             <HeaderRoundButton
               icon="auto-awesome"
               variant="primary"
-              onPress={() => chatPromptBus.askAssistant('Que tipo de reunião você quer criar? (Link individual 1-on-1 ou votação em grupo?)')}
+              onPress={() => tabNavigationBus.notify('chat')}
               accessibilityLabel="Pedir ao Vito: novo link"
               size={20}
             />

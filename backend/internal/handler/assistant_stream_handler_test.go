@@ -5,10 +5,12 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -225,5 +227,122 @@ func TestAssistantStreamHandler_VisionChat(t *testing.T) {
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("esperava status 200 para VisionChat, obteve %d (%s)", rec.Code, rec.Body.String())
+	}
+}
+
+type emptyMockTranscriber struct{}
+
+func (m *emptyMockTranscriber) Transcribe(ctx context.Context, audio io.Reader, filename string) (string, error) {
+	return "", nil
+}
+
+func TestAssistantStreamHandler_AudioChat_EmptyTranscript_ReturnsImmediateNotice(t *testing.T) {
+	h, userID := setupStreamHandlerTest(t)
+	h.SetTranscriber(&emptyMockTranscriber{})
+
+	bodyBytes, _ := json.Marshal(map[string]any{
+		"audio_b64": base64.StdEncoding.EncodeToString([]byte("silence")),
+		"filename":  "audio.m4a",
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/assistant/audio", bytes.NewReader(bodyBytes))
+	req.Header.Set("Content-Type", "application/json")
+	ctx := context.WithValue(req.Context(), middleware.UserIDKey, userID)
+	req = req.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	h.AudioChat(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("esperava status 200, obteve %d", rec.Code)
+	}
+	var res map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &res); err != nil {
+		t.Fatalf("falha ao decodificar json: %v", err)
+	}
+	reply := fmt.Sprintf("%v", res["reply"])
+	if !strings.Contains(reply, "Não consegui captar sua voz") {
+		t.Errorf("esperava aviso de voz não captada, obteve %s", reply)
+	}
+	if strings.Contains(reply, "compromisso") || strings.Contains(reply, "pendente") {
+		t.Errorf("não deve mencionar compromissos ou pendências em áudio silencioso: %s", reply)
+	}
+}
+
+type markdownMockProvider struct{}
+
+func (m *markdownMockProvider) Name() string          { return "markdown-provider" }
+func (m *markdownMockProvider) ModelName() string     { return "markdown-model" }
+func (m *markdownMockProvider) SupportsTools() bool   { return false }
+func (m *markdownMockProvider) SupportsVision() bool  { return false }
+func (m *markdownMockProvider) QualityTier() int      { return 3 }
+func (m *markdownMockProvider) MaxContextTokens() int { return 100000 }
+func (m *markdownMockProvider) Chat(ctx context.Context, req ai.AgentChatRequest) (*ai.AgentChatResponse, error) {
+	return &ai.AgentChatResponse{Text: "**Bom dia, André!** Você tem **2 compromissos** marcados hoje."}, nil
+}
+func (m *markdownMockProvider) StreamChat(ctx context.Context, req ai.AgentChatRequest, onDelta func(ai.StreamDelta) error) (*ai.AgentChatResponse, error) {
+	return m.Chat(ctx, req)
+}
+
+func TestAssistantStreamHandler_AudioChat_CleansMarkdownAndIsolatesThread(t *testing.T) {
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "test_markdown.db")
+	db, err := database.Open(dbPath)
+	if err != nil {
+		t.Fatalf("falha ao abrir db: %v", err)
+	}
+	t.Cleanup(func() { db.Close() })
+
+	userRepo := repository.NewUserRepository(db)
+	userID := "user-voice-1"
+	_ = userRepo.Create(&domain.User{
+		ID:        userID,
+		Name:      "André Santos",
+		Email:     "andre@example.com",
+		CreatedAt: time.Now().UTC(),
+		UpdatedAt: time.Now().UTC(),
+	})
+
+	convRepo := repository.NewConversationStoreRepository(db)
+	router := ai.NewModelRouter(&markdownMockProvider{})
+	guard := service.NewScopeGuard()
+	gate := service.NewConfirmationGateService(db)
+	reg := toolsets.NewToolsetsRegistry()
+	loop := service.NewAgentLoop(router, reg, guard, gate, convRepo, nil)
+	loop.SetUserRepositories(userRepo, nil)
+
+	h := handler.NewAssistantStreamHandler(loop)
+	h.SetTranscriber(&streamMockTranscriber{})
+
+	bodyBytes, _ := json.Marshal(map[string]any{
+		"audio_b64": base64.StdEncoding.EncodeToString([]byte("fake-audio")),
+		"filename":  "audio.wav",
+		"thread_id": "isolated-voice-thread-99",
+		"channel":   "voice",
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/assistant/audio", bytes.NewReader(bodyBytes))
+	req.Header.Set("Content-Type", "application/json")
+	ctx := context.WithValue(req.Context(), middleware.UserIDKey, userID)
+	req = req.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	h.AudioChat(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("esperava status 200, obteve %d", rec.Code)
+	}
+	var res map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &res); err != nil {
+		t.Fatalf("falha ao decodificar json: %v", err)
+	}
+
+	reply := fmt.Sprintf("%v", res["reply"])
+	if strings.Contains(reply, "**") {
+		t.Errorf("resposta de voz não deve conter asteriscos de markdown (**): %s", reply)
+	}
+	if !strings.Contains(reply, "Bom dia, André!") || !strings.Contains(reply, "2 compromissos") {
+		t.Errorf("resposta deve preservar o texto limpo sem formatação, obteve: %s", reply)
+	}
+	if res["thread_id"] != "isolated-voice-thread-99" {
+		t.Errorf("esperava thread_id 'isolated-voice-thread-99', obteve %v", res["thread_id"])
 	}
 }

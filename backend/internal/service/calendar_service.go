@@ -201,7 +201,12 @@ func (s *CalendarService) DeleteEvent(id, userID string) error {
 		_ = s.syncPusher.DeleteEvent(ctx, userID, id)
 		cancel()
 	}
-	return s.eventRepo.Delete(id, userID)
+	err := s.eventRepo.Delete(id, userID)
+	if err == domain.ErrEventNotFound && s.syncPusher != nil {
+		// Se o syncPusher já excluiu o evento no SQLite, a exclusão foi bem-sucedida.
+		return nil
+	}
+	return err
 }
 
 // DeleteEventWithOption remove um evento individual ou toda a série recorrente.
@@ -237,6 +242,10 @@ func (s *CalendarService) DeleteEventWithOption(id, userID string, allSeries boo
 		cancel()
 	}
 	err := s.eventRepo.Delete(id, userID)
+	if err == domain.ErrEventNotFound && s.syncPusher != nil {
+		// Se o syncPusher já excluiu o evento no SQLite, a exclusão foi bem-sucedida.
+		return 1, nil
+	}
 	if err != nil {
 		return 0, err
 	}

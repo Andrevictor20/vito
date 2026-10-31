@@ -11,6 +11,8 @@ export interface ChatHistoryItem {
 }
 
 export interface AssistantChatOptions {
+  thread_id?: string;
+  channel?: string;
   timezone?: string;
   history?: ChatHistoryItem[];
   signal?: AbortSignal;

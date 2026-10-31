@@ -119,6 +119,8 @@ export function useChatMessages(
         }));
 
         const res = await api.assistantChat(text.trim(), {
+          thread_id: activeSessionId,
+          channel: 'app_desktop',
           history,
           focus_mode: focusMode,
         });
@@ -178,7 +180,11 @@ export function useChatMessages(
       setLoading(true);
 
       try {
-        const res = await api.assistantAudio(audioB64, 'audio.wav', { focus_mode: focusMode });
+        const res = await api.assistantAudio(audioB64, 'audio.wav', {
+          thread_id: activeSessionId,
+          channel: 'app_desktop',
+          focus_mode: focusMode,
+        });
         const vitoMsg = buildAssistantMessage('vito-audio', res, 'Áudio processado.');
         const withVito = [...withUser, vitoMsg];
         setMessages(withVito);

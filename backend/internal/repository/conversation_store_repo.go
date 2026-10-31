@@ -280,10 +280,40 @@ func (r *ConversationStoreRepository) DeleteThread(ctx context.Context, threadID
 	return err
 }
 
+// TouchThread atualiza last_activity_at e updated_at de uma thread.
+func (r *ConversationStoreRepository) TouchThread(ctx context.Context, threadID string) error {
+	query := `UPDATE conversation_threads SET last_activity_at = ?, updated_at = ? WHERE id = ?`
+	now := time.Now().UTC()
+	_, err := r.db.ExecContext(ctx, query, now, now, threadID)
+	return err
+}
+
 // GetOrCreateThread busca uma thread recente do canal ou cria uma nova.
-func (r *ConversationStoreRepository) GetOrCreateThread(ctx context.Context, userID, channel, externalChatID string) (*ConversationThread, error) {
+// Se threadID for informado e existir para o usuário, retorna-a isolada. Se não existir, cria com este ID.
+func (r *ConversationStoreRepository) GetOrCreateThread(ctx context.Context, userID, channel, threadID string) (*ConversationThread, error) {
+	if threadID != "" {
+		existing, err := r.GetThreadByID(ctx, threadID)
+		if err == nil && existing != nil && existing.UserID == userID {
+			_ = r.TouchThread(ctx, threadID)
+			return existing, nil
+		}
+		newThread := &ConversationThread{
+			ID:             threadID,
+			UserID:         userID,
+			Channel:        channel,
+			Title:          "Conversa",
+			LastActivityAt: time.Now().UTC(),
+			CreatedAt:      time.Now().UTC(),
+			UpdatedAt:      time.Now().UTC(),
+		}
+		if err := r.CreateThread(ctx, newThread); err != nil {
+			return nil, err
+		}
+		return newThread, nil
+	}
+
 	threads, err := r.ListThreadsByUser(ctx, userID, channel, 1)
-	if err == nil && len(threads) > 0 && time.Since(threads[0].LastActivityAt) < 24*time.Hour {
+	if err == nil && len(threads) > 0 && time.Since(threads[0].LastActivityAt) < 2*time.Hour {
 		return threads[0], nil
 	}
 
@@ -291,7 +321,6 @@ func (r *ConversationStoreRepository) GetOrCreateThread(ctx context.Context, use
 		ID:             uuid.New().String(),
 		UserID:         userID,
 		Channel:        channel,
-		ExternalChatID: externalChatID,
 		Title:          "Conversa",
 		LastActivityAt: time.Now().UTC(),
 		CreatedAt:      time.Now().UTC(),

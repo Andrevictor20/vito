@@ -50,11 +50,12 @@ func payloadImagem(remoteJID, messageID, caption string) []byte {
 	return bytesPayload
 }
 
-// TestWhatsAppService_ImagemNoChatVoce_AnalisaEGeraResposta
+// TestWhatsAppService_ImagemSemLegendaNoChatVoce_NaoGeraResposta
 //
-// O Vito ignorava completamente imagens no WhatsApp: o parser não tinha
-// IsImage e o fluxo abortava quando a mensagem não tinha texto.
-func TestWhatsAppService_ImagemNoChatVoce_AnalisaEGeraResposta(t *testing.T) {
+// Regra: Uma captura de tela ou foto sem legenda NÃO deve acionar o Vito.
+// O arquivo é apenas arquivado no shadow inbox para histórico/consulta futura,
+// sem disparar reação nem chamada de IA.
+func TestWhatsAppService_ImagemSemLegendaNoChatVoce_NaoGeraResposta(t *testing.T) {
 	svc, mockClient, waRepo, userRepo := setupConversationalWhatsAppTest(t)
 	_ = waRepo
 	_ = userRepo
@@ -67,7 +68,38 @@ func TestWhatsAppService_ImagemNoChatVoce_AnalisaEGeraResposta(t *testing.T) {
 	mockClient.mockMediaBase64 = base64.StdEncoding.EncodeToString([]byte("bytes-de-imagem-fake"))
 
 	err := svc.HandleWebhook(context.Background(), "messages.upsert",
-		payloadImagem("5511999998888@s.whatsapp.net", "msg-img-1", ""))
+		payloadImagem("5511999998888@s.whatsapp.net", "msg-img-sem-legenda", ""))
+	if err != nil {
+		t.Fatalf("HandleWebhook retornou erro: %v", err)
+	}
+
+	if mockClient.mediaDownloadedCount != 0 {
+		t.Errorf("imagem sem legenda não deveria ser baixada (downloaded=%d)", mockClient.mediaDownloadedCount)
+	}
+	if gateway.input.ImageB64 != "" {
+		t.Error("imagem sem legenda não deveria ser entregue à IA")
+	}
+	if len(mockClient.sentMessages) != 0 {
+		t.Errorf("imagem sem legenda não deveria gerar resposta, obteve %d mensagens", len(mockClient.sentMessages))
+	}
+}
+
+// TestWhatsAppService_ImagemComChamadaAoVito_AnalisaEGeraResposta
+//
+// Quando a imagem vem com legenda chamando o Vito (@vito, Vito,), aí sim
+// o Vito deve baixar a mídia, processar na IA e responder.
+func TestWhatsAppService_ImagemComChamadaAoVito_AnalisaEGeraResposta(t *testing.T) {
+	svc, mockClient, _, _ := setupConversationalWhatsAppTest(t)
+
+	gateway := &mockGatewayCapturador{}
+	assistantSvc := service.NewAssistantService(gateway, nil, nil, nil)
+	svc.SetAssistantService(assistantSvc)
+	svc.SetAsyncRunner(func(fn func()) { fn() })
+
+	mockClient.mockMediaBase64 = base64.StdEncoding.EncodeToString([]byte("bytes-de-imagem-fake"))
+
+	err := svc.HandleWebhook(context.Background(), "messages.upsert",
+		payloadImagem("5511999998888@s.whatsapp.net", "msg-img-com-vito", "@vito analisa este boleto"))
 	if err != nil {
 		t.Fatalf("HandleWebhook retornou erro: %v", err)
 	}
@@ -81,8 +113,8 @@ func TestWhatsAppService_ImagemNoChatVoce_AnalisaEGeraResposta(t *testing.T) {
 	if gateway.input.ImageMime != "image/jpeg" {
 		t.Errorf("mime esperado image/jpeg, obteve %q", gateway.input.ImageMime)
 	}
-	if strings.TrimSpace(gateway.input.Text) == "" {
-		t.Error("esperava um prompt para a análise da imagem")
+	if !strings.Contains(gateway.input.Text, "analisa este boleto") {
+		t.Errorf("esperava prompt com a instrução do usuário, obteve: %q", gateway.input.Text)
 	}
 	if len(mockClient.sentMessages) == 0 {
 		t.Fatal("esperava resposta do Vito no chat")
@@ -93,24 +125,55 @@ func TestWhatsAppService_ImagemNoChatVoce_AnalisaEGeraResposta(t *testing.T) {
 	}
 }
 
-// TestWhatsAppService_ImagemComLegenda_UsaALegendaComoPrompt
-func TestWhatsAppService_ImagemComLegenda_UsaALegendaComoPrompt(t *testing.T) {
-	svc, _, _, _ := setupConversationalWhatsAppTest(t)
+// TestWhatsAppService_ImagemComLegendaSemVito_NaoGeraResposta
+//
+// Se o usuário envia uma imagem com legenda descritiva ("print do comprovante")
+// mas NÃO chama o Vito, o Vito não deve se intrometer.
+func TestWhatsAppService_ImagemComLegendaSemVito_NaoGeraResposta(t *testing.T) {
+	svc, mockClient, _, _ := setupConversationalWhatsAppTest(t)
 
 	gateway := &mockGatewayCapturador{}
 	svc.SetAssistantService(service.NewAssistantService(gateway, nil, nil, nil))
 	svc.SetAsyncRunner(func(fn func()) { fn() })
 
 	err := svc.HandleWebhook(context.Background(), "messages.upsert",
-		payloadImagem("5511999998888@s.whatsapp.net", "msg-img-2", "quanto eu paguei nesse boleto?"))
+		payloadImagem("5511999998888@s.whatsapp.net", "msg-img-sem-vito", "foto tirada no parque hoje"))
 	if err != nil {
 		t.Fatalf("HandleWebhook retornou erro: %v", err)
 	}
-	if !strings.Contains(gateway.input.Text, "quanto eu paguei nesse boleto?") {
-		t.Errorf("esperava a legenda como prompt, obteve: %q", gateway.input.Text)
+	if mockClient.mediaDownloadedCount != 0 {
+		t.Errorf("imagem sem chamada ao Vito não deveria ser baixada")
 	}
-	if gateway.input.ImageB64 == "" {
-		t.Error("esperava ImageB64 entregue à IA")
+	if gateway.input.ImageB64 != "" {
+		t.Error("imagem sem chamada ao Vito não deveria chegar à IA")
+	}
+	if len(mockClient.sentMessages) != 0 {
+		t.Errorf("imagem sem chamada ao Vito não deveria gerar resposta")
+	}
+}
+
+// TestWhatsAppService_ImagemComChamadaNaturalNoChatVoce_ReageEAnalisa
+//
+// No chat pessoal, uma chamada natural como "Vito, o que é isso?" também deve funcionar.
+func TestWhatsAppService_ImagemComChamadaNaturalNoChatVoce_ReageEAnalisa(t *testing.T) {
+	svc, mockClient, _, _ := setupConversationalWhatsAppTest(t)
+
+	gateway := &mockGatewayCapturador{}
+	svc.SetAssistantService(service.NewAssistantService(gateway, nil, nil, nil))
+	svc.SetAsyncRunner(func(fn func()) { fn() })
+
+	mockClient.mockMediaBase64 = base64.StdEncoding.EncodeToString([]byte("bytes-de-imagem-fake"))
+
+	err := svc.HandleWebhook(context.Background(), "messages.upsert",
+		payloadImagem("5511999998888@s.whatsapp.net", "msg-img-natural", "Vito, o que tem nessa imagem?"))
+	if err != nil {
+		t.Fatalf("HandleWebhook retornou erro: %v", err)
+	}
+	if mockClient.mediaDownloadedCount == 0 {
+		t.Error("esperava download da imagem quando chamado como 'Vito,'")
+	}
+	if len(mockClient.sentMessages) == 0 {
+		t.Fatal("esperava resposta do Vito no chat")
 	}
 }
 
@@ -155,7 +218,7 @@ func TestWhatsAppService_ImagemIndisponivel_RespostaHonesta(t *testing.T) {
 	mockClient.mockMediaBase64 = ""
 
 	err := svc.HandleWebhook(context.Background(), "messages.upsert",
-		payloadImagem("5511999998888@s.whatsapp.net", "msg-img-5", ""))
+		payloadImagem("5511999998888@s.whatsapp.net", "msg-img-5", "@vito analisa"))
 	if err != nil {
 		t.Fatalf("HandleWebhook retornou erro: %v", err)
 	}
@@ -188,7 +251,7 @@ func TestWhatsAppService_ProcessamentoEmBackground(t *testing.T) {
 	})
 
 	err := svc.HandleWebhook(context.Background(), "messages.upsert",
-		payloadImagem("5511999998888@s.whatsapp.net", "msg-img-4", ""))
+		payloadImagem("5511999998888@s.whatsapp.net", "msg-img-4", "@vito analisa"))
 	if err != nil {
 		t.Fatalf("HandleWebhook retornou erro: %v", err)
 	}
