@@ -35,21 +35,23 @@ func StripVitoSignature(text string) (string, bool) {
 
 // inboundMessage é uma mensagem recebida do WhatsApp já normalizada.
 type inboundMessage struct {
-	MessageID    string
-	RemoteJID    string
-	FromMe       bool
-	Participant  string
-	PushName     string
-	MessageType  string
-	Text         string
-	QuotedText   string
-	QuotedAuthor string
-	Timestamp    time.Time
-	IsAudio      bool
-	IsImage      bool
-	ImageMime    string
-	QuotedID     string
-	MediaPayload interface{}
+	MessageID      string
+	RemoteJID      string
+	RemoteJIDAlt   string
+	FromMe         bool
+	Participant    string
+	ParticipantAlt string
+	PushName       string
+	MessageType    string
+	Text           string
+	QuotedText     string
+	QuotedAuthor   string
+	Timestamp      time.Time
+	IsAudio        bool
+	IsImage        bool
+	ImageMime      string
+	QuotedID       string
+	MediaPayload   interface{}
 }
 
 // TestInboundMessage exporta campos essenciais para testes.
@@ -151,13 +153,15 @@ func parseInboundMessage(data json.RawMessage) (*inboundMessage, error) {
 	}
 
 	msg := &inboundMessage{
-		MessageID:    raw.Key.ID,
-		RemoteJID:    remoteJID,
-		FromMe:       raw.Key.FromMe,
-		Participant:  participant,
-		PushName:     strings.TrimSpace(raw.PushName),
-		MessageType:  raw.MessageType,
-		MediaPayload: data,
+		MessageID:      raw.Key.ID,
+		RemoteJID:      remoteJID,
+		RemoteJIDAlt:   strings.TrimSpace(raw.Key.RemoteJIDAlt),
+		FromMe:         raw.Key.FromMe,
+		Participant:    participant,
+		ParticipantAlt: strings.TrimSpace(raw.Key.ParticipantAlt),
+		PushName:       strings.TrimSpace(raw.PushName),
+		MessageType:    raw.MessageType,
+		MediaPayload:   data,
 	}
 	if raw.MessageTimestamp > 0 {
 		msg.Timestamp = time.Unix(raw.MessageTimestamp, 0).UTC()

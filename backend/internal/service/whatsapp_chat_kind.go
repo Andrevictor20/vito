@@ -26,6 +26,53 @@ func NormalizeJIDForSend(jid string) string {
 	return trimmed
 }
 
+// ResolveReplyJID normaliza e resolve o destino da resposta na Evolution API.
+// Em conversas consigo mesmo ("Você" / self), remove prefixos de dispositivo do note-to-self
+// (ex.: 047...) e identificadores @lid, convertendo para o JID @s.whatsapp.net canônico do dono,
+// evitando que a Evolution API v2 rejeite o envio com HTTP 400 Bad Request (exists: false).
+func ResolveReplyJID(remoteJID, remoteJIDAlt, chatKind, ownerJID, ownerPhone string) string {
+	cleanRemote := strings.TrimSpace(remoteJID)
+	cleanAlt := strings.TrimSpace(remoteJIDAlt)
+
+	// Em grupos, o destino é sempre o próprio grupo
+	if strings.HasSuffix(cleanRemote, "@g.us") {
+		return NormalizeJIDForSend(cleanRemote)
+	}
+
+	// JID canônico do dono (@s.whatsapp.net)
+	canonicalOwner := ""
+	if strings.Contains(ownerJID, "@s.whatsapp.net") {
+		canonicalOwner = NormalizeJIDForSend(ownerJID)
+	} else if ownerPhone != "" {
+		digits := phoneDigits(ownerPhone)
+		if digits != "" {
+			canonicalOwner = digits + "@s.whatsapp.net"
+		}
+	}
+
+	// Se for chat pessoal ("Você" / self / self_group), a Evolution API exige o JID canônico do dono
+	if chatKind == domain.WhatsAppChatKindSelf || chatKind == domain.WhatsAppChatKindSelfGroup {
+		if canonicalOwner != "" {
+			return canonicalOwner
+		}
+		if strings.HasSuffix(cleanAlt, "@s.whatsapp.net") {
+			return NormalizeJIDForSend(cleanAlt)
+		}
+		// Fallback: se remoteJID terminar com @s.whatsapp.net mas tiver prefixo note-to-self (ex.: 04755...)
+		digits := phoneDigits(cleanRemote)
+		if len(digits) >= 12 && strings.HasPrefix(digits, "047") {
+			return digits[3:] + "@s.whatsapp.net"
+		}
+	}
+
+	// Se for @lid com alternativo @s.whatsapp.net disponível
+	if strings.HasSuffix(cleanRemote, "@lid") && strings.HasSuffix(cleanAlt, "@s.whatsapp.net") {
+		return NormalizeJIDForSend(cleanAlt)
+	}
+
+	return NormalizeJIDForSend(cleanRemote)
+}
+
 // ClassifyChat classifica uma conversa do WhatsApp para definir o escopo de contexto.
 //
 // Regra (SPEC §2.1):
@@ -36,7 +83,7 @@ func NormalizeJIDForSend(jid string) string {
 //
 // Quando os dados de participantes estão obsoletos ou ausentes, o fallback é o tipo
 // MAIS RESTRITIVO (`group`), que bloqueia o contexto cross-chat por construção.
-func ClassifyChat(remoteJID, myPhone string, groupParticipants int, participantsFresh bool) string {
+func ClassifyChat(remoteJID, myPhone string, groupParticipants int, participantsFresh bool, ownerLID ...string) string {
 	jid := strings.TrimSpace(remoteJID)
 	if jid == "" {
 		return domain.WhatsAppChatKindDirect
@@ -58,6 +105,14 @@ func ClassifyChat(remoteJID, myPhone string, groupParticipants int, participants
 
 	cleanJID := strings.Split(jid, "@")[0]
 	cleanJID = strings.Split(cleanJID, ":")[0]
+
+	if len(ownerLID) > 0 && ownerLID[0] != "" {
+		cleanLID := strings.TrimSpace(ownerLID[0])
+		if strings.EqualFold(jid, cleanLID) || strings.EqualFold(cleanJID, strings.Split(cleanLID, "@")[0]) {
+			return domain.WhatsAppChatKindSelf
+		}
+	}
+
 	if myPhone != "" && IsSelfChatJID(cleanJID, myPhone) {
 		return domain.WhatsAppChatKindSelf
 	}

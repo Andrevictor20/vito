@@ -200,3 +200,49 @@ func (s *WhatsAppService) SendWhatsAppMessage(ctx context.Context, userID, chatJ
 	}
 	return s.client.SendText(ctx, integration.InstanceName, chatJID, text)
 }
+
+// markOutboundReply registra uma resposta gerada pelo Vito para evitar loops de reprocessamento.
+func (s *WhatsAppService) markOutboundReply(text string) {
+	if s == nil {
+		return
+	}
+	s.outboundMu.Lock()
+	defer s.outboundMu.Unlock()
+	if s.recentOutboundTexts == nil {
+		s.recentOutboundTexts = make(map[string]time.Time)
+	}
+	now := time.Now()
+	for k, exp := range s.recentOutboundTexts {
+		if now.Sub(exp) > 2*time.Minute {
+			delete(s.recentOutboundTexts, k)
+		}
+	}
+	trimmed := strings.TrimSpace(text)
+	if trimmed != "" {
+		s.recentOutboundTexts[trimmed] = now
+	}
+}
+
+// isOutboundReply verifica se a mensagem foi originada recentemente pelo próprio Vito.
+func (s *WhatsAppService) isOutboundReply(text string) bool {
+	if s == nil {
+		return false
+	}
+	trimmed := strings.TrimSpace(text)
+	if trimmed == "" {
+		return false
+	}
+	s.outboundMu.Lock()
+	defer s.outboundMu.Unlock()
+	if s.recentOutboundTexts == nil {
+		return false
+	}
+	now := time.Now()
+	if t, ok := s.recentOutboundTexts[trimmed]; ok {
+		if now.Sub(t) <= 2*time.Minute {
+			return true
+		}
+		delete(s.recentOutboundTexts, trimmed)
+	}
+	return false
+}

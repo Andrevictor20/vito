@@ -133,6 +133,77 @@ func TestHandleWebhook_OwnerInGroupWithFromMeFalse(t *testing.T) {
 	}
 }
 
+// AC-01: Entrega e Roteamento de Webhook WhatsApp Resiliente
+// AC-02: Resolução de ReplyJID em Note-to-Self 047... e @lid + Anti-Loop
+// AC-03: Correção de findOwnerJIDIn e Cadeia de Modelos Gemini no WhatsApp
+// AC-08: Qualidade, Zero Regressões e No-God-Files < 500L
+func TestResolveReplyJID(t *testing.T) {
+	cases := []struct {
+		name       string
+		remoteJID  string
+		altJID     string
+		chatKind   string
+		ownerJID   string
+		ownerPhone string
+		expected   string
+	}{
+		{
+			name:       "AC-02: note-to-self com prefixo 047",
+			remoteJID:  "047559884417165:33@s.whatsapp.net",
+			altJID:     "",
+			chatKind:   domain.WhatsAppChatKindSelf,
+			ownerJID:   "559884417165@s.whatsapp.net",
+			ownerPhone: "559884417165",
+			expected:   "559884417165@s.whatsapp.net",
+		},
+		{
+			name:       "AC-02: chat self via @lid",
+			remoteJID:  "1849204920149@lid",
+			altJID:     "",
+			chatKind:   domain.WhatsAppChatKindSelf,
+			ownerJID:   "559884417165@s.whatsapp.net",
+			ownerPhone: "559884417165",
+			expected:   "559884417165@s.whatsapp.net",
+		},
+		{
+			name:       "AC-02: grupo deve manter o jid do grupo",
+			remoteJID:  "12036300112233@g.us",
+			altJID:     "",
+			chatKind:   domain.WhatsAppChatKindGroup,
+			ownerJID:   "559884417165@s.whatsapp.net",
+			ownerPhone: "559884417165",
+			expected:   "12036300112233@g.us",
+		},
+		{
+			name:       "AC-02: chat @lid de terceiro com alt @s.whatsapp.net",
+			remoteJID:  "1849204920149@lid",
+			altJID:     "5511999998888@s.whatsapp.net",
+			chatKind:   domain.WhatsAppChatKindDirect,
+			ownerJID:   "559884417165@s.whatsapp.net",
+			ownerPhone: "559884417165",
+			expected:   "5511999998888@s.whatsapp.net",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := service.ResolveReplyJID(tc.remoteJID, tc.altJID, tc.chatKind, tc.ownerJID, tc.ownerPhone)
+			if got != tc.expected {
+				t.Errorf("ResolveReplyJID esperava %q, obteve %q", tc.expected, got)
+			}
+		})
+	}
+}
+
+// AC-02: Classificação correta com ownerLID sem colisão
+func TestClassifyChat_WithOwnerLID(t *testing.T) {
+	// Se o JID remoto for o LID registrado do dono, classifica como self
+	chatKind := service.ClassifyChat("1849204920149@lid", "559884417165", 0, false, "1849204920149@lid")
+	if chatKind != domain.WhatsAppChatKindSelf {
+		t.Errorf("esperava chatKind self para JID igual ao ownerLID, obteve %q", chatKind)
+	}
+}
+
 // Helpers
 type recordingEvolutionClient struct {
 	sentMessages []string

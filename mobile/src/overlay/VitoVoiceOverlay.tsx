@@ -122,7 +122,7 @@ export function VitoVoiceOverlay({
   const handleToggleVoice = useCallback(() => {
     setPreferredVoice((prev) => {
       const next = prev === 'puck' ? 'kore' : 'puck';
-      api.updateAISettings({ preferred_voice: next } as any).catch(() => {});
+      api.updateAISettings({ preferred_voice: next }).catch(() => {});
       return next;
     });
   }, []);
@@ -215,6 +215,9 @@ export function VitoVoiceOverlay({
         return;
       }
 
+      // Pequena drenagem acústica (120ms) para dissipar a reverberação do alto-falante viva-voz
+      await new Promise((r) => setTimeout(r, 120));
+
       const nextListenState: ConversationState = isCompact ? 'IDLE' : 'LISTENING';
       setState(nextListenState);
       if (!isCompact) setTranscript('Ouvindo você...');
@@ -265,6 +268,7 @@ export function VitoVoiceOverlay({
       setHighlightedWordCount(splitReplyWordsForHighlight(errMsg).length);
 
       if (!isClosingRef.current) {
+        await new Promise((r) => setTimeout(r, 120));
         setState('LISTENING');
         resetInactivityTimer('LISTENING');
         if (!isMutedRef.current) VitoDuplexAudioModule?.startRecording?.().catch(() => {});

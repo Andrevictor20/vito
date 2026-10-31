@@ -435,7 +435,7 @@ export class ApiService extends ApiClient {
   getAISettings(): Promise<AISettings> {
     return this.notificationsApi.getAISettings();
   }
-  updateAISettings(data: { autonomy_mode?: AutonomyMode; auto_focus_blocks?: boolean }): Promise<AISettings> {
+  updateAISettings(data: Parameters<NotificationsApi['updateAISettings']>[0]): Promise<AISettings> {
     return this.notificationsApi.updateAISettings(data);
   }
 

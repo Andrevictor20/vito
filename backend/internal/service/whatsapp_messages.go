@@ -67,8 +67,12 @@ func (s *WhatsAppService) handleMessagesEvent(ctx context.Context, instanceName 
 
 	integration, err := s.repo.GetByInstanceName(ctx, instanceName)
 	if err != nil || integration == nil {
-		log.Printf("⚠️ [WhatsAppInbound] integração não encontrada para instância %q: %v", instanceName, err)
-		return nil
+		if connInteg, connErr := s.repo.FindConnectedInstance(ctx); connErr == nil && connInteg != nil {
+			integration = connInteg
+		} else {
+			log.Printf("⚠️ [WhatsAppInbound] integração não encontrada para instância %q: %v", instanceName, err)
+			return nil
+		}
 	}
 
 	// Quando o próprio dono envia mensagem (fromMe=true) e a Evolution API informa
@@ -92,7 +96,7 @@ func (s *WhatsAppService) handleMessagesEvent(ctx context.Context, instanceName 
 		instanceName, msg.RemoteJID, integration.Phone, chatKind, msg.MessageType, len(rawText), msg.QuotedText != "", msg.FromMe, msg.Participant)
 
 	// Mensagem gerada pelo próprio Vito: arquiva (faz parte do contexto) e encerra (anti-loop).
-	if IsVitoMessage(rawText) {
+	if IsVitoMessage(rawText) || s.isOutboundReply(rawText) {
 		clean, _ := StripVitoSignature(rawText)
 		s.archiveMessage(ctx, integration.UserID, instanceName, msg, chatKind, clean, "vito")
 		return nil
@@ -246,6 +250,11 @@ func (s *WhatsAppService) processPendingMessage(pending *pendingMessage) error {
 		history = nil
 	}
 
+	ownerJID := ""
+	if s.ownerCache != nil {
+		ownerJID, _ = s.ownerCache.JID(instanceName)
+	}
+
 	resp, err := s.assistantSvc.Process(ctx, integration.UserID, ai.UserInput{
 		Text:                 rawText,
 		ConversationHistory:  history,
@@ -259,7 +268,8 @@ func (s *WhatsAppService) processPendingMessage(pending *pendingMessage) error {
 		log.Printf("⚠️ [WhatsAppService] Erro ao processar mensagem do WhatsApp: %v", err)
 		assinatura := VitoSignature(ctx, s.contextSvc, integration.UserID, msg.RemoteJID, msg.PushName)
 		fallbackReply := fmt.Sprintf("%s\n\nEstou com uma instabilidade temporária nos meus provedores de IA agora. Pode tentar novamente em alguns instantes?", assinatura)
-		targetJID := NormalizeJIDForSend(msg.RemoteJID)
+		targetJID := ResolveReplyJID(msg.RemoteJID, msg.RemoteJIDAlt, chatKind, ownerJID, integration.Phone)
+		s.markOutboundReply(fallbackReply)
 		if strings.HasSuffix(msg.RemoteJID, "@g.us") && msg.MessageID != "" {
 			_ = s.client.SendTextWithQuoted(ctx, instanceName, targetJID, fallbackReply, msg.MessageID)
 		} else {
@@ -288,12 +298,19 @@ func (s *WhatsAppService) processPendingMessage(pending *pendingMessage) error {
 	assinatura := VitoSignature(ctx, s.contextSvc, integration.UserID, msg.RemoteJID, msg.PushName)
 	formattedReply := fmt.Sprintf("%s\n\n%s", assinatura, replyText)
 	isGroup := strings.HasSuffix(msg.RemoteJID, "@g.us")
-	targetJID := NormalizeJIDForSend(msg.RemoteJID)
+	targetJID := ResolveReplyJID(msg.RemoteJID, msg.RemoteJIDAlt, chatKind, ownerJID, integration.Phone)
+	canonicalOwnerJID := ResolveReplyJID(msg.RemoteJID, msg.RemoteJIDAlt, domain.WhatsAppChatKindSelf, ownerJID, integration.Phone)
+	s.markOutboundReply(formattedReply)
+
 	var sendErr error
 	if isGroup && msg.MessageID != "" {
 		sendErr = s.client.SendTextWithQuoted(ctx, instanceName, targetJID, formattedReply, msg.MessageID)
 	} else {
 		sendErr = s.client.SendText(ctx, instanceName, targetJID, formattedReply)
+		if sendErr != nil && canonicalOwnerJID != "" && targetJID != canonicalOwnerJID {
+			log.Printf("⚠️ [WhatsAppService] tentativa inicial falhou para %s (%v); tentando fallback para ownerJID %s", targetJID, sendErr, canonicalOwnerJID)
+			sendErr = s.client.SendText(ctx, instanceName, canonicalOwnerJID, formattedReply)
+		}
 	}
 	if sendErr != nil {
 		log.Printf("❌ [WhatsAppService] falha ao enviar resposta para %s: %v", targetJID, sendErr)
@@ -336,9 +353,11 @@ func (s *WhatsAppService) classifyChat(ctx context.Context, instanceName string,
 		}
 	}
 
+	ownerLID := ""
 	selfReference := integration.Phone
 	if s.ownerCache != nil {
-		if ownerLID := s.ownerCache.LID(instanceName); ownerLID != "" && strings.EqualFold(strings.TrimSpace(remoteJID), ownerLID) {
+		ownerLID = s.ownerCache.LID(instanceName)
+		if ownerLID != "" && strings.EqualFold(strings.TrimSpace(remoteJID), ownerLID) {
 			return domain.WhatsAppChatKindSelf
 		}
 		ownerJID, ownerFresh := s.ownerCache.JID(instanceName)
@@ -357,6 +376,6 @@ func (s *WhatsAppService) classifyChat(ctx context.Context, instanceName string,
 			s.ownerCache.Ensure(ctx, instanceName)
 		}
 	}
-	return ClassifyChat(remoteJID, selfReference, participants, fresh)
+	return ClassifyChat(remoteJID, selfReference, participants, fresh, ownerLID)
 }
 

@@ -53,9 +53,10 @@ type WhatsAppService struct {
 	// enricher lê a mídia (áudio/imagem) das mensagens do WhatsApp.
 	enricher *WhatsAppMediaEnricher
 	// blockedReplies guarda a última resposta educativa enviada por conversa
-	// (cooldown: "spam de @vito" não pode virar spam no grupo).
-	blockedMu      sync.Mutex
-	blockedReplies map[string]time.Time
+	blockedMu           sync.Mutex
+	blockedReplies      map[string]time.Time
+	outboundMu          sync.Mutex
+	recentOutboundTexts map[string]time.Time
 }
 
 // AsyncRunner executa uma tarefa em background (ou de forma síncrona, em testes).
@@ -69,12 +70,13 @@ func NewWhatsAppService(
 	assistantSvc *AssistantService,
 ) *WhatsAppService {
 	return &WhatsAppService{
-		cfg:          cfg,
-		repo:         repo,
-		client:       client,
-		assistantSvc: assistantSvc,
-		memory:       NewWhatsAppConversationMemory(),
-		runAsync:     func(fn func()) { go fn() },
+		cfg:                 cfg,
+		repo:                repo,
+		client:              client,
+		assistantSvc:        assistantSvc,
+		memory:              NewWhatsAppConversationMemory(),
+		runAsync:            func(fn func()) { go fn() },
+		recentOutboundTexts: make(map[string]time.Time),
 	}
 }
 
@@ -469,7 +471,7 @@ func (s *WhatsAppService) HandleWebhook(ctx context.Context, eventType string, p
 		return nil
 	}
 
-	if strings.Contains(event, "messages") {
+	if strings.Contains(event, "messages") || strings.Contains(event, "send.message") || strings.Contains(event, "send_message") {
 		return s.handleMessagesEvent(ctx, base.Instance, base.Data)
 	}
 

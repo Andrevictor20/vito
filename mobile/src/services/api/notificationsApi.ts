@@ -61,6 +61,8 @@ export class NotificationsApi {
   async updateAISettings(data: {
     autonomy_mode?: AutonomyMode;
     auto_focus_blocks?: boolean;
+    persona_style?: string;
+    preferred_voice?: string;
   }): Promise<AISettings> {
     return this.client.request<AISettings>('/api/v1/users/ai-settings', {
       method: 'PUT',

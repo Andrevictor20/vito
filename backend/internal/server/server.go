@@ -223,6 +223,7 @@ func (s *Server) registerRoutes() {
 
 		if s.whatsappHandler != nil {
 			r.Post("/integrations/whatsapp/webhook", s.whatsappHandler.Webhook)
+			r.Post("/integrations/whatsapp/webhook/{event}", s.whatsappHandler.Webhook)
 		}
 
 		if s.triggerHandler != nil {

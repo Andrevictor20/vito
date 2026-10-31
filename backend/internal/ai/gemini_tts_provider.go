@@ -221,7 +221,7 @@ func (p *GeminiTTSProvider) synthesizeWithModel(text string, voice string, model
 							sampleRate = uint32(parsed)
 						}
 					}
-					wav := PCMToWAV(rawAudio, sampleRate, 1, 16)
+					wav := PCMToWAV(normalizePCMPeak(rawAudio), sampleRate, 1, 16)
 					return wav, "audio/wav", nil
 				}
 
@@ -234,6 +234,51 @@ func (p *GeminiTTSProvider) synthesizeWithModel(text string, voice string, model
 	}
 
 	return nil, "", errors.New("nenhum dado de áudio inline retornado pelo Gemini")
+}
+
+// normalizePCMPeak normaliza o volume de amostras PCM 16-bit little-endian para pico de -1.0 dBFS (~29000).
+func normalizePCMPeak(pcm []byte) []byte {
+	if len(pcm) < 2 {
+		return pcm
+	}
+	numSamples := len(pcm) / 2
+	var maxAbs int16
+	for i := 0; i < numSamples; i++ {
+		sample := int16(binary.LittleEndian.Uint16(pcm[i*2 : i*2+2]))
+		absVal := sample
+		if absVal < 0 {
+			if absVal == -32768 {
+				absVal = 32767
+			} else {
+				absVal = -absVal
+			}
+		}
+		if absVal > maxAbs {
+			maxAbs = absVal
+		}
+	}
+
+	if maxAbs < 400 || maxAbs >= 28000 {
+		return pcm
+	}
+
+	gain := float64(29000) / float64(maxAbs)
+	if gain > 2.5 {
+		gain = 2.5
+	}
+
+	normalized := make([]byte, len(pcm))
+	for i := 0; i < numSamples; i++ {
+		sample := int16(binary.LittleEndian.Uint16(pcm[i*2 : i*2+2]))
+		amplified := int(float64(sample) * gain)
+		if amplified > 32767 {
+			amplified = 32767
+		} else if amplified < -32768 {
+			amplified = -32768
+		}
+		binary.LittleEndian.PutUint16(normalized[i*2:i*2+2], uint16(int16(amplified)))
+	}
+	return normalized
 }
 
 // PCMToWAV converte bytes PCM brutos (16-bit LE) em um arquivo WAV padrão com cabeçalho RIFF de 44 bytes.

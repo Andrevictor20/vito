@@ -7,6 +7,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/andrevmp/vito/backend/internal/domain"
 )
 
 // WhatsAppOwnerCache guarda o JID do dono (número realmente pareado) de cada
@@ -169,27 +171,57 @@ func ResolveWhatsAppWebhookBaseURL(publicBaseURL, evolutionAPIURL, port string) 
 }
 
 // SyncConnectedWebhooks reaplica a URL de webhook em todas as instâncias cadastradas
-// no boot do servidor para migrar instâncias já pareadas para a rede interna do Docker.
+// no boot do servidor com retry progressivo para aguardar a inicialização do container Evolution API.
 func (s *WhatsAppService) SyncConnectedWebhooks(ctx context.Context) {
 	if s == nil || s.repo == nil || s.client == nil || strings.TrimSpace(s.cfg.WebhookBaseURL) == "" {
 		return
 	}
-	timeoutCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
-	defer cancel()
 
-	integrations, err := s.repo.ListAll(timeoutCtx)
-	if err != nil {
-		return
-	}
 	webhookURL := fmt.Sprintf("%s/api/v1/integrations/whatsapp/webhook", strings.TrimRight(s.cfg.WebhookBaseURL, "/"))
-	for _, integ := range integrations {
-		if strings.TrimSpace(integ.InstanceName) == "" {
+	backoffs := []time.Duration{0, 5 * time.Second, 15 * time.Second, 30 * time.Second, 60 * time.Second}
+
+	for attempt, delay := range backoffs {
+		if delay > 0 {
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(delay):
+			}
+		}
+
+		timeoutCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
+		integrations, err := s.repo.ListAll(timeoutCtx)
+		if err != nil {
+			cancel()
 			continue
 		}
-		if err := s.client.SetWebhook(timeoutCtx, integ.InstanceName, webhookURL); err != nil {
-			log.Printf("⚠️ [WhatsAppService] falha ao sincronizar webhook de %s: %v", integ.InstanceName, err)
-		} else {
-			log.Printf("🔗 [WhatsAppService] webhook sincronizado para %s -> %s", integ.InstanceName, webhookURL)
+
+		allSuccess := true
+		for _, integ := range integrations {
+			if strings.TrimSpace(integ.InstanceName) == "" {
+				continue
+			}
+
+			// Auto-cura de status: se a Evolution já estiver conectada ('open'), atualiza localmente
+			state, stateErr := s.client.GetConnectionState(timeoutCtx, integ.InstanceName)
+			if stateErr == nil && strings.EqualFold(state, "open") && integ.Status != domain.WhatsAppStatusConnected {
+				now := time.Now().UTC()
+				_ = s.repo.UpdateStatus(timeoutCtx, integ.ID, domain.WhatsAppStatusConnected, &now)
+				log.Printf("🔄 [WhatsAppService] Status da instância %s auto-curado para 'connected'", integ.InstanceName)
+			}
+
+			if err := s.client.SetWebhook(timeoutCtx, integ.InstanceName, webhookURL); err != nil {
+				allSuccess = false
+				log.Printf("⚠️ [WhatsAppService] Tentativa %d/%d falhou ao configurar webhook de %s: %v", attempt+1, len(backoffs), integ.InstanceName, err)
+			} else {
+				log.Printf("🔗 [WhatsAppService] Webhook sincronizado com sucesso para %s -> %s", integ.InstanceName, webhookURL)
+			}
+		}
+		cancel()
+
+		if allSuccess && len(integrations) > 0 {
+			log.Printf("✅ [WhatsAppService] Todos os webhooks foram sincronizados com sucesso na tentativa %d", attempt+1)
+			return
 		}
 	}
 }

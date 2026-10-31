@@ -34,9 +34,9 @@ func TestGeminiModelChain_ContemFallbacksVerificados(t *testing.T) {
 
 	want := []string{
 		"gemini-2.5-flash",
-		"gemini-3.5-flash-lite",
+		"gemini-2.5-flash-lite",
+		"gemini-2.0-flash",
 		"gemini-flash-latest",
-		"gemini-3.8-flash",
 	}
 	for _, w := range want {
 		found := false

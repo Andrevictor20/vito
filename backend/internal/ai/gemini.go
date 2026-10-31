@@ -102,9 +102,9 @@ func geminiModelChain(primary string) []string {
 	candidates := []string{
 		primary,
 		"gemini-2.5-flash",
-		"gemini-3.5-flash-lite",
+		"gemini-2.5-flash-lite",
+		"gemini-2.0-flash",
 		"gemini-flash-latest",
-		"gemini-3.8-flash",
 	}
 	chain := make([]string, 0, len(candidates))
 	seen := make(map[string]bool, len(candidates))

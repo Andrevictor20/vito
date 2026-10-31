@@ -245,7 +245,9 @@ func findOwnerJIDIn(node interface{}, instanceName string) string {
 	case map[string]interface{}:
 		matchesInstance := instanceName == ""
 		if name, ok := value["name"].(string); ok && name != "" {
-			matchesInstance = name == instanceName
+			matchesInstance = strings.EqualFold(name, instanceName)
+		} else if instName, ok := value["instanceName"].(string); ok && instName != "" {
+			matchesInstance = strings.EqualFold(instName, instanceName)
 		}
 		if matchesInstance {
 			for _, key := range []string{"owner", "ownerJid", "jid"} {
@@ -259,11 +261,6 @@ func findOwnerJIDIn(node interface{}, instanceName string) string {
 						}
 					}
 				}
-			}
-		}
-		for _, key := range []string{"owner", "ownerJid"} {
-			if jid, ok := value[key].(string); ok && strings.Contains(jid, "@s.whatsapp.net") {
-				return jid
 			}
 		}
 		for _, child := range value {

@@ -11,6 +11,7 @@ import (
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/handler/middleware"
 	"github.com/andrevmp/vito/backend/internal/service"
+	"github.com/go-chi/chi/v5"
 )
 
 // WhatsAppHandler gerencia as rotas HTTP de integração com o WhatsApp.
@@ -183,7 +184,15 @@ func (h *WhatsAppHandler) Webhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	eventType := r.Header.Get("x-event-type")
+	eventType := chi.URLParam(r, "event")
+	if eventType == "" {
+		for _, hKey := range []string{"x-webhook-event", "x-event-type", "event"} {
+			if v := r.Header.Get(hKey); v != "" {
+				eventType = v
+				break
+			}
+		}
+	}
 	_ = h.waSvc.HandleWebhook(r.Context(), eventType, body)
 
 	writeJSON(w, http.StatusOK, map[string]string{"status": "received"})
