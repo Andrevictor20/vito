@@ -52,6 +52,64 @@ type inboundMessage struct {
 	MediaPayload interface{}
 }
 
+// TestInboundMessage exporta campos essenciais para testes.
+type TestInboundMessage struct {
+	Text        string
+	Participant string
+	RemoteJID   string
+	FromMe      bool
+}
+
+// ParseInboundMessageForTest normaliza uma mensagem para validação em testes de regressão.
+func ParseInboundMessageForTest(data json.RawMessage) (*TestInboundMessage, error) {
+	msg, err := parseInboundMessage(data)
+	if err != nil {
+		return nil, err
+	}
+	return &TestInboundMessage{
+		Text:        msg.Text,
+		Participant: msg.Participant,
+		RemoteJID:   msg.RemoteJID,
+		FromMe:      msg.FromMe,
+	}, nil
+}
+
+// unwrapMessageSubtypes desembala envelopes comuns do WhatsApp como ephemeralMessage e viewOnceMessage.
+func unwrapMessageSubtypes(raw json.RawMessage) json.RawMessage {
+	if len(raw) == 0 {
+		return raw
+	}
+	var wrapper struct {
+		EphemeralMessage struct {
+			Message json.RawMessage `json:"message"`
+		} `json:"ephemeralMessage"`
+		ViewOnceMessage struct {
+			Message json.RawMessage `json:"message"`
+		} `json:"viewOnceMessage"`
+		ViewOnceMessageV2 struct {
+			Message json.RawMessage `json:"message"`
+		} `json:"viewOnceMessageV2"`
+		DocumentWithCaptionMessage struct {
+			Message json.RawMessage `json:"message"`
+		} `json:"documentWithCaptionMessage"`
+	}
+	if err := json.Unmarshal(raw, &wrapper); err == nil {
+		if len(wrapper.EphemeralMessage.Message) > 0 {
+			return unwrapMessageSubtypes(wrapper.EphemeralMessage.Message)
+		}
+		if len(wrapper.ViewOnceMessage.Message) > 0 {
+			return unwrapMessageSubtypes(wrapper.ViewOnceMessage.Message)
+		}
+		if len(wrapper.ViewOnceMessageV2.Message) > 0 {
+			return unwrapMessageSubtypes(wrapper.ViewOnceMessageV2.Message)
+		}
+		if len(wrapper.DocumentWithCaptionMessage.Message) > 0 {
+			return unwrapMessageSubtypes(wrapper.DocumentWithCaptionMessage.Message)
+		}
+	}
+	return raw
+}
+
 // parseInboundMessage normaliza o payload `messages.upsert` da Evolution API.
 //
 // A Evolution entrega o texto em formatos diferentes conforme o tipo da mensagem
@@ -79,6 +137,8 @@ func parseInboundMessage(data json.RawMessage) (*inboundMessage, error) {
 		return nil, err
 	}
 
+	rawMessage := unwrapMessageSubtypes(raw.Message)
+
 	msg := &inboundMessage{
 		MessageID:    raw.Key.ID,
 		RemoteJID:    raw.Key.RemoteJID,
@@ -92,8 +152,8 @@ func parseInboundMessage(data json.RawMessage) (*inboundMessage, error) {
 		msg.Timestamp = time.Unix(raw.MessageTimestamp, 0).UTC()
 	}
 
-	subtypes := subtypesOf(raw.Message)
-	if len(raw.Message) > 0 {
+	subtypes := subtypesOf(rawMessage)
+	if len(rawMessage) > 0 {
 		for _, name := range messageSubtypePriority(subtypes) {
 			sub := subtypes[name]
 			if text := extractMessageText(sub); text != "" && msg.Text == "" {
@@ -111,10 +171,10 @@ func parseInboundMessage(data json.RawMessage) (*inboundMessage, error) {
 		// O `contextInfo` também pode vir no nível de `message` (irmão do
 		// subtipo) — é assim que a Evolution entrega em conversa simples.
 		if msg.QuotedID == "" {
-			msg.QuotedID = extractQuotedID(raw.Message)
+			msg.QuotedID = extractQuotedID(rawMessage)
 		}
 		if msg.QuotedText == "" {
-			if quoted, author := extractQuotedContext(raw.Message); quoted != "" {
+			if quoted, author := extractQuotedContext(rawMessage); quoted != "" {
 				msg.QuotedText = quoted
 				msg.QuotedAuthor = author
 			}

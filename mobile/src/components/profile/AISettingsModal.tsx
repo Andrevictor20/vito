@@ -16,6 +16,7 @@ import { AutonomyMode, AISettings } from '../../types';
 import { BottomSheetModal } from '../ui/BottomSheetModal';
 import { M3Switch } from '../ui/M3Switch';
 import { PersonaStyleSelector } from './PersonaStyleSelector';
+import { VoiceSelector } from './VoiceSelector';
 import { UserMemoriesModal } from './UserMemoriesModal';
 import { styles } from './AISettingsModal.styles';
 
@@ -37,6 +38,7 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
   const [autonomyMode, setAutonomyMode] = useState<AutonomyMode>('assisted');
   const [autoFocusBlocks, setAutoFocusBlocks] = useState(false);
   const [personaStyle, setPersonaStyle] = useState('balanced');
+  const [preferredVoice, setPreferredVoice] = useState<'puck' | 'kore'>('puck');
   const [memoriesVisible, setMemoriesVisible] = useState(false);
 
   useEffect(() => {
@@ -55,6 +57,15 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
         if (data.persona_style) {
           setPersonaStyle(data.persona_style);
         }
+        if (data.preferred_voice) {
+          setPreferredVoice(
+            data.preferred_voice.toLowerCase().includes('kore') ||
+            data.preferred_voice.toLowerCase().includes('female') ||
+            data.preferred_voice.toLowerCase().includes('feminino')
+              ? 'kore'
+              : 'puck'
+          );
+        }
       }
     } catch (err: any) {
       console.warn('[AISettingsModal] Falha ao carregar configurações de IA:', err);
@@ -66,6 +77,11 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
   const handleSelectPersonaStyle = async (style: string) => {
     setPersonaStyle(style);
     await persistUpdate({ persona_style: style } as any);
+  };
+
+  const handleSelectVoice = async (voice: 'puck' | 'kore') => {
+    setPreferredVoice(voice);
+    await persistUpdate({ preferred_voice: voice } as any);
   };
 
   const handleSelectMode = async (mode: AutonomyMode) => {
@@ -350,6 +366,13 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
               <PersonaStyleSelector
                 value={personaStyle}
                 onChange={handleSelectPersonaStyle}
+              />
+
+              {/* Voz do Assistente (Gemini Neural) */}
+              <VoiceSelector
+                value={preferredVoice}
+                onChange={handleSelectVoice}
+                disabled={isSaving}
               />
 
               {/* Acesso a Memórias de Longo Prazo */}

@@ -129,3 +129,24 @@ func TestClassifyChat_BroadcastAndNewsletter(t *testing.T) {
 		})
 	}
 }
+
+func TestClassifyChat_MultiDeviceJID(t *testing.T) {
+	cases := []struct {
+		name  string
+		jid   string
+		phone string
+	}{
+		{"multi-device simples :33", "559884417165:33@s.whatsapp.net", "559884417165"},
+		{"multi-device com prefixo note-to-self", "047559884417165:12@s.whatsapp.net", "559884417165"},
+		{"multi-device com variacao de 9o digito", "5598984417165:33@s.whatsapp.net", "559884417165"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			kind := service.ClassifyChat(tc.jid, tc.phone, 0, false)
+			if kind != domain.WhatsAppChatKindSelf {
+				t.Errorf("esperava %q, obteve %q", domain.WhatsAppChatKindSelf, kind)
+			}
+		})
+	}
+}
+

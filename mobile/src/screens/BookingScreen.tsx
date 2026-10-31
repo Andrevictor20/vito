@@ -28,6 +28,8 @@ import {
 import { BookingLinksTab } from '../components/booking/BookingLinksTab';
 import { BookingReceivedTab } from '../components/booking/BookingReceivedTab';
 import { MeetingPollDetailView } from '../components/booking/MeetingPollDetailView';
+import { SmartActionSheetModal } from '../components/ui/SmartActionSheetModal';
+import { buildBookingSmartActions } from '../utils/smartActionBuilders';
 import { bookingStyles as styles } from './BookingScreen.styles';
 import { copyToClipboard } from '../utils/clipboard';
 
@@ -68,6 +70,10 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({
   const [activeTab, setActiveTab] = useState<'links' | 'appointments'>('links');
   const [confirmingSlotId, setConfirmingSlotId] = useState<string | null>(null);
   const [selectedMeetingForDetail, setSelectedMeetingForDetail] = useState<Meeting | null>(null);
+  const [actionTarget, setActionTarget] = useState<{
+    item: BookingType | Meeting;
+    type: 'type' | 'meeting';
+  } | null>(null);
 
   const handleBookingPrompt = useCallback(() => {
     chatPromptBus.askAssistant('Que tipo de reunião você quer criar? (Link individual 1-on-1 ou votação em grupo?)');
@@ -243,36 +249,79 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({
     }
   };
 
+  const renderActionSheet = () => (
+    <SmartActionSheetModal
+      visible={!!actionTarget}
+      onClose={() => setActionTarget(null)}
+      tag={actionTarget?.type === 'type' ? 'LINK DE AGENDAMENTO' : 'VOTAÇÃO DE REUNIÃO'}
+      title={actionTarget?.item.title || ''}
+      subtitle={
+        actionTarget?.type === 'type'
+          ? `${(actionTarget.item as BookingType).duration_minutes || 30} min • Link individual`
+          : 'Reunião com votação em grupo'
+      }
+      actions={
+        actionTarget
+          ? buildBookingSmartActions(
+              {
+                id: actionTarget.item.id,
+                title: actionTarget.item.title,
+                slug: (actionTarget.item as BookingType).slug,
+                duration: (actionTarget.item as BookingType).duration_minutes,
+              },
+              actionTarget.type,
+              {
+                onCopyLink: () => {
+                  if (actionTarget.type === 'type') {
+                    const bt = actionTarget.item as BookingType;
+                    const url =
+                      bt.short_url ||
+                      bt.public_url ||
+                      `https://vito.rasppi.cloud/book/${bookingUsername}/${bt.slug}`;
+                    handleCopyLink(url);
+                  } else {
+                    const m = actionTarget.item as Meeting;
+                    const url =
+                      (m as any).public_url ||
+                      (m as any).short_url ||
+                      `https://vito.rasppi.cloud/meet/${m.id}`;
+                    handleCopyLink(url);
+                  }
+                },
+                onAskVitoCustomize: (prompt) => chatPromptBus.askAssistant(prompt),
+                onAskVitoDuplicate: (prompt) => chatPromptBus.askAssistant(prompt),
+                onDelete: () => {
+                  if (actionTarget.type === 'type') {
+                    handleDeleteType(actionTarget.item.id);
+                  } else {
+                    handleDeleteMeeting(actionTarget.item.id);
+                  }
+                },
+              }
+            )
+          : []
+      }
+    />
+  );
+
   if (selectedMeetingForDetail) {
     return (
-      <MeetingPollDetailView
-        meeting={selectedMeetingForDetail}
-        onBack={() => setSelectedMeetingForDetail(null)}
-        onEdit={(target) => {
-          Alert.alert(
-            `Sobre "${target.title}":`,
-            'O que você quer fazer?',
-            [
-              {
-                text: 'Ajustar reunião',
-                onPress: () => chatPromptBus.askAssistant(`Como você gostaria de ajustar a reunião "${target.title}"?`),
-              },
-              {
-                text: 'Excluir reunião',
-                style: 'destructive',
-                onPress: () => handleDeleteMeeting(target.id),
-              },
-              { text: 'Voltar', style: 'cancel' },
-            ]
-          );
-        }}
-        onConfirmSlot={handleConfirmMeetingSlot}
-        confirmingSlotId={confirmingSlotId}
-        onDelete={async (id) => {
-          setSelectedMeetingForDetail(null);
-          handleDeleteMeeting(id);
-        }}
-      />
+      <View style={{ flex: 1 }}>
+        <MeetingPollDetailView
+          meeting={selectedMeetingForDetail}
+          onBack={() => setSelectedMeetingForDetail(null)}
+          onEdit={(target) => {
+            setActionTarget({ item: target, type: 'meeting' });
+          }}
+          onConfirmSlot={handleConfirmMeetingSlot}
+          confirmingSlotId={confirmingSlotId}
+          onDelete={async (id) => {
+            setSelectedMeetingForDetail(null);
+            handleDeleteMeeting(id);
+          }}
+        />
+        {renderActionSheet()}
+      </View>
     );
   }
 
@@ -411,36 +460,10 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({
           onRefresh={onRefresh}
           onCopyLink={handleCopyLink}
           onEditType={(bt) => {
-            Alert.alert(
-              `Sobre "${bt.title}":`,
-              'O que você quer fazer?',
-              [
-                {
-                  text: 'Ajustar link',
-                  onPress: () => chatPromptBus.askAssistant(`Como você gostaria de personalizar ou ajustar o link "${bt.title}"?`),
-                },
-                {
-                  text: 'Duplicar link',
-                  onPress: () => chatPromptBus.askAssistant(`Deseja criar um novo link baseado em "${bt.title}" com quais alterações?`),
-                },
-                { text: 'Excluir link', style: 'destructive', onPress: () => handleDeleteType(bt.id) },
-                { text: 'Voltar', style: 'cancel' },
-              ]
-            );
+            setActionTarget({ item: bt, type: 'type' });
           }}
           onEditMeeting={(m) => {
-            Alert.alert(
-              `Sobre "${m.title}":`,
-              'O que você quer fazer?',
-              [
-                {
-                  text: 'Ajustar reunião',
-                  onPress: () => chatPromptBus.askAssistant(`Como você gostaria de ajustar a votação/reunião "${m.title}"?`),
-                },
-                { text: 'Excluir reunião', style: 'destructive', onPress: () => handleDeleteMeeting(m.id) },
-                { text: 'Voltar', style: 'cancel' },
-              ]
-            );
+            setActionTarget({ item: m, type: 'meeting' });
           }}
           onDeleteType={handleDeleteType}
           onDeleteMeeting={handleDeleteMeeting}
@@ -458,6 +481,9 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({
           onCancelAppointment={handleCancelAppointment}
         />
       )}
+
+      {/* Modal de Ações Contextuais Inteligentes (Padrão Vito) */}
+      {renderActionSheet()}
     </View>
   );
 };

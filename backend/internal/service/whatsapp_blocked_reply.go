@@ -37,11 +37,12 @@ func (s *WhatsAppService) replyOnlyOwnerCanCommand(ctx context.Context, instance
 	assinatura := VitoSignature(ctx, s.contextSvc, userID, msg.RemoteJID, msg.PushName)
 	formatted := assinatura + "\n\n" + onlyOwnerCanCommandMessage
 	isGroup := strings.HasSuffix(msg.RemoteJID, "@g.us")
+	targetJID := NormalizeJIDForSend(msg.RemoteJID)
 	if isGroup && msg.MessageID != "" {
-		_ = s.client.SendTextWithQuoted(ctx, instanceName, msg.RemoteJID, formatted, msg.MessageID)
+		_ = s.client.SendTextWithQuoted(ctx, instanceName, targetJID, formatted, msg.MessageID)
 		return
 	}
-	_ = s.client.SendText(ctx, instanceName, msg.RemoteJID, formatted)
+	_ = s.client.SendText(ctx, instanceName, targetJID, formatted)
 }
 
 // allowBlockedReply aplica o cooldown por conversa.

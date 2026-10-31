@@ -3,13 +3,11 @@ package service
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/domain"
@@ -34,8 +32,25 @@ const imageUnavailablePrompt = "Não consegui baixar a imagem desta mensagem. Re
 //  4. decisão de resposta conforme o gatilho do tipo de chat
 //  5. montagem do contexto (mensagem citada + janela) e chamada ao assistente
 func (s *WhatsAppService) handleMessagesEvent(ctx context.Context, instanceName string, data json.RawMessage) error {
+	// Suporte resiliente a payloads da Evolution API onde data é um array ou contém wrapper
+	trimmedData := bytes.TrimSpace(data)
+	if len(trimmedData) > 0 && trimmedData[0] == '[' {
+		var arr []json.RawMessage
+		if err := json.Unmarshal(trimmedData, &arr); err == nil && len(arr) > 0 {
+			data = arr[0]
+		}
+	} else if len(trimmedData) > 0 && trimmedData[0] == '{' {
+		var wrapper struct {
+			Messages []json.RawMessage `json:"messages"`
+		}
+		if err := json.Unmarshal(trimmedData, &wrapper); err == nil && len(wrapper.Messages) > 0 {
+			data = wrapper.Messages[0]
+		}
+	}
+
 	msg, err := parseInboundMessage(data)
 	if err != nil {
+		log.Printf("❌ [WhatsAppInbound] parseInboundMessage falhou: %v (data_len=%d)", err, len(data))
 		return err
 	}
 
@@ -45,11 +60,13 @@ func (s *WhatsAppService) handleMessagesEvent(ctx context.Context, instanceName 
 	}
 	// Imagem sem legenda é uma mensagem válida: o Vito precisa "enxergar" o arquivo.
 	if rawText == "" && !msg.IsImage {
+		log.Printf("ℹ️ [WhatsAppInbound] mensagem sem texto nem imagem ignorada (msgType=%s, remoteJid=%s)", msg.MessageType, msg.RemoteJID)
 		return nil
 	}
 
 	integration, err := s.repo.GetByInstanceName(ctx, instanceName)
 	if err != nil || integration == nil {
+		log.Printf("⚠️ [WhatsAppInbound] integração não encontrada para instância %q: %v", instanceName, err)
 		return nil
 	}
 
@@ -63,8 +80,8 @@ func (s *WhatsAppService) handleMessagesEvent(ctx context.Context, instanceName 
 	// classificado (essencial para auditar a classificação do chat "Você").
 	// O `fromMe` é o que separa o DONO de um terceiro — é a base da blindagem
 	// (só o dono dá comandos ao Vito).
-	log.Printf("🧭 [WhatsAppContext] instance=%s jid=%s phone=%s kind=%s tipo=%s texto=%d citada=%v fromMe=%v",
-		instanceName, msg.RemoteJID, integration.Phone, chatKind, msg.MessageType, len(rawText), msg.QuotedText != "", msg.FromMe)
+	log.Printf("🧭 [WhatsAppContext] instance=%s jid=%s phone=%s kind=%s tipo=%s texto=%d citada=%v fromMe=%v participant=%s",
+		instanceName, msg.RemoteJID, integration.Phone, chatKind, msg.MessageType, len(rawText), msg.QuotedText != "", msg.FromMe, msg.Participant)
 
 	// Mensagem gerada pelo próprio Vito: arquiva (faz parte do contexto) e encerra (anti-loop).
 	if IsVitoMessage(rawText) {
@@ -89,9 +106,20 @@ func (s *WhatsAppService) handleMessagesEvent(ctx context.Context, instanceName 
 	// Blindagem: só o DONO da instância dá comandos ao Vito. Uma mensagem de
 	// terceiro é arquivada (o Vito continua enxergando a conversa) mas NÃO aciona
 	// a IA — nem executa agenda/tarefa, nem responde pelo WhatsApp do dono.
-	if !CanActOnMessage(chatKind, msg.FromMe) {
+	// O remetente é reconhecido como o dono se:
+	//  1) CanActOnMessage devolver true (fromMe=true ou chat pessoal self/self_group)
+	//  2) msg.Participant ou msg.RemoteJID corresponder ao número pareado/cadastrado
+	ownerJID := ""
+	if s.ownerCache != nil {
+		ownerJID, _ = s.ownerCache.JID(instanceName)
+	}
+	isOwner := CanActOnMessage(chatKind, msg.FromMe) ||
+		IsOwnerSender(msg.Participant, integration.Phone, ownerJID) ||
+		IsOwnerSender(msg.RemoteJID, integration.Phone, ownerJID)
+
+	if !isOwner {
 		s.archiveMessage(ctx, integration.UserID, instanceName, msg, chatKind, rawText, "user")
-		log.Printf("🛡️ [WhatsAppContext] comando de terceiro bloqueado (kind=%s jid=%s fromMe=false)", chatKind, msg.RemoteJID)
+		log.Printf("🛡️ [WhatsAppContext] comando de terceiro bloqueado (kind=%s jid=%s participant=%s fromMe=%v)", chatKind, msg.RemoteJID, msg.Participant, msg.FromMe)
 		// Em grupo, um terceiro (fromMe=false) que chama @vito não recebe a
 		// recusa educada: como cada participante tem o seu próprio Vito
 		// instalado, isso evitaria duplicar a resposta e poluir o chat.
@@ -112,7 +140,8 @@ func (s *WhatsAppService) handleMessagesEvent(ctx context.Context, instanceName 
 
 	// Feedback visual imediato: reagir com olhinho para confirmar leitura.
 	if msg.MessageID != "" && msg.RemoteJID != "" {
-		_ = s.client.SendReaction(ctx, instanceName, msg.RemoteJID, msg.MessageID, "👀")
+		targetJID := NormalizeJIDForSend(msg.RemoteJID)
+		_ = s.client.SendReaction(ctx, instanceName, targetJID, msg.MessageID, "👀")
 	}
 
 	// O diretório de contatos e as pendências só podem entrar no prompt quando a
@@ -240,10 +269,17 @@ func (s *WhatsAppService) processPendingMessage(pending *pendingMessage) error {
 	assinatura := VitoSignature(ctx, s.contextSvc, integration.UserID, msg.RemoteJID, msg.PushName)
 	formattedReply := fmt.Sprintf("%s\n\n%s", assinatura, replyText)
 	isGroup := strings.HasSuffix(msg.RemoteJID, "@g.us")
+	targetJID := NormalizeJIDForSend(msg.RemoteJID)
+	var sendErr error
 	if isGroup && msg.MessageID != "" {
-		_ = s.client.SendTextWithQuoted(ctx, instanceName, msg.RemoteJID, formattedReply, msg.MessageID)
+		sendErr = s.client.SendTextWithQuoted(ctx, instanceName, targetJID, formattedReply, msg.MessageID)
 	} else {
-		_ = s.client.SendText(ctx, instanceName, msg.RemoteJID, formattedReply)
+		sendErr = s.client.SendText(ctx, instanceName, targetJID, formattedReply)
+	}
+	if sendErr != nil {
+		log.Printf("❌ [WhatsAppService] falha ao enviar resposta para %s: %v", targetJID, sendErr)
+	} else {
+		log.Printf("📤 [WhatsAppService] resposta enviada com sucesso para %s (%d bytes)", targetJID, len(formattedReply))
 	}
 
 	if s.notifSender != nil {
@@ -261,23 +297,6 @@ func (s *WhatsAppService) processPendingMessage(pending *pendingMessage) error {
 	}
 
 	return nil
-}
-
-// transcribeAudio baixa o áudio da Evolution API e transcreve com o Whisper.
-func (s *WhatsAppService) transcribeAudio(ctx context.Context, instanceName string, data json.RawMessage) string {
-	b64, err := s.client.GetMediaBase64(ctx, instanceName, data)
-	if err != nil || b64 == "" {
-		return ""
-	}
-	audioBytes, decodeErr := base64.StdEncoding.DecodeString(b64)
-	if decodeErr != nil || len(audioBytes) == 0 {
-		return ""
-	}
-	transcribed, trErr := s.audioTranscriber.Transcribe(ctx, bytes.NewReader(audioBytes), "audio.ogg")
-	if trErr != nil {
-		return ""
-	}
-	return strings.TrimSpace(transcribed)
 }
 
 // classifyChat classifica a conversa e agenda a atualização do cache de participantes.
@@ -305,185 +324,3 @@ func (s *WhatsAppService) classifyChat(ctx context.Context, instanceName string,
 	return ClassifyChat(remoteJID, selfReference, participants, fresh)
 }
 
-// archiveMessage persiste a mensagem no shadow inbox (idempotente por id).
-func (s *WhatsAppService) archiveMessage(ctx context.Context, userID, instanceName string, msg *inboundMessage, chatKind, text, senderRole string) {
-	if s.contextSvc == nil || msg.MessageID == "" || userID == "" {
-		return
-	}
-	timestamp := msg.Timestamp
-	if timestamp.IsZero() {
-		timestamp = time.Now().UTC()
-	}
-	fromMe := msg.FromMe
-	kind := messageKind(msg)
-	if senderRole == "vito" {
-		fromMe = true
-		kind = messageKindVito
-	}
-
-	// Mídia: o tipo, o mime e o envelope de download (a Evolution precisa dele
-	// para devolver a mídia quando o Vito for enricher a mensagem).
-	mediaKind := ""
-	mediaMime := ""
-	mediaStatus := domain.WhatsAppMediaStatusNone
-	mediaPayload := ""
-	switch {
-	case msg.IsImage:
-		mediaKind = domain.WhatsAppMediaKindImage
-		mediaMime = msg.ImageMime
-	case msg.IsAudio:
-		mediaKind = domain.WhatsAppMediaKindAudio
-	}
-	if mediaKind != "" {
-		if raw, ok := msg.MediaPayload.(json.RawMessage); ok {
-			mediaPayload = string(raw)
-		}
-		if mediaPayload != "" {
-			mediaStatus = domain.WhatsAppMediaStatusPending
-		}
-	}
-
-	entry := &domain.WhatsAppConversationMessage{
-		ID:               msg.MessageID,
-		UserID:           userID,
-		InstanceName:     instanceName,
-		ChatJID:          msg.RemoteJID,
-		ChatKind:         chatKind,
-		ChatLabel:        s.resolveChatLabel(chatKind, msg),
-		SenderJID:        firstNonEmpty(msg.Participant, msg.RemoteJID),
-		SenderName:       msg.PushName,
-		FromMe:           fromMe,
-		Kind:             kind,
-		Text:             text,
-		QuotedText:       strings.TrimSpace(msg.QuotedText),
-		QuotedID:         strings.TrimSpace(msg.QuotedID),
-		MediaKind:        mediaKind,
-		MediaMime:        mediaMime,
-		MediaStatus:      mediaStatus,
-		MediaPayload:     mediaPayload,
-		MessageTimestamp: timestamp,
-		CreatedAt:        time.Now().UTC(),
-	}
-	if err := s.contextSvc.Archive(ctx, entry); err != nil {
-		log.Printf("⚠️ [WhatsAppService] falha ao arquivar mensagem: %v", err)
-	}
-}
-
-// buildContext monta a mensagem citada e a janela de contexto do WhatsApp.
-func (s *WhatsAppService) buildContext(ctx context.Context, userID string, msg *inboundMessage, chatKind, text string) (string, []ai.ChatMessageContext) {
-	if s.contextSvc == nil {
-		return "", nil
-	}
-	settings, err := s.contextSvc.Settings(ctx, userID)
-	if err != nil {
-		return "", nil
-	}
-	quoted := ""
-	if settings.Scope != domain.WhatsAppContextScopeOff {
-		quoted = s.resolveQuoted(ctx, userID, msg)
-	}
-	window := s.contextSvc.Window(ctx, userID, msg.RemoteJID, chatKind, text, msg.MessageID)
-	return quoted, window
-}
-
-// resolveQuoted resolve a mensagem marcada ("responder a esta mensagem").
-//
-// A resolução é por ID (contextInfo.stanzaId) e não só pelo texto embutido:
-//   - a citada pode ser antiga (o texto inline vem junto, mas o id é o elo real);
-//   - a citada pode ser uma imagem/áudio — nesses casos o texto inline é VAZIO
-//     e só o id permite achar a mensagem arquivada (e o que o Vito viu nela).
-func (s *WhatsAppService) resolveQuoted(ctx context.Context, userID string, msg *inboundMessage) string {
-	if msg == nil {
-		return ""
-	}
-	if s.contextSvc != nil && msg.QuotedID != "" {
-		if archived, err := s.contextSvc.MessageByID(ctx, userID, msg.QuotedID); err == nil && archived != nil {
-			if text := quotedTextOf(archived); text != "" {
-				return text
-			}
-		}
-	}
-	return strings.TrimSpace(msg.QuotedText)
-}
-
-// resolveChatLabel define o rótulo do chat exibido no contexto (ex.: "Você", "Família", "Ana").
-func (s *WhatsAppService) resolveChatLabel(chatKind string, msg *inboundMessage) string {
-	switch chatKind {
-	case domain.WhatsAppChatKindSelf:
-		return "Você"
-	case domain.WhatsAppChatKindSelfGroup, domain.WhatsAppChatKindGroup:
-		if s.groupMeta != nil {
-			if subject := s.groupMeta.Subject(msg.RemoteJID); subject != "" {
-				return subject
-			}
-		}
-		return "Grupo"
-	default:
-		// O nome SALVO pelo dono tem prioridade sobre o nome de perfil: é o nome
-		// pelo qual o usuário fala da pessoa ("isa", não "bella"). O nome de
-		// perfil (pushName da mensagem) fica como segundo rótulo.
-		if s.contactsCache != nil {
-			if name := s.contactsCache.Name(msg.RemoteJID); name != "" {
-				s.labelsMu.Lock()
-				if s.chatLabels == nil {
-					s.chatLabels = make(map[string]string)
-				}
-				s.chatLabels[msg.RemoteJID] = name
-				s.labelsMu.Unlock()
-				return name
-			}
-		}
-		s.labelsMu.Lock()
-		defer s.labelsMu.Unlock()
-		if s.chatLabels == nil {
-			s.chatLabels = make(map[string]string)
-		}
-		if !msg.FromMe && strings.TrimSpace(msg.PushName) != "" {
-			s.chatLabels[msg.RemoteJID] = msg.PushName
-			// O nome de perfil vira ALIAS do contato salvo: é o que permite ao
-			// Vito entender "isa" e "bella" como a mesma pessoa.
-			s.contactsCache.SetProfile(msg.RemoteJID, msg.PushName)
-		}
-		if label, ok := s.chatLabels[msg.RemoteJID]; ok {
-			return label
-		}
-		return "Contato"
-	}
-}
-
-// messageKind classifica o tipo da mensagem arquivada.
-func messageKind(msg *inboundMessage) string {
-	switch {
-	case msg.IsAudio:
-		return "audio"
-	case strings.Contains(strings.ToLower(msg.MessageType), "image"):
-		return "image"
-	case strings.TrimSpace(msg.Text) != "":
-		return "text"
-	default:
-		return "other"
-	}
-}
-
-// WhatsAppMessageSender envia uma mensagem do WhatsApp em nome do usuário.
-//
-// Interface (e não o tipo concreto) para o AssistantService não depender do
-// WhatsAppService — que já depende do AssistantService.
-type WhatsAppMessageSender interface {
-	SendWhatsAppMessage(ctx context.Context, userID, chatJID, text string) error
-}
-
-// SendWhatsAppMessage envia uma mensagem a uma conversa, em nome do usuário.
-func (s *WhatsAppService) SendWhatsAppMessage(ctx context.Context, userID, chatJID, text string) error {
-	if strings.TrimSpace(chatJID) == "" || strings.TrimSpace(text) == "" {
-		return fmt.Errorf("conversa e texto são obrigatórios")
-	}
-	integration, err := s.repo.GetByUserID(ctx, userID)
-	if err != nil {
-		return err
-	}
-	if integration == nil || integration.Status != domain.WhatsAppStatusConnected {
-		return fmt.Errorf("WhatsApp não está conectado")
-	}
-	return s.client.SendText(ctx, integration.InstanceName, chatJID, text)
-}

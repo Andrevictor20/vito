@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { api } from '../../services/api';
+import React, { useState, useMemo, useRef } from 'react';
+import { useTasks } from '../../hooks';
 import { Todo } from '../../types';
 import {
   Plus,
@@ -19,8 +19,15 @@ import {
 type FilterTab = 'all' | 'today' | 'week' | 'overdue';
 
 export const TasksView: React.FC = () => {
-  const [todos, setTodos] = useState<Todo[]>([]);
-  const [loading, setLoading] = useState(true);
+  const {
+    todos,
+    loading,
+    createTodo,
+    updateTodo,
+    deleteTodo,
+    toggleTodo,
+  } = useTasks();
+
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<FilterTab>('all');
   const [showCompleted, setShowCompleted] = useState(false);
@@ -36,43 +43,18 @@ export const TasksView: React.FC = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
 
-  const fetchTodos = async () => {
-    try {
-      setLoading(true);
-      const data = await api.getTodos();
-      setTodos(data);
-    } catch (err) {
-      console.error('Erro ao buscar tarefas:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchTodos();
-  }, []);
-
   const handleToggleTodo = async (todo: Todo) => {
-    const isCompleted = todo.status === 'completed' || todo.completed;
-    const nextStatus = isCompleted ? 'pending' : 'completed';
-
-    setTodos((prev) =>
-      prev.map((t) => (t.id === todo.id ? { ...t, status: nextStatus, completed: !isCompleted } : t))
-    );
-
     try {
-      await api.updateTodo(todo.id, { status: nextStatus });
+      await toggleTodo(todo);
     } catch (err: any) {
       alert(err.message || 'Erro ao atualizar tarefa');
-      fetchTodos();
     }
   };
 
   const handleDeleteTodo = async (id: string) => {
     if (!confirm('Deseja excluir esta tarefa?')) return;
     try {
-      await api.deleteTodo(id);
-      setTodos((prev) => prev.filter((t) => t.id !== id));
+      await deleteTodo(id);
     } catch (err: any) {
       alert(err.message || 'Erro ao excluir tarefa');
     }
@@ -85,12 +67,11 @@ export const TasksView: React.FC = () => {
 
     setCreating(true);
     try {
-      const created = await api.createTodo({
+      await createTodo({
         title,
         priority: newPriority,
         status: 'pending',
       });
-      setTodos((prev) => [created, ...prev]);
       setNewTitle('');
       setIsAdding(false);
     } catch (err: any) {
@@ -111,14 +92,12 @@ export const TasksView: React.FC = () => {
       setEditingId(null);
       return;
     }
-    setTodos((prev) => prev.map((t) => (t.id === id ? { ...t, title: trimmed } : t)));
     setEditingId(null);
 
     try {
-      await api.updateTodo(id, { title: trimmed });
+      await updateTodo(id, { title: trimmed });
     } catch (err: any) {
       alert(err.message || 'Erro ao salvar alteração');
-      fetchTodos();
     }
   };
 

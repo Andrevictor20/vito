@@ -116,6 +116,20 @@ export interface BookingType {
   created_at?: string;
 }
 
+export interface BookingAppointment {
+  id: string;
+  booking_type_id: string;
+  user_id: string;
+  guest_name: string;
+  guest_email: string;
+  guest_notes?: string;
+  start_at: string;
+  end_at: string;
+  status: 'confirmed' | 'cancelled';
+  event_id?: string;
+  created_at: string;
+}
+
 export interface MeetingSlot {
   id: string;
   meeting_id?: string;

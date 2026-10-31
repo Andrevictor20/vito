@@ -46,6 +46,28 @@ export function VitoVoiceOverlay({
   const [whatsappCard, setWhatsappCard] = useState<ChatWhatsAppMessage | null>(null);
   const [isSendingWhatsApp, setIsSendingWhatsApp] = useState<boolean>(false);
   const [whatsAppSent, setWhatsAppSent] = useState<boolean>(false);
+  const [preferredVoice, setPreferredVoice] = useState<'puck' | 'kore'>('puck');
+
+  useEffect(() => {
+    api.getAISettings().then((s) => {
+      if (s?.preferred_voice) {
+        const v = s.preferred_voice.toLowerCase();
+        if (v.includes('kore') || v.includes('female') || v.includes('feminino')) {
+          setPreferredVoice('kore');
+        } else {
+          setPreferredVoice('puck');
+        }
+      }
+    }).catch(() => {});
+  }, []);
+
+  const handleToggleVoice = useCallback(() => {
+    setPreferredVoice((prev) => {
+      const next = prev === 'puck' ? 'kore' : 'puck';
+      api.updateAISettings({ preferred_voice: next } as any).catch(() => {});
+      return next;
+    });
+  }, []);
 
   // Animações de entrada para o modo compacto
   const slideAnim = useRef(new Animated.Value(80)).current;
@@ -186,10 +208,10 @@ export function VitoVoiceOverlay({
 
       const isGoodbye = isGoodbyeUtterance(userText) || isGoodbyeUtterance(replyText);
 
-      // TTS Neural (Edge-TTS) com fallback silencioso para speakText nativo
+      // TTS Neural (Gemini Live) com fallback silencioso para speakText nativo
       let ttsPlayed = false;
       try {
-        const tts = await api.voiceTTS(replyText);
+        const tts = await api.voiceTTS(replyText, preferredVoice);
         if (tts.audio_b64 && VitoDuplexAudioModule?.playTtsAudio) {
           await VitoDuplexAudioModule.playTtsAudio(tts.audio_b64);
           ttsPlayed = true;
@@ -362,6 +384,8 @@ export function VitoVoiceOverlay({
       whatsAppSent={whatsAppSent}
       onConfirmWhatsApp={handleConfirmWhatsApp}
       screenContext={screenContext}
+      voice={preferredVoice}
+      onToggleVoice={handleToggleVoice}
     />
   );
 }

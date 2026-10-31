@@ -11,7 +11,6 @@ import {
   LayoutAnimation,
   Platform,
   UIManager,
-  Alert,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens } from '../theme/tokens';
@@ -24,6 +23,8 @@ import { VitoSuggestionCard } from '../components/tasks/VitoSuggestionCard';
 import { TaskGroupHeader } from '../components/tasks/TaskGroupHeader';
 import { CompletedAccordion } from '../components/tasks/CompletedAccordion';
 import { TaskFilterModal, PriorityFilter } from '../components/tasks/TaskFilterModal';
+import { SmartActionSheetModal } from '../components/ui/SmartActionSheetModal';
+import { buildTaskSmartActions } from '../utils/smartActionBuilders';
 import { usePendingItems } from '../hooks/usePendingItems';
 import { toUnifiedRows, sortUnifiedRows, TaskSort, UnifiedRow } from '../utils/unifiedTasks';
 import { chatPromptBus } from '../services/dataSync';
@@ -105,6 +106,7 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
   const [internalQuery, setInternalQuery] = useState('');
   const [internalSearchOpen, setInternalSearchOpen] = useState(false);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [actionRow, setActionRow] = useState<UnifiedRow | null>(null);
   const [vitoDismissed, setVitoDismissed] = useState(false);
   const [rescheduling, setRescheduling] = useState(false);
 
@@ -178,41 +180,10 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
     }
   }, [overdueRows, onUpdateTodoFull, pending]);
 
+  // Ação contextual da tarefa via Vito Action Sheet inteligente
   const handleOpenEdit = useCallback((row: UnifiedRow) => {
-    const title = row.kind === 'todo' && row.sourceTodo ? row.sourceTodo.title : row.sourcePending?.title || 'tarefa';
-    Alert.alert(
-      `Sobre "${title}":`,
-      'O que você quer fazer?',
-      [
-        {
-          text: 'Mover tarefa',
-          onPress: () => chatPromptBus.askAssistant(`Para qual dia ou horário você quer mover a tarefa "${title}"?`),
-        },
-        {
-          text: 'Marcar como concluída',
-          onPress: () => {
-            if (row.kind === 'todo' && row.sourceTodo) {
-              onToggleTodo(row.sourceTodo.id);
-            } else if (row.sourcePending) {
-              pending.toggleComplete(row.sourcePending);
-            }
-          },
-        },
-        {
-          text: 'Excluir',
-          style: 'destructive',
-          onPress: () => {
-            if (row.kind === 'todo' && row.sourceTodo) {
-              onDeleteTodo(row.sourceTodo.id);
-            } else if (row.sourcePending) {
-              pending.remove(row.sourcePending.id);
-            }
-          },
-        },
-        { text: 'Voltar', style: 'cancel' },
-      ]
-    );
-  }, [onToggleTodo, onDeleteTodo, pending]);
+    setActionRow(row);
+  }, []);
 
   const handleToggleRow = useCallback((row: UnifiedRow) => {
     if (row.kind === 'todo' && row.sourceTodo) {
@@ -357,6 +328,51 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
           handleQueryChange('');
         }}
         activeCount={activeRows.length}
+      />
+
+      {/* Modal de Ações Contextuais Inteligentes da Tarefa (Padrão Vito) */}
+      <SmartActionSheetModal
+        visible={!!actionRow}
+        onClose={() => setActionRow(null)}
+        tag={actionRow?.kind === 'todo' ? 'TAREFA' : 'PENDÊNCIA'}
+        title={
+          actionRow?.kind === 'todo' && actionRow.sourceTodo
+            ? actionRow.sourceTodo.title
+            : actionRow?.sourcePending?.title || 'Tarefa'
+        }
+        subtitle={
+          actionRow?.done
+            ? 'Concluída'
+            : actionRow?.overdue
+            ? 'Prazo vencido'
+            : 'Em aberto'
+        }
+        actions={
+          actionRow
+            ? buildTaskSmartActions(
+                {
+                  id: actionRow.id,
+                  title:
+                    actionRow.kind === 'todo' && actionRow.sourceTodo
+                      ? actionRow.sourceTodo.title
+                      : actionRow.sourcePending?.title || 'Tarefa',
+                  isCompleted: !!actionRow.done,
+                  isOverdue: !!actionRow.overdue,
+                  kind: actionRow.kind,
+                },
+                {
+                  onToggleComplete: () => {
+                    handleToggleRow(actionRow);
+                  },
+                  onAskVitoReschedule: (prompt) => chatPromptBus.askAssistant(prompt),
+                  onAskVitoBreakdown: (prompt) => chatPromptBus.notify(prompt),
+                  onDelete: () => {
+                    handleDeleteRow(actionRow);
+                  },
+                }
+              )
+            : []
+        }
       />
     </View>
   );

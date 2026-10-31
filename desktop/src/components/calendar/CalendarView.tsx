@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { api } from '../../services/api';
-import { CalendarEvent } from '../../types';
+import React, { useState } from 'react';
+import { useCalendarSync } from '../../hooks';
 import { MonthGrid } from './MonthGrid';
 import { CalendarEventsSidebar } from './CalendarEventsSidebar';
 import {
@@ -25,11 +24,17 @@ interface CalendarViewProps {
 export const CalendarView: React.FC<CalendarViewProps> = ({ onNavigateToSummaries }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [events, setEvents] = useState<CalendarEvent[]>([]);
-  const [_loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [viewMode, setViewMode] = useState<'day' | 'week' | 'month'>('month');
-  const [syncingGoogle, setSyncingGoogle] = useState(false);
+
+  // Hook de sincronização e mutações de calendário
+  const {
+    events,
+    syncing: syncingGoogle,
+    syncCalendar,
+    createEvent,
+    deleteEvent,
+  } = useCalendarSync();
 
   // Quick Event Quick-Add (Zero Modais)
   const [isAddingEvent, setIsAddingEvent] = useState(false);
@@ -37,40 +42,18 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onNavigateToSummarie
   const [newEventTime, setNewEventTime] = useState('14:00');
   const [creatingEvent, setCreatingEvent] = useState(false);
 
-  const fetchEvents = async () => {
-    try {
-      setLoading(true);
-      const data = await api.getEvents();
-      setEvents(data);
-    } catch (err) {
-      console.error('Erro ao buscar eventos:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleSyncGoogle = async () => {
-    setSyncingGoogle(true);
     try {
-      await api.syncCalendar('google');
-      await fetchEvents();
+      await syncCalendar('google');
     } catch (err) {
       console.warn('Sync google calendar:', err);
-    } finally {
-      setSyncingGoogle(false);
     }
   };
-
-  useEffect(() => {
-    fetchEvents();
-    api.syncCalendar('google').then(() => fetchEvents()).catch(() => {});
-  }, []);
 
   const handleDeleteEvent = async (id: string) => {
     if (!confirm('Deseja realmente remover este evento?')) return;
     try {
-      await api.deleteEvent(id);
-      setEvents((prev) => prev.filter((ev) => ev.id !== id));
+      await deleteEvent(id);
     } catch (err: any) {
       alert(err.message || 'Erro ao remover evento');
     }
@@ -88,12 +71,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onNavigateToSummarie
       const day = String(selectedDate.getDate()).padStart(2, '0');
       const startAt = `${year}-${month}-${day}T${newEventTime || '12:00'}:00Z`;
 
-      const created = await api.createEvent({
+      await createEvent({
         title,
         start_at: startAt,
         category: 'EVENTO',
       });
-      setEvents((prev) => [...prev, created]);
       setNewEventTitle('');
       setIsAddingEvent(false);
     } catch (err: any) {

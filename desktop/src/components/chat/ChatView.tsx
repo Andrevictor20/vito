@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { api } from '../../services/api';
+import { useChat } from '../../hooks';
 import { ChatMessage, ConversationSession } from '../../types';
 import { VitoMascot } from '../common/VitoMascot';
 import { ChatHistoryPanel } from './ChatHistoryPanel';
@@ -28,10 +28,20 @@ interface ChatViewProps {
 
 export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab }) => {
   const { user } = useAuth();
-  const [conversations, setConversations] = useState<ConversationSession[]>([]);
-  const [activeSessionId, setActiveSessionId] = useState<string | undefined>();
-  const [historyOpen, setHistoryOpen] = useState(false);
+  const {
+    conversations,
+    setConversations,
+    activeSessionId,
+    setActiveSessionId,
+    loadSessions,
+    loadSessionWithMessages,
+    deleteChatSession,
+    askAssistant,
+    syncChatSession,
+    togglePinConversation,
+  } = useChat({ currentUserId: user?.id });
 
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -55,23 +65,14 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
     }
   }, [initialPrompt]);
 
-  const loadSessions = async () => {
-    try {
-      const data = await api.getChatSessions();
-      setConversations(data);
-    } catch (err) {
-      console.warn('Falha ao carregar sessões de chat:', err);
-    }
-  };
-
   useEffect(() => {
     loadSessions();
-  }, []);
+  }, [loadSessions]);
 
   const handleSelectConversation = async (id: string) => {
     setActiveSessionId(id);
     try {
-      const detailed = await api.getChatSessionWithMessages(id);
+      const detailed = await loadSessionWithMessages(id);
       if (detailed && detailed.messages) {
         setMessages(detailed.messages);
       }
@@ -83,8 +84,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
   const handleDeleteConversation = async (id: string) => {
     if (!confirm('Deseja excluir esta conversa do histórico?')) return;
     try {
-      await api.deleteChatSession(id);
-      setConversations((prev) => prev.filter((c) => c.id !== id));
+      await deleteChatSession(id);
       if (activeSessionId === id) {
         handleStartNewChat();
       }
@@ -94,11 +94,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
   };
 
   const handleTogglePin = (id: string) => {
-    setConversations((prev) =>
-      prev.map((c) =>
-        c.id === id ? { ...c, pinned: !c.pinned, timestamp: new Date().toISOString() } : c
-      )
-    );
+    togglePinConversation(id);
   };
 
   const handleSendPrompt = async (textToSend: string, focus: FocusMode | null = null) => {
@@ -129,7 +125,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
         contextPayload.system_instruction_override = `Foco ativo do usuário: ${focus.title} - ${focus.description}.`;
       }
 
-      const res = await api.askAssistant(textToSend, contextPayload);
+      const res = await askAssistant(textToSend, contextPayload);
       const vitoMsg: ChatMessage = {
         id: `vito-${Date.now()}`,
         sender: 'vito',
@@ -159,7 +155,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
         setConversations((prev) => [newSession, ...prev]);
       }
 
-      await api.syncChatSession(newSession, updated);
+      await syncChatSession(newSession, updated);
     } catch (err: any) {
       const errorMsg: ChatMessage = {
         id: `vito-error-${Date.now()}`,
@@ -188,7 +184,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
   };
 
   const handleStartNewChat = () => {
-    setActiveSessionId(undefined);
+    setActiveSessionId('');
     setMessages([]);
   };
 

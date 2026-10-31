@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { View, StyleSheet, Alert } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { Header, HeaderRoundButton } from '../components/common/Header';
 import { ExecutiveSummariesHubView } from '../screens/ExecutiveSummariesHubView';
 import { FullMonthCalendarView } from '../components/calendar/FullMonthCalendarView';
 import { AgendaView } from '../components/home/AgendaView';
 import { AgendaFilterModal } from '../components/calendar/AgendaFilterModal';
+import { SmartActionSheetModal } from '../components/ui/SmartActionSheetModal';
+import { buildAgendaSmartActions, formatEventSubtitle } from '../utils/smartActionBuilders';
 import { useHomeDataContext } from './HomeDataProvider';
 import { useTheme } from '../context/ThemeContext';
 import { chatPromptBus } from '../services/dataSync';
@@ -40,6 +42,7 @@ export const AgendaTabScreen: React.FC<AgendaTabScreenProps> = ({
   const [searchOpen, setSearchOpen] = useState(false);
   const [filters, setFilters] = useState<AgendaFilterState>(DEFAULT_AGENDA_FILTER);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [actionEvent, setActionEvent] = useState<Event | null>(null);
 
   const activeFilterCount = countActiveAgendaFilters(filters);
   const isFiltering = activeFilterCount > 0 || !!filters.query;
@@ -56,27 +59,12 @@ export const AgendaTabScreen: React.FC<AgendaTabScreenProps> = ({
   }, [showSummaries, showFullCalendar, onSubViewChange]);
 
   useEffect(() => {
-    onModalChange(filterModalVisible);
-  }, [filterModalVisible, onModalChange]);
+    onModalChange(filterModalVisible || !!actionEvent);
+  }, [filterModalVisible, actionEvent, onModalChange]);
 
-  // Ação contextual de evento (vito-telas.html evTap)
+  // Ação contextual de evento via Vito Action Sheet inteligente
   const handleEventAction = useCallback((item: Event) => {
-    Alert.alert(
-      `Sobre "${item.title}":`,
-      'O que você quer fazer?',
-      [
-        {
-          text: 'Reagendar',
-          onPress: () => chatPromptBus.askAssistant(`Para quando você gostaria de reagendar o evento "${item.title}"?`),
-        },
-        {
-          text: 'Cancelar evento',
-          style: 'destructive',
-          onPress: () => chatPromptBus.notify(`Cancela ${item.title}`),
-        },
-        { text: 'Voltar', style: 'cancel' },
-      ]
-    );
+    setActionEvent(item);
   }, []);
 
   const handleCreatePrompt = useCallback(() => {
@@ -208,6 +196,25 @@ export const AgendaTabScreen: React.FC<AgendaTabScreenProps> = ({
         filters={filters}
         onFiltersChange={setFilters}
         resultCount={totalResultsCount}
+      />
+
+      {/* Modal de Ações Contextuais Inteligentes (Padrão Vito) */}
+      <SmartActionSheetModal
+        visible={!!actionEvent}
+        onClose={() => setActionEvent(null)}
+        tag={actionEvent?.source ? `AGENDA • ${actionEvent.source}` : 'COMPROMISSO'}
+        title={actionEvent?.title || ''}
+        subtitle={actionEvent ? formatEventSubtitle(actionEvent) : undefined}
+        actions={
+          actionEvent
+            ? buildAgendaSmartActions(actionEvent, {
+                onAskVitoReschedule: (prompt) => chatPromptBus.askAssistant(prompt),
+                onAskVitoMoveTomorrow: (prompt) => chatPromptBus.notify(prompt),
+                onAskVitoBriefing: (prompt) => chatPromptBus.notify(prompt),
+                onAskVitoCancel: (prompt) => chatPromptBus.notify(prompt),
+              })
+            : []
+        }
       />
     </View>
   );

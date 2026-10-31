@@ -17,8 +17,12 @@ func TestMapVoiceToGemini(t *testing.T) {
 	}{
 		{"pt-BR-AntonioNeural", "Puck"},
 		{"antonio", "Puck"},
+		{"masculino", "Puck"},
+		{"homem", "Puck"},
 		{"pt-BR-FranciscaNeural", "Kore"},
 		{"francisca", "Kore"},
+		{"feminino", "Kore"},
+		{"mulher", "Kore"},
 		{"alloy", "Puck"},
 		{"nova", "Kore"},
 		{"kore", "Kore"},

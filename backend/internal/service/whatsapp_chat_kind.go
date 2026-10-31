@@ -7,6 +7,25 @@ import (
 	"github.com/andrevmp/vito/backend/internal/domain"
 )
 
+// NormalizeJIDForSend normaliza o JID para envio de mensagens pela Evolution API.
+// Em conversas 1-on-1 (@s.whatsapp.net), remove o sufixo de dispositivo multi-device (:33, :1, etc.)
+// que faria a Evolution API rejeitar a requisição com 400.
+func NormalizeJIDForSend(jid string) string {
+	trimmed := strings.TrimSpace(jid)
+	if trimmed == "" {
+		return ""
+	}
+	if strings.HasSuffix(trimmed, "@s.whatsapp.net") {
+		parts := strings.Split(trimmed, "@")
+		userPart := strings.Split(parts[0], ":")[0]
+		return userPart + "@s.whatsapp.net"
+	}
+	if !strings.Contains(trimmed, "@") && strings.Contains(trimmed, ":") {
+		return strings.Split(trimmed, ":")[0]
+	}
+	return trimmed
+}
+
 // ClassifyChat classifica uma conversa do WhatsApp para definir o escopo de contexto.
 //
 // Regra (SPEC §2.1):
@@ -38,6 +57,7 @@ func ClassifyChat(remoteJID, myPhone string, groupParticipants int, participants
 	}
 
 	cleanJID := strings.Split(jid, "@")[0]
+	cleanJID = strings.Split(cleanJID, ":")[0]
 	if myPhone != "" && IsSelfChatJID(cleanJID, myPhone) {
 		return domain.WhatsAppChatKindSelf
 	}
@@ -49,10 +69,15 @@ func ClassifyChat(remoteJID, myPhone string, groupParticipants int, participants
 // O WhatsApp endereça a conversa consigo mesmo com um **prefixo** sobre o número
 // (observado em produção: `047559884097322@s.whatsapp.net` para o número
 // `559884097322`). Por isso a comparação é feita por **sufixo**, tolerando ainda
-// a diferença do 9º dígito brasileiro.
+// a diferença do 9º dígito brasileiro e o identificador de dispositivo multi-device (:33).
 func IsSelfChatJID(jid, phone string) bool {
-	j := phoneDigits(jid)
-	p := phoneDigits(phone)
+	cleanJID := strings.Split(jid, "@")[0]
+	cleanJID = strings.Split(cleanJID, ":")[0]
+	cleanPhone := strings.Split(phone, "@")[0]
+	cleanPhone = strings.Split(cleanPhone, ":")[0]
+
+	j := phoneDigits(cleanJID)
+	p := phoneDigits(cleanPhone)
 	if j == "" || p == "" {
 		return false
 	}
@@ -69,6 +94,35 @@ func IsSelfChatJID(jid, phone string) bool {
 		return true
 	}
 	return strings.HasSuffix(j, pCanon)
+}
+
+// IsOwnerSender verifica se um remetente (participant ou remoteJID) corresponde ao dono cadastrado.
+func IsOwnerSender(senderJID, ownerPhone, ownerJID string) bool {
+	cleanSender := strings.Split(senderJID, "@")[0]
+	cleanSender = strings.Split(cleanSender, ":")[0]
+	sDigits := phoneDigits(cleanSender)
+	if sDigits == "" {
+		return false
+	}
+
+	for _, candidate := range []string{ownerPhone, ownerJID} {
+		if candidate == "" {
+			continue
+		}
+		cleanCandidate := strings.Split(candidate, "@")[0]
+		cleanCandidate = strings.Split(cleanCandidate, ":")[0]
+		cDigits := phoneDigits(cleanCandidate)
+		if cDigits == "" {
+			continue
+		}
+		if sDigits == cDigits || isMatchingPhone(sDigits, cDigits) {
+			return true
+		}
+		if strings.HasSuffix(sDigits, cDigits) || strings.HasSuffix(cDigits, sDigits) {
+			return true
+		}
+	}
+	return false
 }
 
 // canonicalBRPhone remove o 9º dígito de um celular brasileiro (DDI 55 + DDD + 9 + 8).

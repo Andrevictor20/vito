@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { api } from '../../services/api';
-import { Trigger, TriggerLog } from '../../types';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useTriggers } from '../../hooks';
+import { Trigger } from '../../types';
 import { CreateTriggerModal } from './CreateTriggerModal';
 import { EditTriggerModal } from './EditTriggerModal';
 import { DeleteTriggerModal, DeleteModalType } from './DeleteTriggerModal';
@@ -34,12 +34,26 @@ const CATEGORIES = [
 ];
 
 export const TriggersView: React.FC<TriggersViewProps> = ({ onOpenChatWithPrompt }) => {
-  const [triggers, setTriggers] = useState<Trigger[]>([]);
-  const [loading, setLoading] = useState(true);
+  const {
+    triggers,
+    setTriggers,
+    loading,
+    logs,
+    setLogs,
+    loadingLogs,
+    fetchTriggers,
+    fetchLogs,
+    toggleTrigger,
+    runTrigger,
+    testTrigger,
+    updateTrigger,
+    deleteTrigger,
+    clearTriggerLogs,
+    deleteTriggerLog,
+  } = useTriggers();
+
   const [selectedTrigger, setSelectedTrigger] = useState<Trigger | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [logs, setLogs] = useState<TriggerLog[]>([]);
-  const [loadingLogs, setLoadingLogs] = useState(false);
   const [runningTest, setRunningTest] = useState(false);
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
 
@@ -54,60 +68,25 @@ export const TriggersView: React.FC<TriggersViewProps> = ({ onOpenChatWithPrompt
   }>({ open: false, type: 'radar' });
   const [deleting, setDeleting] = useState(false);
 
-  const fetchTriggers = useCallback(async () => {
-    try {
-      setLoading(true);
-      const data = await api.getTriggers();
-      setTriggers(data);
-      if (selectedTrigger) {
-        const updated = data.find((t) => t.id === selectedTrigger.id);
-        if (updated) setSelectedTrigger(updated);
-      }
-    } catch (err) {
-      console.error('Erro ao buscar radares:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedTrigger?.id]);
-
-  useEffect(() => {
-    fetchTriggers();
-  }, []);
-
-  const fetchLogs = useCallback(async (triggerId: string) => {
-    if (!triggerId) {
-      setLogs([]);
-      return;
-    }
-    setLoadingLogs(true);
-    try {
-      const data = await api.getTriggerLogs(triggerId);
-      setLogs(data);
-    } catch (err) {
-      console.warn('Falha ao carregar logs da vigília:', err);
-      setLogs([]);
-    } finally {
-      setLoadingLogs(false);
-    }
-  }, []);
-
   useEffect(() => {
     if (selectedTrigger?.id) {
+      const updated = triggers.find((t) => t.id === selectedTrigger.id);
+      if (updated) setSelectedTrigger(updated);
       fetchLogs(selectedTrigger.id);
     } else {
       setLogs([]);
     }
-  }, [selectedTrigger?.id, fetchLogs]);
+  }, [selectedTrigger?.id, fetchLogs, setLogs, triggers]);
 
   const handleToggleActive = async (tr: Trigger) => {
     const nextStatus = tr.status === 'active' ? 'paused' : 'active';
-    const updated = { ...tr, status: nextStatus as Trigger['status'] };
+    const updated = { ...tr, status: nextStatus as Trigger['status'], active: nextStatus === 'active' };
     if (selectedTrigger?.id === tr.id) {
       setSelectedTrigger(updated);
     }
     setTriggers((prev) => prev.map((item) => (item.id === tr.id ? updated : item)));
     try {
-      await api.toggleTrigger(tr.id, nextStatus === 'active');
+      await toggleTrigger(tr.id, nextStatus === 'active');
     } catch {
       fetchTriggers();
     }
@@ -117,13 +96,13 @@ export const TriggersView: React.FC<TriggersViewProps> = ({ onOpenChatWithPrompt
     if (runningTest) return;
     setRunningTest(true);
     try {
-      const newLog = await api.runTrigger(tr.id);
+      const newLog = await runTrigger(tr.id);
       if (newLog) {
         setLogs((prev) => [newLog, ...prev]);
       }
     } catch {
       try {
-        await api.testTrigger(tr.id);
+        await testTrigger(tr.id);
         await fetchLogs(tr.id);
       } catch {
         alert('Falha ao verificar radar no momento.');
@@ -134,25 +113,21 @@ export const TriggersView: React.FC<TriggersViewProps> = ({ onOpenChatWithPrompt
   };
 
   const handleSaveEdit = async (id: string, updates: Partial<Trigger>) => {
-    await api.updateTrigger(id, updates);
-    await fetchTriggers();
+    await updateTrigger(id, updates);
   };
 
   const handleConfirmDelete = async () => {
     setDeleting(true);
     try {
       if (deleteModal.type === 'radar' && deleteModal.trigger) {
-        await api.deleteTrigger(deleteModal.trigger.id);
-        setTriggers((prev) => prev.filter((t) => t.id !== deleteModal.trigger?.id));
+        await deleteTrigger(deleteModal.trigger.id);
         if (selectedTrigger?.id === deleteModal.trigger.id) {
           setSelectedTrigger(null);
         }
       } else if (deleteModal.type === 'clear_logs' && selectedTrigger) {
-        await api.clearTriggerLogs(selectedTrigger.id);
-        setLogs([]);
+        await clearTriggerLogs(selectedTrigger.id);
       } else if (deleteModal.type === 'log' && selectedTrigger && deleteModal.logId) {
-        await api.deleteTriggerLog(selectedTrigger.id, deleteModal.logId);
-        setLogs((prev) => prev.filter((l) => l.id !== deleteModal.logId));
+        await deleteTriggerLog(selectedTrigger.id, deleteModal.logId);
       }
       setDeleteModal({ open: false, type: 'radar' });
     } catch (err: any) {

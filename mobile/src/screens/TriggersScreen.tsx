@@ -16,6 +16,8 @@ import { MyTriggersList } from '../components/triggers/MyTriggersList';
 import { TriggerReportsView } from '../components/triggers/TriggerReportsView';
 import { NaturalPromptInput } from '../components/triggers/NaturalPromptInput';
 import { ExploreTemplatesSection } from '../components/triggers/ExploreTemplatesSection';
+import { SmartActionSheetModal } from '../components/ui/SmartActionSheetModal';
+import { buildTriggerSmartActions } from '../utils/smartActionBuilders';
 import { Trigger, TriggerTemplate } from '../types';
 import { countTriggersByCategory } from '../utils/radarFilter';
 import { chatPromptBus } from '../services/dataSync';
@@ -47,33 +49,11 @@ export const TriggersScreen: React.FC<{
   const [activeTab, setActiveTab] = useState<TriggersTab>('my_triggers');
   const [reportTrigger, setReportTrigger] = useState<Trigger | null>(null);
   const [activatingTemplateId, setActivatingTemplateId] = useState<string | null>(null);
+  const [actionTrigger, setActionTrigger] = useState<Trigger | null>(null);
 
-  // Ação contextual do radar (vito-telas.html radTap)
+  // Ação contextual do radar via Vito Action Sheet inteligente
   const handleRadarAction = useCallback((t: Trigger) => {
-    Alert.alert(
-      `Sobre "${t.title}":`,
-      'O que você quer fazer?',
-      [
-        {
-          text: t.status === 'active' ? 'Pausar vigília' : 'Retomar vigília',
-          onPress: () => chatPromptBus.askAssistant(
-            t.status === 'active'
-              ? `Você gostaria de pausar a vigília "${t.title}" temporariamente?`
-              : `Você gostaria de reativar a vigília "${t.title}"?`
-          ),
-        },
-        {
-          text: 'Mudar horário da checagem',
-          onPress: () => chatPromptBus.askAssistant(`Para qual horário você gostaria de ajustar a checagem da vigília "${t.title}"?`),
-        },
-        {
-          text: 'Excluir vigília',
-          style: 'destructive',
-          onPress: () => chatPromptBus.askAssistant(`Você quer realmente excluir a vigília "${t.title}"?`),
-        },
-        { text: 'Voltar', style: 'cancel' },
-      ]
-    );
+    setActionTrigger(t);
   }, []);
 
   const firstCreateRender = useRef(false);
@@ -158,6 +138,40 @@ export const TriggersScreen: React.FC<{
             await handleDeleteTrigger(id);
             setReportTrigger(null);
           }}
+        />
+        {/* Modal de Ações Contextuais da Vigília (Padrão Vito) */}
+        <SmartActionSheetModal
+          visible={!!actionTrigger}
+          onClose={() => setActionTrigger(null)}
+          tag="VIGÍLIA VITO"
+          title={actionTrigger?.title || ''}
+          subtitle={
+            actionTrigger?.status === 'active'
+              ? 'Vigília ativa • Monitoramento contínuo'
+              : 'Vigília pausada'
+          }
+          actions={
+            actionTrigger
+              ? buildTriggerSmartActions(actionTrigger, {
+                  onToggleStatus: () => {
+                    handleToggleTrigger(actionTrigger.id);
+                    if (reportTrigger?.id === actionTrigger.id) {
+                      setReportTrigger((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              status: prev.status === 'active' ? 'paused' : 'active',
+                            }
+                          : prev
+                      );
+                    }
+                  },
+                  onAskVitoInstantCheck: (prompt) => chatPromptBus.notify(prompt),
+                  onAskVitoChangeSchedule: (prompt) => chatPromptBus.askAssistant(prompt),
+                  onAskVitoDelete: (prompt) => chatPromptBus.askAssistant(prompt),
+                })
+              : []
+          }
         />
       </View>
     );
@@ -280,6 +294,31 @@ export const TriggersScreen: React.FC<{
           />
         </>
       )}
+
+      {/* Modal de Ações Contextuais da Vigília (Padrão Vito) */}
+      <SmartActionSheetModal
+        visible={!!actionTrigger}
+        onClose={() => setActionTrigger(null)}
+        tag="VIGÍLIA VITO"
+        title={actionTrigger?.title || ''}
+        subtitle={
+          actionTrigger?.status === 'active'
+            ? 'Vigília ativa • Monitoramento contínuo'
+            : 'Vigília pausada'
+        }
+        actions={
+          actionTrigger
+            ? buildTriggerSmartActions(actionTrigger, {
+                onToggleStatus: () => {
+                  handleToggleTrigger(actionTrigger.id);
+                },
+                onAskVitoInstantCheck: (prompt) => chatPromptBus.notify(prompt),
+                onAskVitoChangeSchedule: (prompt) => chatPromptBus.askAssistant(prompt),
+                onAskVitoDelete: (prompt) => chatPromptBus.askAssistant(prompt),
+              })
+            : []
+        }
+      />
     </View>
   );
 };

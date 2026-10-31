@@ -25,8 +25,8 @@ type GeminiTTSProvider struct {
 
 // NewGeminiTTSProvider inicializa o provedor de voz do Gemini.
 func NewGeminiTTSProvider(apiKey, model string) *GeminiTTSProvider {
-	if model == "" {
-		model = "gemini-2.5-flash"
+	if model == "" || model == "gemini-2.5-flash" || model == "gemini-2.0-flash" || model == "gemini-1.5-flash" {
+		model = "gemini-2.5-flash-preview-tts"
 	}
 	return &GeminiTTSProvider{
 		apiKey:  apiKey,
@@ -98,13 +98,20 @@ func cleanTextForSpeech(text string) string {
 func MapVoiceToGemini(voice string) string {
 	v := strings.ToLower(strings.TrimSpace(voice))
 	switch v {
-	case "puck", "charon", "kore", "fenrir", "aoede":
-		return strings.Title(v)
-	case "pt-br-antonioneural", "antonio", "alloy", "echo", "onyx", "male":
-		return "Puck"
-	case "pt-br-franciscaneural", "francisca", "shimmer", "fable", "nova", "female":
+	case "kore", "female", "feminino", "francisca", "pt-br-franciscaneural", "shimmer", "fable", "nova", "mulher":
 		return "Kore"
+	case "aoede":
+		return "Aoede"
+	case "charon":
+		return "Charon"
+	case "fenrir":
+		return "Fenrir"
+	case "puck", "male", "masculino", "antonio", "pt-br-antonioneural", "alloy", "echo", "onyx", "homem":
+		return "Puck"
 	default:
+		if strings.Contains(v, "fem") || strings.Contains(v, "kore") || strings.Contains(v, "mulher") {
+			return "Kore"
+		}
 		return "Puck"
 	}
 }
@@ -122,12 +129,13 @@ func (p *GeminiTTSProvider) Synthesize(text string, voice string) ([]byte, strin
 
 	geminiVoice := MapVoiceToGemini(voice)
 
-	// Cadeia de modelos resiliente para TTS
+	// Modelos oficiais do Google AI Studio dedicados a síntese de áudio (TTS)
 	models := []string{
-		p.model,
-		"gemini-2.5-flash",
-		"gemini-2.0-flash",
-		"gemini-1.5-flash",
+		"gemini-2.5-flash-preview-tts",
+		"gemini-2.5-pro-preview-tts",
+	}
+	if p.model != "" && p.model != "gemini-2.5-flash-preview-tts" && p.model != "gemini-2.5-flash" && p.model != "gemini-2.0-flash" && p.model != "gemini-1.5-flash" {
+		models = append([]string{p.model}, models...)
 	}
 
 	var lastErr error

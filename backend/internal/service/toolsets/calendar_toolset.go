@@ -86,18 +86,22 @@ func (t *CalendarToolset) Execute(ctx context.Context, execCtx *domain.ToolExecu
 
 	switch op {
 	case "create_event":
-		start, err := time.Parse(time.RFC3339, params.StartTime)
-		if err != nil {
+		title := strings.TrimSpace(params.Title)
+		if title == "" {
+			title = "Reunião"
+		}
+		start := parseFlexibleDateTime(params.StartTime)
+		if start.IsZero() {
 			start = time.Now().Add(1 * time.Hour)
 		}
-		end, err := time.Parse(time.RFC3339, params.EndTime)
-		if err != nil {
+		end := parseFlexibleDateTime(params.EndTime)
+		if end.IsZero() || end.Before(start) || end.Equal(start) {
 			end = start.Add(1 * time.Hour)
 		}
 		evt := &domain.Event{
 			ID:          uuid.New().String(),
 			UserID:      execCtx.UserID,
-			Title:       params.Title,
+			Title:       title,
 			Description: params.Description,
 			StartAt:     start,
 			EndAt:       end,
@@ -161,4 +165,27 @@ func (t *CalendarToolset) Execute(ctx context.Context, execCtx *domain.ToolExecu
 			Cards:         cards,
 		}, nil
 	}
+}
+
+func parseFlexibleDateTime(raw string) time.Time {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return time.Time{}
+	}
+	formats := []string{
+		time.RFC3339,
+		"2006-01-02T15:04:05",
+		"2006-01-02T15:04",
+		"2006-01-02 15:04:05",
+		"2006-01-02 15:04",
+		"02/01/2006 15:04",
+		"02/01/2006",
+		"2006-01-02",
+	}
+	for _, f := range formats {
+		if t, err := time.Parse(f, raw); err == nil {
+			return t
+		}
+	}
+	return time.Time{}
 }

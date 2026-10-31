@@ -1,0 +1,111 @@
+import React, { useState } from 'react';
+import { Link2, Check, Copy } from 'lucide-react';
+import { BookingType } from '../../../types';
+import { CHAT_CARD_THEMES } from './chatCardTheme';
+
+export interface ChatBookingData {
+  id?: string;
+  title: string;
+  slug?: string;
+  duration_minutes?: number;
+  start_hour?: string;
+  end_hour?: string;
+  days_of_week?: string;
+  public_url?: string;
+  short_url?: string;
+  is_active?: boolean;
+}
+
+export interface BookingInlineCardProps {
+  booking: BookingType | ChatBookingData;
+  onNavigateTab?: (tab: string) => void;
+  onCopyLink?: (link: string) => void;
+}
+
+/**
+ * Card in-chat de link público de agendamento do Vito Booking com botão copiar.
+ * Alinhado ao protótipo e à versão mobile.
+ */
+export const BookingInlineCard: React.FC<BookingInlineCardProps> = ({
+  booking,
+  onNavigateTab,
+  onCopyLink,
+}) => {
+  const [copied, setCopied] = useState(false);
+  const theme = CHAT_CARD_THEMES.booking;
+
+  const rawLink = booking.short_url || booking.public_url || '';
+  const displayUrl = rawLink ? rawLink.replace(/^https?:\/\//, '') : 'Link de agendamento';
+  const subtitle = `${displayUrl} · Ativo`;
+
+  const handleCopy = async () => {
+    if (!rawLink) return;
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        await navigator.clipboard.writeText(rawLink);
+      }
+      setCopied(true);
+      onCopyLink?.(rawLink);
+      setTimeout(() => setCopied(false), 2200);
+    } catch {
+      // Fallback gracioso
+    }
+  };
+
+  return (
+    <div className="mt-4 space-y-2.5 transition-all">
+      {/* Card Principal */}
+      <div
+        className={`p-4.5 rounded-[22px] bg-white dark:bg-[#12151A] border ${theme.borderColor} ${theme.hoverBorder} flex items-center gap-4 shadow-sm transition-colors`}
+      >
+        {/* Chip Azul 44x44 */}
+        <div className={`w-11 h-11 rounded-2xl ${theme.chipBg} flex items-center justify-center shrink-0 shadow-2xs`}>
+          <Link2 color={theme.chipIconColor} size={22} />
+        </div>
+
+        {/* Informações do Booking */}
+        <div className="flex-1 min-w-0">
+          <h4 className="text-sm sm:text-base font-bold text-zinc-900 dark:text-white truncate">
+            {booking.title}
+          </h4>
+          <p className="text-xs text-zinc-400 mt-0.5 truncate font-medium">
+            {subtitle}
+          </p>
+        </div>
+
+        <span className={`text-[11px] font-extrabold px-3 py-1 rounded-full ${theme.tagBg} ${theme.tagTextColor} uppercase tracking-wider shrink-0`}>
+          BOOKING
+        </span>
+      </div>
+
+      {/* Botões de Ação em Pílula */}
+      <div className="flex items-center gap-2 pl-1">
+        <button
+          type="button"
+          onClick={handleCopy}
+          className="px-4 py-1.5 rounded-full border border-zinc-200 dark:border-[#262B33] bg-transparent hover:bg-zinc-100 dark:hover:bg-white/5 text-xs font-bold text-zinc-600 dark:text-zinc-300 transition-colors flex items-center gap-1.5"
+        >
+          {copied ? (
+            <>
+              <Check size={14} className="text-emerald-500" />
+              <span>Copiado!</span>
+            </>
+          ) : (
+            <>
+              <Copy size={13} />
+              <span>Copiar link</span>
+            </>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onNavigateTab?.('booking')}
+          className="px-4 py-1.5 rounded-full bg-[#17191b] hover:bg-black dark:bg-[#f1f3f2] dark:hover:bg-white text-white dark:text-[#09090B] text-xs font-bold transition-all shadow-2xs"
+        >
+          Ver booking
+        </button>
+      </div>
+    </div>
+  );
+};

@@ -36,6 +36,8 @@ export interface VoiceFullscreenViewProps {
   whatsAppSent?: boolean;
   onConfirmWhatsApp?: () => void;
   screenContext?: string;
+  voice?: 'puck' | 'kore';
+  onToggleVoice?: () => void;
 }
 
 export const VoiceFullscreenView: React.FC<VoiceFullscreenViewProps> = ({
@@ -53,6 +55,8 @@ export const VoiceFullscreenView: React.FC<VoiceFullscreenViewProps> = ({
   whatsAppSent = false,
   onConfirmWhatsApp,
   screenContext,
+  voice = 'puck',
+  onToggleVoice,
 }) => {
   const { colors, isDark } = useTheme();
   const stateColor = isMuted ? colors.muted : getPrototypeStateColor(state);
@@ -172,9 +176,34 @@ export const VoiceFullscreenView: React.FC<VoiceFullscreenViewProps> = ({
           </Text>
         </View>
 
-        <Text style={[styles.vtime, { color: colors.muted }]}>
-          {formatVoiceDuration(durationSeconds)}
-        </Text>
+        <View style={{ alignItems: 'flex-end', gap: 4 }}>
+          <Text style={[styles.vtime, { color: colors.muted }]}>
+            {formatVoiceDuration(durationSeconds)}
+          </Text>
+          {onToggleVoice && (
+            <TouchableOpacity
+              onPress={onToggleVoice}
+              activeOpacity={0.7}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 4,
+                paddingHorizontal: 8,
+                paddingVertical: 3,
+                borderRadius: 12,
+                backgroundColor: colors.surf,
+                borderColor: colors.line,
+                borderWidth: 1,
+              }}
+              accessibilityLabel={`Alternar voz. Atual: ${voice === 'kore' ? 'Feminina' : 'Masculina'}`}
+            >
+              <Text style={{ fontSize: 11 }}>{voice === 'kore' ? '👩' : '👨'}</Text>
+              <Text style={{ fontSize: 10, fontWeight: '700', color: colors.ink }}>
+                {voice === 'kore' ? 'Feminina' : 'Masculina'}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* Palco Central (.vstage) */}

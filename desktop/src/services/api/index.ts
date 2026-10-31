@@ -9,6 +9,13 @@ import { MeetingsApi } from './meetingsApi';
 import { IntegrationsApi } from './integrationsApi';
 import { PendingApi } from './pendingApi';
 import { MemoriesApi } from './memoriesApi';
+import { WhatsAppApi, WhatsAppIntegrationStatus, WhatsAppMatchedContact } from './whatsappApi';
+import { WhatsAppAuthApi, RequestWhatsAppOTPResponse, VerifyWhatsAppOTPResponse, LinkPhoneResponse } from './whatsappAuthApi';
+import { WhatsAppContextApi, WhatsAppContextScope, WhatsAppContextSettings, WhatsAppContextPreview, WhatsAppDirectory } from './whatsappContextApi';
+import { GmailApi, GmailStatusResponse, GmailScanResult, GmailDraftInput, GmailDraftResponse, GmailSendResponse } from './gmailApi';
+import { P2PMeetingsApi, P2PMeetingInvite, ContactMatchResult, P2PMutualSlot, SendP2PInviteInput } from './p2pMeetingsApi';
+import { NotificationsApi } from './notificationsApi';
+import { fileUriToBase64 } from './fileUtils';
 import {
   User,
   AuthTokens,
@@ -23,17 +30,43 @@ import {
   ConversationSession,
   ChatMessage,
   WhatsAppStatus,
-  WhatsAppMatchedContact,
   GmailStatus,
-  GmailDraftInput,
-  GmailDraftResponse,
-  GmailSendResponse,
   PendingItem,
   AISettings,
   MorningBriefingSettings,
 } from '../../types';
 
-export { getDesktopDeviceName };
+export {
+  getDesktopDeviceName,
+  fileUriToBase64,
+  WhatsAppApi,
+  WhatsAppAuthApi,
+  WhatsAppContextApi,
+  GmailApi,
+  P2PMeetingsApi,
+  NotificationsApi,
+};
+
+export type {
+  WhatsAppIntegrationStatus,
+  WhatsAppMatchedContact,
+  RequestWhatsAppOTPResponse,
+  VerifyWhatsAppOTPResponse,
+  LinkPhoneResponse,
+  WhatsAppContextScope,
+  WhatsAppContextSettings,
+  WhatsAppContextPreview,
+  WhatsAppDirectory,
+  GmailStatusResponse,
+  GmailScanResult,
+  GmailDraftInput,
+  GmailDraftResponse,
+  GmailSendResponse,
+  P2PMeetingInvite,
+  ContactMatchResult,
+  P2PMutualSlot,
+  SendP2PInviteInput,
+};
 
 export class ApiService extends ApiClient {
   public authApi = new AuthApi(this);
@@ -46,6 +79,16 @@ export class ApiService extends ApiClient {
   public integrationsApi = new IntegrationsApi(this);
   public pendingApi = new PendingApi(this);
   public memoriesApi = new MemoriesApi(this);
+  public whatsappApi = new WhatsAppApi(this);
+  public whatsappAuthApi = new WhatsAppAuthApi(this);
+  public whatsappContextApi = new WhatsAppContextApi(this);
+  public gmailApi = new GmailApi(this);
+  public p2pMeetingsApi = new P2PMeetingsApi(this);
+  public notificationsApi = new NotificationsApi(this);
+
+  public getToken(): string | null {
+    return this.accessToken;
+  }
 
   // --- Auth & Sessions ---
   login(email: string, password: string, deviceName?: string): Promise<AuthTokens> {
@@ -66,14 +109,14 @@ export class ApiService extends ApiClient {
   revokeSession(id: string): Promise<void> {
     return this.authApi.revokeSession(id);
   }
-  requestWhatsAppOTP(phone: string): Promise<{ success: boolean; message: string }> {
-    return this.authApi.requestWhatsAppOTP(phone);
+  requestWhatsAppOTP(phone: string): Promise<RequestWhatsAppOTPResponse> {
+    return this.whatsappAuthApi.requestOTP(phone);
   }
-  verifyWhatsAppOTP(phone: string, code: string, deviceName?: string): Promise<AuthTokens> {
-    return this.authApi.verifyWhatsAppOTP(phone, code, deviceName);
+  verifyWhatsAppOTP(phone: string, code: string, deviceName?: string): Promise<VerifyWhatsAppOTPResponse> {
+    return this.whatsappAuthApi.verifyOTP(phone, code, deviceName);
   }
-  linkWhatsAppPhone(phone: string): Promise<{ data: { status: string; message: string } }> {
-    return this.authApi.linkWhatsAppPhone(phone);
+  linkWhatsAppPhone(phone: string): Promise<LinkPhoneResponse> {
+    return this.whatsappAuthApi.linkPhone(phone);
   }
 
   // --- Calendar ---
@@ -179,8 +222,8 @@ export class ApiService extends ApiClient {
   runTrigger(id: string): Promise<TriggerLog> {
     return this.triggersApi.runTrigger(id);
   }
-  toggleTrigger(id: string, active: boolean): Promise<any> {
-    return this.triggersApi.toggleTrigger(id, active);
+  toggleTrigger(id: string, active?: boolean): Promise<any> {
+    return this.triggersApi.toggleTrigger(id, active ?? true);
   }
   getTriggerTemplates(): Promise<any[]> {
     return this.triggersApi.getTriggerTemplates();
@@ -237,59 +280,59 @@ export class ApiService extends ApiClient {
 
   // --- Integrations: WhatsApp ---
   getWhatsAppStatus(): Promise<WhatsAppStatus> {
-    return this.integrationsApi.getWhatsAppStatus();
+    return this.whatsappApi.getStatus() as Promise<WhatsAppStatus>;
   }
   requestWhatsAppPairingCode(phone: string): Promise<{ pairing_code: string; status: string }> {
-    return this.integrationsApi.requestWhatsAppPairingCode(phone);
+    return this.whatsappApi.requestPairingCode(phone);
   }
   disconnectWhatsApp(): Promise<{ message: string; status: string }> {
-    return this.integrationsApi.disconnectWhatsApp();
+    return this.whatsappApi.disconnect();
   }
   getWhatsAppContacts(): Promise<{ contacts: WhatsAppMatchedContact[]; count: number }> {
-    return this.integrationsApi.getWhatsAppContacts();
+    return this.whatsappApi.getContacts();
   }
   importWhatsAppContactNames(names: { phone: string; name: string }[]): Promise<{ imported: number }> {
-    return this.integrationsApi.importWhatsAppContactNames(names);
+    return this.whatsappContextApi.importContactNames(names);
   }
 
   // --- Integrations: Gmail ---
   getGmailStatus(): Promise<GmailStatus> {
-    return this.integrationsApi.getGmailStatus();
+    return this.gmailApi.getStatus() as Promise<GmailStatus>;
   }
-  scanGmail(params?: { days?: number; limit?: number }): Promise<any> {
-    return this.integrationsApi.scanGmail(params);
+  scanGmail(params?: { days?: number; limit?: number }): Promise<GmailScanResult> {
+    return this.gmailApi.scanEmails(params);
   }
   disconnectGmail(): Promise<{ message: string }> {
-    return this.integrationsApi.disconnectGmail();
+    return this.gmailApi.disconnect();
   }
   createGmailDraft(draft: GmailDraftInput): Promise<GmailDraftResponse> {
-    return this.integrationsApi.createGmailDraft(draft);
+    return this.gmailApi.createDraft(draft);
   }
   sendGmailEmail(email: GmailDraftInput): Promise<GmailSendResponse> {
-    return this.integrationsApi.sendGmailEmail(email);
+    return this.gmailApi.sendEmail(email);
   }
 
   // --- Settings & Notifications ---
   getAISettings(): Promise<AISettings> {
-    return this.integrationsApi.getAISettings();
+    return this.notificationsApi.getAISettings();
   }
   updateAISettings(data: Partial<AISettings>): Promise<AISettings> {
-    return this.integrationsApi.updateAISettings(data);
+    return this.notificationsApi.updateAISettings(data);
   }
   getBriefingSettings(): Promise<MorningBriefingSettings> {
-    return this.integrationsApi.getBriefingSettings();
+    return this.notificationsApi.getBriefingSettings();
   }
   updateBriefingSettings(data: Partial<MorningBriefingSettings>): Promise<MorningBriefingSettings> {
-    return this.integrationsApi.updateBriefingSettings(data);
+    return this.notificationsApi.updateBriefingSettings(data);
   }
   getNotificationStatus(): Promise<{ registered: boolean; device_count: number }> {
-    return this.integrationsApi.getNotificationStatus();
+    return this.notificationsApi.getNotificationStatus();
   }
-  registerDeviceToken(token: string, platform?: string): Promise<{ status: string }> {
-    return this.integrationsApi.registerDeviceToken(token, platform);
+  registerDeviceToken(token: string, platform = 'web'): Promise<{ status: string }> {
+    return this.notificationsApi.registerPushToken(token, platform);
   }
-  testNotification(priority?: string, title?: string, body?: string): Promise<any> {
-    return this.integrationsApi.testNotification(priority, title, body);
+  testNotification(priority = 'default', title?: string, body?: string): Promise<any> {
+    return this.notificationsApi.testPushNotification(priority as 'default' | 'silent', title, body);
   }
 
   // --- Pendências ---
@@ -315,12 +358,15 @@ export class ApiService extends ApiClient {
     return this.pendingApi.deletePendingItem(id);
   }
 
-  // --- Namespaces ---
-  get whatsapp(): IntegrationsApi {
-    return this.integrationsApi;
+  // --- Sub-Namespaces ---
+  get whatsapp(): WhatsAppApi {
+    return this.whatsappApi;
   }
-  get gmail(): IntegrationsApi {
-    return this.integrationsApi;
+  get gmail(): GmailApi {
+    return this.gmailApi;
+  }
+  get p2p(): P2PMeetingsApi {
+    return this.p2pMeetingsApi;
   }
   get pending(): PendingApi {
     return this.pendingApi;
@@ -339,6 +385,9 @@ export class ApiService extends ApiClient {
   }
   get meetings(): MeetingsApi {
     return this.meetingsApi;
+  }
+  get notifications(): NotificationsApi {
+    return this.notificationsApi;
   }
 }
 
