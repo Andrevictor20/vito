@@ -16,8 +16,20 @@ func TestVersionedMigrations_FreshDB(t *testing.T) {
 	if err := db.QueryRow(`SELECT COUNT(*) FROM schema_migrations`).Scan(&count); err != nil {
 		t.Fatal(err)
 	}
-	if count != 21 {
-		t.Fatalf("esperava 21 migrações registradas, vieram %d", count)
+	if count != 22 {
+		t.Fatalf("esperava 22 migrações registradas, vieram %d", count)
+	}
+	if !hasColumn(db, "user_ai_settings", "persona_style") ||
+		!hasColumn(db, "user_ai_settings", "preferred_voice") {
+		t.Fatal("022 deveria adicionar persona_style e preferred_voice em user_ai_settings")
+	}
+	if !hasTable(db, "conversation_threads") ||
+		!hasTable(db, "conversation_turns") ||
+		!hasTable(db, "pending_confirmations") ||
+		!hasTable(db, "memory_episodes") ||
+		!hasTable(db, "memory_thematic_summaries") ||
+		!hasTable(db, "ai_traces") {
+		t.Fatal("022 deveria criar tabelas de conversation store, pending_confirmations, memória hierárquica e ai_traces")
 	}
 	if !hasColumn(db, "triggers", "search_config_json") ||
 		!hasColumn(db, "triggers", "seen_fingerprints_json") ||
@@ -99,8 +111,8 @@ func TestVersionedMigrations_LegacyDB(t *testing.T) {
 	if err := db2.QueryRow(`SELECT COUNT(*) FROM schema_migrations`).Scan(&count); err != nil {
 		t.Fatal(err)
 	}
-	if count != 21 {
-		t.Fatalf("base legada deveria ser carimbada com 21, veio %d", count)
+	if count != 22 {
+		t.Fatalf("base legada deveria ser carimbada com 22, veio %d", count)
 	}
 }
 

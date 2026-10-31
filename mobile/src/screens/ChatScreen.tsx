@@ -466,7 +466,15 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
         >
           <VitoVoiceOverlay
             triggerSource="MANUAL"
+            variant="fullscreen"
+            screenContext="Chat"
             onClose={() => setIsVoiceModeActive(false)}
+            onSwitchToText={() => {
+              setIsVoiceModeActive(false);
+              setTimeout(() => {
+                inputRef.current?.focus?.();
+              }, 200);
+            }}
             onMessageExchange={(userText, aiReply) => {
               if (userText?.trim()) {
                 appendUserMessage(userText.trim());

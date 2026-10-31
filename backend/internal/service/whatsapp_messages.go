@@ -104,6 +104,7 @@ func (s *WhatsAppService) handleMessagesEvent(ctx context.Context, instanceName 
 	}
 
 	s.archiveMessage(ctx, integration.UserID, instanceName, msg, chatKind, rawText, "user")
+	threadID := s.recordBridgeIncoming(ctx, integration.UserID, msg.RemoteJID, rawText)
 
 	if s.assistantSvc == nil {
 		return nil
@@ -132,6 +133,7 @@ func (s *WhatsAppService) handleMessagesEvent(ctx context.Context, instanceName 
 		text:         rawText,
 		privateScope: privateScope,
 		mediaPayload: data,
+		threadID:     threadID,
 	}
 	s.runAsync(func() { _ = s.processPendingMessage(pending) })
 
@@ -148,6 +150,7 @@ type pendingMessage struct {
 	text         string
 	privateScope bool
 	mediaPayload json.RawMessage
+	threadID     string
 }
 
 // processPendingMessage monta o contexto, chama o assistente e responde.
@@ -227,6 +230,12 @@ func (s *WhatsAppService) processPendingMessage(pending *pendingMessage) error {
 		return nil
 	}
 	s.memory.AddMessage(convKey, "vito", replyText)
+
+	modelUsed := resp.ProviderUsed
+	if modelUsed == "" {
+		modelUsed = "vito-assistant"
+	}
+	s.recordBridgeOutgoing(ctx, integration.UserID, pending.threadID, msg.RemoteJID, replyText, modelUsed)
 
 	assinatura := VitoSignature(ctx, s.contextSvc, integration.UserID, msg.RemoteJID, msg.PushName)
 	formattedReply := fmt.Sprintf("%s\n\n%s", assinatura, replyText)

@@ -45,6 +45,7 @@ type WhatsAppService struct {
 	ownerCache       *WhatsAppOwnerCache
 	contactsCache    *WhatsAppContactsCache
 	contextDebugLog  bool
+	convBridge       *WhatsAppConversationBridge
 	labelsMu         sync.RWMutex
 	chatLabels       map[string]string
 	// runAsync executa o processamento com IA em background.

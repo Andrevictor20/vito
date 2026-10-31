@@ -125,3 +125,55 @@ export function extractWhatsAppCardData(
   }
   return null;
 }
+
+/**
+ * Formata duração em segundos para o formato canônico MM:SS (ex: "0:00", "1:15")
+ */
+export function formatVoiceDuration(seconds: number): string {
+  const safeSeconds = Math.max(0, Math.floor(seconds || 0));
+  const mins = Math.floor(safeSeconds / 60);
+  const secs = safeSeconds % 60;
+  return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+}
+
+/**
+ * Retorna as cores de estado do protótipo vito-telas.html
+ * Blue (#2B7FD4) ouvindo, Orange (#D9681A) pensando, Acc (#0B9A5F) falando
+ */
+export function getPrototypeStateColor(state: ConversationState): string {
+  switch (state) {
+    case 'LISTENING':
+      return '#2B7FD4'; // Blue Vito
+    case 'THINKING':
+      return '#D9681A'; // Laranja Vito
+    case 'SPEAKING':
+      return '#0B9A5F'; // Acc / Esmeralda Vito
+    default:
+      return '#69706D'; // Muted
+  }
+}
+
+/**
+ * Retorna o rótulo de quem está com a palavra (VOCÊ ou VITO)
+ */
+export function getPrototypeSpeakerLabel(state: ConversationState): 'VOCÊ' | 'VITO' {
+  return state === 'SPEAKING' ? 'VITO' : 'VOCÊ';
+}
+
+/**
+ * Retorna a dica contextual refinada para a interface de voz
+ */
+export function getPrototypeHint(state: ConversationState, isMuted: boolean): string {
+  if (isMuted) {
+    return 'Microfone desativado';
+  }
+  switch (state) {
+    case 'SPEAKING':
+      return 'Toque no Vito para interromper';
+    case 'THINKING':
+      return 'Processando sua solicitação...';
+    case 'LISTENING':
+    default:
+      return 'Fale naturalmente com o Vito';
+  }
+}

@@ -12,8 +12,7 @@ import { ChatInputDock } from './ChatInputDock';
 import { ChatIdeasDeck } from './ChatIdeasDeck';
 import { FormattedChatMessageText } from './FormattedChatMessageText';
 import { ChatMessageActionBar } from './ChatMessageActionBar';
-import { TodoInlineCard } from './cards/TodoInlineCard';
-import { EventInlineCard } from './cards/EventInlineCard';
+import { ChatStructuredCards } from './cards/ChatStructuredCards';
 import { toChatGmailMessage, toChatWhatsAppMessage } from '../../utils/chatCardExtractors';
 import { pickWelcomeGreeting } from '../../utils/chatGreetings';
 import {
@@ -297,19 +296,13 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
                       />
                     )}
 
-                    {msg.todo && (
-                      <TodoInlineCard
-                        todo={msg.todo}
-                        onNavigateTab={onNavigateTab}
-                      />
-                    )}
-
-                    {msg.event && (
-                      <EventInlineCard
-                        event={msg.event}
-                        onNavigateTab={onNavigateTab}
-                      />
-                    )}
+                    <ChatStructuredCards
+                      message={msg}
+                      onNavigateTab={onNavigateTab}
+                      onConfirmAction={(pendingID) => {
+                        handleSendPrompt(`confirmar ${pendingID}`);
+                      }}
+                    />
 
                     {/* Barra de Ações Minimalista Estilo Claude / Gemini */}
                     <ChatMessageActionBar

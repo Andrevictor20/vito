@@ -8,6 +8,7 @@ import {
   Image,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import Svg, { Path } from 'react-native-svg';
 import { tokens } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { shouldTriggerSend } from '../../utils/chatSendGuard';
@@ -218,22 +219,6 @@ export const ChatInputDock: React.FC<ChatInputDockProps> = ({
             </TouchableOpacity>
           )}
 
-          {/* Botão de Modo Conversação Contínua (Gemini Live) */}
-          {onPressLiveVoice && value.trim().length === 0 && !isRecording && (
-            <TouchableOpacity
-              style={[
-                styles.circ,
-                { backgroundColor: colors.bg, borderColor: colors.line },
-              ]}
-              onPress={onPressLiveVoice}
-              activeOpacity={0.7}
-              hitSlop={tokens.hitSlop.sm}
-              accessibilityLabel="Abrir modo de conversa contínua por voz"
-            >
-              <MaterialIcons name="graphic-eq" size={20} color={colors.primary} />
-            </TouchableOpacity>
-          )}
-
           {/* Botão Microfone (.circ) */}
           <TouchableOpacity
             style={[
@@ -252,6 +237,32 @@ export const ChatInputDock: React.FC<ChatInputDockProps> = ({
               color={isRecording ? '#ffffff' : colors.ink}
             />
           </TouchableOpacity>
+
+          {/* Botão Live Voice (.circ.wv) idêntico ao vito-telas.html */}
+          {onPressLiveVoice && value.trim().length === 0 && !isRecording && (
+            <TouchableOpacity
+              style={[
+                styles.circWv,
+                { backgroundColor: colors.ink },
+              ]}
+              onPress={() => {
+                hapticFeedback.light();
+                onPressLiveVoice();
+              }}
+              activeOpacity={0.75}
+              hitSlop={tokens.hitSlop.sm}
+              accessibilityLabel="Conversar por voz com o Vito"
+            >
+              <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+                <Path
+                  d="M4 10v4M8 6v12M12 9v6M16 4v16M20 10v4"
+                  stroke={colors.bg}
+                  strokeWidth={2.6}
+                  strokeLinecap="round"
+                />
+              </Svg>
+            </TouchableOpacity>
+          )}
 
           {/* Botão Enviar / Parar (.circ.send) */}
           {loading ? (
@@ -348,6 +359,13 @@ const styles = StyleSheet.create({
     height: 36,
     borderRadius: 18,
     borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  circWv: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
   },

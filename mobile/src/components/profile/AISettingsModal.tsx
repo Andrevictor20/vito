@@ -15,6 +15,9 @@ import { api } from '../../services/api';
 import { AutonomyMode, AISettings } from '../../types';
 import { BottomSheetModal } from '../ui/BottomSheetModal';
 import { M3Switch } from '../ui/M3Switch';
+import { PersonaStyleSelector } from './PersonaStyleSelector';
+import { UserMemoriesModal } from './UserMemoriesModal';
+import { styles } from './AISettingsModal.styles';
 
 interface AISettingsModalProps {
   visible: boolean;
@@ -33,6 +36,8 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [autonomyMode, setAutonomyMode] = useState<AutonomyMode>('assisted');
   const [autoFocusBlocks, setAutoFocusBlocks] = useState(false);
+  const [personaStyle, setPersonaStyle] = useState('balanced');
+  const [memoriesVisible, setMemoriesVisible] = useState(false);
 
   useEffect(() => {
     if (visible) {
@@ -47,12 +52,20 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
       if (data) {
         setAutonomyMode(data.autonomy_mode || 'assisted');
         setAutoFocusBlocks(Boolean(data.auto_focus_blocks));
+        if (data.persona_style) {
+          setPersonaStyle(data.persona_style);
+        }
       }
     } catch (err: any) {
       console.warn('[AISettingsModal] Falha ao carregar configurações de IA:', err);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleSelectPersonaStyle = async (style: string) => {
+    setPersonaStyle(style);
+    await persistUpdate({ persona_style: style } as any);
   };
 
   const handleSelectMode = async (mode: AutonomyMode) => {
@@ -333,6 +346,35 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
                 </View>
               </View>
 
+              {/* Estilos Conversacionais */}
+              <PersonaStyleSelector
+                value={personaStyle}
+                onChange={handleSelectPersonaStyle}
+              />
+
+              {/* Acesso a Memórias de Longo Prazo */}
+              <TouchableOpacity
+                style={[
+                  styles.memoriesButton,
+                  { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant },
+                ]}
+                onPress={() => setMemoriesVisible(true)}
+                activeOpacity={0.7}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+                  <MaterialIcons name="psychology" size={24} color={colors.primary} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.optionTitle, { color: colors.onSurface }]}>
+                      O que o Vito sabe sobre mim
+                    </Text>
+                    <Text style={[styles.optionDesc, { color: colors.onSurfaceVariant }]}>
+                      Consulte e gerencie memórias, episódios e fatos aprendidos.
+                    </Text>
+                  </View>
+                </View>
+                <MaterialIcons name="chevron-right" size={20} color={colors.outline} />
+              </TouchableOpacity>
+
               {/* Nota de rodapé de segurança e privacidade */}
               <View style={styles.footerNote}>
                 <MaterialIcons name="security" size={14} color={colors.outline} />
@@ -343,155 +385,11 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
               </View>
             </ScrollView>
           )}
+
+      <UserMemoriesModal
+        visible={memoriesVisible}
+        onClose={() => setMemoriesVisible(false)}
+      />
     </BottomSheetModal>
   );
 };
-
-const styles = StyleSheet.create({
-  loadingContainer: {
-    padding: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-  },
-  loadingText: {
-    fontSize: 13,
-  },
-  scrollContent: {
-    padding: 16,
-    gap: 14,
-    paddingBottom: 40,
-  },
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 4,
-  },
-  savingBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  savingText: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  sectionTitle: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.8,
-  },
-  modeCard: {
-    padding: 16,
-    borderRadius: 16,
-    gap: 10,
-  },
-  modeCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-  },
-  modeCardHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-  },
-  modeIconBox: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  titleBadgeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  modeTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  pillBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 12,
-  },
-  pillBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.2,
-  },
-  modeSub: {
-    fontSize: 11,
-    marginTop: 2,
-  },
-  modeDescription: {
-    fontSize: 12,
-    lineHeight: 18,
-  },
-  featuresList: {
-    gap: 6,
-    paddingTop: 4,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(150, 150, 150, 0.2)',
-  },
-  featureItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  featureText: {
-    fontSize: 11,
-  },
-  optionCard: {
-    padding: 14,
-    borderRadius: 14,
-    borderWidth: 1,
-  },
-  optionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  optionLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-  },
-  optionIconBox: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  optionTexts: {
-    flex: 1,
-  },
-  optionTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  optionDesc: {
-    fontSize: 11,
-    lineHeight: 15,
-    marginTop: 2,
-  },
-  footerNote: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 6,
-    marginTop: 4,
-  },
-  footerNoteText: {
-    fontSize: 11,
-    lineHeight: 15,
-    flex: 1,
-  },
-});

@@ -7,10 +7,7 @@ import { FocusMenu, FocusMode } from './FocusMenu';
 import { ChatIdeasDeck } from './ChatIdeasDeck';
 import { FormattedChatMessageText } from './FormattedChatMessageText';
 import { ChatThinkingIndicator } from './ChatThinkingIndicator';
-import { TodoInlineCard } from './cards/TodoInlineCard';
-import { EventInlineCard } from './cards/EventInlineCard';
-import { WhatsAppMessageCard } from './WhatsAppMessageCard';
-import { GmailMessageCard } from './GmailMessageCard';
+import { ChatStructuredCards } from './cards/ChatStructuredCards';
 import { toChatGmailMessage, toChatWhatsAppMessage } from '../../utils/chatCardExtractors';
 import {
   X,
@@ -217,39 +214,15 @@ export const MiniChatWidget: React.FC<MiniChatWidgetProps> = ({ onExpandToFullCh
                       </div>
 
                       {/* Cards Estruturados Inline */}
-                      {m.gmail_message && (
-                        <GmailMessageCard
-                          messageData={m.gmail_message}
-                          onConfirmSend={handleConfirmEmail}
-                        />
-                      )}
-
-                      {m.whatsapp_message && (
-                        <WhatsAppMessageCard
-                          messageData={m.whatsapp_message}
-                          onConfirmSend={handleConfirmWhatsApp}
-                        />
-                      )}
-
-                      {m.todo && (
-                        <TodoInlineCard
-                          todo={m.todo}
-                          onNavigateTab={() => {
-                            setOpen(false);
-                            onExpandToFullChat();
-                          }}
-                        />
-                      )}
-
-                      {m.event && (
-                        <EventInlineCard
-                          event={m.event}
-                          onNavigateTab={() => {
-                            setOpen(false);
-                            onExpandToFullChat();
-                          }}
-                        />
-                      )}
+                      <ChatStructuredCards
+                        message={m}
+                        onConfirmEmail={handleConfirmEmail}
+                        onConfirmWhatsApp={handleConfirmWhatsApp}
+                        onNavigateTab={() => {
+                          setOpen(false);
+                          onExpandToFullChat();
+                        }}
+                      />
 
                       <div className="pt-1 flex items-center justify-between text-[11px] text-zinc-400 font-mono">
                         <span>{m.timestamp ? new Date(m.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ''}</span>

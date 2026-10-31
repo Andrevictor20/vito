@@ -19,7 +19,10 @@ import {
   MessageSquare,
   Sparkles,
   ExternalLink,
+  Brain,
 } from 'lucide-react';
+import { UserMemoriesModal } from './UserMemoriesModal';
+import { PersonaStyleSelector } from './PersonaStyleSelector';
 
 interface SettingsModalProps {
   open: boolean;
@@ -37,6 +40,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose }) =
   const [sessions, setSessions] = useState<SessionDevice[]>([]);
   const [syncingCalendar, setSyncingCalendar] = useState(false);
   const [calendarSyncSuccess, setCalendarSyncSuccess] = useState(false);
+  const [personaStyle, setPersonaStyle] = useState('balanced');
+  const [isMemoriesOpen, setIsMemoriesOpen] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -44,6 +49,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose }) =
       api.getWhatsAppStatus().then(setWaStatus),
       api.getGmailStatus().then(setGmailStatus),
       api.getSessions().then(setSessions),
+      api.getAISettings().then((s) => {
+        if (s?.persona_style) setPersonaStyle(s.persona_style);
+      }),
     ]);
   }, [open]);
 
@@ -306,6 +314,46 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose }) =
             {/* TAB: IA */}
             {activeTab === 'ia' && (
               <div className="space-y-5">
+                {/* Memórias de Longo Prazo */}
+                <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-[#181C22] border border-zinc-200 dark:border-[#262B33] flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-purple-500/10 text-purple-500 flex items-center justify-center">
+                      <Brain size={16} />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-zinc-900 dark:text-white">Memórias de Longo Prazo</p>
+                      <p className="text-[11px] text-zinc-500 dark:text-zinc-400">Transparência: veja e gerencie o que o Vito sabe sobre você</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setIsMemoriesOpen(true)}
+                    className="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold transition-colors shadow-2xs"
+                  >
+                    Ver Memórias
+                  </button>
+                </div>
+
+                {/* Estilos Conversacionais */}
+                <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-[#181C22] border border-zinc-200 dark:border-[#262B33] space-y-3">
+                  <div>
+                    <p className="text-xs font-bold text-zinc-900 dark:text-white">Estilo Conversacional</p>
+                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400">Escolha o tom de voz e abordagem do assistente</p>
+                  </div>
+
+                  <PersonaStyleSelector
+                    value={personaStyle}
+                    onChange={async (newStyle) => {
+                      setPersonaStyle(newStyle);
+                      try {
+                        await api.updateAISettings({ persona_style: newStyle });
+                      } catch (err) {
+                        console.error(err);
+                      }
+                    }}
+                  />
+                </div>
+
+                {/* Modo de Autonomia */}
                 <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-[#181C22] border border-zinc-200 dark:border-[#262B33] space-y-3">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center">
@@ -440,6 +488,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose }) =
           </div>
         </div>
       </div>
+      <UserMemoriesModal isOpen={isMemoriesOpen} onClose={() => setIsMemoriesOpen(false)} />
     </div>
   );
 };

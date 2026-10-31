@@ -1,50 +1,53 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
-  View,
-  Text,
-  TouchableOpacity,
   NativeModules,
   Animated,
   Easing,
   DeviceEventEmitter,
   BackHandler,
   Linking,
-  ActivityIndicator,
 } from 'react-native';
-import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import api from '../services/api';
 import {
   ConversationState,
   calculateHarmonicBarHeights,
-  getAuraColor,
-  getStateLabel,
   extractWhatsAppCardData,
   isGoodbyeUtterance,
 } from './voiceOverlayHelpers';
-import { voiceOverlayStyles as styles } from './vitoVoiceOverlayStyles';
+import { VoiceFullscreenView } from './VoiceFullscreenView';
+import { VoiceCompactView } from './VoiceCompactView';
 import type { ChatWhatsAppMessage } from '../types';
+import type { ChatHistoryItem } from '../services/api/types';
 
 const { VitoDuplexAudioModule } = NativeModules;
 
 export interface VitoVoiceOverlayProps {
   triggerSource?: 'WAKE_WORD' | 'DEFAULT_ASSISTANT' | 'MANUAL';
   screenContext?: string;
+  variant?: 'fullscreen' | 'compact';
   onClose?: () => void;
   onMessageExchange?: (userText: string, aiReply: string) => void;
+  onSwitchToText?: () => void;
 }
 
 export function VitoVoiceOverlay({
   triggerSource = 'DEFAULT_ASSISTANT',
+  screenContext,
+  variant,
   onClose,
   onMessageExchange,
+  onSwitchToText,
 }: VitoVoiceOverlayProps) {
   const [state, setState] = useState<ConversationState>('LISTENING');
   const [transcript, setTranscript] = useState<string>('Estou ouvindo... O que deseja fazer?');
   const [audioLevel, setAudioLevel] = useState<number>(0);
+  const [durationSeconds, setDurationSeconds] = useState<number>(0);
+  const [isMuted, setIsMuted] = useState<boolean>(false);
   const [whatsappCard, setWhatsappCard] = useState<ChatWhatsAppMessage | null>(null);
   const [isSendingWhatsApp, setIsSendingWhatsApp] = useState<boolean>(false);
   const [whatsAppSent, setWhatsAppSent] = useState<boolean>(false);
 
+  // Animações de entrada para o modo compacto
   const slideAnim = useRef(new Animated.Value(80)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const phaseRef = useRef<number>(0);
@@ -57,8 +60,11 @@ export function VitoVoiceOverlay({
   const audioLevelRef = useRef(audioLevel);
   audioLevelRef.current = audioLevel;
   const isClosingRef = useRef<boolean>(false);
-  const conversationHistoryRef = useRef<{ role: string; content: string }[]>([]);
+  const conversationHistoryRef = useRef<ChatHistoryItem[]>([]);
   const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Determina se deve renderizar o modo compacto (fora do app) ou fullscreen (dentro do app)
+  const isCompact = variant === 'compact' || (!variant && triggerSource !== 'MANUAL');
 
   const handleClose = useCallback(() => {
     if (isClosingRef.current) return;
@@ -82,6 +88,46 @@ export function VitoVoiceOverlay({
     }
   }, [onClose]);
 
+  const handleSwitchToText = useCallback(() => {
+    handleClose();
+    onSwitchToText?.();
+  }, [handleClose, onSwitchToText]);
+
+  const handleTapOrb = useCallback(() => {
+    if (stateRef.current === 'SPEAKING') {
+      try {
+        if (VitoDuplexAudioModule?.releaseDuplexAudio) {
+          VitoDuplexAudioModule.releaseDuplexAudio();
+        }
+      } catch {}
+      setState('LISTENING');
+      setTranscript('Ouvindo você...');
+      if (VitoDuplexAudioModule?.startRecording) {
+        VitoDuplexAudioModule.startRecording().catch(() => {});
+      }
+    }
+  }, []);
+
+  const handleToggleMute = useCallback(() => {
+    setIsMuted((prev) => {
+      const next = !prev;
+      if (next) {
+        try {
+          if (VitoDuplexAudioModule?.stopRecording) {
+            VitoDuplexAudioModule.stopRecording().catch(() => {});
+          }
+        } catch {}
+      } else {
+        try {
+          if (VitoDuplexAudioModule?.startRecording) {
+            VitoDuplexAudioModule.startRecording().catch(() => {});
+          }
+        } catch {}
+      }
+      return next;
+    });
+  }, []);
+
   const resetInactivityTimer = useCallback(() => {
     if (inactivityTimerRef.current) {
       clearTimeout(inactivityTimerRef.current);
@@ -94,7 +140,7 @@ export function VitoVoiceOverlay({
   }, [handleClose]);
 
   const finishRecordingAndProcess = useCallback(async () => {
-    if (stateRef.current !== 'LISTENING' || isClosingRef.current) return;
+    if (stateRef.current !== 'LISTENING' || isClosingRef.current || isMuted) return;
     if (inactivityTimerRef.current) {
       clearTimeout(inactivityTimerRef.current);
     }
@@ -117,16 +163,18 @@ export function VitoVoiceOverlay({
         return;
       }
 
-      const res = await api.assistantAudio(wavPath, 'audio.wav');
+      const res = await api.assistantAudio(wavPath, 'audio.wav', {
+        history: conversationHistoryRef.current,
+      });
       const userText = (res.transcript || '').trim();
       const replyText = (res.reply || res.message || 'Comando executado.').trim();
 
       onMessageExchange?.(userText || 'Áudio enviado', replyText);
 
       if (userText) {
-        conversationHistoryRef.current.push({ role: 'user', content: userText });
+        conversationHistoryRef.current.push({ sender: 'user', text: userText });
       }
-      conversationHistoryRef.current.push({ role: 'assistant', content: replyText });
+      conversationHistoryRef.current.push({ sender: 'vito', text: replyText });
 
       setState('SPEAKING');
       setTranscript(replyText);
@@ -138,7 +186,7 @@ export function VitoVoiceOverlay({
 
       const isGoodbye = isGoodbyeUtterance(userText) || isGoodbyeUtterance(replyText);
 
-      // TTS Neural (Edge-TTS) com fallback silencioso para speakText nativo.
+      // TTS Neural (Edge-TTS) com fallback silencioso para speakText nativo
       let ttsPlayed = false;
       try {
         const tts = await api.voiceTTS(replyText);
@@ -147,7 +195,7 @@ export function VitoVoiceOverlay({
           ttsPlayed = true;
         }
       } catch {
-        // silencioso: cai no speakText abaixo
+        // Silencioso
       }
       if (!ttsPlayed && VitoDuplexAudioModule?.speakText) {
         try {
@@ -190,7 +238,7 @@ export function VitoVoiceOverlay({
         }
       }, 1500);
     }
-  }, [handleClose, onMessageExchange, resetInactivityTimer]);
+  }, [handleClose, onMessageExchange, resetInactivityTimer, isMuted]);
 
   const handleConfirmWhatsApp = useCallback(async () => {
     if (!whatsappCard || isSendingWhatsApp || whatsAppSent) return;
@@ -227,6 +275,11 @@ export function VitoVoiceOverlay({
     }
     resetInactivityTimer();
 
+    // Cronômetro da sessão a cada 1 segundo
+    const durationInterval = setInterval(() => {
+      setDurationSeconds((d) => d + 1);
+    }, 1000);
+
     const levelSub = DeviceEventEmitter.addListener('onAudioLevel', (event: { level?: number }) => {
       if (typeof event?.level === 'number') {
         setAudioLevel(event.level);
@@ -245,7 +298,7 @@ export function VitoVoiceOverlay({
       }
     });
 
-    const interval = setInterval(() => {
+    const waveInterval = setInterval(() => {
       phaseRef.current += 0.12;
       const heights = calculateHarmonicBarHeights(
         audioLevelRef.current,
@@ -258,7 +311,8 @@ export function VitoVoiceOverlay({
     }, 45);
 
     return () => {
-      clearInterval(interval);
+      clearInterval(durationInterval);
+      clearInterval(waveInterval);
       levelSub.remove();
       speechEndSub.remove();
       speechStartSub.remove();
@@ -273,113 +327,41 @@ export function VitoVoiceOverlay({
     };
   }, [slideAnim, fadeAnim, finishRecordingAndProcess, resetInactivityTimer]);
 
-  const auraColor = getAuraColor(state);
+  if (isCompact) {
+    return (
+      <VoiceCompactView
+        state={state}
+        transcript={transcript}
+        barHeights={barHeights}
+        durationSeconds={durationSeconds}
+        triggerSource={triggerSource}
+        slideAnim={slideAnim}
+        fadeAnim={fadeAnim}
+        onClose={handleClose}
+        whatsappCard={whatsappCard}
+        isSendingWhatsApp={isSendingWhatsApp}
+        whatsAppSent={whatsAppSent}
+        onConfirmWhatsApp={handleConfirmWhatsApp}
+      />
+    );
+  }
 
   return (
-    <View style={styles.container}>
-      <TouchableOpacity
-        style={styles.backdrop}
-        activeOpacity={1}
-        onPress={handleClose}
-        accessibilityLabel="Fechar assistente"
-      />
-
-      <View pointerEvents="none" style={styles.vignetteWrapper}>
-        <Svg width="100%" height={220} preserveAspectRatio="none">
-          <Defs>
-            <LinearGradient id="vitoVoiceVignette" x1="0" y1="0" x2="0" y2="1">
-              <Stop offset="0%" stopColor="#0B0D13" stopOpacity="0" />
-              <Stop offset="45%" stopColor="#0B0D13" stopOpacity="0.55" />
-              <Stop offset="100%" stopColor="#0B0D13" stopOpacity="0.92" />
-            </LinearGradient>
-          </Defs>
-          <Rect x="0" y="0" width="100%" height={220} fill="url(#vitoVoiceVignette)" />
-        </Svg>
-      </View>
-
-      <Animated.View
-        style={[
-          styles.bottomSheet,
-          {
-            transform: [{ translateY: slideAnim }],
-            opacity: fadeAnim,
-          },
-        ]}
-      >
-        {whatsappCard && (
-          <View style={styles.whatsAppSatellite}>
-            <View style={styles.whatsAppSatelliteLeft}>
-              <Text style={styles.whatsAppSatelliteIcon}>💬</Text>
-              <Text style={styles.whatsAppSatelliteText} numberOfLines={1}>
-                {whatsappCard.recipient_name || whatsappCard.recipient_phone || 'Contato'}
-              </Text>
-            </View>
-            <TouchableOpacity
-              style={[
-                styles.whatsAppSendBtn,
-                (isSendingWhatsApp || whatsAppSent) && styles.whatsAppSendBtnDisabled,
-              ]}
-              onPress={handleConfirmWhatsApp}
-              disabled={isSendingWhatsApp || whatsAppSent}
-              activeOpacity={0.8}
-            >
-              {isSendingWhatsApp ? (
-                <ActivityIndicator size="small" color="#000000" />
-              ) : (
-                <Text style={styles.whatsAppSendBtnText}>
-                  {whatsAppSent ? 'Enviado ✓' : 'Enviar'}
-                </Text>
-              )}
-            </TouchableOpacity>
-          </View>
-        )}
-
-        <View style={styles.transcriptChip}>
-          <View style={styles.transcriptChipHeader}>
-            <View style={[styles.statusDot, { backgroundColor: auraColor }]} />
-            <Text style={[styles.stateLabel, { color: auraColor }]}>
-              {getStateLabel(state)}
-            </Text>
-          </View>
-          <Text style={styles.transcriptText} numberOfLines={3}>
-            {transcript}
-          </Text>
-        </View>
-
-        <View style={[styles.pill, { borderColor: state === 'LISTENING' ? '#2A2E35' : auraColor }]}>
-          <View style={styles.pillLeft}>
-            <View style={[styles.micIndicator, { backgroundColor: auraColor }]} />
-            <Text style={styles.pillBadgeText}>
-              {triggerSource === 'DEFAULT_ASSISTANT' ? 'Assistente' : 'Vito Voz'}
-            </Text>
-          </View>
-
-          <View style={styles.waveformContainer}>
-            {barHeights.map((h, i) => (
-              <View
-                key={i}
-                style={[
-                  styles.waveformBar,
-                  {
-                    height: h,
-                    backgroundColor: auraColor,
-                  },
-                ]}
-              />
-            ))}
-          </View>
-
-          <TouchableOpacity
-            style={styles.closeBtn}
-            onPress={handleClose}
-            activeOpacity={0.7}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-            accessibilityLabel="Fechar assistente"
-          >
-            <Text style={styles.closeBtnText}>✕</Text>
-          </TouchableOpacity>
-        </View>
-      </Animated.View>
-    </View>
+    <VoiceFullscreenView
+      state={state}
+      transcript={transcript}
+      audioLevel={audioLevel}
+      durationSeconds={durationSeconds}
+      isMuted={isMuted}
+      onToggleMute={handleToggleMute}
+      onClose={handleClose}
+      onSwitchToText={handleSwitchToText}
+      onTapOrb={handleTapOrb}
+      whatsappCard={whatsappCard}
+      isSendingWhatsApp={isSendingWhatsApp}
+      whatsAppSent={whatsAppSent}
+      onConfirmWhatsApp={handleConfirmWhatsApp}
+      screenContext={screenContext}
+    />
   );
 }

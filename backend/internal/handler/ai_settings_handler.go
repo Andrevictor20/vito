@@ -22,6 +22,10 @@ func NewAISettingsHandler(repo domain.AISettingsRepository) *AISettingsHandler {
 type updateAISettingsRequest struct {
 	AutonomyMode    string `json:"autonomy_mode"`
 	AutoFocusBlocks *bool  `json:"auto_focus_blocks"`
+	PersonaStyle    string `json:"persona_style"`
+	PreferredVoice  string `json:"preferred_voice"`
+	EmojiPolicy     string `json:"emoji_policy"`
+	ResponseLength  string `json:"response_length"`
 }
 
 // GetSettings retorna as configurações de IA do usuário logado.
@@ -75,6 +79,18 @@ func (h *AISettingsHandler) UpdateSettings(w http.ResponseWriter, r *http.Reques
 	}
 	if req.AutoFocusBlocks != nil {
 		current.AutoFocusBlocks = *req.AutoFocusBlocks
+	}
+	if p := strings.TrimSpace(req.PersonaStyle); p != "" {
+		current.PersonaStyle = p
+	}
+	if v := strings.TrimSpace(req.PreferredVoice); v != "" {
+		current.PreferredVoice = v
+	}
+	if e := strings.TrimSpace(req.EmojiPolicy); e != "" {
+		current.EmojiPolicy = e
+	}
+	if l := strings.TrimSpace(req.ResponseLength); l != "" {
+		current.ResponseLength = l
 	}
 
 	if err := h.repo.UpsertSettings(current); err != nil {

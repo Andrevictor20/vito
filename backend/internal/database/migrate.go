@@ -344,6 +344,32 @@ func runVersionedMigrations(db *sql.DB) error {
 			}
 			continue
 		}
+		if version == "022_memory_hierarchy.sql" {
+			cols := []struct{ name, ddl string }{
+				{"persona_style", "ALTER TABLE user_ai_settings ADD COLUMN persona_style TEXT NOT NULL DEFAULT 'balanced'"},
+				{"preferred_voice", "ALTER TABLE user_ai_settings ADD COLUMN preferred_voice TEXT NOT NULL DEFAULT 'gemini-default'"},
+				{"emoji_policy", "ALTER TABLE user_ai_settings ADD COLUMN emoji_policy TEXT NOT NULL DEFAULT 'auto'"},
+				{"response_length", "ALTER TABLE user_ai_settings ADD COLUMN response_length TEXT NOT NULL DEFAULT 'medium'"},
+			}
+			for _, c := range cols {
+				if !hasColumn(db, "user_ai_settings", c.name) {
+					if _, err := db.Exec(c.ddl); err != nil {
+						return err
+					}
+				}
+			}
+			content, err := migrationFS.ReadFile(name)
+			if err != nil {
+				return err
+			}
+			if _, err := db.Exec(string(content)); err != nil {
+				return err
+			}
+			if err := recordMigration(db, version); err != nil {
+				return err
+			}
+			continue
+		}
 		content, err := migrationFS.ReadFile(name)
 		if err != nil {
 			return err

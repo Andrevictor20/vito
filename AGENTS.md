@@ -54,7 +54,7 @@ Before emitting any final response for code tasks, execute the **4-Point Pre-Res
 
 - **Turn Budget:** L0 ≤ 3 · L1 ≤ 8 · L2 ≤ 20 · L3 checkpointed. **Mandatory Batching:** Turn 1 groups `PROJECT_MEMORY.md` + target file reads in parallel.
 - **Anti-Tool-Spam:** Never poll `manage_task(status)` (wait for reactive wakeup). Never re-read a file immediately after `replace_file_content`.
-- **File Reading:** Files ≤ 800 lines → read whole in 1 call; > 800 lines → locate symbol via grep/AST graph (`code-review-graph`) and read exact section.
+- **AST Graph Enforcement & File Reading:** For symbol lookup, callers, and impact mapping (L1+), **mandatorily query `code-review-graph` (`call_mcp_tool` or `agy-graph`)**. Text `grep` is prohibited for code call-hierarchies. Read files ≤ 800 lines in 1 call; > 800 lines, locate symbols via AST graph and read exact 400-line section.
 - **Telemetry:** Model token consumption telemetry and response footers are disabled. Mechanical discipline relies strictly on turn limits, batching, and lean context.
 
 ## 5. Continuous Memory (4 Tiers) & Code Quality

@@ -108,3 +108,38 @@ func TestAISettingsHandler_UpdateSettings_InvalidMode(t *testing.T) {
 		t.Fatalf("esperava status 400 Bad Request para modo inválido, obteve %d", rr.Code)
 	}
 }
+
+func TestAISettingsHandler_UpdateSettings_PersonaAndVoice(t *testing.T) {
+	repo := &mockAISettingsRepoForHandler{}
+	h := handler.NewAISettingsHandler(repo)
+
+	body := []byte(`{"persona_style":"direct","preferred_voice":"onyx","emoji_policy":"minimal","response_length":"concise"}`)
+	req := httptest.NewRequest("PUT", "/api/v1/users/ai-settings", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	ctx := context.WithValue(req.Context(), middleware.UserIDKey, "user-ai-1")
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	h.UpdateSettings(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("esperava status 200, obteve %d. Body: %s", rr.Code, rr.Body.String())
+	}
+
+	var res domain.AISettings
+	if err := json.NewDecoder(rr.Body).Decode(&res); err != nil {
+		t.Fatalf("falha ao decodificar JSON: %v", err)
+	}
+	if res.PersonaStyle != "direct" {
+		t.Errorf("esperava persona_style 'direct', obteve %s", res.PersonaStyle)
+	}
+	if res.PreferredVoice != "onyx" {
+		t.Errorf("esperava preferred_voice 'onyx', obteve %s", res.PreferredVoice)
+	}
+	if res.EmojiPolicy != "minimal" {
+		t.Errorf("esperava emoji_policy 'minimal', obteve %s", res.EmojiPolicy)
+	}
+	if res.ResponseLength != "concise" {
+		t.Errorf("esperava response_length 'concise', obteve %s", res.ResponseLength)
+	}
+}

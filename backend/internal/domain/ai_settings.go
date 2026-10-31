@@ -22,6 +22,10 @@ type AISettings struct {
 	UserID          string       `json:"user_id"`
 	AutonomyMode    AutonomyMode `json:"autonomy_mode"` // "assisted" | "proactive"
 	AutoFocusBlocks bool         `json:"auto_focus_blocks"`
+	PersonaStyle    string       `json:"persona_style,omitempty"`
+	PreferredVoice  string       `json:"preferred_voice,omitempty"`
+	EmojiPolicy     string       `json:"emoji_policy,omitempty"`
+	ResponseLength  string       `json:"response_length,omitempty"`
 	CreatedAt       time.Time    `json:"created_at"`
 	UpdatedAt       time.Time    `json:"updated_at"`
 }
@@ -33,6 +37,10 @@ func DefaultAISettings(userID string) *AISettings {
 		UserID:          userID,
 		AutonomyMode:    AutonomyModeAssisted,
 		AutoFocusBlocks: false,
+		PersonaStyle:    "balanced",
+		PreferredVoice:  "alloy",
+		EmojiPolicy:     "moderate",
+		ResponseLength:  "adaptive",
 		CreatedAt:       now,
 		UpdatedAt:       now,
 	}

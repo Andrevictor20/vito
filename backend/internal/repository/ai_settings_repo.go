@@ -20,7 +20,12 @@ func NewAISettingsRepository(db *sql.DB) *AISettingsRepositorySQLite {
 // GetSettings recupera as preferências de IA do usuário ou retorna o default (assistido) se inexistente.
 func (r *AISettingsRepositorySQLite) GetSettings(userID string) (*domain.AISettings, error) {
 	query := `
-		SELECT user_id, autonomy_mode, auto_focus_blocks, created_at, updated_at
+		SELECT user_id, autonomy_mode, auto_focus_blocks,
+		       COALESCE(persona_style, 'balanced'),
+		       COALESCE(preferred_voice, 'alloy'),
+		       COALESCE(emoji_policy, 'moderate'),
+		       COALESCE(response_length, 'adaptive'),
+		       created_at, updated_at
 		FROM user_ai_settings
 		WHERE user_id = ?
 	`
@@ -29,12 +34,17 @@ func (r *AISettingsRepositorySQLite) GetSettings(userID string) (*domain.AISetti
 	var s domain.AISettings
 	var autoFocus bool
 	var modeStr string
+	var persona, voice, emoji, respLen string
 	var createdAt, updatedAt time.Time
 
 	err := row.Scan(
 		&s.UserID,
 		&modeStr,
 		&autoFocus,
+		&persona,
+		&voice,
+		&emoji,
+		&respLen,
 		&createdAt,
 		&updatedAt,
 	)
@@ -47,6 +57,10 @@ func (r *AISettingsRepositorySQLite) GetSettings(userID string) (*domain.AISetti
 
 	s.AutonomyMode = domain.AutonomyMode(modeStr)
 	s.AutoFocusBlocks = autoFocus
+	s.PersonaStyle = persona
+	s.PreferredVoice = voice
+	s.EmojiPolicy = emoji
+	s.ResponseLength = respLen
 	s.CreatedAt = createdAt
 	s.UpdatedAt = updatedAt
 
@@ -65,14 +79,32 @@ func (r *AISettingsRepositorySQLite) UpsertSettings(s *domain.AISettings) error 
 	if mode == "" {
 		mode = string(domain.AutonomyModeAssisted)
 	}
+	if s.PersonaStyle == "" {
+		s.PersonaStyle = "balanced"
+	}
+	if s.PreferredVoice == "" {
+		s.PreferredVoice = "alloy"
+	}
+	if s.EmojiPolicy == "" {
+		s.EmojiPolicy = "moderate"
+	}
+	if s.ResponseLength == "" {
+		s.ResponseLength = "adaptive"
+	}
 
 	query := `
 		INSERT INTO user_ai_settings (
-			user_id, autonomy_mode, auto_focus_blocks, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?)
+			user_id, autonomy_mode, auto_focus_blocks,
+			persona_style, preferred_voice, emoji_policy, response_length,
+			created_at, updated_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(user_id) DO UPDATE SET
 			autonomy_mode = excluded.autonomy_mode,
 			auto_focus_blocks = excluded.auto_focus_blocks,
+			persona_style = excluded.persona_style,
+			preferred_voice = excluded.preferred_voice,
+			emoji_policy = excluded.emoji_policy,
+			response_length = excluded.response_length,
 			updated_at = excluded.updated_at
 	`
 	_, err := r.db.Exec(
@@ -80,6 +112,10 @@ func (r *AISettingsRepositorySQLite) UpsertSettings(s *domain.AISettings) error 
 		s.UserID,
 		mode,
 		s.AutoFocusBlocks,
+		s.PersonaStyle,
+		s.PreferredVoice,
+		s.EmojiPolicy,
+		s.ResponseLength,
 		s.CreatedAt,
 		s.UpdatedAt,
 	)

@@ -1,7 +1,9 @@
 package handler
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
 	"io"
@@ -12,6 +14,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/andrevmp/vito/backend/internal/ai"
+	"github.com/andrevmp/vito/backend/internal/domain"
+	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/andrevmp/vito/backend/internal/service"
 	"golang.org/x/net/websocket"
 )
@@ -25,22 +30,43 @@ type SessionInitPayload struct {
 	TriggerSource string `json:"trigger_source"`
 	Timezone      string `json:"timezone"`
 	ScreenContext string `json:"screen_context,omitempty"`
+	UserID        string `json:"user_id,omitempty"`
 }
 
 type VoiceServerEvent struct {
-	Type    string `json:"type"`
-	Text    string `json:"text,omitempty"`
-	Summary string `json:"summary,omitempty"`
+	Type     string `json:"type"`
+	Text     string `json:"text,omitempty"`
+	Summary  string `json:"summary,omitempty"`
+	AudioB64 string `json:"audio_b64,omitempty"`
 }
 
+// VoiceStreamHandler gerencia streaming de voz bidirecional WebSocket conectando ao AgentLoop e TTS.
 type VoiceStreamHandler struct {
-	astSvc *service.AssistantService
+	astSvc      *service.AssistantService
+	loop        *service.AgentLoop
+	convRepo    *repository.ConversationStoreRepository
+	transcriber ai.AudioTranscriber
+	ttsSvc      ai.TTSService
+	geminiKey   string
 }
 
 func NewVoiceStreamHandler(astSvc *service.AssistantService) *VoiceStreamHandler {
 	return &VoiceStreamHandler{
 		astSvc: astSvc,
 	}
+}
+
+// SetAgentLoop conecta o cérebro único e o repositório de conversas.
+func (h *VoiceStreamHandler) SetAgentLoop(loop *service.AgentLoop, convRepo *repository.ConversationStoreRepository) {
+	h.loop = loop
+	h.convRepo = convRepo
+}
+
+// SetAudioServices configura o transcritor de entrada, sintetizador TTS e chave Gemini.
+func (h *VoiceStreamHandler) SetAudioServices(transcriber ai.AudioTranscriber, ttsSvc ai.TTSService, geminiKey string) {
+	h.transcriber = transcriber
+	h.ttsSvc = ttsSvc
+	h.geminiKey = geminiKey
 }
 
 // Handler returns the http.Handler for WebSocket voice stream
@@ -126,13 +152,59 @@ func (h *VoiceStreamHandler) handleWebSocket(ws *websocket.Conn) {
 				copy(utterance, audioBuffer)
 				audioBuffer = audioBuffer[:0]
 
-				// Processamento concorrente do comando
+				// Processamento do comando via AgentLoop e síntese TTS
 				go func(pcm []byte) {
-					// Fallback amigável de transcrição ou processamento
-					sendEvent(VoiceServerEvent{
-						Type: "BOT_TRANSCRIPT",
-						Text: "Entendido! Como posso ajudar você agora?",
-					})
+					if h.loop != nil {
+						var transcript string
+						if h.transcriber != nil {
+							wav := ai.PCMToWAV(pcm, 16000, 1, 16)
+							tr, err := h.transcriber.Transcribe(ctx, bytes.NewReader(wav), "voice.wav")
+							if err == nil && strings.TrimSpace(tr) != "" {
+								transcript = tr
+							}
+						}
+						if transcript == "" {
+							transcript = "Olá Vito, estou falando por comando de voz."
+						}
+
+						userID := meta.UserID
+						if userID == "" {
+							userID = "default_user"
+						}
+
+						req := domain.UnifiedAssistantRequest{
+							UserID:  userID,
+							Channel: "voice",
+							Message: transcript,
+						}
+						resp, err := h.loop.Run(ctx, req)
+						if err == nil && resp != nil {
+							sendEvent(VoiceServerEvent{
+								Type: "BOT_TRANSCRIPT",
+								Text: resp.Text,
+							})
+
+							if h.ttsSvc != nil {
+								audio, _, err := h.ttsSvc.Synthesize(ctx, resp.Text, "Puck")
+								if err == nil && len(audio) > 0 {
+									sendEvent(VoiceServerEvent{
+										Type:     "AUDIO",
+										AudioB64: base64.StdEncoding.EncodeToString(audio),
+									})
+								}
+							}
+						} else {
+							sendEvent(VoiceServerEvent{
+								Type: "BOT_TRANSCRIPT",
+								Text: "Entendido! Como posso ajudar você agora?",
+							})
+						}
+					} else {
+						sendEvent(VoiceServerEvent{
+							Type: "BOT_TRANSCRIPT",
+							Text: "Entendido! Como posso ajudar você agora?",
+						})
+					}
 					sendEvent(VoiceServerEvent{
 						Type: "STATE_CHANGED",
 						Text: "LISTENING",

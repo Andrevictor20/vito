@@ -528,6 +528,8 @@ export interface AISettings {
   user_id: string;
   autonomy_mode: AutonomyMode;
   auto_focus_blocks: boolean;
+  persona_style?: 'balanced' | 'direct' | 'warm' | 'professional' | 'relaxed' | string;
+  preferred_voice?: string;
   created_at: string;
   updated_at: string;
 }

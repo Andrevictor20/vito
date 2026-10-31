@@ -7,6 +7,10 @@ import {
   extractWhatsAppCardData,
   isGoodbyeUtterance,
   GAUSSIAN_WEIGHTS_13,
+  formatVoiceDuration,
+  getPrototypeStateColor,
+  getPrototypeSpeakerLabel,
+  getPrototypeHint,
 } from '../voiceOverlayHelpers';
 
 describe('voiceOverlayHelpers — Testes do Visualizador e Lógica de Voz', () => {
@@ -107,5 +111,33 @@ describe('voiceOverlayHelpers — Testes do Visualizador e Lógica de Voz', () =
 
     const card = extractWhatsAppCardData(mockResponse);
     assert.strictEqual(card, null);
+  });
+
+  it('formatVoiceDuration formata segundos em formato MM:SS conforme vito-telas', () => {
+    assert.strictEqual(formatVoiceDuration(0), '0:00');
+    assert.strictEqual(formatVoiceDuration(9), '0:09');
+    assert.strictEqual(formatVoiceDuration(10), '0:10');
+    assert.strictEqual(formatVoiceDuration(60), '1:00');
+    assert.strictEqual(formatVoiceDuration(75), '1:15');
+    assert.strictEqual(formatVoiceDuration(605), '10:05');
+  });
+
+  it('getPrototypeStateColor mapeia as cores exatas do vito-telas.html', () => {
+    assert.strictEqual(getPrototypeStateColor('LISTENING'), '#2B7FD4'); // Azul
+    assert.strictEqual(getPrototypeStateColor('THINKING'), '#D9681A');  // Laranja
+    assert.strictEqual(getPrototypeStateColor('SPEAKING'), '#0B9A5F');  // Esmeralda
+  });
+
+  it('getPrototypeSpeakerLabel identifica o orador atual', () => {
+    assert.strictEqual(getPrototypeSpeakerLabel('LISTENING'), 'VOCÊ');
+    assert.strictEqual(getPrototypeSpeakerLabel('THINKING'), 'VOCÊ');
+    assert.strictEqual(getPrototypeSpeakerLabel('SPEAKING'), 'VITO');
+  });
+
+  it('getPrototypeHint fornece dicas contextuais corretas', () => {
+    assert.strictEqual(getPrototypeHint('LISTENING', true), 'Microfone desativado');
+    assert.strictEqual(getPrototypeHint('SPEAKING', false), 'Toque no Vito para interromper');
+    assert.strictEqual(getPrototypeHint('THINKING', false), 'Processando sua solicitação...');
+    assert.strictEqual(getPrototypeHint('LISTENING', false), 'Fale naturalmente com o Vito');
   });
 });

@@ -239,6 +239,8 @@ export interface AISettings {
   autonomy_mode: 'assisted' | 'proactive';
   auto_focus_blocks?: boolean;
   personality_tone?: string;
+  persona_style?: 'balanced' | 'direct' | 'warm' | 'professional' | 'relaxed' | string;
+  preferred_voice?: string;
 }
 
 export interface MorningBriefingSettings {

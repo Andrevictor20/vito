@@ -8,6 +8,7 @@ import { BookingApi } from './bookingApi';
 import { MeetingsApi } from './meetingsApi';
 import { IntegrationsApi } from './integrationsApi';
 import { PendingApi } from './pendingApi';
+import { MemoriesApi } from './memoriesApi';
 import {
   User,
   AuthTokens,
@@ -44,6 +45,7 @@ export class ApiService extends ApiClient {
   public meetingsApi = new MeetingsApi(this);
   public integrationsApi = new IntegrationsApi(this);
   public pendingApi = new PendingApi(this);
+  public memoriesApi = new MemoriesApi(this);
 
   // --- Auth & Sessions ---
   login(email: string, password: string, deviceName?: string): Promise<AuthTokens> {

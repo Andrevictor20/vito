@@ -367,9 +367,40 @@ export const tokens = {
       labelMedium: 0.25,
       labelSmall: 0.35,
     },
+    titleSmall: {
+      fontSize: 14,
+      lineHeight: 20,
+    },
+    titleMedium: {
+      fontSize: 16,
+      lineHeight: 24,
+    },
+    bodySmall: {
+      fontSize: 12,
+      lineHeight: 16,
+    },
+    bodyMedium: {
+      fontSize: 14,
+      lineHeight: 20,
+    },
   },
 
   // 3. Escala de Shapes do Material 3 — Design System: sm8/md14/lg20/full
+  shapes: {
+    none: MD3Shapes.none,
+    xs: MD3Shapes.extraSmall,
+    sm: 8,
+    md: 14,
+    lg: 20,
+    xl: MD3Shapes.extraLarge,
+    full: MD3Shapes.full,
+    extraSmall: MD3Shapes.extraSmall,
+    small: MD3Shapes.small,
+    medium: MD3Shapes.medium,
+    large: MD3Shapes.large,
+    largeIncreased: MD3Shapes.largeIncreased,
+    extraLarge: MD3Shapes.extraLarge,
+  },
   radii: {
     none: MD3Shapes.none,
     xs: MD3Shapes.extraSmall,
@@ -388,6 +419,7 @@ export const tokens = {
 
   // 4. Espaçamentos M3 (Grid de 4dp / 8dp)
   spacing: {
+    '2xs': 2,
     xxs: 2,
     xs: 4,
     sm: 8,

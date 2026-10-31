@@ -69,7 +69,7 @@ func (s *edgeTTSService) Synthesize(ctx context.Context, text string, voice stri
 
 	// Tenta ler do cache em disco.
 	if cached, ok := s.readCache(voice, text); ok {
-		return cached, "audio/mpeg", nil
+		return cached, detectAudioMime(cached), nil
 	}
 
 	// Chama o sintetizador injetado.
@@ -82,6 +82,13 @@ func (s *edgeTTSService) Synthesize(ctx context.Context, text string, voice stri
 	_ = s.writeCache(voice, text, audio)
 
 	return audio, mime, nil
+}
+
+func detectAudioMime(data []byte) string {
+	if len(data) >= 4 && string(data[:4]) == "RIFF" {
+		return "audio/wav"
+	}
+	return "audio/mpeg"
 }
 
 // cacheKey gera o nome do arquivo de cache a partir do SHA-256 de "(voice:text)".

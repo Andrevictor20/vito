@@ -30,6 +30,14 @@ type MorningBriefingWorker struct {
 	running       bool
 	mu            sync.Mutex
 	location      *time.Location
+	bridge        *ProactiveConversationBridge
+}
+
+// SetProactiveBridge injeta a ponte de conversa para registro do briefing matinal.
+func (w *MorningBriefingWorker) SetProactiveBridge(bridge *ProactiveConversationBridge) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.bridge = bridge
 }
 
 // NewMorningBriefingWorker cria uma nova instância do worker de briefing matinal.
@@ -204,6 +212,14 @@ func (w *MorningBriefingWorker) ProcessBriefings(now time.Time) (int, error) {
 			log.Printf("[MorningBriefingWorker] Erro ao despachar push para %s: %v", s.UserID, err)
 		} else if sentCount > 0 {
 			dispatched++
+		}
+
+		w.mu.Lock()
+		bridge := w.bridge
+		w.mu.Unlock()
+		if bridge != nil {
+			msgText := fmt.Sprintf("%s\n%s", title, body)
+			_ = bridge.RecordProactiveNotification(context.Background(), s.UserID, "app", "morning_briefing", msgText)
 		}
 
 		// Marca como enviado no dia corrente para garantir idempotência estrita
