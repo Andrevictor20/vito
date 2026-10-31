@@ -7,6 +7,7 @@ import { TasksView } from '../tasks/TasksView';
 import { TriggersView } from '../triggers/TriggersView';
 import { MeetingsView } from '../meetings/MeetingsView';
 import { ExecutiveSummariesView } from '../summaries/ExecutiveSummariesView';
+import { SettingsView } from '../profile/SettingsView';
 import { SettingsModal } from '../profile/SettingsModal';
 import { MiniChatWidget } from '../chat/MiniChatWidget';
 import { useAuth } from '../../context/AuthContext';
@@ -19,18 +20,76 @@ export const DesktopLayout: React.FC = () => {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [chatPrompt, setChatPrompt] = useState<string | undefined>();
 
-  // Keyboard Shortcuts: ⌘K (command palette), 1-5 (tabs), ⌘, (settings)
+  // Keyboard Shortcuts globais: ⌘K, ⌘B, G+letra, C, Escape (AC-08)
   useEffect(() => {
+    let gPressed = false;
+    let gTimeout: any = null;
+
     const handleKeyDown = (e: KeyboardEvent) => {
       const isMeta = e.metaKey || e.ctrlKey;
+      const target = e.target as HTMLElement;
+      const isInput = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
 
       if (isMeta && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         setCommandPaletteOpen((prev) => !prev);
-      } else if (isMeta && e.key === ',') {
+        return;
+      }
+
+      if (isMeta && e.key.toLowerCase() === 'b') {
+        e.preventDefault();
+        setSidebarCollapsed((prev) => !prev);
+        return;
+      }
+
+      if (isMeta && e.key === ',') {
         e.preventDefault();
         setSettingsOpen((prev) => !prev);
-      } else if (isMeta && !isNaN(Number(e.key))) {
+        return;
+      }
+
+      if (e.key === 'Escape') {
+        setCommandPaletteOpen(false);
+        setSettingsOpen(false);
+        return;
+      }
+
+      // Atalhos que só disparam fora de inputs de texto
+      if (!isInput && !isMeta) {
+        if (gPressed) {
+          gPressed = false;
+          clearTimeout(gTimeout);
+          const key = e.key.toLowerCase();
+          const tabMap: Record<string, DesktopTab> = {
+            a: 'calendar',
+            t: 'tasks',
+            r: 'triggers',
+            m: 'meetings',
+            s: 'summaries',
+            h: 'chat',
+            c: 'settings',
+          };
+          if (tabMap[key]) {
+            e.preventDefault();
+            setCurrentTab(tabMap[key]);
+            return;
+          }
+        }
+
+        if (e.key.toLowerCase() === 'g') {
+          gPressed = true;
+          gTimeout = setTimeout(() => { gPressed = false; }, 1200);
+          return;
+        }
+
+        if (e.key.toLowerCase() === 'c') {
+          e.preventDefault();
+          setCurrentTab('tasks');
+          return;
+        }
+      }
+
+      if (isMeta && !isNaN(Number(e.key))) {
         const num = Number(e.key);
         const tabs: DesktopTab[] = ['chat', 'calendar', 'tasks', 'triggers', 'meetings', 'summaries'];
         if (num >= 1 && num <= 6) {
@@ -41,7 +100,10 @@ export const DesktopLayout: React.FC = () => {
     };
 
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      clearTimeout(gTimeout);
+    };
   }, []);
 
   const renderActiveView = () => {
@@ -78,6 +140,8 @@ export const DesktopLayout: React.FC = () => {
             }}
           />
         );
+      case 'settings':
+        return <SettingsView />;
       default:
         return <ChatView />;
     }

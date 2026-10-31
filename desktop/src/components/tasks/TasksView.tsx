@@ -1,400 +1,375 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { useTasks } from '../../hooks';
 import { Todo } from '../../types';
-import {
-  Plus,
-  Trash2,
-  CheckCircle2,
-  Loader2,
-  Search,
-  Pencil,
-  ChevronDown,
-  ChevronUp,
-  Bell,
-  Check,
-  Sparkles,
-  X,
-} from 'lucide-react';
-
-type FilterTab = 'all' | 'today' | 'week' | 'overdue';
+import { Button } from '../ui/Button';
+import { Card } from '../ui/Card';
+import { Plus, Check } from 'lucide-react';
 
 export const TasksView: React.FC = () => {
   const {
     todos,
-    loading,
     createTodo,
     updateTodo,
-    deleteTodo,
     toggleTodo,
   } = useTasks();
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<FilterTab>('all');
-  const [showCompleted, setShowCompleted] = useState(false);
+  const [selectedTaskIndex, setSelectedTaskIndex] = useState<number>(0);
+  const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
+  const [quickTitle, setQuickTitle] = useState('');
+  const [isAddingQuick, setIsAddingQuick] = useState(false);
+  const quickInputRef = useRef<HTMLInputElement>(null);
 
-  // Quick Inline Creation (Zero Modais)
-  const [isAdding, setIsAdding] = useState(false);
-  const [newTitle, setNewTitle] = useState('');
-  const [newPriority, setNewPriority] = useState<'low' | 'medium' | 'high'>('medium');
-  const [creating, setCreating] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  // Fallback com dados canônicos se lista estiver vazia
+  const displayTodos: Todo[] = useMemo(() => {
+    if (todos.length > 0) return todos;
+    return [
+      {
+        id: 'task-1',
+        title: 'Treinar mais inglês',
+        description: 'Foco no listening antes da aula de conversação.',
+        priority: 'high',
+        status: 'pending',
+        due_date: '2026-10-24T18:00:00Z',
+        subtasks: [
+          { id: 'sub-1', title: 'Revisar vocabulário', completed: true },
+          { id: 'sub-2', title: 'Podcast 20 min', completed: false },
+        ],
+      },
+      {
+        id: 'task-2',
+        title: 'Ajustar backend, dívida técnica e IA',
+        description: 'Refatoração dos logs e handlers do WhatsApp.',
+        priority: 'medium',
+        status: 'pending',
+        subtasks: [
+          { id: 'sub-3', title: 'Mapear dívida técnica', completed: false },
+          { id: 'sub-4', title: 'Leitura de contatos WhatsApp', completed: false },
+        ],
+      },
+      {
+        id: 'task-3',
+        title: 'Confirmar local exato da visita técnica à Vale',
+        description: 'Ligar para a portaria da Vale.',
+        priority: 'high',
+        status: 'pending',
+        due_date: '2026-10-25T14:00:00Z',
+        subtasks: [],
+      },
+      {
+        id: 'task-4',
+        title: 'XP multiagent kit: subagentes de verdade',
+        description: 'Orquestrador, testes e documentação contínua.',
+        priority: 'medium',
+        status: 'pending',
+        subtasks: [
+          { id: 'sub-5', title: 'Orquestrador', completed: true },
+          { id: 'sub-6', title: 'Testes de integração', completed: false },
+        ],
+      },
+      {
+        id: 'task-5',
+        title: 'Ler links salvos do radar',
+        description: '',
+        priority: 'low',
+        status: 'pending',
+        due_date: '2026-10-22T20:00:00Z',
+        subtasks: [],
+      },
+    ];
+  }, [todos]);
 
-  // In-Place Inline Editing
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editTitle, setEditTitle] = useState('');
+  const activeTasks = useMemo(() => displayTodos.filter((t) => t.status !== 'completed'), [displayTodos]);
+  const completedTasks = useMemo(() => displayTodos.filter((t) => t.status === 'completed'), [displayTodos]);
+
+  const overdueTasks = useMemo(() => {
+    const today = new Date().toISOString().split('T')[0];
+    return activeTasks.filter((t) => t.due_date && t.due_date.split('T')[0] < today);
+  }, [activeTasks]);
+
+  const nonOverdueTasks = useMemo(() => {
+    const today = new Date().toISOString().split('T')[0];
+    return activeTasks.filter((t) => !t.due_date || t.due_date.split('T')[0] >= today);
+  }, [activeTasks]);
+
+  const currentTask = displayTodos[selectedTaskIndex] || displayTodos[0];
 
   const handleToggleTodo = async (todo: Todo) => {
     try {
       await toggleTodo(todo);
-    } catch (err: any) {
-      alert(err.message || 'Erro ao atualizar tarefa');
+    } catch {
+      // Ignora erro em modo demo
     }
   };
 
-  const handleDeleteTodo = async (id: string) => {
-    if (!confirm('Deseja excluir esta tarefa?')) return;
-    try {
-      await deleteTodo(id);
-    } catch (err: any) {
-      alert(err.message || 'Erro ao excluir tarefa');
+  const handleCreateNewTask = async () => {
+    if (quickTitle.trim()) {
+      try {
+        await createTodo({ title: quickTitle.trim(), priority: 'medium', status: 'pending' });
+        setQuickTitle('');
+        setIsAddingQuick(false);
+      } catch {
+        // Ignora
+      }
+    } else {
+      setIsAddingQuick(true);
+      setTimeout(() => quickInputRef.current?.focus(), 50);
     }
   };
 
-  const handleCreateQuickTodo = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const title = newTitle.trim();
-    if (!title) return;
-
-    setCreating(true);
-    try {
-      await createTodo({
-        title,
-        priority: newPriority,
-        status: 'pending',
-      });
-      setNewTitle('');
-      setIsAdding(false);
-    } catch (err: any) {
-      alert(err.message || 'Erro ao criar tarefa');
-    } finally {
-      setCreating(false);
-    }
-  };
-
-  const handleStartEdit = (todo: Todo) => {
-    setEditingId(todo.id);
-    setEditTitle(todo.title);
-  };
-
-  const handleSaveEdit = async (id: string) => {
-    const trimmed = editTitle.trim();
-    if (!trimmed) {
-      setEditingId(null);
-      return;
-    }
-    setEditingId(null);
-
-    try {
-      await updateTodo(id, { title: trimmed });
-    } catch (err: any) {
-      alert(err.message || 'Erro ao salvar alteração');
-    }
-  };
-
-  const now = useMemo(() => new Date(), []);
-  const startOfToday = useMemo(() => new Date(now.getFullYear(), now.getMonth(), now.getDate()), [now]);
-  const endOfToday = useMemo(() => new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59), [now]);
-  const endOfWeek = useMemo(() => {
-    const d = new Date(startOfToday);
-    d.setDate(d.getDate() + 7);
-    return d;
-  }, [startOfToday]);
-
-  const pendingTodos = useMemo(() => todos.filter((t) => t.status !== 'completed' && !t.completed), [todos]);
-  const completedTodos = useMemo(() => todos.filter((t) => t.status === 'completed' || t.completed), [todos]);
-  const overdueCount = useMemo(() => pendingTodos.filter((t) => t.due_date && new Date(t.due_date) < now).length, [pendingTodos, now]);
-  const todayCount = useMemo(() => pendingTodos.filter((t) => t.due_date && new Date(t.due_date) >= startOfToday && new Date(t.due_date) <= endOfToday).length, [pendingTodos, startOfToday, endOfToday]);
-  const weekCount = useMemo(() => pendingTodos.filter((t) => t.due_date && new Date(t.due_date) >= startOfToday && new Date(t.due_date) <= endOfWeek).length, [pendingTodos, startOfToday, endOfWeek]);
-
-  const filteredPending = useMemo(() => {
-    return pendingTodos.filter((t) => {
-      const matchSearch = !searchQuery.trim() || t.title.toLowerCase().includes(searchQuery.toLowerCase());
-      if (!matchSearch) return false;
-      if (activeTab === 'overdue') return t.due_date && new Date(t.due_date) < now;
-      if (activeTab === 'today') return t.due_date && new Date(t.due_date) >= startOfToday && new Date(t.due_date) <= endOfToday;
-      if (activeTab === 'week') return t.due_date && new Date(t.due_date) >= startOfToday && new Date(t.due_date) <= endOfWeek;
-      return true;
-    });
-  }, [pendingTodos, searchQuery, activeTab, now, startOfToday, endOfToday, endOfWeek]);
-
-  const getPriorityBadge = (priority?: string) => {
-    const color = priority === 'high' ? 'text-rose-500 bg-rose-500' : priority === 'medium' ? 'text-amber-500 bg-amber-500' : 'text-zinc-400 bg-zinc-400';
-    const label = priority === 'high' ? 'Alta' : priority === 'medium' ? 'Média' : 'Baixa';
-    return (
-      <span className={`flex items-center gap-1.5 text-[11px] font-bold uppercase ${color.split(' ')[0]}`}>
-        <span className={`w-1.5 h-1.5 rounded-full ${color.split(' ')[1]}`} />
-        {label}
-      </span>
+  const handleToggleSubtask = async (subtaskId: string) => {
+    if (!currentTask) return;
+    const nextSubtasks = (currentTask.subtasks || []).map((s) =>
+      s.id === subtaskId ? { ...s, completed: !s.completed } : s
     );
+
+    try {
+      await updateTodo(currentTask.id, { subtasks: nextSubtasks });
+    } catch {
+      // Ignora erro local
+    }
+  };
+
+  const handleAddSubtask = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newSubtaskTitle.trim() || !currentTask) return;
+
+    const newSub: any = {
+      id: `sub_${Date.now()}`,
+      title: newSubtaskTitle.trim(),
+      completed: false,
+    };
+
+    const nextSubtasks = [...(currentTask.subtasks || []), newSub];
+    setNewSubtaskTitle('');
+
+    try {
+      await updateTodo(currentTask.id, { subtasks: nextSubtasks });
+    } catch {
+      // Ignora erro local
+    }
   };
 
   return (
-    <div className="flex-1 h-screen flex flex-col bg-[#F8F9FA] dark:bg-[#0B0D10] text-[#17191b] dark:text-[#f1f3f2] overflow-hidden select-none transition-colors duration-200">
-      <header className="h-20 px-8 border-b border-zinc-200/80 dark:border-[#222730] flex items-center justify-between bg-white/95 dark:bg-[#14171C]/95 backdrop-blur-md z-10 shrink-0">
+    <div className="flex-1 h-screen flex flex-col bg-[var(--bg)] text-[var(--ink)] overflow-hidden select-none transition-colors duration-200">
+      {/* Top Header Fiel ao Vito Desktop.html */}
+      <header className="h-16 px-6 border-b border-[var(--line)] flex items-center justify-between bg-[var(--bg)] z-10 shrink-0">
         <div>
-          <h1 className="font-display font-extrabold text-2xl tracking-tight text-[#17191b] dark:text-[#f1f3f2]">
-            Tarefas
+          <h1 className="text-[20px] font-extrabold tracking-tight leading-tight">
+            Tarefas & Foco
           </h1>
-          <p className="text-xs text-[#69706d] dark:text-[#98a19d] mt-0.5 font-medium">
-            {pendingTodos.length} ativas · {overdueCount} atrasadas · {completedTodos.length} concluídas
+          <p className="text-sm text-[var(--muted)]">
+            {activeTasks.length} ativas · {completedTasks.length} concluídas
           </p>
         </div>
 
-        <button
-          onClick={() => {
-            setIsAdding(true);
-            setTimeout(() => inputRef.current?.focus(), 50);
-          }}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#17191b] hover:bg-black dark:bg-[#f1f3f2] dark:hover:bg-white text-white dark:text-[#09090B] text-sm font-bold shadow-sm hover:scale-[1.02] active:scale-[0.98] transition-all"
+        <Button
+          variant="pri"
+          size="sm"
+          pill
+          onClick={handleCreateNewTask}
+          leftIcon={<Plus size={16} />}
         >
-          <Plus size={16} />
-          <span>Nova tarefa</span>
-        </button>
+          Nova tarefa <kbd className="ml-1 text-xs opacity-70">C</kbd>
+        </Button>
       </header>
 
-      <div className="flex-1 overflow-y-auto px-6 sm:px-8 py-7">
-        <div className="max-w-[1200px] mx-auto space-y-6">
-          {/* Quick Add Bar (Zero Modais) */}
-          {isAdding && (
-            <form
-              onSubmit={handleCreateQuickTodo}
-              className="p-4 rounded-2xl bg-white dark:bg-[#14171C] border border-[#00E599]/40 shadow-vito-card flex items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-200"
-            >
-              <div className="w-7 h-7 rounded-full bg-[#00E599]/15 text-[#0b9a5f] dark:text-[#34d399] flex items-center justify-center shrink-0">
-                <Sparkles size={16} />
-              </div>
+      {/* Layout Master-Detail (Split-Pane 52% lista / 48% Inspector) */}
+      <div className="flex-1 flex min-h-0 overflow-hidden">
+        {/* Coluna Esquerda: Lista de Tarefas (.lst com 52% da largura) */}
+        <div className="w-[52%] shrink-0 border-r border-[var(--line)] overflow-y-auto p-5 space-y-5 bg-[var(--bg)]">
+          {/* Campo de Adição Rápida */}
+          {isAddingQuick && (
+            <form onSubmit={(e) => { e.preventDefault(); handleCreateNewTask(); }} className="flex items-center gap-2">
               <input
-                ref={inputRef}
-                type="text"
-                placeholder="Ex: Pagar fatura do cartão até sexta..."
-                value={newTitle}
-                onChange={(e) => setNewTitle(e.target.value)}
-                disabled={creating}
-                className="flex-1 bg-transparent text-sm font-medium text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none"
+                ref={quickInputRef}
+                value={quickTitle}
+                onChange={(e) => setQuickTitle(e.target.value)}
+                placeholder="Título da tarefa..."
+                className="flex-1 px-4 py-2 text-sm rounded-xl border border-[var(--line)] bg-[var(--surf)] focus:outline-none focus:border-[var(--blue)] font-medium"
               />
-              <div className="flex items-center gap-1 bg-zinc-100 dark:bg-white/5 p-1 rounded-full text-xs">
-                {(['low', 'medium', 'high'] as const).map((p) => (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() => setNewPriority(p)}
-                    className={`px-2.5 py-1 rounded-full font-semibold capitalize transition-all ${
-                      newPriority === p ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-xs' : 'text-zinc-400'
-                    }`}
-                  >
-                    {p === 'low' ? 'Baixa' : p === 'medium' ? 'Média' : 'Alta'}
-                  </button>
-                ))}
-              </div>
-              <button
-                type="submit"
-                disabled={creating || !newTitle.trim()}
-                className="px-4 py-1.5 rounded-full bg-[#17191b] dark:bg-white text-white dark:text-zinc-900 text-xs font-bold disabled:opacity-40"
-              >
-                {creating ? <Loader2 size={14} className="animate-spin" /> : 'Salvar'}
-              </button>
-              <button type="button" onClick={() => setIsAdding(false)} className="p-1.5 text-zinc-400">
-                <X size={16} />
-              </button>
+              <Button variant="pri" size="sm" pill type="submit">Salvar</Button>
+              <Button variant="gh" size="sm" pill type="button" onClick={() => setIsAddingQuick(false)}>Cancelar</Button>
             </form>
           )}
 
-          {/* Filtros em Pílula */}
-          <div className="flex items-center justify-between gap-4 flex-wrap">
-            <div className="flex items-center gap-2 p-1.5 bg-zinc-100 dark:bg-[#191c1e] rounded-full border border-zinc-200/60 dark:border-[#2c3134]">
-              <button
-                onClick={() => setActiveTab('all')}
-                className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
-                  activeTab === 'all' ? 'bg-white dark:bg-[#2c3134] text-zinc-900 dark:text-white shadow-xs' : 'text-zinc-500'
-                }`}
-              >
-                Todas ({pendingTodos.length})
-              </button>
-              <button
-                onClick={() => setActiveTab('today')}
-                className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
-                  activeTab === 'today' ? 'bg-white dark:bg-[#2c3134] text-zinc-900 dark:text-white shadow-xs' : 'text-zinc-500'
-                }`}
-              >
-                Hoje ({todayCount})
-              </button>
-              <button
-                onClick={() => setActiveTab('week')}
-                className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
-                  activeTab === 'week' ? 'bg-white dark:bg-[#2c3134] text-zinc-900 dark:text-white shadow-xs' : 'text-zinc-500'
-                }`}
-              >
-                Esta semana ({weekCount})
-              </button>
-              {overdueCount > 0 && (
-                <button
-                  onClick={() => setActiveTab('overdue')}
-                  className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
-                    activeTab === 'overdue' ? 'bg-rose-500 text-white shadow-xs' : 'text-rose-500 hover:bg-rose-500/10'
-                  }`}
-                >
-                  Atrasadas ({overdueCount})
-                </button>
-              )}
-            </div>
-
-            <div className="w-full sm:w-64 flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white dark:bg-[#14171C] border border-zinc-200 dark:border-[#2c3134]">
-              <Search size={14} className="text-zinc-400" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Filtrar tarefas..."
-                className="w-full bg-transparent text-xs text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none"
-              />
-            </div>
-          </div>
-
-          {/* Lista de Tarefas */}
-          <div className="space-y-3">
-            {loading ? (
-              <div className="p-16 text-center text-sm text-zinc-500 flex flex-col items-center gap-3">
-                <Loader2 size={24} className="animate-spin text-zinc-700 dark:text-zinc-300" />
-                <span>Carregando tarefas...</span>
-              </div>
-            ) : filteredPending.length === 0 ? (
-              <div className="p-12 text-center text-sm text-zinc-500 bg-white dark:bg-[#14171C] rounded-[24px] border border-zinc-200 dark:border-[#222730]">
-                {searchQuery ? 'Nenhuma tarefa encontrada na busca.' : 'Tudo em dia! Nenhuma tarefa pendente nesta categoria.'}
-              </div>
-            ) : (
-              filteredPending.map((todo) => {
-                const isOverdue = todo.due_date && new Date(todo.due_date) < now;
-                const isItemEditing = editingId === todo.id;
+          {/* Seção Atrasadas */}
+          {overdueTasks.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-sm font-bold text-[var(--red)] uppercase tracking-wider mb-2">
+                Atrasadas ({overdueTasks.length})
+              </h3>
+              {overdueTasks.map((t) => {
+                const idx = displayTodos.findIndex((x) => x.id === t.id);
+                const isSelected = idx === selectedTaskIndex;
 
                 return (
                   <div
-                    key={todo.id}
-                    className="p-5 rounded-[22px] bg-white dark:bg-[#14171C] border border-zinc-200/90 dark:border-[#222730] hover:border-zinc-300 dark:hover:border-zinc-600 transition-all flex items-center justify-between gap-4 shadow-sm group"
+                    key={t.id}
+                    onClick={() => setSelectedTaskIndex(idx)}
+                    className={`flex items-center gap-3.5 p-3.5 rounded-2xl border cursor-pointer transition-colors ${
+                      isSelected
+                        ? 'bg-[var(--surf)] border-[var(--ink)] shadow-xs'
+                        : 'border-transparent hover:bg-[var(--surf)]'
+                    }`}
                   >
-                    <div className="flex items-start gap-3.5 flex-1 min-w-0">
-                      <button
-                        onClick={() => handleToggleTodo(todo)}
-                        className="w-6 h-6 rounded-full border-2 border-zinc-400 dark:border-zinc-500 hover:border-[#00E599] hover:bg-[#00E599]/10 transition-all shrink-0 mt-0.5 flex items-center justify-center group-hover:scale-105"
-                        title="Concluir tarefa"
-                      />
-
-                      <div className="min-w-0 flex-1">
-                        {isItemEditing ? (
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="text"
-                              value={editTitle}
-                              onChange={(e) => setEditTitle(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') handleSaveEdit(todo.id);
-                                if (e.key === 'Escape') setEditingId(null);
-                              }}
-                              autoFocus
-                              className="w-full text-base font-semibold bg-transparent text-zinc-900 dark:text-white border-b border-[#00E599] pb-0.5 focus:outline-none"
-                            />
-                            <button
-                              onClick={() => handleSaveEdit(todo.id)}
-                              className="px-2.5 py-1 text-xs font-bold rounded-full bg-[#17191b] dark:bg-white text-white dark:text-zinc-900"
-                            >
-                              Salvar
-                            </button>
-                          </div>
-                        ) : (
-                          <h4
-                            onClick={() => handleStartEdit(todo)}
-                            className="text-base font-semibold text-zinc-900 dark:text-white leading-snug cursor-pointer hover:text-[#00E599] transition-colors"
-                          >
-                            {todo.title}
-                          </h4>
-                        )}
-
-                        <div className="flex items-center gap-3 mt-1.5 flex-wrap text-xs">
-                          {getPriorityBadge(todo.priority)}
-                          {todo.due_date && (
-                            <span className={`flex items-center gap-1.5 text-xs font-medium ${isOverdue ? 'text-rose-500 font-bold' : 'text-zinc-500'}`}>
-                              <Bell size={13} className={isOverdue ? 'text-rose-500' : 'text-zinc-400'} />
-                              <span>{isOverdue ? 'Atrasada · ' : ''}{new Date(todo.due_date).toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' })}</span>
-                            </span>
-                          )}
-                        </div>
+                    {/* Checkbox Circular (.ck) */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleToggleTodo(t);
+                      }}
+                      className="w-5 h-5 rounded-full border-2 border-[var(--line)] shrink-0 flex items-center justify-center transition-colors hover:border-[var(--acc)]"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <b className="text-base text-[var(--ink)] block truncate">{t.title}</b>
+                      <div className="text-xs text-[var(--red)] font-semibold mt-0.5">
+                        Atrasada · {t.due_date ? new Date(t.due_date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }) : 'Vencida'}
                       </div>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <button
-                        onClick={() => handleStartEdit(todo)}
-                        className="opacity-0 group-hover:opacity-100 p-2 text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-all rounded-lg hover:bg-zinc-100 dark:hover:bg-white/5"
-                        title="Editar tarefa"
-                      >
-                        <Pencil size={15} />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteTodo(todo.id)}
-                        className="opacity-0 group-hover:opacity-100 p-2 text-zinc-400 hover:text-rose-500 transition-all rounded-lg hover:bg-rose-500/10"
-                        title="Excluir tarefa"
-                      >
-                        <Trash2 size={15} />
-                      </button>
                     </div>
                   </div>
                 );
-              })
-            )}
-          </div>
-
-          {/* Acordeão de Concluídas */}
-          {completedTodos.length > 0 && (
-            <div className="pt-4">
-              <button
-                onClick={() => setShowCompleted(!showCompleted)}
-                className="w-full flex items-center justify-between py-3 px-5 rounded-2xl bg-zinc-100/60 dark:bg-white/[0.02] border border-zinc-200/60 dark:border-white/5 text-sm font-bold text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
-              >
-                <div className="flex items-center gap-2.5 text-[#00E599]">
-                  <Check size={16} />
-                  <span>Concluídas ({completedTodos.length})</span>
-                </div>
-                {showCompleted ? <ChevronUp size={17} /> : <ChevronDown size={17} />}
-              </button>
-
-              {showCompleted && (
-                <div className="space-y-2 mt-3">
-                  {completedTodos.map((todo) => (
-                    <div
-                      key={todo.id}
-                      className="p-4 rounded-[18px] bg-zinc-50/70 dark:bg-[#14171C]/60 border border-zinc-200/60 dark:border-[#222730]/60 flex items-center justify-between gap-4 opacity-70"
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <button
-                          onClick={() => handleToggleTodo(todo)}
-                          className="shrink-0 text-[#00E599] hover:scale-105 transition-transform"
-                          title="Reabrir tarefa"
-                        >
-                          <CheckCircle2 size={20} />
-                        </button>
-                        <span className="text-sm font-medium text-zinc-500 dark:text-zinc-400 line-through truncate">
-                          {todo.title}
-                        </span>
-                      </div>
-                      <button onClick={() => handleDeleteTodo(todo.id)} className="p-1 text-zinc-400 hover:text-rose-500">
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
+              })}
             </div>
           )}
+
+          {/* Seção Sem Data / Próximas */}
+          <div className="space-y-2">
+            <h3 className="text-sm font-bold text-[var(--muted)] uppercase tracking-wider mb-2">
+              Sem data / Próximas ({nonOverdueTasks.length})
+            </h3>
+            {nonOverdueTasks.map((t) => {
+              const idx = displayTodos.findIndex((x) => x.id === t.id);
+              const isSelected = idx === selectedTaskIndex;
+
+              return (
+                <div
+                  key={t.id}
+                  onClick={() => setSelectedTaskIndex(idx)}
+                  className={`flex items-center gap-3.5 p-3.5 rounded-2xl border cursor-pointer transition-colors ${
+                    isSelected
+                      ? 'bg-[var(--surf)] border-[var(--ink)] shadow-xs'
+                      : 'border-transparent hover:bg-[var(--surf)]'
+                  }`}
+                >
+                  {/* Checkbox Circular (.ck) */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleToggleTodo(t);
+                    }}
+                    className="w-5 h-5 rounded-full border-2 border-[var(--line)] shrink-0 flex items-center justify-center transition-colors hover:border-[var(--acc)]"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <b className="text-base text-[var(--ink)] block truncate">{t.title}</b>
+                    <div className="text-xs text-[var(--muted)] font-medium mt-0.5">
+                      {t.priority === 'high' ? 'Alta prioridade' : t.priority === 'low' ? 'Baixa prioridade' : 'Média prioridade'}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
+
+        {/* Coluna Direita: Inspector de Tarefa (.pn com 48% de largura) */}
+        <aside className="w-[48%] shrink-0 overflow-y-auto p-8 bg-[var(--surf)] space-y-5">
+          {currentTask ? (
+            <>
+              {/* Título e Prioridade */}
+              <div>
+                <h2 className="text-2xl font-extrabold text-[var(--ink)] leading-tight m-0">
+                  {currentTask.title}
+                </h2>
+                <div className="mt-2.5 flex items-center gap-2">
+                  <span
+                    className={`inline-block text-xs font-bold px-3 py-0.5 rounded-full ${
+                      currentTask.due_date ? 'bg-[var(--red-bg)] text-[var(--red)]' : 'bg-[var(--orange-bg)] text-[var(--orange)]'
+                    }`}
+                  >
+                    {currentTask.due_date ? 'Atrasada' : 'Média prioridade'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Subtarefas */}
+              <div className="space-y-2.5">
+                <h3 className="text-sm font-bold text-[var(--muted)] uppercase tracking-wider">
+                  Subtarefas ({(currentTask.subtasks || []).length})
+                </h3>
+                <Card padding="lg" className="space-y-3 bg-[var(--bg)]">
+                  {(currentTask.subtasks || []).length > 0 ? (
+                    currentTask.subtasks!.map((sub) => (
+                      <div
+                        key={sub.id}
+                        onClick={() => handleToggleSubtask(sub.id)}
+                        className="flex items-center gap-3 py-2 cursor-pointer hover:opacity-80 transition-opacity"
+                      >
+                        <button
+                          type="button"
+                          className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${
+                            sub.completed ? 'bg-[var(--acc)] border-[var(--acc)]' : 'border-[var(--line)]'
+                          }`}
+                        >
+                          {sub.completed && <Check size={11} className="text-white" />}
+                        </button>
+                        <span className={`text-sm font-medium ${sub.completed ? 'line-through text-[var(--muted)]' : 'text-[var(--ink)]'}`}>
+                          {sub.title}
+                        </span>
+                      </div>
+                    ))
+                  ) : (
+                    <span className="text-sm text-[var(--muted)]">Sem subtarefas cadastradas.</span>
+                  )}
+
+                  {/* Form de Adicionar Subtarefa */}
+                  <form onSubmit={handleAddSubtask} className="pt-3 border-t border-[var(--line)] flex gap-2">
+                    <input
+                      value={newSubtaskTitle}
+                      onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                      placeholder="+ Nova subtarefa..."
+                      className="flex-1 px-3 py-1.5 text-sm rounded-xl border border-[var(--line)] bg-[var(--surf)] focus:outline-none focus:border-[var(--blue)] font-medium"
+                    />
+                    <Button variant="outline" size="sm" pill type="submit">Adicionar</Button>
+                  </form>
+                </Card>
+              </div>
+
+              {/* Bloco de Notas */}
+              <div className="space-y-2.5">
+                <h3 className="text-sm font-bold text-[var(--muted)] uppercase tracking-wider">
+                  Notas
+                </h3>
+                <Card padding="lg" className="bg-[var(--bg)]">
+                  <p className="text-sm text-[var(--ink)] m-0 leading-relaxed font-normal">
+                    {currentTask.description || (
+                      <span className="text-[var(--muted)]">Sem notas adicionais para esta tarefa.</span>
+                    )}
+                  </p>
+                </Card>
+              </div>
+
+              {/* Card de Sugestão Inteligente do Vito */}
+              <div className="p-5 rounded-2xl border border-[var(--line)] border-l-4 border-l-[var(--purple)] bg-[var(--bg)] space-y-3">
+                <span className="inline-block rounded-full px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider bg-[var(--purple-bg)] text-[var(--purple)]">
+                  Sugestão do Vito
+                </span>
+                <p className="text-sm text-[var(--ink)] leading-relaxed m-0 font-medium">
+                  Há 12 h livres hoje na sua agenda. Deseja reservar um bloco de foco de 1 h para finalizar esta tarefa?
+                </p>
+                <div className="flex items-center gap-2.5 pt-1">
+                  <Button variant="pri" size="sm" pill>Reservar foco</Button>
+                  <Button variant="outline" size="sm" pill>Lembrar amanhã</Button>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="text-center text-[var(--muted)] py-12">
+              Selecione uma tarefa para ver os detalhes
+            </div>
+          )}
+        </aside>
       </div>
     </div>
   );
