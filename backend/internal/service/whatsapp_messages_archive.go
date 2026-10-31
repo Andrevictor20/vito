@@ -246,3 +246,41 @@ func (s *WhatsAppService) isOutboundReply(text string) bool {
 	}
 	return false
 }
+
+// markMessageIDProcessed registra o ID de mensagem para evitar reprocessamento em caso de webhooks duplicados.
+func (s *WhatsAppService) markMessageIDProcessed(id string) {
+	if s == nil || id == "" {
+		return
+	}
+	s.outboundMu.Lock()
+	defer s.outboundMu.Unlock()
+	if s.processedMsgIDs == nil {
+		s.processedMsgIDs = make(map[string]time.Time)
+	}
+	now := time.Now()
+	for k, exp := range s.processedMsgIDs {
+		if now.Sub(exp) > 5*time.Minute {
+			delete(s.processedMsgIDs, k)
+		}
+	}
+	s.processedMsgIDs[id] = now
+}
+
+// isMessageIDProcessed verifica se a mensagem já foi processada recentemente.
+func (s *WhatsAppService) isMessageIDProcessed(id string) bool {
+	if s == nil || id == "" {
+		return false
+	}
+	s.outboundMu.Lock()
+	defer s.outboundMu.Unlock()
+	if s.processedMsgIDs == nil {
+		return false
+	}
+	if t, ok := s.processedMsgIDs[id]; ok {
+		if time.Since(t) <= 5*time.Minute {
+			return true
+		}
+		delete(s.processedMsgIDs, id)
+	}
+	return false
+}

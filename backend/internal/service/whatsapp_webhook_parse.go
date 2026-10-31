@@ -2,6 +2,7 @@ package service
 
 import (
 	"encoding/json"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -9,11 +10,15 @@ import (
 
 // vitoSignatures são as assinaturas que o próprio Vito usa nas respostas.
 // Também servem para reconhecer (e arquivar) as mensagens que ele mesmo enviou.
-var vitoSignatures = []string{"💼 Vito:", "🎩 Vito:", "Vito diz:", "Vito:"}
+var vitoSignatures = []string{"💼 Vito:", "🎩 Vito:", "🤖 Vito:", "Vito diz:", "Vito:"}
+var reVitoSignature = regexp.MustCompile(`(?i)^[💼🎩🤖]?\s*vito(\([^)]*\))?:`)
 
 // IsVitoMessage informa se o texto é uma resposta gerada pelo próprio Vito.
 func IsVitoMessage(text string) bool {
 	trimmed := strings.TrimSpace(text)
+	if reVitoSignature.MatchString(trimmed) {
+		return true
+	}
 	for _, sig := range vitoSignatures {
 		if strings.HasPrefix(trimmed, sig) {
 			return true
@@ -25,6 +30,9 @@ func IsVitoMessage(text string) bool {
 // StripVitoSignature remove a assinatura do Vito do texto e devolve o conteúdo limpo.
 func StripVitoSignature(text string) (string, bool) {
 	trimmed := strings.TrimSpace(text)
+	if loc := reVitoSignature.FindStringIndex(trimmed); loc != nil && loc[0] == 0 {
+		return strings.TrimSpace(trimmed[loc[1]:]), true
+	}
 	for _, sig := range vitoSignatures {
 		if strings.HasPrefix(trimmed, sig) {
 			return strings.TrimSpace(strings.TrimPrefix(trimmed, sig)), true
@@ -49,6 +57,7 @@ type inboundMessage struct {
 	Timestamp      time.Time
 	IsAudio        bool
 	IsImage        bool
+	IsReaction     bool
 	ImageMime      string
 	QuotedID       string
 	MediaPayload   interface{}
@@ -207,6 +216,12 @@ func parseInboundMessage(data json.RawMessage) (*inboundMessage, error) {
 	_, hasAudio := subtypes["audioMessage"]
 	msg.IsAudio = hasAudio || strings.EqualFold(raw.MessageType, "audioMessage")
 
+	_, hasReaction := subtypes["reactionMessage"]
+	msg.IsReaction = hasReaction || strings.EqualFold(raw.MessageType, "reactionMessage")
+	if msg.IsReaction {
+		msg.Text = ""
+	}
+
 	msg.IsImage, msg.ImageMime = detectInboundImage(subtypes, raw.MessageType)
 
 	// O `contextInfo` pode vir no topo do payload (não aninhado em message.<subtype>).
@@ -297,7 +312,7 @@ func messageSubtypePriority(subtypes map[string]json.RawMessage) []string {
 	}
 	rest := make([]string, 0)
 	for name := range subtypes {
-		if !seen[name] {
+		if !seen[name] && name != "reactionMessage" {
 			rest = append(rest, name)
 		}
 	}

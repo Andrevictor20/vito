@@ -59,6 +59,19 @@ func (s *WhatsAppService) handleMessagesEvent(ctx context.Context, instanceName 
 	if rawText == "" && msg.IsAudio && s.audioTranscriber != nil {
 		rawText = s.transcribeAudio(ctx, instanceName, data)
 	}
+
+	if msg.IsReaction || strings.EqualFold(msg.MessageType, "reactionMessage") || rawText == "👀" {
+		log.Printf("ℹ️ [WhatsAppInbound] reação descartada para acionamento conversacional (remoteJid=%s)", msg.RemoteJID)
+		return nil
+	}
+
+	if msg.MessageID != "" {
+		if s.isMessageIDProcessed(msg.MessageID) {
+			log.Printf("ℹ️ [WhatsAppInbound] MessageID %s duplicado ignorado", msg.MessageID)
+			return nil
+		}
+		s.markMessageIDProcessed(msg.MessageID)
+	}
 	// Imagem sem legenda é uma mensagem válida: o Vito precisa "enxergar" o arquivo.
 	if rawText == "" && !msg.IsImage {
 		log.Printf("ℹ️ [WhatsAppInbound] mensagem sem texto nem imagem ignorada (msgType=%s, remoteJid=%s)", msg.MessageType, msg.RemoteJID)

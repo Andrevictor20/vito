@@ -57,6 +57,7 @@ type WhatsAppService struct {
 	blockedReplies      map[string]time.Time
 	outboundMu          sync.Mutex
 	recentOutboundTexts map[string]time.Time
+	processedMsgIDs     map[string]time.Time
 }
 
 // AsyncRunner executa uma tarefa em background (ou de forma síncrona, em testes).
@@ -77,6 +78,7 @@ func NewWhatsAppService(
 		memory:              NewWhatsAppConversationMemory(),
 		runAsync:            func(fn func()) { go fn() },
 		recentOutboundTexts: make(map[string]time.Time),
+		processedMsgIDs:     make(map[string]time.Time),
 	}
 }
 
@@ -468,6 +470,10 @@ func (s *WhatsAppService) HandleWebhook(ctx context.Context, eventType string, p
 				_ = s.repo.UpdateStatus(ctx, integration.ID, domain.WhatsAppStatusDisconnected, nil)
 			}
 		}
+		return nil
+	}
+
+	if strings.Contains(event, "reaction") {
 		return nil
 	}
 

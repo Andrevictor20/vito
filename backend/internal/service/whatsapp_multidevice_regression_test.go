@@ -204,6 +204,28 @@ func TestClassifyChat_WithOwnerLID(t *testing.T) {
 	}
 }
 
+// AC-02: Anti-loop para reações 👀 e assinaturas do Vito
+func TestAntiLoop_ReactionsAndSignatures(t *testing.T) {
+	// 1. Assinaturas do Vito devem ser reconhecidas e não gerar loop
+	testSignatures := []string{
+		"💼 Vito:\n\nOlá André!",
+		"🤖 Vito:\n\nPronto!",
+		"🎩 Vito:\n\nCriei sua tarefa.",
+		"💼 Vito(André):\n\nConfirmado.",
+		"Vito:\n\nBom dia!",
+	}
+	for _, sig := range testSignatures {
+		if !service.IsVitoMessage(sig) {
+			t.Errorf("IsVitoMessage(%q) deveria ser true", sig)
+		}
+	}
+
+	// 2. Mensagem comum não é do Vito
+	if service.IsVitoMessage("Olá, como vai?") {
+		t.Errorf("IsVitoMessage deveria ser false para mensagem comum")
+	}
+}
+
 // Helpers
 type recordingEvolutionClient struct {
 	sentMessages []string
