@@ -372,22 +372,25 @@ func main() {
 	whatsappAuthHandler := handler.NewWhatsAppAuthHandler(waAuthSvc)
 
 	// Síntese de voz: Gemini TTS nativo (Google AI Studio) como motor primário
-	// com fallback em cascata para NoOp (fallback silencioso no Android).
-	var synth ai.TTSSynthesizer = &ai.NoOpTTSynthesizer{}
+	// com fallback em cascata para sintetizador neural pt-BR via HTTP.
+	var synth ai.TTSSynthesizer = ai.NewNeuralHTTPTTSSynthesizer()
 	if cfg.GeminiAPIKey != "" {
 		geminiSynth := ai.NewGeminiTTSProvider(cfg.GeminiAPIKey, cfg.GeminiModel)
 		synth = ai.NewCascadeTTSSynthesizer(geminiSynth, synth)
-		log.Printf("🗣️ [TTS] Síntese de voz Gemini TTS ativada (modelo=%s, voz=%s).", cfg.GeminiModel, cfg.TTSVoice)
+		log.Printf("🗣️ [TTS] Síntese de voz Gemini TTS ativada (modelo=%s, voz=%s) com fallback neural pt-BR.", cfg.GeminiModel, cfg.TTSVoice)
 	} else {
-		log.Printf("⚠️ [TTS] Gemini API Key não configurada; fallback para sintetizador local/nativo.")
+		log.Printf("⚠️ [TTS] Gemini API Key não configurada; usando sintetizador neural HTTP pt-BR.")
 	}
 	ttsSvc := ai.NewTTSService(synth, cfg.TTSCacheDir, cfg.TTSVoice)
 	voiceTTSHandler := handler.NewVoiceTTSHandler(ttsSvc)
 
 	// 5.5 Inteligência Conversacional v2 (Loop de Agente, Toolsets e Memória Hierárquica)
 	agentSys := setupAgentSubsystem(cfg, db, calSvc, todoSvc, waSvc, gmailSvc)
-	if whisperTranscriber != nil && agentSys.StreamHandler != nil {
-		agentSys.StreamHandler.SetTranscriber(whisperTranscriber)
+	if agentSys.StreamHandler != nil {
+		if whisperTranscriber != nil {
+			agentSys.StreamHandler.SetTranscriber(whisperTranscriber)
+		}
+		agentSys.StreamHandler.SetTTSService(ttsSvc)
 	}
 	defer agentSys.TraceRecorder.Close()
 	defer agentSys.ConsolidationWorker.Stop()

@@ -162,6 +162,22 @@ export interface AssistantChatResponse {
   provider_used?: string;
   whatsapp_message?: ChatWhatsAppMessage;
   gmail_message?: ChatGmailMessage;
+  tts_audio_b64?: string;
+  tts_audio_mime?: string;
+  cards?: Array<{
+    id?: string;
+    type?: string;
+    title?: string;
+    subtitle?: string;
+    action_label?: string;
+  }>;
+  actions?: Array<{
+    id?: string;
+    type?: string;
+    title?: string;
+    subtitle?: string;
+    action_label?: string;
+  }>;
 }
 
 export interface ChatWhatsAppMessage {

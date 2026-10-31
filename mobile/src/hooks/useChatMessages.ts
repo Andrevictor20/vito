@@ -309,6 +309,7 @@ export function useChatMessages(
         const res = await api.assistantAudio(audioUri, 'audio.m4a', {
           history: recentHistory,
           focus_mode: focusMode,
+          include_tts: false,
         });
 
         // Substitui o placeholder com a transcrição real

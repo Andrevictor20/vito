@@ -153,6 +153,61 @@ func TestAssistantStreamHandler_AudioChat(t *testing.T) {
 	}
 }
 
+type streamMockTTSSynthesizer struct {
+	lastText  string
+	lastVoice string
+}
+
+func (m *streamMockTTSSynthesizer) Synthesize(text, voice string) ([]byte, string, error) {
+	m.lastText = text
+	m.lastVoice = voice
+	return []byte("RIFF-fake-wav-gemini"), "audio/wav", nil
+}
+
+func TestAssistantStreamHandler_AudioChat_InlineTTSAndContext(t *testing.T) {
+	h, userID := setupStreamHandlerTest(t)
+	h.SetTranscriber(&streamMockTranscriber{})
+
+	mockSynth := &streamMockTTSSynthesizer{}
+	ttsSvc := ai.NewTTSService(mockSynth, t.TempDir(), "Puck")
+	h.SetTTSService(ttsSvc)
+
+	bodyBytes, _ := json.Marshal(map[string]any{
+		"audio_b64":          base64.StdEncoding.EncodeToString([]byte("RIFF-user-wav")),
+		"audio_mime":         "audio/wav",
+		"filename":           "audio.wav",
+		"timezone":           "America/Sao_Paulo",
+		"current_local_time": "2026-10-31T10:55:00-03:00",
+		"screen_context":     "WhatsApp · Mariana: Consegue falar às 15h?",
+		"voice":              "Kore",
+		"include_tts":        true,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/assistant/audio", bytes.NewReader(bodyBytes))
+	req.Header.Set("Content-Type", "application/json")
+	ctx := context.WithValue(req.Context(), middleware.UserIDKey, userID)
+	req = req.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	h.AudioChat(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("esperava status 200 para AudioChat com TTS inline, obteve %d (%s)", rec.Code, rec.Body.String())
+	}
+	var res map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &res); err != nil {
+		t.Fatalf("falha ao decodificar json: %v", err)
+	}
+	if res["tts_audio_b64"] == nil || res["tts_audio_b64"] == "" {
+		t.Fatalf("esperava tts_audio_b64 preenchido no retorno de AudioChat, obteve %v", res["tts_audio_b64"])
+	}
+	if res["tts_audio_mime"] != "audio/wav" {
+		t.Errorf("esperava tts_audio_mime 'audio/wav', obteve %v", res["tts_audio_mime"])
+	}
+	if mockSynth.lastVoice != "Kore" {
+		t.Errorf("esperava voz 'Kore' passada ao sintetizador, obteve %q", mockSynth.lastVoice)
+	}
+}
+
 func TestAssistantStreamHandler_VisionChat(t *testing.T) {
 	h, userID := setupStreamHandlerTest(t)
 

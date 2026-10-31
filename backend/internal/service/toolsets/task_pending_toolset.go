@@ -49,6 +49,7 @@ func (t *TaskPendingToolset) JSONSchema() json.RawMessage {
 					"title": {"type": "string", "description": "Título da tarefa."},
 					"description": {"type": "string", "description": "Descrição da tarefa."},
 					"category": {"type": "string", "description": "Categoria (trabalho, pessoal, etc)."},
+					"due_date": {"type": "string", "description": "Data/hora limite opcional (RFC3339 ou YYYY-MM-DD HH:MM)."},
 					"todo_id": {"type": "string", "description": "ID da tarefa."}
 				}
 			}
@@ -76,6 +77,7 @@ func (t *TaskPendingToolset) Execute(ctx context.Context, execCtx *domain.ToolEx
 		Title       string `json:"title"`
 		Description string `json:"description"`
 		Category    string `json:"category"`
+		DueDate     string `json:"due_date"`
 		TodoID      string `json:"todo_id"`
 	}
 	if len(rawParams) > 0 {
@@ -88,12 +90,17 @@ func (t *TaskPendingToolset) Execute(ctx context.Context, execCtx *domain.ToolEx
 		if cat == "" {
 			cat = "geral"
 		}
+		var dueDate *time.Time
+		if parsed := parseFlexibleDateTime(params.DueDate); !parsed.IsZero() {
+			dueDate = &parsed
+		}
 		todo := &domain.Todo{
 			ID:        uuid.New().String(),
 			UserID:    execCtx.UserID,
 			Title:     params.Title,
 			Priority:  "medium",
 			Category:  cat,
+			DueDate:   dueDate,
 			Status:    domain.TodoStatusPending,
 			CreatedAt: time.Now().UTC(),
 			UpdatedAt: time.Now().UTC(),

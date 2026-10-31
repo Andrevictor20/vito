@@ -3,7 +3,7 @@
     "name": "Vito",
     "slug": "vito",
     "scheme": "vito",
-    "version": "0.1.20",
+    "version": "0.1.21",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -22,7 +22,7 @@
     },
     "android": {
       "package": "com.andrevmp.vito",
-      "versionCode": 20,
+      "versionCode": 21,
       "googleServicesFile": "./google-services.json",
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {

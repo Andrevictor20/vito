@@ -20,6 +20,7 @@ import (
 type AssistantStreamHandler struct {
 	loop        *service.AgentLoop
 	transcriber ai.AudioTranscriber
+	ttsService  ai.TTSService
 }
 
 // NewAssistantStreamHandler cria o handler.
@@ -30,6 +31,11 @@ func NewAssistantStreamHandler(loop *service.AgentLoop) *AssistantStreamHandler 
 // SetTranscriber configura o transcritor Whisper para áudio.
 func (h *AssistantStreamHandler) SetTranscriber(t ai.AudioTranscriber) {
 	h.transcriber = t
+}
+
+// SetTTSService configura o serviço de síntese de voz (Gemini TTS + fallback neural) para respostas de áudio inline.
+func (h *AssistantStreamHandler) SetTTSService(tts ai.TTSService) {
+	h.ttsService = tts
 }
 
 // Chat lida com requisições síncronas REST.
@@ -153,13 +159,24 @@ func (h *AssistantStreamHandler) AudioChat(w http.ResponseWriter, r *http.Reques
 	var fileBytes []byte
 	var filename string
 	var focusMode string
+	var timezone string
+	var currentLocalTime string
+	var screenContext string
+	var voice string
+	includeTTS := true
 
 	contentType := r.Header.Get("Content-Type")
 	if strings.Contains(contentType, "application/json") {
 		var req struct {
-			AudioB64  string `json:"audio_b64"`
-			Filename  string `json:"filename,omitempty"`
-			FocusMode string `json:"focus_mode,omitempty"`
+			AudioB64         string `json:"audio_b64"`
+			AudioMime        string `json:"audio_mime,omitempty"`
+			Filename         string `json:"filename,omitempty"`
+			FocusMode        string `json:"focus_mode,omitempty"`
+			Timezone         string `json:"timezone,omitempty"`
+			CurrentLocalTime string `json:"current_local_time,omitempty"`
+			ScreenContext    string `json:"screen_context,omitempty"`
+			Voice            string `json:"voice,omitempty"`
+			IncludeTTS       *bool  `json:"include_tts,omitempty"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, `{"error":"payload JSON inválido"}`, http.StatusBadRequest)
@@ -177,9 +194,20 @@ func (h *AssistantStreamHandler) AudioChat(w http.ResponseWriter, r *http.Reques
 		fileBytes = decoded
 		filename = req.Filename
 		if filename == "" {
-			filename = "audio.m4a"
+			if strings.Contains(strings.ToLower(req.AudioMime), "wav") || (len(decoded) >= 4 && string(decoded[:4]) == "RIFF") {
+				filename = "audio.wav"
+			} else {
+				filename = "audio.m4a"
+			}
 		}
 		focusMode = req.FocusMode
+		timezone = req.Timezone
+		currentLocalTime = req.CurrentLocalTime
+		screenContext = req.ScreenContext
+		voice = req.Voice
+		if req.IncludeTTS != nil {
+			includeTTS = *req.IncludeTTS
+		}
 	} else {
 		if err := r.ParseMultipartForm(25 << 20); err != nil {
 			http.Error(w, `{"error":"falha ao processar formulário multipart"}`, http.StatusBadRequest)
@@ -201,7 +229,17 @@ func (h *AssistantStreamHandler) AudioChat(w http.ResponseWriter, r *http.Reques
 		}
 		fileBytes = readBytes
 		filename = header.Filename
+		if filename == "" || (!strings.HasSuffix(strings.ToLower(filename), ".wav") && len(readBytes) >= 4 && string(readBytes[:4]) == "RIFF") {
+			filename = "audio.wav"
+		}
 		focusMode = r.FormValue("focus_mode")
+		timezone = r.FormValue("timezone")
+		currentLocalTime = r.FormValue("current_local_time")
+		screenContext = r.FormValue("screen_context")
+		voice = r.FormValue("voice")
+		if rawTTS := strings.TrimSpace(r.FormValue("include_tts")); rawTTS == "false" || rawTTS == "0" {
+			includeTTS = false
+		}
 	}
 
 	var transcript string
@@ -216,17 +254,37 @@ func (h *AssistantStreamHandler) AudioChat(w http.ResponseWriter, r *http.Reques
 		transcript = "Mensagem de voz recebida. Por favor, analise as informações pendentes ou compromissos."
 	}
 
+	var quotedParts []string
+	if strings.TrimSpace(currentLocalTime) != "" || strings.TrimSpace(timezone) != "" {
+		quotedParts = append(quotedParts, fmt.Sprintf("[Data/Hora Local do Usuário: %s (%s)]", currentLocalTime, timezone))
+	}
+	if strings.TrimSpace(screenContext) != "" {
+		quotedParts = append(quotedParts, fmt.Sprintf("[Contexto da Tela Visível do Usuário: %s]", screenContext))
+	}
+
 	unifiedReq := domain.UnifiedAssistantRequest{
-		UserID:    userID,
-		Channel:   "voice",
-		Message:   transcript,
-		FocusMode: focusMode,
+		UserID:        userID,
+		Channel:       "voice",
+		Message:       transcript,
+		FocusMode:     focusMode,
+		QuotedContext: strings.Join(quotedParts, "\n"),
 	}
 
 	resp, err := h.loop.Run(r.Context(), unifiedReq)
 	if err != nil {
 		http.Error(w, fmt.Sprintf(`{"error":%q}`, err.Error()), http.StatusInternalServerError)
 		return
+	}
+
+	var actions []map[string]any
+	for _, c := range resp.Cards {
+		actions = append(actions, map[string]any{
+			"id":           c.ID,
+			"type":         c.Type,
+			"title":        c.Title,
+			"subtitle":     c.Subtitle,
+			"action_label": c.ActionLabel,
+		})
 	}
 
 	result := map[string]any{
@@ -238,10 +296,21 @@ func (h *AssistantStreamHandler) AudioChat(w http.ResponseWriter, r *http.Reques
 		"thread_id":               resp.ThreadID,
 		"turn_id":                 resp.TurnID,
 		"cards":                   resp.Cards,
+		"actions":                 actions,
 		"sources":                 resp.Sources,
 		"suggested_actions":       resp.SuggestedActions,
 		"requires_confirmation":   resp.RequiresConfirmation,
 		"pending_confirmation_id": resp.PendingConfirmationID,
+	}
+
+	if includeTTS && h.ttsService != nil && strings.TrimSpace(resp.Text) != "" {
+		speechText := ai.StripMarkdownForSpeech(resp.Text)
+		if speechText != "" {
+			if audioBytes, audioMime, ttsErr := h.ttsService.Synthesize(r.Context(), speechText, voice); ttsErr == nil && len(audioBytes) > 0 {
+				result["tts_audio_b64"] = base64.StdEncoding.EncodeToString(audioBytes)
+				result["tts_audio_mime"] = audioMime
+			}
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")

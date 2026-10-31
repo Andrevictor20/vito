@@ -228,7 +228,7 @@ func (p *GeminiAgentProvider) buildRequest(req AgentChatRequest) geminiChatReque
 }
 
 func (p *GeminiAgentProvider) modelsChain() []string {
-	chain := []string{p.model, "gemini-3.5-flash-lite", "gemini-flash-latest", "gemini-3.8-flash"}
+	chain := []string{p.model, "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash", "gemini-2.0-flash-lite"}
 	var res []string
 	seen := make(map[string]bool)
 	for _, m := range chain {

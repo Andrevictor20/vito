@@ -262,3 +262,29 @@ func TestCascadeTTSSynthesizer(t *testing.T) {
 		t.Fatal("Esperava erro quando ambos falham")
 	}
 }
+
+func TestNeuralHTTPTTSSynthesizer_Synthesize(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("tl") != "pt-BR" {
+			t.Errorf("esperava tl=pt-BR, obteve %q", r.URL.Query().Get("tl"))
+		}
+		w.Header().Set("Content-Type", "audio/mpeg")
+		_, _ = w.Write([]byte("ID3-neural-mp3-frame"))
+	}))
+	defer server.Close()
+
+	synth := NewNeuralHTTPTTSSynthesizer()
+	synth.baseURL = server.URL
+	synth.httpClient = server.Client()
+
+	audio, mime, err := synth.Synthesize("**Olá!** Sua reunião foi marcada para as 15h.", "Puck")
+	if err != nil {
+		t.Fatalf("NeuralHTTPTTSSynthesizer falhou: %v", err)
+	}
+	if mime != "audio/mpeg" {
+		t.Errorf("esperava mime audio/mpeg, obteve %q", mime)
+	}
+	if len(audio) == 0 {
+		t.Errorf("esperava bytes de áudio não vazios")
+	}
+}

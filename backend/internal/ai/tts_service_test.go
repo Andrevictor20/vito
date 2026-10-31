@@ -248,3 +248,37 @@ func TestTTSService_CacheDirCreation(t *testing.T) {
 		t.Errorf("o serviço deveria criar o diretório de cache automaticamente: %v", err)
 	}
 }
+
+func TestTTSService_Synthesize_PreservesWAVMimeOnCacheHit(t *testing.T) {
+	dir := t.TempDir()
+	wavBytes := append([]byte("RIFF\x24\x00\x00\x00WAVEfmt "), []byte("pcm-data")...)
+	mock := &mockSynthesizer{audio: wavBytes, mime: "audio/wav"}
+	svc := NewTTSService(mock, dir, "Puck")
+
+	_, mime1, err := svc.Synthesize(context.Background(), "Reunião marcada para as 15h.", "Puck")
+	if err != nil {
+		t.Fatalf("primeira chamada falhou: %v", err)
+	}
+	if mime1 != "audio/wav" {
+		t.Fatalf("esperava audio/wav na 1a chamada, obteve %q", mime1)
+	}
+
+	_, mime2, err := svc.Synthesize(context.Background(), "Reunião marcada para as 15h.", "Puck")
+	if err != nil {
+		t.Fatalf("segunda chamada (cache hit) falhou: %v", err)
+	}
+	if mime2 != "audio/wav" {
+		t.Errorf("cache hit para arquivo RIFF WAV deve preservar mime 'audio/wav', obteve %q", mime2)
+	}
+}
+
+func TestStripMarkdownForSpeech(t *testing.T) {
+	raw := "**Pronto!** Marquei a *reunião de produto* em `Agenda` para 15:00.\n- Item 1\n- Item 2"
+	clean := StripMarkdownForSpeech(raw)
+	if strings.Contains(clean, "*") || strings.Contains(clean, "`") {
+		t.Errorf("StripMarkdownForSpeech não removeu símbolos de markdown: %q", clean)
+	}
+	if !strings.Contains(clean, "Pronto!") || !strings.Contains(clean, "reunião de produto") {
+		t.Errorf("StripMarkdownForSpeech removeu conteúdo textual: %q", clean)
+	}
+}

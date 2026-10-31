@@ -1,7 +1,7 @@
 import { AppRegistry } from 'react-native';
 import { registerRootComponent } from 'expo';
 import App from './App';
-import { VitoVoiceOverlay } from './src/overlay/VitoVoiceOverlay';
+import { VitoVoiceOverlayRoot } from './src/overlay/VitoVoiceOverlay';
 
 // Sanitização de logs em ambiente de produção (elimina vazamento de PII em logcat/console)
 if (!__DEV__) {
@@ -11,5 +11,4 @@ if (!__DEV__) {
 }
 
 registerRootComponent(App);
-AppRegistry.registerComponent('VitoVoiceOverlay', () => VitoVoiceOverlay);
-
+AppRegistry.registerComponent('VitoVoiceOverlay', () => VitoVoiceOverlayRoot);

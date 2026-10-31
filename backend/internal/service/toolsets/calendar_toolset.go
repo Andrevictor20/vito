@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -167,25 +169,89 @@ func (t *CalendarToolset) Execute(ctx context.Context, execCtx *domain.ToolExecu
 	}
 }
 
+var (
+	naturalTimeRe = regexp.MustCompile(`(?i)\b(\d{1,2})(?:[:h](\d{2}))?\b`)
+	brDateTimeRe  = regexp.MustCompile(`(?i)^(\d{1,2})/(\d{1,2})/(\d{4})(?:\s*(?:às|as|-|,)?\s*(\d{1,2})(?:[:h](\d{2}))?)?$`)
+)
+
+func saoPauloLocation() *time.Location {
+	loc, err := time.LoadLocation("America/Sao_Paulo")
+	if err != nil {
+		return time.FixedZone("BRT", -3*3600)
+	}
+	return loc
+}
+
 func parseFlexibleDateTime(raw string) time.Time {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
 		return time.Time{}
 	}
-	formats := []string{
-		time.RFC3339,
+	loc := saoPauloLocation()
+
+	// 1. Formatos com timezone explícito (RFC3339)
+	for _, f := range []string{time.RFC3339, time.RFC3339Nano, "2006-01-02T15:04:05Z07:00", "2006-01-02 15:04:05 -0700"} {
+		if t, err := time.Parse(f, raw); err == nil {
+			return t.In(loc)
+		}
+	}
+
+	// 2. Formatos locais interpretados no fuso America/Sao_Paulo
+	localFormats := []string{
 		"2006-01-02T15:04:05",
 		"2006-01-02T15:04",
 		"2006-01-02 15:04:05",
 		"2006-01-02 15:04",
+		"02/01/2006 15:04:05",
 		"02/01/2006 15:04",
 		"02/01/2006",
 		"2006-01-02",
 	}
-	for _, f := range formats {
-		if t, err := time.Parse(f, raw); err == nil {
+	for _, f := range localFormats {
+		if t, err := time.ParseInLocation(f, raw, loc); err == nil {
 			return t
 		}
 	}
+
+	// 3. Formato brasileiro com "às" ou "16h30" (ex: "05/11/2026 às 16h30")
+	if m := brDateTimeRe.FindStringSubmatch(raw); len(m) > 0 {
+		day, _ := strconv.Atoi(m[1])
+		month, _ := strconv.Atoi(m[2])
+		year, _ := strconv.Atoi(m[3])
+		hour := 9
+		min := 0
+		if m[4] != "" {
+			hour, _ = strconv.Atoi(m[4])
+		}
+		if m[5] != "" {
+			min, _ = strconv.Atoi(m[5])
+		}
+		return time.Date(year, time.Month(month), day, hour, min, 0, 0, loc)
+	}
+
+	// 4. Expressões relativas em português ("hoje 18:30", "amanhã às 15:00", "depois de amanhã 10h")
+	lower := strings.ToLower(raw)
+	now := time.Now().In(loc)
+	dayOffset := -1
+	switch {
+	case strings.Contains(lower, "depois de amanh"):
+		dayOffset = 2
+	case strings.Contains(lower, "amanh"):
+		dayOffset = 1
+	case strings.Contains(lower, "hoje"):
+		dayOffset = 0
+	}
+	if dayOffset >= 0 {
+		base := now.AddDate(0, 0, dayOffset)
+		hour, min := 9, 0
+		if tm := naturalTimeRe.FindStringSubmatch(lower); len(tm) > 1 {
+			hour, _ = strconv.Atoi(tm[1])
+			if len(tm) > 2 && tm[2] != "" {
+				min, _ = strconv.Atoi(tm[2])
+			}
+		}
+		return time.Date(base.Year(), base.Month(), base.Day(), hour, min, 0, 0, loc)
+	}
+
 	return time.Time{}
 }

@@ -14,8 +14,8 @@ if git diff --cached | grep -E '^[+](<{7}[[:space:]]|={7}[[:space:]]*$|>{7}[[:sp
 fi
 
 # 2. Previne commit acidental de arquivos de segredos / chaves e protótipos locais não versionados
-SECRET_PATTERNS="(\.env$|\.env\.local$|\.pem$|\.key$|id_rsa|id_ed25519|^vito-telas\.html$|^login-vito\.html$|Arquitetura de Ativação por Voz)"
-STAGED_FILES=$(git diff --cached --name-only)
+SECRET_PATTERNS="(\.env$|\.env\.local$|\.pem$|\.key$|id_rsa|id_ed25519|^vito-telas\.html$|^login-vito\.html$|Modo conversa fora do app|Arquitetura de Ativação por Voz)"
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACMR)
 
 for file in $STAGED_FILES; do
   if echo "$file" | grep -E "$SECRET_PATTERNS" > /dev/null 2>&1; then

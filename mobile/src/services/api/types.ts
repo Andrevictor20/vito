@@ -15,5 +15,8 @@ export interface AssistantChatOptions {
   history?: ChatHistoryItem[];
   signal?: AbortSignal;
   focus_mode?: string;
+  screen_context?: string;
+  voice?: string;
+  include_tts?: boolean;
 }
 

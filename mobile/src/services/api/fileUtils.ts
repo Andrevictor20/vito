@@ -1,10 +1,18 @@
-import { Platform } from 'react-native';
+import { NativeModules, Platform } from 'react-native';
 
-let FileSystemModule: any = null;
+let LegacyFileSystemModule: any = null;
+let ModernFileSystemModule: any = null;
+
 try {
-  FileSystemModule = require('expo-file-system');
-} catch (e) {
-  FileSystemModule = null;
+  LegacyFileSystemModule = require('expo-file-system/legacy');
+} catch {
+  LegacyFileSystemModule = null;
+}
+
+try {
+  ModernFileSystemModule = require('expo-file-system');
+} catch {
+  ModernFileSystemModule = null;
 }
 
 export async function fileUriToBase64(uri: string): Promise<string> {
@@ -23,21 +31,51 @@ export async function fileUriToBase64(uri: string): Promise<string> {
       ? `file://${uri}`
       : uri;
 
-  // 1. Tenta expo-file-system (mecanismo primário e mais estável do Expo para leitura binária local)
-  const fsRead = FileSystemModule?.readAsStringAsync || FileSystemModule?.FileSystem?.readAsStringAsync;
-  if (typeof fsRead === 'function') {
+  // 0. Ponte nativa direta em Kotlin (VitoDuplexAudioModule.readAudioFileBase64) para arquivos locais no Android
+  if (Platform.OS === 'android' && typeof NativeModules?.VitoDuplexAudioModule?.readAudioFileBase64 === 'function') {
     try {
-      const encoding = FileSystemModule?.EncodingType?.Base64 || 'base64';
-      const b64 = await fsRead(cleanUri, { encoding });
-      if (b64 && typeof b64 === 'string' && b64.length > 0) {
-        return b64;
+      const nativeB64 = await NativeModules.VitoDuplexAudioModule.readAudioFileBase64(cleanUri);
+      if (nativeB64 && typeof nativeB64 === 'string' && nativeB64.length > 0) {
+        return nativeB64;
       }
-    } catch (fsErr) {
-      console.warn('[fileUriToBase64] expo-file-system falhou:', fsErr);
+    } catch {
+      // Prossegue para expo-file-system/legacy
     }
   }
 
-  // 2. Tenta XMLHttpRequest nativo do React Native (lê local files como blob)
+  // 1. Tenta expo-file-system/legacy (compatível com Expo SDK 54-57 sem erro de deprecação em runtime)
+  const legacyRead =
+    LegacyFileSystemModule?.readAsStringAsync ||
+    LegacyFileSystemModule?.default?.readAsStringAsync;
+  if (typeof legacyRead === 'function') {
+    try {
+      const encoding = LegacyFileSystemModule?.EncodingType?.Base64 || 'base64';
+      const b64 = await legacyRead(cleanUri, { encoding });
+      if (b64 && typeof b64 === 'string' && b64.length > 0) {
+        return b64;
+      }
+    } catch (legacyErr) {
+      console.warn('[fileUriToBase64] expo-file-system/legacy falhou:', legacyErr);
+    }
+  }
+
+  // 2. Tenta a nova API File do Expo SDK 57 (new File(uri).base64())
+  const ExpoFileClass = ModernFileSystemModule?.File || ModernFileSystemModule?.default?.File;
+  if (typeof ExpoFileClass === 'function') {
+    try {
+      const fileObj = new ExpoFileClass(cleanUri);
+      if (typeof fileObj.base64 === 'function') {
+        const b64 = await fileObj.base64();
+        if (b64 && typeof b64 === 'string' && b64.length > 0) {
+          return b64;
+        }
+      }
+    } catch (modernErr) {
+      console.warn('[fileUriToBase64] Expo File.base64() falhou:', modernErr);
+    }
+  }
+
+  // 3. Tenta XMLHttpRequest nativo do React Native
   try {
     const b64 = await new Promise<string>((resolve, reject) => {
       const xhr = new XMLHttpRequest();
@@ -62,7 +100,7 @@ export async function fileUriToBase64(uri: string): Promise<string> {
     console.warn('[fileUriToBase64] XMLHttpRequest falhou:', xhrErr);
   }
 
-  // 3. Fallback defensivo com fetch
+  // 4. Fallback defensivo com fetch
   try {
     const response = await fetch(cleanUri);
     const blob = await response.blob();

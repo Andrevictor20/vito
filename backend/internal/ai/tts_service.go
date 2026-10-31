@@ -84,6 +84,11 @@ func (s *edgeTTSService) Synthesize(ctx context.Context, text string, voice stri
 	return audio, mime, nil
 }
 
+// StripMarkdownForSpeech remove símbolos de formatação markdown para síntese limpa de voz.
+func StripMarkdownForSpeech(text string) string {
+	return cleanTextForSpeech(text)
+}
+
 func detectAudioMime(data []byte) string {
 	if len(data) >= 4 && string(data[:4]) == "RIFF" {
 		return "audio/wav"

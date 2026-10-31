@@ -82,20 +82,38 @@ export class ChatApi {
       typeof options === 'string' ? { timezone: options } : options || {};
     const tz = opts.timezone || this.getUserTimezone();
     const currentLocalTime = this.getCurrentLocalTimeISO();
+    const lowerName = `${filename || ''} ${audioUri || ''}`.toLowerCase();
+    const resolvedMime = lowerName.includes('.wav')
+      ? 'audio/wav'
+      : lowerName.includes('.mp3')
+        ? 'audio/mpeg'
+        : 'audio/m4a';
+    const resolvedFilename =
+      resolvedMime === 'audio/wav' && !filename.toLowerCase().endsWith('.wav')
+        ? 'audio.wav'
+        : filename || 'audio.m4a';
+
+    if (!this.client.getToken()) {
+      await this.client.init().catch(() => {});
+    }
 
     try {
       const b64 = await fileUriToBase64(audioUri);
       if (b64 && b64.length > 0) {
         return await this.client.request<AssistantChatResponse>('/api/v1/assistant/audio', {
           method: 'POST',
+          timeoutMs: 60000,
           body: JSON.stringify({
             audio_b64: b64,
-            audio_mime: 'audio/m4a',
-            filename,
+            audio_mime: resolvedMime,
+            filename: resolvedFilename,
             timezone: tz,
             current_local_time: currentLocalTime,
             history: opts.history,
             focus_mode: opts.focus_mode,
+            screen_context: opts.screen_context,
+            voice: opts.voice,
+            include_tts: opts.include_tts ?? true,
           }),
         });
       }
@@ -111,15 +129,21 @@ export class ChatApi {
     const formData = new FormData();
     formData.append('audio', {
       uri: cleanUri,
-      name: filename,
-      type: 'audio/m4a',
+      name: resolvedFilename,
+      type: resolvedMime,
     } as unknown as Blob);
     formData.append('timezone', tz);
     formData.append('current_local_time', currentLocalTime);
+    formData.append('include_tts', String(opts.include_tts ?? true));
     if (opts.focus_mode) {
       formData.append('focus_mode', opts.focus_mode);
     }
-
+    if (opts.screen_context) {
+      formData.append('screen_context', opts.screen_context);
+    }
+    if (opts.voice) {
+      formData.append('voice', opts.voice);
+    }
 
     const headers: Record<string, string> = {
       Accept: 'application/json',
