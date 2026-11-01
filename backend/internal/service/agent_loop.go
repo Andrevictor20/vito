@@ -263,7 +263,18 @@ func (l *AgentLoop) RunStream(ctx context.Context, req domain.UnifiedAssistantRe
 			var envelope domain.ToolOperationEnvelope
 			_ = json.Unmarshal(call.Arguments, &envelope)
 			if envelope.Operation == "" {
-				envelope.Operation = "default"
+				var rawMap map[string]any
+				if err := json.Unmarshal(call.Arguments, &rawMap); err == nil {
+					if opVal, ok := rawMap["operation"].(string); ok && opVal != "" {
+						envelope.Operation = opVal
+					}
+				}
+				if envelope.Operation == "" {
+					envelope.Operation = "default"
+				}
+			}
+			if len(envelope.Params) == 0 && len(call.Arguments) > 0 {
+				envelope.Params = call.Arguments
 			}
 
 			isWrite, _, preview := toolset.IsWriteOperation(envelope.Operation, envelope.Params)
@@ -313,6 +324,13 @@ func (l *AgentLoop) RunStream(ctx context.Context, req domain.UnifiedAssistantRe
 					Operation: envelope.Operation,
 					Status:    "ERROR",
 				})
+				// Garante turno RoleTool para manter paridade no protocolo ReAct da LLM
+				messages = append(messages, ai.TurnMessage{
+					Role:       ai.RoleTool,
+					ToolCallID: call.ID,
+					Name:       call.Name,
+					Content:    fmt.Sprintf("Falha ao executar ferramenta %s: %v", call.Name, execErr),
+				})
 				continue
 			}
 
@@ -360,6 +378,45 @@ func (l *AgentLoop) RunStream(ctx context.Context, req domain.UnifiedAssistantRe
 				},
 			}
 			return resp, nil
+		}
+	}
+
+	// 5.1 Garantia de Síntese Final Factual: finalAnswer nunca pode ser vazio.
+	// Se ferramentas foram executadas mas a LLM não concluiu em texto na última iteração,
+	// dispara uma chamada de síntese forçada sem ferramentas para transformar os dados apurados em resposta textual.
+	if strings.TrimSpace(finalAnswer) == "" {
+		if len(executedTools) > 0 && chosenProvider != nil {
+			synthReq := ai.AgentChatRequest{
+				ThreadID:     threadID,
+				UserID:       req.UserID,
+				Channel:      req.Channel,
+				Task:         ai.TaskChat,
+				SystemPrompt: systemPrompt + "\n\nDIRETRIZ MANDATÓRIA: Sintetize os dados factuais obtidos pelas ferramentas acima diretamente para o usuário em texto claro, objetivo e em português. NUNCA finalize vazio nem responda apenas 'comando executado'.",
+				Messages:     messages,
+				Tools:        nil, // Sem ferramentas para forçar resposta em texto
+				RequireTools: false,
+			}
+			synthResp, synthErr := chosenProvider.Chat(ctx, synthReq)
+			if synthErr == nil && synthResp != nil && strings.TrimSpace(synthResp.Text) != "" {
+				finalAnswer = strings.TrimSpace(synthResp.Text)
+			}
+		}
+
+		// Se ainda assim estiver vazio, sintetiza diretamente a partir dos resumos das ferramentas executadas
+		if strings.TrimSpace(finalAnswer) == "" {
+			var summaries []string
+			for _, m := range messages {
+				if m.Role == ai.RoleTool && strings.TrimSpace(m.Content) != "" && !strings.HasPrefix(m.Content, "Falha ao executar") {
+					summaries = append(summaries, m.Content)
+				}
+			}
+			if len(summaries) > 0 {
+				finalAnswer = strings.Join(summaries, "\n\n")
+			} else if len(executedTools) > 0 {
+				finalAnswer = "Ação concluída com sucesso."
+			} else {
+				finalAnswer = "Não consegui obter uma resposta para essa solicitação no momento. Por favor, tente novamente."
+			}
 		}
 	}
 

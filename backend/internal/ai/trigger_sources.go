@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -82,24 +83,80 @@ type FinanceSource struct {
 func (s *FinanceSource) Name() string { return "finance" }
 
 func (s *FinanceSource) Supports(t *domain.Trigger) bool {
-	return t.Category == domain.CategoryFinance
+	if t.Category == domain.CategoryFinance {
+		return true
+	}
+	return len(DetectCurrencies(t.Query+" "+t.Title)) > 0
 }
 
-var currencyPairRe = regexp.MustCompile(`(?i)\b(USD|EUR|BTC|ETH|GBP|JPY|ARS|BRL)\b`)
+var currencyPairRe = regexp.MustCompile(`(?i)\b(USD|EUR|BTC|ETH|GBP|JPY|ARS|CAD|AUD|CHF|BRL)\b`)
 
-func (s *FinanceSource) Fetch(ctx context.Context, t *domain.Trigger) ([]TriggerDataPoint, error) {
+// DetectCurrencies extrai os pares de moedas para cotação frente ao BRL,
+// com suporte a siglas ISO e termos naturais em português.
+func DetectCurrencies(text string) []string {
+	normalized := strings.ToLower(text)
 	found := map[string]bool{}
-	for _, m := range currencyPairRe.FindAllString(strings.ToUpper(t.Query+" "+t.Title), -1) {
+
+	// Detecção de consultas amplas de moedas mundiais
+	if strings.Contains(normalized, "principais moedas") ||
+		strings.Contains(normalized, "moedas do mundo") ||
+		strings.Contains(normalized, "principais cotações") ||
+		strings.Contains(normalized, "principais cotacoes") ||
+		strings.Contains(normalized, "cotação das moedas") ||
+		strings.Contains(normalized, "cotacao das moedas") ||
+		strings.Contains(normalized, "cotações das moedas") ||
+		strings.Contains(normalized, "cotacoes das moedas") ||
+		strings.Contains(normalized, "câmbio de hoje") ||
+		strings.Contains(normalized, "cambio de hoje") {
+		return []string{"USD-BRL", "EUR-BRL", "GBP-BRL", "JPY-BRL", "BTC-BRL"}
+	}
+
+	// Mapeamento em português
+	if strings.Contains(normalized, "dólar") || strings.Contains(normalized, "dolar") {
+		found["USD-BRL"] = true
+	}
+	if strings.Contains(normalized, "euro") {
+		found["EUR-BRL"] = true
+	}
+	if strings.Contains(normalized, "libra") {
+		found["GBP-BRL"] = true
+	}
+	if strings.Contains(normalized, "iene") || strings.Contains(normalized, "yen") {
+		found["JPY-BRL"] = true
+	}
+	if strings.Contains(normalized, "bitcoin") {
+		found["BTC-BRL"] = true
+	}
+	if strings.Contains(normalized, "ethereum") {
+		found["ETH-BRL"] = true
+	}
+	if strings.Contains(normalized, "peso") {
+		found["ARS-BRL"] = true
+	}
+
+	// Siglas ISO no texto
+	for _, m := range currencyPairRe.FindAllString(strings.ToUpper(text), -1) {
 		if m != "BRL" {
 			found[m+"-BRL"] = true
 		}
 	}
+
 	if len(found) == 0 {
-		found["USD-BRL"] = true
+		return nil
 	}
+
 	pairs := make([]string, 0, len(found))
 	for p := range found {
 		pairs = append(pairs, p)
+	}
+	sort.Strings(pairs)
+	return pairs
+}
+
+func (s *FinanceSource) Fetch(ctx context.Context, t *domain.Trigger) ([]TriggerDataPoint, error) {
+	pairs := DetectCurrencies(t.Query + " " + t.Title)
+	if len(pairs) == 0 {
+		pairs = []string{"USD-BRL"}
 	}
 
 	client := s.Client

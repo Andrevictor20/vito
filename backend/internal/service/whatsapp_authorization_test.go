@@ -189,25 +189,39 @@ func TestWhatsAppService_DonoNoGrupoComandoExecutado(t *testing.T) {
 	}
 }
 
-// TestWhatsAppService_DonoNoChatVoceSemMencaoComandoExecutado: no chat "Você"
-// o dono não precisa escrever @vito.
-func TestWhatsAppService_DonoNoChatVoceSemMencaoComandoExecutado(t *testing.T) {
+// TestWhatsAppService_DonoNoChatVoceExigeMencaoExplicita: no chat "Você",
+// mensagens sem menção explícita são arquivadas silenciosamente, e mensagens com @vito acionam o Vito.
+func TestWhatsAppService_DonoNoChatVoceExigeMencaoExplicita(t *testing.T) {
 	svc, mockClient, _, _ := setupConversationalWhatsAppTest(t)
 
 	gateway := &mockGatewayCapturador{}
 	svc.SetAssistantService(service.NewAssistantService(gateway, nil, nil, nil))
 	svc.SetAsyncRunner(func(fn func()) { fn() })
 
+	// 1. Mensagem sem menção explícita -> arquivada silenciosamente, não responde
 	err := svc.HandleWebhook(context.Background(), "messages.upsert",
-		payloadComVito("5511999998888@s.whatsapp.net", "msg-dono-self", "me lembra de comprar café", true))
+		payloadComVito("5511999998888@s.whatsapp.net", "msg-dono-sem-mencao", "me lembra de comprar café", true))
+	if err != nil {
+		t.Fatalf("HandleWebhook retornou erro: %v", err)
+	}
+	if gateway.input.Text != "" {
+		t.Error("mensagem sem menção explícita não deveria acionar o assistente")
+	}
+	if len(mockClient.sentMessages) != 0 {
+		t.Fatalf("esperava 0 respostas para mensagem sem menção, obteve %d", len(mockClient.sentMessages))
+	}
+
+	// 2. Mensagem com @vito -> aciona e responde
+	err = svc.HandleWebhook(context.Background(), "messages.upsert",
+		payloadComVito("5511999998888@s.whatsapp.net", "msg-dono-com-vito", "@vito me lembra de comprar café", true))
 	if err != nil {
 		t.Fatalf("HandleWebhook retornou erro: %v", err)
 	}
 	if gateway.input.Text == "" {
-		t.Error("o dono deveria acionar o Vito no chat 'Você' sem menção")
+		t.Error("o dono deveria acionar o Vito no chat 'Você' com @vito")
 	}
 	if len(mockClient.sentMessages) != 1 {
-		t.Fatalf("esperava 1 resposta no chat 'Você', obteve %d", len(mockClient.sentMessages))
+		t.Fatalf("esperava 1 resposta no chat 'Você' com @vito, obteve %d", len(mockClient.sentMessages))
 	}
 }
 
@@ -445,14 +459,14 @@ func TestWhatsAppService_SelfGroupColdCacheBuscaParticipantesSincrono(t *testing
 	svc.SetAssistantService(service.NewAssistantService(gateway, nil, nil, nil))
 	svc.SetAsyncRunner(func(fn func()) { fn() })
 
-	// Primeira mensagem em grupo individual (sem @vito e com cache frio) deve
+	// Mensagem em grupo individual COM @vito (mesmo com cache frio) deve
 	// buscar participantes sincronamente e responder como self_group.
 	if err := svc.HandleWebhook(context.Background(), "messages.upsert",
-		payloadComVito("12036399999999@g.us", "msg-cold-self-grp", "qual minha agenda de amanhã?", true)); err != nil {
+		payloadComVito("12036399999999@g.us", "msg-cold-self-grp", "@vito qual minha agenda de amanhã?", true)); err != nil {
 		t.Fatalf("HandleWebhook retornou erro: %v", err)
 	}
 	if len(mockClient.sentMessages) != 1 {
-		t.Fatalf("esperava 1 resposta no grupo individual mesmo com cache frio, obteve %d", len(mockClient.sentMessages))
+		t.Fatalf("esperava 1 resposta no grupo individual com @vito mesmo com cache frio, obteve %d", len(mockClient.sentMessages))
 	}
 }
 
@@ -465,7 +479,7 @@ func TestWhatsAppService_OwnerLIDSelfChatRecognition(t *testing.T) {
 	svc.SetAssistantService(service.NewAssistantService(gateway, nil, nil, nil))
 	svc.SetAsyncRunner(func(fn func()) { fn() })
 
-	// 1) Aprende o LID do dono a partir de uma mensagem fromMe=true com participant=@lid
+	// 1) Mensagem com @vito e participant=@lid aprende o LID do dono e responde
 	learnPayload := []byte(`{
 		"event": "messages.upsert",
 		"instance": "vito_conv_user",
@@ -477,14 +491,14 @@ func TestWhatsAppService_OwnerLIDSelfChatRecognition(t *testing.T) {
 				"participant": "182708445675538@lid"
 			},
 			"messageType": "conversation",
-			"message": {"conversation": "qual minha agenda de hoje?"}
+			"message": {"conversation": "@vito qual minha agenda de hoje?"}
 		}
 	}`)
 	if err := svc.HandleWebhook(context.Background(), "messages.upsert", learnPayload); err != nil {
 		t.Fatalf("HandleWebhook retornou erro: %v", err)
 	}
 	if len(mockClient.sentMessages) != 1 {
-		t.Fatalf("esperava 1 resposta no chat @lid do próprio dono sem precisar de @vito, obteve %d", len(mockClient.sentMessages))
+		t.Fatalf("esperava 1 resposta no chat @lid do próprio dono com @vito, obteve %d", len(mockClient.sentMessages))
 	}
 
 	// 2) ResolveURL interna do Docker quando evolution-api está no mesmo compose

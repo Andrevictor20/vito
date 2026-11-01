@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/andrevmp/vito/backend/internal/ai"
@@ -196,5 +197,101 @@ func TestSearchToolset_ReadPage_AutoRouteFromSearch(t *testing.T) {
 
 	if res.TaintSourceLabel != "web_read_page" {
 		t.Errorf("esperava que autorroteasse para web_read_page, obteve %q", res.TaintSourceLabel)
+	}
+}
+
+func TestSearchToolset_DeepWebScrapingOnSearchResult(t *testing.T) {
+	tsSearx := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintln(w, `{
+			"query": "eleicoes 2022 brasil",
+			"results": [
+				{
+					"title": "TSE divulga resultado oficial da eleição 2022",
+					"url": "https://noticias.exemplo.com.br/eleicoes-2022",
+					"content": "Lula venceu a eleição presidencial de 2022 com 50,90% dos votos válidos contra 49,10% de Bolsonaro."
+				}
+			]
+		}`)
+	}))
+	defer tsSearx.Close()
+
+	searxng := ai.NewSearXNGClient(tsSearx.URL, tsSearx.Client())
+	subagent := ai.NewVerticalSearchSubagent(searxng, nil)
+
+	mockReader := &mockWebReader{
+		readURLFn: func(ctx context.Context, targetURL string) (*ai.WebPageContent, error) {
+			if targetURL != "https://noticias.exemplo.com.br/eleicoes-2022" {
+				return nil, fmt.Errorf("url inesperada: %s", targetURL)
+			}
+			return &ai.WebPageContent{
+				URL:      targetURL,
+				Title:    "TSE divulga resultado oficial da eleição 2022",
+				Markdown: "# Relatório Oficial da Apuração\n\nNo segundo turno realizado em 30 de outubro de 2022, Luiz Inácio Lula da Silva obteve 60.345.999 votos (50,90%), sendo eleito presidente.",
+				Source:   "html_reader",
+			}, nil
+		},
+	}
+
+	toolset := toolsets.NewSearchToolset(subagent)
+	toolset.SetWebReader(mockReader)
+
+	params, _ := json.Marshal(map[string]any{
+		"query": "eleicoes 2022 brasil",
+	})
+
+	res, err := toolset.Execute(context.Background(), &domain.ToolExecutionContext{TurnID: "turn-deep"}, "search", params)
+	if err != nil {
+		t.Fatalf("erro ao executar busca: %v", err)
+	}
+
+	if len(res.Sources) != 1 {
+		t.Fatalf("esperava 1 fonte, obteve %d", len(res.Sources))
+	}
+
+	// Verifica se o Markdown aprofundado do web scraping foi anexado ao SummaryForLLM
+	if !strings.Contains(res.SummaryForLLM, "Conteúdo Aprofundado da Fonte Principal") {
+		t.Errorf("esperava resumo com conteúdo aprofundado, obteve: %s", res.SummaryForLLM)
+	}
+	if !strings.Contains(res.SummaryForLLM, "60.345.999 votos") {
+		t.Errorf("esperava dados extraídos da página no resumo, obteve: %s", res.SummaryForLLM)
+	}
+}
+
+func TestSearchToolset_AutoFinanceFromNaturalLanguage(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintln(w, `{
+			"USDBRL":{"code":"USD","name":"Dólar Americano/Real Brasileiro","bid":"5.42"},
+			"EURBRL":{"code":"EUR","name":"Euro/Real Brasileiro","bid":"6.05"}
+		}`)
+	}))
+	defer ts.Close()
+
+	finCollector := &ai.FinanceCollector{
+		Client: ts.Client(),
+	}
+
+	toolset := toolsets.NewSearchToolset()
+	toolset.SetFinanceCollector(finCollector)
+
+	// Categoria general mas query natural contendo cotação de moedas
+	params, _ := json.Marshal(map[string]any{
+		"params": map[string]any{
+			"query":    "Quais as últimas cotações das principais moedas?",
+			"category": "general",
+		},
+	})
+
+	res, err := toolset.Execute(context.Background(), &domain.ToolExecutionContext{TurnID: "turn-fin"}, "search", params)
+	if err != nil {
+		t.Fatalf("erro ao executar busca: %v", err)
+	}
+
+	if len(res.Sources) == 0 {
+		t.Fatalf("esperava fontes financeiras encontradas")
+	}
+	if !strings.Contains(res.SummaryForLLM, "Dólar") || !strings.Contains(res.SummaryForLLM, "Euro") {
+		t.Errorf("resumo financeiro não continha moedas esperadas: %s", res.SummaryForLLM)
 	}
 }

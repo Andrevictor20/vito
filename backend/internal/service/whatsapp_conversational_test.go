@@ -134,6 +134,12 @@ type mockExtendedEvolutionClient struct {
 		Text     string
 		QuotedID string
 	}
+	sentReactions []struct {
+		Instance  string
+		RemoteJID string
+		MessageID string
+		Reaction  string
+	}
 	mediaDownloadedCount int
 	findContactsCount    int
 	mockMessages         []service.WhatsAppChatMessage
@@ -216,6 +222,17 @@ func (m *mockExtendedEvolutionClient) FindContacts(ctx context.Context, instance
 }
 
 func (m *mockExtendedEvolutionClient) SendReaction(ctx context.Context, instanceName, remoteJid, messageID, reaction string) error {
+	m.sentReactions = append(m.sentReactions, struct {
+		Instance  string
+		RemoteJID string
+		MessageID string
+		Reaction  string
+	}{
+		Instance:  instanceName,
+		RemoteJID: remoteJid,
+		MessageID: messageID,
+		Reaction:  reaction,
+	})
 	return nil
 }
 
@@ -234,7 +251,7 @@ func TestWhatsAppService_AudioMessage_TranscribesWithGroqWhisper(t *testing.T) {
 	svc.SetAsyncRunner(func(fn func()) { fn() })
 
 	mockTranscriber := &simpleTranscriber{
-		transcribedText: "Vito, qual é a minha próxima reunião hoje?",
+		transcribedText: "@vito, qual é a minha próxima reunião hoje?",
 	}
 	svc.SetAudioTranscriber(mockTranscriber)
 

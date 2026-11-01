@@ -392,8 +392,8 @@ func TestWhatsAppService_Webhook_PrivateMessageAndAntiLoop(t *testing.T) {
 		Status:       domain.WhatsAppStatusConnected,
 	})
 
-	// 1. Mensagem privada do usuário -> Respondida
-	payloadPrivate := map[string]interface{}{
+	// 1a. Mensagem privada do usuário SEM marcação explícita -> Silenciosamente arquivada, NÃO respondida
+	payloadPrivateWithoutTrigger := map[string]interface{}{
 		"event":    "messages.upsert",
 		"instance": "vito_user_100",
 		"data": map[string]interface{}{
@@ -406,14 +406,38 @@ func TestWhatsAppService_Webhook_PrivateMessageAndAntiLoop(t *testing.T) {
 			},
 		},
 	}
-	bytesPrivate, _ := json.Marshal(payloadPrivate)
+	bytesPrivateWithoutTrigger, _ := json.Marshal(payloadPrivateWithoutTrigger)
 
-	err := svc.HandleWebhook(ctx, "messages.upsert", bytesPrivate)
+	err := svc.HandleWebhook(ctx, "messages.upsert", bytesPrivateWithoutTrigger)
 	if err != nil {
-		t.Fatalf("erro ao processar mensagem privada: %v", err)
+		t.Fatalf("erro ao processar mensagem privada sem menção: %v", err)
+	}
+	if len(mockClient.sentMessages) != 0 {
+		t.Fatalf("mensagem privada sem @vito não deveria responder, obteve %d", len(mockClient.sentMessages))
+	}
+
+	// 1b. Mensagem privada do usuário COM marcação explícita (@vito) -> Respondida
+	payloadPrivateWithTrigger := map[string]interface{}{
+		"event":    "messages.upsert",
+		"instance": "vito_user_100",
+		"data": map[string]interface{}{
+			"key": map[string]interface{}{
+				"remoteJid": "5511988887777@s.whatsapp.net",
+				"fromMe":    false,
+			},
+			"message": map[string]interface{}{
+				"conversation": "@vito Quais são meus compromissos de hoje?",
+			},
+		},
+	}
+	bytesPrivateWithTrigger, _ := json.Marshal(payloadPrivateWithTrigger)
+
+	err = svc.HandleWebhook(ctx, "messages.upsert", bytesPrivateWithTrigger)
+	if err != nil {
+		t.Fatalf("erro ao processar mensagem privada com @vito: %v", err)
 	}
 	if len(mockClient.sentMessages) != 1 {
-		t.Fatalf("esperava 1 mensagem enviada, obteve %d", len(mockClient.sentMessages))
+		t.Fatalf("esperava 1 mensagem enviada para @vito, obteve %d", len(mockClient.sentMessages))
 	}
 
 	// 2. Mensagem com assinatura do Vito (fromMe ou não) -> Ignorada (anti-loop)
@@ -563,7 +587,7 @@ func TestWhatsAppService_Webhook_UserFromMeInSelfChat(t *testing.T) {
 		Status:       domain.WhatsAppStatusConnected,
 	})
 
-	// Usuário manda mensagem na conversa consigo mesmo ("Você" / seu próprio número) sem precisar de chip extra
+	// Usuário manda mensagem na conversa consigo mesmo ("Você" / seu próprio número) sem precisar de chip extra, usando @vito
 	payloadSelf := map[string]interface{}{
 		"event":    "messages.upsert",
 		"instance": "vito_user_100",
@@ -573,7 +597,7 @@ func TestWhatsAppService_Webhook_UserFromMeInSelfChat(t *testing.T) {
 				"fromMe":    true,
 			},
 			"message": map[string]interface{}{
-				"conversation": "me lembre de comprar café amanhã às 9h",
+				"conversation": "@vito me lembre de comprar café amanhã às 9h",
 			},
 		},
 	}
@@ -639,7 +663,7 @@ func TestWhatsAppService_Webhook_SendsReadReactionAndRetainsContext(t *testing.T
 		Status:       domain.WhatsAppStatusConnected,
 	})
 
-	// Turno 1: Usuário pergunta sobre emails
+	// Turno 1: Usuário pergunta sobre emails com @vito
 	payload1 := map[string]interface{}{
 		"event":    "messages.upsert",
 		"instance": "vito_user_100",
@@ -650,7 +674,7 @@ func TestWhatsAppService_Webhook_SendsReadReactionAndRetainsContext(t *testing.T
 				"id":        "MSG-001",
 			},
 			"message": map[string]interface{}{
-				"conversation": "Quais são meus emails?",
+				"conversation": "@vito Quais são meus emails?",
 			},
 		},
 	}
@@ -667,7 +691,7 @@ func TestWhatsAppService_Webhook_SendsReadReactionAndRetainsContext(t *testing.T
 		t.Errorf("reação visual incorreta: %+v", mockClient.sentReactions[0])
 	}
 
-	// Turno 2: Usuário complementa com resposta contextual
+	// Turno 2: Usuário complementa com resposta contextual usando !vito
 	payload2 := map[string]interface{}{
 		"event":    "messages.upsert",
 		"instance": "vito_user_100",
@@ -678,7 +702,7 @@ func TestWhatsAppService_Webhook_SendsReadReactionAndRetainsContext(t *testing.T
 				"id":        "MSG-002",
 			},
 			"message": map[string]interface{}{
-				"conversation": "ok me diga aqui no chat",
+				"conversation": "!vito ok me diga aqui no chat",
 			},
 		},
 	}

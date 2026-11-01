@@ -95,9 +95,25 @@ func (t *SearchToolset) Execute(ctx context.Context, execCtx *domain.ToolExecuti
 		Query    string `json:"query"`
 		Category string `json:"category"`
 		URL      string `json:"url"`
+		Params   *struct {
+			Query    string `json:"query"`
+			Category string `json:"category"`
+			URL      string `json:"url"`
+		} `json:"params"`
 	}
 	if len(rawParams) > 0 {
 		_ = json.Unmarshal(rawParams, &params)
+		if params.Params != nil {
+			if params.Query == "" {
+				params.Query = params.Params.Query
+			}
+			if params.Category == "" {
+				params.Category = params.Params.Category
+			}
+			if params.URL == "" {
+				params.URL = params.Params.URL
+			}
+		}
 	}
 
 	normOp := strings.ToLower(strings.TrimSpace(op))
@@ -151,8 +167,12 @@ func (t *SearchToolset) Execute(ctx context.Context, execCtx *domain.ToolExecuti
 	}
 
 	cat := strings.ToLower(strings.TrimSpace(params.Category))
-	if cat == "" {
-		cat = "general"
+	if cat == "" || cat == "general" {
+		if len(ai.DetectCurrencies(query)) > 0 || (t.financeCollector != nil && t.financeCollector.Supports(&domain.Trigger{Title: query, Query: query})) {
+			cat = "finance"
+		} else if cat == "" {
+			cat = "general"
+		}
 	}
 
 	var sources []domain.SearchSource
@@ -253,6 +273,23 @@ func (t *SearchToolset) Execute(ctx context.Context, execCtx *domain.ToolExecuti
 			summary = fmt.Sprintf("Nenhum dado factual em tempo real disponível para %q na vertical %s: %v", query, cat, searchErr)
 		} else {
 			summary = fmt.Sprintf("Nenhum resultado factual encontrado para %q na vertical %s.", query, cat)
+		}
+	} else if t.webReader != nil {
+		// Aprofundamento com Web Scraping da fonte principal encontrada
+		firstURL := strings.TrimSpace(sources[0].URL)
+		if strings.HasPrefix(firstURL, "http://") || strings.HasPrefix(firstURL, "https://") {
+			if !strings.Contains(firstURL, "awesomeapi.com.br") && !strings.Contains(firstURL, "brapi.dev") {
+				page, err := t.webReader.ReadURL(ctx, firstURL)
+				if err == nil && page != nil && strings.TrimSpace(page.Markdown) != "" {
+					cleanMd := strings.TrimSpace(page.Markdown)
+					runes := []rune(cleanMd)
+					maxRunes := 1500
+					if len(runes) > maxRunes {
+						cleanMd = string(runes[:maxRunes]) + "\n... [conteúdo truncado para síntese]"
+					}
+					summary = fmt.Sprintf("%s\n\n[Conteúdo Aprofundado da Fonte Principal (%s - %s)]:\n%s", summary, page.Title, page.URL, cleanMd)
+				}
+			}
 		}
 	}
 

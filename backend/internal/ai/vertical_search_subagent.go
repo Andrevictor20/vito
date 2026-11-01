@@ -76,11 +76,23 @@ func (s *VerticalSearchSubagent) Search(ctx context.Context, query, category str
 
 	if sClient != nil {
 		opts := SearXNGQueryOptions{
-			Category:  cat,
-			Language:  "pt-BR",
-			TimeRange: "month",
+			Category: cat,
+			Language: "pt-BR",
+		}
+		if cat == "news" {
+			opts.TimeRange = "month"
 		}
 		results, err := sClient.Search(ctx, cleanQuery, opts)
+		if (err != nil || len(results) == 0) && opts.TimeRange != "" {
+			// Tenta novamente sem restrição temporal caso a busca restrita não encontre resultados
+			optsNoTime := opts
+			optsNoTime.TimeRange = ""
+			if fallbackResults, fallbackErr := sClient.Search(ctx, cleanQuery, optsNoTime); fallbackErr == nil && len(fallbackResults) > 0 {
+				results = fallbackResults
+				err = nil
+			}
+		}
+
 		if err == nil && len(results) > 0 {
 			var sources []domain.SearchSource
 			var snippets []string

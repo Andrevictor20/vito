@@ -202,10 +202,10 @@ func AllowsCrossChat(chatKind string) bool {
 	return chatKind == domain.WhatsAppChatKindSelf || chatKind == domain.WhatsAppChatKindSelfGroup
 }
 
-// RequiresTrigger informa se a mensagem precisa de menção explícita (@vito) para
-// acionar o Vito. Conversas pessoais (`self`, `self_group`) dispensam a menção.
+// RequiresTrigger informa se a mensagem precisa de menção explícita (@vito, /vito, !vito) para
+// acionar o Vito. No WhatsApp, todos os chats agora exigem marcação explícita.
 func RequiresTrigger(chatKind string) bool {
-	return chatKind == domain.WhatsAppChatKindGroup || chatKind == domain.WhatsAppChatKindDirect
+	return true
 }
 
 // CanActOnMessage informa se o Vito pode executar comandos a partir desta

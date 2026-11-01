@@ -410,3 +410,64 @@ func TestAgentLoop_PersonaRulesAndUserName(t *testing.T) {
 		t.Errorf("SuggestedActions não deve conter ações fixas hardcoded, obteve %v", res.SuggestedActions)
 	}
 }
+
+// TestAgentLoop_ToolExecutionNeverReturnsEmptyResponse valida que se a LLM chamar tools
+// mas deixar o texto final vazio, o loop força a síntese e entrega os dados factuais ao usuário.
+func TestAgentLoop_ToolExecutionNeverReturnsEmptyResponse(t *testing.T) {
+	// Passo 1: LLM pede tool web_and_vertical_search
+	step1 := &ai.AgentChatResponse{
+		Text: "",
+		ToolCalls: []ai.ToolCall{
+			{
+				ID:   "call-search-1",
+				Name: "web_and_vertical_search",
+				Arguments: []byte(`{
+					"operation": "search",
+					"params": {
+						"query": "cotação do dólar hoje"
+					}
+				}`),
+			},
+		},
+		ProviderName: "mock-gemini",
+		ModelName:    "gemini-2.5-flash",
+	}
+
+	// Passo 2: LLM após receber o RoleTool retorna texto vazio (simulando encerramento silencioso)
+	step2 := &ai.AgentChatResponse{
+		Text:         "",
+		ProviderName: "mock-gemini",
+		ModelName:    "gemini-2.5-flash",
+	}
+
+	// Passo 3 (Síntese Forçada): Chamada de síntese sem tools
+	step3 := &ai.AgentChatResponse{
+		Text:         "O dólar comercial está cotado a R$ 5,42 hoje.",
+		ProviderName: "mock-gemini",
+		ModelName:    "gemini-2.5-flash",
+	}
+
+	loop, userID, threadID := setupAgentLoopTest(t, []*ai.AgentChatResponse{step1, step2, step3})
+
+	req := domain.UnifiedAssistantRequest{
+		UserID:   userID,
+		ThreadID: threadID,
+		Channel:  "app_mobile",
+		Message:  "Qual a cotação do dólar hoje?",
+	}
+
+	res, err := loop.Run(context.Background(), req)
+	if err != nil {
+		t.Fatalf("erro ao executar loop: %v", err)
+	}
+
+	if strings.TrimSpace(res.Text) == "" {
+		t.Fatalf("res.Text não pode ser vazio")
+	}
+	if strings.TrimSpace(res.Reply) == "" {
+		t.Fatalf("res.Reply não pode ser vazio")
+	}
+	if !strings.Contains(res.Text, "R$ 5,42") && !strings.Contains(res.Text, "dólar") {
+		t.Errorf("resposta deve conter os dados factuais sintetizados, obteve: %q", res.Text)
+	}
+}

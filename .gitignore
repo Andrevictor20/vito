@@ -104,6 +104,7 @@ Vito · Modo conversa fora do app (protótipo).html
 opencode.json
 .qoder/
 .qoderignore
+.claude/
 
 # Sistema Operacional
 .DS_Store

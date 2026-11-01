@@ -65,7 +65,14 @@ func setupAgentSubsystem(
 	if gmailSvc != nil {
 		registry.Register(toolsets.NewGmailToolset(&gmailServiceAdapter{gmailSvc}))
 	}
-	searchSubagent := ai.NewVerticalSearchSubagent(ai.DefaultSearXNGClient(), nil)
+
+	var searxClient *ai.SearXNGClient
+	if cfg.SearXNGURL != "" {
+		searxClient = ai.NewSearXNGClient(cfg.SearXNGURL)
+		ai.SetDefaultSearXNGClient(searxClient)
+	}
+
+	searchSubagent := ai.NewVerticalSearchSubagent(searxClient, nil)
 	if cfg.GeminiAPIKey != "" {
 		searchSubagent.SetGeminiConfig(cfg.GeminiAPIKey, cfg.GeminiModel, "")
 	}

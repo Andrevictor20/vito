@@ -163,9 +163,9 @@ func groupJID() string  { return "12036300112233@g.us" }
 func TestWhatsAppContext_QuotedMessageReachesAssistant(t *testing.T) {
 	fx := setupContextualWhatsApp(t)
 
-	payload := buildPayload(selfJID(), "msg-quoted-1", "isso aqui", map[string]interface{}{
+	payload := buildPayload(selfJID(), "msg-quoted-1", "@vito isso aqui", map[string]interface{}{
 		"extendedTextMessage": map[string]interface{}{
-			"text": "isso aqui",
+			"text": "@vito isso aqui",
 			"contextInfo": map[string]interface{}{
 				"stanzaId": "msg-original-1",
 				"quotedMessage": map[string]interface{}{
@@ -194,7 +194,7 @@ func TestWhatsAppContext_WindowContainsPreviousMessagesOfSameChat(t *testing.T) 
 		t.Fatalf("primeiro webhook: %v", err)
 	}
 	if err := fx.svc.HandleWebhook(context.Background(), "messages.upsert",
-		buildPayload(selfJID(), "msg-2", "isso que falei antes")); err != nil {
+		buildPayload(selfJID(), "msg-2", "@vito isso que falei antes")); err != nil {
 		t.Fatalf("segundo webhook: %v", err)
 	}
 
@@ -229,9 +229,9 @@ func TestWhatsAppContext_CrossChatAllowedInSelfChat(t *testing.T) {
 		t.Fatalf("o Vito não deveria responder em conversa com terceiro sem gatilho")
 	}
 
-	// Agora, no chat "Você", o Vito deve enxergar a conversa com a Ana.
+	// Agora, no chat "Você", o Vito deve enxergar a conversa com a Ana ao ser chamado com @vito.
 	if err := fx.svc.HandleWebhook(context.Background(), "messages.upsert",
-		buildPayload(selfJID(), "msg-self-1", "lembra da reunião que falei que queria fazer com a Ana?")); err != nil {
+		buildPayload(selfJID(), "msg-self-1", "@vito lembra da reunião que falei que queria fazer com a Ana?")); err != nil {
 		t.Fatalf("webhook do chat Você: %v", err)
 	}
 
@@ -270,17 +270,27 @@ func TestWhatsAppContext_CrossChatBlockedInDirectChat(t *testing.T) {
 	}
 }
 
-// AC-F16 — grupo só com o usuário dispensa a menção @vito.
-func TestWhatsAppContext_SelfGroupRespondsWithoutMention(t *testing.T) {
+// AC-F16 — grupo só com o usuário NÃO responde sem menção explícita, mas responde com @vito.
+func TestWhatsAppContext_SelfGroupRequiresTrigger(t *testing.T) {
 	fx := setupContextualWhatsApp(t)
 	fx.groupMeta.SetParticipants(groupJID(), 1)
 
+	// 1. Mensagem sem menção explícita no grupo próprio -> arquiva e não responde
 	if err := fx.svc.HandleWebhook(context.Background(), "messages.upsert",
-		buildPayload(groupJID(), "msg-grp-1", "anota a reunião com a Ana")); err != nil {
-		t.Fatalf("HandleWebhook: %v", err)
+		buildPayload(groupJID(), "msg-grp-sem-vito", "anota a reunião com a Ana")); err != nil {
+		t.Fatalf("HandleWebhook sem menção: %v", err)
+	}
+	if len(fx.client.sentMessages) != 0 {
+		t.Fatalf("não deveria responder no grupo-so-comigo sem menção, obteve %d", len(fx.client.sentMessages))
+	}
+
+	// 2. Mensagem com @vito no grupo próprio -> responde
+	if err := fx.svc.HandleWebhook(context.Background(), "messages.upsert",
+		buildPayload(groupJID(), "msg-grp-com-vito", "@vito anota a reunião com a Ana")); err != nil {
+		t.Fatalf("HandleWebhook com menção: %v", err)
 	}
 	if len(fx.client.sentMessages) != 1 {
-		t.Fatalf("esperava resposta no grupo-so-comigo, obteve %d", len(fx.client.sentMessages))
+		t.Fatalf("esperava resposta no grupo-so-comigo com @vito, obteve %d", len(fx.client.sentMessages))
 	}
 }
 
@@ -338,7 +348,7 @@ func TestWhatsAppContext_FailOpenWhenInboxUnavailable(t *testing.T) {
 	fx.svc.SetContextService(failing)
 
 	if err := fx.svc.HandleWebhook(context.Background(), "messages.upsert",
-		buildPayload(selfJID(), "msg-fail-1", "olá")); err != nil {
+		buildPayload(selfJID(), "msg-fail-1", "@vito olá")); err != nil {
 		t.Fatalf("HandleWebhook: %v", err)
 	}
 	if len(fx.client.sentMessages) != 1 {
@@ -418,7 +428,7 @@ func TestWhatsAppContext_WindowIncludesPreviousVitoReplies(t *testing.T) {
 	}
 
 	if err := fx.svc.HandleWebhook(context.Background(), "messages.upsert",
-		buildPayload(selfJID(), "msg-after-1", "e o dentista?")); err != nil {
+		buildPayload(selfJID(), "msg-after-1", "@vito e o dentista?")); err != nil {
 		t.Fatalf("HandleWebhook: %v", err)
 	}
 
@@ -530,7 +540,7 @@ func TestWhatsAppContext_ReadsExtendedTextMessageFormat(t *testing.T) {
 			"key": {"remoteJid": "5511999998888@s.whatsapp.net", "fromMe": true, "id": "msg-ext-1"},
 			"pushName": "André",
 			"messageType": "extendedTextMessage",
-			"message": {"extendedTextMessage": {"text": "o que eu falei antes sobre a Ana?"}}
+			"message": {"extendedTextMessage": {"text": "@vito o que eu falei antes sobre a Ana?"}}
 		}
 	}`)
 
@@ -547,7 +557,7 @@ func TestWhatsAppContext_ReadsExtendedTextMessageFormat(t *testing.T) {
 }
 
 // Regressão: o JID prefixado do chat "Você" deve ser classificado como self,
-// liberando o cross-chat e dispensando o @vito.
+// liberando o cross-chat ao ser chamado com @vito.
 func TestWhatsAppContext_PrefixedSelfJIDEnablesCrossChat(t *testing.T) {
 	fx := setupContextualWhatsApp(t)
 
@@ -576,7 +586,7 @@ func TestWhatsAppContext_PrefixedSelfJIDEnablesCrossChat(t *testing.T) {
 		t.Fatalf("HandleWebhook: %v", err)
 	}
 
-	// No chat "Você" (JID prefixado), sem @vito: o Vito responde e enxerga o outro chat.
+	// No chat "Você" (JID prefixado), com @vito: o Vito responde e enxerga o outro chat.
 	selfChat := []byte(`{
 		"event": "messages.upsert",
 		"instance": "vito_ctx_user",
@@ -584,7 +594,7 @@ func TestWhatsAppContext_PrefixedSelfJIDEnablesCrossChat(t *testing.T) {
 			"key": {"remoteJid": "047559884097322@s.whatsapp.net", "fromMe": true, "id": "msg-self-2"},
 			"pushName": "André",
 			"messageType": "extendedTextMessage",
-			"message": {"extendedTextMessage": {"text": "lembra da reunião com a Ana?"}}
+			"message": {"extendedTextMessage": {"text": "@vito lembra da reunião com a Ana?"}}
 		}
 	}`)
 	if err := fx.svc.HandleWebhook(context.Background(), "messages.upsert", selfChat); err != nil {
@@ -592,7 +602,7 @@ func TestWhatsAppContext_PrefixedSelfJIDEnablesCrossChat(t *testing.T) {
 	}
 
 	if len(fx.client.sentMessages) != 1 {
-		t.Fatalf("esperava resposta no chat Você sem @vito, obteve %d", len(fx.client.sentMessages))
+		t.Fatalf("esperava resposta no chat Você com @vito, obteve %d", len(fx.client.sentMessages))
 	}
 	window := fx.gateway.lastInput().ConversationWindow
 	found := false
@@ -640,7 +650,7 @@ func TestWhatsAppContext_OwnerJIDIdentifiesSelfChat(t *testing.T) {
 		t.Fatalf("HandleWebhook: %v", err)
 	}
 
-	// Chat "Você" com o JID do número paired: sem @vito, responde e enxerga o outro chat.
+	// Chat "Você" com o JID do número paired: com @vito, responde e enxerga o outro chat.
 	selfChat := []byte(`{
 		"event": "messages.upsert",
 		"instance": "vito_ctx_user",
@@ -648,7 +658,7 @@ func TestWhatsAppContext_OwnerJIDIdentifiesSelfChat(t *testing.T) {
 			"key": {"remoteJid": "559884097322@s.whatsapp.net", "fromMe": true, "id": "msg-self-3"},
 			"pushName": "André",
 			"messageType": "extendedTextMessage",
-			"message": {"extendedTextMessage": {"text": "lembra da reunião com a Ana?"}}
+			"message": {"extendedTextMessage": {"text": "@vito lembra da reunião com a Ana?"}}
 		}
 	}`)
 	if err := fx.svc.HandleWebhook(ctx, "messages.upsert", selfChat); err != nil {
@@ -656,7 +666,7 @@ func TestWhatsAppContext_OwnerJIDIdentifiesSelfChat(t *testing.T) {
 	}
 
 	if len(fx.client.sentMessages) != 1 {
-		t.Fatalf("esperava resposta no chat Você sem @vito, obteve %d", len(fx.client.sentMessages))
+		t.Fatalf("esperava resposta no chat Você com @vito, obteve %d", len(fx.client.sentMessages))
 	}
 	found := false
 	for _, m := range fx.gateway.lastInput().ConversationWindow {

@@ -54,9 +54,11 @@ type Config struct {
 	WhatsAppMediaMaxAgeDays        int
 	WhatsAppMediaVisionModel       string
 	// Síntese de fala neural (Edge-TTS pt-BR).
-	TTSVoice   string
-	TTSEnabled bool
+	TTSVoice    string
+	TTSEnabled  bool
 	TTSCacheDir string
+	// Metabuscador SearXNG
+	SearXNGURL string
 }
 
 // Load carrega a configuração a partir de variáveis de ambiente com fallbacks seguros.
@@ -203,9 +205,10 @@ func Load() *Config {
 		// compartilhada por todos os modelos do Gemini e é o gargalo do chat).
 		WhatsAppMediaVisionModel: getEnvDefault("WHATSAPP_MEDIA_VISION_MODEL", "google/gemini-3.5-flash-lite"),
 		// Síntese de fala neural (Edge-TTS pt-BR).
-		TTSVoice:   getEnvDefault("TTS_VOICE", "pt-BR-AntonioNeural"),
-		TTSEnabled: getEnvBoolDefault("TTS_ENABLED", true),
+		TTSVoice:    getEnvDefault("TTS_VOICE", "pt-BR-AntonioNeural"),
+		TTSEnabled:  getEnvBoolDefault("TTS_ENABLED", true),
 		TTSCacheDir: getEnvDefault("TTS_CACHE_DIR", "./data/tts_cache"),
+		SearXNGURL:  getEnvDefault("SEARXNG_URL", "http://127.0.0.1:8185"),
 	}
 }
 

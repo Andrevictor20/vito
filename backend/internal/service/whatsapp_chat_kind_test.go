@@ -96,10 +96,10 @@ func TestAllowsCrossChat_OnlyPersonalChats(t *testing.T) {
 	}
 }
 
-func TestRequiresTrigger_OnlyChatsWithThirdParties(t *testing.T) {
+func TestRequiresTrigger_AllChatsRequireExplicitTrigger(t *testing.T) {
 	required := map[string]bool{
-		domain.WhatsAppChatKindSelf:      false,
-		domain.WhatsAppChatKindSelfGroup: false,
+		domain.WhatsAppChatKindSelf:      true,
+		domain.WhatsAppChatKindSelfGroup: true,
 		domain.WhatsAppChatKindGroup:     true,
 		domain.WhatsAppChatKindDirect:    true,
 	}

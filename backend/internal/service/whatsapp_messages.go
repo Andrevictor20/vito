@@ -15,28 +15,18 @@ import (
 )
 
 // reVitoTrigger detecta comandos ou menções explícitas ao Vito nas mensagens (@vito, /vito, !vito).
-var reVitoTrigger = regexp.MustCompile(`(?i)[@!/]vito\b[:,!-]?\s*`)
+var reVitoTrigger = regexp.MustCompile(`(?i)(?:^|[\s([{\n\r])[@!/]vito\b[:,!-]?\s*`)
 
-// reNaturalVitoTrigger detecta chamadas naturais direcionadas ao Vito ("Vito, ...", "Oi Vito, ...", "Fala Vito, ...").
-var reNaturalVitoTrigger = regexp.MustCompile(`(?i)(?:^|[.!?]\s*)(?:(?:ol[áa]|oi|fala|ei|e\s*a[íi]|por\s+favor)\s+)?vito\b[:,!-]?\s*`)
-
-// hasVitoCall verifica se a mensagem chama explicitamente ou naturalmente o Vito.
-// - Em mensagens de áudio ou conversas pessoais (self/self_group): aceita menção natural ("Vito, ...", "Oi Vito, ...") ou com prefixo (@, !, /).
-// - Em conversas em grupo com terceiros: exige prefixo explícito (@vito, /vito, !vito) para texto/imagem, mas aceita chamada natural no áudio.
-func hasVitoCall(text string, isAudio bool, isPrivateChat bool) (bool, string) {
+// hasVitoCall verifica se a mensagem chama explicitamente o Vito (@vito, /vito, !vito).
+// O Vito só deve ser ativado no WhatsApp se tiver a marcação explícita de @vito, /vito e !vito.
+func hasVitoCall(text string) (bool, string) {
 	trimmed := strings.TrimSpace(text)
 	if trimmed == "" {
 		return false, ""
 	}
 	if reVitoTrigger.MatchString(trimmed) {
-		clean := strings.TrimSpace(reVitoTrigger.ReplaceAllString(trimmed, ""))
+		clean := strings.TrimSpace(reVitoTrigger.ReplaceAllString(trimmed, " "))
 		return true, clean
-	}
-	if isAudio || isPrivateChat {
-		if reNaturalVitoTrigger.MatchString(trimmed) {
-			clean := strings.TrimSpace(reNaturalVitoTrigger.ReplaceAllString(trimmed, ""))
-			return true, clean
-		}
 	}
 	return false, trimmed
 }
@@ -139,16 +129,15 @@ func (s *WhatsAppService) handleMessagesEvent(ctx context.Context, instanceName 
 		return nil
 	}
 
-	isPrivateChat := chatKind == domain.WhatsAppChatKindSelf || chatKind == domain.WhatsAppChatKindSelfGroup
-	calledVito, cleanText := hasVitoCall(rawText, msg.IsAudio, isPrivateChat)
+	calledVito, cleanText := hasVitoCall(rawText)
 
 	// Regra 1: Captura de tela / Imagem (msg.IsImage)
-	// O Vito NUNCA deve responder a prints ou fotos a menos que tenha sido chamado
-	// na legenda da imagem. Sem chamada, arquiva silenciosamente no shadow inbox.
+	// O Vito NUNCA deve responder a prints ou fotos a menos que tenha a marcação
+	// explícita (@vito, /vito, !vito) na legenda da imagem. Sem marcação, arquiva silenciosamente no shadow inbox.
 	if msg.IsImage {
 		if !calledVito {
 			s.archiveMessage(ctx, integration.UserID, instanceName, msg, chatKind, rawText, "user")
-			log.Printf("ℹ️ [WhatsAppInbound] imagem sem menção ao Vito arquivada silenciosamente (jid=%s)", msg.RemoteJID)
+			log.Printf("ℹ️ [WhatsAppInbound] imagem sem menção explícita arquivada silenciosamente (jid=%s)", msg.RemoteJID)
 			return nil
 		}
 		rawText = cleanText
@@ -159,12 +148,12 @@ func (s *WhatsAppService) handleMessagesEvent(ctx context.Context, instanceName 
 
 	// Regra 2: Áudio (msg.IsAudio)
 	// O áudio é transcrito e arquivado no shadow inbox. Porém, o Vito só deve responder
-	// se a fala tiver chamado o Vito ("Vito, ...", "Oi Vito, ...", "@vito...").
-	// Sem menção ao Vito, o áudio é arquivado silenciosamente sem reação nem resposta.
+	// se tiver a marcação explícita (@vito, /vito, !vito).
+	// Sem menção explícita ao Vito, o áudio é arquivado silenciosamente sem reação nem resposta.
 	if msg.IsAudio {
 		if !calledVito {
 			s.archiveMessage(ctx, integration.UserID, instanceName, msg, chatKind, rawText, "user")
-			log.Printf("ℹ️ [WhatsAppInbound] áudio sem menção ao Vito arquivado silenciosamente (jid=%s)", msg.RemoteJID)
+			log.Printf("ℹ️ [WhatsAppInbound] áudio sem menção explícita arquivado silenciosamente (jid=%s)", msg.RemoteJID)
 			return nil
 		}
 		rawText = cleanText
@@ -174,18 +163,18 @@ func (s *WhatsAppService) handleMessagesEvent(ctx context.Context, instanceName 
 	}
 
 	// Regra 3: Texto comum (não imagem, não áudio)
-	// Em grupos ou conversas de terceiros, exige menção explícita (@vito, /vito, !vito).
-	// Em conversas pessoais (chat "Você" / self), conversa diretamente sem exigir menção.
+	// O Vito SÓ deve ser ativado no WhatsApp se tiver a marcação explícita de @vito, /vito e !vito.
+	// Em qualquer conversa (inclusive chat 'Você', grupos comigo mesmo e grupos com terceiros),
+	// mensagens sem a marcação explícita são arquivadas silenciosamente no shadow inbox sem resposta nem reação.
 	if !msg.IsImage && !msg.IsAudio {
-		if RequiresTrigger(chatKind) && !calledVito {
+		if !calledVito {
 			s.archiveMessage(ctx, integration.UserID, instanceName, msg, chatKind, rawText, "user")
+			log.Printf("ℹ️ [WhatsAppInbound] texto sem marcação explícita arquivado silenciosamente (kind=%s jid=%s)", chatKind, msg.RemoteJID)
 			return nil
 		}
-		if calledVito {
-			rawText = cleanText
-			if rawText == "" {
-				rawText = "olá"
-			}
+		rawText = cleanText
+		if rawText == "" {
+			rawText = "olá"
 		}
 	}
 

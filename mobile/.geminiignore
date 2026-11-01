@@ -76,3 +76,10 @@ scratch/
 *.pdf
 *.wasm
 .code-review-graph/
+
+# Planos de modificação e prompts de trabalho temporários
+PLANO-*.md
+*PLANO*
+PROMPT-*.md
+*PROMPT*
+/SPEC-006-THIN-HARNESS.md

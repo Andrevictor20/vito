@@ -26,8 +26,8 @@ func (c *FinanceCollector) Supports(t *domain.Trigger) bool {
 	if t.Category == domain.CategoryFinance {
 		return true
 	}
-	text := strings.ToUpper(t.Title + " " + t.Query)
-	return regexTicker.MatchString(text) || currencyPairRe.MatchString(text)
+	text := t.Title + " " + t.Query
+	return regexTicker.MatchString(strings.ToUpper(text)) || len(DetectCurrencies(text)) > 0
 }
 
 func (c *FinanceCollector) Fetch(ctx context.Context, t *domain.Trigger) ([]TriggerDataPoint, error) {

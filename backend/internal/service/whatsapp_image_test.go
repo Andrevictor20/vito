@@ -152,10 +152,10 @@ func TestWhatsAppService_ImagemComLegendaSemVito_NaoGeraResposta(t *testing.T) {
 	}
 }
 
-// TestWhatsAppService_ImagemComChamadaNaturalNoChatVoce_ReageEAnalisa
+// TestWhatsAppService_ImagemNoChatVoce_ExigePrefixoExplicito
 //
-// No chat pessoal, uma chamada natural como "Vito, o que é isso?" também deve funcionar.
-func TestWhatsAppService_ImagemComChamadaNaturalNoChatVoce_ReageEAnalisa(t *testing.T) {
+// O Vito só deve ser ativado no WhatsApp se tiver a marcação explícita de @vito, /vito e !vito.
+func TestWhatsAppService_ImagemNoChatVoce_ExigePrefixoExplicito(t *testing.T) {
 	svc, mockClient, _, _ := setupConversationalWhatsAppTest(t)
 
 	gateway := &mockGatewayCapturador{}
@@ -164,16 +164,30 @@ func TestWhatsAppService_ImagemComChamadaNaturalNoChatVoce_ReageEAnalisa(t *test
 
 	mockClient.mockMediaBase64 = base64.StdEncoding.EncodeToString([]byte("bytes-de-imagem-fake"))
 
+	// 1. Chamada sem prefixo explícito ("Vito, ...") -> não baixa e não responde
 	err := svc.HandleWebhook(context.Background(), "messages.upsert",
 		payloadImagem("5511999998888@s.whatsapp.net", "msg-img-natural", "Vito, o que tem nessa imagem?"))
 	if err != nil {
 		t.Fatalf("HandleWebhook retornou erro: %v", err)
 	}
+	if mockClient.mediaDownloadedCount != 0 {
+		t.Error("imagem sem prefixo explícito não deveria ser baixada")
+	}
+	if len(mockClient.sentMessages) != 0 {
+		t.Fatal("imagem sem prefixo explícito não deveria gerar resposta")
+	}
+
+	// 2. Chamada com prefixo explícito ("@vito ...") -> baixa e responde
+	err = svc.HandleWebhook(context.Background(), "messages.upsert",
+		payloadImagem("5511999998888@s.whatsapp.net", "msg-img-explicita", "@vito o que tem nessa imagem?"))
+	if err != nil {
+		t.Fatalf("HandleWebhook retornou erro: %v", err)
+	}
 	if mockClient.mediaDownloadedCount == 0 {
-		t.Error("esperava download da imagem quando chamado como 'Vito,'")
+		t.Error("esperava download da imagem com @vito")
 	}
 	if len(mockClient.sentMessages) == 0 {
-		t.Fatal("esperava resposta do Vito no chat")
+		t.Fatal("esperava resposta do Vito no chat para @vito")
 	}
 }
 
