@@ -177,7 +177,13 @@ func (l *AgentLoop) RunStream(ctx context.Context, req domain.UnifiedAssistantRe
 
 	toolDefs := l.registry.Definitions()
 
+	isVoiceChannel := strings.Contains(strings.ToLower(req.Channel), "voice")
+
 	for step := 0; step < maxSteps; step++ {
+		maxTokens := 0
+		if isVoiceChannel {
+			maxTokens = 120
+		}
 		stepReq := ai.AgentChatRequest{
 			ThreadID:     threadID,
 			UserID:       req.UserID,
@@ -187,6 +193,7 @@ func (l *AgentLoop) RunStream(ctx context.Context, req domain.UnifiedAssistantRe
 			Messages:     messages,
 			Tools:        toolDefs,
 			RequireTools: false,
+			MaxTokens:    maxTokens,
 		}
 
 		provider, err := l.router.SelectProvider(ctx, stepReq)

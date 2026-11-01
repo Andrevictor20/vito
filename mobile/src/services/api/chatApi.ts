@@ -105,6 +105,7 @@ export class ChatApi {
         return await this.client.request<AssistantChatResponse>('/api/v1/assistant/audio', {
           method: 'POST',
           timeoutMs: 60000,
+          signal: opts.signal,
           body: JSON.stringify({
             thread_id: opts.thread_id,
             channel: opts.channel || 'voice',
@@ -163,6 +164,17 @@ export class ChatApi {
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 60000);
+    if (opts.signal) {
+      if (opts.signal.aborted) {
+        clearTimeout(timeoutId);
+        controller.abort();
+      } else {
+        opts.signal.addEventListener('abort', () => {
+          clearTimeout(timeoutId);
+          controller.abort();
+        });
+      }
+    }
 
     try {
       const res = await fetch(`${this.client.getBaseUrl()}/api/v1/assistant/audio`, {

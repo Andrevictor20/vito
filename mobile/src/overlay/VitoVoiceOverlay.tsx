@@ -1,12 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import {
-  NativeModules,
-  Animated,
-  Easing,
-  DeviceEventEmitter,
-  BackHandler,
-  Linking,
-} from 'react-native';
+import { NativeModules, Animated, Easing, DeviceEventEmitter, BackHandler, Linking } from 'react-native';
 import { ThemeProvider } from '../context/ThemeContext';
 import api from '../services/api';
 import {
@@ -71,12 +64,11 @@ export function VitoVoiceOverlay({
   const audioLevelRef = useRef(audioLevel);
   audioLevelRef.current = audioLevel;
   const isClosingRef = useRef<boolean>(false);
-  const voiceSessionIdRef = useRef<string>(
-    `voice-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
-  );
+  const voiceSessionIdRef = useRef<string>(`voice-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`);
   const conversationHistoryRef = useRef<ChatHistoryItem[]>([]);
   const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
   const wordTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const isCompact = variant === 'compact' || (!variant && triggerSource !== 'MANUAL');
 
@@ -124,12 +116,35 @@ export function VitoVoiceOverlay({
     }, 135);
   }, [clearWordTimer]);
 
+  const resetVoiceSession = useCallback(() => {
+    isClosingRef.current = false;
+    voiceSessionIdRef.current = `voice-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    conversationHistoryRef.current = [];
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    VitoDuplexAudioModule?.stopSpeaking?.();
+    setReplyText('');
+    setActionCard(null);
+    setWhatsappCard(null);
+    setHasSources(false);
+    setUserTranscript('');
+    setTranscript('Pode falar…');
+    setState('LISTENING');
+  }, []);
+
   const handleClose = useCallback(() => {
     if (isClosingRef.current) return;
     isClosingRef.current = true;
     clearWordTimer();
     if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
     try {
+      VitoDuplexAudioModule?.stopSpeaking?.();
       VitoDuplexAudioModule?.stopRecording?.().catch(() => {});
       VitoDuplexAudioModule?.releaseDuplexAudio?.();
     } catch {}
@@ -161,27 +176,20 @@ export function VitoVoiceOverlay({
   }, [isCompact, handleClose]);
 
   const playNeuralVoiceReply = useCallback(async (textToSpeak: string, inlineAudioB64?: string) => {
-    let played = false;
     if (inlineAudioB64 && VitoDuplexAudioModule?.playTtsAudio) {
       try {
         await VitoDuplexAudioModule.playTtsAudio(inlineAudioB64);
-        played = true;
-      } catch {
-        played = false;
-      }
+        return true;
+      } catch {}
     }
-    if (!played) {
-      try {
-        const tts = await api.voiceTTS(textToSpeak, preferredVoice);
-        if (tts?.audio_b64 && VitoDuplexAudioModule?.playTtsAudio) {
-          await VitoDuplexAudioModule.playTtsAudio(tts.audio_b64);
-          played = true;
-        }
-      } catch {
-        played = false;
+    try {
+      const tts = await api.voiceTTS(textToSpeak, preferredVoice);
+      if (tts?.audio_b64 && VitoDuplexAudioModule?.playTtsAudio) {
+        await VitoDuplexAudioModule.playTtsAudio(tts.audio_b64);
+        return true;
       }
-    }
-    return played;
+    } catch {}
+    return false;
   }, [preferredVoice]);
 
   const handleAssistantTurnResult = useCallback(
@@ -254,12 +262,18 @@ export function VitoVoiceOverlay({
     setWhatsappCard(null);
     setHasSources(false);
 
+    if (abortControllerRef.current) abortControllerRef.current.abort();
+    const currentAbort = new AbortController();
+    abortControllerRef.current = currentAbort;
+
     try {
       const wavPath = (await VitoDuplexAudioModule?.stopRecording?.()) || '';
-      if (!wavPath) {
-        setState('LISTENING');
-        resetInactivityTimer('LISTENING');
-        VitoDuplexAudioModule?.startRecording?.().catch(() => {});
+      if (!wavPath || isClosingRef.current || currentAbort.signal.aborted) {
+        if (!isClosingRef.current && !currentAbort.signal.aborted) {
+          setState('LISTENING');
+          resetInactivityTimer('LISTENING');
+          VitoDuplexAudioModule?.startRecording?.().catch(() => {});
+        }
         return;
       }
 
@@ -270,13 +284,16 @@ export function VitoVoiceOverlay({
         screen_context: screenContextVisible ? screenContext : undefined,
         voice: preferredVoice,
         include_tts: true,
+        signal: currentAbort.signal,
       });
+
+      if (isClosingRef.current || currentAbort.signal.aborted) return;
 
       const spokenUser = (res.transcript || '').trim();
       const spokenReply = (res.reply || res.message || 'Comando executado.').trim();
       await handleAssistantTurnResult(spokenUser, spokenReply, res);
     } catch (err: any) {
-      if (isClosingRef.current) return;
+      if (isClosingRef.current || currentAbort.signal.aborted) return;
       const errMsg = cleanVoiceText(err?.message || 'Não consegui processar o áudio agora. Pode repetir?');
       setReplyText(errMsg);
       setTranscript(errMsg);
@@ -286,7 +303,7 @@ export function VitoVoiceOverlay({
       clearWordTimer();
       setHighlightedWordCount(splitReplyWordsForHighlight(errMsg).length);
 
-      if (!isClosingRef.current) {
+      if (!isClosingRef.current && !currentAbort.signal.aborted) {
         await new Promise((r) => setTimeout(r, 120));
         setState('LISTENING');
         resetInactivityTimer('LISTENING');
@@ -399,12 +416,11 @@ export function VitoVoiceOverlay({
       if (stateRef.current !== 'LISTENING') setState('LISTENING');
     });
     const newIntentSub = DeviceEventEmitter.addListener('onVitoOverlayNewIntent', (payload: { screenContext?: string }) => {
-      isClosingRef.current = false;
+      resetVoiceSession();
       if (payload?.screenContext !== undefined) {
         setScreenContext(payload.screenContext);
         setScreenContextVisible(Boolean(payload.screenContext));
       }
-      setState('LISTENING');
       if (!isMutedRef.current) VitoDuplexAudioModule?.startRecording?.().catch(() => {});
       resetInactivityTimer('LISTENING');
     });
@@ -422,6 +438,8 @@ export function VitoVoiceOverlay({
       speechStartSub.remove();
       newIntentSub.remove();
       if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
+      if (abortControllerRef.current) abortControllerRef.current.abort();
+      VitoDuplexAudioModule?.stopSpeaking?.();
       VitoDuplexAudioModule?.releaseDuplexAudio?.();
     };
   }, [slideAnim, fadeAnim, finishRecordingAndProcess, resetInactivityTimer, clearWordTimer]);
@@ -429,30 +447,17 @@ export function VitoVoiceOverlay({
   if (isCompact) {
     return (
       <VoiceCompactView
-        state={state}
-        transcript={transcript}
-        userTranscript={userTranscript}
-        replyText={replyText}
-        highlightedWordCount={highlightedWordCount}
-        barHeights5={barHeights5}
-        isMuted={isMuted}
-        screenContextLabel="Vendo esta tela"
+        state={state} transcript={transcript} userTranscript={userTranscript}
+        replyText={replyText} highlightedWordCount={highlightedWordCount}
+        barHeights5={barHeights5} isMuted={isMuted} screenContextLabel="Vendo esta tela"
         screenContextVisible={screenContextVisible && Boolean(screenContext)}
-        actionCard={actionCard}
-        slideAnim={slideAnim}
-        fadeAnim={fadeAnim}
-        onClose={handleClose}
-        onToggleMute={handleToggleMute}
-        onTapAvatar={handleTapOrb}
+        actionCard={actionCard} slideAnim={slideAnim} fadeAnim={fadeAnim}
+        onClose={handleClose} onToggleMute={handleToggleMute} onTapAvatar={handleTapOrb}
         onDismissScreenContext={() => setScreenContextVisible(false)}
-        onSelectSuggestion={handleSelectSuggestion}
-        onOpenInVito={handleOpenInVito}
-        onUndoAction={handleUndoAction}
-        onExpandFromMini={handleTapOrb}
-        whatsappCard={whatsappCard}
-        isSendingWhatsApp={isSendingWhatsApp}
-        whatsAppSent={whatsAppSent}
-        onConfirmWhatsApp={handleConfirmWhatsApp}
+        onSelectSuggestion={handleSelectSuggestion} onOpenInVito={handleOpenInVito}
+        onUndoAction={handleUndoAction} onExpandFromMini={handleTapOrb}
+        whatsappCard={whatsappCard} isSendingWhatsApp={isSendingWhatsApp}
+        whatsAppSent={whatsAppSent} onConfirmWhatsApp={handleConfirmWhatsApp}
         hasSources={hasSources}
       />
     );
@@ -460,21 +465,12 @@ export function VitoVoiceOverlay({
 
   return (
     <VoiceFullscreenView
-      state={state}
-      transcript={transcript}
-      audioLevel={audioLevel}
-      durationSeconds={durationSeconds}
-      isMuted={isMuted}
-      onToggleMute={handleToggleMute}
-      onClose={handleClose}
-      onSwitchToText={() => { handleClose(); onSwitchToText?.(); }}
-      onTapOrb={handleTapOrb}
-      whatsappCard={whatsappCard}
-      isSendingWhatsApp={isSendingWhatsApp}
-      whatsAppSent={whatsAppSent}
-      onConfirmWhatsApp={handleConfirmWhatsApp}
-      screenContext={screenContext}
-      voice={preferredVoice}
+      state={state} transcript={transcript} audioLevel={audioLevel}
+      durationSeconds={durationSeconds} isMuted={isMuted} onToggleMute={handleToggleMute}
+      onClose={handleClose} onSwitchToText={() => { handleClose(); onSwitchToText?.(); }}
+      onTapOrb={handleTapOrb} whatsappCard={whatsappCard} isSendingWhatsApp={isSendingWhatsApp}
+      whatsAppSent={whatsAppSent} onConfirmWhatsApp={handleConfirmWhatsApp}
+      screenContext={screenContext} voice={preferredVoice}
     />
   );
 }

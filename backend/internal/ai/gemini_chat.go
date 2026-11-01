@@ -239,7 +239,13 @@ func (p *GeminiAgentProvider) buildRequestForModel(req AgentChatRequest, modelNa
 
 	gReq.GenerationConfig.Temperature = req.Temperature
 	gReq.GenerationConfig.MaxOutputTokens = req.MaxTokens
-	if strings.Contains(modelName, "2.5") {
+	isVoice := strings.Contains(strings.ToLower(req.Channel), "voice")
+	if isVoice {
+		if gReq.GenerationConfig.MaxOutputTokens == 0 || gReq.GenerationConfig.MaxOutputTokens > 120 {
+			gReq.GenerationConfig.MaxOutputTokens = 120
+		}
+		gReq.GenerationConfig.ThinkingConfig = &geminiThinkingConfig{ThinkingBudget: 0}
+	} else if strings.Contains(modelName, "2.5") {
 		gReq.GenerationConfig.ThinkingConfig = &geminiThinkingConfig{ThinkingBudget: 0}
 	}
 
