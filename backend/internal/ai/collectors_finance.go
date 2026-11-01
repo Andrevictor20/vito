@@ -15,9 +15,10 @@ import (
 
 // FinanceCollector é o coletor especializado em ativos da B3, moedas globais e cripto.
 type FinanceCollector struct {
-	Client       *http.Client
-	BrapiBaseURL string
-	BrapiToken   string
+	Client            *http.Client
+	BrapiBaseURL      string
+	BrapiToken        string
+	AwesomeAPIBaseURL string
 }
 
 func (c *FinanceCollector) Name() string { return "finance" }
@@ -53,7 +54,10 @@ func (c *FinanceCollector) Fetch(ctx context.Context, t *domain.Trigger) ([]Trig
 	}
 
 	// 2. Moedas e Câmbio via AwesomeAPI
-	awesomeSource := &FinanceSource{Client: client}
+	awesomeSource := &FinanceSource{
+		Client:  client,
+		BaseURL: c.AwesomeAPIBaseURL,
+	}
 	if awesomeSource.Supports(t) {
 		return awesomeSource.Fetch(ctx, t)
 	}

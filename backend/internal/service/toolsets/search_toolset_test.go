@@ -38,7 +38,8 @@ func TestSearchToolset_FinanceRouting(t *testing.T) {
 	defer ts.Close()
 
 	finCollector := &ai.FinanceCollector{
-		Client: ts.Client(),
+		Client:            ts.Client(),
+		AwesomeAPIBaseURL: ts.URL,
 	}
 
 	toolset := toolsets.NewSearchToolset()
@@ -269,7 +270,8 @@ func TestSearchToolset_AutoFinanceFromNaturalLanguage(t *testing.T) {
 	defer ts.Close()
 
 	finCollector := &ai.FinanceCollector{
-		Client: ts.Client(),
+		Client:            ts.Client(),
+		AwesomeAPIBaseURL: ts.URL,
 	}
 
 	toolset := toolsets.NewSearchToolset()

@@ -77,7 +77,8 @@ func (s *GoogleNewsSource) Fetch(ctx context.Context, t *domain.Trigger) ([]Trig
 // FinanceSource: cotações reais via AwesomeAPI (grátis, sem key) para pares
 // detectados no texto (USD/BRL, EUR/BRL, BTC/BRL...).
 type FinanceSource struct {
-	Client *http.Client
+	Client  *http.Client
+	BaseURL string
 }
 
 func (s *FinanceSource) Name() string { return "finance" }
@@ -163,7 +164,11 @@ func (s *FinanceSource) Fetch(ctx context.Context, t *domain.Trigger) ([]Trigger
 	if client == nil {
 		client = &http.Client{Timeout: 8 * time.Second}
 	}
-	reqURL := "https://economia.awesomeapi.com.br/json/last/" + strings.Join(pairs, ",")
+	baseURL := s.BaseURL
+	if baseURL == "" {
+		baseURL = "https://economia.awesomeapi.com.br"
+	}
+	reqURL := strings.TrimRight(baseURL, "/") + "/json/last/" + strings.Join(pairs, ",")
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
 	if err != nil {
 		return nil, err
