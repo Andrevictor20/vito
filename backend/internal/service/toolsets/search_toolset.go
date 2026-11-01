@@ -10,14 +10,16 @@ import (
 	"github.com/andrevmp/vito/backend/internal/domain"
 )
 
-// SearchToolset implementa a Macro-Ferramenta web_and_vertical_search com coletores especializados.
+// SearchToolset implementa a Macro-Ferramenta web_and_vertical_search com coletores especializados
+// e leitor web aprofundado (read_page) com fallback Jina.
 type SearchToolset struct {
 	subagent          *ai.VerticalSearchSubagent
 	financeCollector  *ai.FinanceCollector
 	shoppingCollector *ai.ShoppingCollector
+	webReader         ai.WebReader
 }
 
-// NewSearchToolset instancia o toolset conectando os coletores verticais e o subagente factual.
+// NewSearchToolset instancia o toolset conectando os coletores verticais, o subagente factual e o leitor web.
 func NewSearchToolset(subagent ...*ai.VerticalSearchSubagent) *SearchToolset {
 	var sub *ai.VerticalSearchSubagent
 	if len(subagent) > 0 && subagent[0] != nil {
@@ -30,6 +32,7 @@ func NewSearchToolset(subagent ...*ai.VerticalSearchSubagent) *SearchToolset {
 		subagent:          sub,
 		financeCollector:  &ai.FinanceCollector{},
 		shoppingCollector: &ai.ShoppingCollector{SearXNG: ai.DefaultSearXNGClient()},
+		webReader:         ai.DefaultWebReader(),
 	}
 }
 
@@ -45,12 +48,16 @@ func (t *SearchToolset) SetSubagent(sub *ai.VerticalSearchSubagent) {
 	t.subagent = sub
 }
 
+func (t *SearchToolset) SetWebReader(wr ai.WebReader) {
+	t.webReader = wr
+}
+
 func (t *SearchToolset) Name() domain.ToolsetName {
 	return domain.ToolsetWebSearch
 }
 
 func (t *SearchToolset) Description() string {
-	return "Realiza buscas factuais em tempo real na web e em coletores verticais (finanças, notícias, compras, concursos)."
+	return "Realiza buscas factuais em tempo real na web, coletores verticais e leitura aprofundada de links/páginas web com extração de Markdown."
 }
 
 func (t *SearchToolset) JSONSchema() json.RawMessage {
@@ -59,20 +66,20 @@ func (t *SearchToolset) JSONSchema() json.RawMessage {
 		"properties": {
 			"operation": {
 				"type": "string",
-				"enum": ["search"],
-				"description": "Operação de busca."
+				"enum": ["search", "read_page"],
+				"description": "Operação: 'search' para busca factual ou 'read_page' para leitura aprofundada de URL específica."
 			},
 			"params": {
 				"type": "object",
 				"properties": {
-					"query": {"type": "string", "description": "Termo de pesquisa factual."},
+					"query": {"type": "string", "description": "Termo de pesquisa factual na web (para operação search)."},
 					"category": {
 						"type": "string",
 						"enum": ["general", "finance", "shopping", "news", "jobs"],
 						"description": "Categoria vertical de busca."
-					}
-				},
-				"required": ["query"]
+					},
+					"url": {"type": "string", "description": "URL completa da página para leitura aprofundada (para operação read_page)."}
+				}
 			}
 		},
 		"required": ["operation"]
@@ -80,16 +87,62 @@ func (t *SearchToolset) JSONSchema() json.RawMessage {
 }
 
 func (t *SearchToolset) IsWriteOperation(op string, rawParams json.RawMessage) (bool, bool, map[string]any) {
-	return false, false, nil // Busca é operação puramente de leitura
+	return false, false, nil // Busca e leitura web são operações puramente de leitura
 }
 
 func (t *SearchToolset) Execute(ctx context.Context, execCtx *domain.ToolExecutionContext, op string, rawParams json.RawMessage) (*domain.ToolExecutionResult, error) {
 	var params struct {
 		Query    string `json:"query"`
 		Category string `json:"category"`
+		URL      string `json:"url"`
 	}
 	if len(rawParams) > 0 {
 		_ = json.Unmarshal(rawParams, &params)
+	}
+
+	normOp := strings.ToLower(strings.TrimSpace(op))
+
+	// Roteamento para Leitura Aprofundada de Página (read_page)
+	if normOp == "read_page" || (normOp == "search" && strings.TrimSpace(params.URL) != "" && strings.TrimSpace(params.Query) == "") {
+		targetURL := strings.TrimSpace(params.URL)
+		if targetURL == "" && strings.HasPrefix(strings.TrimSpace(params.Query), "http") {
+			targetURL = strings.TrimSpace(params.Query)
+		}
+		if targetURL == "" {
+			return nil, fmt.Errorf("parâmetro url é obrigatório para a operação read_page")
+		}
+
+		reader := t.webReader
+		if reader == nil {
+			reader = ai.DefaultWebReader()
+		}
+
+		page, err := reader.ReadURL(ctx, targetURL)
+		if err != nil {
+			return nil, fmt.Errorf("falha ao ler página %q: %w", targetURL, err)
+		}
+
+		snippetLen := 300
+		if len(page.Markdown) < snippetLen {
+			snippetLen = len(page.Markdown)
+		}
+
+		summary := fmt.Sprintf("Conteúdo completo extraído da página %q (%s) via %s:\n\n%s", page.Title, page.URL, page.Source, page.Markdown)
+		sources := []domain.SearchSource{
+			{
+				Title:   page.Title,
+				URL:     page.URL,
+				Snippet: page.Markdown[:snippetLen],
+			},
+		}
+
+		return &domain.ToolExecutionResult{
+			Status:                "COMPLETED",
+			SummaryForLLM:         summary,
+			Sources:               sources,
+			MarksContextAsTainted: true,
+			TaintSourceLabel:      "web_read_page",
+		}, nil
 	}
 
 	query := strings.TrimSpace(params.Query)

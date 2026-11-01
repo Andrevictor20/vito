@@ -13,113 +13,37 @@ import (
 	"github.com/andrevmp/vito/backend/internal/domain"
 )
 
-// HeuristicClassifyCategory analisa o texto em linguagem natural e sugere uma das 12 categorias canônicas.
+// HeuristicClassifyCategory analisa o texto em linguagem natural e sugere uma das categorias canônicas.
 func HeuristicClassifyCategory(text string) domain.TriggerCategory {
 	lower := strings.ToLower(text)
-
-	// 1. Finanças & Investimentos
-	if strings.Contains(lower, "ação") || strings.Contains(lower, "ações") ||
-		strings.Contains(lower, "petr") || strings.Contains(lower, "vale") ||
-		strings.Contains(lower, "itub") || strings.Contains(lower, "dólar") ||
-		strings.Contains(lower, "dolar") || strings.Contains(lower, "euro") ||
-		strings.Contains(lower, "selic") || strings.Contains(lower, "cdi") ||
-		strings.Contains(lower, "fii") || strings.Contains(lower, "dividendo") ||
-		strings.Contains(lower, "bitcoin") || strings.Contains(lower, "cripto") {
-		return domain.CategoryFinance
+	if strings.HasPrefix(lower, "http://") || strings.HasPrefix(lower, "https://") || strings.Contains(lower, "www.") {
+		return domain.CategoryWebPage
 	}
 
-	// 2. Fiscal, Tributos & Documentos
-	if strings.Contains(lower, "irpf") || strings.Contains(lower, "imposto de renda") ||
-		strings.Contains(lower, "receita federal") || strings.Contains(lower, "restituição") ||
-		strings.Contains(lower, "ipva") || strings.Contains(lower, "iptu") ||
-		strings.Contains(lower, "licenciamento") || strings.Contains(lower, "cnh") ||
-		strings.Contains(lower, "passaporte") {
-		return domain.CategoryTaxesDocs
+	rules := []struct {
+		cat      domain.TriggerCategory
+		keywords []string
+	}{
+		{domain.CategoryFinance, []string{"ação", "ações", "petr", "vale", "itub", "dólar", "dolar", "euro", "selic", "cdi", "fii", "dividendo", "bitcoin", "cripto"}},
+		{domain.CategoryTaxesDocs, []string{"irpf", "imposto de renda", "receita federal", "restituição", "ipva", "iptu", "licenciamento", "cnh", "passaporte"}},
+		{domain.CategoryRealEstate, []string{"imóvel", "imovel", "apartamento", "aluguel", "quintoandar", "zap imóveis", "leilão", "leilao"}},
+		{domain.CategoryAutomotive, []string{"fipe", "carro", "moto", "veículo", "veiculo", "combustível", "gasolina", "recall"}},
+		{domain.CategoryCareer, []string{"vaga", "concurso", "edital", "inscrição", "inscricao", "linkedin", "processo seletivo", "emprego"}},
+		{domain.CategoryNews, []string{"notícia", "noticia", "manchete", "resumo diário", "geopolítica", "eleição"}},
+		{domain.CategoryTech, []string{"iphone", "macbook", "android", "apple", "openai", "gpt", "gemini", "api", "software", "sdk"}},
+		{domain.CategoryTravel, []string{"voo", "voos", "passagem", "passagens", "hotel", "hospedagem", "viagem", "viajar", "aeroporto", "visto"}},
+		{domain.CategoryShopping, []string{"comprar", "preço", "preco", "desconto", "promoção", "promocao", "estoque", "amazon", "mercado livre"}},
+		{domain.CategoryEventsSports, []string{"jogo", "partida", "futebol", "flamengo", "corinthians", "palmeiras", "fórmula 1", "f1", "show", "ingresso", "festival", "lote"}},
+		{domain.CategoryEntertainment, []string{"filme", "série", "serie", "netflix", "cinema", "temporada", "trailer", "hbo"}},
+		{domain.CategoryWeather, []string{"clima", "chuva", "temperatura", "previsão", "previsao", "temporal", "tempo", "frio", "calor"}},
 	}
 
-	// 3. Imóveis & Leilões
-	if strings.Contains(lower, "imóvel") || strings.Contains(lower, "imovel") ||
-		strings.Contains(lower, "apartamento") || strings.Contains(lower, "aluguel") ||
-		strings.Contains(lower, "quintoandar") || strings.Contains(lower, "zap imóveis") ||
-		strings.Contains(lower, "leilão") || strings.Contains(lower, "leilao") {
-		return domain.CategoryRealEstate
-	}
-
-	// 4. Automotivo & Veículos
-	if strings.Contains(lower, "fipe") || strings.Contains(lower, "carro") ||
-		strings.Contains(lower, "moto") || strings.Contains(lower, "veículo") ||
-		strings.Contains(lower, "veiculo") || strings.Contains(lower, "combustível") ||
-		strings.Contains(lower, "gasolina") || strings.Contains(lower, "recall") {
-		return domain.CategoryAutomotive
-	}
-
-	// 5. Carreira, Vagas & Concursos
-	if strings.Contains(lower, "vaga") || strings.Contains(lower, "concurso") ||
-		strings.Contains(lower, "edital") || strings.Contains(lower, "inscrição") ||
-		strings.Contains(lower, "inscricao") || strings.Contains(lower, "linkedin") ||
-		strings.Contains(lower, "processo seletivo") || strings.Contains(lower, "emprego") {
-		return domain.CategoryCareer
-	}
-
-	// 6. Notícias, Tendências & Setor
-	if strings.Contains(lower, "notícia") || strings.Contains(lower, "noticia") ||
-		strings.Contains(lower, "manchete") || strings.Contains(lower, "resumo diário") ||
-		strings.Contains(lower, "geopolítica") || strings.Contains(lower, "eleição") {
-		return domain.CategoryNews
-	}
-
-	// 7. Tecnologia & Lançamentos
-	if strings.Contains(lower, "iphone") || strings.Contains(lower, "macbook") ||
-		strings.Contains(lower, "android") || strings.Contains(lower, "apple") ||
-		strings.Contains(lower, "openai") || strings.Contains(lower, "gpt") ||
-		strings.Contains(lower, "gemini") || strings.Contains(lower, "api") ||
-		strings.Contains(lower, "software") || strings.Contains(lower, "sdk") {
-		return domain.CategoryTech
-	}
-
-	// 8. Viagens & Hospitalidade
-	if strings.Contains(lower, "voo") || strings.Contains(lower, "voos") ||
-		strings.Contains(lower, "passagem") || strings.Contains(lower, "passagens") ||
-		strings.Contains(lower, "hotel") || strings.Contains(lower, "hospedagem") ||
-		strings.Contains(lower, "viagem") || strings.Contains(lower, "viajar") ||
-		strings.Contains(lower, "aeroporto") || strings.Contains(lower, "visto") {
-		return domain.CategoryTravel
-	}
-
-	// 9. Compras & Queda de Preço
-	if strings.Contains(lower, "comprar") || strings.Contains(lower, "preço") ||
-		strings.Contains(lower, "preco") || strings.Contains(lower, "desconto") ||
-		strings.Contains(lower, "promoção") || strings.Contains(lower, "promocao") ||
-		strings.Contains(lower, "estoque") || strings.Contains(lower, "amazon") ||
-		strings.Contains(lower, "mercado livre") {
-		return domain.CategoryShopping
-	}
-
-	// 10. Eventos, Shows & Esportes
-	if strings.Contains(lower, "jogo") || strings.Contains(lower, "partida") ||
-		strings.Contains(lower, "futebol") || strings.Contains(lower, "flamengo") ||
-		strings.Contains(lower, "corinthians") || strings.Contains(lower, "palmeiras") ||
-		strings.Contains(lower, "fórmula 1") || strings.Contains(lower, "f1") ||
-		strings.Contains(lower, "show") || strings.Contains(lower, "ingresso") ||
-		strings.Contains(lower, "festival") || strings.Contains(lower, "lote") {
-		return domain.CategoryEventsSports
-	}
-
-	// 11. Entretenimento & Mídia
-	if strings.Contains(lower, "filme") || strings.Contains(lower, "série") ||
-		strings.Contains(lower, "serie") || strings.Contains(lower, "netflix") ||
-		strings.Contains(lower, "cinema") || strings.Contains(lower, "temporada") ||
-		strings.Contains(lower, "trailer") || strings.Contains(lower, "hbo") {
-		return domain.CategoryEntertainment
-	}
-
-	// 12. Clima, Meio Ambiente & Alertas
-	if strings.Contains(lower, "clima") || strings.Contains(lower, "chuva") ||
-		strings.Contains(lower, "temperatura") || strings.Contains(lower, "previsão") ||
-		strings.Contains(lower, "previsao") || strings.Contains(lower, "temporal") ||
-		strings.Contains(lower, "tempo") || strings.Contains(lower, "frio") ||
-		strings.Contains(lower, "calor") {
-		return domain.CategoryWeather
+	for _, r := range rules {
+		for _, kw := range r.keywords {
+			if strings.Contains(lower, kw) {
+				return r.cat
+			}
+		}
 	}
 
 	return domain.CategoryCustom
@@ -249,12 +173,21 @@ func (s *TriggerService) CreateTrigger(userID string, input domain.CreateTrigger
 		targetVal = fmt.Sprintf("%.2f", *plan.TargetValue)
 	}
 
+	targetURL := strings.TrimSpace(input.TargetURL)
+	if targetURL == "" && (strings.HasPrefix(strings.TrimSpace(input.Query), "http://") || strings.HasPrefix(strings.TrimSpace(input.Query), "https://")) {
+		targetURL = strings.TrimSpace(input.Query)
+	}
+	if targetURL != "" && category == domain.CategoryCustom {
+		category = domain.CategoryWebPage
+	}
+
 	trigger := &domain.Trigger{
 		ID:                   uuid.New().String(),
 		UserID:               userID,
 		Title:                input.Title,
 		Category:             category,
 		Query:                expandedQuery,
+		TargetURL:            targetURL,
 		UserIntent:           userIntent,
 		SearchKeywords:       searchKeywords,
 		SearchConfigJSON:     searchConfigJSON,
@@ -372,6 +305,9 @@ func (s *TriggerService) UpdateTrigger(id, userID string, input domain.UpdateTri
 	}
 	if input.Query != nil && strings.TrimSpace(*input.Query) != "" {
 		t.Query = strings.TrimSpace(*input.Query)
+	}
+	if input.TargetURL != nil {
+		t.TargetURL = strings.TrimSpace(*input.TargetURL)
 	}
 	if input.UserIntent != nil {
 		t.UserIntent = strings.TrimSpace(*input.UserIntent)

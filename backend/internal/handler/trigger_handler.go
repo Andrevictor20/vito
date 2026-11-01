@@ -38,6 +38,7 @@ type createTriggerRequest struct {
 	Title          string                      `json:"title"`
 	Category       domain.TriggerCategory      `json:"category"`
 	Query          string                      `json:"query"`
+	TargetURL      string                      `json:"target_url"`
 	UserIntent     string                      `json:"user_intent"`
 	SearchKeywords string                      `json:"search_keywords"`
 	ConditionType  domain.TriggerConditionType `json:"condition_type"`
@@ -64,6 +65,7 @@ func (h *TriggerHandler) CreateTrigger(w http.ResponseWriter, r *http.Request) {
 		Title:          req.Title,
 		Category:       req.Category,
 		Query:          req.Query,
+		TargetURL:      req.TargetURL,
 		UserIntent:     req.UserIntent,
 		SearchKeywords: req.SearchKeywords,
 		ConditionType:  req.ConditionType,
@@ -153,6 +155,7 @@ type updateTriggerRequest struct {
 	Title          *string                      `json:"title"`
 	Category       *domain.TriggerCategory      `json:"category"`
 	Query          *string                      `json:"query"`
+	TargetURL      *string                      `json:"target_url"`
 	UserIntent     *string                      `json:"user_intent"`
 	SearchKeywords *string                      `json:"search_keywords"`
 	ConditionType  *domain.TriggerConditionType `json:"condition_type"`
@@ -181,6 +184,7 @@ func (h *TriggerHandler) UpdateTrigger(w http.ResponseWriter, r *http.Request) {
 		Title:          req.Title,
 		Category:       req.Category,
 		Query:          req.Query,
+		TargetURL:      req.TargetURL,
 		UserIntent:     req.UserIntent,
 		SearchKeywords: req.SearchKeywords,
 		ConditionType:  req.ConditionType,

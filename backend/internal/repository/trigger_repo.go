@@ -63,6 +63,13 @@ func scanTrigger(scanner interface{ Scan(dest ...interface{}) error }) (*domain.
 		t.NextCheckAt = &nextCheck.Time
 	}
 
+	if t.SearchConfigJSON != "" && t.SearchConfigJSON != "{}" {
+		var cfg domain.TriggerSearchConfig
+		if err := json.Unmarshal([]byte(t.SearchConfigJSON), &cfg); err == nil && cfg.TargetURL != "" {
+			t.TargetURL = cfg.TargetURL
+		}
+	}
+
 	return &t, nil
 }
 
@@ -70,6 +77,16 @@ func (r *TriggerRepositorySQLite) Create(t *domain.Trigger) error {
 	searchConfig := t.SearchConfigJSON
 	if searchConfig == "" {
 		searchConfig = "{}"
+	}
+	if t.TargetURL != "" {
+		var cfg domain.TriggerSearchConfig
+		if searchConfig != "" && searchConfig != "{}" {
+			_ = json.Unmarshal([]byte(searchConfig), &cfg)
+		}
+		cfg.TargetURL = t.TargetURL
+		if b, err := json.Marshal(cfg); err == nil {
+			searchConfig = string(b)
+		}
 	}
 	seenFingerprints := t.SeenFingerprintsJSON
 	if seenFingerprints == "" {

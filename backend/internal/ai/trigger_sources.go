@@ -235,6 +235,60 @@ func (s *WeatherSource) Fetch(ctx context.Context, t *domain.Trigger) ([]Trigger
 	}}, nil
 }
 
+// WebPageSource implementa o conector de monitoramento de páginas web e URLs diretas com detecção de deltas (§Plano 17).
+type WebPageSource struct {
+	Reader WebReader
+}
+
+func (s *WebPageSource) Name() string { return "web_page" }
+
+func (s *WebPageSource) Supports(t *domain.Trigger) bool {
+	if t.Category == domain.CategoryWebPage || strings.TrimSpace(t.TargetURL) != "" {
+		return true
+	}
+	clean := strings.TrimSpace(t.Query)
+	return strings.HasPrefix(clean, "http://") || strings.HasPrefix(clean, "https://")
+}
+
+func (s *WebPageSource) Fetch(ctx context.Context, t *domain.Trigger) ([]TriggerDataPoint, error) {
+	target := strings.TrimSpace(t.TargetURL)
+	if target == "" {
+		target = strings.TrimSpace(t.Query)
+	}
+	if target == "" {
+		target = strings.TrimSpace(t.Title)
+	}
+
+	reader := s.Reader
+	if reader == nil {
+		reader = DefaultWebReader()
+	}
+
+	page, err := reader.ReadURL(ctx, target)
+	if err != nil {
+		return nil, fmt.Errorf("falha ao coletar dados da página web %s: %w", target, err)
+	}
+
+	// Gera hash do texto purificado para o delta gate
+	sum := sha256.Sum256([]byte(page.Markdown))
+	contentHash := hex.EncodeToString(sum[:])
+
+	snippet := page.Markdown
+	if len(snippet) > 1000 {
+		snippet = snippet[:1000]
+	}
+
+	return []TriggerDataPoint{
+		{
+			Title:       page.Title,
+			Source:      fmt.Sprintf("WebReader (%s)", page.Source),
+			Link:        page.URL,
+			Value:       fmt.Sprintf("%s|%s", contentHash, snippet),
+			PublishedAt: page.FetchedAt,
+		},
+	}, nil
+}
+
 var (
 	defaultSearXNGClientMu sync.RWMutex
 	defaultSearXNGClient   *SearXNGClient
@@ -254,8 +308,14 @@ func DefaultSearXNGClient() *SearXNGClient {
 	return defaultSearXNGClient
 }
 
-// RouteTriggerSource escolhe o conector especializado ou o padrão (§9.2).
+// RouteTriggerSource escolhe o conector especializado ou o padrão (§9.2 e §Plano 17).
 func RouteTriggerSource(t *domain.Trigger) TriggerDataSource {
+	// 0. Páginas Web e URLs diretas têm prioridade máxima
+	webPage := &WebPageSource{}
+	if webPage.Supports(t) {
+		return webPage
+	}
+
 	sClient := DefaultSearXNGClient()
 
 	fin := &FinanceCollector{}

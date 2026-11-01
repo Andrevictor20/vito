@@ -30,6 +30,7 @@ const (
 	CategoryEntertainment TriggerCategory = "entertainment"
 	CategoryWeather       TriggerCategory = "weather"
 	CategoryPublicExams   TriggerCategory = "public_exams"
+	CategoryWebPage       TriggerCategory = "web_page"
 	CategoryCustom        TriggerCategory = "custom"
 )
 
@@ -67,6 +68,7 @@ type Trigger struct {
 	Title                string               `json:"title"`
 	Category             TriggerCategory      `json:"category"`
 	Query                string               `json:"query"`
+	TargetURL            string               `json:"target_url,omitempty"`
 	UserIntent           string               `json:"user_intent,omitempty"`
 	SearchKeywords       string               `json:"search_keywords,omitempty"`
 	SearchConfigJSON     string               `json:"search_config_json,omitempty"`
@@ -90,6 +92,7 @@ type Trigger struct {
 // TriggerSearchConfig armazena o plano inteligente de buscas segmentadas e filtros.
 type TriggerSearchConfig struct {
 	Queries          []string `json:"queries"`
+	TargetURL        string   `json:"target_url,omitempty"`
 	MustIncludeTerms []string `json:"must_include_terms,omitempty"`
 	ExcludeTerms     []string `json:"exclude_terms,omitempty"`
 	Ticker           string   `json:"ticker,omitempty"`
@@ -155,6 +158,7 @@ type CreateTriggerInput struct {
 	Title          string               `json:"title"`
 	Category       TriggerCategory      `json:"category"`
 	Query          string               `json:"query"`
+	TargetURL      string               `json:"target_url,omitempty"`
 	UserIntent     string               `json:"user_intent,omitempty"`
 	SearchKeywords string               `json:"search_keywords,omitempty"`
 	ConditionType  TriggerConditionType `json:"condition_type,omitempty"`
@@ -169,6 +173,7 @@ type UpdateTriggerInput struct {
 	Title          *string               `json:"title,omitempty"`
 	Category       *TriggerCategory      `json:"category,omitempty"`
 	Query          *string               `json:"query,omitempty"`
+	TargetURL      *string               `json:"target_url,omitempty"`
 	UserIntent     *string               `json:"user_intent,omitempty"`
 	SearchKeywords *string               `json:"search_keywords,omitempty"`
 	ConditionType  *TriggerConditionType `json:"condition_type,omitempty"`

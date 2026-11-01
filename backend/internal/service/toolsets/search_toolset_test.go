@@ -101,3 +101,100 @@ func TestSearchToolset_FallbackToSubagent(t *testing.T) {
 		t.Errorf("fonte inesperada: %+v", res.Sources)
 	}
 }
+
+type mockWebReader struct {
+	readURLFn func(ctx context.Context, targetURL string) (*ai.WebPageContent, error)
+}
+
+func (m *mockWebReader) ReadURL(ctx context.Context, targetURL string) (*ai.WebPageContent, error) {
+	if m.readURLFn != nil {
+		return m.readURLFn(ctx, targetURL)
+	}
+	return &ai.WebPageContent{
+		URL:       targetURL,
+		Title:     "Página de Teste",
+		Markdown:  "# Artigo Completo\n\nTexto extraído em markdown com sucesso.",
+		Source:    "native",
+	}, nil
+}
+
+func TestSearchToolset_ReadPage_Success(t *testing.T) {
+	mockReader := &mockWebReader{
+		readURLFn: func(ctx context.Context, targetURL string) (*ai.WebPageContent, error) {
+			return &ai.WebPageContent{
+				URL:      targetURL,
+				Title:    "Edital de Concurso 2026",
+				Markdown: "# Edital 01/2026\n\nInscrições abertas de 10 a 25 de novembro com 150 vagas.",
+				Source:   "native",
+			}, nil
+		},
+	}
+
+	toolset := toolsets.NewSearchToolset()
+	toolset.SetWebReader(mockReader)
+
+	params, _ := json.Marshal(map[string]any{
+		"url": "https://concursos.gov.br/edital-2026",
+	})
+
+	res, err := toolset.Execute(context.Background(), &domain.ToolExecutionContext{TurnID: "turn-read"}, "read_page", params)
+	if err != nil {
+		t.Fatalf("falha ao executar read_page: %v", err)
+	}
+
+	if res.Status != "COMPLETED" {
+		t.Errorf("esperava status COMPLETED, obteve %q", res.Status)
+	}
+	if !res.MarksContextAsTainted {
+		t.Errorf("esperava MarksContextAsTainted verdadeiro")
+	}
+	if res.TaintSourceLabel != "web_read_page" {
+		t.Errorf("esperava label web_read_page, obteve %q", res.TaintSourceLabel)
+	}
+	if len(res.Sources) != 1 || res.Sources[0].URL != "https://concursos.gov.br/edital-2026" {
+		t.Errorf("fontes incorretas: %+v", res.Sources)
+	}
+	if res.Sources[0].Title != "Edital de Concurso 2026" {
+		t.Errorf("título da fonte incorreto: %q", res.Sources[0].Title)
+	}
+}
+
+func TestSearchToolset_ReadPage_MissingURL(t *testing.T) {
+	toolset := toolsets.NewSearchToolset()
+	params, _ := json.Marshal(map[string]any{})
+
+	_, err := toolset.Execute(context.Background(), &domain.ToolExecutionContext{TurnID: "turn-err"}, "read_page", params)
+	if err == nil {
+		t.Fatalf("esperava erro ao chamar read_page sem url")
+	}
+}
+
+func TestSearchToolset_ReadPage_AutoRouteFromSearch(t *testing.T) {
+	mockReader := &mockWebReader{
+		readURLFn: func(ctx context.Context, targetURL string) (*ai.WebPageContent, error) {
+			return &ai.WebPageContent{
+				URL:      targetURL,
+				Title:    "Notícia de Economia",
+				Markdown: "# PIB Brasileiro Cresce\n\nO PIB subiu no último trimestre.",
+				Source:   "jina_reader",
+			}, nil
+		},
+	}
+
+	toolset := toolsets.NewSearchToolset()
+	toolset.SetWebReader(mockReader)
+
+	params, _ := json.Marshal(map[string]any{
+		"url": "https://g1.globo.com/economia/noticia",
+	})
+
+	// Operação search com URL preenchida e query vazia redireciona para read_page
+	res, err := toolset.Execute(context.Background(), &domain.ToolExecutionContext{TurnID: "turn-auto"}, "search", params)
+	if err != nil {
+		t.Fatalf("falha no autorroteamento: %v", err)
+	}
+
+	if res.TaintSourceLabel != "web_read_page" {
+		t.Errorf("esperava que autorroteasse para web_read_page, obteve %q", res.TaintSourceLabel)
+	}
+}

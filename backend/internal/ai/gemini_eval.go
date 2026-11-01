@@ -101,7 +101,21 @@ func (p *GeminiProvider) TestEvaluateTrigger(ctx context.Context, t *domain.Trig
 	if searchQuery == "" {
 		searchQuery = CleanSearchQuery(t.Title, string(t.Category))
 	}
-	if items, err := FetchGoogleNews(ctx, searchQuery, 6, p.httpClient); err == nil && len(items) > 0 {
+
+	targetWebURL := strings.TrimSpace(t.TargetURL)
+	if targetWebURL == "" && (strings.HasPrefix(strings.TrimSpace(t.Query), "http://") || strings.HasPrefix(strings.TrimSpace(t.Query), "https://")) {
+		targetWebURL = strings.TrimSpace(t.Query)
+	}
+
+	if targetWebURL != "" || t.Category == domain.CategoryWebPage {
+		if targetWebURL == "" {
+			targetWebURL = strings.TrimSpace(t.Title)
+		}
+		reader := DefaultWebReader()
+		if page, err := reader.ReadURL(ctx, targetWebURL); err == nil && page != nil {
+			realtimeFeed = fmt.Sprintf("Página: %s (%s)\n%s", page.Title, page.URL, page.Markdown)
+		}
+	} else if items, err := FetchGoogleNews(ctx, searchQuery, 6, p.httpClient); err == nil && len(items) > 0 {
 		collectedNews = FilterShoppingNews(items, isShopping)
 		realtimeFeed = FormatNewsFeed(collectedNews)
 	} else if items, err := FetchGoogleNews(ctx, t.Title, 6, p.httpClient); err == nil && len(items) > 0 {
@@ -139,7 +153,13 @@ DIRETRIZES DE LOCALIZAÇÃO, IDIOMA E ATUALIDADE:
 5. ESCANEABILIDADE E ZERO PAREDES DE TEXTO:
    - "summary": manchete executiva principal em 1 linha (máx 100 caracteres).
    - "bullets": array com 2 a 3 tópicos factuais curtos e diretos (máximo 120 caracteres por item). PROIBIDO parágrafos longos ou texto corrido maçante.
-6. REGRA ANTI-SLOP ESTRITA: NUNCA use metalinguagem de IA (não diga "Conforme solicitado", "Identifiquei que", "A condição foi atendida"). Seja analítico e direto como um briefing executivo.
+6. SE FOR MONITORAMENTO DE PÁGINA WEB OU URL DIRETA (web_page):
+   - Avalie o conteúdo da página extraída e resuma as informações mais recentes ou alterações relevantes.
+   - "summary": manchete executiva em 1 linha com o status ou principal fato da página (máx 100 caracteres).
+   - "metric_label": "Status da Página" e "metric_value": "Atualizada" ou indicador chave apurado.
+   - Em "bullets", liste os fatos e novidades concretas da página.
+   - Em "sources", inclua a URL direta da página.
+7. REGRA ANTI-SLOP ESTRITA: NUNCA use metalinguagem de IA (não diga "Conforme solicitado", "Identifiquei que", "A condição foi atendida"). Seja analítico e direto como um briefing executivo.
 
 Responda ESTRITAMENTE em formato JSON puro (sem marcações markdown extras):
 {

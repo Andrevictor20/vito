@@ -51,6 +51,23 @@ func (s *VerticalSearchSubagent) Search(ctx context.Context, query, category str
 		cat = "general"
 	}
 
+	// 0. Se a query for uma URL direta, executa leitura aprofundada imediata via WebReader
+	if strings.HasPrefix(cleanQuery, "http://") || strings.HasPrefix(cleanQuery, "https://") {
+		reader := DefaultWebReader()
+		if page, err := reader.ReadURL(ctx, cleanQuery); err == nil && page != nil {
+			snippet := TruncateMarkdown(page.Markdown, 300)
+			sources := []domain.SearchSource{
+				{
+					Title:   page.Title,
+					URL:     page.URL,
+					Snippet: snippet,
+				},
+			}
+			summary := fmt.Sprintf("Conteúdo extraído da página %q (%s) via %s:\n%s", page.Title, page.URL, page.Source, page.Markdown)
+			return sources, summary, nil
+		}
+	}
+
 	// 1. Tentar SearXNG se disponível
 	sClient := s.searxng
 	if sClient == nil {
