@@ -13,6 +13,7 @@ import (
 
 type MemoryRepositoryContract interface {
 	ListByUser(userID string, limit int) ([]domain.Memory, error)
+	SearchRelevant(userID, query string, limit int) ([]domain.Memory, error)
 	Create(m *domain.Memory) error
 }
 
@@ -102,11 +103,23 @@ func (t *MemoryProfileToolset) Execute(ctx context.Context, execCtx *domain.Tool
 		}, nil
 
 	default: // "search_memories", "get_profile"
-		mems, err := t.repo.ListByUser(execCtx.UserID, 10)
+		var mems []domain.Memory
+		var err error
+		if q := strings.TrimSpace(params.Query); q != "" {
+			mems, err = t.repo.SearchRelevant(execCtx.UserID, q, 10)
+		} else {
+			mems, err = t.repo.ListByUser(execCtx.UserID, 10)
+		}
 		if err != nil {
 			return nil, err
 		}
 		if len(mems) == 0 {
+			if params.Query != "" {
+				return &domain.ToolExecutionResult{
+					Status:        "COMPLETED",
+					SummaryForLLM: fmt.Sprintf("Nenhuma memória relevante encontrada sobre %q.", params.Query),
+				}, nil
+			}
 			return &domain.ToolExecutionResult{
 				Status:        "COMPLETED",
 				SummaryForLLM: "Nenhuma memória ou preferência explícita registrada ainda para este usuário.",
@@ -114,19 +127,8 @@ func (t *MemoryProfileToolset) Execute(ctx context.Context, execCtx *domain.Tool
 		}
 		var sb strings.Builder
 		sb.WriteString("Memórias e fatos conhecidos sobre o usuário:\n")
-		count := 0
 		for _, m := range mems {
-			if params.Query != "" && !strings.Contains(strings.ToLower(m.Content), strings.ToLower(params.Query)) {
-				continue
-			}
-			sb.WriteString(fmt.Sprintf("- %s\n", m.Content))
-			count++
-		}
-		if count == 0 {
-			return &domain.ToolExecutionResult{
-				Status:        "COMPLETED",
-				SummaryForLLM: fmt.Sprintf("Nenhuma memória encontrada contendo '%s'.", params.Query),
-			}, nil
+			sb.WriteString(fmt.Sprintf("- [%s] %s\n", m.Category, m.Content))
 		}
 		return &domain.ToolExecutionResult{
 			Status:        "COMPLETED",

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/domain"
@@ -269,17 +270,15 @@ func (t *SearchToolset) Execute(ctx context.Context, execCtx *domain.ToolExecuti
 
 	// 3. Fallback informativo caso nada tenha retornado
 	if len(sources) == 0 {
-		if searchErr != nil {
-			summary = fmt.Sprintf("Nenhum dado factual em tempo real disponível para %q na vertical %s: %v", query, cat, searchErr)
-		} else {
-			summary = fmt.Sprintf("Nenhum resultado factual encontrado para %q na vertical %s.", query, cat)
-		}
-	} else if t.webReader != nil {
-		// Aprofundamento com Web Scraping da fonte principal encontrada
+		summary = fmt.Sprintf("A busca externa em tempo real para %q na vertical %s não retornou páginas indexadas imediatas. Responda ao usuário com clareza utilizando sua base de conhecimento consolidada sobre o assunto de forma honesta e transparente.", query, cat)
+	} else if t.webReader != nil && (cat == "general" || shouldDeepScrape(query, op)) {
+		// Aprofundamento com Web Scraping sob demanda da fonte principal encontrada (máx 2.5s)
 		firstURL := strings.TrimSpace(sources[0].URL)
 		if strings.HasPrefix(firstURL, "http://") || strings.HasPrefix(firstURL, "https://") {
 			if !strings.Contains(firstURL, "awesomeapi.com.br") && !strings.Contains(firstURL, "brapi.dev") {
-				page, err := t.webReader.ReadURL(ctx, firstURL)
+				readCtx, readCancel := context.WithTimeout(ctx, 2500*time.Millisecond)
+				page, err := t.webReader.ReadURL(readCtx, firstURL)
+				readCancel()
 				if err == nil && page != nil && strings.TrimSpace(page.Markdown) != "" {
 					cleanMd := strings.TrimSpace(page.Markdown)
 					runes := []rune(cleanMd)
@@ -300,4 +299,13 @@ func (t *SearchToolset) Execute(ctx context.Context, execCtx *domain.ToolExecuti
 		MarksContextAsTainted: true, // Dados da web aberta contaminam o contexto contra injeção de prompt
 		TaintSourceLabel:      "web_search_results",
 	}, nil
+}
+
+func shouldDeepScrape(query, op string) bool {
+	normOp := strings.ToLower(strings.TrimSpace(op))
+	if normOp == "read_page" {
+		return true
+	}
+	q := strings.ToLower(query)
+	return strings.Contains(q, "ler página") || strings.Contains(q, "leia a página") || strings.Contains(q, "resuma o link") || strings.Contains(q, "abrir link") || strings.Contains(q, "conteúdo completo") || strings.Contains(q, "detalhes do link")
 }

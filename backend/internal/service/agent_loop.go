@@ -24,6 +24,7 @@ type AgentLoop struct {
 	traceRecorder    ai.TraceRecorder
 	userRepo         domain.UserRepository
 	aiSettingsRepo   domain.AISettingsRepository
+	contextEnricher  *AssistantContextEnricher
 }
 
 // NewAgentLoop inicializa o cérebro único do assistente.
@@ -49,6 +50,11 @@ func NewAgentLoop(
 func (l *AgentLoop) SetUserRepositories(userRepo domain.UserRepository, aiSettingsRepo domain.AISettingsRepository) {
 	l.userRepo = userRepo
 	l.aiSettingsRepo = aiSettingsRepo
+}
+
+// SetContextEnricher configura o motor de injeção de contexto Nível 1.
+func (l *AgentLoop) SetContextEnricher(enricher *AssistantContextEnricher) {
+	l.contextEnricher = enricher
 }
 
 // Run executa o loop ReAct síncrono.
@@ -119,6 +125,11 @@ func (l *AgentLoop) RunStream(ctx context.Context, req domain.UnifiedAssistantRe
 		}
 	}
 	systemPrompt := ai.BuildPersonaSystemPromptWithChannel(personaStyle, userName, time.Now(), req.Channel)
+	if l.contextEnricher != nil && req.UserID != "" {
+		if lvl1 := l.contextEnricher.BuildLevel1Context(ctx, req.UserID, req.Message, startTime); lvl1 != "" {
+			systemPrompt = systemPrompt + "\n\n" + lvl1
+		}
+	}
 
 	execCtx := &domain.ToolExecutionContext{
 		UserID:                  req.UserID,

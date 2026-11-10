@@ -2,7 +2,9 @@ package ai_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -314,6 +316,50 @@ func TestGeminiAgentProvider_RetriesOn400AcrossChain(t *testing.T) {
 
 	if resp.Text != "Resposta recuperada via modelo de fallback." {
 		t.Errorf("resposta inesperada: %q", resp.Text)
+	}
+}
+
+func TestGeminiAgentProvider_Chat_VoiceChannelTokenConfig(t *testing.T) {
+	var capturedBody []byte
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		capturedBody, _ = io.ReadAll(r.Body)
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintln(w, `{
+			"candidates": [{
+				"content": {
+					"parts": [{"text": "Resposta de voz clara e objetiva."}],
+					"role": "model"
+				},
+				"finishReason": "STOP"
+			}]
+		}`)
+	}))
+	defer ts.Close()
+
+	provider := ai.NewGeminiAgentProviderForTest("test-key", "gemini-2.5-flash", ts.URL, ts.Client())
+	req := ai.AgentChatRequest{
+		Channel: "voice",
+		Messages: []ai.TurnMessage{
+			{Role: ai.RoleUser, Content: "O que tem na minha agenda?"},
+		},
+	}
+
+	_, err := provider.Chat(context.Background(), req)
+	if err != nil {
+		t.Fatalf("falha no chat de voz: %v", err)
+	}
+
+	var parsed struct {
+		GenerationConfig struct {
+			MaxOutputTokens int `json:"maxOutputTokens"`
+		} `json:"generationConfig"`
+	}
+	if err := json.Unmarshal(capturedBody, &parsed); err != nil {
+		t.Fatalf("falha ao decodificar corpo enviado: %v", err)
+	}
+
+	if parsed.GenerationConfig.MaxOutputTokens != 350 {
+		t.Errorf("esperava MaxOutputTokens=350 para canal voice, obteve %d", parsed.GenerationConfig.MaxOutputTokens)
 	}
 }
 

@@ -3,7 +3,6 @@ name: shipper
 description: "Conducts Zero-Downtime deployments (Canary, Blue/Green), post-deploy RED telemetry verification, and automated rollback."
 skills:
   - zero-downtime-deployment
-  - deploy-pipeline-conductor
   - observability-and-slo-engineering
 ---
 # Shipper

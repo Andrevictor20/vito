@@ -39,6 +39,7 @@ func setupAgentSubsystem(
 	triggerSvc *service.TriggerService,
 	bookingSvc *service.BookingService,
 	memoryRepo *repository.MemoryRepositorySQLite,
+	waDir ...*service.WhatsAppDirectoryService,
 ) *AgentSubsystem {
 	// 1. Repositórios e Serviços de Memória e Confirmação
 	convRepo := repository.NewConversationStoreRepository(db)
@@ -60,7 +61,11 @@ func setupAgentSubsystem(
 	if waSvc != nil {
 		waBridge := service.NewWhatsAppConversationBridge(convRepo)
 		waSvc.SetConversationBridge(waBridge)
-		registry.Register(toolsets.NewWhatsAppToolset(&whatsAppServiceAdapter{waSvc}))
+		var directory *service.WhatsAppDirectoryService
+		if len(waDir) > 0 {
+			directory = waDir[0]
+		}
+		registry.Register(toolsets.NewWhatsAppToolset(&whatsAppServiceAdapter{svc: waSvc, dir: directory}))
 	}
 	if gmailSvc != nil {
 		registry.Register(toolsets.NewGmailToolset(&gmailServiceAdapter{gmailSvc}))
@@ -156,6 +161,18 @@ func setupAgentSubsystem(
 		loop.SetUserRepositories(userRepo, aiSettingsRepo)
 	}
 
+	coreProfileRepo := repository.NewCoreProfileRepository(db)
+	contextEnricher := service.NewAssistantContextEnricher(
+		userRepo,
+		aiSettingsRepo,
+		coreProfileRepo,
+		memoryRepo,
+		calSvc,
+		todoSvc,
+		triggerSvc,
+	)
+	loop.SetContextEnricher(contextEnricher)
+
 	// 6. Worker de Consolidação com debounce de 150s
 	consolidationWorker := service.NewMemoryConsolidationWorker(convRepo, memRepo, 150*time.Second)
 
@@ -230,10 +247,25 @@ func (a *todoServiceAdapter) DeleteTodo(ctx context.Context, id, userID string) 
 
 type whatsAppServiceAdapter struct {
 	svc *service.WhatsAppService
+	dir *service.WhatsAppDirectoryService
 }
 
 func (a *whatsAppServiceAdapter) SendMessage(ctx context.Context, userID, phone, message string) error {
 	return a.svc.SendWhatsAppMessage(ctx, userID, phone, message)
+}
+
+func (a *whatsAppServiceAdapter) SearchMessages(ctx context.Context, userID, query string, limit int) ([]domain.WhatsAppConversationMessage, error) {
+	if a.dir != nil {
+		return a.dir.SearchMessages(ctx, userID, query, limit)
+	}
+	return nil, nil
+}
+
+func (a *whatsAppServiceAdapter) RecentChats(ctx context.Context, userID string) ([]ai.ChatContactSummary, error) {
+	if a.dir != nil {
+		return a.dir.Directory(ctx, userID)
+	}
+	return nil, nil
 }
 
 type gmailServiceAdapter struct {
@@ -248,6 +280,10 @@ func (a *gmailServiceAdapter) SendEmail(ctx context.Context, userID, to, subject
 func (a *gmailServiceAdapter) CreateDraft(ctx context.Context, userID, to, subject, body string) error {
 	_, err := a.svc.CreateDraft(ctx, userID, to, subject, body)
 	return err
+}
+
+func (a *gmailServiceAdapter) ScanEmails(ctx context.Context, userID string) (*domain.GmailScanResult, error) {
+	return a.svc.ScanEmails(ctx, userID)
 }
 
 type bookingServiceAdapter struct {

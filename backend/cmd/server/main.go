@@ -385,7 +385,7 @@ func main() {
 	voiceTTSHandler := handler.NewVoiceTTSHandler(ttsSvc)
 
 	// 5.5 Inteligência Conversacional v2 (Loop de Agente, Toolsets e Memória Hierárquica)
-	agentSys := setupAgentSubsystem(cfg, db, calSvc, todoSvc, waSvc, gmailSvc, userRepo, aiSettingsRepo, triggerSvc, bookingSvc, memoryRepo)
+	agentSys := setupAgentSubsystem(cfg, db, calSvc, todoSvc, waSvc, gmailSvc, userRepo, aiSettingsRepo, triggerSvc, bookingSvc, memoryRepo, waWiring.Directory)
 	if agentSys.StreamHandler != nil {
 		if whisperTranscriber != nil {
 			agentSys.StreamHandler.SetTranscriber(whisperTranscriber)

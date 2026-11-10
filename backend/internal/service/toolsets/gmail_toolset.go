@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/andrevmp/vito/backend/internal/domain"
 )
@@ -11,6 +12,7 @@ import (
 type GmailServiceContract interface {
 	SendEmail(ctx context.Context, userID, to, subject, body string) error
 	CreateDraft(ctx context.Context, userID, to, subject, body string) error
+	ScanEmails(ctx context.Context, userID string) (*domain.GmailScanResult, error)
 }
 
 type GmailToolset struct {
@@ -113,11 +115,41 @@ func (t *GmailToolset) Execute(ctx context.Context, execCtx *domain.ToolExecutio
 		}, nil
 
 	default: // "search_emails"
+		if t.gmailService != nil {
+			scan, err := t.gmailService.ScanEmails(ctx, execCtx.UserID)
+			if err == nil && scan != nil {
+				var sb strings.Builder
+				sb.WriteString("Varredura recente do Gmail:\n")
+				found := 0
+				for _, b := range scan.Bills {
+					dueStr := "a definir"
+					if b.DueDate != nil {
+						dueStr = b.DueDate.Format("02/01/2006")
+					}
+					sb.WriteString(fmt.Sprintf("- [FATURA] %s: R$ %.2f (Vence: %s, Beneficiário: %s)\n", b.Subject, b.AmountBRL, dueStr, b.Beneficiary))
+					found++
+				}
+				for _, f := range scan.Flights {
+					sb.WriteString(fmt.Sprintf("- [VOO] %s (%s -> %s, Cód: %s)\n", f.Airline, f.Origin, f.Destination, f.BookingCode))
+					found++
+				}
+				for _, u := range scan.UrgentEmails {
+					sb.WriteString(fmt.Sprintf("- [E-MAIL] %s: %s (De: %s)\n", u.Subject, u.Snippet, u.From))
+					found++
+				}
+				if found > 0 {
+					return &domain.ToolExecutionResult{
+						Status:                "COMPLETED",
+						SummaryForLLM:         sb.String(),
+						MarksContextAsTainted: true,
+						TaintSourceLabel:      "gmail_untrusted_inbox",
+					}, nil
+				}
+			}
+		}
 		return &domain.ToolExecutionResult{
-			Status:                "COMPLETED",
-			SummaryForLLM:         fmt.Sprintf("Busca por e-mails com '%s' concluída.", params.Query),
-			MarksContextAsTainted: true, // Leitura de e-mails externos marca contexto como tainted!
-			TaintSourceLabel:      "gmail_untrusted_inbox",
+			Status:        "COMPLETED",
+			SummaryForLLM: fmt.Sprintf("Nenhum e-mail ou fatura recente encontrado com o termo %q.", params.Query),
 		}, nil
 	}
 }

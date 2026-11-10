@@ -4,12 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
+	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/domain"
 )
 
 type WhatsAppServiceContract interface {
 	SendMessage(ctx context.Context, userID, phone, message string) error
+	SearchMessages(ctx context.Context, userID, query string, limit int) ([]domain.WhatsAppConversationMessage, error)
+	RecentChats(ctx context.Context, userID string) ([]ai.ChatContactSummary, error)
 }
 
 type WhatsAppToolset struct {
@@ -92,17 +96,63 @@ func (t *WhatsAppToolset) Execute(ctx context.Context, execCtx *domain.ToolExecu
 		}, nil
 
 	case "search_messages":
+		if t.waService != nil && strings.TrimSpace(params.Query) != "" {
+			msgs, err := t.waService.SearchMessages(ctx, execCtx.UserID, params.Query, 6)
+			if err == nil && len(msgs) > 0 {
+				var sb strings.Builder
+				sb.WriteString(fmt.Sprintf("Mensagens encontradas no WhatsApp sobre %q:\n", params.Query))
+				for _, m := range msgs {
+					sender := m.SenderName
+					if m.FromMe {
+						sender = "Você"
+					} else if sender == "" {
+						sender = "Contato"
+					}
+					txt := m.Text
+					if txt == "" {
+						txt = m.MediaText
+					}
+					sb.WriteString(fmt.Sprintf("- [%s] %s: %s\n", m.CreatedAt.Format("02/01 15:04"), sender, txt))
+				}
+				return &domain.ToolExecutionResult{
+					Status:                "COMPLETED",
+					SummaryForLLM:         sb.String(),
+					MarksContextAsTainted: true,
+					TaintSourceLabel:      "whatsapp_external_messages",
+				}, nil
+			}
+		}
 		return &domain.ToolExecutionResult{
-			Status:                "COMPLETED",
-			SummaryForLLM:         fmt.Sprintf("Busca no WhatsApp por '%s' concluída.", params.Query),
-			MarksContextAsTainted: true, // Leitura de mensagens de terceiros marca contexto como tainted!
-			TaintSourceLabel:      "whatsapp_external_messages",
+			Status:        "COMPLETED",
+			SummaryForLLM: fmt.Sprintf("Nenhuma mensagem encontrada no histórico do WhatsApp contendo %q.", params.Query),
 		}, nil
 
 	default: // "recent_chats"
+		if t.waService != nil {
+			chats, err := t.waService.RecentChats(ctx, execCtx.UserID)
+			if err == nil && len(chats) > 0 {
+				var sb strings.Builder
+				sb.WriteString("Conversas recentes no WhatsApp:\n")
+				limit := 6
+				if len(chats) < limit {
+					limit = len(chats)
+				}
+				for _, c := range chats[:limit] {
+					line := fmt.Sprintf("- %s", c.Name)
+					if c.Preview != "" {
+						line += fmt.Sprintf(": %s", c.Preview)
+					}
+					sb.WriteString(line + "\n")
+				}
+				return &domain.ToolExecutionResult{
+					Status:        "COMPLETED",
+					SummaryForLLM: sb.String(),
+				}, nil
+			}
+		}
 		return &domain.ToolExecutionResult{
 			Status:        "COMPLETED",
-			SummaryForLLM: "Conversas recentes recuperadas.",
+			SummaryForLLM: "Nenhuma conversa recente encontrada no WhatsApp.",
 		}, nil
 	}
 }

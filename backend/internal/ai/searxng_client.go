@@ -62,7 +62,7 @@ func NewSearXNGClient(baseURL string, customClient ...*http.Client) *SearXNGClie
 	if len(customClient) > 0 && customClient[0] != nil {
 		client = customClient[0]
 	} else {
-		client = &http.Client{Timeout: 8 * time.Second}
+		client = &http.Client{Timeout: 1800 * time.Millisecond}
 	}
 
 	return &SearXNGClient{
@@ -103,7 +103,9 @@ func (c *SearXNGClient) Search(ctx context.Context, query string, opts ...SearXN
 	}
 
 	reqURL := fmt.Sprintf("%s/search?%s", c.baseURL, params.Encode())
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
+	timeoutCtx, cancel := context.WithTimeout(ctx, 1800*time.Millisecond)
+	defer cancel()
+	req, err := http.NewRequestWithContext(timeoutCtx, http.MethodGet, reqURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("falha ao criar requisição SearXNG: %w", err)
 	}
