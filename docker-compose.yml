@@ -45,6 +45,9 @@ services:
       - SEARXNG_URL=${SEARXNG_URL:-http://searxng:8080}
       - BRAPI_TOKEN=${BRAPI_TOKEN:-}
       - SERPER_API_KEY=${SERPER_API_KEY:-}
+      # Open Finance (Pluggy API)
+      - PLUGGY_CLIENT_ID=${PLUGGY_CLIENT_ID:-}
+      - PLUGGY_CLIENT_SECRET=${PLUGGY_CLIENT_SECRET:-}
       # Teto de heap do Go: evita que o backend engula a RAM do Pi e o kernel mate o Postgres (256M).
       - GOMEMLIMIT=${GOMEMLIMIT:-256MiB}
     volumes:
