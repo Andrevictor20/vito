@@ -162,8 +162,9 @@ type FinancialSummary struct {
 
 // FinanceSyncPayload é o envelope enviado pelo app mobile no Edge-Sync.
 type FinanceSyncPayload struct {
-	ConnectionID string               `json:"connection_id,omitempty"`
-	PluggyItemID string               `json:"pluggy_item_id,omitempty"`
-	Accounts     []FinanceAccount     `json:"accounts"`
-	Transactions []FinanceTransaction `json:"transactions"`
+	ConnectionID    string               `json:"connection_id,omitempty"`
+	PluggyItemID    string               `json:"pluggy_item_id,omitempty"`
+	InstitutionName string               `json:"institution_name,omitempty"`
+	Accounts        []FinanceAccount     `json:"accounts"`
+	Transactions    []FinanceTransaction `json:"transactions"`
 }

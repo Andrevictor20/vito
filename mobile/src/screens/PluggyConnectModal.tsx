@@ -34,6 +34,7 @@ export const PluggyConnectModal: React.FC<PluggyConnectModalProps> = ({
   const [connections, setConnections] = useState<FinanceConnection[]>([]);
   const [loading, setLoading] = useState(false);
   const [connecting, setConnecting] = useState(false);
+  const [syncingId, setSyncingId] = useState<string | null>(null);
 
   const loadConnections = useCallback(async () => {
     setLoading(true);
@@ -52,6 +53,129 @@ export const PluggyConnectModal: React.FC<PluggyConnectModalProps> = ({
       loadConnections();
     }
   }, [visible, loadConnections]);
+
+  const fetchAndSyncPluggyData = async (apiKey: string, targetItemId?: string) => {
+    let resolvedItemId = targetItemId;
+
+    // Se o itemId não veio na URL do browser ou se for temporário, busca itens criados na Pluggy
+    if (!resolvedItemId || resolvedItemId.startsWith('item_')) {
+      try {
+        const itemsResp = await fetch('https://api.pluggy.ai/items', {
+          headers: { 'X-API-KEY': apiKey },
+        });
+        if (itemsResp.ok) {
+          const itemsData = await itemsResp.json();
+          const itemsList = itemsData.results || itemsData;
+          if (Array.isArray(itemsList) && itemsList.length > 0) {
+            resolvedItemId = itemsList[0]?.id;
+          }
+        }
+      } catch (err) {
+        console.warn('[PluggyConnectModal] Nota ao buscar itens da Pluggy:', err);
+      }
+    }
+
+    if (!resolvedItemId || resolvedItemId.startsWith('item_')) {
+      return { accountsCount: 0, transactionsCount: 0, itemId: resolvedItemId, institutionName: '' };
+    }
+
+    // 1. Busca contas na Pluggy diretamente do aparelho (Zero IP Leak)
+    let fetchedAccounts: any[] = [];
+    try {
+      const accResp = await fetch(`https://api.pluggy.ai/accounts?itemId=${encodeURIComponent(resolvedItemId)}`, {
+        headers: { 'X-API-KEY': apiKey },
+      });
+      if (accResp.ok) {
+        const accJson = await accResp.json();
+        const results = accJson.results || accJson;
+        if (Array.isArray(results)) {
+          fetchedAccounts = results.map((a: any) => ({
+            pluggy_account_id: a.id,
+            institution_name: a.marketingName || a.name || 'Nubank',
+            account_type: a.type === 'CREDIT' ? 'CREDIT' : 'BANK',
+            account_subtype: a.subtype,
+            name: a.name || (a.type === 'CREDIT' ? 'Cartão de Crédito' : 'Conta Corrente'),
+            balance: Number(a.balance || 0),
+            currency_code: a.currencyCode || 'BRL',
+          }));
+        }
+      }
+    } catch (fetchErr) {
+      console.warn('[PluggyConnectModal] Erro ao buscar contas na Pluggy:', fetchErr);
+    }
+
+    // 2. Busca transações recentes de cada conta para alimentar Safe-to-Spend e categorias
+    let fetchedTransactions: any[] = [];
+    for (const acc of fetchedAccounts) {
+      try {
+        const txResp = await fetch(
+          `https://api.pluggy.ai/v2/transactions?accountId=${encodeURIComponent(acc.pluggy_account_id)}&pageSize=50`,
+          { headers: { 'X-API-KEY': apiKey } }
+        );
+        if (txResp.ok) {
+          const txJson = await txResp.json();
+          const txList = txJson.results || txJson;
+          if (Array.isArray(txList)) {
+            for (const t of txList) {
+              fetchedTransactions.push({
+                pluggy_transaction_id: t.id,
+                description: t.description || 'Lançamento',
+                clean_merchant_name: t.merchant?.name || t.merchantName || undefined,
+                amount: Number(t.amount || 0),
+                transaction_type: (t.amount < 0 || t.type === 'DEBIT') ? 'DEBIT' : 'CREDIT',
+                payment_method: t.paymentMethod || undefined,
+                category: t.category || 'Geral',
+                occurred_at: t.date || new Date().toISOString(),
+              });
+            }
+          }
+        }
+      } catch (txErr) {
+        console.warn('[PluggyConnectModal] Erro ao buscar transações na Pluggy:', txErr);
+      }
+    }
+
+    const instName = fetchedAccounts[0]?.institution_name || 'Meu Pluggy';
+
+    // 3. Registra a conexão e sincroniza contas e transações no backend do Vito
+    await api.finance.sync({
+      pluggy_item_id: resolvedItemId,
+      institution_name: instName,
+      accounts: fetchedAccounts,
+      transactions: fetchedTransactions,
+    });
+
+    return {
+      accountsCount: fetchedAccounts.length,
+      transactionsCount: fetchedTransactions.length,
+      itemId: resolvedItemId,
+      institutionName: instName,
+    };
+  };
+
+  const handleSyncConnection = async (conn: FinanceConnection) => {
+    setSyncingId(conn.id);
+    hapticFeedback.light();
+    try {
+      const tokenRes = await api.finance.getConnectToken();
+      const apiKey = (tokenRes as any)?.api_key;
+      if (!apiKey) {
+        throw new Error('Não foi possível obter chave de sessão da Pluggy.');
+      }
+      const res = await fetchAndSyncPluggyData(apiKey, conn.pluggy_item_id);
+      hapticFeedback.selection();
+      dataSync.notify('refresh_finance');
+      await loadConnections();
+      Alert.alert(
+        'Sincronização Concluída',
+        `Foram sincronizadas ${res.accountsCount} contas e ${res.transactionsCount} transações de "${res.institutionName || conn.institution_name}".`
+      );
+    } catch (err: any) {
+      Alert.alert('Erro na Sincronização', err?.message || 'Falha ao sincronizar contas com a Pluggy.');
+    } finally {
+      setSyncingId(null);
+    }
+  };
 
   const handleOpenPluggyWidget = async () => {
     setConnecting(true);
@@ -95,7 +219,6 @@ export const PluggyConnectModal: React.FC<PluggyConnectModalProps> = ({
       }
 
       // Abre o widget oficial da Pluggy para escolha do banco do usuário (Nubank, Itaú, Inter, etc.)
-      // Nota: o web app connect.pluggy.ai lê estritamente "connect_token" em snake_case dos query params.
       const widgetUrl =
         (tokenRes as any)?.widget_url ||
         `https://connect.pluggy.ai/?connect_token=${encodeURIComponent(token)}&connectToken=${encodeURIComponent(token)}&theme=${isDark ? 'dark' : 'light'}`;
@@ -115,58 +238,27 @@ export const PluggyConnectModal: React.FC<PluggyConnectModalProps> = ({
         } catch {}
       }
 
-      if (!itemId) {
-        itemId = `item_${Date.now()}`;
-      }
-
-      // Edge-Sync: Busca contas reais na Pluggy diretamente do aparelho do usuário (Zero IP Leak)
-      let fetchedAccounts: any[] = [];
-      if (apiKey && itemId && !itemId.startsWith('item_')) {
+      // Edge-Sync: Busca itens, contas e extratos da Pluggy diretamente do smartphone (Zero IP Leak)
+      let syncResult = { accountsCount: 0, transactionsCount: 0, institutionName: '' };
+      if (apiKey) {
         try {
-          const accResp = await fetch(`https://api.pluggy.ai/accounts?itemId=${encodeURIComponent(itemId)}`, {
-            headers: { 'X-API-KEY': apiKey },
-          });
-          if (accResp.ok) {
-            const accJson = await accResp.json();
-            const results = accJson.results || accJson;
-            if (Array.isArray(results)) {
-              fetchedAccounts = results.map((a: any) => ({
-                pluggy_account_id: a.id,
-                institution_name: a.marketingName || a.name || 'Banco Conectado',
-                account_type: a.type === 'CREDIT' ? 'CREDIT' : 'BANK',
-                account_subtype: a.subtype,
-                name: a.name || 'Conta Corrente',
-                balance: Number(a.balance || 0),
-                currency_code: a.currencyCode || 'BRL',
-              }));
-            }
-          }
-        } catch (fetchErr) {
-          console.warn('[PluggyConnectModal] Nota ao buscar contas na Pluggy:', fetchErr);
+          syncResult = await fetchAndSyncPluggyData(apiKey, itemId);
+        } catch (syncErr) {
+          console.warn('[PluggyConnectModal] Nota ao sincronizar pós-conexão:', syncErr);
         }
-      }
-
-      // Registra a conexão e sincroniza contas no backend do Vito
-      try {
-        await api.finance.sync({
-          pluggy_item_id: itemId,
-          accounts: fetchedAccounts,
-          transactions: [],
-        });
-      } catch {
-        try {
-          await api.finance.createConnection({
-            pluggy_item_id: itemId,
-            connector_id: 200,
-            institution_name: fetchedAccounts[0]?.institution_name || 'Open Finance',
-          });
-        } catch {}
       }
 
       hapticFeedback.selection();
       dataSync.notify('refresh_finance');
       await loadConnections();
       onConnectionSuccess?.();
+
+      if (syncResult.accountsCount > 0) {
+        Alert.alert(
+          'Sucesso!',
+          `Banco conectado com sucesso! Foram importadas ${syncResult.accountsCount} contas e ${syncResult.transactionsCount} transações.`
+        );
+      }
     } catch (e: any) {
       Alert.alert('Open Finance', e?.message || 'Falha ao abrir conexão bancária.');
     } finally {
@@ -246,18 +338,32 @@ export const PluggyConnectModal: React.FC<PluggyConnectModalProps> = ({
                       <MaterialIcons name="account-balance" size={20} color={colors.ink} />
                     </View>
                     <View style={styles.connInfoCol}>
-                      <Text style={[styles.connName, { color: colors.ink }]}>{item.institution_name}</Text>
+                      <Text style={[styles.connName, { color: colors.ink }]}>{item.institution_name || 'Meu Pluggy'}</Text>
                       <Text style={[styles.connStatus, { color: item.status === 'UPDATED' ? '#10B981' : '#EF4444' }]}>
                         {item.status === 'UPDATED' ? 'Sincronizado' : 'Atenção necessária'}
                       </Text>
                     </View>
-                    <TouchableOpacity
-                      onPress={() => handleDeleteConnection(item)}
-                      hitSlop={tokens.hitSlop.sm}
-                      style={styles.trashBtn}
-                    >
-                      <MaterialIcons name="delete-outline" size={20} color={colors.muted} />
-                    </TouchableOpacity>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <TouchableOpacity
+                        onPress={() => handleSyncConnection(item)}
+                        disabled={syncingId === item.id}
+                        hitSlop={tokens.hitSlop.sm}
+                        style={styles.trashBtn}
+                      >
+                        {syncingId === item.id ? (
+                          <ActivityIndicator size="small" color="#10B981" />
+                        ) : (
+                          <MaterialIcons name="sync" size={20} color={colors.ink} />
+                        )}
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => handleDeleteConnection(item)}
+                        hitSlop={tokens.hitSlop.sm}
+                        style={styles.trashBtn}
+                      >
+                        <MaterialIcons name="delete-outline" size={20} color={colors.muted} />
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 )}
               />

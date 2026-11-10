@@ -90,6 +90,7 @@ export interface FinancialSummary {
 export interface FinanceSyncPayload {
   connection_id?: string;
   pluggy_item_id?: string;
+  institution_name?: string;
   connections?: Partial<FinanceConnection>[];
   accounts?: Partial<FinanceAccount>[];
   transactions?: Partial<FinanceTransaction>[];

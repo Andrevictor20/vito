@@ -56,12 +56,21 @@ func (s *FinanceService) IngestSyncPayload(ctx context.Context, userID string, p
 			payload.ConnectionID = connID
 		}
 		now := time.Now().UTC()
+		instName := payload.InstitutionName
+		if instName == "" && len(payload.Accounts) > 0 {
+			instName = payload.Accounts[0].InstitutionName
+		}
+		if instName == "" {
+			instName = "Meu Pluggy"
+		}
 		_ = s.repo.UpsertConnection(ctx, &domain.FinanceConnection{
-			ID:           connID,
-			UserID:       userID,
-			PluggyItemID: payload.PluggyItemID,
-			LastSyncAt:   &now,
-			Status:       domain.ConnectionStatusUpdated,
+			ID:              connID,
+			UserID:          userID,
+			PluggyItemID:    payload.PluggyItemID,
+			ConnectorID:     200,
+			InstitutionName: instName,
+			LastSyncAt:      &now,
+			Status:          domain.ConnectionStatusUpdated,
 		})
 	}
 
@@ -195,7 +204,8 @@ func (s *FinanceService) fetchPluggyAPIKey(ctx context.Context) (string, error) 
 func (s *FinanceService) fetchPluggyConnectToken(ctx context.Context, apiKey, userID string) (string, error) {
 	tokenReqBody, _ := json.Marshal(map[string]any{
 		"options": map[string]any{
-			"clientUserId": userID,
+			"clientUserId":     userID,
+			"oauthRedirectUri": "vito://pluggy-success",
 		},
 	})
 
