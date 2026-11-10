@@ -138,11 +138,13 @@ type UnifiedAssistantResponse struct {
 	Reasoning             []string       `json:"reasoning,omitempty"`
 	ToolCalls             []ExecutedTool `json:"tool_calls,omitempty"`
 	Cards                 []ChatCard     `json:"cards,omitempty"`
-	Sources               []SearchSource `json:"sources,omitempty"`
-	RequiresConfirmation  bool           `json:"requires_confirmation"`
-	PendingConfirmationID string         `json:"pending_confirmation_id,omitempty"`
-	SuggestedActions      []string       `json:"suggested_actions,omitempty"`
-	Telemetry             TurnTelemetry  `json:"telemetry"`
+	Sources               []SearchSource       `json:"sources,omitempty"`
+	RequiresConfirmation  bool                 `json:"requires_confirmation"`
+	PendingConfirmationID string               `json:"pending_confirmation_id,omitempty"`
+	WhatsAppMessage       *ChatWhatsAppMessage `json:"whatsapp_message,omitempty"`
+	GmailMessage          *ChatGmailMessage    `json:"gmail_message,omitempty"`
+	SuggestedActions      []string             `json:"suggested_actions,omitempty"`
+	Telemetry             TurnTelemetry        `json:"telemetry"`
 }
 
 type ExecutedTool struct {

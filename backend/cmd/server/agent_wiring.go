@@ -3,8 +3,11 @@ package main
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log"
+	"strings"
 	"time"
+	"unicode"
 
 	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/config"
@@ -251,7 +254,40 @@ type whatsAppServiceAdapter struct {
 }
 
 func (a *whatsAppServiceAdapter) SendMessage(ctx context.Context, userID, phone, message string) error {
-	return a.svc.SendWhatsAppMessage(ctx, userID, phone, message)
+	target := strings.TrimSpace(phone)
+	if target == "" {
+		return fmt.Errorf("destinatário do WhatsApp é obrigatório")
+	}
+
+	// 1. Se já for um JID válido (@s.whatsapp.net ou @g.us)
+	if strings.Contains(target, "@s.whatsapp.net") || strings.Contains(target, "@g.us") {
+		return a.svc.SendWhatsAppMessage(ctx, userID, service.NormalizeJIDForSend(target), message)
+	}
+
+	// 2. Se for número com dígitos suficientes
+	digits := 0
+	for _, r := range target {
+		if unicode.IsDigit(r) {
+			digits++
+		}
+	}
+	if digits >= 8 {
+		normalized := domain.NormalizePhone(target)
+		if normalized != "" {
+			cleanDigits := strings.TrimPrefix(normalized, "+")
+			return a.svc.SendWhatsAppMessage(ctx, userID, cleanDigits+"@s.whatsapp.net", message)
+		}
+	}
+
+	// 3. Se for nome de contato (ex: "Carlos", "Maria")
+	if a.dir != nil {
+		chat, err := a.dir.ResolveChat(ctx, userID, target)
+		if err == nil && chat != nil && chat.ChatJID != "" {
+			return a.svc.SendWhatsAppMessage(ctx, userID, service.NormalizeJIDForSend(chat.ChatJID), message)
+		}
+	}
+
+	return fmt.Errorf("contato %q não encontrado na sua agenda do WhatsApp. Por favor, confirme o número com DDD", target)
 }
 
 func (a *whatsAppServiceAdapter) SearchMessages(ctx context.Context, userID, query string, limit int) ([]domain.WhatsAppConversationMessage, error) {
@@ -273,7 +309,11 @@ type gmailServiceAdapter struct {
 }
 
 func (a *gmailServiceAdapter) SendEmail(ctx context.Context, userID, to, subject, body string) error {
-	_, err := a.svc.SendEmail(ctx, userID, to, subject, body)
+	cleanSubj := strings.TrimSpace(subject)
+	if cleanSubj == "" {
+		cleanSubj = "Mensagem enviada pelo Vito"
+	}
+	_, err := a.svc.SendEmail(ctx, userID, to, cleanSubj, body)
 	return err
 }
 

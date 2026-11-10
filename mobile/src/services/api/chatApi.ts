@@ -75,6 +75,13 @@ export class ChatApi {
     });
   }
 
+  async assistantConfirm(pendingId: string): Promise<AssistantChatResponse> {
+    return this.client.request<AssistantChatResponse>('/api/v1/assistant/confirm', {
+      method: 'POST',
+      body: JSON.stringify({ pending_id: pendingId }),
+    });
+  }
+
   async assistantAudio(
     audioUri: string,
     filename: string = 'audio.m4a',

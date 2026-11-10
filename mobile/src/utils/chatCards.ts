@@ -209,6 +209,22 @@ export const toChatWhatsAppMessage = (res: AssistantChatResponse): ChatWhatsAppM
     };
   }
 
+  // Extrai de cards estruturados se disponíveis
+  if (res.cards && Array.isArray(res.cards)) {
+    const waCard = res.cards.find((c) => c.type === 'whatsapp');
+    if (waCard) {
+      const isSent = waCard.action_label === 'Enviado' || !(waCard as any).confirm;
+      const recName = waCard.title ? waCard.title.replace(/^WhatsApp para\s+/i, '') : 'Contato';
+      return {
+        id: waCard.id,
+        recipient_name: recName,
+        message: waCard.subtitle || '',
+        status: isSent ? 'sent' : 'ready',
+        sent_at: isSent ? new Date().toISOString() : undefined,
+      };
+    }
+  }
+
   // Fallback heurístico resiliente para textos planos do backend
   const text = (res.reply || res.message || '').trim();
   const match = text.match(/(?:Enviei para|Preparei a mensagem para|Preparei o rascunho para|Rascunho para)\s+([^:\n]+)[:\n]+([\s\S]+)/i);
@@ -217,7 +233,8 @@ export const toChatWhatsAppMessage = (res: AssistantChatResponse): ChatWhatsAppM
     let body = match[2].trim();
     // Remove "Posso enviar?" do corpo da mensagem se presente no final
     body = body.replace(/[\n\s]*Posso enviar\?[\s\S]*$/i, '').trim();
-    const isSent = text.toLowerCase().includes('enviei para');
+    body = body.replace(/^["“”']|["“”']$/g, '').trim();
+    const isSent = text.toLowerCase().includes('enviei para') || text.toLowerCase().includes('enviada com sucesso');
     return {
       recipient_name: rawRecipient,
       message: body,
@@ -238,15 +255,32 @@ export const toChatGmailMessage = (res: AssistantChatResponse): ChatGmailMessage
     };
   }
 
+  // Extrai de cards estruturados se disponíveis
+  if (res.cards && Array.isArray(res.cards)) {
+    const gmCard = res.cards.find((c) => c.type === 'gmail');
+    if (gmCard) {
+      const isSent = gmCard.action_label === 'Enviado' || !(gmCard as any).confirm;
+      return {
+        id: gmCard.id,
+        recipient_email: gmCard.subtitle ? gmCard.subtitle.replace(/^Para:\s+/i, '') : '',
+        subject: gmCard.title || 'Sem assunto',
+        body: '',
+        status: isSent ? 'sent' : 'ready',
+        sent_at: isSent ? new Date().toISOString() : undefined,
+      };
+    }
+  }
+
   // Fallback heurístico resiliente para e-mails em texto plano
   const text = (res.reply || res.message || '').trim();
-  const match = text.match(/(?:E-mail enviado com sucesso para|Preparei o rascunho do e-mail para|Criei o rascunho no seu Gmail para|Ajustei o e-mail para)\s+([^\s(]+)(?:\s*\(Assunto:\s*"([^"]+)"\))?[:\n\s]*([\s\S]*)/i);
+  const match = text.match(/(?:E-mail enviado com sucesso para|Preparei o rascunho do e-mail para|Criei o rascunho no seu Gmail para|Ajustei o e-mail para|Preparei o e-mail para)\s+([^\s(]+)(?:\s*\(Assunto:\s*"([^"]+)"\))?[:\n\s]*([\s\S]*)/i);
   if (match) {
     const email = match[1].trim();
     const subject = match[2] ? match[2].trim() : 'Sem assunto';
     let body = (match[3] || '').trim();
     body = body.replace(/[\n\s]*Posso enviar\?[\s\S]*$/i, '').trim();
-    const isSent = text.toLowerCase().includes('e-mail enviado com sucesso');
+    body = body.replace(/^["“”']|["“”']$/g, '').trim();
+    const isSent = text.toLowerCase().includes('e-mail enviado com sucesso') || text.toLowerCase().includes('enviado com sucesso');
     return {
       recipient_email: email,
       subject,

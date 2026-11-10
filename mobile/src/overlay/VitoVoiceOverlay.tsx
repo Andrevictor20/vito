@@ -380,14 +380,28 @@ export function VitoVoiceOverlay({
     if (!whatsappCard || isSendingWhatsApp || whatsAppSent) return;
     setIsSendingWhatsApp(true);
     try {
-      const phone = (whatsappCard.recipient_phone || '').replace(/\D/g, '');
-      const msg = encodeURIComponent(whatsappCard.message || '');
-      const url = phone ? `https://wa.me/${phone}?text=${msg}` : `https://wa.me/?text=${msg}`;
-      await Linking.openURL(url);
+      if (whatsappCard.id) {
+        await api.assistantConfirm(whatsappCard.id);
+      } else {
+        await api.assistantChat(`Confirmar e enviar WhatsApp para ${whatsappCard.recipient_name || whatsappCard.recipient_phone}: "${whatsappCard.message}"`, {
+          channel: 'voice',
+          thread_id: voiceSessionIdRef.current,
+        });
+      }
       setWhatsAppSent(true);
-      setTimeout(() => handleClose(), 1800);
+      setReplyText(`Mensagem enviada com sucesso!`);
+      setTimeout(() => handleClose(), 1600);
     } catch {
-      setIsSendingWhatsApp(false);
+      try {
+        const phone = (whatsappCard.recipient_phone || '').replace(/\D/g, '');
+        const msg = encodeURIComponent(whatsappCard.message || '');
+        const url = phone ? `https://wa.me/${phone}?text=${msg}` : `https://wa.me/?text=${msg}`;
+        await Linking.openURL(url);
+        setWhatsAppSent(true);
+        setTimeout(() => handleClose(), 1800);
+      } catch {
+        setIsSendingWhatsApp(false);
+      }
     }
   }, [whatsappCard, isSendingWhatsApp, whatsAppSent, handleClose]);
 
@@ -476,9 +490,5 @@ export function VitoVoiceOverlay({
 }
 
 export function VitoVoiceOverlayRoot(props: VitoVoiceOverlayProps) {
-  return (
-    <ThemeProvider>
-      <VitoVoiceOverlay {...props} />
-    </ThemeProvider>
-  );
+  return <ThemeProvider><VitoVoiceOverlay {...props} /></ThemeProvider>;
 }

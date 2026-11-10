@@ -97,19 +97,33 @@ func (t *GmailToolset) Execute(ctx context.Context, execCtx *domain.ToolExecutio
 		}, nil
 
 	case "send_email":
+		cleanTo := strings.TrimSpace(params.To)
+		if cleanTo == "" || !strings.Contains(cleanTo, "@") {
+			return &domain.ToolExecutionResult{
+				Status:        "ERROR",
+				SummaryForLLM: fmt.Sprintf("Não foi possível enviar o e-mail: o endereço %q não é um e-mail válido (ex: nome@empresa.com). Por favor, informe o e-mail do destinatário.", params.To),
+			}, nil
+		}
 		if t.gmailService != nil {
-			if err := t.gmailService.SendEmail(ctx, execCtx.UserID, params.To, params.Subject, params.Body); err != nil {
-				return nil, err
+			if err := t.gmailService.SendEmail(ctx, execCtx.UserID, cleanTo, params.Subject, params.Body); err != nil {
+				return &domain.ToolExecutionResult{
+					Status:        "ERROR",
+					SummaryForLLM: fmt.Sprintf("Não foi possível enviar o e-mail pelo Gmail: %v", err),
+				}, nil
 			}
+		}
+		subj := params.Subject
+		if subj == "" {
+			subj = "Mensagem enviada pelo Vito"
 		}
 		return &domain.ToolExecutionResult{
 			Status:        "COMPLETED",
-			SummaryForLLM: fmt.Sprintf("E-mail enviado para '%s' com assunto '%s'.", params.To, params.Subject),
+			SummaryForLLM: fmt.Sprintf("E-mail enviado com sucesso para %s com assunto %q.", cleanTo, subj),
 			Cards: []domain.ChatCard{{
 				ID:          "gmail-sent",
 				Type:        "gmail",
-				Title:       params.Subject,
-				Subtitle:    fmt.Sprintf("Enviado para: %s", params.To),
+				Title:       subj,
+				Subtitle:    fmt.Sprintf("Enviado para: %s", cleanTo),
 				ActionLabel: "Enviado",
 			}},
 		}, nil

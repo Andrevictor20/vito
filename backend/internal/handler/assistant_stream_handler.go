@@ -358,6 +358,12 @@ func (h *AssistantStreamHandler) AudioChat(w http.ResponseWriter, r *http.Reques
 		"requires_confirmation":   resp.RequiresConfirmation,
 		"pending_confirmation_id": resp.PendingConfirmationID,
 	}
+	if resp.WhatsAppMessage != nil {
+		result["whatsapp_message"] = resp.WhatsAppMessage
+	}
+	if resp.GmailMessage != nil {
+		result["gmail_message"] = resp.GmailMessage
+	}
 
 	if includeTTS && h.ttsService != nil && strings.TrimSpace(cleanReplyText) != "" {
 		speechText := ai.StripMarkdownForSpeech(cleanReplyText)
@@ -457,6 +463,12 @@ func (h *AssistantStreamHandler) VisionChat(w http.ResponseWriter, r *http.Reque
 		"suggested_actions":       resp.SuggestedActions,
 		"requires_confirmation":   resp.RequiresConfirmation,
 		"pending_confirmation_id": resp.PendingConfirmationID,
+	}
+	if resp.WhatsAppMessage != nil {
+		result["whatsapp_message"] = resp.WhatsAppMessage
+	}
+	if resp.GmailMessage != nil {
+		result["gmail_message"] = resp.GmailMessage
 	}
 
 	w.Header().Set("Content-Type", "application/json")

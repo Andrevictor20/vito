@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -142,3 +143,51 @@ func (s *ConfirmationGateService) Cancel(ctx context.Context, id, userID string)
 	}
 	return s.fsm.CancelAction(ctx, id)
 }
+
+// GetLatestPending busca a última confirmação pendente ativa do usuário/thread.
+func (s *ConfirmationGateService) GetLatestPending(ctx context.Context, userID, threadID string) (*PendingConfirmationRecord, error) {
+	if s.db == nil || strings.TrimSpace(userID) == "" {
+		return nil, sql.ErrNoRows
+	}
+
+	query := `
+		SELECT id, user_id, thread_id, channel, toolset_name, operation,
+		       arguments_json, preview_json, idempotency_key, tainted_context,
+		       status, expires_at, resolved_at, execution_result_json, created_at
+		FROM pending_confirmations
+		WHERE user_id = ? AND (thread_id = ? OR ? = '') AND status = 'SUSPENDED' AND expires_at > CURRENT_TIMESTAMP
+		ORDER BY created_at DESC
+		LIMIT 1
+	`
+	row := s.db.QueryRowContext(ctx, query, userID, threadID, threadID)
+	p, err := scanPendingConfirmation(row)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) && threadID != "" {
+			// Fallback: busca qualquer pendência recente do usuário em outra thread (ex: iniciou no app e confirmou na voz)
+			queryAny := `
+				SELECT id, user_id, thread_id, channel, toolset_name, operation,
+				       arguments_json, preview_json, idempotency_key, tainted_context,
+				       status, expires_at, resolved_at, execution_result_json, created_at
+				FROM pending_confirmations
+				WHERE user_id = ? AND status = 'SUSPENDED' AND expires_at > CURRENT_TIMESTAMP
+				ORDER BY created_at DESC
+				LIMIT 1
+			`
+			rowAny := s.db.QueryRowContext(ctx, queryAny, userID)
+			return scanPendingConfirmation(rowAny)
+		}
+		return nil, err
+	}
+	return p, nil
+}
+
+// SaveExecutionResult persiste o resultado da execução da ferramenta na tabela.
+func (s *ConfirmationGateService) SaveExecutionResult(ctx context.Context, id, resultJSON string) error {
+	if s.db == nil || strings.TrimSpace(id) == "" {
+		return nil
+	}
+	query := `UPDATE pending_confirmations SET execution_result_json = ? WHERE id = ?`
+	_, err := s.db.ExecContext(ctx, query, resultJSON, id)
+	return err
+}
+

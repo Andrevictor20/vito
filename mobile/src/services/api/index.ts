@@ -207,6 +207,7 @@ export class ApiService extends ApiClient {
   assistantChat(prompt: string, options?: string | AssistantChatOptions): Promise<AssistantChatResponse> {
     return this.chatApi.assistantChat(prompt, options);
   }
+  assistantConfirm = (pendingId: string): Promise<AssistantChatResponse> => this.chatApi.assistantConfirm(pendingId);
   assistantAudio(audioUri: string, filename: string = 'audio.m4a', options?: string | AssistantChatOptions): Promise<AssistantChatResponse> {
     return this.chatApi.assistantAudio(audioUri, filename, options);
   }

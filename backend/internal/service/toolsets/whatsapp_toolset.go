@@ -80,16 +80,19 @@ func (t *WhatsAppToolset) Execute(ctx context.Context, execCtx *domain.ToolExecu
 	case "send_message":
 		if t.waService != nil {
 			if err := t.waService.SendMessage(ctx, execCtx.UserID, params.Recipient, params.Message); err != nil {
-				return nil, err
+				return &domain.ToolExecutionResult{
+					Status:        "ERROR",
+					SummaryForLLM: fmt.Sprintf("Não foi possível enviar a mensagem no WhatsApp: %v", err),
+				}, nil
 			}
 		}
 		return &domain.ToolExecutionResult{
 			Status:        "COMPLETED",
-			SummaryForLLM: fmt.Sprintf("Mensagem WhatsApp enviada para %s.", params.Recipient),
+			SummaryForLLM: fmt.Sprintf("Mensagem WhatsApp enviada com sucesso para %s: %q.", params.Recipient, params.Message),
 			Cards: []domain.ChatCard{{
 				ID:          "wa-sent",
 				Type:        "whatsapp",
-				Title:       fmt.Sprintf("WhatsApp para %s", params.Recipient),
+				Title:       params.Recipient,
 				Subtitle:    params.Message,
 				ActionLabel: "Enviado",
 			}},

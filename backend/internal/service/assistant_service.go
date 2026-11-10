@@ -170,6 +170,13 @@ func (s *AssistantService) Process(ctx context.Context, userID string, input ai.
 		return nil, fmt.Errorf("falha ao interpretar comando com IA: %w", err)
 	}
 
+	// Se for uma confirmação expressa e a IA não gerou intenção de envio, recupera o que foi proposto
+	if isExplicitSendConfirmation(input) && (intent.Action == ai.ActionGeneralChat || intent.Action == "") {
+		if reconstructed := tryReconstructConfirmationIntent(input); reconstructed != nil {
+			intent = reconstructed
+		}
+	}
+
 	// Coerção resiliente: se o texto pede booking por sinônimo mas a IA retornou CREATE_EVENT,
 	// corrige para CREATE_BOOKING_LINK para criação direta sem fricção.
 	if intent.Action == ai.ActionCreateEvent && intent.Event != nil && s.bookingSvc != nil {

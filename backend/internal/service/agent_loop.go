@@ -86,23 +86,9 @@ func (l *AgentLoop) RunStream(ctx context.Context, req domain.UnifiedAssistantRe
 		threadID = uuid.New().String()
 	}
 
-	// 2. Se a requisição contiver confirmação pendente explícita (clique em card ou "sim")
-	if req.ConfirmPendingID != "" && l.confirmationGate != nil {
-		pending, err := l.confirmationGate.Resume(ctx, req.ConfirmPendingID, req.UserID)
-		if err == nil && pending != nil {
-			msg := fmt.Sprintf("Ação '%s' confirmada e executada com sucesso.", pending.Operation)
-			resp := &domain.UnifiedAssistantResponse{
-				ThreadID: threadID,
-				TurnID:   turnID,
-				Text:     msg,
-				Reply:    msg,
-				Message:  msg,
-				Telemetry: domain.TurnTelemetry{
-					LatencyMs: time.Since(startTime).Milliseconds(),
-				},
-			}
-			return resp, nil
-		}
+	// 2. Se a requisição contiver confirmação pendente explícita (clique em card ou "sim") ou cancelamento
+	if confResp, handled, confErr := l.tryHandlePendingConfirmation(ctx, req, threadID, turnID, startTime); handled {
+		return confResp, confErr
 	}
 
 	// 3. Montagem do contexto e persona humana real
@@ -131,12 +117,22 @@ func (l *AgentLoop) RunStream(ctx context.Context, req domain.UnifiedAssistantRe
 		}
 	}
 
+	autonomyLevel := ""
+	if IsExplicitSendConfirmationText(req.Message) {
+		autonomyLevel = "confirmed"
+	} else if l.aiSettingsRepo != nil && req.UserID != "" {
+		if st, err := l.aiSettingsRepo.GetSettings(req.UserID); err == nil && st != nil && st.AutonomyMode == domain.AutonomyModeProactive {
+			autonomyLevel = "autonomous_write"
+		}
+	}
+
 	execCtx := &domain.ToolExecutionContext{
 		UserID:                  req.UserID,
 		ThreadID:                threadID,
 		TurnID:                  turnID,
 		Channel:                 req.Channel,
 		FocusMode:               req.FocusMode,
+		AutonomyLevel:           autonomyLevel,
 		TaintedByUntrustedInput: false,
 	}
 
@@ -185,6 +181,10 @@ func (l *AgentLoop) RunStream(ctx context.Context, req domain.UnifiedAssistantRe
 	var collectedSources []domain.SearchSource
 	var finalAnswer string
 	var chosenProvider ai.AgentProvider
+	var respWhatsApp *domain.ChatWhatsAppMessage
+	var respGmail *domain.ChatGmailMessage
+	var hasSuspendedTool bool
+	var pendingID string
 
 	toolDefs := l.registry.Definitions()
 
@@ -262,8 +262,8 @@ func (l *AgentLoop) RunStream(ctx context.Context, req domain.UnifiedAssistantRe
 		})
 
 		// Processa as ferramentas invocadas
-		hasSuspendedTool := false
-		var pendingID string
+		hasSuspendedTool = false
+		pendingID = ""
 
 		for _, call := range stepResp.ToolCalls {
 			toolset, exists := l.registry.Get(domain.ToolsetName(call.Name))
@@ -301,7 +301,7 @@ func (l *AgentLoop) RunStream(ctx context.Context, req domain.UnifiedAssistantRe
 						Channel:        req.Channel,
 						ToolsetName:    string(toolset.Name()),
 						Operation:      envelope.Operation,
-						ArgumentsJSON:  string(call.Arguments),
+						ArgumentsJSON:  string(envelope.Params),
 						PreviewJSON:    string(previewBytes),
 						TaintedContext: execCtx.TaintedByUntrustedInput,
 					})
@@ -313,15 +313,15 @@ func (l *AgentLoop) RunStream(ctx context.Context, req domain.UnifiedAssistantRe
 							Operation: envelope.Operation,
 							Status:    "AWAITING_USER_CONFIRMATION",
 						})
-						collectedCards = append(collectedCards, domain.ChatCard{
-							ID:          p.ID,
-							Type:        "confirm",
-							Title:       fmt.Sprintf("Confirmar: %s", envelope.Operation),
-							Subtitle:    reason,
-							ActionLabel: "Confirmar Agora",
-							Confirm:     true,
-						})
-						finalAnswer = fmt.Sprintf("Preparei a ação '%s'. Para sua segurança, você confirma o envio?", envelope.Operation)
+						promptText, card, waMsg, gmMsg := formatSuspendedActionResponse(envelope.Operation, p.ID, reason, preview)
+						collectedCards = append(collectedCards, card)
+						finalAnswer = promptText
+						if waMsg != nil {
+							respWhatsApp = waMsg
+						}
+						if gmMsg != nil {
+							respGmail = gmMsg
+						}
 						break
 					}
 				}
@@ -352,6 +352,25 @@ func (l *AgentLoop) RunStream(ctx context.Context, req domain.UnifiedAssistantRe
 			})
 			if len(res.Cards) > 0 {
 				collectedCards = append(collectedCards, res.Cards...)
+				for _, c := range res.Cards {
+					if c.Type == "whatsapp" {
+						respWhatsApp = &domain.ChatWhatsAppMessage{
+							ID:            c.ID,
+							RecipientName: c.Title,
+							Message:       c.Subtitle,
+							Status:        "sent",
+							SentAt:        time.Now().Format(time.RFC3339),
+						}
+					} else if c.Type == "gmail" {
+						respGmail = &domain.ChatGmailMessage{
+							ID:             c.ID,
+							RecipientEmail: c.Subtitle,
+							Subject:        c.Title,
+							Status:         "sent",
+							SentAt:         time.Now().Format(time.RFC3339),
+						}
+					}
+				}
 			}
 			if len(res.Sources) > 0 {
 				collectedSources = append(collectedSources, res.Sources...)
@@ -382,6 +401,8 @@ func (l *AgentLoop) RunStream(ctx context.Context, req domain.UnifiedAssistantRe
 				Cards:                 collectedCards,
 				RequiresConfirmation:  true,
 				PendingConfirmationID: pendingID,
+				WhatsAppMessage:       respWhatsApp,
+				GmailMessage:          respGmail,
 				Telemetry: domain.TurnTelemetry{
 					ProviderUsed: chosenProvider.Name(),
 					ModelUsed:    chosenProvider.ModelName(),
@@ -432,52 +453,32 @@ func (l *AgentLoop) RunStream(ctx context.Context, req domain.UnifiedAssistantRe
 	}
 
 	// 6. Grava turnos do usuário e do assistente no ConversationStore
-	if l.convRepo != nil {
-		_ = l.convRepo.CreateTurn(ctx, &repository.ConversationTurn{
-			ID:        turnID,
-			ThreadID:  threadID,
-			UserID:    req.UserID,
-			Channel:   req.Channel,
-			Role:      "user",
-			Content:   req.Message,
-			CreatedAt: startTime,
-		})
-
-		cardsBytes, _ := json.Marshal(collectedCards)
-		toolsBytes, _ := json.Marshal(executedTools)
-		reasonBytes, _ := json.Marshal(collectedReasoning)
-
-		_ = l.convRepo.CreateTurn(ctx, &repository.ConversationTurn{
-			ID:                uuid.New().String(),
-			ThreadID:          threadID,
-			UserID:            req.UserID,
-			Channel:           req.Channel,
-			Role:              "assistant",
-			Content:           finalAnswer,
-			ReasoningJSON:     string(reasonBytes),
-			ToolCallsJSON:     string(toolsBytes),
-			CardsJSON:         string(cardsBytes),
-			ModelUsed:         chosenProvider.ModelName(),
-			LatencyMs:         time.Since(startTime).Milliseconds(),
-			TaintedByExternal: 0,
-			CreatedAt:         time.Now().UTC(),
-		})
+	modelName := ""
+	providerName := ""
+	if chosenProvider != nil {
+		modelName = chosenProvider.ModelName()
+		providerName = chosenProvider.Name()
 	}
+	l.persistCompletedTurn(ctx, threadID, turnID, req, finalAnswer, collectedCards, executedTools, collectedReasoning, modelName, startTime)
 
 	return &domain.UnifiedAssistantResponse{
-		ThreadID:         threadID,
-		TurnID:           turnID,
-		Text:             finalAnswer,
-		Reply:            finalAnswer,
-		Message:          finalAnswer,
-		Reasoning:        collectedReasoning,
-		ToolCalls:        executedTools,
-		Cards:            collectedCards,
-		Sources:          collectedSources,
-		SuggestedActions: nil,
+		ThreadID:              threadID,
+		TurnID:                turnID,
+		Text:                  finalAnswer,
+		Reply:                 finalAnswer,
+		Message:               finalAnswer,
+		Reasoning:             collectedReasoning,
+		ToolCalls:             executedTools,
+		Cards:                 collectedCards,
+		Sources:               collectedSources,
+		RequiresConfirmation:  hasSuspendedTool,
+		PendingConfirmationID: pendingID,
+		WhatsAppMessage:       respWhatsApp,
+		GmailMessage:          respGmail,
+		SuggestedActions:      nil,
 		Telemetry: domain.TurnTelemetry{
-			ProviderUsed: chosenProvider.Name(),
-			ModelUsed:    chosenProvider.ModelName(),
+			ProviderUsed: providerName,
+			ModelUsed:    modelName,
 			LatencyMs:    time.Since(startTime).Milliseconds(),
 		},
 	}, nil

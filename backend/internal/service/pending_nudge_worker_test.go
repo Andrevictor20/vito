@@ -1,6 +1,8 @@
 package service_test
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -60,6 +62,12 @@ func TestPendingNudgeWorker_ProcessNudges(t *testing.T) {
 		user: &domain.User{ID: "user-1", Name: "André", Email: "andre@test.com"},
 	}
 
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":[{"status":"ok"}]}`))
+	}))
+	defer server.Close()
+
 	// Token repo mock para notificação
 	tokenRepo := &mockTokenRepoForNudge{
 		token: domain.DeviceToken{
@@ -71,7 +79,8 @@ func TestPendingNudgeWorker_ProcessNudges(t *testing.T) {
 			UpdatedAt: time.Now().UTC(),
 		},
 	}
-	notifSvc := service.NewNotificationService(tokenRepo)
+	notifSvc := service.NewNotificationService(tokenRepo, server.Client())
+	notifSvc.SetExpoAPIURL(server.URL)
 
 	worker := service.NewPendingNudgeWorker(pendingRepo, userRepo, notifSvc)
 	loc := time.UTC
