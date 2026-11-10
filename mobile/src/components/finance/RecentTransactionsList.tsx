@@ -33,8 +33,8 @@ export const RecentTransactionsList: React.FC<RecentTransactionsListProps> = ({
     }
   };
 
-  const cardBg = isDark ? '#18181B' : colors.surf;
-  const cardBorder = isDark ? 'rgba(255,255,255,0.08)' : colors.line;
+  const cardBg = colors.surf;
+  const cardBorder = colors.line;
 
   const displayList = transactions.slice(0, 5);
 
@@ -72,20 +72,20 @@ export const RecentTransactionsList: React.FC<RecentTransactionsListProps> = ({
                 key={tx.id || tx.pluggy_transaction_id || `tx_${idx}`}
                 style={[
                   styles.txRow,
-                  idx > 0 && { borderTopWidth: 1, borderTopColor: isDark ? 'rgba(255,255,255,0.06)' : colors.line },
+                  idx > 0 && { borderTopWidth: 1, borderTopColor: colors.line },
                 ]}
                 onPress={() => onSelectTransaction?.(tx)}
                 activeOpacity={0.7}
               >
                 <View style={styles.txIconBox}>
-                  <View style={[styles.txIconCircle, { backgroundColor: isDark ? '#27272A' : '#F4F4F5' }]}>
+                  <View style={[styles.txIconCircle, { backgroundColor: colors.bg }]}>
                     <MaterialIcons
                       name={isCredit ? 'arrow-downward' : 'shopping-bag'}
                       size={16}
                       color={isCredit ? '#10B981' : colors.ink}
                     />
                   </View>
-                  <View style={styles.nuTinyBadge}>
+                  <View style={[styles.nuTinyBadge, { borderColor: cardBg }]}>
                     <Text style={styles.nuTinyText}>nu</Text>
                   </View>
                 </View>

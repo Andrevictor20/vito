@@ -27,7 +27,7 @@ export const FinanceInsightBanner: React.FC<FinanceInsightBannerProps> = ({
       style={[
         styles.banner,
         {
-          backgroundColor: isDark ? '#1C1917' : '#FEF3C7',
+          backgroundColor: isDark ? colors.surf : '#FEF3C7',
           borderColor: isDark ? 'rgba(245, 158, 11, 0.25)' : 'rgba(217, 119, 6, 0.2)',
         },
       ]}
@@ -41,7 +41,7 @@ export const FinanceInsightBanner: React.FC<FinanceInsightBannerProps> = ({
             Seu dinheiro parado rende no CDB
           </Text>
         </View>
-        <Text style={[styles.desc, { color: isDark ? '#D6D3D1' : '#78350F' }]}>
+        <Text style={[styles.desc, { color: isDark ? colors.muted : '#78350F' }]}>
           {isPrivacyHidden ? '••••••' : formatBRL(balance)} parado na conta corrente poderia render 100% do CDI com liquidez diária.
         </Text>
       </View>

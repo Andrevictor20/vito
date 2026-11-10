@@ -23,11 +23,12 @@ export const BentoMetricsGrid: React.FC<BentoMetricsGridProps> = ({
   const formatBRL = (val: number) =>
     `R$ ${Math.abs(val).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-  const cardBg = isDark ? '#18181B' : colors.surf;
-  const cardBorder = isDark ? 'rgba(255,255,255,0.08)' : colors.line;
+  const cardBg = colors.surf;
+  const cardBorder = colors.line;
 
-  // Extrai conta de cartão de crédito e dados de limite
-  const creditAccount = accounts.find((a) => a.account_type === 'CREDIT');
+  // Extrai contas de cartão de crédito e dados de limite
+  const creditAccounts = accounts.filter((a) => a.account_type === 'CREDIT');
+  const creditAccount = creditAccounts[0];
   const creditLimitTotal = creditAccount?.credit_limit ?? 4300;
   const creditBillAmount = summary.open_credit_card_bills > 0 ? summary.open_credit_card_bills : 249;
   const creditAvailable = Math.max(0, creditLimitTotal - creditBillAmount);
@@ -109,7 +110,9 @@ export const BentoMetricsGrid: React.FC<BentoMetricsGridProps> = ({
               <View style={styles.nuMiniLogo}>
                 <Text style={styles.nuMiniText}>nu</Text>
               </View>
-              <Text style={[styles.cardDigitsText, { color: colors.muted }]}>•••• 6327</Text>
+              <Text style={[styles.cardDigitsText, { color: colors.muted }]}>
+                {creditAccounts.length > 1 ? `${creditAccounts.length} cartões` : '•••• 6327'}
+              </Text>
             </View>
             <MaterialIcons name="chevron-right" size={16} color={colors.muted} />
           </View>
@@ -134,8 +137,8 @@ export const BentoMetricsGrid: React.FC<BentoMetricsGridProps> = ({
             {isPrivacyHidden ? '••••••' : formatBRL(creditBillAmount)}
           </Text>
 
-          <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: `${creditPercentUsed}%`, backgroundColor: '#A3E635' }]} />
+          <View style={[styles.progressTrack, { backgroundColor: colors.line }]}>
+            <View style={[styles.progressFill, { width: `${creditPercentUsed}%`, backgroundColor: colors.acc || '#A3E635' }]} />
           </View>
           <Text style={[styles.tileSubtext, { color: colors.muted }]}>
             {isPrivacyHidden ? 'Disp: ••••••' : `Disp: ${formatBRL(creditAvailable)}`}
@@ -153,16 +156,16 @@ export const BentoMetricsGrid: React.FC<BentoMetricsGridProps> = ({
         >
           <View style={styles.tileHeader}>
             <View style={styles.subsIconsOverlapping}>
-              <View style={[styles.subMiniIcon, { backgroundColor: '#EF4444' }]}>
+              <View style={[styles.subMiniIcon, { backgroundColor: '#EF4444', borderColor: cardBg }]}>
                 <Text style={styles.subMiniLetter}>C</Text>
               </View>
-              <View style={[styles.subMiniIcon, { backgroundColor: '#3B82F6', marginLeft: -6 }]}>
+              <View style={[styles.subMiniIcon, { backgroundColor: '#3B82F6', borderColor: cardBg, marginLeft: -6 }]}>
                 <Text style={styles.subMiniLetter}>G</Text>
               </View>
-              <View style={[styles.subMiniIcon, { backgroundColor: '#0284C7', marginLeft: -6 }]}>
+              <View style={[styles.subMiniIcon, { backgroundColor: '#0284C7', borderColor: cardBg, marginLeft: -6 }]}>
                 <Text style={styles.subMiniLetter}>P</Text>
               </View>
-              <View style={[styles.subMiniIconPlus, { backgroundColor: isDark ? '#27272A' : '#E4E4E7', marginLeft: -6 }]}>
+              <View style={[styles.subMiniIconPlus, { backgroundColor: colors.bg, borderColor: cardBg, marginLeft: -6 }]}>
                 <Text style={[styles.subMiniPlusText, { color: colors.ink }]}>+1</Text>
               </View>
             </View>
@@ -325,7 +328,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
-    borderColor: '#18181B',
   },
   subMiniLetter: {
     color: '#FFFFFF',
@@ -339,7 +341,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
-    borderColor: '#18181B',
   },
   subMiniPlusText: {
     fontSize: 7.5,
