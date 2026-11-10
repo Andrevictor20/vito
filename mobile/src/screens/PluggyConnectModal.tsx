@@ -70,6 +70,21 @@ export const PluggyConnectModal: React.FC<PluggyConnectModalProps> = ({
           );
           return;
         }
+        if (
+          errMsg.includes('autorização ausente') ||
+          errMsg.includes('não autorizado') ||
+          errMsg.includes('token inválido') ||
+          errMsg.includes('expirado') ||
+          errMsg.includes('sessão revogada') ||
+          err?.status === 401
+        ) {
+          Alert.alert(
+            'Sessão Expirada',
+            'Sua sessão no Vito precisa ser renovada após o reinício do servidor. Por favor, feche e reabra o aplicativo (ou saia e entre novamente no Perfil) para conectar com segurança.',
+            [{ text: 'Entendi', style: 'default' }]
+          );
+          return;
+        }
         throw err;
       }
 
@@ -80,7 +95,10 @@ export const PluggyConnectModal: React.FC<PluggyConnectModalProps> = ({
       }
 
       // Abre o widget oficial da Pluggy para escolha do banco do usuário (Nubank, Itaú, Inter, etc.)
-      const widgetUrl = `https://connect.pluggy.ai/?connectToken=${encodeURIComponent(token)}`;
+      // Nota: o web app connect.pluggy.ai lê estritamente "connect_token" em snake_case dos query params.
+      const widgetUrl =
+        (tokenRes as any)?.widget_url ||
+        `https://connect.pluggy.ai/?connect_token=${encodeURIComponent(token)}&connectToken=${encodeURIComponent(token)}&with_sandbox=true&theme=${isDark ? 'dark' : 'light'}`;
 
       let authResult = null;
       if (WebBrowser?.openAuthSessionAsync) {
