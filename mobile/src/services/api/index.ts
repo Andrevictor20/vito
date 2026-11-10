@@ -31,11 +31,19 @@ import {
   ScannedFlight,
   UrgentEmail,
 } from './gmailApi';
+import { WhatsAppAuthApi, RequestWhatsAppOTPResponse, VerifyWhatsAppOTPResponse } from './whatsappAuthApi';
+import { FinanceApi } from './financeApi';
 import {
-  WhatsAppAuthApi,
-  RequestWhatsAppOTPResponse,
-  VerifyWhatsAppOTPResponse,
-} from './whatsappAuthApi';
+  FinancialSummary,
+  FinanceAccount,
+  FinanceConnection,
+  FinanceTransaction,
+  FinanceAlert,
+  CategorySpendItem,
+  SubscriptionItem,
+  FinanceSyncPayload,
+  FinanceConnectTokenResponse,
+} from '../../types/finance';
 import {
   User,
   AuthResponse,
@@ -112,46 +120,27 @@ export class ApiService extends ApiClient {
   private gmailApi = new GmailApi(this);
   private whatsappAuthApi = new WhatsAppAuthApi(this);
   private whatsappContextApi = new WhatsAppContextApi(this);
+  private financeApi = new FinanceApi(this);
 
   // Auth & Sessions
-  login(email: string, password: string): Promise<AuthResponse> {
-    return this.authApi.login(email, password);
-  }
-  register(name: string, email: string, password: string): Promise<AuthResponse> {
-    return this.authApi.register(name, email, password);
-  }
-  getMe(): Promise<{ user: User }> {
-    return this.authApi.getMe();
-  }
-  getSessions(): Promise<{ sessions: UserSession[] }> {
-    return this.authApi.getSessions();
-  }
-  revokeSession(sessionId: string): Promise<{ status: string }> {
-    return this.authApi.revokeSession(sessionId);
-  }
-  revokeOtherSessions(): Promise<{ status: string }> {
-    return this.authApi.revokeOtherSessions();
-  }
-  logoutSession(): Promise<{ status: string }> {
-    return this.authApi.logoutSession();
-  }
+  login(email: string, password: string): Promise<AuthResponse> { return this.authApi.login(email, password); }
+  register(name: string, email: string, password: string): Promise<AuthResponse> { return this.authApi.register(name, email, password); }
+  getMe(): Promise<{ user: User }> { return this.authApi.getMe(); }
+  getSessions(): Promise<{ sessions: UserSession[] }> { return this.authApi.getSessions(); }
+  revokeSession(sessionId: string): Promise<{ status: string }> { return this.authApi.revokeSession(sessionId); }
+  revokeOtherSessions(): Promise<{ status: string }> { return this.authApi.revokeOtherSessions(); }
+  logoutSession(): Promise<{ status: string }> { return this.authApi.logoutSession(); }
 
   // Calendar
-  getEvents(): Promise<Event[]> {
-    return this.calendarApi.getEvents();
-  }
+  getEvents(): Promise<Event[]> { return this.calendarApi.getEvents(); }
   createEvent(event: { title: string; description?: string; location?: string; start_at: string; end_at: string; recurrence?: string }) {
     return this.calendarApi.createEvent(event);
   }
   updateEvent(id: string, eventData: Partial<Event> & { update_series?: boolean }): Promise<{ event: Event; updated_count: number }> {
     return this.calendarApi.updateEvent(id, eventData);
   }
-  deleteEvent(id: string, allSeries: boolean = false): Promise<void> {
-    return this.calendarApi.deleteEvent(id, allSeries);
-  }
-  syncCalendar(provider: string = 'google'): Promise<{ status: string; provider: string }> {
-    return this.calendarApi.syncCalendar(provider);
-  }
+  deleteEvent(id: string, allSeries: boolean = false): Promise<void> { return this.calendarApi.deleteEvent(id, allSeries); }
+  syncCalendar(provider: string = 'google'): Promise<{ status: string; provider: string }> { return this.calendarApi.syncCalendar(provider); }
 
   // Todos
   getTodos(status?: string): Promise<Todo[]> {
@@ -491,6 +480,17 @@ export class ApiService extends ApiClient {
   sendGmailEmail = (email: GmailDraftInput): Promise<GmailSendResponse> => this.gmailApi.sendEmail(email);
   get gmail(): GmailApi {
     return this.gmailApi;
+  }
+
+  // Finance & Open Finance (Vito Finance MVP)
+  get finance(): FinanceApi {
+    return this.financeApi;
+  }
+  getFinancialSummary(): Promise<FinancialSummary> {
+    return this.financeApi.getSummary();
+  }
+  getFinanceConnections(): Promise<FinanceConnection[]> {
+    return this.financeApi.getConnections();
   }
 }
 

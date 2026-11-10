@@ -11,6 +11,7 @@ import { TasksScreen } from '../screens/TasksScreen';
 import { TriggersScreen } from '../screens/TriggersScreen';
 import { BookingScreen } from '../screens/BookingScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
+import { FinanceScreen } from '../screens/FinanceScreen';
 import { AgendaTabScreen } from './AgendaTabScreen';
 import { useHomeDataContext } from './HomeDataProvider';
 import { useTheme } from '../context/ThemeContext';
@@ -212,6 +213,14 @@ const BookingTabScreen: React.FC<{
   );
 };
 
+const FinanceTabScreen: React.FC = () => {
+  return (
+    <View style={styles.tabRoot}>
+      <FinanceScreen />
+    </View>
+  );
+};
+
 const ProfileTabScreen: React.FC = () => {
   const home = useHomeDataContext();
   return (
@@ -246,6 +255,8 @@ export const MainTabs: React.FC<{ route?: any }> = ({ route }) => {
   const fireTabSideEffects = useCallback((tab: MainTabType) => {
     if (tab === 'calendar' || tab === 'tasks') {
       home.loadData(true);
+    } else if (tab === 'finance') {
+      dataSync.notify('refresh_finance');
     } else if (tab === 'triggers') {
       dataSync.notify('refresh_triggers');
     } else if (tab === 'booking') {
@@ -392,14 +403,18 @@ export const MainTabs: React.FC<{ route?: any }> = ({ route }) => {
         </View>
 
         <View key="3" style={[styles.pageWrapper, { width: containerWidth }]} collapsable={false}>
-          <TriggersTabScreen onSubViewChange={setInTriggersSubView} />
+          <FinanceTabScreen />
         </View>
 
         <View key="4" style={[styles.pageWrapper, { width: containerWidth }]} collapsable={false}>
-          <BookingTabScreen onSubViewChange={setInBookingSubView} />
+          <TriggersTabScreen onSubViewChange={setInTriggersSubView} />
         </View>
 
         <View key="5" style={[styles.pageWrapper, { width: containerWidth }]} collapsable={false}>
+          <BookingTabScreen onSubViewChange={setInBookingSubView} />
+        </View>
+
+        <View key="6" style={[styles.pageWrapper, { width: containerWidth }]} collapsable={false}>
           <ProfileTabScreen />
         </View>
       </AdaptivePager>

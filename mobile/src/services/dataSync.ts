@@ -1,10 +1,13 @@
+import type { MainTabType } from '../utils/pagerNavigation';
+
 export type SyncEventType =
   | 'refresh_all'
   | 'refresh_events'
   | 'refresh_todos'
   | 'refresh_triggers'
   | 'refresh_bookings'
-  | 'refresh_pending';
+  | 'refresh_pending'
+  | 'refresh_finance';
 
 type SyncCallback = () => void;
 
@@ -62,7 +65,7 @@ export const dataSync = new DataSyncBus();
 export interface ChatContextualPrompt {
   question: string;
   focusMode?: string;
-  context?: 'agenda' | 'tasks' | 'triggers' | 'booking' | 'profile' | 'general';
+  context?: 'agenda' | 'tasks' | 'triggers' | 'booking' | 'profile' | 'finance' | 'general';
 }
 
 export type ChatPromptItem = string | ChatContextualPrompt;
@@ -101,7 +104,7 @@ class ChatPromptBus {
 export const chatPromptBus = new ChatPromptBus();
 
 // Barramento de navegação lateral direta de abas (§Instagram/TikTok swipe).
-type TabNavigationCallback = (tab: 'chat' | 'calendar' | 'tasks' | 'triggers' | 'booking' | 'profile') => void;
+type TabNavigationCallback = (tab: MainTabType) => void;
 
 export class TabNavigationBus {
   private listeners = new Set<TabNavigationCallback>();
@@ -113,7 +116,7 @@ export class TabNavigationBus {
     };
   }
 
-  notify(tab: 'chat' | 'calendar' | 'tasks' | 'triggers' | 'booking' | 'profile'): void {
+  notify(tab: MainTabType): void {
     this.listeners.forEach((cb) => {
       try {
         cb(tab);

@@ -157,6 +157,7 @@ const TAB_TITLES: Record<MainTabType, { title: string; subtitle: string }> = {
   chat: { title: 'Vito', subtitle: '' },
   calendar: { title: 'Agenda', subtitle: '' },
   tasks: { title: 'Tarefas', subtitle: '' },
+  finance: { title: 'Finanças', subtitle: 'Open Finance & Safe-to-Spend' },
   triggers: { title: 'Radares', subtitle: 'O Vito vigia por você' },
   booking: { title: 'Booking', subtitle: 'Links de agendamento do Vito' },
   profile: { title: 'Perfil', subtitle: 'Conta, autonomia e integrações' },

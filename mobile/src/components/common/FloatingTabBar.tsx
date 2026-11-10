@@ -59,7 +59,7 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
         >
           <MaterialIcons
             name={activeTab === 'chat' ? 'chat' : 'chat-bubble-outline'}
-            size={24}
+            size={22}
             color={activeTab === 'chat' ? colors.bg : colors.muted}
           />
         </TouchableOpacity>
@@ -82,7 +82,7 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
         >
           <MaterialIcons
             name={activeTab === 'calendar' ? 'event' : 'calendar-today'}
-            size={24}
+            size={22}
             color={activeTab === 'calendar' ? colors.bg : colors.muted}
           />
         </TouchableOpacity>
@@ -105,12 +105,35 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
         >
           <MaterialIcons
             name={activeTab === 'tasks' ? 'task-alt' : 'checklist'}
-            size={24}
+            size={22}
             color={activeTab === 'tasks' ? colors.bg : colors.muted}
           />
         </TouchableOpacity>
 
-        {/* Item 4: Radares */}
+        {/* Item 4: Finanças */}
+        <TouchableOpacity
+          style={[
+            styles.tabButton,
+            activeTab === 'finance' && [
+              styles.tabButtonActive,
+              { backgroundColor: colors.ink },
+            ],
+          ]}
+          onPress={() => handleTabPress('finance')}
+          activeOpacity={0.7}
+          hitSlop={tokens.hitSlop.sm}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: activeTab === 'finance' }}
+          accessibilityLabel="Aba Finanças"
+        >
+          <MaterialIcons
+            name={activeTab === 'finance' ? 'account-balance-wallet' : 'account-balance'}
+            size={22}
+            color={activeTab === 'finance' ? colors.bg : colors.muted}
+          />
+        </TouchableOpacity>
+
+        {/* Item 5: Radares */}
         <TouchableOpacity
           style={[
             styles.tabButton,
@@ -128,12 +151,12 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
         >
           <MaterialIcons
             name={activeTab === 'triggers' ? 'radar' : 'track-changes'}
-            size={24}
+            size={22}
             color={activeTab === 'triggers' ? colors.bg : colors.muted}
           />
         </TouchableOpacity>
 
-        {/* Item 5: Booking */}
+        {/* Item 6: Booking */}
         <TouchableOpacity
           style={[
             styles.tabButton,
@@ -151,12 +174,12 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
         >
           <MaterialIcons
             name={activeTab === 'booking' ? 'event-available' : 'link'}
-            size={24}
+            size={22}
             color={activeTab === 'booking' ? colors.bg : colors.muted}
           />
         </TouchableOpacity>
 
-        {/* Item 6: Perfil */}
+        {/* Item 7: Perfil */}
         <TouchableOpacity
           style={[
             styles.tabButton,
@@ -174,7 +197,7 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
         >
           <MaterialIcons
             name={activeTab === 'profile' ? 'person' : 'person-outline'}
-            size={24}
+            size={22}
             color={activeTab === 'profile' ? colors.bg : colors.muted}
           />
         </TouchableOpacity>
@@ -197,25 +220,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 8,
-    borderRadius: 40,
+    padding: 6,
+    borderRadius: 36,
     borderWidth: 1,
-    gap: 6,
+    gap: 4,
     elevation: 10,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.14,
     shadowRadius: 22,
   },
   tabButton: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
   },
   tabButtonActive: {
-    width: 60,
-    borderRadius: 30,
+    width: 52,
+    borderRadius: 26,
     elevation: 4,
   },
 });

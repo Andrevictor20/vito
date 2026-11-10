@@ -311,6 +311,10 @@ func main() {
 	chatSvc := service.NewChatService(chatRepo)
 	chatHandler := handler.NewChatHandler(chatSvc)
 
+	financeRepo := repository.NewFinanceRepository(db)
+	financeSvc := service.NewFinanceService(financeRepo, "", "")
+	financeHandler := handler.NewFinanceHandler(financeSvc)
+
 	evoClient := service.NewDefaultEvolutionClient(cfg.EvolutionAPIURL, cfg.EvolutionAPIKey, nil)
 	waSvc := service.NewWhatsAppService(service.WhatsAppServiceConfig{
 		WebhookBaseURL:  service.ResolveWhatsAppWebhookBaseURL(cfg.PublicBaseURL, cfg.EvolutionAPIURL, cfg.Port),
@@ -430,6 +434,7 @@ func main() {
 		WhatsAppAuthHandler: whatsappAuthHandler,
 		VoiceHandler:        voiceStreamHandler,
 		VoiceTTSHandler:     voiceTTSHandler,
+		FinanceHandler:      financeHandler,
 		AuthSvc:             authSvc,
 		AllowedOrigins:      cfg.AllowedOrigins(),
 		Environment:         cfg.Environment,

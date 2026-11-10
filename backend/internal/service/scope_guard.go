@@ -34,18 +34,19 @@ func (g *MemoryScopeGuard) CanExecute(ctx context.Context, execCtx *domain.ToolE
 		return true, "operação de leitura segura"
 	}
 
-	// Se a confirmação humana prévia já foi concedida (ex: clique no card ou "sim")
-	if execCtx != nil && (execCtx.AutonomyLevel == "confirmed" || execCtx.AutonomyLevel == "autonomous_write") {
-		return true, "autorizado por confirmação prévia explícita do usuário"
-	}
-
-	// Se o contexto foi contaminado por dados externos (web, terceiros), bloqueia escrita sumariamente
-	if execCtx != nil && execCtx.TaintedByUntrustedInput {
+	// Se o contexto foi contaminado por dados externos (Pix, web, terceiros), bloqueia escrita autônoma
+	// Somente a confirmação humana explícita pontual ("confirmed") pode liberar
+	isTainted := execCtx != nil && (execCtx.TaintedByUntrustedInput || g.IsTainted(ctx, execCtx.TurnID))
+	if isTainted {
+		if execCtx != nil && execCtx.AutonomyLevel == "confirmed" {
+			return true, "autorizado por confirmação pontual explícita do usuário"
+		}
 		return false, "bloqueado por Taint Tracking: dados externos não confiáveis no contexto exigem confirmação explícita"
 	}
 
-	if execCtx != nil && g.IsTainted(ctx, execCtx.TurnID) {
-		return false, "bloqueado por Taint Tracking: turno marcado como contaminado"
+	// Se não está contaminado e a confirmação humana ou autonomia prévia já foi concedida
+	if execCtx != nil && (execCtx.AutonomyLevel == "confirmed" || execCtx.AutonomyLevel == "autonomous_write") {
+		return true, "autorizado por confirmação prévia explícita do usuário"
 	}
 
 	return false, "operações de escrita exigem aprovação prévia do usuário no Confirmation Gate"

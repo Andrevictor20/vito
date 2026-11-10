@@ -9,18 +9,22 @@ interface ProfileConnectionsGridProps {
   onPressCalendar: () => void;
   onPressGmail: () => void;
   onPressWhatsApp: () => void;
+  onPressFinance?: () => void;
   calendarActive?: boolean;
   gmailActive?: boolean;
   whatsAppActive?: boolean;
+  financeActive?: boolean;
 }
 
 export const ProfileConnectionsGrid: React.FC<ProfileConnectionsGridProps> = ({
   onPressCalendar,
   onPressGmail,
   onPressWhatsApp,
+  onPressFinance,
   calendarActive = false,
   gmailActive = false,
   whatsAppActive = false,
+  financeActive = false,
 }) => {
   const { colors } = useTheme();
 
@@ -51,6 +55,15 @@ export const ProfileConnectionsGrid: React.FC<ProfileConnectionsGridProps> = ({
       bgColor: colors.greenBg,
       active: whatsAppActive,
       onPress: onPressWhatsApp,
+    },
+    {
+      id: 'finance',
+      name: 'Open Finance',
+      icon: 'account-balance' as const,
+      color: '#10B981',
+      bgColor: colors.greenBg,
+      active: financeActive,
+      onPress: onPressFinance || (() => {}),
     },
   ];
 
@@ -103,12 +116,14 @@ export const ProfileConnectionsGrid: React.FC<ProfileConnectionsGridProps> = ({
 const styles = StyleSheet.create({
   grid: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 10,
     marginTop: 4,
     marginBottom: 8,
   },
   tile: {
-    flex: 1,
+    flexBasis: '47%',
+    flexGrow: 1,
     borderRadius: 16,
     borderWidth: 1,
     paddingVertical: 12,

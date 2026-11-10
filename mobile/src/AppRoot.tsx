@@ -19,6 +19,7 @@ export type MainTabParamList = {
   chat: undefined;
   calendar: undefined;
   tasks: undefined;
+  finance: undefined;
   triggers: undefined;
   booking: undefined;
   profile: undefined;
@@ -39,6 +40,7 @@ const linking: LinkingOptions<RootStackParamList> = {
           chat: 'chat',
           calendar: 'agenda',
           tasks: 'tarefas',
+          finance: 'financas',
           triggers: 'radares',
           booking: 'booking',
           profile: 'perfil',

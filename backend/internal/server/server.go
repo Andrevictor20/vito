@@ -42,6 +42,7 @@ type Server struct {
 	whatsappAuthHandler *handler.WhatsAppAuthHandler
 	voiceHandler        *handler.VoiceStreamHandler
 	voiceTTSHandler     *handler.VoiceTTSHandler
+	financeHandler      *handler.FinanceHandler
 	authSvc             *service.AuthService
 }
 
@@ -71,6 +72,7 @@ type Config struct {
 	WhatsAppAuthHandler *handler.WhatsAppAuthHandler
 	VoiceHandler        *handler.VoiceStreamHandler
 	VoiceTTSHandler     *handler.VoiceTTSHandler
+	FinanceHandler      *handler.FinanceHandler
 	AuthSvc             *service.AuthService
 	// AllowedOrigins restringe o CORS (SEC-03). Vazio = ["*"] apenas fora
 	// de produção (dev/testes); em produção, vazio nega origens (fail-closed).
@@ -108,6 +110,7 @@ func New(cfg ...Config) *Server {
 		s.whatsappAuthHandler = cfg[0].WhatsAppAuthHandler
 		s.voiceHandler = cfg[0].VoiceHandler
 		s.voiceTTSHandler = cfg[0].VoiceTTSHandler
+		s.financeHandler = cfg[0].FinanceHandler
 		s.authSvc = cfg[0].AuthSvc
 	}
 
@@ -442,6 +445,20 @@ func (s *Server) registerRoutes() {
 						cr.Get("/sessions/{id}", s.chatHandler.GetSessionMessages)
 						cr.Post("/sync", s.chatHandler.SyncSession)
 						cr.Delete("/sessions/{id}", s.chatHandler.DeleteSession)
+					})
+				}
+
+				if s.financeHandler != nil {
+					protected.Route("/finance", func(fr chi.Router) {
+						fr.Get("/summary", s.financeHandler.GetSummary)
+						fr.Get("/accounts", s.financeHandler.ListAccounts)
+						fr.Get("/transactions", s.financeHandler.ListTransactions)
+						fr.Get("/connections", s.financeHandler.ListConnections)
+						fr.Post("/connections", s.financeHandler.CreateConnection)
+						fr.Delete("/connections/{id}", s.financeHandler.DeleteConnection)
+						fr.Post("/sync", s.financeHandler.SyncPayload)
+						fr.Post("/connect-token", s.financeHandler.GetConnectToken)
+						fr.Get("/test-token", s.financeHandler.GetTestToken)
 					})
 				}
 			})

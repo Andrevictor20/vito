@@ -25,6 +25,7 @@ import { ConnectedDevicesModal } from '../components/profile/ConnectedDevicesMod
 import { WhatsAppConnectModal } from '../components/profile/WhatsAppConnectModal';
 import { GmailConnectModal } from '../components/profile/GmailConnectModal';
 import { VoiceActivationSettings } from '../components/profile/VoiceActivationSettings';
+import { PluggyConnectModal } from './PluggyConnectModal';
 import { api } from '../services/api';
 import { calendarSyncService } from '../services/calendarSyncService';
 import { hapticFeedback } from '../theme/motion';
@@ -57,6 +58,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const [whatsAppStatus, setWhatsAppStatus] = useState<'disconnected' | 'connecting' | 'connected' | null>(null);
   const [gmailVisible, setGmailVisible] = useState(false);
   const [gmailStatus, setGmailStatus] = useState<{ connected: boolean; email?: string } | null>(null);
+  const [financeVisible, setFinanceVisible] = useState(false);
+  const [financeConnected, setFinanceConnected] = useState(false);
   const [userPhone, setUserPhone] = useState(user?.phone || '');
   const [checking, setChecking] = useState(false);
 
@@ -109,6 +112,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
       setGmailStatus(gm);
     } catch {
       setGmailStatus({ connected: false });
+    }
+    try {
+      const conns = await api.finance.getConnections();
+      setFinanceConnected(Boolean(conns && conns.length > 0));
+    } catch {
+      setFinanceConnected(false);
     }
   }, [userPhone]);
 
@@ -179,9 +188,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         onPressCalendar={() => setSyncVisible(true)}
         onPressGmail={() => setGmailVisible(true)}
         onPressWhatsApp={() => setWhatsAppVisible(true)}
+        onPressFinance={() => setFinanceVisible(true)}
         calendarActive={Boolean(calendarsActive && calendarsActive > 0)}
         gmailActive={Boolean(gmailStatus?.connected)}
         whatsAppActive={whatsAppStatus === 'connected'}
+        financeActive={financeConnected}
       />
 
       {/* Seção Autonomia do Vito (.lbl + .aut) */}
@@ -378,33 +389,23 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
       />
       <WhatsAppConnectModal
         visible={whatsAppVisible}
-        onClose={() => {
-          setWhatsAppVisible(false);
-          loadStatuses();
-        }}
+        onClose={() => { setWhatsAppVisible(false); loadStatuses(); }}
         defaultPhone={userPhone}
-        onStatusChanged={() => {
-          loadStatuses();
-          onDataChanged?.();
-        }}
+        onStatusChanged={() => { loadStatuses(); onDataChanged?.(); }}
       />
       <GmailConnectModal
         visible={gmailVisible}
-        onClose={() => {
-          setGmailVisible(false);
-          loadStatuses();
-        }}
-        onStatusChanged={() => {
-          loadStatuses();
-          onDataChanged?.();
-        }}
+        onClose={() => { setGmailVisible(false); loadStatuses(); }}
+        onStatusChanged={() => { loadStatuses(); onDataChanged?.(); }}
+      />
+      <PluggyConnectModal
+        visible={financeVisible}
+        onClose={() => { setFinanceVisible(false); loadStatuses(); }}
+        onConnectionSuccess={() => { loadStatuses(); onDataChanged?.(); }}
       />
       <VoiceActivationSettings
         visible={voiceVisible}
-        onClose={() => {
-          setVoiceVisible(false);
-          loadStatuses();
-        }}
+        onClose={() => { setVoiceVisible(false); loadStatuses(); }}
         preferredVoice={preferredVoice}
         onVoiceChanged={(v) => setPreferredVoice(v)}
       />
