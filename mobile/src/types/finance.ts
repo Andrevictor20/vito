@@ -77,6 +77,8 @@ export interface FinancialSummary {
   days_remaining_in_month: number;
   monthly_spend_planned: number;
   monthly_spend_actual: number;
+  month_expenses?: number;
+  month_income?: number;
   pace_percent: number;
   month_progress_percent: number;
   projected_leftover: number;

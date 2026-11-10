@@ -27,6 +27,14 @@ export class FinanceApi {
   }
 
   /**
+   * Lista as transações financeiras sincronizadas (extrato e compras de cartão).
+   */
+  async getTransactions(limit = 50, offset = 0): Promise<FinanceTransaction[]> {
+    const res = await this.client.request<FinanceTransaction[]>(`/api/v1/finance/transactions?limit=${limit}&offset=${offset}`);
+    return Array.isArray(res) ? res : [];
+  }
+
+  /**
    * Lista as conexões ativas com instituições financeiras (Open Finance).
    */
   async getConnections(): Promise<FinanceConnection[]> {
