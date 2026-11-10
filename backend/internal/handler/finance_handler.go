@@ -197,7 +197,7 @@ func (h *FinanceHandler) GetConnectToken(w http.ResponseWriter, r *http.Request)
 
 	apiKey, _ := h.financeSvc.GetSessionToken(r.Context())
 
-	widgetURL := fmt.Sprintf("https://connect.pluggy.ai/?connect_token=%s&connectToken=%s&with_sandbox=true", url.QueryEscape(token), url.QueryEscape(token))
+	widgetURL := fmt.Sprintf("https://connect.pluggy.ai/?connect_token=%s&connectToken=%s", url.QueryEscape(token), url.QueryEscape(token))
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]any{

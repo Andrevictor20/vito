@@ -98,7 +98,7 @@ export const PluggyConnectModal: React.FC<PluggyConnectModalProps> = ({
       // Nota: o web app connect.pluggy.ai lê estritamente "connect_token" em snake_case dos query params.
       const widgetUrl =
         (tokenRes as any)?.widget_url ||
-        `https://connect.pluggy.ai/?connect_token=${encodeURIComponent(token)}&connectToken=${encodeURIComponent(token)}&with_sandbox=true&theme=${isDark ? 'dark' : 'light'}`;
+        `https://connect.pluggy.ai/?connect_token=${encodeURIComponent(token)}&connectToken=${encodeURIComponent(token)}&theme=${isDark ? 'dark' : 'light'}`;
 
       let authResult = null;
       if (WebBrowser?.openAuthSessionAsync) {
