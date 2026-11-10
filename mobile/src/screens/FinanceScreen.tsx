@@ -18,7 +18,6 @@ import { PluggyConnectModal } from './PluggyConnectModal';
 import { BentoAccountHero } from '../components/finance/BentoAccountHero';
 import { BentoMetricsGrid } from '../components/finance/BentoMetricsGrid';
 import { RecentTransactionsList } from '../components/finance/RecentTransactionsList';
-import { FinanceInsightBanner } from '../components/finance/FinanceInsightBanner';
 
 const DEFAULT_SUMMARY: FinancialSummary = {
   total_balance: 0,
@@ -293,14 +292,7 @@ export const FinanceScreen: React.FC = () => {
           }
         />
 
-        {/* 2. Banner de Oportunidade / CDB */}
-        <FinanceInsightBanner
-          balance={summary.total_balance}
-          isPrivacyHidden={isPrivacyHidden}
-          onPressPrompt={handlePromptPress}
-        />
-
-        {/* 3. Grid Bento 2 Colunas (Gastos do mês, Fluxo de Caixa, Fatura Cartão, Limite, Assinaturas, Safe-to-Spend) */}
+        {/* 2. Grid Bento 2 Colunas (Gastos do mês, Fluxo de Caixa, Fatura Cartão, Limite, Assinaturas, Safe-to-Spend) */}
         <BentoMetricsGrid
           summary={summary}
           accounts={accounts}
