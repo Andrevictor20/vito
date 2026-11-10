@@ -1,8 +1,12 @@
 package service
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"regexp"
 	"strings"
 	"time"
@@ -128,15 +132,109 @@ func (s *FinanceService) GetFinancialSummary(ctx context.Context, userID string)
 		})
 	}
 
+	summary.AttentionAlerts = summary.Alerts
 	return summary, nil
 }
 
-// GenerateConnectToken emite o token efêmero de conexão do Meu Pluggy (conector 200).
+// GenerateConnectToken emite o token efêmero oficial da Pluggy para o widget de conexão.
 func (s *FinanceService) GenerateConnectToken(ctx context.Context, userID string) (string, error) {
 	if s.pluggyClientID == "" || s.pluggyClientSecret == "" {
-		return fmt.Sprintf("mock-connect-token-%s-%d", userID, time.Now().Unix()), nil
+		return "", domain.ErrPluggyCredentialsMissing
 	}
-	return fmt.Sprintf("pluggy-connect-%s-%d", userID, time.Now().Unix()), nil
+
+	apiKey, err := s.fetchPluggyAPIKey(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	return s.fetchPluggyConnectToken(ctx, apiKey, userID)
+}
+
+// GetSessionToken emite uma apiKey efêmera da Pluggy para o cliente móvel realizar o Edge-Sync.
+func (s *FinanceService) GetSessionToken(ctx context.Context) (string, error) {
+	if s.pluggyClientID == "" || s.pluggyClientSecret == "" {
+		return "", domain.ErrPluggyCredentialsMissing
+	}
+	return s.fetchPluggyAPIKey(ctx)
+}
+
+func (s *FinanceService) fetchPluggyAPIKey(ctx context.Context) (string, error) {
+	authBody, _ := json.Marshal(map[string]string{
+		"clientId":     s.pluggyClientID,
+		"clientSecret": s.pluggyClientSecret,
+	})
+
+	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.pluggy.ai/auth", bytes.NewReader(authBody))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("falha ao conectar na API da Pluggy: %w", err)
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", fmt.Errorf("autenticação na Pluggy rejeitada (HTTP %d): %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	var authRes struct {
+		APIKey string `json:"apiKey"`
+	}
+	if err := json.Unmarshal(bodyBytes, &authRes); err != nil || authRes.APIKey == "" {
+		return "", fmt.Errorf("resposta inválida de autenticação da Pluggy: %s", string(bodyBytes))
+	}
+
+	return authRes.APIKey, nil
+}
+
+func (s *FinanceService) fetchPluggyConnectToken(ctx context.Context, apiKey, userID string) (string, error) {
+	tokenReqBody, _ := json.Marshal(map[string]any{
+		"options": map[string]any{
+			"clientUserId": userID,
+		},
+	})
+
+	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.pluggy.ai/connect_token", bytes.NewReader(tokenReqBody))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-API-KEY", apiKey)
+
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("falha ao solicitar connect_token na Pluggy: %w", err)
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", fmt.Errorf("emissão de connect_token na Pluggy rejeitada (HTTP %d): %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	var tokenRes struct {
+		AccessToken  string `json:"accessToken"`
+		ConnectToken string `json:"connectToken"`
+	}
+	if err := json.Unmarshal(bodyBytes, &tokenRes); err != nil {
+		return "", fmt.Errorf("resposta inválida de connect_token da Pluggy: %s", string(bodyBytes))
+	}
+
+	token := tokenRes.AccessToken
+	if token == "" {
+		token = tokenRes.ConnectToken
+	}
+	if token == "" {
+		return "", fmt.Errorf("connect_token vazio retornado pela Pluggy: %s", string(bodyBytes))
+	}
+
+	return token, nil
 }
 
 // CreateConnection cadastra uma nova conexão manualmente.

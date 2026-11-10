@@ -6,9 +6,10 @@ import (
 )
 
 var (
-	ErrFinanceConnectionNotFound = errors.New("conexão financeira não encontrada")
-	ErrFinanceAccountNotFound    = errors.New("conta bancária não encontrada")
-	ErrFinanceInvalidPayload     = errors.New("payload financeiro inválido")
+	ErrFinanceConnectionNotFound   = errors.New("conexão financeira não encontrada")
+	ErrFinanceAccountNotFound      = errors.New("conta bancária não encontrada")
+	ErrFinanceInvalidPayload       = errors.New("payload financeiro inválido")
+	ErrPluggyCredentialsMissing    = errors.New("credenciais do Open Finance não configuradas no servidor (configure PLUGGY_CLIENT_ID e PLUGGY_CLIENT_SECRET no .env)")
 )
 
 type AccountType string
@@ -137,16 +138,26 @@ type SubscriptionItem struct {
 
 // FinancialSummary agrega os dados macroeconômicos do usuário para o Card Hero e IA.
 type FinancialSummary struct {
-	ConsolidatedBalance      float64             `json:"consolidated_balance"`
-	OpenInvoicesTotal        float64             `json:"open_invoices_total"`
-	MonthExpenses            float64             `json:"month_expenses"`
-	MonthIncome              float64             `json:"month_income"`
-	SafeToSpendDaily         float64             `json:"safe_to_spend_daily"`
-	SafeToSpendDaysRemaining int                 `json:"safe_to_spend_days_remaining"`
-	SafeToSpendMonthPercent  float64             `json:"safe_to_spend_month_percent"`
-	SafeToSpendBudgetPercent float64             `json:"safe_to_spend_budget_percent"`
-	CategorySpending         []CategorySpendItem `json:"category_spending"`
-	Alerts                   []FinanceAlert      `json:"alerts"`
+	ConnectedInstitutionsCount int                 `json:"connected_institutions_count"`
+	ConsolidatedBalance        float64             `json:"consolidated_balance"`
+	TotalBalance               float64             `json:"total_balance"`
+	OpenInvoicesTotal          float64             `json:"open_invoices_total"`
+	OpenCreditCardBills        float64             `json:"open_credit_card_bills"`
+	MonthExpenses              float64             `json:"month_expenses"`
+	MonthIncome                float64             `json:"month_income"`
+	SafeToSpendDaily           float64             `json:"safe_to_spend_daily"`
+	SafeToSpendDaysRemaining   int                 `json:"safe_to_spend_days_remaining"`
+	DaysRemainingInMonth       int                 `json:"days_remaining_in_month"`
+	SafeToSpendMonthPercent    float64             `json:"safe_to_spend_month_percent"`
+	MonthProgressPercent       float64             `json:"month_progress_percent"`
+	SafeToSpendBudgetPercent   float64             `json:"safe_to_spend_budget_percent"`
+	PacePercent                float64             `json:"pace_percent"`
+	ProjectedLeftover          float64             `json:"projected_leftover"`
+	HeadlineStatus             string              `json:"headline_status"`
+	CategorySpending           []CategorySpendItem `json:"category_spending"`
+	Alerts                     []FinanceAlert      `json:"alerts"`
+	AttentionAlerts            []FinanceAlert      `json:"attention_alerts"`
+	Subscriptions              []SubscriptionItem  `json:"subscriptions"`
 }
 
 // FinanceSyncPayload é o envelope enviado pelo app mobile no Edge-Sync.

@@ -18,48 +18,21 @@ import type { FinancialSummary, FinanceAlert, CategorySpendItem, SubscriptionIte
 import { PluggyConnectModal } from './PluggyConnectModal';
 
 const DEFAULT_SUMMARY: FinancialSummary = {
-  total_balance: 3840.5,
-  open_credit_card_bills: 1420.0,
-  safe_to_spend_daily: 86.0,
-  safe_to_spend_total: 1290.0,
-  days_remaining_in_month: 15,
-  monthly_spend_planned: 4200.0,
-  monthly_spend_actual: 2980.0,
-  pace_percent: 71,
-  month_progress_percent: 74,
-  projected_leftover: 860.5,
-  headline_status: 'Você está bem este mês',
-  connected_institutions_count: 2,
-  attention_alerts: [
-    {
-      id: 'alt-1',
-      kind: 'BILL_DUE',
-      title: 'Fatura do Nubank fecha em 2 dias',
-      description: 'Valor aberto em R$ 1.420,00. Saldo em conta suficiente.',
-      action_label: 'Lembrar de pagar',
-      urgency: 'high',
-    },
-    {
-      id: 'alt-2',
-      kind: 'BUDGET_CEILING',
-      title: 'Delivery em 85% do teto',
-      description: 'Você gastou R$ 340 dos R$ 400 previstos.',
-      action_label: 'Ver teto',
-      urgency: 'medium',
-    },
-  ],
-  category_spending: [
-    { category: 'Alimentação & Mercado', amount: 1250, percentage: 42, delta_vs_average_percent: -4 },
-    { category: 'Moradia & Contas', amount: 980, percentage: 33, delta_vs_average_percent: 2 },
-    { category: 'Transporte & Uber', amount: 450, percentage: 15, delta_vs_average_percent: 18 },
-    { category: 'Lazer & Delivery', amount: 300, percentage: 10, delta_vs_average_percent: -12 },
-  ],
-  subscriptions: [
-    { id: 'sub-1', name: 'Netflix 4K', amount: 55.9, frequency: 'monthly' },
-    { id: 'sub-2', name: 'Spotify Família', amount: 34.9, frequency: 'monthly' },
-    { id: 'sub-3', name: 'Gympass Gold', amount: 139.9, frequency: 'monthly', has_price_increase: true, previous_amount: 119.9 },
-    { id: 'sub-4', name: 'Google One 2TB', amount: 38.9, frequency: 'monthly' },
-  ],
+  total_balance: 0,
+  open_credit_card_bills: 0,
+  safe_to_spend_daily: 0,
+  safe_to_spend_total: 0,
+  days_remaining_in_month: 0,
+  monthly_spend_planned: 0,
+  monthly_spend_actual: 0,
+  pace_percent: 0,
+  month_progress_percent: 0,
+  projected_leftover: 0,
+  headline_status: 'Nenhuma conta conectada',
+  connected_institutions_count: 0,
+  attention_alerts: [],
+  category_spending: [],
+  subscriptions: [],
 };
 
 const PROMPT_CHIPS = [
@@ -91,12 +64,57 @@ export const FinanceScreen: React.FC = () => {
 
   const loadFinanceSummary = useCallback(async () => {
     try {
-      const data = await api.finance.getSummary();
+      const data: any = await api.finance.getSummary();
       if (data && typeof data === 'object') {
-        setSummary((prev) => ({ ...prev, ...data }));
+        const totalBalance = data.total_balance ?? data.consolidated_balance ?? 0;
+        const openBills = data.open_credit_card_bills ?? data.open_invoices_total ?? 0;
+        const daysRemaining = data.days_remaining_in_month ?? data.safe_to_spend_days_remaining ?? 0;
+        const safeDaily = data.safe_to_spend_daily ?? 0;
+        const monthProgress = data.month_progress_percent ?? data.safe_to_spend_month_percent ?? 0;
+        const leftover = data.projected_leftover ?? (totalBalance - openBills);
+        const pace = data.pace_percent ?? 0;
+        const connCount = data.connected_institutions_count ?? 0;
+        const alerts = data.attention_alerts ?? data.alerts ?? [];
+        const catSpending = (data.category_spending || []).map((c: any) => ({
+          category: c.category,
+          amount: c.total_amount ?? c.amount ?? 0,
+          percentage: c.percentage ?? 0,
+          delta_vs_average_percent: c.delta_percent ?? c.delta_vs_average_percent,
+        }));
+        const subs = (data.subscriptions || []).map((s: any) => ({
+          id: s.id || s.merchant_name || s.name,
+          name: s.name || s.merchant_name,
+          amount: s.amount ?? 0,
+          frequency: s.frequency || 'monthly',
+          has_price_increase: s.is_price_increased ?? s.has_price_increase,
+          previous_amount: s.previous_amount,
+        }));
+
+        let headline = 'Nenhuma conta conectada';
+        if (connCount > 0) {
+          headline = leftover >= 0 ? 'Você está bem este mês' : 'Atenção com faturas de cartão';
+        }
+
+        setSummary({
+          total_balance: totalBalance,
+          open_credit_card_bills: openBills,
+          safe_to_spend_daily: safeDaily,
+          safe_to_spend_total: safeDaily * (daysRemaining > 0 ? daysRemaining : 1),
+          days_remaining_in_month: daysRemaining,
+          monthly_spend_planned: 0,
+          monthly_spend_actual: data.month_expenses ?? 0,
+          pace_percent: pace,
+          month_progress_percent: monthProgress,
+          projected_leftover: leftover,
+          headline_status: data.headline_status || headline,
+          connected_institutions_count: connCount,
+          attention_alerts: alerts,
+          category_spending: catSpending,
+          subscriptions: subs,
+        });
       }
     } catch {
-      // Mantém fallback seguro para visualização imediata
+      // Estado real mantido
     }
   }, []);
 
@@ -152,63 +170,101 @@ export const FinanceScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
 
-        {/* Card Hero: Safe-to-Spend (.fhero) */}
-        <View style={[styles.heroCard, { backgroundColor: colors.surf, borderColor: colors.line }]}>
-          <View style={styles.eyebrowRow}>
-            <Animated.View
-              style={[
-                styles.pulseDot,
-                { transform: [{ scale: pulseAnim }], backgroundColor: '#10B981' },
-              ]}
-            />
-            <Text style={[styles.eyebrowText, { color: '#10B981' }]}>{summary.headline_status}</Text>
-          </View>
-
-          <View style={styles.dailyMetricRow}>
-            <Text style={[styles.dailyValueText, { color: colors.ink }]}>
-              R$ {Math.round(summary.safe_to_spend_daily)}
+        {/* Card Hero: Safe-to-Spend (.fhero) ou Onboarding quando sem contas */}
+        {summary.connected_institutions_count === 0 && summary.total_balance === 0 && summary.open_credit_card_bills === 0 ? (
+          <View style={[styles.heroCard, { backgroundColor: colors.surf, borderColor: colors.line }]}>
+            <View style={styles.emptyIconCircle}>
+              <MaterialIcons name="account-balance-wallet" size={30} color="#8B5CF6" />
+            </View>
+            <Text style={[styles.emptyHeroTitle, { color: colors.ink }]}>Safe-to-Spend em Tempo Real</Text>
+            <Text style={[styles.emptyHeroDesc, { color: colors.muted }]}>
+              Conecte suas contas bancárias e cartões com segurança via Open Finance. O Vito calcula quanto você pode gastar hoje sem comprometer suas faturas.
             </Text>
-            <Text style={[styles.dailyUnitText, { color: colors.muted }]}>
-              /dia até o fim do mês ({summary.days_remaining_in_month} dias)
-            </Text>
+            <TouchableOpacity
+              style={styles.emptyConnectBtn}
+              onPress={() => {
+                hapticFeedback.medium();
+                setConnectModalVisible(true);
+              }}
+              activeOpacity={0.8}
+              accessibilityLabel="Conectar Banco via Open Finance"
+            >
+              <MaterialIcons name="add" size={18} color="#FFFFFF" />
+              <Text style={styles.emptyConnectBtnText}>Conectar Banco com Open Finance</Text>
+            </TouchableOpacity>
+            <View style={styles.securityBadgesRow}>
+              <View style={styles.secBadgeItem}>
+                <MaterialIcons name="lock-outline" size={13} color={colors.muted} />
+                <Text style={[styles.secBadgeText, { color: colors.muted }]}>Somente Leitura</Text>
+              </View>
+              <View style={styles.secBadgeItem}>
+                <MaterialIcons name="security" size={13} color={colors.muted} />
+                <Text style={[styles.secBadgeText, { color: colors.muted }]}>Zero IP Leak</Text>
+              </View>
+              <View style={styles.secBadgeItem}>
+                <MaterialIcons name="sd-storage" size={13} color={colors.muted} />
+                <Text style={[styles.secBadgeText, { color: colors.muted }]}>SQLite Local</Text>
+              </View>
+            </View>
           </View>
-
-          {/* Barra de Ritmo Comparativa */}
-          <View style={styles.paceBarSection}>
-            <View style={[styles.paceTrack, { backgroundColor: colors.bg }]}>
-              <View
+        ) : (
+          <View style={[styles.heroCard, { backgroundColor: colors.surf, borderColor: colors.line }]}>
+            <View style={styles.eyebrowRow}>
+              <Animated.View
                 style={[
-                  styles.paceFill,
-                  {
-                    width: `${Math.min(100, summary.pace_percent)}%`,
-                    backgroundColor: summary.pace_percent > summary.month_progress_percent ? '#EF4444' : '#10B981',
-                  },
+                  styles.pulseDot,
+                  { transform: [{ scale: pulseAnim }], backgroundColor: '#10B981' },
                 ]}
               />
+              <Text style={[styles.eyebrowText, { color: '#10B981' }]}>{summary.headline_status}</Text>
             </View>
-            <Text style={[styles.paceLegend, { color: colors.muted }]}>
-              Você usou {summary.pace_percent}% do planejado. O mês está em {summary.month_progress_percent}%.
-            </Text>
-          </View>
 
-          {/* 3 Submétricas Típicas */}
-          <View style={[styles.subMetricsRow, { borderTopColor: colors.line }]}>
-            <View style={styles.subMetricCol}>
-              <Text style={[styles.subMetricLabel, { color: colors.muted }]}>Saldo Disponível</Text>
-              <Text style={[styles.subMetricVal, { color: colors.ink }]}>{formatBRL(summary.total_balance)}</Text>
+            <View style={styles.dailyMetricRow}>
+              <Text style={[styles.dailyValueText, { color: colors.ink }]}>
+                R$ {Math.round(summary.safe_to_spend_daily)}
+              </Text>
+              <Text style={[styles.dailyUnitText, { color: colors.muted }]}>
+                /dia até o fim do mês ({summary.days_remaining_in_month} dias)
+              </Text>
             </View>
-            <View style={[styles.subMetricDivider, { backgroundColor: colors.line }]} />
-            <View style={styles.subMetricCol}>
-              <Text style={[styles.subMetricLabel, { color: colors.muted }]}>Fatura Aberta</Text>
-              <Text style={[styles.subMetricVal, { color: colors.ink }]}>{formatBRL(summary.open_credit_card_bills)}</Text>
+
+            {/* Barra de Ritmo Comparativa */}
+            <View style={styles.paceBarSection}>
+              <View style={[styles.paceTrack, { backgroundColor: colors.bg }]}>
+                <View
+                  style={[
+                    styles.paceFill,
+                    {
+                      width: `${Math.min(100, summary.pace_percent)}%`,
+                      backgroundColor: summary.pace_percent > summary.month_progress_percent ? '#EF4444' : '#10B981',
+                    },
+                  ]}
+                />
+              </View>
+              <Text style={[styles.paceLegend, { color: colors.muted }]}>
+                Você usou {summary.pace_percent}% do planejado. O mês está em {summary.month_progress_percent}%.
+              </Text>
             </View>
-            <View style={[styles.subMetricDivider, { backgroundColor: colors.line }]} />
-            <View style={styles.subMetricCol}>
-              <Text style={[styles.subMetricLabel, { color: colors.muted }]}>Sobra Prevista</Text>
-              <Text style={[styles.subMetricVal, { color: '#10B981' }]}>{formatBRL(summary.projected_leftover)}</Text>
+
+            {/* 3 Submétricas Típicas */}
+            <View style={[styles.subMetricsRow, { borderTopColor: colors.line }]}>
+              <View style={styles.subMetricCol}>
+                <Text style={[styles.subMetricLabel, { color: colors.muted }]}>Saldo Disponível</Text>
+                <Text style={[styles.subMetricVal, { color: colors.ink }]}>{formatBRL(summary.total_balance)}</Text>
+              </View>
+              <View style={[styles.subMetricDivider, { backgroundColor: colors.line }]} />
+              <View style={styles.subMetricCol}>
+                <Text style={[styles.subMetricLabel, { color: colors.muted }]}>Fatura Aberta</Text>
+                <Text style={[styles.subMetricVal, { color: colors.ink }]}>{formatBRL(summary.open_credit_card_bills)}</Text>
+              </View>
+              <View style={[styles.subMetricDivider, { backgroundColor: colors.line }]} />
+              <View style={styles.subMetricCol}>
+                <Text style={[styles.subMetricLabel, { color: colors.muted }]}>Sobra Prevista</Text>
+                <Text style={[styles.subMetricVal, { color: '#10B981' }]}>{formatBRL(summary.projected_leftover)}</Text>
+              </View>
             </View>
           </View>
-        </View>
+        )}
 
         {/* Seção Alertas de Atenção */}
         {summary.attention_alerts && summary.attention_alerts.length > 0 && (
@@ -265,59 +321,63 @@ export const FinanceScreen: React.FC = () => {
           </ScrollView>
         </View>
 
-        {/* Seção Gastos do Mês por Categoria */}
-        <View style={styles.sectionBlock}>
-          <Text style={[styles.sectionTitle, { color: colors.muted }]}>GASTOS DO MÊS POR CATEGORIA</Text>
-          <View style={[styles.categoriesCard, { backgroundColor: colors.surf, borderColor: colors.line }]}>
-            {summary.category_spending.map((cat, idx) => {
-              const delta = cat.delta_vs_average_percent ?? 0;
-              const isUp = delta > 0;
-              return (
-                <View key={cat.category} style={[styles.categoryRow, idx > 0 && { borderTopColor: colors.line, borderTopWidth: 1 }]}>
-                  <View style={styles.catMetaRow}>
-                    <Text style={[styles.catName, { color: colors.ink }]}>{cat.category}</Text>
-                    <View style={styles.catValuesRow}>
-                      <Text style={[styles.catAmount, { color: colors.ink }]}>{formatBRL(cat.amount)}</Text>
-                      {delta !== 0 && (
-                        <View style={[styles.deltaBadge, { backgroundColor: isUp ? '#FEE2E2' : '#DCFCE7' }]}>
-                          <Text style={[styles.deltaText, { color: isUp ? '#B91C1C' : '#15803D' }]}>
-                            {isUp ? `+${delta}%` : `${delta}%`}
-                          </Text>
-                        </View>
-                      )}
+        {/* Seção Gastos do Mês por Categoria (somente se houver dados reais) */}
+        {summary.category_spending && summary.category_spending.length > 0 && (
+          <View style={styles.sectionBlock}>
+            <Text style={[styles.sectionTitle, { color: colors.muted }]}>GASTOS DO MÊS POR CATEGORIA</Text>
+            <View style={[styles.categoriesCard, { backgroundColor: colors.surf, borderColor: colors.line }]}>
+              {summary.category_spending.map((cat, idx) => {
+                const delta = cat.delta_vs_average_percent ?? 0;
+                const isUp = delta > 0;
+                return (
+                  <View key={cat.category} style={[styles.categoryRow, idx > 0 && { borderTopColor: colors.line, borderTopWidth: 1 }]}>
+                    <View style={styles.catMetaRow}>
+                      <Text style={[styles.catName, { color: colors.ink }]}>{cat.category}</Text>
+                      <View style={styles.catValuesRow}>
+                        <Text style={[styles.catAmount, { color: colors.ink }]}>{formatBRL(cat.amount)}</Text>
+                        {delta !== 0 && (
+                          <View style={[styles.deltaBadge, { backgroundColor: isUp ? '#FEE2E2' : '#DCFCE7' }]}>
+                            <Text style={[styles.deltaText, { color: isUp ? '#B91C1C' : '#15803D' }]}>
+                              {isUp ? `+${delta}%` : `${delta}%`}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    </View>
+                    <View style={[styles.catBarTrack, { backgroundColor: colors.bg }]}>
+                      <View style={[styles.catBarFill, { width: `${cat.percentage}%`, backgroundColor: colors.ink }]} />
                     </View>
                   </View>
-                  <View style={[styles.catBarTrack, { backgroundColor: colors.bg }]}>
-                    <View style={[styles.catBarFill, { width: `${cat.percentage}%`, backgroundColor: colors.ink }]} />
-                  </View>
-                </View>
-              );
-            })}
+                );
+              })}
+            </View>
           </View>
-        </View>
+        )}
 
-        {/* Seção Assinaturas Recorrentes */}
-        <View style={styles.sectionBlock}>
-          <Text style={[styles.sectionTitle, { color: colors.muted }]}>ASSINATURAS RECORRENTES</Text>
-          <View style={[styles.categoriesCard, { backgroundColor: colors.surf, borderColor: colors.line }]}>
-            {summary.subscriptions.map((sub, idx) => (
-              <View key={sub.id} style={[styles.subRow, idx > 0 && { borderTopColor: colors.line, borderTopWidth: 1 }]}>
-                <View style={styles.subLeftCol}>
-                  <Text style={[styles.subName, { color: colors.ink }]}>{sub.name}</Text>
-                  {sub.has_price_increase && (
-                    <Text style={[styles.subAlert, { color: '#EF4444' }]}>
-                      Reajuste detectado (era {formatBRL(sub.previous_amount || 0)})
-                    </Text>
-                  )}
+        {/* Seção Assinaturas Recorrentes (somente se houver dados reais) */}
+        {summary.subscriptions && summary.subscriptions.length > 0 && (
+          <View style={styles.sectionBlock}>
+            <Text style={[styles.sectionTitle, { color: colors.muted }]}>ASSINATURAS RECORRENTES</Text>
+            <View style={[styles.categoriesCard, { backgroundColor: colors.surf, borderColor: colors.line }]}>
+              {summary.subscriptions.map((sub, idx) => (
+                <View key={sub.id} style={[styles.subRow, idx > 0 && { borderTopColor: colors.line, borderTopWidth: 1 }]}>
+                  <View style={styles.subLeftCol}>
+                    <Text style={[styles.subName, { color: colors.ink }]}>{sub.name}</Text>
+                    {sub.has_price_increase && (
+                      <Text style={[styles.subAlert, { color: '#EF4444' }]}>
+                        Reajuste detectado (era {formatBRL(sub.previous_amount || 0)})
+                      </Text>
+                    )}
+                  </View>
+                  <Text style={[styles.subAmount, { color: colors.ink }]}>
+                    {formatBRL(sub.amount)}
+                    <Text style={[styles.subFreq, { color: colors.muted }]}>/{sub.frequency === 'monthly' ? 'mês' : 'ano'}</Text>
+                  </Text>
                 </View>
-                <Text style={[styles.subAmount, { color: colors.ink }]}>
-                  {formatBRL(sub.amount)}
-                  <Text style={[styles.subFreq, { color: colors.muted }]}>/{sub.frequency === 'monthly' ? 'mês' : 'ano'}</Text>
-                </Text>
-              </View>
-            ))}
+              ))}
+            </View>
           </View>
-        </View>
+        )}
       </ScrollView>
 
       {/* Modal de Conexão Open Finance Meu Pluggy */}
@@ -383,4 +443,12 @@ const styles = StyleSheet.create({
   subAlert: { fontSize: 11.5, marginTop: 2, fontWeight: '500' },
   subAmount: { fontSize: 14, fontWeight: '700' },
   subFreq: { fontSize: 12, fontWeight: '400' },
+  emptyIconCircle: { width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(139, 92, 246, 0.12)', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
+  emptyHeroTitle: { fontFamily: tokens.typography.family.montserratBold, fontSize: 20, fontWeight: '800', marginBottom: 6 },
+  emptyHeroDesc: { fontSize: 13, lineHeight: 19, marginBottom: 16 },
+  emptyConnectBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 44, borderRadius: 22, backgroundColor: '#8B5CF6', paddingHorizontal: 18, marginBottom: 14 },
+  emptyConnectBtnText: { color: '#FFFFFF', fontSize: 13.5, fontWeight: '700' },
+  securityBadgesRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)', paddingTop: 10 },
+  secBadgeItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  secBadgeText: { fontSize: 11, fontWeight: '500' },
 });

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -54,20 +55,20 @@ func withAuth(req *http.Request, userID string) *http.Request {
 func TestFinanceHandler_SummaryAndConnectToken(t *testing.T) {
 	h, userID := setupTestFinanceHandler(t)
 
-	// 1. GetConnectToken
+	// 1. GetConnectToken sem credenciais configuradas -> deve exigir configuração com 428
 	req := httptest.NewRequest("POST", "/api/v1/finance/connect-token", nil)
 	req = withAuth(req, userID)
 	rec := httptest.NewRecorder()
 	h.GetConnectToken(rec, req)
 
-	if rec.Code != http.StatusOK {
-		t.Fatalf("esperava 200 em connect-token, obteve %d", rec.Code)
+	if rec.Code != http.StatusPreconditionRequired {
+		t.Fatalf("esperava 428 em connect-token sem credenciais, obteve %d", rec.Code)
 	}
 
-	var tokenRes map[string]any
-	_ = json.Unmarshal(rec.Body.Bytes(), &tokenRes)
-	if tokenRes["connect_token"] == "" {
-		t.Errorf("esperava connect_token não vazio")
+	var errRes map[string]string
+	_ = json.Unmarshal(rec.Body.Bytes(), &errRes)
+	if !strings.Contains(errRes["error"], "PLUGGY_CLIENT_ID") {
+		t.Errorf("esperava mensagem orientando configuração de PLUGGY_CLIENT_ID, obteve: %v", errRes["error"])
 	}
 
 	// 2. GetSummary

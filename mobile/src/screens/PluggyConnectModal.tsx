@@ -57,36 +57,92 @@ export const PluggyConnectModal: React.FC<PluggyConnectModalProps> = ({
     setConnecting(true);
     hapticFeedback.medium();
     try {
-      let token = '';
+      let tokenRes;
       try {
-        const tokenRes = await api.finance.getConnectToken();
-        token = tokenRes.connect_token;
-      } catch {
-        const testRes = await api.finance.getTestToken();
-        token = testRes.connect_token;
+        tokenRes = await api.finance.getConnectToken();
+      } catch (err: any) {
+        const errMsg = err?.message || '';
+        if (errMsg.includes('PLUGGY_CLIENT_ID') || errMsg.includes('Open Finance') || errMsg.includes('credenciais')) {
+          Alert.alert(
+            'Configuração do Open Finance',
+            'Para conectar contas bancárias reais via Pluggy, adicione as chaves no arquivo .env do servidor Vito:\n\nPLUGGY_CLIENT_ID=...\nPLUGGY_CLIENT_SECRET=...\n\n(Obtenha gratuitamente em dashboard.pluggy.ai)',
+            [{ text: 'Entendi', style: 'default' }]
+          );
+          return;
+        }
+        throw err;
       }
 
+      const token = tokenRes?.connect_token;
+      const apiKey = (tokenRes as any)?.api_key;
       if (!token) {
         throw new Error('Não foi possível obter o token de conexão do Open Finance.');
       }
 
-      const widgetUrl = `https://connect.pluggy.ai/?connectToken=${encodeURIComponent(token)}&connectorId=200`;
+      // Abre o widget oficial da Pluggy para escolha do banco do usuário (Nubank, Itaú, Inter, etc.)
+      const widgetUrl = `https://connect.pluggy.ai/?connectToken=${encodeURIComponent(token)}`;
 
+      let authResult = null;
       if (WebBrowser?.openAuthSessionAsync) {
-        await WebBrowser.openAuthSessionAsync(widgetUrl, 'vito://pluggy-success');
+        authResult = await WebBrowser.openAuthSessionAsync(widgetUrl, 'vito://pluggy-success');
       } else {
         await Linking.openURL(widgetUrl);
       }
 
-      // Ao retornar da sessão, cria o registro da conexão
+      let itemId = '';
+      if (authResult && authResult.type === 'success' && authResult.url) {
+        try {
+          const match = authResult.url.match(/itemId=([^&]+)/);
+          if (match && match[1]) itemId = decodeURIComponent(match[1]);
+        } catch {}
+      }
+
+      if (!itemId) {
+        itemId = `item_${Date.now()}`;
+      }
+
+      // Edge-Sync: Busca contas reais na Pluggy diretamente do aparelho do usuário (Zero IP Leak)
+      let fetchedAccounts: any[] = [];
+      if (apiKey && itemId && !itemId.startsWith('item_')) {
+        try {
+          const accResp = await fetch(`https://api.pluggy.ai/accounts?itemId=${encodeURIComponent(itemId)}`, {
+            headers: { 'X-API-KEY': apiKey },
+          });
+          if (accResp.ok) {
+            const accJson = await accResp.json();
+            const results = accJson.results || accJson;
+            if (Array.isArray(results)) {
+              fetchedAccounts = results.map((a: any) => ({
+                pluggy_account_id: a.id,
+                institution_name: a.marketingName || a.name || 'Banco Conectado',
+                account_type: a.type === 'CREDIT' ? 'CREDIT' : 'BANK',
+                account_subtype: a.subtype,
+                name: a.name || 'Conta Corrente',
+                balance: Number(a.balance || 0),
+                currency_code: a.currencyCode || 'BRL',
+              }));
+            }
+          }
+        } catch (fetchErr) {
+          console.warn('[PluggyConnectModal] Nota ao buscar contas na Pluggy:', fetchErr);
+        }
+      }
+
+      // Registra a conexão e sincroniza contas no backend do Vito
       try {
-        await api.finance.createConnection({
-          pluggy_item_id: `item_${Date.now()}`,
-          connector_id: 200,
-          institution_name: 'Meu Pluggy (Open Finance)',
+        await api.finance.sync({
+          pluggy_item_id: itemId,
+          accounts: fetchedAccounts,
+          transactions: [],
         });
-      } catch (err) {
-        console.warn('[PluggyConnectModal] Nota ao criar conexão:', err);
+      } catch {
+        try {
+          await api.finance.createConnection({
+            pluggy_item_id: itemId,
+            connector_id: 200,
+            institution_name: fetchedAccounts[0]?.institution_name || 'Open Finance',
+          });
+        } catch {}
       }
 
       hapticFeedback.selection();

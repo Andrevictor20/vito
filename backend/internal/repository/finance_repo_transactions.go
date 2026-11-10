@@ -178,9 +178,19 @@ func (r *sqliteFinanceRepo) GetFinancialSummary(ctx context.Context, userID stri
 	summary := &domain.FinancialSummary{
 		SafeToSpendDaysRemaining: daysRemaining,
 		SafeToSpendMonthPercent:  math.Round(monthPercent*10) / 10,
+		DaysRemainingInMonth:     daysRemaining,
+		MonthProgressPercent:     math.Round(monthPercent*10) / 10,
 		CategorySpending:         []domain.CategorySpendItem{},
 		Alerts:                   []domain.FinanceAlert{},
+		AttentionAlerts:          []domain.FinanceAlert{},
+		Subscriptions:            []domain.SubscriptionItem{},
+		HeadlineStatus:           "Nenhuma conta conectada",
 	}
+
+	// 0. Quantidade de conexões
+	_ = r.db.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM finance_connections WHERE user_id = ?
+	`, userID).Scan(&summary.ConnectedInstitutionsCount)
 
 	// 1. Saldo Consolidado em Contas Bancárias (BANK)
 	err := r.db.QueryRowContext(ctx, `
@@ -251,6 +261,45 @@ func (r *sqliteFinanceRepo) GetFinancialSummary(ctx context.Context, userID stri
 					item.Percentage = math.Round((item.TotalAmount/summary.MonthExpenses)*1000) / 10
 				}
 				summary.CategorySpending = append(summary.CategorySpending, item)
+			}
+		}
+	}
+
+	// Preencher aliases e status reais para compatibilidade total
+	summary.TotalBalance = summary.ConsolidatedBalance
+	summary.OpenCreditCardBills = summary.OpenInvoicesTotal
+	summary.ProjectedLeftover = sobraPrevista
+	if summary.ConnectedInstitutionsCount > 0 {
+		if sobraPrevista >= 0 {
+			summary.HeadlineStatus = "Você está bem este mês"
+		} else {
+			summary.HeadlineStatus = "Atenção: faturas superam o saldo"
+		}
+	}
+	if summary.MonthExpenses > 0 {
+		denom := summary.MonthExpenses + math.Max(0, sobraPrevista)
+		if denom > 0 {
+			summary.PacePercent = math.Round((summary.MonthExpenses / denom) * 100)
+		}
+	}
+
+	// 6. Assinaturas / Transações recorrentes reais
+	subRows, err := r.db.QueryContext(ctx, `
+		SELECT COALESCE(NULLIF(clean_merchant_name, ''), description) as merchant,
+		       category, ABS(amount), occurred_at
+		FROM finance_transactions
+		WHERE user_id = ? AND is_recurring = 1
+		GROUP BY merchant
+		ORDER BY occurred_at DESC
+		LIMIT 10
+	`, userID)
+	if err == nil {
+		defer subRows.Close()
+		for subRows.Next() {
+			var sub domain.SubscriptionItem
+			if sErr := subRows.Scan(&sub.MerchantName, &sub.Category, &sub.Amount, &sub.LastChargedAt); sErr == nil {
+				sub.Frequency = "monthly"
+				summary.Subscriptions = append(summary.Subscriptions, sub)
 			}
 		}
 	}

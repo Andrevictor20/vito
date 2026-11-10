@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 
@@ -177,15 +178,51 @@ func (h *FinanceHandler) GetConnectToken(w http.ResponseWriter, r *http.Request)
 
 	token, err := h.financeSvc.GenerateConnectToken(r.Context(), userID)
 	if err != nil {
-		http.Error(w, "erro ao gerar token de conexão", http.StatusInternalServerError)
+		w.Header().Set("Content-Type", "application/json")
+		if errors.Is(err, domain.ErrPluggyCredentialsMissing) {
+			w.WriteHeader(http.StatusPreconditionRequired)
+			_ = json.NewEncoder(w).Encode(map[string]string{
+				"error": err.Error(),
+			})
+			return
+		}
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]string{
+			"error": err.Error(),
+		})
 		return
 	}
+
+	apiKey, _ := h.financeSvc.GetSessionToken(r.Context())
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]any{
 		"connect_token":      token,
+		"api_key":            apiKey,
 		"expires_in_minutes": 30,
 		"client_user_id":     userID,
+	})
+}
+
+// GetSessionToken emite uma apiKey efêmera da Pluggy para o cliente móvel realizar o Edge-Sync.
+func (h *FinanceHandler) GetSessionToken(w http.ResponseWriter, r *http.Request) {
+	_, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "não autorizado", http.StatusUnauthorized)
+		return
+	}
+
+	apiKey, err := h.financeSvc.GetSessionToken(r.Context())
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusPreconditionRequired)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]string{
+		"api_key": apiKey,
 	})
 }
 

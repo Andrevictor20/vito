@@ -59,6 +59,9 @@ type Config struct {
 	TTSCacheDir string
 	// Metabuscador SearXNG
 	SearXNGURL string
+	// Open Finance (Pluggy API)
+	PluggyClientID     string
+	PluggyClientSecret string
 }
 
 // Load carrega a configuração a partir de variáveis de ambiente com fallbacks seguros.
@@ -209,6 +212,9 @@ func Load() *Config {
 		TTSEnabled:  getEnvBoolDefault("TTS_ENABLED", true),
 		TTSCacheDir: getEnvDefault("TTS_CACHE_DIR", "./data/tts_cache"),
 		SearXNGURL:  getEnvDefault("SEARXNG_URL", "http://127.0.0.1:8185"),
+		// Open Finance (Pluggy API)
+		PluggyClientID:     getEnvDefault("PLUGGY_CLIENT_ID", ""),
+		PluggyClientSecret: getEnvDefault("PLUGGY_CLIENT_SECRET", ""),
 	}
 }
 

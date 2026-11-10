@@ -458,6 +458,7 @@ func (s *Server) registerRoutes() {
 						fr.Delete("/connections/{id}", s.financeHandler.DeleteConnection)
 						fr.Post("/sync", s.financeHandler.SyncPayload)
 						fr.Post("/connect-token", s.financeHandler.GetConnectToken)
+						fr.Get("/session-token", s.financeHandler.GetSessionToken)
 						fr.Get("/test-token", s.financeHandler.GetTestToken)
 					})
 				}
