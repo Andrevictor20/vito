@@ -34,24 +34,13 @@ import {
   formatBRL,
   normalizeSummary,
 } from '../components/finance/financeHelpers';
+import { syncAllUserConnections } from '../services/financeSyncRunner';
 
 const PROMPT_CHIPS: ReadonlyArray<{ label: string; prompt: string }> = [
-  {
-    label: 'Quanto gastei com Uber?',
-    prompt: 'Quanto gastei com Uber este mês em comparação com minha média?',
-  },
-  {
-    label: 'Posso gastar R$ 300 sábado?',
-    prompt: 'Posso gastar R$ 300 neste sábado sem estourar meu limite diário?',
-  },
-  {
-    label: 'Quero juntar R$ 3.000',
-    prompt: 'Quero juntar R$ 3.000. Como ajustar meus gastos mensais para atingir essa meta?',
-  },
-  {
-    label: 'Quando vence minha fatura?',
-    prompt: 'Quando vence minha fatura de cartão e qual é o valor atual?',
-  },
+  { label: 'Quanto gastei com Uber?', prompt: 'Quanto gastei com Uber este mês em comparação com minha média?' },
+  { label: 'Posso gastar R$ 300 sábado?', prompt: 'Posso gastar R$ 300 neste sábado sem estourar meu limite diário?' },
+  { label: 'Quero juntar R$ 3.000', prompt: 'Quero juntar R$ 3.000. Como ajustar meus gastos mensais para atingir essa meta?' },
+  { label: 'Quando vence minha fatura?', prompt: 'Quando vence minha fatura de cartão e qual é o valor atual?' },
 ];
 
 export const FinanceScreen: React.FC = () => {
@@ -102,9 +91,19 @@ export const FinanceScreen: React.FC = () => {
     return () => unsub();
   }, [loadAllFinanceData]);
 
+  useEffect(() => {
+    if (!loading && connections.length > 0 && transactions.length === 0) {
+      void (async () => {
+        const synced = await syncAllUserConnections();
+        if (synced > 0) void loadAllFinanceData();
+      })();
+    }
+  }, [loading, connections.length, transactions.length, loadAllFinanceData]);
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     hapticFeedback.light();
+    await syncAllUserConnections();
     await loadAllFinanceData();
     setRefreshing(false);
   }, [loadAllFinanceData]);

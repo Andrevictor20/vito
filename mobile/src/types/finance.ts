@@ -38,6 +38,7 @@ export interface FinanceTransaction {
   id: string;
   user_id?: string;
   account_id: string;
+  pluggy_account_id?: string;
   pluggy_transaction_id: string;
   description: string;
   clean_merchant_name?: string;
