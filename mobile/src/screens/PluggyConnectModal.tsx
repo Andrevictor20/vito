@@ -135,7 +135,11 @@ export const PluggyConnectModal: React.FC<PluggyConnectModalProps> = ({ visible,
           completedCount={setup.syncCompletedCount}
           banks={setup.syncedBanks}
           error={setup.error}
-          onRetrySync={setup.syncNow}
+          connectionItemId={setup.connectionItemId}
+          onUpdateItemId={setup.updateConnectionItemId}
+          onPasteItemId={setup.pasteConnectionItemId}
+          onSyncWithItemId={setup.completeConnectSync}
+          onRetrySync={setup.openConnectExternal}
           onBack={setup.resetSyncView}
           onFinish={onClose}
         />

@@ -88,6 +88,26 @@ export interface PluggyItem {
   id: string;
   connector?: { id?: number; name?: string };
   status?: string;
+  executionStatus?: string;
+  error?: Record<string, unknown>;
+}
+
+/** Consulta os detalhes e status de um Item específico na Pluggy. */
+export async function getItem(
+  apiKey: string,
+  itemId: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<PluggyItem | null> {
+  if (!itemId) return null;
+  try {
+    const res = await call(fetchImpl, `/items/${encodeURIComponent(itemId)}`, {
+      method: 'GET',
+      headers: authHeaders(apiKey),
+    });
+    return (await res.json()) as PluggyItem;
+  } catch {
+    return null;
+  }
 }
 
 /** Lista os itens (bancos conectados) da aplicação do usuário. */

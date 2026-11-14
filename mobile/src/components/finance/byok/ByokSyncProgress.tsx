@@ -6,12 +6,17 @@ import { tokens } from '../../../theme/tokens';
 import type { ByokSyncPhase } from '../../../hooks/useByokSetup';
 import { BYOK_SYNC_CHECKPOINTS } from '../../../utils/byokFlow';
 import { ActionButton, StatusBanner, getFinTokens } from './byokUi';
+import { KeyPasteField } from './KeyPasteField';
 
 interface Props {
   phase: Exclude<ByokSyncPhase, 'idle'>;
   completedCount: number;
   banks: string[];
   error: string;
+  connectionItemId?: string;
+  onUpdateItemId?: (v: string) => void;
+  onPasteItemId?: () => void;
+  onSyncWithItemId?: (id?: string) => void;
   onRetrySync: () => void;
   onBack: () => void;
   onFinish: () => void;
@@ -26,6 +31,10 @@ export const ByokSyncProgress: React.FC<Props> = ({
   completedCount,
   banks,
   error,
+  connectionItemId,
+  onUpdateItemId,
+  onPasteItemId,
+  onSyncWithItemId,
   onRetrySync,
   onBack,
   onFinish,
@@ -111,14 +120,37 @@ export const ByokSyncProgress: React.FC<Props> = ({
             title={phase === 'waiting_auth' ? 'Aguardando a sua autorização' : 'Falha na sincronização'}
             subtitle={error || 'Conclua no Pluggy Connect para continuar.'}
           />
+
+          {phase === 'waiting_auth' && onSyncWithItemId && (
+            <View style={[styles.manualBox, { backgroundColor: colors.surf, borderColor: colors.line }]}>
+              <Text style={[styles.manualTitle, { color: colors.ink }]}>Já autorizou no navegador?</Text>
+              <Text style={[styles.manualDesc, { color: colors.muted }]}>
+                No Dashboard da Pluggy (Aplicações → sua aplicação → Itens Conectados), copie o ID da Conexão (Item ID) e cole aqui:
+              </Text>
+              <KeyPasteField
+                label="ID da Conexão (Item ID)"
+                value={connectionItemId || ''}
+                onChangeText={onUpdateItemId || (() => {})}
+                onPaste={onPasteItemId || (() => {})}
+              />
+              <ActionButton
+                primary
+                icon="sync"
+                label="Sincronizar com este ID"
+                disabled={!connectionItemId}
+                onPress={() => onSyncWithItemId(connectionItemId)}
+                style={{ marginTop: 8 }}
+              />
+            </View>
+          )}
+
           <ActionButton
-            primary
-            label="Reabrir Pluggy Connect"
+            label="Reabrir Pluggy Connect no Navegador"
             onPress={onRetrySync}
-            style={styles.pillFull}
+            style={[styles.pillFull, { marginTop: 10 }]}
           />
           <TouchableOpacity onPress={onBack} style={styles.backLink} accessibilityRole="button">
-            <Text style={[styles.backLinkText, { color: colors.muted }]}>Voltar</Text>
+            <Text style={[styles.backLinkText, { color: colors.muted }]}>Voltar às etapas</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -144,6 +176,14 @@ const styles = StyleSheet.create({
   ckTitle: { fontSize: 15, fontWeight: '500' },
   ckSub: { fontSize: 12, marginTop: 2 },
   retryBox: { marginTop: 16 },
+  manualBox: {
+    padding: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginTop: 12,
+  },
+  manualTitle: { fontSize: 13.5, fontWeight: '700' },
+  manualDesc: { fontSize: 12.5, lineHeight: 18, marginTop: 4 },
   backLink: { height: 40, alignItems: 'center', justifyContent: 'center', marginTop: 6 },
   backLinkText: { fontSize: 14, fontWeight: '600' },
   bankList: { marginTop: 22, gap: 10 },

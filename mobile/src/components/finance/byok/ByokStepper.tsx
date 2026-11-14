@@ -55,6 +55,14 @@ export const ByokStepper: React.FC<{ setup: Setup }> = ({ setup: s }) => {
         ? `Colar ${s.clientId ? 'Client Secret' : 'Client ID'} detectado (${maskClientIdShort(s.clipboardUuids[0])})`
         : '';
 
+  const step2Candidate =
+    s.clipboardUuids.find(
+      (u) => u.toLowerCase() !== s.clientId.toLowerCase() && u.toLowerCase() !== s.clientSecret.toLowerCase(),
+    ) || '';
+  const step2ChipLabel = step2Candidate
+    ? `Colar ID da Conexão detectado (${maskClientIdShort(step2Candidate)})`
+    : '';
+
   return (
     <View>
       <Text style={[styles.heading, { color: colors.ink }]}>Conecte seus bancos</Text>
@@ -177,13 +185,13 @@ export const ByokStepper: React.FC<{ setup: Setup }> = ({ setup: s }) => {
           />
           <GuideStepRow
             num={2}
-            title="Autorizar Meu Pluggy ou Bancos"
-            desc="Autorize o conector Meu Pluggy (para contas já agrupadas) ou conecte diretamente seus bancos (Nubank, Itaú, Inter, etc.)."
+            title="Selecione seu banco real diretamente"
+            desc="Pesquise e selecione seu banco (Nubank, Itaú, Inter, etc.) e autorize. Evite 'MeuPluggy' se estiver no mesmo navegador do Dashboard para não colidir sessões."
           />
           <GuideStepRow
             num={3}
-            title="Concluir e sincronizar"
-            desc="Ao autorizar no app do seu banco, o navegador redireciona de volta ao Vito. Se voltar manualmente, use o botão de sincronização abaixo."
+            title="Sincronização automática ou com ID"
+            desc="Se o retorno automático não disparar, acesse o Dashboard da Pluggy (Aplicações → sua aplicação → Itens Conectados), copie o ID da Conexão e cole abaixo."
             isLast
           />
         </View>
@@ -196,12 +204,33 @@ export const ByokStepper: React.FC<{ setup: Setup }> = ({ setup: s }) => {
           onPress={s.openConnectExternal}
         />
 
+        {!!step2ChipLabel && (
+          <TouchableOpacity
+            style={[styles.cchip, { borderColor: colors.acc, backgroundColor: colors.greenBg }]}
+            onPress={() => s.updateConnectionItemId(step2Candidate)}
+            accessibilityRole="button"
+            accessibilityLabel={step2ChipLabel}
+          >
+            <MaterialIcons name="content-copy" size={16} color={colors.acc} />
+            <Text style={[styles.cchipText, { color: colors.ink }]} numberOfLines={1}>
+              {step2ChipLabel}
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        <KeyPasteField
+          label="ID da Conexão (Item ID) · Copiado do Dashboard"
+          value={s.connectionItemId}
+          onChangeText={(v) => s.updateConnectionItemId(v)}
+          onPaste={s.pasteConnectionItemId}
+        />
+
         <ActionButton
           icon="sync"
-          label="Já conectei meus bancos · Sincronizar contas"
+          label={s.connectionItemId ? 'Sincronizar com este ID de Conexão' : 'Já conectei meus bancos · Sincronizar contas'}
           busy={s.busy}
           style={{ marginTop: 10 }}
-          onPress={() => void s.completeConnectSync('')}
+          onPress={() => void s.completeConnectSync(s.connectionItemId)}
         />
 
         {s.error ? <ErrorText message={s.error} /> : null}

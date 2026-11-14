@@ -46,6 +46,7 @@ export function useByokSetup({ visible, isDark, onSynced }: Options) {
   const [shortcut, setShortcut] = useState(false);
   const [clientId, setClientId] = useState('');
   const [clientSecret, setClientSecret] = useState('');
+  const [connectionItemId, setConnectionItemId] = useState('');
   const [validated, setValidated] = useState(false);
   const [authStatus, setAuthStatus] = useState<ByokAuthStatus>('idle');
   const [validationNote, setValidationNote] = useState('');
@@ -94,6 +95,7 @@ export function useByokSetup({ visible, isDark, onSynced }: Options) {
       setSyncPhase('idle');
       setClientId('');
       setClientSecret('');
+      setConnectionItemId('');
       setClipboardUuids([]);
       setReady(false);
       return;
@@ -127,7 +129,6 @@ export function useByokSetup({ visible, isDark, onSynced }: Options) {
   useEffect(() => {
     if (!visible) return;
     const check = async () => {
-      if (stepRef.current !== '1') return;
       try {
         const raw = await Clipboard.getStringAsync();
         const found = extractUuids(raw).filter(
@@ -277,15 +278,24 @@ export function useByokSetup({ visible, isDark, onSynced }: Options) {
     setError('');
   }, []);
 
-  const handleWebViewCapture = useCallback(() => {}, []);
-  const clearDraftKeys = useCallback(() => {
-    setClientId('');
-    setClientSecret('');
-    setValidated(false);
-    setAuthStatus('idle');
+  const updateConnectionItemId = useCallback((v: string) => {
+    setConnectionItemId(v);
     setError('');
   }, []);
-  const confirmWebViewKeys = useCallback(async () => {}, []);
+
+  const pasteConnectionItemId = useCallback(async () => {
+    const raw = await Clipboard.getStringAsync().catch(() => '');
+    const uuids = extractUuids(raw);
+    const text = uuids[0] ?? normalizeKey(raw);
+    if (text) {
+      setConnectionItemId(text);
+      setError('');
+    }
+  }, []);
+
+  const handleWebViewCapture = () => {};
+  const clearDraftKeys = () => { setClientId(''); setClientSecret(''); setValidated(false); setAuthStatus('idle'); setError(''); };
+  const confirmWebViewKeys = async () => {};
 
   const apiKeyFromStore = useCallback(async (): Promise<string> => {
     let keys = await store.getKeys();
@@ -323,7 +333,8 @@ export function useByokSetup({ visible, isDark, onSynced }: Options) {
   }, [syncNow]);
 
   const completeConnectSync = useCallback(
-    async (itemId: string) => {
+    async (overrideItemId?: string) => {
+      const targetItemId = normalizeKey(overrideItemId || connectionItemId);
       setPortalMode(null);
       setBusy(true);
       setError('');
@@ -333,14 +344,18 @@ export function useByokSetup({ visible, isDark, onSynced }: Options) {
       setSyncCompletedCount(2);
       try {
         const apiKey = pendingApiKeyRef.current || (await apiKeyFromStore());
-        const result = await syncPluggyItem(apiKey, itemId || undefined, (completed) => {
+        const result = await syncPluggyItem(apiKey, targetItemId || undefined, (completed) => {
           setSyncCompletedCount(completed);
         });
 
         if (result.accountsCount === 0) {
           setSyncPhase('waiting_auth');
           setSyncCompletedCount(2);
-          setError('Nenhuma conta encontrada. Conclua a autorização no Pluggy Connect para continuar.');
+          setError(
+            targetItemId
+              ? 'Nenhuma conta encontrada para o ID informado. Verifique se a conexão concluiu com sucesso no Pluggy Dashboard.'
+              : 'Nenhuma conta encontrada. Conclua a autorização no Pluggy Connect ou informe o ID da Conexão para continuar.',
+          );
           return;
         }
 
@@ -360,7 +375,7 @@ export function useByokSetup({ visible, isDark, onSynced }: Options) {
         setBusy(false);
       }
     },
-    [apiKeyFromStore, foundBanks, goTo, onSynced],
+    [apiKeyFromStore, connectionItemId, foundBanks, goTo, onSynced],
   );
 
   // Escuta deep links (ex.: vito://pluggy-success?itemId=...) quando o navegador externo redireciona de volta.
@@ -396,7 +411,6 @@ export function useByokSetup({ visible, isDark, onSynced }: Options) {
     try {
       const apiKey = await apiKeyFromStore();
       pendingApiKeyRef.current = apiKey;
-
       const clientUserId = await store.getClientUserId();
       const token = await createConnectToken(apiKey, clientUserId);
       const url = buildPluggyConnectUrl(token, isDark);
@@ -411,23 +425,20 @@ export function useByokSetup({ visible, isDark, onSynced }: Options) {
           return;
         }
       }
-      // Se fechar ou voltar sem redirect, deixa pronto para sincronização manual com 1 toque
+      try {
+        const raw = await Clipboard.getStringAsync();
+        const found = extractUuids(raw).filter(
+          (u) => u.toLowerCase() !== clientId.toLowerCase() && u.toLowerCase() !== clientSecret.toLowerCase(),
+        );
+        if (found.length > 0) setClipboardUuids(found.slice(0, 2));
+      } catch {}
       setStep2Status('found');
     } catch (e) {
       setError(e instanceof PluggyError ? e.message : e instanceof Error ? e.message : 'Falha ao abrir Pluggy Connect.');
     } finally {
       setBusy(false);
     }
-  }, [apiKeyFromStore, completeConnectSync, isDark]);
-
-  const openDashboard = openDashboardExternal;
-  const closeDashboard = useCallback(() => setWebViewOpen(false), []);
-  const openMeuPluggy = openConnectExternal;
-  const fallbackConnectExternal = openConnectExternal;
-  const closePortal = useCallback(() => setBusy(false), []);
-  const finishMeuPluggyPortal = useCallback(() => {
-    void completeConnectSync('');
-  }, [completeConnectSync]);
+  }, [apiKeyFromStore, completeConnectSync, isDark, clientId, clientSecret]);
 
   const resetLocalFlow = useCallback(
     (targetStep: ByokStep) => {
@@ -439,6 +450,7 @@ export function useByokSetup({ visible, isDark, onSynced }: Options) {
       setWebSessionKey((k) => k + 1);
       setClientId('');
       setClientSecret('');
+      setConnectionItemId('');
       setClipboardUuids([]);
       setValidated(false);
       setAuthStatus('idle');
@@ -452,33 +464,21 @@ export function useByokSetup({ visible, isDark, onSynced }: Options) {
     [clearPendingTimer, goTo],
   );
 
-  const changeKeys = useCallback(async () => {
-    await store.clearKeys();
-    resetLocalFlow('1');
-  }, [resetLocalFlow]);
-
-  const resetFromScratch = useCallback(async () => {
-    await store.resetAllFromScratch();
-    resetLocalFlow('tutorial');
-  }, [resetLocalFlow]);
-
-  const showTutorial = useCallback(() => {
-    setShortcut(false);
-    goTo('tutorial');
-  }, [goTo]);
-  const resetSyncView = useCallback(() => {
-    setSyncPhase('idle');
-    setError('');
-  }, []);
+  const changeKeys = useCallback(async () => { await store.clearKeys(); resetLocalFlow('1'); }, [resetLocalFlow]);
+  const resetFromScratch = useCallback(async () => { await store.resetAllFromScratch(); resetLocalFlow('tutorial'); }, [resetLocalFlow]);
+  const showTutorial = useCallback(() => { setShortcut(false); goTo('tutorial'); }, [goTo]);
+  const resetSyncView = useCallback(() => { setSyncPhase('idle'); setError(''); goTo('2'); }, [goTo]);
 
   return {
     ready, step, shortcut, clientId, clientSecret, validated, authStatus, validationNote, busy, error,
+    connectionItemId, updateConnectionItemId, pasteConnectionItemId,
     clipboardUuids, clipboardSuggestion: clipboardUuids[0] ?? '', webViewOpen, webSessionKey,
     portalMode, portalUrl, step2Status, foundBanks, syncPhase, syncCompletedCount, syncedBanks,
     finishTutorial, paste, applySuggestion, updateField, validateKeys, handleWebViewCapture,
-    clearDraftKeys, confirmWebViewKeys, confirmBanks, syncNow, completeConnectSync, fallbackConnectExternal,
-    openDashboard, closeDashboard, openMeuPluggy, closePortal, finishMeuPluggyPortal, changeKeys,
-    openDashboardExternal, openConnectExternal,
-    resetFromScratch, showTutorial, resetSyncView,
+    clearDraftKeys, confirmWebViewKeys, confirmBanks, syncNow, completeConnectSync,
+    fallbackConnectExternal: openConnectExternal, openDashboard: openDashboardExternal,
+    closeDashboard: () => setWebViewOpen(false), openMeuPluggy: openConnectExternal,
+    closePortal: () => setBusy(false), finishMeuPluggyPortal: () => void completeConnectSync(''),
+    changeKeys, openDashboardExternal, openConnectExternal, resetFromScratch, showTutorial, resetSyncView,
   };
 }

@@ -1,6 +1,6 @@
 import { api } from './api';
 import type { FinanceAccount, FinanceSyncPayload } from '../types/finance';
-import { listItems, PluggyError, type PluggyItem } from './pluggyService';
+import { getItem, listItems, PluggyError, type PluggyItem } from './pluggyService';
 import * as byokStore from './byokStore';
 
 /**
@@ -36,7 +36,7 @@ export async function syncPluggyItem(
   itemId?: string,
   onProgress?: (completedCheckpoints: number) => void,
 ): Promise<PluggySyncResult> {
-  let resolved = itemId;
+  let resolved = itemId ? itemId.trim() : undefined;
   if (!resolved || resolved.startsWith('item_')) {
     try {
       const clientUserId = await byokStore.getClientUserId().catch(() => '');
@@ -60,10 +60,17 @@ export async function syncPluggyItem(
 
   onProgress?.(3);
 
-  const accRaw = results(await getJson(`https://api.pluggy.ai/accounts?itemId=${encodeURIComponent(resolved)}`, apiKey));
+  const itemDetails = await getItem(apiKey, resolved).catch(() => null);
+
+  let accRaw = results(await getJson(`https://api.pluggy.ai/accounts?itemId=${encodeURIComponent(resolved)}`, apiKey));
+  if (accRaw.length === 0 && itemDetails?.status === 'UPDATING') {
+    await new Promise((r) => setTimeout(r, 2200));
+    accRaw = results(await getJson(`https://api.pluggy.ai/accounts?itemId=${encodeURIComponent(resolved)}`, apiKey));
+  }
+
   const accounts = accRaw.map((a) => ({
     pluggy_account_id: String(a.id),
-    institution_name: String(a.marketingName || a.name || 'Banco'),
+    institution_name: String(a.marketingName || a.name || itemDetails?.connector?.name || 'Banco'),
     account_type: a.type === 'CREDIT' ? ('CREDIT' as const) : ('BANK' as const),
     account_subtype: a.subtype as FinanceAccount['account_subtype'],
     name: String(a.name || (a.type === 'CREDIT' ? 'Cartão de Crédito' : 'Conta Corrente')),
@@ -71,10 +78,14 @@ export async function syncPluggyItem(
     currency_code: String(a.currencyCode || 'BRL'),
   }));
 
-  const institutionName = accounts[0]?.institution_name || 'Meu Pluggy';
+  const institutionName = accounts[0]?.institution_name || itemDetails?.connector?.name || 'Meu Pluggy';
   if (accounts.length > 0) {
     await api.finance
-      .createConnection({ pluggy_item_id: resolved, connector_id: 200, institution_name: institutionName })
+      .createConnection({
+        pluggy_item_id: resolved,
+        connector_id: itemDetails?.connector?.id ?? 200,
+        institution_name: institutionName,
+      })
       .catch(() => {});
   }
   onProgress?.(4);

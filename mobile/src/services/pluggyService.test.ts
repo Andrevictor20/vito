@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { authenticate, createConnectToken, listConnectorNamesOrDefault, listItems, PluggyError } from './pluggyService';
+import { authenticate, createConnectToken, getItem, listConnectorNamesOrDefault, listItems, PluggyError } from './pluggyService';
 
 type Call = { url: string; init?: RequestInit };
 
@@ -120,5 +120,17 @@ describe('pluggyService', () => {
       fakeFetch(403, { code: 'LIST_ITEMS_FEATURE_NOT_ENABLED' }),
     );
     assert.deepEqual(fallback403, ['Pluggy Connect pronto para conectar']);
+  });
+
+  it('getItem busca detalhes do item por ID', async () => {
+    const calls: Call[] = [];
+    const item = await getItem('K', 'item-uuid-1', fakeFetch(200, { id: 'item-uuid-1', status: 'UPDATED', connector: { id: 201, name: 'Nubank' } }, calls));
+    assert.equal(item?.id, 'item-uuid-1');
+    assert.equal(item?.status, 'UPDATED');
+    assert.equal(item?.connector?.name, 'Nubank');
+    assert.equal(calls[0].url, 'https://api.pluggy.ai/items/item-uuid-1');
+
+    assert.equal(await getItem('K', '', fakeFetch(200, {})), null);
+    assert.equal(await getItem('K', 'bad-id', fakeFetch(404, {})), null);
   });
 });
