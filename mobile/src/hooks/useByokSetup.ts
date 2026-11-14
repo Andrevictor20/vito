@@ -158,19 +158,19 @@ export function useByokSetup({ visible, isDark, onSynced }: Options) {
 
   // Etapa 1: valida via POST /auth; tenta par invertido em caso de 401 com 2 UUIDs distintos.
   const validateKeys = useCallback(
-    async (overrideId?: string, overrideSecret?: string, opts?: { fromWebView?: boolean }) => {
+    async (overrideId?: string, overrideSecret?: string, opts?: { fromWebView?: boolean }): Promise<boolean> => {
       const id = normalizeKey(overrideId ?? clientId);
       const sec = normalizeKey(overrideSecret ?? clientSecret);
 
       if (hasIdenticalKeys(id, sec)) {
         setAuthStatus('error');
         setError('O Client ID e o Client Secret estão iguais. Copie cada um no seu campo.');
-        return;
+        return false;
       }
       if (!canValidate(id, sec)) {
         setAuthStatus('error');
         setError('Informe o Client ID (UUID) e o Client Secret.');
-        return;
+        return false;
       }
 
       setBusy(true);
@@ -208,11 +208,13 @@ export function useByokSetup({ visible, isDark, onSynced }: Options) {
         timerRef.current = setTimeout(() => {
           goTo('2');
         }, 950);
+        return true;
       } catch (e) {
         setValidated(false);
         const isNet = e instanceof PluggyError && e.kind === 'network';
         setAuthStatus(isNet ? 'offline' : 'error');
         setError(e instanceof PluggyError ? e.message : 'Falha ao validar as chaves.');
+        return false;
       } finally {
         setBusy(false);
       }
@@ -278,24 +280,30 @@ export function useByokSetup({ visible, isDark, onSynced }: Options) {
 
   const handleWebViewCapture = useCallback(
     (payload: { clientId?: string; clientSecret?: string }) => {
-      const nextId = payload.clientId ? normalizeKey(payload.clientId) : clientId;
-      const nextSec = payload.clientSecret ? normalizeKey(payload.clientSecret) : clientSecret;
-      if (payload.clientId) setClientId(nextId);
+      if (payload.clientId) setClientId(normalizeKey(payload.clientId));
       if (payload.clientSecret) {
-        setClientSecret(nextSec);
+        setClientSecret(normalizeKey(payload.clientSecret));
         void Clipboard.setStringAsync('').catch(() => {});
       }
       setValidated(false);
       setAuthStatus('idle');
       setError('');
-
-      if (canValidate(nextId, nextSec)) {
-        setWebViewOpen(false);
-        void validateKeys(nextId, nextSec, { fromWebView: true });
-      }
     },
-    [clientId, clientSecret, validateKeys],
+    [],
   );
+
+  const clearDraftKeys = useCallback(() => {
+    setClientId('');
+    setClientSecret('');
+    setValidated(false);
+    setAuthStatus('idle');
+    setError('');
+  }, []);
+
+  const confirmWebViewKeys = useCallback(async () => {
+    const ok = await validateKeys(clientId, clientSecret, { fromWebView: true });
+    if (ok) setWebViewOpen(false);
+  }, [clientId, clientSecret, validateKeys]);
 
   const apiKeyFromStore = useCallback(async (): Promise<string> => {
     const keys = await store.getKeys();
@@ -474,7 +482,8 @@ export function useByokSetup({ visible, isDark, onSynced }: Options) {
     clipboardUuids, clipboardSuggestion: clipboardUuids[0] ?? '', webViewOpen, webSessionKey,
     portalMode, portalUrl, step2Status, foundBanks, syncPhase, syncCompletedCount, syncedBanks,
     finishTutorial, paste, applySuggestion, updateField, validateKeys, handleWebViewCapture,
-    confirmBanks, syncNow, completeConnectSync, fallbackConnectExternal, openDashboard, closeDashboard,
-    openMeuPluggy, closePortal, finishMeuPluggyPortal, changeKeys, resetFromScratch, showTutorial, resetSyncView,
+    clearDraftKeys, confirmWebViewKeys, confirmBanks, syncNow, completeConnectSync, fallbackConnectExternal,
+    openDashboard, closeDashboard, openMeuPluggy, closePortal, finishMeuPluggyPortal, changeKeys,
+    resetFromScratch, showTutorial, resetSyncView,
   };
 }

@@ -68,7 +68,7 @@ export const PLUGGY_CAPTURE_BRIDGE_SCRIPT = `
         var trimmed = v.trim();
         if ((kl === 'clientid' || kl === 'client_id') && UUID_EXACT.test(trimmed)) {
           out.clientId = trimmed;
-        } else if ((kl === 'clientsecret' || kl === 'client_secret' || kl === 'secret') && isSecretCandidate(trimmed)) {
+        } else if ((kl === 'clientsecret' || kl === 'client_secret') && isSecretCandidate(trimmed)) {
           out.clientSecret = trimmed;
         }
       } else if (v && typeof v === 'object') {
@@ -77,28 +77,34 @@ export const PLUGGY_CAPTURE_BRIDGE_SCRIPT = `
     }
   }
 
+  function inspectParsedJson(parsed) {
+    if (!parsed || typeof parsed !== 'object') return;
+    if (Array.isArray(parsed) || Array.isArray(parsed.results)) return;
+    var out = {};
+    extractFromJson(parsed, 0, out);
+    // Resposta de listagem sem clientSecret não deve roubar o clientId de app antigo antes de criar nova app.
+    if (out.clientSecret) {
+      post({
+        type: out.clientId ? 'captured_keys' : 'partial_keys',
+        clientId: out.clientId || '',
+        clientSecret: out.clientSecret || '',
+        source: 'network'
+      });
+    }
+  }
+
   function inspectJsonString(rawText) {
     if (typeof rawText !== 'string' || rawText.length < 10 || rawText.length > 262144) return;
-    if (rawText.indexOf('clientSecret') === -1 && rawText.indexOf('client_secret') === -1 && rawText.indexOf('"secret"') === -1 && rawText.indexOf('clientId') === -1 && rawText.indexOf('client_id') === -1) {
+    if (rawText.indexOf('clientSecret') === -1 && rawText.indexOf('client_secret') === -1 && rawText.indexOf('clientId') === -1 && rawText.indexOf('client_id') === -1) {
       return;
     }
     try {
-      var parsed = JSON.parse(rawText);
-      var out = {};
-      extractFromJson(parsed, 0, out);
-      if (out.clientSecret || out.clientId) {
-        post({
-          type: out.clientId && out.clientSecret ? 'captured_keys' : 'partial_keys',
-          clientId: out.clientId || '',
-          clientSecret: out.clientSecret || '',
-          source: 'network'
-        });
-      }
+      inspectParsedJson(JSON.parse(rawText));
     } catch (_) {}
   }
 
   function collectAnchoredKeys() {
-    var result = { clientId: '', clientSecret: '' };
+    var result = { clientId: '', clientSecret: '', idLabelCount: 0 };
     try {
       var els = document.querySelectorAll('label, span, p, div, th, td, h1, h2, h3, h4, strong');
       for (var i = 0; i < els.length && i < 400; i++) {
@@ -107,6 +113,7 @@ export const PLUGGY_CAPTURE_BRIDGE_SCRIPT = `
         if (!labelTxt || labelTxt.length > 42) continue;
         var isIdLabel = /^client\\s*id$/i.test(labelTxt);
         var isSecLabel = /^client\\s*secret$/i.test(labelTxt) || /^novo\\s+client\\s*secret$/i.test(labelTxt);
+        if (isIdLabel) result.idLabelCount += 1;
         if (!isIdLabel && !isSecLabel) continue;
 
         var box = el.parentElement;
@@ -136,6 +143,9 @@ export const PLUGGY_CAPTURE_BRIDGE_SCRIPT = `
             }
           }
         }
+      }
+      if (result.idLabelCount > 1) {
+        result.clientId = '';
       }
     } catch (_) {}
     return result;
@@ -170,19 +180,13 @@ export const PLUGGY_CAPTURE_BRIDGE_SCRIPT = `
       var joined = chunks.join(' ');
       var matches = extractUuids(joined);
       var masked = /[•*]{2,}/.test(joined);
-      var cid = anchored.clientId || matches[0] || '';
+      var allowFallbackUuid = source === 'scan' && anchored.idLabelCount <= 1 && matches.length === 1;
+      var cid = anchored.clientId || (allowFallbackUuid ? matches[0] : '');
       var csec = anchored.clientSecret || '';
-      if (!csec) {
-        for (var m = 0; m < matches.length; m++) {
-          if (matches[m].toLowerCase() !== cid.toLowerCase()) {
-            csec = matches[m];
-            break;
-          }
-        }
-      }
 
       if (source === 'auto_scan') {
-        if (!cid && !csec) return;
+        // auto_scan só relata quando o Client Secret real visível está presente (evita roubar IDs ao navegar em Aplicações).
+        if (!csec) return;
         var sig = cid + '|' + csec;
         if (window.__vitoLastAutoSig === sig) return;
         window.__vitoLastAutoSig = sig;
@@ -235,16 +239,7 @@ export const PLUGGY_CAPTURE_BRIDGE_SCRIPT = `
           this.addEventListener('load', function () {
             try {
               if (this.responseType === 'json' && this.response) {
-                var out = {};
-                extractFromJson(this.response, 0, out);
-                if (out.clientSecret || out.clientId) {
-                  post({
-                    type: out.clientId && out.clientSecret ? 'captured_keys' : 'partial_keys',
-                    clientId: out.clientId || '',
-                    clientSecret: out.clientSecret || '',
-                    source: 'network'
-                  });
-                }
+                inspectParsedJson(this.response);
               } else if (!this.responseType || this.responseType === 'text') {
                 inspectJsonString(this.responseText);
               }

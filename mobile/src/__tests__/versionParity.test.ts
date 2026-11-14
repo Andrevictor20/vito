@@ -5,7 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // AC-08: Qualidade, Zero Regressões e No-God-Files < 500L
-describe('Version Parity & Release Integrity — APK 0.1.29', () => {
+describe('Version Parity & Release Integrity — APK 0.1.30', () => {
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = path.dirname(__filename);
   const rootMobile = path.resolve(__dirname, '../..');
@@ -13,22 +13,22 @@ describe('Version Parity & Release Integrity — APK 0.1.29', () => {
   const pkgJsonPath = path.join(rootMobile, 'package.json');
   const buildGradlePath = path.join(rootMobile, 'android/app/build.gradle');
 
-  it('mobile/app.json possui version 0.1.29 e versionCode 29', () => {
+  it('mobile/app.json possui version 0.1.30 e versionCode 30', () => {
     const raw = fs.readFileSync(appJsonPath, 'utf8');
     const parsed = JSON.parse(raw);
-    assert.strictEqual(parsed.expo.version, '0.1.29');
-    assert.strictEqual(parsed.expo.android.versionCode, 29);
+    assert.strictEqual(parsed.expo.version, '0.1.30');
+    assert.strictEqual(parsed.expo.android.versionCode, 30);
   });
 
-  it('mobile/package.json possui version 0.1.29', () => {
+  it('mobile/package.json possui version 0.1.30', () => {
     const raw = fs.readFileSync(pkgJsonPath, 'utf8');
     const parsed = JSON.parse(raw);
-    assert.strictEqual(parsed.version, '0.1.29');
+    assert.strictEqual(parsed.version, '0.1.30');
   });
 
-  it('mobile/android/app/build.gradle possui versionName 0.1.29 e versionCode 29', () => {
+  it('mobile/android/app/build.gradle possui versionName 0.1.30 e versionCode 30', () => {
     const raw = fs.readFileSync(buildGradlePath, 'utf8');
-    assert.ok(raw.includes('versionCode 29'), 'build.gradle deve conter versionCode 29');
-    assert.ok(raw.includes('versionName "0.1.29"'), 'build.gradle deve conter versionName "0.1.29"');
+    assert.ok(raw.includes('versionCode 30'), 'build.gradle deve conter versionCode 30');
+    assert.ok(raw.includes('versionName "0.1.30"'), 'build.gradle deve conter versionName "0.1.30"');
   });
 });

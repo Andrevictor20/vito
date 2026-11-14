@@ -19,7 +19,7 @@ const K_USER = 'vito_pluggy_client_user_id';
 const K_BACKUP_KEY = 'vito_byok_backup_key';
 const K_STEP = 'vito_byok_step';
 const K_TUTORIAL = 'vito_byok_tutorial_seen';
-const K_CLEAN_RESET_0129 = 'vito_byok_clean_reset_0_1_29';
+const K_CLEAN_RESET_0129 = 'vito_byok_clean_reset_0_1_30';
 const BACKUP_KEY_VERSION = 1;
 const SECURE_STORE_OPTS: SecureStore.SecureStoreOptions = {
   keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,

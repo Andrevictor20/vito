@@ -250,7 +250,11 @@ export const PluggyConnectModal: React.FC<PluggyConnectModalProps> = ({ visible,
           sessionKey={setup.webSessionKey}
           clientId={setup.clientId}
           clientSecret={setup.clientSecret}
+          validating={setup.busy && setup.authStatus === 'validating'}
+          captureError={setup.authStatus === 'error' || setup.authStatus === 'offline' ? setup.error : ''}
           onCapture={setup.handleWebViewCapture}
+          onClearDraft={setup.clearDraftKeys}
+          onConfirmKeys={() => void setup.confirmWebViewKeys()}
           onClose={setup.closeDashboard}
         />
 

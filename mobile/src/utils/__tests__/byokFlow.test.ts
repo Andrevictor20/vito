@@ -137,4 +137,14 @@ describe('byokFlow', () => {
     assert.ok(url.includes('selectedConnectorId=200'));
     assert.ok(url.includes('theme=dark'));
   });
+
+  it('isAllowedPluggyWebViewUrl permite hosts do fluxo Google OAuth/reCAPTCHA sem liberar domínios externos', () => {
+    assert.equal(isAllowedPluggyWebViewUrl('https://accounts.google.com/o/oauth2/v2/auth', true), true);
+    assert.equal(isAllowedPluggyWebViewUrl('https://accounts.youtube.com/accounts/SetSID', false), true);
+    assert.equal(isAllowedPluggyWebViewUrl('https://consent.google.com/m', true), true);
+    assert.equal(isAllowedPluggyWebViewUrl('https://www.google.com/recaptcha/api2/anchor', false), true);
+    assert.equal(isAllowedPluggyWebViewUrl('https://lh3.googleusercontent.com/a/avatar', false), true);
+    assert.equal(isAllowedPluggyWebViewUrl('https://evil.example.com/phishing', true), false);
+    assert.equal(isAllowedPluggyWebViewUrl('http://accounts.google.com', true), false);
+  });
 });

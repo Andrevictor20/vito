@@ -78,12 +78,25 @@ export const BYOK_SYNC_CHECKPOINTS: readonly SyncCheckpointDef[] = [
   { title: 'Enviando ao servidor · Edge-Sync', subtitle: 'POST /api/v1/finance/sync' },
 ];
 
+export const WEBVIEW_CHROME_USER_AGENT =
+  'Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36';
+
 const EXACT_OAUTH_HOSTS = new Set([
   'accounts.google.com',
+  'accounts.youtube.com',
   'apis.google.com',
-  'ssl.gstatic.com',
-  'myaccount.google.com',
+  'consent.google.com',
   'gds.google.com',
+  'myaccount.google.com',
+  'ogs.google.com',
+  'oauth2.googleapis.com',
+  'www.googleapis.com',
+  'www.google.com',
+  'ssl.gstatic.com',
+  'www.gstatic.com',
+  'fonts.gstatic.com',
+  'www.recaptcha.net',
+  'recaptcha.net',
   'github.com',
   'api.github.com',
   'login.microsoftonline.com',
@@ -115,6 +128,9 @@ export function isAllowedPluggyWebViewUrl(url: string, isTopFrame = true): boole
   const host = parsed.hostname.toLowerCase();
   if (host === 'pluggy.ai' || host.endsWith('.pluggy.ai')) return true;
   if (host === 'auth0.com' || host.endsWith('.auth0.com')) return true;
+  if (!isTopFrame && (host.endsWith('.gstatic.com') || host.endsWith('.googleusercontent.com'))) {
+    return true;
+  }
   return EXACT_OAUTH_HOSTS.has(host);
 }
 

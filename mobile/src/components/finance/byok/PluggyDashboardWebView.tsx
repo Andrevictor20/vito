@@ -4,7 +4,12 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import { useTheme } from '../../../context/ThemeContext';
-import { formatWebViewDisplayUrl, isAllowedPluggyWebViewUrl, isPluggyDashboardUrl } from '../../../utils/byokFlow';
+import {
+  formatWebViewDisplayUrl,
+  isAllowedPluggyWebViewUrl,
+  isPluggyDashboardUrl,
+  WEBVIEW_CHROME_USER_AGENT,
+} from '../../../utils/byokFlow';
 import { clearPluggyWebViewData } from '../../../utils/pluggyBrowserReset';
 import { parseCapturedKeysMessage } from '../../../utils/pluggyKeys';
 import { resolveModalBottomInset, resolveModalTopInset } from '../../../utils/safeArea';
@@ -16,7 +21,11 @@ interface Props {
   sessionKey?: number;
   clientId: string;
   clientSecret: string;
+  validating?: boolean;
+  captureError?: string;
   onCapture: (payload: { clientId?: string; clientSecret?: string }) => void;
+  onClearDraft?: () => void;
+  onConfirmKeys?: () => void;
   onClose: () => void;
 }
 
@@ -30,7 +39,11 @@ export const PluggyDashboardWebView: React.FC<Props> = ({
   sessionKey = 0,
   clientId,
   clientSecret,
+  validating = false,
+  captureError = '',
   onCapture,
+  onClearDraft,
+  onConfirmKeys,
   onClose,
 }) => {
   const { colors } = useTheme();
@@ -169,17 +182,27 @@ export const PluggyDashboardWebView: React.FC<Props> = ({
             key={`dash-${sessionKey}-${localSessionKey}`}
             ref={webViewRef}
             source={{ uri: initialUrl }}
+            userAgent={WEBVIEW_CHROME_USER_AGENT}
             originWhitelist={['https://*']}
             injectedJavaScriptBeforeContentLoaded={PLUGGY_CAPTURE_BRIDGE_SCRIPT}
             injectedJavaScript={PLUGGY_CAPTURE_BRIDGE_SCRIPT}
             onMessage={handleMessage}
             javaScriptEnabled
             domStorageEnabled
+            sharedCookiesEnabled
+            thirdPartyCookiesEnabled
+            javaScriptCanOpenWindowsAutomatically
             allowFileAccess={false}
             allowUniversalAccessFromFileURLs={false}
             mixedContentMode="never"
-            setSupportMultipleWindows={false}
+            setSupportMultipleWindows
             geolocationEnabled={false}
+            onOpenWindow={(event) => {
+              const target = event?.nativeEvent?.targetUrl;
+              if (target && isAllowedPluggyWebViewUrl(target, true)) {
+                webViewRef.current?.injectJavaScript(`window.location.href = ${JSON.stringify(target)}; true;`);
+              }
+            }}
             onShouldStartLoadWithRequest={(req) => isAllowedPluggyWebViewUrl(req.url, req.isTopFrame !== false)}
             onNavigationStateChange={(nav) => {
               if (nav.url) setCurrentUrl(nav.url);
@@ -197,8 +220,36 @@ export const PluggyDashboardWebView: React.FC<Props> = ({
           <View style={styles.pillRow}>
             <StatusPill label="Client ID" captured={hasId} />
             <StatusPill label="Client Secret" captured={hasSecret} />
+            {(hasId || hasSecret) && onClearDraft && (
+              <TouchableOpacity
+                onPress={() => {
+                  setHint('');
+                  onClearDraft();
+                }}
+                style={[styles.clearDraftBtn, { borderColor: colors.line }]}
+                accessibilityRole="button"
+                accessibilityLabel="Limpar chaves capturadas"
+              >
+                <MaterialIcons name="close" size={14} color={colors.muted} />
+              </TouchableOpacity>
+            )}
             <View style={{ flex: 1 }} />
-            {!(hasId && hasSecret) && (
+            {hasId && hasSecret ? (
+              <TouchableOpacity
+                style={[styles.capBtn, { backgroundColor: colors.ink }]}
+                onPress={onConfirmKeys ?? onClose}
+                disabled={validating}
+                activeOpacity={0.85}
+                accessibilityRole="button"
+                accessibilityLabel="Validar e usar chaves"
+              >
+                {validating ? (
+                  <ActivityIndicator size="small" color={colors.bg} />
+                ) : (
+                  <Text style={[styles.capBtnText, { color: colors.bg }]}>Validar e usar</Text>
+                )}
+              </TouchableOpacity>
+            ) : (
               <TouchableOpacity
                 style={[styles.capBtn, { backgroundColor: colors.ink }]}
                 onPress={triggerScan}
@@ -210,6 +261,11 @@ export const PluggyDashboardWebView: React.FC<Props> = ({
               </TouchableOpacity>
             )}
           </View>
+          {!!captureError && (
+            <Text style={[styles.hintText, { color: colors.red }]} accessibilityLiveRegion="polite">
+              {captureError}
+            </Text>
+          )}
           {!!hint && (
             <Text style={[styles.hintText, { color: colors.orange }]} accessibilityLiveRegion="polite">
               {hint}
@@ -261,6 +317,7 @@ const styles = StyleSheet.create({
   bottomBar: { borderTopWidth: 1, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 14 },
   pillRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   pill: { flexDirection: 'row', alignItems: 'center', gap: 5, height: 32, paddingHorizontal: 11, borderRadius: 16, borderWidth: 1.5 },
+  clearDraftBtn: { width: 28, height: 28, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   pillCircle: { fontSize: 12, fontWeight: '600' },
   pillLabel: { fontSize: 12.5, fontWeight: '600' },
   capBtn: { height: 34, paddingHorizontal: 14, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },

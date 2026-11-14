@@ -11,6 +11,7 @@ import {
   isPluggyDashboardUrl,
   parseItemId,
   parsePluggyConnectItemMessage,
+  WEBVIEW_CHROME_USER_AGENT,
 } from '../../../utils/byokFlow';
 import { IN_APP_BROWSER_OPTIONS } from '../../../utils/platformInfo';
 import { clearPluggyWebViewData } from '../../../utils/pluggyBrowserReset';
@@ -172,6 +173,7 @@ export const PluggyPortalWebView: React.FC<Props> = ({
               key={`${mode}-${sessionKey}-${localSessionKey}`}
               ref={webViewRef}
               source={{ uri: url }}
+              userAgent={WEBVIEW_CHROME_USER_AGENT}
               originWhitelist={['https://*']}
               injectedJavaScriptBeforeContentLoaded={isConnect ? PLUGGY_CONNECT_BRIDGE_SCRIPT : undefined}
               injectedJavaScript={isConnect ? PLUGGY_CONNECT_BRIDGE_SCRIPT : undefined}
@@ -180,11 +182,26 @@ export const PluggyPortalWebView: React.FC<Props> = ({
               domStorageEnabled
               sharedCookiesEnabled
               thirdPartyCookiesEnabled
+              javaScriptCanOpenWindowsAutomatically
               allowFileAccess={false}
               allowUniversalAccessFromFileURLs={false}
               mixedContentMode="never"
-              setSupportMultipleWindows={false}
+              setSupportMultipleWindows
               geolocationEnabled={false}
+              onOpenWindow={(event) => {
+                const target = event?.nativeEvent?.targetUrl;
+                if (!target) return;
+                const action = classifyPortalNavigation(target, true);
+                if (action === 'vito_success') {
+                  const id = parseItemId(target);
+                  if (id) emitConnectItem(id, true);
+                  else onConnectItemCaptured(capturedItemId);
+                } else if (action === 'external') {
+                  void Linking.openURL(target).catch(() => {});
+                } else if (action === 'allow') {
+                  webViewRef.current?.injectJavaScript(`window.location.href = ${JSON.stringify(target)}; true;`);
+                }
+              }}
               onShouldStartLoadWithRequest={(req) => {
                 const action = classifyPortalNavigation(req.url, req.isTopFrame !== false);
                 if (action === 'vito_success') {

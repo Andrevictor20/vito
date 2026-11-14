@@ -164,6 +164,47 @@ describe('PLUGGY_CAPTURE_BRIDGE_SCRIPT', () => {
     assert.equal(ctx.posted[0].clientSecret, CSEC_TOKEN);
     assert.equal(ctx.posted[0].source, 'scan');
   });
+
+  it('nunca trata múltiplos Client IDs em /applications como secret nem rouba clientId de listagem', async () => {
+    const ctx = createSandbox('dashboard.pluggy.ai');
+    const row1 = {
+      textContent: `Client ID  ${CID}`,
+      innerText: `Client ID ${CID}`,
+      parentElement: { tagName: 'BODY' },
+      querySelectorAll: () => [],
+    };
+    const row2 = {
+      textContent: `Client ID  ${CSEC_UUID}`,
+      innerText: `Client ID ${CSEC_UUID}`,
+      parentElement: { tagName: 'BODY' },
+      querySelectorAll: () => [],
+    };
+    ctx.queryMap['label, span, p, div, th, td, h1, h2, h3, h4, strong'] = [
+      { textContent: 'Client ID', parentElement: row1 },
+      { textContent: 'Client ID', parentElement: row2 },
+    ];
+    ctx.setFetch(async () => ({
+      headers: { get: () => 'application/json' },
+      clone: () => ({
+        text: async () =>
+          JSON.stringify({
+            results: [{ clientId: CID }, { clientId: CSEC_UUID }],
+            webhook: { secret: CSEC_TOKEN },
+          }),
+      }),
+    }));
+
+    vm.runInNewContext(PLUGGY_CAPTURE_BRIDGE_SCRIPT, ctx.sandbox);
+    const wrappedFetch = ctx.windowObj.fetch as (u: string) => Promise<unknown>;
+    await wrappedFetch('https://dashboard.pluggy.ai/api/applications');
+    (ctx.windowObj.__vitoScanVisibleKeys as () => void)();
+
+    // Nenhum network capture em listagem/webhook.secret, e scan manual retorna clientId='' e clientSecret=''
+    assert.equal(ctx.posted.length, 1);
+    assert.equal(ctx.posted[0].source, 'scan');
+    assert.equal(ctx.posted[0].clientId, '');
+    assert.equal(ctx.posted[0].clientSecret, '');
+  });
 });
 
 describe('PLUGGY_CONNECT_BRIDGE_SCRIPT', () => {
