@@ -2,6 +2,7 @@ package repository_test
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 	"testing"
 	"time"
@@ -262,5 +263,125 @@ func TestFinanceRepo_GetFinancialSummary_Math(t *testing.T) {
 	}
 	if len(summary.CategorySpending) != 2 {
 		t.Errorf("esperava 2 categorias agrupadas, obteve %d", len(summary.CategorySpending))
+	}
+}
+
+func TestFinanceRepo_CrossTenantBOLAUpsertProtection(t *testing.T) {
+	repo, aliceID, bobID := setupTestByokRepo(t)
+	ctx := context.Background()
+
+	// Alice cria conexão, conta e transação
+	err := repo.UpsertConnection(ctx, &domain.FinanceConnection{
+		ID:              "conn-alice-bola",
+		UserID:          aliceID,
+		PluggyItemID:    "shared-pluggy-item-1",
+		ConnectorID:     200,
+		InstitutionName: "Nubank Alice",
+		Status:          domain.ConnectionStatusUpdated,
+	})
+	if err != nil {
+		t.Fatalf("erro ao criar conexão de Alice: %v", err)
+	}
+	err = repo.UpsertAccountsBatch(ctx, aliceID, []domain.FinanceAccount{
+		{
+			ID:              "acc-alice-bola",
+			ConnectionID:    "conn-alice-bola",
+			PluggyAccountID: "shared-pluggy-acc-1",
+			InstitutionName: "Nubank",
+			AccountType:     domain.AccountTypeBank,
+			Name:            "Conta Alice",
+			Balance:         9000.0,
+		},
+	})
+	if err != nil {
+		t.Fatalf("erro ao criar conta de Alice: %v", err)
+	}
+	err = repo.UpsertTransactionsBatch(ctx, aliceID, []domain.FinanceTransaction{
+		{
+			ID:                  "tx-alice-bola",
+			AccountID:           "acc-alice-bola",
+			PluggyTransactionID: "shared-pluggy-tx-1",
+			Description:         "Salário Alice",
+			Amount:              5000.0,
+			TransactionType:     domain.TxCredit,
+			OccurredAt:          time.Now().UTC(),
+		},
+	})
+	if err != nil {
+		t.Fatalf("erro ao criar transação de Alice: %v", err)
+	}
+
+	// 1. Bob tenta sobrescrever conexão de Alice usando o mesmo PluggyItemID -> ErrFinanceConnectionNotFound
+	err = repo.UpsertConnection(ctx, &domain.FinanceConnection{
+		ID:              "conn-bob-hijack",
+		UserID:          bobID,
+		PluggyItemID:    "shared-pluggy-item-1",
+		ConnectorID:     200,
+		InstitutionName: "Hacked Bank",
+		Status:          domain.ConnectionStatusLoginError,
+	})
+	if !errors.Is(err, domain.ErrFinanceConnectionNotFound) {
+		t.Fatalf("esperava ErrFinanceConnectionNotFound ao tentar upsert cross-tenant de conexão, obteve %v", err)
+	}
+	aliceConn, err := repo.GetConnection(ctx, aliceID, "conn-alice-bola")
+	if err != nil || aliceConn.InstitutionName != "Nubank Alice" {
+		t.Fatalf("conexão de Alice foi adulterada ou perdida: conn=%+v err=%v", aliceConn, err)
+	}
+
+	// 2. Bob tenta sobrescrever conta de Alice usando o mesmo PluggyAccountID
+	_ = repo.UpsertAccountsBatch(ctx, bobID, []domain.FinanceAccount{
+		{
+			ID:              "acc-bob-hijack",
+			PluggyAccountID: "shared-pluggy-acc-1",
+			InstitutionName: "Hacked",
+			AccountType:     domain.AccountTypeBank,
+			Name:            "Conta Hacked",
+			Balance:         0.0,
+		},
+	})
+	aliceAcc, err := repo.GetAccount(ctx, aliceID, "acc-alice-bola")
+	if err != nil || aliceAcc.Balance != 9000.0 || aliceAcc.Name != "Conta Alice" {
+		t.Fatalf("conta de Alice foi adulterada por upsert cross-tenant: acc=%+v err=%v", aliceAcc, err)
+	}
+
+	// 3. Bob tenta anexar transação diretamente ao AccountID de Alice e/ou sobrescrever PluggyTransactionID de Alice
+	_ = repo.UpsertAccountsBatch(ctx, bobID, []domain.FinanceAccount{
+		{
+			ID:              "acc-bob-own",
+			PluggyAccountID: "bob-pluggy-acc-own",
+			InstitutionName: "Inter",
+			AccountType:     domain.AccountTypeBank,
+			Name:            "Conta Bob",
+			Balance:         100.0,
+		},
+	})
+	_ = repo.UpsertTransactionsBatch(ctx, bobID, []domain.FinanceTransaction{
+		{
+			ID:                  "tx-bob-hijack-acc",
+			AccountID:           "acc-alice-bola",
+			PluggyTransactionID: "bob-tx-hijack-1",
+			Description:         "Tentativa BOLA AccountID",
+			Amount:              -999.0,
+			TransactionType:     domain.TxDebit,
+			OccurredAt:          time.Now().UTC(),
+		},
+		{
+			ID:                  "tx-bob-hijack-tx",
+			AccountID:           "acc-bob-own",
+			PluggyTransactionID: "shared-pluggy-tx-1",
+			Description:         "Hacked Tx",
+			Amount:              -1.0,
+			TransactionType:     domain.TxDebit,
+			OccurredAt:          time.Now().UTC(),
+		},
+	})
+
+	aliceTxs, err := repo.ListTransactions(ctx, aliceID, 10, 0)
+	if err != nil || len(aliceTxs) != 1 || aliceTxs[0].Description != "Salário Alice" || aliceTxs[0].Amount != 5000.0 {
+		t.Fatalf("transações de Alice foram adulteradas: txs=%+v err=%v", aliceTxs, err)
+	}
+	bobTxs, err := repo.ListTransactions(ctx, bobID, 10, 0)
+	if err != nil || len(bobTxs) != 0 {
+		t.Fatalf("Bob não deveria ter persistido transações inválidas/cross-tenant: txs=%+v err=%v", bobTxs, err)
 	}
 }

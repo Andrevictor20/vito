@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"math"
 	"time"
 
@@ -24,9 +25,15 @@ func (r *sqliteFinanceRepo) UpsertTransactionsBatch(ctx context.Context, userID 
 		INSERT INTO finance_transactions (
 			id, user_id, account_id, pluggy_transaction_id, description,
 			clean_merchant_name, amount, transaction_type, payment_method,
-			category, is_recurring, occurred_at, created_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			category, is_recurring, occurred_at, created_at,
+			installment_number, total_installments, payment_type, mcc, tx_status
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(pluggy_transaction_id) DO UPDATE SET
+			installment_number = excluded.installment_number,
+			total_installments = excluded.total_installments,
+			payment_type = excluded.payment_type,
+			mcc = excluded.mcc,
+			tx_status = excluded.tx_status,
 			description = excluded.description,
 			clean_merchant_name = excluded.clean_merchant_name,
 			amount = excluded.amount,
@@ -35,6 +42,7 @@ func (r *sqliteFinanceRepo) UpsertTransactionsBatch(ctx context.Context, userID 
 			category = excluded.category,
 			is_recurring = excluded.is_recurring,
 			occurred_at = excluded.occurred_at
+		WHERE finance_transactions.user_id = excluded.user_id
 	`)
 	if err != nil {
 		return err
@@ -55,14 +63,22 @@ func (r *sqliteFinanceRepo) UpsertTransactionsBatch(ctx context.Context, userID 
 		if cat == "" {
 			cat = "Outros"
 		}
-		var accID any = t.AccountID
-		if t.AccountID == "" {
-			accID = nil
+		accountID, ok, err := resolveTxAccountID(ctx, tx, userID, t)
+		if err != nil {
+			return err
 		}
-		_, err := stmt.ExecContext(ctx,
-			id, userID, accID, t.PluggyTransactionID, t.Description,
+		if !ok {
+			continue // conta desconhecida: ignora a transação órfã sem derrubar o lote
+		}
+		status := t.Status
+		if status == "" {
+			status = "POSTED"
+		}
+		_, err = stmt.ExecContext(ctx,
+			id, userID, accountID, t.PluggyTransactionID, t.Description,
 			t.CleanMerchantName, t.Amount, t.TransactionType, t.PaymentMethod,
 			cat, isRec, t.OccurredAt.UTC(), now,
+			t.InstallmentNumber, t.TotalInstallments, nullIfEmpty(t.PaymentType), t.MCC, status,
 		)
 		if err != nil {
 			return err
@@ -78,7 +94,8 @@ func (r *sqliteFinanceRepo) ListTransactions(ctx context.Context, userID string,
 	query := `
 		SELECT id, user_id, account_id, pluggy_transaction_id, description,
 		       clean_merchant_name, amount, transaction_type, payment_method,
-		       category, is_recurring, occurred_at, created_at
+		       category, is_recurring, occurred_at, created_at,
+		       installment_number, total_installments, payment_type, mcc, tx_status
 		FROM finance_transactions
 		WHERE user_id = ?
 		ORDER BY occurred_at DESC
@@ -96,14 +113,18 @@ func (r *sqliteFinanceRepo) ListTransactions(ctx context.Context, userID string,
 		var clean sql.NullString
 		var payMethod sql.NullString
 		var isRec int
+		var instNum, instTotal, mcc sql.NullInt64
+		var payType, status sql.NullString
 		err := rows.Scan(
 			&t.ID, &t.UserID, &t.AccountID, &t.PluggyTransactionID, &t.Description,
 			&clean, &t.Amount, &t.TransactionType, &payMethod,
 			&t.Category, &isRec, &t.OccurredAt, &t.CreatedAt,
+			&instNum, &instTotal, &payType, &mcc, &status,
 		)
 		if err != nil {
 			return nil, err
 		}
+		applyTxCardMeta(&t, instNum, instTotal, mcc, payType, status)
 		t.IsRecurring = (isRec == 1)
 		if clean.Valid {
 			t.CleanMerchantName = clean.String
@@ -305,4 +326,60 @@ func (r *sqliteFinanceRepo) GetFinancialSummary(ctx context.Context, userID stri
 	}
 
 	return summary, nil
+}
+
+// resolveTxAccountID resolve o account_id interno validando ownership do userID:
+// valida AccountID quando presente; senão busca por PluggyAccountID.
+func resolveTxAccountID(ctx context.Context, tx *sql.Tx, userID string, t domain.FinanceTransaction) (string, bool, error) {
+	if t.AccountID != "" {
+		var id string
+		err := tx.QueryRowContext(ctx,
+			`SELECT id FROM finance_accounts WHERE user_id = ? AND id = ?`,
+			userID, t.AccountID).Scan(&id)
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", false, nil
+		}
+		if err != nil {
+			return "", false, err
+		}
+		return id, true, nil
+	}
+	if t.PluggyAccountID == "" {
+		return "", false, nil
+	}
+	var id string
+	err := tx.QueryRowContext(ctx,
+		`SELECT id FROM finance_accounts WHERE user_id = ? AND pluggy_account_id = ?`,
+		userID, t.PluggyAccountID).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, err
+	}
+	return id, true, nil
+}
+
+func nullIfEmpty(s string) any {
+	if s == "" {
+		return nil
+	}
+	return s
+}
+
+func applyTxCardMeta(t *domain.FinanceTransaction, instNum, instTotal, mcc sql.NullInt64, payType, status sql.NullString) {
+	if instNum.Valid {
+		v := int(instNum.Int64)
+		t.InstallmentNumber = &v
+	}
+	if instTotal.Valid {
+		v := int(instTotal.Int64)
+		t.TotalInstallments = &v
+	}
+	if mcc.Valid {
+		v := int(mcc.Int64)
+		t.MCC = &v
+	}
+	t.PaymentType = payType.String
+	t.Status = status.String
 }

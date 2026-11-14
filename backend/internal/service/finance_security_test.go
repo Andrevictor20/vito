@@ -276,11 +276,8 @@ func TestFinanceSecurity_MultiTenantIsolation_BOLA_IDOR(t *testing.T) {
 func TestFinanceSecurity_ZeroIPLeak_StaticAudit(t *testing.T) {
 	backendRoot := filepath.Join("..", "..")
 	forbiddenEndpoints := []string{
-		"api.pluggy.ai/accounts",
-		"api.pluggy.ai/v2/transactions",
-		"api.pluggy.ai/transactions",
-		"api.pluggy.ai/investments",
-		"api.pluggy.ai/bills",
+		"api.pluggy.ai",
+		"connect.pluggy.ai",
 	}
 
 	var violations []string

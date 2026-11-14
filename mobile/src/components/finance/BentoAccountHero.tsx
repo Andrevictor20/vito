@@ -1,18 +1,21 @@
 import React, { useState } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { tokens } from '../../theme/tokens';
+import { tokens, tabularNumbers } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { hapticFeedback } from '../../theme/motion';
-import type { FinanceAccount } from '../../types/finance';
-import { getBankBrand, BankBrand } from '../../utils/bankBrands';
+import type { FinanceAccount, FinanceConnection } from '../../types/finance';
+import { getBankBrand, partitionBankAccounts } from '../../utils/bankBrands';
+import { formatBRL, maskBRL } from './financeHelpers';
 
 interface BentoAccountHeroProps {
   totalBalance: number;
   connectionsCount: number;
   accounts?: FinanceAccount[];
+  connections?: FinanceConnection[];
   isPrivacyHidden: boolean;
-  onPressManage?: () => void;
+  onPressConnections?: () => void;
+  onPressAddBank?: () => void;
   onSelectAccount?: (account: FinanceAccount) => void;
 }
 
@@ -20,27 +23,33 @@ export const BentoAccountHero: React.FC<BentoAccountHeroProps> = ({
   totalBalance,
   connectionsCount,
   accounts = [],
+  connections = [],
   isPrivacyHidden,
-  onPressManage,
+  onPressConnections,
+  onPressAddBank,
   onSelectAccount,
 }) => {
   const { colors } = useTheme();
   const [isExpanded, setIsExpanded] = useState(true);
 
-  const formatBRL = (val: number) =>
-    `R$ ${Math.abs(val).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
-  // Filtra apenas contas de saldo bancário (depósito, corrente, poupança, investimento)
-  const bankAccounts = accounts.filter(
-    (a) => a.account_type === 'BANK' || !a.account_type
-  );
-
-  // Instituições bancárias distintas
+  const { bankAccounts } = partitionBankAccounts(accounts);
   const distinctInstitutions = Array.from(
-    new Set(
-      bankAccounts.map((a) => a.institution_name || 'Nubank').filter(Boolean)
-    )
+    new Set(bankAccounts.map((a) => a.institution_name).filter(Boolean))
   );
+
+  const effectiveCount = Math.max(connectionsCount, distinctInstitutions.length);
+  const updatedCount =
+    connections.length > 0
+      ? connections.filter((c) => c.status === 'UPDATED').length
+      : effectiveCount;
+  const allUpdated = connections.length === 0 || updatedCount === connections.length;
+
+  const isConnectionOutdated = (acc: FinanceAccount): boolean => {
+    const conn = connections.find(
+      (c) => c.id === acc.connection_id || c.institution_name === acc.institution_name
+    );
+    return Boolean(conn && conn.status !== 'UPDATED');
+  };
 
   const toggleExpand = () => {
     hapticFeedback.selection();
@@ -48,181 +57,162 @@ export const BentoAccountHero: React.FC<BentoAccountHeroProps> = ({
   };
 
   return (
-    <View
-      style={[
-        styles.card,
-        {
-          backgroundColor: colors.surf,
-          borderColor: colors.line,
-        },
-      ]}
-    >
-      {/* Top Header Row do Card */}
-      <View style={styles.topRow}>
+    <View style={[styles.card, { backgroundColor: colors.bg, borderColor: colors.line }]}>
+      {/* Top row: avatares sobrepostos + N bancos conectados + chevron (abre sub-tela conn) */}
+      <TouchableOpacity
+        style={styles.topRow}
+        onPress={() => {
+          hapticFeedback.light();
+          onPressConnections?.();
+        }}
+        activeOpacity={0.75}
+        accessibilityLabel="Ver contas conectadas"
+      >
         <View style={styles.institutionsRow}>
-          {distinctInstitutions.length <= 1 ? (
-            <View style={styles.singleBankBadge}>
-              {(() => {
-                const brand = getBankBrand(distinctInstitutions[0] || 'Nubank');
+          {distinctInstitutions.length > 0 ? (
+            <View style={styles.overlappingCircles}>
+              {distinctInstitutions.slice(0, 4).map((inst, idx) => {
+                const brand = getBankBrand(inst);
                 return (
-                  <>
-                    <View style={[styles.bankLogoCircle, { backgroundColor: brand.color }]}>
-                      <Text style={[styles.bankLogoText, { color: brand.textColor }]}>
-                        {brand.initials}
-                      </Text>
-                    </View>
-                    <Text style={[styles.bankNameText, { color: colors.ink }]}>
-                      {brand.name}
+                  <View
+                    key={`${inst}_${idx}`}
+                    style={[
+                      styles.avatarSmall,
+                      {
+                        backgroundColor: brand.color,
+                        marginLeft: idx > 0 ? -6 : 0,
+                        borderColor: colors.bg,
+                        zIndex: 10 - idx,
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.avatarSmallText, { color: brand.textColor }]}>
+                      {brand.initials}
                     </Text>
-                  </>
+                  </View>
                 );
-              })()}
+              })}
             </View>
           ) : (
-            <View style={styles.multiBankBadge}>
-              <View style={styles.overlappingCircles}>
-                {distinctInstitutions.slice(0, 3).map((inst, idx) => {
-                  const brand = getBankBrand(inst);
-                  return (
-                    <View
-                      key={inst + idx}
-                      style={[
-                        styles.bankLogoCircle,
-                        {
-                          backgroundColor: brand.color,
-                          marginLeft: idx > 0 ? -8 : 0,
-                          borderWidth: 2,
-                          borderColor: colors.surf,
-                          zIndex: 10 - idx,
-                        },
-                      ]}
-                    >
-                      <Text style={[styles.bankLogoText, { color: brand.textColor }]}>
-                        {brand.initials}
-                      </Text>
-                    </View>
-                  );
-                })}
-              </View>
-              <Text style={[styles.bankNameText, { color: colors.ink }]}>
-                {distinctInstitutions.length} bancos conectados
-              </Text>
+            <View style={[styles.avatarFallback, { backgroundColor: colors.finBg }]}>
+              <MaterialIcons name="account-balance" size={16} color={colors.fin} />
             </View>
           )}
+          <Text style={[styles.topLabel, { color: colors.ink }]}>
+            {effectiveCount > 0
+              ? `${effectiveCount} ${effectiveCount === 1 ? 'banco conectado' : 'bancos conectados'}`
+              : 'Nenhuma conta conectada'}
+          </Text>
         </View>
+        <MaterialIcons name="chevron-right" size={18} color={colors.muted} />
+      </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.manageBtn}
-          onPress={onPressManage}
-          hitSlop={tokens.hitSlop.sm}
-          accessibilityLabel="Gerenciar conexões bancárias"
-        >
-          <MaterialIcons name="chevron-right" size={20} color={colors.muted} />
-        </TouchableOpacity>
-      </View>
-
-      {/* Saldo Consolidado */}
-      <Text style={[styles.titleLabel, { color: colors.muted }]}>
-        {bankAccounts.length > 1 ? 'Saldo consolidado em contas' : 'Saldo em contas'}
+      {/* Saldo consolidado */}
+      <Text style={[styles.balanceCaption, { color: colors.muted }]}>
+        Saldo consolidado em contas
       </Text>
-      <Text style={[styles.balanceValue, { color: colors.ink }]}>
-        {isPrivacyHidden ? '••••••' : formatBRL(totalBalance)}
+      <Text style={[styles.balanceValue, tabularNumbers, { color: colors.ink }]}>
+        {maskBRL(isPrivacyHidden, formatBRL(totalBalance))}
       </Text>
 
-      {/* Lista organizada de 2 ou mais contas */}
-      {bankAccounts.length >= 2 && (
+      {/* Acordeão CONTAS ATIVAS (N) */}
+      {bankAccounts.length > 0 && (
         <View style={styles.accountsSection}>
           <TouchableOpacity
-            style={styles.accountsSectionHeader}
+            style={[styles.accordionHeader, { borderTopColor: colors.line }]}
             onPress={toggleExpand}
             activeOpacity={0.7}
+            accessibilityState={{ expanded: isExpanded }}
           >
-            <Text style={[styles.sectionHeading, { color: colors.muted }]}>
+            <Text style={[styles.accordionTitle, { color: colors.muted }]}>
               CONTAS ATIVAS ({bankAccounts.length})
             </Text>
             <MaterialIcons
-              name={isExpanded ? 'expand-less' : 'expand-more'}
+              name={isExpanded ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
               size={18}
               color={colors.muted}
             />
           </TouchableOpacity>
 
-          {isExpanded && (
-            <View style={[styles.accountsList, { borderTopColor: colors.line }]}>
-              {bankAccounts.map((acc, index) => {
-                const brand = getBankBrand(acc.institution_name);
-                const isSavings =
-                  acc.account_subtype === 'SAVINGS_ACCOUNT' ||
-                  acc.name?.toLowerCase().includes('reserva') ||
-                  acc.name?.toLowerCase().includes('caixinha') ||
-                  acc.name?.toLowerCase().includes('poupança');
-                const percentShare = totalBalance > 0
+          {isExpanded &&
+            bankAccounts.map((acc, index) => {
+              const brand = getBankBrand(acc.institution_name);
+              const isSavings =
+                acc.account_subtype === 'SAVINGS_ACCOUNT' ||
+                /reserva|caixinha|poupança/i.test(acc.name || '');
+              const percentShare =
+                totalBalance > 0
                   ? Math.round((Math.max(0, acc.balance) / totalBalance) * 100)
                   : 0;
+              const needsReconnect = isConnectionOutdated(acc);
 
-                return (
-                  <TouchableOpacity
-                    key={acc.id || acc.pluggy_account_id || `acc_${index}`}
-                    style={[
-                      styles.accountItemRow,
-                      index > 0 && { borderTopWidth: 1, borderTopColor: colors.line },
-                    ]}
-                    onPress={() => onSelectAccount?.(acc)}
-                    activeOpacity={0.7}
-                  >
-                    <View style={[styles.itemLogoCircle, { backgroundColor: brand.color }]}>
-                      <Text style={[styles.itemLogoText, { color: brand.textColor }]}>
-                        {brand.initials}
-                      </Text>
-                    </View>
+              return (
+                <TouchableOpacity
+                  key={acc.id || acc.pluggy_account_id || `acc_${index}`}
+                  style={[styles.accountRow, { borderTopColor: colors.line }]}
+                  onPress={() => onSelectAccount?.(acc)}
+                  activeOpacity={0.75}
+                >
+                  <View style={[styles.avatarBig, { backgroundColor: brand.color }]}>
+                    <Text style={[styles.avatarBigText, { color: brand.textColor }]}>
+                      {brand.initials}
+                    </Text>
+                  </View>
 
-                    <View style={styles.itemInfoCol}>
-                      <Text style={[styles.itemAccountName, { color: colors.ink }]} numberOfLines={1}>
-                        {acc.name || (isSavings ? 'Reserva Financeira' : 'Conta Corrente')}
-                      </Text>
-                      <Text style={[styles.itemSubtype, { color: colors.muted }]}>
-                        {brand.name} • {isSavings ? 'Poupança / Reserva' : 'Conta corrente'}
-                      </Text>
-                    </View>
+                  <View style={styles.accountInfo}>
+                    <Text style={[styles.accountName, { color: colors.ink }]} numberOfLines={1}>
+                      {acc.name || (isSavings ? 'Reserva Financeira' : 'Conta corrente')}
+                    </Text>
+                    <Text style={[styles.accountMeta, { color: colors.muted }]} numberOfLines={1}>
+                      {brand.name} · {isSavings ? 'Poupança / Reserva' : 'Conta corrente'}
+                    </Text>
+                  </View>
 
-                    <View style={styles.itemBalanceCol}>
-                      <Text style={[styles.itemBalanceText, { color: colors.ink }]}>
-                        {isPrivacyHidden ? '••••••' : formatBRL(acc.balance)}
+                  <View style={styles.accountRight}>
+                    <Text style={[styles.accountBalance, tabularNumbers, { color: colors.ink }]}>
+                      {maskBRL(isPrivacyHidden, formatBRL(acc.balance))}
+                    </Text>
+                    {needsReconnect ? (
+                      <View style={[styles.reconnectPill, { backgroundColor: colors.finBg }]}>
+                        <Text style={[styles.reconnectText, { color: colors.fin }]}>Reconectar</Text>
+                      </View>
+                    ) : totalBalance > 0 ? (
+                      <Text style={[styles.shareText, { color: colors.muted }]}>
+                        {percentShare}% do saldo
                       </Text>
-                      {totalBalance > 0 && (
-                        <Text style={[styles.itemShareText, { color: colors.muted }]}>
-                          {percentShare}% do saldo
-                        </Text>
-                      )}
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          )}
+                    ) : null}
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
         </View>
       )}
 
-      {/* Footer com Status de Sincronização */}
+      {/* Rodapé: pill de status + "+ Adicionar banco" */}
       <View style={styles.footerRow}>
         <View style={[styles.statusPill, { backgroundColor: colors.bg, borderColor: colors.line }]}>
-          <View style={styles.activeDot} />
-          <Text style={[styles.footerText, { color: colors.muted }]}>
-            {connectionsCount > 0
-              ? `${connectionsCount} ${connectionsCount === 1 ? 'banco conectado' : 'bancos conectados'}`
-              : 'Conectar banco'}
+          <View
+            style={[
+              styles.statusDot,
+              { backgroundColor: allUpdated ? colors.acc : colors.orange },
+            ]}
+          />
+          <Text style={[styles.statusPillText, { color: colors.ink }]}>
+            {connections.length > 0 && !allUpdated
+              ? `${updatedCount} de ${connections.length} atualizados`
+              : `${effectiveCount} ${effectiveCount === 1 ? 'banco conectado' : 'bancos conectados'}`}
           </Text>
         </View>
 
         <TouchableOpacity
-          style={styles.addAccountLink}
-          onPress={onPressManage}
+          style={styles.addBankBtn}
+          onPress={() => {
+            hapticFeedback.light();
+            onPressAddBank?.();
+          }}
           activeOpacity={0.7}
         >
-          <MaterialIcons name="add" size={14} color={colors.accent || '#10B981'} />
-          <Text style={[styles.addAccountLinkText, { color: colors.accent || '#10B981' }]}>
-            Adicionar banco
-          </Text>
+          <Text style={[styles.addBankText, { color: colors.ink }]}>+ Adicionar banco</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -231,163 +221,160 @@ export const BentoAccountHero: React.FC<BentoAccountHeroProps> = ({
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 24,
+    borderRadius: 22,
     borderWidth: 1,
-    padding: 18,
+    padding: 16,
     marginBottom: 14,
   },
   topRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
   },
   institutionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  singleBankBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  multiBankBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: 10,
+    flex: 1,
   },
   overlappingCircles: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  bankLogoCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+  avatarSmall: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  bankLogoText: {
+  avatarSmallText: {
     fontSize: 11,
-    fontWeight: '800',
-    fontFamily: tokens.typography.family.montserratBold,
+    fontWeight: '700',
   },
-  bankNameText: {
-    fontSize: 13,
+  avatarFallback: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  topLabel: {
+    fontSize: 15.5,
     fontWeight: '600',
   },
-  manageBtn: {
-    padding: 4,
-  },
-  titleLabel: {
+  balanceCaption: {
     fontSize: 12.5,
     fontWeight: '500',
-    marginBottom: 4,
+    marginTop: 14,
   },
   balanceValue: {
     fontFamily: tokens.typography.family.montserratBold,
-    fontSize: 32,
+    fontSize: 34,
+    lineHeight: 38,
     fontWeight: '800',
-    letterSpacing: -0.8,
+    letterSpacing: -0.9,
+    marginTop: 6,
     marginBottom: 14,
   },
   accountsSection: {
-    marginBottom: 14,
+    marginBottom: 8,
   },
-  accountsSectionHeader: {
+  accordionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 6,
-    marginBottom: 4,
-  },
-  sectionHeading: {
-    fontSize: 10.5,
-    fontWeight: '700',
-    letterSpacing: 0.8,
-  },
-  accountsList: {
     borderTopWidth: 1,
-    marginTop: 4,
+    paddingTop: 14,
+    paddingBottom: 6,
   },
-  accountItemRow: {
+  accordionTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 0.7,
+  },
+  accountRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
+    gap: 12,
+    paddingVertical: 12,
+    borderTopWidth: 1,
   },
-  itemLogoCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+  avatarBig: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 10,
   },
-  itemLogoText: {
-    fontSize: 11,
-    fontWeight: '800',
-    fontFamily: tokens.typography.family.montserratBold,
-  },
-  itemInfoCol: {
-    flex: 1,
-    marginRight: 8,
-  },
-  itemAccountName: {
+  avatarBigText: {
     fontSize: 13,
-    fontWeight: '600',
-  },
-  itemSubtype: {
-    fontSize: 11,
-    marginTop: 2,
-    fontWeight: '400',
-  },
-  itemBalanceCol: {
-    alignItems: 'flex-end',
-  },
-  itemBalanceText: {
-    fontFamily: tokens.typography.family.montserratBold,
-    fontSize: 13.5,
     fontWeight: '700',
   },
-  itemShareText: {
-    fontSize: 10.5,
+  accountInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+  accountName: {
+    fontSize: 14.5,
+    fontWeight: '600',
+  },
+  accountMeta: {
+    fontSize: 12,
     marginTop: 2,
-    fontWeight: '500',
+  },
+  accountRight: {
+    alignItems: 'flex-end',
+  },
+  accountBalance: {
+    fontSize: 14.5,
+    fontWeight: '700',
+  },
+  shareText: {
+    fontSize: 11.5,
+    marginTop: 2,
+  },
+  reconnectPill: {
+    marginTop: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  reconnectText: {
+    fontSize: 11,
+    fontWeight: '600',
   },
   footerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 4,
+    marginTop: 6,
   },
   statusPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
+    gap: 8,
+    height: 34,
+    paddingHorizontal: 12,
+    borderRadius: 17,
     borderWidth: 1,
   },
-  activeDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#10B981',
+  statusDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
   },
-  footerText: {
-    fontSize: 11.5,
+  statusPillText: {
+    fontSize: 13,
     fontWeight: '500',
   },
-  addAccountLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingVertical: 4,
-    paddingHorizontal: 6,
+  addBankBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 4,
   },
-  addAccountLinkText: {
-    fontSize: 12,
+  addBankText: {
+    fontSize: 14,
     fontWeight: '600',
   },
 });

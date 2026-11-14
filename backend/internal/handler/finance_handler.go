@@ -3,9 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
-	"net/url"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
@@ -170,81 +168,89 @@ func (h *FinanceHandler) SyncPayload(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// GetConnectToken gera o token para carregar o widget Meu Pluggy no smartphone.
-func (h *FinanceHandler) GetConnectToken(w http.ResponseWriter, r *http.Request) {
+// PutByokBackup armazena ou atualiza o blob opaco cifrado no cliente (chaves BYOK).
+// Segurança: nunca loga nem devolve ciphertext/nonce nesta resposta.
+func (h *FinanceHandler) PutByokBackup(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok || userID == "" {
 		http.Error(w, "não autorizado", http.StatusUnauthorized)
 		return
 	}
 
-	token, err := h.financeSvc.GenerateConnectToken(r.Context(), userID)
+	r.Body = http.MaxBytesReader(w, r.Body, 64*1024)
+	var req struct {
+		Ciphertext []byte `json:"ciphertext"`
+		Nonce      []byte `json:"nonce"`
+		KeyVersion int    `json:"key_version"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "payload json inválido"})
+		return
+	}
+
+	backup, err := h.financeSvc.UpsertByokBackup(r.Context(), userID, req.Ciphertext, req.Nonce, req.KeyVersion)
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
-		if errors.Is(err, domain.ErrPluggyCredentialsMissing) {
-			w.WriteHeader(http.StatusPreconditionRequired)
-			_ = json.NewEncoder(w).Encode(map[string]string{
-				"error": err.Error(),
-			})
+		if errors.Is(err, domain.ErrByokBackupInvalid) {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 			return
 		}
-		w.WriteHeader(http.StatusBadRequest)
-		_ = json.NewEncoder(w).Encode(map[string]string{
-			"error": err.Error(),
-		})
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "erro ao salvar backup BYOK"})
 		return
 	}
 
-	apiKey, _ := h.financeSvc.GetSessionToken(r.Context())
-
-	widgetURL := fmt.Sprintf("https://connect.pluggy.ai/?connect_token=%s&connectToken=%s", url.QueryEscape(token), url.QueryEscape(token))
-
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]any{
-		"connect_token":      token,
-		"widget_url":         widgetURL,
-		"api_key":            apiKey,
-		"expires_in_minutes": 30,
-		"client_user_id":     userID,
+		"key_version": backup.KeyVersion,
+		"updated_at":  backup.UpdatedAt,
 	})
 }
 
-// GetSessionToken emite uma apiKey efêmera da Pluggy para o cliente móvel realizar o Edge-Sync.
-func (h *FinanceHandler) GetSessionToken(w http.ResponseWriter, r *http.Request) {
-	_, ok := middleware.UserIDFromContext(r.Context())
-	if !ok {
+// GetByokBackup retorna o blob opaco cifrado do usuário autenticado ou 404 se inexistente.
+func (h *FinanceHandler) GetByokBackup(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok || userID == "" {
 		http.Error(w, "não autorizado", http.StatusUnauthorized)
 		return
 	}
 
-	apiKey, err := h.financeSvc.GetSessionToken(r.Context())
+	backup, err := h.financeSvc.GetByokBackup(r.Context(), userID)
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusPreconditionRequired)
-		_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		if errors.Is(err, domain.ErrByokBackupNotFound) {
+			w.WriteHeader(http.StatusNotFound)
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+			return
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "erro ao buscar backup BYOK"})
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]string{
-		"api_key": apiKey,
-	})
+	_ = json.NewEncoder(w).Encode(backup)
 }
 
-// GetTestToken emite token de teste/sandbox para o MVP rápido.
-func (h *FinanceHandler) GetTestToken(w http.ResponseWriter, r *http.Request) {
+// DeleteByokBackup remove o blob opaco cifrado do usuário autenticado.
+func (h *FinanceHandler) DeleteByokBackup(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok || userID == "" {
-		userID = "user_mvp_test"
+		http.Error(w, "não autorizado", http.StatusUnauthorized)
+		return
 	}
 
-	token, _ := h.financeSvc.GenerateConnectToken(r.Context(), userID)
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]any{
-		"connect_token":      token,
-		"expires_in_minutes": 60,
-		"client_user_id":     userID,
-	})
+	if err := h.financeSvc.DeleteByokBackup(r.Context(), userID); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "erro ao remover backup BYOK"})
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // ListTransactions lista transações com paginação.

@@ -6,10 +6,18 @@ import (
 )
 
 var (
-	ErrFinanceConnectionNotFound   = errors.New("conexão financeira não encontrada")
-	ErrFinanceAccountNotFound      = errors.New("conta bancária não encontrada")
-	ErrFinanceInvalidPayload       = errors.New("payload financeiro inválido")
-	ErrPluggyCredentialsMissing    = errors.New("credenciais do Open Finance não configuradas no servidor (configure PLUGGY_CLIENT_ID e PLUGGY_CLIENT_SECRET no .env)")
+	ErrFinanceConnectionNotFound = errors.New("conexão financeira não encontrada")
+	ErrFinanceAccountNotFound    = errors.New("conta bancária não encontrada")
+	ErrFinanceInvalidPayload     = errors.New("payload financeiro inválido")
+	ErrByokBackupNotFound        = errors.New("backup BYOK não encontrado")
+	ErrByokBackupInvalid         = errors.New("backup BYOK inválido")
+)
+
+const (
+	// MaxByokCiphertextBytes limita o blob opaco cifrado no cliente (16 KiB).
+	MaxByokCiphertextBytes = 16 * 1024
+	// MaxByokNonceBytes limita o tamanho do nonce criptográfico (256 bytes).
+	MaxByokNonceBytes = 256
 )
 
 type AccountType string
@@ -70,6 +78,9 @@ type FinanceAccount struct {
 	CreditLimit          *float64    `json:"credit_limit,omitempty"`
 	AvailableCreditLimit *float64    `json:"available_credit_limit,omitempty"`
 	CurrencyCode         string      `json:"currency_code"`
+	ClosingDay           *int        `json:"closing_day,omitempty"` // dia do fechamento da fatura (cartão)
+	DueDay               *int        `json:"due_day,omitempty"`     // dia do vencimento da fatura (cartão)
+	MinimumPayment       *float64    `json:"minimum_payment,omitempty"`
 	UpdatedAt            time.Time   `json:"updated_at"`
 }
 
@@ -88,6 +99,13 @@ type FinanceTransaction struct {
 	IsRecurring         bool            `json:"is_recurring"`
 	OccurredAt          time.Time       `json:"occurred_at"`
 	CreatedAt           time.Time       `json:"created_at"`
+	// PluggyAccountID permite ao backend resolver account_id quando o cliente só conhece o id da Pluggy.
+	PluggyAccountID   string `json:"pluggy_account_id,omitempty"`
+	InstallmentNumber *int   `json:"installment_number,omitempty"`
+	TotalInstallments *int   `json:"total_installments,omitempty"`
+	PaymentType       string `json:"payment_type,omitempty"` // INSTALLMENT, SINGLE
+	MCC               *int   `json:"mcc,omitempty"`
+	Status            string `json:"status,omitempty"` // PENDING, POSTED
 }
 
 // FinanceBudgetAndGoal representa um teto de gastos por categoria ou meta de economia.
@@ -167,4 +185,13 @@ type FinanceSyncPayload struct {
 	InstitutionName string               `json:"institution_name,omitempty"`
 	Accounts        []FinanceAccount     `json:"accounts"`
 	Transactions    []FinanceTransaction `json:"transactions"`
+}
+
+// FinanceByokBackup representa o blob opaco cifrado no cliente contendo as chaves BYOK do usuário.
+type FinanceByokBackup struct {
+	UserID     string    `json:"-"`
+	Ciphertext []byte    `json:"ciphertext"`
+	Nonce      []byte    `json:"nonce"`
+	KeyVersion int       `json:"key_version"`
+	UpdatedAt  time.Time `json:"updated_at"`
 }

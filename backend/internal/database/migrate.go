@@ -370,6 +370,24 @@ func runVersionedMigrations(db *sql.DB) error {
 			}
 			continue
 		}
+		if version == "024_finance_cards_installments.sql" {
+			if err := applyFinanceCardsMigration(db, name); err != nil {
+				return err
+			}
+			if err := recordMigration(db, version); err != nil {
+				return err
+			}
+			continue
+		}
+		if version == "025_finance_byok_backup.sql" {
+			if err := applyFinanceByokBackupMigration(db, name); err != nil {
+				return err
+			}
+			if err := recordMigration(db, version); err != nil {
+				return err
+			}
+			continue
+		}
 		content, err := migrationFS.ReadFile(name)
 		if err != nil {
 			return err

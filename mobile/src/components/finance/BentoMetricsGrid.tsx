@@ -1,205 +1,256 @@
 import React from 'react';
 import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { tokens } from '../../theme/tokens';
+import { tokens, tabularNumbers } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
-import type { FinancialSummary, FinanceAccount } from '../../types/finance';
+import type { FinanceAccount, FinanceSubScreenKey, FinancialSummary } from '../../types/finance';
+import {
+  buildFinScale,
+  computeCreditCardStats,
+  formatBRL,
+  getCategoryAmount,
+  hasSubscriptionIncrease,
+  maskBRL,
+} from './financeHelpers';
 
 interface BentoMetricsGridProps {
   summary: FinancialSummary;
   accounts: FinanceAccount[];
   isPrivacyHidden: boolean;
-  onPressCard?: (cardType: string) => void;
+  onOpenSubScreen: (key: FinanceSubScreenKey) => void;
+  onPressSafeToSpend: () => void;
 }
 
 export const BentoMetricsGrid: React.FC<BentoMetricsGridProps> = ({
   summary,
   accounts,
   isPrivacyHidden,
-  onPressCard,
+  onOpenSubScreen,
+  onPressSafeToSpend,
 }) => {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
+  const finScale = buildFinScale(colors.fin);
 
-  const formatBRL = (val: number) =>
-    `R$ ${Math.abs(val).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const monthExpenses = summary.month_expenses ?? summary.monthly_spend_actual ?? 0;
+  const monthIncome = summary.month_income ?? 0;
+  const leftover = monthIncome - monthExpenses;
+  const hasFlowData = monthIncome > 0 || monthExpenses > 0;
 
-  const cardBg = colors.surf;
-  const cardBorder = colors.line;
-
-  // Extrai contas de cartão de crédito e dados de limite
-  const creditAccounts = accounts.filter((a) => a.account_type === 'CREDIT');
-  const creditAccount = creditAccounts[0];
-  const creditLimitTotal = creditAccount?.credit_limit ?? 4300;
-  const creditBillAmount = summary.open_credit_card_bills > 0 ? summary.open_credit_card_bills : 249;
-  const creditAvailable = Math.max(0, creditLimitTotal - creditBillAmount);
-  const creditPercentUsed = Math.min(100, Math.round((creditBillAmount / creditLimitTotal) * 100));
-
-  // Entradas e Saídas do mês (Fluxo de caixa)
-  const monthExpenses = summary.month_expenses && summary.month_expenses > 0
-    ? summary.month_expenses
-    : (summary.open_credit_card_bills > 0 ? summary.open_credit_card_bills + 155.52 : 404.52);
-  const monthIncome = summary.month_income && summary.month_income > 0 ? summary.month_income : 86.0;
-
-  // Assinaturas do mês
-  const subscriptionsTotal = summary.subscriptions.reduce((acc, s) => acc + s.amount, 0) || 212.31;
-  const subscriptionsCount = summary.subscriptions.length || 4;
+  const creditStats = computeCreditCardStats(accounts, summary);
+  const subscriptionsTotal = summary.subscriptions.reduce((acc, s) => acc + (s.amount || 0), 0);
+  const subscriptionsCount = summary.subscriptions.length;
+  const priceIncreaseCount = summary.subscriptions.filter(hasSubscriptionIncrease).length;
+  const categories = summary.category_spending.slice(0, 5);
 
   return (
     <View style={styles.gridContainer}>
-      {/* Linha 1: Gastos do Mês e Fluxo de Caixa */}
+      {/* Linha 1: Gastos do mês | Fluxo de caixa */}
       <View style={styles.gridRow}>
-        {/* Card Gastos do Mês */}
         <TouchableOpacity
-          style={[styles.bentoTile, { backgroundColor: cardBg, borderColor: cardBorder }]}
-          onPress={() => onPressCard?.('expenses')}
-          activeOpacity={0.85}
+          style={[styles.tile, { backgroundColor: colors.bg, borderColor: colors.line }]}
+          onPress={() => onOpenSubScreen('spend')}
+          activeOpacity={0.82}
         >
           <View style={styles.tileHeader}>
-            <Text style={[styles.tileLabel, { color: colors.muted }]}>Gastos do mês</Text>
+            <Text style={[styles.tileTitle, { color: colors.muted }]}>Gastos do mês</Text>
             <MaterialIcons name="chevron-right" size={16} color={colors.muted} />
           </View>
-          <Text style={[styles.tileMainValue, { color: colors.ink }]}>
-            {isPrivacyHidden ? '••••••' : formatBRL(monthExpenses)}
+          <Text style={[styles.tileValue, tabularNumbers, { color: colors.ink }]}>
+            {maskBRL(isPrivacyHidden, formatBRL(monthExpenses))}
           </Text>
-
-          {/* Barras coloridas de categorias (Ciano, Lilás) */}
-          <View style={styles.categoryBarsRow}>
-            <View style={[styles.catBarSegment, { flex: 6, backgroundColor: '#06B6D4' }]} />
-            <View style={[styles.catBarSegment, { flex: 4, backgroundColor: '#8B5CF6' }]} />
+          <View style={styles.segmentedBar}>
+            {categories.length > 0 ? (
+              categories.map((cat, idx) => (
+                <View
+                  key={`${cat.category}_${idx}`}
+                  style={[
+                    styles.segmentedPiece,
+                    {
+                      flex: Math.max(1, getCategoryAmount(cat)),
+                      backgroundColor: finScale[idx % finScale.length],
+                    },
+                  ]}
+                />
+              ))
+            ) : (
+              <View style={[styles.segmentedPiece, { flex: 1, backgroundColor: colors.line }]} />
+            )}
           </View>
-          <Text style={[styles.tileSubtext, { color: colors.muted }]}>
-            {summary.category_spending.length > 0 ? `${summary.category_spending.length} categorias` : '2 categorias'}
+          <Text style={[styles.tileSub, { color: colors.muted }]}>
+            {summary.category_spending.length}{' '}
+            {summary.category_spending.length === 1 ? 'categoria' : 'categorias'}
           </Text>
         </TouchableOpacity>
 
-        {/* Card Fluxo de Caixa */}
         <TouchableOpacity
-          style={[styles.bentoTile, { backgroundColor: cardBg, borderColor: cardBorder }]}
-          onPress={() => onPressCard?.('cashflow')}
-          activeOpacity={0.85}
+          style={[styles.tile, { backgroundColor: colors.bg, borderColor: colors.line }]}
+          onPress={() => onOpenSubScreen('flow')}
+          activeOpacity={0.82}
         >
           <View style={styles.tileHeader}>
-            <Text style={[styles.tileLabel, { color: colors.muted }]}>Fluxo de caixa</Text>
+            <Text style={[styles.tileTitle, { color: colors.muted }]}>Fluxo de caixa</Text>
             <MaterialIcons name="chevron-right" size={16} color={colors.muted} />
           </View>
-          <Text style={[styles.cashInText, { color: '#10B981' }]}>
-            {isPrivacyHidden ? '••••••' : `+${formatBRL(monthIncome)}`}
+          <Text
+            style={[
+              styles.tileValue,
+              tabularNumbers,
+              { color: leftover >= 0 ? colors.acc : colors.red },
+            ]}
+          >
+            {isPrivacyHidden
+              ? 'R$ ••••'
+              : `${leftover >= 0 ? '+' : '−'}${formatBRL(leftover)}`}
           </Text>
-          <Text style={[styles.cashOutText, { color: '#EF4444' }]}>
-            {isPrivacyHidden ? '••••••' : `-${formatBRL(monthExpenses - monthIncome > 0 ? monthExpenses - monthIncome : 155.52)}`}
-          </Text>
-
-          {/* Barra comparativa Entrada vs Saída */}
-          <View style={styles.cashFlowBarTrack}>
-            <View style={[styles.cashFlowInBar, { flex: 3.5, backgroundColor: '#A3E635' }]} />
-            <View style={[styles.cashFlowOutBar, { flex: 6.5, backgroundColor: '#EF4444' }]} />
+          <View style={styles.segmentedBar}>
+            {hasFlowData ? (
+              <>
+                {monthIncome > 0 && (
+                  <View
+                    style={[
+                      styles.segmentedPiece,
+                      { flex: monthIncome, backgroundColor: colors.acc },
+                    ]}
+                  />
+                )}
+                {monthExpenses > 0 && (
+                  <View
+                    style={[
+                      styles.segmentedPiece,
+                      { flex: monthExpenses, backgroundColor: colors.red },
+                    ]}
+                  />
+                )}
+              </>
+            ) : (
+              <View style={[styles.segmentedPiece, { flex: 1, backgroundColor: colors.line }]} />
+            )}
           </View>
+          <Text style={[styles.tileSub, { color: colors.muted }]}>
+            {leftover >= 0 ? 'Sobra no mês' : 'Déficit no mês'}
+          </Text>
         </TouchableOpacity>
       </View>
 
-      {/* Linha 2: Fatura do Cartão e Limite de Crédito */}
+      {/* Linha 2: Fatura atual | Limite usado */}
       <View style={styles.gridRow}>
-        {/* Card Fatura Atual */}
         <TouchableOpacity
-          style={[styles.bentoTile, { backgroundColor: cardBg, borderColor: cardBorder }]}
-          onPress={() => onPressCard?.('credit_card')}
-          activeOpacity={0.85}
+          style={[styles.tile, { backgroundColor: colors.bg, borderColor: colors.line }]}
+          onPress={() => onOpenSubScreen('card')}
+          activeOpacity={0.82}
         >
           <View style={styles.tileHeader}>
-            <View style={styles.creditCardLogoRow}>
-              <View style={styles.nuMiniLogo}>
-                <Text style={styles.nuMiniText}>nu</Text>
-              </View>
-              <Text style={[styles.cardDigitsText, { color: colors.muted }]}>
-                {creditAccounts.length > 1 ? `${creditAccounts.length} cartões` : '•••• 6327'}
+            <View style={styles.cardBadgeRow}>
+              {creditStats.primaryBrand ? (
+                <View
+                  style={[
+                    styles.miniBrandAvatar,
+                    { backgroundColor: creditStats.primaryBrand.color },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.miniBrandText,
+                      { color: creditStats.primaryBrand.textColor },
+                    ]}
+                  >
+                    {creditStats.primaryBrand.initials}
+                  </Text>
+                </View>
+              ) : (
+                <MaterialIcons name="credit-card" size={16} color={colors.muted} />
+              )}
+              <Text style={[styles.tileTitle, { color: colors.muted }]}>
+                {creditStats.creditAccounts.length > 0
+                  ? `${creditStats.creditAccounts.length} ${
+                      creditStats.creditAccounts.length === 1 ? 'cartão' : 'cartões'
+                    }`
+                  : 'Cartões'}
               </Text>
             </View>
             <MaterialIcons name="chevron-right" size={16} color={colors.muted} />
           </View>
-          <Text style={[styles.tileLabel, { color: colors.muted, marginTop: 4 }]}>Fatura Atual</Text>
-          <Text style={[styles.tileMainValue, { color: colors.ink }]}>
-            {isPrivacyHidden ? '••••••' : formatBRL(creditBillAmount)}
+          <Text style={[styles.tileSub, { color: colors.muted, marginTop: 6 }]}>Fatura atual</Text>
+          <Text style={[styles.tileValue, tabularNumbers, { color: colors.ink, marginTop: 2 }]}>
+            {maskBRL(isPrivacyHidden, formatBRL(creditStats.totalBill))}
           </Text>
-          <Text style={[styles.tileSubtext, { color: '#F59E0B' }]}>Vence 16 de Novembro</Text>
+          <Text
+            style={[
+              styles.tileSub,
+              {
+                color: creditStats.hasBillAlert ? colors.orange : colors.muted,
+                fontWeight: creditStats.hasBillAlert ? '600' : '500',
+              },
+            ]}
+          >
+            {creditStats.dueLabel}
+          </Text>
         </TouchableOpacity>
 
-        {/* Card Limite Usado */}
         <TouchableOpacity
-          style={[styles.bentoTile, { backgroundColor: cardBg, borderColor: cardBorder }]}
-          onPress={() => onPressCard?.('credit_limit')}
-          activeOpacity={0.85}
+          style={[styles.tile, { backgroundColor: colors.bg, borderColor: colors.line }]}
+          onPress={() => onOpenSubScreen('card')}
+          activeOpacity={0.82}
         >
           <View style={styles.tileHeader}>
-            <Text style={[styles.tileLabel, { color: colors.muted }]}>Limite usado</Text>
+            <Text style={[styles.tileTitle, { color: colors.muted }]}>Limite usado</Text>
             <MaterialIcons name="chevron-right" size={16} color={colors.muted} />
           </View>
-          <Text style={[styles.tileMainValue, { color: colors.ink }]}>
-            {isPrivacyHidden ? '••••••' : formatBRL(creditBillAmount)}
+          <Text style={[styles.tileValue, tabularNumbers, { color: colors.ink }]}>
+            {maskBRL(isPrivacyHidden, formatBRL(creditStats.totalBill))}
           </Text>
-
           <View style={[styles.progressTrack, { backgroundColor: colors.line }]}>
-            <View style={[styles.progressFill, { width: `${creditPercentUsed}%`, backgroundColor: colors.acc || '#A3E635' }]} />
+            <View
+              style={[
+                styles.progressFill,
+                {
+                  width: `${creditStats.usedPercent}%`,
+                  backgroundColor: colors.acc,
+                },
+              ]}
+            />
           </View>
-          <Text style={[styles.tileSubtext, { color: colors.muted }]}>
-            {isPrivacyHidden ? 'Disp: ••••••' : `Disp: ${formatBRL(creditAvailable)}`}
+          <Text style={[styles.tileSub, { color: colors.muted }]}>
+            {isPrivacyHidden
+              ? 'Disp: R$ ••••'
+              : `Disp: ${formatBRL(creditStats.totalAvailable)}`}
           </Text>
         </TouchableOpacity>
       </View>
 
-      {/* Linha 3: Assinaturas e Safe-to-Spend Diário */}
+      {/* Linha 3: Assinaturas | Pode gastar hoje */}
       <View style={styles.gridRow}>
-        {/* Card Assinaturas */}
         <TouchableOpacity
-          style={[styles.bentoTile, { backgroundColor: cardBg, borderColor: cardBorder }]}
-          onPress={() => onPressCard?.('subscriptions')}
-          activeOpacity={0.85}
+          style={[styles.tile, { backgroundColor: colors.bg, borderColor: colors.line }]}
+          onPress={() => onOpenSubScreen('sub')}
+          activeOpacity={0.82}
         >
           <View style={styles.tileHeader}>
-            <View style={styles.subsIconsOverlapping}>
-              <View style={[styles.subMiniIcon, { backgroundColor: '#EF4444', borderColor: cardBg }]}>
-                <Text style={styles.subMiniLetter}>C</Text>
-              </View>
-              <View style={[styles.subMiniIcon, { backgroundColor: '#3B82F6', borderColor: cardBg, marginLeft: -6 }]}>
-                <Text style={styles.subMiniLetter}>G</Text>
-              </View>
-              <View style={[styles.subMiniIcon, { backgroundColor: '#0284C7', borderColor: cardBg, marginLeft: -6 }]}>
-                <Text style={styles.subMiniLetter}>P</Text>
-              </View>
-              <View style={[styles.subMiniIconPlus, { backgroundColor: colors.bg, borderColor: cardBg, marginLeft: -6 }]}>
-                <Text style={[styles.subMiniPlusText, { color: colors.ink }]}>+1</Text>
-              </View>
-            </View>
+            <Text style={[styles.tileTitle, { color: colors.muted }]}>Assinaturas</Text>
             <MaterialIcons name="chevron-right" size={16} color={colors.muted} />
           </View>
-          <Text style={[styles.tileLabel, { color: colors.muted, marginTop: 4 }]}>Assinaturas</Text>
-          <Text style={[styles.tileMainValue, { color: colors.ink }]}>
-            {isPrivacyHidden ? '••••••' : formatBRL(subscriptionsTotal)}
+          <Text style={[styles.tileValue, tabularNumbers, { color: colors.ink }]}>
+            {maskBRL(isPrivacyHidden, formatBRL(subscriptionsTotal))}
           </Text>
-          <Text style={[styles.tileSubtext, { color: colors.muted }]}>
-            {subscriptionsCount} assinaturas
+          <Text style={[styles.tileSub, { color: colors.muted }]}>
+            {subscriptionsCount} {subscriptionsCount === 1 ? 'serviço' : 'serviços'}
+            {priceIncreaseCount > 0 ? ` · ${priceIncreaseCount} reajuste` : ''}
           </Text>
         </TouchableOpacity>
 
-        {/* Card Safe-to-Spend Diário */}
         <TouchableOpacity
-          style={[styles.bentoTile, { backgroundColor: cardBg, borderColor: cardBorder }]}
-          onPress={() => onPressCard?.('safe_to_spend')}
-          activeOpacity={0.85}
+          style={[styles.tile, { backgroundColor: colors.bg, borderColor: colors.line }]}
+          onPress={onPressSafeToSpend}
+          activeOpacity={0.82}
         >
           <View style={styles.tileHeader}>
-            <View style={styles.safeIconPill}>
-              <MaterialIcons name="auto-awesome" size={12} color="#10B981" />
-              <Text style={styles.safePillText}>Vito AI</Text>
-            </View>
-            <MaterialIcons name="chevron-right" size={16} color={colors.muted} />
+            <Text style={[styles.tileTitle, { color: colors.muted }]}>Pode gastar hoje</Text>
           </View>
-          <Text style={[styles.tileLabel, { color: colors.muted, marginTop: 4 }]}>Pode gastar hoje</Text>
-          <Text style={[styles.dailySafeValue, { color: '#10B981' }]}>
-            {isPrivacyHidden ? '••••••' : `R$ ${Math.round(summary.safe_to_spend_daily || 35)}`}
-            <Text style={[styles.dailyUnit, { color: colors.muted }]}>/dia</Text>
+          <Text style={[styles.tileValue, tabularNumbers, { color: colors.ink }]}>
+            {maskBRL(isPrivacyHidden, formatBRL(summary.safe_to_spend_daily, 0))}
           </Text>
-          <Text style={[styles.tileSubtext, { color: colors.muted }]}>
-            até o fim do mês ({summary.days_remaining_in_month || 21}d)
+          <Text style={[styles.tileSub, { color: colors.muted }]}>
+            por dia · {summary.days_remaining_in_month}d restantes
           </Text>
         </TouchableOpacity>
       </View>
@@ -209,165 +260,79 @@ export const BentoMetricsGrid: React.FC<BentoMetricsGridProps> = ({
 
 const styles = StyleSheet.create({
   gridContainer: {
-    gap: 10,
-    marginBottom: 16,
+    gap: 12,
+    marginBottom: 14,
   },
   gridRow: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 12,
   },
-  bentoTile: {
+  tile: {
     flex: 1,
+    minWidth: 0,
     borderRadius: 20,
     borderWidth: 1,
     padding: 14,
-    minHeight: 128,
     justifyContent: 'space-between',
   },
   tileHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 4,
+    gap: 6,
   },
-  tileLabel: {
-    fontSize: 12,
-    fontWeight: '500',
+  tileTitle: {
+    fontSize: 13.5,
+    fontWeight: '600',
   },
-  tileMainValue: {
+  tileValue: {
     fontFamily: tokens.typography.family.montserratBold,
     fontSize: 20,
     fontWeight: '800',
     letterSpacing: -0.5,
-  },
-  tileSubtext: {
-    fontSize: 11,
-    fontWeight: '500',
-    marginTop: 4,
-  },
-  categoryBarsRow: {
-    flexDirection: 'row',
-    gap: 4,
-    height: 5,
-    borderRadius: 2.5,
-    overflow: 'hidden',
     marginTop: 8,
   },
-  catBarSegment: {
-    height: '100%',
-    borderRadius: 2.5,
+  tileSub: {
+    fontSize: 12.5,
+    fontWeight: '500',
+    marginTop: 8,
   },
-  cashInText: {
-    fontSize: 14,
-    fontWeight: '700',
-    fontFamily: tokens.typography.family.montserratBold,
-  },
-  cashOutText: {
-    fontSize: 13,
-    fontWeight: '700',
-    marginTop: 1,
-  },
-  cashFlowBarTrack: {
+  segmentedBar: {
     flexDirection: 'row',
     gap: 3,
-    height: 4,
-    borderRadius: 2,
+    height: 6,
+    marginTop: 12,
+    borderRadius: 3,
     overflow: 'hidden',
-    marginTop: 6,
   },
-  cashFlowInBar: {
+  segmentedPiece: {
     height: '100%',
-    borderRadius: 2,
+    borderRadius: 3,
   },
-  cashFlowOutBar: {
-    height: '100%',
-    borderRadius: 2,
-  },
-  creditCardLogoRow: {
+  cardBadgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 7,
   },
-  nuMiniLogo: {
-    width: 20,
-    height: 20,
-    borderRadius: 6,
-    backgroundColor: '#820AD1',
+  miniBrandAvatar: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  nuMiniText: {
-    color: '#FFFFFF',
+  miniBrandText: {
     fontSize: 9,
-    fontWeight: '800',
-    fontFamily: tokens.typography.family.montserratBold,
-  },
-  cardDigitsText: {
-    fontSize: 11,
-    fontWeight: '500',
+    fontWeight: '700',
   },
   progressTrack: {
-    height: 5,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 2.5,
+    height: 8,
+    borderRadius: 4,
     overflow: 'hidden',
-    marginTop: 8,
+    marginTop: 10,
   },
   progressFill: {
     height: '100%',
-    borderRadius: 2.5,
-  },
-  subsIconsOverlapping: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  subMiniIcon: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-  },
-  subMiniLetter: {
-    color: '#FFFFFF',
-    fontSize: 8,
-    fontWeight: '800',
-  },
-  subMiniIconPlus: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-  },
-  subMiniPlusText: {
-    fontSize: 7.5,
-    fontWeight: '700',
-  },
-  safeIconPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(16, 185, 129, 0.12)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-  safePillText: {
-    color: '#10B981',
-    fontSize: 9.5,
-    fontWeight: '700',
-  },
-  dailySafeValue: {
-    fontFamily: tokens.typography.family.montserratBold,
-    fontSize: 20,
-    fontWeight: '800',
-    letterSpacing: -0.5,
-  },
-  dailyUnit: {
-    fontSize: 12,
-    fontWeight: '500',
+    borderRadius: 4,
   },
 });

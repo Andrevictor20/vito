@@ -16,14 +16,36 @@ func TestVersionedMigrations_FreshDB(t *testing.T) {
 	if err := db.QueryRow(`SELECT COUNT(*) FROM schema_migrations`).Scan(&count); err != nil {
 		t.Fatal(err)
 	}
-	if count != 23 {
-		t.Fatalf("esperava 23 migrações registradas, vieram %d", count)
+	if count != 25 {
+		t.Fatalf("esperava 25 migrações registradas, vieram %d", count)
+	}
+	if !hasTable(db, "finance_byok_backup") ||
+		!hasColumn(db, "finance_byok_backup", "user_id") ||
+		!hasColumn(db, "finance_byok_backup", "ciphertext") ||
+		!hasColumn(db, "finance_byok_backup", "nonce") ||
+		!hasColumn(db, "finance_byok_backup", "key_version") ||
+		!hasColumn(db, "finance_byok_backup", "updated_at") {
+		t.Fatal("025 deveria criar finance_byok_backup com todas as colunas esperadas")
 	}
 	if !hasTable(db, "finance_connections") ||
 		!hasTable(db, "finance_accounts") ||
 		!hasTable(db, "finance_transactions") ||
 		!hasTable(db, "finance_budgets_and_goals") {
 		t.Fatal("023 deveria criar tabelas de conexões, contas, transações e orçamentos financeiros")
+	}
+	if !hasTable(db, "finance_credit_bills") ||
+		!hasTable(db, "finance_installment_plans") ||
+		!hasTable(db, "finance_merchants") ||
+		!hasTable(db, "finance_category_rules") {
+		t.Fatal("024 deveria criar faturas, planos de parcelamento, comerciantes e regras de categoria")
+	}
+	if !hasColumn(db, "finance_transactions", "installment_number") ||
+		!hasColumn(db, "finance_transactions", "total_installments") ||
+		!hasColumn(db, "finance_transactions", "bill_id") ||
+		!hasColumn(db, "finance_transactions", "merchant_id") ||
+		!hasColumn(db, "finance_accounts", "closing_day") ||
+		!hasColumn(db, "finance_accounts", "due_day") {
+		t.Fatal("024 deveria adicionar colunas de parcelas, fatura, comerciante e ciclo do cartão")
 	}
 	if !hasColumn(db, "user_ai_settings", "persona_style") ||
 		!hasColumn(db, "user_ai_settings", "preferred_voice") {
@@ -117,8 +139,52 @@ func TestVersionedMigrations_LegacyDB(t *testing.T) {
 	if err := db2.QueryRow(`SELECT COUNT(*) FROM schema_migrations`).Scan(&count); err != nil {
 		t.Fatal(err)
 	}
-	if count != 23 {
-		t.Fatalf("base legada deveria ser carimbada com 23, veio %d", count)
+	if count != 25 {
+		t.Fatalf("base legada deveria ser carimbada com 25, veio %d", count)
+	}
+}
+
+func TestVersionedMigrations_025_ByokBackupIdempotentAndCascade(t *testing.T) {
+	db, err := Open(filepath.Join(t.TempDir(), "byok_025.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	if _, err := db.Exec(`PRAGMA foreign_keys = ON`); err != nil {
+		t.Fatal(err)
+	}
+	_, err = db.Exec(`INSERT INTO users (id, name, email, password_hash, created_at, updated_at) VALUES ('u-byok', 'BYOK', 'byok@test.com', 'h', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = db.Exec(`INSERT INTO finance_byok_backup (user_id, ciphertext, nonce, key_version, updated_at) VALUES ('u-byok', X'010203', X'040506', 2, CURRENT_TIMESTAMP)`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Reexecutar a migration 025 deve ser 100% idempotente e preservar os dados.
+	if err := applyFinanceByokBackupMigration(db, "migrations/025_finance_byok_backup.sql"); err != nil {
+		t.Fatalf("reexecução idempotente da 025 falhou: %v", err)
+	}
+	var keyVersion int
+	if err := db.QueryRow(`SELECT key_version FROM finance_byok_backup WHERE user_id = 'u-byok'`).Scan(&keyVersion); err != nil {
+		t.Fatalf("registro existente deveria ser preservado após reexecução da 025: %v", err)
+	}
+	if keyVersion != 2 {
+		t.Fatalf("esperava key_version=2, veio %d", keyVersion)
+	}
+
+	// ON DELETE CASCADE ao excluir usuário.
+	if _, err := db.Exec(`DELETE FROM users WHERE id = 'u-byok'`); err != nil {
+		t.Fatal(err)
+	}
+	var remaining int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM finance_byok_backup WHERE user_id = 'u-byok'`).Scan(&remaining); err != nil {
+		t.Fatal(err)
+	}
+	if remaining != 0 {
+		t.Fatalf("esperava remoção em cascata do backup BYOK, restaram %d", remaining)
 	}
 }
 

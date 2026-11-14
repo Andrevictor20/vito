@@ -312,7 +312,7 @@ func main() {
 	chatHandler := handler.NewChatHandler(chatSvc)
 
 	financeRepo := repository.NewFinanceRepository(db)
-	financeSvc := service.NewFinanceService(financeRepo, cfg.PluggyClientID, cfg.PluggyClientSecret)
+	financeSvc := service.NewFinanceService(financeRepo)
 	financeHandler := handler.NewFinanceHandler(financeSvc)
 
 	evoClient := service.NewDefaultEvolutionClient(cfg.EvolutionAPIURL, cfg.EvolutionAPIKey, nil)

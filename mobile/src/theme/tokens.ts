@@ -89,6 +89,8 @@ export const lightColors = {
   orangeBg: '#fbebdb',
   teal: '#0e8f9b',
   tealBg: '#dff3f5',
+  fin: '#a8710a',
+  finBg: '#fbf0d8',
 
   // M3 Primary
   primary: '#17191b', // ink
@@ -194,6 +196,8 @@ export const darkColors = {
   orangeBg: '#35230f',
   teal: '#3cc4d0',
   tealBg: '#10343a',
+  fin: '#f5b93d',
+  finBg: '#3a2b0b',
 
   // M3 Primary
   primary: '#f1f3f2', // ink

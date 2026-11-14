@@ -8,6 +8,16 @@ import {
   FinanceConnectTokenResponse,
 } from '../../types/finance';
 
+export interface ByokBackupPayload {
+  ciphertext: string;
+  nonce: string;
+  key_version: number;
+}
+
+export interface ByokBackupRecord extends ByokBackupPayload {
+  updated_at?: string;
+}
+
 export class FinanceApi {
   constructor(private client: ApiClient) {}
 
@@ -84,6 +94,38 @@ export class FinanceApi {
     return this.client.request<{ processed_accounts: number; processed_transactions: number }>('/api/v1/finance/sync', {
       method: 'POST',
       body: JSON.stringify(payload),
+    });
+  }
+
+  /**
+   * Salva blob cifrado no cliente com as chaves BYOK do usuário (`PUT /finance/byok-backup`).
+   */
+  async saveByokBackup(payload: ByokBackupPayload): Promise<{ status?: string; updated_at?: string }> {
+    return this.client.request<{ status?: string; updated_at?: string }>('/api/v1/finance/byok-backup', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  /**
+   * Recupera o blob cifrado das chaves BYOK (`GET /finance/byok-backup`). Retorna null se inexistente.
+   */
+  async getByokBackup(): Promise<ByokBackupRecord | null> {
+    try {
+      return await this.client.request<ByokBackupRecord>('/api/v1/finance/byok-backup');
+    } catch (err) {
+      const status = (err as { status?: number } | null)?.status;
+      if (status === 404) return null;
+      throw err;
+    }
+  }
+
+  /**
+   * Remove o backup cifrado das chaves BYOK no servidor (`DELETE /finance/byok-backup`).
+   */
+  async deleteByokBackup(): Promise<void> {
+    await this.client.request<void>('/api/v1/finance/byok-backup', {
+      method: 'DELETE',
     });
   }
 }

@@ -3,7 +3,7 @@
     "name": "Vito",
     "slug": "vito",
     "scheme": "vito",
-    "version": "0.1.25",
+    "version": "0.1.26",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -22,7 +22,7 @@
     },
     "android": {
       "package": "com.andrevmp.vito",
-      "versionCode": 25,
+      "versionCode": 26,
       "googleServicesFile": "./google-services.json",
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
@@ -66,7 +66,7 @@
         "android.permission.READ_CONTACTS"
       ]
     },
-    "runtimeVersion": "d5ecc4898d48d608cc521325c2b186e1edbc9734",
+    "runtimeVersion": "07caecf59c0a3fee57bc1eae6da22d350a643e20",
     "updates": {
       "url": "https://u.expo.dev/b376b3f5-a93f-4f3e-a262-ddded8f96586",
       "checkAutomatically": "ON_LOAD",

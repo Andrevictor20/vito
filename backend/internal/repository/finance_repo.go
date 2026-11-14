@@ -29,6 +29,10 @@ type FinanceRepository interface {
 	GetFinancialSummary(ctx context.Context, userID string, now time.Time) (*domain.FinancialSummary, error)
 	ListBudgetsAndGoals(ctx context.Context, userID string) ([]domain.FinanceBudgetAndGoal, error)
 	UpsertBudgetOrGoal(ctx context.Context, item *domain.FinanceBudgetAndGoal) error
+
+	UpsertByokBackup(ctx context.Context, backup *domain.FinanceByokBackup) error
+	GetByokBackup(ctx context.Context, userID string) (*domain.FinanceByokBackup, error)
+	DeleteByokBackup(ctx context.Context, userID string) error
 }
 
 type sqliteFinanceRepo struct {
@@ -62,12 +66,23 @@ func (r *sqliteFinanceRepo) UpsertConnection(ctx context.Context, conn *domain.F
 			last_sync_at = excluded.last_sync_at,
 			consent_expires_at = excluded.consent_expires_at,
 			updated_at = excluded.updated_at
+		WHERE finance_connections.user_id = excluded.user_id
 	`
-	_, err := r.db.ExecContext(ctx, query,
+	res, err := r.db.ExecContext(ctx, query,
 		conn.ID, conn.UserID, conn.PluggyItemID, conn.ConnectorID, conn.InstitutionName,
 		conn.Status, conn.LastSyncAt, conn.ConsentExpiresAt, conn.CreatedAt, conn.UpdatedAt,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return domain.ErrFinanceConnectionNotFound
+	}
+	return nil
 }
 
 func (r *sqliteFinanceRepo) GetConnection(ctx context.Context, userID, connectionID string) (*domain.FinanceConnection, error) {
@@ -170,8 +185,8 @@ func (r *sqliteFinanceRepo) UpsertAccountsBatch(ctx context.Context, userID stri
 		INSERT INTO finance_accounts (
 			id, user_id, connection_id, pluggy_account_id, institution_name,
 			account_type, account_subtype, name, balance, credit_limit,
-			available_credit_limit, currency_code, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			available_credit_limit, currency_code, closing_day, due_day, minimum_payment, updated_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(pluggy_account_id) DO UPDATE SET
 			institution_name = excluded.institution_name,
 			account_type = excluded.account_type,
@@ -181,7 +196,11 @@ func (r *sqliteFinanceRepo) UpsertAccountsBatch(ctx context.Context, userID stri
 			credit_limit = excluded.credit_limit,
 			available_credit_limit = excluded.available_credit_limit,
 			currency_code = excluded.currency_code,
+			closing_day = COALESCE(excluded.closing_day, finance_accounts.closing_day),
+			due_day = COALESCE(excluded.due_day, finance_accounts.due_day),
+			minimum_payment = COALESCE(excluded.minimum_payment, finance_accounts.minimum_payment),
 			updated_at = excluded.updated_at
+		WHERE finance_accounts.user_id = excluded.user_id
 	`)
 	if err != nil {
 		return err
@@ -205,7 +224,7 @@ func (r *sqliteFinanceRepo) UpsertAccountsBatch(ctx context.Context, userID stri
 		_, err := stmt.ExecContext(ctx,
 			id, userID, connID, a.PluggyAccountID, a.InstitutionName,
 			a.AccountType, a.AccountSubtype, a.Name, a.Balance, a.CreditLimit,
-			a.AvailableCreditLimit, currency, now,
+			a.AvailableCreditLimit, currency, a.ClosingDay, a.DueDay, a.MinimumPayment, now,
 		)
 		if err != nil {
 			return err
@@ -218,7 +237,7 @@ func (r *sqliteFinanceRepo) ListAccounts(ctx context.Context, userID string) ([]
 	query := `
 		SELECT id, user_id, connection_id, pluggy_account_id, institution_name,
 		       account_type, account_subtype, name, balance, credit_limit,
-		       available_credit_limit, currency_code, updated_at
+		       available_credit_limit, currency_code, closing_day, due_day, minimum_payment, updated_at
 		FROM finance_accounts
 		WHERE user_id = ?
 		ORDER BY institution_name ASC, name ASC
@@ -232,15 +251,20 @@ func (r *sqliteFinanceRepo) ListAccounts(ctx context.Context, userID string) ([]
 	var accounts []domain.FinanceAccount
 	for rows.Next() {
 		var a domain.FinanceAccount
-		var sub sql.NullString
-		var credLimit, availLimit sql.NullFloat64
+		var connID, sub sql.NullString
+		var credLimit, availLimit, minPay sql.NullFloat64
+		var closing, due sql.NullInt64
 		err := rows.Scan(
-			&a.ID, &a.UserID, &a.ConnectionID, &a.PluggyAccountID, &a.InstitutionName,
+			&a.ID, &a.UserID, &connID, &a.PluggyAccountID, &a.InstitutionName,
 			&a.AccountType, &sub, &a.Name, &a.Balance, &credLimit,
-			&availLimit, &a.CurrencyCode, &a.UpdatedAt,
+			&availLimit, &a.CurrencyCode, &closing, &due, &minPay, &a.UpdatedAt,
 		)
 		if err != nil {
 			return nil, err
+		}
+		applyAccountCycle(&a, closing, due, minPay)
+		if connID.Valid {
+			a.ConnectionID = connID.String
 		}
 		if sub.Valid {
 			a.AccountSubtype = sub.String
@@ -262,24 +286,29 @@ func (r *sqliteFinanceRepo) GetAccount(ctx context.Context, userID, accountID st
 	query := `
 		SELECT id, user_id, connection_id, pluggy_account_id, institution_name,
 		       account_type, account_subtype, name, balance, credit_limit,
-		       available_credit_limit, currency_code, updated_at
+		       available_credit_limit, currency_code, closing_day, due_day, minimum_payment, updated_at
 		FROM finance_accounts
 		WHERE user_id = ? AND id = ?
 	`
 	row := r.db.QueryRowContext(ctx, query, userID, accountID)
 	var a domain.FinanceAccount
-	var sub sql.NullString
-	var credLimit, availLimit sql.NullFloat64
+	var connID, sub sql.NullString
+	var credLimit, availLimit, minPay sql.NullFloat64
+	var closing, due sql.NullInt64
 	err := row.Scan(
-		&a.ID, &a.UserID, &a.ConnectionID, &a.PluggyAccountID, &a.InstitutionName,
+		&a.ID, &a.UserID, &connID, &a.PluggyAccountID, &a.InstitutionName,
 		&a.AccountType, &sub, &a.Name, &a.Balance, &credLimit,
-		&availLimit, &a.CurrencyCode, &a.UpdatedAt,
+		&availLimit, &a.CurrencyCode, &closing, &due, &minPay, &a.UpdatedAt,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, domain.ErrFinanceAccountNotFound
 	}
 	if err != nil {
 		return nil, err
+	}
+	applyAccountCycle(&a, closing, due, minPay)
+	if connID.Valid {
+		a.ConnectionID = connID.String
 	}
 	if sub.Valid {
 		a.AccountSubtype = sub.String
@@ -362,4 +391,20 @@ func (r *sqliteFinanceRepo) UpsertBudgetOrGoal(ctx context.Context, item *domain
 		item.AutoAlertThreshold, item.CreatedAt, item.UpdatedAt,
 	)
 	return err
+}
+
+// applyAccountCycle copia os campos opcionais do ciclo do cartão (fechamento, vencimento, mínimo).
+func applyAccountCycle(a *domain.FinanceAccount, closing, due sql.NullInt64, minPay sql.NullFloat64) {
+	if closing.Valid {
+		v := int(closing.Int64)
+		a.ClosingDay = &v
+	}
+	if due.Valid {
+		v := int(due.Int64)
+		a.DueDay = &v
+	}
+	if minPay.Valid {
+		v := minPay.Float64
+		a.MinimumPayment = &v
+	}
 }

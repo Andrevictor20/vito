@@ -1,12 +1,8 @@
 package service
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"regexp"
 	"strings"
 	"time"
@@ -19,22 +15,20 @@ import (
 var (
 	rePromptInjectionPatterns = regexp.MustCompile(`(?i)(ignore\s+(all\s+)?previous\s+instructions|system\s*:|assistant\s*:|developer\s*:|<script>|\[INST\]|\[\/INST\])`)
 	reSanitizeControls        = regexp.MustCompile(`[\r\n\t]+`)
+	reUntrustedCloseTag       = regexp.MustCompile(`(?i)</untrusted_content>`)
+	reUntrustedOpenTag        = regexp.MustCompile(`(?i)<untrusted_content`)
+	reUntrustedUserCloseTag   = regexp.MustCompile(`(?i)</untrusted_user_input>`)
+	reUntrustedUserOpenTag    = regexp.MustCompile(`(?i)<untrusted_user_input>`)
 )
 
-// FinanceService gerencia regras de negócio, ingestão edge-sync, segurança e emissão de tokens.
+// FinanceService gerencia regras de negócio, ingestão edge-sync, segurança e backup opaco BYOK.
 type FinanceService struct {
-	repo               repository.FinanceRepository
-	pluggyClientID     string
-	pluggyClientSecret string
+	repo repository.FinanceRepository
 }
 
-// NewFinanceService instancia o serviço financeiro.
-func NewFinanceService(repo repository.FinanceRepository, pluggyClientID, pluggyClientSecret string) *FinanceService {
-	return &FinanceService{
-		repo:               repo,
-		pluggyClientID:     pluggyClientID,
-		pluggyClientSecret: pluggyClientSecret,
-	}
+// NewFinanceService instancia o serviço financeiro (modelo 100% BYOK sem credencial mestra no servidor).
+func NewFinanceService(repo repository.FinanceRepository) *FinanceService {
+	return &FinanceService{repo: repo}
 }
 
 // IngestSyncPayload processa o lote de contas e transações enviado pelo Edge-Sync mobile.
@@ -145,106 +139,50 @@ func (s *FinanceService) GetFinancialSummary(ctx context.Context, userID string)
 	return summary, nil
 }
 
-// GenerateConnectToken emite o token efêmero oficial da Pluggy para o widget de conexão.
-func (s *FinanceService) GenerateConnectToken(ctx context.Context, userID string) (string, error) {
-	if s.pluggyClientID == "" || s.pluggyClientSecret == "" {
-		return "", domain.ErrPluggyCredentialsMissing
+// UpsertByokBackup valida e armazena o blob opaco cifrado no cliente para o usuário autenticado.
+func (s *FinanceService) UpsertByokBackup(ctx context.Context, userID string, ciphertext, nonce []byte, keyVersion int) (*domain.FinanceByokBackup, error) {
+	if strings.TrimSpace(userID) == "" {
+		return nil, domain.ErrByokBackupInvalid
+	}
+	if len(ciphertext) == 0 || len(ciphertext) > domain.MaxByokCiphertextBytes {
+		return nil, domain.ErrByokBackupInvalid
+	}
+	if len(nonce) == 0 || len(nonce) > domain.MaxByokNonceBytes {
+		return nil, domain.ErrByokBackupInvalid
+	}
+	if keyVersion < 0 {
+		return nil, domain.ErrByokBackupInvalid
+	}
+	if keyVersion == 0 {
+		keyVersion = 1
 	}
 
-	apiKey, err := s.fetchPluggyAPIKey(ctx)
-	if err != nil {
-		return "", err
+	backup := &domain.FinanceByokBackup{
+		UserID:     userID,
+		Ciphertext: ciphertext,
+		Nonce:      nonce,
+		KeyVersion: keyVersion,
 	}
-
-	return s.fetchPluggyConnectToken(ctx, apiKey, userID)
+	if err := s.repo.UpsertByokBackup(ctx, backup); err != nil {
+		return nil, err
+	}
+	return backup, nil
 }
 
-// GetSessionToken emite uma apiKey efêmera da Pluggy para o cliente móvel realizar o Edge-Sync.
-func (s *FinanceService) GetSessionToken(ctx context.Context) (string, error) {
-	if s.pluggyClientID == "" || s.pluggyClientSecret == "" {
-		return "", domain.ErrPluggyCredentialsMissing
+// GetByokBackup recupera o blob opaco cifrado no cliente pertencente ao usuário autenticado.
+func (s *FinanceService) GetByokBackup(ctx context.Context, userID string) (*domain.FinanceByokBackup, error) {
+	if strings.TrimSpace(userID) == "" {
+		return nil, domain.ErrByokBackupInvalid
 	}
-	return s.fetchPluggyAPIKey(ctx)
+	return s.repo.GetByokBackup(ctx, userID)
 }
 
-func (s *FinanceService) fetchPluggyAPIKey(ctx context.Context) (string, error) {
-	authBody, _ := json.Marshal(map[string]string{
-		"clientId":     s.pluggyClientID,
-		"clientSecret": s.pluggyClientSecret,
-	})
-
-	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.pluggy.ai/auth", bytes.NewReader(authBody))
-	if err != nil {
-		return "", err
+// DeleteByokBackup remove o blob opaco do usuário autenticado.
+func (s *FinanceService) DeleteByokBackup(ctx context.Context, userID string) error {
+	if strings.TrimSpace(userID) == "" {
+		return domain.ErrByokBackupInvalid
 	}
-	req.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{Timeout: 15 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("falha ao conectar na API da Pluggy: %w", err)
-	}
-	defer resp.Body.Close()
-
-	bodyBytes, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return "", fmt.Errorf("autenticação na Pluggy rejeitada (HTTP %d): %s", resp.StatusCode, string(bodyBytes))
-	}
-
-	var authRes struct {
-		APIKey string `json:"apiKey"`
-	}
-	if err := json.Unmarshal(bodyBytes, &authRes); err != nil || authRes.APIKey == "" {
-		return "", fmt.Errorf("resposta inválida de autenticação da Pluggy: %s", string(bodyBytes))
-	}
-
-	return authRes.APIKey, nil
-}
-
-func (s *FinanceService) fetchPluggyConnectToken(ctx context.Context, apiKey, userID string) (string, error) {
-	tokenReqBody, _ := json.Marshal(map[string]any{
-		"options": map[string]any{
-			"clientUserId":     userID,
-			"oauthRedirectUri": "vito://pluggy-success",
-		},
-	})
-
-	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.pluggy.ai/connect_token", bytes.NewReader(tokenReqBody))
-	if err != nil {
-		return "", err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-API-KEY", apiKey)
-
-	client := &http.Client{Timeout: 15 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("falha ao solicitar connect_token na Pluggy: %w", err)
-	}
-	defer resp.Body.Close()
-
-	bodyBytes, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return "", fmt.Errorf("emissão de connect_token na Pluggy rejeitada (HTTP %d): %s", resp.StatusCode, string(bodyBytes))
-	}
-
-	var tokenRes struct {
-		AccessToken  string `json:"accessToken"`
-		ConnectToken string `json:"connectToken"`
-	}
-	if err := json.Unmarshal(bodyBytes, &tokenRes); err != nil {
-		return "", fmt.Errorf("resposta inválida de connect_token da Pluggy: %s", string(bodyBytes))
-	}
-
-	token := tokenRes.AccessToken
-	if token == "" {
-		token = tokenRes.ConnectToken
-	}
-	if token == "" {
-		return "", fmt.Errorf("connect_token vazio retornado pela Pluggy: %s", string(bodyBytes))
-	}
-
-	return token, nil
+	return s.repo.DeleteByokBackup(ctx, userID)
 }
 
 // CreateConnection cadastra uma nova conexão manualmente.
@@ -274,10 +212,33 @@ func (s *FinanceService) ListTransactions(ctx context.Context, userID string, li
 
 // SanitizeFinancialDescription neutraliza tentativas de prompt injection em extratos bancários.
 func SanitizeFinancialDescription(raw string) string {
-	if raw == "" {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
 		return ""
 	}
-	clean := reSanitizeControls.ReplaceAllString(raw, " ")
+	clean := reSanitizeControls.ReplaceAllString(trimmed, " ")
+
+	var sb strings.Builder
+	sb.Grow(len(clean))
+	for _, r := range clean {
+		if r == '\u200B' || r == '\u200C' || r == '\u200D' || r == '\uFEFF' || r < 32 {
+			continue
+		}
+		sb.WriteRune(r)
+	}
+	clean = sb.String()
+
+	clean = reUntrustedCloseTag.ReplaceAllString(clean, "[escaped_closed_tag]")
+	clean = reUntrustedOpenTag.ReplaceAllString(clean, "[escaped_open_tag")
+	clean = reUntrustedUserCloseTag.ReplaceAllString(clean, "[escaped_closed_tag]")
+	clean = reUntrustedUserOpenTag.ReplaceAllString(clean, "[escaped_open_tag]")
+	clean = strings.ReplaceAll(clean, "```", "")
 	clean = rePromptInjectionPatterns.ReplaceAllLiteralString(clean, "[REDACTED]")
-	return strings.TrimSpace(clean)
+	clean = strings.TrimSpace(clean)
+
+	runes := []rune(clean)
+	if len(runes) > 200 {
+		clean = strings.TrimSpace(string(runes[:200]))
+	}
+	return clean
 }
