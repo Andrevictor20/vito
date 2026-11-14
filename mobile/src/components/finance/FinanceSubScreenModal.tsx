@@ -14,6 +14,7 @@ import { tokens } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { hapticFeedback } from '../../theme/motion';
 import { pagerSwipeLockBus } from '../../services/dataSync';
+import { resolveModalBottomInset, resolveModalTopInset } from '../../utils/safeArea';
 import type {
   FinanceAccount,
   FinanceConnection,
@@ -127,6 +128,7 @@ export const FinanceSubScreenModal: React.FC<FinanceSubScreenModalProps> = ({
       visible={visible}
       animationType="slide"
       presentationStyle="fullScreen"
+      statusBarTranslucent
       onRequestClose={onClose}
     >
       <View
@@ -134,7 +136,7 @@ export const FinanceSubScreenModal: React.FC<FinanceSubScreenModalProps> = ({
           styles.container,
           {
             backgroundColor: colors.bg,
-            paddingTop: Math.max(12, insets.top + 6),
+            paddingTop: resolveModalTopInset(insets.top, 6),
           },
         ]}
       >
@@ -178,7 +180,7 @@ export const FinanceSubScreenModal: React.FC<FinanceSubScreenModalProps> = ({
           showsVerticalScrollIndicator={false}
           contentContainerStyle={[
             styles.scrollContent,
-            { paddingBottom: Math.max(32, insets.bottom + 24) },
+            { paddingBottom: resolveModalBottomInset(insets.bottom, 20) },
           ]}
         >
           {screenKey === 'ext' && (

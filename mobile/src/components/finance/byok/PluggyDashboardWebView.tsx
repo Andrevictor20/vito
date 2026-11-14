@@ -6,6 +6,8 @@ import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import { useTheme } from '../../../context/ThemeContext';
 import { formatWebViewDisplayUrl, isAllowedPluggyWebViewUrl, isPluggyDashboardUrl } from '../../../utils/byokFlow';
 import { parseCapturedKeysMessage } from '../../../utils/pluggyKeys';
+import { resolveModalBottomInset, resolveModalTopInset } from '../../../utils/safeArea';
+import { PLUGGY_CAPTURE_BRIDGE_SCRIPT } from './pluggyWebViewBridge';
 
 interface Props {
   visible: boolean;
@@ -15,82 +17,6 @@ interface Props {
   onCapture: (payload: { clientId?: string; clientSecret?: string }) => void;
   onClose: () => void;
 }
-
-/**
- * Script injetado estritamente limitado:
- * - NUNCA lê <input type="password">, e-mail nem document.cookie.
- * - Intercepta apenas cópia explícita (clipboard.writeText / evento copy) e varredura visível sob demanda.
- */
-const INJECTED_CAPTURE_SCRIPT = `
-(function () {
-  if (window.__vitoPluggyBridgeInstalled) return;
-  window.__vitoPluggyBridgeInstalled = true;
-  var UUID_G = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/ig;
-
-  function post(payload) {
-    try {
-      if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
-        window.ReactNativeWebView.postMessage(JSON.stringify(payload));
-      }
-    } catch (_) {}
-  }
-
-  if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-    var origWrite = navigator.clipboard.writeText.bind(navigator.clipboard);
-    navigator.clipboard.writeText = function (text) {
-      try {
-        var s = typeof text === 'string' ? text : '';
-        if (UUID_G.test(s)) {
-          UUID_G.lastIndex = 0;
-          post({ type: 'clipboard_copy', rawText: s, source: 'clipboard' });
-        }
-      } catch (_) {}
-      return origWrite(text);
-    };
-  }
-
-  document.addEventListener('copy', function () {
-    try {
-      var active = document.activeElement;
-      if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) return;
-      var sel = window.getSelection ? String(window.getSelection()) : '';
-      if (sel && UUID_G.test(sel)) {
-        UUID_G.lastIndex = 0;
-        post({ type: 'clipboard_copy', rawText: sel, source: 'copy' });
-      }
-    } catch (_) {}
-  }, true);
-
-  window.__vitoScanVisibleKeys = function () {
-    try {
-      var walker = document.createTreeWalker(document.body || document.documentElement, NodeFilter.SHOW_TEXT, null);
-      var chunks = [];
-      var node;
-      while ((node = walker.nextNode())) {
-        var el = node.parentElement;
-        if (!el) continue;
-        var tag = el.tagName;
-        if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'NOSCRIPT' || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') continue;
-        var style = window.getComputedStyle ? window.getComputedStyle(el) : null;
-        if (style && (style.display === 'none' || style.visibility === 'hidden')) continue;
-        var txt = (node.nodeValue || '').trim();
-        if (txt) chunks.push(txt);
-      }
-      var joined = chunks.join(' ');
-      var matches = joined.match(UUID_G) || [];
-      var masked = /[•*]{6,}/.test(joined);
-      post({
-        type: matches.length >= 2 ? 'captured_keys' : 'partial_keys',
-        uuids: matches,
-        rawText: matches.join(' '),
-        maskedSecretDetected: masked,
-        source: 'scan'
-      });
-    } catch (_) {}
-  };
-})();
-true;
-`;
 
 /**
  * WebView in-app `#s-br.wv` da Etapa 1 (Plano 26 v2.0):
@@ -120,6 +46,8 @@ export const PluggyDashboardWebView: React.FC<Props> = ({
 
   const hasId = clientId.trim().length > 0;
   const hasSecret = clientSecret.trim().length > 0;
+  const topInset = resolveModalTopInset(insets.top);
+  const bottomInset = resolveModalBottomInset(insets.bottom);
 
   const handleMessage = (event: WebViewMessageEvent) => {
     const { data, url } = event.nativeEvent;
@@ -134,21 +62,42 @@ export const PluggyDashboardWebView: React.FC<Props> = ({
       return;
     }
 
-    if (parsed.source === 'scan') {
-      if (parsed.clientId) {
+    if (parsed.source === 'network' || parsed.source === 'auto_scan') {
+      if (parsed.clientSecret) {
+        setHint('');
+        onCapture({
+          ...(parsed.clientId && !hasId ? { clientId: parsed.clientId } : {}),
+          clientSecret: parsed.clientSecret,
+        });
+      } else if (parsed.clientId && !hasId) {
         onCapture({ clientId: parsed.clientId });
       }
-      if (parsed.partial) {
+      return;
+    }
+
+    if (parsed.source === 'scan') {
+      const nextPayload: { clientId?: string; clientSecret?: string } = {};
+      if (parsed.clientId) nextPayload.clientId = parsed.clientId;
+      if (parsed.clientSecret) nextPayload.clientSecret = parsed.clientSecret;
+      if (nextPayload.clientId || nextPayload.clientSecret) {
+        onCapture(nextPayload);
+      }
+      if (parsed.partial && !(hasId && parsed.clientSecret) && !(parsed.clientId && hasSecret)) {
         setHint(
-          parsed.maskedSecretDetected || parsed.clientId
-            ? 'Só o Client ID está visível. Revele o Client Secret e toque em Capturar chaves.'
-            : 'Abra sua aplicação na aba Applications para capturar as chaves.',
+          parsed.maskedSecretDetected || parsed.clientId || hasId
+            ? 'Client ID capturado. Toque em "Gerar novo secret" na tela da Pluggy para exibir e capturar o Client Secret.'
+            : 'Abra "Suas Credenciais" ou "Applications" no painel para capturar as chaves.',
         );
       }
       return;
     }
 
-    // Cópia individual (botão Copiar do Dashboard): preenche ID primeiro, depois Secret se distinto.
+    // Cópia individual (botão Copiar do Dashboard): atribui secret direto ou UUID distinto do ID.
+    if (parsed.clientSecret) {
+      setHint('');
+      onCapture({ clientSecret: parsed.clientSecret });
+      return;
+    }
     if (parsed.clientId) {
       if (!hasId) {
         setHint('');
@@ -166,8 +115,14 @@ export const PluggyDashboardWebView: React.FC<Props> = ({
   };
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
-      <View style={[styles.root, { backgroundColor: colors.bg, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="fullScreen"
+      statusBarTranslucent
+      onRequestClose={onClose}
+    >
+      <View style={[styles.root, { backgroundColor: colors.bg, paddingTop: topInset, paddingBottom: bottomInset }]}>
         <View style={[styles.topBar, { backgroundColor: colors.bg, borderBottomColor: colors.line }]}>
           <TouchableOpacity
             style={[styles.closeCircle, { backgroundColor: colors.bg, borderColor: colors.line }]}
@@ -194,7 +149,8 @@ export const PluggyDashboardWebView: React.FC<Props> = ({
             ref={webViewRef}
             source={{ uri: initialUrl }}
             originWhitelist={['https://*']}
-            injectedJavaScript={INJECTED_CAPTURE_SCRIPT}
+            injectedJavaScriptBeforeContentLoaded={PLUGGY_CAPTURE_BRIDGE_SCRIPT}
+            injectedJavaScript={PLUGGY_CAPTURE_BRIDGE_SCRIPT}
             onMessage={handleMessage}
             javaScriptEnabled
             domStorageEnabled
@@ -209,7 +165,10 @@ export const PluggyDashboardWebView: React.FC<Props> = ({
               setLoading(Boolean(nav.loading));
             }}
             onLoadStart={() => setLoading(true)}
-            onLoadEnd={() => setLoading(false)}
+            onLoadEnd={() => {
+              setLoading(false);
+              webViewRef.current?.injectJavaScript(PLUGGY_CAPTURE_BRIDGE_SCRIPT);
+            }}
           />
         </View>
 

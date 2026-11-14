@@ -16,8 +16,8 @@ func TestVersionedMigrations_FreshDB(t *testing.T) {
 	if err := db.QueryRow(`SELECT COUNT(*) FROM schema_migrations`).Scan(&count); err != nil {
 		t.Fatal(err)
 	}
-	if count != 25 {
-		t.Fatalf("esperava 25 migrações registradas, vieram %d", count)
+	if count != 26 {
+		t.Fatalf("esperava 26 migrações registradas, vieram %d", count)
 	}
 	if !hasTable(db, "finance_byok_backup") ||
 		!hasColumn(db, "finance_byok_backup", "user_id") ||
@@ -139,8 +139,8 @@ func TestVersionedMigrations_LegacyDB(t *testing.T) {
 	if err := db2.QueryRow(`SELECT COUNT(*) FROM schema_migrations`).Scan(&count); err != nil {
 		t.Fatal(err)
 	}
-	if count != 25 {
-		t.Fatalf("base legada deveria ser carimbada com 25, veio %d", count)
+	if count != 26 {
+		t.Fatalf("base legada deveria ser carimbada com 26, veio %d", count)
 	}
 }
 
@@ -196,5 +196,86 @@ func TestVersionedMigrations_LastNotifiedColumn(t *testing.T) {
 	defer db.Close()
 	if !hasColumn(db, "triggers", "last_notified_at") {
 		t.Fatal("007 deveria criar last_notified_at em triggers")
+	}
+}
+
+func TestVersionedMigrations_026_ResetsLegacyNonByokOnly(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "reset_026.db")
+	db, err := Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Simula estado logo após a 025 (antes da 026 rodar): apaga registro da 026.
+	if _, err := db.Exec(`DELETE FROM schema_migrations WHERE version = '026_finance_reset_legacy_non_byok.sql'`); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, u := range []string{"u-legacy", "u-byok"} {
+		_, err = db.Exec(
+			`INSERT INTO users (id, name, email, password_hash, created_at, updated_at) VALUES (?, ?, ?, 'h', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+			u, u, u+"@test.com",
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = db.Exec(
+			`INSERT INTO finance_connections (id, user_id, pluggy_item_id, institution_name, created_at, updated_at) VALUES (?, ?, ?, 'Nubank', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+			"conn-"+u, u, "item-"+u,
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = db.Exec(
+			`INSERT INTO finance_accounts (id, user_id, connection_id, pluggy_account_id, institution_name, account_type, name, balance, updated_at) VALUES (?, ?, ?, ?, 'Nubank', 'BANK', 'Conta', 286.99, CURRENT_TIMESTAMP)`,
+			"acc-"+u, u, "conn-"+u, "pacc-"+u,
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = db.Exec(
+			`INSERT INTO finance_transactions (id, user_id, account_id, pluggy_transaction_id, description, amount, transaction_type, occurred_at, created_at) VALUES (?, ?, ?, ?, 'Pix', -10.0, 'DEBIT', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+			"tx-"+u, u, "acc-"+u, "ptx-"+u,
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = db.Exec(
+			`INSERT INTO finance_budgets_and_goals (id, user_id, kind, title, target_amount, created_at, updated_at) VALUES (?, ?, 'SAVINGS_GOAL', 'Reserva', 1000, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+			"goal-"+u, u,
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Apenas u-byok já possuía backup BYOK configurado.
+	if _, err := db.Exec(`INSERT INTO finance_byok_backup (user_id, ciphertext, nonce, key_version, updated_at) VALUES ('u-byok', X'01', X'02', 1, CURRENT_TIMESTAMP)`); err != nil {
+		t.Fatal(err)
+	}
+	db.Close()
+
+	// Reabre banco -> migration 026 deve limpar apenas u-legacy e preservar u-byok.
+	db2, err := Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db2.Close()
+
+	countRows := func(table, userID string) int {
+		var n int
+		if err := db2.QueryRow(`SELECT COUNT(*) FROM `+table+` WHERE user_id = ?`, userID).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+
+	for _, tbl := range []string{"finance_connections", "finance_accounts", "finance_transactions", "finance_budgets_and_goals"} {
+		if got := countRows(tbl, "u-legacy"); got != 0 {
+			t.Fatalf("esperava %s zerada para usuário legado pré-BYOK, veio %d", tbl, got)
+		}
+		if got := countRows(tbl, "u-byok"); got != 1 {
+			t.Fatalf("esperava preservar %s do usuário BYOK, veio %d", tbl, got)
+		}
 	}
 }

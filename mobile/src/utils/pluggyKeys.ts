@@ -2,8 +2,10 @@
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const UUID_GLOBAL_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
+const JWT_RE = /^eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*/;
+const SECRET_TOKEN_RE = /^[A-Za-z0-9_.\-=+/]{20,128}$/;
 
-export type CapturedKeysSource = 'clipboard' | 'scan' | 'copy';
+export type CapturedKeysSource = 'clipboard' | 'scan' | 'copy' | 'auto_scan' | 'network';
 
 export interface ParsedCapturedKeys {
   clientId: string;
@@ -19,6 +21,19 @@ export function normalizeKey(value: string): string {
 
 export function isPluggyUuid(value: string): boolean {
   return UUID_RE.test(normalizeKey(value));
+}
+
+/**
+ * Valida candidato a Client Secret (UUID ou token alfanumérico/hex/base64 >= 20 chars),
+ * rejeitando JWTs (API Key `eyJ...`), URLs, valores truncados com reticências e máscaras.
+ */
+export function isPlausiblePluggySecret(value: string): boolean {
+  const s = normalizeKey(value);
+  if (!s || s.length < 20 || s.length > 128) return false;
+  if (JWT_RE.test(s) || /^https?:/i.test(s)) return false;
+  if (/[•*\s]/.test(s) || /\.\.\.$|…$/.test(s)) return false;
+  if (UUID_RE.test(s)) return true;
+  return SECRET_TOKEN_RE.test(s) && /\d/.test(s) && !/^[a-z-]+$/.test(s);
 }
 
 /** Mostra apenas os 4 últimos caracteres; o restante vira `•`. */
@@ -76,7 +91,7 @@ export function detectSwappedKeysCandidate(
   return { clientId: sec, clientSecret: id };
 }
 
-const VALID_SOURCES: readonly CapturedKeysSource[] = ['clipboard', 'scan', 'copy'];
+const VALID_SOURCES: readonly CapturedKeysSource[] = ['clipboard', 'scan', 'copy', 'auto_scan', 'network'];
 const VALID_TYPES = new Set(['captured_keys', 'partial_keys', 'clipboard_copy']);
 
 /** Faz parse seguro e validação estrita das mensagens enviadas pela WebView (`onMessage`). */
@@ -101,15 +116,18 @@ export function parseCapturedKeysMessage(raw: string): ParsedCapturedKeys | null
 
   let clientId = typeof parsed.clientId === 'string' && isPluggyUuid(parsed.clientId) ? normalizeKey(parsed.clientId) : '';
   let clientSecret =
-    typeof parsed.clientSecret === 'string' && isPluggyUuid(parsed.clientSecret) ? normalizeKey(parsed.clientSecret) : '';
+    typeof parsed.clientSecret === 'string' && isPlausiblePluggySecret(parsed.clientSecret)
+      ? normalizeKey(parsed.clientSecret)
+      : '';
 
   if (clientId && clientSecret && clientId.toLowerCase() === clientSecret.toLowerCase()) {
     clientSecret = '';
   }
 
   if (!clientId || !clientSecret) {
+    const rawStr = typeof parsed.rawText === 'string' ? parsed.rawText : '';
     const poolText = [
-      typeof parsed.rawText === 'string' ? parsed.rawText : '',
+      rawStr,
       Array.isArray(parsed.uuids) ? parsed.uuids.filter((u): u is string => typeof u === 'string').join(' ') : '',
     ].join(' ');
     const found = extractUuids(poolText);
@@ -118,6 +136,12 @@ export function parseCapturedKeysMessage(raw: string): ParsedCapturedKeys | null
         clientId = u;
       } else if (!clientSecret && u.toLowerCase() !== clientId.toLowerCase()) {
         clientSecret = u;
+      }
+    }
+    if (!clientSecret && found.length === 0 && (source === 'clipboard' || source === 'copy') && isPlausiblePluggySecret(rawStr)) {
+      const candidate = normalizeKey(rawStr);
+      if (!clientId || candidate.toLowerCase() !== clientId.toLowerCase()) {
+        clientSecret = candidate;
       }
     }
   }

@@ -16,6 +16,7 @@ import { ByokStepper } from '../components/finance/byok/ByokStepper';
 import { ByokShortcut } from '../components/finance/byok/ByokShortcut';
 import { ByokSyncProgress } from '../components/finance/byok/ByokSyncProgress';
 import { PluggyDashboardWebView } from '../components/finance/byok/PluggyDashboardWebView';
+import { resolveModalBottomInset, resolveModalTopInset } from '../utils/safeArea';
 
 interface PluggyConnectModalProps {
   visible: boolean;
@@ -145,11 +146,15 @@ export const PluggyConnectModal: React.FC<PluggyConnectModalProps> = ({ visible,
   };
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" statusBarTranslucent onRequestClose={onClose}>
       <View
         style={[
           styles.screen,
-          { backgroundColor: colors.bg, paddingTop: insets.top + 12, paddingBottom: insets.bottom + 12 },
+          {
+            backgroundColor: colors.bg,
+            paddingTop: resolveModalTopInset(insets.top, 8),
+            paddingBottom: resolveModalBottomInset(insets.bottom),
+          },
         ]}
       >
         <View style={styles.ftop}>

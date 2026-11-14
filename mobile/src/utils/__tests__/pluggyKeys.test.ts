@@ -2,6 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   isPluggyUuid,
+  isPlausiblePluggySecret,
   normalizeKey,
   maskSecret,
   maskClientIdShort,
@@ -125,5 +126,45 @@ describe('pluggyKeys', () => {
     assert.equal(parseCapturedKeysMessage('not-json'), null);
     assert.equal(parseCapturedKeysMessage(JSON.stringify({ type: 'unknown', rawText: UUID })), null);
     assert.equal(parseCapturedKeysMessage(JSON.stringify({ type: 'clipboard_copy', rawText: 'minha-senha-123' })), null);
+  });
+
+  it('aceita Client Secret gerado não-UUID (network/copy/auto_scan) e rejeita API Key JWT', () => {
+    const nonUuidSecret = 'plg_sec_9a8b7c6d5e4f3a2b1c0d9e8f';
+    assert.equal(isPlausiblePluggySecret(nonUuidSecret), true);
+    assert.equal(
+      isPlausiblePluggySecret('eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.payload_123456.sig_7890'),
+      false,
+    );
+    assert.equal(isPlausiblePluggySecret('b735999c-1306-4759-86de-49af53d0...'), false);
+
+    const netMsg = parseCapturedKeysMessage(
+      JSON.stringify({
+        type: 'partial_keys',
+        clientSecret: nonUuidSecret,
+        source: 'network',
+      }),
+    );
+    assert.deepEqual(netMsg, {
+      clientId: '',
+      clientSecret: nonUuidSecret,
+      partial: true,
+      maskedSecretDetected: false,
+      source: 'network',
+    });
+
+    const copiedSecret = parseCapturedKeysMessage(
+      JSON.stringify({
+        type: 'clipboard_copy',
+        rawText: nonUuidSecret,
+        source: 'copy',
+      }),
+    );
+    assert.deepEqual(copiedSecret, {
+      clientId: '',
+      clientSecret: nonUuidSecret,
+      partial: true,
+      maskedSecretDetected: false,
+      source: 'copy',
+    });
   });
 });
