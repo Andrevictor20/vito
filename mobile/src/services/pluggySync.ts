@@ -1,6 +1,7 @@
 import { api } from './api';
 import type { FinanceAccount, FinanceSyncPayload } from '../types/finance';
-import { listItems, PluggyError } from './pluggyService';
+import { listItems, PluggyError, type PluggyItem } from './pluggyService';
+import * as byokStore from './byokStore';
 
 /**
  * Edge-Sync (Zero IP Leak): o celular lê contas/transações direto da Pluggy
@@ -38,10 +39,17 @@ export async function syncPluggyItem(
   let resolved = itemId;
   if (!resolved || resolved.startsWith('item_')) {
     try {
-      const items = await listItems(apiKey);
+      const clientUserId = await byokStore.getClientUserId().catch(() => '');
+      let items: PluggyItem[] = [];
+      if (clientUserId) {
+        items = await listItems(apiKey, clientUserId).catch(() => []);
+      }
+      if (!items || items.length === 0) {
+        items = await listItems(apiKey).catch(() => []);
+      }
       resolved = items[0]?.id;
     } catch (e) {
-      if (e instanceof PluggyError && e.kind === 'list_items_disabled') {
+      if (e instanceof PluggyError && (e.kind === 'list_items_disabled' || e.kind === 'http')) {
         resolved = undefined;
       } else {
         throw e;

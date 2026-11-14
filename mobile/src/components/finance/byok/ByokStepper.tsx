@@ -18,7 +18,28 @@ const stateOf = (n: '1' | '2' | '3', s: Setup): 'locked' | 'active' | 'done' => 
   return 'locked';
 };
 
-/** Stepper vertical `#s-fon` (`mainV` em Vito-telas-atualizadas.html) com WebView na Etapa 1. */
+/** Card de passo didático numerado para o onboarding manual e no navegador externo. */
+const GuideStepRow: React.FC<{
+  num: number;
+  title: string;
+  desc: string;
+  isLast?: boolean;
+}> = ({ num, title, desc, isLast }) => {
+  const { colors } = useTheme();
+  return (
+    <View style={[styles.guideRow, isLast && { marginBottom: 0 }]}>
+      <View style={[styles.guideNumBadge, { backgroundColor: colors.surf, borderColor: colors.line }]}>
+        <Text style={[styles.guideNumText, { color: colors.ink }]}>{num}</Text>
+      </View>
+      <View style={styles.guideTextCol}>
+        <Text style={[styles.guideTitle, { color: colors.ink }]}>{title}</Text>
+        <Text style={[styles.guideDesc, { color: colors.muted }]}>{desc}</Text>
+      </View>
+    </View>
+  );
+};
+
+/** Stepper vertical didático e visual para o fluxo BYOK com navegador externo. */
 export const ByokStepper: React.FC<{ setup: Setup }> = ({ setup: s }) => {
   const { colors } = useTheme();
   const s1State = stateOf('1', s);
@@ -38,24 +59,47 @@ export const ByokStepper: React.FC<{ setup: Setup }> = ({ setup: s }) => {
     <View>
       <Text style={[styles.heading, { color: colors.ink }]}>Conecte seus bancos</Text>
       <Text style={[styles.sub, { color: colors.muted }]}>
-        Três etapas, uma única vez. Cada uma libera a próxima.
+        Três etapas simples e seguras com suas credenciais privadas da Pluggy.
       </Text>
 
+      {/* ETAPA 1: Dashboard e chaves */}
       <VerticalStep
         index={1}
         title="Dashboard e chaves"
         state={s1State}
         showDoneBody={s.authStatus === 'validated'}
       >
-        <Text style={[styles.vp, { color: colors.muted }]}>
-          1. Crie sua conta no Dashboard · 2. Crie uma aplicação · 3. Copie o Client ID e o Client Secret.
-        </Text>
+        <View style={[styles.guideBox, { backgroundColor: colors.surf, borderColor: colors.line }]}>
+          <Text style={[styles.guideBoxHeading, { color: colors.ink }]}>Como obter suas chaves na Pluggy:</Text>
+          <GuideStepRow
+            num={1}
+            title="Abra o Dashboard"
+            desc="Toque no botão abaixo para abrir a Pluggy no seu navegador. Entre na sua conta (Google ou e-mail)."
+          />
+          <GuideStepRow
+            num={2}
+            title="Acesse Aplicações"
+            desc="No menu da Pluggy, clique em Aplicações (ou use a tela inicial do Dashboard)."
+          />
+          <GuideStepRow
+            num={3}
+            title="Copie as credenciais"
+            desc="Copie o Client ID e o Client Secret. Se o segredo estiver oculto, clique em 'Gerar novo secret'."
+          />
+          <GuideStepRow
+            num={4}
+            title="Cole e valide no Vito"
+            desc="Volte aqui no Vito, cole nos campos abaixo e valide com um toque."
+            isLast
+          />
+        </View>
+
         <ActionButton
           primary
           icon="open-in-new"
-          label="Abrir Pluggy Dashboard"
+          label="Abrir Pluggy Dashboard no Navegador"
           disabled={s.authStatus === 'validating'}
-          onPress={s.openDashboard}
+          onPress={s.openDashboardExternal}
         />
 
         {!!chipLabel && !lockedStep1 && (
@@ -101,7 +145,7 @@ export const ByokStepper: React.FC<{ setup: Setup }> = ({ setup: s }) => {
           <StatusBanner
             kind="ok"
             title="Chaves validadas!"
-            subtitle={`${s.validationNote}Guardadas no cofre do celular. Backup cifrado no seu servidor.`}
+            subtitle={`${s.validationNote}Guardadas com segurança no cofre do aparelho. Backup cifrado no seu servidor.`}
           />
         )}
         {(s.authStatus === 'error' || s.authStatus === 'offline') && (
@@ -122,27 +166,54 @@ export const ByokStepper: React.FC<{ setup: Setup }> = ({ setup: s }) => {
         )}
       </VerticalStep>
 
+      {/* ETAPA 2: Pluggy Connect e bancos */}
       <VerticalStep index={2} title="Pluggy Connect e bancos" state={s2State}>
-        <Text style={[styles.vp, { color: colors.muted }]}>
-          Agora abra o plugin oficial Pluggy Connect aqui no Vito para conectar pelo Meu Pluggy ou escolher seus bancos (Nubank, Itaú, Inter…). Ele já faz a associação automática com suas chaves.
-        </Text>
+        <View style={[styles.guideBox, { backgroundColor: colors.surf, borderColor: colors.line }]}>
+          <Text style={[styles.guideBoxHeading, { color: colors.ink }]}>Como conectar seus bancos com segurança:</Text>
+          <GuideStepRow
+            num={1}
+            title="Abrir o Pluggy Connect"
+            desc="Toque no botão abaixo. O widget oficial da Pluggy será aberto de forma segura no seu navegador."
+          />
+          <GuideStepRow
+            num={2}
+            title="Autorizar Meu Pluggy ou Bancos"
+            desc="Autorize o conector Meu Pluggy (para contas já agrupadas) ou conecte diretamente seus bancos (Nubank, Itaú, Inter, etc.)."
+          />
+          <GuideStepRow
+            num={3}
+            title="Concluir e sincronizar"
+            desc="Ao autorizar no app do seu banco, o navegador redireciona de volta ao Vito. Se voltar manualmente, use o botão de sincronização abaixo."
+            isLast
+          />
+        </View>
+
         <ActionButton
           primary
           icon="open-in-new"
-          label="Abrir Pluggy Connect no Vito"
+          label="Abrir Pluggy Connect no Navegador"
           busy={s.busy}
-          onPress={s.openMeuPluggy}
+          onPress={s.openConnectExternal}
         />
+
+        <ActionButton
+          icon="sync"
+          label="Já conectei meus bancos · Sincronizar contas"
+          busy={s.busy}
+          style={{ marginTop: 10 }}
+          onPress={() => void s.completeConnectSync('')}
+        />
+
         {s.error ? <ErrorText message={s.error} /> : null}
       </VerticalStep>
 
+      {/* ETAPA 3: Sincronizar */}
       <VerticalStep index={3} title="Sincronizar" state={s3State} isLast>
         <Text style={[styles.vp, { color: colors.muted }]}>
-          O Vito usa as suas chaves para abrir o Pluggy Connect e trazer os bancos. Tudo sai do celular, o servidor nunca
-          fala com a Pluggy.
+          O Vito usa suas credenciais privadas para ler contas e transações da Pluggy diretamente no smartphone (Edge-Sync). O servidor nunca recebe suas senhas bancárias.
         </Text>
         {s.step === '3' && <ErrorText message={s.error} />}
-        <ActionButton primary label="Sincronizar no Vito" busy={s.busy} onPress={s.syncNow} />
+        <ActionButton primary icon="sync" label="Sincronizar contas agora" busy={s.busy} onPress={() => void s.completeConnectSync('')} />
       </VerticalStep>
 
       <TouchableOpacity onPress={s.showTutorial} style={styles.tutorialLink} accessibilityRole="button">
@@ -160,8 +231,50 @@ const styles = StyleSheet.create({
     letterSpacing: -0.6,
     marginTop: 18,
   },
-  sub: { fontSize: 15, lineHeight: 22, marginTop: 8, marginBottom: 24 },
-  vp: { fontSize: 14, lineHeight: 21, marginBottom: 4 },
+  sub: { fontSize: 15, lineHeight: 22, marginTop: 8, marginBottom: 20 },
+  vp: { fontSize: 14, lineHeight: 21, marginBottom: 8 },
+  guideBox: {
+    padding: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 12,
+  },
+  guideBoxHeading: {
+    fontSize: 13.5,
+    fontWeight: '700',
+    marginBottom: 12,
+  },
+  guideRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    marginBottom: 12,
+  },
+  guideNumBadge: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
+  },
+  guideNumText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  guideTextCol: {
+    flex: 1,
+  },
+  guideTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  guideDesc: {
+    fontSize: 12.5,
+    lineHeight: 18,
+  },
   cchip: {
     flexDirection: 'row',
     alignItems: 'center',

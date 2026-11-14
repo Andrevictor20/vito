@@ -91,8 +91,15 @@ export interface PluggyItem {
 }
 
 /** Lista os itens (bancos conectados) da aplicação do usuário. */
-export async function listItems(apiKey: string, fetchImpl: typeof fetch = fetch): Promise<PluggyItem[]> {
-  const res = await call(fetchImpl, '/items', { method: 'GET', headers: authHeaders(apiKey) });
+export async function listItems(
+  apiKey: string,
+  clientUserIdOrFetch?: string | typeof fetch,
+  fetchImpl: typeof fetch = fetch,
+): Promise<PluggyItem[]> {
+  const clientUserId = typeof clientUserIdOrFetch === 'string' ? clientUserIdOrFetch : undefined;
+  const actualFetch = typeof clientUserIdOrFetch === 'function' ? clientUserIdOrFetch : fetchImpl;
+  const path = clientUserId ? `/items?clientUserId=${encodeURIComponent(clientUserId)}` : '/items';
+  const res = await call(actualFetch, path, { method: 'GET', headers: authHeaders(apiKey) });
   const json = (await res.json()) as { results?: PluggyItem[] };
   return Array.isArray(json?.results) ? json.results : [];
 }

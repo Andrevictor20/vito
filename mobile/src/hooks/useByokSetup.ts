@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState } from 'react-native';
+import { AppState, Linking } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import * as WebBrowser from 'expo-web-browser';
 import {
@@ -277,20 +277,7 @@ export function useByokSetup({ visible, isDark, onSynced }: Options) {
     setError('');
   }, []);
 
-  const handleWebViewCapture = useCallback(
-    (payload: { clientId?: string; clientSecret?: string }) => {
-      if (payload.clientId) setClientId(normalizeKey(payload.clientId));
-      if (payload.clientSecret) {
-        setClientSecret(normalizeKey(payload.clientSecret));
-        void Clipboard.setStringAsync('').catch(() => {});
-      }
-      setValidated(false);
-      setAuthStatus('idle');
-      setError('');
-    },
-    [],
-  );
-
+  const handleWebViewCapture = useCallback(() => {}, []);
   const clearDraftKeys = useCallback(() => {
     setClientId('');
     setClientSecret('');
@@ -298,11 +285,7 @@ export function useByokSetup({ visible, isDark, onSynced }: Options) {
     setAuthStatus('idle');
     setError('');
   }, []);
-
-  const confirmWebViewKeys = useCallback(async () => {
-    const ok = await validateKeys(clientId, clientSecret, { fromWebView: true });
-    if (ok) setWebViewOpen(false);
-  }, [clientId, clientSecret, validateKeys]);
+  const confirmWebViewKeys = useCallback(async () => {}, []);
 
   const apiKeyFromStore = useCallback(async (): Promise<string> => {
     let keys = await store.getKeys();
@@ -380,37 +363,68 @@ export function useByokSetup({ visible, isDark, onSynced }: Options) {
     [apiKeyFromStore, foundBanks, goTo, onSynced],
   );
 
-  const fallbackConnectExternal = useCallback(async () => {
-    const url = pendingConnectUrlRef.current || portalUrl;
-    setPortalMode(null);
-    if (!url) return;
-    setBusy(true);
+  // Escuta deep links (ex.: vito://pluggy-success?itemId=...) quando o navegador externo redireciona de volta.
+  useEffect(() => {
+    const handleUrl = (event: { url: string }) => {
+      const itemId = parseItemId(event.url);
+      if (itemId) {
+        void completeConnectSync(itemId);
+      }
+    };
+    const sub = Linking.addEventListener('url', handleUrl);
+    void Linking.getInitialURL().then((url) => {
+      if (url) {
+        const itemId = parseItemId(url);
+        if (itemId) void completeConnectSync(itemId);
+      }
+    });
+    return () => sub.remove();
+  }, [completeConnectSync]);
+
+  const openDashboardExternal = useCallback(async () => {
+    setError('');
     try {
-      const authRes = await WebBrowser.openAuthSessionAsync(url, 'vito://pluggy-callback');
-      const callbackItemId = authRes.type === 'success' ? parseItemId(authRes.url) : null;
-      await completeConnectSync(callbackItemId || '');
+      await WebBrowser.openBrowserAsync(DASHBOARD_URL);
     } catch {
-      setSyncPhase('idle');
+      await Linking.openURL(DASHBOARD_URL).catch(() => {});
+    }
+  }, []);
+
+  const openConnectExternal = useCallback(async () => {
+    setBusy(true);
+    setError('');
+    try {
+      const apiKey = await apiKeyFromStore();
+      pendingApiKeyRef.current = apiKey;
+
+      const clientUserId = await store.getClientUserId();
+      const token = await createConnectToken(apiKey, clientUserId);
+      const url = buildPluggyConnectUrl(token, isDark);
+      pendingConnectUrlRef.current = url;
+      setPortalUrl(url);
+
+      const authRes = await WebBrowser.openAuthSessionAsync(url, 'vito://pluggy-success');
+      if (authRes.type === 'success' && authRes.url) {
+        const callbackItemId = parseItemId(authRes.url);
+        if (callbackItemId) {
+          await completeConnectSync(callbackItemId);
+          return;
+        }
+      }
+      // Se fechar ou voltar sem redirect, deixa pronto para sincronização manual com 1 toque
+      setStep2Status('found');
+    } catch (e) {
+      setError(e instanceof PluggyError ? e.message : e instanceof Error ? e.message : 'Falha ao abrir Pluggy Connect.');
     } finally {
       setBusy(false);
     }
-  }, [completeConnectSync, portalUrl]);
+  }, [apiKeyFromStore, completeConnectSync, isDark]);
 
-  const openDashboard = useCallback(() => {
-    setError('');
-    setWebViewOpen(true);
-  }, []);
+  const openDashboard = openDashboardExternal;
   const closeDashboard = useCallback(() => setWebViewOpen(false), []);
-
-  const openMeuPluggy = useCallback(() => {
-    void syncNow();
-  }, [syncNow]);
-
-  const closePortal = useCallback(() => {
-    setPortalMode(null);
-    setBusy(false);
-  }, []);
-
+  const openMeuPluggy = openConnectExternal;
+  const fallbackConnectExternal = openConnectExternal;
+  const closePortal = useCallback(() => setBusy(false), []);
   const finishMeuPluggyPortal = useCallback(() => {
     void completeConnectSync('');
   }, [completeConnectSync]);
@@ -464,6 +478,7 @@ export function useByokSetup({ visible, isDark, onSynced }: Options) {
     finishTutorial, paste, applySuggestion, updateField, validateKeys, handleWebViewCapture,
     clearDraftKeys, confirmWebViewKeys, confirmBanks, syncNow, completeConnectSync, fallbackConnectExternal,
     openDashboard, closeDashboard, openMeuPluggy, closePortal, finishMeuPluggyPortal, changeKeys,
+    openDashboardExternal, openConnectExternal,
     resetFromScratch, showTutorial, resetSyncView,
   };
 }

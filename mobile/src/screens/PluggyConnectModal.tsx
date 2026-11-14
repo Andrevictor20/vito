@@ -15,8 +15,6 @@ import { ByokTutorialCards } from '../components/finance/byok/ByokTutorialCards'
 import { ByokStepper } from '../components/finance/byok/ByokStepper';
 import { ByokShortcut } from '../components/finance/byok/ByokShortcut';
 import { ByokSyncProgress } from '../components/finance/byok/ByokSyncProgress';
-import { PluggyDashboardWebView } from '../components/finance/byok/PluggyDashboardWebView';
-import { PluggyPortalWebView } from '../components/finance/byok/PluggyPortalWebView';
 import { resolveModalBottomInset, resolveModalTopInset } from '../utils/safeArea';
 
 interface PluggyConnectModalProps {
@@ -244,30 +242,6 @@ export const PluggyConnectModal: React.FC<PluggyConnectModalProps> = ({ visible,
             </View>
           )}
         </ScrollView>
-
-        <PluggyDashboardWebView
-          visible={setup.webViewOpen}
-          sessionKey={setup.webSessionKey}
-          clientId={setup.clientId}
-          clientSecret={setup.clientSecret}
-          validating={setup.busy && setup.authStatus === 'validating'}
-          captureError={setup.authStatus === 'error' || setup.authStatus === 'offline' ? setup.error : ''}
-          onCapture={setup.handleWebViewCapture}
-          onClearDraft={setup.clearDraftKeys}
-          onConfirmKeys={() => void setup.confirmWebViewKeys()}
-          onClose={setup.closeDashboard}
-        />
-
-        <PluggyPortalWebView
-          visible={setup.portalMode !== null}
-          mode={setup.portalMode ?? 'meu_pluggy'}
-          url={setup.portalUrl}
-          sessionKey={setup.webSessionKey}
-          onClose={setup.closePortal}
-          onFinishMeuPluggy={setup.finishMeuPluggyPortal}
-          onConnectItemCaptured={(itemId) => void setup.completeConnectSync(itemId)}
-          onFallbackConnectExternal={() => void setup.fallbackConnectExternal()}
-        />
       </View>
     </Modal>
   );
