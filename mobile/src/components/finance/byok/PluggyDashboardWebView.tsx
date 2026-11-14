@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import { useTheme } from '../../../context/ThemeContext';
 import { formatWebViewDisplayUrl, isAllowedPluggyWebViewUrl, isPluggyDashboardUrl } from '../../../utils/byokFlow';
+import { clearPluggyWebViewData } from '../../../utils/pluggyBrowserReset';
 import { parseCapturedKeysMessage } from '../../../utils/pluggyKeys';
 import { resolveModalBottomInset, resolveModalTopInset } from '../../../utils/safeArea';
 import { PLUGGY_CAPTURE_BRIDGE_SCRIPT } from './pluggyWebViewBridge';
@@ -12,6 +13,7 @@ import { PLUGGY_CAPTURE_BRIDGE_SCRIPT } from './pluggyWebViewBridge';
 interface Props {
   visible: boolean;
   initialUrl?: string;
+  sessionKey?: number;
   clientId: string;
   clientSecret: string;
   onCapture: (payload: { clientId?: string; clientSecret?: string }) => void;
@@ -25,6 +27,7 @@ interface Props {
 export const PluggyDashboardWebView: React.FC<Props> = ({
   visible,
   initialUrl = 'https://dashboard.pluggy.ai',
+  sessionKey = 0,
   clientId,
   clientSecret,
   onCapture,
@@ -36,6 +39,7 @@ export const PluggyDashboardWebView: React.FC<Props> = ({
   const [currentUrl, setCurrentUrl] = useState(initialUrl);
   const [loading, setLoading] = useState(true);
   const [hint, setHint] = useState('');
+  const [localSessionKey, setLocalSessionKey] = useState(0);
 
   useEffect(() => {
     if (!visible) {
@@ -114,6 +118,14 @@ export const PluggyDashboardWebView: React.FC<Props> = ({
     webViewRef.current?.injectJavaScript('window.__vitoScanVisibleKeys && window.__vitoScanVisibleKeys(); true;');
   };
 
+  const handleClearSession = async () => {
+    await clearPluggyWebViewData(webViewRef);
+    setCurrentUrl(initialUrl);
+    setLoading(true);
+    setHint('Sessão e cookies apagados. Faça login do zero.');
+    setLocalSessionKey((k) => k + 1);
+  };
+
   return (
     <Modal
       visible={visible}
@@ -142,10 +154,19 @@ export const PluggyDashboardWebView: React.FC<Props> = ({
             </Text>
             {loading && <ActivityIndicator size="small" color={colors.muted} />}
           </View>
+          <TouchableOpacity
+            style={[styles.closeCircle, { backgroundColor: colors.bg, borderColor: colors.line }]}
+            onPress={() => void handleClearSession()}
+            accessibilityRole="button"
+            accessibilityLabel="Limpar dados de navegação"
+          >
+            <MaterialIcons name="delete-sweep" size={18} color={colors.ink} />
+          </TouchableOpacity>
         </View>
 
         <View style={styles.webWrap}>
           <WebView
+            key={`dash-${sessionKey}-${localSessionKey}`}
             ref={webViewRef}
             source={{ uri: initialUrl }}
             originWhitelist={['https://*']}

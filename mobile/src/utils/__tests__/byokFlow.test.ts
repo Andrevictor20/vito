@@ -12,6 +12,9 @@ import {
   isAllowedPluggyWebViewUrl,
   isPluggyDashboardUrl,
   formatWebViewDisplayUrl,
+  classifyPortalNavigation,
+  parsePluggyConnectItemMessage,
+  buildPluggyConnectUrl,
 } from '../byokFlow';
 
 describe('byokFlow', () => {
@@ -94,7 +97,29 @@ describe('byokFlow', () => {
   it('formatWebViewDisplayUrl formata domínio e caminho', () => {
     assert.equal(formatWebViewDisplayUrl('https://dashboard.pluggy.ai/applications?tab=1'), 'dashboard.pluggy.ai/applications');
     assert.equal(formatWebViewDisplayUrl('https://dashboard.pluggy.ai/'), 'dashboard.pluggy.ai');
-    assert.equal(formatWebViewDisplayUrl('invalido'), 'dashboard.pluggy.ai');
+    assert.equal(formatWebViewDisplayUrl('invalido'), 'pluggy.ai');
+  });
+
+  it('classifyPortalNavigation distingue vito_success, allow, external e bloqueios', () => {
+    assert.equal(classifyPortalNavigation('vito://pluggy-success?itemId=123'), 'vito_success');
+    assert.equal(classifyPortalNavigation('https://meu.pluggy.ai/accounts'), 'allow');
+    assert.equal(classifyPortalNavigation('https://connect.pluggy.ai/?connect_token=abc'), 'allow');
+    assert.equal(classifyPortalNavigation('nubank://openfinance/auth'), 'external');
+    assert.equal(classifyPortalNavigation('intent://app.nubank.com.br#Intent;scheme=https;end'), 'external');
+    assert.equal(classifyPortalNavigation('https://app.nubank.com.br/consent', true), 'external');
+    assert.equal(classifyPortalNavigation('javascript:alert(1)'), 'block');
+    assert.equal(classifyPortalNavigation('file:///etc/passwd'), 'block');
+    assert.equal(classifyPortalNavigation('http://insecure.bank.com'), 'block');
+  });
+
+  it('parsePluggyConnectItemMessage valida UUID de itemId vindo do Pluggy Connect', () => {
+    const id = '3f2b8c1e-9a47-4d6e-8b21-5c7a0e9d1f42';
+    assert.deepEqual(
+      parsePluggyConnectItemMessage(JSON.stringify({ type: 'pluggy_connect_item', itemId: id, status: 'UPDATED', source: 'network' })),
+      { itemId: id, status: 'UPDATED', source: 'network' },
+    );
+    assert.equal(parsePluggyConnectItemMessage(JSON.stringify({ type: 'pluggy_connect_item', itemId: 'invalido' })), null);
+    assert.equal(parsePluggyConnectItemMessage(JSON.stringify({ type: 'outro', itemId: id })), null);
   });
 
   it('isPluggyDashboardUrl exige HTTPS e host pluggy.ai para postMessage', () => {
@@ -103,5 +128,13 @@ describe('byokFlow', () => {
     assert.equal(isPluggyDashboardUrl('http://dashboard.pluggy.ai'), false);
     assert.equal(isPluggyDashboardUrl('https://accounts.google.com'), false);
     assert.equal(isPluggyDashboardUrl('https://dashboard.pluggy.ai.evil.com'), false);
+  });
+
+  it('buildPluggyConnectUrl monta widget focado no conector Meu Pluggy (200)', () => {
+    const url = buildPluggyConnectUrl('tok abc', true);
+    assert.ok(url.startsWith('https://connect.pluggy.ai/?'));
+    assert.ok(url.includes('connect_token=tok%20abc'));
+    assert.ok(url.includes('selectedConnectorId=200'));
+    assert.ok(url.includes('theme=dark'));
   });
 });

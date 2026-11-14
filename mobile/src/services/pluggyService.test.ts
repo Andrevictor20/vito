@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { authenticate, createConnectToken, listItems, PluggyError } from './pluggyService';
+import { authenticate, createConnectToken, listConnectorNamesOrDefault, listItems, PluggyError } from './pluggyService';
 
 type Call = { url: string; init?: RequestInit };
 
@@ -61,13 +61,18 @@ describe('pluggyService', () => {
     });
   });
 
-  it('createConnectToken usa X-API-KEY e retorna accessToken', async () => {
+  it('createConnectToken usa X-API-KEY com options.clientUserId e oauthRedirectUri', async () => {
     const calls: Call[] = [];
     const tok = await createConnectToken('K', 'user-1', fakeFetch(200, { accessToken: 'T' }, calls));
     assert.equal(tok, 'T');
     assert.equal(calls[0].url, 'https://api.pluggy.ai/connect_token');
     assert.equal((calls[0].init?.headers as Record<string, string>)['X-API-KEY'], 'K');
-    assert.deepEqual(JSON.parse(String(calls[0].init?.body)), { clientUserId: 'user-1' });
+    assert.deepEqual(JSON.parse(String(calls[0].init?.body)), {
+      options: {
+        clientUserId: 'user-1',
+        oauthRedirectUri: 'vito://pluggy-success',
+      },
+    });
   });
 
   it('listItems retorna results ou [] e usa GET com X-API-KEY', async () => {
@@ -79,11 +84,37 @@ describe('pluggyService', () => {
     assert.deepEqual(await listItems('K', fakeFetch(200, {})), []);
   });
 
-  it('listItems 401 → invalid_keys', async () => {
+  it('listItems 401 → invalid_keys e 403 → list_items_disabled', async () => {
     await assert.rejects(listItems('K', fakeFetch(401, {})), (e: unknown) => {
       assert.ok(e instanceof PluggyError);
       assert.equal(e.kind, 'invalid_keys');
       return true;
     });
+    await assert.rejects(listItems('K', fakeFetch(403, { code: 'LIST_ITEMS_FEATURE_NOT_ENABLED' })), (e: unknown) => {
+      assert.ok(e instanceof PluggyError);
+      assert.equal(e.kind, 'list_items_disabled');
+      assert.equal(e.status, 403);
+      return true;
+    });
+  });
+
+  it('listConnectorNamesOrDefault retorna nomes únicos e tolera 403 LIST_ITEMS_FEATURE_NOT_ENABLED', async () => {
+    const names = await listConnectorNamesOrDefault(
+      'K',
+      fakeFetch(200, {
+        results: [
+          { id: '1', connector: { id: 201, name: 'Nubank' } },
+          { id: '2', connector: { id: 201, name: 'Nubank' } },
+          { id: '3', connector: { id: 203, name: 'Itaú' } },
+        ],
+      }),
+    );
+    assert.deepEqual(names, ['Nubank', 'Itaú']);
+
+    const fallbackNames = await listConnectorNamesOrDefault(
+      'K',
+      fakeFetch(403, { code: 'LIST_ITEMS_FEATURE_NOT_ENABLED' }),
+    );
+    assert.deepEqual(fallbackNames, ['Meu Pluggy pronto para autorizar']);
   });
 });

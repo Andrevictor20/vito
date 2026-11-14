@@ -5,7 +5,7 @@
 
 const BASE = 'https://api.pluggy.ai';
 
-export type PluggyErrorKind = 'invalid_keys' | 'network' | 'http';
+export type PluggyErrorKind = 'invalid_keys' | 'list_items_disabled' | 'network' | 'http';
 
 export class PluggyError extends Error {
   kind: PluggyErrorKind;
@@ -26,7 +26,17 @@ async function call(fetchImpl: typeof fetch, path: string, init: RequestInit): P
   } catch {
     throw new PluggyError('network', 'Sem conexão com a Pluggy. Verifique a internet e tente novamente.');
   }
-  if (res.status === 401 || res.status === 403) {
+  if (res.status === 401) {
+    throw new PluggyError('invalid_keys', 'Chaves inválidas. Confira o Client ID e o Client Secret.', res.status);
+  }
+  if (res.status === 403) {
+    if (path.startsWith('/items')) {
+      throw new PluggyError(
+        'list_items_disabled',
+        'Listagem em lote (/items) desabilitada nesta conta Pluggy; o itemId virá direto do Pluggy Connect.',
+        res.status,
+      );
+    }
     throw new PluggyError('invalid_keys', 'Chaves inválidas. Confira o Client ID e o Client Secret.', res.status);
   }
   if (!res.ok) {
@@ -65,7 +75,12 @@ export async function createConnectToken(
   const res = await call(fetchImpl, '/connect_token', {
     method: 'POST',
     headers: authHeaders(apiKey),
-    body: JSON.stringify({ clientUserId }),
+    body: JSON.stringify({
+      options: {
+        clientUserId,
+        oauthRedirectUri: 'vito://pluggy-success',
+      },
+    }),
   });
   const json = (await res.json()) as { accessToken?: string };
   if (!json?.accessToken) throw new PluggyError('http', 'Resposta da Pluggy sem accessToken.', res.status);
@@ -83,4 +98,23 @@ export async function listItems(apiKey: string, fetchImpl: typeof fetch = fetch)
   const res = await call(fetchImpl, '/items', { method: 'GET', headers: authHeaders(apiKey) });
   const json = (await res.json()) as { results?: PluggyItem[] };
   return Array.isArray(json?.results) ? json.results : [];
+}
+
+/** Lista nomes de conectores para a Etapa 2, tratando GET /items desabilitado (403) como pronto para Connect. */
+export async function listConnectorNamesOrDefault(
+  apiKey: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<string[]> {
+  try {
+    const items = await listItems(apiKey, fetchImpl);
+    const names = Array.from(
+      new Set(items.map((item) => item.connector?.name?.trim()).filter((n): n is string => !!n)),
+    );
+    return names.length > 0 ? names : ['Meu Pluggy pronto para autorizar'];
+  } catch (err) {
+    if (err instanceof PluggyError && err.kind === 'list_items_disabled') {
+      return ['Meu Pluggy pronto para autorizar'];
+    }
+    throw err;
+  }
 }

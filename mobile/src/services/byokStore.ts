@@ -2,6 +2,7 @@ import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Crypto from 'expo-crypto';
 import { ByokStep, isByokStep } from '../utils/byokFlow';
+import { clearPluggyWebViewData } from '../utils/pluggyBrowserReset';
 import { canValidate } from '../utils/pluggyKeys';
 import { api } from './api';
 
@@ -18,6 +19,7 @@ const K_USER = 'vito_pluggy_client_user_id';
 const K_BACKUP_KEY = 'vito_byok_backup_key';
 const K_STEP = 'vito_byok_step';
 const K_TUTORIAL = 'vito_byok_tutorial_seen';
+const K_CLEAN_RESET_0129 = 'vito_byok_clean_reset_0_1_29';
 const BACKUP_KEY_VERSION = 1;
 const SECURE_STORE_OPTS: SecureStore.SecureStoreOptions = {
   keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
@@ -126,12 +128,35 @@ export async function saveKeys(keys: PluggyKeys): Promise<void> {
   await syncEncryptedBackup(keys);
 }
 
-/** "Trocar chaves": apaga chaves, etapa local e backup cifrado remoto (silencioso se offline). */
+/** "Trocar chaves": apaga chaves, etapa local, backup cifrado remoto e cookies do WebView. */
 export async function clearKeys(): Promise<void> {
   await SecureStore.deleteItemAsync(K_ID).catch(() => {});
   await SecureStore.deleteItemAsync(K_SECRET).catch(() => {});
   await AsyncStorage.removeItem(K_STEP).catch(() => {});
   await api.finance.deleteByokBackup().catch(() => {});
+  await clearPluggyWebViewData().catch(() => {});
+}
+
+/** Zera integralmente chaves, identificadores BYOK, tutorial, backup remoto e dados de navegação. */
+export async function resetAllFromScratch(): Promise<void> {
+  await Promise.allSettled([
+    SecureStore.deleteItemAsync(K_ID),
+    SecureStore.deleteItemAsync(K_SECRET),
+    SecureStore.deleteItemAsync(K_USER),
+    SecureStore.deleteItemAsync(K_BACKUP_KEY),
+    AsyncStorage.removeItem(K_STEP),
+    AsyncStorage.removeItem(K_TUTORIAL),
+    api.finance.deleteByokBackup(),
+    clearPluggyWebViewData(),
+  ]);
+}
+
+/** Garante reinício limpo único após atualização do 0.1.28 (que bloqueava na Etapa 2). */
+export async function ensureCleanStartReset0129(): Promise<void> {
+  const alreadyReset = await AsyncStorage.getItem(K_CLEAN_RESET_0129).catch(() => null);
+  if (alreadyReset === '1') return;
+  await resetAllFromScratch();
+  await AsyncStorage.setItem(K_CLEAN_RESET_0129, '1').catch(() => {});
 }
 
 export async function getStep(): Promise<ByokStep | null> {

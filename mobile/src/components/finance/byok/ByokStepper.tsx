@@ -124,10 +124,9 @@ export const ByokStepper: React.FC<{ setup: Setup }> = ({ setup: s }) => {
 
       <VerticalStep index={2} title="Meu Pluggy e bancos" state={s2State}>
         <Text style={[styles.vp, { color: colors.muted }]}>
-          Agora abra o Meu Pluggy, crie sua conta de usuário e conecte seus bancos (Nubank, Itaú, Inter…). O app do seu
-          banco abrirá automaticamente para confirmar.
+          Agora abra o Meu Pluggy aqui no Vito, crie sua conta de usuário e conecte seus bancos (Nubank, Itaú, Inter…). O app do seu banco abrirá automaticamente para confirmar.
         </Text>
-        <ActionButton primary icon="open-in-new" label="Abrir Meu Pluggy" onPress={s.openMeuPluggy} />
+        <ActionButton primary icon="open-in-new" label="Abrir Meu Pluggy no Vito" onPress={s.openMeuPluggy} />
         <ActionButton
           label="Já conectei meus bancos, continuar"
           busy={s.busy && s.step2Status === 'loading'}

@@ -317,3 +317,81 @@ export const PLUGGY_CAPTURE_BRIDGE_SCRIPT = `
 })();
 true;
 `;
+
+/**
+ * Script injetado na WebView do widget Pluggy Connect (`connect.pluggy.ai`):
+ * captura o `itemId` real via eventos `postMessage` ou resposta JSON de `/items`
+ * para não depender de `GET /items` (403 em contas gratuitas da Pluggy).
+ */
+export const PLUGGY_CONNECT_BRIDGE_SCRIPT = `
+(function () {
+  if (!window.location || window.location.hostname.toLowerCase().indexOf('pluggy.ai') === -1) return true;
+  if (window.__vitoPluggyConnectInstalled) return true;
+  window.__vitoPluggyConnectInstalled = true;
+
+  var UUID_EXACT = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+  function postItem(itemId, status, source) {
+    try {
+      if (!UUID_EXACT.test(String(itemId || '').trim())) return;
+      if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: 'pluggy_connect_item',
+          itemId: String(itemId).trim(),
+          status: typeof status === 'string' ? status : '',
+          source: source
+        }));
+      }
+    } catch (_) {}
+  }
+
+  function inspectConnectPayload(obj, source, urlHint) {
+    if (!obj || typeof obj !== 'object') return;
+    if (obj.item && typeof obj.item === 'object' && UUID_EXACT.test(String(obj.item.id || ''))) {
+      postItem(obj.item.id, obj.item.status, source);
+      return;
+    }
+    if (obj.data && obj.data.item && typeof obj.data.item === 'object' && UUID_EXACT.test(String(obj.data.item.id || ''))) {
+      postItem(obj.data.item.id, obj.data.item.status, source);
+      return;
+    }
+    if (typeof obj.itemId === 'string' && UUID_EXACT.test(obj.itemId)) {
+      postItem(obj.itemId, obj.status, source);
+      return;
+    }
+    var fromItemsApi = urlHint && urlHint.indexOf('/items') !== -1;
+    if ((fromItemsApi || obj.connector) && typeof obj.id === 'string' && UUID_EXACT.test(obj.id)) {
+      postItem(obj.id, obj.status, source);
+    }
+  }
+
+  window.addEventListener('message', function (ev) {
+    try {
+      var d = typeof ev.data === 'string' ? JSON.parse(ev.data) : ev.data;
+      inspectConnectPayload(d, 'postmessage', '');
+    } catch (_) {}
+  });
+
+  if (typeof window.fetch === 'function') {
+    var origFetch = window.fetch.bind(window);
+    window.fetch = function (input) {
+      var reqUrl = typeof input === 'string' ? input : (input && input.url) || '';
+      var p = origFetch.apply(window, arguments);
+      try {
+        if (reqUrl.indexOf('/items') !== -1) {
+          p.then(function (res) {
+            try {
+              if (!res || typeof res.clone !== 'function') return;
+              res.clone().json().then(function (json) {
+                inspectConnectPayload(json, 'network', reqUrl);
+              }).catch(function () {});
+            } catch (_) {}
+          }).catch(function () {});
+        }
+      } catch (_) {}
+      return p;
+    };
+  }
+})();
+true;
+`;

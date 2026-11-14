@@ -1,6 +1,6 @@
 import { api } from './api';
 import type { FinanceAccount, FinanceSyncPayload } from '../types/finance';
-import { listItems } from './pluggyService';
+import { listItems, PluggyError } from './pluggyService';
 
 /**
  * Edge-Sync (Zero IP Leak): o celular lê contas/transações direto da Pluggy
@@ -37,8 +37,16 @@ export async function syncPluggyItem(
 ): Promise<PluggySyncResult> {
   let resolved = itemId;
   if (!resolved || resolved.startsWith('item_')) {
-    const items = await listItems(apiKey);
-    resolved = items[0]?.id;
+    try {
+      const items = await listItems(apiKey);
+      resolved = items[0]?.id;
+    } catch (e) {
+      if (e instanceof PluggyError && e.kind === 'list_items_disabled') {
+        resolved = undefined;
+      } else {
+        throw e;
+      }
+    }
   }
   if (!resolved) return { accountsCount: 0, transactionsCount: 0, itemId: '', institutionName: '' };
 

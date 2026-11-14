@@ -16,6 +16,7 @@ import { ByokStepper } from '../components/finance/byok/ByokStepper';
 import { ByokShortcut } from '../components/finance/byok/ByokShortcut';
 import { ByokSyncProgress } from '../components/finance/byok/ByokSyncProgress';
 import { PluggyDashboardWebView } from '../components/finance/byok/PluggyDashboardWebView';
+import { PluggyPortalWebView } from '../components/finance/byok/PluggyPortalWebView';
 import { resolveModalBottomInset, resolveModalTopInset } from '../utils/safeArea';
 
 interface PluggyConnectModalProps {
@@ -116,6 +117,17 @@ export const PluggyConnectModal: React.FC<PluggyConnectModalProps> = ({ visible,
   const showConnectionsSection =
     setup.ready && setup.step !== 'tutorial' && !inSyncScreen && (setup.shortcut || connections.length > 0);
 
+  const handleConfirmResetAll = () => {
+    Alert.alert(
+      'Começar do zero',
+      'Apaga Client ID, Client Secret, backup cifrado e os cookies/sessão do navegador interno.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Apagar e recomeçar', style: 'destructive', onPress: () => void setup.resetFromScratch() },
+      ],
+    );
+  };
+
   const renderFlow = () => {
     if (!setup.ready) return <ActivityIndicator size="small" color={colors.ink} style={{ marginVertical: 32 }} />;
     if (setup.syncPhase !== 'idle') {
@@ -132,15 +144,24 @@ export const PluggyConnectModal: React.FC<PluggyConnectModalProps> = ({ visible,
       );
     }
     if (setup.step === 'tutorial') return <ByokTutorialCards onDone={setup.finishTutorial} />;
-    if (setup.shortcut) return <ByokShortcut setup={setup} />;
+
     return (
       <>
-        <ByokStepper setup={setup} />
-        {setup.validated && (
-          <TouchableOpacity onPress={setup.changeKeys} style={styles.linkBtn} accessibilityRole="button">
-            <Text style={[styles.linkBtnText, { color: colors.muted }]}>Trocar chaves</Text>
-          </TouchableOpacity>
+        {setup.shortcut ? (
+          <ByokShortcut setup={setup} />
+        ) : (
+          <>
+            <ByokStepper setup={setup} />
+            {setup.validated && (
+              <TouchableOpacity onPress={setup.changeKeys} style={styles.linkBtn} accessibilityRole="button">
+                <Text style={[styles.linkBtnText, { color: colors.muted }]}>Trocar chaves</Text>
+              </TouchableOpacity>
+            )}
+          </>
         )}
+        <TouchableOpacity onPress={handleConfirmResetAll} style={styles.linkBtn} accessibilityRole="button">
+          <Text style={[styles.linkBtnText, { color: colors.red }]}>Apagar chaves e dados de navegação</Text>
+        </TouchableOpacity>
       </>
     );
   };
@@ -226,10 +247,22 @@ export const PluggyConnectModal: React.FC<PluggyConnectModalProps> = ({ visible,
 
         <PluggyDashboardWebView
           visible={setup.webViewOpen}
+          sessionKey={setup.webSessionKey}
           clientId={setup.clientId}
           clientSecret={setup.clientSecret}
           onCapture={setup.handleWebViewCapture}
           onClose={setup.closeDashboard}
+        />
+
+        <PluggyPortalWebView
+          visible={setup.portalMode !== null}
+          mode={setup.portalMode ?? 'meu_pluggy'}
+          url={setup.portalUrl}
+          sessionKey={setup.webSessionKey}
+          onClose={setup.closePortal}
+          onFinishMeuPluggy={setup.finishMeuPluggyPortal}
+          onConnectItemCaptured={(itemId) => void setup.completeConnectSync(itemId)}
+          onFallbackConnectExternal={() => void setup.fallbackConnectExternal()}
         />
       </View>
     </Modal>

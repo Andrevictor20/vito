@@ -1,5 +1,7 @@
 /** Máquina de estados pura do onboarding BYOK Pluggy (Plano 26). */
 
+import { isPluggyUuid, normalizeKey } from './pluggyKeys';
+
 export type ByokStep = 'tutorial' | '1' | '2' | '3' | 'done';
 
 export interface ByokPersisted {
@@ -136,6 +138,97 @@ export function formatWebViewDisplayUrl(url: string): string {
     const path = parsed.pathname === '/' ? '' : parsed.pathname;
     return `${parsed.hostname}${path}`;
   } catch {
-    return 'dashboard.pluggy.ai';
+    return 'pluggy.ai';
   }
+}
+
+const DANGEROUS_SCHEMES = new Set(['javascript:', 'file:', 'data:', 'blob:', 'vbscript:', 'about:']);
+
+/**
+ * Classifica navegações da WebView do Meu Pluggy e Pluggy Connect:
+ * - `vito_success`: callback de conclusão com itemId;
+ * - `allow`: domínio HTTPS oficial Pluggy/OAuth na WebView;
+ * - `external`: app bancário (nubank://, itau://, intent://, etc.) para abrir nativamente;
+ * - `block`: esquemas inseguros (`javascript:`, `file:`, `data:`, `http://`).
+ */
+export function classifyPortalNavigation(
+  url: string,
+  isTopFrame = true,
+): 'allow' | 'vito_success' | 'external' | 'block' {
+  if (!url || typeof url !== 'string') return 'block';
+  const trimmed = url.trim();
+  const lower = trimmed.toLowerCase();
+
+  if (lower.startsWith('vito://pluggy-success')) return 'vito_success';
+  if (trimmed === 'about:blank') return isTopFrame ? 'block' : 'allow';
+  if (isAllowedPluggyWebViewUrl(trimmed, isTopFrame)) return 'allow';
+
+  const colonIdx = lower.indexOf(':');
+  if (colonIdx <= 0) return 'block';
+  const scheme = lower.slice(0, colonIdx + 1);
+  if (DANGEROUS_SCHEMES.has(scheme) || scheme === 'http:') return 'block';
+
+  // Links externos de bancos Open Finance (apps nativos ou app links top-level)
+  if (scheme === 'https:') {
+    if (!isTopFrame) return 'block';
+    try {
+      const parsed = new URL(trimmed);
+      if (parsed.username || parsed.password) return 'block';
+      return 'external';
+    } catch {
+      return 'block';
+    }
+  }
+
+  return isTopFrame ? 'external' : 'block';
+}
+
+export interface ParsedConnectItemMessage {
+  itemId: string;
+  status?: string;
+  source: 'network' | 'postmessage';
+}
+
+/** Faz parse seguro de eventos de itemId capturados em `connect.pluggy.ai`. */
+export function parsePluggyConnectItemMessage(raw: string): ParsedConnectItemMessage | null {
+  if (!raw || typeof raw !== 'string') return null;
+  let parsed: Record<string, unknown>;
+  try {
+    const json: unknown = JSON.parse(raw);
+    if (!json || typeof json !== 'object' || Array.isArray(json)) return null;
+    parsed = json as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+  if (parsed.type !== 'pluggy_connect_item') return null;
+  const itemId = typeof parsed.itemId === 'string' ? normalizeKey(parsed.itemId) : '';
+  if (!isPluggyUuid(itemId)) return null;
+  const status = typeof parsed.status === 'string' ? parsed.status.trim() : undefined;
+  const source = parsed.source === 'postmessage' ? 'postmessage' : 'network';
+  return { itemId, status, source };
+}
+
+/** Monta URL do widget Pluggy Connect focado no conector Meu Pluggy (ID 200). */
+export function buildPluggyConnectUrl(connectToken: string, isDark: boolean): string {
+  const tok = encodeURIComponent(connectToken);
+  return (
+    `https://connect.pluggy.ai/?connect_token=${tok}&connectToken=${tok}` +
+    `&includeSandbox=false&selectedConnectorId=200&theme=${isDark ? 'dark' : 'light'}`
+  );
+}
+
+/** Combina sugestões de UUID da área de transferência com os campos atuais. */
+export function mergeClipboardSuggestion(
+  clipboardUuids: string[],
+  clientId: string,
+  clientSecret: string,
+  target?: 'id' | 'secret',
+): { nextId: string; nextSec: string } {
+  if (clipboardUuids.length >= 2) {
+    return { nextId: clipboardUuids[0], nextSec: clipboardUuids[1] };
+  }
+  const dest = target ?? (!clientId ? 'id' : 'secret');
+  return dest === 'id'
+    ? { nextId: clipboardUuids[0], nextSec: clientSecret }
+    : { nextId: clientId, nextSec: clipboardUuids[0] };
 }

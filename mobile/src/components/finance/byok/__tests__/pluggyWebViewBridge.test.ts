@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
-import { PLUGGY_CAPTURE_BRIDGE_SCRIPT } from '../pluggyWebViewBridge';
+import { PLUGGY_CAPTURE_BRIDGE_SCRIPT, PLUGGY_CONNECT_BRIDGE_SCRIPT } from '../pluggyWebViewBridge';
 
 const CID = 'b735999c-1306-4759-86de-49af53d01234';
 const CSEC_UUID = '9f8e7d6c-5b4a-4321-8765-abcdef123456';
@@ -38,12 +38,21 @@ function createSandbox(hostname: string) {
       clone: () => ({ text: async () => '{}' }),
     });
 
+  const windowListeners: Record<string, Array<(ev: unknown) => void>> = {};
+
   const windowObj: Record<string, unknown> = {
     location: { hostname },
     ReactNativeWebView: {
       postMessage: (raw: string) => {
         posted.push(JSON.parse(raw));
       },
+    },
+    addEventListener: (ev: string, fn: (ev: unknown) => void) => {
+      windowListeners[ev] = windowListeners[ev] || [];
+      windowListeners[ev].push(fn);
+    },
+    dispatchWindowEvent: (ev: string, payload: unknown) => {
+      for (const fn of windowListeners[ev] ?? []) fn(payload);
     },
     getComputedStyle: () => ({ display: 'block', visibility: 'visible' }),
     getSelection: () => '',
@@ -154,5 +163,44 @@ describe('PLUGGY_CAPTURE_BRIDGE_SCRIPT', () => {
     assert.equal(ctx.posted.length, 1);
     assert.equal(ctx.posted[0].clientSecret, CSEC_TOKEN);
     assert.equal(ctx.posted[0].source, 'scan');
+  });
+});
+
+describe('PLUGGY_CONNECT_BRIDGE_SCRIPT', () => {
+  it('captura itemId via fetch /items e postMessage no connect.pluggy.ai', async () => {
+    const ctx = createSandbox('connect.pluggy.ai');
+    const ITEM_ID = '11111111-2222-4333-8444-555555555555';
+    const ITEM_ID_2 = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+
+    ctx.setFetch((async () => ({
+      headers: { get: () => 'application/json' },
+      clone: () => ({
+        text: async () => '{}',
+        json: async () => ({ id: ITEM_ID, connector: { id: 200 }, status: 'UPDATED' }),
+      }),
+    })) as never);
+
+    vm.runInNewContext(PLUGGY_CONNECT_BRIDGE_SCRIPT, ctx.sandbox);
+
+    const wrappedFetch = ctx.windowObj.fetch as (u: string) => Promise<unknown>;
+    await wrappedFetch('https://api.pluggy.ai/items');
+    await new Promise((r) => setTimeout(r, 15));
+
+    const dispatch = ctx.windowObj.dispatchWindowEvent as (ev: string, p: unknown) => void;
+    dispatch('message', { data: JSON.stringify({ item: { id: ITEM_ID_2, status: 'LOGIN_IN_PROGRESS' } }) });
+
+    assert.equal(ctx.posted.length, 2);
+    assert.deepEqual(ctx.posted[0], {
+      type: 'pluggy_connect_item',
+      itemId: ITEM_ID,
+      status: 'UPDATED',
+      source: 'network',
+    });
+    assert.deepEqual(ctx.posted[1], {
+      type: 'pluggy_connect_item',
+      itemId: ITEM_ID_2,
+      status: 'LOGIN_IN_PROGRESS',
+      source: 'postmessage',
+    });
   });
 });

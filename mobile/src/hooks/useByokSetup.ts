@@ -1,8 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, Linking } from 'react-native';
+import { AppState } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import * as WebBrowser from 'expo-web-browser';
-import { ByokStep, initialStep, isShortcutMode, parseItemId, step2Outcome } from '../utils/byokFlow';
+import {
+  buildPluggyConnectUrl,
+  ByokStep,
+  initialStep,
+  isShortcutMode,
+  mergeClipboardSuggestion,
+  parseItemId,
+} from '../utils/byokFlow';
 import {
   canValidate,
   detectSwappedKeysCandidate,
@@ -10,8 +17,14 @@ import {
   hasIdenticalKeys,
   normalizeKey,
 } from '../utils/pluggyKeys';
-import { authenticate, createConnectToken, listItems, PluggyError } from '../services/pluggyService';
+import {
+  authenticate,
+  createConnectToken,
+  listConnectorNamesOrDefault,
+  PluggyError,
+} from '../services/pluggyService';
 import { syncPluggyItem, PluggySyncResult } from '../services/pluggySync';
+import type { PluggyPortalMode } from '../components/finance/byok/PluggyPortalWebView';
 import * as store from '../services/byokStore';
 
 export const DASHBOARD_URL = 'https://dashboard.pluggy.ai';
@@ -41,6 +54,9 @@ export function useByokSetup({ visible, isDark, onSynced }: Options) {
   const [error, setError] = useState('');
   const [clipboardUuids, setClipboardUuids] = useState<string[]>([]);
   const [webViewOpen, setWebViewOpen] = useState(false);
+  const [webSessionKey, setWebSessionKey] = useState(0);
+  const [portalMode, setPortalMode] = useState<PluggyPortalMode | null>(null);
+  const [portalUrl, setPortalUrl] = useState('');
   const [step2Status, setStep2Status] = useState<ByokStep2Status>('idle');
   const [foundBanks, setFoundBanks] = useState<string[]>([]);
   const [syncPhase, setSyncPhase] = useState<ByokSyncPhase>('idle');
@@ -49,6 +65,8 @@ export function useByokSetup({ visible, isDark, onSynced }: Options) {
 
   const stepRef = useRef<ByokStep>('tutorial');
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingApiKeyRef = useRef('');
+  const pendingConnectUrlRef = useRef('');
 
   const clearPendingTimer = useCallback(() => {
     if (timerRef.current) {
@@ -70,6 +88,10 @@ export function useByokSetup({ visible, isDark, onSynced }: Options) {
     if (!visible) {
       clearPendingTimer();
       setWebViewOpen(false);
+      setPortalMode(null);
+      setPortalUrl('');
+      pendingApiKeyRef.current = '';
+      pendingConnectUrlRef.current = '';
       setSyncPhase('idle');
       setClientId('');
       setClientSecret('');
@@ -79,6 +101,7 @@ export function useByokSetup({ visible, isDark, onSynced }: Options) {
     }
     let alive = true;
     (async () => {
+      await store.ensureCleanStartReset0129();
       let keys = await store.getKeys();
       if (!keys) keys = await store.restoreBackupKeys();
       const [saved, seen] = await Promise.all([store.getStep(), store.isTutorialSeen()]);
@@ -229,17 +252,7 @@ export function useByokSetup({ visible, isDark, onSynced }: Options) {
   const applySuggestion = useCallback(
     (target?: 'id' | 'secret') => {
       if (clipboardUuids.length === 0) return;
-      let nextId = clientId;
-      let nextSec = clientSecret;
-
-      if (clipboardUuids.length >= 2) {
-        nextId = clipboardUuids[0];
-        nextSec = clipboardUuids[1];
-      } else {
-        const dest = target ?? (!clientId ? 'id' : 'secret');
-        if (dest === 'id') nextId = clipboardUuids[0];
-        else nextSec = clipboardUuids[0];
-      }
+      const { nextId, nextSec } = mergeClipboardSuggestion(clipboardUuids, clientId, clientSecret, target);
 
       setClientId(nextId);
       setClientSecret(nextSec);
@@ -290,28 +303,18 @@ export function useByokSetup({ visible, isDark, onSynced }: Options) {
     return authenticate(keys.clientId, keys.clientSecret);
   }, []);
 
-  // Etapa 2: confirma a conexão consultando GET /items (Q-3).
+  // Etapa 2: valida chaves (/auth) e consulta GET /items quando habilitado; 403/0 itens segue para o Connect 200.
   const confirmBanks = useCallback(async () => {
     setBusy(true);
     setStep2Status('loading');
     setError('');
     try {
-      const items = await listItems(await apiKeyFromStore());
-      const out = step2Outcome(items.length);
-      if (out.advance) {
-        const names = Array.from(
-          new Set(items.map((item) => item.connector?.name?.trim()).filter((n): n is string => !!n)),
-        );
-        setFoundBanks(names.length > 0 ? names : ['Meu Pluggy']);
-        setStep2Status('found');
-        clearPendingTimer();
-        timerRef.current = setTimeout(() => {
-          goTo('3');
-        }, 900);
-      } else {
-        setStep2Status('zero');
-        setError(out.message);
-      }
+      const apiKey = await apiKeyFromStore();
+      const names = await listConnectorNamesOrDefault(apiKey);
+      setFoundBanks(names);
+      setStep2Status('found');
+      clearPendingTimer();
+      timerRef.current = setTimeout(() => goTo('3'), 900);
     } catch (e) {
       setStep2Status('error');
       setError(e instanceof PluggyError ? e.message : 'Falha ao consultar a Pluggy.');
@@ -320,7 +323,46 @@ export function useByokSetup({ visible, isDark, onSynced }: Options) {
     }
   }, [apiKeyFromStore, goTo, clearPendingTimer]);
 
-  // Etapa 3: connectToken local + widget externo conector 200 + Edge-Sync em 6 checkpoints.
+  const completeConnectSync = useCallback(
+    async (itemId: string) => {
+      setPortalMode(null);
+      setBusy(true);
+      setError('');
+      setSyncPhase('running');
+      setSyncCompletedCount(2);
+      try {
+        const apiKey = pendingApiKeyRef.current || (await apiKeyFromStore());
+        const result = await syncPluggyItem(apiKey, itemId || undefined, (completed) => {
+          setSyncCompletedCount(completed);
+        });
+
+        if (result.accountsCount === 0) {
+          setSyncPhase('waiting_auth');
+          setSyncCompletedCount(2);
+          setError('Nenhuma conta encontrada. Conclua a autorização no Pluggy Connect para continuar.');
+          return;
+        }
+
+        setSyncCompletedCount(6);
+        const banks = Array.from(
+          new Set([result.institutionName, ...foundBanks].filter((n) => !!n && n.trim().length > 0)),
+        );
+        setSyncedBanks(banks.length > 0 ? banks : ['Meu Pluggy']);
+        setSyncPhase('done');
+        setShortcut(true);
+        goTo('done');
+        onSynced?.(result);
+      } catch (e) {
+        setSyncPhase('error');
+        setError(e instanceof PluggyError ? e.message : e instanceof Error ? e.message : 'Falha ao sincronizar.');
+      } finally {
+        setBusy(false);
+      }
+    },
+    [apiKeyFromStore, foundBanks, goTo, onSynced],
+  );
+
+  // Etapa 3: connectToken local + widget conector 200 na WebView in-app + Edge-Sync em 6 checkpoints.
   const syncNow = useCallback(async () => {
     setBusy(true);
     setError('');
@@ -328,114 +370,111 @@ export function useByokSetup({ visible, isDark, onSynced }: Options) {
     setSyncCompletedCount(0);
     try {
       const apiKey = await apiKeyFromStore();
+      pendingApiKeyRef.current = apiKey;
       setSyncCompletedCount(1);
 
       const token = await createConnectToken(apiKey, await store.getClientUserId());
       setSyncCompletedCount(2);
 
-      const url =
-        `https://connect.pluggy.ai/?connect_token=${encodeURIComponent(token)}` +
-        `&connectToken=${encodeURIComponent(token)}&includeSandbox=false&selectedConnectorId=200` +
-        `&theme=${isDark ? 'dark' : 'light'}`;
-      const res = await WebBrowser.openAuthSessionAsync(url, 'vito://pluggy-success');
-      const itemId = res.type === 'success' ? parseItemId(res.url) : '';
-
-      const result = await syncPluggyItem(apiKey, itemId || undefined, (completed) => {
-        setSyncCompletedCount(completed);
-      });
-
-      if (result.accountsCount === 0) {
-        setSyncPhase('waiting_auth');
-        setSyncCompletedCount(2);
-        setError('Nenhuma conta encontrada. Conclua a autorização no Pluggy Connect para continuar.');
-        return;
-      }
-
-      setSyncCompletedCount(6);
-      const banks = Array.from(
-        new Set([result.institutionName, ...foundBanks].filter((n) => !!n && n.trim().length > 0)),
-      );
-      setSyncedBanks(banks.length > 0 ? banks : ['Meu Pluggy']);
-      setSyncPhase('done');
-      setShortcut(true);
-      goTo('done');
-      onSynced?.(result);
+      const url = buildPluggyConnectUrl(token, isDark);
+      pendingConnectUrlRef.current = url;
+      setPortalUrl(url);
+      setPortalMode('connect');
     } catch (e) {
       setSyncPhase('error');
       setError(e instanceof PluggyError ? e.message : e instanceof Error ? e.message : 'Falha ao sincronizar.');
     } finally {
       setBusy(false);
     }
-  }, [apiKeyFromStore, foundBanks, goTo, isDark, onSynced]);
+  }, [apiKeyFromStore, isDark]);
+
+  const fallbackConnectExternal = useCallback(async () => {
+    const url = pendingConnectUrlRef.current;
+    setPortalMode(null);
+    if (!url) return;
+    setBusy(true);
+    try {
+      const res = await WebBrowser.openAuthSessionAsync(url, 'vito://pluggy-success');
+      const itemId = res.type === 'success' ? parseItemId(res.url) : '';
+      await completeConnectSync(itemId);
+    } catch (e) {
+      setSyncPhase('error');
+      setError(e instanceof Error ? e.message : 'Falha ao abrir Pluggy Connect.');
+      setBusy(false);
+    }
+  }, [completeConnectSync]);
 
   const openDashboard = useCallback(() => {
     setError('');
     setWebViewOpen(true);
   }, []);
+  const closeDashboard = useCallback(() => setWebViewOpen(false), []);
 
-  const closeDashboard = useCallback(() => {
-    setWebViewOpen(false);
+  const openMeuPluggy = useCallback(() => {
+    setError('');
+    setPortalUrl(MEU_PLUGGY_URL);
+    setPortalMode('meu_pluggy');
   }, []);
 
-  const openMeuPluggy = useCallback(() => void Linking.openURL(MEU_PLUGGY_URL), []);
+  const closePortal = useCallback(() => {
+    if (portalMode === 'connect') setSyncPhase('idle');
+    setPortalMode(null);
+    setBusy(false);
+  }, [portalMode]);
+
+  const finishMeuPluggyPortal = useCallback(() => {
+    setPortalMode(null);
+    void confirmBanks();
+  }, [confirmBanks]);
+
+  const resetLocalFlow = useCallback(
+    (targetStep: ByokStep) => {
+      clearPendingTimer();
+      pendingApiKeyRef.current = '';
+      pendingConnectUrlRef.current = '';
+      setWebViewOpen(false);
+      setPortalMode(null);
+      setWebSessionKey((k) => k + 1);
+      setClientId('');
+      setClientSecret('');
+      setClipboardUuids([]);
+      setValidated(false);
+      setAuthStatus('idle');
+      setValidationNote('');
+      setStep2Status('idle');
+      setFoundBanks([]);
+      setSyncPhase('idle');
+      setShortcut(false);
+      goTo(targetStep);
+    },
+    [clearPendingTimer, goTo],
+  );
 
   const changeKeys = useCallback(async () => {
-    clearPendingTimer();
     await store.clearKeys();
-    setClientId('');
-    setClientSecret('');
-    setValidated(false);
-    setAuthStatus('idle');
-    setValidationNote('');
-    setStep2Status('idle');
-    setFoundBanks([]);
-    setSyncPhase('idle');
-    setShortcut(false);
-    goTo('1');
-  }, [clearPendingTimer, goTo]);
+    resetLocalFlow('1');
+  }, [resetLocalFlow]);
+
+  const resetFromScratch = useCallback(async () => {
+    await store.resetAllFromScratch();
+    resetLocalFlow('tutorial');
+  }, [resetLocalFlow]);
 
   const showTutorial = useCallback(() => {
     setShortcut(false);
     goTo('tutorial');
   }, [goTo]);
-
   const resetSyncView = useCallback(() => {
     setSyncPhase('idle');
     setError('');
   }, []);
 
   return {
-    ready,
-    step,
-    shortcut,
-    clientId,
-    clientSecret,
-    validated,
-    authStatus,
-    validationNote,
-    busy,
-    error,
-    clipboardUuids,
-    clipboardSuggestion: clipboardUuids[0] ?? '',
-    webViewOpen,
-    step2Status,
-    foundBanks,
-    syncPhase,
-    syncCompletedCount,
-    syncedBanks,
-    finishTutorial,
-    paste,
-    applySuggestion,
-    updateField,
-    validateKeys,
-    handleWebViewCapture,
-    confirmBanks,
-    syncNow,
-    openDashboard,
-    closeDashboard,
-    openMeuPluggy,
-    changeKeys,
-    showTutorial,
-    resetSyncView,
+    ready, step, shortcut, clientId, clientSecret, validated, authStatus, validationNote, busy, error,
+    clipboardUuids, clipboardSuggestion: clipboardUuids[0] ?? '', webViewOpen, webSessionKey,
+    portalMode, portalUrl, step2Status, foundBanks, syncPhase, syncCompletedCount, syncedBanks,
+    finishTutorial, paste, applySuggestion, updateField, validateKeys, handleWebViewCapture,
+    confirmBanks, syncNow, completeConnectSync, fallbackConnectExternal, openDashboard, closeDashboard,
+    openMeuPluggy, closePortal, finishMeuPluggyPortal, changeKeys, resetFromScratch, showTutorial, resetSyncView,
   };
 }
