@@ -208,10 +208,16 @@ export const PluggyDashboardWebView: React.FC<Props> = ({
               if (nav.url) setCurrentUrl(nav.url);
               setLoading(Boolean(nav.loading));
             }}
+            onLoadProgress={({ nativeEvent }) => {
+              if (nativeEvent.progress >= 0.95) setLoading(false);
+            }}
             onLoadStart={() => setLoading(true)}
-            onLoadEnd={() => {
+            onLoadEnd={(ev) => {
               setLoading(false);
-              webViewRef.current?.injectJavaScript(PLUGGY_CAPTURE_BRIDGE_SCRIPT);
+              const loadedUrl = ev?.nativeEvent?.url || currentUrl;
+              if (loadedUrl.includes('dashboard.pluggy.ai')) {
+                webViewRef.current?.injectJavaScript(PLUGGY_CAPTURE_BRIDGE_SCRIPT);
+              }
             }}
           />
         </View>

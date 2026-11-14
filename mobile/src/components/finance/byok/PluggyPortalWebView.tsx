@@ -87,12 +87,17 @@ export const PluggyPortalWebView: React.FC<Props> = ({
   const handleMessage = (event: WebViewMessageEvent) => {
     if (!isConnect) return;
     const { data, url: msgUrl } = event.nativeEvent;
-    if (typeof data !== 'string' || data.length === 0 || data.length > 2048) return;
+    if (typeof data !== 'string' || data.length === 0 || data.length > 16384) return;
     if (msgUrl && !isPluggyDashboardUrl(msgUrl)) return;
     const parsed = parsePluggyConnectItemMessage(data);
     if (!parsed) return;
     setCapturedItemId(parsed.itemId);
-    if (parsed.status === 'UPDATED' || parsed.status === 'UPDATING' || parsed.source === 'postmessage') {
+    const isCompletedEvent =
+      parsed.status === 'UPDATED' ||
+      parsed.status === 'OUTDATED' ||
+      parsed.event === 'onSuccess' ||
+      parsed.event === 'ITEM_UPDATED';
+    if (isCompletedEvent) {
       emitConnectItem(parsed.itemId, true);
     }
   };

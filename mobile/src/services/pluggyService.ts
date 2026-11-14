@@ -26,10 +26,7 @@ async function call(fetchImpl: typeof fetch, path: string, init: RequestInit): P
   } catch {
     throw new PluggyError('network', 'Sem conexão com a Pluggy. Verifique a internet e tente novamente.');
   }
-  if (res.status === 401) {
-    throw new PluggyError('invalid_keys', 'Chaves inválidas. Confira o Client ID e o Client Secret.', res.status);
-  }
-  if (res.status === 403) {
+  if (res.status === 401 || res.status === 403) {
     if (path.startsWith('/items')) {
       throw new PluggyError(
         'list_items_disabled',
@@ -100,7 +97,7 @@ export async function listItems(apiKey: string, fetchImpl: typeof fetch = fetch)
   return Array.isArray(json?.results) ? json.results : [];
 }
 
-/** Lista nomes de conectores para a Etapa 2, tratando GET /items desabilitado (403) como pronto para Connect. */
+/** Lista nomes de conectores para a Etapa 2, tratando GET /items restrito (400/401/403) como pronto para Connect. */
 export async function listConnectorNamesOrDefault(
   apiKey: string,
   fetchImpl: typeof fetch = fetch,
@@ -110,10 +107,10 @@ export async function listConnectorNamesOrDefault(
     const names = Array.from(
       new Set(items.map((item) => item.connector?.name?.trim()).filter((n): n is string => !!n)),
     );
-    return names.length > 0 ? names : ['Meu Pluggy pronto para autorizar'];
+    return names.length > 0 ? names : ['Pluggy Connect pronto para conectar'];
   } catch (err) {
-    if (err instanceof PluggyError && err.kind === 'list_items_disabled') {
-      return ['Meu Pluggy pronto para autorizar'];
+    if (err instanceof PluggyError && (err.kind === 'list_items_disabled' || err.kind === 'http')) {
+      return ['Pluggy Connect pronto para conectar'];
     }
     throw err;
   }

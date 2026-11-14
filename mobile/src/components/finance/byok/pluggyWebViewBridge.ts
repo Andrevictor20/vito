@@ -342,6 +342,12 @@ export const PLUGGY_CONNECT_BRIDGE_SCRIPT = `
 
   function inspectConnectPayload(obj, source, urlHint) {
     if (!obj || typeof obj !== 'object') return;
+    if (Array.isArray(obj)) {
+      for (var i = 0; i < obj.length; i++) {
+        inspectConnectPayload(obj[i], source, urlHint);
+      }
+      return;
+    }
     if (obj.item && typeof obj.item === 'object' && UUID_EXACT.test(String(obj.item.id || ''))) {
       postItem(obj.item.id, obj.item.status, source);
       return;
@@ -350,8 +356,19 @@ export const PLUGGY_CONNECT_BRIDGE_SCRIPT = `
       postItem(obj.data.item.id, obj.data.item.status, source);
       return;
     }
+    if (obj.payload && obj.payload.item && typeof obj.payload.item === 'object' && UUID_EXACT.test(String(obj.payload.item.id || ''))) {
+      postItem(obj.payload.item.id, obj.payload.item.status, source);
+      return;
+    }
     if (typeof obj.itemId === 'string' && UUID_EXACT.test(obj.itemId)) {
       postItem(obj.itemId, obj.status, source);
+      return;
+    }
+    var list = Array.isArray(obj.results) ? obj.results : (Array.isArray(obj.items) ? obj.items : null);
+    if (list && list.length > 0) {
+      for (var j = 0; j < list.length; j++) {
+        inspectConnectPayload(list[j], source, '/items');
+      }
       return;
     }
     var fromItemsApi = urlHint && urlHint.indexOf('/items') !== -1;
@@ -385,6 +402,33 @@ export const PLUGGY_CONNECT_BRIDGE_SCRIPT = `
         }
       } catch (_) {}
       return p;
+    };
+  }
+
+  var XHR = (typeof XMLHttpRequest === 'function' && XMLHttpRequest) || (typeof window.XMLHttpRequest === 'function' && window.XMLHttpRequest);
+  if (XHR && XHR.prototype) {
+    var origOpen = XHR.prototype.open;
+    var origSend = XHR.prototype.send;
+    XHR.prototype.open = function (method, url) {
+      try {
+        this.__vitoConnectUrl = String(url || '');
+      } catch (_) {}
+      return origOpen ? origOpen.apply(this, arguments) : undefined;
+    };
+    XHR.prototype.send = function () {
+      try {
+        var self = this;
+        if (self.__vitoConnectUrl && self.__vitoConnectUrl.indexOf('/items') !== -1 && typeof self.addEventListener === 'function') {
+          self.addEventListener('load', function () {
+            try {
+              var text = typeof self.responseText === 'string' ? self.responseText : '';
+              if (!text || text.length > 262144) return;
+              inspectConnectPayload(JSON.parse(text), 'network', self.__vitoConnectUrl);
+            } catch (_) {}
+          });
+        }
+      } catch (_) {}
+      return origSend ? origSend.apply(this, arguments) : undefined;
     };
   }
 })();

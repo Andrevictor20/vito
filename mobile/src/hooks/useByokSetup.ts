@@ -20,7 +20,6 @@ import {
 import {
   authenticate,
   createConnectToken,
-  listConnectorNamesOrDefault,
   PluggyError,
 } from '../services/pluggyService';
 import { syncPluggyItem, PluggySyncResult } from '../services/pluggySync';
@@ -306,36 +305,47 @@ export function useByokSetup({ visible, isDark, onSynced }: Options) {
   }, [clientId, clientSecret, validateKeys]);
 
   const apiKeyFromStore = useCallback(async (): Promise<string> => {
-    const keys = await store.getKeys();
+    let keys = await store.getKeys();
+    if (!keys && canValidate(clientId, clientSecret)) {
+      keys = { clientId: normalizeKey(clientId), clientSecret: normalizeKey(clientSecret) };
+      await store.saveKeys(keys);
+    }
     if (!keys) throw new PluggyError('invalid_keys', 'Chaves não encontradas. Refaça a Etapa 1.');
     return authenticate(keys.clientId, keys.clientSecret);
-  }, []);
+  }, [clientId, clientSecret]);
 
-  // Etapa 2: valida chaves (/auth) e consulta GET /items quando habilitado; 403/0 itens segue para o Connect 200.
-  const confirmBanks = useCallback(async () => {
+  // Abre o plugin oficial Pluggy Connect (connect.pluggy.ai/?connect_token=...) na WebView in-app.
+  const syncNow = useCallback(async () => {
     setBusy(true);
-    setStep2Status('loading');
     setError('');
     try {
       const apiKey = await apiKeyFromStore();
-      const names = await listConnectorNamesOrDefault(apiKey);
-      setFoundBanks(names);
-      setStep2Status('found');
-      clearPendingTimer();
-      timerRef.current = setTimeout(() => goTo('3'), 900);
+      pendingApiKeyRef.current = apiKey;
+
+      const token = await createConnectToken(apiKey, await store.getClientUserId());
+      const url = buildPluggyConnectUrl(token, isDark);
+      pendingConnectUrlRef.current = url;
+      setPortalUrl(url);
+      setPortalMode('connect');
     } catch (e) {
-      setStep2Status('error');
-      setError(e instanceof PluggyError ? e.message : 'Falha ao consultar a Pluggy.');
+      setError(e instanceof PluggyError ? e.message : e instanceof Error ? e.message : 'Falha ao abrir Pluggy Connect.');
     } finally {
       setBusy(false);
     }
-  }, [apiKeyFromStore, goTo, clearPendingTimer]);
+  }, [apiKeyFromStore, isDark]);
+
+  // Etapa 2: abre direto o plugin oficial Pluggy Connect para associar Meu Pluggy / bancos ao connect_token.
+  const confirmBanks = useCallback(async () => {
+    await syncNow();
+  }, [syncNow]);
 
   const completeConnectSync = useCallback(
     async (itemId: string) => {
       setPortalMode(null);
       setBusy(true);
       setError('');
+      setStep2Status('found');
+      goTo('3');
       setSyncPhase('running');
       setSyncCompletedCount(2);
       try {
@@ -370,47 +380,21 @@ export function useByokSetup({ visible, isDark, onSynced }: Options) {
     [apiKeyFromStore, foundBanks, goTo, onSynced],
   );
 
-  // Etapa 3: connectToken local + widget conector 200 na WebView in-app + Edge-Sync em 6 checkpoints.
-  const syncNow = useCallback(async () => {
-    setBusy(true);
-    setError('');
-    setSyncPhase('running');
-    setSyncCompletedCount(0);
-    try {
-      const apiKey = await apiKeyFromStore();
-      pendingApiKeyRef.current = apiKey;
-      setSyncCompletedCount(1);
-
-      const token = await createConnectToken(apiKey, await store.getClientUserId());
-      setSyncCompletedCount(2);
-
-      const url = buildPluggyConnectUrl(token, isDark);
-      pendingConnectUrlRef.current = url;
-      setPortalUrl(url);
-      setPortalMode('connect');
-    } catch (e) {
-      setSyncPhase('error');
-      setError(e instanceof PluggyError ? e.message : e instanceof Error ? e.message : 'Falha ao sincronizar.');
-    } finally {
-      setBusy(false);
-    }
-  }, [apiKeyFromStore, isDark]);
-
   const fallbackConnectExternal = useCallback(async () => {
-    const url = pendingConnectUrlRef.current;
+    const url = pendingConnectUrlRef.current || portalUrl;
     setPortalMode(null);
     if (!url) return;
     setBusy(true);
     try {
-      const res = await WebBrowser.openAuthSessionAsync(url, 'vito://pluggy-success');
-      const itemId = res.type === 'success' ? parseItemId(res.url) : '';
-      await completeConnectSync(itemId);
-    } catch (e) {
-      setSyncPhase('error');
-      setError(e instanceof Error ? e.message : 'Falha ao abrir Pluggy Connect.');
+      const authRes = await WebBrowser.openAuthSessionAsync(url, 'vito://pluggy-callback');
+      const callbackItemId = authRes.type === 'success' ? parseItemId(authRes.url) : null;
+      await completeConnectSync(callbackItemId || '');
+    } catch {
+      setSyncPhase('idle');
+    } finally {
       setBusy(false);
     }
-  }, [completeConnectSync]);
+  }, [completeConnectSync, portalUrl]);
 
   const openDashboard = useCallback(() => {
     setError('');
@@ -419,21 +403,17 @@ export function useByokSetup({ visible, isDark, onSynced }: Options) {
   const closeDashboard = useCallback(() => setWebViewOpen(false), []);
 
   const openMeuPluggy = useCallback(() => {
-    setError('');
-    setPortalUrl(MEU_PLUGGY_URL);
-    setPortalMode('meu_pluggy');
-  }, []);
+    void syncNow();
+  }, [syncNow]);
 
   const closePortal = useCallback(() => {
-    if (portalMode === 'connect') setSyncPhase('idle');
     setPortalMode(null);
     setBusy(false);
-  }, [portalMode]);
+  }, []);
 
   const finishMeuPluggyPortal = useCallback(() => {
-    setPortalMode(null);
-    void confirmBanks();
-  }, [confirmBanks]);
+    void completeConnectSync('');
+  }, [completeConnectSync]);
 
   const resetLocalFlow = useCallback(
     (targetStep: ByokStep) => {

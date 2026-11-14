@@ -24,6 +24,7 @@ function createSandbox(hostname: string) {
     responseText = '';
     response: unknown = null;
     private listeners: Array<() => void> = [];
+    open(_method: string, _url: string) {}
     addEventListener(ev: string, fn: () => void) {
       if (ev === 'load') this.listeners.push(fn);
     }
@@ -242,6 +243,31 @@ describe('PLUGGY_CONNECT_BRIDGE_SCRIPT', () => {
       itemId: ITEM_ID_2,
       status: 'LOGIN_IN_PROGRESS',
       source: 'postmessage',
+    });
+  });
+
+  it('captura itemId via XMLHttpRequest /items e results[] no connect.pluggy.ai', () => {
+    const ctx = createSandbox('connect.pluggy.ai');
+    const ITEM_ID = '22222222-3333-4444-8555-666666666666';
+
+    vm.runInNewContext(PLUGGY_CONNECT_BRIDGE_SCRIPT, ctx.sandbox);
+
+    const XhrCtor = ctx.sandbox.XMLHttpRequest as new () => {
+      open: (m: string, u: string) => void;
+      send: () => void;
+      responseText: string;
+    };
+    const xhr = new XhrCtor();
+    xhr.open('GET', 'https://api.pluggy.ai/items?clientUserId=123');
+    xhr.responseText = JSON.stringify({ results: [{ id: ITEM_ID, status: 'UPDATED' }] });
+    xhr.send();
+
+    assert.equal(ctx.posted.length, 1);
+    assert.deepEqual(ctx.posted[0], {
+      type: 'pluggy_connect_item',
+      itemId: ITEM_ID,
+      status: 'UPDATED',
+      source: 'network',
     });
   });
 });

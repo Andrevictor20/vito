@@ -81,29 +81,27 @@ export const BYOK_SYNC_CHECKPOINTS: readonly SyncCheckpointDef[] = [
 export const WEBVIEW_CHROME_USER_AGENT =
   'Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36';
 
-const EXACT_OAUTH_HOSTS = new Set([
-  'accounts.google.com',
-  'accounts.youtube.com',
-  'apis.google.com',
-  'consent.google.com',
-  'gds.google.com',
-  'myaccount.google.com',
-  'ogs.google.com',
-  'oauth2.googleapis.com',
-  'www.googleapis.com',
-  'www.google.com',
-  'ssl.gstatic.com',
-  'www.gstatic.com',
-  'fonts.gstatic.com',
-  'www.recaptcha.net',
+const ALLOWED_DOMAIN_SUFFIXES = [
+  'pluggy.ai',
+  'auth0.com',
+  'google.com',
+  'google.com.br',
+  'googleapis.com',
+  'gstatic.com',
+  'googleusercontent.com',
+  'youtube.com',
   'recaptcha.net',
+  'gvt1.com',
   'github.com',
-  'api.github.com',
-  'login.microsoftonline.com',
-  'login.live.com',
-  'appleid.apple.com',
-  'challenges.cloudflare.com',
-]);
+  'githubusercontent.com',
+  'microsoftonline.com',
+  'microsoft.com',
+  'live.com',
+  'msauth.net',
+  'msftauth.net',
+  'apple.com',
+  'cloudflare.com',
+];
 
 /**
  * Restrição estrita de URL para a WebView da Etapa 1 (`PluggyDashboardWebView`):
@@ -126,12 +124,7 @@ export function isAllowedPluggyWebViewUrl(url: string, isTopFrame = true): boole
   if (parsed.username || parsed.password) return false;
 
   const host = parsed.hostname.toLowerCase();
-  if (host === 'pluggy.ai' || host.endsWith('.pluggy.ai')) return true;
-  if (host === 'auth0.com' || host.endsWith('.auth0.com')) return true;
-  if (!isTopFrame && (host.endsWith('.gstatic.com') || host.endsWith('.googleusercontent.com'))) {
-    return true;
-  }
-  return EXACT_OAUTH_HOSTS.has(host);
+  return ALLOWED_DOMAIN_SUFFIXES.some((domain) => host === domain || host.endsWith(`.${domain}`));
 }
 
 /** Garante que postMessage da WebView venha estritamente de host HTTPS `*.pluggy.ai` (ex: `dashboard.pluggy.ai`). */
@@ -202,35 +195,81 @@ export function classifyPortalNavigation(
 export interface ParsedConnectItemMessage {
   itemId: string;
   status?: string;
+  event?: string;
   source: 'network' | 'postmessage';
 }
 
-/** Faz parse seguro de eventos de itemId capturados em `connect.pluggy.ai`. */
+function asObj(val: unknown): Record<string, unknown> | null {
+  return val && typeof val === 'object' && !Array.isArray(val)
+    ? (val as Record<string, unknown>)
+    : null;
+}
+
+/** Faz parse seguro de eventos de itemId capturados em `connect.pluggy.ai` (bridge ou nativos). */
 export function parsePluggyConnectItemMessage(raw: string): ParsedConnectItemMessage | null {
   if (!raw || typeof raw !== 'string') return null;
   let parsed: Record<string, unknown>;
   try {
     const json: unknown = JSON.parse(raw);
-    if (!json || typeof json !== 'object' || Array.isArray(json)) return null;
-    parsed = json as Record<string, unknown>;
+    const obj = asObj(json);
+    if (!obj) return null;
+    parsed = obj;
   } catch {
     return null;
   }
-  if (parsed.type !== 'pluggy_connect_item') return null;
-  const itemId = typeof parsed.itemId === 'string' ? normalizeKey(parsed.itemId) : '';
+
+  if (parsed.type === 'pluggy_connect_item') {
+    const itemId = typeof parsed.itemId === 'string' ? normalizeKey(parsed.itemId) : '';
+    if (!isPluggyUuid(itemId)) return null;
+    const status = typeof parsed.status === 'string' ? parsed.status.trim() : undefined;
+    const event = typeof parsed.event === 'string' ? parsed.event.trim() : undefined;
+    const source = parsed.source === 'postmessage' ? 'postmessage' : 'network';
+    return { itemId, status, event, source };
+  }
+
+  // Suporte a eventos nativos postados diretamente por connect.pluggy.ai no ReactNativeWebView
+  const dataObj = asObj(parsed.data);
+  const payloadObj = asObj(parsed.payload);
+  const firstResult = Array.isArray(parsed.results) && parsed.results.length > 0
+    ? asObj(parsed.results[0])
+    : null;
+  const itemCandidate =
+    asObj(parsed.item) ||
+    (dataObj && asObj(dataObj.item)) ||
+    (payloadObj && asObj(payloadObj.item)) ||
+    firstResult ||
+    dataObj ||
+    payloadObj ||
+    parsed;
+
+  const rawId =
+    (itemCandidate && typeof itemCandidate.id === 'string' ? itemCandidate.id : '') ||
+    (typeof parsed.itemId === 'string' ? parsed.itemId : '') ||
+    (dataObj && typeof dataObj.itemId === 'string' ? dataObj.itemId : '') ||
+    (payloadObj && typeof payloadObj.itemId === 'string' ? payloadObj.itemId : '');
+
+  const itemId = normalizeKey(rawId);
   if (!isPluggyUuid(itemId)) return null;
-  const status = typeof parsed.status === 'string' ? parsed.status.trim() : undefined;
-  const source = parsed.source === 'postmessage' ? 'postmessage' : 'network';
-  return { itemId, status, source };
+
+  const rawStatus =
+    (itemCandidate && typeof itemCandidate.status === 'string' ? itemCandidate.status : '') ||
+    (typeof parsed.status === 'string' ? parsed.status : '');
+  const rawEvent =
+    (typeof parsed.event === 'string' ? parsed.event : '') ||
+    (typeof parsed.type === 'string' ? parsed.type : '');
+
+  return {
+    itemId,
+    status: rawStatus ? rawStatus.trim() : undefined,
+    event: rawEvent ? rawEvent.trim() : undefined,
+    source: 'postmessage',
+  };
 }
 
-/** Monta URL do widget Pluggy Connect focado no conector Meu Pluggy (ID 200). */
+/** Monta URL oficial do widget Pluggy Connect (`connect.pluggy.ai`) com connect_token. */
 export function buildPluggyConnectUrl(connectToken: string, isDark: boolean): string {
   const tok = encodeURIComponent(connectToken);
-  return (
-    `https://connect.pluggy.ai/?connect_token=${tok}&connectToken=${tok}` +
-    `&includeSandbox=false&selectedConnectorId=200&theme=${isDark ? 'dark' : 'light'}`
-  );
+  return `https://connect.pluggy.ai/?connect_token=${tok}&connectToken=${tok}&theme=${isDark ? 'dark' : 'light'}`;
 }
 
 /** Combina sugestões de UUID da área de transferência com os campos atuais. */

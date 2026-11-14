@@ -112,14 +112,18 @@ describe('byokFlow', () => {
     assert.equal(classifyPortalNavigation('http://insecure.bank.com'), 'block');
   });
 
-  it('parsePluggyConnectItemMessage valida UUID de itemId vindo do Pluggy Connect', () => {
+  it('parsePluggyConnectItemMessage valida UUID de itemId vindo do Pluggy Connect (bridge e nativo)', () => {
     const id = '3f2b8c1e-9a47-4d6e-8b21-5c7a0e9d1f42';
     assert.deepEqual(
       parsePluggyConnectItemMessage(JSON.stringify({ type: 'pluggy_connect_item', itemId: id, status: 'UPDATED', source: 'network' })),
-      { itemId: id, status: 'UPDATED', source: 'network' },
+      { itemId: id, status: 'UPDATED', event: undefined, source: 'network' },
+    );
+    assert.deepEqual(
+      parsePluggyConnectItemMessage(JSON.stringify({ event: 'onSuccess', item: { id, status: 'UPDATED' } })),
+      { itemId: id, status: 'UPDATED', event: 'onSuccess', source: 'postmessage' },
     );
     assert.equal(parsePluggyConnectItemMessage(JSON.stringify({ type: 'pluggy_connect_item', itemId: 'invalido' })), null);
-    assert.equal(parsePluggyConnectItemMessage(JSON.stringify({ type: 'outro', itemId: id })), null);
+    assert.equal(parsePluggyConnectItemMessage(JSON.stringify({ type: 'outro', text: 'sem uuid' })), null);
   });
 
   it('isPluggyDashboardUrl exige HTTPS e host pluggy.ai para postMessage', () => {
@@ -130,16 +134,17 @@ describe('byokFlow', () => {
     assert.equal(isPluggyDashboardUrl('https://dashboard.pluggy.ai.evil.com'), false);
   });
 
-  it('buildPluggyConnectUrl monta widget focado no conector Meu Pluggy (200)', () => {
+  it('buildPluggyConnectUrl monta widget oficial do Pluggy Connect com connect_token e connectToken', () => {
     const url = buildPluggyConnectUrl('tok abc', true);
     assert.ok(url.startsWith('https://connect.pluggy.ai/?'));
     assert.ok(url.includes('connect_token=tok%20abc'));
-    assert.ok(url.includes('selectedConnectorId=200'));
+    assert.ok(url.includes('connectToken=tok%20abc'));
     assert.ok(url.includes('theme=dark'));
   });
 
-  it('isAllowedPluggyWebViewUrl permite hosts do fluxo Google OAuth/reCAPTCHA sem liberar domínios externos', () => {
+  it('isAllowedPluggyWebViewUrl permite hosts do fluxo Google OAuth/reCAPTCHA e regionais sem liberar domínios externos', () => {
     assert.equal(isAllowedPluggyWebViewUrl('https://accounts.google.com/o/oauth2/v2/auth', true), true);
+    assert.equal(isAllowedPluggyWebViewUrl('https://accounts.google.com.br/accounts/CheckCookie', true), true);
     assert.equal(isAllowedPluggyWebViewUrl('https://accounts.youtube.com/accounts/SetSID', false), true);
     assert.equal(isAllowedPluggyWebViewUrl('https://consent.google.com/m', true), true);
     assert.equal(isAllowedPluggyWebViewUrl('https://www.google.com/recaptcha/api2/anchor', false), true);

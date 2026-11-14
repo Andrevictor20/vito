@@ -122,34 +122,18 @@ export const ByokStepper: React.FC<{ setup: Setup }> = ({ setup: s }) => {
         )}
       </VerticalStep>
 
-      <VerticalStep index={2} title="Meu Pluggy e bancos" state={s2State}>
+      <VerticalStep index={2} title="Pluggy Connect e bancos" state={s2State}>
         <Text style={[styles.vp, { color: colors.muted }]}>
-          Agora abra o Meu Pluggy aqui no Vito, crie sua conta de usuário e conecte seus bancos (Nubank, Itaú, Inter…). O app do seu banco abrirá automaticamente para confirmar.
+          Agora abra o plugin oficial Pluggy Connect aqui no Vito para conectar pelo Meu Pluggy ou escolher seus bancos (Nubank, Itaú, Inter…). Ele já faz a associação automática com suas chaves.
         </Text>
-        <ActionButton primary icon="open-in-new" label="Abrir Meu Pluggy no Vito" onPress={s.openMeuPluggy} />
         <ActionButton
-          label="Já conectei meus bancos, continuar"
-          busy={s.busy && s.step2Status === 'loading'}
-          onPress={s.confirmBanks}
+          primary
+          icon="open-in-new"
+          label="Abrir Pluggy Connect no Vito"
+          busy={s.busy}
+          onPress={s.openMeuPluggy}
         />
-        {s.step2Status === 'loading' && (
-          <StatusBanner kind="loading" title="Conferindo seus bancos…" subtitle="GET api.pluggy.ai/items" />
-        )}
-        {s.step2Status === 'zero' && (
-          <StatusBanner
-            kind="bad"
-            title="Nenhum banco encontrado"
-            subtitle="Abra o Meu Pluggy, conecte ao menos um banco e volte aqui."
-          />
-        )}
-        {s.step2Status === 'found' && (
-          <StatusBanner
-            kind="ok"
-            title={`${s.foundBanks.length} ${s.foundBanks.length > 1 ? 'bancos encontrados' : 'banco encontrado'}`}
-            subtitle={s.foundBanks.join(' · ')}
-          />
-        )}
-        {s.step2Status === 'error' && <ErrorText message={s.error} />}
+        {s.error ? <ErrorText message={s.error} /> : null}
       </VerticalStep>
 
       <VerticalStep index={3} title="Sincronizar" state={s3State} isLast>

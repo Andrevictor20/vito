@@ -84,10 +84,11 @@ describe('pluggyService', () => {
     assert.deepEqual(await listItems('K', fakeFetch(200, {})), []);
   });
 
-  it('listItems 401 → invalid_keys e 403 → list_items_disabled', async () => {
+  it('listItems 401 e 403 → list_items_disabled (endpoint /items restrito em contas padrão)', async () => {
     await assert.rejects(listItems('K', fakeFetch(401, {})), (e: unknown) => {
       assert.ok(e instanceof PluggyError);
-      assert.equal(e.kind, 'invalid_keys');
+      assert.equal(e.kind, 'list_items_disabled');
+      assert.equal(e.status, 401);
       return true;
     });
     await assert.rejects(listItems('K', fakeFetch(403, { code: 'LIST_ITEMS_FEATURE_NOT_ENABLED' })), (e: unknown) => {
@@ -98,7 +99,7 @@ describe('pluggyService', () => {
     });
   });
 
-  it('listConnectorNamesOrDefault retorna nomes únicos e tolera 403 LIST_ITEMS_FEATURE_NOT_ENABLED', async () => {
+  it('listConnectorNamesOrDefault retorna nomes únicos e tolera 401/403 em /items', async () => {
     const names = await listConnectorNamesOrDefault(
       'K',
       fakeFetch(200, {
@@ -111,10 +112,13 @@ describe('pluggyService', () => {
     );
     assert.deepEqual(names, ['Nubank', 'Itaú']);
 
-    const fallbackNames = await listConnectorNamesOrDefault(
+    const fallback401 = await listConnectorNamesOrDefault('K', fakeFetch(401, {}));
+    assert.deepEqual(fallback401, ['Pluggy Connect pronto para conectar']);
+
+    const fallback403 = await listConnectorNamesOrDefault(
       'K',
       fakeFetch(403, { code: 'LIST_ITEMS_FEATURE_NOT_ENABLED' }),
     );
-    assert.deepEqual(fallbackNames, ['Meu Pluggy pronto para autorizar']);
+    assert.deepEqual(fallback403, ['Pluggy Connect pronto para conectar']);
   });
 });
