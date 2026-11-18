@@ -178,7 +178,7 @@ func (s *WhatsAppService) SyncConnectedWebhooks(ctx context.Context) {
 	}
 
 	webhookURL := fmt.Sprintf("%s/api/v1/integrations/whatsapp/webhook", strings.TrimRight(s.cfg.WebhookBaseURL, "/"))
-	backoffs := []time.Duration{0, 5 * time.Second, 15 * time.Second, 30 * time.Second, 60 * time.Second}
+	backoffs := []time.Duration{0, 5 * time.Second, 15 * time.Second, 30 * time.Second, 60 * time.Second, 60 * time.Second, 60 * time.Second}
 
 	for attempt, delay := range backoffs {
 		if delay > 0 {
@@ -194,6 +194,10 @@ func (s *WhatsAppService) SyncConnectedWebhooks(ctx context.Context) {
 		if err != nil {
 			cancel()
 			continue
+		}
+		if len(integrations) == 0 {
+			cancel()
+			return
 		}
 
 		allSuccess := true

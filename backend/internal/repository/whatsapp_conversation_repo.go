@@ -183,15 +183,21 @@ func (r *WhatsAppConversationRepositorySQLite) UpdateChatLabels(ctx context.Cont
 		if chatJID == "" || label == "" {
 			continue
 		}
-		res, err := r.db.ExecContext(ctx, `
-			UPDATE whatsapp_conversation_messages
-			SET chat_label = ?
-			WHERE user_id = ? AND chat_jid = ? AND chat_label <> ?
-		`, label, userID, chatJID, label)
-		if err != nil {
+		var affected int64
+		if err := database.WithBusyRetry(4, func() error {
+			res, execErr := r.db.ExecContext(ctx, `
+				UPDATE whatsapp_conversation_messages
+				SET chat_label = ?
+				WHERE user_id = ? AND chat_jid = ? AND chat_label <> ?
+			`, label, userID, chatJID, label)
+			if execErr != nil {
+				return execErr
+			}
+			affected, _ = res.RowsAffected()
+			return nil
+		}); err != nil {
 			return updated, err
 		}
-		affected, _ := res.RowsAffected()
 		updated += affected
 	}
 	return updated, nil

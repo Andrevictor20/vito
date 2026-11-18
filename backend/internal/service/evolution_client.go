@@ -129,7 +129,6 @@ func (c *DefaultEvolutionClient) SetWebhook(ctx context.Context, instanceName, w
 				"MESSAGES_UPSERT",
 				"SEND_MESSAGE",
 				"CONNECTION_UPDATE",
-				"MESSAGES_UPDATE",
 			},
 		},
 	}
@@ -152,7 +151,6 @@ func (c *DefaultEvolutionClient) SetWebhook(ctx context.Context, instanceName, w
 			"MESSAGES_UPSERT",
 			"SEND_MESSAGE",
 			"CONNECTION_UPDATE",
-			"MESSAGES_UPDATE",
 		},
 	}
 	respFlat, errFlat := c.doRequest(ctx, http.MethodPost, path, flatPayload)

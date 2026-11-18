@@ -17,15 +17,16 @@ import (
 //   - mais antiga primeiro: a mídia que está há mais tempo invisível é a que
 //     o usuário mais precisa.
 type WhatsAppMediaWorker struct {
-	enricher   *WhatsAppMediaEnricher
-	waRepo     domain.WhatsAppRepository
-	perCycle   int
-	interval   time.Duration
-	stopCh     chan struct{}
-	wg         sync.WaitGroup
-	running    bool
-	mu         sync.Mutex
-	instanceFn func() []string
+	enricher     *WhatsAppMediaEnricher
+	waRepo       domain.WhatsAppRepository
+	perCycle     int
+	interval     time.Duration
+	initialDelay time.Duration
+	stopCh       chan struct{}
+	wg           sync.WaitGroup
+	running      bool
+	mu           sync.Mutex
+	instanceFn   func() []string
 }
 
 // NewWhatsAppMediaWorker cria o worker de enriquecimento de mídia.
@@ -42,15 +43,16 @@ func NewWhatsAppMediaWorker(
 		interval = 15 * time.Minute
 	}
 	return &WhatsAppMediaWorker{
-		enricher: enricher,
-		waRepo:   waRepo,
-		perCycle: perCycle,
-		interval: interval,
-		stopCh:   make(chan struct{}),
+		enricher:     enricher,
+		waRepo:       waRepo,
+		perCycle:     perCycle,
+		interval:     interval,
+		initialDelay: 60 * time.Second,
+		stopCh:       make(chan struct{}),
 	}
 }
 
-// Start sobe o worker. A primeira varredura roda logo no boot.
+// Start sobe o worker. Aguarda initialDelay no boot para não disputar o startup da Evolution API.
 func (w *WhatsAppMediaWorker) Start() {
 	w.mu.Lock()
 	if w.running {
@@ -63,6 +65,13 @@ func (w *WhatsAppMediaWorker) Start() {
 	w.wg.Add(1)
 	go func() {
 		defer w.wg.Done()
+		if w.initialDelay > 0 {
+			select {
+			case <-w.stopCh:
+				return
+			case <-time.After(w.initialDelay):
+			}
+		}
 		w.runOnce()
 		ticker := time.NewTicker(w.interval)
 		defer ticker.Stop()

@@ -198,36 +198,39 @@ func (s *Server) registerRoutes() {
 	// Rate limit global da API (SEC-05): 120 req/min por IP/usuário, além dos estritos.
 	apiLimiter := middleware.NewRateLimiter(120, 1*time.Minute)
 
-	s.router.Route("/api/v1", func(r chi.Router) {
-		r.Use(apiLimiter)
-		// Rotas públicas de autenticação com proteção anti-bruteforce
-		if s.authHandler != nil {
-			r.Group(func(ar chi.Router) {
-				ar.Use(authLimiter)
-				ar.Post("/auth/register", s.authHandler.Register)
-				ar.Post("/auth/login", s.authHandler.Login)
-				ar.Post("/auth/refresh", s.authHandler.Refresh)
-				if s.whatsappAuthHandler != nil {
-					ar.Post("/auth/whatsapp/request-otp", s.whatsappAuthHandler.RequestOTP)
-					ar.Post("/auth/whatsapp/verify-otp", s.whatsappAuthHandler.VerifyOTP)
-				}
-			})
-		}
-		if s.googleAuthHandler != nil {
-			r.Get("/auth/google/start", s.googleAuthHandler.Start)
-			r.Get("/auth/google/callback", s.googleAuthHandler.Callback)
-			r.Post("/auth/google/native", s.googleAuthHandler.NativeAuth)
-		}
-
-		if s.p2pHandler != nil {
-			r.Get("/contacts/challenge", s.p2pHandler.GetChallenge)
-			r.Post("/contacts/match", s.p2pHandler.MatchContacts)
-		}
-
+	s.router.Route("/api/v1", func(apiRouter chi.Router) {
+		// Webhooks internos da Evolution API ficam fora do rate limiter por IP (120/min)
+		// para que rajadas de reconexão pós-queda não recebam HTTP 429 em cascata.
 		if s.whatsappHandler != nil {
-			r.Post("/integrations/whatsapp/webhook", s.whatsappHandler.Webhook)
-			r.Post("/integrations/whatsapp/webhook/{event}", s.whatsappHandler.Webhook)
+			apiRouter.Post("/integrations/whatsapp/webhook", s.whatsappHandler.Webhook)
+			apiRouter.Post("/integrations/whatsapp/webhook/{event}", s.whatsappHandler.Webhook)
 		}
+
+		apiRouter.Group(func(r chi.Router) {
+			r.Use(apiLimiter)
+			// Rotas públicas de autenticação com proteção anti-bruteforce
+			if s.authHandler != nil {
+				r.Group(func(ar chi.Router) {
+					ar.Use(authLimiter)
+					ar.Post("/auth/register", s.authHandler.Register)
+					ar.Post("/auth/login", s.authHandler.Login)
+					ar.Post("/auth/refresh", s.authHandler.Refresh)
+					if s.whatsappAuthHandler != nil {
+						ar.Post("/auth/whatsapp/request-otp", s.whatsappAuthHandler.RequestOTP)
+						ar.Post("/auth/whatsapp/verify-otp", s.whatsappAuthHandler.VerifyOTP)
+					}
+				})
+			}
+			if s.googleAuthHandler != nil {
+				r.Get("/auth/google/start", s.googleAuthHandler.Start)
+				r.Get("/auth/google/callback", s.googleAuthHandler.Callback)
+				r.Post("/auth/google/native", s.googleAuthHandler.NativeAuth)
+			}
+
+			if s.p2pHandler != nil {
+				r.Get("/contacts/challenge", s.p2pHandler.GetChallenge)
+				r.Post("/contacts/match", s.p2pHandler.MatchContacts)
+			}
 
 		if s.triggerHandler != nil {
 			r.Route("/triggers", func(tr chi.Router) {
@@ -464,5 +467,6 @@ func (s *Server) registerRoutes() {
 				}
 			})
 		}
+		})
 	})
 }

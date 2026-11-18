@@ -130,7 +130,7 @@ services:
     restart: unless-stopped
     depends_on:
       evolution-postgres:
-        condition: service_started
+        condition: service_healthy
     ports:
       - "127.0.0.1:8085:8085"
     env_file:

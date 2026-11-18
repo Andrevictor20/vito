@@ -1,7 +1,6 @@
 package service
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -38,30 +37,24 @@ const imageAnalysisPrompt = "Analise esta imagem e me diga o que ela contém. Se
 // avisa em vez de inventar o conteúdo da imagem.
 const imageUnavailablePrompt = "Não consegui baixar a imagem desta mensagem. Responda ao usuário, de forma breve, que não foi possível ler a imagem e sugira reenviá-la."
 
-// handleMessagesEvent processa um evento `messages.upsert` da Evolution API.
-//
-// Fluxo (SPEC §5):
-//  1. parse da mensagem e transcrição de áudio (Groq Whisper)
-//  2. classificação do chat (self | self_group | group | direct)
-//  3. arquivamento no shadow inbox — SEMPRE, mesmo em mensagens que não acionam o Vito
-//  4. decisão de resposta conforme o gatilho do tipo de chat
-//  5. montagem do contexto (mensagem citada + janela) e chamada ao assistente
+// handleMessagesEvent despacha cada mensagem do webhook `messages.upsert` para
+// processamento assíncrono em fila limitada, respondendo rápido à Evolution API.
 func (s *WhatsAppService) handleMessagesEvent(ctx context.Context, instanceName string, data json.RawMessage) error {
-	// Suporte resiliente a payloads da Evolution API onde data é um array ou contém wrapper
-	trimmedData := bytes.TrimSpace(data)
-	if len(trimmedData) > 0 && trimmedData[0] == '[' {
-		var arr []json.RawMessage
-		if err := json.Unmarshal(trimmedData, &arr); err == nil && len(arr) > 0 {
-			data = arr[0]
-		}
-	} else if len(trimmedData) > 0 && trimmedData[0] == '{' {
-		var wrapper struct {
-			Messages []json.RawMessage `json:"messages"`
-		}
-		if err := json.Unmarshal(trimmedData, &wrapper); err == nil && len(wrapper.Messages) > 0 {
-			data = wrapper.Messages[0]
-		}
+	items := extractInboundItems(data)
+	for _, item := range items {
+		it := item
+		s.runAsync(func() {
+			_ = s.processInboundItem(context.WithoutCancel(ctx), instanceName, it.upsertType, it.raw)
+		})
 	}
+	return nil
+}
+
+// processInboundItem normaliza, deduplica, filtra replays antigos e executa o fluxo
+// conversacional de uma mensagem dentro do worker assíncrono.
+func (s *WhatsAppService) processInboundItem(ctx context.Context, instanceName, upsertType string, data json.RawMessage) error {
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	defer cancel()
 
 	msg, err := parseInboundMessage(data)
 	if err != nil {
@@ -69,12 +62,7 @@ func (s *WhatsAppService) handleMessagesEvent(ctx context.Context, instanceName 
 		return err
 	}
 
-	rawText := strings.TrimSpace(msg.Text)
-	if rawText == "" && msg.IsAudio && s.audioTranscriber != nil {
-		rawText = s.transcribeAudio(ctx, instanceName, data)
-	}
-
-	if msg.IsReaction || strings.EqualFold(msg.MessageType, "reactionMessage") || rawText == "👀" {
+	if msg.IsReaction || strings.EqualFold(msg.MessageType, "reactionMessage") || strings.TrimSpace(msg.Text) == "👀" {
 		log.Printf("ℹ️ [WhatsAppInbound] reação descartada para acionamento conversacional (remoteJid=%s)", msg.RemoteJID)
 		return nil
 	}
@@ -86,10 +74,10 @@ func (s *WhatsAppService) handleMessagesEvent(ctx context.Context, instanceName 
 		}
 		s.markMessageIDProcessed(msg.MessageID)
 	}
-	// Imagem sem legenda é uma mensagem válida: o Vito precisa "enxergar" o arquivo.
-	if rawText == "" && !msg.IsImage {
-		log.Printf("ℹ️ [WhatsAppInbound] mensagem sem texto nem imagem ignorada (msgType=%s, remoteJid=%s)", msg.MessageType, msg.RemoteJID)
-		return nil
+
+	if s.inboundCoord != nil {
+		unlock := s.inboundCoord.lockChat(instanceName, msg.RemoteJID)
+		defer unlock()
 	}
 
 	integration, err := s.repo.GetByInstanceName(ctx, instanceName)
@@ -107,6 +95,35 @@ func (s *WhatsAppService) handleMessagesEvent(ctx context.Context, instanceName 
 	// chat "Você" (@lid) e validar autoria mesmo quando fromMe vier false.
 	if msg.FromMe && strings.HasSuffix(msg.Participant, "@lid") && s.ownerCache != nil {
 		s.ownerCache.SetLID(instanceName, msg.Participant)
+	}
+
+	// Blindagem pós-queda/reinício: mensagens já arquivadas no banco ou antigas/append
+	// NÃO devem disparar Whisper, reação 👀 nem fila de IA.
+	alreadyHandled, cachedMediaText := checkShadowInboxDuplicate(ctx, s.contextSvc, integration.UserID, msg, upsertType)
+	if alreadyHandled {
+		log.Printf("ℹ️ [WhatsAppInbound] MessageID %s já arquivado/tratado no shadow inbox; replay ignorado", msg.MessageID)
+		return nil
+	}
+	if isStaleOrAppendReplay(upsertType, msg.Timestamp, s.maxInboundAge) {
+		log.Printf("ℹ️ [WhatsAppInbound] replay antigo/append (%s, ts=%s) arquivado silenciosamente sem Whisper/IA",
+			msg.MessageID, msg.Timestamp.Format(time.RFC3339))
+		s.archiveStaleMessage(ctx, integration, instanceName, msg)
+		return nil
+	}
+
+	rawText := strings.TrimSpace(msg.Text)
+	if rawText == "" && msg.IsAudio {
+		if strings.TrimSpace(cachedMediaText) != "" {
+			rawText = strings.TrimSpace(cachedMediaText)
+		} else if s.audioTranscriber != nil {
+			rawText = s.transcribeAudio(ctx, instanceName, data)
+		}
+	}
+
+	// Imagem sem legenda é uma mensagem válida: o Vito precisa "enxergar" o arquivo.
+	if rawText == "" && !msg.IsImage {
+		log.Printf("ℹ️ [WhatsAppInbound] mensagem sem texto nem imagem ignorada (msgType=%s, remoteJid=%s)", msg.MessageType, msg.RemoteJID)
+		return nil
 	}
 
 	chatKind := s.classifyChat(ctx, instanceName, integration, msg.RemoteJID)
@@ -216,10 +233,12 @@ func (s *WhatsAppService) handleMessagesEvent(ctx context.Context, instanceName 
 		return nil
 	}
 
-	// Feedback visual imediato: reagir com olhinho para confirmar leitura.
+	// Feedback visual imediato: reagir com olhinho para confirmar leitura (timeout curto).
 	if msg.MessageID != "" && msg.RemoteJID != "" {
 		targetJID := NormalizeJIDForSend(msg.RemoteJID)
-		_ = s.client.SendReaction(ctx, instanceName, targetJID, msg.MessageID, "👀")
+		reactCtx, reactCancel := context.WithTimeout(ctx, 5*time.Second)
+		_ = s.client.SendReaction(reactCtx, instanceName, targetJID, msg.MessageID, "👀")
+		reactCancel()
 	}
 
 	// O diretório de contatos e as pendências só podem entrar no prompt quando a
@@ -227,12 +246,8 @@ func (s *WhatsAppService) handleMessagesEvent(ctx context.Context, instanceName 
 	// Em conversa com terceiro, isso revelaria "a Ana te espera" para o João.
 	privateScope := chatKind == domain.WhatsAppChatKindSelf || chatKind == domain.WhatsAppChatKindSelfGroup
 
-	// O processamento com IA roda em BACKGROUND: analisar uma imagem pode levar
-	// dezenas de segundos e acontece dentro do handler HTTP do webhook. Processar
-	// ali estouraria o timeout do webhook da Evolution, que reenviaria a mensagem
-	// e faria o Vito responder duas vezes.
 	pending := &pendingMessage{
-		ctx:          context.WithoutCancel(ctx),
+		ctx:          ctx,
 		integration:  integration,
 		instanceName: instanceName,
 		msg:          msg,
@@ -242,9 +257,7 @@ func (s *WhatsAppService) handleMessagesEvent(ctx context.Context, instanceName 
 		mediaPayload: data,
 		threadID:     threadID,
 	}
-	s.runAsync(func() { _ = s.processPendingMessage(pending) })
-
-	return nil
+	return s.processPendingMessage(pending)
 }
 
 // pendingMessage carrega o que o processamento em background precisa.

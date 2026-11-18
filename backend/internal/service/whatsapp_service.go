@@ -48,8 +48,10 @@ type WhatsAppService struct {
 	convBridge       *WhatsAppConversationBridge
 	labelsMu         sync.RWMutex
 	chatLabels       map[string]string
-	// runAsync executa o processamento com IA em background.
-	runAsync AsyncRunner
+	// runAsync executa o processamento de webhooks em background com concorrência limitada.
+	runAsync      AsyncRunner
+	inboundCoord  *whatsappInboundCoordinator
+	maxInboundAge time.Duration
 	// enricher lê a mídia (áudio/imagem) das mensagens do WhatsApp.
 	enricher *WhatsAppMediaEnricher
 	// blockedReplies guarda a última resposta educativa enviada por conversa
@@ -70,16 +72,25 @@ func NewWhatsAppService(
 	client EvolutionAPIClient,
 	assistantSvc *AssistantService,
 ) *WhatsAppService {
+	coord := newWhatsAppInboundCoordinator(defaultMaxInboundConcurrency, defaultMaxInboundQueue)
 	return &WhatsAppService{
 		cfg:                 cfg,
 		repo:                repo,
 		client:              client,
 		assistantSvc:        assistantSvc,
 		memory:              NewWhatsAppConversationMemory(),
-		runAsync:            func(fn func()) { go fn() },
+		inboundCoord:        coord,
+		maxInboundAge:       defaultMaxInboundAge,
+		runAsync:            coord.run,
 		recentOutboundTexts: make(map[string]time.Time),
 		processedMsgIDs:     make(map[string]time.Time),
 	}
+}
+
+// SetMaxInboundAge configura o limite máximo de idade para mensagens recebidas
+// acionarem transcrição/IA (evita processar backlog antigo após quedas do servidor).
+func (s *WhatsAppService) SetMaxInboundAge(maxAge time.Duration) {
+	s.maxInboundAge = maxAge
 }
 
 // SetAssistantService injeta o serviço de assistente (usado em testes e recargas).
@@ -477,7 +488,7 @@ func (s *WhatsAppService) HandleWebhook(ctx context.Context, eventType string, p
 		return nil
 	}
 
-	if strings.Contains(event, "messages") || strings.Contains(event, "send.message") || strings.Contains(event, "send_message") {
+	if isSupportedMessagesWebhookEvent(event) {
 		return s.handleMessagesEvent(ctx, base.Instance, base.Data)
 	}
 

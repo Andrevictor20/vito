@@ -6,6 +6,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/andrevmp/vito/backend/internal/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
 )
 
@@ -275,8 +276,10 @@ func (r *WhatsAppRepositorySQLite) UpdateStatus(ctx context.Context, id string, 
 		SET status = ?, last_connected_at = ?, updated_at = ?
 		WHERE id = ?
 	`
-	_, err := r.db.ExecContext(ctx, query, status, lastConnectedAt, time.Now().UTC(), id)
-	return err
+	return database.WithBusyRetry(4, func() error {
+		_, err := r.db.ExecContext(ctx, query, status, lastConnectedAt, time.Now().UTC(), id)
+		return err
+	})
 }
 
 // Delete remove a integração pelo userID.
