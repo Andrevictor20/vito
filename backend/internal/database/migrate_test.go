@@ -16,8 +16,14 @@ func TestVersionedMigrations_FreshDB(t *testing.T) {
 	if err := db.QueryRow(`SELECT COUNT(*) FROM schema_migrations`).Scan(&count); err != nil {
 		t.Fatal(err)
 	}
-	if count != 26 {
-		t.Fatalf("esperava 26 migrações registradas, vieram %d", count)
+	if count != 27 {
+		t.Fatalf("esperava 27 migrações registradas, vieram %d", count)
+	}
+	if !hasTable(db, "memory_embeddings") ||
+		!hasTable(db, "entity_links") ||
+		!hasTable(db, "attention_budget_logs") ||
+		!hasTable(db, "ai_eval_runs") {
+		t.Fatal("036 deveria criar memory_embeddings, entity_links, attention_budget_logs e ai_eval_runs")
 	}
 	if !hasTable(db, "finance_byok_backup") ||
 		!hasColumn(db, "finance_byok_backup", "user_id") ||
@@ -139,8 +145,8 @@ func TestVersionedMigrations_LegacyDB(t *testing.T) {
 	if err := db2.QueryRow(`SELECT COUNT(*) FROM schema_migrations`).Scan(&count); err != nil {
 		t.Fatal(err)
 	}
-	if count != 26 {
-		t.Fatalf("base legada deveria ser carimbada com 26, veio %d", count)
+	if count != 27 {
+		t.Fatalf("base legada deveria ser carimbada com 27, veio %d", count)
 	}
 }
 
