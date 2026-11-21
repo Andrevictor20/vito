@@ -36,6 +36,7 @@ type WhatsAppService struct {
 	repo             domain.WhatsAppRepository
 	client           EvolutionAPIClient
 	assistantSvc     *AssistantService
+	agentLoop        AssistantEngine
 	notifSender      NotificationSender
 	audioTranscriber ai.AudioTranscriber
 	userRepo         domain.UserRepository
@@ -98,13 +99,10 @@ func (s *WhatsAppService) SetAssistantService(assistantSvc *AssistantService) {
 	s.assistantSvc = assistantSvc
 }
 
+// SetAgentLoop conecta o motor Google ADK / AgentLoop ao canal do WhatsApp.
+func (s *WhatsAppService) SetAgentLoop(loop AssistantEngine) { s.agentLoop = loop }
+
 // SetAsyncRunner injeta o executor de tarefas em background.
-//
-// O processamento com IA pode levar dezenas de segundos (análise de imagem) e
-// acontece DENTRO do handler HTTP do webhook: processar ali estouraria o
-// timeout do webhook da Evolution, que reenviaria a mensagem e faria o Vito
-// responder duas vezes. Em produção o runner padrão é uma goroutine; nos
-// testes o runner é síncrono para manter as asserções determinísticas.
 func (s *WhatsAppService) SetAsyncRunner(runner AsyncRunner) {
 	if runner == nil {
 		return

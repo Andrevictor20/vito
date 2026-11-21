@@ -8,16 +8,24 @@ import (
 	"time"
 
 	"github.com/andrevmp/vito/backend/internal/domain"
+	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/andrevmp/vito/backend/internal/service/assistant"
 )
 
-// AssistantContextEnricher enriquece o AgentLoop com o contexto cognitivo de Nível 1
-// (perfil permanente, memórias semânticas relevantes, agenda e tarefas prioritárias).
+// FinanceSnapshotProvider fornece o resumo enxuto Safe-to-Spend e faturas próximas (Plano 05) ao contexto Nível 1.
+type FinanceSnapshotProvider interface {
+	GetCompactFinanceContext(ctx context.Context, userID string) string
+}
+
+// AssistantContextEnricher enriquece o AgentLoop/BeforeModelCallback com o contexto cognitivo de Nível 1
+// (perfil permanente, memórias híbridas FTS5+Embeddings, resumos temáticos/episódicos, finanças Safe-to-Spend, agenda e tarefas).
 type AssistantContextEnricher struct {
 	userRepo        domain.UserRepository
 	aiSettingsRepo  domain.AISettingsRepository
 	coreProfileRepo domain.CoreProfileRepository
 	memoryRepo      domain.MemoryRepository
+	hierarchyRepo   *repository.MemoryHierarchyRepository
+	financeProvider FinanceSnapshotProvider
 	calSvc          *CalendarService
 	todoSvc         *TodoService
 	triggerSvc      *TriggerService
@@ -44,6 +52,16 @@ func NewAssistantContextEnricher(
 	}
 }
 
+// SetMemoryHierarchyRepository conecta os resumos temáticos e episódios consolidados (#s-memory).
+func (e *AssistantContextEnricher) SetMemoryHierarchyRepository(repo *repository.MemoryHierarchyRepository) {
+	e.hierarchyRepo = repo
+}
+
+// SetFinanceSnapshotProvider conecta o provedor de snapshot financeiro enxuto (Safe-to-Spend).
+func (e *AssistantContextEnricher) SetFinanceSnapshotProvider(provider FinanceSnapshotProvider) {
+	e.financeProvider = provider
+}
+
 // BuildLevel1Context constrói o bloco de contexto essencial em paralelo com timeout estrito de 400ms.
 func (e *AssistantContextEnricher) BuildLevel1Context(ctx context.Context, userID, userMessage string, now time.Time) string {
 	if strings.TrimSpace(userID) == "" {
@@ -61,6 +79,8 @@ func (e *AssistantContextEnricher) BuildLevel1Context(ctx context.Context, userI
 	var (
 		coreProfileLines []string
 		memoryLines      []string
+		themeLines       []string
+		financeLine      string
 		scheduleLines    []string
 		todoLines        []string
 		triggerLines     []string
@@ -89,7 +109,7 @@ func (e *AssistantContextEnricher) BuildLevel1Context(ctx context.Context, userI
 		}()
 	}
 
-	// 2. Memórias de Longo Prazo Relevantes
+	// 2. Memórias de Longo Prazo Relevantes (Busca Híbrida FTS5 + Embeddings)
 	if e.memoryRepo != nil && strings.TrimSpace(userMessage) != "" {
 		wg.Add(1)
 		go func() {
@@ -109,6 +129,44 @@ func (e *AssistantContextEnricher) BuildLevel1Context(ctx context.Context, userI
 						}
 					}
 				}
+			}
+		}()
+	}
+
+	// 2.5 Resumos Temáticos e Episódios Relevantes (#s-memory)
+	if e.hierarchyRepo != nil {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			select {
+			case <-enrichCtx.Done():
+				return
+			default:
+				if themes, err := e.hierarchyRepo.ListThematicSummaries(enrichCtx, userID); err == nil && len(themes) > 0 {
+					limit := 3
+					if len(themes) < limit {
+						limit = len(themes)
+					}
+					for _, th := range themes[:limit] {
+						if strings.TrimSpace(th.ConsolidatedSummary) != "" {
+							themeLines = append(themeLines, fmt.Sprintf("[%s] %s", th.ThemeTitle, th.ConsolidatedSummary))
+						}
+					}
+				}
+			}
+		}()
+	}
+
+	// 2.8 Snapshot Financeiro Enxuto (Safe-to-Spend) apenas quando relevante à intenção
+	if e.financeProvider != nil && isFinanceRelevantQuery(userMessage) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			select {
+			case <-enrichCtx.Done():
+				return
+			default:
+				financeLine = strings.TrimSpace(e.financeProvider.GetCompactFinanceContext(enrichCtx, userID))
 			}
 		}()
 	}
@@ -188,7 +246,7 @@ func (e *AssistantContextEnricher) BuildLevel1Context(ctx context.Context, userI
 
 	wg.Wait()
 
-	if len(coreProfileLines) == 0 && len(memoryLines) == 0 && len(scheduleLines) == 0 && len(todoLines) == 0 && len(triggerLines) == 0 {
+	if len(coreProfileLines) == 0 && len(memoryLines) == 0 && len(themeLines) == 0 && financeLine == "" && len(scheduleLines) == 0 && len(todoLines) == 0 && len(triggerLines) == 0 {
 		return ""
 	}
 
@@ -208,6 +266,18 @@ func (e *AssistantContextEnricher) BuildLevel1Context(ctx context.Context, userI
 		for _, line := range memoryLines {
 			sb.WriteString(fmt.Sprintf("  - %s\n", line))
 		}
+	}
+
+	if len(themeLines) > 0 {
+		sb.WriteString("\n* Resumos Temáticos Consolidados:\n")
+		for _, line := range themeLines {
+			sb.WriteString(fmt.Sprintf("  - %s\n", line))
+		}
+	}
+
+	if financeLine != "" {
+		sb.WriteString("\n* Snapshot Financeiro (Safe-to-Spend):\n")
+		sb.WriteString(fmt.Sprintf("  - %s\n", financeLine))
 	}
 
 	if len(scheduleLines) > 0 {
@@ -234,4 +304,15 @@ func (e *AssistantContextEnricher) BuildLevel1Context(ctx context.Context, userI
 	sb.WriteString("\nDIRETRIZ DE USO DESTE CONTEXTO: Utilize estes dados diretamente para responder perguntas pessoais, sobre sua rotina, compromissos ou tarefas com calor humano e precisão, SEM precisar chamar ferramentas para o que já consta acima.\n")
 
 	return sb.String()
+}
+
+func isFinanceRelevantQuery(msg string) bool {
+	lower := strings.ToLower(msg)
+	cues := []string{"gasto", "finanç", "financ", "saldo", "fatura", "cartão", "cartao", "orçamento", "orcamento", "comprar", "dinheiro", "pagar", "pix", "conta"}
+	for _, c := range cues {
+		if strings.Contains(lower, c) {
+			return true
+		}
+	}
+	return false
 }

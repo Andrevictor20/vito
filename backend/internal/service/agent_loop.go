@@ -14,7 +14,11 @@ import (
 	"github.com/google/uuid"
 )
 
-// AgentLoop coordena o loop ReAct, roteamento de modelo, Confirmation Gate e execução de ferramentas.
+type AssistantEngine interface {
+	Run(ctx context.Context, req domain.UnifiedAssistantRequest) (*domain.UnifiedAssistantResponse, error)
+	RunStream(ctx context.Context, req domain.UnifiedAssistantRequest, onDelta func(ai.StreamDelta) error) (*domain.UnifiedAssistantResponse, error)
+}
+
 type AgentLoop struct {
 	router           *ai.ModelRouter
 	registry         *toolsets.ToolsetsRegistry
@@ -25,9 +29,11 @@ type AgentLoop struct {
 	userRepo         domain.UserRepository
 	aiSettingsRepo   domain.AISettingsRepository
 	contextEnricher  *AssistantContextEnricher
+	engine           AssistantEngine
 }
 
-// NewAgentLoop inicializa o cérebro único do assistente.
+func (l *AgentLoop) SetEngine(engine AssistantEngine) { l.engine = engine }
+
 func NewAgentLoop(
 	router *ai.ModelRouter,
 	registry *toolsets.ToolsetsRegistry,
@@ -46,24 +52,26 @@ func NewAgentLoop(
 	}
 }
 
-// SetUserRepositories injeta os repositórios para resolução do nome real e persona style do usuário.
 func (l *AgentLoop) SetUserRepositories(userRepo domain.UserRepository, aiSettingsRepo domain.AISettingsRepository) {
 	l.userRepo = userRepo
 	l.aiSettingsRepo = aiSettingsRepo
 }
 
-// SetContextEnricher configura o motor de injeção de contexto Nível 1.
 func (l *AgentLoop) SetContextEnricher(enricher *AssistantContextEnricher) {
 	l.contextEnricher = enricher
 }
 
-// Run executa o loop ReAct síncrono.
 func (l *AgentLoop) Run(ctx context.Context, req domain.UnifiedAssistantRequest) (*domain.UnifiedAssistantResponse, error) {
+	if l.engine != nil {
+		return l.engine.Run(ctx, req)
+	}
 	return l.RunStream(ctx, req, nil)
 }
 
-// RunStream executa o loop ReAct emitindo fragmentos em tempo real via callback onDelta.
 func (l *AgentLoop) RunStream(ctx context.Context, req domain.UnifiedAssistantRequest, onDelta func(ai.StreamDelta) error) (*domain.UnifiedAssistantResponse, error) {
+	if l.engine != nil {
+		return l.engine.RunStream(ctx, req, onDelta)
+	}
 	startTime := time.Now()
 	turnID := uuid.New().String()
 
@@ -193,7 +201,7 @@ func (l *AgentLoop) RunStream(ctx context.Context, req domain.UnifiedAssistantRe
 	for step := 0; step < maxSteps; step++ {
 		maxTokens := 0
 		if isVoiceChannel {
-			maxTokens = 120
+			maxTokens = 320
 		}
 		stepReq := ai.AgentChatRequest{
 			ThreadID:     threadID,
@@ -216,7 +224,7 @@ func (l *AgentLoop) RunStream(ctx context.Context, req domain.UnifiedAssistantRe
 		var stepResp *ai.AgentChatResponse
 		var stepErr error
 
-		if onDelta != nil && step == 0 {
+		if onDelta != nil {
 			stepResp, stepErr = provider.StreamChat(ctx, stepReq, onDelta)
 		} else {
 			stepResp, stepErr = provider.Chat(ctx, stepReq)
@@ -226,7 +234,7 @@ func (l *AgentLoop) RunStream(ctx context.Context, req domain.UnifiedAssistantRe
 			// Failover transparente para outros provedores aptos
 			fallbacks := l.router.SelectFallbackProviders(ctx, stepReq, provider.Name())
 			for _, fb := range fallbacks {
-				if onDelta != nil && step == 0 {
+				if onDelta != nil {
 					stepResp, stepErr = fb.StreamChat(ctx, stepReq, onDelta)
 				} else {
 					stepResp, stepErr = fb.Chat(ctx, stepReq)

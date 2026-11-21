@@ -229,7 +229,7 @@ func (s *WhatsAppService) processInboundItem(ctx context.Context, instanceName, 
 	s.archiveMessage(ctx, integration.UserID, instanceName, msg, chatKind, rawText, "user")
 	threadID := s.recordBridgeIncoming(ctx, integration.UserID, msg.RemoteJID, rawText)
 
-	if s.assistantSvc == nil {
+	if s.agentLoop == nil && s.assistantSvc == nil {
 		return nil
 	}
 
@@ -331,15 +331,60 @@ func (s *WhatsAppService) processPendingMessage(pending *pendingMessage) error {
 		ownerJID, _ = s.ownerCache.JID(instanceName)
 	}
 
-	resp, err := s.assistantSvc.Process(ctx, integration.UserID, ai.UserInput{
-		Text:                 rawText,
-		ConversationHistory:  history,
-		QuotedContext:        quoted,
-		ConversationWindow:   window,
-		WhatsAppPrivateScope: privateScope,
-		ImageB64:             imageB64,
-		ImageMime:            imageMime,
-	})
+	var replyText, modelUsed string
+	var err error
+
+	if s.agentLoop != nil {
+		var quotedParts []string
+		if strings.TrimSpace(quoted) != "" {
+			quotedParts = append(quotedParts, "Mensagem citada: "+strings.TrimSpace(quoted))
+		}
+		if len(window) > 0 {
+			var winLines []string
+			for _, w := range window {
+				winLines = append(winLines, fmt.Sprintf("[%s] %s: %s", w.Chat, w.Sender, w.Text))
+			}
+			quotedParts = append(quotedParts, "Janela recente do WhatsApp:\n"+strings.Join(winLines, "\n"))
+		}
+		adkResp, adkErr := s.agentLoop.Run(ctx, domain.UnifiedAssistantRequest{
+			UserID:        integration.UserID,
+			ThreadID:      pending.threadID,
+			Channel:       "whatsapp",
+			Message:       rawText,
+			QuotedContext: strings.Join(quotedParts, "\n\n"),
+			ImageB64:      imageB64,
+			ImageMime:     imageMime,
+		})
+		err = adkErr
+		if adkResp != nil {
+			replyText = adkResp.Reply
+			if replyText == "" {
+				replyText = adkResp.Text
+			}
+			if replyText == "" {
+				replyText = adkResp.Message
+			}
+			modelUsed = adkResp.Telemetry.ProviderUsed
+		}
+	} else if s.assistantSvc != nil {
+		var resp *AssistantResponse
+		resp, err = s.assistantSvc.Process(ctx, integration.UserID, ai.UserInput{
+			Text:                 rawText,
+			ConversationHistory:  history,
+			QuotedContext:        quoted,
+			ConversationWindow:   window,
+			WhatsAppPrivateScope: privateScope,
+			ImageB64:             imageB64,
+			ImageMime:            imageMime,
+		})
+		if resp != nil {
+			replyText = resp.Reply
+			if replyText == "" {
+				replyText = resp.Message
+			}
+			modelUsed = resp.ProviderUsed
+		}
+	}
 	if err != nil {
 		log.Printf("⚠️ [WhatsAppService] Erro ao processar mensagem do WhatsApp: %v", err)
 		assinatura := VitoSignature(ctx, s.contextSvc, integration.UserID, msg.RemoteJID, msg.PushName)
@@ -356,16 +401,11 @@ func (s *WhatsAppService) processPendingMessage(pending *pendingMessage) error {
 
 	s.memory.AddMessage(convKey, "user", rawText)
 
-	replyText := resp.Reply
-	if replyText == "" {
-		replyText = resp.Message
-	}
 	if replyText == "" {
 		return nil
 	}
 	s.memory.AddMessage(convKey, "vito", replyText)
 
-	modelUsed := resp.ProviderUsed
 	if modelUsed == "" {
 		modelUsed = "vito-assistant"
 	}

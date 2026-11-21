@@ -9,7 +9,8 @@ import (
 
 // MemoryRepositorySQLite implementa domain.MemoryRepository usando SQLite.
 type MemoryRepositorySQLite struct {
-	db *sql.DB
+	db       *sql.DB
+	embedder EmbedderFunc
 }
 
 // NewMemoryRepository instancia um repositório de memórias de longo prazo.

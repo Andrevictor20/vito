@@ -10,6 +10,8 @@ ARG TARGETARCH
 
 WORKDIR /app
 
+ENV GOTOOLCHAIN=auto
+
 RUN apk add --no-cache ca-certificates git tzdata
 
 COPY go.mod go.sum ./

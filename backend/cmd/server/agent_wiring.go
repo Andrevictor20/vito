@@ -10,6 +10,7 @@ import (
 	"unicode"
 
 	"github.com/andrevmp/vito/backend/internal/ai"
+	"github.com/andrevmp/vito/backend/internal/ai/adkengine"
 	"github.com/andrevmp/vito/backend/internal/config"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/handler"
@@ -174,10 +175,39 @@ func setupAgentSubsystem(
 		todoSvc,
 		triggerSvc,
 	)
+	contextEnricher.SetMemoryHierarchyRepository(memRepo)
 	loop.SetContextEnricher(contextEnricher)
 
-	// 6. Worker de Consolidação com debounce de 150s
+	// 6. Worker de Consolidação com debounce de 150s + SQLiteMemoryService Híbrido (FTS5 + Embeddings 036)
+	embedder := adkengine.BuildGenaiEmbedder(cfg.GeminiAPIKey)
+	sqliteMemorySvc := adkengine.NewSQLiteMemoryService(memoryRepo, memRepo, embedder)
 	consolidationWorker := service.NewMemoryConsolidationWorker(convRepo, memRepo, 150*time.Second)
+	consolidationWorker.SetFactRepository(memoryRepo, embedder)
+
+	// 6.5 Motor Google ADK Go v2 (ADKLoopFacade) plugado ao AgentLoop e ao WhatsAppService
+	adkFacade, adkErr := adkengine.NewADKLoopFacade(adkengine.FacadeConfig{
+		Router:              router,
+		Registry:            registry,
+		ScopeGuard:          scopeGuard,
+		ConfirmationGate:    confGate,
+		ConvRepo:            convRepo,
+		TraceRecorder:       traceRecorder,
+		UserRepo:            userRepo,
+		AISettingsRepo:      aiSettingsRepo,
+		ContextEnricher:     contextEnricher,
+		ConsolidationWorker: consolidationWorker,
+		MemoryService:       sqliteMemorySvc,
+	})
+	if adkErr == nil && adkFacade != nil {
+		consolidationWorker.SetSemanticExtractor(adkengine.NewADKMemoryExtractor(adkFacade.RoutedLLM()))
+		loop.SetEngine(adkFacade)
+		if waSvc != nil {
+			waSvc.SetAgentLoop(adkFacade)
+		}
+		log.Println("🧠 [Google ADK v2] Motor ADKLoopFacade inicializado e conectado aos canais Mobile, Desktop, Voz e WhatsApp.")
+	} else if adkErr != nil {
+		log.Printf("⚠️ [Google ADK v2] Falha ao inicializar ADKLoopFacade (%v); mantendo fallback ReAct.", adkErr)
+	}
 
 	// 7. Handlers HTTP REST e SSE
 	streamHandler := handler.NewAssistantStreamHandler(loop)
