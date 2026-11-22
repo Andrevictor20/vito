@@ -144,6 +144,8 @@ import { Montserrat_600SemiBold, Montserrat_800ExtraBold } from '@expo-google-fo
 
 export const AppRoot: React.FC = () => {
   const [fontsLoaded, fontError] = useFonts({
+    Geist: Inter_400Regular,
+    'Geist Mono': Inter_500Medium,
     Inter_400Regular,
     Inter_500Medium,
     Inter_600SemiBold,

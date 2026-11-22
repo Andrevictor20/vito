@@ -3,20 +3,17 @@
  * Sem imports diretos de react-native para rodar limpo em testes Node (`tsx --test`).
  */
 
-let Haptics: {
+interface HapticsModule {
   impactAsync?: (style: unknown) => Promise<void>;
   selectionAsync?: () => Promise<void>;
   notificationAsync?: (type: unknown) => Promise<void>;
   ImpactFeedbackStyle?: { Light: unknown; Medium: unknown };
   NotificationFeedbackType?: { Success: unknown };
-} | null = null;
+}
 
-try {
-  if (typeof navigator !== 'undefined' && navigator.product === 'ReactNative') {
-    Haptics = require('expo-haptics');
-  }
-} catch {
-  Haptics = null;
+// Optional runtime hook without static Metro require on uninstalled expo-haptics
+function getHaptics(): HapticsModule | null {
+  return (globalThis as { __VITO_HAPTICS__?: HapticsModule | null }).__VITO_HAPTICS__ ?? null;
 }
 
 export const MOTION_CURVES = {
@@ -153,27 +150,31 @@ export const springs = {
 
 export const hapticFeedback = {
   light: async () => {
-    if (!Haptics?.impactAsync || !Haptics?.ImpactFeedbackStyle) return;
+    const h = getHaptics();
+    if (!h?.impactAsync || !h?.ImpactFeedbackStyle) return;
     try {
-      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      await h.impactAsync(h.ImpactFeedbackStyle.Light);
     } catch {}
   },
   medium: async () => {
-    if (!Haptics?.impactAsync || !Haptics?.ImpactFeedbackStyle) return;
+    const h = getHaptics();
+    if (!h?.impactAsync || !h?.ImpactFeedbackStyle) return;
     try {
-      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      await h.impactAsync(h.ImpactFeedbackStyle.Medium);
     } catch {}
   },
   selection: async () => {
-    if (!Haptics?.selectionAsync) return;
+    const h = getHaptics();
+    if (!h?.selectionAsync) return;
     try {
-      await Haptics.selectionAsync();
+      await h.selectionAsync();
     } catch {}
   },
   success: async () => {
-    if (!Haptics?.notificationAsync || !Haptics?.NotificationFeedbackType) return;
+    const h = getHaptics();
+    if (!h?.notificationAsync || !h?.NotificationFeedbackType) return;
     try {
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      await h.notificationAsync(h.NotificationFeedbackType.Success);
     } catch {}
   },
 };

@@ -39,9 +39,11 @@ export function tryNavigateStackRoute(routeName: string): boolean {
   try {
     const nav = navigationRef as unknown as {
       navigate: (name: string, params?: Record<string, unknown>) => void;
+      getRootState?: () => { routeNames?: string[] } | undefined;
       getState?: () => { routeNames?: string[] } | undefined;
     };
-    const state = nav.getState?.();
+    const rootState = nav.getRootState?.();
+    const state = rootState?.routeNames ? rootState : nav.getState?.();
     if (state?.routeNames && state.routeNames.includes(routeName)) {
       nav.navigate(routeName);
       return true;

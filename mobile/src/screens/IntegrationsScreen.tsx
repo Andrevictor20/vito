@@ -98,7 +98,7 @@ export const IntegrationsScreen: React.FC = () => {
       api.getGmailStatus().catch(() => ({ connected: false })),
       api.getWhatsAppStatus().catch(() => ({ status: 'disconnected' })),
     ]);
-    setCalConnected((cals || []).some((c) => c.status === 'active'));
+    setCalConnected(Array.isArray(cals) && cals.some((c) => c.status === 'active'));
     setGmailConnected(Boolean(gm?.connected));
     setGmailEmail((gm as { email?: string })?.email || '');
     setWaConnected(wa?.status === 'connected');

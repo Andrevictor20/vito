@@ -53,7 +53,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const [connectedAppsCount, setConnectedAppsCount] = useState(0);
   const [autonomyLabel, setAutonomyLabel] = useState('Modo Assistido · Equilibrado');
   const [voiceLabel, setVoiceLabel] = useState('Voz Feminina');
-  const [memorySummary, setMemorySummary] = useState('Ver e editar');
+  const [memorySummary, setMemorySummary] = useState('');
   const [sessionsCount, setSessionsCount] = useState<number | null>(null);
   const [planLabel, setPlanLabel] = useState('Plano gratuito · 7 dias grátis');
   const [planCta, setPlanCta] = useState('Assinar');
@@ -92,7 +92,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     }
 
     let conns = 0;
-    if ((cals || []).some((c) => c.status === 'active')) conns++;
+    if (Array.isArray(cals) && cals.some((c) => c.status === 'active')) conns++;
     if (wa?.status === 'connected') conns++;
     if (gm?.connected) conns++;
     setConnectedAppsCount(conns);
@@ -246,7 +246,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           </View>
           <View style={{ flex: 1 }}>
             <Text style={[styles.liTitle, { color: colors.ink }]}>Memória do Vito</Text>
-            <Text style={[styles.liMeta, { color: colors.muted }]}>{memorySummary} · Ver e editar</Text>
+            <Text style={[styles.liMeta, { color: colors.muted }]}>
+              {memorySummary ? `${memorySummary} · Ver e editar` : 'Ver e editar'}
+            </Text>
           </View>
           <MaterialIcons name="chevron-right" size={18} color={colors.muted} />
         </TouchableOpacity>

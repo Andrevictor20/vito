@@ -49,7 +49,7 @@ export const LoginMascotRig: React.FC<LoginMascotRigProps> = ({
   const eyes = isDark ? '#f5f5f5' : '#0a0a0a'
   const hat = isDark ? '#f5f5f5' : '#0a0a0a'
   const band = isDark ? '#0a0a0a' : '#ffffff'
-  const bowtie = isDark ? '#2dd17f' : '#0aa55c'
+  const bowtie = isDark ? '#f5f5f5' : '#0a0a0a'
 
   const phase = useRef(new Animated.Value(0)).current
   const [t, setT] = useState(0)

@@ -87,15 +87,12 @@ export const ChatEmptyWelcome: React.FC<ChatEmptyWelcomeProps> = ({
           accessibilityLabel="Interagir com o mascote Vito"
           testID="chero-rig"
         >
-          {React.createElement(
-            VitoMascot as unknown as React.ComponentType<Record<string, unknown>>,
-            {
-              size: 76,
-              animated: true,
-              state: mascotStateProp,
-              interactiveParts: false,
-            }
-          )}
+          <VitoMascot
+            size={76}
+            animated
+            state={mascotStateProp}
+            interactiveParts={false}
+          />
         </TouchableOpacity>
 
         <Text style={[styles.heroTitle, { color: colors.ink }]}>

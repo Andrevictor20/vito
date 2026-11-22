@@ -14,10 +14,12 @@ import { HeaderRoundButton, SubScreenHeader } from '../components/common/Header'
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { api } from '../services/api';
+import { notificationsInboxStore } from '../services/notificationsInboxStore';
 import { chatPromptBus, dataSync, pagerSwipeLockBus, tabNavigationBus } from '../services/dataSync';
 import { BookingScreen } from '../screens/BookingScreen';
 import { ChatScreenRef } from '../screens/ChatScreen';
 import { FinanceScreen } from '../screens/FinanceScreen';
+import { NotificationsScreen } from '../screens/NotificationsScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
 import { hapticFeedback } from '../theme/motion';
 import {
@@ -40,7 +42,7 @@ import {
   useRadarPushSync,
 } from './MainTabViews';
 
-type OverlaySubScreen = 'booking' | 'profile' | null;
+type OverlaySubScreen = 'booking' | 'profile' | 'notifications' | null;
 
 export const MainTabs: React.FC<{ route?: { params?: { screen?: MainTabType } } }> = ({ route }) => {
   const { colors } = useTheme();
@@ -66,14 +68,21 @@ export const MainTabs: React.FC<{ route?: { params?: { screen?: MainTabType } } 
 
   const refreshUnreadCount = useCallback(async () => {
     try {
-      const pending = await api.getPendingItems();
-      setUnreadNotificationsCount(Array.isArray(pending) ? pending.length : 0);
+      await notificationsInboxStore.refreshUnreadCount();
     } catch {
-      // Mantém último valor conhecido
+      try {
+        const pending = await api.getPendingItems();
+        setUnreadNotificationsCount(Array.isArray(pending) ? pending.length : 0);
+      } catch {
+        // Mantém último valor conhecido
+      }
     }
   }, []);
 
   useEffect(() => {
+    const unsubStore = notificationsInboxStore.subscribe((count) => {
+      setUnreadNotificationsCount(Math.max(0, count));
+    });
     void refreshUnreadCount();
     const unsubPending = dataSync.subscribe('refresh_pending', refreshUnreadCount);
     const unsubAll = dataSync.subscribe('refresh_all', refreshUnreadCount);
@@ -81,11 +90,12 @@ export const MainTabs: React.FC<{ route?: { params?: { screen?: MainTabType } } 
       'vito:notifications-unread',
       (count: unknown) => {
         if (typeof count === 'number' && Number.isFinite(count)) {
-          setUnreadNotificationsCount(Math.max(0, count));
+          notificationsInboxStore.setUnreadCount(Math.max(0, count));
         }
       }
     );
     return () => {
+      unsubStore();
       unsubPending();
       unsubAll();
       badgeSub.remove();
@@ -134,6 +144,7 @@ export const MainTabs: React.FC<{ route?: { params?: { screen?: MainTabType } } 
 
   const handleOpenNotifications = useCallback(() => {
     if (tryNavigateStackRoute('notifications')) return;
+    setOverlaySubScreen('notifications');
     DeviceEventEmitter.emit('vito:open-notifications');
   }, []);
 
@@ -346,6 +357,14 @@ export const MainTabs: React.FC<{ route?: { params?: { screen?: MainTabType } } 
           onRefresh={home.onRefresh}
           onDataChanged={home.loadData}
         />
+      </TransitioningView>
+
+      <TransitioningView
+        visible={overlaySubScreen === 'notifications'}
+        mode="push"
+        style={[styles.overlaySubScreen, { backgroundColor: colors.bg }]}
+      >
+        <NotificationsScreen onBack={() => setOverlaySubScreen(null)} />
       </TransitioningView>
 
       <FloatingTabBar
