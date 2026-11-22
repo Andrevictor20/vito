@@ -309,3 +309,18 @@ func shouldDeepScrape(query, op string) bool {
 	q := strings.ToLower(query)
 	return strings.Contains(q, "ler página") || strings.Contains(q, "leia a página") || strings.Contains(q, "resuma o link") || strings.Contains(q, "abrir link") || strings.Contains(q, "conteúdo completo") || strings.Contains(q, "detalhes do link")
 }
+
+// BotActions declara as ações de pesquisa web disponíveis para Bots (Plano 04 §3 / Fase 5).
+func (t *SearchToolset) BotActions() []domain.BotActionSpec {
+	return []domain.BotActionSpec{
+		{
+			AppKey:      "web",
+			ActionKey:   "web:search",
+			Label:       "Pesquisar fontes",
+			Description: "Pesquisa informações em tempo real e lê páginas da web.",
+			IsWrite:     false,
+			AlwaysAsk:   false,
+			Operations:  []string{"search", "read_page"},
+		},
+	}
+}

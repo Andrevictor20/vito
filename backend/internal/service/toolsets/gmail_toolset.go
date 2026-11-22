@@ -189,3 +189,36 @@ func (t *GmailToolset) Execute(ctx context.Context, execCtx *domain.ToolExecutio
 		}, nil
 	}
 }
+
+// BotActions declara as ações de Gmail disponíveis para Bots (Plano 04 §3 / Fase 5).
+func (t *GmailToolset) BotActions() []domain.BotActionSpec {
+	return []domain.BotActionSpec{
+		{
+			AppKey:      "gmail",
+			ActionKey:   "gmail:mailr",
+			Label:       "Ler e-mails",
+			Description: "Pesquisa e lê e-mails recentes na caixa de entrada do Gmail.",
+			IsWrite:     false,
+			AlwaysAsk:   false,
+			Operations:  []string{"search_emails", "scan_emails"},
+		},
+		{
+			AppKey:      "gmail",
+			ActionKey:   "gmail:draft",
+			Label:       "Rascunhar resposta",
+			Description: "Cria um rascunho de e-mail no Gmail sem enviar.",
+			IsWrite:     false,
+			AlwaysAsk:   false,
+			Operations:  []string{"create_draft"},
+		},
+		{
+			AppKey:      "gmail",
+			ActionKey:   "gmail:mailsend",
+			Label:       "Enviar e-mail",
+			Description: "Envia um e-mail pelo Gmail (sempre pede aprovação).",
+			IsWrite:     true,
+			AlwaysAsk:   true,
+			Operations:  []string{"send_email"},
+		},
+	}
+}

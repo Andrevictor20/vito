@@ -65,6 +65,24 @@ var canonicalAtomicSpecs = []AtomicToolSpec{
 	{AtomicName: "finance_get_summary", ToolsetName: domain.ToolsetName("finance_manager"), Operation: "get_summary", Description: "Obtém o resumo financeiro Safe-to-Spend, faturas e despesas por categoria.", ActionKey: "fin:summary"},
 }
 
+// canonicalActionAliases mapeia action_keys curtas/canônicas do Plano 04 §3 para as specs atômicas do bridge.
+var canonicalActionAliases = map[string]string{
+	"free":       "cal:list",
+	"gcal:free":  "cal:list",
+	"evt":        "cal:create",
+	"gcal:evt":   "cal:create",
+	"task":       "todo:create",
+	"vito:task":  "todo:create",
+	"waread":     "wa:waread",
+	"wasend":     "wa:wasend",
+	"mailr":      "gmail:mailr",
+	"draft":      "gmail:draft",
+	"mailsend":   "gmail:mailsend",
+	"search":     "web:search",
+	"spend":      "fin:summary",
+	"fin:spend":  "fin:summary",
+}
+
 // ToolsetBridge converte os DomainToolsets do Vito em functiontool.New(...) fortemente tipadas do Google ADK,
 // mantendo compatibilidade retroativa com nomes de macro-toolsets legados.
 type ToolsetBridge struct {
@@ -171,9 +189,16 @@ func (b *ToolsetBridge) FilterByActionKeys(allowedActionKeys []string) []tool.To
 	if b.registry == nil || len(allowedActionKeys) == 0 {
 		return nil
 	}
-	allowed := make(map[string]bool, len(allowedActionKeys))
+	allowed := make(map[string]bool, len(allowedActionKeys)*2)
 	for _, k := range allowedActionKeys {
-		allowed[strings.TrimSpace(k)] = true
+		trimmed := strings.TrimSpace(k)
+		if trimmed == "" {
+			continue
+		}
+		allowed[trimmed] = true
+		if mapped, ok := canonicalActionAliases[trimmed]; ok {
+			allowed[mapped] = true
+		}
 	}
 	var out []tool.Tool
 	for _, spec := range canonicalAtomicSpecs {
@@ -189,6 +214,70 @@ func (b *ToolsetBridge) FilterByActionKeys(allowedActionKeys []string) []tool.To
 		}
 	}
 	return out
+}
+
+// ToolsForBotContext constrói o slice []tool.Tool filtrando exclusivamente pelas operações/toolsets/políticas
+// permitidos no ToolExecutionContext do bot (Plano 04 §6 Fase 1 & AC-04).
+func (b *ToolsetBridge) ToolsForBotContext(execCtx *domain.ToolExecutionContext) []tool.Tool {
+	if b.registry == nil || execCtx == nil {
+		return nil
+	}
+	allowedTS := make(map[domain.ToolsetName]bool, len(execCtx.AllowedToolsets))
+	for _, ts := range execCtx.AllowedToolsets {
+		allowedTS[ts] = true
+	}
+	allowedOps := make(map[domain.ToolsetName]map[string]bool, len(execCtx.AllowedOperations))
+	for ts, ops := range execCtx.AllowedOperations {
+		m := make(map[string]bool, len(ops))
+		for _, op := range ops {
+			m[op] = true
+		}
+		allowedOps[ts] = m
+	}
+
+	var out []tool.Tool
+	for _, spec := range canonicalAtomicSpecs {
+		if len(allowedTS) > 0 && !allowedTS[spec.ToolsetName] {
+			continue
+		}
+		if len(allowedOps) > 0 {
+			opsMap, ok := allowedOps[spec.ToolsetName]
+			if !ok || !opsMap[spec.Operation] {
+				continue
+			}
+		}
+		if len(execCtx.ActionPolicies) > 0 {
+			pol, hasPol := lookupActionPolicy(execCtx.ActionPolicies, spec.ActionKey)
+			if hasPol && pol == domain.ActionPolicyOff {
+				continue
+			}
+			if !hasPol && len(allowedTS) == 0 && len(allowedOps) == 0 {
+				continue
+			}
+		}
+		ts, exists := b.registry.Get(spec.ToolsetName)
+		if !exists {
+			continue
+		}
+		if ft, err := b.newAtomicFunctionTool(spec, ts); err == nil && ft != nil {
+			out = append(out, ft)
+		}
+	}
+	return out
+}
+
+func lookupActionPolicy(policies map[string]domain.ActionPolicy, bridgeActionKey string) (domain.ActionPolicy, bool) {
+	if p, ok := policies[bridgeActionKey]; ok {
+		return p, true
+	}
+	for alias, target := range canonicalActionAliases {
+		if target == bridgeActionKey {
+			if p, ok := policies[alias]; ok {
+				return p, true
+			}
+		}
+	}
+	return "", false
 }
 
 // SpecForTool retorna a especificação atômica associada ao nome da tool.
@@ -288,6 +377,8 @@ func buildToolExecutionContextFromAgent(ctx agent.Context) *domain.ToolExecution
 			execCtx.ThreadID = meta.ThreadID
 		}
 		execCtx.TurnID = meta.TurnID
+		execCtx.BotID = meta.BotID
+		execCtx.ActionPolicies = meta.BotActionPolicies
 		execCtx.Channel = meta.Channel
 		execCtx.FocusMode = meta.FocusMode
 	}
@@ -300,6 +391,16 @@ func buildToolExecutionContextFromAgent(ctx agent.Context) *domain.ToolExecution
 		if aut, err := st.Get("autonomy_level"); err == nil {
 			if as, ok := aut.(string); ok {
 				execCtx.AutonomyLevel = as
+			}
+		}
+		if bid, err := st.Get("bot_id"); err == nil {
+			if bs, ok := bid.(string); ok && bs != "" {
+				execCtx.BotID = bs
+			}
+		}
+		if pols, err := st.Get("bot_action_policies"); err == nil {
+			if pm, ok := pols.(map[string]domain.ActionPolicy); ok && len(pm) > 0 {
+				execCtx.ActionPolicies = pm
 			}
 		}
 	}

@@ -274,3 +274,27 @@ func parseFlexibleDateTime(raw string) time.Time {
 
 	return time.Time{}
 }
+
+// BotActions declara as ações de agenda disponíveis para Bots (Plano 04 §3 / Fase 5).
+func (t *CalendarToolset) BotActions() []domain.BotActionSpec {
+	return []domain.BotActionSpec{
+		{
+			AppKey:      "gcal",
+			ActionKey:   "gcal:free",
+			Label:       "Ver horários livres",
+			Description: "Consulta compromissos e horários disponíveis na agenda.",
+			IsWrite:     false,
+			AlwaysAsk:   false,
+			Operations:  []string{"list_events", "check_conflicts"},
+		},
+		{
+			AppKey:      "gcal",
+			ActionKey:   "gcal:evt",
+			Label:       "Criar evento",
+			Description: "Cria um novo compromisso ou lembrete na agenda.",
+			IsWrite:     true,
+			AlwaysAsk:   false,
+			Operations:  []string{"create_event"},
+		},
+	}
+}

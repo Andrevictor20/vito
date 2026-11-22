@@ -24,12 +24,33 @@ type ToolExecutionContext struct {
 	UserID                  string
 	ThreadID                string
 	TurnID                  string
-	Channel                 string // "app_mobile", "app_desktop", "whatsapp", "voice"
+	Channel                 string // "app_mobile", "app_desktop", "whatsapp", "voice", "bot"
 	FocusMode               string // "default", "finance", "shopping", "jobs", "academic"
 	AutonomyLevel           string
 	WhatsAppPrivateScope    bool
 	TaintedByUntrustedInput bool
 	TaintSources            []string
+	BotID                   string
+	AllowedToolsets         []ToolsetName
+	AllowedOperations       map[ToolsetName][]string
+	ActionPolicies          map[string]ActionPolicy // action_key -> "auto" | "ask" | "off"
+}
+
+// BotActionSpec descreve uma ação plugável exposta por um DomainToolset para uso em Bots (Plano 04 §6 Fase 5).
+type BotActionSpec struct {
+	AppKey      string   `json:"app_key"`
+	ActionKey   string   `json:"action_key"`
+	Label       string   `json:"label"`
+	Description string   `json:"description"`
+	IsWrite     bool     `json:"is_write"`
+	AlwaysAsk   bool     `json:"always_ask"`
+	Operations  []string `json:"operations"`
+}
+
+// BotCapableToolset é implementado por toolsets que expõem ações plugáveis para Bots (antigo RadarCapableToolset).
+type BotCapableToolset interface {
+	DomainToolset
+	BotActions() []BotActionSpec
 }
 
 // ToolOperationEnvelope é a estrutura polimórfica padrão de qualquer chamada aos 8 Toolsets.

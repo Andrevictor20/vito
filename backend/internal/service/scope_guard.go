@@ -30,13 +30,35 @@ func NewScopeGuard() *MemoryScopeGuard {
 
 // CanExecute avalia se uma operação pode rodar sem confirmação humana.
 func (g *MemoryScopeGuard) CanExecute(ctx context.Context, execCtx *domain.ToolExecutionContext, operation string, isWrite bool) (bool, string) {
+	isTainted := execCtx != nil && (execCtx.TaintedByUntrustedInput || g.IsTainted(ctx, execCtx.TurnID))
+
+	// Política específica de Bot (Plano 04 §6 Fase 1)
+	if execCtx != nil && execCtx.BotID != "" {
+		if pol, ok := resolveBotOperationPolicy(execCtx.ActionPolicies, operation); ok {
+			if pol == domain.ActionPolicyOff {
+				return false, "ação desligada na política deste bot"
+			}
+			if isAlwaysAskOperation(operation) && execCtx.AutonomyLevel != "confirmed" {
+				return false, "ação sempre exige aprovação do usuário (ALWAYS)"
+			}
+			if isWrite && isTainted && execCtx.AutonomyLevel != "confirmed" {
+				return false, "bloqueado por Taint Tracking: dados externos não confiáveis no contexto exigem confirmação explícita"
+			}
+			if pol == domain.ActionPolicyAsk && execCtx.AutonomyLevel != "confirmed" {
+				return false, "ação configurada para pedir aprovação antes (ask)"
+			}
+			if pol == domain.ActionPolicyAuto {
+				return true, "autorizado pela política automática do bot"
+			}
+		}
+	}
+
 	if !isWrite {
 		return true, "operação de leitura segura"
 	}
 
 	// Se o contexto foi contaminado por dados externos (Pix, web, terceiros), bloqueia escrita autônoma
 	// Somente a confirmação humana explícita pontual ("confirmed") pode liberar
-	isTainted := execCtx != nil && (execCtx.TaintedByUntrustedInput || g.IsTainted(ctx, execCtx.TurnID))
 	if isTainted {
 		if execCtx != nil && execCtx.AutonomyLevel == "confirmed" {
 			return true, "autorizado por confirmação pontual explícita do usuário"
@@ -50,6 +72,47 @@ func (g *MemoryScopeGuard) CanExecute(ctx context.Context, execCtx *domain.ToolE
 	}
 
 	return false, "operações de escrita exigem aprovação prévia do usuário no Confirmation Gate"
+}
+
+func isAlwaysAskOperation(op string) bool {
+	switch op {
+	case "send_message", "send_email", "delete_event", "delete_todo", "delete_trigger", "delete_bot":
+		return true
+	default:
+		return false
+	}
+}
+
+func resolveBotOperationPolicy(policies map[string]domain.ActionPolicy, operation string) (domain.ActionPolicy, bool) {
+	if len(policies) == 0 {
+		return "", false
+	}
+	if p, ok := policies[operation]; ok {
+		return p, true
+	}
+	opToKeys := map[string][]string{
+		"list_events":    {"free", "gcal:free", "cal:list"},
+		"check_conflicts": {"free", "gcal:free", "cal:list"},
+		"create_event":   {"evt", "gcal:evt", "cal:create"},
+		"create_todo":    {"task", "vito:task", "todo:create"},
+		"list_todos":     {"task", "vito:task", "todo:list"},
+		"search_messages": {"waread", "wa:waread"},
+		"recent_chats":   {"waread", "wa:waread"},
+		"send_message":   {"wasend", "wa:wasend"},
+		"search_emails":  {"mailr", "gmail:mailr"},
+		"scan_emails":    {"mailr", "gmail:mailr"},
+		"create_draft":   {"draft", "gmail:draft"},
+		"send_email":     {"mailsend", "gmail:mailsend"},
+		"search":         {"search", "web:search"},
+		"read_page":      {"search", "web:search", "web:read"},
+		"get_summary":    {"spend", "fin:spend", "fin:summary"},
+	}
+	for _, k := range opToKeys[operation] {
+		if p, ok := policies[k]; ok {
+			return p, true
+		}
+	}
+	return "", false
 }
 
 // MarkTainted marca um turno como contaminado por uma fonte externa não confiável.

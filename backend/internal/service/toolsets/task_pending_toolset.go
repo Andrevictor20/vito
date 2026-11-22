@@ -187,3 +187,18 @@ func (t *TaskPendingToolset) Execute(ctx context.Context, execCtx *domain.ToolEx
 		}, nil
 	}
 }
+
+// BotActions declara as ações de tarefas disponíveis para Bots (Plano 04 §3 / Fase 5).
+func (t *TaskPendingToolset) BotActions() []domain.BotActionSpec {
+	return []domain.BotActionSpec{
+		{
+			AppKey:      "vito",
+			ActionKey:   "vito:task",
+			Label:       "Criar tarefa",
+			Description: "Cria uma nova tarefa ou pendência na lista do usuário.",
+			IsWrite:     true,
+			AlwaysAsk:   false,
+			Operations:  []string{"create_todo", "list_todos"},
+		},
+	}
+}

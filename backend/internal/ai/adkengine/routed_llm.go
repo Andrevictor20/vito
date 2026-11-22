@@ -21,13 +21,14 @@ type turnContextKey struct{}
 
 // TurnExecutionMeta armazena metadados de roteamento, streaming e estado por requisição no contexto Go.
 type TurnExecutionMeta struct {
-	UserID           string
-	ThreadID         string
-	TurnID           string
-	BotID            string
-	Channel          string
-	FocusMode        string
-	Effort           string
+	UserID            string
+	ThreadID          string
+	TurnID            string
+	BotID             string
+	BotActionPolicies map[string]domain.ActionPolicy
+	Channel           string
+	FocusMode         string
+	Effort            string
 	AgentName        string
 	OnDelta          func(ai.StreamDelta) error
 	Mu               sync.Mutex

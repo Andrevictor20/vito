@@ -2,6 +2,7 @@ package adkengine
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -230,6 +231,29 @@ func (g *GuardrailPlugin) BeforeTool(ctx agent.Context, t tool.Tool, args map[st
 	}
 
 	isWrite, _, preview := res.Toolset.IsWriteOperation(res.Operation, res.Params)
+
+	// Política específica de Bot: 'off' retorna erro explicativo imediato ao modelo sem abrir HITL
+	if execCtx.BotID != "" && len(execCtx.ActionPolicies) > 0 {
+		spec, hasSpec := g.bridge.SpecForTool(t.Name())
+		var pol domain.ActionPolicy
+		hasPol := false
+		if hasSpec {
+			pol, hasPol = lookupActionPolicy(execCtx.ActionPolicies, spec.ActionKey)
+		}
+		if !hasPol {
+			pol, hasPol = execCtx.ActionPolicies[res.Operation]
+		}
+		if hasPol && pol == domain.ActionPolicyOff {
+			msg := fmt.Sprintf("A ação '%s' está desligada para este bot. Não é possível executá-la sem que o usuário a habilite nas Ações do bot.", res.Operation)
+			return map[string]any{
+				"status":          "ERROR",
+				"summary_for_llm": msg,
+				"result":          msg,
+				"error":           "action_policy_off",
+			}, nil
+		}
+	}
+
 	allowed := true
 	reason := ""
 	if g.scopeGuard != nil {

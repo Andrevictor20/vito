@@ -180,3 +180,27 @@ func (t *WhatsAppToolset) Execute(ctx context.Context, execCtx *domain.ToolExecu
 		}, nil
 	}
 }
+
+// BotActions declara as ações de WhatsApp disponíveis para Bots (Plano 04 §3 / Fase 5).
+func (t *WhatsAppToolset) BotActions() []domain.BotActionSpec {
+	return []domain.BotActionSpec{
+		{
+			AppKey:      "wa",
+			ActionKey:   "wa:waread",
+			Label:       "Ler conversas e mensagens",
+			Description: "Pesquisa conversas e mensagens recentes no WhatsApp.",
+			IsWrite:     false,
+			AlwaysAsk:   false,
+			Operations:  []string{"search_messages", "recent_chats"},
+		},
+		{
+			AppKey:      "wa",
+			ActionKey:   "wa:wasend",
+			Label:       "Enviar mensagem",
+			Description: "Envia uma mensagem pelo WhatsApp (sempre pede aprovação).",
+			IsWrite:     true,
+			AlwaysAsk:   true,
+			Operations:  []string{"send_message"},
+		},
+	}
+}
