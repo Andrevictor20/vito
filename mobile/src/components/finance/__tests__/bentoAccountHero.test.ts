@@ -22,15 +22,15 @@ import {
 
 describe('Vito Finance Design System & Helpers', () => {
   it('define tokens canônicos --fin e --fin-bg nos temas Light e Dark', () => {
-    assert.strictEqual(lightColors.fin, '#a8710a');
-    assert.strictEqual(lightColors.finBg, '#fbf0d8');
-    assert.strictEqual(darkColors.fin, '#f5b93d');
+    assert.strictEqual(lightColors.fin, '#d98a00');
+    assert.strictEqual(lightColors.finBg, '#fff2d6');
+    assert.strictEqual(darkColors.fin, '#ffb938');
     assert.strictEqual(darkColors.finBg, '#3a2b0b');
 
     const lightScale = buildFinScale(lightColors.fin);
     assert.strictEqual(lightScale.length, 5);
-    assert.strictEqual(lightScale[0], '#a8710a');
-    assert.ok(lightScale[1].startsWith('rgba(168, 113, 10, 0.72)'));
+    assert.strictEqual(lightScale[0], '#d98a00');
+    assert.ok(lightScale[1].startsWith('rgba(217, 138, 0, 0.72)'));
   });
 
   it('normalizeSummary preserva zeros reais sem injetar dados mockados falsos', () => {

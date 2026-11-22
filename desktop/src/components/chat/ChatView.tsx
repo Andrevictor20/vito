@@ -1,31 +1,36 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Bell, PanelLeft, PanelLeftClose, Plus } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { useChat, useAiProviders } from '../../hooks';
-import { AiReasoningEffort, ChatMessage, ConversationSession } from '../../types';
+import { useAiProviders, useChat } from '../../hooks';
+import type { AiReasoningEffort, ChatMessage, ConversationSession } from '../../types';
+import { toChatGmailMessage, toChatWhatsAppMessage } from '../../utils/chatCardExtractors';
+import { getResolvedModelDisplay, resolveModelRef } from '../ai/aiProvidersCatalog';
+import { ModelPickerModal } from '../ai/ModelPickerModal';
 import { VitoMascot } from '../common/VitoMascot';
 import { ChatHistoryPanel } from './ChatHistoryPanel';
-import { FocusMode } from './FocusMenu';
-import { WhatsAppMessageCard } from './WhatsAppMessageCard';
-import { GmailMessageCard } from './GmailMessageCard';
-import { ChatThinkingIndicator } from './ChatThinkingIndicator';
-import { ChatInputDock } from './ChatInputDock';
 import { ChatIdeasDeck } from './ChatIdeasDeck';
-import { FormattedChatMessageText } from './FormattedChatMessageText';
+import { ChatInputDock } from './ChatInputDock';
 import { ChatMessageActionBar } from './ChatMessageActionBar';
+import { ChatThinkingIndicator } from './ChatThinkingIndicator';
+import type { FocusMode } from './FocusMenu';
+import { FormattedChatMessageText } from './FormattedChatMessageText';
+import { GmailMessageCard } from './GmailMessageCard';
+import { WhatsAppMessageCard } from './WhatsAppMessageCard';
 import { ChatStructuredCards } from './cards/ChatStructuredCards';
-import { ModelPickerModal } from '../ai/ModelPickerModal';
-import { getResolvedModelDisplay, resolveModelRef } from '../ai/aiProvidersCatalog';
-import { toChatGmailMessage, toChatWhatsAppMessage } from '../../utils/chatCardExtractors';
-import { pickWelcomeGreeting } from '../../utils/chatGreetings';
-import {
-  PanelLeftClose,
-  PanelLeft,
-  Plus,
-} from 'lucide-react';
+
+const HERO_STATES = ['gentleman', 'happy', 'curious', 'dance', 'idle'] as const;
 
 interface ChatViewProps {
   initialPrompt?: string;
   onNavigateTab?: (tab: string) => void;
+}
+
+function getInitials(name?: string | null): string {
+  const clean = (name || '').trim();
+  if (!clean) return 'AV';
+  const parts = clean.split(/\s+/).filter(Boolean);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
 }
 
 export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab }) => {
@@ -50,14 +55,11 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
   const [threadModelPref, setThreadModelPref] = useState<string | null>(null);
   const [threadEffortPref, setThreadEffortPref] = useState<AiReasoningEffort>('auto');
   const [modelToast, setModelToast] = useState('');
+  const [heroIndex, setHeroIndex] = useState(0);
+  const [unreadCount] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const {
-    modelGroups,
-    preferences,
-    resolvedDefaultRef,
-    updateThreadModel,
-  } = useAiProviders();
+  const { modelGroups, preferences, resolvedDefaultRef, updateThreadModel } = useAiProviders();
 
   const resolvedChatModelRef = useMemo(
     () => resolveModelRef([threadModelPref, resolvedDefaultRef], modelGroups),
@@ -83,11 +85,6 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
     setTimeout(() => setModelToast(''), 3000);
   }, []);
 
-  const welcomeGreeting = React.useMemo(() => {
-    const firstName = user?.name ? user.name.split(' ')[0] : undefined;
-    return pickWelcomeGreeting(firstName, new Date().getHours());
-  }, [user?.name]);
-
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
@@ -98,24 +95,26 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
 
   useEffect(() => {
     if (initialPrompt && initialPrompt.trim()) {
-      handleSendPrompt(initialPrompt.trim(), null);
+      void handleSendPrompt(initialPrompt.trim(), null);
     }
   }, [initialPrompt]);
 
   useEffect(() => {
-    loadSessions();
+    void loadSessions();
   }, [loadSessions]);
 
   const handleSelectConversation = async (id: string) => {
     setActiveSessionId(id);
     try {
       const detailed = await loadSessionWithMessages(id);
-      if (detailed && detailed.messages) {
+      if (detailed?.messages) {
         setMessages(detailed.messages);
       }
       if (detailed?.session) {
         setThreadModelPref(detailed.session.model_pref || null);
-        setThreadEffortPref((detailed.session.effort_pref as AiReasoningEffort) || preferences.default_effort);
+        setThreadEffortPref(
+          (detailed.session.effort_pref as AiReasoningEffort) || preferences.default_effort
+        );
       }
     } catch (err) {
       console.error('Erro ao carregar conversa:', err);
@@ -132,10 +131,6 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
     } catch (err) {
       console.error('Erro ao excluir conversa:', err);
     }
-  };
-
-  const handleTogglePin = (id: string) => {
-    togglePinConversation(id);
   };
 
   const handleSendPrompt = async (textToSend: string, focus: FocusMode | null = null) => {
@@ -161,7 +156,9 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
         history: historyPayload,
         ...(activeSessionId ? { thread_id: activeSessionId } : {}),
         ...(threadModelPref ? { model_pref: threadModelPref } : {}),
-        ...(threadEffortPref && threadEffortPref !== 'auto' ? { effort_pref: threadEffortPref } : {}),
+        ...(threadEffortPref && threadEffortPref !== 'auto'
+          ? { effort_pref: threadEffortPref }
+          : {}),
       };
 
       if (focus) {
@@ -202,11 +199,13 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
       }
 
       await syncChatSession(newSession, updated);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const messageText =
+        err instanceof Error ? err.message : 'Verifique sua conexão.';
       const errorMsg: ChatMessage = {
         id: `vito-error-${Date.now()}`,
         sender: 'vito',
-        text: `Desculpe, ocorreu uma instabilidade ao conectar ao servidor: ${err.message || 'Verifique sua conexão.'}`,
+        text: `Desculpe, ocorreu uma instabilidade ao conectar ao servidor: ${messageText}`,
         timestamp: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, errorMsg]);
@@ -215,15 +214,22 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
     }
   };
 
-  const handleConfirmEmail = (updated: any) => {
-    handleSendPrompt(
+  const handleConfirmEmail = (updated: {
+    recipient_email: string;
+    subject: string;
+    body: string;
+  }) => {
+    void handleSendPrompt(
       `Enviar e-mail para ${updated.recipient_email} com assunto "${updated.subject}": "${updated.body}"`,
       null
     );
   };
 
-  const handleConfirmWhatsApp = (updated: any) => {
-    handleSendPrompt(
+  const handleConfirmWhatsApp = (updated: {
+    recipient_name: string;
+    message: string;
+  }) => {
+    void handleSendPrompt(
       `Enviar mensagem WhatsApp para ${updated.recipient_name}: "${updated.message}"`,
       null
     );
@@ -236,81 +242,128 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
     setThreadEffortPref(preferences.default_effort);
   };
 
+  const initials = getInitials(user?.name);
+  const currentHeroState = loading ? 'thinking' : HERO_STATES[heroIndex];
+
   return (
-    <div className="flex-1 h-screen flex bg-[#FAFAFA] dark:bg-[#0B0D10] text-[#17191b] dark:text-[#f1f3f2] overflow-hidden select-none transition-colors duration-200">
-      {/* Drawer de Histórico no estilo Toki / Mobile */}
+    <div className="flex-1 h-screen flex bg-[var(--bg)] text-[var(--ink)] overflow-hidden select-none">
       {historyOpen && (
         <ChatHistoryPanel
           conversations={conversations}
           activeSessionId={activeSessionId}
           onSelectConversation={handleSelectConversation}
           onDeleteConversation={handleDeleteConversation}
-          onTogglePin={handleTogglePin}
+          onTogglePin={togglePinConversation}
           onNewChat={handleStartNewChat}
         />
       )}
 
-      {/* Workspace Principal de Conversa */}
       <div className="flex-1 flex flex-col h-full overflow-hidden relative">
-        {/* Top Header Minimalista Estilo Gemini / Claude */}
-        <header className="h-14 px-6 border-b border-zinc-200/70 dark:border-[#1E2228] flex items-center justify-between bg-white/80 dark:bg-[#0B0D10]/80 backdrop-blur-md z-10 shrink-0">
+        {/* Header v5 "Conversas": Menu, Sino #c-notifs, + #c-new, Avatar AV */}
+        <header className="sbar h-16 px-6 border-b border-[var(--line)] flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
             <button
-              onClick={() => setHistoryOpen(!historyOpen)}
-              className="p-2 rounded-lg text-zinc-500 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 transition-colors"
-              title={historyOpen ? 'Ocultar histórico' : 'Mostrar histórico'}
+              id="c-menu"
+              type="button"
+              onClick={() => setHistoryOpen((prev) => !prev)}
+              className="v5-press w-11 h-11 rounded-full bg-[var(--bg)] border border-[var(--line)] shadow-[var(--shadow)] flex items-center justify-center text-[var(--ink)]"
+              title={historyOpen ? 'Ocultar histórico' : 'Conversas'}
+              aria-label="Conversas"
             >
               {historyOpen ? <PanelLeftClose size={18} /> : <PanelLeft size={18} />}
             </button>
-
-            <div className="flex items-center gap-2">
-              <span className="text-base font-extrabold tracking-tight text-[#17191b] dark:text-[#f1f3f2]">vito</span>
-              <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-zinc-100 dark:bg-[#181C20] text-zinc-500 dark:text-zinc-400 border border-zinc-200/60 dark:border-white/5">
-                Executivo
-              </span>
-            </div>
+            <h1 className="text-[17px] font-medium tracking-tight text-[var(--ink)]">
+              Conversas
+            </h1>
           </div>
 
-          <button
-            onClick={handleStartNewChat}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-zinc-100 hover:bg-zinc-200 dark:bg-[#181C20] dark:hover:bg-[#22272E] border border-zinc-200 dark:border-[#222730] text-xs font-semibold text-zinc-700 dark:text-zinc-300 transition-colors shadow-2xs"
-          >
-            <Plus size={14} />
-            <span>Nova Conversa</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              id="c-notifs"
+              type="button"
+              onClick={() => {
+                window.dispatchEvent(new CustomEvent('vito:open-notifications'));
+                onNavigateTab?.('notifications');
+              }}
+              className="v5-press relative w-11 h-11 rounded-full bg-[var(--bg)] border border-[var(--line)] shadow-[var(--shadow)] flex items-center justify-center text-[var(--ink)]"
+              aria-label="Notificações"
+              title="Notificações"
+            >
+              <Bell size={18} />
+              {unreadCount > 0 && (
+                <span
+                  id="c-notifs-n"
+                  className="absolute top-2.5 right-2.5 w-2.5 h-2.5 rounded-full bg-[var(--red)] border-2 border-[var(--bg)]"
+                />
+              )}
+            </button>
+
+            <button
+              id="c-new"
+              type="button"
+              onClick={handleStartNewChat}
+              className="v5-press w-11 h-11 rounded-full bg-[var(--bg)] border border-[var(--line)] shadow-[var(--shadow)] flex items-center justify-center text-[var(--ink)]"
+              aria-label="Nova conversa"
+              title="Nova conversa"
+            >
+              <Plus size={18} />
+            </button>
+
+            <button
+              type="button"
+              data-go-perfil
+              onClick={() => {
+                window.dispatchEvent(new CustomEvent('vito:open-profile'));
+                onNavigateTab?.('settings');
+              }}
+              className="v5-press w-11 h-11 rounded-full bg-[var(--ink)] text-[var(--bg)] border border-[var(--line)] text-[13px] font-semibold flex items-center justify-center tracking-tight"
+              aria-label="Perfil e configurações"
+              title="Perfil"
+            >
+              {initials}
+            </button>
+          </div>
         </header>
 
-        {/* Main Messages Scroll Area */}
         <div className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-6 scroll-smooth flex flex-col">
           {messages.length === 0 ? (
-            /* Mobile-Identical Empty State com Mascote Animado e Carrossel 3D de Ideias */
-            <div className="max-w-3xl lg:max-w-4xl mx-auto my-auto w-full flex flex-col items-center justify-center text-center space-y-3 py-4">
-              <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-[28px] bg-white dark:bg-[#191c1e] border border-zinc-200 dark:border-[#262B33] flex items-center justify-center shadow-lg p-2 hover:scale-105 transition-all duration-300">
-                <VitoMascot size={80} animated={true} state={loading ? 'thinking' : 'idle'} />
-              </div>
-              <h1 className="font-display font-extrabold text-2xl sm:text-3xl lg:text-4xl tracking-tight text-[#17191b] dark:text-[#f1f3f2] max-w-2xl leading-tight">
-                {welcomeGreeting}
-              </h1>
-              <p className="text-sm sm:text-base text-zinc-500 dark:text-zinc-400 max-w-lg mx-auto">
-                Toque numa sugestão abaixo ou me diga o que precisa
-              </p>
+            <div className="max-w-3xl lg:max-w-4xl mx-auto my-auto w-full flex flex-col items-center justify-center text-center space-y-3 py-4 vito-hero-in">
+              <button
+                id="chero-rig"
+                type="button"
+                onClick={() => setHeroIndex((prev) => (prev + 1) % HERO_STATES.length)}
+                className="v5-press p-2 rounded-[26px] focus-visible:outline-2 focus-visible:outline-[var(--blue)]"
+                aria-label="Interagir com o mascote Vito"
+              >
+                {React.createElement(
+                  VitoMascot as unknown as React.ComponentType<Record<string, unknown>>,
+                  {
+                    size: 76,
+                    animated: true,
+                    state: currentHeroState,
+                    interactiveParts: false,
+                  }
+                )}
+              </button>
 
-              {/* Carrossel 3D de Ideias Canônico do Mobile */}
+              <h2 className="text-2xl sm:text-3xl font-medium tracking-[-0.025em] text-[var(--ink)] max-w-2xl leading-tight">
+                Como posso ajudar hoje?
+              </h2>
+
               <ChatIdeasDeck
-                onUseIdea={(prompt) => handleSendPrompt(prompt, null)}
+                onUseIdea={(prompt) => void handleSendPrompt(prompt, null)}
                 disabled={loading}
               />
             </div>
           ) : (
-            /* Stream Editorial Borderless Estilo Claude / Gemini (Largura Consistente max-w-3xl/4xl) */
-            <div className="max-w-3xl lg:max-w-4xl mx-auto w-full flex-1 flex flex-col justify-start space-y-7 pb-6">
+            <div className="max-w-3xl lg:max-w-4xl mx-auto w-full flex-1 flex flex-col justify-start space-y-6 pb-6">
               {messages.map((msg) => {
                 const isUser = msg.sender === 'user';
                 if (isUser) {
                   return (
-                    <div key={msg.id} className="flex justify-end w-full">
-                      <div className="max-w-[85%] sm:max-w-[75%] md:max-w-[70%] rounded-[24px] px-5 py-3.5 bg-[#F0F2F1] dark:bg-[#1E2024] text-[#17191b] dark:text-[#f1f3f2] border border-black/5 dark:border-white/5 shadow-2xs">
-                        <div className="text-[15px] sm:text-base leading-relaxed whitespace-pre-wrap font-sans">
+                    <div key={msg.id} className="flex justify-end w-full animate-rise">
+                      <div className="max-w-[84%] sm:max-w-[74%] rounded-[22px] px-4 py-3 bg-[var(--ink)] text-[var(--bg)]">
+                        <div className="text-[15px] leading-[1.35] whitespace-pre-wrap">
                           {msg.text}
                         </div>
                       </div>
@@ -319,13 +372,11 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
                 }
 
                 return (
-                  <div key={msg.id} className="w-full flex flex-col space-y-3 pt-1">
-                    {/* Texto Editorial Borderless (Sem balão, sem avatar lateral, leitura fluida como Claude/Gemini) */}
-                    <div className="text-[15.5px] sm:text-base text-[#17191b] dark:text-[#f1f3f2] leading-relaxed">
+                  <div key={msg.id} className="w-full flex flex-col space-y-3 pt-1 animate-rise">
+                    <div className="text-[15px] text-[var(--ink)] leading-[1.45]">
                       <FormattedChatMessageText text={msg.text} isUser={false} />
                     </div>
 
-                    {/* Cards Estruturados Modulares Canônicos na Largura Total */}
                     {msg.gmail_message && (
                       <GmailMessageCard
                         messageData={msg.gmail_message}
@@ -344,12 +395,12 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
                       message={msg}
                       onNavigateTab={onNavigateTab}
                       onConfirmAction={(pendingID) => {
-                        handleSendPrompt(`confirmar ${pendingID}`);
+                        void handleSendPrompt(`confirmar ${pendingID}`);
                       }}
                     />
 
                     {msg.fallback_notice && (
-                      <div className="px-3.5 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-700 dark:text-amber-300 flex items-center justify-between gap-3">
+                      <div className="px-3.5 py-2 rounded-2xl bg-[var(--orange-bg)] text-xs text-[var(--orange)] flex items-center justify-between gap-3">
                         <span>{msg.fallback_notice}</span>
                         <button
                           type="button"
@@ -361,7 +412,6 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
                       </div>
                     )}
 
-                    {/* Barra de Ações Minimalista Estilo Claude / Gemini */}
                     <ChatMessageActionBar
                       messageText={msg.text}
                       timestamp={msg.timestamp}
@@ -371,7 +421,6 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
                 );
               })}
 
-              {/* Indicador de Pensamento Ancorado sem Avatar Lateral (Estilo Claude / Gemini) */}
               {loading && (
                 <div className="w-full pt-2">
                   <ChatThinkingIndicator />
@@ -383,25 +432,20 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
           )}
         </div>
 
-        {/* Input Dock Toki / Claude Style (Centrado na Mesma Largura das Mensagens) */}
         <div className="p-4 sm:p-6 bg-transparent shrink-0">
           <div className="max-w-3xl lg:max-w-4xl mx-auto w-full">
             {modelToast && (
-              <div className="mb-2 px-3 py-1.5 rounded-full bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-xs font-medium inline-block">
+              <div className="mb-2 px-3.5 py-1.5 rounded-full bg-[var(--ink)] text-[var(--bg)] text-xs font-medium inline-block">
                 {modelToast}
               </div>
             )}
             <ChatInputDock
-              onSendMessage={handleSendPrompt}
+              onSendMessage={(text, focus) => void handleSendPrompt(text, focus)}
               loading={loading}
               modelName={resolvedChatModelDisplay.model.name}
               modelColor={resolvedChatModelDisplay.color}
               onOpenModelPicker={() => setModelPickerOpen(true)}
             />
-
-            <div className="mt-2.5 text-center text-[11px] sm:text-[11.5px] text-zinc-400 dark:text-zinc-500 font-sans select-none tracking-normal">
-              O Vito pode cometer erros. Verifique informações importantes.
-            </div>
           </div>
         </div>
       </div>
@@ -421,7 +465,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
             try {
               await updateThreadModel(activeSessionId, modelRef || '', threadEffortPref);
             } catch {
-              // Mantém preferência local na sessão atual mesmo se thread ainda não sincronizou
+              // Mantém preferência local na sessão
             }
           }
           if (modelRef) {

@@ -75,13 +75,13 @@ const ChatMessageBubbleComponent: React.FC<ChatMessageBubbleProps> = ({
   return (
     <View style={[styles.messageRow, isUser ? styles.messageRowUser : styles.messageRowVito]}>
       {isUser ? (
-        // BALÃO DO USUÁRIO: Pílula moderna discreta alinhada à direita
+        // BALÃO DO USUÁRIO (.cu): pílula v5 ink/bg alinhada à direita
         <View
           style={[
             styles.bubbleUser,
             {
-              backgroundColor: isDark ? colors.surfaceContainerHigh : '#F0F2F1',
-              borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+              backgroundColor: colors.ink,
+              borderColor: colors.hairline,
             },
           ]}
         >
@@ -91,120 +91,107 @@ const ChatMessageBubbleComponent: React.FC<ChatMessageBubbleProps> = ({
 
           {isEditing ? (
             <View style={styles.inlineEditContainer}>
-              <TextInput
-                style={[
-                  styles.inlineEditInput,
-                  {
-                    color: colors.onSurface,
-                    borderColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)',
-                  },
-                ]}
-                value={draftText}
-                onChangeText={setDraftText}
-                multiline
-                autoFocus
-                maxLength={1000}
-                placeholderTextColor={colors.onSurfaceVariant}
-              />
-              <View style={styles.inlineEditActions}>
-                <TouchableOpacity
-                  style={[styles.inlineEditButton, styles.inlineEditCancelButton]}
-                  onPress={handleCancelEdit}
-                  hitSlop={tokens.hitSlop.sm}
-                  activeOpacity={0.7}
-                  accessibilityLabel="Cancelar edição"
-                >
-                  <MaterialIcons name="close" size={14} color={colors.onSurfaceVariant} />
-                  <Text style={[styles.inlineEditButtonText, { color: colors.onSurfaceVariant }]}>
-                    Cancelar
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
+                <TextInput
                   style={[
-                    styles.inlineEditButton,
-                    styles.inlineEditSaveButton,
-                    { backgroundColor: isDark ? colors.primary : '#17191B' },
+                    styles.inlineEditInput,
+                    {
+                      color: colors.bg,
+                      borderColor: colors.hairline,
+                    },
                   ]}
-                  onPress={handleConfirmEdit}
-                  hitSlop={tokens.hitSlop.sm}
-                  activeOpacity={0.7}
-                  accessibilityLabel="Salvar e reenviar mensagem"
-                >
-                  <MaterialIcons
-                    name="send"
-                    size={14}
-                    color={isDark ? colors.onPrimary : '#FFFFFF'}
-                  />
-                  <Text
-                    style={[
-                      styles.inlineEditButtonText,
-                      { color: isDark ? colors.onPrimary : '#FFFFFF', fontWeight: '700' },
-                    ]}
+                  value={draftText}
+                  onChangeText={setDraftText}
+                  multiline
+                  autoFocus
+                  maxLength={1000}
+                  placeholderTextColor={colors.muted}
+                />
+                <View style={styles.inlineEditActions}>
+                  <TouchableOpacity
+                    style={[styles.inlineEditButton, styles.inlineEditCancelButton]}
+                    onPress={handleCancelEdit}
+                    hitSlop={tokens.hitSlop.sm}
+                    activeOpacity={0.7}
+                    accessibilityLabel="Cancelar edição"
                   >
-                    Salvar
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          ) : (
-            <View style={message.id.includes('audio') ? styles.voiceTextRow : undefined}>
-              {message.id.includes('audio') && (
-                <MaterialIcons
-                  name="mic"
-                  size={16}
-                  color={colors.onSurface}
-                  style={{ marginRight: 6, marginTop: 2 }}
-                />
-              )}
-              <FormattedChatMessageText
-                text={message.text}
-                isUser={isUser}
-                textColor={colors.onSurface}
-                isDark={isDark}
-                style={[
-                  styles.messageTextUser,
-                  message.id.includes('audio') && { flexShrink: 1 },
-                ]}
-              />
-            </View>
-          )}
+                    <MaterialIcons name="close" size={14} color={colors.bg} />
+                    <Text style={[styles.inlineEditButtonText, { color: colors.bg }]}>
+                      Cancelar
+                    </Text>
+                  </TouchableOpacity>
 
-          {/* Metadados: Editar + Horário + Check */}
-          <View style={styles.metaRow}>
-            {(onSaveEdit || onEditMessage) && !isEditing && (
-              <TouchableOpacity
-                style={[styles.actionButton, disabled && { opacity: 0.5 }]}
-                onPress={handleStartEdit}
-                disabled={disabled}
-                hitSlop={tokens.hitSlop.md}
-                activeOpacity={0.7}
-                accessibilityLabel="Editar e reenviar mensagem"
-              >
-                <MaterialIcons
-                  name="edit"
-                  size={12}
-                  color={colors.onSurfaceVariant}
+                  <TouchableOpacity
+                    style={[
+                      styles.inlineEditButton,
+                      styles.inlineEditSaveButton,
+                      { backgroundColor: colors.bg },
+                    ]}
+                    onPress={handleConfirmEdit}
+                    hitSlop={tokens.hitSlop.sm}
+                    activeOpacity={0.7}
+                    accessibilityLabel="Salvar e reenviar mensagem"
+                  >
+                    <MaterialIcons name="send" size={14} color={colors.ink} />
+                    <Text
+                      style={[
+                        styles.inlineEditButtonText,
+                        { color: colors.ink, fontWeight: '600' },
+                      ]}
+                    >
+                      Salvar
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : (
+              <View style={message.id.includes('audio') ? styles.voiceTextRow : undefined}>
+                {message.id.includes('audio') && (
+                  <MaterialIcons
+                    name="mic"
+                    size={16}
+                    color={colors.bg}
+                    style={{ marginRight: 6, marginTop: 2 }}
+                  />
+                )}
+                <FormattedChatMessageText
+                  text={message.text}
+                  isUser={isUser}
+                  textColor={colors.bg}
+                  isDark={isDark}
+                  style={[
+                    styles.messageTextUser,
+                    message.id.includes('audio') && { flexShrink: 1 },
+                  ]}
                 />
-                <Text style={[styles.actionButtonText, { color: colors.onSurfaceVariant }]}>
-                  Editar
-                </Text>
-              </TouchableOpacity>
+              </View>
             )}
 
-            <Text style={[styles.timestampUser, { color: colors.onSurfaceVariant }]}>
-              {new Date(message.timestamp).toLocaleTimeString('pt-BR', {
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
-            </Text>
+            <View style={styles.metaRow}>
+              {(onSaveEdit || onEditMessage) && !isEditing && (
+                <TouchableOpacity
+                  style={[styles.actionButton, disabled && { opacity: 0.5 }]}
+                  onPress={handleStartEdit}
+                  disabled={disabled}
+                  hitSlop={tokens.hitSlop.md}
+                  activeOpacity={0.7}
+                  accessibilityLabel="Editar e reenviar mensagem"
+                >
+                  <MaterialIcons name="edit" size={12} color={colors.bg} style={{ opacity: 0.75 }} />
+                  <Text style={[styles.actionButtonText, { color: colors.bg, opacity: 0.8 }]}>
+                    Editar
+                  </Text>
+                </TouchableOpacity>
+              )}
 
-            <MaterialIcons
-              name="done-all"
-              size={13}
-              color={colors.onSurfaceVariant}
-            />
-          </View>
+              <Text style={[styles.timestampUser, { color: colors.bg }]}>
+                {new Date(message.timestamp).toLocaleTimeString('pt-BR', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+              </Text>
+
+              <MaterialIcons name="done-all" size={13} color={colors.bg} style={{ opacity: 0.75 }} />
+            </View>
         </View>
       ) : (
         // RESPOSTA DA IA (VITO): Borderless, largura 100%, texto corrido editorial estilo Claude / Gemini
@@ -308,23 +295,25 @@ const styles = StyleSheet.create({
   },
   // Balão do usuário: pílula moderna e discreta
   bubbleUser: {
-    maxWidth: '85%',
+    maxWidth: '84%',
     alignSelf: 'flex-end',
-    borderRadius: 20,
+    borderRadius: 22,
     borderBottomRightRadius: 6,
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     paddingVertical: 10,
     borderWidth: 1,
   },
   messageTextUser: {
-    fontSize: 15.5,
-    lineHeight: 23,
-    letterSpacing: -0.1,
+    fontFamily: 'Geist',
+    fontSize: 15,
+    lineHeight: 21,
+    letterSpacing: -0.08,
   },
   messageTextVito: {
-    fontSize: 16,
-    lineHeight: 25,
-    letterSpacing: -0.15,
+    fontFamily: 'Geist',
+    fontSize: 15,
+    lineHeight: 22,
+    letterSpacing: -0.08,
   },
   metaRow: {
     flexDirection: 'row',

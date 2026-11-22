@@ -3,7 +3,6 @@ import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/api';
 import { ChatMessage } from '../../types';
 import { VitoMascot } from '../common/VitoMascot';
-import { FocusMenu, FocusMode } from './FocusMenu';
 import { ChatIdeasDeck } from './ChatIdeasDeck';
 import { FormattedChatMessageText } from './FormattedChatMessageText';
 import { ChatThinkingIndicator } from './ChatThinkingIndicator';
@@ -14,8 +13,6 @@ import {
   Maximize2,
   History,
   Send,
-  Mic,
-  Plus,
   Loader2,
 } from 'lucide-react';
 
@@ -29,7 +26,6 @@ export const MiniChatWidget: React.FC<MiniChatWidgetProps> = ({ onExpandToFullCh
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [loading, setLoading] = useState(false);
-  const [selectedFocus, setSelectedFocus] = useState<FocusMode | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -57,17 +53,12 @@ export const MiniChatWidget: React.FC<MiniChatWidgetProps> = ({ onExpandToFullCh
     setLoading(true);
 
     try {
-      const contextPayload: any = {
+      const contextPayload: Record<string, unknown> = {
         history: messages.slice(-6).map((m) => ({
           role: m.sender === 'user' ? 'user' : 'assistant',
           content: m.text,
         })),
       };
-
-      if (selectedFocus) {
-        contextPayload.focus_mode = selectedFocus.id;
-        contextPayload.system_instruction_override = `Foco ativo: ${selectedFocus.title} - ${selectedFocus.description}.`;
-      }
 
       const res = await api.askAssistant(textToSend, contextPayload);
       const vitoMsg: ChatMessage = {
@@ -248,20 +239,9 @@ export const MiniChatWidget: React.FC<MiniChatWidgetProps> = ({ onExpandToFullCh
             )}
           </div>
 
-          {/* Input Dock Toki Style Ampliado */}
-          <div className="p-4 sm:p-5 bg-zinc-50/80 dark:bg-[#0E1014]/80 border-t border-zinc-200/80 dark:border-[#222730] shrink-0">
-            <div className="rounded-[24px] bg-white dark:bg-[#14171C] border border-zinc-200 dark:border-[#222730] p-3.5 sm:p-4 shadow-sm">
-              <div className="flex items-center gap-2.5 px-1 pb-2.5">
-                <button
-                  type="button"
-                  className="p-1.5 rounded-full text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/5 transition-colors"
-                  title="Anexar"
-                >
-                  <Plus size={18} />
-                </button>
-                <FocusMenu selectedFocus={selectedFocus} onSelectFocus={setSelectedFocus} />
-              </div>
-
+          {/* Input Dock v5 limpo (sem Foco em) */}
+          <div className="p-4 sm:p-5 bg-[var(--surf)] border-t border-[var(--line)] shrink-0">
+            <div className="rounded-[26px] bg-[var(--bg)] border border-[var(--line)] p-3.5 shadow-[var(--shadow)]">
               <div className="flex items-end gap-2.5">
                 <textarea
                   value={inputValue}
@@ -273,23 +253,17 @@ export const MiniChatWidget: React.FC<MiniChatWidgetProps> = ({ onExpandToFullCh
                     }
                   }}
                   rows={2}
-                  placeholder="Diga ao Vito o que você precisa..."
+                  placeholder="Pergunte ao Vito..."
                   disabled={loading}
-                  className="flex-1 bg-transparent border-none text-sm sm:text-base text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none resize-none px-1.5 py-1 leading-relaxed"
+                  className="flex-1 bg-transparent border-none text-sm sm:text-base text-[var(--ink)] placeholder-[var(--muted)] focus:outline-none resize-none px-1.5 py-1 leading-relaxed"
                 />
 
                 <div className="flex items-center gap-2 pb-1 shrink-0">
                   <button
                     type="button"
-                    className="p-2.5 rounded-full text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/5 transition-colors"
-                    title="Voz"
-                  >
-                    <Mic size={19} />
-                  </button>
-                  <button
                     onClick={() => handleSendPrompt(inputValue)}
                     disabled={!inputValue.trim() || loading}
-                    className="p-3 rounded-full bg-zinc-900 hover:bg-zinc-800 dark:bg-white dark:hover:bg-zinc-200 text-white dark:text-[#09090B] disabled:opacity-30 transition-all shadow-xs"
+                    className="v5-press p-2.5 rounded-full bg-[var(--ink)] text-[var(--bg)] disabled:opacity-30 transition-all"
                     title="Enviar"
                   >
                     {loading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
