@@ -18,7 +18,9 @@ func (s *Server) registerAIRoutes(protected chi.Router) {
 	if s.chatHandler != nil {
 		protected.Patch("/threads/{id}/model", s.chatHandler.UpdateThreadModelPref)
 	}
-	if s.triggerHandler != nil {
+	if s.botHandler != nil {
+		protected.Patch("/bots/{id}/model", s.botHandler.UpdateBotModelPref)
+	} else if s.triggerHandler != nil {
 		protected.Patch("/bots/{id}/model", s.triggerHandler.UpdateBotModelPref)
 	}
 }

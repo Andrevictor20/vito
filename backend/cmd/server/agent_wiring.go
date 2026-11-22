@@ -34,6 +34,8 @@ type AgentSubsystem struct {
 	ADKFacade           *adkengine.ADKLoopFacade
 	AIProviderHandler   *handler.AIProviderHandler
 	AIProviderSvc       *service.AIProviderService
+	ScopeGuard          *service.MemoryScopeGuard
+	ConfGate            *service.ConfirmationGateService
 }
 
 // setupAgentSubsystem instancia e orquestra o cérebro único do assistente, ferramentas e memória.
@@ -251,6 +253,8 @@ func setupAgentSubsystem(
 		ADKFacade:           adkFacade,
 		AIProviderHandler:   aiProviderRT.Handler,
 		AIProviderSvc:       aiProviderRT.Service,
+		ScopeGuard:          scopeGuard,
+		ConfGate:            confGate,
 	}
 }
 

@@ -402,11 +402,12 @@ func main() {
 	// Injeta ponte proativa e governança cognitiva (Ondas 2 e 3: AttentionBudget, CrossDomainBriefing e EntityLinks)
 	proactiveBridge := service.NewProactiveConversationBridge(agentSys.ConversationStore)
 	morningBriefingWorker.SetProactiveBridge(proactiveBridge)
-	wireCognitiveRuntime(CognitiveRuntimeConfig{
+	cognitiveRes := wireCognitiveRuntime(CognitiveRuntimeConfig{
 		DB: db, EventRepo: eventRepo, NotifSvc: notifSvc, PendingSvc: pendingSvc,
 		ReminderWorker: reminderWorker, TriggerWorker: triggerWorker,
 		MorningBriefingWorker: morningBriefingWorker, BehavioralWorker: behavioralWorker, AgentSys: agentSys,
 	})
+	botHandler := setupBotSubsystem(db, triggerRepo, notifSvc, cognitiveRes.BudgetSvc, agentSys)
 
 	// Handler de voz bidirecional conectado ao Loop de Agente e TTS
 	voiceStreamHandler := handler.NewVoiceStreamHandler(astSvc)
@@ -432,6 +433,7 @@ func main() {
 		NotifHandler:        notifHandler,
 		SyncHandler:         syncHandler,
 		TriggerHandler:      triggerHandler,
+		BotHandler:          botHandler,
 		BriefingHandler:     briefingHandler,
 		AISettingsHandler:   aiSettingsHandler,
 		AIProviderHandler:   agentSys.AIProviderHandler,

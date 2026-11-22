@@ -32,7 +32,9 @@ func respondError(w http.ResponseWriter, err error) {
 		errors.Is(err, domain.ErrIntegrationNotFound),
 		errors.Is(err, domain.ErrMeetingNotFound),
 		errors.Is(err, domain.ErrMeetingSlotNotFound),
-		errors.Is(err, domain.ErrP2PInviteNotFound):
+		errors.Is(err, domain.ErrP2PInviteNotFound),
+		errors.Is(err, domain.ErrBotNotFound),
+		errors.Is(err, domain.ErrSkillNotFound):
 		w.WriteHeader(http.StatusNotFound)
 		_ = json.NewEncoder(w).Encode(apiError{Error: apiErrorBody{Code: "not_found", Message: err.Error()}})
 	case errors.Is(err, domain.ErrP2PInviteUnauthorized):
@@ -53,7 +55,11 @@ func respondError(w http.ResponseWriter, err error) {
 		errors.Is(err, domain.ErrHolidayReadOnly),
 		errors.Is(err, domain.ErrMeetingExpired),
 		errors.Is(err, domain.ErrInvalidMeetingData),
-		errors.Is(err, domain.ErrP2PSelfInvite):
+		errors.Is(err, domain.ErrP2PSelfInvite),
+		errors.Is(err, domain.ErrAlwaysAskPolicyViolation),
+		errors.Is(err, domain.ErrInvalidActionPolicy),
+		errors.Is(err, domain.ErrUnknownAction),
+		errors.Is(err, domain.ErrMaxSkillsExceeded):
 		w.WriteHeader(http.StatusUnprocessableEntity)
 		_ = json.NewEncoder(w).Encode(apiError{Error: apiErrorBody{Code: "validation", Message: err.Error()}})
 	default:

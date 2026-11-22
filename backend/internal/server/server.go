@@ -30,6 +30,7 @@ type Server struct {
 	notifHandler        *handler.NotificationHandler
 	syncHandler         *handler.CalendarSyncHandler
 	triggerHandler      *handler.TriggerHandler
+	botHandler          *handler.BotHandler
 	briefingHandler     *handler.BriefingHandler
 	aiSettingsHandler   *handler.AISettingsHandler
 	aiProviderHandler   *handler.AIProviderHandler
@@ -61,6 +62,7 @@ type Config struct {
 	NotifHandler        *handler.NotificationHandler
 	SyncHandler         *handler.CalendarSyncHandler
 	TriggerHandler      *handler.TriggerHandler
+	BotHandler          *handler.BotHandler
 	BriefingHandler     *handler.BriefingHandler
 	AISettingsHandler   *handler.AISettingsHandler
 	AIProviderHandler   *handler.AIProviderHandler
@@ -100,6 +102,7 @@ func New(cfg ...Config) *Server {
 		s.notifHandler = cfg[0].NotifHandler
 		s.syncHandler = cfg[0].SyncHandler
 		s.triggerHandler = cfg[0].TriggerHandler
+		s.botHandler = cfg[0].BotHandler
 		s.briefingHandler = cfg[0].BriefingHandler
 		s.aiSettingsHandler = cfg[0].AISettingsHandler
 		s.aiProviderHandler = cfg[0].AIProviderHandler
@@ -237,6 +240,12 @@ func (s *Server) registerRoutes() {
 
 		if s.triggerHandler != nil {
 			r.Route("/triggers", func(tr chi.Router) {
+				tr.Use(func(next http.Handler) http.Handler {
+					return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+						w.Header().Set("Deprecation", "true")
+						next.ServeHTTP(w, req)
+					})
+				})
 				tr.Get("/templates", s.triggerHandler.ListTemplates)
 
 				tr.Group(func(ptr chi.Router) {
@@ -470,6 +479,7 @@ func (s *Server) registerRoutes() {
 					})
 				}
 
+				s.registerBotRoutes(protected)
 				s.registerAIRoutes(protected)
 			})
 		}
