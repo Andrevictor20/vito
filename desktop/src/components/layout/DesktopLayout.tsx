@@ -4,7 +4,7 @@ import { ChatView } from '../chat/ChatView';
 import { CommandPalette } from './CommandPalette';
 import { CalendarView } from '../calendar/CalendarView';
 import { TasksView } from '../tasks/TasksView';
-import { TriggersView } from '../triggers/TriggersView';
+import { BotsView } from '../bots/BotsView';
 import { MeetingsView } from '../meetings/MeetingsView';
 import { ExecutiveSummariesView } from '../summaries/ExecutiveSummariesView';
 import { SettingsView } from '../profile/SettingsView';
@@ -64,6 +64,7 @@ export const DesktopLayout: React.FC = () => {
             a: 'calendar',
             t: 'tasks',
             r: 'triggers',
+            b: 'triggers',
             m: 'meetings',
             s: 'summaries',
             h: 'chat',
@@ -121,7 +122,7 @@ export const DesktopLayout: React.FC = () => {
         return <TasksView />;
       case 'triggers':
         return (
-          <TriggersView
+          <BotsView
             onOpenChatWithPrompt={(prompt) => {
               setChatPrompt(prompt);
               setCurrentTab('chat');

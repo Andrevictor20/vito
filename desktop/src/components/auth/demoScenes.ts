@@ -75,7 +75,7 @@ export const DEMO_SCENES: readonly DemoScene[] = [
     headline: 'monitorar preços',
     tone: 'orange',
     userText: 'Me avisa se o voo pro Rio baixar de R$ 600',
-    vitoText: 'Radar criado. Eu confiro todo dia.',
+    vitoText: 'Bot criado. Eu confiro todo dia.',
     card: {
       kind: 'radar',
       title: 'Voo para o Rio',

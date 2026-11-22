@@ -404,7 +404,7 @@ export const SettingsView: React.FC = () => {
 
                   <div className="pt-3 border-t border-[var(--line)] flex items-center justify-between">
                     <div>
-                      <b className="text-base text-[var(--ink)] block">Alertas Urgentes de Radares</b>
+                      <b className="text-base text-[var(--ink)] block">Alertas Urgentes de Bots</b>
                       <span className="text-sm text-[var(--muted)]">Destaque imediato quando houver queda crítica de preço ou edital</span>
                     </div>
                     <button

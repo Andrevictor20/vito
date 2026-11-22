@@ -4,7 +4,7 @@ import {
   Search,
   Calendar,
   CheckSquare,
-  Radar,
+  Bot,
   CalendarCheck,
   User,
   Sparkles,
@@ -55,9 +55,9 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     },
     {
       id: 'tab-triggers',
-      label: 'Ir para Vigílias & Radares',
+      label: 'Ir para Bots',
       category: 'Navegação',
-      icon: Radar,
+      icon: Bot,
       run: () => onSelectTab('triggers'),
     },
     {

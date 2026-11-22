@@ -3,7 +3,7 @@ import {
   SlidersHorizontal,
   Calendar,
   CheckSquare,
-  Radar,
+  Bot,
   CalendarCheck,
   Sparkles,
   Brain,
@@ -33,9 +33,9 @@ export const FOCUS_MODES: FocusMode[] = [
   },
   {
     id: 'triggers',
-    title: 'Vigílias & Radares',
-    description: 'Monitoramento contínuo de faturas, contas e alertas',
-    icon: Radar,
+    title: 'Bots',
+    description: 'Mini assistentes, cada um com uma função só',
+    icon: Bot,
   },
   {
     id: 'meetings',

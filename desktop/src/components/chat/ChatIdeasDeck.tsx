@@ -44,7 +44,7 @@ export const IDEA_CARDS: IdeaCard[] = [
   },
   {
     id: 'flight',
-    tag: 'Radar',
+    tag: 'Bot',
     title: 'Voo para o Rio',
     subtitle: 'Alerta quando o preço baixar de R$ 600',
     prompt: 'Me avisa quando o voo para o Rio baixar de R$ 600',

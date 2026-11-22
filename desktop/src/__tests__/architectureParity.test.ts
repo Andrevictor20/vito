@@ -151,6 +151,7 @@ describe('Paridade Arquitetural Desktop ↔ Mobile (Plano 13)', () => {
       'useCalendarSync.ts',
       'usePendingItems.ts',
       'useTriggers.ts',
+      'useBots.ts',
       'useNotifications.ts',
       'chatMessageEffects.ts',
     ];
@@ -170,7 +171,7 @@ describe('Paridade Arquitetural Desktop ↔ Mobile (Plano 13)', () => {
       'components/chat/ChatView.tsx',
       'components/calendar/CalendarView.tsx',
       'components/tasks/TasksView.tsx',
-      'components/triggers/TriggersView.tsx',
+      'components/bots/BotsView.tsx',
     ];
 
     const violatingViews: string[] = [];

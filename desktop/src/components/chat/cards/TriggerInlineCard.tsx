@@ -21,8 +21,8 @@ export const TriggerInlineCard: React.FC<TriggerInlineCardProps> = ({
   const theme = CHAT_CARD_THEMES.trigger;
 
   const subtitle = trigger.query
-    ? `${trigger.query} · Radar ativo`
-    : 'Monitorando diariamente · Alerta ativo';
+    ? `${trigger.query} · Bot ativo`
+    : 'Monitorando diariamente · Bot ativo';
 
   return (
     <div className={`mt-4 space-y-2.5 transition-all ${undone ? 'opacity-40' : ''}`}>
@@ -46,7 +46,7 @@ export const TriggerInlineCard: React.FC<TriggerInlineCardProps> = ({
         </div>
 
         <span className={`text-[11px] font-extrabold px-3 py-1 rounded-full ${theme.tagBg} ${theme.tagTextColor} uppercase tracking-wider shrink-0`}>
-          RADAR
+          BOT
         </span>
       </div>
 
@@ -69,7 +69,7 @@ export const TriggerInlineCard: React.FC<TriggerInlineCardProps> = ({
           onClick={() => onNavigateTab?.('triggers')}
           className="px-4 py-1.5 rounded-full bg-[#17191b] hover:bg-black dark:bg-[#f1f3f2] dark:hover:bg-white text-white dark:text-[#09090B] text-xs font-bold transition-all shadow-2xs"
         >
-          Ver radares
+          Ver bots
         </button>
       </div>
     </div>

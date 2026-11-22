@@ -6,6 +6,7 @@ export * from './useHomeData';
 export * from './useCalendarSync';
 export * from './usePendingItems';
 export * from './useTriggers';
+export * from './useBots';
 export * from './useNotifications';
 export * from './useTasks';
 export * from './useAiProviders';

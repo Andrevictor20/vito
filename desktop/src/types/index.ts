@@ -1,3 +1,5 @@
+export * from './bot';
+
 export interface User {
   id: string;
   name: string;

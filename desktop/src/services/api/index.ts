@@ -4,6 +4,7 @@ import { CalendarApi } from './calendarApi';
 import { TodosApi } from './todosApi';
 import { ChatApi } from './chatApi';
 import { TriggersApi } from './triggersApi';
+import { BotsApi } from './botsApi';
 import { BookingApi } from './bookingApi';
 import { MeetingsApi } from './meetingsApi';
 import { IntegrationsApi } from './integrationsApi';
@@ -78,6 +79,7 @@ export class ApiService extends ApiClient {
   public todosApi = new TodosApi(this);
   public chatApi = new ChatApi(this);
   public triggersApi = new TriggersApi(this);
+  public botsApi = new BotsApi(this);
   public bookingApi = new BookingApi(this);
   public meetingsApi = new MeetingsApi(this);
   public integrationsApi = new IntegrationsApi(this);

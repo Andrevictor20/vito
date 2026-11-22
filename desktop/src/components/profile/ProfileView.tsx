@@ -122,7 +122,7 @@ export const ProfileView: React.FC = () => {
                   </div>
                   <div>
                     <p className="text-xs font-bold text-zinc-900 dark:text-white">Autonomia do Vito</p>
-                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400">Proativo em radares e sugestões</p>
+                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400">Proativo em bots e sugestões</p>
                   </div>
                 </div>
 
