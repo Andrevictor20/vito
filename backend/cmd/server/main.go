@@ -408,6 +408,7 @@ func main() {
 		MorningBriefingWorker: morningBriefingWorker, BehavioralWorker: behavioralWorker, AgentSys: agentSys,
 	})
 	botHandler := setupBotSubsystem(db, triggerRepo, notifSvc, cognitiveRes.BudgetSvc, agentSys)
+	v5Sys := setupV5Subsystem(db, cognitiveRes.BudgetSvc, agentSys, todoRepo)
 
 	// Handler de voz bidirecional conectado ao Loop de Agente e TTS
 	voiceStreamHandler := handler.NewVoiceStreamHandler(astSvc)
@@ -429,8 +430,10 @@ func main() {
 		TodoHandler:         todoHandler,
 		AstHandler:          astHandler,
 		AstStreamHandler:    agentSys.StreamHandler,
-		MemoryHandler:       agentSys.MemoryHandler,
-		NotifHandler:        notifHandler,
+		MemoryHandler:          agentSys.MemoryHandler,
+		NotifHandler:           notifHandler,
+		NotifInboxHandler:      v5Sys.NotifInboxHandler,
+		StoreComplianceHandler: v5Sys.StoreComplianceHandler,
 		SyncHandler:         syncHandler,
 		TriggerHandler:      triggerHandler,
 		BotHandler:          botHandler,

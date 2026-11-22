@@ -26,8 +26,10 @@ type Server struct {
 	todoHandler         *handler.TodoHandler
 	astHandler          *handler.AssistantHandler
 	astStreamHandler    *handler.AssistantStreamHandler
-	memoryHandler       *handler.MemoryHandler
-	notifHandler        *handler.NotificationHandler
+	memoryHandler          *handler.MemoryHandler
+	notifHandler           *handler.NotificationHandler
+	notifInboxHandler      *handler.NotificationsInboxHandler
+	storeComplianceHandler *handler.StoreComplianceHandler
 	syncHandler         *handler.CalendarSyncHandler
 	triggerHandler      *handler.TriggerHandler
 	botHandler          *handler.BotHandler
@@ -58,8 +60,10 @@ type Config struct {
 	TodoHandler         *handler.TodoHandler
 	AstHandler          *handler.AssistantHandler
 	AstStreamHandler    *handler.AssistantStreamHandler
-	MemoryHandler       *handler.MemoryHandler
-	NotifHandler        *handler.NotificationHandler
+	MemoryHandler          *handler.MemoryHandler
+	NotifHandler           *handler.NotificationHandler
+	NotifInboxHandler      *handler.NotificationsInboxHandler
+	StoreComplianceHandler *handler.StoreComplianceHandler
 	SyncHandler         *handler.CalendarSyncHandler
 	TriggerHandler      *handler.TriggerHandler
 	BotHandler          *handler.BotHandler
@@ -100,6 +104,8 @@ func New(cfg ...Config) *Server {
 		s.astStreamHandler = cfg[0].AstStreamHandler
 		s.memoryHandler = cfg[0].MemoryHandler
 		s.notifHandler = cfg[0].NotifHandler
+		s.notifInboxHandler = cfg[0].NotifInboxHandler
+		s.storeComplianceHandler = cfg[0].StoreComplianceHandler
 		s.syncHandler = cfg[0].SyncHandler
 		s.triggerHandler = cfg[0].TriggerHandler
 		s.botHandler = cfg[0].BotHandler
@@ -338,15 +344,6 @@ func (s *Server) registerRoutes() {
 					protected.Post("/voice/tts", s.voiceTTSHandler.HandleTTS)
 				}
 
-				if s.notifHandler != nil {
-					protected.Route("/notifications", func(nr chi.Router) {
-						nr.Get("/status", s.notifHandler.GetNotificationStatus)
-						nr.Post("/device-token", s.notifHandler.RegisterDeviceToken)
-						nr.Delete("/device-token", s.notifHandler.UnregisterDeviceToken)
-						nr.Post("/test", s.notifHandler.SendTestNotification)
-					})
-				}
-
 				if s.syncHandler != nil {
 					protected.Route("/integrations/calendars", func(ir chi.Router) {
 						ir.Get("/", s.syncHandler.ListIntegrations)
@@ -481,6 +478,7 @@ func (s *Server) registerRoutes() {
 
 				s.registerBotRoutes(protected)
 				s.registerAIRoutes(protected)
+				s.registerV5Routes(protected)
 			})
 		}
 		})

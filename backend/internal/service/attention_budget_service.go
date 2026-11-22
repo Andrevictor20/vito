@@ -42,6 +42,11 @@ type AttentionDecision struct {
 	ScheduledFor *time.Time `json:"scheduled_for,omitempty"`
 }
 
+// InboxNotificationRecorder persiste notificações entregues na central de notificações (#s-notifs).
+type InboxNotificationRecorder interface {
+	RecordDeliveredCandidate(ctx context.Context, cand AttentionCandidate) error
+}
+
 // AttentionBudgetService governa o orçamento global de atenção e anti-fadiga (Onda 3 / COG-05):
 // - Deduplicação semântica entre workers (ex.: Bot ADK + FinanceTrigger sobre a mesma cobrança/fatura);
 // - Silêncio contextual por Agenda: se há evento em andamento no CalendarRepository, segura alertas leves até o término do evento;
@@ -54,6 +59,14 @@ type AttentionBudgetService struct {
 	dedupWindow     time.Duration
 	mu              sync.RWMutex
 	categoryEnabled map[string]map[string]bool // userID -> category -> enabled
+	inboxRecorder   InboxNotificationRecorder
+}
+
+// SetInboxRecorder conecta o gravador da central de notificações (#s-notifs).
+func (s *AttentionBudgetService) SetInboxRecorder(rec InboxNotificationRecorder) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.inboxRecorder = rec
 }
 
 // NewAttentionBudgetService instancia o controlador global de orçamento de atenção.
@@ -132,6 +145,7 @@ func (s *AttentionBudgetService) Evaluate(ctx context.Context, cand AttentionCan
 	// 1. Alarmes críticos furam qualquer bloqueio de agenda ou fadiga
 	if isCritical {
 		_ = s.persistDecision(ctx, cand, decision, dedupKey, now)
+		s.notifyInboxRecorder(ctx, cand)
 		return decision, nil
 	}
 
@@ -170,18 +184,59 @@ func (s *AttentionBudgetService) Evaluate(ctx context.Context, cand AttentionCan
 	}
 
 	_ = s.persistDecision(ctx, cand, decision, dedupKey, now)
+	s.notifyInboxRecorder(ctx, cand)
 	return decision, nil
+}
+
+func (s *AttentionBudgetService) notifyInboxRecorder(ctx context.Context, cand AttentionCandidate) {
+	s.mu.RLock()
+	rec := s.inboxRecorder
+	s.mu.RUnlock()
+	if rec != nil && strings.TrimSpace(cand.UserID) != "" {
+		_ = rec.RecordDeliveredCandidate(ctx, cand)
+	}
 }
 
 func (s *AttentionBudgetService) isCategoryAllowed(userID, category string) bool {
 	s.mu.RLock()
-	defer s.mu.RUnlock()
 	if prefs, ok := s.categoryEnabled[userID]; ok {
 		if allowed, exists := prefs[category]; exists {
+			s.mu.RUnlock()
 			return allowed
 		}
 	}
-	return true
+	db := s.db
+	s.mu.RUnlock()
+
+	if db == nil || strings.TrimSpace(userID) == "" {
+		return true
+	}
+	var col string
+	switch category {
+	case "agenda":
+		col = "agenda"
+	case "tarefas":
+		col = "tarefas"
+	case "financas":
+		col = "financas"
+	case "bots":
+		col = "bots"
+	case "resumo":
+		col = "resumo"
+	case "promo":
+		col = "promo"
+	default:
+		return true
+	}
+	var enabled int
+	err := db.QueryRow(
+		"SELECT "+col+" FROM notification_preferences WHERE user_id = ?",
+		userID,
+	).Scan(&enabled)
+	if err != nil {
+		return true
+	}
+	return enabled != 0
 }
 
 func (s *AttentionBudgetService) isDuplicateWithinWindow(ctx context.Context, userID, dedupKey string, now time.Time) bool {
