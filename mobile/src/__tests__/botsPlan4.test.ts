@@ -29,6 +29,7 @@ describe('Plano 04 — Bots UI Mobile (AC-03, AC-13, AC-14 & §7)', () => {
       'components/common/FloatingTabBar.tsx',
       'components/common/Header.tsx',
       'data/botsCatalogFallback.ts',
+      'data/botsSkillsFallback.ts',
       'components/bots/BotCard.tsx',
       'components/bots/BotsMyTab.tsx',
       'components/bots/BotsCatalogTab.tsx',
