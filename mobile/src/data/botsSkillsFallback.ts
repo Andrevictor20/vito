@@ -1,143 +1,34 @@
+import {
+  MASCOT_PRESETS as CANONICAL_MASCOT_PRESETS,
+  type MascotPreset as CanonicalMascotPreset,
+} from '../components/mascot/mascotPalettes';
 import { BotSkin, SkillPackage } from '../types/bots';
 
 export interface MascotPreset {
   key: string;
   name: string;
+  tag: string;
+  darkStage: boolean;
   skin: BotSkin;
 }
 
-export const MASCOT_PRESETS: MascotPreset[] = [
-  {
-    key: 'vito_classic',
-    name: 'Vito Clássico',
+export const MASCOT_PRESETS: MascotPreset[] = CANONICAL_MASCOT_PRESETS.map(
+  (p: CanonicalMascotPreset) => ({
+    key: p.id,
+    name: p.name,
+    tag: p.tag,
+    darkStage: p.darkStage,
     skin: {
-      preset: 'vito_classic',
-      bodyColor: '#17191B',
-      bellyColor: '#2B2F36',
-      tentacleColor: '#17191B',
-      eyeColor: '#FFFFFF',
-      cheekColor: '#0B9A5F',
-      accentColor: '#0B9A5F',
+      preset: p.id,
+      fill: p.fill,
+      stroke: p.stroke,
+      eyes: p.eyes,
+      bowtie: p.bowtie,
+      hat: p.hat,
+      band: p.band,
     },
-  },
-  {
-    key: 'emerald_scout',
-    name: 'Esmeralda',
-    skin: {
-      preset: 'emerald_scout',
-      bodyColor: '#0B9A5F',
-      bellyColor: '#DDF4E8',
-      tentacleColor: '#077A4B',
-      eyeColor: '#17191B',
-      cheekColor: '#34D399',
-      accentColor: '#059669',
-    },
-  },
-  {
-    key: 'cobalt_sky',
-    name: 'Azul Cobalto',
-    skin: {
-      preset: 'cobalt_sky',
-      bodyColor: '#2B7FD4',
-      bellyColor: '#E4EFFB',
-      tentacleColor: '#1E5FA3',
-      eyeColor: '#FFFFFF',
-      cheekColor: '#38BDF8',
-      accentColor: '#2B7FD4',
-    },
-  },
-  {
-    key: 'sunset_coral',
-    name: 'Coral Vivo',
-    skin: {
-      preset: 'sunset_coral',
-      bodyColor: '#D6355A',
-      bellyColor: '#FDE6EC',
-      tentacleColor: '#A92343',
-      eyeColor: '#FFFFFF',
-      cheekColor: '#FB7185',
-      accentColor: '#D6355A',
-    },
-  },
-  {
-    key: 'amber_gold',
-    name: 'Âmbar Ouro',
-    skin: {
-      preset: 'amber_gold',
-      bodyColor: '#D9681A',
-      bellyColor: '#FBEBDB',
-      tentacleColor: '#B45309',
-      eyeColor: '#FFFFFF',
-      cheekColor: '#FBBF24',
-      accentColor: '#D9681A',
-    },
-  },
-  {
-    key: 'royal_violet',
-    name: 'Violeta',
-    skin: {
-      preset: 'royal_violet',
-      bodyColor: '#7A4FE0',
-      bellyColor: '#EEE8FD',
-      tentacleColor: '#5B34B8',
-      eyeColor: '#FFFFFF',
-      cheekColor: '#A78BFA',
-      accentColor: '#7A4FE0',
-    },
-  },
-  {
-    key: 'ocean_teal',
-    name: 'Turquesa',
-    skin: {
-      preset: 'ocean_teal',
-      bodyColor: '#0E8F9B',
-      bellyColor: '#DFF3F5',
-      tentacleColor: '#0A6C75',
-      eyeColor: '#FFFFFF',
-      cheekColor: '#2DD4BF',
-      accentColor: '#0E8F9B',
-    },
-  },
-  {
-    key: 'fin_bronze',
-    name: 'Bronze Fin',
-    skin: {
-      preset: 'fin_bronze',
-      bodyColor: '#A8710A',
-      bellyColor: '#FBF0D8',
-      tentacleColor: '#855806',
-      eyeColor: '#FFFFFF',
-      cheekColor: '#F59E0B',
-      accentColor: '#A8710A',
-    },
-  },
-  {
-    key: 'slate_pro',
-    name: 'Ardósia',
-    skin: {
-      preset: 'slate_pro',
-      bodyColor: '#475569',
-      bellyColor: '#E2E8F0',
-      tentacleColor: '#334155',
-      eyeColor: '#FFFFFF',
-      cheekColor: '#94A3B8',
-      accentColor: '#475569',
-    },
-  },
-  {
-    key: 'mint_fresh',
-    name: 'Menta',
-    skin: {
-      preset: 'mint_fresh',
-      bodyColor: '#0D9488',
-      bellyColor: '#CCFBF1',
-      tentacleColor: '#115E59',
-      eyeColor: '#FFFFFF',
-      cheekColor: '#5EEAD4',
-      accentColor: '#0D9488',
-    },
-  },
-];
+  })
+);
 
 export const ASK_VITO_CHIPS: { label: string; prompt: string }[] = [
   {

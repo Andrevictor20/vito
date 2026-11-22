@@ -1,8 +1,14 @@
 import React, { useState } from 'react';
 import { ArrowLeft, Dices, Sparkles, Sun, Moon } from 'lucide-react';
 import { BotSkin } from '../../types/bot';
-import { BotMascotRig } from './BotMascotRig';
-import { MASCOT_PRESETS, presetById, resolveSkin } from './mascotPalettes';
+import { MascotVectorRig } from '../mascot/MascotVectorRig';
+import {
+  MASCOT_PRESETS,
+  MascotPart,
+  pickRandomMascotPreset,
+  presetById,
+  resolveSkin,
+} from '../mascot/mascotPalettes';
 
 interface BotMascotStudioProps {
   initialTitle?: string;
@@ -33,19 +39,20 @@ export const BotMascotStudio: React.FC<BotMascotStudioProps> = ({
   const [title, setTitle] = useState(initialTitle);
   const [goal, setGoal] = useState(initialGoal);
   const [skin, setSkin] = useState<BotSkin>(initialSkin || MASCOT_PRESETS[1]);
+  const [lastRandomName, setLastRandomName] = useState<string | null>(null);
   const [darkStage, setDarkStage] = useState<boolean>(
     () => presetById(initialSkin?.preset || MASCOT_PRESETS[1].id).darkStage
   );
-  const [reaction, setReaction] = useState<'hat' | 'bowtie' | 'eyes' | null>(null);
+  const [reaction, setReaction] = useState<MascotPart | null>(null);
   const [saving, setSaving] = useState(false);
 
   const activePreset = presetById(skin.preset);
   const resolved = resolveSkin(skin, darkStage);
 
   const handleRandomize = () => {
-    const pick = MASCOT_PRESETS[Math.floor(Math.random() * MASCOT_PRESETS.length)];
+    const pick = pickRandomMascotPreset(skin.preset);
     setSkin({
-      preset: pick.id,
+      preset: pick.preset,
       fill: pick.fill,
       stroke: pick.stroke,
       eyes: pick.eyes,
@@ -53,11 +60,12 @@ export const BotMascotStudio: React.FC<BotMascotStudioProps> = ({
       hat: pick.hat,
       band: pick.band,
     });
+    setLastRandomName(pick.preset === 'custom' ? pick.name : null);
     setDarkStage(pick.darkStage);
   };
 
   const handleTestReaction = () => {
-    const options: Array<'hat' | 'bowtie' | 'eyes'> = ['hat', 'bowtie', 'eyes'];
+    const options: MascotPart[] = ['hat', 'bowtie', 'eyes'];
     const next = options[Math.floor(Math.random() * options.length)];
     setReaction(next);
     setTimeout(() => setReaction(null), 580);
@@ -74,10 +82,12 @@ export const BotMascotStudio: React.FC<BotMascotStudioProps> = ({
       hat: p.hat,
       band: p.band,
     });
+    setLastRandomName(null);
     setDarkStage(p.darkStage);
   };
 
   const handleColorChange = (part: keyof Omit<BotSkin, 'preset'>, value: string) => {
+    setLastRandomName(null);
     setSkin((prev) => ({
       ...prev,
       preset: 'custom',
@@ -98,6 +108,9 @@ export const BotMascotStudio: React.FC<BotMascotStudioProps> = ({
       setSaving(false);
     }
   };
+
+  const badgeLabel =
+    skin.preset === 'custom' ? lastRandomName || 'Personalizado' : activePreset.name;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5 max-w-2xl mx-auto">
@@ -121,8 +134,10 @@ export const BotMascotStudio: React.FC<BotMascotStudioProps> = ({
         </div>
 
         <button
+          id="mascot-rand"
           type="button"
           onClick={handleRandomize}
+          aria-label="Sortear estilo"
           className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[var(--line)] bg-[var(--bg)] text-xs font-bold text-[var(--ink)] hover:bg-[var(--surf)]"
         >
           <Dices size={15} />
@@ -133,15 +148,16 @@ export const BotMascotStudio: React.FC<BotMascotStudioProps> = ({
       {/* Palco do Mascote */}
       <div
         className={`rounded-3xl border border-[var(--line)] p-5 transition-colors ${
-          darkStage ? 'bg-[#0d0f10] text-[#f1f3f2]' : 'bg-[#f2f4f3] text-[#17191b]'
+          darkStage ? 'bg-[#0f1318] text-[#f5f5f5]' : 'bg-[var(--surf)] text-[var(--ink)]'
         }`}
       >
         <div className="flex items-center justify-between">
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-black/10 dark:bg-white/10">
             <Sparkles size={12} />
-            {skin.preset === 'custom' ? 'Personalizado' : activePreset.name}
+            {badgeLabel}
           </span>
           <button
+            id="mc-bg-tgl"
             type="button"
             onClick={() => setDarkStage((v) => !v)}
             className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-black/10 dark:bg-white/10 hover:opacity-80"
@@ -151,14 +167,15 @@ export const BotMascotStudio: React.FC<BotMascotStudioProps> = ({
           </button>
         </div>
 
-        <div className="py-4 flex justify-center">
-          <BotMascotRig
+        <div id="mc-stage-rig" className="py-4 flex justify-center">
+          <MascotVectorRig
             skin={skin}
             state="idle"
-            size={144}
+            size={152}
             animated={true}
             darkStage={darkStage}
             reaction={reaction}
+            interactiveParts={true}
           />
         </div>
 
@@ -205,7 +222,7 @@ export const BotMascotStudio: React.FC<BotMascotStudioProps> = ({
         <div className="text-xs font-bold uppercase tracking-wider text-[var(--muted)]">
           Presets de cores
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           {MASCOT_PRESETS.map((p) => {
             const selected = skin.preset === p.id;
             return (
@@ -213,18 +230,22 @@ export const BotMascotStudio: React.FC<BotMascotStudioProps> = ({
                 key={p.id}
                 type="button"
                 onClick={() => handleSelectPreset(p.id)}
-                className={`p-2.5 rounded-xl border text-left transition-all flex items-center gap-2 ${
+                className={`p-2.5 rounded-xl border text-left transition-all flex items-center gap-2.5 ${
                   selected
-                    ? 'border-[var(--ink)] bg-[var(--surf)]'
-                    : 'border-[var(--line)] bg-[var(--bg)] hover:border-[var(--muted)]'
+                    ? 'border-[var(--ink)] bg-[var(--ink)] text-[var(--bg)]'
+                    : 'border-[var(--line)] bg-[var(--bg)] text-[var(--ink)] hover:border-[var(--muted)]'
                 }`}
               >
-                <div className="w-8 h-8 rounded-lg bg-[var(--surf)] flex items-center justify-center shrink-0">
-                  <BotMascotRig skin={p} state="idle" size={28} animated={false} />
+                <div
+                  className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
+                    selected ? 'bg-white/15' : 'bg-[var(--surf)]'
+                  }`}
+                >
+                  <MascotVectorRig skin={p} state="idle" size={28} animated={false} />
                 </div>
                 <div className="min-w-0">
-                  <div className="text-[11px] font-bold text-[var(--ink)] truncate">{p.name}</div>
-                  <div className="text-[10px] text-[var(--muted)] truncate">{p.tag}</div>
+                  <div className="text-xs font-semibold truncate">{p.name}</div>
+                  <div className="text-[11px] opacity-70 truncate">{p.tag}</div>
                 </div>
               </button>
             );

@@ -1,4 +1,4 @@
-import { MASCOT_PRESETS } from '../data/botsCatalogFallback';
+import { parseMascotSkin } from '../components/mascot/mascotPalettes';
 import {
   ALWAYS_ASK_ACTIONS,
   ActionPolicy,
@@ -60,23 +60,7 @@ export function getPolicyLabel(policy: ActionPolicy): string {
 }
 
 export function parseBotSkin(skinJson?: string | null, fallbackSkin?: BotSkin): BotSkin {
-  if (fallbackSkin && fallbackSkin.bodyColor) {
-    return fallbackSkin;
-  }
-  if (skinJson) {
-    try {
-      const parsed = JSON.parse(skinJson) as Partial<BotSkin>;
-      if (parsed && typeof parsed.bodyColor === 'string') {
-        return {
-          ...MASCOT_PRESETS[0].skin,
-          ...parsed,
-        };
-      }
-    } catch {
-      // Fallback para preset padrão
-    }
-  }
-  return MASCOT_PRESETS[0].skin;
+  return parseMascotSkin(skinJson, fallbackSkin);
 }
 
 export function resolveBotAnimState(bot: Pick<Bot, 'status' | 'anim_state' | 'pending' | 'last_run_at'>): BotAnimState {

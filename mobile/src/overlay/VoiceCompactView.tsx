@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import { VitoMascot } from '../components/common/VitoMascot';
+import { voiceStateToMascotAnim } from '../components/mascot/mascotPalettes';
 import {
   ConversationState,
   OverlayActionCardData,
@@ -353,7 +354,11 @@ export const VoiceCompactView: React.FC<VoiceCompactViewProps> = ({
               activeOpacity={0.78}
               accessibilityLabel="Avatar do Vito"
             >
-              <VitoMascot size={26} animated={!isMuted} state={state === 'THINKING' ? 'thinking' : 'idle'} />
+              <VitoMascot
+                size={26}
+                animated={!isMuted}
+                state={voiceStateToMascotAnim(state, isMuted)}
+              />
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.pillCaption} activeOpacity={0.85} onPress={onTapAvatar}>

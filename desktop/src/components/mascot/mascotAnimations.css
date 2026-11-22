@@ -1,0 +1,481 @@
+/* ===== Mascote Rig Vetorial 500x500 & 10 Animações Dinâmicas (v5) ===== */
+:root {
+  --anim-speed: 1;
+}
+
+.mascot-svg {
+  display: block;
+  overflow: visible;
+}
+
+.rig-whole,
+.rig-body,
+.rig-hat,
+.rig-eyes-group,
+.rig-eye-left,
+.rig-eye-right,
+.rig-bowtie,
+.fx-sparkles,
+.fx-alert,
+.fx-dot-1,
+.fx-dot-2,
+.fx-dot-3,
+.fx-z-1,
+.fx-z-2,
+.fx-z-3 {
+  transform-box: view-box;
+  will-change: transform;
+}
+
+.rig-whole {
+  transform-origin: 250px 280px;
+}
+.rig-body {
+  transform-origin: 250px 390px;
+}
+.rig-hat {
+  transform-origin: 332px 104px;
+}
+.rig-eyes-group {
+  transform-origin: 250px 211.5px;
+}
+.rig-eye-left {
+  transform-origin: 209px 211.5px;
+}
+.rig-eye-right {
+  transform-origin: 291px 211.5px;
+}
+.rig-bowtie {
+  transform-origin: 250px 316px;
+}
+
+.fx-sparkles,
+.fx-alert,
+.fx-thinking,
+.fx-zzz,
+.eyes-happy,
+.eyes-sleeping {
+  display: none;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* 1. Blink */
+@keyframes anim-blink-eyes {
+  0%, 44%, 50%, 78%, 84%, 100% { transform: scaleY(1); }
+  47%, 81% { transform: scaleY(0.06); }
+}
+.state-blink .rig-eye-left,
+.state-blink .rig-eye-right {
+  animation: anim-blink-eyes calc(3.6s / var(--anim-speed, 1)) infinite cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 2. Idle */
+@keyframes anim-idle-float {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(0, -9px, 0); }
+}
+@keyframes anim-idle-hat-follow {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+  55% { transform: translate3d(1px, -3.5px, 0) rotate(1.6deg); }
+}
+@keyframes anim-idle-face-parallax {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(0, -2px, 0); }
+}
+@keyframes anim-idle-bowtie-follow {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  52% { transform: translate3d(0, -1.5px, 0) scale(1.025); }
+}
+.state-idle .rig-whole {
+  animation: anim-idle-float calc(3.2s / var(--anim-speed, 1)) infinite cubic-bezier(0.45, 0, 0.55, 1);
+}
+.state-idle .rig-hat {
+  animation: anim-idle-hat-follow calc(3.2s / var(--anim-speed, 1)) infinite cubic-bezier(0.45, 0, 0.55, 1);
+}
+.state-idle .rig-eyes-group {
+  animation: anim-idle-face-parallax calc(3.2s / var(--anim-speed, 1)) infinite cubic-bezier(0.45, 0, 0.55, 1);
+}
+.state-idle .rig-bowtie {
+  animation: anim-idle-bowtie-follow calc(3.2s / var(--anim-speed, 1)) infinite cubic-bezier(0.45, 0, 0.55, 1);
+}
+.state-idle .rig-eye-left,
+.state-idle .rig-eye-right {
+  animation: anim-blink-eyes calc(4.2s / var(--anim-speed, 1)) infinite cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 3. Gentleman */
+@keyframes anim-hat-tip {
+  0%, 18%, 82%, 100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+  36%, 62% { transform: translate3d(14px, -22px, 0) rotate(18deg); }
+  48% { transform: translate3d(16px, -25px, 0) rotate(21deg); }
+}
+@keyframes anim-gentleman-nod {
+  0%, 18%, 82%, 100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+  38%, 60% { transform: translate3d(0, 4px, 0) rotate(2.5deg); }
+}
+@keyframes anim-gentleman-face {
+  0%, 18%, 82%, 100% { transform: translate3d(0, 0, 0); }
+  38%, 60% { transform: translate3d(3px, 4px, 0); }
+}
+@keyframes anim-wink-right {
+  0%, 26%, 68%, 100% { transform: scaleY(1); }
+  36%, 56% { transform: scaleY(0.08); }
+}
+@keyframes anim-bowtie-wiggle {
+  0%, 22%, 78%, 100% { transform: rotate(0deg) scale(1); }
+  34% { transform: rotate(-7deg) scale(1.06); }
+  46% { transform: rotate(7deg) scale(1.06); }
+  58% { transform: rotate(-4deg) scale(1.03); }
+}
+.state-gentleman .rig-whole {
+  animation: anim-gentleman-nod calc(3s / var(--anim-speed, 1)) infinite cubic-bezier(0.4, 0, 0.2, 1);
+}
+.state-gentleman .rig-eyes-group {
+  animation: anim-gentleman-face calc(3s / var(--anim-speed, 1)) infinite cubic-bezier(0.4, 0, 0.2, 1);
+}
+.state-gentleman .rig-hat {
+  animation: anim-hat-tip calc(3s / var(--anim-speed, 1)) infinite cubic-bezier(0.34, 1.45, 0.64, 1);
+}
+.state-gentleman .rig-eye-right {
+  animation: anim-wink-right calc(3s / var(--anim-speed, 1)) infinite cubic-bezier(0.4, 0, 0.2, 1);
+}
+.state-gentleman .rig-bowtie {
+  animation: anim-bowtie-wiggle calc(3s / var(--anim-speed, 1)) infinite cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 4. Happy */
+@keyframes anim-happy-hop {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  25% { transform: translate3d(0, -18px, 0) rotate(-1.5deg); }
+  50% { transform: translate3d(0, 0, 0); }
+  75% { transform: translate3d(0, -18px, 0) rotate(1.5deg); }
+}
+@keyframes anim-happy-hat {
+  0%, 50%, 100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+  28% { transform: translate3d(-2px, -9px, 0) rotate(-4deg); }
+  78% { transform: translate3d(2px, -9px, 0) rotate(5deg); }
+}
+@keyframes anim-happy-bowtie {
+  0%, 12% { transform: rotate(0deg) scale(1); }
+  45%, 55% { transform: rotate(180deg) scale(1.08); }
+  88%, 100% { transform: rotate(360deg) scale(1); }
+}
+@keyframes anim-happy-sparkles {
+  0%, 100% { opacity: 0; transform: translate3d(0, 4px, 0) scale(0.75); }
+  25%, 75% { opacity: 1; transform: translate3d(0, -4px, 0) scale(1); }
+}
+.state-happy .rig-whole {
+  animation: anim-happy-hop calc(2s / var(--anim-speed, 1)) infinite cubic-bezier(0.42, 0, 0.58, 1);
+}
+.state-happy .rig-hat {
+  animation: anim-happy-hat calc(2s / var(--anim-speed, 1)) infinite cubic-bezier(0.42, 0, 0.58, 1);
+}
+.state-happy .rig-bowtie {
+  animation: anim-happy-bowtie calc(2s / var(--anim-speed, 1)) infinite cubic-bezier(0.65, 0, 0.35, 1);
+}
+.state-happy .eyes-default {
+  display: none;
+  opacity: 0;
+}
+.state-happy .eyes-happy {
+  display: block;
+  opacity: 1;
+}
+.state-happy .fx-sparkles {
+  display: block;
+  opacity: 1;
+  animation: anim-happy-sparkles calc(2s / var(--anim-speed, 1)) infinite ease-in-out;
+}
+
+/* 5. Thinking */
+@keyframes anim-thinking-body {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+  30%, 75% { transform: translate3d(0, -5px, 0) rotate(-1.8deg); }
+}
+@keyframes anim-thinking-eyes {
+  0%, 15%, 100% { transform: translate3d(0, 0, 0); }
+  30%, 75% { transform: translate3d(11px, -12px, 0); }
+  52% { transform: translate3d(7px, -14px, 0); }
+}
+@keyframes anim-thinking-bowtie {
+  0%, 15%, 100% { transform: translate3d(0, 0, 0); }
+  30%, 75% { transform: translate3d(4px, -3px, 0); }
+}
+@keyframes anim-thinking-squint {
+  0%, 15%, 100% { transform: scaleY(1); }
+  30%, 75% { transform: scaleY(0.72); }
+}
+@keyframes anim-thinking-hat {
+  0%, 15%, 100% { transform: rotate(0deg) translate3d(0, 0, 0); }
+  30%, 75% { transform: rotate(-3.5deg) translate3d(-2px, -3px, 0); }
+}
+@keyframes anim-thinking-dots {
+  0%, 100% { opacity: 0.25; transform: translate3d(0, 3px, 0) scale(0.88); }
+  50% { opacity: 1; transform: translate3d(0, -4px, 0) scale(1.06); }
+}
+.state-thinking .rig-whole {
+  animation: anim-thinking-body calc(3.4s / var(--anim-speed, 1)) infinite cubic-bezier(0.45, 0, 0.55, 1);
+}
+.state-thinking .rig-eyes-group {
+  animation: anim-thinking-eyes calc(3.4s / var(--anim-speed, 1)) infinite cubic-bezier(0.4, 0, 0.2, 1);
+}
+.state-thinking .rig-bowtie {
+  animation: anim-thinking-bowtie calc(3.4s / var(--anim-speed, 1)) infinite cubic-bezier(0.4, 0, 0.2, 1);
+}
+.state-thinking .rig-eye-left {
+  animation: anim-thinking-squint calc(3.4s / var(--anim-speed, 1)) infinite cubic-bezier(0.4, 0, 0.2, 1);
+}
+.state-thinking .rig-hat {
+  animation: anim-thinking-hat calc(3.4s / var(--anim-speed, 1)) infinite cubic-bezier(0.45, 0, 0.55, 1);
+}
+.state-thinking .fx-thinking {
+  display: block;
+  opacity: 1;
+}
+.state-thinking .fx-dot-1 {
+  transform-origin: 404px 148px;
+  animation: anim-thinking-dots calc(1.5s / var(--anim-speed, 1)) infinite 0s ease-in-out;
+}
+.state-thinking .fx-dot-2 {
+  transform-origin: 432px 112px;
+  animation: anim-thinking-dots calc(1.5s / var(--anim-speed, 1)) infinite 0.25s ease-in-out;
+}
+.state-thinking .fx-dot-3 {
+  transform-origin: 456px 66px;
+  animation: anim-thinking-dots calc(1.5s / var(--anim-speed, 1)) infinite 0.5s ease-in-out;
+}
+
+/* 6. Curious */
+@keyframes anim-curious-eyes {
+  0%, 14%, 86%, 100% { transform: translate3d(0, 0, 0); }
+  26%, 44% { transform: translate3d(-18px, -2px, 0); }
+  58%, 76% { transform: translate3d(18px, -2px, 0); }
+}
+@keyframes anim-curious-bowtie {
+  0%, 14%, 86%, 100% { transform: translate3d(0, 0, 0); }
+  26%, 44% { transform: translate3d(-7px, 0, 0); }
+  58%, 76% { transform: translate3d(7px, 0, 0); }
+}
+@keyframes anim-curious-hat {
+  0%, 14%, 86%, 100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+  26%, 44% { transform: translate3d(5px, -2px, 0) rotate(-2.5deg); }
+  58%, 76% { transform: translate3d(-5px, 2px, 0) rotate(2.5deg); }
+}
+@keyframes anim-curious-left-eye {
+  0%, 14%, 86%, 100% { transform: scaleY(1); }
+  26%, 44% { transform: scaleY(1.06); }
+  58%, 76% { transform: scaleY(0.65); }
+}
+@keyframes anim-curious-right-eye {
+  0%, 14%, 86%, 100% { transform: scaleY(1); }
+  26%, 44% { transform: scaleY(0.65); }
+  58%, 76% { transform: scaleY(1.06); }
+}
+@keyframes anim-curious-body {
+  0%, 14%, 86%, 100% { transform: rotate(0deg) translate3d(0, 0, 0); }
+  26%, 44% { transform: rotate(-2.2deg) translate3d(-4px, 0, 0); }
+  58%, 76% { transform: rotate(2.2deg) translate3d(4px, 0, 0); }
+}
+.state-curious .rig-whole {
+  animation: anim-curious-body calc(3.8s / var(--anim-speed, 1)) infinite cubic-bezier(0.4, 0, 0.2, 1);
+}
+.state-curious .rig-eyes-group {
+  animation: anim-curious-eyes calc(3.8s / var(--anim-speed, 1)) infinite cubic-bezier(0.4, 0, 0.2, 1);
+}
+.state-curious .rig-bowtie {
+  animation: anim-curious-bowtie calc(3.8s / var(--anim-speed, 1)) infinite cubic-bezier(0.4, 0, 0.2, 1);
+}
+.state-curious .rig-hat {
+  animation: anim-curious-hat calc(3.8s / var(--anim-speed, 1)) infinite cubic-bezier(0.4, 0, 0.2, 1);
+}
+.state-curious .rig-eye-left {
+  animation: anim-curious-left-eye calc(3.8s / var(--anim-speed, 1)) infinite cubic-bezier(0.4, 0, 0.2, 1);
+}
+.state-curious .rig-eye-right {
+  animation: anim-curious-right-eye calc(3.8s / var(--anim-speed, 1)) infinite cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 7. Surprised */
+@keyframes anim-surprised-body {
+  0%, 18%, 72%, 100% { transform: translate3d(0, 0, 0); }
+  24% { transform: translate3d(0, 5px, 0); }
+  34%, 46% { transform: translate3d(0, -14px, 0); }
+  58% { transform: translate3d(0, 2px, 0); }
+}
+@keyframes anim-surprised-hat {
+  0%, 22%, 68%, 100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+  36%, 44% { transform: translate3d(6px, -28px, 0) rotate(-8deg); }
+  56% { transform: translate3d(-1px, 2px, 0) rotate(2deg); }
+}
+@keyframes anim-surprised-eyes {
+  0%, 20%, 68%, 100% { transform: scale(1); }
+  32%, 48% { transform: scale(1.16); }
+}
+@keyframes anim-surprised-bowtie {
+  0%, 22%, 68%, 100% { transform: scale(1) rotate(0deg); }
+  34% { transform: scale(1.18) rotate(-6deg); }
+  44% { transform: scale(1.18) rotate(6deg); }
+}
+@keyframes anim-surprised-fx {
+  0%, 24%, 58%, 100% { opacity: 0; transform: scale(0.8); }
+  32%, 48% { opacity: 1; transform: scale(1); }
+}
+.state-surprised .rig-whole {
+  animation: anim-surprised-body calc(2.6s / var(--anim-speed, 1)) infinite cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+.state-surprised .rig-hat {
+  animation: anim-surprised-hat calc(2.6s / var(--anim-speed, 1)) infinite cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+.state-surprised .rig-eye-left,
+.state-surprised .rig-eye-right {
+  animation: anim-surprised-eyes calc(2.6s / var(--anim-speed, 1)) infinite cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+.state-surprised .rig-bowtie {
+  animation: anim-surprised-bowtie calc(2.6s / var(--anim-speed, 1)) infinite ease-in-out;
+}
+.state-surprised .fx-alert {
+  display: block;
+  transform-origin: 120px 90px;
+  opacity: 1;
+  animation: anim-surprised-fx calc(2.6s / var(--anim-speed, 1)) infinite ease-in-out;
+}
+
+/* 8. Sleeping */
+@keyframes anim-sleep-breathe {
+  0%, 100% { transform: translate3d(0, 3px, 0); }
+  50% { transform: translate3d(0, -4px, 0); }
+}
+@keyframes anim-sleep-hat {
+  0%, 100% { transform: translate3d(-8px, 6px, 0) rotate(-9deg); }
+  50% { transform: translate3d(-6px, 2px, 0) rotate(-6.5deg); }
+}
+@keyframes anim-sleep-face {
+  0%, 100% { transform: translate3d(0, 3px, 0); }
+  50% { transform: translate3d(0, -2px, 0); }
+}
+@keyframes anim-sleep-z1 {
+  0% { opacity: 0; transform: translate3d(0, 8px, 0) scale(0.75); }
+  35% { opacity: 1; }
+  100% { opacity: 0; transform: translate3d(18px, -28px, 0) scale(1.08); }
+}
+.state-sleeping .rig-whole {
+  animation: anim-sleep-breathe calc(4s / var(--anim-speed, 1)) infinite cubic-bezier(0.45, 0, 0.55, 1);
+}
+.state-sleeping .rig-hat {
+  animation: anim-sleep-hat calc(4s / var(--anim-speed, 1)) infinite cubic-bezier(0.45, 0, 0.55, 1);
+}
+.state-sleeping .rig-eyes-group {
+  animation: anim-sleep-face calc(4s / var(--anim-speed, 1)) infinite cubic-bezier(0.45, 0, 0.55, 1);
+}
+.state-sleeping .eyes-default {
+  display: none;
+  opacity: 0;
+}
+.state-sleeping .eyes-sleeping {
+  display: block;
+  opacity: 1;
+}
+.state-sleeping .fx-zzz {
+  display: block;
+  opacity: 1;
+}
+.state-sleeping .fx-z-1 {
+  transform-origin: 400px 165px;
+  animation: anim-sleep-z1 calc(3s / var(--anim-speed, 1)) infinite 0s ease-out;
+}
+.state-sleeping .fx-z-2 {
+  transform-origin: 428px 132px;
+  animation: anim-sleep-z1 calc(3s / var(--anim-speed, 1)) infinite 1s ease-out;
+}
+.state-sleeping .fx-z-3 {
+  transform-origin: 454px 99px;
+  animation: anim-sleep-z1 calc(3s / var(--anim-speed, 1)) infinite 2s ease-out;
+}
+
+/* 9. Dance */
+@keyframes anim-dance-body {
+  0%, 100% { transform: translate3d(-7px, 0, 0) rotate(-2.5deg); }
+  25% { transform: translate3d(0, -10px, 0) rotate(0deg); }
+  50% { transform: translate3d(7px, 0, 0) rotate(2.5deg); }
+  75% { transform: translate3d(0, -10px, 0) rotate(0deg); }
+}
+@keyframes anim-dance-eyes {
+  0%, 100% { transform: translate3d(-6px, 0, 0); }
+  25% { transform: translate3d(0, -3px, 0); }
+  50% { transform: translate3d(6px, 0, 0); }
+  75% { transform: translate3d(0, -3px, 0); }
+}
+@keyframes anim-dance-hat {
+  0%, 100% { transform: translate3d(-2px, 0, 0) rotate(-3deg); }
+  25% { transform: translate3d(0, -6px, 0) rotate(2deg); }
+  50% { transform: translate3d(2px, 0, 0) rotate(3deg); }
+  75% { transform: translate3d(0, -6px, 0) rotate(-2deg); }
+}
+@keyframes anim-dance-bowtie {
+  0%, 100% { transform: translate3d(-3px, 0, 0) rotate(-6deg) scale(1.04); }
+  50% { transform: translate3d(3px, 0, 0) rotate(6deg) scale(1.04); }
+}
+.state-dance .rig-whole {
+  animation: anim-dance-body calc(1.8s / var(--anim-speed, 1)) infinite cubic-bezier(0.45, 0, 0.55, 1);
+}
+.state-dance .rig-eyes-group {
+  animation: anim-dance-eyes calc(1.8s / var(--anim-speed, 1)) infinite cubic-bezier(0.45, 0, 0.55, 1);
+}
+.state-dance .rig-hat {
+  animation: anim-dance-hat calc(1.8s / var(--anim-speed, 1)) infinite cubic-bezier(0.45, 0, 0.55, 1);
+}
+.state-dance .rig-bowtie {
+  animation: anim-dance-bowtie calc(0.9s / var(--anim-speed, 1)) infinite cubic-bezier(0.45, 0, 0.55, 1);
+}
+.state-dance .rig-eye-left,
+.state-dance .rig-eye-right {
+  animation: anim-blink-eyes calc(3.6s / var(--anim-speed, 1)) infinite cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 10. Interactive (Damped cursor tracking) */
+.state-interactive .rig-eye-left,
+.state-interactive .rig-eye-right {
+  animation: anim-blink-eyes calc(4.2s / var(--anim-speed, 1)) infinite cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Micro-interactions (touch/click parts) */
+.mascot-react-hat .rig-hat {
+  animation: none !important;
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transform: translate3d(16px, -26px, 0) rotate(20deg);
+}
+.mascot-react-bowtie .rig-bowtie {
+  animation: none !important;
+  transition: transform 0.55s cubic-bezier(0.65, 0, 0.35, 1);
+  transform: rotate(360deg) scale(1.18);
+}
+.mascot-react-eyes .rig-eye-left,
+.mascot-react-eyes .rig-eye-right {
+  animation: none !important;
+  transition: transform 0.14s ease;
+  transform: scaleY(0.08);
+}
+
+/* List-pause lock & Compact mode (<=34px) */
+.mascot-paused *,
+.mascot-list-item .mascot-svg * {
+  animation: none !important;
+}
+
+.mascot-compact .fx-sparkles,
+.mascot-compact .fx-alert,
+.mascot-compact .fx-thinking,
+.mascot-compact .fx-zzz {
+  display: none !important;
+  opacity: 0 !important;
+}
+
+/* Strict ReduceMotion */
+@media (prefers-reduced-motion: reduce) {
+  .mascot-svg,
+  .mascot-svg * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
