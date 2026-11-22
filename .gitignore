@@ -81,6 +81,11 @@ docs/auditoria-vito/
 backups/
 craft/
 .agents/
+.githooks/
+AGENTS.md
+CLAUDE.md
+.antigravityignore
+.geminiignore
 Relatório Técnico_ Arquitetura Inteligente de Radares e Motor de Busca (Vito).md
 /*.html
 *Modo conversa fora do app*

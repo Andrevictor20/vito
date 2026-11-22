@@ -16,26 +16,27 @@ func TestVersionedMigrations_FreshDB(t *testing.T) {
 	if err := db.QueryRow(`SELECT COUNT(*) FROM schema_migrations`).Scan(&count); err != nil {
 		t.Fatal(err)
 	}
-	if count != 29 {
-		t.Fatalf("esperava 29 migrações registradas, vieram %d", count)
+	if want := len(orderedMigrations()); count != want {
+		t.Fatalf("esperava %d migração(ões) registrada(s), vieram %d", want, count)
 	}
 	if !hasTable(db, "user_ai_providers") ||
 		!hasColumn(db, "user_ai_settings", "default_model") ||
 		!hasColumn(db, "user_ai_settings", "default_effort") ||
 		!hasColumn(db, "conversation_threads", "model_pref") ||
 		!hasColumn(db, "conversation_threads", "effort_pref") ||
+		!hasColumn(db, "ai_traces", "agent_name") ||
 		!hasColumn(db, "ai_traces", "credential_source") ||
 		!hasColumn(db, "ai_traces", "provider_key") ||
 		!hasColumn(db, "ai_traces", "effort") ||
 		!hasColumn(db, "triggers", "model_pref") ||
 		!hasColumn(db, "triggers", "effort_pref") {
-		t.Fatal("037 deveria criar user_ai_providers e colunas de modelo/esforço em user_ai_settings, conversation_threads, ai_traces e triggers")
+		t.Fatal("001 deveria criar user_ai_providers e colunas de modelo/esforço em user_ai_settings, conversation_threads, ai_traces e triggers")
 	}
 	if !hasTable(db, "memory_embeddings") ||
 		!hasTable(db, "entity_links") ||
 		!hasTable(db, "attention_budget_logs") ||
 		!hasTable(db, "ai_eval_runs") {
-		t.Fatal("036 deveria criar memory_embeddings, entity_links, attention_budget_logs e ai_eval_runs")
+		t.Fatal("001 deveria criar memory_embeddings, entity_links, attention_budget_logs e ai_eval_runs")
 	}
 	if !hasTable(db, "finance_byok_backup") ||
 		!hasColumn(db, "finance_byok_backup", "user_id") ||
@@ -43,19 +44,19 @@ func TestVersionedMigrations_FreshDB(t *testing.T) {
 		!hasColumn(db, "finance_byok_backup", "nonce") ||
 		!hasColumn(db, "finance_byok_backup", "key_version") ||
 		!hasColumn(db, "finance_byok_backup", "updated_at") {
-		t.Fatal("025 deveria criar finance_byok_backup com todas as colunas esperadas")
+		t.Fatal("001 deveria criar finance_byok_backup com todas as colunas esperadas")
 	}
 	if !hasTable(db, "finance_connections") ||
 		!hasTable(db, "finance_accounts") ||
 		!hasTable(db, "finance_transactions") ||
 		!hasTable(db, "finance_budgets_and_goals") {
-		t.Fatal("023 deveria criar tabelas de conexões, contas, transações e orçamentos financeiros")
+		t.Fatal("001 deveria criar tabelas de conexões, contas, transações e orçamentos financeiros")
 	}
 	if !hasTable(db, "finance_credit_bills") ||
 		!hasTable(db, "finance_installment_plans") ||
 		!hasTable(db, "finance_merchants") ||
 		!hasTable(db, "finance_category_rules") {
-		t.Fatal("024 deveria criar faturas, planos de parcelamento, comerciantes e regras de categoria")
+		t.Fatal("001 deveria criar faturas, planos de parcelamento, comerciantes e regras de categoria")
 	}
 	if !hasColumn(db, "finance_transactions", "installment_number") ||
 		!hasColumn(db, "finance_transactions", "total_installments") ||
@@ -63,11 +64,11 @@ func TestVersionedMigrations_FreshDB(t *testing.T) {
 		!hasColumn(db, "finance_transactions", "merchant_id") ||
 		!hasColumn(db, "finance_accounts", "closing_day") ||
 		!hasColumn(db, "finance_accounts", "due_day") {
-		t.Fatal("024 deveria adicionar colunas de parcelas, fatura, comerciante e ciclo do cartão")
+		t.Fatal("001 deveria incluir colunas de parcelas, fatura, comerciante e ciclo do cartão")
 	}
 	if !hasColumn(db, "user_ai_settings", "persona_style") ||
 		!hasColumn(db, "user_ai_settings", "preferred_voice") {
-		t.Fatal("022 deveria adicionar persona_style e preferred_voice em user_ai_settings")
+		t.Fatal("001 deveria incluir persona_style e preferred_voice em user_ai_settings")
 	}
 	if !hasTable(db, "conversation_threads") ||
 		!hasTable(db, "conversation_turns") ||
@@ -75,95 +76,76 @@ func TestVersionedMigrations_FreshDB(t *testing.T) {
 		!hasTable(db, "memory_episodes") ||
 		!hasTable(db, "memory_thematic_summaries") ||
 		!hasTable(db, "ai_traces") {
-		t.Fatal("022 deveria criar tabelas de conversation store, pending_confirmations, memória hierárquica e ai_traces")
+		t.Fatal("001 deveria criar tabelas de conversation store, pending_confirmations, memória hierárquica e ai_traces")
 	}
 	if !hasColumn(db, "triggers", "search_config_json") ||
 		!hasColumn(db, "triggers", "seen_fingerprints_json") ||
-		!hasColumn(db, "triggers", "last_metric_value") {
-		t.Fatal("021 deveria adicionar search_config_json, seen_fingerprints_json e last_metric_value em triggers")
+		!hasColumn(db, "triggers", "last_metric_value") ||
+		!hasColumn(db, "triggers", "last_notified_at") ||
+		!hasColumn(db, "triggers", "user_intent") ||
+		!hasColumn(db, "triggers", "search_keywords") {
+		t.Fatal("001 deveria incluir colunas de busca, notificação e intenção em triggers")
 	}
-	if !hasTable(db, "synced_contacts") {
-		t.Fatal("020 deveria criar synced_contacts")
-	}
-	if !hasTable(db, "whatsapp_contact_aliases") {
-		t.Fatal("019 deveria criar whatsapp_contact_aliases")
+	if !hasTable(db, "synced_contacts") ||
+		!hasTable(db, "whatsapp_contact_aliases") ||
+		!hasTable(db, "whatsapp_pending_state") ||
+		!hasTable(db, "whatsapp_conversation_messages") ||
+		!hasTable(db, "whatsapp_context_settings") ||
+		!hasTable(db, "whatsapp_auth_otps") ||
+		!hasTable(db, "gmail_integrations") ||
+		!hasTable(db, "whatsapp_integrations") {
+		t.Fatal("001 deveria criar tabelas de WhatsApp, Gmail e contatos sincronizados")
 	}
 	if !hasColumn(db, "whatsapp_conversation_messages", "media_kind") ||
 		!hasColumn(db, "whatsapp_conversation_messages", "media_payload") ||
 		!hasColumn(db, "whatsapp_conversation_messages", "quoted_id") {
-		t.Fatal("017 deveria adicionar as colunas de mídia e quoted_id")
+		t.Fatal("001 deveria incluir colunas de mídia e quoted_id em whatsapp_conversation_messages")
 	}
-	if !hasTable(db, "whatsapp_pending_state") {
-		t.Fatal("016 deveria criar whatsapp_pending_state")
-	}
-	if !hasTable(db, "whatsapp_conversation_messages") || !hasTable(db, "whatsapp_context_settings") {
-		t.Fatal("015 deveria criar whatsapp_conversation_messages e whatsapp_context_settings")
-	}
-	if !hasTable(db, "whatsapp_auth_otps") {
-		t.Fatal("014 deveria criar tabela whatsapp_auth_otps")
-	}
-	if !hasTable(db, "gmail_integrations") {
-		t.Fatal("013 deveria criar tabela gmail_integrations")
-	}
-	if !hasTable(db, "whatsapp_integrations") {
-		t.Fatal("012 deveria criar tabela whatsapp_integrations")
-	}
-	if !hasTable(db, "refresh_tokens") {
-		t.Fatal("011 deveria criar tabela refresh_tokens")
-	}
-	if !hasTable(db, "meetings") || !hasTable(db, "meeting_slots") {
-		t.Fatal("009 deveria criar meetings e meeting_slots")
-	}
-	if !hasColumn(db, "users", "phone") || !hasTable(db, "p2p_meeting_invites") {
-		t.Fatal("010 deveria criar coluna phone em users e tabela p2p_meeting_invites")
-	}
-	if !hasColumn(db, "booking_types", "valid_from") || !hasColumn(db, "booking_types", "valid_until") || !hasColumn(db, "booking_types", "allowed_dates") {
-		t.Fatal("008 deveria criar valid_from, valid_until e allowed_dates em booking_types")
-	}
-	if !hasColumn(db, "todos", "category") || !hasColumn(db, "todos", "remind_at") {
-		t.Fatal("001 deveria criar todos com category e remind_at")
-	}
-	if !hasColumn(db, "events", "recurrence") || !hasColumn(db, "triggers", "days_of_week") {
-		t.Fatal("001 deveria incluir colunas dobradas dos ALTERs legados")
-	}
-	if !hasColumn(db, "triggers", "user_intent") || !hasColumn(db, "triggers", "search_keywords") {
-		t.Fatal("006 deveria criar user_intent e search_keywords em triggers")
-	}
-	if !hasTable(db, "user_core_profile") {
-		t.Fatal("005 deveria criar user_core_profile")
+	if !hasTable(db, "refresh_tokens") ||
+		!hasTable(db, "meetings") ||
+		!hasTable(db, "meeting_slots") ||
+		!hasColumn(db, "users", "phone") ||
+		!hasTable(db, "p2p_meeting_invites") ||
+		!hasColumn(db, "booking_types", "valid_from") ||
+		!hasColumn(db, "booking_types", "valid_until") ||
+		!hasColumn(db, "booking_types", "allowed_dates") ||
+		!hasColumn(db, "todos", "category") ||
+		!hasColumn(db, "todos", "remind_at") ||
+		!hasColumn(db, "events", "recurrence") ||
+		!hasColumn(db, "triggers", "days_of_week") ||
+		!hasTable(db, "user_core_profile") {
+		t.Fatal("001 deveria incluir todas as tabelas e colunas consolidadas de agenda, reuniões, todos e perfil")
 	}
 }
 
-func TestVersionedMigrations_LegacyDB(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "legacy.db")
+func TestVersionedMigrations_IdempotentReopen(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "reopen.db")
 	db, err := Open(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Simula base pré-versionada: apaga o rastreio e remove a coluna category.
-	if _, err := db.Exec(`DELETE FROM schema_migrations`); err != nil {
+	if _, err := db.Exec(`INSERT INTO users (id, name, email, password_hash, created_at, updated_at) VALUES ('u1', 'Test', 't@test.com', 'h', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`); err != nil {
 		t.Fatal(err)
 	}
 	db.Close()
 
-	// Reabre "legada": sem rastreio, mas com tabelas (sem category).
 	db2, err := Open(path)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer db2.Close()
-	// Como a base já tinha category (001 aplicada antes do DELETE), o carimbo ocorre.
+
 	var count int
 	if err := db2.QueryRow(`SELECT COUNT(*) FROM schema_migrations`).Scan(&count); err != nil {
 		t.Fatal(err)
 	}
-	if count != 29 {
-		t.Fatalf("base legada deveria ser carimbada com 29, veio %d", count)
+	if want := len(orderedMigrations()); count != want {
+		t.Fatalf("esperava %d migração(ões) registrada(s) ao reabrir, veio %d", want, count)
 	}
 }
 
-func TestVersionedMigrations_037_UserAIProvidersIdempotentAndCascade(t *testing.T) {
-	db, err := Open(filepath.Join(t.TempDir(), "ai_037.db"))
+func TestVersionedMigrations_UserAIProvidersConstraintsAndCascade(t *testing.T) {
+	db, err := Open(filepath.Join(t.TempDir(), "ai_providers.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -181,9 +163,9 @@ func TestVersionedMigrations_037_UserAIProvidersIdempotentAndCascade(t *testing.
 		t.Fatal(err)
 	}
 
-	// Reexecutar a migration 037 deve ser idempotente e preservar os dados.
-	if err := applyUserAIProvidersMigration(db, "migrations/037_user_ai_providers.sql"); err != nil {
-		t.Fatalf("reexecução idempotente da 037 falhou: %v", err)
+	// Reexecutar runVersionedMigrations deve ser idempotente e preservar os dados.
+	if err := runVersionedMigrations(db); err != nil {
+		t.Fatalf("reexecução idempotente falhou: %v", err)
 	}
 	var last4 string
 	if err := db.QueryRow(`SELECT key_last4 FROM user_ai_providers WHERE id = 'p-1'`).Scan(&last4); err != nil {
@@ -214,8 +196,8 @@ func TestVersionedMigrations_037_UserAIProvidersIdempotentAndCascade(t *testing.
 	}
 }
 
-func TestVersionedMigrations_025_ByokBackupIdempotentAndCascade(t *testing.T) {
-	db, err := Open(filepath.Join(t.TempDir(), "byok_025.db"))
+func TestVersionedMigrations_ByokBackupCascade(t *testing.T) {
+	db, err := Open(filepath.Join(t.TempDir(), "byok_backup.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -233,19 +215,17 @@ func TestVersionedMigrations_025_ByokBackupIdempotentAndCascade(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Reexecutar a migration 025 deve ser 100% idempotente e preservar os dados.
-	if err := applyFinanceByokBackupMigration(db, "migrations/025_finance_byok_backup.sql"); err != nil {
-		t.Fatalf("reexecução idempotente da 025 falhou: %v", err)
+	if err := runVersionedMigrations(db); err != nil {
+		t.Fatalf("reexecução idempotente falhou: %v", err)
 	}
 	var keyVersion int
 	if err := db.QueryRow(`SELECT key_version FROM finance_byok_backup WHERE user_id = 'u-byok'`).Scan(&keyVersion); err != nil {
-		t.Fatalf("registro existente deveria ser preservado após reexecução da 025: %v", err)
+		t.Fatalf("registro existente deveria ser preservado: %v", err)
 	}
 	if keyVersion != 2 {
 		t.Fatalf("esperava key_version=2, veio %d", keyVersion)
 	}
 
-	// ON DELETE CASCADE ao excluir usuário.
 	if _, err := db.Exec(`DELETE FROM users WHERE id = 'u-byok'`); err != nil {
 		t.Fatal(err)
 	}
@@ -255,97 +235,5 @@ func TestVersionedMigrations_025_ByokBackupIdempotentAndCascade(t *testing.T) {
 	}
 	if remaining != 0 {
 		t.Fatalf("esperava remoção em cascata do backup BYOK, restaram %d", remaining)
-	}
-}
-
-func TestVersionedMigrations_LastNotifiedColumn(t *testing.T) {
-	db, err := Open(filepath.Join(t.TempDir(), "notified.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
-	if !hasColumn(db, "triggers", "last_notified_at") {
-		t.Fatal("007 deveria criar last_notified_at em triggers")
-	}
-}
-
-func TestVersionedMigrations_026_ResetsLegacyNonByokOnly(t *testing.T) {
-	dbPath := filepath.Join(t.TempDir(), "reset_026.db")
-	db, err := Open(dbPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Simula estado logo após a 025 (antes da 026 rodar): apaga registro da 026.
-	if _, err := db.Exec(`DELETE FROM schema_migrations WHERE version = '026_finance_reset_legacy_non_byok.sql'`); err != nil {
-		t.Fatal(err)
-	}
-
-	for _, u := range []string{"u-legacy", "u-byok"} {
-		_, err = db.Exec(
-			`INSERT INTO users (id, name, email, password_hash, created_at, updated_at) VALUES (?, ?, ?, 'h', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
-			u, u, u+"@test.com",
-		)
-		if err != nil {
-			t.Fatal(err)
-		}
-		_, err = db.Exec(
-			`INSERT INTO finance_connections (id, user_id, pluggy_item_id, institution_name, created_at, updated_at) VALUES (?, ?, ?, 'Nubank', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
-			"conn-"+u, u, "item-"+u,
-		)
-		if err != nil {
-			t.Fatal(err)
-		}
-		_, err = db.Exec(
-			`INSERT INTO finance_accounts (id, user_id, connection_id, pluggy_account_id, institution_name, account_type, name, balance, updated_at) VALUES (?, ?, ?, ?, 'Nubank', 'BANK', 'Conta', 286.99, CURRENT_TIMESTAMP)`,
-			"acc-"+u, u, "conn-"+u, "pacc-"+u,
-		)
-		if err != nil {
-			t.Fatal(err)
-		}
-		_, err = db.Exec(
-			`INSERT INTO finance_transactions (id, user_id, account_id, pluggy_transaction_id, description, amount, transaction_type, occurred_at, created_at) VALUES (?, ?, ?, ?, 'Pix', -10.0, 'DEBIT', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
-			"tx-"+u, u, "acc-"+u, "ptx-"+u,
-		)
-		if err != nil {
-			t.Fatal(err)
-		}
-		_, err = db.Exec(
-			`INSERT INTO finance_budgets_and_goals (id, user_id, kind, title, target_amount, created_at, updated_at) VALUES (?, ?, 'SAVINGS_GOAL', 'Reserva', 1000, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
-			"goal-"+u, u,
-		)
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	// Apenas u-byok já possuía backup BYOK configurado.
-	if _, err := db.Exec(`INSERT INTO finance_byok_backup (user_id, ciphertext, nonce, key_version, updated_at) VALUES ('u-byok', X'01', X'02', 1, CURRENT_TIMESTAMP)`); err != nil {
-		t.Fatal(err)
-	}
-	db.Close()
-
-	// Reabre banco -> migration 026 deve limpar apenas u-legacy e preservar u-byok.
-	db2, err := Open(dbPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db2.Close()
-
-	countRows := func(table, userID string) int {
-		var n int
-		if err := db2.QueryRow(`SELECT COUNT(*) FROM `+table+` WHERE user_id = ?`, userID).Scan(&n); err != nil {
-			t.Fatal(err)
-		}
-		return n
-	}
-
-	for _, tbl := range []string{"finance_connections", "finance_accounts", "finance_transactions", "finance_budgets_and_goals"} {
-		if got := countRows(tbl, "u-legacy"); got != 0 {
-			t.Fatalf("esperava %s zerada para usuário legado pré-BYOK, veio %d", tbl, got)
-		}
-		if got := countRows(tbl, "u-byok"); got != 1 {
-			t.Fatalf("esperava preservar %s do usuário BYOK, veio %d", tbl, got)
-		}
 	}
 }

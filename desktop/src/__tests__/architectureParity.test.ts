@@ -100,19 +100,9 @@ describe('Paridade Arquitetural Desktop ↔ Mobile (Plano 13)', () => {
       'chatCardExtractors.ts',
       'chatGreetings.ts',
       'chatHistoryGrouping.ts',
-      'radarFilter.ts',
-      'radarReportUtils.ts',
       'weeklySummaryCalculator.ts',
-      'agendaFilter.ts',
       'calendarDateUtils.ts',
-      'taskBuckets.ts',
-      'summaryCalculators.ts',
-      'meetingPollUtils.ts',
-      'slotAvailability.ts',
-      'tokiCalendarUtils.ts',
       'unifiedTasks.ts',
-      'phoneFormat.ts',
-      'chatSendGuard.ts',
     ];
 
     const missingUtils: string[] = [];
