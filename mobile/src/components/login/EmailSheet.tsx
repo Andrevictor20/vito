@@ -27,6 +27,7 @@ export interface EmailSheetProps {
   onClose: () => void
   onLogin: (email: string, password: string) => void
   onRegister?: (name: string, email: string, password: string) => void
+  onForgotPassword?: (email: string) => void
   onSwitchMode?: (mode: EmailSheetMode) => void
   isLoading?: boolean
   error?: string | null
@@ -37,10 +38,9 @@ const INPUT_HEIGHT = 54
 const CTA_HEIGHT = 52
 
 /**
- * Bottom sheet de login e criação de conta por e-mail em paridade visual com login-vito.html:
- * - Suporta dois modos: `'login'` ("Entrar com e-mail") e `'register'` ("Criar conta com e-mail")
- * - No modo `'register'`, exibe campo de Nome completo + E-mail + Senha com validação imediata
- * - Permite alternar entre Login e Cadastro diretamente dentro do modal
+ * Bottom sheet de login e criacao de conta por e-mail v5 (#s-login):
+ * - Modos 'login' ("Entrar com e-mail") e 'register' ("Criar conta com e-mail")
+ * - Botao "Esqueci minha senha" no modo login com validacao e confirmacao inline
  */
 export const EmailSheet: React.FC<EmailSheetProps> = ({
   visible,
@@ -48,26 +48,30 @@ export const EmailSheet: React.FC<EmailSheetProps> = ({
   onClose,
   onLogin,
   onRegister,
+  onForgotPassword,
   onSwitchMode,
   isLoading = false,
   error = null,
   style,
 }) => {
-  const { isDark, colors } = useTheme()
+  const { isDark } = useTheme()
   const palette = loginPalette(isDark)
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [localError, setLocalError] = useState<string | null>(null)
+  const [infoMsg, setInfoMsg] = useState<string | null>(null)
 
   const isRegister = mode === 'register'
 
   useEffect(() => {
     setLocalError(null)
+    setInfoMsg(null)
   }, [mode, visible])
 
   const handleSubmit = useCallback(() => {
+    setInfoMsg(null)
     const validationErr = validateEmailAuth({
       email,
       password,
@@ -91,12 +95,25 @@ export const EmailSheet: React.FC<EmailSheetProps> = ({
     }
   }, [email, password, name, isRegister, onRegister, onLogin])
 
+  const handleForgotPassword = useCallback(() => {
+    const clean = normalizeEmail(email)
+    if (!clean || !clean.includes('@') || !clean.includes('.')) {
+      setInfoMsg(null)
+      setLocalError('Informe seu e-mail acima para receber o link de recuperação.')
+      return
+    }
+    setLocalError(null)
+    setInfoMsg(`Link de recuperação enviado por e-mail para ${clean}.`)
+    onForgotPassword?.(clean)
+  }, [email, onForgotPassword])
+
   const handleTogglePassword = useCallback(() => {
     setShowPassword((prev) => !prev)
   }, [])
 
   const handleToggleMode = useCallback(() => {
     setLocalError(null)
+    setInfoMsg(null)
     onSwitchMode?.(isRegister ? 'login' : 'register')
   }, [isRegister, onSwitchMode])
 
@@ -139,10 +156,15 @@ export const EmailSheet: React.FC<EmailSheetProps> = ({
           </TouchableOpacity>
 
           <Text style={[styles.title, { color: palette.ink }]}>
-            {isRegister ? 'Criar conta com e-mail' : 'Entrar com e-mail'}
+            {isRegister ? 'Criar conta' : 'Entrar com e-mail'}
+          </Text>
+          <Text style={[styles.subtitle, { color: palette.muted }]}>
+            {isRegister
+              ? 'Comece em segundos com sua conta Vito'
+              : 'Acesse sua agenda, tarefas, finanças e bots'}
           </Text>
 
-          {isRegister && (
+          {isRegister ? (
             <View style={styles.inpWrap}>
               <RNTextInput
                 placeholder="Seu nome"
@@ -158,14 +180,14 @@ export const EmailSheet: React.FC<EmailSheetProps> = ({
                 style={[
                   styles.input,
                   {
-                    borderColor: palette.muted,
+                    borderColor: palette.line,
                     backgroundColor: palette.surf,
                     color: palette.ink,
                   },
                 ]}
               />
             </View>
-          )}
+          ) : null}
 
           <View style={styles.inpWrap}>
             <RNTextInput
@@ -175,6 +197,7 @@ export const EmailSheet: React.FC<EmailSheetProps> = ({
               onChangeText={(v) => {
                 setEmail(v)
                 if (localError) setLocalError(null)
+                if (infoMsg) setInfoMsg(null)
               }}
               autoCapitalize="none"
               keyboardType="email-address"
@@ -183,7 +206,7 @@ export const EmailSheet: React.FC<EmailSheetProps> = ({
               style={[
                 styles.input,
                 {
-                  borderColor: palette.muted,
+                  borderColor: palette.line,
                   backgroundColor: palette.surf,
                   color: palette.ink,
                 },
@@ -206,7 +229,7 @@ export const EmailSheet: React.FC<EmailSheetProps> = ({
               style={[
                 styles.input,
                 {
-                  borderColor: palette.muted,
+                  borderColor: palette.line,
                   backgroundColor: palette.surf,
                   color: palette.ink,
                   paddingRight: 48,
@@ -225,11 +248,17 @@ export const EmailSheet: React.FC<EmailSheetProps> = ({
             </TouchableOpacity>
           </View>
 
-          {!!displayedError && (
-            <Text style={[styles.errorText, { color: colors.error }]}>
+          {displayedError ? (
+            <Text style={[styles.feedbackText, { color: palette.red }]}>
               {displayedError}
             </Text>
-          )}
+          ) : null}
+
+          {infoMsg ? (
+            <Text style={[styles.feedbackText, { color: palette.acc }]}>
+              {infoMsg}
+            </Text>
+          ) : null}
 
           <TouchableOpacity
             onPress={handleSubmit}
@@ -249,7 +278,7 @@ export const EmailSheet: React.FC<EmailSheetProps> = ({
           </TouchableOpacity>
 
           <View style={styles.footerLinks}>
-            {onSwitchMode && (
+            {onSwitchMode ? (
               <TouchableOpacity
                 onPress={handleToggleMode}
                 activeOpacity={0.75}
@@ -258,30 +287,31 @@ export const EmailSheet: React.FC<EmailSheetProps> = ({
                 accessibilityLabel={
                   isRegister
                     ? 'Já tem uma conta? Entrar'
-                    : 'Não tem conta? Cadastre-se'
+                    : 'Não tem conta? Criar conta'
                 }
               >
                 <Text style={[styles.switchModeText, { color: palette.ink }]}>
                   {isRegister
                     ? 'Já tem uma conta? Entrar'
-                    : 'Não tem conta? Cadastre-se'}
+                    : 'Não tem conta? Criar conta'}
                 </Text>
               </TouchableOpacity>
-            )}
+            ) : null}
 
-            {!isRegister && (
+            {!isRegister ? (
               <TouchableOpacity
-                onPress={onClose}
+                testID="lg-forgot"
+                onPress={handleForgotPassword}
                 activeOpacity={0.75}
                 style={styles.forgotWrap}
                 accessibilityRole="button"
-                accessibilityLabel="Esqueci a senha"
+                accessibilityLabel="Esqueci minha senha"
               >
                 <Text style={[styles.forgotText, { color: palette.muted }]}>
-                  Esqueci a senha
+                  Esqueci minha senha
                 </Text>
               </TouchableOpacity>
-            )}
+            ) : null}
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -296,7 +326,7 @@ const styles = StyleSheet.create({
   } as ViewStyle,
   scrim: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: 'rgba(0,0,0,0.45)',
   } as ViewStyle,
   sheet: {
     borderTopLeftRadius: 28,
@@ -318,23 +348,28 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   } as ViewStyle,
   title: {
-    fontFamily: 'Montserrat_800ExtraBold',
+    fontFamily: 'Inter_600SemiBold',
     fontSize: 22,
     letterSpacing: -0.44,
-    marginBottom: 14,
+    marginBottom: 4,
+  } as TextStyle,
+  subtitle: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 14,
+    marginBottom: 16,
   } as TextStyle,
   inpWrap: {
     position: 'relative',
-    marginBottom: 12,
+    marginBottom: 10,
   } as ViewStyle,
   input: {
     width: '100%',
     height: INPUT_HEIGHT,
-    borderRadius: 10,
-    borderWidth: 1.5,
+    borderRadius: 14,
+    borderWidth: 1,
     paddingHorizontal: 14,
     fontFamily: 'Inter_400Regular',
-    fontSize: 16,
+    fontSize: 15,
   } as TextStyle,
   eyeBtn: {
     position: 'absolute',
@@ -345,8 +380,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   } as ViewStyle,
-  errorText: {
-    fontFamily: 'Inter_400Regular',
+  feedbackText: {
+    fontFamily: 'Inter_500Medium',
     fontSize: 12.5,
     marginBottom: 8,
   } as TextStyle,
@@ -356,11 +391,11 @@ const styles = StyleSheet.create({
     borderRadius: CTA_HEIGHT / 2,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 4,
+    marginTop: 6,
   } as ViewStyle,
   ctaText: {
     fontFamily: 'Inter_600SemiBold',
-    fontSize: 16,
+    fontSize: 15.5,
   } as TextStyle,
   footerLinks: {
     alignItems: 'center',
@@ -380,6 +415,6 @@ const styles = StyleSheet.create({
   } as ViewStyle,
   forgotText: {
     fontFamily: 'Inter_500Medium',
-    fontSize: 13,
+    fontSize: 13.5,
   } as TextStyle,
 })

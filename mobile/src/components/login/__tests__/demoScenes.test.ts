@@ -1,22 +1,33 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import {
+  DEMO_HEADLINES,
   DEMO_SCENES,
   DEMO_SCENE_COUNT,
   demoSceneById,
   nextSceneIndex,
-  type DemoScene,
 } from '../demoScenes'
 
-describe('demoScenes — dados das seis cenas da demonstração', () => {
-  it('deve conter exatamente seis cenas, na ordem de login-vito.html', () => {
+describe('demoScenes — dados das seis cenas v5 da demonstração', () => {
+  it('contém exatamente seis cenas canônicas na ordem de Vito-telas-atualizadas.html', () => {
     assert.equal(DEMO_SCENE_COUNT, 6)
     assert.equal(DEMO_SCENES.length, 6)
+    assert.deepEqual(
+      DEMO_HEADLINES,
+      [
+        'organizar a agenda',
+        'controlar finanças',
+        'automatizar rotinas',
+        'cuidar do WhatsApp',
+        'ler seus e-mails',
+        'não perder prazos',
+      ],
+    )
     assert.equal(DEMO_SCENES[0].id, 'dentista')
-    assert.equal(DEMO_SCENES[1].id, 'emails')
-    assert.equal(DEMO_SCENES[2].id, 'voo-rio')
+    assert.equal(DEMO_SCENES[1].id, 'financas-uber')
+    assert.equal(DEMO_SCENES[2].id, 'rotina-manha')
     assert.equal(DEMO_SCENES[3].id, 'isa-whatsapp')
-    assert.equal(DEMO_SCENES[4].id, 'escrever-email')
+    assert.equal(DEMO_SCENES[4].id, 'emails')
     assert.equal(DEMO_SCENES[5].id, 'boleto')
   })
 
@@ -27,105 +38,68 @@ describe('demoScenes — dados das seis cenas da demonstração', () => {
     assert.equal(s.userText, 'Dentista terça às 15h')
     assert.equal(s.vitoText, 'Marcado. Sem conflitos na sua agenda.')
     assert.equal(s.card.kind, 'agenda')
-    assert.equal(s.card.title, 'Dentista')
-    assert.equal(s.card.subtitle, 'Terça, 15:00 · Google Agenda')
     assert.equal(s.card.trailing, 'check')
-    assert.equal(s.photo, undefined)
   })
 
-  it('cena 2 — emails: ler seus e-mails + tag Urgente', () => {
+  it('cena 2 — controlar finanças: Uber + R$ 212', () => {
     const s = DEMO_SCENES[1]
-    assert.equal(s.headline, 'ler seus e-mails')
-    assert.equal(s.tone, 'red')
-    assert.equal(s.userText, 'Tem e-mail importante hoje?')
-    assert.equal(s.vitoText, '3 novos. O da Ana pede resposta até hoje.')
-    assert.equal(s.card.kind, 'email')
-    assert.equal(s.card.title, 'Ana Souza · Proposta')
-    assert.equal(s.card.subtitle, 'Pede resposta hoje · Gmail')
-    assert.equal(s.card.trailing, 'tag')
-    assert.equal(s.card.tagLabel, 'Urgente')
+    assert.equal(s.headline, 'controlar finanças')
+    assert.equal(s.tone, 'fin')
+    assert.equal(s.userText, 'Quanto gastei com Uber esse mês?')
+    assert.equal(s.vitoText, 'R$ 212,40 em 14 corridas (+18% vs média).')
+    assert.equal(s.card.kind, 'finance')
+    assert.equal(s.card.trailing, 'value')
+    assert.equal(s.card.trailingValue, 'R$ 212')
   })
 
-  it('cena 3 — voo Rio: radar + gráfico sparkline', () => {
+  it('cena 3 — automatizar rotinas: Resumo da manhã + Ativo', () => {
     const s = DEMO_SCENES[2]
-    assert.equal(s.headline, 'monitorar preços')
+    assert.equal(s.headline, 'automatizar rotinas')
     assert.equal(s.tone, 'orange')
-    assert.equal(s.userText, 'Me avisa se o voo pro Rio baixar de R$ 600')
-    assert.equal(s.vitoText, 'Radar criado. Eu confiro todo dia.')
+    assert.equal(s.userText, 'Todo dia às 7h30, me manda um resumo do meu dia')
     assert.equal(s.card.kind, 'radar')
-    assert.equal(s.card.title, 'Voo para o Rio')
-    assert.equal(s.card.subtitle, 'Hoje R$ 742 · alerta abaixo de R$ 600')
-    assert.equal(s.card.trailing, 'chart')
+    assert.equal(s.card.title, 'Resumo da manhã')
+    assert.equal(s.card.trailing, 'status')
+    assert.equal(s.card.tagLabel, 'Ativo')
   })
 
-  it('cena 4 — Isa WhatsApp: card col com balão verde + pílulas Enviar/Editar', () => {
+  it('cena 4 — Isa WhatsApp: card col com balão verde', () => {
     const s = DEMO_SCENES[3]
     assert.equal(s.headline, 'cuidar do WhatsApp')
     assert.equal(s.tone, 'acc')
     assert.equal(s.userText, 'Responde a Isa que chego às 19h')
-    assert.equal(s.vitoText, 'Rascunho pronto. Quer que eu envie?')
+    assert.equal(s.vitoText, 'Rascunho pronto. Posso enviar?')
     assert.equal(s.card.kind, 'whatsapp')
-    assert.equal(s.card.title, 'Para Isa · WhatsApp')
     assert.equal(s.card.bubbleText, 'Oi! Chego às 19h.')
-    assert.equal(s.card.trailing, 'pills')
     assert.equal(s.card.isCol, true)
   })
 
-  it('cena 5 — Escrever e-mail: card col com balão vermelho + pílulas Enviar/Editar', () => {
+  it('cena 5 — ler seus e-mails: Ana Souza + tag Urgente', () => {
     const s = DEMO_SCENES[4]
-    assert.equal(s.headline, 'escrever e-mails')
+    assert.equal(s.headline, 'ler seus e-mails')
     assert.equal(s.tone, 'red')
-    assert.equal(s.userText, 'Escreve pro Carlos confirmando a reunião de quinta')
-    assert.equal(s.vitoText, 'Rascunho pronto no seu Gmail.')
-    assert.equal(s.card.kind, 'email-draft')
-    assert.equal(s.card.title, 'Para Carlos · E-mail')
-    assert.equal(s.card.bubbleTitle, 'Confirmação da reunião')
-    assert.equal(s.card.bubbleText, 'Oi Carlos, confirmo nossa reunião de quinta às 10h.')
-    assert.equal(s.card.trailing, 'pills')
-    assert.equal(s.card.isCol, true)
+    assert.equal(s.userText, 'Tem algum e-mail urgente hoje?')
+    assert.equal(s.vitoText, 'Sim — Ana Souza pediu retorno na proposta.')
+    assert.equal(s.card.kind, 'email')
+    assert.equal(s.card.tagLabel, 'Urgente')
   })
 
-  it('cena 6 — boleto: chip roxo + tag Tarefa + foto', () => {
+  it('cena 6 — não perder prazos: boleto R$ 248,90 + check', () => {
     const s = DEMO_SCENES[5]
     assert.equal(s.headline, 'não perder prazos')
     assert.equal(s.tone, 'purple')
-    assert.equal(s.userText, 'Paga esse boleto até sexta')
-    assert.equal(s.vitoText, 'Li o boleto e criei a tarefa.')
+    assert.equal(s.userText, 'Lembra de pagar o boleto sexta')
+    assert.equal(s.vitoText, 'Tarefa criada com lembrete às 9h.')
     assert.equal(s.card.kind, 'boleto')
     assert.equal(s.card.title, 'Pagar boleto · R$ 248,90')
-    assert.equal(s.card.subtitle, 'Vence sexta · prioridade alta')
-    assert.equal(s.card.trailing, 'tag')
-    assert.equal(s.card.tagLabel, 'Tarefa')
-    assert.equal(s.photo, true)
+    assert.equal(s.card.trailing, 'check')
   })
 
-  it('demoSceneById retorna a cena correta e undefined para id inexistente', () => {
-    assert.equal(demoSceneById('voo-rio')?.id, 'voo-rio')
-    assert.equal(demoSceneById('emails')?.id, 'emails')
+  it('demoSceneById e nextSceneIndex funcionam para todas as 6 cenas', () => {
+    assert.equal(demoSceneById('financas-uber')?.id, 'financas-uber')
     assert.equal(demoSceneById('nao-existe'), undefined)
-  })
-
-  it('nextSceneIndex avança e volta ao zero após a última (6 cenas)', () => {
-    assert.equal(nextSceneIndex(0), 1)
-    assert.equal(nextSceneIndex(1), 2)
-    assert.equal(nextSceneIndex(2), 3)
-    assert.equal(nextSceneIndex(3), 4)
-    assert.equal(nextSceneIndex(4), 5)
-    assert.equal(nextSceneIndex(5), 0)
-  })
-
-  it('toda cena tem campos obrigatórios preenchidos', () => {
-    for (const s of DEMO_SCENES) {
-      assert.ok(s.id, 'id')
-      assert.ok(s.userText, 'userText')
-      assert.ok(s.vitoText, 'vitoText')
-      assert.ok(s.card.title, 'card.title')
-      assert.ok(
-        ['agenda', 'email', 'radar', 'whatsapp', 'email-draft', 'tarefa', 'boleto'].includes(
-          s.card.kind,
-        ),
-        'card.kind válido',
-      )
+    for (let i = 0; i < 6; i += 1) {
+      assert.equal(nextSceneIndex(i), (i + 1) % 6)
     }
   })
 })

@@ -9,7 +9,7 @@ import {
 } from './headlineReel'
 import type { LoginPalette } from './loginPalette'
 
-const FONT = 28
+const FONT = 27
 const LINE = FONT * REEL_LINE_EM
 
 export function HeadlineReel({
@@ -92,8 +92,8 @@ const styles = StyleSheet.create({
   item: {
     height: LINE,
     lineHeight: LINE,
-    fontFamily: 'Montserrat_800ExtraBold',
+    fontFamily: 'Inter_700Bold',
     fontSize: FONT,
-    letterSpacing: -0.7,
+    letterSpacing: -0.945,
   },
 })

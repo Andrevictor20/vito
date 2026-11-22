@@ -7,14 +7,15 @@ import {
   StyleSheet,
   type StyleProp,
   type ViewStyle,
+  type TextStyle,
 } from 'react-native'
-import { MaterialIcons } from '@expo/vector-icons'
-import { VitoLoginMark } from './VitoLoginMark'
+import { LoginMascotRig } from './LoginMascotRig'
 import { HeadlineReel } from './HeadlineReel'
+import { SunIcon } from './DemoIcons'
 import { loginPalette } from './loginPalette'
 import { headlineColor, type DemoTone } from './demoScenes'
 
-const THEME_BTN_SIZE = 34
+const THEME_BTN_SIZE = 40
 
 export interface LoginHeaderProps {
   isDark: boolean
@@ -26,10 +27,9 @@ export interface LoginHeaderProps {
 }
 
 /**
- * Cabeçalho da tela de login v2 (fidelidade a login-vito.html).
- * - Brand horizontal: VitoLoginMark (SVG com olhos animados) + wordmark "vito" em Montserrat 800.
- * - Botão de alternar tema claro/escuro à direita.
- * - H1 em Montserrat 800: "Seu assistente para" + HeadlineReel (roleta com as cenas do protótipo).
+ * Cabecalho da tela de login v5 (#s-login .lg-hero):
+ * - Topbar com logo #vito + "vito" + alternador circular Claro/Escuro (#lg-th-tgl)
+ * - Hero com titulo "Seu assistente para" + roleta cinetica (.lg-reel) sincronizada a cena atual
  */
 export const LoginHeader: React.FC<LoginHeaderProps> = ({
   isDark,
@@ -41,7 +41,6 @@ export const LoginHeader: React.FC<LoginHeaderProps> = ({
 }) => {
   const palette = loginPalette(isDark)
   const activeColor = headlineColor(currentTone, palette)
-  const iconName = isDark ? 'light-mode' : 'dark-mode'
 
   const handleThemePress = useCallback(() => {
     toggleTheme()
@@ -53,11 +52,7 @@ export const LoginHeader: React.FC<LoginHeaderProps> = ({
 
       <View style={styles.topRow}>
         <View style={styles.brand}>
-          <VitoLoginMark
-            color={palette.ink}
-            width={40}
-            height={42}
-          />
+          <LoginMascotRig size={38} state="blink" animated={!reduceMotion} />
           <Text
             style={[styles.wordmark, { color: palette.ink }]}
             maxFontSizeMultiplier={1.3}
@@ -67,27 +62,27 @@ export const LoginHeader: React.FC<LoginHeaderProps> = ({
         </View>
 
         <TouchableOpacity
+          testID="lg-th-tgl"
           style={[
             styles.themeButton,
-            { backgroundColor: palette.surf },
+            {
+              backgroundColor: palette.surf,
+              borderColor: palette.line,
+            },
           ]}
           onPress={handleThemePress}
           activeOpacity={0.75}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           accessibilityRole="button"
-          accessibilityLabel={isDark ? 'Mudar para tema claro' : 'Mudar para tema escuro'}
+          accessibilityLabel="Alternar tema claro ou escuro"
         >
-          <MaterialIcons
-            name={iconName}
-            size={18}
-            color={palette.ink}
-          />
+          <SunIcon color={palette.ink} size={18} />
         </TouchableOpacity>
       </View>
 
       <View style={styles.titleBlock}>
         <Text
-          style={[styles.l1, { color: palette.ink }]}
+          style={[styles.l1, { color: palette.muted }]}
           maxFontSizeMultiplier={1.3}
         >
           Seu assistente para
@@ -106,40 +101,43 @@ export const LoginHeader: React.FC<LoginHeaderProps> = ({
 const styles = StyleSheet.create({
   hero: {
     paddingHorizontal: 24,
-    paddingTop: 16,
+    paddingTop: 12,
     paddingBottom: 4,
-  },
+    zIndex: 2,
+  } as ViewStyle,
   topRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
-  },
+    marginBottom: 20,
+  } as ViewStyle,
   brand: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-  },
+  } as ViewStyle,
   wordmark: {
-    fontFamily: 'Montserrat_800ExtraBold',
+    fontFamily: 'Inter_700Bold',
     fontSize: 22,
-    letterSpacing: -0.66,
-  },
+    letterSpacing: -0.88,
+  } as TextStyle,
   themeButton: {
     width: THEME_BTN_SIZE,
     height: THEME_BTN_SIZE,
     borderRadius: THEME_BTN_SIZE / 2,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-  },
+  } as ViewStyle,
   titleBlock: {
     alignItems: 'flex-start',
-  },
+  } as ViewStyle,
   l1: {
-    fontFamily: 'Montserrat_800ExtraBold',
-    fontSize: 26,
-    lineHeight: 34,
-    letterSpacing: -0.65,
+    fontFamily: 'Inter_500Medium',
+    fontSize: 21,
+    lineHeight: 26,
+    letterSpacing: -0.4,
+    marginBottom: 2,
     textAlign: 'left',
-  },
+  } as TextStyle,
 })

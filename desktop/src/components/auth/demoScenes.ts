@@ -1,19 +1,20 @@
-export type DemoTone = 'blue' | 'red' | 'orange' | 'acc' | 'purple';
+export type DemoTone = 'blue' | 'fin' | 'orange' | 'acc' | 'red' | 'purple';
 
 export type DemoCardKind =
   | 'agenda'
-  | 'email'
+  | 'finance'
   | 'radar'
   | 'whatsapp'
-  | 'email-draft'
-  | 'tarefa'
-  | 'boleto';
+  | 'email'
+  | 'boleto'
+  | 'tarefa';
 
 export interface DemoSceneCardChip {
   kind: DemoCardKind;
   title: string;
   subtitle?: string;
-  trailing?: 'check' | 'chart' | 'pills' | 'tag';
+  trailing?: 'check' | 'value' | 'status' | 'tag' | 'pills';
+  trailingValue?: string;
   tagLabel?: string;
   tagTone?: 'red' | 'purple' | 'green';
   bubbleTitle?: string;
@@ -34,10 +35,10 @@ export interface DemoScene {
 
 export const DEMO_HEADLINES = [
   'organizar a agenda',
-  'ler seus e-mails',
-  'monitorar preços',
+  'controlar finanças',
+  'automatizar rotinas',
   'cuidar do WhatsApp',
-  'escrever e-mails',
+  'ler seus e-mails',
   'não perder prazos',
 ] as const;
 
@@ -56,31 +57,32 @@ export const DEMO_SCENES: readonly DemoScene[] = [
     },
   },
   {
-    id: 'emails',
-    headline: 'ler seus e-mails',
-    tone: 'red',
-    userText: 'Tem e-mail importante hoje?',
-    vitoText: '3 novos. O da Ana pede resposta até hoje.',
+    id: 'financas-uber',
+    headline: 'controlar finanças',
+    tone: 'fin',
+    userText: 'Quanto gastei com Uber esse mês?',
+    vitoText: 'R$ 212,40 em 14 corridas (+18% vs média).',
     card: {
-      kind: 'email',
-      title: 'Ana Souza · Proposta',
-      subtitle: 'Pede resposta hoje · Gmail',
-      trailing: 'tag',
-      tagLabel: 'Urgente',
-      tagTone: 'red',
+      kind: 'finance',
+      title: 'Uber · Outubro',
+      subtitle: '14 corridas · Nubank',
+      trailing: 'value',
+      trailingValue: 'R$ 212',
     },
   },
   {
-    id: 'voo-rio',
-    headline: 'monitorar preços',
+    id: 'rotina-manha',
+    headline: 'automatizar rotinas',
     tone: 'orange',
-    userText: 'Me avisa se o voo pro Rio baixar de R$ 600',
-    vitoText: 'Bot criado. Eu confiro todo dia.',
+    userText: 'Todo dia às 7h30, me manda um resumo do meu dia',
+    vitoText: 'Bot ativado. Seu resumo chega às 7h30 no WhatsApp.',
     card: {
       kind: 'radar',
-      title: 'Voo para o Rio',
-      subtitle: 'Hoje R$ 742 · alerta abaixo de R$ 600',
-      trailing: 'chart',
+      title: 'Resumo da manhã',
+      subtitle: 'Todo dia · 07:30 · WhatsApp',
+      trailing: 'status',
+      tagLabel: 'Ativo',
+      tagTone: 'green',
     },
   },
   {
@@ -88,7 +90,7 @@ export const DEMO_SCENES: readonly DemoScene[] = [
     headline: 'cuidar do WhatsApp',
     tone: 'acc',
     userText: 'Responde a Isa que chego às 19h',
-    vitoText: 'Rascunho pronto. Quer que eu envie?',
+    vitoText: 'Rascunho pronto. Posso enviar?',
     card: {
       kind: 'whatsapp',
       title: 'Para Isa · WhatsApp',
@@ -99,51 +101,49 @@ export const DEMO_SCENES: readonly DemoScene[] = [
     },
   },
   {
-    id: 'escrever-email',
-    headline: 'escrever e-mails',
+    id: 'emails',
+    headline: 'ler seus e-mails',
     tone: 'red',
-    userText: 'Escreve pro Carlos confirmando a reunião de quinta',
-    vitoText: 'Rascunho pronto no seu Gmail.',
+    userText: 'Tem algum e-mail urgente hoje?',
+    vitoText: 'Sim — Ana Souza pediu retorno na proposta.',
     card: {
-      kind: 'email-draft',
-      title: 'Para Carlos · E-mail',
-      bubbleTitle: 'Confirmação da reunião',
-      bubbleText: 'Oi Carlos, confirmo nossa reunião de quinta às 10h.',
-      trailing: 'pills',
-      bubbleTone: 'red',
-      isCol: true,
+      kind: 'email',
+      title: 'Ana Souza · Proposta',
+      subtitle: 'Responder hoje · Gmail',
+      trailing: 'tag',
+      tagLabel: 'Urgente',
+      tagTone: 'red',
     },
   },
   {
     id: 'boleto',
     headline: 'não perder prazos',
     tone: 'purple',
-    userText: 'Paga esse boleto até sexta',
-    vitoText: 'Li o boleto e criei a tarefa.',
+    userText: 'Lembra de pagar o boleto sexta',
+    vitoText: 'Tarefa criada com lembrete às 9h.',
     card: {
       kind: 'boleto',
       title: 'Pagar boleto · R$ 248,90',
-      subtitle: 'Vence sexta · prioridade alta',
-      trailing: 'tag',
-      tagLabel: 'Tarefa',
-      tagTone: 'purple',
+      subtitle: 'Sexta · prioridade alta',
+      trailing: 'check',
     },
-    photo: true,
   },
 ] as const;
 
 export function getToneColor(tone: DemoTone, isDark: boolean): string {
   switch (tone) {
     case 'blue':
-      return isDark ? '#5aa2ee' : '#2b7fd4';
-    case 'red':
-      return isDark ? '#ff6b8a' : '#d6355a';
+      return isDark ? '#3b93ff' : '#0a7cff';
+    case 'fin':
+      return isDark ? '#ffb938' : '#d98a00';
     case 'orange':
-      return isDark ? '#ff9a52' : '#d9681a';
+      return isDark ? '#ffa733' : '#f08300';
+    case 'red':
+      return isDark ? '#ff5468' : '#ff2d46';
     case 'purple':
-      return isDark ? '#a58bff' : '#7a4fe0';
+      return isDark ? '#ff55b0' : '#ff2fa0';
     case 'acc':
     default:
-      return isDark ? '#34d399' : '#0b9a5f';
+      return isDark ? '#2dd17f' : '#0aa55c';
   }
 }

@@ -12,10 +12,10 @@ import { useTheme } from '../../context/ThemeContext'
 import { loginPalette, type LoginPalette } from './loginPalette'
 import {
   CalIcon,
+  CarIcon,
   MailIcon,
   RadarIcon,
   CheckCircleIcon,
-  Sparkline,
 } from './DemoIcons'
 
 export interface DemoActionCardProps {
@@ -50,12 +50,12 @@ export const DemoActionCard: React.FC<DemoActionCardProps> = ({
     Animated.parallel([
       Animated.timing(opacity, {
         toValue: 1,
-        duration: 450,
+        duration: 420,
         useNativeDriver: true,
       }),
       Animated.timing(translateY, {
         toValue: 0,
-        duration: 450,
+        duration: 420,
         useNativeDriver: true,
       }),
     ]).start()
@@ -68,8 +68,8 @@ export const DemoActionCard: React.FC<DemoActionCardProps> = ({
           styles.card,
           styles.cardCol,
           {
-            backgroundColor: palette.bg,
-            borderColor: palette.line,
+            backgroundColor: palette.surf,
+            borderColor: palette.hairline,
             opacity,
             transform: [{ translateY }],
           },
@@ -88,38 +88,14 @@ export const DemoActionCard: React.FC<DemoActionCardProps> = ({
             },
           ]}
         >
-          {card.bubbleTitle && (
+          {card.bubbleTitle ? (
             <Text style={[styles.bubbleTitle, { color: palette.ink }]}>
               {card.bubbleTitle}
             </Text>
-          )}
+          ) : null}
           <Text style={[styles.bubbleText, { color: palette.ink }]}>
             {card.bubbleText}
           </Text>
-        </View>
-
-        <View style={styles.miniRow}>
-          <View
-            style={[
-              styles.miniBtn,
-              { backgroundColor: palette.ink, borderColor: palette.ink },
-            ]}
-          >
-            <Text style={[styles.miniBtnText, { color: palette.bg }]}>
-              Enviar
-            </Text>
-          </View>
-          <View
-            style={[
-              styles.miniBtn,
-              styles.miniBtnOutline,
-              { borderColor: palette.ink },
-            ]}
-          >
-            <Text style={[styles.miniBtnText, { color: palette.ink }]}>
-              Editar
-            </Text>
-          </View>
         </View>
       </Animated.View>
     )
@@ -130,8 +106,8 @@ export const DemoActionCard: React.FC<DemoActionCardProps> = ({
       style={[
         styles.card,
         {
-          backgroundColor: palette.bg,
-          borderColor: palette.line,
+          backgroundColor: palette.surf,
+          borderColor: palette.hairline,
           opacity,
           transform: [{ translateY }],
         },
@@ -153,18 +129,18 @@ export const DemoActionCard: React.FC<DemoActionCardProps> = ({
         >
           {card.title}
         </Text>
-        {card.subtitle && (
+        {card.subtitle ? (
           <Text
             style={[styles.subtitle, { color: palette.muted }]}
             numberOfLines={1}
           >
             {card.subtitle}
           </Text>
-        )}
+        ) : null}
       </View>
 
       <View style={styles.trailing}>
-        {renderTrailing(card.trailing, card.tagLabel, card.tagTone, palette)}
+        {renderTrailing(card, palette)}
       </View>
     </Animated.View>
   )
@@ -174,6 +150,8 @@ function getChipBg(kind: string, palette: LoginPalette): string {
   switch (kind) {
     case 'agenda':
       return palette.blueBg
+    case 'finance':
+      return palette.finBg
     case 'email':
       return palette.redBg
     case 'radar':
@@ -189,6 +167,8 @@ function renderChipIcon(kind: string, palette: LoginPalette) {
   switch (kind) {
     case 'agenda':
       return <CalIcon color={palette.blue} size={20} />
+    case 'finance':
+      return <CarIcon color={palette.fin} size={20} />
     case 'email':
       return <MailIcon color={palette.red} size={20} />
     case 'radar':
@@ -196,38 +176,49 @@ function renderChipIcon(kind: string, palette: LoginPalette) {
     case 'boleto':
     case 'tarefa':
     default:
-      return <CheckCircleIcon color={palette.purple} size={22} />
+      return <CheckCircleIcon color={palette.purple} size={20} />
   }
 }
 
-function renderTrailing(
-  trailing: 'check' | 'chart' | 'pills' | 'tag' | undefined,
-  tagLabel: string | undefined,
-  tagTone: 'red' | 'purple' | 'green' | undefined,
-  palette: LoginPalette,
-) {
-  switch (trailing) {
-    case 'check':
-      return <CheckCircleIcon color={palette.accent} size={22} />
-    case 'chart':
-      return <Sparkline color={palette.orange} />
+function renderTrailing(card: DemoScene['card'], palette: LoginPalette) {
+  switch (card.trailing) {
+    case 'check': {
+      const checkColor = card.kind === 'boleto' || card.kind === 'tarefa'
+        ? palette.purple
+        : palette.acc
+      return <CheckCircleIcon color={checkColor} size={20} />
+    }
+    case 'value':
+      return (
+        <Text style={[styles.trailingValue, { color: palette.ink }]}>
+          {card.trailingValue}
+        </Text>
+      )
+    case 'status':
+      return (
+        <View style={[styles.statusPill, { backgroundColor: palette.greenBg }]}>
+          <Text style={[styles.statusText, { color: palette.acc }]}>
+            {card.tagLabel || 'Ativo'}
+          </Text>
+        </View>
+      )
     case 'tag': {
       const bg =
-        tagTone === 'red'
+        card.tagTone === 'red'
           ? palette.redBg
-          : tagTone === 'purple'
+          : card.tagTone === 'purple'
           ? palette.purpleBg
           : palette.greenBg
       const fg =
-        tagTone === 'red'
+        card.tagTone === 'red'
           ? palette.red
-          : tagTone === 'purple'
+          : card.tagTone === 'purple'
           ? palette.purple
-          : palette.accent
+          : palette.acc
       return (
         <View style={[styles.tag, { backgroundColor: bg }]}>
           <Text style={[styles.tagText, { color: fg }]}>
-            {tagLabel || 'Tarefa'}
+            {card.tagLabel || 'Urgente'}
           </Text>
         </View>
       )
@@ -240,33 +231,33 @@ function renderTrailing(
 const styles = StyleSheet.create({
   card: {
     borderWidth: 1,
-    borderRadius: 16,
+    borderRadius: 18,
     paddingHorizontal: 14,
     paddingVertical: 12,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    marginTop: 10,
+    marginTop: 9,
     width: '100%',
-    shadowColor: '#141916',
-    shadowOffset: { width: 0, height: 2 },
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.06,
-    shadowRadius: 8,
+    shadowRadius: 20,
     elevation: 2,
   } as ViewStyle,
   cardCol: {
     flexDirection: 'column',
     alignItems: 'stretch',
-    gap: 10,
+    gap: 8,
   } as ViewStyle,
   colHeader: {
     fontSize: 12.5,
     fontFamily: 'Inter_600SemiBold',
   } as TextStyle,
   waBubble: {
-    borderRadius: 14,
+    borderRadius: 12,
     borderBottomLeftRadius: 4,
-    paddingVertical: 9,
+    paddingVertical: 8,
     paddingHorizontal: 12,
     alignSelf: 'flex-start',
   } as ViewStyle,
@@ -276,28 +267,9 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   } as TextStyle,
   bubbleText: {
-    fontSize: 14,
+    fontSize: 13.5,
     fontFamily: 'Inter_400Regular',
     lineHeight: 19,
-  } as TextStyle,
-  miniRow: {
-    flexDirection: 'row',
-    gap: 8,
-  } as ViewStyle,
-  miniBtn: {
-    height: 32,
-    paddingHorizontal: 16,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-  } as ViewStyle,
-  miniBtnOutline: {
-    backgroundColor: 'transparent',
-  } as ViewStyle,
-  miniBtnText: {
-    fontSize: 13,
-    fontFamily: 'Inter_600SemiBold',
   } as TextStyle,
   chip: {
     width: 38,
@@ -313,8 +285,9 @@ const styles = StyleSheet.create({
   } as ViewStyle,
   title: {
     fontFamily: 'Inter_600SemiBold',
-    fontSize: 14.5,
-    lineHeight: 20,
+    fontSize: 14,
+    lineHeight: 19,
+    letterSpacing: -0.14,
   } as TextStyle,
   subtitle: {
     fontFamily: 'Inter_400Regular',
@@ -326,6 +299,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     flexShrink: 0,
   } as ViewStyle,
+  trailingValue: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 14,
+    fontVariant: ['tabular-nums'],
+  } as TextStyle,
+  statusPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+  } as ViewStyle,
+  statusText: {
+    fontSize: 11.5,
+    fontFamily: 'Inter_600SemiBold',
+  } as TextStyle,
   tag: {
     paddingHorizontal: 9,
     paddingVertical: 4,

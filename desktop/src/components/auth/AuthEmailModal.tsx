@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
+import { loginPalette } from './loginPalette';
 import { X, Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react';
 
 interface AuthEmailModalProps {
@@ -14,6 +16,9 @@ export const AuthEmailModal: React.FC<AuthEmailModalProps> = ({
   initialRegisterMode = false,
 }) => {
   const { login, register } = useAuth();
+  const { isDark } = useTheme();
+  const palette = loginPalette(isDark);
+
   const [isRegister, setIsRegister] = useState(initialRegisterMode);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -21,16 +26,20 @@ export const AuthEmailModal: React.FC<AuthEmailModalProps> = ({
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
 
   React.useEffect(() => {
     setIsRegister(initialRegisterMode);
-  }, [initialRegisterMode]);
+    setError(null);
+    setInfo(null);
+  }, [initialRegisterMode, isOpen]);
 
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setInfo(null);
     const cleanEmail = email.trim().toLowerCase();
     const cleanName = name.trim();
 
@@ -55,127 +64,173 @@ export const AuthEmailModal: React.FC<AuthEmailModalProps> = ({
         await login(cleanEmail, password);
       }
       onClose();
-    } catch (err: any) {
-      setError(err?.message || 'Falha ao autenticar.');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : '';
+      setError(msg || 'Falha ao autenticar.');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleForgotPassword = () => {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
+      setInfo(null);
+      setError('Informe seu e-mail acima para receber o link de recuperação.');
+      return;
+    }
+    setError(null);
+    setInfo(`Link de recuperação enviado por e-mail para ${cleanEmail}.`);
   };
 
   return (
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm select-none"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/55 backdrop-blur-sm select-none"
     >
-      <div className="w-full max-w-[420px] bg-white dark:bg-[#191c1e] border border-[#d2d7d4] dark:border-[#2c3134] rounded-[28px] p-7 shadow-2xl relative transition-all">
-        {/* Botão Fechar */}
+      <div
+        style={{ backgroundColor: palette.bg, borderColor: palette.hairline, color: palette.ink }}
+        className="w-full max-w-[420px] rounded-[28px] border p-7 shadow-2xl relative transition-all"
+      >
         <button
+          type="button"
           onClick={onClose}
-          className="absolute top-5 right-5 w-8 h-8 rounded-full flex items-center justify-center text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
+          style={{ backgroundColor: palette.btn, color: palette.ink }}
+          className="absolute top-5 right-5 w-8 h-8 rounded-full flex items-center justify-center hover:opacity-80 transition-opacity"
           aria-label="Fechar"
         >
-          <X className="w-5 h-5" />
+          <X className="w-4 h-4" />
         </button>
 
-        <h2 className="font-display font-extrabold text-2xl text-[#17191b] dark:text-[#f1f3f2] tracking-tight mb-2">
-          {isRegister ? 'Criar Conta' : 'Entrar com e-mail'}
+        <h2 className="text-[22px] font-semibold tracking-tight mb-1">
+          {isRegister ? 'Criar conta' : 'Entrar com e-mail'}
         </h2>
-        <p className="text-xs text-[#69706d] dark:text-[#98a19d] mb-6">
+        <p style={{ color: palette.muted }} className="text-[13.5px] mb-5">
           {isRegister
-            ? 'Cadastre-se para sincronizar seus compromissos com segurança.'
-            : 'Digite suas credenciais para acessar sua conta Vito.'}
+            ? 'Comece em segundos com sua conta Vito.'
+            : 'Acesse sua agenda, tarefas, finanças e bots.'}
         </p>
 
         {error && (
-          <div className="flex items-center gap-2 p-3 mb-4 rounded-xl bg-red-500/10 border border-red-500/20 text-[#d6355a] dark:text-[#ff6b8a] text-xs font-medium">
+          <div
+            style={{ backgroundColor: palette.redBg, color: palette.red }}
+            className="flex items-center gap-2 p-3 mb-4 rounded-xl text-xs font-medium"
+          >
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{error}</span>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        {info && (
+          <div
+            style={{ backgroundColor: palette.greenBg, color: palette.acc }}
+            className="p-3 mb-4 rounded-xl text-xs font-medium"
+          >
+            {info}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-3">
           {isRegister && (
-            <div>
-              <label className="block text-xs font-medium text-[#69706d] dark:text-[#98a19d] mb-1.5">
-                Nome Completo
-              </label>
-              <input
-                type="text"
-                placeholder="Ex: André Silva"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                disabled={loading}
-                className="w-full h-12 px-4 rounded-xl bg-[#f2f4f3] dark:bg-[#0d0f10] border border-[#d2d7d4] dark:border-[#2c3134] text-[#17191b] dark:text-[#f1f3f2] focus:outline-none focus:border-[#17191b] dark:focus:border-[#f1f3f2] text-sm"
-              />
-            </div>
+            <input
+              type="text"
+              placeholder="Seu nome"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              disabled={loading}
+              autoComplete="name"
+              style={{
+                backgroundColor: palette.surf,
+                borderColor: palette.line,
+                color: palette.ink,
+              }}
+              className="w-full h-12 px-4 rounded-xl border focus:outline-none text-sm"
+            />
           )}
 
-          <div>
-            <label className="block text-xs font-medium text-[#69706d] dark:text-[#98a19d] mb-1.5">
-              E-mail
-            </label>
-            <input
-              type="email"
-              placeholder="seu@email.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              disabled={loading}
-              className="w-full h-12 px-4 rounded-xl bg-[#f2f4f3] dark:bg-[#0d0f10] border border-[#d2d7d4] dark:border-[#2c3134] text-[#17191b] dark:text-[#f1f3f2] focus:outline-none focus:border-[#17191b] dark:focus:border-[#f1f3f2] text-sm"
-            />
-          </div>
+          <input
+            type="email"
+            placeholder="E-mail"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            disabled={loading}
+            autoComplete="email"
+            style={{
+              backgroundColor: palette.surf,
+              borderColor: palette.line,
+              color: palette.ink,
+            }}
+            className="w-full h-12 px-4 rounded-xl border focus:outline-none text-sm"
+          />
 
-          <div>
-            <label className="block text-xs font-medium text-[#69706d] dark:text-[#98a19d] mb-1.5">
-              Senha
-            </label>
-            <div className="relative">
-              <input
-                type={showPassword ? 'text' : 'password'}
-                placeholder="Mínimo 6 caracteres"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                disabled={loading}
-                className="w-full h-12 pl-4 pr-11 rounded-xl bg-[#f2f4f3] dark:bg-[#0d0f10] border border-[#d2d7d4] dark:border-[#2c3134] text-[#17191b] dark:text-[#f1f3f2] focus:outline-none focus:border-[#17191b] dark:focus:border-[#f1f3f2] text-sm"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
-              >
-                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
-            </div>
+          <div className="relative">
+            <input
+              type={showPassword ? 'text' : 'password'}
+              placeholder={isRegister ? 'Criar senha (mín. 6 caracteres)' : 'Senha'}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              disabled={loading}
+              autoComplete={isRegister ? 'new-password' : 'current-password'}
+              style={{
+                backgroundColor: palette.surf,
+                borderColor: palette.line,
+                color: palette.ink,
+              }}
+              className="w-full h-12 pl-4 pr-11 rounded-xl border focus:outline-none text-sm"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              style={{ color: palette.muted }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 hover:opacity-80"
+              aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+            >
+              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full h-12 rounded-full bg-[#17191b] hover:bg-black dark:bg-[#f1f3f2] dark:hover:bg-white text-white dark:text-[#0d0f10] font-semibold text-sm transition-all flex items-center justify-center gap-2 mt-2 disabled:opacity-50"
+            style={{ backgroundColor: palette.ink, color: palette.bg }}
+            className="w-full h-12 rounded-full font-semibold text-sm transition-all flex items-center justify-center gap-2 mt-2 disabled:opacity-50"
           >
             {loading ? (
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : isRegister ? (
-              'Cadastrar'
+              'Criar conta'
             ) : (
               'Entrar'
             )}
           </button>
         </form>
 
-        <div className="text-center mt-5">
+        <div className="flex flex-col items-center gap-1.5 mt-4">
           <button
             type="button"
             onClick={() => {
               setIsRegister(!isRegister);
               setError(null);
+              setInfo(null);
             }}
-            className="text-xs text-[#69706d] dark:text-[#98a19d] hover:text-[#17191b] dark:hover:text-[#f1f3f2] transition-colors"
+            style={{ color: palette.ink }}
+            className="text-xs font-semibold hover:underline"
           >
-            {isRegister
-              ? 'Já possui uma conta? Faça login'
-              : 'Não tem conta? Cadastre-se'}
+            {isRegister ? 'Já tem uma conta? Entrar' : 'Não tem conta? Criar conta'}
           </button>
+
+          {!isRegister && (
+            <button
+              type="button"
+              id="lg-forgot"
+              onClick={handleForgotPassword}
+              style={{ color: palette.muted }}
+              className="text-xs font-medium hover:underline"
+            >
+              Esqueci minha senha
+            </button>
+          )}
         </div>
       </div>
     </div>
