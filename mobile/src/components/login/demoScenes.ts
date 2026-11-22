@@ -1,21 +1,22 @@
 import type { LoginPalette } from './loginPalette'
 
-export type DemoTone = 'blue' | 'red' | 'orange' | 'acc' | 'purple'
+export type DemoTone = 'blue' | 'fin' | 'orange' | 'acc' | 'red' | 'purple'
 
 export type DemoCardKind =
   | 'agenda'
-  | 'email'
+  | 'finance'
   | 'radar'
   | 'whatsapp'
-  | 'email-draft'
-  | 'tarefa'
+  | 'email'
   | 'boleto'
+  | 'tarefa'
 
 export interface DemoSceneCardChip {
   kind: DemoCardKind
   title: string
   subtitle?: string
-  trailing?: 'check' | 'chart' | 'pills' | 'tag'
+  trailing?: 'check' | 'value' | 'status' | 'tag' | 'pills'
+  trailingValue?: string
   tagLabel?: string
   tagTone?: 'red' | 'purple' | 'green'
   bubbleTitle?: string
@@ -31,16 +32,15 @@ export interface DemoScene {
   userText: string
   vitoText: string
   card: DemoSceneCardChip
-  /** Cena de boleto exibe miniatura de documento acima do texto na bolha do usuário. */
   photo?: boolean
 }
 
 export const DEMO_HEADLINES = [
   'organizar a agenda',
-  'ler seus e-mails',
-  'monitorar preços',
+  'controlar finanças',
+  'automatizar rotinas',
   'cuidar do WhatsApp',
-  'escrever e-mails',
+  'ler seus e-mails',
   'não perder prazos',
 ] as const
 
@@ -48,10 +48,12 @@ export function headlineColor(tone: DemoTone, palette: LoginPalette): string {
   switch (tone) {
     case 'blue':
       return palette.blue
-    case 'red':
-      return palette.red
+    case 'fin':
+      return palette.fin
     case 'orange':
       return palette.orange
+    case 'red':
+      return palette.red
     case 'purple':
       return palette.purple
     case 'acc':
@@ -61,8 +63,7 @@ export function headlineColor(tone: DemoTone, palette: LoginPalette): string {
 }
 
 /**
- * Seis cenas da demonstração animada da tela de login, em paridade exata com login-vito.html.
- * Dados estáticos, sem rede, sem store, sem analytics.
+ * Seis cenas da demonstração animada da tela de login v5 (`Vito-telas-atualizadas.html` #s-login).
  */
 export const DEMO_SCENES: readonly DemoScene[] = [
   {
@@ -79,31 +80,32 @@ export const DEMO_SCENES: readonly DemoScene[] = [
     },
   },
   {
-    id: 'emails',
-    headline: 'ler seus e-mails',
-    tone: 'red',
-    userText: 'Tem e-mail importante hoje?',
-    vitoText: '3 novos. O da Ana pede resposta até hoje.',
+    id: 'financas-uber',
+    headline: 'controlar finanças',
+    tone: 'fin',
+    userText: 'Quanto gastei com Uber esse mês?',
+    vitoText: 'R$ 212,40 em 14 corridas (+18% vs média).',
     card: {
-      kind: 'email',
-      title: 'Ana Souza · Proposta',
-      subtitle: 'Pede resposta hoje · Gmail',
-      trailing: 'tag',
-      tagLabel: 'Urgente',
-      tagTone: 'red',
+      kind: 'finance',
+      title: 'Uber · Outubro',
+      subtitle: '14 corridas · Nubank',
+      trailing: 'value',
+      trailingValue: 'R$ 212',
     },
   },
   {
-    id: 'voo-rio',
-    headline: 'monitorar preços',
+    id: 'rotina-manha',
+    headline: 'automatizar rotinas',
     tone: 'orange',
-    userText: 'Me avisa se o voo pro Rio baixar de R$ 600',
-    vitoText: 'Radar criado. Eu confiro todo dia.',
+    userText: 'Todo dia às 7h30, me manda um resumo do meu dia',
+    vitoText: 'Bot ativado. Seu resumo chega às 7h30 no WhatsApp.',
     card: {
       kind: 'radar',
-      title: 'Voo para o Rio',
-      subtitle: 'Hoje R$ 742 · alerta abaixo de R$ 600',
-      trailing: 'chart',
+      title: 'Resumo da manhã',
+      subtitle: 'Todo dia · 07:30 · WhatsApp',
+      trailing: 'status',
+      tagLabel: 'Ativo',
+      tagTone: 'green',
     },
   },
   {
@@ -111,7 +113,7 @@ export const DEMO_SCENES: readonly DemoScene[] = [
     headline: 'cuidar do WhatsApp',
     tone: 'acc',
     userText: 'Responde a Isa que chego às 19h',
-    vitoText: 'Rascunho pronto. Quer que eu envie?',
+    vitoText: 'Rascunho pronto. Posso enviar?',
     card: {
       kind: 'whatsapp',
       title: 'Para Isa · WhatsApp',
@@ -122,36 +124,32 @@ export const DEMO_SCENES: readonly DemoScene[] = [
     },
   },
   {
-    id: 'escrever-email',
-    headline: 'escrever e-mails',
+    id: 'emails',
+    headline: 'ler seus e-mails',
     tone: 'red',
-    userText: 'Escreve pro Carlos confirmando a reunião de quinta',
-    vitoText: 'Rascunho pronto no seu Gmail.',
+    userText: 'Tem algum e-mail urgente hoje?',
+    vitoText: 'Sim — Ana Souza pediu retorno na proposta.',
     card: {
-      kind: 'email-draft',
-      title: 'Para Carlos · E-mail',
-      bubbleTitle: 'Confirmação da reunião',
-      bubbleText: 'Oi Carlos, confirmo nossa reunião de quinta às 10h.',
-      trailing: 'pills',
-      bubbleTone: 'red',
-      isCol: true,
+      kind: 'email',
+      title: 'Ana Souza · Proposta',
+      subtitle: 'Responder hoje · Gmail',
+      trailing: 'tag',
+      tagLabel: 'Urgente',
+      tagTone: 'red',
     },
   },
   {
     id: 'boleto',
     headline: 'não perder prazos',
     tone: 'purple',
-    userText: 'Paga esse boleto até sexta',
-    vitoText: 'Li o boleto e criei a tarefa.',
+    userText: 'Lembra de pagar o boleto sexta',
+    vitoText: 'Tarefa criada com lembrete às 9h.',
     card: {
       kind: 'boleto',
       title: 'Pagar boleto · R$ 248,90',
-      subtitle: 'Vence sexta · prioridade alta',
-      trailing: 'tag',
-      tagLabel: 'Tarefa',
-      tagTone: 'purple',
+      subtitle: 'Sexta · prioridade alta',
+      trailing: 'check',
     },
-    photo: true,
   },
 ] as const
 

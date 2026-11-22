@@ -16,12 +16,19 @@ export const HeadlineReel: React.FC<HeadlineReelProps> = ({
   const [items, setItems] = useState<string[]>([headline]);
   const [animating, setAnimating] = useState(false);
   const previousRef = useRef(headline);
-  const stripRef = useRef<HTMLDivElement>(null);
+  const stripRef = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
-    if (headline === previousRef.current) return;
+    const reduce =
+      typeof window !== 'undefined' &&
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
-    // Constrói lista com nova frase, preenchedores intermediários e a frase anterior
+    if (headline === previousRef.current || reduce) {
+      setItems([headline]);
+      previousRef.current = headline;
+      return;
+    }
+
     const pool = DEMO_HEADLINES.filter((h) => h !== headline && h !== previousRef.current);
     const fillers: string[] = [];
     while (fillers.length < 3 && pool.length > 0) {
@@ -35,11 +42,9 @@ export const HeadlineReel: React.FC<HeadlineReelProps> = ({
     const strip = stripRef.current;
     if (strip) {
       strip.style.transition = 'none';
-      strip.style.transform = `translateY(-${(sequence.length - 1) * 1.3}em)`;
-      // Força reflow
+      strip.style.transform = `translateY(-${(sequence.length - 1) * 1.25}em)`;
       void strip.offsetHeight;
-
-      strip.style.transition = 'transform 1.15s cubic-bezier(0.2, 0.85, 0.3, 1.08)';
+      strip.style.transition = 'transform 0.95s cubic-bezier(0.22, 1, 0.36, 1)';
       strip.style.transform = 'translateY(0)';
     }
 
@@ -51,14 +56,14 @@ export const HeadlineReel: React.FC<HeadlineReelProps> = ({
       }
       setAnimating(false);
       previousRef.current = headline;
-    }, 1250);
+    }, 1020);
 
     return () => clearTimeout(timer);
   }, [headline]);
 
   return (
-    <span className="block h-[1.3em] overflow-hidden whitespace-nowrap align-bottom select-none">
-      <span ref={stripRef} className="block will-change-transform">
+    <span className="lg-reel block h-[1.25em] overflow-hidden whitespace-nowrap align-bottom select-none">
+      <span ref={stripRef} id="lg-strip" className="block will-change-transform">
         {items.map((text, idx) => {
           const isFiller = animating && idx > 0 && idx < items.length - 1;
           const scene = DEMO_SCENES.find((s) => s.headline === text);
@@ -68,8 +73,8 @@ export const HeadlineReel: React.FC<HeadlineReelProps> = ({
             <span
               key={`${text}-${idx}`}
               style={{ color }}
-              className={`block h-[1.3em] leading-[1.3em] font-display font-extrabold tracking-[-0.025em] transition-opacity duration-300 ${
-                isFiller ? 'opacity-55 scale-y-110 blur-[1.2px]' : 'opacity-100'
+              className={`block h-[1.25em] leading-[1.25em] font-bold tracking-[-0.035em] transition-opacity duration-300 ${
+                isFiller ? 'opacity-45 scale-y-110 blur-[1.5px]' : 'opacity-100'
               }`}
             >
               {text}

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, ActivityIndicator, Platform, StatusBar as RNStatusBar } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { StyleSheet, View, Platform, StatusBar as RNStatusBar } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
 import { NavigationContainer, NavigatorScreenParams, type LinkingOptions } from '@react-navigation/native';
@@ -20,6 +20,9 @@ import {
 import { UpdateBanner } from './components/common/UpdateBanner';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { PrivacyScreenShield } from './components/common/PrivacyScreenShield';
+import { SplashScreen } from './screens/SplashScreen';
+import { PostLoginPermissionsSheet } from './components/auth/PostLoginPermissionsSheet';
+import { hasPromptedPostLoginPerms } from './components/auth/onboardingStorage';
 
 export type MainTabParamList = {
   chat: undefined;
@@ -61,15 +64,37 @@ const MainNavigator: React.FC = () => {
   const { user, isInitialLoading } = useAuth();
   const { isDark, colors } = useTheme();
   const [serverUrl, setServerUrl] = useState(DEFAULT_SERVER_URL);
+  const [splashDone, setSplashDone] = useState(false);
+  const [showPermsSheet, setShowPermsSheet] = useState(false);
+  const prevUserIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (user) {
-      // Auto-registro e sincronização ativa de push token no backend Go
-      notificationService.requestPermissions().then(() => {
-        notificationService.syncPushTokenWithBackend().catch(() => {});
-      }).catch(() => {});
+    const currentId = user?.id ?? null;
+    const prevId = prevUserIdRef.current;
+    prevUserIdRef.current = currentId;
+
+    if (!currentId) {
+      setShowPermsSheet(false);
+      return;
     }
-  }, [user?.id]);
+
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    hasPromptedPostLoginPerms()
+      .then((prompted) => {
+        if (!prompted && !isInitialLoading && prevId === null) {
+          timer = setTimeout(() => setShowPermsSheet(true), 650);
+        } else if (prompted) {
+          notificationService.syncPushTokenWithBackend().catch(() => {});
+        }
+      })
+      .catch(() => {
+        notificationService.syncPushTokenWithBackend().catch(() => {});
+      });
+
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [user?.id, isInitialLoading]);
 
   useEffect(() => {
     if (!user || isInitialLoading) return;
@@ -93,21 +118,22 @@ const MainNavigator: React.FC = () => {
     await api.setBaseUrl(nextUrl);
   };
 
-  if (isInitialLoading) {
-    return (
-      <View style={[styles.loadingContainer, { backgroundColor: colors.surface }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
-  }
-
   return (
     <View style={[styles.safeArea, { backgroundColor: colors.surface }]}>
       <StatusBar style={isDark ? 'light' : 'dark'} />
       <UpdateBanner />
-      <NavigationContainer linking={linking} ref={navigationRef}>
-        <RootNavigator serverUrl={serverUrl} onToggleServer={toggleServer} />
-      </NavigationContainer>
+      {!isInitialLoading && (
+        <NavigationContainer linking={linking} ref={navigationRef}>
+          <RootNavigator serverUrl={serverUrl} onToggleServer={toggleServer} />
+        </NavigationContainer>
+      )}
+      <PostLoginPermissionsSheet
+        visible={Boolean(user) && showPermsSheet}
+        onClose={() => setShowPermsSheet(false)}
+      />
+      {(isInitialLoading || !splashDone) && (
+        <SplashScreen autoDismiss durationMs={2100} onFinish={() => setSplashDone(true)} />
+      )}
       <PrivacyScreenShield />
     </View>
   );
@@ -136,9 +162,9 @@ export const AppRoot: React.FC = () => {
 
   if (!fontsLoaded && !fontError && !fontTimedOut) {
     return (
-      <View style={[styles.loadingContainer, { backgroundColor: '#18181B' }]}>
-        <ActivityIndicator size="large" color="#FFFFFF" />
-      </View>
+      <ThemeProvider>
+        <SplashScreen autoDismiss={false} />
+      </ThemeProvider>
     );
   }
 

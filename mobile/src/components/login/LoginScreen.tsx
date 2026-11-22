@@ -1,24 +1,25 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert,
   StyleSheet,
-  TouchableOpacity,
   View,
-  Text,
   type ViewStyle,
-  type TextStyle,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg'
 import * as Updates from 'expo-updates'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
 import { WhatsAppAuthModal } from '../auth/WhatsAppAuthModal'
+import { hasSeenOnboarding, markOnboardingSeen } from '../auth/onboardingStorage'
+import { OnboardingScreen } from '../../screens/OnboardingScreen'
 import { LoginHeader } from './LoginHeader'
 import { DemoStage } from './DemoStage'
-import { AuthIconPill } from './AuthIconPill'
+import { AuthActionsFooter } from './AuthActionsFooter'
 import { EmailSheet, type EmailSheetMode } from './EmailSheet'
+import { LegalDocModal, type LegalDocKind } from './LegalDocModal'
 import { useDemoLoop } from './useDemoLoop'
-import { DEMO_SCENES } from './demoScenes'
+import { DEMO_SCENES, headlineColor } from './demoScenes'
 import { loginPalette } from './loginPalette'
 
 export interface LoginScreenProps {
@@ -29,12 +30,11 @@ export interface LoginScreenProps {
 const LONG_PRESS_MS = 600
 
 /**
- * Tela de login do Vito v2 em paridade total com login-vito.html.
- * Layout em coluna flexível estrita:
- * 1. Hero (Logo animada + Título com HeadlineReel colorido)
- * 2. Stage (Palco com trocas empilhadas e degradê superior sob o título)
- * 3. Auth Footer (Pílula com 3 botões circulares de 58px + link "Não tem conta? Cadastre-se"
- *    que abre o modal de criação de conta por e-mail)
+ * Tela de login v5 (#s-login) com gate de Onboarding (#vonb) para novos usuarios.
+ * - Topbar com #vito + "vito" + alternador circular de tema (#lg-th-tgl)
+ * - Glow radial dinamico sincronizado a cena atual
+ * - Palco central com 6 cenas interativas (toque avanca)
+ * - Rodape com Google pill + linha WhatsApp/E-mail + Termos/Privacidade (13+)
  */
 export const LoginScreen: React.FC<LoginScreenProps> = () => {
   const { login, register, loginWithGoogle, isLoading } = useAuth()
@@ -43,14 +43,42 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
   const { state: demoState, advanceScene, reduceMotion } = useDemoLoop()
   const currentScene = DEMO_SCENES[demoState.sceneIndex]
   const palette = loginPalette(isDark)
+  const glowColor = headlineColor(currentScene.tone, palette)
+
+  const [onboardingChecked, setOnboardingChecked] = useState(false)
+  const [showOnboarding, setShowOnboarding] = useState(false)
 
   const [sheetMode, setSheetMode] = useState<EmailSheetMode>('login')
   const [emailSheetVisible, setEmailSheetVisible] = useState(false)
   const [whatsappAuthVisible, setWhatsappAuthVisible] = useState(false)
+  const [legalDoc, setLegalDoc] = useState<LegalDocKind | null>(null)
   const [sheetError, setSheetError] = useState<string | null>(null)
   const longPressRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const { currentlyRunning } = Updates.useUpdates()
+
+  useEffect(() => {
+    let alive = true
+    hasSeenOnboarding()
+      .then((seen) => {
+        if (!alive) return
+        setShowOnboarding(!seen)
+        setOnboardingChecked(true)
+      })
+      .catch(() => {
+        if (!alive) return
+        setShowOnboarding(false)
+        setOnboardingChecked(true)
+      })
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  const handleCompleteOnboarding = useCallback(() => {
+    void markOnboardingSeen()
+    setShowOnboarding(false)
+  }, [])
 
   const handleGoogleLogin = useCallback(() => {
     loginWithGoogle()
@@ -66,20 +94,15 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
     setEmailSheetVisible(true)
   }, [])
 
-  const handleSignupPress = useCallback(() => {
-    setSheetMode('register')
-    setSheetError(null)
-    setEmailSheetVisible(true)
-  }, [])
-
   const handleEmailLogin = useCallback(
     async (email: string, password: string) => {
       setSheetError(null)
       try {
         await login(email, password)
         setEmailSheetVisible(false)
-      } catch (err: any) {
-        setSheetError(err?.message || 'Não foi possível entrar. Verifique seu e-mail e senha.')
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : ''
+        setSheetError(msg || 'Não foi possível entrar. Verifique seu e-mail e senha.')
       }
     },
     [login],
@@ -91,8 +114,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
       try {
         await register(name, email, password)
         setEmailSheetVisible(false)
-      } catch (err: any) {
-        setSheetError(err?.message || 'Não foi possível criar sua conta. Tente novamente.')
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : ''
+        setSheetError(msg || 'Não foi possível criar sua conta. Tente novamente.')
       }
     },
     [register],
@@ -125,18 +149,16 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
       } else {
         Alert.alert('Aplicativo Atualizado', 'Você já está na versão mais recente.')
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Falha de conexão.'
       console.warn('[LoginScreen] Erro ao verificar atualização:', e)
-      Alert.alert(
-        'Verificação de Atualização',
-        `Não foi possível verificar: ${e?.message || 'Falha de conexão.'}`,
-      )
+      Alert.alert('Verificação de Atualização', `Não foi possível verificar: ${msg}`)
     }
   }, [])
 
   const showBuildToast = useCallback(() => {
     const updateId = currentlyRunning?.updateId
-    const buildText = updateId ? `OTA ${updateId.slice(0, 7)}` : 'v0.1.16'
+    const buildText = updateId ? `OTA ${updateId.slice(0, 7)}` : 'v0.1.31'
     Alert.alert('Build do Vito', buildText, [
       { text: 'Cancelar', style: 'cancel' },
       { text: 'Buscar update', onPress: handleManualCheckUpdate },
@@ -155,21 +177,41 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
   }, [])
 
   const handleDemoAdvance = useCallback(() => {
-    // Toque no palco avança a cena (tratado no DemoStage).
+    // Toque no palco avanca a cena (tratado no DemoStage).
   }, [])
 
   const rootStyle = useMemo<ViewStyle>(
     () => ({
       flex: 1,
       backgroundColor: palette.bg,
-      paddingTop: Math.max(insets.top, 6),
+      paddingTop: Math.max(insets.top, 8),
       paddingBottom: Math.max(insets.bottom, 12),
     }),
     [palette.bg, insets.top, insets.bottom],
   )
 
+  if (!onboardingChecked) {
+    return <View style={{ flex: 1, backgroundColor: palette.bg }} />
+  }
+
+  if (showOnboarding) {
+    return <OnboardingScreen onComplete={handleCompleteOnboarding} />
+  }
+
   return (
-    <View style={rootStyle}>
+    <View testID="s-login" style={rootStyle}>
+      <View style={styles.glowBackdrop} pointerEvents="none">
+        <Svg width="100%" height="100%">
+          <Defs>
+            <RadialGradient id="lgGlowGrad" cx="50%" cy="32%" r="55%">
+              <Stop offset="0%" stopColor={glowColor} stopOpacity={isDark ? '0.22' : '0.15'} />
+              <Stop offset="100%" stopColor={glowColor} stopOpacity="0" />
+            </RadialGradient>
+          </Defs>
+          <Rect x="0" y="0" width="100%" height="100%" fill="url(#lgGlowGrad)" />
+        </Svg>
+      </View>
+
       <View
         onTouchStart={handleLongPressStart}
         onTouchEnd={handleLongPressEnd}
@@ -181,7 +223,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
           currentHeadline={currentScene?.headline}
           currentTone={currentScene?.tone}
           reduceMotion={reduceMotion}
-          style={{ backgroundColor: palette.bg }}
         />
       </View>
 
@@ -193,27 +234,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
         style={styles.stage}
       />
 
-      <View style={styles.authFooter}>
-        <AuthIconPill
-          onGoogle={handleGoogleLogin}
-          onWhatsApp={handleWhatsAppLogin}
-          onEmail={handleOpenEmailLogin}
-          loading={isLoading}
-        />
-
-        <TouchableOpacity
-          onPress={handleSignupPress}
-          activeOpacity={0.7}
-          hitSlop={{ top: 10, bottom: 10, left: 20, right: 20 }}
-          accessibilityRole="button"
-          accessibilityLabel="Não tem conta? Cadastre-se"
-          style={styles.signupWrap}
-        >
-          <Text style={[styles.signupText, { color: palette.ink }]}>
-            Não tem conta? Cadastre-se
-          </Text>
-        </TouchableOpacity>
-      </View>
+      <AuthActionsFooter
+        onGoogle={handleGoogleLogin}
+        onWhatsApp={handleWhatsAppLogin}
+        onEmail={handleOpenEmailLogin}
+        onOpenLegal={setLegalDoc}
+        loading={isLoading}
+      />
 
       <EmailSheet
         visible={emailSheetVisible}
@@ -241,30 +268,20 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
           setEmailSheetVisible(true)
         }}
       />
+
+      <LegalDocModal doc={legalDoc} onClose={() => setLegalDoc(null)} />
     </View>
   )
 }
 
 const styles = StyleSheet.create({
+  glowBackdrop: {
+    ...StyleSheet.absoluteFill,
+    zIndex: 0,
+  } as ViewStyle,
   stage: {
     flex: 1,
     minHeight: 0,
+    zIndex: 1,
   } as ViewStyle,
-  authFooter: {
-    paddingTop: 12,
-    paddingHorizontal: 20,
-    paddingBottom: 8,
-    alignItems: 'center',
-  } as ViewStyle,
-  signupWrap: {
-    marginTop: 12,
-    paddingVertical: 6,
-    paddingHorizontal: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  } as ViewStyle,
-  signupText: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 14,
-  } as TextStyle,
 })

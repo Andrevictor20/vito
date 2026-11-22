@@ -1,8 +1,7 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Animated,
   Easing,
-  Platform,
   StyleSheet,
   View,
   useWindowDimensions,
@@ -32,20 +31,14 @@ function getWrappedScene(index: number): DemoScene {
 
 function estimateSceneHeight(scene: DemoScene): number {
   const userH = scene.photo ? 116 : 44
-  const cardH = scene.card.isCol ? 138 : 66
+  const cardH = scene.card.isCol ? 116 : 66
   return userH + 12 + 22 + 10 + cardH + 16
 }
 
 /**
- * Palco da demonstração animada em paridade exata com `login-vito.html`:
- * - `.feed` com `overflow: hidden` e degradê superior de 22% da altura do feed
- *   (`mask-image: linear-gradient(transparent, #000 22%)` + `GradientOverlay` SVG),
- *   criando a transição suave entre o título (`HeadlineReel`) e as mensagens empilhadas.
- * - `.inner` ancorado na parte inferior (`bottom: 18px`) mantendo múltiplas trocas
- *   empilhadas simultaneamente (trocas anteriores completas acima + troca ativa embaixo),
- *   de modo que a conversa preenche todo o palco até o degradê abaixo do título.
- * - Quando avança de cena, executa `push(e)`: `translateY(h -> 0)` em `500ms`
- *   `Easing.bezier(0.2, 0.8, 0.2, 1)` enquanto a troca mais antiga no topo faz fade-out (`400ms`).
+ * Palco central (.lg-stage) do Login v5:
+ * - Cicla as 6 cenas de dialogo simuladas (toque avanca para a proxima)
+ * - Exibe barra de dots expansiveis (.lg-dots-bar) abaixo do feed
  */
 export const DemoStage: React.FC<DemoStageProps> = ({
   onAdvance,
@@ -68,13 +61,11 @@ export const DemoStage: React.FC<DemoStageProps> = ({
 
   const currentScene = DEMO_SCENES[state.sceneIndex]
   const prevScene = getWrappedScene(state.sceneIndex - 1)
-  const olderScene = getWrappedScene(state.sceneIndex - 2)
 
-  // Quando o índice da cena muda, empurra a pilha de mensagens para cima (`push(el)`)
   useEffect(() => {
     if (state.sceneIndex !== prevIndexRef.current) {
-      const outgoingOldest = getWrappedScene(prevIndexRef.current - 2)
-      setExitingScene(outgoingOldest)
+      const outgoing = getWrappedScene(prevIndexRef.current - 1)
+      setExitingScene(outgoing)
       prevIndexRef.current = state.sceneIndex
 
       if (!reduceMotion) {
@@ -82,7 +73,7 @@ export const DemoStage: React.FC<DemoStageProps> = ({
         innerTranslateY.setValue(pushDistance)
         Animated.timing(innerTranslateY, {
           toValue: 0,
-          duration: 500,
+          duration: 460,
           easing: Easing.bezier(0.2, 0.8, 0.2, 1),
           useNativeDriver: true,
         }).start()
@@ -101,115 +92,121 @@ export const DemoStage: React.FC<DemoStageProps> = ({
     onAdvance()
   }, [advanceScene, onAdvance])
 
-  const gradientHeight = Math.max(88, Math.round(windowHeight * 0.12))
+  const gradientHeight = Math.max(72, Math.round(windowHeight * 0.1))
 
-  if (reduceMotion) {
-    return (
-      <View
-        style={[styles.stage, { backgroundColor: palette.bg }, style]}
-        accessible={false}
-        accessibilityElementsHidden
-        importantForAccessibility="no-hide-descendants"
-      >
-        <View style={styles.feed}>
+  return (
+    <View
+      testID="lg-stage"
+      style={[styles.stage, style]}
+      accessible
+      accessibilityRole="button"
+      accessibilityLabel="Demonstração interativa: toque para ver o próximo exemplo"
+      onStartShouldSetResponder={() => true}
+      onResponderGrant={handlePress}
+    >
+      <View style={styles.feed}>
+        {reduceMotion ? (
           <View style={styles.inner}>
-            {[olderScene, prevScene, currentScene].map((s) => (
+            <View style={styles.prevExchange}>
               <DemoExchange
-                key={`static-${s.id}`}
-                scene={s}
+                key={`static-prev-${prevScene.id}`}
+                scene={prevScene}
                 phase="showing-card"
-                userTyped={s.userText}
+                userTyped={prevScene.userText}
                 userComplete
                 vitoVisible
                 cardVisible
                 dotsVisible={false}
                 reduceMotion
               />
-            ))}
-          </View>
-          <GradientOverlay
-            height={gradientHeight}
-            isDark={isDark}
-            pointerEvents="none"
-          />
-        </View>
-      </View>
-    )
-  }
-
-  return (
-    <View
-      style={[styles.stage, { backgroundColor: palette.bg }, style]}
-      accessible
-      accessibilityLabel="Demonstração interativa do Vito. Toque para ver o próximo exemplo."
-      importantForAccessibility="yes"
-      onStartShouldSetResponder={() => true}
-      onResponderGrant={handlePress}
-    >
-      <View style={styles.feed}>
-        <Animated.View
-          style={[
-            styles.inner,
-            { transform: [{ translateY: innerTranslateY }] },
-          ]}
-        >
-          {exitingScene && (
+            </View>
             <DemoExchange
-              key={`exiting-${exitingScene.id}`}
-              scene={exitingScene}
+              key={`static-cur-${currentScene.id}`}
+              scene={currentScene}
               phase="showing-card"
-              userTyped={exitingScene.userText}
+              userTyped={currentScene.userText}
               userComplete
               vitoVisible
               cardVisible
               dotsVisible={false}
-              exiting
               reduceMotion
             />
-          )}
+          </View>
+        ) : (
+          <Animated.View
+            style={[
+              styles.inner,
+              { transform: [{ translateY: innerTranslateY }] },
+            ]}
+          >
+            {exitingScene ? (
+              <View style={styles.prevExchange}>
+                <DemoExchange
+                  key={`exiting-${exitingScene.id}`}
+                  scene={exitingScene}
+                  phase="showing-card"
+                  userTyped={exitingScene.userText}
+                  userComplete
+                  vitoVisible
+                  cardVisible
+                  dotsVisible={false}
+                  exiting
+                  reduceMotion
+                />
+              </View>
+            ) : null}
 
-          <DemoExchange
-            key={`older-${olderScene.id}`}
-            scene={olderScene}
-            phase="showing-card"
-            userTyped={olderScene.userText}
-            userComplete
-            vitoVisible
-            cardVisible
-            dotsVisible={false}
-            reduceMotion
-          />
+            <View style={styles.prevExchange}>
+              <DemoExchange
+                key={`prev-${prevScene.id}`}
+                scene={prevScene}
+                phase="showing-card"
+                userTyped={prevScene.userText}
+                userComplete
+                vitoVisible
+                cardVisible
+                dotsVisible={false}
+                reduceMotion
+              />
+            </View>
 
-          <DemoExchange
-            key={`prev-${prevScene.id}`}
-            scene={prevScene}
-            phase="showing-card"
-            userTyped={prevScene.userText}
-            userComplete
-            vitoVisible
-            cardVisible
-            dotsVisible={false}
-            reduceMotion
-          />
+            <DemoExchange
+              key={`current-${currentScene.id}`}
+              scene={currentScene}
+              phase={state.phase}
+              userTyped={state.userTyped}
+              userComplete={state.userComplete}
+              vitoVisible={state.vitoVisible}
+              cardVisible={state.cardVisible}
+              dotsVisible={state.dotsVisible}
+              reduceMotion={reduceMotion}
+            />
+          </Animated.View>
+        )}
 
-          <DemoExchange
-            key={`current-${currentScene.id}`}
-            scene={currentScene}
-            phase={state.phase}
-            userTyped={state.userTyped}
-            userComplete={state.userComplete}
-            vitoVisible={state.vitoVisible}
-            cardVisible={state.cardVisible}
-            dotsVisible={state.dotsVisible}
-          />
-        </Animated.View>
-
-        {/* Degradê entre o título e as mensagens empilhadas */}
         <GradientOverlay
           height={gradientHeight}
           isDark={isDark}
           pointerEvents="none"
         />
+      </View>
+
+      <View style={styles.dotsBar} accessibilityElementsHidden>
+        {DEMO_SCENES.map((sc, idx) => {
+          const isActive = idx === state.sceneIndex
+          return (
+            <View
+              key={sc.id}
+              style={[
+                styles.dot,
+                {
+                  width: isActive ? 18 : 6,
+                  backgroundColor: isActive ? palette.ink : palette.line,
+                },
+              ]}
+            />
+          )
+        })}
       </View>
     </View>
   )
@@ -219,21 +216,39 @@ const styles = StyleSheet.create({
   stage: {
     flex: 1,
     minHeight: 0,
-    marginTop: 2,
+    paddingHorizontal: 20,
+    paddingTop: 4,
+    paddingBottom: 6,
+    justifyContent: 'space-between',
   } as ViewStyle,
   feed: {
     flex: 1,
-    minHeight: 0,
+    minHeight: 240,
     position: 'relative',
     overflow: 'hidden',
-    paddingHorizontal: 16,
   } as ViewStyle,
   inner: {
     position: 'absolute',
-    left: 16,
-    right: 16,
-    bottom: 18,
+    left: 0,
+    right: 0,
+    bottom: 12,
     flexDirection: 'column',
-    gap: 16,
+    gap: 18,
+  } as ViewStyle,
+  prevExchange: {
+    opacity: 0.42,
+    transform: [{ scale: 0.97 }],
+  } as ViewStyle,
+  dotsBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 8,
+    marginBottom: 2,
+  } as ViewStyle,
+  dot: {
+    height: 6,
+    borderRadius: 3,
   } as ViewStyle,
 })
