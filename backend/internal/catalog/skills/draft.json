@@ -1,0 +1,16 @@
+{
+  "key": "draft",
+  "version": 1,
+  "name": "Rascunhar resposta",
+  "icon": "edit",
+  "description": "Identifica perguntas ou cobranças sem resposta e prepara um rascunho.",
+  "when": "Quando uma conversa ou e-mail pede resposta ou follow-up.",
+  "steps": [
+    "Ler conversas e e-mails recentes",
+    "Detectar pendência ou ghosting",
+    "Escrever rascunho no seu tom",
+    "Deixar para revisão sem enviar sozinho"
+  ],
+  "actions": ["mailr", "waread", "draft"],
+  "output_contract": "Liste remetente, assunto pendente e rascunho sugerido."
+}

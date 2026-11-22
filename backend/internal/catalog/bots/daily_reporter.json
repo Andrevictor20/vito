@@ -1,0 +1,13 @@
+{
+  "key": "daily_reporter",
+  "version": 1,
+  "name": "Repórter do dia",
+  "category": "Notícias",
+  "goal": "Entrega um resumo diário curto de um assunto.",
+  "icon": "newspaper",
+  "color": "teal",
+  "skills": ["brief"],
+  "default_triggers": [{"kind": "schedule", "label": "Todo dia às 07:30", "cron": "30 7 * * *"}],
+  "default_rules": ["Evitar notícias repetidas de dias anteriores", "Manter o resumo em até 5 linhas"],
+  "setup_questions": ["Sobre qual assunto você quer receber o resumo diário?"]
+}

@@ -1,0 +1,16 @@
+{
+  "key": "inv",
+  "version": 1,
+  "name": "Extrair fatura",
+  "icon": "receipt",
+  "description": "Lê e-mails de cobrança para extrair valor, vencimento e propor tarefa.",
+  "when": "Quando chega fatura, boleto ou cobrança.",
+  "steps": [
+    "Ler o e-mail mais recente do emissor",
+    "Extrair valor, vencimento e emissor",
+    "Comparar com o mês anterior",
+    "Propor tarefa de pagamento antes do vencimento"
+  ],
+  "actions": ["mailr", "task"],
+  "output_contract": "Informe emissor, valor, vencimento e variação; pendências vão para aprovação."
+}

@@ -1,0 +1,14 @@
+{
+  "key": "message_followups",
+  "version": 1,
+  "name": "Pendências em mensagens",
+  "category": "Comunicação",
+  "goal": "Lê e-mails e WhatsApp recentes, identifica perguntas/cobranças sem resposta e prepara rascunho para sua aprovação.",
+  "icon": "message-circle",
+  "color": "orange",
+  "skills": ["draft"],
+  "extra_actions": ["wasend", "task"],
+  "default_triggers": [{"kind": "schedule", "label": "Todo dia às 11:00 e 17:00", "cron": "0 11,17 * * *"}],
+  "default_rules": ["Nunca enviar mensagem no WhatsApp ou e-mail sem aprovação explícita", "Respeitar o tom da conversa original"],
+  "setup_questions": ["Quais contatos ou grupos são prioridade para follow-up?"]
+}

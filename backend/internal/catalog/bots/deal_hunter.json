@@ -1,0 +1,13 @@
+{
+  "key": "deal_hunter",
+  "version": 1,
+  "name": "Caçador de ofertas",
+  "category": "Compras",
+  "goal": "Compara preços de um produto e avisa da melhor oferta.",
+  "icon": "tag",
+  "color": "purple",
+  "skills": ["cmp"],
+  "default_triggers": [{"kind": "schedule", "label": "Todo dia às 12:00", "cron": "0 12 * * *"}],
+  "default_rules": ["Nunca finalizar compras", "Considerar frete na comparação"],
+  "setup_questions": ["Qual produto você quer acompanhar?", "Qual o preço máximo desejado?"]
+}

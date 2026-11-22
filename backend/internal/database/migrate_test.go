@@ -16,8 +16,8 @@ func TestVersionedMigrations_FreshDB(t *testing.T) {
 	if err := db.QueryRow(`SELECT COUNT(*) FROM schema_migrations`).Scan(&count); err != nil {
 		t.Fatal(err)
 	}
-	if count != 28 {
-		t.Fatalf("esperava 28 migrações registradas, vieram %d", count)
+	if count != 29 {
+		t.Fatalf("esperava 29 migrações registradas, vieram %d", count)
 	}
 	if !hasTable(db, "user_ai_providers") ||
 		!hasColumn(db, "user_ai_settings", "default_model") ||
@@ -157,8 +157,8 @@ func TestVersionedMigrations_LegacyDB(t *testing.T) {
 	if err := db2.QueryRow(`SELECT COUNT(*) FROM schema_migrations`).Scan(&count); err != nil {
 		t.Fatal(err)
 	}
-	if count != 28 {
-		t.Fatalf("base legada deveria ser carimbada com 28, veio %d", count)
+	if count != 29 {
+		t.Fatalf("base legada deveria ser carimbada com 29, veio %d", count)
 	}
 }
 

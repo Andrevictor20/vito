@@ -1,0 +1,15 @@
+{
+  "key": "tri",
+  "version": 1,
+  "name": "Triagem de e-mails",
+  "icon": "inbox",
+  "description": "Classifica novos e-mails do Outlook e propõe tarefas para o que é urgente.",
+  "when": "Para organizar a caixa de entrada da Microsoft.",
+  "steps": [
+    "Ler e-mails novos no Outlook",
+    "Separar entre urgente, informativo e ruído",
+    "Propor tarefas para os itens urgentes"
+  ],
+  "actions": ["omail", "task"],
+  "output_contract": "Agrupe por urgência e liste as tarefas propostas."
+}

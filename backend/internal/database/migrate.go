@@ -388,6 +388,15 @@ func runVersionedMigrations(db *sql.DB) error {
 			}
 			continue
 		}
+		if version == "027_bots.sql" {
+			if err := applyBotsMigration(db, name); err != nil {
+				return err
+			}
+			if err := recordMigration(db, version); err != nil {
+				return err
+			}
+			continue
+		}
 		if version == "037_user_ai_providers.sql" {
 			if err := applyUserAIProvidersMigration(db, name); err != nil {
 				return err

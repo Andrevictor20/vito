@@ -1,0 +1,16 @@
+{
+  "key": "cmp",
+  "version": 1,
+  "name": "Comparar preços",
+  "icon": "tag",
+  "description": "Compara o mesmo item em mais de uma fonte e diz qual é o menor valor.",
+  "when": "Quando o bot acompanha preço de voo, produto ou serviço.",
+  "steps": [
+    "Pesquisar em pelo menos duas fontes",
+    "Igualar moeda, bagagem e taxas",
+    "Apontar o menor preço e a distância até o alvo",
+    "Dizer qual fonte não carregou"
+  ],
+  "actions": ["search", "notify"],
+  "output_contract": "Liste preço, fonte e diferença para o alvo; se uma fonte falhar, coloque-a em cant."
+}

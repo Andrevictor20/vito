@@ -1,0 +1,13 @@
+{
+  "key": "outlook_triage",
+  "version": 1,
+  "name": "Triagem do Outlook",
+  "category": "E-mail",
+  "goal": "Separa o que é urgente na caixa da Microsoft e propõe tarefas.",
+  "icon": "inbox",
+  "color": "purple",
+  "skills": ["tri"],
+  "default_triggers": [{"kind": "schedule", "label": "Todo dia às 09:00 e 14:00", "cron": "0 9,14 * * *"}],
+  "default_rules": ["Nunca responder nem apagar e-mails sozinho", "Propor tarefa apenas para itens urgentes"],
+  "setup_questions": ["Quais remetentes ou assuntos são sempre urgentes para você?"]
+}

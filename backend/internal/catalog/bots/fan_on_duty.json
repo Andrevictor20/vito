@@ -1,0 +1,13 @@
+{
+  "key": "fan_on_duty",
+  "version": 1,
+  "name": "Torcedor de plantão",
+  "category": "Esportes",
+  "goal": "Cuida de datas, horários e saída para os jogos do seu time.",
+  "icon": "trophy",
+  "color": "green",
+  "skills": ["prep", "leave"],
+  "default_triggers": [{"kind": "schedule", "label": "Todo dia às 09:00", "cron": "0 9 * * *"}],
+  "default_rules": ["Confirmar horário em duas fontes antes de propor evento", "Sempre pedir aprovação para criar evento"],
+  "setup_questions": ["Qual é o seu time?", "De onde você costuma sair para o estádio?"]
+}

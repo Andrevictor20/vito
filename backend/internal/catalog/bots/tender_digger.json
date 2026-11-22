@@ -1,0 +1,13 @@
+{
+  "key": "tender_digger",
+  "version": 1,
+  "name": "Garimpo de editais",
+  "category": "Concursos",
+  "goal": "Acompanha novos editais da sua área e prepara os prazos.",
+  "icon": "file-text",
+  "color": "blue",
+  "skills": ["brief", "prep"],
+  "default_triggers": [{"kind": "schedule", "label": "Todo dia às 08:00", "cron": "0 8 * * *"}],
+  "default_rules": ["Confirmar datas diretamente no edital oficial", "Sempre pedir aprovação antes de criar evento"],
+  "setup_questions": ["Qual área, órgão ou cargo você quer acompanhar?"]
+}

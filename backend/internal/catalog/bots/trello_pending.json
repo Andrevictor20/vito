@@ -1,0 +1,13 @@
+{
+  "key": "trello_pending",
+  "version": 1,
+  "name": "Pendências no Trello",
+  "category": "Projetos",
+  "goal": "Transforma e-mails em cartões na lista certa.",
+  "icon": "trello",
+  "color": "blue",
+  "skills": ["card"],
+  "default_triggers": [{"kind": "schedule", "label": "A cada 2 horas", "cron": "0 */2 * * *"}],
+  "default_rules": ["Sempre pedir aprovação antes de criar cartão", "Evitar duplicar cartões já existentes"],
+  "setup_questions": ["Em qual quadro e lista do Trello devo criar os cartões?"]
+}

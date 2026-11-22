@@ -1,0 +1,15 @@
+{
+  "key": "leave",
+  "version": 1,
+  "name": "Hora de sair",
+  "icon": "navigation",
+  "description": "Calcula rota com trânsito atual e avisa a hora exata de sair.",
+  "when": "Para compromissos com endereço definido.",
+  "steps": [
+    "Ler endereço do compromisso",
+    "Calcular rota considerando trânsito atual",
+    "Avisar horário recomendado de saída"
+  ],
+  "actions": ["route", "leave", "notify"],
+  "output_contract": "Informe tempo estimado, rota principal e horário limite de saída."
+}

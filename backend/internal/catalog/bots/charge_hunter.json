@@ -1,0 +1,13 @@
+{
+  "key": "charge_hunter",
+  "version": 1,
+  "name": "Caça-cobranças",
+  "category": "Finanças pessoais",
+  "goal": "Detecta cobranças repetidas e reajustes silenciosos.",
+  "icon": "search",
+  "color": "red",
+  "skills": ["spend"],
+  "default_triggers": [{"kind": "schedule", "label": "Toda segunda às 09:00", "cron": "0 9 * * 1"}],
+  "default_rules": ["Nunca cancelar assinaturas sozinho", "Apontar sempre o valor anterior e o atual"],
+  "setup_questions": ["Há alguma assinatura específica que você quer vigiar?"]
+}

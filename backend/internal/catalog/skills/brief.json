@@ -1,0 +1,15 @@
+{
+  "key": "brief",
+  "version": 1,
+  "name": "Resumo diário",
+  "icon": "newspaper",
+  "description": "Resume o que mudou desde ontem sem repetir informações antigas.",
+  "when": "Em checagens diárias de assunto, notícias ou gastos.",
+  "steps": [
+    "Identificar o que mudou desde ontem",
+    "Cortar itens repetidos",
+    "Sintetizar em até 5 linhas objetivas"
+  ],
+  "actions": ["search", "notify"],
+  "output_contract": "Entregue no máximo 5 linhas com novidades reais."
+}

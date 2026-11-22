@@ -1,0 +1,15 @@
+{
+  "key": "card",
+  "version": 1,
+  "name": "E-mail vira cartão",
+  "icon": "trello",
+  "description": "Transforma e-mails acionáveis em cartões organizados no Trello.",
+  "when": "Quando um e-mail gera uma pendência de projeto.",
+  "steps": [
+    "Ler e-mail relevante",
+    "Extrair título curto e descrição objetiva",
+    "Propor criação do cartão na lista combinada"
+  ],
+  "actions": ["mailr", "tcard"],
+  "output_contract": "Mostre título, lista de destino e link de origem do e-mail."
+}

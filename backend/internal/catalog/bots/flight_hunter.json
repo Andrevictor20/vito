@@ -1,0 +1,13 @@
+{
+  "key": "flight_hunter",
+  "version": 1,
+  "name": "Caçador de voos",
+  "category": "Viagens",
+  "goal": "Acompanha o preço da passagem e avisa quando cair.",
+  "icon": "plane",
+  "color": "orange",
+  "skills": ["cmp"],
+  "default_triggers": [{"kind": "schedule", "label": "Todo dia às 09:00", "cron": "0 9 * * *"}],
+  "default_rules": ["Nunca comprar nem pagar nada", "Se não conseguir verificar, dizer isso em vez de estimar"],
+  "setup_questions": ["Qual a origem e o destino?", "Qual o preço-alvo?"]
+}

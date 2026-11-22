@@ -1,0 +1,13 @@
+{
+  "key": "deadlines",
+  "version": 1,
+  "name": "Prazos e lembretes",
+  "category": "Organização",
+  "goal": "Cria lembretes a partir de datas importantes nos seus e-mails.",
+  "icon": "clock",
+  "color": "teal",
+  "skills": ["inv", "prep"],
+  "default_triggers": [{"kind": "schedule", "label": "Todo dia às 08:30", "cron": "30 8 * * *"}],
+  "default_rules": ["Sempre pedir aprovação antes de criar evento ou tarefa", "Destacar prazos com menos de 72 horas"],
+  "setup_questions": ["Quais tipos de prazo você quer acompanhar (impostos, contratos, entregas)?"]
+}

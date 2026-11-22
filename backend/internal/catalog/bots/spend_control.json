@@ -1,0 +1,13 @@
+{
+  "key": "spend_control",
+  "version": 1,
+  "name": "Controle de gastos",
+  "category": "Finanças pessoais",
+  "goal": "Avisa quando um orçamento passa de 80% e resume o mês.",
+  "icon": "wallet",
+  "color": "green",
+  "skills": ["spend", "brief"],
+  "default_triggers": [{"kind": "schedule", "label": "Todo dia às 20:00", "cron": "0 20 * * *"}],
+  "default_rules": ["Nunca realizar pagamentos ou transferências", "Respeitar sigilo financeiro"],
+  "setup_questions": ["Quais categorias você quer acompanhar mais de perto?"]
+}

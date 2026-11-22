@@ -1,0 +1,16 @@
+{
+  "key": "prep",
+  "version": 1,
+  "name": "Preparar compromisso",
+  "icon": "calendar",
+  "description": "Confirma data e horário do evento e verifica agenda livre antes de propor.",
+  "when": "Antes de jogo, reunião, prova ou evento importante.",
+  "steps": [
+    "Confirmar data e horário em duas fontes",
+    "Verificar horários livres na agenda",
+    "Propor criação do evento se houver disponibilidade",
+    "Avisar com antecedência"
+  ],
+  "actions": ["search", "free", "evt"],
+  "output_contract": "Mostre data confirmada, conflitos na agenda e evento proposto."
+}

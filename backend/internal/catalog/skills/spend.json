@@ -1,0 +1,15 @@
+{
+  "key": "spend",
+  "version": 1,
+  "name": "Vigiar orçamento",
+  "icon": "wallet",
+  "description": "Acompanha gastos por categoria e alerta quando passa de 80% do limite.",
+  "when": "Em bots de controle de finanças pessoais.",
+  "steps": [
+    "Consultar gastos por categoria",
+    "Calcular percentual consumido do orçamento",
+    "Avisar quando alguma categoria passar de 80%"
+  ],
+  "actions": ["spend", "notify"],
+  "output_contract": "Informe categoria, valor gasto, limite e percentual."
+}

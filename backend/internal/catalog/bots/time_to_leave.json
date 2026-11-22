@@ -1,0 +1,13 @@
+{
+  "key": "time_to_leave",
+  "version": 1,
+  "name": "Hora de sair",
+  "category": "Rotina",
+  "goal": "Avisa quando é hora de sair para cada compromisso.",
+  "icon": "navigation",
+  "color": "blue",
+  "skills": ["leave"],
+  "default_triggers": [{"kind": "schedule", "label": "A cada 30 minutos", "cron": "*/30 * * * *"}],
+  "default_rules": ["Considerar margem de segurança de 15 minutos", "Silenciar quando não houver compromisso com endereço"],
+  "setup_questions": ["Qual é o seu endereço de partida padrão?"]
+}
