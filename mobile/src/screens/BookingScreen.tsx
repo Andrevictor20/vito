@@ -8,7 +8,8 @@ import {
   Alert,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { tokens } from '../theme/tokens';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
@@ -27,6 +28,7 @@ import {
 } from '../utils/bookingActions';
 import { BookingLinksTab } from '../components/booking/BookingLinksTab';
 import { BookingReceivedTab } from '../components/booking/BookingReceivedTab';
+import { BookingStackHeader } from '../components/booking/BookingStackHeader';
 import { MeetingPollDetailView } from '../components/booking/MeetingPollDetailView';
 import { SmartActionSheetModal } from '../components/ui/SmartActionSheetModal';
 import { buildBookingSmartActions } from '../utils/smartActionBuilders';
@@ -52,14 +54,18 @@ interface BookingScreenProps {
   onBack?: () => void;
   createRequestId?: number;
   onSubViewChange?: (inSubView: boolean) => void;
+  showBackHeader?: boolean;
 }
 
 export const BookingScreen: React.FC<BookingScreenProps> = ({
+  onBack,
   createRequestId,
   onSubViewChange,
+  showBackHeader = false,
 }) => {
   const { colors, isDark } = useTheme();
   const { user: authUser } = useAuth();
+  const navigation = useNavigation();
   const firstCreateRender = React.useRef(true);
 
   const [types, setTypes] = useState<BookingType[]>([]);
@@ -333,6 +339,10 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
       <StatusBar style={isDark ? 'light' : 'dark'} />
+
+      {showBackHeader && (
+        <BookingStackHeader onBack={() => (onBack ? onBack() : navigation.goBack())} />
+      )}
 
       {/* Segmented Control .seg: Links [N] | Recebidos [N] */}
       <View style={styles.segmentContainer}>
