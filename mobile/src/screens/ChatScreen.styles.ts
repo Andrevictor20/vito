@@ -1,38 +1,21 @@
-import { StyleSheet, Platform } from 'react-native';
-import { tokens, MD3Shapes } from '../theme/tokens';
+import { Platform, StyleSheet } from 'react-native';
+import { tokens } from '../theme/tokens';
 
 export const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: tokens.colors.surface,
+    backgroundColor: tokens.colors.bg,
   },
   flatList: {
     flex: 1,
   },
   messagesList: {
-    paddingHorizontal: tokens.spacing.md,
+    paddingHorizontal: 16,
     paddingTop: tokens.spacing.sm,
-  },
-  loadingBubble: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: tokens.spacing.sm,
-    alignSelf: 'stretch',
-    backgroundColor: 'transparent',
-    paddingHorizontal: tokens.spacing.xs,
-    paddingVertical: tokens.spacing.sm,
-    marginBottom: tokens.spacing.md,
-  },
-  loadingText: {
-    color: tokens.colors.onSurfaceVariant,
-    fontSize: tokens.typography.size.bodySmall,
   },
   emptyMessagesList: {
     flexGrow: 1,
     justifyContent: 'center',
-  },
-  suggestionsWrapper: {
-    paddingBottom: 4,
   },
   dockContainer: {
     backgroundColor: 'transparent',
@@ -44,11 +27,12 @@ export const styles = StyleSheet.create({
     alignSelf: 'center',
     paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 18,
+    borderRadius: 999,
     zIndex: 20,
   },
   modelToastText: {
+    fontFamily: 'Geist',
     fontSize: 12.5,
-    fontWeight: '600',
+    fontWeight: '500',
   },
 });

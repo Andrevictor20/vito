@@ -1,165 +1,56 @@
 import React, { useState } from 'react';
 import {
-  StyleSheet,
-  Text,
-  View,
-  TouchableOpacity,
-  TextInput,
   LayoutAnimation,
   Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
   UIManager,
+  View,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens } from '../../theme/tokens';
+import { getFloatingSurfaceShadow } from '../../theme/surfaces';
+import { PressableScale } from '../../theme/vitoMotion';
 import { useTheme } from '../../context/ThemeContext';
-import { MainTabType } from '../../utils/pagerNavigation';
+import { tabNavigationBus } from '../../services/dataSync';
+import type { MainTabType } from '../../utils/pagerNavigation';
+import {
+  HeaderIconButton,
+  HeaderPill,
+  HeaderRoundButton,
+  SubScreenHeader,
+  type HeaderIconButtonProps,
+  type HeaderPillProps,
+  type HeaderRoundButtonProps,
+  type HeaderRoundButtonVariant,
+  type SubScreenHeaderProps,
+} from './HeaderControls';
+
+export {
+  HeaderIconButton,
+  HeaderPill,
+  HeaderRoundButton,
+  SubScreenHeader,
+  type HeaderIconButtonProps,
+  type HeaderPillProps,
+  type HeaderRoundButtonProps,
+  type HeaderRoundButtonVariant,
+  type SubScreenHeaderProps,
+};
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-export type HeaderRoundButtonVariant = 'default' | 'primary';
-
-export interface HeaderRoundButtonProps {
-  icon: keyof typeof MaterialIcons.glyphMap;
-  onPress: () => void;
-  accessibilityLabel: string;
-  variant?: HeaderRoundButtonVariant;
-  size?: number;
-  testID?: string;
-  disabled?: boolean;
-}
-
-/**
- * Botão circular (.rb) de 42x42px fiel a vito-telas.html.
- * - variant 'default': fundo colors.bg, borda 1px colors.line, ícone colors.ink.
- * - variant 'primary' (.rb.pri): fundo colors.ink, borda colors.ink, ícone colors.bg.
- */
-export const HeaderRoundButton: React.FC<HeaderRoundButtonProps> = ({
-  icon,
-  onPress,
-  accessibilityLabel,
-  variant = 'default',
-  size = 20,
-  testID,
-  disabled = false,
-}) => {
-  const { colors } = useTheme();
-  const isPri = variant === 'primary';
-
-  return (
-    <TouchableOpacity
-      style={[
-        styles.roundBtn,
-        {
-          backgroundColor: isPri ? colors.ink : colors.bg,
-          borderColor: isPri ? colors.ink : colors.line,
-        },
-        disabled && styles.btnDisabled,
-      ]}
-      onPress={onPress}
-      activeOpacity={0.7}
-      hitSlop={tokens.hitSlop.sm}
-      accessibilityLabel={accessibilityLabel}
-      accessibilityRole="button"
-      testID={testID}
-      disabled={disabled}
-    >
-      <MaterialIcons
-        name={icon}
-        size={size}
-        color={isPri ? colors.bg : colors.ink}
-      />
-    </TouchableOpacity>
-  );
-};
-
-export interface HeaderIconButtonProps {
-  icon: keyof typeof MaterialIcons.glyphMap;
-  onPress: () => void;
-  accessibilityLabel: string;
-  size?: number;
-}
-
-/**
- * Botão auxiliar retrocompatível mapeado para o design .rb circular.
- */
-export const HeaderIconButton: React.FC<HeaderIconButtonProps> = ({
-  icon,
-  onPress,
-  accessibilityLabel,
-  size = 20,
-}) => {
-  return (
-    <HeaderRoundButton
-      icon={icon}
-      onPress={onPress}
-      accessibilityLabel={accessibilityLabel}
-      size={size}
-      variant="default"
-    />
-  );
-};
-
-/** Pill de ação do header editorial (sólida primária ou ghost discreta). */
-export interface HeaderPillProps {
-  label: string;
-  onPress: () => void;
-  accessibilityLabel: string;
-  variant?: 'solid' | 'ghost';
-  icon?: keyof typeof MaterialIcons.glyphMap;
-}
-
-export const HeaderPill: React.FC<HeaderPillProps> = ({
-  label,
-  onPress,
-  accessibilityLabel,
-  variant = 'solid',
-  icon,
-}) => {
-  const { colors } = useTheme();
-  const ghost = variant === 'ghost';
-  return (
-    <TouchableOpacity
-      style={[
-        styles.pill,
-        ghost
-          ? { backgroundColor: colors.bg, borderColor: colors.line, borderWidth: 1 }
-          : { backgroundColor: colors.ink, borderColor: colors.ink, borderWidth: 1 },
-      ]}
-      onPress={onPress}
-      activeOpacity={0.8}
-      hitSlop={tokens.hitSlop.md}
-      accessibilityLabel={accessibilityLabel}
-      accessibilityRole="button"
-    >
-      {icon ? (
-        <MaterialIcons
-          name={icon}
-          size={16}
-          color={ghost ? colors.ink : colors.bg}
-        />
-      ) : null}
-      <Text
-        style={[
-          styles.pillText,
-          { color: ghost ? colors.ink : colors.bg },
-        ]}
-        numberOfLines={1}
-      >
-        {label}
-      </Text>
-    </TouchableOpacity>
-  );
-};
-
 const TAB_TITLES: Record<MainTabType, { title: string; subtitle: string }> = {
-  chat: { title: 'Vito', subtitle: '' },
+  chat: { title: 'Conversas', subtitle: '' },
   calendar: { title: 'Agenda', subtitle: '' },
   tasks: { title: 'Tarefas', subtitle: '' },
-  finance: { title: 'Finanças', subtitle: 'Open Finance & Safe-to-Spend' },
+  finance: { title: 'Finanças', subtitle: '' },
   triggers: { title: 'Bots', subtitle: 'Mini assistentes, cada um com uma função só' },
-  booking: { title: 'Booking', subtitle: 'Links de agendamento do Vito' },
+  booking: { title: 'Agendamentos', subtitle: 'Links e votações de horário' },
   profile: { title: 'Perfil', subtitle: 'Conta, autonomia e integrações' },
 };
 
@@ -171,14 +62,14 @@ export interface HeaderProps {
   onPressTitle?: () => void;
   activeTab?: MainTabType;
   onPressNewChat?: () => void;
-  /** Abre a gaveta lateral (hamburger à esquerda). */
   onPressMenu?: () => void;
-  /** Oculta título/subtítulo (visual clean, ex. chat). */
+  onPressNotifications?: () => void;
+  unreadNotificationsCount?: number;
+  onPressProfile?: () => void;
+  profileInitials?: string;
+  onPressBooking?: () => void;
   hideTitle?: boolean;
-  /** Alinhamento do título. Default 'left' conforme vito-telas.html. */
   align?: 'left' | 'center';
-
-  // Barra de busca retrátil (.search)
   showSearchButton?: boolean;
   searchOpen?: boolean;
   onToggleSearch?: () => void;
@@ -197,6 +88,11 @@ export const Header: React.FC<HeaderProps> = ({
   onPressTitle,
   activeTab,
   onPressMenu,
+  onPressNotifications,
+  unreadNotificationsCount = 0,
+  onPressProfile,
+  profileInitials = 'AV',
+  onPressBooking,
   hideTitle = false,
   align = 'left',
   onPressNewChat,
@@ -209,7 +105,7 @@ export const Header: React.FC<HeaderProps> = ({
   onPressFilter,
   hasActiveFilters = false,
 }) => {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const [internalSearchOpen, setInternalSearchOpen] = useState(false);
   const [internalQuery, setInternalQuery] = useState('');
 
@@ -233,19 +129,15 @@ export const Header: React.FC<HeaderProps> = ({
     }
   };
 
-  const handleClearQuery = () => {
-    handleQueryChange('');
-  };
-
   const currentQuery = searchQuery !== undefined ? searchQuery : internalQuery;
-
   const resolved = activeTab ? TAB_TITLES[activeTab] : undefined;
+  const isChat = activeTab === 'chat';
+  const isCalendar = activeTab === 'calendar';
+
   const displayTitle = hideTitle ? null : (title ?? resolved?.title ?? 'Agenda');
   const displaySubtitle: string | null = hideTitle
     ? null
     : (subtitle ?? resolved?.subtitle ?? null) || null;
-
-  const isChat = activeTab === 'chat';
   const centered = align === 'center';
   const hasLeft = !!onPressMenu;
 
@@ -286,10 +178,16 @@ export const Header: React.FC<HeaderProps> = ({
       style={[
         styles.headerWrapper,
         {
-          backgroundColor: colors.bg,
-          borderBottomColor: colors.line,
+          backgroundColor: colors.headerGlass,
+          borderBottomColor: colors.hairline,
           borderBottomWidth: showDivider ? 1 : 0,
         },
+        Platform.OS === 'web'
+          ? ({
+              backdropFilter: 'blur(16px)',
+              WebkitBackdropFilter: 'blur(16px)',
+            } as Record<string, string>)
+          : null,
       ]}
       accessibilityRole="header"
     >
@@ -299,13 +197,20 @@ export const Header: React.FC<HeaderProps> = ({
             <HeaderRoundButton
               icon="menu"
               onPress={onPressMenu}
-              accessibilityLabel="Abrir histórico de conversas"
+              accessibilityLabel="Conversas"
               size={22}
+              testID="c-menu"
             />
           </View>
         ) : null}
 
-        {displayTitle ? (
+        {isChat ? (
+          <View style={styles.chatTitleSlot}>
+            <Text style={[styles.chatHeaderLabel, { color: colors.ink }]} numberOfLines={1}>
+              {title ?? 'Conversas'}
+            </Text>
+          </View>
+        ) : displayTitle ? (
           <View style={[styles.titleSlot, centered && styles.titleSlotCenter]}>
             {onPressTitle ? (
               <TouchableOpacity
@@ -333,6 +238,30 @@ export const Header: React.FC<HeaderProps> = ({
               size={20}
             />
           )}
+
+          {isCalendar && (
+            <HeaderRoundButton
+              icon="link"
+              onPress={onPressBooking ?? (() => tabNavigationBus.notify('booking'))}
+              accessibilityLabel="Links de agendamento"
+              variant="default"
+              size={20}
+              testID="open-book"
+            />
+          )}
+
+          {isChat && onPressNotifications && (
+            <HeaderRoundButton
+              icon="notifications-none"
+              onPress={onPressNotifications}
+              accessibilityLabel="Notificações"
+              variant="default"
+              size={20}
+              badgeCount={unreadNotificationsCount}
+              testID="c-notifs"
+            />
+          )}
+
           {isChat && onPressNewChat ? (
             <HeaderRoundButton
               icon="add"
@@ -340,21 +269,45 @@ export const Header: React.FC<HeaderProps> = ({
               accessibilityLabel="Nova conversa"
               variant="default"
               size={20}
+              testID="c-new"
             />
           ) : null}
+
+          {isChat && onPressProfile && (
+            <PressableScale
+              onPress={onPressProfile}
+              hitSlop={tokens.hitSlop.sm}
+              accessibilityLabel="Perfil e configurações"
+              accessibilityRole="button"
+              testID="go-perfil"
+              style={[
+                styles.avatarBtn,
+                getFloatingSurfaceShadow(isDark),
+                {
+                  backgroundColor: colors.ink,
+                  borderColor: colors.line,
+                },
+              ]}
+            >
+              <Text style={[styles.avatarBtnText, { color: colors.bg }]} numberOfLines={1}>
+                {profileInitials}
+              </Text>
+            </PressableScale>
+          )}
+
           {contextualActions}
         </View>
       </View>
 
-      {/* Barra de busca retrátil (.search) */}
       {isSearching && (
         <View style={styles.searchSection}>
           <View
             style={[
               styles.searchBar,
+              getFloatingSurfaceShadow(isDark),
               {
-                backgroundColor: colors.surf,
-                borderColor: colors.line,
+                backgroundColor: colors.bg,
+                borderColor: colors.hairline,
               },
             ]}
           >
@@ -371,7 +324,7 @@ export const Header: React.FC<HeaderProps> = ({
             />
             {currentQuery.length > 0 && (
               <TouchableOpacity
-                onPress={handleClearQuery}
+                onPress={() => handleQueryChange('')}
                 hitSlop={tokens.hitSlop.sm}
                 accessibilityLabel="Limpar busca"
                 accessibilityRole="button"
@@ -409,12 +362,13 @@ export const TopAppBar = Header;
 const styles = StyleSheet.create({
   headerWrapper: {
     paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 10,
+    paddingTop: 10,
+    paddingBottom: 8,
+    zIndex: 4,
   },
   head: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
     gap: 10,
   },
@@ -422,8 +376,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   leftSlot: {
-    marginRight: 6,
     justifyContent: 'center',
+  },
+  chatTitleSlot: {
+    flex: 1,
+    minWidth: 0,
+    justifyContent: 'center',
+  },
+  chatHeaderLabel: {
+    fontFamily: 'Geist',
+    fontSize: 17,
+    lineHeight: 22,
+    fontWeight: '500',
+    letterSpacing: -0.34,
   },
   titleSlot: {
     flex: 1,
@@ -440,20 +405,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   h1Title: {
-    fontFamily: tokens.typography.family.montserratBold,
+    fontFamily: 'Geist',
     fontSize: 30,
     lineHeight: 33,
-    letterSpacing: -0.9,
-    fontWeight: '800',
+    letterSpacing: -1.05,
+    fontWeight: '500',
   },
   titleCenter: {
     textAlign: 'center',
   },
   subtitle: {
+    fontFamily: 'Geist',
     fontSize: 14,
-    lineHeight: 18,
+    lineHeight: 19,
     marginTop: 4,
-    fontWeight: '500',
+    fontWeight: '400',
   },
   subtitleCenter: {
     textAlign: 'center',
@@ -462,33 +428,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginTop: 2,
     flexShrink: 0,
   },
-  roundBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    borderWidth: 1,
+  avatarBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  btnDisabled: {
-    opacity: 0.5,
-  },
-  pill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 21,
-    height: 42,
-    paddingHorizontal: 16,
-    gap: 6,
-    flexShrink: 0,
-  },
-  pillText: {
-    fontSize: 14,
+  avatarBtnText: {
+    fontFamily: 'Geist',
+    fontSize: 13,
     fontWeight: '600',
-    letterSpacing: -0.1,
+    letterSpacing: -0.26,
   },
   searchSection: {
     marginTop: 12,
@@ -505,13 +459,14 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     height: 44,
+    fontFamily: 'Geist',
     fontSize: 15,
     paddingVertical: 0,
   },
   filterTuneBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
   },

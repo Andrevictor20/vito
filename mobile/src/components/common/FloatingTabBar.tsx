@@ -1,10 +1,33 @@
-import React from 'react';
-import { StyleSheet, View, TouchableOpacity, Platform } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
-import { tokens } from '../../theme/tokens';
+import React, { useEffect, useRef } from 'react';
+import {
+  Animated,
+  Easing,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import { useTheme } from '../../context/ThemeContext';
-import { hapticFeedback } from '../../theme/motion';
-import { MainTabType } from '../../utils/pagerNavigation';
+import { getDockGlassStyle } from '../../theme/surfaces';
+import { MOTION_CURVES, MOTION_DURATIONS, PRESS_SCALE, hapticFeedback } from '../../theme/motion';
+import { useReduceMotion } from '../../theme/vitoMotion';
+import type { MainTabType } from '../../utils/pagerNavigation';
+
+export type DockTabType = 'chat' | 'calendar' | 'tasks' | 'finance' | 'triggers';
+
+export const DOCK_TABS: readonly {
+  id: DockTabType;
+  label: string;
+  accessibilityLabel: string;
+}[] = [
+  { id: 'chat', label: 'Vito', accessibilityLabel: 'Aba Vito' },
+  { id: 'calendar', label: 'Agenda', accessibilityLabel: 'Aba Agenda' },
+  { id: 'tasks', label: 'Tarefas', accessibilityLabel: 'Aba Tarefas' },
+  { id: 'finance', label: 'Finanças', accessibilityLabel: 'Aba Finanças' },
+  { id: 'triggers', label: 'Bots', accessibilityLabel: 'Aba Bots' },
+] as const;
 
 interface FloatingTabBarProps {
   activeTab: MainTabType;
@@ -12,16 +35,231 @@ interface FloatingTabBarProps {
   visible?: boolean;
 }
 
+const DockSvgIcon: React.FC<{ id: DockTabType; color: string; active: boolean }> = ({
+  id,
+  color,
+  active,
+}) => {
+  switch (id) {
+    case 'chat':
+      return (
+        <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+          <Path
+            d="M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H8l-5 4V6a2 2 0 0 1 1-2z"
+            stroke={color}
+            strokeWidth={2.1}
+            strokeLinejoin="round"
+            fill={active ? color : 'none'}
+            fillOpacity={active ? 0.14 : 0}
+          />
+        </Svg>
+      );
+    case 'calendar':
+      return (
+        <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+          <Path
+            d="M7 2h2v2h6V2h2v2h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2zM5 9v11h14V9z"
+            fill={color}
+          />
+        </Svg>
+      );
+    case 'tasks':
+      return (
+        <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+          <Path
+            d="M4 7l2 2 3-4M4 16l2 2 3-4M13 8h7M13 17h7"
+            stroke={color}
+            strokeWidth={2.1}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </Svg>
+      );
+    case 'finance':
+      return (
+        <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+          <Path
+            d="M3 7a2 2 0 0 1 2-2h12v3M3 7v11a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1H5a2 2 0 0 1-2-2z"
+            stroke={color}
+            strokeWidth={2.1}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <Circle cx={16.5} cy={14} r={1.2} fill={color} />
+        </Svg>
+      );
+    case 'triggers':
+      return (
+        <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+          <Path
+            d="M12 3v3M2 12v2M22 12v2"
+            stroke={color}
+            strokeWidth={2.1}
+            strokeLinecap="round"
+          />
+          <Circle cx={12} cy={2.5} r={1} fill={color} />
+          <Rect
+            x={4}
+            y={7}
+            width={16}
+            height={12}
+            rx={4}
+            stroke={color}
+            strokeWidth={2.1}
+          />
+          <Circle cx={9.2} cy={13} r={1.3} fill={color} />
+          <Circle cx={14.8} cy={13} r={1.3} fill={color} />
+        </Svg>
+      );
+  }
+};
+
+const DockTabButton: React.FC<{
+  tab: (typeof DOCK_TABS)[number];
+  isActive: boolean;
+  onPress: () => void;
+  ink: string;
+  bg: string;
+  muted: string;
+  reduceMotion: boolean;
+}> = ({ tab, isActive, onPress, ink, bg, muted, reduceMotion }) => {
+  const expandAnim = useRef(new Animated.Value(isActive ? 1 : 0)).current;
+  const bounceAnim = useRef(new Animated.Value(0)).current;
+  const pressScale = useRef(new Animated.Value(1)).current;
+  const prevActive = useRef(isActive);
+
+  useEffect(() => {
+    if (reduceMotion) {
+      expandAnim.setValue(isActive ? 1 : 0);
+      bounceAnim.setValue(0);
+      prevActive.current = isActive;
+      return;
+    }
+
+    Animated.timing(expandAnim, {
+      toValue: isActive ? 1 : 0,
+      duration: 380,
+      easing: Easing.bezier(...MOTION_CURVES.q),
+      useNativeDriver: false,
+    }).start();
+
+    if (isActive && !prevActive.current) {
+      bounceAnim.setValue(0);
+      Animated.timing(bounceAnim, {
+        toValue: 1,
+        duration: MOTION_DURATIONS.navBounce,
+        easing: Easing.bezier(...MOTION_CURVES.q),
+        useNativeDriver: true,
+      }).start();
+    }
+    prevActive.current = isActive;
+  }, [isActive, reduceMotion, expandAnim, bounceAnim]);
+
+  const iconScale = bounceAnim.interpolate({
+    inputRange: [0, 0.01, 0.6, 1],
+    outputRange: [1, 0.6, 1.2, 1],
+  });
+  const iconRotate = bounceAnim.interpolate({
+    inputRange: [0, 0.01, 0.6, 1],
+    outputRange: ['0deg', '-14deg', '5deg', '0deg'],
+  });
+  const labelMaxWidth = expandAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 74],
+  });
+  const labelMarginLeft = expandAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 8],
+  });
+  const labelOpacity = expandAnim.interpolate({
+    inputRange: [0, 0.35, 1],
+    outputRange: [0, 0, 1],
+  });
+  const horizontalPad = expandAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [12, 16],
+  });
+
+  return (
+    <Pressable
+      onPress={onPress}
+      onPressIn={() => {
+        if (reduceMotion) return;
+        Animated.timing(pressScale, {
+          toValue: PRESS_SCALE,
+          duration: MOTION_DURATIONS.press,
+          easing: Easing.bezier(...MOTION_CURVES.std),
+          useNativeDriver: true,
+        }).start();
+      }}
+      onPressOut={() => {
+        if (reduceMotion) return;
+        Animated.timing(pressScale, {
+          toValue: 1,
+          duration: MOTION_DURATIONS.press,
+          easing: Easing.bezier(...MOTION_CURVES.std),
+          useNativeDriver: true,
+        }).start();
+      }}
+      accessibilityRole="tab"
+      accessibilityState={{ selected: isActive }}
+      accessibilityLabel={tab.accessibilityLabel}
+    >
+      <Animated.View style={{ transform: [{ scale: pressScale }] }}>
+        <Animated.View
+          style={[
+            styles.tabButton,
+            {
+              paddingHorizontal: horizontalPad,
+              backgroundColor: isActive ? ink : 'transparent',
+            },
+          ]}
+        >
+          <Animated.View
+            style={{
+              transform: [{ scale: iconScale }, { rotate: iconRotate }],
+            }}
+          >
+            <DockSvgIcon
+              id={tab.id}
+              color={isActive ? bg : muted}
+              active={isActive}
+            />
+          </Animated.View>
+
+          <Animated.View
+            style={{
+              maxWidth: labelMaxWidth,
+              marginLeft: labelMarginLeft,
+              opacity: labelOpacity,
+              overflow: 'hidden',
+            }}
+          >
+            <Text
+              style={[styles.tabLabel, { color: bg }]}
+              numberOfLines={1}
+              ellipsizeMode="clip"
+            >
+              {tab.label}
+            </Text>
+          </Animated.View>
+        </Animated.View>
+      </Animated.View>
+    </Pressable>
+  );
+};
+
 export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
   activeTab,
   onSelectTab,
   visible = true,
 }) => {
   const { colors, isDark } = useTheme();
+  const reduceMotion = useReduceMotion();
 
   if (!visible) return null;
 
-  const handleTabPress = (tab: MainTabType) => {
+  const handleTabPress = (tab: DockTabType) => {
     if (tab !== activeTab) {
       hapticFeedback.selection();
     }
@@ -33,174 +271,28 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
       <View
         style={[
           styles.dockPill,
-          {
-            backgroundColor: colors.surf,
-            borderColor: colors.line,
-            shadowColor: isDark ? '#000000' : '#141916',
-          },
+          getDockGlassStyle(isDark),
+          Platform.OS === 'web'
+            ? ({
+                backdropFilter: 'blur(22px) saturate(180%)',
+                WebkitBackdropFilter: 'blur(22px) saturate(180%)',
+              } as Record<string, string>)
+            : null,
         ]}
         accessibilityRole="tablist"
       >
-        {/* Item 1: Chat */}
-        <TouchableOpacity
-          style={[
-            styles.tabButton,
-            activeTab === 'chat' && [
-              styles.tabButtonActive,
-              { backgroundColor: colors.ink },
-            ],
-          ]}
-          onPress={() => handleTabPress('chat')}
-          activeOpacity={0.7}
-          hitSlop={tokens.hitSlop.sm}
-          accessibilityRole="tab"
-          accessibilityState={{ selected: activeTab === 'chat' }}
-          accessibilityLabel="Aba Chat com Vito"
-        >
-          <MaterialIcons
-            name={activeTab === 'chat' ? 'chat' : 'chat-bubble-outline'}
-            size={22}
-            color={activeTab === 'chat' ? colors.bg : colors.muted}
+        {DOCK_TABS.map((tab) => (
+          <DockTabButton
+            key={tab.id}
+            tab={tab}
+            isActive={activeTab === tab.id}
+            onPress={() => handleTabPress(tab.id)}
+            ink={colors.ink}
+            bg={colors.bg}
+            muted={colors.muted}
+            reduceMotion={reduceMotion}
           />
-        </TouchableOpacity>
-
-        {/* Item 2: Agenda */}
-        <TouchableOpacity
-          style={[
-            styles.tabButton,
-            activeTab === 'calendar' && [
-              styles.tabButtonActive,
-              { backgroundColor: colors.ink },
-            ],
-          ]}
-          onPress={() => handleTabPress('calendar')}
-          activeOpacity={0.7}
-          hitSlop={tokens.hitSlop.sm}
-          accessibilityRole="tab"
-          accessibilityState={{ selected: activeTab === 'calendar' }}
-          accessibilityLabel="Aba Agenda"
-        >
-          <MaterialIcons
-            name={activeTab === 'calendar' ? 'event' : 'calendar-today'}
-            size={22}
-            color={activeTab === 'calendar' ? colors.bg : colors.muted}
-          />
-        </TouchableOpacity>
-
-        {/* Item 3: Tarefas */}
-        <TouchableOpacity
-          style={[
-            styles.tabButton,
-            activeTab === 'tasks' && [
-              styles.tabButtonActive,
-              { backgroundColor: colors.ink },
-            ],
-          ]}
-          onPress={() => handleTabPress('tasks')}
-          activeOpacity={0.7}
-          hitSlop={tokens.hitSlop.sm}
-          accessibilityRole="tab"
-          accessibilityState={{ selected: activeTab === 'tasks' }}
-          accessibilityLabel="Aba Tarefas"
-        >
-          <MaterialIcons
-            name={activeTab === 'tasks' ? 'task-alt' : 'checklist'}
-            size={22}
-            color={activeTab === 'tasks' ? colors.bg : colors.muted}
-          />
-        </TouchableOpacity>
-
-        {/* Item 4: Finanças */}
-        <TouchableOpacity
-          style={[
-            styles.tabButton,
-            activeTab === 'finance' && [
-              styles.tabButtonActive,
-              { backgroundColor: colors.ink },
-            ],
-          ]}
-          onPress={() => handleTabPress('finance')}
-          activeOpacity={0.7}
-          hitSlop={tokens.hitSlop.sm}
-          accessibilityRole="tab"
-          accessibilityState={{ selected: activeTab === 'finance' }}
-          accessibilityLabel="Aba Finanças"
-        >
-          <MaterialIcons
-            name={activeTab === 'finance' ? 'account-balance-wallet' : 'account-balance'}
-            size={22}
-            color={activeTab === 'finance' ? colors.bg : colors.muted}
-          />
-        </TouchableOpacity>
-
-        {/* Item 5: Bots */}
-        <TouchableOpacity
-          style={[
-            styles.tabButton,
-            activeTab === 'triggers' && [
-              styles.tabButtonActive,
-              { backgroundColor: colors.ink },
-            ],
-          ]}
-          onPress={() => handleTabPress('triggers')}
-          activeOpacity={0.7}
-          hitSlop={tokens.hitSlop.sm}
-          accessibilityRole="tab"
-          accessibilityState={{ selected: activeTab === 'triggers' }}
-          accessibilityLabel="Aba Bots"
-        >
-          <MaterialIcons
-            name="smart-toy"
-            size={22}
-            color={activeTab === 'triggers' ? colors.bg : colors.muted}
-          />
-        </TouchableOpacity>
-
-        {/* Item 6: Booking */}
-        <TouchableOpacity
-          style={[
-            styles.tabButton,
-            activeTab === 'booking' && [
-              styles.tabButtonActive,
-              { backgroundColor: colors.ink },
-            ],
-          ]}
-          onPress={() => handleTabPress('booking')}
-          activeOpacity={0.7}
-          hitSlop={tokens.hitSlop.sm}
-          accessibilityRole="tab"
-          accessibilityState={{ selected: activeTab === 'booking' }}
-          accessibilityLabel="Aba Booking"
-        >
-          <MaterialIcons
-            name={activeTab === 'booking' ? 'event-available' : 'link'}
-            size={22}
-            color={activeTab === 'booking' ? colors.bg : colors.muted}
-          />
-        </TouchableOpacity>
-
-        {/* Item 7: Perfil */}
-        <TouchableOpacity
-          style={[
-            styles.tabButton,
-            activeTab === 'profile' && [
-              styles.tabButtonActive,
-              { backgroundColor: colors.ink },
-            ],
-          ]}
-          onPress={() => handleTabPress('profile')}
-          activeOpacity={0.7}
-          hitSlop={tokens.hitSlop.sm}
-          accessibilityRole="tab"
-          accessibilityState={{ selected: activeTab === 'profile' }}
-          accessibilityLabel="Aba Perfil"
-        >
-          <MaterialIcons
-            name={activeTab === 'profile' ? 'person' : 'person-outline'}
-            size={22}
-            color={activeTab === 'profile' ? colors.bg : colors.muted}
-          />
-        </TouchableOpacity>
+        ))}
       </View>
     </View>
   );
@@ -209,7 +301,7 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
 const styles = StyleSheet.create({
   floatingWrapper: {
     position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 20 : 18,
+    bottom: Platform.OS === 'ios' ? 18 : 14,
     left: 0,
     right: 0,
     alignItems: 'center',
@@ -220,25 +312,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 6,
-    borderRadius: 36,
-    borderWidth: 1,
-    gap: 4,
-    elevation: 10,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.14,
-    shadowRadius: 22,
+    paddingVertical: 7,
+    paddingHorizontal: 8,
+    gap: 6,
   },
   tabButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    minWidth: 46,
+    height: 46,
+    borderRadius: 23,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  tabButtonActive: {
-    width: 52,
-    borderRadius: 26,
-    elevation: 4,
+  tabLabel: {
+    fontFamily: 'Geist',
+    fontSize: 13,
+    fontWeight: '500',
+    letterSpacing: -0.1,
   },
 });

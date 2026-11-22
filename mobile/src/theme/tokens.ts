@@ -1,352 +1,372 @@
-import { TextStyle } from 'react-native';
+import type { TextStyle } from 'react-native';
 
-// Google Material Design 3 (M3 / Material You) Design Tokens
-// Paleta tonal calibrada para Dark Theme Executivo e Light Theme Vito (vito-telas.html)
+/**
+ * tokens.ts — Vito Design System v5 (Light & Dark)
+ * Fonte canônica: Vito-telas-atualizadas.html + DESIGN.md
+ */
+
+export const v5Radii = {
+  none: 0,
+  xs: 4,
+  sm: 10,
+  md: 14,
+  lg: 20,
+  evc: 20,
+  card: 22,
+  xl: 28,
+  sheet: 28,
+  phone: 32,
+  dock: 40,
+  pill: 999,
+  full: 999,
+} as const;
 
 export const MD3Shapes = {
   none: 0,
-  extraSmall: 4,      // Badges pequenos, tags de prioridade
-  small: 8,           // Chips de filtro, caixas de seleção
-  medium: 12,         // Cards de tarefas, alertas inline
-  large: 16,          // Cards secundários, balões de chat
-  largeIncreased: 20, // Quick Action Tiles, cards principais de eventos
-  extraLarge: 28,     // Bottom sheets, Search Bars, Modais principais, Input Dock
-  full: 9999,         // Pílulas de navegação, botões circulares, avatares
+  extraSmall: 4,
+  small: 10,
+  medium: 14,
+  large: 20,
+  largeIncreased: 22,
+  extraLarge: 28,
+  full: 9999,
 };
 
 export const harmonicAccentsLight = {
-  emerald: '#059669',
-  emeraldContainer: '#D1FAE5',
-  emeraldText: '#065F46',
-  sky: '#0284C7',
-  skyContainer: '#E0F2FE',
+  emerald: '#0aa55c',
+  emeraldContainer: '#e3f6ec',
+  emeraldText: '#065f46',
+  sky: '#0a7cff',
+  skyContainer: '#e6f1ff',
   skyText: '#075985',
-  indigo: '#4F46E5',
-  indigoContainer: '#EEF2FF',
-  indigoText: '#3730A3',
-  coral: '#E11D48',
-  coralContainer: '#FFE4E6',
-  coralText: '#9F1239',
-  amber: '#D97706',
-  amberContainer: '#FEF3C7',
-  amberText: '#92400E',
-  mint: '#0D9488',
-  mintContainer: '#CCFBF1',
-  mintText: '#115E59',
-  orange: '#EA580C',
-  orangeContainer: '#FFEDD5',
-  orangeText: '#9A3412',
-  violet: '#7C3AED',
-  violetContainer: '#F3E8FF',
-  violetText: '#5B21B6',
+  indigo: '#0a7cff',
+  indigoContainer: '#e6f1ff',
+  indigoText: '#0f2540',
+  coral: '#ff2d46',
+  coralContainer: '#ffe8ec',
+  coralText: '#9f1239',
+  amber: '#d98a00',
+  amberContainer: '#fff2d6',
+  amberText: '#92400e',
+  mint: '#0aa5b5',
+  mintContainer: '#dff4f6',
+  mintText: '#115e59',
+  orange: '#f08300',
+  orangeContainer: '#fff0d9',
+  orangeText: '#9a3412',
+  violet: '#ff2fa0',
+  violetContainer: '#ffe6f4',
+  violetText: '#831843',
 };
 
 export const harmonicAccentsDark = {
-  emerald: '#34D399',
-  emeraldContainer: 'rgba(52, 211, 153, 0.16)',
-  emeraldText: '#A7F3D0',
-  sky: '#38BDF8',
-  skyContainer: 'rgba(56, 189, 248, 0.16)',
-  skyText: '#BAE6FD',
-  indigo: '#818CF8',
-  indigoContainer: 'rgba(129, 140, 248, 0.16)',
-  indigoText: '#C7D2FE',
-  coral: '#FB7185',
-  coralContainer: 'rgba(251, 113, 133, 0.16)',
-  coralText: '#FECDD3',
-  amber: '#FBBF24',
-  amberContainer: 'rgba(251, 191, 36, 0.16)',
-  amberText: '#FDE68A',
-  mint: '#2DD4BF',
-  mintContainer: 'rgba(45, 212, 191, 0.16)',
-  mintText: '#99F6E4',
-  orange: '#FB923C',
-  orangeContainer: 'rgba(251, 146, 60, 0.16)',
-  orangeText: '#FED7AA',
-  violet: '#A78BFA',
-  violetContainer: 'rgba(167, 139, 250, 0.16)',
-  violetText: '#DDD6FE',
+  emerald: '#2dd17f',
+  emeraldContainer: '#0f2f22',
+  emeraldText: '#a7f3d0',
+  sky: '#3b93ff',
+  skyContainer: '#0f2540',
+  skyText: '#bae6fd',
+  indigo: '#3b93ff',
+  indigoContainer: '#0f2540',
+  indigoText: '#c7d2fe',
+  coral: '#ff5468',
+  coralContainer: '#3a1219',
+  coralText: '#fecdd3',
+  amber: '#ffb938',
+  amberContainer: '#3a2b0b',
+  amberText: '#fde68a',
+  mint: '#3cc4d0',
+  mintContainer: '#10343a',
+  mintText: '#99f6e4',
+  orange: '#ffa733',
+  orangeContainer: '#35230f',
+  orangeText: '#fed7aa',
+  violet: '#ff55b0',
+  violetContainer: '#3a1229',
+  violetText: '#fbcfe8',
 };
 
 export const lightColors = {
   accents: harmonicAccentsLight,
-  // Tokens exatos de vito-telas.html (Light)
-  page: '#dde1df',
+  // Paleta canônica v5 (Light)
+  page: '#efefef',
   bg: '#ffffff',
-  surf: '#f2f4f3',
-  ink: '#17191b',
-  muted: '#69706d',
-  line: '#d2d7d4',
-  blue: '#2b7fd4',
-  blueBg: '#e4effb',
-  red: '#d6355a',
-  redBg: '#fde6ec',
-  purple: '#7a4fe0',
-  purpleBg: '#eee8fd',
-  acc: '#0b9a5f',
-  greenBg: '#ddf4e8',
-  orange: '#d9681a',
-  orangeBg: '#fbebdb',
-  teal: '#0e8f9b',
-  tealBg: '#dff3f5',
-  fin: '#a8710a',
-  finBg: '#fbf0d8',
+  surf: '#f4f4f4',
+  btn: '#ececec',
+  ink: '#0a0a0a',
+  muted: '#595959',
+  line: '#e6e6e6',
+  blue: '#0a7cff',
+  blueBg: '#e6f1ff',
+  red: '#ff2d46',
+  redBg: '#ffe8ec',
+  purple: '#ff2fa0',
+  purpleBg: '#ffe6f4',
+  acc: '#0aa55c',
+  greenBg: '#e3f6ec',
+  orange: '#f08300',
+  orangeBg: '#fff0d9',
+  teal: '#0aa5b5',
+  tealBg: '#dff4f6',
+  fin: '#d98a00',
+  finBg: '#fff2d6',
 
-  // M3 Primary
-  primary: '#17191b', // ink
-  onPrimary: '#ffffff', // bg
-  primaryContainer: '#f2f4f3', // surf
-  onPrimaryContainer: '#17191b',
-  primaryHover: '#27272a',
-  primaryLight: 'rgba(23, 25, 27, 0.08)',
-  cobalt: '#17191b',
-  cobaltGlow: 'rgba(23, 25, 27, 0.12)',
+  // Hairline & Glassmorphism v5
+  hairline: 'rgba(10, 10, 10, 0.065)',
+  hairlineHighlight: 'rgba(255, 255, 255, 0.0)',
+  surfaceGlass: 'rgba(244, 244, 244, 0.80)',
+  headerGlass: 'rgba(255, 255, 255, 0.86)',
+  glassBorder: 'rgba(10, 10, 10, 0.08)',
 
-  // M3 Secondary
-  secondary: '#69706d', // muted
+  // Primary / Secondary / Tertiary aliases
+  primary: '#0a0a0a',
+  onPrimary: '#ffffff',
+  primaryContainer: '#f4f4f4',
+  onPrimaryContainer: '#0a0a0a',
+  primaryHover: '#262626',
+  primaryLight: 'rgba(10, 10, 10, 0.08)',
+  cobalt: '#0a0a0a',
+  cobaltGlow: 'rgba(10, 10, 10, 0.12)',
+
+  secondary: '#595959',
   onSecondary: '#ffffff',
-  secondaryContainer: '#f2f4f3',
-  onSecondaryContainer: '#17191b',
+  secondaryContainer: '#f4f4f4',
+  onSecondaryContainer: '#0a0a0a',
 
-  // M3 Tertiary
-  tertiary: '#2b7fd4', // blue
+  tertiary: '#0a7cff',
   onTertiary: '#ffffff',
-  tertiaryContainer: '#e4effb', // blueBg
-  onTertiaryContainer: '#17191b',
+  tertiaryContainer: '#e6f1ff',
+  onTertiaryContainer: '#0a0a0a',
 
-  // M3 Surface
-  surface: '#ffffff', // bg
-  onSurface: '#17191b', // ink
-  surfaceVariant: '#f2f4f3', // surf
-  onSurfaceVariant: '#69706d', // muted
-
-  // M3 Surface Containers
+  // Surfaces
+  surface: '#ffffff',
+  onSurface: '#0a0a0a',
+  surfaceVariant: '#f4f4f4',
+  onSurfaceVariant: '#595959',
   surfaceContainerLowest: '#ffffff',
   surfaceContainerLow: '#ffffff',
-  surfaceContainer: '#f2f4f3',
-  surfaceContainerHigh: '#f2f4f3',
-  surfaceContainerHighest: '#d2d7d4',
-  surfaceDim: '#dde1df',
+  surfaceContainer: '#f4f4f4',
+  surfaceContainerHigh: '#ececec',
+  surfaceContainerHighest: '#e6e6e6',
+  surfaceDim: '#efefef',
   surfaceBright: '#ffffff',
-  surfaceSubtle: '#f2f4f3',
+  surfaceSubtle: '#f4f4f4',
   surfaceElevated: '#ffffff',
-  surfaceGlass: 'rgba(255, 255, 255, 0.85)',
-  glassBorder: 'rgba(0, 0, 0, 0.06)',
 
-  // M3 Outlines & Borders
-  outline: '#69706d',
-  outlineVariant: '#d2d7d4', // line
+  // Outlines & Borders
+  outline: '#595959',
+  outlineVariant: '#e6e6e6',
 
-  // M3 Error
-  error: '#d6355a', // red
+  // Semantic statuses
+  error: '#ff2d46',
   onError: '#ffffff',
-  errorContainer: '#fde6ec', // redBg
-  onErrorContainer: '#d6355a',
-  danger: '#d6355a',
-  dangerContainer: '#fde6ec',
-  dangerLight: 'rgba(214, 53, 90, 0.12)',
+  errorContainer: '#ffe8ec',
+  onErrorContainer: '#ff2d46',
+  danger: '#ff2d46',
+  dangerContainer: '#ffe8ec',
+  dangerLight: 'rgba(255, 45, 70, 0.12)',
 
-  // Custom Utilities
-  canvas: '#dde1df',
-  success: '#0b9a5f', // acc
+  canvas: '#efefef',
+  success: '#0aa55c',
   onSuccess: '#ffffff',
-  successContainer: '#ddf4e8', // greenBg
-  onSuccessContainer: '#0b9a5f',
-  successLight: 'rgba(11, 154, 95, 0.12)',
-  warning: '#d9681a', // orange
-  warningLight: 'rgba(217, 104, 26, 0.12)',
-  statusOnline: '#0b9a5f',
+  successContainer: '#e3f6ec',
+  onSuccessContainer: '#0aa55c',
+  successLight: 'rgba(10, 165, 92, 0.12)',
+  warning: '#f08300',
+  warningLight: 'rgba(240, 131, 0, 0.12)',
+  statusOnline: '#0aa55c',
 
-  // Custom Background categories
-  categoryBirthdayBg: '#fbebdb',
-  categoryBirthdayText: '#d9681a',
-  categoryPartyBg: '#eee8fd',
-  categoryPartyText: '#7a4fe0',
-  categoryBbqBg: '#fde6ec',
-  categoryBbqText: '#d6355a',
+  categoryBirthdayBg: '#fff0d9',
+  categoryBirthdayText: '#f08300',
+  categoryPartyBg: '#ffe6f4',
+  categoryPartyText: '#ff2fa0',
+  categoryBbqBg: '#ffe8ec',
+  categoryBbqText: '#ff2d46',
 
   // Backward compatibility
-  textPrimary: '#17191b',
-  textSecondary: '#69706d',
-  textMuted: '#69706d',
-  surfaceBorder: '#d2d7d4',
-  structuralBorder: '#d2d7d4',
-  accent: '#17191b',
-  accentLight: 'rgba(23, 25, 27, 0.08)',
+  textPrimary: '#0a0a0a',
+  textSecondary: '#595959',
+  textMuted: '#595959',
+  surfaceBorder: '#e6e6e6',
+  structuralBorder: '#e6e6e6',
+  accent: '#0a0a0a',
+  accentLight: 'rgba(10, 10, 10, 0.08)',
 };
 
 export const darkColors = {
   accents: harmonicAccentsDark,
-  // Tokens exatos de vito-telas.html (Dark)
-  page: '#050606',
-  bg: '#0d0f10',
-  surf: '#191c1e',
-  ink: '#f1f3f2',
-  muted: '#98a19d',
-  line: '#2c3134',
-  blue: '#5aa2ee',
-  blueBg: '#16283b',
-  red: '#ff6b8a',
-  redBg: '#3a1620',
-  purple: '#a58bff',
-  purpleBg: '#241a42',
-  acc: '#34d399',
-  greenBg: '#12302a',
-  orange: '#ff9a52',
+  // Paleta canônica v5 (Dark)
+  page: '#000000',
+  bg: '#0a0a0a',
+  surf: '#171717',
+  btn: '#262626',
+  ink: '#f5f5f5',
+  muted: '#8c8c8c',
+  line: '#262626',
+  blue: '#3b93ff',
+  blueBg: '#0f2540',
+  red: '#ff5468',
+  redBg: '#3a1219',
+  purple: '#ff55b0',
+  purpleBg: '#3a1229',
+  acc: '#2dd17f',
+  greenBg: '#0f2f22',
+  orange: '#ffa733',
   orangeBg: '#35230f',
   teal: '#3cc4d0',
   tealBg: '#10343a',
-  fin: '#f5b93d',
+  fin: '#ffb938',
   finBg: '#3a2b0b',
 
-  // M3 Primary
-  primary: '#f1f3f2', // ink
-  onPrimary: '#0d0f10', // bg
-  primaryContainer: '#191c1e', // surf
-  onPrimaryContainer: '#f1f3f2',
-  primaryHover: '#e4e4e7',
-  primaryLight: 'rgba(241, 243, 242, 0.08)',
-  cobalt: '#f1f3f2',
-  cobaltGlow: 'rgba(241, 243, 242, 0.12)',
+  // Hairline & Glassmorphism v5
+  hairline: 'rgba(255, 255, 255, 0.07)',
+  hairlineHighlight: 'rgba(255, 255, 255, 0.045)',
+  surfaceGlass: 'rgba(24, 24, 26, 0.78)',
+  headerGlass: 'rgba(10, 10, 10, 0.86)',
+  glassBorder: 'rgba(255, 255, 255, 0.10)',
 
-  // M3 Secondary
-  secondary: '#98a19d', // muted
-  onSecondary: '#0d0f10',
-  secondaryContainer: '#191c1e',
-  onSecondaryContainer: '#f1f3f2',
+  // Primary / Secondary / Tertiary aliases
+  primary: '#f5f5f5',
+  onPrimary: '#0a0a0a',
+  primaryContainer: '#171717',
+  onPrimaryContainer: '#f5f5f5',
+  primaryHover: '#e5e5e5',
+  primaryLight: 'rgba(245, 245, 245, 0.08)',
+  cobalt: '#f5f5f5',
+  cobaltGlow: 'rgba(245, 245, 245, 0.12)',
 
-  // M3 Tertiary
-  tertiary: '#5aa2ee', // blue
-  onTertiary: '#0d0f10',
-  tertiaryContainer: '#16283b', // blueBg
-  onTertiaryContainer: '#f1f3f2',
+  secondary: '#8c8c8c',
+  onSecondary: '#0a0a0a',
+  secondaryContainer: '#171717',
+  onSecondaryContainer: '#f5f5f5',
 
-  // M3 Surface
-  surface: '#0d0f10', // bg
-  onSurface: '#f1f3f2', // ink
-  surfaceVariant: '#191c1e', // surf
-  onSurfaceVariant: '#98a19d', // muted
+  tertiary: '#3b93ff',
+  onTertiary: '#0a0a0a',
+  tertiaryContainer: '#0f2540',
+  onTertiaryContainer: '#f5f5f5',
 
-  // M3 Surface Containers
-  surfaceContainerLowest: '#050606',
-  surfaceContainerLow: '#0d0f10',
-  surfaceContainer: '#191c1e',
-  surfaceContainerHigh: '#191c1e',
-  surfaceContainerHighest: '#2c3134',
-  surfaceDim: '#050606',
-  surfaceBright: '#191c1e',
-  surfaceSubtle: '#0d0f10',
-  surfaceElevated: '#191c1e',
-  surfaceGlass: 'rgba(13, 15, 16, 0.85)',
-  glassBorder: 'rgba(255, 255, 255, 0.08)',
+  // Surfaces
+  surface: '#0a0a0a',
+  onSurface: '#f5f5f5',
+  surfaceVariant: '#171717',
+  onSurfaceVariant: '#8c8c8c',
+  surfaceContainerLowest: '#000000',
+  surfaceContainerLow: '#0a0a0a',
+  surfaceContainer: '#171717',
+  surfaceContainerHigh: '#262626',
+  surfaceContainerHighest: '#262626',
+  surfaceDim: '#000000',
+  surfaceBright: '#171717',
+  surfaceSubtle: '#0a0a0a',
+  surfaceElevated: '#171717',
 
-  // M3 Outlines & Borders
-  outline: '#98a19d',
-  outlineVariant: '#2c3134', // line
+  // Outlines & Borders
+  outline: '#8c8c8c',
+  outlineVariant: '#262626',
 
-  // M3 Error
-  error: '#ff6b8a', // red
-  onError: '#3a1620',
-  errorContainer: '#3a1620',
-  onErrorContainer: '#ff6b8a',
-  danger: '#ff6b8a',
-  dangerContainer: '#3a1620',
-  dangerLight: 'rgba(255, 107, 138, 0.16)',
+  // Semantic statuses
+  error: '#ff5468',
+  onError: '#3a1219',
+  errorContainer: '#3a1219',
+  onErrorContainer: '#ff5468',
+  danger: '#ff5468',
+  dangerContainer: '#3a1219',
+  dangerLight: 'rgba(255, 84, 104, 0.16)',
 
-  // Custom Utilities
-  canvas: '#050606',
-  success: '#34d399', // acc
-  onSuccess: '#12302a',
-  successContainer: '#12302a',
-  onSuccessContainer: '#34d399',
-  successLight: 'rgba(52, 211, 153, 0.16)',
-  warning: '#ff9a52', // orange
-  warningLight: 'rgba(255, 154, 82, 0.16)',
-  statusOnline: '#34d399',
+  canvas: '#000000',
+  success: '#2dd17f',
+  onSuccess: '#0f2f22',
+  successContainer: '#0f2f22',
+  onSuccessContainer: '#2dd17f',
+  successLight: 'rgba(45, 209, 127, 0.16)',
+  warning: '#ffa733',
+  warningLight: 'rgba(255, 167, 51, 0.16)',
+  statusOnline: '#2dd17f',
 
-  // Custom Background categories
   categoryBirthdayBg: '#35230f',
-  categoryBirthdayText: '#ff9a52',
-  categoryPartyBg: '#241a42',
-  categoryPartyText: '#a58bff',
-  categoryBbqBg: '#3a1620',
-  categoryBbqText: '#ff6b8a',
+  categoryBirthdayText: '#ffa733',
+  categoryPartyBg: '#3a1229',
+  categoryPartyText: '#ff55b0',
+  categoryBbqBg: '#3a1219',
+  categoryBbqText: '#ff5468',
 
   // Backward compatibility
-  textPrimary: '#f1f3f2',
-  textSecondary: '#98a19d',
-  textMuted: '#98a19d',
-  surfaceBorder: '#2c3134',
-  structuralBorder: '#2c3134',
-  accent: '#f1f3f2',
-  accentLight: 'rgba(241, 243, 242, 0.12)',
+  textPrimary: '#f5f5f5',
+  textSecondary: '#8c8c8c',
+  textMuted: '#8c8c8c',
+  surfaceBorder: '#262626',
+  structuralBorder: '#262626',
+  accent: '#f5f5f5',
+  accentLight: 'rgba(245, 245, 245, 0.12)',
 };
 
 export type ThemeColors = typeof lightColors;
 
 export const tokens = {
-  // 1. Paleta Tonal Ativa (inicializada com Light)
   colors: { ...lightColors },
 
-  // 2. Escala Tipográfica Material Design 3
   typography: {
     family: {
-      regular: 'Inter_400Regular',
-      medium: 'Inter_500Medium',
-      semibold: 'Inter_600SemiBold',
-      bold: 'Inter_700Bold',
-      montserratBold: 'Montserrat_800ExtraBold',
-      montserratSemiBold: 'Montserrat_600SemiBold',
-      interBold: 'Inter_700Bold',
-      interExtraBold: 'Inter_800ExtraBold',
+      sans: 'Geist',
+      mono: 'Geist Mono',
+      regular: 'Geist',
+      medium: 'Geist',
+      semibold: 'Geist',
+      bold: 'Geist',
+      montserratBold: 'Geist',
+      montserratSemiBold: 'Geist',
+      interBold: 'Geist',
+      interExtraBold: 'Geist',
     },
     size: {
-      displayLarge: 57,
-      displayMedium: 45,
-      displaySmall: 36,
-      headlineLarge: 32,
-      headlineMedium: 28,
+      displayHero: 40,
+      displayBalance: 34,
+      displayLarge: 40,
+      displayMedium: 34,
+      displaySmall: 30,
+      headlineLarge: 30,
+      headlineMedium: 26,
       headlineSmall: 24,
       titleLarge: 22,
-      titleMedium: 16,
-      titleSmall: 14,
-      bodyLarge: 16,
-      bodyMedium: 14,
-      bodySmall: 12,
+      titleMedium: 17,
+      titleSmall: 15.5,
+      bodyLarge: 15.5,
+      bodyMedium: 15,
+      bodySmall: 13,
       labelLarge: 14,
-      labelMedium: 12,
-      labelSmall: 11,
-      xs: 11,
+      labelMedium: 13,
+      labelSmall: 12,
+      xs: 12,
       sm: 13,
       md: 15,
       lg: 17,
-      xl: 20,
+      xl: 22,
       xxl: 24,
-      title: 28,
+      title: 30,
     },
     lineHeight: {
-      displayLarge: 64,
-      displayMedium: 52,
-      displaySmall: 44,
-      headlineLarge: 40,
-      headlineMedium: 36,
-      headlineSmall: 32,
+      displayLarge: 40,
+      displayMedium: 34,
+      displaySmall: 33,
+      headlineLarge: 33,
+      headlineMedium: 30,
+      headlineSmall: 29,
       titleLarge: 28,
-      titleMedium: 24,
-      titleSmall: 20,
-      bodyLarge: 24,
-      bodyMedium: 20,
-      bodySmall: 16,
+      titleMedium: 22,
+      titleSmall: 21,
+      bodyLarge: 22,
+      bodyMedium: 22,
+      bodySmall: 18,
       labelLarge: 20,
-      labelMedium: 16,
+      labelMedium: 18,
       labelSmall: 16,
-      xs: 14,
+      xs: 16,
       sm: 18,
       md: 22,
-      lg: 24,
+      lg: 22,
       xl: 28,
-      xxl: 32,
-      title: 36,
+      xxl: 29,
+      title: 33,
     },
     weight: {
       regular: '400' as const,
@@ -355,49 +375,37 @@ export const tokens = {
       bold: '700' as const,
     },
     letterSpacing: {
-      displayLarge: -0.5,
-      displayMedium: -0.4,
-      displaySmall: -0.3,
-      headlineLarge: -0.4,
-      headlineMedium: -0.3,
-      headlineSmall: -0.2,
-      titleLarge: -0.3,
-      titleMedium: -0.2,
-      titleSmall: -0.1,
-      bodyLarge: -0.1,
-      bodyMedium: 0,
-      bodySmall: 0.1,
-      labelLarge: 0.15,
-      labelMedium: 0.25,
-      labelSmall: 0.35,
+      displayLarge: -1.2,
+      displayMedium: -1.02,
+      displaySmall: -1.05,
+      headlineLarge: -1.05,
+      headlineMedium: -0.78,
+      headlineSmall: -0.48,
+      titleLarge: -0.44,
+      titleMedium: -0.34,
+      titleSmall: -0.08,
+      bodyLarge: -0.08,
+      bodyMedium: -0.075,
+      bodySmall: 0,
+      labelLarge: 0,
+      labelMedium: 0,
+      labelSmall: 0,
     },
-    titleSmall: {
-      fontSize: 14,
-      lineHeight: 20,
-    },
-    titleMedium: {
-      fontSize: 16,
-      lineHeight: 24,
-    },
-    bodySmall: {
-      fontSize: 12,
-      lineHeight: 16,
-    },
-    bodyMedium: {
-      fontSize: 14,
-      lineHeight: 20,
-    },
+    titleSmall: { fontSize: 14, lineHeight: 20 },
+    titleMedium: { fontSize: 16, lineHeight: 24 },
+    bodySmall: { fontSize: 13, lineHeight: 18 },
+    bodyMedium: { fontSize: 15, lineHeight: 22 },
   },
 
-  // 3. Escala de Shapes do Material 3 — Design System: sm8/md14/lg20/full
   shapes: {
-    none: MD3Shapes.none,
-    xs: MD3Shapes.extraSmall,
-    sm: 8,
-    md: 14,
-    lg: 20,
-    xl: MD3Shapes.extraLarge,
-    full: MD3Shapes.full,
+    none: v5Radii.none,
+    xs: v5Radii.xs,
+    sm: v5Radii.sm,
+    md: v5Radii.md,
+    lg: v5Radii.lg,
+    card: v5Radii.card,
+    xl: v5Radii.sheet,
+    full: v5Radii.full,
     extraSmall: MD3Shapes.extraSmall,
     small: MD3Shapes.small,
     medium: MD3Shapes.medium,
@@ -406,13 +414,7 @@ export const tokens = {
     extraLarge: MD3Shapes.extraLarge,
   },
   radii: {
-    none: MD3Shapes.none,
-    xs: MD3Shapes.extraSmall,
-    sm: 8,
-    md: 14,
-    lg: 20,
-    xl: MD3Shapes.extraLarge,
-    full: MD3Shapes.full,
+    ...v5Radii,
     extraSmall: MD3Shapes.extraSmall,
     small: MD3Shapes.small,
     medium: MD3Shapes.medium,
@@ -421,7 +423,6 @@ export const tokens = {
     extraLarge: MD3Shapes.extraLarge,
   },
 
-  // 4. Espaçamentos M3 (Grid de 4dp / 8dp)
   spacing: {
     '2xs': 2,
     xxs: 2,
@@ -429,65 +430,20 @@ export const tokens = {
     sm: 8,
     md: 12,
     lg: 16,
+    screen: 20,
     xl: 24,
     xxl: 32,
   },
 
-  // 5. Elevações Tonais e Sombras Sutis
   shadows: {
-    level0: {
-      shadowOpacity: 0,
-      elevation: 0,
-    },
-    level1: {
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.04,
-      shadowRadius: 8,
-      elevation: 1,
-    },
-    level2: {
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.20,
-      shadowRadius: 6,
-      elevation: 3,
-    },
-    level3: {
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.25,
-      shadowRadius: 8,
-      elevation: 6,
-    },
-    level4: {
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 6 },
-      shadowOpacity: 0.30,
-      shadowRadius: 10,
-      elevation: 8,
-    },
-    level5: {
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 8 },
-      shadowOpacity: 0.30,
-      shadowRadius: 14,
-      elevation: 12,
-    },
-    subtle: {
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.18,
-      shadowRadius: 4,
-      elevation: 2,
-    },
-    floating: {
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 6 },
-      shadowOpacity: 0.35,
-      shadowRadius: 12,
-      elevation: 6,
-    },
+    level0: { shadowOpacity: 0, elevation: 0 },
+    level1: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.025, shadowRadius: 2, elevation: 1 },
+    level2: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 8, elevation: 3 },
+    level3: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 24, elevation: 5 },
+    level4: { shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.11, shadowRadius: 32, elevation: 8 },
+    level5: { shadowColor: '#000', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.25, shadowRadius: 36, elevation: 12 },
+    subtle: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.025, shadowRadius: 2, elevation: 1 },
+    floating: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 24, elevation: 6 },
   },
 
   hitSlop: {
@@ -495,7 +451,6 @@ export const tokens = {
     md: { top: 12, bottom: 12, left: 12, right: 12 },
   },
 
-  // 7. Booking / Agendamento — Cards Compactos Padronizados
   booking: {
     cardPadding: 12,
     cardGap: 8,
@@ -522,4 +477,4 @@ export const tabularNumbers: TextStyle = {
   fontVariant: ['tabular-nums'],
 };
 
-export const BOTTOM_NAV_CLEARANCE = 100;
+export const BOTTOM_NAV_CLEARANCE = 140;

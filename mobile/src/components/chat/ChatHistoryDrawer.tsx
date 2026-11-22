@@ -15,13 +15,16 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ConversationSession } from '../../types';
+import { useTheme } from '../../context/ThemeContext';
+import { MOTION_CURVES } from '../../theme/motion';
+import { v5Radii } from '../../theme/tokens';
+import { useReduceMotion } from '../../theme/vitoMotion';
+import type { ConversationSession } from '../../types';
 import {
   filterSessionsByQuery,
   findEmptyOrErrorSessions,
   groupSessionsByDate,
 } from '../../utils/chatHistoryGrouping';
-import { useTheme } from '../../context/ThemeContext';
 import { SwipeableConversationRow } from './SwipeableConversationRow';
 
 interface ChatHistoryDrawerProps {
@@ -38,11 +41,6 @@ interface ChatHistoryDrawerProps {
 
 const PANEL_WIDTH = Math.min(Dimensions.get('window').width * 0.86, 340);
 
-/**
- * Gaveta lateral de conversas fiel ao protótipo `<aside class="drawer" id="drawer">`
- * de `vito-telas.html`, com busca em tempo real, sugestão inteligente de limpeza
- * e gesto de deslizar para fixar ou excluir.
- */
 export const ChatHistoryDrawer: React.FC<ChatHistoryDrawerProps> = ({
   visible,
   onClose,
@@ -55,6 +53,7 @@ export const ChatHistoryDrawer: React.FC<ChatHistoryDrawerProps> = ({
   onRetrySync,
 }) => {
   const { colors } = useTheme();
+  const reduceMotion = useReduceMotion();
   const insets = useSafeAreaInsets();
   const slide = useRef(new Animated.Value(-PANEL_WIDTH)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
@@ -65,16 +64,22 @@ export const ChatHistoryDrawer: React.FC<ChatHistoryDrawerProps> = ({
 
   useEffect(() => {
     if (visible) {
+      if (reduceMotion) {
+        slide.setValue(0);
+        backdropOpacity.setValue(1);
+        return;
+      }
       Animated.parallel([
         Animated.timing(slide, {
           toValue: 0,
-          duration: 340,
-          easing: Easing.bezier(0.2, 0.8, 0.2, 1),
+          duration: 460,
+          easing: Easing.bezier(...MOTION_CURVES.q),
           useNativeDriver: true,
         }),
         Animated.timing(backdropOpacity, {
           toValue: 1,
-          duration: 240,
+          duration: 340,
+          easing: Easing.bezier(...MOTION_CURVES.std),
           useNativeDriver: true,
         }),
       ]).start();
@@ -82,29 +87,29 @@ export const ChatHistoryDrawer: React.FC<ChatHistoryDrawerProps> = ({
       slide.setValue(-PANEL_WIDTH);
       backdropOpacity.setValue(0);
     }
-  }, [visible, slide, backdropOpacity]);
+  }, [visible, reduceMotion, slide, backdropOpacity]);
 
   const filteredConversations = useMemo(
     () => filterSessionsByQuery(conversations, searchQuery),
-    [conversations, searchQuery],
+    [conversations, searchQuery]
   );
 
   const pinnedConversations = useMemo(
     () => filteredConversations.filter((c) => c.pinned),
-    [filteredConversations],
+    [filteredConversations]
   );
   const unpinnedConversations = useMemo(
     () => filteredConversations.filter((c) => !c.pinned),
-    [filteredConversations],
+    [filteredConversations]
   );
   const unpinnedGroups = useMemo(
     () => groupSessionsByDate(unpinnedConversations),
-    [unpinnedConversations],
+    [unpinnedConversations]
   );
 
   const emptyOrErrorSessions = useMemo(
     () => findEmptyOrErrorSessions(conversations),
-    [conversations],
+    [conversations]
   );
 
   const showCleanupBanner =
@@ -118,9 +123,7 @@ export const ChatHistoryDrawer: React.FC<ChatHistoryDrawerProps> = ({
 
   const handleCleanEmptyConversations = () => {
     if (!onDeleteConversation) return;
-    emptyOrErrorSessions.forEach((session) => {
-      onDeleteConversation(session.id);
-    });
+    emptyOrErrorSessions.forEach((session) => onDeleteConversation(session.id));
     setCleanupDismissed(true);
   };
 
@@ -132,21 +135,9 @@ export const ChatHistoryDrawer: React.FC<ChatHistoryDrawerProps> = ({
       : Math.max(insets.top + 8, 36);
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="none"
-      onRequestClose={onClose}
-    >
+    <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
       <View style={styles.root}>
-        <Animated.View
-          style={[
-            styles.backdrop,
-            {
-              opacity: backdropOpacity,
-            },
-          ]}
-        >
+        <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}>
           <TouchableOpacity
             style={StyleSheet.absoluteFill}
             activeOpacity={1}
@@ -167,12 +158,12 @@ export const ChatHistoryDrawer: React.FC<ChatHistoryDrawerProps> = ({
             },
           ]}
         >
-          {/* Cabeçalho .drawer h2 + .sub */}
           <View style={styles.headerRow}>
             <View style={styles.headerTextCol}>
               <Text style={[styles.headerTitle, { color: colors.ink }]}>Conversas</Text>
               <Text style={[styles.headerSub, { color: colors.muted }]}>
-                {conversations.length} {conversations.length === 1 ? 'conversa' : 'conversas'}
+                {conversations.length}{' '}
+                {conversations.length === 1 ? 'conversa' : 'conversas'}
               </Text>
             </View>
             <TouchableOpacity
@@ -186,14 +177,10 @@ export const ChatHistoryDrawer: React.FC<ChatHistoryDrawerProps> = ({
             </TouchableOpacity>
           </View>
 
-          {/* Busca .dsearch */}
           <View
             style={[
               styles.searchBox,
-              {
-                backgroundColor: colors.surf,
-                borderColor: colors.line,
-              },
+              { backgroundColor: colors.surf, borderColor: colors.hairline },
             ]}
           >
             <TextInput
@@ -218,12 +205,11 @@ export const ChatHistoryDrawer: React.FC<ChatHistoryDrawerProps> = ({
             )}
           </View>
 
-          {/* Alerta de sincronização pendente (se houver) */}
           {showPending && (
             <View
               style={[
                 styles.suggestionCard,
-                { backgroundColor: colors.surf, borderColor: colors.line },
+                { backgroundColor: colors.surf, borderColor: colors.hairline },
               ]}
               accessibilityRole="alert"
             >
@@ -253,12 +239,11 @@ export const ChatHistoryDrawer: React.FC<ChatHistoryDrawerProps> = ({
             </View>
           )}
 
-          {/* Sugestão inteligente .vsug#dclean de vito-telas.html */}
           {showCleanupBanner && (
             <View
               style={[
                 styles.suggestionCard,
-                { backgroundColor: colors.surf, borderColor: colors.line },
+                { backgroundColor: colors.surf, borderColor: colors.hairline },
               ]}
             >
               <View style={[styles.vitoBadge, { backgroundColor: colors.ink }]}>
@@ -305,7 +290,6 @@ export const ChatHistoryDrawer: React.FC<ChatHistoryDrawerProps> = ({
             </View>
           )}
 
-          {/* Lista .cvl */}
           <ScrollView
             style={styles.listScroll}
             contentContainerStyle={styles.listContent}
@@ -381,7 +365,6 @@ export const ChatHistoryDrawer: React.FC<ChatHistoryDrawerProps> = ({
             )}
           </ScrollView>
 
-          {/* Rodapé .dhint + .cta2 */}
           <Text style={[styles.swipeHint, { color: colors.muted }]}>
             Deslize para fixar ou excluir
           </Text>
@@ -405,18 +388,15 @@ export const ChatHistoryDrawer: React.FC<ChatHistoryDrawerProps> = ({
 };
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    flexDirection: 'row',
-  },
+  root: { flex: 1, flexDirection: 'row' },
   backdrop: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(11, 13, 18, 0.35)',
+    backgroundColor: 'rgba(0, 0, 0, 0.40)',
   },
   panel: {
     height: '100%',
-    borderTopRightRadius: 28,
-    borderBottomRightRadius: 28,
+    borderTopRightRadius: v5Radii.sheet,
+    borderBottomRightRadius: v5Radii.sheet,
     paddingHorizontal: 16,
     overflow: 'hidden',
     elevation: 12,
@@ -427,23 +407,18 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 12,
   },
-  headerTextCol: {
-    flex: 1,
-  },
+  headerTextCol: { flex: 1 },
   headerTitle: {
-    fontFamily: 'Montserrat_800ExtraBold',
+    fontFamily: 'Geist',
     fontSize: 24,
-    fontWeight: '800',
+    fontWeight: '500',
     letterSpacing: -0.48,
   },
-  headerSub: {
-    fontSize: 13,
-    marginTop: 2,
-  },
+  headerSub: { fontFamily: 'Geist', fontSize: 13, marginTop: 2 },
   closeBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -457,15 +432,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  searchInput: {
-    flex: 1,
-    fontSize: 14.5,
-    paddingVertical: 0,
-  },
+  searchInput: { flex: 1, fontFamily: 'Geist', fontSize: 14.5, paddingVertical: 0 },
   suggestionCard: {
     marginTop: 12,
     padding: 12,
-    borderRadius: 16,
+    borderRadius: 20,
     borderWidth: 1,
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -479,97 +450,43 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     flexShrink: 0,
   },
-  vitoBadgeText: {
-    fontFamily: 'Montserrat_800ExtraBold',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  suggestionBody: {
-    flex: 1,
-    minWidth: 0,
-  },
-  suggestionText: {
-    fontSize: 13,
-    lineHeight: 17.5,
-  },
-  suggestionBold: {
-    fontWeight: '600',
-  },
-  suggestionActions: {
-    flexDirection: 'row',
-    gap: 6,
-    marginTop: 8,
-  },
+  vitoBadgeText: { fontFamily: 'Geist', fontSize: 12, fontWeight: '600' },
+  suggestionBody: { flex: 1, minWidth: 0 },
+  suggestionText: { fontFamily: 'Geist', fontSize: 13, lineHeight: 17.5 },
+  suggestionBold: { fontWeight: '600' },
+  suggestionActions: { flexDirection: 'row', gap: 6, marginTop: 8 },
   suggestionBtnPrimary: {
-    height: 28,
+    height: 30,
     paddingHorizontal: 12,
-    borderRadius: 14,
+    borderRadius: 999,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  suggestionBtnPrimaryText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
+  suggestionBtnPrimaryText: { fontFamily: 'Geist', fontSize: 12, fontWeight: '500' },
   suggestionBtnSecondary: {
-    height: 28,
+    height: 30,
     paddingHorizontal: 12,
-    borderRadius: 14,
+    borderRadius: 999,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  suggestionBtnSecondaryText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  listScroll: {
-    flex: 1,
-    marginTop: 10,
-  },
-  listContent: {
-    paddingBottom: 12,
-  },
+  suggestionBtnSecondaryText: { fontFamily: 'Geist', fontSize: 12, fontWeight: '500' },
+  listScroll: { flex: 1, marginTop: 10 },
+  listContent: { paddingBottom: 12 },
   groupHeader: {
-    fontSize: 12,
-    fontWeight: '600',
-    letterSpacing: 0.72,
-    textTransform: 'uppercase',
+    fontFamily: 'Geist',
+    fontSize: 13,
+    fontWeight: '500',
     marginTop: 16,
     marginBottom: 6,
     marginHorizontal: 4,
   },
-  emptyContainer: {
-    paddingVertical: 44,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-    gap: 6,
-  },
-  emptyTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  emptySub: {
-    fontSize: 13,
-    textAlign: 'center',
-    lineHeight: 18,
-  },
-  swipeHint: {
-    textAlign: 'center',
-    fontSize: 12,
-    marginVertical: 8,
-  },
-  newChatBtn: {
-    height: 50,
-    borderRadius: 25,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 4,
-  },
-  newChatBtnText: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
+  emptyContainer: { paddingVertical: 44, paddingHorizontal: 16, alignItems: 'center', gap: 6 },
+  emptyTitle: { fontFamily: 'Geist', fontSize: 15, fontWeight: '500', textAlign: 'center' },
+  emptySub: { fontFamily: 'Geist', fontSize: 13, textAlign: 'center', lineHeight: 18 },
+  swipeHint: { textAlign: 'center', fontFamily: 'Geist', fontSize: 12, marginVertical: 8 },
+  newChatBtn: { height: 50, borderRadius: 999, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
+  newChatBtnText: { fontFamily: 'Geist', fontSize: 15, fontWeight: '500' },
 });

@@ -1,251 +1,54 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { View, StyleSheet, Keyboard, Platform, BackHandler, useWindowDimensions, Alert } from 'react-native';
-import * as Notifications from 'expo-notifications';
-import { dataSync, chatPromptBus, tabNavigationBus, pagerSwipeLockBus } from '../services/dataSync';
-import { navigateToTab } from './navigationRef';
-import { FloatingTabBar } from '../components/common/FloatingTabBar';
-import { Header, HeaderPill, HeaderRoundButton } from '../components/common/Header';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  BackHandler,
+  DeviceEventEmitter,
+  Keyboard,
+  Platform,
+  StyleSheet,
+  View,
+  useWindowDimensions,
+} from 'react-native';
 import { AdaptivePager, AdaptivePagerRef } from '../components/common/AdaptivePager';
-import { ChatScreen, ChatScreenRef } from '../screens/ChatScreen';
-import { TasksScreen } from '../screens/TasksScreen';
-import { BotsScreen } from '../screens/BotsScreen';
-import { BookingScreen } from '../screens/BookingScreen';
-import { ProfileScreen } from '../screens/ProfileScreen';
-import { FinanceScreen } from '../screens/FinanceScreen';
-import { AgendaTabScreen } from './AgendaTabScreen';
-import { useHomeDataContext } from './HomeDataProvider';
+import { DOCK_TABS, FloatingTabBar, type DockTabType } from '../components/common/FloatingTabBar';
+import { HeaderRoundButton, SubScreenHeader } from '../components/common/Header';
+import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { api } from '../services/api';
+import { chatPromptBus, dataSync, pagerSwipeLockBus, tabNavigationBus } from '../services/dataSync';
+import { BookingScreen } from '../screens/BookingScreen';
+import { ChatScreenRef } from '../screens/ChatScreen';
+import { FinanceScreen } from '../screens/FinanceScreen';
+import { ProfileScreen } from '../screens/ProfileScreen';
 import { hapticFeedback } from '../theme/motion';
 import {
-  MainTabType,
-  getIndexForTab,
-  getTabForIndex,
-  shouldPreventSwipe,
-  determineBackAction,
-} from '../utils/pagerNavigation';
+  CircularThemeRevealOverlay,
+  TransitioningView,
+  VfxCelebrationOverlay,
+} from '../theme/vitoMotion';
+import { determineBackAction, shouldPreventSwipe, type MainTabType } from '../utils/pagerNavigation';
+import { AgendaTabScreen } from './AgendaTabScreen';
+import { useHomeDataContext } from './HomeDataProvider';
+import {
+  BotsTabScreen,
+  ChatTabScreen,
+  TasksTabScreen,
+  getDockIndex,
+  getDockTabAt,
+  getInitials,
+  isDockTab,
+  tryNavigateStackRoute,
+  useRadarPushSync,
+} from './MainTabViews';
 
+type OverlaySubScreen = 'booking' | 'profile' | null;
 
-const ChatTabScreen: React.FC<{
-  chatRef: React.RefObject<ChatScreenRef | null>;
-  onKeyboardStateChange: (open: boolean) => void;
-}> = ({ chatRef, onKeyboardStateChange }) => {
-  const { loadData } = useHomeDataContext();
-
-  return (
-    <View style={styles.tabRoot}>
-      <Header
-        activeTab="chat"
-        onPressNewChat={() => chatRef.current?.startNewChat()}
-        onPressMenu={() => chatRef.current?.openHistory()}
-        hideTitle
-      />
-      <ChatScreen
-        ref={chatRef}
-        onDataChanged={loadData}
-        onKeyboardStateChange={onKeyboardStateChange}
-      />
-    </View>
-  );
-};
-
-// Push de radar -> refresh imediato; toque na notificação -> abre Radares (§9.4).
-// Push de booking -> atualiza Recebidos + Agenda; toque -> abre Booking.
-const useRadarPushSync = (onSelectTab: (tab: MainTabType) => void) => {
-  useEffect(() => {
-    const subReceived = Notifications.addNotificationReceivedListener((n) => {
-      const data = (n.request?.content?.data || {}) as Record<string, unknown>;
-      if (data.type === 'RADAR_TRIGGERED') {
-        dataSync.notify('refresh_triggers');
-      }
-      if (data.type === 'booking_appointment' || data.type === 'meeting_vote' || data.type === 'meeting_confirmed') {
-        dataSync.notify('refresh_bookings');
-        dataSync.notify('refresh_events');
-      }
-    });
-    const subResponse = Notifications.addNotificationResponseReceivedListener((resp) => {
-      const data = (resp.notification.request?.content?.data || {}) as Record<string, unknown>;
-      if (data.type === 'RADAR_TRIGGERED') {
-        dataSync.notify('refresh_triggers');
-        onSelectTab('triggers');
-      }
-      if (data.type === 'booking_appointment' || data.type === 'meeting_vote' || data.type === 'meeting_confirmed') {
-        dataSync.notify('refresh_bookings');
-        dataSync.notify('refresh_events');
-        onSelectTab('booking');
-      }
-    });
-    return () => {
-      subReceived.remove();
-      subResponse.remove();
-    };
-  }, [onSelectTab]);
-};
-
-
-const TasksTabScreen: React.FC = () => {
-  const home = useHomeDataContext();
-  const pendingTodos = home.todos.filter((t) => t.status !== 'completed');
-  const completedList = home.todos.filter((t) => t.status === 'completed');
-  const [createRequestId, setCreateRequestId] = useState(0);
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-
-  const now = Date.now();
-  const dayStart = new Date(now);
-  dayStart.setHours(0, 0, 0, 0);
-  const overdue = pendingTodos.filter((t) => {
-    if (!t.due_date) return false;
-    const ms = new Date(t.due_date.length === 10 ? `${t.due_date}T23:59:59` : t.due_date).getTime();
-    return !Number.isNaN(ms) && ms < dayStart.getTime();
-  }).length;
-  const subtitle = `${pendingTodos.length} ativas · ${overdue} atrasadas · ${completedList.length} concluídas`;
-
-  return (
-    <View style={styles.tabRoot}>
-      <Header
-        activeTab="tasks"
-        align="left"
-        subtitle={subtitle}
-        showSearchButton={true}
-        searchOpen={searchOpen}
-        onToggleSearch={() => setSearchOpen((prev) => !prev)}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        searchPlaceholder="Pesquisar tarefas..."
-        contextualActions={
-          <HeaderRoundButton
-            icon="auto-awesome"
-            variant="primary"
-            onPress={() => tabNavigationBus.notify('chat')}
-            accessibilityLabel="Pedir ao Vito: nova tarefa"
-            size={20}
-          />
-        }
-      />
-      <TasksScreen
-        todos={home.todos}
-        pendingTodos={pendingTodos}
-        completedTodosList={completedList}
-        completedCount={completedList.length}
-        loading={home.loading}
-        refreshing={home.refreshing}
-        onRefresh={home.onRefresh}
-        onToggleTodo={home.handleToggleTodo}
-        onDeleteTodo={home.handleDeleteTodo}
-        onToggleSubtask={home.handleToggleSubtask}
-        onAddSubtask={home.handleAddSubtask}
-        onDeleteSubtask={home.handleDeleteSubtask}
-        onSaveTodoFull={home.handleCreateTodo}
-        onUpdateTodoFull={home.handleUpdateTodo}
-        onOpenEventCreate={() => {}}
-        createRequestId={createRequestId}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        searchOpen={searchOpen}
-      />
-    </View>
-  );
-};
-
-const BotsTabScreen: React.FC<{
-  onSubViewChange: (inSubView: boolean) => void;
-}> = ({ onSubViewChange }) => {
-  const [inSubView, setInSubView] = useState(false);
-  const [subtitle, setSubtitle] = useState('Mini assistentes, cada um com uma função só');
-  const [createRequestId, setCreateRequestId] = useState(0);
-
-  const handleSubViewChange = (sub: boolean) => {
-    setInSubView(sub);
-    onSubViewChange(sub);
-  };
-
-  return (
-    <View style={styles.tabRoot}>
-      <Header
-        activeTab="triggers"
-        align="left"
-        subtitle={subtitle}
-        hideTitle={inSubView}
-        contextualActions={
-          inSubView ? undefined : (
-            <HeaderRoundButton
-              icon="add"
-              variant="primary"
-              onPress={() => setCreateRequestId((n) => n + 1)}
-              accessibilityLabel="Novo bot"
-              size={22}
-            />
-          )
-        }
-      />
-      <BotsScreen
-        onSubViewChange={handleSubViewChange}
-        onSubtitleChange={setSubtitle}
-        createRequestId={createRequestId}
-      />
-    </View>
-  );
-};
-
-const BookingTabScreen: React.FC<{
-  onSubViewChange: (inSubView: boolean) => void;
-}> = ({ onSubViewChange }) => {
-  const [inSubView, setInSubView] = useState(false);
-
-  const handleSubViewChange = (sub: boolean) => {
-    setInSubView(sub);
-    onSubViewChange(sub);
-  };
-
-  return (
-    <View style={styles.tabRoot}>
-      <Header
-        activeTab="booking"
-        align="left"
-        hideTitle={inSubView}
-        contextualActions={
-          inSubView ? undefined : (
-            <HeaderRoundButton
-              icon="auto-awesome"
-              variant="primary"
-              onPress={() => tabNavigationBus.notify('chat')}
-              accessibilityLabel="Pedir ao Vito: novo link"
-              size={20}
-            />
-          )
-        }
-      />
-      <BookingScreen onSubViewChange={handleSubViewChange} />
-    </View>
-  );
-};
-
-const FinanceTabScreen: React.FC = () => {
-  return (
-    <View style={styles.tabRoot}>
-      <FinanceScreen />
-    </View>
-  );
-};
-
-const ProfileTabScreen: React.FC = () => {
-  const home = useHomeDataContext();
-  return (
-    <View style={styles.tabRoot}>
-      <Header
-        activeTab="profile"
-        align="left"
-        subtitle="Conta, autonomia e integrações"
-      />
-      <ProfileScreen refreshing={home.refreshing} onRefresh={home.onRefresh} onDataChanged={home.loadData} />
-    </View>
-  );
-};
-
-export const MainTabs: React.FC<{ route?: any }> = ({ route }) => {
+export const MainTabs: React.FC<{ route?: { params?: { screen?: MainTabType } } }> = ({ route }) => {
   const { colors } = useTheme();
+  const { user } = useAuth();
   const home = useHomeDataContext();
-  const [activeTab, setActiveTab] = useState<MainTabType>('chat');
+
+  const [activeTab, setActiveTab] = useState<DockTabType>('chat');
+  const [overlaySubScreen, setOverlaySubScreen] = useState<OverlaySubScreen>(null);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const [inAgendaSubView, setInAgendaSubView] = useState(false);
   const [inAgendaModal, setInAgendaModal] = useState(false);
@@ -253,40 +56,104 @@ export const MainTabs: React.FC<{ route?: any }> = ({ route }) => {
   const [inTriggersSubView, setInTriggersSubView] = useState(false);
   const [inBookingSubView, setInBookingSubView] = useState(false);
   const [gestureSwipeLocked, setGestureSwipeLocked] = useState(false);
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
 
   const chatRef = useRef<ChatScreenRef>(null);
   const pagerRef = useRef<AdaptivePagerRef>(null);
   const { width: windowWidth } = useWindowDimensions();
   const [containerWidth, setContainerWidth] = useState(windowWidth || 390);
+  const profileInitials = useMemo(() => getInitials(user?.name), [user?.name]);
 
-  const fireTabSideEffects = useCallback((tab: MainTabType) => {
-    if (tab === 'calendar' || tab === 'tasks') {
-      home.loadData(true);
-    } else if (tab === 'finance') {
-      dataSync.notify('refresh_finance');
-    } else if (tab === 'triggers') {
-      dataSync.notify('refresh_triggers');
-    } else if (tab === 'booking') {
-      dataSync.notify('refresh_bookings');
+  const refreshUnreadCount = useCallback(async () => {
+    try {
+      const pending = await api.getPendingItems();
+      setUnreadNotificationsCount(Array.isArray(pending) ? pending.length : 0);
+    } catch {
+      // Mantém último valor conhecido
     }
-  }, [home]);
+  }, []);
 
-  const handleSelectTab = useCallback((tab: MainTabType) => {
-    setActiveTab(tab);
-    pagerRef.current?.setPage(getIndexForTab(tab));
-    fireTabSideEffects(tab);
-  }, [fireTabSideEffects]);
+  useEffect(() => {
+    void refreshUnreadCount();
+    const unsubPending = dataSync.subscribe('refresh_pending', refreshUnreadCount);
+    const unsubAll = dataSync.subscribe('refresh_all', refreshUnreadCount);
+    const badgeSub = DeviceEventEmitter.addListener(
+      'vito:notifications-unread',
+      (count: unknown) => {
+        if (typeof count === 'number' && Number.isFinite(count)) {
+          setUnreadNotificationsCount(Math.max(0, count));
+        }
+      }
+    );
+    return () => {
+      unsubPending();
+      unsubAll();
+      badgeSub.remove();
+    };
+  }, [refreshUnreadCount]);
 
-  const handlePageSelected = useCallback((position: number) => {
-    const newTab = getTabForIndex(position);
-    if (newTab !== activeTab) {
-      hapticFeedback.selection();
-      setActiveTab(newTab);
-      fireTabSideEffects(newTab);
-    }
-  }, [activeTab, fireTabSideEffects]);
+  const fireTabSideEffects = useCallback(
+    (tab: MainTabType) => {
+      if (tab === 'calendar' || tab === 'tasks') {
+        home.loadData(true);
+      } else if (tab === 'finance') {
+        dataSync.notify('refresh_finance');
+      } else if (tab === 'triggers') {
+        dataSync.notify('refresh_triggers');
+      } else if (tab === 'booking') {
+        dataSync.notify('refresh_bookings');
+      }
+    },
+    [home]
+  );
 
-  // Teclado global
+  const handleSelectTab = useCallback(
+    (tab: MainTabType) => {
+      if (tab === 'booking') {
+        if (!tryNavigateStackRoute('booking')) {
+          setOverlaySubScreen('booking');
+        }
+        fireTabSideEffects('booking');
+        return;
+      }
+      if (tab === 'profile') {
+        if (!tryNavigateStackRoute('profile')) {
+          setOverlaySubScreen('profile');
+        }
+        return;
+      }
+      if (isDockTab(tab)) {
+        setOverlaySubScreen(null);
+        setActiveTab(tab);
+        pagerRef.current?.setPage(getDockIndex(tab));
+        fireTabSideEffects(tab);
+      }
+    },
+    [fireTabSideEffects]
+  );
+
+  const handleOpenNotifications = useCallback(() => {
+    if (tryNavigateStackRoute('notifications')) return;
+    DeviceEventEmitter.emit('vito:open-notifications');
+  }, []);
+
+  const handleOpenProfile = useCallback(() => {
+    if (tryNavigateStackRoute('profile')) return;
+    setOverlaySubScreen('profile');
+  }, []);
+
+  const handlePageSelected = useCallback(
+    (position: number) => {
+      const newTab = getDockTabAt(position);
+      if (newTab !== activeTab) {
+        hapticFeedback.selection();
+        setActiveTab(newTab);
+        fireTabSideEffects(newTab);
+      }
+    },
+    [activeTab, fireTabSideEffects]
+  );
+
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
@@ -298,21 +165,18 @@ export const MainTabs: React.FC<{ route?: any }> = ({ route }) => {
     };
   }, []);
 
-  // Barramento de navegação lateral direta (§Instagram/TikTok swipe)
   useEffect(() => {
     return tabNavigationBus.subscribe((tab) => {
       handleSelectTab(tab);
     });
   }, [handleSelectTab]);
 
-  // Bloqueio temporário do pager quando carrossel interno (ChatIdeasDeck) está sendo arrastado
   useEffect(() => {
     return pagerSwipeLockBus.subscribe((locked) => {
       setGestureSwipeLocked(locked);
     });
   }, []);
 
-  // Prompts externos vindos das abas / radares
   useEffect(() => {
     return chatPromptBus.subscribe((prompt) => {
       if (typeof prompt === 'string') {
@@ -326,17 +190,22 @@ export const MainTabs: React.FC<{ route?: any }> = ({ route }) => {
 
   useRadarPushSync(handleSelectTab);
 
-  // Parâmetro de rota / deep linking
-  const targetScreen = route?.params?.screen as MainTabType | undefined;
+  const targetScreen = route?.params?.screen;
   useEffect(() => {
     if (targetScreen && targetScreen !== activeTab) {
       handleSelectTab(targetScreen);
     }
-  }, [targetScreen, handleSelectTab]);
+  }, [targetScreen, activeTab, handleSelectTab]);
 
-  // Intercepta gesto de voltar do hardware/sistema para navegar hierarquicamente
   useEffect(() => {
     const onBackPress = () => {
+      if (overlaySubScreen) {
+        if (overlaySubScreen === 'booking' && inBookingSubView) {
+          return false;
+        }
+        setOverlaySubScreen(null);
+        return true;
+      }
       const hasModal = inAgendaModal;
       const hasSub = inAgendaSubView || inTriggersSubView || inBookingSubView;
       const action = determineBackAction({
@@ -364,19 +233,30 @@ export const MainTabs: React.FC<{ route?: any }> = ({ route }) => {
 
     const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
     return () => subscription.remove();
-  }, [activeTab, inAgendaModal, inAgendaSubView, inTriggersSubView, inBookingSubView, showSummaries, handleSelectTab]);
+  }, [
+    activeTab,
+    overlaySubScreen,
+    inAgendaModal,
+    inAgendaSubView,
+    inTriggersSubView,
+    inBookingSubView,
+    showSummaries,
+    handleSelectTab,
+  ]);
 
-  const hasSubScreen = inAgendaSubView || inTriggersSubView || inBookingSubView;
+  const hasSubScreen =
+    inAgendaSubView || inTriggersSubView || inBookingSubView || overlaySubScreen !== null;
   const hasModal = inAgendaModal;
-  const scrollEnabled = !shouldPreventSwipe({
-    isKeyboardOpen: keyboardOpen,
-    hasModal,
-    hasSubScreen,
-  }) && !gestureSwipeLocked;
+  const scrollEnabled =
+    !shouldPreventSwipe({
+      isKeyboardOpen: keyboardOpen,
+      hasModal,
+      hasSubScreen,
+    }) && !gestureSwipeLocked;
 
   return (
     <View
-      style={[styles.mainTabsContainer, { backgroundColor: colors.surface }]}
+      style={[styles.mainTabsContainer, { backgroundColor: colors.bg }]}
       onLayout={(e) => {
         const w = e.nativeEvent.layout.width;
         if (w > 0 && Math.abs(w - containerWidth) > 1) {
@@ -392,7 +272,14 @@ export const MainTabs: React.FC<{ route?: any }> = ({ route }) => {
         onPageSelected={handlePageSelected}
       >
         <View key="0" style={[styles.pageWrapper, { width: containerWidth }]} collapsable={false}>
-          <ChatTabScreen chatRef={chatRef} onKeyboardStateChange={setKeyboardOpen} />
+          <ChatTabScreen
+            chatRef={chatRef}
+            onKeyboardStateChange={setKeyboardOpen}
+            unreadNotificationsCount={unreadNotificationsCount}
+            profileInitials={profileInitials}
+            onOpenNotifications={handleOpenNotifications}
+            onOpenProfile={handleOpenProfile}
+          />
         </View>
 
         <View key="1" style={[styles.pageWrapper, { width: containerWidth }]} collapsable={false}>
@@ -410,27 +297,65 @@ export const MainTabs: React.FC<{ route?: any }> = ({ route }) => {
         </View>
 
         <View key="3" style={[styles.pageWrapper, { width: containerWidth }]} collapsable={false}>
-          <FinanceTabScreen />
+          <FinanceScreen />
         </View>
 
         <View key="4" style={[styles.pageWrapper, { width: containerWidth }]} collapsable={false}>
           <BotsTabScreen onSubViewChange={setInTriggersSubView} />
         </View>
-
-        <View key="5" style={[styles.pageWrapper, { width: containerWidth }]} collapsable={false}>
-          <BookingTabScreen onSubViewChange={setInBookingSubView} />
-        </View>
-
-        <View key="6" style={[styles.pageWrapper, { width: containerWidth }]} collapsable={false}>
-          <ProfileTabScreen />
-        </View>
       </AdaptivePager>
+
+      {/* Sub-telas pushed fora da dock: Booking (#open-book) e Perfil (AV) */}
+      <TransitioningView
+        visible={overlaySubScreen === 'booking'}
+        mode="push"
+        style={[styles.overlaySubScreen, { backgroundColor: colors.bg }]}
+      >
+        <SubScreenHeader
+          title="Agendamentos"
+          subtitle="Links e votações de horário"
+          onPressBack={() => setOverlaySubScreen(null)}
+          rightAction={
+            <HeaderRoundButton
+              icon="auto-awesome"
+              variant="primary"
+              onPress={() => {
+                setOverlaySubScreen(null);
+                handleSelectTab('chat');
+              }}
+              accessibilityLabel="Pedir ao Vito: novo link"
+              size={20}
+            />
+          }
+        />
+        <BookingScreen onSubViewChange={setInBookingSubView} />
+      </TransitioningView>
+
+      <TransitioningView
+        visible={overlaySubScreen === 'profile'}
+        mode="push"
+        style={[styles.overlaySubScreen, { backgroundColor: colors.bg }]}
+      >
+        <SubScreenHeader
+          title="Perfil"
+          subtitle="Conta, autonomia e integrações"
+          onPressBack={() => setOverlaySubScreen(null)}
+        />
+        <ProfileScreen
+          refreshing={home.refreshing}
+          onRefresh={home.onRefresh}
+          onDataChanged={home.loadData}
+        />
+      </TransitioningView>
 
       <FloatingTabBar
         activeTab={activeTab}
         onSelectTab={handleSelectTab}
-        visible={!keyboardOpen}
+        visible={!keyboardOpen && overlaySubScreen === null && !inAgendaSubView && !inTriggersSubView}
       />
+
+      <CircularThemeRevealOverlay />
+      <VfxCelebrationOverlay />
     </View>
   );
 };
@@ -438,6 +363,7 @@ export const MainTabs: React.FC<{ route?: any }> = ({ route }) => {
 const styles = StyleSheet.create({
   mainTabsContainer: {
     flex: 1,
+    position: 'relative',
   },
   pager: {
     flex: 1,
@@ -445,8 +371,8 @@ const styles = StyleSheet.create({
   pageWrapper: {
     flex: 1,
   },
-  tabRoot: {
-    flex: 1,
+  overlaySubScreen: {
+    ...StyleSheet.absoluteFill,
+    zIndex: 110,
   },
 });
-
