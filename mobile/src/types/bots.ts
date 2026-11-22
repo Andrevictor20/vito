@@ -6,12 +6,12 @@ export type BotAnimState = 'idle' | 'thinking' | 'happy' | 'surprised' | 'sleepi
 
 export interface BotSkin {
   preset?: string;
-  bodyColor: string;
-  bellyColor: string;
-  tentacleColor: string;
-  eyeColor: string;
-  cheekColor: string;
-  accentColor: string;
+  fill?: string;
+  stroke?: string;
+  eyes?: string;
+  bowtie?: string;
+  hat?: string;
+  band?: string;
 }
 
 export interface BotActionSpec {

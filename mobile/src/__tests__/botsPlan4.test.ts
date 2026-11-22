@@ -126,7 +126,7 @@ describe('Plano 04 — Bots UI Mobile (AC-03, AC-13, AC-14 & §7)', () => {
 
   test('Skin e botAnimState resolvem corretamente para cards e studio', () => {
     const parsed = parseBotSkin(JSON.stringify(MASCOT_PRESETS[2].skin));
-    assert.equal(parsed.bodyColor, MASCOT_PRESETS[2].skin.bodyColor);
+    assert.equal(parsed.fill, MASCOT_PRESETS[2].skin.fill);
     assert.equal(resolveBotAnimState({ status: 'paused', pending: [] }), 'sleeping');
     assert.equal(
       resolveBotAnimState({

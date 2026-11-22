@@ -10,6 +10,7 @@ import {
 import Svg, { Defs, RadialGradient, Circle, Stop, Path, Rect } from 'react-native-svg';
 import { useTheme } from '../context/ThemeContext';
 import { VitoMascot } from '../components/common/VitoMascot';
+import { voiceStateToMascotAnim } from '../components/mascot/mascotPalettes';
 import {
   ConversationState,
   formatVoiceDuration,
@@ -253,8 +254,8 @@ export const VoiceFullscreenView: React.FC<VoiceFullscreenViewProps> = ({
             >
               <VitoMascot
                 size={84}
-                animated
-                state={state === 'THINKING' ? 'thinking' : 'idle'}
+                animated={!isMuted}
+                state={voiceStateToMascotAnim(state, isMuted)}
               />
             </Animated.View>
           </TouchableOpacity>
