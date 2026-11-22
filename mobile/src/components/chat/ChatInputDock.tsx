@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState, useImperativeHandle, forwardRef } from 'react';
 import {
   StyleSheet,
   View,
@@ -12,13 +12,19 @@ import Svg, { Path } from 'react-native-svg';
 import { tokens } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { shouldTriggerSend } from '../../utils/chatSendGuard';
-import { FocusMode } from '../../types/focus';
+import { prepareEditDraft } from '../../utils/chatActions';
 import { hapticFeedback } from '../../theme/motion';
 
+export interface ChatInputDockRef {
+  focus: () => void;
+  clear: () => void;
+  setDraft: (text: string) => void;
+  insertTranscript: (text: string) => void;
+  getText: () => string;
+}
+
 interface ChatInputDockProps {
-  value: string;
-  onChangeText: (text: string) => void;
-  onSend: () => void;
+  onSend: (text: string) => void;
   loading?: boolean;
   onStop?: () => void;
   onPressMic?: () => void;
@@ -28,16 +34,13 @@ interface ChatInputDockProps {
   onPressAttach?: () => void;
   selectedImageUri?: string | null;
   onClearImage?: () => void;
-  inputRef?: React.RefObject<any>;
   onRefusedSend?: (reason: 'empty' | 'loading' | 'debounced') => void;
-  selectedFocus?: FocusMode | null;
-  onPressFocus?: () => void;
-  onClearFocus?: () => void;
+  modelLabel?: string;
+  modelDotColor?: string;
+  onPressModel?: () => void;
 }
 
-export const ChatInputDock: React.FC<ChatInputDockProps> = ({
-  value,
-  onChangeText,
+export const ChatInputDock = forwardRef<ChatInputDockRef, ChatInputDockProps>(({
   onSend,
   loading = false,
   onStop,
@@ -48,19 +51,49 @@ export const ChatInputDock: React.FC<ChatInputDockProps> = ({
   onPressAttach,
   selectedImageUri,
   onClearImage,
-  inputRef,
   onRefusedSend,
-  selectedFocus,
-  onPressFocus,
-  onClearFocus,
-}) => {
+  modelLabel = 'Vito Auto',
+  modelDotColor,
+  onPressModel,
+}, ref) => {
   const { colors } = useTheme();
-  const canSend = (value.trim().length > 0 || !!selectedImageUri) && !loading;
+  const [inputText, setInputText] = useState('');
+  const inputTextRef = useRef('');
+  const textInputRef = useRef<TextInput>(null);
+  const canSend = (inputText.trim().length > 0 || !!selectedImageUri) && !loading;
   const lastSentAtRef = useRef(0);
 
+  const updateInputText = (next: string) => {
+    inputTextRef.current = next;
+    setInputText(next);
+  };
+
+  useImperativeHandle(ref, () => ({
+    focus: () => {
+      textInputRef.current?.focus();
+    },
+    clear: () => {
+      updateInputText('');
+    },
+    setDraft: (text: string) => {
+      const next = prepareEditDraft(inputTextRef.current, text);
+      updateInputText(next);
+      requestAnimationFrame(() => textInputRef.current?.focus());
+    },
+    insertTranscript: (text: string) => {
+      const trimmed = text.trim();
+      if (!trimmed) return;
+      const current = inputTextRef.current.trimEnd();
+      const next = current ? `${current} ${trimmed}` : trimmed;
+      updateInputText(next);
+    },
+    getText: () => inputTextRef.current,
+  }), []);
+
   const handleTriggerSend = () => {
+    const currentText = inputTextRef.current;
     const decision = shouldTriggerSend({
-      hasContent: value.trim().length > 0 || !!selectedImageUri,
+      hasContent: currentText.trim().length > 0 || !!selectedImageUri,
       loading,
       now: Date.now(),
       lastSentAt: lastSentAtRef.current,
@@ -71,7 +104,8 @@ export const ChatInputDock: React.FC<ChatInputDockProps> = ({
     }
     lastSentAtRef.current = decision.sentAt;
     hapticFeedback.medium();
-    onSend();
+    updateInputText('');
+    onSend(currentText);
   };
 
   return (
@@ -101,7 +135,7 @@ export const ChatInputDock: React.FC<ChatInputDockProps> = ({
           },
         ]}
       >
-        {/* Linha Superior (.crow): Anexo (+) e Foco em */}
+        {/* Linha Superior (.crow): Anexo (+) e Pill de Modelo (#c-model) */}
         <View style={styles.crowTop}>
           {onPressAttach && !isRecording && (
             <TouchableOpacity
@@ -118,67 +152,35 @@ export const ChatInputDock: React.FC<ChatInputDockProps> = ({
             </TouchableOpacity>
           )}
 
-          {/* Foco em (.focus) */}
-          {onPressFocus && (
-            selectedFocus ? (
+          {onPressModel && (
+            <TouchableOpacity
+              style={[
+                styles.modelPill,
+                { backgroundColor: colors.bg, borderColor: colors.line },
+              ]}
+              onPress={onPressModel}
+              activeOpacity={0.75}
+              hitSlop={tokens.hitSlop.sm}
+              accessibilityLabel="Modelo de IA"
+            >
               <View
                 style={[
-                  styles.focusPillActive,
-                  {
-                    backgroundColor: colors.bg,
-                    borderColor: colors.primary,
-                  },
+                  styles.modelDot,
+                  { backgroundColor: modelDotColor || colors.ink },
                 ]}
-              >
-                <TouchableOpacity
-                  style={styles.focusPillTouchable}
-                  onPress={onPressFocus}
-                  activeOpacity={0.7}
-                  accessibilityLabel={`Foco em: ${selectedFocus.title}`}
-                >
-                  <MaterialIcons name={selectedFocus.iconName as any} size={13} color={colors.primary} />
-                  <Text style={[styles.focusTextActive, { color: colors.primary }]} numberOfLines={1}>
-                    {selectedFocus.title}
-                  </Text>
-                </TouchableOpacity>
-                {onClearFocus && (
-                  <TouchableOpacity
-                    style={styles.focusClear}
-                    onPress={onClearFocus}
-                    hitSlop={tokens.hitSlop.sm}
-                    accessibilityLabel="Remover foco"
-                  >
-                    <MaterialIcons name="close" size={12} color={colors.primary} />
-                  </TouchableOpacity>
-                )}
-              </View>
-            ) : (
-              <TouchableOpacity
-                style={[
-                  styles.focusPill,
-                  {
-                    backgroundColor: colors.bg,
-                    borderColor: colors.line,
-                  },
-                ]}
-                onPress={onPressFocus}
-                activeOpacity={0.7}
-                accessibilityLabel="Selecionar foco de IA"
-              >
-                <MaterialIcons name="tune" size={13} color={colors.ink} />
-                <Text style={[styles.focusText, { color: colors.ink }]}>
-                  Foco em
-                </Text>
-                <MaterialIcons name="keyboard-arrow-down" size={13} color={colors.muted} />
-              </TouchableOpacity>
-            )
+              />
+              <Text style={[styles.modelText, { color: colors.ink }]} numberOfLines={1}>
+                {modelLabel}
+              </Text>
+              <MaterialIcons name="keyboard-arrow-down" size={14} color={colors.muted} />
+            </TouchableOpacity>
           )}
         </View>
 
         {/* Linha Inferior (.crow): Campo de Texto + Mic + Enviar */}
         <View style={styles.crowBottom}>
           <TextInput
-            ref={inputRef}
+            ref={textInputRef}
             style={[styles.fieldInput, { color: colors.ink }]}
             placeholder={
               isRecording
@@ -186,8 +188,8 @@ export const ChatInputDock: React.FC<ChatInputDockProps> = ({
                 : 'Instrua o Vito ou pergunte algo...'
             }
             placeholderTextColor={isRecording ? colors.red : colors.muted}
-            value={value}
-            onChangeText={onChangeText}
+            value={inputText}
+            onChangeText={updateInputText}
             multiline
             maxLength={1000}
             blurOnSubmit={false}
@@ -195,10 +197,10 @@ export const ChatInputDock: React.FC<ChatInputDockProps> = ({
           />
 
           {/* Botão limpar texto */}
-          {value.length > 0 && !loading && (
+          {inputText.length > 0 && !loading && (
             <TouchableOpacity
               style={styles.clearBtn}
-              onPress={() => onChangeText('')}
+              onPress={() => updateInputText('')}
               hitSlop={tokens.hitSlop.sm}
               accessibilityLabel="Limpar texto digitado"
             >
@@ -239,7 +241,7 @@ export const ChatInputDock: React.FC<ChatInputDockProps> = ({
           </TouchableOpacity>
 
           {/* Botão Live Voice (.circ.wv) idêntico ao vito-telas.html */}
-          {onPressLiveVoice && value.trim().length === 0 && !isRecording && (
+          {onPressLiveVoice && inputText.trim().length === 0 && !isRecording && (
             <TouchableOpacity
               style={[
                 styles.circWv,
@@ -303,7 +305,7 @@ export const ChatInputDock: React.FC<ChatInputDockProps> = ({
       </View>
     </View>
   );
-};
+});
 
 const styles = StyleSheet.create({
   dockWrapper: {
@@ -372,39 +374,26 @@ const styles = StyleSheet.create({
   sendBtn: {
     marginLeft: 2,
   },
-  focusPill: {
+  modelPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 11,
+    gap: 7,
+    minHeight: 34,
+    maxWidth: 210,
+    paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 14,
+    borderRadius: 17,
     borderWidth: 1,
   },
-  focusText: {
+  modelDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  modelText: {
     fontSize: 12.5,
     fontWeight: '600',
-  },
-  focusPillActive: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    gap: 6,
-  },
-  focusPillTouchable: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
-  focusTextActive: {
-    fontSize: 12.5,
-    fontWeight: '700',
-  },
-  focusClear: {
-    padding: 2,
+    flexShrink: 1,
   },
   fieldInput: {
     flex: 1,

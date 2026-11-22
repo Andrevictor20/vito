@@ -186,6 +186,8 @@ export interface ChatMessage {
   role?: 'user' | 'assistant' | 'system';
   content?: string;
   created_at?: string;
+  model_used?: string;
+  fallback_notice?: string;
   event?: CalendarEvent;
   todo?: Todo;
   trigger?: Trigger;
@@ -203,6 +205,8 @@ export interface ConversationSession {
   messages?: ChatMessage[];
   active?: boolean;
   pinned?: boolean;
+  model_pref?: string;
+  effort_pref?: AiReasoningEffort | '';
 }
 
 export interface WhatsAppStatus {
@@ -255,6 +259,62 @@ export interface AISettings {
   personality_tone?: string;
   persona_style?: 'balanced' | 'direct' | 'warm' | 'professional' | 'relaxed' | string;
   preferred_voice?: string;
+  default_model?: string;
+  default_effort?: AiReasoningEffort;
+}
+
+export type AiProviderKey =
+  | 'srv'
+  | 'anthropic'
+  | 'google'
+  | 'openai'
+  | 'groq'
+  | 'openrouter'
+  | 'custom';
+
+export type AiProviderStatus = 'ok' | 'invalid' | 'disconnected';
+export type AiReasoningEffort = 'auto' | 'low' | 'med' | 'high';
+
+export interface AiModelItem {
+  id: string;
+  name: string;
+  note?: string;
+  reasoning?: boolean;
+  supports_tools?: boolean;
+  supports_vision?: boolean;
+  quality_tier?: number;
+  max_context?: number;
+}
+
+export interface AiProviderInfo {
+  provider_key: AiProviderKey;
+  name: string;
+  company: string;
+  status: AiProviderStatus;
+  fixed?: boolean;
+  connected?: boolean;
+  key_last4?: string;
+  base_url?: string;
+  model_count?: number;
+  verified_at?: string;
+  models?: AiModelItem[];
+}
+
+export interface AiModelGroup {
+  provider_key: AiProviderKey;
+  provider_name: string;
+  status?: AiProviderStatus;
+  models: AiModelItem[];
+}
+
+export interface AiPreferences {
+  default_model: string;
+  default_effort: AiReasoningEffort;
+}
+
+export interface ThreadModelPref {
+  model_pref: string;
+  effort_pref: AiReasoningEffort | '';
 }
 
 export interface MorningBriefingSettings {

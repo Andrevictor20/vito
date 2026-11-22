@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 
@@ -31,8 +32,10 @@ func (r *MemoryRepositorySQLite) Create(m *domain.Memory) error {
 		INSERT INTO memories (id, user_id, category, content, importance, confidence, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 	`
-	_, err := r.db.Exec(query, m.ID, m.UserID, m.Category, m.Content, imp, conf, m.CreatedAt, m.UpdatedAt)
-	return err
+	return ExecuteQueuedWrite(context.Background(), func() error {
+		_, err := r.db.Exec(query, m.ID, m.UserID, m.Category, m.Content, imp, conf, m.CreatedAt, m.UpdatedAt)
+		return err
+	})
 }
 
 func (r *MemoryRepositorySQLite) GetByID(id, userID string) (*domain.Memory, error) {
@@ -96,11 +99,9 @@ func (r *MemoryRepositorySQLite) ListByUser(userID string, limit int) ([]domain.
 
 func (r *MemoryRepositorySQLite) Delete(id, userID string) error {
 	query := `DELETE FROM memories WHERE id = ? AND user_id = ?`
-	res, err := r.db.Exec(query, id, userID)
-	if err != nil {
-		return err
-	}
-	rows, err := res.RowsAffected()
+	rows, err := ExecuteQueuedWriteRows(context.Background(), func() (sql.Result, error) {
+		return r.db.Exec(query, id, userID)
+	})
 	if err != nil {
 		return err
 	}

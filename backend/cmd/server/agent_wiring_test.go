@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/andrevmp/vito/backend/internal/config"
 	"github.com/andrevmp/vito/backend/internal/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/repository"
@@ -184,5 +185,91 @@ func TestWhatsAppServiceAdapter_SendMessage_ResolvesContactName(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "não encontrado") {
 		t.Errorf("esperava mensagem amigável de contato não encontrado, obteve: %v", err)
+	}
+}
+
+func TestProductionCognitiveWiring_Onda2AndOnda3(t *testing.T) {
+	ctx := context.Background()
+	db, err := database.Open(filepath.Join(t.TempDir(), "prod_wiring.db"))
+	if err != nil {
+		t.Fatalf("database.Open: %v", err)
+	}
+	defer db.Close()
+
+	now := time.Now().UTC()
+	userRepo := repository.NewUserRepository(db)
+	userID := "u-prod-wire-1"
+	_ = userRepo.Create(&domain.User{
+		ID: userID, Name: "Prod Wire", Email: "prodwire@vito.test", CreatedAt: now, UpdatedAt: now,
+	})
+
+	eventRepo := repository.NewEventRepository(db)
+	todoRepo := repository.NewTodoRepository(db)
+	memoryRepo := repository.NewMemoryRepository(db)
+	aiSettingsRepo := repository.NewAISettingsRepository(db)
+	triggerRepo := repository.NewTriggerRepository(db)
+	briefingRepo := repository.NewBriefingRepository(db)
+	pendingRepo := repository.NewPendingRepository(db)
+	notifRepo := repository.NewDeviceTokenRepository(db)
+	finRepo := repository.NewFinanceRepository(db)
+	waRepo := repository.NewWhatsAppRepository(db)
+
+	calSvc := service.NewCalendarService(eventRepo)
+	todoSvc := service.NewTodoService(todoRepo)
+	triggerSvc := service.NewTriggerService(triggerRepo)
+	pendingSvc := service.NewPendingService(pendingRepo)
+	notifSvc := service.NewNotificationService(notifRepo)
+	waSvc := service.NewWhatsAppService(service.WhatsAppServiceConfig{}, waRepo, &mockEvoClientWiring{}, nil)
+
+	agentSys := setupAgentSubsystem(
+		&config.Config{}, db, calSvc, todoSvc, waSvc, nil,
+		userRepo, aiSettingsRepo, triggerSvc, nil, memoryRepo,
+	)
+	if agentSys == nil || agentSys.ADKFacade == nil || agentSys.EntityLinkRepo == nil || agentSys.ContextEnricher == nil || agentSys.AIProviderHandler == nil || agentSys.AIProviderSvc == nil {
+		t.Fatalf("setupAgentSubsystem não inicializou dependências esperadas: %+v", agentSys)
+	}
+	defer agentSys.TraceRecorder.Close()
+	defer agentSys.ConsolidationWorker.Stop()
+
+	reminderWorker := service.NewReminderWorker(eventRepo, notifSvc, 15*time.Minute)
+	triggerWorker := service.NewTriggerWorker(triggerRepo, notifSvc, &service.DefaultTriggerEvaluator{}, time.Minute)
+	morningWorker := service.NewMorningBriefingWorker(briefingRepo, eventRepo, todoRepo, userRepo, notifSvc, time.Minute)
+	behavioralWorker := service.NewBehavioralWorker(todoRepo, eventRepo, memoryRepo)
+
+	cogRes := wireCognitiveRuntime(CognitiveRuntimeConfig{
+		DB: db, EventRepo: eventRepo, NotifSvc: notifSvc, PendingSvc: pendingSvc,
+		ReminderWorker: reminderWorker, TriggerWorker: triggerWorker,
+		MorningBriefingWorker: morningWorker, BehavioralWorker: behavioralWorker, AgentSys: agentSys,
+	})
+	if cogRes.BudgetSvc == nil || cogRes.WorkflowRunner == nil {
+		t.Fatalf("wireCognitiveRuntime deveria inicializar BudgetSvc e WorkflowRunner: %+v", cogRes)
+	}
+
+	// Verifica que FinanceSnapshotProvider e EntityLinkRepository estão conectados em produção
+	_ = finRepo.UpsertConnection(ctx, &domain.FinanceConnection{
+		ID: "c-wire", UserID: userID, PluggyItemID: "item-wire", ConnectorID: 200, InstitutionName: "Itaú", Status: domain.ConnectionStatusUpdated,
+	})
+	_ = finRepo.UpsertAccountsBatch(ctx, userID, []domain.FinanceAccount{
+		{ID: "a-wire", UserID: userID, ConnectionID: "c-wire", PluggyAccountID: "pa-w", AccountType: domain.AccountTypeBank, Name: "Conta Itaú", InstitutionName: "Itaú", Balance: 4200.00},
+	})
+
+	if _, err := todoSvc.CreateTodoWithOptions(userID, domain.CreateTodoInput{
+		Title: "Preparar apresentação", EventID: "evt-wire-1", EventTitle: "Board Review",
+	}); err != nil {
+		t.Fatalf("CreateTodoWithOptions: %v", err)
+	}
+	if _, err := pendingSvc.CreatePending(userID, domain.CreatePendingInput{
+		Title: "Revisar contrato", ScheduledDate: "2026-12-05",
+	}); err != nil {
+		t.Fatalf("CreatePending: %v", err)
+	}
+
+	agentSys.ContextEnricher.SetLevel1Timeout(3 * time.Second)
+	lvl1 := agentSys.ContextEnricher.BuildLevel1Context(ctx, userID, "Qual meu saldo para o Board Review?", now)
+	if !strings.Contains(lvl1, "Conta Itaú: R$ 4200.00") {
+		t.Errorf("esperava FinanceSnapshotProvider conectado no BuildLevel1Context, obteve:\n%s", lvl1)
+	}
+	if !strings.Contains(lvl1, "Board Review") {
+		t.Errorf("esperava EntityLinkRepository conectado no BuildLevel1Context, obteve:\n%s", lvl1)
 	}
 }

@@ -25,10 +25,12 @@ type AssistantContextEnricher struct {
 	coreProfileRepo domain.CoreProfileRepository
 	memoryRepo      domain.MemoryRepository
 	hierarchyRepo   *repository.MemoryHierarchyRepository
+	entityLinkRepo  *repository.EntityLinkRepository
 	financeProvider FinanceSnapshotProvider
 	calSvc          *CalendarService
 	todoSvc         *TodoService
 	triggerSvc      *TriggerService
+	level1Timeout   time.Duration
 }
 
 // NewAssistantContextEnricher instancia o enriquecedor de contexto do agente.
@@ -49,6 +51,14 @@ func NewAssistantContextEnricher(
 		calSvc:          calSvc,
 		todoSvc:         todoSvc,
 		triggerSvc:      triggerSvc,
+		level1Timeout:   400 * time.Millisecond,
+	}
+}
+
+// SetLevel1Timeout configura o timeout do enriquecimento paralelo Nível 1 (padrão 400ms em produção).
+func (e *AssistantContextEnricher) SetLevel1Timeout(d time.Duration) {
+	if d > 0 {
+		e.level1Timeout = d
 	}
 }
 
@@ -68,7 +78,11 @@ func (e *AssistantContextEnricher) BuildLevel1Context(ctx context.Context, userI
 		return ""
 	}
 
-	enrichCtx, cancel := context.WithTimeout(ctx, 400*time.Millisecond)
+	timeout := e.level1Timeout
+	if timeout <= 0 {
+		timeout = 400 * time.Millisecond
+	}
+	enrichCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	loc, err := time.LoadLocation("America/Sao_Paulo")
@@ -80,6 +94,7 @@ func (e *AssistantContextEnricher) BuildLevel1Context(ctx context.Context, userI
 		coreProfileLines []string
 		memoryLines      []string
 		themeLines       []string
+		entityLines      []string
 		financeLine      string
 		scheduleLines    []string
 		todoLines        []string
@@ -153,6 +168,20 @@ func (e *AssistantContextEnricher) BuildLevel1Context(ctx context.Context, userI
 						}
 					}
 				}
+			}
+		}()
+	}
+
+	// 2.6 Entidades Vinculadas (entity_links cross-canal na 036)
+	if e.entityLinkRepo != nil && strings.TrimSpace(userMessage) != "" {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			select {
+			case <-enrichCtx.Done():
+				return
+			default:
+				entityLines = e.resolveEntityLinksInMessage(enrichCtx, userID, userMessage)
 			}
 		}()
 	}
@@ -246,7 +275,7 @@ func (e *AssistantContextEnricher) BuildLevel1Context(ctx context.Context, userI
 
 	wg.Wait()
 
-	if len(coreProfileLines) == 0 && len(memoryLines) == 0 && len(themeLines) == 0 && financeLine == "" && len(scheduleLines) == 0 && len(todoLines) == 0 && len(triggerLines) == 0 {
+	if len(coreProfileLines) == 0 && len(memoryLines) == 0 && len(themeLines) == 0 && len(entityLines) == 0 && financeLine == "" && len(scheduleLines) == 0 && len(todoLines) == 0 && len(triggerLines) == 0 {
 		return ""
 	}
 
@@ -271,6 +300,13 @@ func (e *AssistantContextEnricher) BuildLevel1Context(ctx context.Context, userI
 	if len(themeLines) > 0 {
 		sb.WriteString("\n* Resumos Temáticos Consolidados:\n")
 		for _, line := range themeLines {
+			sb.WriteString(fmt.Sprintf("  - %s\n", line))
+		}
+	}
+
+	if len(entityLines) > 0 {
+		sb.WriteString("\n* Entidades Vinculadas (Cross-Canal):\n")
+		for _, line := range entityLines {
 			sb.WriteString(fmt.Sprintf("  - %s\n", line))
 		}
 	}

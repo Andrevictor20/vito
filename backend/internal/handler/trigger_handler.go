@@ -17,6 +17,7 @@ import (
 type TriggerHandler struct {
 	triggerSvc    *service.TriggerService
 	triggerWorker *service.TriggerWorker
+	aiProviderSvc *service.AIProviderService
 }
 
 func NewTriggerHandler(triggerSvc *service.TriggerService, triggerWorker ...*service.TriggerWorker) *TriggerHandler {

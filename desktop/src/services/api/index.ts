@@ -15,6 +15,7 @@ import { WhatsAppContextApi, WhatsAppContextScope, WhatsAppContextSettings, What
 import { GmailApi, GmailStatusResponse, GmailScanResult, GmailDraftInput, GmailDraftResponse, GmailSendResponse } from './gmailApi';
 import { P2PMeetingsApi, P2PMeetingInvite, ContactMatchResult, P2PMutualSlot, SendP2PInviteInput } from './p2pMeetingsApi';
 import { NotificationsApi } from './notificationsApi';
+import { AiProvidersApi, ConnectAiProviderInput, TestAiProviderResponse } from './aiProvidersApi';
 import { fileUriToBase64 } from './fileUtils';
 import {
   User,
@@ -45,9 +46,12 @@ export {
   GmailApi,
   P2PMeetingsApi,
   NotificationsApi,
+  AiProvidersApi,
 };
 
 export type {
+  ConnectAiProviderInput,
+  TestAiProviderResponse,
   WhatsAppIntegrationStatus,
   WhatsAppMatchedContact,
   RequestWhatsAppOTPResponse,
@@ -85,6 +89,7 @@ export class ApiService extends ApiClient {
   public gmailApi = new GmailApi(this);
   public p2pMeetingsApi = new P2PMeetingsApi(this);
   public notificationsApi = new NotificationsApi(this);
+  public aiProvidersApi = new AiProvidersApi(this);
 
   public getToken(): string | null {
     return this.accessToken;
@@ -388,6 +393,9 @@ export class ApiService extends ApiClient {
   }
   get notifications(): NotificationsApi {
     return this.notificationsApi;
+  }
+  get aiProviders(): AiProvidersApi {
+    return this.aiProvidersApi;
   }
 }
 

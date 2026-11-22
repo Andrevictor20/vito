@@ -16,8 +16,20 @@ func TestVersionedMigrations_FreshDB(t *testing.T) {
 	if err := db.QueryRow(`SELECT COUNT(*) FROM schema_migrations`).Scan(&count); err != nil {
 		t.Fatal(err)
 	}
-	if count != 27 {
-		t.Fatalf("esperava 27 migrações registradas, vieram %d", count)
+	if count != 28 {
+		t.Fatalf("esperava 28 migrações registradas, vieram %d", count)
+	}
+	if !hasTable(db, "user_ai_providers") ||
+		!hasColumn(db, "user_ai_settings", "default_model") ||
+		!hasColumn(db, "user_ai_settings", "default_effort") ||
+		!hasColumn(db, "conversation_threads", "model_pref") ||
+		!hasColumn(db, "conversation_threads", "effort_pref") ||
+		!hasColumn(db, "ai_traces", "credential_source") ||
+		!hasColumn(db, "ai_traces", "provider_key") ||
+		!hasColumn(db, "ai_traces", "effort") ||
+		!hasColumn(db, "triggers", "model_pref") ||
+		!hasColumn(db, "triggers", "effort_pref") {
+		t.Fatal("037 deveria criar user_ai_providers e colunas de modelo/esforço em user_ai_settings, conversation_threads, ai_traces e triggers")
 	}
 	if !hasTable(db, "memory_embeddings") ||
 		!hasTable(db, "entity_links") ||
@@ -145,8 +157,60 @@ func TestVersionedMigrations_LegacyDB(t *testing.T) {
 	if err := db2.QueryRow(`SELECT COUNT(*) FROM schema_migrations`).Scan(&count); err != nil {
 		t.Fatal(err)
 	}
-	if count != 27 {
-		t.Fatalf("base legada deveria ser carimbada com 27, veio %d", count)
+	if count != 28 {
+		t.Fatalf("base legada deveria ser carimbada com 28, veio %d", count)
+	}
+}
+
+func TestVersionedMigrations_037_UserAIProvidersIdempotentAndCascade(t *testing.T) {
+	db, err := Open(filepath.Join(t.TempDir(), "ai_037.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	if _, err := db.Exec(`PRAGMA foreign_keys = ON`); err != nil {
+		t.Fatal(err)
+	}
+	_, err = db.Exec(`INSERT INTO users (id, name, email, password_hash, created_at, updated_at) VALUES ('u-ai', 'AI User', 'ai@test.com', 'h', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = db.Exec(`INSERT INTO user_ai_providers (id, user_id, provider_key, base_url, key_ciphertext, key_last4, status, created_at, updated_at) VALUES ('p-1', 'u-ai', 'anthropic', '', 'cipher', '1234', 'ok', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Reexecutar a migration 037 deve ser idempotente e preservar os dados.
+	if err := applyUserAIProvidersMigration(db, "migrations/037_user_ai_providers.sql"); err != nil {
+		t.Fatalf("reexecução idempotente da 037 falhou: %v", err)
+	}
+	var last4 string
+	if err := db.QueryRow(`SELECT key_last4 FROM user_ai_providers WHERE id = 'p-1'`).Scan(&last4); err != nil {
+		t.Fatalf("registro existente deveria ser preservado: %v", err)
+	}
+	if last4 != "1234" {
+		t.Fatalf("esperava key_last4='1234', veio %q", last4)
+	}
+
+	// CHECK constraint para provider_key e status inválidos.
+	if _, err := db.Exec(`INSERT INTO user_ai_providers (id, user_id, provider_key, key_ciphertext, key_last4, status, created_at, updated_at) VALUES ('p-bad', 'u-ai', 'unknown', 'c', '0000', 'ok', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`); err == nil {
+		t.Fatal("esperava falha na CHECK constraint para provider_key inválido")
+	}
+	if _, err := db.Exec(`INSERT INTO user_ai_providers (id, user_id, provider_key, key_ciphertext, key_last4, status, created_at, updated_at) VALUES ('p-bad-s', 'u-ai', 'openai', 'c', '0000', 'pending', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`); err == nil {
+		t.Fatal("esperava falha na CHECK constraint para status inválido")
+	}
+
+	// ON DELETE CASCADE ao excluir usuário.
+	if _, err := db.Exec(`DELETE FROM users WHERE id = 'u-ai'`); err != nil {
+		t.Fatal(err)
+	}
+	var remaining int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM user_ai_providers WHERE user_id = 'u-ai'`).Scan(&remaining); err != nil {
+		t.Fatal(err)
+	}
+	if remaining != 0 {
+		t.Fatalf("esperava remoção em cascata em user_ai_providers, restaram %d", remaining)
 	}
 }
 

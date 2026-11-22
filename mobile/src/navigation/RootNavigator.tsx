@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { LoginScreen } from '../components/login/LoginScreen';
 import { MainTabs } from './MainTabs';
 import { HomeDataProvider } from './HomeDataProvider';
+import { AiProvidersScreen } from '../screens/AiProvidersScreen';
 import type { RootStackParamList } from '../AppRoot';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -34,6 +35,7 @@ export const RootNavigator: React.FC<RootNavigatorProps> = ({ serverUrl, onToggl
     <HomeDataProvider>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="main" component={MainTabs} />
+        <Stack.Screen name="aiProviders" component={AiProvidersScreen} />
       </Stack.Navigator>
     </HomeDataProvider>
   );

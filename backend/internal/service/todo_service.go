@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/andrevmp/vito/backend/internal/domain"
+	"github.com/andrevmp/vito/backend/internal/repository"
 )
 
 // ClassifyTodoPriority analisa o texto e prazo da tarefa para definir urgência heurística.
@@ -36,7 +37,8 @@ func ClassifyTodoPriority(title string, dueDate *time.Time) string {
 
 // TodoService orquestra tarefas e pendências do usuário.
 type TodoService struct {
-	todoRepo domain.TodoRepository
+	todoRepo       domain.TodoRepository
+	entityLinkRepo *repository.EntityLinkRepository
 }
 
 // NewTodoService instancia o serviço de tarefas.
@@ -78,6 +80,7 @@ func (s *TodoService) CreateTodoWithOptions(userID string, input domain.CreateTo
 	if err := s.todoRepo.Create(todo); err != nil {
 		return nil, err
 	}
+	s.linkTodoEventEntity(todo)
 
 	return todo, nil
 }

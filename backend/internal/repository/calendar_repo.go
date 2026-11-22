@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -50,8 +51,10 @@ func (r *EventRepositorySQLite) Create(e *domain.Event) error {
 			recurrence = excluded.recurrence,
 			updated_at = excluded.updated_at
 	`
-	_, err := r.db.Exec(query, e.ID, e.UserID, e.Title, e.Description, e.Location, startAt, endAt, source, category, e.Color, e.Recurrence, createdAt, updatedAt)
-	return err
+	return ExecuteQueuedWrite(context.Background(), func() error {
+		_, err := r.db.Exec(query, e.ID, e.UserID, e.Title, e.Description, e.Location, startAt, endAt, source, category, e.Color, e.Recurrence, createdAt, updatedAt)
+		return err
+	})
 }
 
 // parseDBTime converte defensivamente qualquer tipo vindo do SQLite para time.Time em UTC.
@@ -267,11 +270,16 @@ func (r *EventRepositorySQLite) CheckConflict(userID string, startAt, endAt time
 
 func (r *EventRepositorySQLite) Delete(id, userID string) error {
 	query := `DELETE FROM events WHERE id = ? AND user_id = ?`
-	res, err := r.db.Exec(query, id, userID)
-	if err != nil {
-		return err
-	}
-	rowsAffected, err := res.RowsAffected()
+	var rowsAffected int64
+	err := ExecuteQueuedWrite(context.Background(), func() error {
+		res, execErr := r.db.Exec(query, id, userID)
+		if execErr != nil {
+			return execErr
+		}
+		var raErr error
+		rowsAffected, raErr = res.RowsAffected()
+		return raErr
+	})
 	if err != nil {
 		return err
 	}

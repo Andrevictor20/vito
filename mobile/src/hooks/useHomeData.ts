@@ -3,7 +3,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Event, Todo, AssistantChatResponse } from '../types';
 import { api } from '../services/api';
 import { notificationService } from '../services/notificationService';
+import {
+  cancelEventRemindersAndAlarms,
+  scheduleEventRemindersAndAlarm,
+  syncEventsAndTodosReminders,
+} from '../services/eventReminderSync';
 import { dataSync } from '../services/dataSync';
+import { readHomeCache } from './homeDataCache';
 
 import { toLocalDateString, parseSafeDate, isEventOnDate, getEventDays, getUpcomingGroupedEvents } from '../utils/calendarDateUtils';
 
@@ -48,11 +54,8 @@ export function useHomeData(currentUserId?: string) {
       setTodos(fetchedTodos || []);
       AsyncStorage.setItem(cacheKeys.eventsKey, JSON.stringify(fetchedEvents || [])).catch(() => {});
       AsyncStorage.setItem(cacheKeys.todosKey, JSON.stringify(fetchedTodos || [])).catch(() => {});
-      // Purga órfãos primeiro (série deletada / Google inbound / outro device), depois agenda de forma idempotente.
-      await notificationService.reconcileOrphanReminders(fetchedEvents || [], fetchedTodos || []).catch(() => {});
-      if ((fetchedEvents && fetchedEvents.length > 0) || (fetchedTodos && fetchedTodos.length > 0)) {
-        notificationService.scheduleAllUpcomingReminders(fetchedEvents || [], fetchedTodos || []).catch(() => {});
-      }
+      // Purga órfãos primeiro (série deletada / Google inbound / outro device), depois agenda de forma idempotente + alarmes críticos.
+      await syncEventsAndTodosReminders(fetchedEvents || [], fetchedTodos || []);
     } catch (e: any) {
       if (e?.status === 401 || e?.message?.includes('autorização ausente') || e?.message?.includes('não autorizado')) {
         console.warn('[useHomeData] Sessão desautenticada ao carregar dados:', e?.message || e);
@@ -75,26 +78,16 @@ export function useHomeData(currentUserId?: string) {
     }
 
     // 1. Hidratação Instantânea de Cache (< 5ms) da conta autenticada
-    AsyncStorage.multiGet([cacheKeys.eventsKey, cacheKeys.todosKey]).then(([eventsEntry, todosEntry]) => {
+    readHomeCache(cacheKeys).then((cached) => {
       if (!isMounted) return;
       let hasCachedData = false;
-      if (eventsEntry && eventsEntry[1]) {
-        try {
-          const parsed = JSON.parse(eventsEntry[1]);
-          if (Array.isArray(parsed)) {
-            setEvents(parsed);
-            hasCachedData = true;
-          }
-        } catch {}
+      if (cached.events) {
+        setEvents(cached.events);
+        hasCachedData = true;
       }
-      if (todosEntry && todosEntry[1]) {
-        try {
-          const parsed = JSON.parse(todosEntry[1]);
-          if (Array.isArray(parsed)) {
-            setTodos(parsed);
-            hasCachedData = true;
-          }
-        } catch {}
+      if (cached.todos) {
+        setTodos(cached.todos);
+        hasCachedData = true;
       }
       if (hasCachedData) {
         setLoading(false);
@@ -138,7 +131,15 @@ export function useHomeData(currentUserId?: string) {
       });
   };
 
-  const handleCreateEvent = async (eventData: { title: string; description?: string; location?: string; start_at: string; end_at: string }) => {
+  const handleCreateEvent = async (eventData: {
+    title: string;
+    description?: string;
+    location?: string;
+    start_at: string;
+    end_at: string;
+    critical_alarm?: boolean;
+    wake_offset_minutes?: number;
+  }) => {
     try {
       const res = await api.createEvent(eventData);
       if (res?.event) {
@@ -147,7 +148,7 @@ export function useHomeData(currentUserId?: string) {
           AsyncStorage.setItem(cacheKeys.eventsKey, JSON.stringify(next)).catch(() => {});
           return next;
         });
-        notificationService.scheduleEventDualReminders(res.event).catch(() => {});
+        scheduleEventRemindersAndAlarm(res.event);
       }
       await loadData(true);
       // Reconciliação transparente em segundo plano com o Google Calendar
@@ -232,7 +233,7 @@ export function useHomeData(currentUserId?: string) {
 
     try {
       await api.deleteEvent(id, allSeries);
-      notificationService.cancelEventReminders(seriesIds).catch(() => {});
+      cancelEventRemindersAndAlarms(seriesIds);
       dataSync.notify('refresh_events');
       if (allSeries) {
         loadData(true);
@@ -240,7 +241,7 @@ export function useHomeData(currentUserId?: string) {
     } catch (e: any) {
       // Se o backend retornar 404 (já removido no banco/sync), mantém a exclusão otimista
       if (e?.status === 404 || e?.message?.includes('404') || e?.message?.includes('não encontrado')) {
-        notificationService.cancelEventReminders(seriesIds).catch(() => {});
+        cancelEventRemindersAndAlarms(seriesIds);
         return;
       }
       console.error('Erro ao deletar evento, revertendo:', e);
@@ -261,7 +262,7 @@ export function useHomeData(currentUserId?: string) {
           AsyncStorage.setItem(cacheKeys.eventsKey, JSON.stringify(next)).catch(() => {});
           return next;
         });
-        notificationService.scheduleEventDualReminders(res.event).catch(() => {});
+        scheduleEventRemindersAndAlarm(res.event);
       }
       return res;
     } catch (e) {

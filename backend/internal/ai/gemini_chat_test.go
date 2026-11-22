@@ -375,3 +375,78 @@ func containsSub(s, sub string) bool {
 	}
 	return false
 }
+
+func TestGeminiAgentProvider_ThinkingBudgetAndReasoningStream(t *testing.T) {
+	var capturedBodies [][]byte
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		capturedBodies = append(capturedBodies, b)
+		w.Header().Set("Content-Type", "text/event-stream")
+		flusher, _ := w.(http.Flusher)
+		fmt.Fprint(w, "data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"Pensando na agenda\",\"thought\":true}]}}]}\n\n")
+		flusher.Flush()
+		fmt.Fprint(w, "data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"Tudo certo!\"}]}}]}\n\n")
+		flusher.Flush()
+		fmt.Fprint(w, "data: [DONE]\n\n")
+		flusher.Flush()
+	}))
+	defer ts.Close()
+
+	provider := ai.NewGeminiAgentProviderForTest("test-key", "gemini-2.5-flash", ts.URL, ts.Client())
+	budget := 2048
+
+	var deltas []ai.StreamDelta
+	resp, err := provider.StreamChat(context.Background(), ai.AgentChatRequest{
+		Channel:         "app_mobile",
+		ThinkingBudget:  &budget,
+		IncludeThoughts: true,
+		Messages:        []ai.TurnMessage{{Role: ai.RoleUser, Content: "Analise minha semana"}},
+	}, func(d ai.StreamDelta) error {
+		deltas = append(deltas, d)
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("StreamChat falhou: %v", err)
+	}
+	if resp.Text != "Tudo certo!" || resp.Thought != "Pensando na agenda" {
+		t.Errorf("resposta divergente: text=%q thought=%q", resp.Text, resp.Thought)
+	}
+	if len(deltas) < 2 || deltas[0].Type != "reasoning" || deltas[0].ReasoningDelta != "Pensando na agenda" {
+		t.Errorf("esperava primeiro delta de reasoning separado, obteve %+v", deltas)
+	}
+	if deltas[1].Type != "text" || deltas[1].TextDelta != "Tudo certo!" {
+		t.Errorf("esperava segundo delta de text, obteve %+v", deltas)
+	}
+
+	var sent struct {
+		GenerationConfig struct {
+			ThinkingConfig struct {
+				ThinkingBudget  int  `json:"thinkingBudget"`
+				IncludeThoughts bool `json:"includeThoughts"`
+			} `json:"thinkingConfig"`
+		} `json:"generationConfig"`
+	}
+	if err := json.Unmarshal(capturedBodies[0], &sent); err != nil {
+		t.Fatalf("unmarshal payload: %v", err)
+	}
+	if sent.GenerationConfig.ThinkingConfig.ThinkingBudget != 2048 || !sent.GenerationConfig.ThinkingConfig.IncludeThoughts {
+		t.Errorf("esperava thinkingBudget=2048 e includeThoughts=true, obteve %+v", sent.GenerationConfig.ThinkingConfig)
+	}
+
+	// Canal voice deve forçar thinkingBudget=0 mesmo com ThinkingBudget positivo
+	_, err = provider.StreamChat(context.Background(), ai.AgentChatRequest{
+		Channel:         "voice",
+		ThinkingBudget:  &budget,
+		IncludeThoughts: true,
+		Messages:        []ai.TurnMessage{{Role: ai.RoleUser, Content: "Oi"}},
+	}, func(d ai.StreamDelta) error { return nil })
+	if err != nil {
+		t.Fatalf("StreamChat voice falhou: %v", err)
+	}
+	if err := json.Unmarshal(capturedBodies[1], &sent); err != nil {
+		t.Fatalf("unmarshal payload voice: %v", err)
+	}
+	if sent.GenerationConfig.ThinkingConfig.ThinkingBudget != 0 {
+		t.Errorf("canal voice deve forçar thinkingBudget=0, obteve %d", sent.GenerationConfig.ThinkingConfig.ThinkingBudget)
+	}
+}

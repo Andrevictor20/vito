@@ -15,6 +15,7 @@ import (
 
 	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/domain"
+	"github.com/andrevmp/vito/backend/internal/repository"
 )
 
 // WhatsAppServiceConfig armazena parâmetros do serviço de integração com WhatsApp.
@@ -54,7 +55,8 @@ type WhatsAppService struct {
 	inboundCoord  *whatsappInboundCoordinator
 	maxInboundAge time.Duration
 	// enricher lê a mídia (áudio/imagem) das mensagens do WhatsApp.
-	enricher *WhatsAppMediaEnricher
+	enricher            *WhatsAppMediaEnricher
+	entityLinkRepo      *repository.EntityLinkRepository
 	// blockedReplies guarda a última resposta educativa enviada por conversa
 	blockedMu           sync.Mutex
 	blockedReplies      map[string]time.Time

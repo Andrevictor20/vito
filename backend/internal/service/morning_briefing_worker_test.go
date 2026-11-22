@@ -1,13 +1,19 @@
 package service_test
 
 import (
+	"context"
+	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/andrevmp/vito/backend/internal/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
+	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/andrevmp/vito/backend/internal/service"
 )
 
@@ -289,4 +295,196 @@ func searchSubstring(s, substr string) bool {
 		}
 	}
 	return false
+}
+
+type stubBriefingWorkflowRunner struct {
+	mu     sync.Mutex
+	calls  int
+	inputs []service.BriefingWorkflowInput
+	reply  string
+	err    error
+}
+
+func (s *stubBriefingWorkflowRunner) GenerateBriefing(ctx context.Context, input service.BriefingWorkflowInput) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.calls++
+	s.inputs = append(s.inputs, input)
+	return s.reply, s.err
+}
+
+type stubBriefingTextGen struct {
+	mu    sync.Mutex
+	calls int
+	reply string
+}
+
+func (s *stubBriefingTextGen) GenerateText(ctx context.Context, systemPrompt, userPrompt string) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.calls++
+	return s.reply, nil
+}
+
+func TestMorningBriefingWorker_WorkflowRunnerPrimaryAndTextFallback(t *testing.T) {
+	var mu sync.Mutex
+	var received []service.PushMessage
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var msgs []service.PushMessage
+		_ = json.NewDecoder(r.Body).Decode(&msgs)
+		mu.Lock()
+		received = append(received, msgs...)
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":[{"status":"ok"}]}`))
+	}))
+	defer ts.Close()
+
+	userID := "user-wf-1"
+	briefingRepo := newMockBriefingRepo()
+	_ = briefingRepo.UpsertSettings(&domain.BriefingSettings{
+		UserID:        userID,
+		Enabled:       true,
+		ScheduledTime: "07:30",
+	})
+	tokenRepo := &mockTokenRepoForBriefing{
+		token: domain.DeviceToken{UserID: userID, Token: "ExponentPushToken[wf]", Platform: "android"},
+	}
+	notifSvc := service.NewNotificationService(tokenRepo, ts.Client())
+	notifSvc.SetExpoAPIURL(ts.URL)
+	userRepo := &mockUserRepoForBriefing{user: &domain.User{ID: userID, Name: "André"}}
+	eventRepo := &mockEventRepoForBriefing{events: []domain.Event{{Title: "Standup", StartAt: time.Date(2026, 11, 21, 9, 0, 0, 0, time.UTC)}}}
+	todoRepo := &mockTodoRepoForBriefing{todos: []domain.Todo{{Title: "Fechar PR"}}}
+
+	wfRunner := &stubBriefingWorkflowRunner{reply: "Prioridade 1: Standup às 09:00 e fechar PR."}
+	textGen := &stubBriefingTextGen{reply: "Texto fallback do TextGenerator."}
+
+	worker := service.NewMorningBriefingWorker(briefingRepo, eventRepo, todoRepo, userRepo, notifSvc, time.Minute)
+	worker.SetLocation(time.UTC)
+	worker.SetBriefingWorkflowRunner(wfRunner)
+	worker.SetTextGenerator(textGen)
+
+	now := time.Date(2026, 11, 21, 7, 30, 0, 0, time.UTC)
+	count, err := worker.ProcessBriefings(now)
+	if err != nil || count != 1 {
+		t.Fatalf("esperava 1 briefing pelo workflow ADK, obteve count=%d err=%v", count, err)
+	}
+	if wfRunner.calls != 1 {
+		t.Fatalf("esperava 1 chamada ao BriefingWorkflowRunner, obteve %d", wfRunner.calls)
+	}
+	if textGen.calls != 0 {
+		t.Fatalf("não esperava chamada ao TextGenerator quando workflow teve sucesso, obteve %d", textGen.calls)
+	}
+	mu.Lock()
+	if len(received) != 1 || received[0].Body != "Prioridade 1: Standup às 09:00 e fechar PR." {
+		t.Fatalf("corpo inesperado do workflow: %+v", received)
+	}
+	mu.Unlock()
+
+	// Dia seguinte: se workflow falhar, faz fallback limpo para TextGenerator
+	wfRunner.err = errors.New("adk timeout")
+	nextDay := now.Add(24 * time.Hour)
+	count2, err := worker.ProcessBriefings(nextDay)
+	if err != nil || count2 != 1 {
+		t.Fatalf("esperava 1 briefing no fallback, obteve count=%d err=%v", count2, err)
+	}
+	if textGen.calls != 1 {
+		t.Fatalf("esperava 1 chamada ao TextGenerator no fallback, obteve %d", textGen.calls)
+	}
+	mu.Lock()
+	if len(received) != 2 || received[1].Body != "Texto fallback do TextGenerator." {
+		t.Fatalf("corpo inesperado no fallback: %+v", received)
+	}
+	mu.Unlock()
+}
+
+func TestMorningBriefingWorker_AttentionBudget_DefersAndDeduplicates(t *testing.T) {
+	var mu sync.Mutex
+	var pushCount int
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		pushCount++
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":[{"status":"ok"}]}`))
+	}))
+	defer ts.Close()
+
+	db, err := database.Open(filepath.Join(t.TempDir(), "briefing_budget.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+
+	userID := "u-brief-budget"
+	now := time.Date(2026, 11, 21, 7, 30, 0, 0, time.UTC)
+	_, err = db.Exec(`INSERT INTO users (id, email, name, password_hash, created_at, updated_at) VALUES (?,?,?,?,?,?)`,
+		userID, "brief@vito.ai", "André", "h", now, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	briefingRepo := repository.NewBriefingRepository(db)
+	eventRepo := repository.NewEventRepository(db)
+	todoRepo := repository.NewTodoRepository(db)
+	userRepo := repository.NewUserRepository(db)
+	tokenRepo := &mockTokenRepoForBriefing{
+		token: domain.DeviceToken{UserID: userID, Token: "ExponentPushToken[bb]", Platform: "android"},
+	}
+	notifSvc := service.NewNotificationService(tokenRepo, ts.Client())
+	notifSvc.SetExpoAPIURL(ts.URL)
+
+	_ = briefingRepo.UpsertSettings(&domain.BriefingSettings{
+		UserID:        userID,
+		Enabled:       true,
+		ScheduledTime: "07:30",
+	})
+	// Reunião em andamento às 07:30 -> DEFERRED
+	_ = eventRepo.Create(&domain.Event{
+		ID:        "ev-brief-active",
+		UserID:    userID,
+		Title:     "Call Internacional",
+		StartAt:   now.Add(-15 * time.Minute),
+		EndAt:     now.Add(30 * time.Minute),
+		CreatedAt: now,
+		UpdatedAt: now,
+	})
+
+	budget := service.NewAttentionBudgetService(db, eventRepo)
+	worker := service.NewMorningBriefingWorker(briefingRepo, eventRepo, todoRepo, userRepo, notifSvc, time.Minute)
+	worker.SetLocation(time.UTC)
+	worker.SetAttentionBudget(budget)
+
+	count, err := worker.ProcessBriefings(now)
+	if err != nil {
+		t.Fatalf("erro inesperado: %v", err)
+	}
+	if count != 0 || pushCount != 0 {
+		t.Fatalf("esperava briefing adiado durante reunião ativa, obteve count=%d push=%d", count, pushCount)
+	}
+
+	// Após reunião (08:30), pré-registra mensagem equivalente do bot_runner -> DEDUPLICATED
+	afterMtg := now.Add(60 * time.Minute)
+	_ = briefingRepo.UpsertSettings(&domain.BriefingSettings{
+		UserID:        userID,
+		Enabled:       true,
+		ScheduledTime: "08:30",
+	})
+	title, body := service.FormatBriefingMessage("André", nil, nil, time.UTC)
+	_, _ = budget.Evaluate(context.Background(), service.AttentionCandidate{
+		UserID:       userID,
+		SourceWorker: "bot_runner",
+		Category:     "resumo",
+		Urgency:      "normal",
+		Title:        title,
+		Body:         body,
+		Now:          afterMtg,
+	})
+	count2, err := worker.ProcessBriefings(afterMtg)
+	if err != nil {
+		t.Fatalf("erro no ciclo dedup: %v", err)
+	}
+	if count2 != 0 || pushCount != 0 {
+		t.Fatalf("esperava deduplicação cross-worker, obteve count=%d push=%d", count2, pushCount)
+	}
 }

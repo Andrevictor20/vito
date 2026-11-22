@@ -363,3 +363,82 @@ func TestAC03_COG03_ToolsetBridgeAndMultiAgentTopologyAndSession(t *testing.T) {
 		t.Fatal("unreachable")
 	}
 }
+
+type reasoningStreamProvider struct {
+	fakeAgentProvider
+}
+
+func (r *reasoningStreamProvider) StreamChat(ctx context.Context, req ai.AgentChatRequest, onDelta func(ai.StreamDelta) error) (*ai.AgentChatResponse, error) {
+	r.capturedReqs = append(r.capturedReqs, req)
+	if onDelta != nil {
+		_ = onDelta(ai.StreamDelta{ReasoningDelta: "Verificando conflitos..."})
+		_ = onDelta(ai.StreamDelta{ToolCalls: []ai.ToolCall{{ID: "c1", Name: "calendar_list_events"}}})
+		_ = onDelta(ai.StreamDelta{TextDelta: "Agenda livre."})
+	}
+	return &ai.AgentChatResponse{
+		Text:         "Agenda livre.",
+		Thought:      "Verificando conflitos...",
+		ProviderName: r.name,
+		ModelName:    r.model,
+	}, nil
+}
+
+func TestRoutedLLM_ThinkingBudgetAndReasoningDeltaPropagation(t *testing.T) {
+	prov := &reasoningStreamProvider{
+		fakeAgentProvider: fakeAgentProvider{name: "Gemini-ADK", model: "gemini-2.5-flash", tier: 3, supportsTools: true},
+	}
+	routedLLM := adkengine.NewRoutedLLM(ai.NewModelRouter(prov))
+
+	budget := int32(2048)
+	req := &model.LLMRequest{
+		Model: "gemini-2.5-flash",
+		Config: &genai.GenerateContentConfig{
+			ThinkingConfig: &genai.ThinkingConfig{
+				IncludeThoughts: true,
+				ThinkingBudget:  &budget,
+			},
+		},
+		Contents: []*genai.Content{genai.NewContentFromText("Planeje minha semana", genai.RoleUser)},
+	}
+
+	var streamed []ai.StreamDelta
+	meta := &adkengine.TurnExecutionMeta{
+		UserID:  "u1",
+		Channel: "app_mobile",
+		OnDelta: func(d ai.StreamDelta) error {
+			streamed = append(streamed, d)
+			return nil
+		},
+	}
+	ctx := adkengine.WithTurnExecutionMeta(context.Background(), meta)
+
+	for _, err := range routedLLM.GenerateContent(ctx, req, true) {
+		if err != nil {
+			t.Fatalf("GenerateContent falhou: %v", err)
+		}
+	}
+
+	if len(prov.capturedReqs) != 1 || prov.capturedReqs[0].ThinkingBudget == nil || *prov.capturedReqs[0].ThinkingBudget != 2048 || !prov.capturedReqs[0].IncludeThoughts {
+		t.Fatalf("ThinkingConfig não propagado ao AgentChatRequest: %+v", prov.capturedReqs)
+	}
+	if len(streamed) != 3 || streamed[0].Type != "reasoning" || streamed[0].ReasoningDelta != "Verificando conflitos..." {
+		t.Errorf("ReasoningDelta não propagado no streaming: %+v", streamed)
+	}
+	if streamed[1].Type != "tool_call" || streamed[1].ToolName != "calendar_list_events" {
+		t.Errorf("ToolCall delta não propagado no streaming: %+v", streamed)
+	}
+	if streamed[2].Type != "text" || streamed[2].TextDelta != "Agenda livre." {
+		t.Errorf("TextDelta não propagado no streaming: %+v", streamed)
+	}
+
+	// Verifica que canal voice mantém ThinkingBudget=0 mesmo se ThinkingConfig tiver valor positivo
+	voiceCtx := adkengine.WithTurnExecutionMeta(context.Background(), &adkengine.TurnExecutionMeta{UserID: "u1", Channel: "voice"})
+	for _, err := range routedLLM.GenerateContent(voiceCtx, req, false) {
+		if err != nil {
+			t.Fatalf("GenerateContent voice falhou: %v", err)
+		}
+	}
+	if len(prov.capturedReqs) != 2 || prov.capturedReqs[1].ThinkingBudget == nil || *prov.capturedReqs[1].ThinkingBudget != 0 {
+		t.Errorf("canal voice deve manter ThinkingBudget=0, obteve %+v", prov.capturedReqs[1].ThinkingBudget)
+	}
+}

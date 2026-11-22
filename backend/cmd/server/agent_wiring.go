@@ -28,6 +28,12 @@ type AgentSubsystem struct {
 	ConversationStore   *repository.ConversationStoreRepository
 	MemoryHierarchy     *repository.MemoryHierarchyRepository
 	AgentLoop           *service.AgentLoop
+	ContextEnricher     *service.AssistantContextEnricher
+	EntityLinkRepo      *repository.EntityLinkRepository
+	ToolsetRegistry     *toolsets.ToolsetsRegistry
+	ADKFacade           *adkengine.ADKLoopFacade
+	AIProviderHandler   *handler.AIProviderHandler
+	AIProviderSvc       *service.AIProviderService
 }
 
 // setupAgentSubsystem instancia e orquestra o cérebro único do assistente, ferramentas e memória.
@@ -48,6 +54,8 @@ func setupAgentSubsystem(
 	// 1. Repositórios e Serviços de Memória e Confirmação
 	convRepo := repository.NewConversationStoreRepository(db)
 	memRepo := repository.NewMemoryHierarchyRepository(db)
+	entityLinkRepo := repository.NewEntityLinkRepository(db)
+	finRepo := repository.NewFinanceRepository(db)
 	confGate := service.NewConfirmationGateService(db)
 	scopeGuard := service.NewMemoryScopeGuard()
 
@@ -57,22 +65,29 @@ func setupAgentSubsystem(
 	// 3. 8 Domain Toolsets
 	registry := toolsets.NewToolsetsRegistry()
 	if calSvc != nil {
+		calSvc.SetEntityLinkRepository(entityLinkRepo)
 		registry.Register(toolsets.NewCalendarToolset(&calendarServiceAdapter{calSvc}))
 	}
 	if todoSvc != nil {
+		todoSvc.SetEntityLinkRepository(entityLinkRepo)
 		registry.Register(toolsets.NewTaskPendingToolset(&todoServiceAdapter{todoSvc}))
 	}
 	if waSvc != nil {
 		waBridge := service.NewWhatsAppConversationBridge(convRepo)
 		waSvc.SetConversationBridge(waBridge)
+		waSvc.SetEntityLinkRepository(entityLinkRepo)
 		var directory *service.WhatsAppDirectoryService
 		if len(waDir) > 0 {
 			directory = waDir[0]
 		}
-		registry.Register(toolsets.NewWhatsAppToolset(&whatsAppServiceAdapter{svc: waSvc, dir: directory}))
+		waTS := toolsets.NewWhatsAppToolset(&whatsAppServiceAdapter{svc: waSvc, dir: directory})
+		waTS.SetEntityLinkResolver(entityLinkRepo)
+		registry.Register(waTS)
 	}
 	if gmailSvc != nil {
-		registry.Register(toolsets.NewGmailToolset(&gmailServiceAdapter{gmailSvc}))
+		gmailTS := toolsets.NewGmailToolset(&gmailServiceAdapter{gmailSvc})
+		gmailTS.SetEntityLinkResolver(entityLinkRepo)
+		registry.Register(gmailTS)
 	}
 
 	var searxClient *ai.SearXNGClient
@@ -176,6 +191,8 @@ func setupAgentSubsystem(
 		triggerSvc,
 	)
 	contextEnricher.SetMemoryHierarchyRepository(memRepo)
+	contextEnricher.SetFinanceSnapshotProvider(service.NewSQLiteFinanceSnapshotProvider(finRepo))
+	contextEnricher.SetEntityLinkRepository(entityLinkRepo)
 	loop.SetContextEnricher(contextEnricher)
 
 	// 6. Worker de Consolidação com debounce de 150s + SQLiteMemoryService Híbrido (FTS5 + Embeddings 036)
@@ -183,6 +200,10 @@ func setupAgentSubsystem(
 	sqliteMemorySvc := adkengine.NewSQLiteMemoryService(memoryRepo, memRepo, embedder)
 	consolidationWorker := service.NewMemoryConsolidationWorker(convRepo, memRepo, 150*time.Second)
 	consolidationWorker.SetFactRepository(memoryRepo, embedder)
+	confGate.SetFeedbackRecorder(consolidationWorker)
+
+	// 6.4 Provedores BYOK & Resolução de Modelos (§2-§5)
+	aiProviderRT := setupAIProviderSubsystem(cfg, db, aiSettingsRepo, convRepo)
 
 	// 6.5 Motor Google ADK Go v2 (ADKLoopFacade) plugado ao AgentLoop e ao WhatsAppService
 	adkFacade, adkErr := adkengine.NewADKLoopFacade(adkengine.FacadeConfig{
@@ -197,6 +218,9 @@ func setupAgentSubsystem(
 		ContextEnricher:     contextEnricher,
 		ConsolidationWorker: consolidationWorker,
 		MemoryService:       sqliteMemorySvc,
+		ModelResolver:       aiProviderRT.Resolver,
+		AIProviderRepo:      aiProviderRT.Repo,
+		UserRegistry:        aiProviderRT.Registry,
 	})
 	if adkErr == nil && adkFacade != nil {
 		consolidationWorker.SetSemanticExtractor(adkengine.NewADKMemoryExtractor(adkFacade.RoutedLLM()))
@@ -221,6 +245,12 @@ func setupAgentSubsystem(
 		ConversationStore:   convRepo,
 		MemoryHierarchy:     memRepo,
 		AgentLoop:           loop,
+		ContextEnricher:     contextEnricher,
+		EntityLinkRepo:      entityLinkRepo,
+		ToolsetRegistry:     registry,
+		ADKFacade:           adkFacade,
+		AIProviderHandler:   aiProviderRT.Handler,
+		AIProviderSvc:       aiProviderRT.Service,
 	}
 }
 

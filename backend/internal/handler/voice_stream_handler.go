@@ -177,23 +177,7 @@ func (h *VoiceStreamHandler) handleWebSocket(ws *websocket.Conn) {
 							Channel: "voice",
 							Message: transcript,
 						}
-						resp, err := h.loop.Run(ctx, req)
-						if err == nil && resp != nil {
-							sendEvent(VoiceServerEvent{
-								Type: "BOT_TRANSCRIPT",
-								Text: resp.Text,
-							})
-
-							if h.ttsSvc != nil {
-								audio, _, err := h.ttsSvc.Synthesize(ctx, resp.Text, "Puck")
-								if err == nil && len(audio) > 0 {
-									sendEvent(VoiceServerEvent{
-										Type:     "AUDIO",
-										AudioB64: base64.StdEncoding.EncodeToString(audio),
-									})
-								}
-							}
-						} else {
+						if err := h.ProcessVoiceUtteranceStream(ctx, req, sendEvent); err != nil {
 							sendEvent(VoiceServerEvent{
 								Type: "BOT_TRANSCRIPT",
 								Text: "Entendido! Como posso ajudar você agora?",
@@ -213,6 +197,71 @@ func (h *VoiceStreamHandler) handleWebSocket(ws *websocket.Conn) {
 			}
 		}
 	}
+}
+
+// ProcessVoiceUtteranceStream executa o comando de voz via AgentLoop.RunStream acoplado ao SentenceChunker,
+// disparando a síntese TTS da primeira sentença imediatamente (< 800ms) enquanto o restante da resposta é gerado.
+func (h *VoiceStreamHandler) ProcessVoiceUtteranceStream(
+	ctx context.Context,
+	req domain.UnifiedAssistantRequest,
+	sendEvent func(VoiceServerEvent),
+) error {
+	if h.loop == nil {
+		return nil
+	}
+
+	chunker := ai.NewSentenceChunker()
+	synthesizedCount := 0
+	emitSentenceAudio := func(sentence string) {
+		trimmed := strings.TrimSpace(sentence)
+		if trimmed == "" || h.ttsSvc == nil {
+			return
+		}
+		audio, _, err := h.ttsSvc.Synthesize(ctx, trimmed, "Puck")
+		if err == nil && len(audio) > 0 {
+			synthesizedCount++
+			sendEvent(VoiceServerEvent{
+				Type:     "AUDIO",
+				Text:     trimmed,
+				AudioB64: base64.StdEncoding.EncodeToString(audio),
+			})
+		}
+	}
+
+	resp, err := h.loop.RunStream(ctx, req, func(delta ai.StreamDelta) error {
+		if delta.TextDelta != "" {
+			for _, sentence := range chunker.Feed(delta.TextDelta) {
+				emitSentenceAudio(sentence)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	if rem := chunker.Flush(); rem != "" {
+		emitSentenceAudio(rem)
+	}
+
+	if resp != nil {
+		finalText := strings.TrimSpace(resp.Text)
+		if finalText == "" {
+			finalText = strings.TrimSpace(resp.Reply)
+		}
+		if finalText == "" {
+			finalText = strings.TrimSpace(resp.Message)
+		}
+		sendEvent(VoiceServerEvent{
+			Type: "BOT_TRANSCRIPT",
+			Text: finalText,
+		})
+		if synthesizedCount == 0 && finalText != "" {
+			emitSentenceAudio(finalText)
+		}
+	}
+
+	return nil
 }
 
 // CalculateRMS16Bit calcula a energia acústica média (RMS) de frames PCM 16-bit Little Endian

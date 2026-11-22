@@ -80,7 +80,8 @@ type geminiTool struct {
 // O parâmetro só é aceito pela família 2.5: enviar para gemini-3.5-flash-lite
 // devolve HTTP 400.
 type geminiThinkingConfig struct {
-	ThinkingBudget int `json:"thinkingBudget"`
+	ThinkingBudget  int  `json:"thinkingBudget"`
+	IncludeThoughts bool `json:"includeThoughts,omitempty"`
 }
 
 // thinkingConfigFor devolve a configuração de thinking aceita pelo modelo.

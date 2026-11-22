@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -31,10 +32,16 @@ type CreatePendingRequest struct {
 	TTL            time.Duration
 }
 
+// ImplicitFeedbackRecorder registra aprendizado operacional quando o usuário rejeita ou edita uma ação no gate.
+type ImplicitFeedbackRecorder interface {
+	RecordImplicitFeedback(ctx context.Context, userID, toolName, action, reason string) error
+}
+
 // ConfirmationGateService fornece a interface de alto nível para o Confirmation Gate.
 type ConfirmationGateService struct {
-	fsm *ConfirmationStateMachine
-	db  *sql.DB
+	fsm              *ConfirmationStateMachine
+	db               *sql.DB
+	feedbackRecorder ImplicitFeedbackRecorder
 }
 
 // NewConfirmationGateService cria o serviço.
@@ -43,6 +50,11 @@ func NewConfirmationGateService(db *sql.DB) *ConfirmationGateService {
 		fsm: NewConfirmationStateMachine(db),
 		db:  db,
 	}
+}
+
+// SetFeedbackRecorder conecta o worker de consolidação para registrar rejeições e edições como feedback implícito.
+func (s *ConfirmationGateService) SetFeedbackRecorder(recorder ImplicitFeedbackRecorder) {
+	s.feedbackRecorder = recorder
 }
 
 // CreatePending registra uma nova pendência de confirmação.
@@ -134,6 +146,11 @@ func (s *ConfirmationGateService) Resume(ctx context.Context, id, userID string)
 
 // Cancel cancela a confirmação pendente.
 func (s *ConfirmationGateService) Cancel(ctx context.Context, id, userID string) error {
+	return s.CancelWithReason(ctx, id, userID, "")
+}
+
+// CancelWithReason cancela a confirmação pendente e registra feedback implícito de rejeição quando configurado.
+func (s *ConfirmationGateService) CancelWithReason(ctx context.Context, id, userID, reason string) error {
 	p, err := s.GetByID(ctx, id, userID)
 	if err != nil {
 		return err
@@ -141,7 +158,29 @@ func (s *ConfirmationGateService) Cancel(ctx context.Context, id, userID string)
 	if p.Status != StatusSuspended {
 		return ErrConfirmationAlreadyResolved
 	}
-	return s.fsm.CancelAction(ctx, id)
+	if err := s.fsm.CancelAction(ctx, id); err != nil {
+		return err
+	}
+	if s.feedbackRecorder != nil {
+		effectiveReason := strings.TrimSpace(reason)
+		if effectiveReason == "" {
+			effectiveReason = fmt.Sprintf("usuário cancelou/rejeitou a ação %s (%s)", p.Operation, p.ToolsetName)
+		}
+		_ = s.feedbackRecorder.RecordImplicitFeedback(ctx, p.UserID, p.ToolsetName, p.Operation, effectiveReason)
+	}
+	return nil
+}
+
+// RecordEditFeedback registra aprendizado quando o usuário modifica uma proposta antes/em vez de aprová-la.
+func (s *ConfirmationGateService) RecordEditFeedback(ctx context.Context, id, userID, reason string) error {
+	if s.feedbackRecorder == nil || strings.TrimSpace(reason) == "" {
+		return nil
+	}
+	p, err := s.GetByID(ctx, id, userID)
+	if err != nil {
+		return err
+	}
+	return s.feedbackRecorder.RecordImplicitFeedback(ctx, p.UserID, p.ToolsetName, p.Operation+"_edited", strings.TrimSpace(reason))
 }
 
 // GetLatestPending busca a última confirmação pendente ativa do usuário/thread.

@@ -12,13 +12,16 @@ import (
 
 // RingBufferTraceRecorder acumula traces em memória e descarrega em lote para proteger o SQLite do Pi 4.
 type RingBufferTraceRecorder struct {
-	db        *sql.DB
-	mu        sync.Mutex
-	buffer    []AITrace
-	capacity  int
-	flushChan chan struct{}
-	stopChan  chan struct{}
-	interval  time.Duration
+	db              *sql.DB
+	mu              sync.Mutex
+	buffer          []AITrace
+	capacity        int
+	flushChan       chan struct{}
+	stopChan        chan struct{}
+	interval        time.Duration
+	serverTurns     int64
+	serverTokensIn  int64
+	serverTokensOut int64
 }
 
 // NewRingBufferTraceRecorder cria o gravador com capacidade e intervalo de flush em lote.
@@ -44,6 +47,7 @@ func NewRingBufferTraceRecorder(db *sql.DB, capacity int, interval time.Duration
 }
 
 // RecordAsync adiciona um trace ao buffer sem bloquear a requisição.
+// Turnos executados via chave própria ("byok") não incrementam os contadores de cota do servidor (AI-11).
 func (r *RingBufferTraceRecorder) RecordAsync(trace AITrace) {
 	if trace.ID == "" {
 		trace.ID = uuid.New().String()
@@ -51,9 +55,21 @@ func (r *RingBufferTraceRecorder) RecordAsync(trace AITrace) {
 	if trace.CreatedAt.IsZero() {
 		trace.CreatedAt = time.Now().UTC()
 	}
+	if trace.CredentialSource == "" {
+		trace.CredentialSource = "server"
+	}
+	trace.FallbackReason = RedactSecrets(trace.FallbackReason)
+	trace.ErrorCode = RedactSecrets(trace.ErrorCode)
+	trace.ProviderName = RedactSecrets(trace.ProviderName)
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
+
+	if trace.CredentialSource != "byok" {
+		r.serverTurns++
+		r.serverTokensIn += int64(trace.TokensIn)
+		r.serverTokensOut += int64(trace.TokensOut)
+	}
 
 	r.buffer = append(r.buffer, trace)
 	if len(r.buffer) >= r.capacity {
@@ -62,6 +78,13 @@ func (r *RingBufferTraceRecorder) RecordAsync(trace AITrace) {
 		default:
 		}
 	}
+}
+
+// ServerQuotaStats retorna a contagem acumulada de turnos e tokens consumidos na cota do servidor.
+func (r *RingBufferTraceRecorder) ServerQuotaStats() (turns, tokensIn, tokensOut int64) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.serverTurns, r.serverTokensIn, r.serverTokensOut
 }
 
 // FlushNow força o esvaziamento imediato do buffer.
@@ -115,11 +138,12 @@ func (r *RingBufferTraceRecorder) persistBatch(ctx context.Context, batch []AITr
 
 	stmt, err := tx.PrepareContext(ctx, `
 		INSERT INTO ai_traces (
-			id, user_id, thread_id, turn_id, channel, task_type,
+			id, user_id, thread_id, turn_id, channel, agent_name, task_type,
+			credential_source, provider_key, effort,
 			provider_name, model_name, step_index, toolset_called, operation_called,
 			fallback_triggered, fallback_reason, tainted_turn, confirmation_gate_status,
 			tokens_in, tokens_out, latency_ms, status_code, error_code, created_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
 		return fmt.Errorf("falha ao preparar statement para ai_traces: %w", err)
@@ -137,7 +161,8 @@ func (r *RingBufferTraceRecorder) persistBatch(ctx context.Context, batch []AITr
 		}
 
 		_, err := stmt.ExecContext(ctx,
-			t.ID, t.UserID, t.ThreadID, t.TurnID, t.Channel, string(t.TaskType),
+			t.ID, t.UserID, t.ThreadID, t.TurnID, t.Channel, t.AgentName, string(t.TaskType),
+			t.CredentialSource, t.ProviderKey, t.Effort,
 			t.ProviderName, t.ModelName, t.StepIndex, t.ToolsetCalled, t.OperationCalled,
 			fallbackInt, t.FallbackReason, taintedInt, t.ConfirmationGateStatus,
 			t.TokensIn, t.TokensOut, t.LatencyMs, t.StatusCode, t.ErrorCode, t.CreatedAt,

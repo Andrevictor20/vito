@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"context"
+	"database/sql"
 	"errors"
 	"strings"
 	"time"
@@ -16,11 +18,9 @@ func (r *EventRepositorySQLite) DeleteSeries(id, userID string) (int, error) {
 	}
 
 	query := `DELETE FROM events WHERE user_id = ? AND (LOWER(title) = LOWER(?) OR (recurrence != '' AND recurrence = ? AND LOWER(title) = LOWER(?)))`
-	res, err := r.db.Exec(query, userID, orig.Title, orig.Recurrence, orig.Title)
-	if err != nil {
-		return 0, err
-	}
-	rowsAffected, err := res.RowsAffected()
+	rowsAffected, err := ExecuteQueuedWriteRows(context.Background(), func() (sql.Result, error) {
+		return r.db.Exec(query, userID, orig.Title, orig.Recurrence, orig.Title)
+	})
 	if err != nil {
 		return 0, err
 	}
@@ -38,11 +38,9 @@ func (r *EventRepositorySQLite) Update(e *domain.Event) error {
 		SET title = ?, description = ?, location = ?, start_at = ?, end_at = ?, category = ?, color = ?, recurrence = ?, updated_at = ?
 		WHERE id = ? AND user_id = ?
 	`
-	res, err := r.db.Exec(query, e.Title, e.Description, e.Location, startAt, endAt, e.Category, e.Color, e.Recurrence, now, e.ID, e.UserID)
-	if err != nil {
-		return err
-	}
-	rows, err := res.RowsAffected()
+	rows, err := ExecuteQueuedWriteRows(context.Background(), func() (sql.Result, error) {
+		return r.db.Exec(query, e.Title, e.Description, e.Location, startAt, endAt, e.Category, e.Color, e.Recurrence, now, e.ID, e.UserID)
+	})
 	if err != nil {
 		return err
 	}
@@ -104,7 +102,10 @@ func (r *EventRepositorySQLite) UpdateSeries(e *domain.Event) (int, error) {
 			SET title = ?, description = ?, location = ?, start_at = ?, end_at = ?, category = ?, color = ?, recurrence = ?, updated_at = ?
 			WHERE id = ? AND user_id = ?
 		`
-		if _, err := r.db.Exec(queryUpdate, e.Title, e.Description, e.Location, targetStart, targetEnd, e.Category, e.Color, e.Recurrence, nowUTC, item.id, e.UserID); err == nil {
+		if err := ExecuteQueuedWrite(context.Background(), func() error {
+			_, execErr := r.db.Exec(queryUpdate, e.Title, e.Description, e.Location, targetStart, targetEnd, e.Category, e.Color, e.Recurrence, nowUTC, item.id, e.UserID)
+			return execErr
+		}); err == nil {
 			updatedCount++
 		}
 	}
@@ -120,11 +121,9 @@ func (r *EventRepositorySQLite) DeleteByTitle(userID, titleQuery string) (int, e
 	}
 
 	query := `DELETE FROM events WHERE user_id = ? AND LOWER(title) LIKE '%' || LOWER(?) || '%' AND COALESCE(category, '') != 'holiday'`
-	res, err := r.db.Exec(query, userID, clean)
-	if err != nil {
-		return 0, err
-	}
-	rowsAffected, err := res.RowsAffected()
+	rowsAffected, err := ExecuteQueuedWriteRows(context.Background(), func() (sql.Result, error) {
+		return r.db.Exec(query, userID, clean)
+	})
 	if err != nil {
 		return 0, err
 	}
@@ -186,7 +185,10 @@ func (r *EventRepositorySQLite) UpdateTimesByTitle(userID, titleQuery string, ne
 		targetEnd := targetStart.Add(dur)
 
 		queryUpdate := `UPDATE events SET start_at = ?, end_at = ?, updated_at = ? WHERE id = ? AND user_id = ?`
-		if _, err := r.db.Exec(queryUpdate, targetStart, targetEnd, nowUTC, item.id, userID); err == nil {
+		if err := ExecuteQueuedWrite(context.Background(), func() error {
+			_, execErr := r.db.Exec(queryUpdate, targetStart, targetEnd, nowUTC, item.id, userID)
+			return execErr
+		}); err == nil {
 			updatedCount++
 		}
 	}
@@ -237,8 +239,10 @@ func (r *EventRepositorySQLite) ListUpcomingUnreminded(from, to time.Time) ([]do
 // MarkReminderSent registra o timestamp em que o lembrete de antecedência foi despachado para o usuário.
 func (r *EventRepositorySQLite) MarkReminderSent(eventID string, sentAt time.Time) error {
 	query := `UPDATE events SET reminder_sent_at = ? WHERE id = ?`
-	_, err := r.db.Exec(query, sentAt.UTC(), eventID)
-	return err
+	return ExecuteQueuedWrite(context.Background(), func() error {
+		_, err := r.db.Exec(query, sentAt.UTC(), eventID)
+		return err
+	})
 }
 
 // ListStartingNowUnreminded busca compromissos que iniciam no intervalo especificado e ainda não tiveram alerta de início disparado.
@@ -284,6 +288,8 @@ func (r *EventRepositorySQLite) ListStartingNowUnreminded(from, to time.Time) ([
 // MarkStartReminderSent registra o timestamp em que o alerta de início de evento foi despachado.
 func (r *EventRepositorySQLite) MarkStartReminderSent(eventID string, sentAt time.Time) error {
 	query := `UPDATE events SET start_reminder_sent_at = ? WHERE id = ?`
-	_, err := r.db.Exec(query, sentAt.UTC(), eventID)
-	return err
+	return ExecuteQueuedWrite(context.Background(), func() error {
+		_, err := r.db.Exec(query, sentAt.UTC(), eventID)
+		return err
+	})
 }

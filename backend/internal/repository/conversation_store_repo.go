@@ -20,6 +20,8 @@ type ConversationThread struct {
 	SummaryUpToTurnID  string     `json:"summary_up_to_turn_id"`
 	StickyModelName    string     `json:"sticky_model_name"`
 	StickyModelUntil   *time.Time `json:"sticky_model_until"`
+	ModelPref          string     `json:"model_pref"`
+	EffortPref         string     `json:"effort_pref"`
 	LastActivityAt     time.Time  `json:"last_activity_at"`
 	LastConsolidatedAt *time.Time `json:"last_consolidated_at"`
 	CreatedAt          time.Time  `json:"created_at"`
@@ -86,15 +88,19 @@ func (r *ConversationStoreRepository) CreateThread(ctx context.Context, t *Conve
 		INSERT INTO conversation_threads (
 			id, user_id, channel, external_chat_id, title, rolling_summary,
 			summary_up_to_turn_id, sticky_model_name, sticky_model_until,
+			model_pref, effort_pref,
 			last_activity_at, last_consolidated_at, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
-	_, err := r.db.ExecContext(ctx, query,
-		t.ID, t.UserID, t.Channel, t.ExternalChatID, t.Title, t.RollingSummary,
-		t.SummaryUpToTurnID, t.StickyModelName, t.StickyModelUntil,
-		t.LastActivityAt, t.LastConsolidatedAt, t.CreatedAt, t.UpdatedAt,
-	)
-	return err
+	return ExecuteQueuedWrite(ctx, func() error {
+		_, err := r.db.ExecContext(ctx, query,
+			t.ID, t.UserID, t.Channel, t.ExternalChatID, t.Title, t.RollingSummary,
+			t.SummaryUpToTurnID, t.StickyModelName, t.StickyModelUntil,
+			t.ModelPref, t.EffortPref,
+			t.LastActivityAt, t.LastConsolidatedAt, t.CreatedAt, t.UpdatedAt,
+		)
+		return err
+	})
 }
 
 // GetThreadByID busca thread por ID.
@@ -102,6 +108,7 @@ func (r *ConversationStoreRepository) GetThreadByID(ctx context.Context, id stri
 	query := `
 		SELECT id, user_id, channel, external_chat_id, title, rolling_summary,
 		       summary_up_to_turn_id, sticky_model_name, sticky_model_until,
+		       COALESCE(model_pref, ''), COALESCE(effort_pref, ''),
 		       last_activity_at, last_consolidated_at, created_at, updated_at
 		FROM conversation_threads
 		WHERE id = ?
@@ -122,8 +129,10 @@ func (r *ConversationStoreRepository) UpdateThreadSummary(ctx context.Context, t
 		SET rolling_summary = ?, summary_up_to_turn_id = ?, updated_at = ?
 		WHERE id = ?
 	`
-	_, err := r.db.ExecContext(ctx, query, summary, upToTurnID, time.Now().UTC(), threadID)
-	return err
+	return ExecuteQueuedWrite(ctx, func() error {
+		_, err := r.db.ExecContext(ctx, query, summary, upToTurnID, time.Now().UTC(), threadID)
+		return err
+	})
 }
 
 // UpdateThreadSticky atualiza o modelo e expiração fixada da thread.
@@ -133,8 +142,42 @@ func (r *ConversationStoreRepository) UpdateThreadSticky(ctx context.Context, th
 		SET sticky_model_name = ?, sticky_model_until = ?, updated_at = ?
 		WHERE id = ?
 	`
-	_, err := r.db.ExecContext(ctx, query, modelName, until, time.Now().UTC(), threadID)
-	return err
+	return ExecuteQueuedWrite(ctx, func() error {
+		_, err := r.db.ExecContext(ctx, query, modelName, until, time.Now().UTC(), threadID)
+		return err
+	})
+}
+
+// UpdateThreadModelPref atualiza a preferência de modelo e esforço da conversa.
+func (r *ConversationStoreRepository) UpdateThreadModelPref(ctx context.Context, userID, threadID, modelPref, effortPref string) error {
+	const query = `
+		UPDATE conversation_threads
+		SET model_pref = ?, effort_pref = ?, updated_at = ?
+		WHERE id = ? AND user_id = ?
+	`
+	n, err := ExecuteQueuedWriteRows(ctx, func() (sql.Result, error) {
+		return r.db.ExecContext(ctx, query, modelPref, effortPref, time.Now().UTC(), threadID, userID)
+	})
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
+// ClearProviderPrefs limpa preferências de modelo de threads que apontam para um provedor removido.
+func (r *ConversationStoreRepository) ClearProviderPrefs(ctx context.Context, userID, providerKey string) error {
+	const query = `
+		UPDATE conversation_threads
+		SET model_pref = '', updated_at = ?
+		WHERE user_id = ? AND model_pref LIKE ?
+	`
+	return ExecuteQueuedWrite(ctx, func() error {
+		_, err := r.db.ExecContext(ctx, query, time.Now().UTC(), userID, providerKey+":%")
+		return err
+	})
 }
 
 // ListThreadsByUser retorna threads do usuário filtradas por canal e ordenadas por last_activity_at DESC.
@@ -145,6 +188,7 @@ func (r *ConversationStoreRepository) ListThreadsByUser(ctx context.Context, use
 	query := `
 		SELECT id, user_id, channel, external_chat_id, title, rolling_summary,
 		       summary_up_to_turn_id, sticky_model_name, sticky_model_until,
+		       COALESCE(model_pref, ''), COALESCE(effort_pref, ''),
 		       last_activity_at, last_consolidated_at, created_at, updated_at
 		FROM conversation_threads
 		WHERE user_id = ? AND channel = ?
@@ -192,40 +236,42 @@ func (r *ConversationStoreRepository) CreateTurn(ctx context.Context, t *Convers
 		t.Origin = "direct"
 	}
 
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
+	return ExecuteQueuedWrite(ctx, func() error {
+		tx, err := r.db.BeginTx(ctx, nil)
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
 
-	insertQuery := `
-		INSERT INTO conversation_turns (
-			id, thread_id, user_id, channel, role, origin, worker_type, content,
-			reasoning_json, tool_calls_json, tool_call_id, cards_json, reference_ids_json,
-			model_used, tokens_in, tokens_out, latency_ms, tainted_by_external, created_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`
-	_, err = tx.ExecContext(ctx, insertQuery,
-		t.ID, t.ThreadID, t.UserID, t.Channel, t.Role, t.Origin, t.WorkerType,
-		t.Content, t.ReasoningJSON, t.ToolCallsJSON, t.ToolCallID, t.CardsJSON,
-		t.ReferenceIDsJSON, t.ModelUsed, t.TokensIn, t.TokensOut, t.LatencyMs,
-		t.TaintedByExternal, t.CreatedAt,
-	)
-	if err != nil {
-		return fmt.Errorf("falha ao inserir turno de conversa: %w", err)
-	}
+		insertQuery := `
+			INSERT INTO conversation_turns (
+				id, thread_id, user_id, channel, role, origin, worker_type, content,
+				reasoning_json, tool_calls_json, tool_call_id, cards_json, reference_ids_json,
+				model_used, tokens_in, tokens_out, latency_ms, tainted_by_external, created_at
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`
+		_, err = tx.ExecContext(ctx, insertQuery,
+			t.ID, t.ThreadID, t.UserID, t.Channel, t.Role, t.Origin, t.WorkerType,
+			t.Content, t.ReasoningJSON, t.ToolCallsJSON, t.ToolCallID, t.CardsJSON,
+			t.ReferenceIDsJSON, t.ModelUsed, t.TokensIn, t.TokensOut, t.LatencyMs,
+			t.TaintedByExternal, t.CreatedAt,
+		)
+		if err != nil {
+			return fmt.Errorf("falha ao inserir turno de conversa: %w", err)
+		}
 
-	updateThread := `
-		UPDATE conversation_threads
-		SET last_activity_at = ?, updated_at = ?
-		WHERE id = ?
-	`
-	_, err = tx.ExecContext(ctx, updateThread, t.CreatedAt, t.CreatedAt, t.ThreadID)
-	if err != nil {
-		return fmt.Errorf("falha ao atualizar last_activity_at na thread: %w", err)
-	}
+		updateThread := `
+			UPDATE conversation_threads
+			SET last_activity_at = ?, updated_at = ?
+			WHERE id = ?
+		`
+		_, err = tx.ExecContext(ctx, updateThread, t.CreatedAt, t.CreatedAt, t.ThreadID)
+		if err != nil {
+			return fmt.Errorf("falha ao atualizar last_activity_at na thread: %w", err)
+		}
 
-	return tx.Commit()
+		return tx.Commit()
+	})
 }
 
 // AddTurn é alias de compatibilidade.
@@ -276,16 +322,20 @@ func (r *ConversationStoreRepository) ListTurnsByThread(ctx context.Context, thr
 // DeleteThread remove uma thread e aciona CASCADE para os turnos.
 func (r *ConversationStoreRepository) DeleteThread(ctx context.Context, threadID string) error {
 	query := `DELETE FROM conversation_threads WHERE id = ?`
-	_, err := r.db.ExecContext(ctx, query, threadID)
-	return err
+	return ExecuteQueuedWrite(ctx, func() error {
+		_, err := r.db.ExecContext(ctx, query, threadID)
+		return err
+	})
 }
 
 // TouchThread atualiza last_activity_at e updated_at de uma thread.
 func (r *ConversationStoreRepository) TouchThread(ctx context.Context, threadID string) error {
 	query := `UPDATE conversation_threads SET last_activity_at = ?, updated_at = ? WHERE id = ?`
 	now := time.Now().UTC()
-	_, err := r.db.ExecContext(ctx, query, now, now, threadID)
-	return err
+	return ExecuteQueuedWrite(ctx, func() error {
+		_, err := r.db.ExecContext(ctx, query, now, now, threadID)
+		return err
+	})
 }
 
 // GetOrCreateThread busca uma thread recente do canal ou cria uma nova.
@@ -345,6 +395,7 @@ func scanThread(scanner interface{ Scan(...any) error }) (*ConversationThread, e
 	err := scanner.Scan(
 		&t.ID, &t.UserID, &t.Channel, &t.ExternalChatID, &t.Title, &t.RollingSummary,
 		&t.SummaryUpToTurnID, &t.StickyModelName, &stickyUntil,
+		&t.ModelPref, &t.EffortPref,
 		&t.LastActivityAt, &lastConsol, &t.CreatedAt, &t.UpdatedAt,
 	)
 	if err != nil {

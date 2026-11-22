@@ -67,6 +67,9 @@ export class ChatApi {
     return {
       reply: res.reply || res.message || res.text || '',
       message: res.message || res.reply || '',
+      thread_id: res.thread_id,
+      model_used: res.model_used,
+      fallback_notice: res.fallback_notice,
       actions: res.actions,
       event: res.event,
       todo: res.todo,

@@ -14,24 +14,18 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { VitoVoiceOverlay } from '../overlay/VitoVoiceOverlay';
-
-let ImagePicker: any = null;
-try {
-  ImagePicker = require('expo-image-picker');
-} catch (e) {
-  ImagePicker = null;
-}
 import { tokens } from '../theme/tokens';
 import { useChat } from '../hooks/useChat';
 import { ChatMessageBubble } from '../components/chat/ChatMessageBubble';
 import { ChatQuickChips } from '../components/chat/ChatQuickChips';
-import { ChatInputDock } from '../components/chat/ChatInputDock';
+import { ChatInputDock, ChatInputDockRef } from '../components/chat/ChatInputDock';
 import { ChatHistoryDrawer } from '../components/chat/ChatHistoryDrawer';
 import { ChatEmptyWelcome } from '../components/chat/ChatEmptyWelcome';
-import { ChatThinkingIndicator } from '../components/chat/ChatThinkingIndicator';
-import { FocusMenuModal } from '../components/chat/FocusMenuModal';
-import { FocusMode } from '../types/focus';
-import { prepareEditDraft } from '../utils/chatActions';
+import { ThinkingProcessAccordion } from '../components/chat/ThinkingProcessAccordion';
+import { ModelPickerSheet } from '../components/ai/ModelPickerSheet';
+import { useChatModelSelection } from '../hooks/useChatModelSelection';
+import { useChatImagePicker } from '../hooks/useChatImagePicker';
+import { navigateToAiProviders } from '../navigation/navigationRef';
 import { pickWelcomeGreeting } from '../utils/chatGreetings';
 import { resolveKeyboardHeight } from '../utils/keyboardHeight';
 import { useAuth } from '../context/AuthContext';
@@ -64,7 +58,9 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
   const {
     messages,
     loading,
+    streamingSteps,
     sessions,
+    activeSessionId,
     sendMessage,
     appendUserMessage,
     appendAssistantMessage,
@@ -79,14 +75,14 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
     togglePinConversation,
   } = useChat(onDataChanged, user?.id);
 
-  const [inputText, setInputText] = useState('');
-  const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
-  const [selectedImageBase64, setSelectedImageBase64] = useState<string | null>(null);
-  // Mime real da imagem escolhida: enviar "image/jpeg" para um PNG/WEBP/HEIC
-  // fazia o backend receber um tipo incompatível com os bytes da imagem.
-  const [selectedImageMime, setSelectedImageMime] = useState<string | null>(null);
-  const [selectedFocus, setSelectedFocus] = useState<FocusMode | null>(null);
-  const [focusModalVisible, setFocusModalVisible] = useState(false);
+  const chatModel = useChatModelSelection(activeSessionId, sessions);
+  const {
+    selectedImageUri,
+    selectedImageBase64,
+    selectedImageMime,
+    clearSelectedImage,
+    handlePickImage,
+  } = useChatImagePicker(loading);
   const [historyVisible, setHistoryVisible] = useState(false);
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -101,7 +97,7 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
   }, []);
 
   const flatListRef = useRef<FlatList>(null);
-  const inputRef = useRef<any>(null);
+  const inputRef = useRef<ChatInputDockRef>(null);
   // Espelhos p/ o listener de teclado decidir sem re-subscrever (zona morta).
   const keyboardOpenRef = useRef(false);
   const keyboardHeightRef = useRef(0);
@@ -117,15 +113,13 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
   useImperativeHandle(ref, () => ({
     openHistory: () => setHistoryVisible(true),
     startNewChat: () => {
-      setInputText('');
-      setSelectedImageUri(null);
-      setSelectedImageBase64(null);
-      setSelectedFocus(null);
+      inputRef.current?.clear();
+      clearSelectedImage();
       startNewConversation();
     },
     submitExternalPrompt: (text: string) => {
       if (text.trim()) {
-        sendMessage(text.trim(), selectedFocus?.id);
+        sendMessage(text.trim());
       }
     },
     askAssistantQuestion: (question: string) => {
@@ -136,7 +130,7 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
         inputRef.current?.focus?.();
       }, 150);
     },
-  }), [startNewConversation, sendMessage, appendAssistantMessage, selectedFocus?.id]);
+  }), [startNewConversation, sendMessage, appendAssistantMessage]);
 
 
   useEffect(() => {
@@ -189,110 +183,30 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
     }, 120);
   }, [messages.length, loading]);
 
-  const openImagePicker = async (useCamera: boolean = false) => {
-    if (loading) return;
-    if (!ImagePicker) {
-      Alert.alert('Fotos', 'Módulo de fotos não disponível nesta versão.');
-      return;
-    }
-
-    try {
-      if (useCamera) {
-        const permission = await ImagePicker.requestCameraPermissionsAsync();
-        if (!permission.granted) {
-          Alert.alert('Permissão da Câmera', 'É necessário conceder permissão de câmera para tirar foto de convites e recibos.');
-          return;
-        }
-
-        const result = await ImagePicker.launchCameraAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
-          allowsEditing: true,
-          quality: 0.8,
-          base64: true,
-        });
-
-        if (!result.canceled && result.assets && result.assets.length > 0) {
-          setSelectedImageUri(result.assets[0].uri);
-          setSelectedImageBase64(result.assets[0].base64 || null);
-          setSelectedImageMime(result.assets[0].mimeType || null);
-        }
-      } else {
-        const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (!permission.granted) {
-          Alert.alert('Permissão de Fotos', 'É necessário conceder permissão de galeria para anexar imagens.');
-          return;
-        }
-
-        const result = await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
-          allowsEditing: true,
-          quality: 0.8,
-          base64: true,
-        });
-
-        if (!result.canceled && result.assets && result.assets.length > 0) {
-          setSelectedImageUri(result.assets[0].uri);
-          setSelectedImageBase64(result.assets[0].base64 || null);
-          setSelectedImageMime(result.assets[0].mimeType || null);
-        }
-      }
-    } catch (e) {
-      console.error('Falha ao selecionar imagem:', e);
-      Alert.alert('Erro', 'Não foi possível carregar a imagem.');
-    }
-  };
-
-  const handlePickImage = () => {
-    if (loading) return;
-    Alert.alert(
-      'Anexar Imagem',
-      'Como deseja enviar a foto ou documento para o Vito?',
-      [
-        {
-          text: 'Tirar Foto',
-          onPress: () => openImagePicker(true),
-        },
-        {
-          text: 'Escolher da Galeria',
-          onPress: () => openImagePicker(false),
-        },
-        {
-          text: 'Cancelar',
-          style: 'cancel',
-        },
-      ]
-    );
-  };
-
-  const handleSend = () => {
-    if ((!inputText.trim() && !selectedImageUri) || loading) return;
+  const handleSend = (text: string) => {
+    if ((!text.trim() && !selectedImageUri) || loading) return;
 
     if (selectedImageUri) {
       const uri = selectedImageUri;
       const b64 = selectedImageBase64 || undefined;
       const mime = selectedImageMime || undefined;
-      const prompt = inputText.trim() || undefined;
-      setSelectedImageUri(null);
-      setSelectedImageBase64(null);
-      setSelectedImageMime(null);
-      setInputText('');
+      const prompt = text.trim() || undefined;
+      clearSelectedImage();
       sendImage(uri, prompt, b64, mime);
     } else {
-      const text = inputText;
-      setInputText('');
-      sendMessage(text, selectedFocus?.id);
+      sendMessage(text);
     }
     // Mantém teclado aberto e foco para a próxima mensagem (1 toque sempre).
-    requestAnimationFrame(() => inputRef.current?.focus?.());
+    requestAnimationFrame(() => inputRef.current?.focus());
   };
 
   const handleQuickPrompt = (prompt: string) => {
     if (loading) return;
-    sendMessage(prompt, selectedFocus?.id);
+    sendMessage(prompt);
   };
 
   const handleEditMessage = (text: string) => {
-    setInputText(prepareEditDraft(inputText, text));
+    inputRef.current?.setDraft(text);
     setTimeout(() => {
       flatListRef.current?.scrollToEnd({ animated: true });
     }, 100);
@@ -302,9 +216,9 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
     if (loading) return;
     const title = msg.event?.title || msg.conflict?.conflicting_title;
     if (title) {
-      sendMessage(`Reagendar "${title}" para ${slot.label}`, selectedFocus?.id);
+      sendMessage(`Reagendar "${title}" para ${slot.label}`);
     } else {
-      sendMessage(`Reagendar compromisso para ${slot.label}`, selectedFocus?.id);
+      sendMessage(`Reagendar compromisso para ${slot.label}`);
     }
   };
 
@@ -334,7 +248,7 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
       const result = await SafeAudioRecorder.stopRecording();
       if (result?.uri) {
         // Envia o áudio real para o backend (Groq Whisper)
-        await sendAudio(result.uri, selectedFocus?.id);
+        await sendAudio(result.uri);
       } else {
         console.warn('[Voice] Nenhum URI de áudio retornado.');
       }
@@ -396,7 +310,7 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
           />
         }
         ListFooterComponent={
-          loading ? <ChatThinkingIndicator /> : null
+          loading ? <ThinkingProcessAccordion steps={streamingSteps} isStreaming={true} /> : null
         }
       />
 
@@ -421,27 +335,29 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
         ]}
       >
         <ChatInputDock
-          value={inputText}
-          onChangeText={setInputText}
+          ref={inputRef}
           onSend={handleSend}
           loading={loading}
           onStop={stopGeneration}
-          inputRef={inputRef}
           isRecording={isRecording}
           onPressMic={handleToggleRecording}
           onPressLiveVoice={() => setIsVoiceModeActive(true)}
           onCancelRecording={handleCancelRecording}
           onPressAttach={handlePickImage}
           selectedImageUri={selectedImageUri}
-          onClearImage={() => {
-            setSelectedImageUri(null);
-            setSelectedImageBase64(null);
-          }}
-          selectedFocus={selectedFocus}
-          onPressFocus={() => setFocusModalVisible(true)}
-          onClearFocus={() => setSelectedFocus(null)}
+          onClearImage={clearSelectedImage}
+          modelLabel={chatModel.pillLabel}
+          modelDotColor={chatModel.pillDotColor}
+          onPressModel={() => chatModel.setPickerVisible(true)}
         />
       </View>
+      {!!chatModel.toastMessage && (
+        <View style={[styles.modelToast, { backgroundColor: colors.ink }]}>
+          <Text style={[styles.modelToastText, { color: colors.bg }]}>
+            {chatModel.toastMessage}
+          </Text>
+        </View>
+      )}
       <ChatHistoryDrawer
         visible={historyVisible}
         onClose={() => setHistoryVisible(false)}
@@ -451,11 +367,18 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(({
         onDeleteConversation={deleteConversation}
         onTogglePin={togglePinConversation}
       />
-      <FocusMenuModal
-        visible={focusModalVisible}
-        onClose={() => setFocusModalVisible(false)}
-        selectedFocus={selectedFocus}
-        onSelectFocus={setSelectedFocus}
+      <ModelPickerSheet
+        visible={chatModel.pickerVisible}
+        onClose={() => chatModel.setPickerVisible(false)}
+        scopeLabel="Esta conversa"
+        allowInherit={true}
+        selectedModel={chatModel.threadModel}
+        inheritedModel={chatModel.defaultModel}
+        selectedEffort={chatModel.threadEffort}
+        groups={chatModel.modelGroups}
+        onSelectModel={chatModel.selectThreadModel}
+        onSelectEffort={chatModel.selectThreadEffort}
+        onManageProviders={navigateToAiProviders}
       />
       {isVoiceModeActive && (
         <Modal

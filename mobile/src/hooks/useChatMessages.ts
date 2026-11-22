@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { AssistantChatResponse, ChatBooking, ChatMeeting, ChatMessage, ConversationSession } from '../types';
+import type { ChatMessage, ConversationSession } from '../types';
 import { api } from '../services/api';
 import { isAbortError, truncateMessagesForEdit } from '../utils/chatActions';
 import { humanizePreview, semanticTitle } from '../utils/chatPreview';
@@ -12,6 +12,7 @@ import {
   notifyAssistantResult,
   handleAssistantSideEffects,
 } from './chatMessageEffects';
+import { runAssistantStreamTurn } from './chatStreamRunner';
 
 export {
   toChatMeeting,
@@ -33,6 +34,7 @@ export interface UseChatMessagesResult {
   messages: ChatMessage[];
   setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
   loading: boolean;
+  streamingSteps: string[];
   saveMessages: (newMessages: ChatMessage[]) => void;
   sendMessage: (text: string, focusMode?: string) => Promise<void>;
   appendUserMessage: (text: string) => void;
@@ -57,6 +59,7 @@ export function useChatMessages(
 ): UseChatMessagesResult {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
+  const [streamingSteps, setStreamingSteps] = useState<string[]>([]);
   const abortControllerRef = useRef<AbortController | null>(null);
   const isUserStoppedRef = useRef<boolean>(false);
 
@@ -159,20 +162,19 @@ export function useChatMessages(
       const controller = new AbortController();
       abortControllerRef.current = controller;
       isUserStoppedRef.current = false;
+      setStreamingSteps([]);
 
       try {
-        const recentHistory = messages.slice(-12).map((m) => ({
-          sender: m.sender === 'user' ? ('user' as const) : ('vito' as const),
-          text: m.text,
-        }));
-        const res = await api.assistantChat(text.trim(), {
-          thread_id: activeRef.current || activeSessionId,
-          channel: 'app_mobile',
-          history: recentHistory,
+        const { res, vitoMsg } = await runAssistantStreamTurn({
+          prompt: text.trim(),
+          baseMessages: withUser,
+          historySource: messages,
+          threadId: activeRef.current || activeSessionId,
+          focusMode,
           signal: controller.signal,
-          focus_mode: focusMode,
+          setMessages,
+          setStreamingSteps,
         });
-        const vitoMsg = buildAssistantMessage('vito', res, 'Instrução processada com sucesso.');
 
         const withVito = [...withUser, vitoMsg];
         setMessages(withVito);
@@ -209,6 +211,7 @@ export function useChatMessages(
           abortControllerRef.current = null;
         }
         isUserStoppedRef.current = false;
+        setStreamingSteps([]);
         setLoading(false);
       }
     },
@@ -230,23 +233,19 @@ export function useChatMessages(
       const controller = new AbortController();
       abortControllerRef.current = controller;
       isUserStoppedRef.current = false;
+      setStreamingSteps([]);
 
       try {
-        const previousSlice = messages.slice(0, targetIdx);
-        const recentHistory = previousSlice.slice(-12).map((m) => ({
-          sender: m.sender === 'user' ? ('user' as const) : ('vito' as const),
-          text: m.text,
-        }));
-
-        const res = await api.assistantChat(newText.trim(), {
-          thread_id: activeRef.current || activeSessionId,
-          channel: 'app_mobile',
-          history: recentHistory,
+        const { res, vitoMsg } = await runAssistantStreamTurn({
+          prompt: newText.trim(),
+          baseMessages: truncatedList,
+          historySource: messages.slice(0, targetIdx),
+          threadId: activeRef.current || activeSessionId,
+          focusMode,
           signal: controller.signal,
-          focus_mode: focusMode,
+          setMessages,
+          setStreamingSteps,
         });
-
-        const vitoMsg = buildAssistantMessage('vito', res, 'Instrução processada com sucesso.');
 
         const withVito = [...truncatedList, vitoMsg];
         setMessages(withVito);
@@ -282,6 +281,7 @@ export function useChatMessages(
           abortControllerRef.current = null;
         }
         isUserStoppedRef.current = false;
+        setStreamingSteps([]);
         setLoading(false);
       }
     },
@@ -450,6 +450,7 @@ export function useChatMessages(
     messages,
     setMessages,
     loading,
+    streamingSteps,
     saveMessages,
     sendMessage,
     appendUserMessage,

@@ -1,7 +1,7 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { useChat } from '../../hooks';
-import { ChatMessage, ConversationSession } from '../../types';
+import { useChat, useAiProviders } from '../../hooks';
+import { AiReasoningEffort, ChatMessage, ConversationSession } from '../../types';
 import { VitoMascot } from '../common/VitoMascot';
 import { ChatHistoryPanel } from './ChatHistoryPanel';
 import { FocusMode } from './FocusMenu';
@@ -13,6 +13,8 @@ import { ChatIdeasDeck } from './ChatIdeasDeck';
 import { FormattedChatMessageText } from './FormattedChatMessageText';
 import { ChatMessageActionBar } from './ChatMessageActionBar';
 import { ChatStructuredCards } from './cards/ChatStructuredCards';
+import { ModelPickerModal } from '../ai/ModelPickerModal';
+import { getResolvedModelDisplay, resolveModelRef } from '../ai/aiProvidersCatalog';
 import { toChatGmailMessage, toChatWhatsAppMessage } from '../../utils/chatCardExtractors';
 import { pickWelcomeGreeting } from '../../utils/chatGreetings';
 import {
@@ -44,7 +46,42 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
   const [historyOpen, setHistoryOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
+  const [modelPickerOpen, setModelPickerOpen] = useState(false);
+  const [threadModelPref, setThreadModelPref] = useState<string | null>(null);
+  const [threadEffortPref, setThreadEffortPref] = useState<AiReasoningEffort>('auto');
+  const [modelToast, setModelToast] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const {
+    modelGroups,
+    preferences,
+    resolvedDefaultRef,
+    updateThreadModel,
+  } = useAiProviders();
+
+  const resolvedChatModelRef = useMemo(
+    () => resolveModelRef([threadModelPref, resolvedDefaultRef], modelGroups),
+    [threadModelPref, resolvedDefaultRef, modelGroups]
+  );
+
+  const resolvedChatModelDisplay = useMemo(
+    () => getResolvedModelDisplay(resolvedChatModelRef, modelGroups),
+    [resolvedChatModelRef, modelGroups]
+  );
+
+  const openManageProviders = useCallback(() => {
+    onNavigateTab?.('settings');
+    if (typeof window !== 'undefined') {
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('vito:open-settings-tab', { detail: 'ia' }));
+      }, 0);
+    }
+  }, [onNavigateTab]);
+
+  const showModelToast = useCallback((msg: string) => {
+    setModelToast(msg);
+    setTimeout(() => setModelToast(''), 3000);
+  }, []);
 
   const welcomeGreeting = React.useMemo(() => {
     const firstName = user?.name ? user.name.split(' ')[0] : undefined;
@@ -75,6 +112,10 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
       const detailed = await loadSessionWithMessages(id);
       if (detailed && detailed.messages) {
         setMessages(detailed.messages);
+      }
+      if (detailed?.session) {
+        setThreadModelPref(detailed.session.model_pref || null);
+        setThreadEffortPref((detailed.session.effort_pref as AiReasoningEffort) || preferences.default_effort);
       }
     } catch (err) {
       console.error('Erro ao carregar conversa:', err);
@@ -116,8 +157,11 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
         content: m.text,
       }));
 
-      const contextPayload: any = {
+      const contextPayload: Record<string, unknown> = {
         history: historyPayload,
+        ...(activeSessionId ? { thread_id: activeSessionId } : {}),
+        ...(threadModelPref ? { model_pref: threadModelPref } : {}),
+        ...(threadEffortPref && threadEffortPref !== 'auto' ? { effort_pref: threadEffortPref } : {}),
       };
 
       if (focus) {
@@ -131,6 +175,8 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
         sender: 'vito',
         text: res.reply || res.message || 'Instrução recebida e processada com sucesso.',
         timestamp: new Date().toISOString(),
+        model_used: res.model_used,
+        fallback_notice: res.fallback_notice,
         todo: res.todo,
         event: res.event,
         trigger: res.trigger,
@@ -186,6 +232,8 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
   const handleStartNewChat = () => {
     setActiveSessionId('');
     setMessages([]);
+    setThreadModelPref(null);
+    setThreadEffortPref(preferences.default_effort);
   };
 
   return (
@@ -300,10 +348,24 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
                       }}
                     />
 
+                    {msg.fallback_notice && (
+                      <div className="px-3.5 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-700 dark:text-amber-300 flex items-center justify-between gap-3">
+                        <span>{msg.fallback_notice}</span>
+                        <button
+                          type="button"
+                          onClick={openManageProviders}
+                          className="font-semibold underline shrink-0"
+                        >
+                          Gerenciar provedores
+                        </button>
+                      </div>
+                    )}
+
                     {/* Barra de Ações Minimalista Estilo Claude / Gemini */}
                     <ChatMessageActionBar
                       messageText={msg.text}
                       timestamp={msg.timestamp}
+                      modelUsed={msg.model_used}
                     />
                   </div>
                 );
@@ -324,7 +386,18 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
         {/* Input Dock Toki / Claude Style (Centrado na Mesma Largura das Mensagens) */}
         <div className="p-4 sm:p-6 bg-transparent shrink-0">
           <div className="max-w-3xl lg:max-w-4xl mx-auto w-full">
-            <ChatInputDock onSendMessage={handleSendPrompt} loading={loading} />
+            {modelToast && (
+              <div className="mb-2 px-3 py-1.5 rounded-full bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-xs font-medium inline-block">
+                {modelToast}
+              </div>
+            )}
+            <ChatInputDock
+              onSendMessage={handleSendPrompt}
+              loading={loading}
+              modelName={resolvedChatModelDisplay.model.name}
+              modelColor={resolvedChatModelDisplay.color}
+              onOpenModelPicker={() => setModelPickerOpen(true)}
+            />
 
             <div className="mt-2.5 text-center text-[11px] sm:text-[11.5px] text-zinc-400 dark:text-zinc-500 font-sans select-none tracking-normal">
               O Vito pode cometer erros. Verifique informações importantes.
@@ -332,6 +405,44 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
           </div>
         </div>
       </div>
+
+      <ModelPickerModal
+        isOpen={modelPickerOpen}
+        onClose={() => setModelPickerOpen(false)}
+        scope="Esta conversa"
+        allowInherit={true}
+        selectedModel={threadModelPref}
+        selectedEffort={threadEffortPref}
+        inheritedModel={resolvedDefaultRef}
+        groups={modelGroups}
+        onSelectModel={async (modelRef) => {
+          setThreadModelPref(modelRef);
+          if (activeSessionId) {
+            try {
+              await updateThreadModel(activeSessionId, modelRef || '', threadEffortPref);
+            } catch {
+              // Mantém preferência local na sessão atual mesmo se thread ainda não sincronizou
+            }
+          }
+          if (modelRef) {
+            const disp = getResolvedModelDisplay(modelRef, modelGroups);
+            showModelToast(`Próximas mensagens usam ${disp.model.name}`);
+          } else {
+            showModelToast('Voltou ao modelo padrão');
+          }
+        }}
+        onSelectEffort={async (effort) => {
+          setThreadEffortPref(effort);
+          if (activeSessionId) {
+            try {
+              await updateThreadModel(activeSessionId, threadModelPref || '', effort);
+            } catch {
+              // Ignora erro transitório
+            }
+          }
+        }}
+        onManageProviders={openManageProviders}
+      />
     </div>
   );
 };

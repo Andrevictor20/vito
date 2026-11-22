@@ -57,6 +57,8 @@ export interface Event {
   color?: string;
   recurrence?: string;
   is_recurring?: boolean;
+  critical_alarm?: boolean;
+  wake_offset_minutes?: number;
   created_at: string;
   updated_at?: string;
 }
@@ -160,6 +162,20 @@ export interface AssistantChatResponse {
   conflict?: ConflictInfo;
   pending_confirmation?: DestructiveConfirmation;
   provider_used?: string;
+  model_used?: string;
+  byok_warning?: string;
+  telemetry?: {
+    provider_used?: string;
+    model_used?: string;
+    credential_source?: string;
+    fallback_reason?: string;
+  };
+  reasoning?: string[];
+  tool_calls?: Array<{
+    tool?: string;
+    operation?: string;
+    status?: string;
+  }>;
   whatsapp_message?: ChatWhatsAppMessage;
   gmail_message?: ChatGmailMessage;
   tts_audio_b64?: string;
@@ -217,6 +233,9 @@ export interface ChatMessage {
   pending_confirmation?: DestructiveConfirmation;
   whatsapp_message?: ChatWhatsAppMessage;
   gmail_message?: ChatGmailMessage;
+  thinkingSteps?: string[];
+  modelUsed?: string;
+  byokWarning?: string;
 }
 
 export interface ConversationSession {
@@ -227,6 +246,8 @@ export interface ConversationSession {
   messages: ChatMessage[];
   active?: boolean;
   pinned?: boolean;
+  model_pref?: string;
+  effort_pref?: string;
 }
 
 export type NotificationPriority = 'silent' | 'default';
@@ -755,3 +776,4 @@ export interface SendP2PInviteInput {
 
 export * from './focus';
 export * from './finance';
+export * from './aiProviders';

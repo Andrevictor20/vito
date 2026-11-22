@@ -29,6 +29,26 @@ func (m *mockAISettingsRepoForHandler) UpsertSettings(s *domain.AISettings) erro
 	return nil
 }
 
+func (m *mockAISettingsRepoForHandler) GetPreferences(_ context.Context, userID string) (*domain.AIPreferences, error) {
+	if m.settings != nil {
+		return &domain.AIPreferences{DefaultModel: m.settings.DefaultModel, DefaultEffort: m.settings.DefaultEffort}, nil
+	}
+	return &domain.AIPreferences{DefaultEffort: domain.EffortAuto}, nil
+}
+
+func (m *mockAISettingsRepoForHandler) UpdatePreferences(_ context.Context, userID, defaultModel, defaultEffort string) error {
+	if m.settings == nil {
+		m.settings = domain.DefaultAISettings(userID)
+	}
+	m.settings.DefaultModel = defaultModel
+	m.settings.DefaultEffort = defaultEffort
+	return nil
+}
+
+func (m *mockAISettingsRepoForHandler) ClearProviderPrefs(_ context.Context, userID, providerKey string) error {
+	return nil
+}
+
 func TestAISettingsHandler_GetSettings(t *testing.T) {
 	repo := &mockAISettingsRepoForHandler{
 		settings: &domain.AISettings{

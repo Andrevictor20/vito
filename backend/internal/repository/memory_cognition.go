@@ -311,21 +311,25 @@ func (r *MemoryRepositorySQLite) recentActive(userID string, limit int) ([]domai
 
 // Reinforce aplica reforço por uso (Spaced Reinforcement, §8.3).
 func (r *MemoryRepositorySQLite) Reinforce(id, userID string) error {
-	_, err := r.db.Exec(`
-		UPDATE memories
-		SET access_count = COALESCE(access_count, 0) + 1,
-		    last_accessed_at = ?
-		WHERE id = ? AND user_id = ?
-	`, time.Now().UTC(), id, userID)
-	return err
+	return ExecuteQueuedWrite(context.Background(), func() error {
+		_, err := r.db.Exec(`
+			UPDATE memories
+			SET access_count = COALESCE(access_count, 0) + 1,
+			    last_accessed_at = ?
+			WHERE id = ? AND user_id = ?
+		`, time.Now().UTC(), id, userID)
+		return err
+	})
 }
 
 // Supersede marca a memória como substituída, preservando histórico.
 func (r *MemoryRepositorySQLite) Supersede(id, userID, supersededBy string) error {
-	_, err := r.db.Exec(`
-		UPDATE memories
-		SET superseded_by = ?, updated_at = ?
-		WHERE id = ? AND user_id = ?
-	`, supersededBy, time.Now().UTC(), id, userID)
-	return err
+	return ExecuteQueuedWrite(context.Background(), func() error {
+		_, err := r.db.Exec(`
+			UPDATE memories
+			SET superseded_by = ?, updated_at = ?
+			WHERE id = ? AND user_id = ?
+		`, supersededBy, time.Now().UTC(), id, userID)
+		return err
+	})
 }

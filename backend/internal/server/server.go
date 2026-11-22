@@ -32,6 +32,7 @@ type Server struct {
 	triggerHandler      *handler.TriggerHandler
 	briefingHandler     *handler.BriefingHandler
 	aiSettingsHandler   *handler.AISettingsHandler
+	aiProviderHandler   *handler.AIProviderHandler
 	pendingHandler      *handler.PendingHandler
 	bookingHandler      *handler.BookingHandler
 	meetingHandler      *handler.MeetingHandler
@@ -62,6 +63,7 @@ type Config struct {
 	TriggerHandler      *handler.TriggerHandler
 	BriefingHandler     *handler.BriefingHandler
 	AISettingsHandler   *handler.AISettingsHandler
+	AIProviderHandler   *handler.AIProviderHandler
 	PendingHandler      *handler.PendingHandler
 	BookingHandler      *handler.BookingHandler
 	MeetingHandler      *handler.MeetingHandler
@@ -100,6 +102,7 @@ func New(cfg ...Config) *Server {
 		s.triggerHandler = cfg[0].TriggerHandler
 		s.briefingHandler = cfg[0].BriefingHandler
 		s.aiSettingsHandler = cfg[0].AISettingsHandler
+		s.aiProviderHandler = cfg[0].AIProviderHandler
 		s.pendingHandler = cfg[0].PendingHandler
 		s.bookingHandler = cfg[0].BookingHandler
 		s.meetingHandler = cfg[0].MeetingHandler
@@ -299,6 +302,7 @@ func (s *Server) registerRoutes() {
 						air.Use(aiLimiter)
 						air.Post("/assistant/chat", s.astStreamHandler.Chat)
 						air.Post("/assistant/stream", s.astStreamHandler.Stream)
+						air.Post("/assistant/chat/stream", s.astStreamHandler.Stream)
 						air.Post("/assistant/confirm", s.astStreamHandler.Confirm)
 						air.Post("/assistant/audio", s.astStreamHandler.AudioChat)
 						air.Post("/assistant/vision", s.astStreamHandler.VisionChat)
@@ -465,6 +469,8 @@ func (s *Server) registerRoutes() {
 						fr.Delete("/byok-backup", s.financeHandler.DeleteByokBackup)
 					})
 				}
+
+				s.registerAIRoutes(protected)
 			})
 		}
 		})

@@ -7,6 +7,8 @@ import { useTheme } from '../../context/ThemeContext';
 import { ChatStructuredCards } from './cards/ChatStructuredCards';
 import { FormattedChatMessageText } from './FormattedChatMessageText';
 import { ChatMessageActionBar } from './ChatMessageActionBar';
+import { ThinkingProcessAccordion } from './ThinkingProcessAccordion';
+import { navigateToAiProviders } from '../../navigation/navigationRef';
 
 interface ChatMessageBubbleProps {
   message: ChatMessage;
@@ -18,7 +20,7 @@ interface ChatMessageBubbleProps {
   disabled?: boolean;
 }
 
-export const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
+const ChatMessageBubbleComponent: React.FC<ChatMessageBubbleProps> = ({
   message,
   onSelectSlot,
   onEditMessage,
@@ -108,6 +110,7 @@ export const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
                 <TouchableOpacity
                   style={[styles.inlineEditButton, styles.inlineEditCancelButton]}
                   onPress={handleCancelEdit}
+                  hitSlop={tokens.hitSlop.sm}
                   activeOpacity={0.7}
                   accessibilityLabel="Cancelar edição"
                 >
@@ -124,6 +127,7 @@ export const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
                     { backgroundColor: isDark ? colors.primary : '#17191B' },
                   ]}
                   onPress={handleConfirmEdit}
+                  hitSlop={tokens.hitSlop.sm}
                   activeOpacity={0.7}
                   accessibilityLabel="Salvar e reenviar mensagem"
                 >
@@ -173,7 +177,7 @@ export const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
                 style={[styles.actionButton, disabled && { opacity: 0.5 }]}
                 onPress={handleStartEdit}
                 disabled={disabled}
-                hitSlop={tokens.hitSlop.sm}
+                hitSlop={tokens.hitSlop.md}
                 activeOpacity={0.7}
                 accessibilityLabel="Editar e reenviar mensagem"
               >
@@ -205,6 +209,10 @@ export const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
       ) : (
         // RESPOSTA DA IA (VITO): Borderless, largura 100%, texto corrido editorial estilo Claude / Gemini
         <View style={styles.vitoResponseContainer}>
+          {message.thinkingSteps && message.thinkingSteps.length > 0 && (
+            <ThinkingProcessAccordion steps={message.thinkingSteps} isStreaming={false} />
+          )}
+
           {message.imageUri && (
             <Image source={{ uri: message.imageUri }} style={styles.imageAttachment} resizeMode="cover" />
           )}
@@ -238,10 +246,33 @@ export const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
             disabled={disabled}
           />
 
+          {!!message.byokWarning && (
+            <View
+              style={[
+                styles.byokWarnBox,
+                { backgroundColor: colors.redBg, borderColor: colors.red },
+              ]}
+            >
+              <Text style={[styles.byokWarnText, { color: colors.ink }]}>
+                {message.byokWarning}
+              </Text>
+              <TouchableOpacity
+                style={styles.byokWarnBtn}
+                onPress={navigateToAiProviders}
+                hitSlop={tokens.hitSlop.sm}
+              >
+                <Text style={[styles.byokWarnLink, { color: colors.red }]}>
+                  Gerenciar provedores
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
           {/* Barra de Ações Minimalista Estilo Claude / Gemini */}
           <ChatMessageActionBar
             messageText={message.text}
             timestamp={message.timestamp}
+            modelUsed={message.modelUsed}
             onPlayAudio={onPlayAudio}
             disabled={disabled}
           />
@@ -250,6 +281,8 @@ export const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
     </View>
   );
 };
+
+export const ChatMessageBubble = React.memo(ChatMessageBubbleComponent);
 
 const styles = StyleSheet.create({
   messageRow: {
@@ -303,9 +336,11 @@ const styles = StyleSheet.create({
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 32,
     gap: 3,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     borderRadius: 6,
     marginRight: 4,
   },
@@ -353,8 +388,10 @@ const styles = StyleSheet.create({
   inlineEditButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
+    justifyContent: 'center',
+    minHeight: 44,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
     borderRadius: MD3Shapes.full,
     gap: 4,
   },
@@ -370,5 +407,30 @@ const styles = StyleSheet.create({
   },
   inlineEditButtonText: {
     fontSize: 12,
+  },
+  byokWarnBox: {
+    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  byokWarnText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  byokWarnBtn: {
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+  },
+  byokWarnLink: {
+    fontSize: 12,
+    fontWeight: '700',
   },
 });

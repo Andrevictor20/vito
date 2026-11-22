@@ -4,6 +4,7 @@ import { Copy, Check, ThumbsUp, ThumbsDown, Volume2, VolumeX, RotateCcw } from '
 export interface ChatMessageActionBarProps {
   messageText: string;
   timestamp?: string;
+  modelUsed?: string;
   onRetry?: () => void;
   onPlayAudio?: () => void;
   isPlayingAudio?: boolean;
@@ -13,6 +14,7 @@ export interface ChatMessageActionBarProps {
 export const ChatMessageActionBar: React.FC<ChatMessageActionBarProps> = ({
   messageText,
   timestamp,
+  modelUsed,
   onRetry,
   onPlayAudio,
   isPlayingAudio = false,
@@ -115,11 +117,18 @@ export const ChatMessageActionBar: React.FC<ChatMessageActionBarProps> = ({
         )}
       </div>
 
-      {timestamp && (
-        <span className="font-mono text-[11px] text-zinc-400 dark:text-zinc-500 opacity-70">
-          {new Date(timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-        </span>
-      )}
+      <div className="flex items-center gap-2.5">
+        {modelUsed && (
+          <span className="text-[11px] font-medium text-zinc-400 dark:text-zinc-500">
+            via {modelUsed}
+          </span>
+        )}
+        {timestamp && (
+          <span className="font-mono text-[11px] text-zinc-400 dark:text-zinc-500 opacity-70">
+            {new Date(timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+          </span>
+        )}
+      </div>
     </div>
   );
 };

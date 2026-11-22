@@ -1,35 +1,34 @@
 # XP Multi-Agent Kit v4 (Thin Harness)
 
-> **Idioma Obrigatório:** Todas as respostas, planos e explicações ao usuário DEVEM ser em Português (Português do Brasil).
+> **Idioma:** Todas as respostas, planos e explicações ao usuário DEVEM ser em Português (PT-BR).
 
 ## 1. CONTRATO
-Separar O QUÊ (especificação, ACs, SbE) do COMO (código, testes). Validar via `xp contract validate <spec>`. Reduzir ambiguidade antes de implementar.
+Separar O QUÊ do COMO. Inicializar em 1 comando (sem `--help`): `xp contract init --risk L1 --goal "<meta>" --scope <arqs> --verify "<cmd>"` (só usar `--acs AC-01` para critérios numerados). Validar specs via `xp contract validate <spec>`.
 
 ## 2. CONTEXTO
-Contexto base fixo restrito (≤ 8 KB total). Consultar memória sob demanda via `xp context <query>`. Políticas detalhadas residem em `.agents/policies/` e carregam JIT.
-**Step 0 Obrigatório:** Inspecione SEMPRE `.agents/memory/PROJECT_MEMORY.md` antes de propor ou alterar código. Leia a seção de Dead-Ends para NUNCA sugerir ou repetir abordagens que já falharam.
+Contexto base fixo ≤ 8 KB.
+**Step 0:** Ler `.agents/memory/PROJECT_MEMORY.md` via `read_file` **em paralelo** com os arquivos da tarefa (não rodar `xp context` em L0/L1 simples; usar `xp context <query>` / `xp policy show <id>` apenas em L2/L3 ou falha).
 
 ## 3. FERRAMENTAS
-Uso prioritário de ferramentas determinísticas locais (`xp`) e AST graph (`code-review-graph` / `agy-graph`) para impacto e chamadas em arquivos > 800 linhas (com fallback textual se ausente). Sem spam de chamadas.
+Priorizar CLI `xp` e busca textual (`grep`/`ripgrep`) para impacto; agrupar chamadas independentes no mesmo turno.
 
 ## 4. ESTADO
-Estado transiente de execução mantido em `.agents/runtime/` (`run.json`, `events.jsonl`, `flow_state.json`). Não versionado em Git.
+Estado transiente em `.agents/runtime/` (`run.json`, `events.jsonl`, `flow_state.json`), fora do Git.
 
 ## 5. POLÍTICA
-Governança declarativa em `.agents/policy.yaml`. Ações classificadas em camadas (`auto`, `review`, `human`). Ações irreversíveis e arquivos protegidos exigem `xp approve`.
+Governança declarativa em `.agents/policy.yaml` (`auto` | `review` | `human`). Ações destrutivas e arquivos protegidos exigem `xp approve`.
 
 ## 6. VERIFICAÇÃO
-Executar `xp gate check` antes de concluir fases e tarefas. Revisões EGM (Pass 1 Spec, Pass 2 Código, Pass 3 Conformance via `xp conformance`). Ciclo estrito TDD: RED → GREEN → REFACTOR. Anti-Test-Bypass rígido (sem blind mocks, sem asserções vazias, sem pular testes). Rastreabilidade 100% de ACs.
-**Zero Correção Cosmética:** Proibido afirmar que algo está corrigido sem executar teste nativo e observar exit_code 0. Para bugs corrigidos, criar teste de regressão obrigatório para impedir retorno do erro.
+Fluxo L1+ (sem turno extra): no turno do teste RED, rodar `xp contract init ...` em paralelo com a criação/edição do teste → `xp gate record -- <teste>` (RED) → editar código → `xp gate record -- <teste> && xp gate check` (**ao obter `GATE PASS`, encerrar sem editar nada depois**). Em L2/L3, aplicar EGM (`xp conformance`). Em `--acs AC-01`, citar `AC-01` ou `test_ac_01_` em `tests/`.
+**Zero Correção Cosmética:** Nunca declarar correção sem rodar teste nativo (`exit_code: 0`); todo bug exige teste de regressão.
 
 ## 7. RECUPERAÇÃO
-Auto-cura determinística em falhas de ferramenta/testes: isolar causa raiz, corrigir e re-verificar. Circuit breaker: interromper na 2ª falha idêntica consecutiva. Registrar abordagens fracassadas na Seção de Dead-Ends da memória.
+Auto-cura determinística na causa raiz. Circuit breaker na 2ª falha idêntica; registrar falhas em Dead-Ends.
 
 ## 8. OBSERVABILIDADE
-Eventos de execução emitidos de forma estruturada via `kit_events.py` para `.agents/runtime/events.jsonl`. Recibo operacional emitido a cada invocação.
+Eventos estruturados via `kit_events.py` em `.agents/runtime/events.jsonl` + recibo operacional.
 
-## Invariantes & Regras Transitórias
-- **Stop Gate Humano:** Ações de risco L2/L3 e aprovação de specs exigem confirmação explícita ou pré-autorização documentada.
-- **Orçamentos:** Limites de turnos e tokens regidos por `workflow.yaml` / `kit_constants.py`.
-- **Memória Contínua:** Atualizar `.agents/memory/PROJECT_MEMORY.md` ao final de cada fase/entrega, registrando progresso, decisões e dead-ends.
-- **Qualidade de Código:** Sem God Files (> 500 linhas), sem `TODO`/`TBD`, sem contornos (`as any`, `@ts-ignore`).
+## Invariantes
+- **Stop Gate Humano:** L2/L3 e specs exigem confirmação explícita.
+- **Orçamentos:** Limites em `workflow.yaml` / `kit_constants.py`. Atualizar `PROJECT_MEMORY.md` apenas em L2/L3 ou novas decisões/dead-ends (antes do `xp gate check`).
+- **Gate Passo 4 (mecânico):** Sem God Files (>500 linhas), `TODO`/`TBD`/`FIXME`, contornos (`as any`, `@ts-ignore`, `# type: ignore`, `# noqa`), skips (`@unittest.skip`, `.skipTest`, `pytest.mark.skip`) ou segredos hardcoded.

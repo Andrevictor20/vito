@@ -38,4 +38,17 @@ export const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     paddingBottom: Platform.OS === 'android' ? 8 : 8,
   },
+  modelToast: {
+    position: 'absolute',
+    top: 10,
+    alignSelf: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 18,
+    zIndex: 20,
+  },
+  modelToastText: {
+    fontSize: 12.5,
+    fontWeight: '600',
+  },
 });

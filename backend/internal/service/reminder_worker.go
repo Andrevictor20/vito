@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"strings"
@@ -22,14 +23,50 @@ func defaultReminderLocation() *time.Location {
 
 // ReminderWorker monitora compromissos iminentes e despacha notificações push ativas.
 type ReminderWorker struct {
-	eventRepo     domain.EventRepository
-	notifSvc      *NotificationService
-	windowAhead   time.Duration
-	checkInterval time.Duration
-	stopCh        chan struct{}
-	wg            sync.WaitGroup
-	running       bool
-	mu            sync.Mutex
+	eventRepo       domain.EventRepository
+	notifSvc        *NotificationService
+	attentionBudget *AttentionBudgetService
+	windowAhead     time.Duration
+	checkInterval   time.Duration
+	stopCh          chan struct{}
+	wg              sync.WaitGroup
+	running         bool
+	mu              sync.Mutex
+}
+
+// SetAttentionBudget injeta o controlador de orçamento de atenção para silêncio contextual e deduplicação.
+func (w *ReminderWorker) SetAttentionBudget(ab *AttentionBudgetService) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.attentionBudget = ab
+}
+
+func (w *ReminderWorker) getAttentionBudget() *AttentionBudgetService {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.attentionBudget
+}
+
+func buildReminderAttentionCandidate(event domain.Event, kind, title, body, urgency string, now time.Time) AttentionCandidate {
+	category := "agenda"
+	dedupKey := ""
+	if kind == "start" {
+		dedupKey = fmt.Sprintf("event_start:%s", event.ID)
+	}
+	if strings.EqualFold(strings.TrimSpace(event.Category), "critical_alarm") {
+		category = "critical_alarm"
+		urgency = "critical"
+	}
+	return AttentionCandidate{
+		UserID:       event.UserID,
+		SourceWorker: "reminder_worker",
+		Category:     category,
+		Urgency:      urgency,
+		DedupKey:     dedupKey,
+		Title:        title,
+		Body:         body,
+		Now:          now,
+	}
 }
 
 // NewReminderWorker inicializa o worker de lembretes.
@@ -133,11 +170,14 @@ func (w *ReminderWorker) CheckAndDispatchReminders(now time.Time) (int, error) {
 				"priority": priority,
 			}
 
-			sent, pushErr := w.notifSvc.SendPushToUser(event.UserID, title, body, priority, data)
-			if pushErr != nil {
-				log.Printf("[ReminderWorker] Erro ao enviar push de antecedência para evento %s (user %s): %v", event.ID, event.UserID, pushErr)
-			} else if sent > 0 {
-				dispatchedCount++
+			cand := buildReminderAttentionCandidate(event, "advance", title, body, "normal", now)
+			if allowed, _ := w.getAttentionBudget().ShouldDeliver(context.Background(), cand); allowed && w.notifSvc != nil {
+				sent, pushErr := w.notifSvc.SendPushToUser(event.UserID, title, body, priority, data)
+				if pushErr != nil {
+					log.Printf("[ReminderWorker] Erro ao enviar push de antecedência para evento %s (user %s): %v", event.ID, event.UserID, pushErr)
+				} else if sent > 0 {
+					dispatchedCount++
+				}
 			}
 
 			// Marca como notificado mesmo se o usuário não possuir tokens ativos no momento
@@ -180,11 +220,14 @@ func (w *ReminderWorker) CheckAndDispatchReminders(now time.Time) (int, error) {
 				"priority": priority,
 			}
 
-			sent, pushErr := w.notifSvc.SendPushToUser(event.UserID, title, body, priority, data)
-			if pushErr != nil {
-				log.Printf("[ReminderWorker] Erro ao enviar push de início para evento %s (user %s): %v", event.ID, event.UserID, pushErr)
-			} else if sent > 0 {
-				dispatchedCount++
+			cand := buildReminderAttentionCandidate(event, "start", title, body, "high", now)
+			if allowed, _ := w.getAttentionBudget().ShouldDeliver(context.Background(), cand); allowed && w.notifSvc != nil {
+				sent, pushErr := w.notifSvc.SendPushToUser(event.UserID, title, body, priority, data)
+				if pushErr != nil {
+					log.Printf("[ReminderWorker] Erro ao enviar push de início para evento %s (user %s): %v", event.ID, event.UserID, pushErr)
+				} else if sent > 0 {
+					dispatchedCount++
+				}
 			}
 
 			if markErr := w.eventRepo.MarkStartReminderSent(event.ID, now); markErr != nil {

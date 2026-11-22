@@ -16,7 +16,11 @@ export interface UseChatMessagesResult {
   setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
   loading: boolean;
   saveMessages: (newMessages: ChatMessage[]) => void;
-  sendMessage: (text: string, focusMode?: string) => Promise<void>;
+  sendMessage: (
+    text: string,
+    focusMode?: string,
+    modelOptions?: { model_pref?: string; effort_pref?: string }
+  ) => Promise<void>;
   appendUserMessage: (text: string) => void;
   appendAssistantMessage: (text: string) => void;
   editAndResendMessage: (messageId: string, newText: string, focusMode?: string) => Promise<void>;
@@ -94,7 +98,11 @@ export function useChatMessages(
   }, []);
 
   const sendMessage = useCallback(
-    async (text: string, focusMode?: string) => {
+    async (
+      text: string,
+      focusMode?: string,
+      modelOptions?: { model_pref?: string; effort_pref?: string }
+    ) => {
       if (!text.trim() || loading) return;
 
       const userMsg: ChatMessage = {
@@ -123,6 +131,8 @@ export function useChatMessages(
           channel: 'app_desktop',
           history,
           focus_mode: focusMode,
+          ...(modelOptions?.model_pref ? { model_pref: modelOptions.model_pref } : {}),
+          ...(modelOptions?.effort_pref ? { effort_pref: modelOptions.effort_pref } : {}),
         });
 
         const vitoMsg = buildAssistantMessage('vito', res, 'Instrução processada com sucesso.');

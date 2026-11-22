@@ -1,14 +1,21 @@
 package repository
 
-import "github.com/andrevmp/vito/backend/internal/domain"
+import (
+	"context"
+	"database/sql"
+
+	"github.com/andrevmp/vito/backend/internal/domain"
+)
 
 func (r *TriggerRepositorySQLite) CreateLog(log *domain.TriggerLog) error {
 	query := `
 		INSERT INTO trigger_logs (id, trigger_id, triggered_at, message, payload, is_read)
 		VALUES (?, ?, ?, ?, ?, ?)
 	`
-	_, err := r.db.Exec(query, log.ID, log.TriggerID, log.TriggeredAt, log.Message, log.Payload, log.IsRead)
-	return err
+	return ExecuteQueuedWrite(context.Background(), func() error {
+		_, err := r.db.Exec(query, log.ID, log.TriggerID, log.TriggeredAt, log.Message, log.Payload, log.IsRead)
+		return err
+	})
 }
 
 func (r *TriggerRepositorySQLite) ListLogsByTrigger(triggerID string) ([]domain.TriggerLog, error) {
@@ -41,11 +48,9 @@ func (r *TriggerRepositorySQLite) DeleteLog(id, userID string) error {
 		DELETE FROM trigger_logs
 		WHERE id = ? AND trigger_id IN (SELECT id FROM triggers WHERE user_id = ?)
 	`
-	res, err := r.db.Exec(query, id, userID)
-	if err != nil {
-		return err
-	}
-	n, err := res.RowsAffected()
+	n, err := ExecuteQueuedWriteRows(context.Background(), func() (sql.Result, error) {
+		return r.db.Exec(query, id, userID)
+	})
 	if err != nil {
 		return err
 	}
@@ -60,8 +65,10 @@ func (r *TriggerRepositorySQLite) ClearLogs(triggerID, userID string) error {
 		DELETE FROM trigger_logs
 		WHERE trigger_id = ? AND trigger_id IN (SELECT id FROM triggers WHERE user_id = ?)
 	`
-	_, err := r.db.Exec(query, triggerID, userID)
-	return err
+	return ExecuteQueuedWrite(context.Background(), func() error {
+		_, err := r.db.Exec(query, triggerID, userID)
+		return err
+	})
 }
 
 // ListUnreadLogsByTriggerIDs busca logs não lidos de múltiplos radares em uma única query IN (elimina N+1).

@@ -189,7 +189,7 @@ func (f *ADKLoopFacade) tryHandlePendingConfirmation(
 	}
 
 	if isCancel {
-		_ = f.cfg.ConfirmationGate.Cancel(ctx, pending.ID, userID)
+		_ = f.cfg.ConfirmationGate.CancelWithReason(ctx, pending.ID, userID, userMsg)
 		cancelMsg := fmt.Sprintf("Ação de envio (%s) cancelada. Nada foi enviado.", pending.Operation)
 		f.recordSimpleTurns(ctx, threadID, turnID, userID, req.Channel, userMsg, cancelMsg, startTime)
 		return &domain.UnifiedAssistantResponse{

@@ -1,24 +1,29 @@
 import React, { useState } from 'react';
-import { FocusMenu, FocusMode } from './FocusMenu';
-import { Plus, Mic, Send, Loader2 } from 'lucide-react';
+import { FocusMode } from './FocusMenu';
+import { Plus, Mic, Send, Loader2, ChevronDown } from 'lucide-react';
 
 interface ChatInputDockProps {
   onSendMessage: (text: string, focus: FocusMode | null) => void;
   loading: boolean;
+  modelName?: string;
+  modelColor?: string;
+  onOpenModelPicker?: () => void;
 }
 
 export const ChatInputDock: React.FC<ChatInputDockProps> = ({
   onSendMessage,
   loading,
+  modelName = 'Vito Auto',
+  modelColor = 'var(--ink)',
+  onOpenModelPicker,
 }) => {
   const [inputValue, setInputValue] = useState('');
-  const [selectedFocus, setSelectedFocus] = useState<FocusMode | null>(null);
 
   const handleSubmit = (e?: React.FormEvent) => {
     e?.preventDefault();
     const text = inputValue.trim();
     if (!text || loading) return;
-    onSendMessage(text, selectedFocus);
+    onSendMessage(text, null);
     setInputValue('');
   };
 
@@ -33,8 +38,21 @@ export const ChatInputDock: React.FC<ChatInputDockProps> = ({
           <Plus size={17} />
         </button>
 
-        {/* Botão Foco em */}
-        <FocusMenu selectedFocus={selectedFocus} onSelectFocus={setSelectedFocus} />
+        {/* Pill de modelo #c-model */}
+        <button
+          id="c-model"
+          type="button"
+          onClick={onOpenModelPicker}
+          aria-label="Modelo de IA"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-zinc-100 hover:bg-zinc-200 dark:bg-[#1C2026] dark:hover:bg-[#262B33] border border-zinc-200 dark:border-[#222730] text-xs font-medium text-zinc-700 dark:text-zinc-300 transition-colors shadow-xs"
+        >
+          <span
+            className="w-2 h-2 rounded-full shrink-0"
+            style={{ backgroundColor: modelColor }}
+          />
+          <span className="max-w-[180px] truncate">{modelName}</span>
+          <ChevronDown size={12} className="text-zinc-400 shrink-0" />
+        </button>
       </div>
 
       <div className="flex items-end gap-3">

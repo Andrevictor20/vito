@@ -7,7 +7,8 @@ export type SyncEventType =
   | 'refresh_triggers'
   | 'refresh_bookings'
   | 'refresh_pending'
-  | 'refresh_finance';
+  | 'refresh_finance'
+  | 'refresh_ai_providers';
 
 type SyncCallback = () => void;
 
@@ -74,15 +75,30 @@ type ChatPromptCallback = (payload: ChatPromptItem) => void;
 
 class ChatPromptBus {
   private listeners = new Set<ChatPromptCallback>();
+  private pendingPrompts: ChatPromptItem[] = [];
 
   subscribe(cb: ChatPromptCallback): () => void {
     this.listeners.add(cb);
+    if (this.pendingPrompts.length > 0) {
+      const queued = this.pendingPrompts.splice(0, this.pendingPrompts.length);
+      for (const item of queued) {
+        try {
+          cb(item);
+        } catch (err) {
+          console.warn('[chatPromptBus] Erro ao drenar fila:', err);
+        }
+      }
+    }
     return () => {
       this.listeners.delete(cb);
     };
   }
 
   notify(prompt: ChatPromptItem): void {
+    if (this.listeners.size === 0) {
+      this.pendingPrompts.push(prompt);
+      return;
+    }
     this.listeners.forEach((cb) => {
       try {
         cb(prompt);

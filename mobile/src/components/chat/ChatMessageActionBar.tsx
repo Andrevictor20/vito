@@ -10,6 +10,7 @@ import { hapticFeedback } from '../../theme/motion';
 export interface ChatMessageActionBarProps {
   messageText: string;
   timestamp: string;
+  modelUsed?: string;
   onPlayAudio?: () => void;
   isPlayingAudio?: boolean;
   disabled?: boolean;
@@ -18,6 +19,7 @@ export interface ChatMessageActionBarProps {
 export const ChatMessageActionBar: React.FC<ChatMessageActionBarProps> = ({
   messageText,
   timestamp,
+  modelUsed,
   onPlayAudio,
   isPlayingAudio = false,
   disabled = false,
@@ -146,10 +148,17 @@ export const ChatMessageActionBar: React.FC<ChatMessageActionBarProps> = ({
         </TouchableOpacity>
       </View>
 
-      {/* Timestamp Discreto */}
-      <Text style={[styles.timestamp, { color: iconColor }]}>
-        {formattedTime}
-      </Text>
+      {/* Modelo utilizado + Timestamp Discreto */}
+      <View style={styles.metaRight}>
+        {!!modelUsed && (
+          <Text style={[styles.modelVia, { color: iconColor }]} numberOfLines={1}>
+            via {modelUsed}
+          </Text>
+        )}
+        <Text style={[styles.timestamp, { color: iconColor }]}>
+          {formattedTime}
+        </Text>
+      </View>
     </View>
   );
 };
@@ -184,6 +193,17 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     letterSpacing: -0.2,
+  },
+  metaRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexShrink: 1,
+  },
+  modelVia: {
+    fontSize: 11,
+    opacity: 0.7,
+    flexShrink: 1,
   },
   timestamp: {
     fontSize: 11,

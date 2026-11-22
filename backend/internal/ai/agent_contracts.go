@@ -68,16 +68,18 @@ type ToolCall struct {
 
 // AgentChatRequest encapsula a entrada padronizada independente de provedor.
 type AgentChatRequest struct {
-	ThreadID     string           `json:"thread_id"`
-	UserID       string           `json:"user_id"`
-	Channel      string           `json:"channel"`
-	Task         TaskCategory     `json:"task"`
-	SystemPrompt string           `json:"system_prompt"`
-	Messages     []TurnMessage    `json:"messages"`
-	Tools        []ToolDefinition `json:"tools,omitempty"`
-	Temperature  *float64         `json:"temperature,omitempty"`
-	MaxTokens    int              `json:"max_tokens,omitempty"`
-	RequireTools bool             `json:"require_tools,omitempty"`
+	ThreadID        string           `json:"thread_id"`
+	UserID          string           `json:"user_id"`
+	Channel         string           `json:"channel"`
+	Task            TaskCategory     `json:"task"`
+	SystemPrompt    string           `json:"system_prompt"`
+	Messages        []TurnMessage    `json:"messages"`
+	Tools           []ToolDefinition `json:"tools,omitempty"`
+	Temperature     *float64         `json:"temperature,omitempty"`
+	MaxTokens       int              `json:"max_tokens,omitempty"`
+	ThinkingBudget  *int             `json:"thinking_budget,omitempty"`
+	IncludeThoughts bool             `json:"include_thoughts,omitempty"`
+	RequireTools    bool             `json:"require_tools,omitempty"`
 }
 
 // AgentChatResponse encapsula a resposta padronizada do provedor.
@@ -95,6 +97,8 @@ type AgentChatResponse struct {
 
 // StreamDelta representa um fragmento emitido em tempo real durante StreamChat.
 type StreamDelta struct {
+	Type           string             `json:"type,omitempty"`
+	ToolName       string             `json:"tool_name,omitempty"`
 	TextDelta      string             `json:"text_delta,omitempty"`
 	ReasoningDelta string             `json:"reasoning_delta,omitempty"`
 	ToolCalls      []ToolCall         `json:"tool_calls,omitempty"`
@@ -121,7 +125,11 @@ type AITrace struct {
 	ThreadID               string
 	TurnID                 string
 	Channel                string
+	AgentName              string
 	TaskType               TaskCategory
+	CredentialSource       string
+	ProviderKey            string
+	Effort                 string
 	ProviderName           string
 	ModelName              string
 	StepIndex              int

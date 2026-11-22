@@ -1,34 +1,13 @@
-import type { AssistantChatResponse, ChatMessage } from '../types';
+import type { AssistantChatResponse } from '../types';
 import { notificationService } from '../services/notificationService';
-import { dataSync } from '../services/dataSync';
 import {
-  toChatMeeting,
-  toChatBooking,
-  toChatWhatsAppMessage,
-  toChatGmailMessage,
-} from '../utils/chatCards';
+  cancelEventRemindersAndAlarms,
+  scheduleEventRemindersAndAlarm,
+} from '../services/eventReminderSync';
+import { dataSync } from '../services/dataSync';
+import { buildAssistantMessage } from '../utils/chatMessageBuilder';
 
-export const buildAssistantMessage = (
-  idPrefix: string,
-  res: AssistantChatResponse,
-  defaultReply: string
-): ChatMessage => ({
-  id: `${idPrefix}-${Date.now()}`,
-  sender: 'vito',
-  text: res.reply || res.message || defaultReply,
-  timestamp: new Date().toISOString(),
-  action_performed: res.action_performed,
-  event: res.event,
-  todo: res.todo,
-  trigger: res.trigger,
-  pending: res.pending,
-  booking: toChatBooking(res),
-  meeting: toChatMeeting(res),
-  whatsapp_message: toChatWhatsAppMessage(res),
-  gmail_message: toChatGmailMessage(res),
-  conflict: res.conflict,
-  pending_confirmation: res.pending_confirmation,
-});
+export { buildAssistantMessage };
 
 export const notifyAssistantResult = (res: AssistantChatResponse) => {
   const action = res.action_performed?.toLowerCase() || '';
@@ -54,8 +33,8 @@ export const handleAssistantSideEffects = (
   res: AssistantChatResponse,
   onDataChanged?: () => void
 ) => {
-  if (res.event) {
-    notificationService.scheduleEventDualReminders(res.event).catch(() => {});
+  if (res.event && res.action_performed !== 'delete_event') {
+    scheduleEventRemindersAndAlarm(res.event);
   }
   if (res.todo) {
     notificationService.scheduleTodoReminder(res.todo).catch(() => {});
@@ -65,7 +44,7 @@ export const handleAssistantSideEffects = (
     dataSync.notify('refresh_pending');
   }
   if (res.action_performed === 'delete_event' && res.event?.id) {
-    notificationService.cancelEventReminder(res.event.id).catch(() => {});
+    cancelEventRemindersAndAlarms([res.event.id]);
   }
   if (res.action_performed === 'delete_todo' && res.todo?.id) {
     notificationService.cancelTodoReminder(res.todo.id).catch(() => {});

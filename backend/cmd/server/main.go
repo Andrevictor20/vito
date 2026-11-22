@@ -399,15 +399,25 @@ func main() {
 	defer agentSys.TraceRecorder.Close()
 	defer agentSys.ConsolidationWorker.Stop()
 
-	// Injeta ponte proativa no histórico dos workers
+	// Injeta ponte proativa e governança cognitiva (Ondas 2 e 3: AttentionBudget, CrossDomainBriefing e EntityLinks)
 	proactiveBridge := service.NewProactiveConversationBridge(agentSys.ConversationStore)
 	morningBriefingWorker.SetProactiveBridge(proactiveBridge)
+	wireCognitiveRuntime(CognitiveRuntimeConfig{
+		DB: db, EventRepo: eventRepo, NotifSvc: notifSvc, PendingSvc: pendingSvc,
+		ReminderWorker: reminderWorker, TriggerWorker: triggerWorker,
+		MorningBriefingWorker: morningBriefingWorker, BehavioralWorker: behavioralWorker, AgentSys: agentSys,
+	})
 
 	// Handler de voz bidirecional conectado ao Loop de Agente e TTS
 	voiceStreamHandler := handler.NewVoiceStreamHandler(astSvc)
 	if agentSys.AgentLoop != nil {
 		voiceStreamHandler.SetAgentLoop(agentSys.AgentLoop, agentSys.ConversationStore)
 		voiceStreamHandler.SetAudioServices(whisperTranscriber, ttsSvc, cfg.GeminiAPIKey)
+	}
+
+	if agentSys.AIProviderSvc != nil {
+		chatHandler.SetAIProviderService(agentSys.AIProviderSvc)
+		triggerHandler.SetAIProviderService(agentSys.AIProviderSvc)
 	}
 
 	// 6. Servidor HTTP
@@ -424,6 +434,7 @@ func main() {
 		TriggerHandler:      triggerHandler,
 		BriefingHandler:     briefingHandler,
 		AISettingsHandler:   aiSettingsHandler,
+		AIProviderHandler:   agentSys.AIProviderHandler,
 		PendingHandler:      pendingHandler,
 		BookingHandler:      bookingHandler,
 		MeetingHandler:      meetingHandler,

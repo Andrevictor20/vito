@@ -17,11 +17,17 @@ type WhatsAppServiceContract interface {
 }
 
 type WhatsAppToolset struct {
-	waService WhatsAppServiceContract
+	waService      WhatsAppServiceContract
+	entityResolver EntityLinkResolver
 }
 
 func NewWhatsAppToolset(svc WhatsAppServiceContract) *WhatsAppToolset {
 	return &WhatsAppToolset{waService: svc}
+}
+
+// SetEntityLinkResolver conecta o resolvedor cross-canal para traduzir nomes/apelidos em JID/telefone.
+func (t *WhatsAppToolset) SetEntityLinkResolver(resolver EntityLinkResolver) {
+	t.entityResolver = resolver
 }
 
 func (t *WhatsAppToolset) Name() domain.ToolsetName {
@@ -78,8 +84,23 @@ func (t *WhatsAppToolset) Execute(ctx context.Context, execCtx *domain.ToolExecu
 
 	switch op {
 	case "send_message":
+		recipient := strings.TrimSpace(params.Recipient)
+		if recipient != "" && !strings.Contains(recipient, "@") && t.entityResolver != nil {
+			if links, err := t.entityResolver.Resolve(ctx, execCtx.UserID, recipient); err == nil {
+				for _, el := range links {
+					if strings.TrimSpace(el.Phone) != "" {
+						recipient = strings.TrimSpace(el.Phone)
+						break
+					}
+					if strings.TrimSpace(el.WhatsAppJID) != "" {
+						recipient = strings.TrimSpace(el.WhatsAppJID)
+						break
+					}
+				}
+			}
+		}
 		if t.waService != nil {
-			if err := t.waService.SendMessage(ctx, execCtx.UserID, params.Recipient, params.Message); err != nil {
+			if err := t.waService.SendMessage(ctx, execCtx.UserID, recipient, params.Message); err != nil {
 				return &domain.ToolExecutionResult{
 					Status:        "ERROR",
 					SummaryForLLM: fmt.Sprintf("Não foi possível enviar a mensagem no WhatsApp: %v", err),
@@ -88,11 +109,11 @@ func (t *WhatsAppToolset) Execute(ctx context.Context, execCtx *domain.ToolExecu
 		}
 		return &domain.ToolExecutionResult{
 			Status:        "COMPLETED",
-			SummaryForLLM: fmt.Sprintf("Mensagem WhatsApp enviada com sucesso para %s: %q.", params.Recipient, params.Message),
+			SummaryForLLM: fmt.Sprintf("Mensagem WhatsApp enviada com sucesso para %s: %q.", recipient, params.Message),
 			Cards: []domain.ChatCard{{
 				ID:          "wa-sent",
 				Type:        "whatsapp",
-				Title:       params.Recipient,
+				Title:       recipient,
 				Subtitle:    params.Message,
 				ActionLabel: "Enviado",
 			}},

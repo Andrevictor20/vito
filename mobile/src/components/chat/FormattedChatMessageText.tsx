@@ -52,121 +52,127 @@ export interface FormattedChatMessageTextProps {
   isDark?: boolean;
 }
 
-export const FormattedChatMessageText: React.FC<FormattedChatMessageTextProps> = ({
+export const FormattedChatMessageText: React.FC<FormattedChatMessageTextProps> = React.memo(({
   text,
   isUser,
   style,
   textColor,
   isDark = false,
 }) => {
+  const renderedElements = React.useMemo(() => {
+    if (!text || isUser) return null;
+
+    const lines = text.split('\n');
+    let insideCodeBlock = false;
+    let codeBlockBuffer: string[] = [];
+    const elements: React.ReactNode[] = [];
+
+    lines.forEach((line, lineIdx) => {
+      const trimmed = line.trim();
+
+      // Tratamento de bloco de código ```
+      if (trimmed.startsWith('```')) {
+        if (insideCodeBlock) {
+          // Fecha o bloco de código
+          const codeContent = codeBlockBuffer.join('\n');
+          elements.push(
+            <View
+              key={`code-block-${lineIdx}`}
+              style={[
+                styles.codeBlock,
+                {
+                  backgroundColor: isDark ? '#141618' : '#F4F5F4',
+                  borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
+                },
+              ]}
+            >
+              <Text style={[styles.codeBlockText, { color: textColor }]}>
+                {codeContent}
+              </Text>
+            </View>
+          );
+          codeBlockBuffer = [];
+          insideCodeBlock = false;
+        } else {
+          // Abre o bloco de código
+          insideCodeBlock = true;
+        }
+        return;
+      }
+
+      if (insideCodeBlock) {
+        codeBlockBuffer.push(line);
+        return;
+      }
+
+      // Linha em branco -> espaçamento de parágrafo editorial
+      if (!trimmed) {
+        elements.push(
+          <View key={`space-${lineIdx}`} style={styles.paragraphSpacer} />
+        );
+        return;
+      }
+
+      // Títulos Markdown (# Título, ## Subtítulo, ### Seção)
+      if (/^#{1,4}\s+/.test(trimmed)) {
+        const headerClean = trimmed.replace(/^#{1,4}\s+/, '').trim();
+        elements.push(
+          <Text key={`header-${lineIdx}`} style={[style, styles.headerLine, { color: textColor }]}>
+            {renderInlineFormatted(headerClean, textColor, isDark)}
+          </Text>
+        );
+        return;
+      }
+
+      // Marcadores de lista não numerada (* Item, - Item, • Item)
+      if (/^[\*\-\+•]\s+/.test(trimmed)) {
+        const bulletClean = trimmed.replace(/^[\*\-\+•]\s+/, '').trim();
+        elements.push(
+          <View key={`bullet-${lineIdx}`} style={styles.bulletRow}>
+            <Text style={[styles.bulletSymbol, { color: textColor }]}>•</Text>
+            <Text style={[style, styles.bulletContent, { color: textColor }]}>
+              {renderInlineFormatted(bulletClean, textColor, isDark)}
+            </Text>
+          </View>
+        );
+        return;
+      }
+
+      // Marcadores de lista numerada (1. Item, 2) Item)
+      const numberedMatch = trimmed.match(/^(\d+)[\.\)]\s+(.*)/);
+      if (numberedMatch) {
+        const number = numberedMatch[1];
+        const content = numberedMatch[2];
+        elements.push(
+          <View key={`num-${lineIdx}`} style={styles.bulletRow}>
+            <Text style={[styles.numberedSymbol, { color: textColor }]}>{number}.</Text>
+            <Text style={[style, styles.bulletContent, { color: textColor }]}>
+              {renderInlineFormatted(content, textColor, isDark)}
+            </Text>
+          </View>
+        );
+        return;
+      }
+
+      // Linha de texto normal com entrelinha espaçosa
+      elements.push(
+        <Text key={`normal-${lineIdx}`} style={[style, styles.normalLine, { color: textColor }]}>
+          {renderInlineFormatted(line, textColor, isDark)}
+        </Text>
+      );
+    });
+
+    return elements;
+  }, [text, isUser, textColor, isDark, style]);
+
   if (!text) return null;
 
   if (isUser) {
     return <Text style={[style, { color: textColor }]}>{text}</Text>;
   }
 
-  const lines = text.split('\n');
-  let insideCodeBlock = false;
-  let codeBlockBuffer: string[] = [];
-  const renderedElements: React.ReactNode[] = [];
-
-  lines.forEach((line, lineIdx) => {
-    const trimmed = line.trim();
-
-    // Tratamento de bloco de código ```
-    if (trimmed.startsWith('```')) {
-      if (insideCodeBlock) {
-        // Fecha o bloco de código
-        const codeContent = codeBlockBuffer.join('\n');
-        renderedElements.push(
-          <View
-            key={`code-block-${lineIdx}`}
-            style={[
-              styles.codeBlock,
-              {
-                backgroundColor: isDark ? '#141618' : '#F4F5F4',
-                borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
-              },
-            ]}
-          >
-            <Text style={[styles.codeBlockText, { color: textColor }]}>
-              {codeContent}
-            </Text>
-          </View>
-        );
-        codeBlockBuffer = [];
-        insideCodeBlock = false;
-      } else {
-        // Abre o bloco de código
-        insideCodeBlock = true;
-      }
-      return;
-    }
-
-    if (insideCodeBlock) {
-      codeBlockBuffer.push(line);
-      return;
-    }
-
-    // Linha em branco -> espaçamento de parágrafo editorial
-    if (!trimmed) {
-      renderedElements.push(
-        <View key={`space-${lineIdx}`} style={styles.paragraphSpacer} />
-      );
-      return;
-    }
-
-    // Títulos Markdown (# Título, ## Subtítulo, ### Seção)
-    if (/^#{1,4}\s+/.test(trimmed)) {
-      const headerClean = trimmed.replace(/^#{1,4}\s+/, '').trim();
-      renderedElements.push(
-        <Text key={`header-${lineIdx}`} style={[style, styles.headerLine, { color: textColor }]}>
-          {renderInlineFormatted(headerClean, textColor, isDark)}
-        </Text>
-      );
-      return;
-    }
-
-    // Marcadores de lista não numerada (* Item, - Item, • Item)
-    if (/^[\*\-\+•]\s+/.test(trimmed)) {
-      const bulletClean = trimmed.replace(/^[\*\-\+•]\s+/, '').trim();
-      renderedElements.push(
-        <View key={`bullet-${lineIdx}`} style={styles.bulletRow}>
-          <Text style={[styles.bulletSymbol, { color: textColor }]}>•</Text>
-          <Text style={[style, styles.bulletContent, { color: textColor }]}>
-            {renderInlineFormatted(bulletClean, textColor, isDark)}
-          </Text>
-        </View>
-      );
-      return;
-    }
-
-    // Marcadores de lista numerada (1. Item, 2) Item)
-    const numberedMatch = trimmed.match(/^(\d+)[\.\)]\s+(.*)/);
-    if (numberedMatch) {
-      const number = numberedMatch[1];
-      const content = numberedMatch[2];
-      renderedElements.push(
-        <View key={`num-${lineIdx}`} style={styles.bulletRow}>
-          <Text style={[styles.numberedSymbol, { color: textColor }]}>{number}.</Text>
-          <Text style={[style, styles.bulletContent, { color: textColor }]}>
-            {renderInlineFormatted(content, textColor, isDark)}
-          </Text>
-        </View>
-      );
-      return;
-    }
-
-    // Linha de texto normal com entrelinha espaçosa
-    renderedElements.push(
-      <Text key={`normal-${lineIdx}`} style={[style, styles.normalLine, { color: textColor }]}>
-        {renderInlineFormatted(line, textColor, isDark)}
-      </Text>
-    );
-  });
-
   return <View style={styles.formattedContainer}>{renderedElements}</View>;
-};
+});
 
 const styles = StyleSheet.create({
   formattedContainer: {

@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { PersonaStyleSelector } from './PersonaStyleSelector';
 import { UserMemoriesModal } from './UserMemoriesModal';
+import { AiProvidersPanel } from '../ai/AiProvidersPanel';
 
 type SettingsTab = 'conta' | 'integracoes' | 'ia' | 'aparencia' | 'notificacoes' | 'dispositivos';
 
@@ -47,6 +48,11 @@ export const SettingsView: React.FC = () => {
   const [radarAlerts, setRadarAlerts] = useState(true);
 
   useEffect(() => {
+    const onOpenTab = (event: Event) => {
+      const detail = (event as CustomEvent<SettingsTab>).detail;
+      if (detail) setActiveTab(detail);
+    };
+    window.addEventListener('vito:open-settings-tab', onOpenTab);
     Promise.allSettled([
       api.getWhatsAppStatus().then(setWaStatus),
       api.getGmailStatus().then(setGmailStatus),
@@ -55,6 +61,7 @@ export const SettingsView: React.FC = () => {
         if (s?.persona_style) setPersonaStyle(s.persona_style);
       }),
     ]);
+    return () => window.removeEventListener('vito:open-settings-tab', onOpenTab);
   }, []);
 
   const handleSyncCalendarNow = async () => {
@@ -269,88 +276,67 @@ export const SettingsView: React.FC = () => {
 
             {/* 3. INTELIGÊNCIA & IA */}
             {activeTab === 'ia' && (
-              <div className="space-y-4 animate-in fade-in duration-200">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-xl font-bold tracking-tight text-[var(--ink)]">Autonomia & Estilo da IA</h2>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    pill
-                    onClick={() => setIsMemoriesOpen(true)}
-                    leftIcon={<Brain size={14} className="text-[var(--purple)]" />}
-                  >
-                    O que o Vito sabe sobre mim
-                  </Button>
-                </div>
+              <div className="space-y-6 animate-in fade-in duration-200">
+                <AiProvidersPanel />
 
-                {/* Estilo de Conversação */}
-                <Card padding="lg" className="space-y-3 bg-[var(--bg)]">
-                  <b className="text-base text-[var(--ink)] block">Estilo de Comunicação do Vito</b>
-                  <PersonaStyleSelector value={personaStyle} onChange={handlePersonaChange} />
-                </Card>
-
-                {/* Switches de Autonomia */}
-                <Card padding="lg" className="space-y-4 bg-[var(--bg)]">
+                <div className="pt-2 border-t border-[var(--line)] space-y-4">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <b className="text-base text-[var(--ink)] block">Modo Pró-ativo (Recomendado)</b>
-                      <span className="text-sm text-[var(--muted)]">Vito sugere resoluções e alertas com antecedência</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setProactiveEnabled(!proactiveEnabled)}
-                      className={`w-12 h-7 rounded-full p-1 transition-colors flex items-center ${
-                        proactiveEnabled ? 'bg-[var(--acc)]' : 'bg-[var(--line)]'
-                      }`}
+                    <h2 className="text-xl font-bold tracking-tight text-[var(--ink)]">Autonomia & Estilo da IA</h2>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      pill
+                      onClick={() => setIsMemoriesOpen(true)}
+                      leftIcon={<Brain size={14} className="text-[var(--purple)]" />}
                     >
-                      <div
-                        className={`w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${
-                          proactiveEnabled ? 'translate-x-5' : 'translate-x-0'
-                        }`}
-                      />
-                    </button>
+                      O que o Vito sabe sobre mim
+                    </Button>
                   </div>
 
-                  <div className="pt-3 border-t border-[var(--line)] flex items-center justify-between">
-                    <div>
-                      <b className="text-base text-[var(--ink)] block">Pedir confirmação em ações de envio</b>
-                      <span className="text-sm text-[var(--muted)]">Evita disparo automático de e-mails e mensagens no WhatsApp</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setConfirmDestructive(!confirmDestructive)}
-                      className={`w-12 h-7 rounded-full p-1 transition-colors flex items-center ${
-                        confirmDestructive ? 'bg-[var(--acc)]' : 'bg-[var(--line)]'
-                      }`}
-                    >
-                      <div
-                        className={`w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${
-                          confirmDestructive ? 'translate-x-5' : 'translate-x-0'
-                        }`}
-                      />
-                    </button>
-                  </div>
+                  <Card padding="lg" className="space-y-3 bg-[var(--bg)]">
+                    <b className="text-base text-[var(--ink)] block">Estilo de Comunicação do Vito</b>
+                    <PersonaStyleSelector value={personaStyle} onChange={handlePersonaChange} />
+                  </Card>
 
-                  <div className="pt-3 border-t border-[var(--line)] flex items-center justify-between">
-                    <div>
-                      <b className="text-base text-[var(--ink)] block">Ativação por voz rápida</b>
-                      <span className="text-sm text-[var(--muted)]">Abrir microfone ao pressionar a tecla Espaço no chat</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setVoiceActivation(!voiceActivation)}
-                      className={`w-12 h-7 rounded-full p-1 transition-colors flex items-center ${
-                        voiceActivation ? 'bg-[var(--acc)]' : 'bg-[var(--line)]'
-                      }`}
-                    >
-                      <div
-                        className={`w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${
-                          voiceActivation ? 'translate-x-5' : 'translate-x-0'
-                        }`}
-                      />
-                    </button>
-                  </div>
-                </Card>
+                  <Card padding="lg" className="space-y-4 bg-[var(--bg)]">
+                    {[
+                      {
+                        label: 'Modo Pró-ativo (Recomendado)',
+                        desc: 'Vito sugere resoluções e alertas com antecedência',
+                        checked: proactiveEnabled,
+                        toggle: () => setProactiveEnabled(!proactiveEnabled),
+                      },
+                      {
+                        label: 'Pedir confirmação em ações de envio',
+                        desc: 'Evita disparo automático de e-mails e mensagens no WhatsApp',
+                        checked: confirmDestructive,
+                        toggle: () => setConfirmDestructive(!confirmDestructive),
+                      },
+                      {
+                        label: 'Ativação por voz rápida',
+                        desc: 'Abrir microfone ao pressionar a tecla Espaço no chat',
+                        checked: voiceActivation,
+                        toggle: () => setVoiceActivation(!voiceActivation),
+                      },
+                    ].map((sw, idx) => (
+                      <div key={sw.label} className={idx > 0 ? 'pt-3 border-t border-[var(--line)] flex items-center justify-between' : 'flex items-center justify-between'}>
+                        <div>
+                          <b className="text-base text-[var(--ink)] block">{sw.label}</b>
+                          <span className="text-sm text-[var(--muted)]">{sw.desc}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={sw.toggle}
+                          className={`w-12 h-7 rounded-full p-1 transition-colors flex items-center ${
+                            sw.checked ? 'bg-[var(--acc)]' : 'bg-[var(--line)]'
+                          }`}
+                        >
+                          <div className={`w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${sw.checked ? 'translate-x-5' : 'translate-x-0'}`} />
+                        </button>
+                      </div>
+                    ))}
+                  </Card>
+                </div>
               </div>
             )}
 
@@ -373,7 +359,7 @@ export const SettingsView: React.FC = () => {
                         key={theme.id}
                         interactive
                         padding="lg"
-                        onClick={() => setThemeMode(theme.id as any)}
+                        onClick={() => setThemeMode(theme.id as 'light' | 'dark' | 'system')}
                         className={`cursor-pointer text-center space-y-2 transition-all bg-[var(--bg)] ${
                           isCurrent ? 'ring-2 ring-[var(--ink)] border-[var(--ink)]' : 'hover:border-[var(--muted)]'
                         }`}

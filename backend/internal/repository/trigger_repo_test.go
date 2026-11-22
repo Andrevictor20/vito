@@ -1,6 +1,7 @@
 package repository_test
 
 import (
+	"context"
 	"path/filepath"
 	"testing"
 	"time"
@@ -163,5 +164,53 @@ func TestTriggerRepository_Lifecycle(t *testing.T) {
 	_, err = triggerRepo.GetByID("trig-1", "user-trig-1")
 	if err != domain.ErrTriggerNotFound {
 		t.Errorf("esperava ErrTriggerNotFound, recebeu: %v", err)
+	}
+}
+
+func TestTriggerRepository_ModelPrefAndClearProvider(t *testing.T) {
+	triggerRepo, _ := setupTriggerTestDB(t)
+	ctx := context.Background()
+	now := time.Now().UTC().Truncate(time.Second)
+
+	trig := &domain.Trigger{
+		ID:            "trig-model-1",
+		UserID:        "user-trig-1",
+		Title:         "Bot Analítico",
+		Category:      domain.CategoryTech,
+		Query:         "Resumo diário",
+		ConditionType: domain.ConditionDailyBrief,
+		Status:        domain.TriggerStatusActive,
+		Frequency:     domain.FrequencyDailyMorning,
+		ModelPref:     "google:gemini-2.5-pro",
+		EffortPref:    "high",
+		CreatedAt:     now,
+		UpdatedAt:     now,
+	}
+	if err := triggerRepo.Create(trig); err != nil {
+		t.Fatalf("Create falhou: %v", err)
+	}
+
+	got, err := triggerRepo.GetByID("trig-model-1", "user-trig-1")
+	if err != nil {
+		t.Fatalf("GetByID falhou: %v", err)
+	}
+	if got.ModelPref != "google:gemini-2.5-pro" || got.EffortPref != "high" {
+		t.Fatalf("preferências iniciais incorretas: %+v", got)
+	}
+
+	if err := triggerRepo.UpdateTriggerModelPref(ctx, "user-trig-1", "trig-model-1", "groq:deepseek-r1", "med"); err != nil {
+		t.Fatalf("UpdateTriggerModelPref falhou: %v", err)
+	}
+	updated, _ := triggerRepo.GetByID("trig-model-1", "user-trig-1")
+	if updated.ModelPref != "groq:deepseek-r1" || updated.EffortPref != "med" {
+		t.Fatalf("preferências atualizadas incorretas: %+v", updated)
+	}
+
+	if err := triggerRepo.ClearProviderPrefs(ctx, "user-trig-1", "groq"); err != nil {
+		t.Fatalf("ClearProviderPrefs falhou: %v", err)
+	}
+	cleared, _ := triggerRepo.GetByID("trig-model-1", "user-trig-1")
+	if cleared.ModelPref != "" {
+		t.Fatalf("esperava model_pref vazio após ClearProviderPrefs, veio %q", cleared.ModelPref)
 	}
 }

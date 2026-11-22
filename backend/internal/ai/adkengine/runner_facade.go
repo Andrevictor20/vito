@@ -50,6 +50,9 @@ type FacadeConfig struct {
 	ContextEnricher     ContextEnricherProvider
 	ConsolidationWorker ActivityNotifier
 	MemoryService       *SQLiteMemoryService
+	ModelResolver       *service.ModelResolver
+	AIProviderRepo      domain.AIProviderRepository
+	UserRegistry        *service.UserProviderRegistry
 }
 
 // ADKLoopFacade encapsula o google.golang.org/adk/v2/runner.Runner mantendo 100% de compatibilidade
@@ -72,6 +75,7 @@ type ADKLoopFacade struct {
 // NewADKLoopFacade instancia o motor Google ADK Go v2 completo.
 func NewADKLoopFacade(cfg FacadeConfig) (*ADKLoopFacade, error) {
 	routedLLM := NewRoutedLLM(cfg.Router)
+	routedLLM.ConfigureBYOK(cfg.ModelResolver, cfg.AIProviderRepo, cfg.UserRegistry, cfg.TraceRecorder)
 	sessionSvc := NewSQLiteSessionService(cfg.ConvRepo)
 	bridge := NewToolsetBridge(cfg.Registry)
 	guardrail := NewGuardrailPlugin(bridge, cfg.ScopeGuard, cfg.ConfirmationGate, cfg.TraceRecorder)
@@ -227,12 +231,25 @@ func (f *ADKLoopFacade) RunStream(ctx context.Context, req domain.UnifiedAssista
 
 	// 5. Preparação do contexto e collector do turno para os callbacks do ADK
 	collector := &TurnCollector{}
+	initialEffort := ""
+	if f.cfg.ModelResolver != nil {
+		if resolved, resErr := f.cfg.ModelResolver.Resolve(ctx, service.ModelResolveRequest{
+			UserID:   userID,
+			ThreadID: threadID,
+			BotID:    req.BotID,
+			Channel:  req.Channel,
+		}); resErr == nil && resolved != nil {
+			initialEffort = resolved.Effort
+		}
+	}
 	meta := &TurnExecutionMeta{
 		UserID:    userID,
 		ThreadID:  threadID,
 		TurnID:    turnID,
+		BotID:     req.BotID,
 		Channel:   req.Channel,
 		FocusMode: req.FocusMode,
+		Effort:    initialEffort,
 		OnDelta:   onDelta,
 	}
 	runCtx := WithTurnExecutionMeta(ctx, meta)
@@ -302,9 +319,14 @@ func (f *ADKLoopFacade) RunStream(ctx context.Context, req domain.UnifiedAssista
 	meta.Mu.Lock()
 	providerUsed := meta.ProviderUsed
 	modelUsed := meta.ModelUsed
+	modelDisplay := meta.ModelDisplayName
+	fallbackNotice := meta.FallbackNotice
 	tokensIn := meta.TokensIn
 	tokensOut := meta.TokensOut
 	meta.Mu.Unlock()
+	if modelDisplay == "" {
+		modelDisplay = modelUsed
+	}
 
 	var finalAnswer string
 	if requiresConf && suspendedText != "" {
@@ -324,7 +346,7 @@ func (f *ADKLoopFacade) RunStream(ctx context.Context, req domain.UnifiedAssista
 
 	// 8. Persistência no ConversationStore via DefaultWriterQueue() e notificação de consolidação
 	if !requiresConf {
-		f.persistCompletedTurn(ctx, threadID, turnID, req, finalAnswer, collectedCards, executedTools, collectedReasoning, modelUsed, startTime)
+		f.persistCompletedTurn(ctx, threadID, turnID, req, finalAnswer, collectedCards, executedTools, collectedReasoning, modelDisplay, startTime)
 		if f.consolidationWorker != nil && userID != "" && threadID != "" {
 			f.consolidationWorker.NotifyActivity(threadID, userID)
 		}
@@ -344,12 +366,15 @@ func (f *ADKLoopFacade) RunStream(ctx context.Context, req domain.UnifiedAssista
 		PendingConfirmationID: pendingID,
 		WhatsAppMessage:       respWhatsApp,
 		GmailMessage:          respGmail,
+		ModelUsed:             modelDisplay,
+		FallbackNotice:        fallbackNotice,
 		Telemetry: domain.TurnTelemetry{
-			ProviderUsed: providerUsed,
-			ModelUsed:    modelUsed,
-			TokensIn:     tokensIn,
-			TokensOut:    tokensOut,
-			LatencyMs:    time.Since(startTime).Milliseconds(),
+			ProviderUsed:   providerUsed,
+			ModelUsed:      modelDisplay,
+			FallbackNotice: fallbackNotice,
+			TokensIn:       tokensIn,
+			TokensOut:      tokensOut,
+			LatencyMs:      time.Since(startTime).Milliseconds(),
 		},
 	}, nil
 }

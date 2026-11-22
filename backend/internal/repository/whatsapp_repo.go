@@ -6,7 +6,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/andrevmp/vito/backend/internal/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
 )
 
@@ -255,18 +254,20 @@ func (r *WhatsAppRepositorySQLite) Upsert(ctx context.Context, i *domain.WhatsAp
 			last_connected_at = excluded.last_connected_at,
 			updated_at = excluded.updated_at
 	`
-	_, err := r.db.ExecContext(ctx, query,
-		i.ID,
-		i.UserID,
-		i.InstanceName,
-		i.Phone,
-		i.Status,
-		i.PairingCode,
-		i.LastConnectedAt,
-		i.CreatedAt,
-		i.UpdatedAt,
-	)
-	return err
+	return ExecuteQueuedWrite(ctx, func() error {
+		_, err := r.db.ExecContext(ctx, query,
+			i.ID,
+			i.UserID,
+			i.InstanceName,
+			i.Phone,
+			i.Status,
+			i.PairingCode,
+			i.LastConnectedAt,
+			i.CreatedAt,
+			i.UpdatedAt,
+		)
+		return err
+	})
 }
 
 // UpdateStatus atualiza apenas o estado de conexão e timestamp.
@@ -276,7 +277,7 @@ func (r *WhatsAppRepositorySQLite) UpdateStatus(ctx context.Context, id string, 
 		SET status = ?, last_connected_at = ?, updated_at = ?
 		WHERE id = ?
 	`
-	return database.WithBusyRetry(4, func() error {
+	return ExecuteQueuedWrite(ctx, func() error {
 		_, err := r.db.ExecContext(ctx, query, status, lastConnectedAt, time.Now().UTC(), id)
 		return err
 	})
@@ -285,6 +286,8 @@ func (r *WhatsAppRepositorySQLite) UpdateStatus(ctx context.Context, id string, 
 // Delete remove a integração pelo userID.
 func (r *WhatsAppRepositorySQLite) Delete(ctx context.Context, userID string) error {
 	query := `DELETE FROM whatsapp_integrations WHERE user_id = ?`
-	_, err := r.db.ExecContext(ctx, query, userID)
-	return err
+	return ExecuteQueuedWrite(ctx, func() error {
+		_, err := r.db.ExecContext(ctx, query, userID)
+		return err
+	})
 }

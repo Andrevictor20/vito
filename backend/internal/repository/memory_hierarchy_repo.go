@@ -105,12 +105,14 @@ func (r *MemoryHierarchyRepository) CreateEpisode(ctx context.Context, ep *Memor
 			followup_date, followup_done, created_at, updated_at
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
-	_, err := r.db.ExecContext(ctx, query,
-		ep.ID, ep.UserID, ep.ThreadID, ep.Channel, ep.Title, ep.NarrativeSummary,
-		ep.ParticipantsJSON, ep.EmotionalTone, ep.Importance, ep.HappenedAt,
-		ep.FollowupDate, followupDoneInt, ep.CreatedAt, ep.UpdatedAt,
-	)
-	return err
+	return ExecuteQueuedWrite(ctx, func() error {
+		_, err := r.db.ExecContext(ctx, query,
+			ep.ID, ep.UserID, ep.ThreadID, ep.Channel, ep.Title, ep.NarrativeSummary,
+			ep.ParticipantsJSON, ep.EmotionalTone, ep.Importance, ep.HappenedAt,
+			ep.FollowupDate, followupDoneInt, ep.CreatedAt, ep.UpdatedAt,
+		)
+		return err
+	})
 }
 
 // UpsertThematicSummary atualiza ou insere um resumo temático.
@@ -137,11 +139,13 @@ func (r *MemoryHierarchyRepository) UpsertThematicSummary(ctx context.Context, s
 			last_consolidated_at = excluded.last_consolidated_at,
 			updated_at = excluded.updated_at
 	`
-	_, err := r.db.ExecContext(ctx, query,
-		sum.ID, sum.UserID, sum.ThemeSlug, sum.ThemeTitle, sum.ConsolidatedSummary,
-		sum.FactCount, sum.EpisodeCount, sum.LastConsolidatedAt, sum.CreatedAt, sum.UpdatedAt,
-	)
-	return err
+	return ExecuteQueuedWrite(ctx, func() error {
+		_, err := r.db.ExecContext(ctx, query,
+			sum.ID, sum.UserID, sum.ThemeSlug, sum.ThemeTitle, sum.ConsolidatedSummary,
+			sum.FactCount, sum.EpisodeCount, sum.LastConsolidatedAt, sum.CreatedAt, sum.UpdatedAt,
+		)
+		return err
+	})
 }
 
 // SearchHierarchy busca no índice virtual FTS5 memory_hierarchy_fts com performance ultra-rápida.
@@ -243,15 +247,19 @@ func (r *MemoryHierarchyRepository) ListThematicSummaries(ctx context.Context, u
 // DeleteEpisode remove um episódio específico garantindo isolamento do usuário.
 func (r *MemoryHierarchyRepository) DeleteEpisode(ctx context.Context, userID, episodeID string) error {
 	query := `DELETE FROM memory_episodes WHERE id = ? AND user_id = ?`
-	_, err := r.db.ExecContext(ctx, query, episodeID, userID)
-	return err
+	return ExecuteQueuedWrite(ctx, func() error {
+		_, err := r.db.ExecContext(ctx, query, episodeID, userID)
+		return err
+	})
 }
 
 // DeleteThematicSummary remove um resumo temático específico.
 func (r *MemoryHierarchyRepository) DeleteThematicSummary(ctx context.Context, userID, themeSlug string) error {
 	query := `DELETE FROM memory_thematic_summaries WHERE theme_slug = ? AND user_id = ?`
-	_, err := r.db.ExecContext(ctx, query, themeSlug, userID)
-	return err
+	return ExecuteQueuedWrite(ctx, func() error {
+		_, err := r.db.ExecContext(ctx, query, themeSlug, userID)
+		return err
+	})
 }
 
 // CreateAtomicFact insere um fato atômico em user_memories.
@@ -283,11 +291,13 @@ func (r *MemoryHierarchyRepository) CreateAtomicFact(ctx context.Context, fact *
 			is_active, created_at, updated_at
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
-	_, err := r.db.ExecContext(ctx, query,
-		fact.ID, fact.UserID, fact.Category, fact.Content, fact.Source, fact.Confidence,
-		activeInt, fact.CreatedAt, fact.UpdatedAt,
-	)
-	return err
+	return ExecuteQueuedWrite(ctx, func() error {
+		_, err := r.db.ExecContext(ctx, query,
+			fact.ID, fact.UserID, fact.Category, fact.Content, fact.Source, fact.Confidence,
+			activeInt, fact.CreatedAt, fact.UpdatedAt,
+		)
+		return err
+	})
 }
 
 // ListAtomicFacts lista fatos atômicos ativos do usuário.
@@ -327,6 +337,8 @@ func (r *MemoryHierarchyRepository) ListAtomicFacts(ctx context.Context, userID 
 // DeleteAtomicFact desativa logicamente ou remove um fato atômico.
 func (r *MemoryHierarchyRepository) DeleteAtomicFact(ctx context.Context, userID, factID string) error {
 	query := `UPDATE user_memories SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?`
-	_, err := r.db.ExecContext(ctx, query, factID, userID)
-	return err
+	return ExecuteQueuedWrite(ctx, func() error {
+		_, err := r.db.ExecContext(ctx, query, factID, userID)
+		return err
+	})
 }

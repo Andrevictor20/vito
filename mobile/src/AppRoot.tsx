@@ -8,10 +8,15 @@ import { queryClient } from './services/queryClient';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { RootNavigator } from './navigation/RootNavigator';
-import { navigationRef } from './navigation/navigationRef';
+import { navigationRef, navigateToTab } from './navigation/navigationRef';
 import { tokens } from './theme/tokens';
 import { api, DEFAULT_SERVER_URL, CLOUDFLARE_SERVER_URL, PI_SERVER_URL, isCloudServer } from './services/api';
 import { notificationService } from './services/notificationService';
+import { chatPromptBus } from './services/dataSync';
+import {
+  buildMorningBriefingPromptFromAlarm,
+  subscribeCriticalAlarmDismissed,
+} from './services/criticalAlarmService';
 import { UpdateBanner } from './components/common/UpdateBanner';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { PrivacyScreenShield } from './components/common/PrivacyScreenShield';
@@ -29,6 +34,7 @@ export type MainTabParamList = {
 export type RootStackParamList = {
   auth: undefined;
   main: NavigatorScreenParams<MainTabParamList>;
+  aiProviders: undefined;
 };
 
 const linking: LinkingOptions<RootStackParamList> = {
@@ -64,6 +70,14 @@ const MainNavigator: React.FC = () => {
       }).catch(() => {});
     }
   }, [user?.id]);
+
+  useEffect(() => {
+    if (!user || isInitialLoading) return;
+    return subscribeCriticalAlarmDismissed((payload) => {
+      navigateToTab('chat');
+      chatPromptBus.notify(buildMorningBriefingPromptFromAlarm(payload));
+    });
+  }, [user?.id, isInitialLoading]);
 
   useEffect(() => {
     // Sincroniza a URL ativa com a instância inicializada da API

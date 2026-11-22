@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -26,7 +27,7 @@ const triggerSelectColumns = `
 	condition_type,
 	target_value, current_value, status, frequency,
 	COALESCE(scheduled_time, ''), COALESCE(days_of_week, 'DAILY'), COALESCE(last_run_status, ''),
-	COALESCE(last_error, ''),
+	COALESCE(last_error, ''), COALESCE(model_pref, ''), COALESCE(effort_pref, ''),
 	last_checked_at, next_check_at, created_at, updated_at
 `
 
@@ -42,6 +43,7 @@ func scanTrigger(scanner interface{ Scan(dest ...interface{}) error }) (*domain.
 		&cond,
 		&t.TargetValue, &t.CurrentValue, &status, &freq,
 		&t.ScheduledTime, &t.DaysOfWeek, &t.LastRunStatus, &t.LastError,
+		&t.ModelPref, &t.EffortPref,
 		&lastChecked, &nextCheck, &t.CreatedAt, &t.UpdatedAt,
 	)
 	if err != nil {
@@ -102,19 +104,21 @@ func (r *TriggerRepositorySQLite) Create(t *domain.Trigger) error {
 			id, user_id, title, category, query, user_intent, search_keywords,
 			search_config_json, seen_fingerprints_json, last_metric_value,
 			condition_type, target_value, current_value, status, frequency,
-			scheduled_time, days_of_week, last_run_status,
+			scheduled_time, days_of_week, last_run_status, model_pref, effort_pref,
 			last_checked_at, next_check_at, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
-	_, err := r.db.Exec(
-		query,
-		t.ID, t.UserID, t.Title, string(t.Category), t.Query, t.UserIntent, t.SearchKeywords,
-		searchConfig, seenFingerprints, lastMetricVal,
-		string(t.ConditionType), t.TargetValue, t.CurrentValue, string(t.Status), string(t.Frequency),
-		t.ScheduledTime, t.DaysOfWeek, t.LastRunStatus,
-		t.LastCheckedAt, t.NextCheckAt, t.CreatedAt, t.UpdatedAt,
-	)
-	return err
+	return ExecuteQueuedWrite(context.Background(), func() error {
+		_, err := r.db.Exec(
+			query,
+			t.ID, t.UserID, t.Title, string(t.Category), t.Query, t.UserIntent, t.SearchKeywords,
+			searchConfig, seenFingerprints, lastMetricVal,
+			string(t.ConditionType), t.TargetValue, t.CurrentValue, string(t.Status), string(t.Frequency),
+			t.ScheduledTime, t.DaysOfWeek, t.LastRunStatus, t.ModelPref, t.EffortPref,
+			t.LastCheckedAt, t.NextCheckAt, t.CreatedAt, t.UpdatedAt,
+		)
+		return err
+	})
 }
 
 func (r *TriggerRepositorySQLite) GetByID(id, userID string) (*domain.Trigger, error) {
@@ -211,20 +215,20 @@ func (r *TriggerRepositorySQLite) Update(t *domain.Trigger) error {
 		UPDATE triggers
 		SET title = ?, category = ?, query = ?, user_intent = ?, search_keywords = ?,
 		    search_config_json = ?, condition_type = ?,
-		    target_value = ?, frequency = ?, scheduled_time = ?, days_of_week = ?, updated_at = ?
+		    target_value = ?, frequency = ?, scheduled_time = ?, days_of_week = ?,
+		    model_pref = ?, effort_pref = ?, updated_at = ?
 		WHERE id = ? AND user_id = ?
 	`
-	res, err := r.db.Exec(
-		query,
-		t.Title, string(t.Category), t.Query, t.UserIntent, t.SearchKeywords,
-		searchConfig, string(t.ConditionType),
-		t.TargetValue, string(t.Frequency), t.ScheduledTime, t.DaysOfWeek, t.UpdatedAt,
-		t.ID, t.UserID,
-	)
-	if err != nil {
-		return err
-	}
-	n, err := res.RowsAffected()
+	n, err := ExecuteQueuedWriteRows(context.Background(), func() (sql.Result, error) {
+		return r.db.Exec(
+			query,
+			t.Title, string(t.Category), t.Query, t.UserIntent, t.SearchKeywords,
+			searchConfig, string(t.ConditionType),
+			t.TargetValue, string(t.Frequency), t.ScheduledTime, t.DaysOfWeek,
+			t.ModelPref, t.EffortPref, t.UpdatedAt,
+			t.ID, t.UserID,
+		)
+	})
 	if err != nil {
 		return err
 	}
@@ -244,8 +248,10 @@ func (r *TriggerRepositorySQLite) UpdateFingerprintsAndMetric(id string, seenFin
 		metricVal = sql.NullFloat64{Float64: *lastMetricValue, Valid: true}
 	}
 	query := `UPDATE triggers SET seen_fingerprints_json = ?, last_metric_value = ?, updated_at = ? WHERE id = ?`
-	_, err := r.db.Exec(query, seenFingerprintsJSON, metricVal, time.Now().UTC(), id)
-	return err
+	return ExecuteQueuedWrite(context.Background(), func() error {
+		_, err := r.db.Exec(query, seenFingerprintsJSON, metricVal, time.Now().UTC(), id)
+		return err
+	})
 }
 
 // UpdateSearchConfig atualiza o plano de buscas e parâmetros estruturados do radar.
@@ -254,8 +260,10 @@ func (r *TriggerRepositorySQLite) UpdateSearchConfig(id string, searchConfigJSON
 		searchConfigJSON = "{}"
 	}
 	query := `UPDATE triggers SET search_config_json = ?, updated_at = ? WHERE id = ?`
-	_, err := r.db.Exec(query, searchConfigJSON, time.Now().UTC(), id)
-	return err
+	return ExecuteQueuedWrite(context.Background(), func() error {
+		_, err := r.db.Exec(query, searchConfigJSON, time.Now().UTC(), id)
+		return err
+	})
 }
 
 func (r *TriggerRepositorySQLite) UpdateStatus(id, userID string, status domain.TriggerStatus) error {
@@ -264,11 +272,9 @@ func (r *TriggerRepositorySQLite) UpdateStatus(id, userID string, status domain.
 		SET status = ?, updated_at = ?
 		WHERE id = ? AND user_id = ?
 	`
-	res, err := r.db.Exec(query, string(status), time.Now().UTC(), id, userID)
-	if err != nil {
-		return err
-	}
-	n, err := res.RowsAffected()
+	n, err := ExecuteQueuedWriteRows(context.Background(), func() (sql.Result, error) {
+		return r.db.Exec(query, string(status), time.Now().UTC(), id, userID)
+	})
 	if err != nil {
 		return err
 	}
@@ -284,8 +290,10 @@ func (r *TriggerRepositorySQLite) UpdateEvaluation(id string, currentValue strin
 		SET current_value = ?, status = ?, last_checked_at = ?, next_check_at = ?, updated_at = ?
 		WHERE id = ?
 	`
-	_, err := r.db.Exec(query, currentValue, string(status), lastChecked, nextCheck, time.Now().UTC(), id)
-	return err
+	return ExecuteQueuedWrite(context.Background(), func() error {
+		_, err := r.db.Exec(query, currentValue, string(status), lastChecked, nextCheck, time.Now().UTC(), id)
+		return err
+	})
 }
 
 func (r *TriggerRepositorySQLite) UpdateRunResult(id string, currentValue string, status domain.TriggerStatus, lastRunStatus string, lastChecked time.Time, nextCheck *time.Time) error {
@@ -294,8 +302,10 @@ func (r *TriggerRepositorySQLite) UpdateRunResult(id string, currentValue string
 		SET current_value = ?, status = ?, last_run_status = ?, last_checked_at = ?, next_check_at = ?, updated_at = ?
 		WHERE id = ?
 	`
-	_, err := r.db.Exec(query, currentValue, string(status), lastRunStatus, lastChecked, nextCheck, time.Now().UTC(), id)
-	return err
+	return ExecuteQueuedWrite(context.Background(), func() error {
+		_, err := r.db.Exec(query, currentValue, string(status), lastRunStatus, lastChecked, nextCheck, time.Now().UTC(), id)
+		return err
+	})
 }
 
 // UpdateLastError persiste o erro da última coleta para visibilidade no app.
@@ -303,8 +313,10 @@ func (r *TriggerRepositorySQLite) UpdateLastError(id string, errMsg string) erro
 	if len(errMsg) > 500 {
 		errMsg = errMsg[:500]
 	}
-	_, err := r.db.Exec(`UPDATE triggers SET last_error = ?, updated_at = ? WHERE id = ?`, errMsg, time.Now().UTC(), id)
-	return err
+	return ExecuteQueuedWrite(context.Background(), func() error {
+		_, err := r.db.Exec(`UPDATE triggers SET last_error = ?, updated_at = ? WHERE id = ?`, errMsg, time.Now().UTC(), id)
+		return err
+	})
 }
 
 // GetLastNotifiedAt lê o último push enviado (cooldown Fase 1).
@@ -324,8 +336,10 @@ func (r *TriggerRepositorySQLite) GetLastNotifiedAt(id string) (*time.Time, erro
 
 // UpdateLastNotifiedAt registra o push enviado (cooldown Fase 1).
 func (r *TriggerRepositorySQLite) UpdateLastNotifiedAt(id string, t time.Time) error {
-	_, err := r.db.Exec(`UPDATE triggers SET last_notified_at = ?, updated_at = ? WHERE id = ?`, t.UTC(), time.Now().UTC(), id)
-	return err
+	return ExecuteQueuedWrite(context.Background(), func() error {
+		_, err := r.db.Exec(`UPDATE triggers SET last_notified_at = ?, updated_at = ? WHERE id = ?`, t.UTC(), time.Now().UTC(), id)
+		return err
+	})
 }
 
 // GetSeenHashes lê os hashes do delta gate (§9.3).
@@ -356,17 +370,49 @@ func (r *TriggerRepositorySQLite) SetSeenHashes(id string, hashes []string) erro
 	if err != nil {
 		return err
 	}
-	_, err = r.db.Exec(`UPDATE triggers SET last_seen_hashes = ?, updated_at = ? WHERE id = ?`, string(encoded), time.Now().UTC(), id)
-	return err
+	return ExecuteQueuedWrite(context.Background(), func() error {
+		_, err := r.db.Exec(`UPDATE triggers SET last_seen_hashes = ?, updated_at = ? WHERE id = ?`, string(encoded), time.Now().UTC(), id)
+		return err
+	})
+}
+
+// UpdateTriggerModelPref atualiza a preferência de modelo e esforço do bot/trigger.
+func (r *TriggerRepositorySQLite) UpdateTriggerModelPref(ctx context.Context, userID, triggerID, modelPref, effortPref string) error {
+	const query = `
+		UPDATE triggers
+		SET model_pref = ?, effort_pref = ?, updated_at = ?
+		WHERE id = ? AND user_id = ?
+	`
+	n, err := ExecuteQueuedWriteRows(ctx, func() (sql.Result, error) {
+		return r.db.ExecContext(ctx, query, modelPref, effortPref, time.Now().UTC(), triggerID, userID)
+	})
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return domain.ErrTriggerNotFound
+	}
+	return nil
+}
+
+// ClearProviderPrefs limpa model_pref de triggers que apontam para um provedor removido.
+func (r *TriggerRepositorySQLite) ClearProviderPrefs(ctx context.Context, userID, providerKey string) error {
+	const query = `
+		UPDATE triggers
+		SET model_pref = '', updated_at = ?
+		WHERE user_id = ? AND model_pref LIKE ?
+	`
+	return ExecuteQueuedWrite(ctx, func() error {
+		_, err := r.db.ExecContext(ctx, query, time.Now().UTC(), userID, providerKey+":%")
+		return err
+	})
 }
 
 func (r *TriggerRepositorySQLite) Delete(id, userID string) error {
 	query := `DELETE FROM triggers WHERE id = ? AND user_id = ?`
-	res, err := r.db.Exec(query, id, userID)
-	if err != nil {
-		return err
-	}
-	n, err := res.RowsAffected()
+	n, err := ExecuteQueuedWriteRows(context.Background(), func() (sql.Result, error) {
+		return r.db.Exec(query, id, userID)
+	})
 	if err != nil {
 		return err
 	}

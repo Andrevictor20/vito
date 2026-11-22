@@ -8,3 +8,4 @@ export * from './usePendingItems';
 export * from './useTriggers';
 export * from './useNotifications';
 export * from './useTasks';
+export * from './useAiProviders';

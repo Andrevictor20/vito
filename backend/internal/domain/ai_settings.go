@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"context"
 	"errors"
 	"time"
 )
@@ -26,6 +27,8 @@ type AISettings struct {
 	PreferredVoice  string       `json:"preferred_voice,omitempty"`
 	EmojiPolicy     string       `json:"emoji_policy,omitempty"`
 	ResponseLength  string       `json:"response_length,omitempty"`
+	DefaultModel    string       `json:"default_model"`
+	DefaultEffort   string       `json:"default_effort"`
 	CreatedAt       time.Time    `json:"created_at"`
 	UpdatedAt       time.Time    `json:"updated_at"`
 }
@@ -41,6 +44,8 @@ func DefaultAISettings(userID string) *AISettings {
 		PreferredVoice:  "alloy",
 		EmojiPolicy:     "moderate",
 		ResponseLength:  "adaptive",
+		DefaultModel:    "",
+		DefaultEffort:   EffortAuto,
 		CreatedAt:       now,
 		UpdatedAt:       now,
 	}
@@ -50,4 +55,7 @@ func DefaultAISettings(userID string) *AISettings {
 type AISettingsRepository interface {
 	GetSettings(userID string) (*AISettings, error)
 	UpsertSettings(settings *AISettings) error
+	GetPreferences(ctx context.Context, userID string) (*AIPreferences, error)
+	UpdatePreferences(ctx context.Context, userID, defaultModel, defaultEffort string) error
+	ClearProviderPrefs(ctx context.Context, userID, providerKey string) error
 }

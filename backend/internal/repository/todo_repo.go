@@ -1,12 +1,12 @@
 package repository
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"strings"
 	"time"
 
-	"github.com/andrevmp/vito/backend/internal/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
 )
 
@@ -28,11 +28,10 @@ func (r *TodoRepositorySQLite) Create(t *domain.Todo) error {
 		INSERT INTO todos (id, user_id, title, status, priority, category, due_date, remind_at, remind_repeat, remind_advance, event_id, event_title, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
-	err := database.WithBusyRetry(4, func() error {
+	return ExecuteQueuedWrite(context.Background(), func() error {
 		_, execErr := r.db.Exec(query, t.ID, t.UserID, t.Title, t.Status, t.Priority, t.Category, t.DueDate, t.RemindAt, t.RemindRepeat, t.RemindAdvance, t.EventID, t.EventTitle, t.CreatedAt, t.UpdatedAt)
 		return execErr
 	})
-	return err
 }
 
 func (r *TodoRepositorySQLite) GetByID(id, userID string) (*domain.Todo, error) {
@@ -221,11 +220,16 @@ func escapeLike(s string) string {
 
 func (r *TodoRepositorySQLite) UpdateStatus(id, userID string, status domain.TodoStatus) error {
 	query := `UPDATE todos SET status = ?, updated_at = ? WHERE id = ? AND user_id = ?`
-	res, err := r.db.Exec(query, status, time.Now().UTC(), id, userID)
-	if err != nil {
-		return err
-	}
-	rowsAffected, err := res.RowsAffected()
+	var rowsAffected int64
+	err := ExecuteQueuedWrite(context.Background(), func() error {
+		res, execErr := r.db.Exec(query, status, time.Now().UTC(), id, userID)
+		if execErr != nil {
+			return execErr
+		}
+		var raErr error
+		rowsAffected, raErr = res.RowsAffected()
+		return raErr
+	})
 	if err != nil {
 		return err
 	}
@@ -242,7 +246,7 @@ func (r *TodoRepositorySQLite) Update(t *domain.Todo) error {
 	}
 	query := `UPDATE todos SET title = ?, priority = ?, category = ?, due_date = ?, remind_at = ?, remind_repeat = ?, remind_advance = ?, updated_at = ? WHERE id = ? AND user_id = ?`
 	var res sql.Result
-	err := database.WithBusyRetry(4, func() error {
+	err := ExecuteQueuedWrite(context.Background(), func() error {
 		var execErr error
 		res, execErr = r.db.Exec(query, t.Title, t.Priority, t.Category, t.DueDate, t.RemindAt, t.RemindRepeat, t.RemindAdvance, time.Now().UTC(), t.ID, t.UserID)
 		return execErr
@@ -262,11 +266,16 @@ func (r *TodoRepositorySQLite) Update(t *domain.Todo) error {
 
 func (r *TodoRepositorySQLite) Delete(id, userID string) error {
 	query := `DELETE FROM todos WHERE id = ? AND user_id = ?`
-	res, err := r.db.Exec(query, id, userID)
-	if err != nil {
-		return err
-	}
-	rowsAffected, err := res.RowsAffected()
+	var rowsAffected int64
+	err := ExecuteQueuedWrite(context.Background(), func() error {
+		res, execErr := r.db.Exec(query, id, userID)
+		if execErr != nil {
+			return execErr
+		}
+		var raErr error
+		rowsAffected, raErr = res.RowsAffected()
+		return raErr
+	})
 	if err != nil {
 		return err
 	}
@@ -281,8 +290,10 @@ func (r *TodoRepositorySQLite) AddSubtask(st *domain.Subtask) error {
 		INSERT INTO todo_subtasks (id, todo_id, title, completed, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?)
 	`
-	_, err := r.db.Exec(query, st.ID, st.TodoID, st.Title, st.Completed, st.CreatedAt, st.UpdatedAt)
-	return err
+	return ExecuteQueuedWrite(context.Background(), func() error {
+		_, err := r.db.Exec(query, st.ID, st.TodoID, st.Title, st.Completed, st.CreatedAt, st.UpdatedAt)
+		return err
+	})
 }
 
 func (r *TodoRepositorySQLite) ToggleSubtask(id, todoID string) (*domain.Subtask, error) {
@@ -293,12 +304,13 @@ func (r *TodoRepositorySQLite) ToggleSubtask(id, todoID string) (*domain.Subtask
 		    updated_at = ?
 		WHERE id = ? AND todo_id = ?
 	`
-	res, err := r.db.Exec(query, now, id, todoID)
+	affected, err := ExecuteQueuedWriteRows(context.Background(), func() (sql.Result, error) {
+		return r.db.Exec(query, now, id, todoID)
+	})
 	if err != nil {
 		return nil, err
 	}
-	affected, err := res.RowsAffected()
-	if err != nil || affected == 0 {
+	if affected == 0 {
 		return nil, domain.ErrSubtaskNotFound
 	}
 
@@ -313,12 +325,13 @@ func (r *TodoRepositorySQLite) ToggleSubtask(id, todoID string) (*domain.Subtask
 
 func (r *TodoRepositorySQLite) DeleteSubtask(id, todoID string) error {
 	query := `DELETE FROM todo_subtasks WHERE id = ? AND todo_id = ?`
-	res, err := r.db.Exec(query, id, todoID)
+	affected, err := ExecuteQueuedWriteRows(context.Background(), func() (sql.Result, error) {
+		return r.db.Exec(query, id, todoID)
+	})
 	if err != nil {
 		return err
 	}
-	affected, err := res.RowsAffected()
-	if err != nil || affected == 0 {
+	if affected == 0 {
 		return domain.ErrSubtaskNotFound
 	}
 	return nil
@@ -417,13 +430,17 @@ func (r *TodoRepositorySQLite) ListDueNowUnreminded(from, to time.Time) ([]domai
 // MarkReminderSent marca o timestamp do lembrete de antecedência da tarefa.
 func (r *TodoRepositorySQLite) MarkReminderSent(todoID string, sentAt time.Time) error {
 	query := `UPDATE todos SET reminder_sent_at = ? WHERE id = ?`
-	_, err := r.db.Exec(query, sentAt.UTC(), todoID)
-	return err
+	return ExecuteQueuedWrite(context.Background(), func() error {
+		_, err := r.db.Exec(query, sentAt.UTC(), todoID)
+		return err
+	})
 }
 
 // MarkDueReminderSent marca o timestamp do lembrete de prazo atingido da tarefa.
 func (r *TodoRepositorySQLite) MarkDueReminderSent(todoID string, sentAt time.Time) error {
 	query := `UPDATE todos SET start_reminder_sent_at = ? WHERE id = ?`
-	_, err := r.db.Exec(query, sentAt.UTC(), todoID)
-	return err
+	return ExecuteQueuedWrite(context.Background(), func() error {
+		_, err := r.db.Exec(query, sentAt.UTC(), todoID)
+		return err
+	})
 }

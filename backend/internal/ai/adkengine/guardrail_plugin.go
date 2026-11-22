@@ -2,7 +2,6 @@ package adkengine
 
 import (
 	"encoding/json"
-	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -123,11 +122,11 @@ func computeAdaptiveThinkingBudget(llmReq *model.LLMRequest, effort string) int3
 	case "none", "0", "off":
 		return 0
 	case "low":
-		return 1024
+		return 512
 	case "med", "medium":
 		return 2048
 	case "high":
-		return 4096
+		return 8192
 	}
 
 	// Em modo "auto" (padrão), analisa a complexidade do pedido do usuário
@@ -169,9 +168,14 @@ func (g *GuardrailPlugin) BeforeModel(ctx agent.Context, llmReq *model.LLMReques
 	effort := "auto"
 	if meta != nil {
 		channel = meta.Channel
+		meta.Mu.Lock()
 		if meta.Effort != "" {
 			effort = meta.Effort
 		}
+		if name := ctx.AgentName(); name != "" {
+			meta.AgentName = name
+		}
+		meta.Mu.Unlock()
 	}
 
 	// Se uma ferramenta já foi suspensa pelo ConfirmationGate neste turno, interrompe novas chamadas à LLM
@@ -284,6 +288,13 @@ func (g *GuardrailPlugin) BeforeTool(ctx agent.Context, t tool.Tool, args map[st
 		}, nil
 	}
 
+	if meta := TurnExecutionMetaFromContext(ctx); meta != nil && meta.OnDelta != nil {
+		_ = meta.OnDelta(ai.StreamDelta{
+			Type:     "tool_call",
+			ToolName: t.Name(),
+		})
+	}
+
 	return nil, nil
 }
 
@@ -370,25 +381,41 @@ func (g *GuardrailPlugin) AfterTool(ctx agent.Context, t tool.Tool, args, result
 
 	if g.traceRecorder != nil {
 		meta := TurnExecutionMetaFromContext(ctx)
-		provName, modName := "", ""
+		provName, modName, credSrc, provKey, eff, fbReason := "", "", "server", "srv", "", ""
+		var fbUsed bool
 		if meta != nil {
 			meta.Mu.Lock()
 			provName = meta.ProviderUsed
 			modName = meta.ModelUsed
+			if meta.CredentialSource != "" {
+				credSrc = meta.CredentialSource
+			}
+			if meta.ProviderKey != "" {
+				provKey = meta.ProviderKey
+			}
+			eff = meta.Effort
+			fbUsed = meta.FallbackUsed
+			fbReason = meta.FallbackReason
 			meta.Mu.Unlock()
 		}
 		g.traceRecorder.RecordAsync(ai.AITrace{
-			UserID:          execCtx.UserID,
-			ThreadID:        execCtx.ThreadID,
-			TurnID:          execCtx.TurnID,
-			Channel:         execCtx.Channel,
-			TaskType:        ai.TaskToolUse,
-			ProviderName:    provName,
-			ModelName:       modName,
-			ToolsetCalled:   toolsetName,
-			OperationCalled: operation,
-			TaintedTurn:     tainted,
-			CreatedAt:       time.Now().UTC(),
+			UserID:            execCtx.UserID,
+			ThreadID:          execCtx.ThreadID,
+			TurnID:            execCtx.TurnID,
+			Channel:           execCtx.Channel,
+			AgentName:         ctx.AgentName(),
+			TaskType:          ai.TaskToolUse,
+			CredentialSource:  credSrc,
+			ProviderKey:       provKey,
+			Effort:            eff,
+			ProviderName:      provName,
+			ModelName:         modName,
+			ToolsetCalled:     toolsetName,
+			OperationCalled:   operation,
+			FallbackTriggered: fbUsed,
+			FallbackReason:    fbReason,
+			TaintedTurn:       tainted,
+			CreatedAt:         time.Now().UTC(),
 		})
 	}
 
@@ -403,73 +430,4 @@ func turnCollectorFromAgentContext(ctx agent.Context) *TurnCollector {
 		return v
 	}
 	return nil
-}
-
-// FormatSuspendedAction formata a resposta e ChatCard para uma ferramenta suspensa no ConfirmationGate.
-func FormatSuspendedAction(
-	operation string,
-	pendingID string,
-	reason string,
-	preview map[string]any,
-) (finalAnswer string, card domain.ChatCard, waMsg *domain.ChatWhatsAppMessage, gmailMsg *domain.ChatGmailMessage) {
-	switch operation {
-	case "send_message":
-		rec, _ := preview["recipient"].(string)
-		msg, _ := preview["message"].(string)
-		if rec == "" {
-			rec = "o destinatário"
-		}
-		finalAnswer = fmt.Sprintf("Preparei a mensagem para %s:\n\n\"%s\"\n\nPosso enviar?", rec, msg)
-		card = domain.ChatCard{
-			ID:          pendingID,
-			Type:        "whatsapp",
-			Title:       fmt.Sprintf("WhatsApp para %s", rec),
-			Subtitle:    msg,
-			ActionLabel: "Confirmar Envio",
-			Confirm:     true,
-		}
-		waMsg = &domain.ChatWhatsAppMessage{
-			ID:            pendingID,
-			RecipientName: rec,
-			Message:       msg,
-			Status:        "ready",
-		}
-	case "send_email":
-		to, _ := preview["to"].(string)
-		subj, _ := preview["subject"].(string)
-		body, _ := preview["body"].(string)
-		if subj == "" {
-			subj = "Mensagem do Vito"
-		}
-		if to == "" {
-			to = "o destinatário"
-		}
-		finalAnswer = fmt.Sprintf("Preparei o e-mail para %s (Assunto: \"%s\"):\n\n\"%s\"\n\nPosso enviar?", to, subj, body)
-		card = domain.ChatCard{
-			ID:          pendingID,
-			Type:        "gmail",
-			Title:       subj,
-			Subtitle:    fmt.Sprintf("Para: %s", to),
-			ActionLabel: "Confirmar Envio",
-			Confirm:     true,
-		}
-		gmailMsg = &domain.ChatGmailMessage{
-			ID:             pendingID,
-			RecipientEmail: to,
-			Subject:        subj,
-			Body:           body,
-			Status:         "ready",
-		}
-	default:
-		finalAnswer = fmt.Sprintf("Preparei a ação '%s'. Para sua segurança, você confirma o envio?", operation)
-		card = domain.ChatCard{
-			ID:          pendingID,
-			Type:        "confirm",
-			Title:       fmt.Sprintf("Confirmar: %s", operation),
-			Subtitle:    reason,
-			ActionLabel: "Confirmar Agora",
-			Confirm:     true,
-		}
-	}
-	return
 }

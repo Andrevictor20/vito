@@ -9,6 +9,8 @@ export const buildAssistantMessage = (
   sender: 'vito',
   text: res.reply || res.message || defaultReply,
   timestamp: new Date().toISOString(),
+  model_used: res.model_used,
+  fallback_notice: res.fallback_notice,
   event: res.event,
   todo: res.todo,
   trigger: res.trigger,

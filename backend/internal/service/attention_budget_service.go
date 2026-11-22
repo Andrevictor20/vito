@@ -84,6 +84,22 @@ func (s *AttentionBudgetService) SetDailyLimit(limit int) {
 	}
 }
 
+// ShouldDeliver avalia um candidato no AttentionBudgetService de forma nil-safe.
+// Quando o serviço não está configurado (nil), permite o envio para preservar compatibilidade com testes legados.
+func (s *AttentionBudgetService) ShouldDeliver(ctx context.Context, cand AttentionCandidate) (bool, *AttentionDecision) {
+	if s == nil {
+		return true, &AttentionDecision{Status: AttentionStatusDelivered, Reason: "attention_budget_unconfigured"}
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	dec, err := s.Evaluate(ctx, cand)
+	if err != nil {
+		return true, &AttentionDecision{Status: AttentionStatusDelivered, Reason: "attention_budget_error_fallback"}
+	}
+	return dec.Status == AttentionStatusDelivered, dec
+}
+
 // Evaluate avalia, persiste e decide se uma notificação proativa deve ser entregue agora, adiada, deduplicada ou suprimida.
 func (s *AttentionBudgetService) Evaluate(ctx context.Context, cand AttentionCandidate) (*AttentionDecision, error) {
 	now := cand.Now

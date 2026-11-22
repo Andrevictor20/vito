@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/andrevmp/vito/backend/internal/domain"
+	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/google/uuid"
 )
 
@@ -15,7 +16,8 @@ var (
 
 // PendingService gerencia as regras de negócio da Incubadora de Pendências.
 type PendingService struct {
-	repo domain.PendingRepository
+	repo           domain.PendingRepository
+	entityLinkRepo *repository.EntityLinkRepository
 }
 
 // NewPendingService cria uma nova instância de PendingService.
@@ -58,6 +60,7 @@ func (s *PendingService) CreatePending(userID string, input domain.CreatePending
 	if err := s.repo.Create(item); err != nil {
 		return nil, err
 	}
+	s.linkPendingEntity(item)
 
 	return item, nil
 }
@@ -121,6 +124,7 @@ func (s *PendingService) UpdatePending(id, userID string, input domain.UpdatePen
 	if err := s.repo.Update(item); err != nil {
 		return nil, err
 	}
+	s.linkPendingEntity(item)
 
 	return item, nil
 }

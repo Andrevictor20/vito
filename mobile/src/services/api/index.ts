@@ -4,7 +4,7 @@ import { ApiRequestOptions, ChatHistoryItem, AssistantChatOptions } from './type
 import { AuthApi } from './authApi';
 import { CalendarApi } from './calendarApi';
 import { TodosApi } from './todosApi';
-import { ChatApi } from './chatApi';
+import { ChatApi, ChatStreamDelta } from './chatApi';
 import { TriggersApi } from './triggersApi';
 import { PendingApi } from './pendingApi';
 import { BookingApi } from './bookingApi';
@@ -12,97 +12,26 @@ import { MeetingsApi } from './meetingsApi';
 import { P2PMeetingsApi } from './p2pMeetingsApi';
 import { NotificationsApi } from './notificationsApi';
 import { WhatsAppApi, WhatsAppIntegrationStatus } from './whatsappApi';
-import {
-  WhatsAppContextApi,
-  WhatsAppContextScope,
-  WhatsAppContextSettings,
-  WhatsAppContextPreview,
-  WhatsAppDirectory,
-  WhatsAppMediaStatus,
-} from './whatsappContextApi';
-import {
-  GmailApi,
-  GmailStatusResponse,
-  GmailScanResult,
-  GmailDraftInput,
-  GmailDraftResponse,
-  GmailSendResponse,
-  ScannedBill,
-  ScannedFlight,
-  UrgentEmail,
-} from './gmailApi';
+import { WhatsAppContextApi, WhatsAppContextScope, WhatsAppContextSettings, WhatsAppContextPreview, WhatsAppDirectory, WhatsAppMediaStatus } from './whatsappContextApi';
+import { GmailApi, GmailStatusResponse, GmailScanResult, GmailDraftInput, GmailDraftResponse, GmailSendResponse, ScannedBill, ScannedFlight, UrgentEmail } from './gmailApi';
 import { WhatsAppAuthApi, RequestWhatsAppOTPResponse, VerifyWhatsAppOTPResponse } from './whatsappAuthApi';
 import { FinanceApi } from './financeApi';
+import { AiProvidersApi } from './aiProvidersApi';
+import { FinancialSummary, FinanceAccount, FinanceConnection, FinanceTransaction, FinanceAlert, CategorySpendItem, SubscriptionItem, FinanceSyncPayload, FinanceConnectTokenResponse } from '../../types/finance';
 import {
-  FinancialSummary,
-  FinanceAccount,
-  FinanceConnection,
-  FinanceTransaction,
-  FinanceAlert,
-  CategorySpendItem,
-  SubscriptionItem,
-  FinanceSyncPayload,
-  FinanceConnectTokenResponse,
-} from '../../types/finance';
-import {
-  User,
-  AuthResponse,
-  Event,
-  Todo,
-  Subtask,
-  AssistantChatResponse,
-  ConflictInfo,
-  Trigger,
-  TriggerCategory,
-  TriggerLog,
-  TriggerTestResult,
-  TriggerStatus,
-  CreateTriggerInput,
-  TriggerTemplate,
-  MorningBriefingSettings,
-  AutonomyMode,
-  AISettings,
-  PendingItem,
-  PendingStatus,
-  CreatePendingInput,
-  UpdatePendingInput,
-  BookingType,
-  BookingAppointment,
-  CreateBookingTypeInput,
-  DeleteBookingImpact,
-  Meeting,
-  MeetingWithDetails,
-  CreateMeetingInput,
-  WhatsAppShareData,
-  ChatMessage,
-  ConversationSession,
-  P2PMeetingInvite,
-  ContactMatchResult,
-  P2PMutualSlot,
-  SendP2PInviteInput,
-  UserSession,
+  User, AuthResponse, Event, Todo, Subtask, AssistantChatResponse, ConflictInfo, Trigger, TriggerCategory,
+  TriggerLog, TriggerTestResult, TriggerStatus, CreateTriggerInput, TriggerTemplate, MorningBriefingSettings,
+  AutonomyMode, AISettings, PendingItem, PendingStatus, CreatePendingInput, UpdatePendingInput, BookingType,
+  BookingAppointment, CreateBookingTypeInput, DeleteBookingImpact, Meeting, MeetingWithDetails,
+  CreateMeetingInput, WhatsAppShareData, ChatMessage, ConversationSession, P2PMeetingInvite,
+  ContactMatchResult, P2PMutualSlot, SendP2PInviteInput, UserSession,
 } from '../../types';
 
 export {
-  PI_SERVER_URL,
-  CLOUDFLARE_SERVER_URL,
-  DEFAULT_SERVER_URL,
-  isCloudServer,
-  fileUriToBase64,
-  ApiRequestOptions,
-  ChatHistoryItem,
-  AssistantChatOptions,
-  WhatsAppIntegrationStatus,
-  GmailStatusResponse,
-  GmailScanResult,
-  GmailDraftInput,
-  GmailDraftResponse,
-  GmailSendResponse,
-  ScannedBill,
-  ScannedFlight,
-  UrgentEmail,
-  RequestWhatsAppOTPResponse,
-  VerifyWhatsAppOTPResponse,
+  PI_SERVER_URL, CLOUDFLARE_SERVER_URL, DEFAULT_SERVER_URL, isCloudServer, fileUriToBase64,
+  ApiRequestOptions, ChatHistoryItem, AssistantChatOptions, WhatsAppIntegrationStatus,
+  GmailStatusResponse, GmailScanResult, GmailDraftInput, GmailDraftResponse, GmailSendResponse,
+  ScannedBill, ScannedFlight, UrgentEmail, RequestWhatsAppOTPResponse, VerifyWhatsAppOTPResponse,
 };
 
 export class ApiService extends ApiClient {
@@ -121,6 +50,7 @@ export class ApiService extends ApiClient {
   private whatsappAuthApi = new WhatsAppAuthApi(this);
   private whatsappContextApi = new WhatsAppContextApi(this);
   private financeApi = new FinanceApi(this);
+  private aiProvidersApi = new AiProvidersApi(this);
 
   // Auth & Sessions
   login(email: string, password: string): Promise<AuthResponse> { return this.authApi.login(email, password); }
@@ -133,7 +63,16 @@ export class ApiService extends ApiClient {
 
   // Calendar
   getEvents(): Promise<Event[]> { return this.calendarApi.getEvents(); }
-  createEvent(event: { title: string; description?: string; location?: string; start_at: string; end_at: string; recurrence?: string }) {
+  createEvent(event: {
+    title: string;
+    description?: string;
+    location?: string;
+    start_at: string;
+    end_at: string;
+    recurrence?: string;
+    critical_alarm?: boolean;
+    wake_offset_minutes?: number;
+  }) {
     return this.calendarApi.createEvent(event);
   }
   updateEvent(id: string, eventData: Partial<Event> & { update_series?: boolean }): Promise<{ event: Event; updated_count: number }> {
@@ -195,6 +134,13 @@ export class ApiService extends ApiClient {
   // Chat & Vision
   assistantChat(prompt: string, options?: string | AssistantChatOptions): Promise<AssistantChatResponse> {
     return this.chatApi.assistantChat(prompt, options);
+  }
+  assistantChatStream(
+    prompt: string,
+    options?: string | AssistantChatOptions,
+    onDelta?: (delta: ChatStreamDelta) => void
+  ): Promise<AssistantChatResponse> {
+    return this.chatApi.assistantChatStream(prompt, options, onDelta);
   }
   assistantConfirm = (pendingId: string): Promise<AssistantChatResponse> => this.chatApi.assistantConfirm(pendingId);
   assistantAudio(audioUri: string, filename: string = 'audio.m4a', options?: string | AssistantChatOptions): Promise<AssistantChatResponse> {
@@ -485,6 +431,9 @@ export class ApiService extends ApiClient {
   // Finance & Open Finance (Vito Finance MVP)
   get finance(): FinanceApi {
     return this.financeApi;
+  }
+  get aiProviders(): AiProvidersApi {
+    return this.aiProvidersApi;
   }
   getFinancialSummary(): Promise<FinancialSummary> {
     return this.financeApi.getSummary();

@@ -77,12 +77,12 @@ scratch/
 # Planejamento, Agentes & Notas Locais (Não versionado)
 planning/
 docs/roadmap/
+docs/auditoria-vito/
+backups/
+craft/
 .agents/
 Relatório Técnico_ Arquitetura Inteligente de Radares e Motor de Busca (Vito).md
-login-vito.html
-vito-telas.html
-Vito Desktop.html
-Vito · Modo conversa fora do app (protótipo).html
+/*.html
 *Modo conversa fora do app*
 *protótipo*.html
 *prototipo*.html
@@ -110,4 +110,3 @@ opencode.json
 .DS_Store
 Thumbs.db
 *.apk
-Vito-telas-atualizadas.html

@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"database/sql"
 	"time"
 
@@ -73,17 +74,19 @@ func (r *BriefingRepositorySQLite) UpsertSettings(s *domain.BriefingSettings) er
 			last_sent_date = excluded.last_sent_date,
 			updated_at = excluded.updated_at
 	`
-	_, err := r.db.Exec(
-		query,
-		s.UserID,
-		s.Enabled,
-		s.ScheduledTime,
-		s.WakeupAlarmEarly,
-		s.LastSentDate,
-		s.CreatedAt,
-		s.UpdatedAt,
-	)
-	return err
+	return ExecuteQueuedWrite(context.Background(), func() error {
+		_, err := r.db.Exec(
+			query,
+			s.UserID,
+			s.Enabled,
+			s.ScheduledTime,
+			s.WakeupAlarmEarly,
+			s.LastSentDate,
+			s.CreatedAt,
+			s.UpdatedAt,
+		)
+		return err
+	})
 }
 
 // ListActiveSettings retorna todos os usuários com o briefing matinal ativado.
@@ -139,6 +142,8 @@ func (r *BriefingRepositorySQLite) MarkSent(userID, dateStr string) error {
 			last_sent_date = excluded.last_sent_date,
 			updated_at = excluded.updated_at
 	`
-	_, err := r.db.Exec(query, userID, dateStr, now, now)
-	return err
+	return ExecuteQueuedWrite(context.Background(), func() error {
+		_, err := r.db.Exec(query, userID, dateStr, now, now)
+		return err
+	})
 }

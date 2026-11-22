@@ -33,6 +33,9 @@ func (s *WhatsAppService) transcribeAudio(ctx context.Context, instanceName stri
 
 // archiveMessage persiste a mensagem no shadow inbox (idempotente por id).
 func (s *WhatsAppService) archiveMessage(ctx context.Context, userID, instanceName string, msg *inboundMessage, chatKind, text, senderRole string) {
+	if msg != nil && userID != "" {
+		s.recordWhatsAppEntityLink(ctx, userID, msg)
+	}
 	if s.contextSvc == nil || msg.MessageID == "" || userID == "" {
 		return
 	}

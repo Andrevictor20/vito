@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/andrevmp/vito/backend/internal/domain"
+	"github.com/andrevmp/vito/backend/internal/repository"
 )
 
 // CalendarSyncPusher define o contrato para propagação de eventos locais para agendas remotas (ex: Google Calendar).
@@ -21,8 +22,9 @@ type CalendarSyncPusher interface {
 
 // CalendarService orquestra criação, listagem e detecção de conflitos de eventos.
 type CalendarService struct {
-	eventRepo  domain.EventRepository
-	syncPusher CalendarSyncPusher
+	eventRepo      domain.EventRepository
+	syncPusher     CalendarSyncPusher
+	entityLinkRepo *repository.EntityLinkRepository
 }
 
 // NewCalendarService instancia o serviço de calendário.
@@ -72,6 +74,7 @@ func (s *CalendarService) CreateEvent(userID, title, description, location strin
 	if err := s.eventRepo.Create(event); err != nil {
 		return nil, nil, err
 	}
+	s.linkEventEntity(event)
 
 	if s.syncPusher != nil {
 		go func(evt *domain.Event) {

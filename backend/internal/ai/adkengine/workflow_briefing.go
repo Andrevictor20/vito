@@ -1,17 +1,23 @@
 package adkengine
 
 import (
+	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"google.golang.org/adk/v2/agent"
 	"google.golang.org/adk/v2/agent/llmagent"
 	"google.golang.org/adk/v2/agent/workflowagents/parallelagent"
 	"google.golang.org/adk/v2/agent/workflowagents/sequentialagent"
 	"google.golang.org/adk/v2/model"
+	"google.golang.org/adk/v2/runner"
+	"google.golang.org/adk/v2/session"
 	"google.golang.org/adk/v2/tool"
+	"google.golang.org/genai"
 
 	"github.com/andrevmp/vito/backend/internal/domain"
+	"github.com/andrevmp/vito/backend/internal/service"
 )
 
 // CrossDomainBriefingWorkflow encapsula o ParallelAgent coletor multi-domínio e o SequentialAgent sintetizador (Onda 3).
@@ -104,6 +110,84 @@ func BuildCrossDomainBriefingWorkflow(llm model.LLM, bridge *ToolsetBridge) (*Cr
 		ParallelCollectors: parallelCollectors,
 		SequentialPipeline: sequentialPipeline,
 	}, nil
+}
+
+// CrossDomainBriefingWorkflowRunner adapta CrossDomainBriefingWorkflow para service.BriefingWorkflowRunner,
+// executando ParallelAgent + SequentialAgent via adk/v2/runner.Runner.
+type CrossDomainBriefingWorkflowRunner struct {
+	workflow  *CrossDomainBriefingWorkflow
+	adkRunner *runner.Runner
+}
+
+// NewCrossDomainBriefingWorkflowRunner instancia o workflow cross-domain e um Runner ADK dedicado.
+func NewCrossDomainBriefingWorkflowRunner(llm model.LLM, bridge *ToolsetBridge) (*CrossDomainBriefingWorkflowRunner, error) {
+	if llm == nil {
+		return nil, fmt.Errorf("llm não pode ser nil para o briefing cross-domain")
+	}
+	wf, err := BuildCrossDomainBriefingWorkflow(llm, bridge)
+	if err != nil {
+		return nil, err
+	}
+	r, err := runner.New(runner.Config{
+		AppName:           "vito_briefing",
+		Agent:             wf.SequentialPipeline,
+		SessionService:    session.InMemoryService(),
+		AutoCreateSession: true,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("falha ao criar runner para briefing cross-domain: %w", err)
+	}
+	return &CrossDomainBriefingWorkflowRunner{
+		workflow:  wf,
+		adkRunner: r,
+	}, nil
+}
+
+// GenerateBriefing executa o pipeline ParallelAgent -> SequentialAgent para sintetizar o briefing matinal.
+func (r *CrossDomainBriefingWorkflowRunner) GenerateBriefing(ctx context.Context, input service.BriefingWorkflowInput) (string, error) {
+	if r == nil || r.adkRunner == nil {
+		return "", fmt.Errorf("CrossDomainBriefingWorkflowRunner não inicializado")
+	}
+	userID := strings.TrimSpace(input.UserID)
+	if userID == "" {
+		userID = "briefing_user"
+	}
+	sessionID := fmt.Sprintf("briefing_%s_%s_%d", userID, input.Date, time.Now().UnixNano())
+	prompt := fmt.Sprintf(
+		"Gere um briefing matinal executivo conciso (máximo 2 frases, sem emojis) para %s (%s) na data %s. Compromissos hoje: %d. Tarefas pendentes: %d. Resumo base: %s",
+		input.UserName, userID, input.Date, input.EventsCount, input.TodosCount, input.BaseSummary,
+	)
+	userContent := genai.NewContentFromText(prompt, genai.RoleUser)
+
+	var synthesizedText string
+	var lastModelText string
+	for ev, err := range r.adkRunner.Run(ctx, userID, sessionID, userContent, agent.RunConfig{MaxLLMCalls: 12}) {
+		if err != nil {
+			return "", err
+		}
+		if ev == nil || ev.Partial || ev.Content == nil || ev.Content.Role != genai.RoleModel {
+			continue
+		}
+		var parts []string
+		for _, p := range ev.Content.Parts {
+			if p != nil && !p.Thought && strings.TrimSpace(p.Text) != "" {
+				parts = append(parts, strings.TrimSpace(p.Text))
+			}
+		}
+		if len(parts) == 0 {
+			continue
+		}
+		joined := strings.Join(parts, "\n")
+		lastModelText = joined
+		if ev.Author == "vito_briefing_synthesizer" {
+			synthesizedText = joined
+		}
+	}
+
+	if strings.TrimSpace(synthesizedText) != "" {
+		return strings.TrimSpace(synthesizedText), nil
+	}
+	return strings.TrimSpace(lastModelText), nil
 }
 
 // BotAgentConfig descreve a configuração de um Bot isolado instanciado como llmagent no ADK (Plano 01 §2.1.6 & Plano 04).

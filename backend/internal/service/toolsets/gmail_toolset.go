@@ -7,7 +7,13 @@ import (
 	"strings"
 
 	"github.com/andrevmp/vito/backend/internal/domain"
+	"github.com/andrevmp/vito/backend/internal/repository"
 )
+
+// EntityLinkResolver resolve entidades cruzadas (nome/apelido -> e-mail/WhatsApp/telefone).
+type EntityLinkResolver interface {
+	Resolve(ctx context.Context, userID, query string) ([]repository.EntityLink, error)
+}
 
 type GmailServiceContract interface {
 	SendEmail(ctx context.Context, userID, to, subject, body string) error
@@ -16,11 +22,17 @@ type GmailServiceContract interface {
 }
 
 type GmailToolset struct {
-	gmailService GmailServiceContract
+	gmailService   GmailServiceContract
+	entityResolver EntityLinkResolver
 }
 
 func NewGmailToolset(svc GmailServiceContract) *GmailToolset {
 	return &GmailToolset{gmailService: svc}
+}
+
+// SetEntityLinkResolver conecta o resolvedor cross-canal para traduzir nomes/apelidos em endereços de e-mail.
+func (t *GmailToolset) SetEntityLinkResolver(resolver EntityLinkResolver) {
+	t.entityResolver = resolver
 }
 
 func (t *GmailToolset) Name() domain.ToolsetName {
@@ -98,6 +110,16 @@ func (t *GmailToolset) Execute(ctx context.Context, execCtx *domain.ToolExecutio
 
 	case "send_email":
 		cleanTo := strings.TrimSpace(params.To)
+		if cleanTo != "" && !strings.Contains(cleanTo, "@") && t.entityResolver != nil {
+			if links, err := t.entityResolver.Resolve(ctx, execCtx.UserID, cleanTo); err == nil {
+				for _, el := range links {
+					if strings.Contains(el.Email, "@") {
+						cleanTo = strings.TrimSpace(el.Email)
+						break
+					}
+				}
+			}
+		}
 		if cleanTo == "" || !strings.Contains(cleanTo, "@") {
 			return &domain.ToolExecutionResult{
 				Status:        "ERROR",

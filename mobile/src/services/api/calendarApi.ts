@@ -9,7 +9,16 @@ export class CalendarApi {
     return res || [];
   }
 
-  async createEvent(event: { title: string; description?: string; location?: string; start_at: string; end_at: string; recurrence?: string }) {
+  async createEvent(event: {
+    title: string;
+    description?: string;
+    location?: string;
+    start_at: string;
+    end_at: string;
+    recurrence?: string;
+    critical_alarm?: boolean;
+    wake_offset_minutes?: number;
+  }) {
     return this.client.request<{ event: Event; conflict?: ConflictInfo }>('/api/v1/events', {
       method: 'POST',
       body: JSON.stringify(event),

@@ -248,7 +248,16 @@ func (p *GeminiAgentProvider) buildRequestForModel(req AgentChatRequest, modelNa
 			gReq.GenerationConfig.ThinkingConfig = &geminiThinkingConfig{ThinkingBudget: 0}
 		}
 	} else if strings.Contains(modelName, "2.5") {
-		gReq.GenerationConfig.ThinkingConfig = &geminiThinkingConfig{ThinkingBudget: 0}
+		budget := 0
+		includeThoughts := false
+		if req.ThinkingBudget != nil && *req.ThinkingBudget > 0 {
+			budget = *req.ThinkingBudget
+			includeThoughts = req.IncludeThoughts
+		}
+		gReq.GenerationConfig.ThinkingConfig = &geminiThinkingConfig{
+			ThinkingBudget:  budget,
+			IncludeThoughts: includeThoughts,
+		}
 	}
 
 	return gReq
@@ -345,7 +354,10 @@ func (p *GeminiAgentProvider) Chat(ctx context.Context, req AgentChatRequest) (*
 			cand := gResp.Candidates[0]
 			for i, part := range cand.Content.Parts {
 				if part.Thought {
-					agentResp.Thought = part.Text
+					agentResp.Thought += part.Text
+					if strings.TrimSpace(part.Text) != "" {
+						agentResp.Reasoning = append(agentResp.Reasoning, part.Text)
+					}
 				} else if part.Text != "" {
 					agentResp.Text += part.Text
 				}
@@ -432,8 +444,14 @@ func (p *GeminiAgentProvider) StreamChat(ctx context.Context, req AgentChatReque
 			cand := chunk.Candidates[0]
 			for _, part := range cand.Content.Parts {
 				delta := StreamDelta{}
-				if part.Text != "" {
+				if part.Thought && part.Text != "" {
+					agentResp.Thought += part.Text
+					agentResp.Reasoning = append(agentResp.Reasoning, part.Text)
+					delta.Type = "reasoning"
+					delta.ReasoningDelta = part.Text
+				} else if part.Text != "" {
 					agentResp.Text += part.Text
+					delta.Type = "text"
 					delta.TextDelta = part.Text
 				}
 				if part.FunctionCall != nil {
@@ -450,8 +468,14 @@ func (p *GeminiAgentProvider) StreamChat(ctx context.Context, req AgentChatReque
 					}
 					agentResp.ToolCalls = append(agentResp.ToolCalls, tc)
 					delta.ToolCalls = append(delta.ToolCalls, tc)
+					if delta.Type == "" {
+						delta.Type = "tool_call"
+					}
+					if delta.ToolName == "" {
+						delta.ToolName = part.FunctionCall.Name
+					}
 				}
-				if delta.TextDelta != "" || len(delta.ToolCalls) > 0 {
+				if delta.TextDelta != "" || delta.ReasoningDelta != "" || len(delta.ToolCalls) > 0 {
 					if err := onDelta(delta); err != nil {
 						return nil, err
 					}

@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -26,23 +27,25 @@ func (r *PendingRepositorySQLite) Create(item *domain.PendingItem) error {
 			id, user_id, title, description, category, status, scheduled_date, remind_at, remind_repeat, remind_advance, nudge_sent_at, created_at, updated_at
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
-	_, err := r.db.Exec(
-		query,
-		item.ID,
-		item.UserID,
-		item.Title,
-		item.Description,
-		item.Category,
-		item.Status,
-		item.ScheduledDate,
-		item.RemindAt,
-		item.RemindRepeat,
-		item.RemindAdvance,
-		item.NudgeSentAt,
-		item.CreatedAt,
-		item.UpdatedAt,
-	)
-	return err
+	return ExecuteQueuedWrite(context.Background(), func() error {
+		_, err := r.db.Exec(
+			query,
+			item.ID,
+			item.UserID,
+			item.Title,
+			item.Description,
+			item.Category,
+			item.Status,
+			item.ScheduledDate,
+			item.RemindAt,
+			item.RemindRepeat,
+			item.RemindAdvance,
+			item.NudgeSentAt,
+			item.CreatedAt,
+			item.UpdatedAt,
+		)
+		return err
+	})
 }
 
 func (r *PendingRepositorySQLite) GetByID(id, userID string) (*domain.PendingItem, error) {
@@ -139,25 +142,23 @@ func (r *PendingRepositorySQLite) Update(item *domain.PendingItem) error {
 		WHERE id = ? AND user_id = ?
 	`
 	item.UpdatedAt = time.Now().UTC()
-	res, err := r.db.Exec(
-		query,
-		item.Title,
-		item.Description,
-		item.Category,
-		item.Status,
-		item.ScheduledDate,
-		item.RemindAt,
-		item.RemindRepeat,
-		item.RemindAdvance,
-		item.NudgeSentAt,
-		item.UpdatedAt,
-		item.ID,
-		item.UserID,
-	)
-	if err != nil {
-		return err
-	}
-	affected, err := res.RowsAffected()
+	affected, err := ExecuteQueuedWriteRows(context.Background(), func() (sql.Result, error) {
+		return r.db.Exec(
+			query,
+			item.Title,
+			item.Description,
+			item.Category,
+			item.Status,
+			item.ScheduledDate,
+			item.RemindAt,
+			item.RemindRepeat,
+			item.RemindAdvance,
+			item.NudgeSentAt,
+			item.UpdatedAt,
+			item.ID,
+			item.UserID,
+		)
+	})
 	if err != nil {
 		return err
 	}
@@ -169,11 +170,9 @@ func (r *PendingRepositorySQLite) Update(item *domain.PendingItem) error {
 
 func (r *PendingRepositorySQLite) Delete(id, userID string) error {
 	query := `DELETE FROM pending_items WHERE id = ? AND user_id = ?`
-	res, err := r.db.Exec(query, id, userID)
-	if err != nil {
-		return err
-	}
-	affected, err := res.RowsAffected()
+	affected, err := ExecuteQueuedWriteRows(context.Background(), func() (sql.Result, error) {
+		return r.db.Exec(query, id, userID)
+	})
 	if err != nil {
 		return err
 	}
@@ -273,6 +272,8 @@ func (r *PendingRepositorySQLite) ListScheduledDueForNudge(today string, since t
 
 func (r *PendingRepositorySQLite) MarkNudgeSent(id string, sentAt time.Time) error {
 	query := `UPDATE pending_items SET nudge_sent_at = ? WHERE id = ?`
-	_, err := r.db.Exec(query, sentAt, id)
-	return err
+	return ExecuteQueuedWrite(context.Background(), func() error {
+		_, err := r.db.Exec(query, sentAt, id)
+		return err
+	})
 }

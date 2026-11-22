@@ -28,6 +28,7 @@ export function useChat(onDataChanged?: () => void, currentUserId?: string) {
     messages,
     setMessages,
     loading,
+    streamingSteps,
     sendMessage,
     appendUserMessage,
     appendAssistantMessage,
@@ -82,6 +83,7 @@ export function useChat(onDataChanged?: () => void, currentUserId?: string) {
   return {
     messages,
     loading,
+    streamingSteps,
     sessions: sessionsWithActive,
     activeSessionId,
     sendMessage,

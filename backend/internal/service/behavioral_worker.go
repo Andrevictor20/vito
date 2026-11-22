@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"sort"
@@ -15,15 +16,17 @@ import (
 // BehavioralWorker consolida padrões de uso em insights ("dream worker", §8.4 ciclo 3).
 // Roda 1x/dia e grava até 3 memórias category=behavioral_insight (rotaciona as antigas).
 type BehavioralWorker struct {
-	todoRepo   domain.TodoRepository
-	eventRepo  domain.EventRepository
-	memoryRepo domain.MemoryRepository
-	interval   time.Duration
-	stopCh     chan struct{}
-	wg         sync.WaitGroup
-	running    bool
-	mu         sync.Mutex
-	nowFn      func() time.Time
+	todoRepo        domain.TodoRepository
+	eventRepo       domain.EventRepository
+	memoryRepo      domain.MemoryRepository
+	notifSvc        PushDispatcher
+	attentionBudget *AttentionBudgetService
+	interval        time.Duration
+	stopCh          chan struct{}
+	wg              sync.WaitGroup
+	running         bool
+	mu              sync.Mutex
+	nowFn           func() time.Time
 }
 
 func NewBehavioralWorker(todoRepo domain.TodoRepository, eventRepo domain.EventRepository, memoryRepo domain.MemoryRepository) *BehavioralWorker {
@@ -35,6 +38,26 @@ func NewBehavioralWorker(todoRepo domain.TodoRepository, eventRepo domain.EventR
 		stopCh:     make(chan struct{}),
 		nowFn:      time.Now,
 	}
+}
+
+// SetAttentionBudget injeta o controlador de orçamento de atenção para notificações proativas.
+func (w *BehavioralWorker) SetAttentionBudget(ab *AttentionBudgetService) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.attentionBudget = ab
+}
+
+// SetNotificationService injeta o despachante de push opcional para entrega de insights comportamentais.
+func (w *BehavioralWorker) SetNotificationService(ns PushDispatcher) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.notifSvc = ns
+}
+
+func (w *BehavioralWorker) getNotificationDeps() (PushDispatcher, *AttentionBudgetService) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.notifSvc, w.attentionBudget
 }
 
 // Consolidate agrega os últimos 30 dias e rotaciona os insights do usuário.
@@ -85,6 +108,25 @@ func (w *BehavioralWorker) Consolidate(userID string) (int, error) {
 			CreatedAt:  now,
 			UpdatedAt:  now,
 		})
+	}
+	if ns, budget := w.getNotificationDeps(); ns != nil {
+		title := "💡 Novo insight sobre sua rotina"
+		body := insights[0]
+		cand := AttentionCandidate{
+			UserID:       userID,
+			SourceWorker: "behavioral_worker",
+			Category:     "resumo",
+			Urgency:      "low",
+			Title:        title,
+			Body:         body,
+			Now:          now,
+		}
+		if allowed, _ := budget.ShouldDeliver(context.Background(), cand); allowed {
+			_, _ = ns.SendPushToUser(userID, title, body, "default", map[string]interface{}{
+				"type":     "behavioral_insight",
+				"insights": len(insights),
+			})
+		}
 	}
 	return len(insights), nil
 }

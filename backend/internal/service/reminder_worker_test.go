@@ -1,13 +1,18 @@
 package service_test
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/andrevmp/vito/backend/internal/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
+	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/andrevmp/vito/backend/internal/service"
 )
 
@@ -340,5 +345,120 @@ func TestReminderWorker_SkipsAllDayEventsAndHolidays(t *testing.T) {
 	// O evento deve ter sido marcado como notificado para não ficar sendo consultado sem parar
 	if holidayFromRepo, _ := eventRepo.GetByID("evt-holiday", "user-1"); holidayFromRepo.ReminderSentAt == nil {
 		t.Errorf("esperava que ReminderSentAt fosse marcado para o evento de dia inteiro")
+	}
+}
+
+func TestReminderWorker_AttentionBudget_DeferDedupAndCriticalBypass(t *testing.T) {
+	var mu sync.Mutex
+	var receivedPush []service.PushMessage
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var msgs []service.PushMessage
+		_ = json.NewDecoder(r.Body).Decode(&msgs)
+		mu.Lock()
+		receivedPush = append(receivedPush, msgs...)
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":[{"status":"ok"}]}`))
+	}))
+	defer server.Close()
+
+	db, err := database.Open(filepath.Join(t.TempDir(), "rem_budget.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+
+	userID := "user-rem-budget"
+	now := time.Date(2026, 11, 21, 14, 5, 0, 0, time.UTC)
+	_, err = db.Exec(`INSERT INTO users (id, email, name, password_hash, created_at, updated_at) VALUES (?,?,?,?,?,?)`,
+		userID, "rem@vito.ai", "Rem", "h", now, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tokenRepo := &mockDeviceTokenRepo{
+		tokens: []domain.DeviceToken{{ID: "tok-1", UserID: userID, Token: "ExponentPushToken[rem]", Platform: "android"}},
+	}
+	notifSvc := service.NewNotificationService(tokenRepo, server.Client())
+	notifSvc.SetExpoAPIURL(server.URL)
+
+	// Reunião ativa 14:00..15:00 + lembrete normal às 14:15 + alarme crítico às 14:15
+	eventRepo := repository.NewEventRepository(db)
+	_ = eventRepo.Create(&domain.Event{
+		ID:        "evt-active-mtg",
+		UserID:    userID,
+		Title:     "Daily Sync",
+		StartAt:   now.Add(-5 * time.Minute),
+		EndAt:     now.Add(55 * time.Minute),
+		CreatedAt: now,
+		UpdatedAt: now,
+	})
+	// Marca reminder_sent na reunião ativa para testar apenas os dois próximos eventos
+	_ = eventRepo.MarkReminderSent("evt-active-mtg", now.Add(-15*time.Minute))
+
+	_ = eventRepo.Create(&domain.Event{
+		ID:        "evt-normal-upcoming",
+		UserID:    userID,
+		Title:     "Dentista",
+		StartAt:   now.Add(10 * time.Minute),
+		EndAt:     now.Add(40 * time.Minute),
+		CreatedAt: now,
+		UpdatedAt: now,
+	})
+	_ = eventRepo.Create(&domain.Event{
+		ID:        "evt-critical-alarm",
+		UserID:    userID,
+		Title:     "Tomar insulina agora",
+		Category:  "critical_alarm",
+		StartAt:   now.Add(10 * time.Minute),
+		EndAt:     now.Add(25 * time.Minute),
+		CreatedAt: now,
+		UpdatedAt: now,
+	})
+
+	budget := service.NewAttentionBudgetService(db, eventRepo)
+	worker := service.NewReminderWorker(eventRepo, notifSvc, 15*time.Minute)
+	worker.SetAttentionBudget(budget)
+
+	count, err := worker.CheckAndDispatchReminders(now)
+	if err != nil {
+		t.Fatalf("erro inesperado: %v", err)
+	}
+	// Apenas o critical_alarm deve furar o silêncio da reunião em andamento
+	if count != 1 {
+		t.Fatalf("esperava exatamente 1 push entregue (critical_alarm bypass), obteve %d", count)
+	}
+	mu.Lock()
+	if len(receivedPush) != 1 || receivedPush[0].Title != "Tomar insulina agora" {
+		t.Fatalf("push inesperado: %+v", receivedPush)
+	}
+	mu.Unlock()
+
+	// Cross-worker semantic dedup após a reunião terminar (15:10)
+	afterMtg := now.Add(65 * time.Minute) // 15:10
+	_, _ = budget.Evaluate(context.Background(), service.AttentionCandidate{
+		UserID:       userID,
+		SourceWorker: "bot_runner",
+		Category:     "agenda",
+		Urgency:      "normal",
+		Title:        "Consulta Cardiologista",
+		Body:         "Começa às 12:20",
+		Now:          afterMtg,
+	})
+	_ = eventRepo.Create(&domain.Event{
+		ID:        "evt-dedup-cardio",
+		UserID:    userID,
+		Title:     "Consulta Cardiologista",
+		StartAt:   afterMtg.Add(10 * time.Minute), // 15:20 UTC = 12:20 BRT
+		EndAt:     afterMtg.Add(40 * time.Minute),
+		CreatedAt: afterMtg,
+		UpdatedAt: afterMtg,
+	})
+	countDedup, err := worker.CheckAndDispatchReminders(afterMtg)
+	if err != nil {
+		t.Fatalf("erro no ciclo de dedup: %v", err)
+	}
+	if countDedup != 0 {
+		t.Fatalf("esperava 0 pushes por deduplicação semântica cross-worker, obteve %d", countDedup)
 	}
 }

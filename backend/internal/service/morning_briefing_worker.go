@@ -16,21 +16,38 @@ type TextGenerator interface {
 	GenerateText(ctx context.Context, systemPrompt, userPrompt string) (string, error)
 }
 
+// BriefingWorkflowInput fornece os dados contextuais do dia para o workflow ADK multi-domínio.
+type BriefingWorkflowInput struct {
+	UserID      string
+	UserName    string
+	Date        string
+	EventsCount int
+	TodosCount  int
+	BaseSummary string
+}
+
+// BriefingWorkflowRunner executa o pipeline ADK (ParallelAgent + SequentialAgent) de síntese do briefing matinal.
+type BriefingWorkflowRunner interface {
+	GenerateBriefing(ctx context.Context, input BriefingWorkflowInput) (string, error)
+}
+
 // MorningBriefingWorker orquestra a geração e o despacho proativo do resumo matinal diário.
 type MorningBriefingWorker struct {
-	briefingRepo  domain.BriefingRepository
-	eventRepo     domain.EventRepository
-	todoRepo      domain.TodoRepository
-	userRepo      domain.UserRepository
-	notifSvc      *NotificationService
-	textGen       TextGenerator
-	checkInterval time.Duration
-	stopCh        chan struct{}
-	wg            sync.WaitGroup
-	running       bool
-	mu            sync.Mutex
-	location      *time.Location
-	bridge        *ProactiveConversationBridge
+	briefingRepo    domain.BriefingRepository
+	eventRepo       domain.EventRepository
+	todoRepo        domain.TodoRepository
+	userRepo        domain.UserRepository
+	notifSvc        *NotificationService
+	textGen         TextGenerator
+	workflowRunner  BriefingWorkflowRunner
+	attentionBudget *AttentionBudgetService
+	checkInterval   time.Duration
+	stopCh          chan struct{}
+	wg              sync.WaitGroup
+	running         bool
+	mu              sync.Mutex
+	location        *time.Location
+	bridge          *ProactiveConversationBridge
 }
 
 // SetProactiveBridge injeta a ponte de conversa para registro do briefing matinal.
@@ -83,6 +100,20 @@ func (w *MorningBriefingWorker) SetTextGenerator(tg TextGenerator) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	w.textGen = tg
+}
+
+// SetBriefingWorkflowRunner injeta o workflow ADK (ParallelAgent + SequentialAgent) como gerador primário de briefing.
+func (w *MorningBriefingWorker) SetBriefingWorkflowRunner(r BriefingWorkflowRunner) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.workflowRunner = r
+}
+
+// SetAttentionBudget injeta o controlador de orçamento de atenção para deduplicação e silêncio contextual.
+func (w *MorningBriefingWorker) SetAttentionBudget(ab *AttentionBudgetService) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.attentionBudget = ab
 }
 
 // FormatBriefingMessage formata o título e o corpo da notificação de forma executiva, clara e amigável.
@@ -178,9 +209,33 @@ func (w *MorningBriefingWorker) ProcessBriefings(now time.Time) (int, error) {
 		title, body := FormatBriefingMessage(userName, events, todos, loc)
 
 		w.mu.Lock()
+		wfRunner := w.workflowRunner
 		tg := w.textGen
+		budget := w.attentionBudget
+		bridge := w.bridge
 		w.mu.Unlock()
-		if tg != nil {
+
+		generatedByWorkflow := false
+		if wfRunner != nil {
+			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+			wfInput := BriefingWorkflowInput{
+				UserID:      s.UserID,
+				UserName:    userName,
+				Date:        currentDateStr,
+				EventsCount: len(events),
+				TodosCount:  len(todos),
+				BaseSummary: body,
+			}
+			if wfBody, wfErr := wfRunner.GenerateBriefing(ctx, wfInput); wfErr == nil && strings.TrimSpace(wfBody) != "" {
+				body = strings.TrimSpace(wfBody)
+				generatedByWorkflow = true
+			} else if wfErr != nil {
+				log.Printf("[MorningBriefingWorker] Fallback para TextGenerator após falha no workflow ADK para %s: %v", s.UserID, wfErr)
+			}
+			cancel()
+		}
+
+		if !generatedByWorkflow && tg != nil {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			sysPrompt := "Você é o Vito, assistente executivo pessoal. Elabore um briefing matinal conciso (máximo 2 frases), elegante, motivador e executivo para o usuário iniciar o dia com clareza total. Sem emojis, direto ao ponto."
 			usrPrompt := fmt.Sprintf("Usuário: %s. Compromissos: %d. Tarefas pendentes: %d. Base: %s", userName, len(events), len(todos), body)
@@ -191,13 +246,28 @@ func (w *MorningBriefingWorker) ProcessBriefings(now time.Time) (int, error) {
 		}
 
 		priority := "default"
+		urgency := "normal"
 		// Se configurado alarme antecipado e o primeiro evento ocorrer em até 45 minutos do briefing
 		if s.WakeupAlarmEarly && len(events) > 0 {
 			firstStart := events[0].StartAt.In(loc)
 			diff := firstStart.Sub(userNow)
 			if diff > 0 && diff <= 45*time.Minute {
 				priority = "wakeup"
+				urgency = "high"
 			}
+		}
+
+		cand := AttentionCandidate{
+			UserID:       s.UserID,
+			SourceWorker: "morning_briefing_worker",
+			Category:     "resumo",
+			Urgency:      urgency,
+			Title:        title,
+			Body:         body,
+			Now:          now,
+		}
+		if allowed, _ := budget.ShouldDeliver(context.Background(), cand); !allowed {
+			continue
 		}
 
 		data := map[string]interface{}{
@@ -207,16 +277,15 @@ func (w *MorningBriefingWorker) ProcessBriefings(now time.Time) (int, error) {
 			"todosCount":  len(todos),
 		}
 
-		sentCount, err := w.notifSvc.SendPushToUser(s.UserID, title, body, priority, data)
-		if err != nil {
-			log.Printf("[MorningBriefingWorker] Erro ao despachar push para %s: %v", s.UserID, err)
-		} else if sentCount > 0 {
-			dispatched++
+		if w.notifSvc != nil {
+			sentCount, err := w.notifSvc.SendPushToUser(s.UserID, title, body, priority, data)
+			if err != nil {
+				log.Printf("[MorningBriefingWorker] Erro ao despachar push para %s: %v", s.UserID, err)
+			} else if sentCount > 0 {
+				dispatched++
+			}
 		}
 
-		w.mu.Lock()
-		bridge := w.bridge
-		w.mu.Unlock()
 		if bridge != nil {
 			msgText := fmt.Sprintf("%s\n%s", title, body)
 			_ = bridge.RecordProactiveNotification(context.Background(), s.UserID, "app", "morning_briefing", msgText)

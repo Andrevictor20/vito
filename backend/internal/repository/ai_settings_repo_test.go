@@ -1,6 +1,7 @@
 package repository_test
 
 import (
+	"context"
 	"database/sql"
 	"path/filepath"
 	"testing"
@@ -78,5 +79,41 @@ func TestAISettingsRepositorySQLite_UpsertAndRetrieve(t *testing.T) {
 	}
 	if retrieved.AutoFocusBlocks != true {
 		t.Errorf("esperava AutoFocusBlocks true, obteve %v", retrieved.AutoFocusBlocks)
+	}
+}
+
+func TestAISettingsRepositorySQLite_PreferencesAndClearProvider(t *testing.T) {
+	db, userID := setupTestDBWithUserForAI(t)
+	defer db.Close()
+
+	ctx := context.Background()
+	repo := repository.NewAISettingsRepository(db)
+
+	if err := repo.UpdatePreferences(ctx, userID, "anthropic:claude-sonnet-4", domain.EffortHigh); err != nil {
+		t.Fatalf("UpdatePreferences falhou: %v", err)
+	}
+	prefs, err := repo.GetPreferences(ctx, userID)
+	if err != nil {
+		t.Fatalf("GetPreferences falhou: %v", err)
+	}
+	if prefs.DefaultModel != "anthropic:claude-sonnet-4" || prefs.DefaultEffort != domain.EffortHigh {
+		t.Fatalf("preferências divergentes: %+v", prefs)
+	}
+
+	// Limpa apenas quando o prefixo do provedor corresponde.
+	if err := repo.ClearProviderPrefs(ctx, userID, "openai"); err != nil {
+		t.Fatalf("ClearProviderPrefs (outro provedor) falhou: %v", err)
+	}
+	prefs, _ = repo.GetPreferences(ctx, userID)
+	if prefs.DefaultModel != "anthropic:claude-sonnet-4" {
+		t.Fatalf("não deveria limpar preferência de outro provedor: %+v", prefs)
+	}
+
+	if err := repo.ClearProviderPrefs(ctx, userID, "anthropic"); err != nil {
+		t.Fatalf("ClearProviderPrefs falhou: %v", err)
+	}
+	prefs, _ = repo.GetPreferences(ctx, userID)
+	if prefs.DefaultModel != "" {
+		t.Fatalf("esperava default_model vazio após ClearProviderPrefs, veio %q", prefs.DefaultModel)
 	}
 }

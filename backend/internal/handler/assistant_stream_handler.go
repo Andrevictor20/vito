@@ -136,6 +136,8 @@ func (h *AssistantStreamHandler) Confirm(w http.ResponseWriter, r *http.Request)
 
 	var body struct {
 		PendingID string `json:"pending_id"`
+		Reject    bool   `json:"reject,omitempty"`
+		Reason    string `json:"reason,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.PendingID == "" {
 		http.Error(w, `{"error":"pending_id obrigatório"}`, http.StatusBadRequest)
@@ -143,8 +145,16 @@ func (h *AssistantStreamHandler) Confirm(w http.ResponseWriter, r *http.Request)
 	}
 
 	req := domain.UnifiedAssistantRequest{
-		UserID:           userID,
-		ConfirmPendingID: body.PendingID,
+		UserID:  userID,
+		Message: strings.TrimSpace(body.Reason),
+	}
+	if body.Reject {
+		req.RejectPendingID = body.PendingID
+		if req.Message == "" {
+			req.Message = "cancelar"
+		}
+	} else {
+		req.ConfirmPendingID = body.PendingID
 	}
 
 	resp, err := h.loop.Run(r.Context(), req)

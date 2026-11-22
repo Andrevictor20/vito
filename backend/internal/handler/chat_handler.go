@@ -1,8 +1,11 @@
 package handler
 
 import (
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 
@@ -13,12 +16,18 @@ import (
 
 // ChatHandler gerencia as requisições HTTP REST de sincronização de conversas e mensagens.
 type ChatHandler struct {
-	svc *service.ChatService
+	svc           *service.ChatService
+	aiProviderSvc *service.AIProviderService
 }
 
 // NewChatHandler cria um novo handler de chat.
 func NewChatHandler(svc *service.ChatService) *ChatHandler {
 	return &ChatHandler{svc: svc}
+}
+
+// SetAIProviderService conecta o serviço de preferências BYOK para atualizar modelo por conversa.
+func (h *ChatHandler) SetAIProviderService(svc *service.AIProviderService) {
+	h.aiProviderSvc = svc
 }
 
 type syncChatRequest struct {
@@ -121,4 +130,36 @@ func (h *ChatHandler) DeleteSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// UpdateThreadModelPref atualiza model_pref e effort_pref da conversa (PATCH /api/v1/threads/{id}/model).
+func (h *ChatHandler) UpdateThreadModelPref(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok || userID == "" {
+		writeJSONError(w, http.StatusUnauthorized, "não autorizado")
+		return
+	}
+	if h.aiProviderSvc == nil {
+		writeJSONError(w, http.StatusServiceUnavailable, "serviço de provedores de IA não configurado")
+		return
+	}
+	threadID := strings.TrimSpace(chi.URLParam(r, "id"))
+	if threadID == "" {
+		writeJSONError(w, http.StatusBadRequest, "id da conversa obrigatório")
+		return
+	}
+	var body domain.ModelPreferenceUpdate
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeJSONError(w, http.StatusBadRequest, "payload JSON inválido")
+		return
+	}
+	if err := h.aiProviderSvc.UpdateThreadModelPref(r.Context(), userID, threadID, body.ModelPref, body.EffortPref); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			writeJSONError(w, http.StatusNotFound, "conversa não encontrada")
+			return
+		}
+		writeJSONError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, body)
 }

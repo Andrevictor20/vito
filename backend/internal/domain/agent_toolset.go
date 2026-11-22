@@ -114,6 +114,7 @@ type ConversationHistoryItem struct {
 type UnifiedAssistantRequest struct {
 	UserID           string                    `json:"user_id"`
 	ThreadID         string                    `json:"thread_id,omitempty"`
+	BotID            string                    `json:"bot_id,omitempty"`
 	Channel          string                    `json:"channel"` // "app_mobile", "app_desktop", "whatsapp", "voice"
 	Message          string                    `json:"message"`
 	Prompt           string                    `json:"prompt,omitempty"` // Alias compatível com clientes legados
@@ -144,6 +145,8 @@ type UnifiedAssistantResponse struct {
 	WhatsAppMessage       *ChatWhatsAppMessage `json:"whatsapp_message,omitempty"`
 	GmailMessage          *ChatGmailMessage    `json:"gmail_message,omitempty"`
 	SuggestedActions      []string             `json:"suggested_actions,omitempty"`
+	ModelUsed             string               `json:"model_used,omitempty"`
+	FallbackNotice        string               `json:"fallback_notice,omitempty"`
 	Telemetry             TurnTelemetry        `json:"telemetry"`
 }
 
@@ -154,9 +157,10 @@ type ExecutedTool struct {
 }
 
 type TurnTelemetry struct {
-	ProviderUsed string `json:"provider_used"`
-	ModelUsed    string `json:"model_used"`
-	TokensIn     int    `json:"tokens_in"`
-	TokensOut    int    `json:"tokens_out"`
-	LatencyMs    int64  `json:"latency_ms"`
+	ProviderUsed   string `json:"provider_used"`
+	ModelUsed      string `json:"model_used"`
+	FallbackNotice string `json:"fallback_notice,omitempty"`
+	TokensIn       int    `json:"tokens_in"`
+	TokensOut      int    `json:"tokens_out"`
+	LatencyMs      int64  `json:"latency_ms"`
 }

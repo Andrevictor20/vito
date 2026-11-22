@@ -31,6 +31,7 @@ type evalSignal struct {
 	met        bool
 	confidence int
 	urgent     bool
+	critical   bool
 }
 
 // parseEvalSignal interpreta o payload de avaliação.
@@ -41,11 +42,17 @@ func parseEvalSignal(payload string) evalSignal {
 		ConditionMet *bool  `json:"condition_met"`
 		Confidence   *int   `json:"confidence"`
 		Urgency      string `json:"urgency"`
+		Category     string `json:"category"`
 	}
 	if err := json.Unmarshal([]byte(payload), &raw); err != nil {
 		return sig
 	}
+	sig.critical = strings.EqualFold(strings.TrimSpace(raw.Category), "critical_alarm") ||
+		strings.EqualFold(strings.TrimSpace(raw.Urgency), "critical")
 	if raw.ConditionMet == nil && raw.Confidence == nil {
+		if sig.critical {
+			sig.urgent = true
+		}
 		return sig
 	}
 	sig.hasGate = true
@@ -55,7 +62,8 @@ func parseEvalSignal(payload string) evalSignal {
 	if raw.Confidence != nil {
 		sig.confidence = *raw.Confidence
 	}
-	sig.urgent = strings.EqualFold(strings.TrimSpace(raw.Urgency), "high") ||
+	sig.urgent = sig.critical ||
+		strings.EqualFold(strings.TrimSpace(raw.Urgency), "high") ||
 		strings.EqualFold(strings.TrimSpace(raw.Urgency), "breaking")
 	return sig
 }
@@ -156,14 +164,15 @@ func (e *AITriggerEvaluator) TestEvaluate(ctx context.Context, t *domain.Trigger
 
 // TriggerWorker orquestra a vigília contínua, cumprimento de horários e despacho de relatórios.
 type TriggerWorker struct {
-	triggerRepo   domain.TriggerRepository
-	notifSvc      PushDispatcher
-	evaluator     TriggerEvaluator
-	checkInterval time.Duration
-	stopCh        chan struct{}
-	wg            sync.WaitGroup
-	running       bool
-	mu            sync.Mutex
+	triggerRepo     domain.TriggerRepository
+	notifSvc        PushDispatcher
+	evaluator       TriggerEvaluator
+	attentionBudget *AttentionBudgetService
+	checkInterval   time.Duration
+	stopCh          chan struct{}
+	wg              sync.WaitGroup
+	running         bool
+	mu              sync.Mutex
 	// deltaFetcher retorna os hashes dos fatos atuais; nil desliga o delta gate.
 	// Na volta: (hashesNovos, todosHashes, erro).
 	deltaFetcher func(ctx context.Context, t *domain.Trigger) (fresh []string, all []string, err error)
@@ -314,19 +323,27 @@ func (w *TriggerWorker) checkPriceFastPath(ctx context.Context, now time.Time, t
 		log.Printf("[TriggerWorker] Erro ao gravar log de preço do disparador %s: %v", t.ID, err)
 	}
 	_ = w.triggerRepo.UpdateFingerprintsAndMetric(t.ID, t.SeenFingerprintsJSON, &current)
+	notified := true
 	if w.notifSvc != nil && t.UserID != "" {
-		pushData := map[string]interface{}{
-			"type":         "RADAR_TRIGGERED",
-			"triggerId":    t.ID,
-			"logId":        logEntry.ID,
-			"currentValue": summary,
-			"urgency":      "price_target",
+		pushTitle := fmt.Sprintf("Preço atingido: %s", t.Title)
+		if w.shouldDeliverTriggerPush(ctx, t, pushTitle, summary, "high", false, now) {
+			pushData := map[string]interface{}{
+				"type":         "RADAR_TRIGGERED",
+				"triggerId":    t.ID,
+				"logId":        logEntry.ID,
+				"currentValue": summary,
+				"urgency":      "price_target",
+			}
+			_, _ = w.notifSvc.SendPushToUser(t.UserID, pushTitle, summary, "urgent", pushData)
+			_ = w.triggerRepo.UpdateLastNotifiedAt(t.ID, now.UTC())
+		} else {
+			notified = false
 		}
-		_, _ = w.notifSvc.SendPushToUser(t.UserID, fmt.Sprintf("Preço atingido: %s", t.Title), summary, "urgent", pushData)
+	} else {
+		_ = w.triggerRepo.UpdateLastNotifiedAt(t.ID, now.UTC())
 	}
-	_ = w.triggerRepo.UpdateLastNotifiedAt(t.ID, now.UTC())
 	_ = w.triggerRepo.UpdateRunResult(t.ID, summary, t.Status, "success", now.UTC(), &nextCheck)
-	return true, true
+	return true, notified
 }
 
 // CheckAndEvaluateTriggers busca disparadores com horário de vigília vencido e gera relatórios.
@@ -407,18 +424,22 @@ func (w *TriggerWorker) CheckAndEvaluateTriggers(now time.Time) (int, error) {
 		// Urgência alta (Fase 2) usa o canal urgente com som.
 		if evalErr == nil && w.notifSvc != nil && t.UserID != "" {
 			pushTitle := fmt.Sprintf("Radar: %s", t.Title)
-			pushData := map[string]interface{}{
-				"type":         "RADAR_TRIGGERED",
-				"channelId":    "vito_radar",
-				"triggerId":    t.ID,
-				"logId":        logEntry.ID,
-				"currentValue": summary,
-			}
+			urgency := "normal"
 			priority := "default"
 			if sig.urgent {
+				urgency = "high"
 				priority = "urgent"
 			}
-			_, _ = w.notifSvc.SendPushToUser(t.UserID, pushTitle, summary, priority, pushData)
+			if w.shouldDeliverTriggerPush(context.Background(), &t, pushTitle, summary, urgency, sig.critical, now) {
+				pushData := map[string]interface{}{
+					"type":         "RADAR_TRIGGERED",
+					"channelId":    "vito_radar",
+					"triggerId":    t.ID,
+					"logId":        logEntry.ID,
+					"currentValue": summary,
+				}
+				_, _ = w.notifSvc.SendPushToUser(t.UserID, pushTitle, summary, priority, pushData)
+			}
 		}
 
 		// 3. Calcula o próximo horário com base no scheduled_time e fuso

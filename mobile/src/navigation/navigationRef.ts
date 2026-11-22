@@ -15,3 +15,11 @@ export function navigateToTab(tab: keyof MainTabParamList): void {
   }
 }
 
+export function navigateToAiProviders(): void {
+  if (navigationRef.isReady()) {
+    try {
+      navigationRef.navigate('aiProviders');
+    } catch {}
+  }
+}
+

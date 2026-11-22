@@ -2,11 +2,14 @@ import { Platform } from 'react-native';
 import { ApiClient } from './client';
 import { fileUriToBase64 } from './fileUtils';
 import { AssistantChatOptions } from './types';
+import { ChatStreamDelta, consumeSSEStream } from './chatStreamHelper';
 import {
   AssistantChatResponse,
   ConversationSession,
   ChatMessage,
 } from '../../types';
+
+export type { ChatStreamDelta };
 
 export class ChatApi {
   constructor(private client: ApiClient) {}
@@ -73,6 +76,54 @@ export class ChatApi {
         focus_mode: opts.focus_mode,
       }),
     });
+  }
+
+  async assistantChatStream(
+    prompt: string,
+    options?: string | AssistantChatOptions,
+    onDelta?: (delta: ChatStreamDelta) => void
+  ): Promise<AssistantChatResponse> {
+    const opts: AssistantChatOptions =
+      typeof options === 'string' ? { timezone: options } : options || {};
+    const tz = opts.timezone || this.getUserTimezone();
+    const currentLocalTime = this.getCurrentLocalTimeISO();
+
+    if (!this.client.getToken()) {
+      await this.client.init().catch(() => {});
+    }
+
+    const headers: Record<string, string> = { 'Content-Type': 'application/json', Accept: 'text/event-stream' };
+    const token = this.client.getToken();
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const bodyPayload = JSON.stringify({
+      thread_id: opts.thread_id, channel: opts.channel || 'app_mobile', prompt,
+      timezone: tz, current_local_time: currentLocalTime, history: opts.history, focus_mode: opts.focus_mode,
+    });
+
+    try {
+      const res = await fetch(`${this.client.getBaseUrl()}/api/v1/assistant/chat/stream`, {
+        method: 'POST',
+        headers,
+        body: bodyPayload,
+        signal: opts.signal,
+      });
+
+      if (!res.ok) {
+        return this.assistantChat(prompt, opts);
+      }
+
+      const streamResult = await consumeSSEStream(res, onDelta);
+      if (streamResult) {
+        return streamResult;
+      }
+    } catch (err: any) {
+      if (err?.name === 'AbortError' || opts.signal?.aborted) {
+        throw err;
+      }
+    }
+
+    return this.assistantChat(prompt, opts);
   }
 
   async assistantConfirm(pendingId: string): Promise<AssistantChatResponse> {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -13,6 +14,45 @@ import (
 
 // BreakingNewsCooldown define o intervalo mínimo entre alertas breaking consecutivos de um mesmo radar.
 const BreakingNewsCooldown = 30 * time.Minute
+
+// SetAttentionBudget injeta o controlador de orçamento de atenção para deduplicação cross-worker e silêncio por agenda.
+func (w *TriggerWorker) SetAttentionBudget(ab *AttentionBudgetService) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.attentionBudget = ab
+}
+
+func (w *TriggerWorker) getAttentionBudget() *AttentionBudgetService {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.attentionBudget
+}
+
+func (w *TriggerWorker) shouldDeliverTriggerPush(ctx context.Context, t *domain.Trigger, title, body, urgency string, isCritical bool, now time.Time) bool {
+	sourceWorker := "trigger_worker"
+	category := string(t.Category)
+	if t.Category == domain.CategoryFinance {
+		sourceWorker = "finance_trigger"
+		category = "financas"
+	}
+	if isCritical || strings.EqualFold(category, "critical_alarm") {
+		category = "critical_alarm"
+		urgency = "critical"
+	} else if category == "" {
+		category = "radar"
+	}
+	cand := AttentionCandidate{
+		UserID:       t.UserID,
+		SourceWorker: sourceWorker,
+		Category:     category,
+		Urgency:      urgency,
+		Title:        title,
+		Body:         body,
+		Now:          now,
+	}
+	allowed, _ := w.getAttentionBudget().ShouldDeliver(ctx, cand)
+	return allowed
+}
 
 // CheckBreakingTriggers vigia fatos urgentes/breaking fora do horário regular agendado (Ponto 5).
 // Avalia disparadores ativos cuja checagem diária ainda não venceu; se houver novos fatos com
@@ -77,6 +117,10 @@ func (w *TriggerWorker) CheckBreakingTriggers(now time.Time) (int, error) {
 
 			if w.notifSvc != nil && t.UserID != "" {
 				pushTitle := fmt.Sprintf("🚨 URGENTE: %s", t.Title)
+				if !w.shouldDeliverTriggerPush(context.Background(), &t, pushTitle, summary, "high", sig.critical, now) {
+					_ = w.triggerRepo.SetSeenHashes(t.ID, all)
+					continue
+				}
 				pushData := map[string]interface{}{
 					"type":         "RADAR_TRIGGERED",
 					"channelId":    "vito_radar",

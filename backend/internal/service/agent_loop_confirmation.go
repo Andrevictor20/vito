@@ -25,7 +25,7 @@ func (l *AgentLoop) tryHandlePendingConfirmation(
 
 	userMsg := strings.TrimSpace(req.Message)
 	isConfirm := req.ConfirmPendingID != "" || IsExplicitSendConfirmationText(userMsg)
-	isCancel := IsExplicitSendCancellationText(userMsg)
+	isCancel := req.RejectPendingID != "" || IsExplicitSendCancellationText(userMsg)
 
 	if !isConfirm && !isCancel {
 		return nil, false, nil
@@ -36,6 +36,8 @@ func (l *AgentLoop) tryHandlePendingConfirmation(
 
 	if req.ConfirmPendingID != "" {
 		pending, err = l.confirmationGate.GetByID(ctx, req.ConfirmPendingID, req.UserID)
+	} else if req.RejectPendingID != "" {
+		pending, err = l.confirmationGate.GetByID(ctx, req.RejectPendingID, req.UserID)
 	} else {
 		pending, err = l.confirmationGate.GetLatestPending(ctx, req.UserID, threadID)
 	}
@@ -47,7 +49,7 @@ func (l *AgentLoop) tryHandlePendingConfirmation(
 
 	// 1. Caso de Cancelamento
 	if isCancel {
-		_ = l.confirmationGate.Cancel(ctx, pending.ID, req.UserID)
+		_ = l.confirmationGate.CancelWithReason(ctx, pending.ID, req.UserID, userMsg)
 		cancelMsg := fmt.Sprintf("Ação de envio (%s) cancelada. Nada foi enviado.", pending.Operation)
 		resp := &domain.UnifiedAssistantResponse{
 			ThreadID: threadID,

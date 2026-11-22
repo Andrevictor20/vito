@@ -278,3 +278,44 @@ func TestConversationStoreRepo_CascadeDelete(t *testing.T) {
 		t.Errorf("turnos não foram removidos em cascata: restaram %d", len(turns))
 	}
 }
+
+func TestConversationStoreRepo_ModelPrefAndClearProvider(t *testing.T) {
+	repo, userID := setupConversationStoreTestDB(t)
+	ctx := context.Background()
+
+	thread := &repository.ConversationThread{
+		ID:         "thread-model-pref-1",
+		UserID:     userID,
+		Channel:    "app_mobile",
+		Title:      "Thread com Modelo",
+		ModelPref:  "openai:gpt-4o",
+		EffortPref: "med",
+	}
+	if err := repo.CreateThread(ctx, thread); err != nil {
+		t.Fatalf("CreateThread falhou: %v", err)
+	}
+
+	got, err := repo.GetThreadByID(ctx, thread.ID)
+	if err != nil {
+		t.Fatalf("GetThreadByID falhou: %v", err)
+	}
+	if got.ModelPref != "openai:gpt-4o" || got.EffortPref != "med" {
+		t.Fatalf("preferências iniciais incorretas: %+v", got)
+	}
+
+	if err := repo.UpdateThreadModelPref(ctx, userID, thread.ID, "anthropic:claude-sonnet-4", "high"); err != nil {
+		t.Fatalf("UpdateThreadModelPref falhou: %v", err)
+	}
+	updated, _ := repo.GetThreadByID(ctx, thread.ID)
+	if updated.ModelPref != "anthropic:claude-sonnet-4" || updated.EffortPref != "high" {
+		t.Fatalf("preferências atualizadas incorretas: %+v", updated)
+	}
+
+	if err := repo.ClearProviderPrefs(ctx, userID, "anthropic"); err != nil {
+		t.Fatalf("ClearProviderPrefs falhou: %v", err)
+	}
+	cleared, _ := repo.GetThreadByID(ctx, thread.ID)
+	if cleared.ModelPref != "" {
+		t.Fatalf("esperava model_pref vazio após ClearProviderPrefs, veio %q", cleared.ModelPref)
+	}
+}

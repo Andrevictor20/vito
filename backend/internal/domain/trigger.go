@@ -83,6 +83,8 @@ type Trigger struct {
 	DaysOfWeek           string               `json:"days_of_week,omitempty"`
 	LastRunStatus        string               `json:"last_run_status,omitempty"`
 	LastError            string               `json:"last_error,omitempty"`
+	ModelPref            string               `json:"model_pref,omitempty"`
+	EffortPref           string               `json:"effort_pref,omitempty"`
 	LastCheckedAt        *time.Time           `json:"last_checked_at,omitempty"`
 	NextCheckAt          *time.Time           `json:"next_check_at,omitempty"`
 	CreatedAt            time.Time            `json:"created_at"`

@@ -388,6 +388,15 @@ func runVersionedMigrations(db *sql.DB) error {
 			}
 			continue
 		}
+		if version == "037_user_ai_providers.sql" {
+			if err := applyUserAIProvidersMigration(db, name); err != nil {
+				return err
+			}
+			if err := recordMigration(db, version); err != nil {
+				return err
+			}
+			continue
+		}
 		content, err := migrationFS.ReadFile(name)
 		if err != nil {
 			return err
@@ -406,8 +415,50 @@ func runVersionedMigrations(db *sql.DB) error {
 	if _, err := db.Exec("CREATE INDEX IF NOT EXISTS idx_todos_user_category ON todos(user_id, category)"); err != nil {
 		return err
 	}
+	if hasTable(db, "ai_traces") && !hasColumn(db, "ai_traces", "agent_name") {
+		if _, err := db.Exec("ALTER TABLE ai_traces ADD COLUMN agent_name TEXT NOT NULL DEFAULT ''"); err != nil {
+			return err
+		}
+	}
 	if err := MigratePendingItemsToTodos(db); err != nil {
 		return err
+	}
+	return nil
+}
+
+// applyUserAIProvidersMigration cria user_ai_providers e adiciona colunas idempotentes de modelo/esforço.
+func applyUserAIProvidersMigration(db *sql.DB, scriptPath string) error {
+	content, err := migrationFS.ReadFile(scriptPath)
+	if err != nil {
+		return err
+	}
+	if _, err := db.Exec(string(content)); err != nil {
+		return err
+	}
+
+	alterRules := []struct {
+		table  string
+		column string
+		ddl    string
+	}{
+		{"user_ai_settings", "default_model", "ALTER TABLE user_ai_settings ADD COLUMN default_model TEXT NOT NULL DEFAULT ''"},
+		{"user_ai_settings", "default_effort", "ALTER TABLE user_ai_settings ADD COLUMN default_effort TEXT NOT NULL DEFAULT 'auto'"},
+		{"conversation_threads", "model_pref", "ALTER TABLE conversation_threads ADD COLUMN model_pref TEXT NOT NULL DEFAULT ''"},
+		{"conversation_threads", "effort_pref", "ALTER TABLE conversation_threads ADD COLUMN effort_pref TEXT NOT NULL DEFAULT ''"},
+		{"ai_traces", "credential_source", "ALTER TABLE ai_traces ADD COLUMN credential_source TEXT NOT NULL DEFAULT ''"},
+		{"ai_traces", "provider_key", "ALTER TABLE ai_traces ADD COLUMN provider_key TEXT NOT NULL DEFAULT ''"},
+		{"ai_traces", "effort", "ALTER TABLE ai_traces ADD COLUMN effort TEXT NOT NULL DEFAULT ''"},
+		{"triggers", "model_pref", "ALTER TABLE triggers ADD COLUMN model_pref TEXT NOT NULL DEFAULT ''"},
+		{"triggers", "effort_pref", "ALTER TABLE triggers ADD COLUMN effort_pref TEXT NOT NULL DEFAULT ''"},
+	}
+
+	for _, rule := range alterRules {
+		if !hasTable(db, rule.table) || hasColumn(db, rule.table, rule.column) {
+			continue
+		}
+		if _, err := db.Exec(rule.ddl); err != nil {
+			return err
+		}
 	}
 	return nil
 }

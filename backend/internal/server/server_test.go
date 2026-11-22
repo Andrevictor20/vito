@@ -2,13 +2,17 @@ package server_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
 
+	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/handler"
@@ -223,5 +227,78 @@ func TestFinanceRouting_ByokBackupAndLegacyRemoved(t *testing.T) {
 	delResp.Body.Close()
 	if delResp.StatusCode != http.StatusNoContent {
 		t.Fatalf("esperava 204 no DELETE byok-backup, obteve %d", delResp.StatusCode)
+	}
+}
+
+type routeStreamEngine struct{}
+
+func (e *routeStreamEngine) Run(ctx context.Context, req domain.UnifiedAssistantRequest) (*domain.UnifiedAssistantResponse, error) {
+	return &domain.UnifiedAssistantResponse{Text: "Stream OK", Reply: "Stream OK", Message: "Stream OK"}, nil
+}
+
+func (e *routeStreamEngine) RunStream(ctx context.Context, req domain.UnifiedAssistantRequest, onDelta func(ai.StreamDelta) error) (*domain.UnifiedAssistantResponse, error) {
+	if onDelta != nil {
+		_ = onDelta(ai.StreamDelta{Type: "text", TextDelta: "Stream OK"})
+	}
+	return e.Run(ctx, req)
+}
+
+func TestAssistantChatStream_RouteAlias(t *testing.T) {
+	db, err := database.Open(filepath.Join(t.TempDir(), "test_stream_alias.db"))
+	if err != nil {
+		t.Fatalf("failed to open database: %v", err)
+	}
+	defer db.Close()
+
+	userRepo := repository.NewUserRepository(db)
+	authSvc := service.NewAuthService(userRepo, "test-secret")
+	authHandler := handler.NewAuthHandler(authSvc, userRepo)
+	loop := service.NewAgentLoop(nil, nil, nil, nil, nil, nil)
+	loop.SetEngine(&routeStreamEngine{})
+	streamHandler := handler.NewAssistantStreamHandler(loop)
+
+	srv := server.New(server.Config{
+		AuthSvc:          authSvc,
+		AuthHandler:      authHandler,
+		AstStreamHandler: streamHandler,
+	})
+	ts := httptest.NewServer(srv.Router())
+	defer ts.Close()
+
+	regBody, _ := json.Marshal(map[string]string{
+		"name":     "SSE User",
+		"email":    "sse-alias@vito.test",
+		"password": "senhaSegura123",
+	})
+	regRes, err := http.Post(ts.URL+"/api/v1/auth/register", "application/json", bytes.NewReader(regBody))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer regRes.Body.Close()
+	var regOut struct {
+		Token string `json:"token"`
+	}
+	_ = json.NewDecoder(regRes.Body).Decode(&regOut)
+
+	for _, path := range []string{"/api/v1/assistant/stream", "/api/v1/assistant/chat/stream"} {
+		payload, _ := json.Marshal(domain.UnifiedAssistantRequest{Message: "oi", Channel: "app_mobile"})
+		req, _ := http.NewRequest(http.MethodPost, ts.URL+path, bytes.NewReader(payload))
+		req.Header.Set("Authorization", "Bearer "+regOut.Token)
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("POST %s falhou: %v", path, err)
+		}
+		raw, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("POST %s esperava 200, obteve %d (%s)", path, resp.StatusCode, string(raw))
+		}
+		if ct := resp.Header.Get("Content-Type"); !strings.Contains(ct, "text/event-stream") {
+			t.Errorf("POST %s esperava text/event-stream, obteve %q", path, ct)
+		}
+		if !strings.Contains(string(raw), `"text_delta":"Stream OK"`) || !strings.Contains(string(raw), "event: done") {
+			t.Errorf("POST %s payload SSE inesperado: %s", path, string(raw))
+		}
 	}
 }
