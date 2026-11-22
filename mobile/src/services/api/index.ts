@@ -18,6 +18,8 @@ import { WhatsAppAuthApi, RequestWhatsAppOTPResponse, VerifyWhatsAppOTPResponse 
 import { FinanceApi } from './financeApi';
 import { AiProvidersApi } from './aiProvidersApi';
 import { BotsApi } from './botsApi';
+import { InboxNotificationsApi } from './inboxNotificationsApi';
+import { StoreComplianceApi } from './storeComplianceApi';
 import type {
   ActionPolicy,
   Bot,
@@ -67,6 +69,8 @@ export class ApiService extends ApiClient {
   private financeApi = new FinanceApi(this);
   private aiProvidersApi = new AiProvidersApi(this);
   private botsApi = new BotsApi(this);
+  private inboxNotificationsApi = new InboxNotificationsApi(this);
+  private storeComplianceApi = new StoreComplianceApi(this);
 
   // Bots
   listBots(): Promise<Bot[]> { return this.botsApi.listBots(); }
@@ -475,6 +479,12 @@ export class ApiService extends ApiClient {
   }
   get aiProviders(): AiProvidersApi {
     return this.aiProvidersApi;
+  }
+  get inbox(): InboxNotificationsApi {
+    return this.inboxNotificationsApi;
+  }
+  get store(): StoreComplianceApi {
+    return this.storeComplianceApi;
   }
   getFinancialSummary(): Promise<FinancialSummary> {
     return this.financeApi.getSummary();

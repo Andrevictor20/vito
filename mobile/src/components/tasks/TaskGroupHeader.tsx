@@ -1,31 +1,46 @@
 import React from 'react';
-import { StyleSheet, View, Text } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { tokens } from '../../theme/tokens';
+import { hapticFeedback } from '../../theme/motion';
 import type { TaskBucket } from '../../utils/taskBuckets';
 
 interface TaskGroupHeaderProps {
   bucket: TaskBucket;
   title: string;
   count: number;
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
 /**
- * Cabeçalho de grupo por prazo (.gh) fiel a vito-telas.html.
- * - Tipografia: Montserrat 800 (15px, letterSpacing -0.01em)
- * - Se 'atr': cor colors.red e badge em colors.redBg + colors.red
- * - Badge .cnt: 12px, font-weight 600, padding 4px 10px, borderRadius 12px
+ * Cabeçalho de grupo colapsável por prazo (.gh) fiel a vito-telas.html.
  */
 export const TaskGroupHeader: React.FC<TaskGroupHeaderProps> = ({
   bucket,
   title,
   count,
+  collapsed = false,
+  onToggleCollapse,
 }) => {
   const { colors } = useTheme();
   const isRed = bucket === 'atr';
 
   return (
-    <View style={styles.container}>
+    <TouchableOpacity
+      style={styles.container}
+      onPress={() => {
+        if (!onToggleCollapse) return;
+        hapticFeedback.selection();
+        onToggleCollapse();
+      }}
+      activeOpacity={onToggleCollapse ? 0.7 : 1}
+      disabled={!onToggleCollapse}
+      accessibilityRole={onToggleCollapse ? 'button' : 'header'}
+      accessibilityState={onToggleCollapse ? { expanded: !collapsed } : undefined}
+      accessibilityLabel={`${title}, ${count} tarefas`}
+    >
       <Text
         style={[
           styles.title,
@@ -58,7 +73,17 @@ export const TaskGroupHeader: React.FC<TaskGroupHeaderProps> = ({
           {count}
         </Text>
       </View>
-    </View>
+
+      <View style={styles.spacer} />
+
+      {onToggleCollapse && (
+        <MaterialIcons
+          name={collapsed ? 'keyboard-arrow-right' : 'keyboard-arrow-down'}
+          size={20}
+          color={colors.muted}
+        />
+      )}
+    </TouchableOpacity>
   );
 };
 
@@ -67,9 +92,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginTop: 20,
+    marginTop: 18,
     marginBottom: 6,
     paddingHorizontal: 20,
+    minHeight: 36,
   },
   title: {
     fontSize: 15,
@@ -87,5 +113,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     lineHeight: 15,
+    fontVariant: ['tabular-nums'],
   },
+  spacer: { flex: 1 },
 });

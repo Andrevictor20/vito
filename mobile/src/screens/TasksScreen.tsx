@@ -1,39 +1,41 @@
-import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
-  StyleSheet,
-  View,
-  Text,
-  ScrollView,
-  RefreshControl,
   ActivityIndicator,
-  TextInput,
-  TouchableOpacity,
   LayoutAnimation,
   Platform,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
   UIManager,
+  View,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { tokens } from '../theme/tokens';
 import { useTheme } from '../context/ThemeContext';
 import { hapticFeedback } from '../theme/motion';
-import type { Todo, PendingItem } from '../types';
+import type { Todo } from '../types';
 import { TaskRow } from '../components/tasks/TaskRow';
 import { TaskFilterChips } from '../components/tasks/TaskFilterChips';
-import { VitoSuggestionCard } from '../components/tasks/VitoSuggestionCard';
+import { TaskListChips } from '../components/tasks/TaskListChips';
+import { DailyTasksSummaryCard } from '../components/tasks/DailyTasksSummaryCard';
+import { TaskQuickAddSheet } from '../components/tasks/TaskQuickAddSheet';
+import { TaskDetailSheet } from '../components/tasks/TaskDetailSheet';
 import { TaskGroupHeader } from '../components/tasks/TaskGroupHeader';
 import { CompletedAccordion } from '../components/tasks/CompletedAccordion';
-import { TaskFilterModal, PriorityFilter } from '../components/tasks/TaskFilterModal';
-import { SmartActionSheetModal } from '../components/ui/SmartActionSheetModal';
-import { buildTaskSmartActions } from '../utils/smartActionBuilders';
+import { VitoMascot } from '../components/common/VitoMascot';
 import { usePendingItems } from '../hooks/usePendingItems';
 import { toUnifiedRows, sortUnifiedRows, TaskSort, UnifiedRow } from '../utils/unifiedTasks';
-import { chatPromptBus } from '../services/dataSync';
+import { DEFAULT_TASK_LISTS, formatIsoDate, TaskListDef } from '../utils/taskQuickAddParser';
 import {
+  TaskBucket,
   TaskFilterType,
   computeChipCounts,
-  groupTasksByBucket,
   getRowDateStr,
   getTaskBucket,
+  groupTasksByBucket,
 } from '../utils/taskBuckets';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -61,16 +63,19 @@ export interface TasksScreenProps {
     remind_at?: string;
     remind_repeat?: string;
     remind_advance_minutes?: number;
-  }) => Promise<any>;
-  onUpdateTodoFull: (id: string, input: {
-    title?: string;
-    priority?: string;
-    category?: string;
-    due_date?: string;
-    remind_at?: string;
-    remind_repeat?: string;
-    remind_advance_minutes?: number;
-  }) => Promise<any>;
+  }) => Promise<unknown>;
+  onUpdateTodoFull: (
+    id: string,
+    input: {
+      title?: string;
+      priority?: string;
+      category?: string;
+      due_date?: string;
+      remind_at?: string;
+      remind_repeat?: string;
+      remind_advance_minutes?: number;
+    }
+  ) => Promise<unknown>;
   onOpenEventCreate?: (title: string, date?: string) => void;
   createRequestId?: number;
   searchQuery?: string;
@@ -93,139 +98,146 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
   onSaveTodoFull,
   onUpdateTodoFull,
   onOpenEventCreate,
-  createRequestId,
   searchQuery: externalSearchQuery,
   onSearchChange: externalOnSearchChange,
   searchOpen: externalSearchOpen,
 }) => {
-  const { colors, isDark } = useTheme();
-
+  const { colors } = useTheme();
   const [activeFilter, setActiveFilter] = useState<TaskFilterType>('all');
-  const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all');
-  const [sort, setSort] = useState<TaskSort>('date');
+  const [selectedListId, setSelectedListId] = useState<string>('all');
+  const [lists, setLists] = useState<TaskListDef[]>(DEFAULT_TASK_LISTS);
+  const [collapsedBuckets, setCollapsedBuckets] = useState<Record<string, boolean>>({});
+  const [sort] = useState<TaskSort>('date');
   const [internalQuery, setInternalQuery] = useState('');
-  const [internalSearchOpen, setInternalSearchOpen] = useState(false);
-  const [filterModalVisible, setFilterModalVisible] = useState(false);
-  const [actionRow, setActionRow] = useState<UnifiedRow | null>(null);
-  const [vitoDismissed, setVitoDismissed] = useState(false);
-  const [rescheduling, setRescheduling] = useState(false);
+  const [detailRow, setDetailRow] = useState<UnifiedRow | null>(null);
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [undoToast, setUndoToast] = useState<{ msg: string; onUndo?: () => void } | null>(null);
 
   const pending = usePendingItems(onOpenEventCreate);
+  const query = (externalSearchQuery !== undefined ? externalSearchQuery : internalQuery)
+    .trim()
+    .toLowerCase();
+  const isSearchOpen = externalSearchOpen !== undefined ? externalSearchOpen : false;
 
-  const query = (externalSearchQuery !== undefined ? externalSearchQuery : internalQuery).trim().toLowerCase();
-  const isSearchOpen = externalSearchOpen !== undefined ? externalSearchOpen : internalSearchOpen;
+  const showUndoToast = useCallback((msg: string, onUndo?: () => void) => {
+    setUndoToast({ msg, onUndo });
+    setTimeout(() => {
+      setUndoToast((cur) => (cur?.msg === msg ? null : cur));
+    }, 3500);
+  }, []);
+
+  const now = Date.now();
+  const rawRows = useMemo(
+    () => toUnifiedRows([...pendingTodos, ...completedTodosList], pending.items, now),
+    [pendingTodos, completedTodosList, pending.items, now]
+  );
+
+  const resolveListId = useCallback(
+    (row: UnifiedRow): string => {
+      const cat = (row.sourceTodo?.category || '').toLowerCase();
+      const match = lists.find((l) => l.id === cat || l.name.toLowerCase() === cat);
+      return match ? match.id : lists[0].id;
+    },
+    [lists]
+  );
+
+  const activeRows = useMemo(() => {
+    const base = rawRows.filter((r) => !r.done);
+    return sort !== 'date' ? sortUnifiedRows(base, sort) : base;
+  }, [rawRows, sort]);
+
+  const listFilteredRows = useMemo(
+    () =>
+      selectedListId === 'all'
+        ? activeRows
+        : activeRows.filter((r) => resolveListId(r) === selectedListId),
+    [activeRows, selectedListId, resolveListId]
+  );
+
+  const countsByList = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const r of activeRows) {
+      const id = resolveListId(r);
+      map[id] = (map[id] || 0) + 1;
+    }
+    return map;
+  }, [activeRows, resolveListId]);
+
+  const doneRows = useMemo(() => rawRows.filter((r) => r.done), [rawRows]);
+  const chipCounts = useMemo(() => computeChipCounts(listFilteredRows, now), [listFilteredRows, now]);
+  const taskGroups = useMemo(
+    () => groupTasksByBucket(listFilteredRows, activeFilter, query, now),
+    [listFilteredRows, activeFilter, query, now]
+  );
+
+  const todayCount = useMemo(
+    () => activeRows.filter((r) => getTaskBucket(getRowDateStr(r), now) === 'hoje').length,
+    [activeRows, now]
+  );
+  const overdueCount = useMemo(
+    () => activeRows.filter((r) => getTaskBucket(getRowDateStr(r), now) === 'atr').length,
+    [activeRows, now]
+  );
+
+  const handleToggleRow = useCallback(
+    (row: UnifiedRow) => {
+      if (row.kind === 'todo' && row.sourceTodo) {
+        const todoId = row.sourceTodo.id;
+        const wasDone = row.done;
+        onToggleTodo(todoId);
+        if (!wasDone) showUndoToast('Tarefa concluída', () => onToggleTodo(todoId));
+      } else if (row.sourcePending) {
+        pending.toggleComplete(row.sourcePending);
+      }
+    },
+    [onToggleTodo, pending, showUndoToast]
+  );
+
+  const handlePostponeTomorrow = useCallback(
+    async (row: UnifiedRow) => {
+      const tm = new Date();
+      tm.setDate(tm.getDate() + 1);
+      const tomorrowIso = formatIsoDate(tm);
+      const prevDate = row.sourceTodo?.due_date || row.sourcePending?.scheduled_date || '';
+      if (row.kind === 'todo' && row.sourceTodo) {
+        const todoId = row.sourceTodo.id;
+        await onUpdateTodoFull(todoId, { due_date: tomorrowIso });
+        showUndoToast('Adiada para amanhã', () => {
+          onUpdateTodoFull(todoId, { due_date: prevDate });
+        });
+      } else if (row.sourcePending) {
+        await pending.schedule(row.sourcePending, tomorrowIso);
+        showUndoToast('Adiada para amanhã');
+      }
+    },
+    [onUpdateTodoFull, pending, showUndoToast]
+  );
+
+  const handleDeleteRow = useCallback(
+    (row: UnifiedRow) => {
+      if (row.kind === 'todo' && row.sourceTodo) onDeleteTodo(row.sourceTodo.id);
+      if (row.sourcePending) pending.remove(row.sourcePending.id);
+    },
+    [onDeleteTodo, pending]
+  );
+
+  const toggleGroupCollapse = (bucket: TaskBucket) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setCollapsedBuckets((prev) => ({ ...prev, [bucket]: !prev[bucket] }));
+  };
 
   const handleQueryChange = (text: string) => {
     if (externalOnSearchChange) externalOnSearchChange(text);
     else setInternalQuery(text);
   };
 
-  const now = Date.now();
-  const rawRows = useMemo(
-    () => toUnifiedRows([...pendingTodos, ...completedTodosList], pending.items, now),
-    [pendingTodos, completedTodosList, pending.items, now],
-  );
-
-  const activeRows = useMemo(() => {
-    let list = rawRows.filter((r) => !r.done);
-    if (priorityFilter !== 'all') {
-      list = list.filter((r) => r.priority === priorityFilter);
-    }
-    if (sort !== 'date') {
-      list = sortUnifiedRows(list, sort);
-    }
-    return list;
-  }, [rawRows, priorityFilter, sort]);
-
-  const doneRows = useMemo(() => rawRows.filter((r) => r.done), [rawRows]);
-
-  const chipCounts = useMemo(() => computeChipCounts(rawRows, now), [rawRows, now]);
-
-  const taskGroups = useMemo(
-    () => groupTasksByBucket(activeRows, activeFilter, query, now),
-    [activeRows, activeFilter, query, now],
-  );
-
-  const overdueRows = useMemo(
-    () => activeRows.filter((r) => getTaskBucket(getRowDateStr(r), now) === 'atr'),
-    [activeRows, now],
-  );
-
-  const showVitoSuggestion =
-    !vitoDismissed &&
-    overdueRows.length > 0 &&
-    activeFilter === 'all' &&
-    !query;
-
-  // Reagendar todas as tarefas atrasadas para a data de hoje
-  const handleRescheduleAllOverdue = useCallback(async () => {
-    setRescheduling(true);
-    try {
-      const todayISO = new Date().toISOString().split('T')[0];
-      const updates = overdueRows.map(async (row) => {
-        if (row.kind === 'todo' && row.sourceTodo) {
-          return onUpdateTodoFull(row.sourceTodo.id, { due_date: todayISO });
-        }
-        if (row.sourcePending) {
-          return pending.schedule(row.sourcePending, todayISO);
-        }
-      });
-      await Promise.all(updates);
-      setVitoDismissed(true);
-      hapticFeedback.success();
-    } catch (err) {
-      console.warn('[TasksScreen] Falha ao reagendar atrasadas:', err);
-    } finally {
-      setRescheduling(false);
-    }
-  }, [overdueRows, onUpdateTodoFull, pending]);
-
-  // Ação contextual da tarefa via Vito Action Sheet inteligente
-  const handleOpenEdit = useCallback((row: UnifiedRow) => {
-    setActionRow(row);
-  }, []);
-
-  const handleToggleRow = useCallback((row: UnifiedRow) => {
-    if (row.kind === 'todo' && row.sourceTodo) {
-      onToggleTodo(row.sourceTodo.id);
-    } else if (row.sourcePending) {
-      pending.toggleComplete(row.sourcePending);
-    }
-  }, [onToggleTodo, pending]);
-
-  const handleDeleteRow = useCallback(
-    (row: UnifiedRow) => {
-      const normTitle = row.title.trim().toLowerCase();
-      if (row.kind === 'todo' && row.sourceTodo) {
-        onDeleteTodo(row.sourceTodo.id);
-      }
-      if (row.sourcePending) {
-        pending.remove(row.sourcePending.id);
-      }
-      // Purgar duplicatas cruzadas (pendência espelho ou todo homônimo)
-      if (normTitle) {
-        const dupPending = pending.items.find(
-          (p) => p.title.trim().toLowerCase() === normTitle && p.id !== row.sourcePending?.id
-        );
-        if (dupPending) {
-          pending.remove(dupPending.id);
-        }
-        const dupTodo = todos.find(
-          (t) => t.title.trim().toLowerCase() === normTitle && t.id !== row.sourceTodo?.id
-        );
-        if (dupTodo) {
-          onDeleteTodo(dupTodo.id);
-        }
-      }
-    },
-    [onDeleteTodo, pending, todos]
-  );
-
   const initialLoading = loading && todos.length === 0 && pending.loading && pending.items.length === 0;
+  const activeDetailRow = detailRow
+    ? rawRows.find((r) => r.id === detailRow.id && r.kind === detailRow.kind) || detailRow
+    : null;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
-      {/* Barra de busca retrátil se não fornecida externamente */}
       {isSearchOpen && externalSearchOpen === undefined && (
         <View style={styles.searchSection}>
           <View style={[styles.searchBar, { backgroundColor: colors.surf, borderColor: colors.line }]}>
@@ -236,28 +248,23 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
               onChangeText={handleQueryChange}
               placeholder="Pesquisar tarefas..."
               placeholderTextColor={colors.muted}
-              returnKeyType="search"
-              accessibilityLabel="Pesquisar tarefas"
-              autoFocus
             />
-            {internalQuery.length > 0 && (
-              <TouchableOpacity
-                onPress={() => handleQueryChange('')}
-                hitSlop={tokens.hitSlop.sm}
-                accessibilityLabel="Limpar busca"
-              >
-                <MaterialIcons name="close" size={18} color={colors.muted} />
-              </TouchableOpacity>
-            )}
           </View>
         </View>
       )}
 
-      {/* Faixa de chips horizontais (.chips) */}
       <TaskFilterChips
         selectedFilter={activeFilter}
         onSelectFilter={setActiveFilter}
         counts={chipCounts}
+      />
+
+      <TaskListChips
+        lists={lists}
+        selectedListId={selectedListId}
+        onSelectList={setSelectedListId}
+        countsByList={countsByList}
+        onCreateList={(newList) => setLists((prev) => [...prev, newList])}
       />
 
       <ScrollView
@@ -275,145 +282,144 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
           />
         }
       >
-        {/* Card de sugestão inteligente do Vito (.vsug) */}
-        {showVitoSuggestion && (
-          <VitoSuggestionCard
-            overdueCount={overdueRows.length}
-            onReschedule={handleRescheduleAllOverdue}
-            onDismiss={() => setVitoDismissed(true)}
-            loading={rescheduling}
+        {!query && (
+          <DailyTasksSummaryCard
+            completedTodayCount={completedTodosList.length}
+            pendingTodayCount={todayCount}
+            overdueCount={overdueCount}
           />
         )}
 
-        {/* Indicador de carregamento */}
         {initialLoading ? (
           <ActivityIndicator color={colors.ink} style={{ marginVertical: 32 }} />
         ) : taskGroups.length === 0 ? (
           <View style={styles.emptyContainer}>
+            <VitoMascot size={72} state="success" animated />
+            <Text style={[styles.emptyTitle, { color: colors.ink }]}>
+              {activeFilter === 'hoje' ? 'Nada para hoje' : 'Tudo em dia!'}
+            </Text>
             <Text style={[styles.emptyText, { color: colors.muted }]}>
-              {query ? 'Nenhuma tarefa encontrada para esta busca.' : 'Nenhuma tarefa aqui.'}
+              {query
+                ? 'Nenhuma tarefa corresponde à busca.'
+                : 'Aproveite o tempo livre ou planeje o que vem a seguir.'}
             </Text>
           </View>
         ) : (
-          /* Grupos por prazo (.grp) */
-          taskGroups.map((group) => (
-            <View key={`group-${group.bucket}`} style={styles.groupBlock}>
-              <TaskGroupHeader
-                bucket={group.bucket}
-                title={group.label}
-                count={group.rows.length}
-              />
-              <View style={styles.groupList}>
-                {group.rows.map((row, idx) => (
-                  <TaskRow
-                    key={`task-${row.kind}-${row.id}`}
-                    row={row}
-                    isFirst={idx === 0}
-                    onToggle={() => handleToggleRow(row)}
-                    onDelete={() => handleDeleteRow(row)}
-                    onEdit={() => handleOpenEdit(row)}
-                    onAiAction={() => handleOpenEdit(row)}
-                    subtasks={row.sourceTodo?.subtasks}
-                    onToggleSubtask={(sid) => row.sourceTodo && onToggleSubtask(row.sourceTodo.id, sid)}
-                    onAddSubtask={(title) => row.sourceTodo && onAddSubtask(row.sourceTodo.id, title)}
-                    onDeleteSubtask={(sid) => row.sourceTodo && onDeleteSubtask(row.sourceTodo.id, sid)}
-                    onSchedule={(dateStr) => row.sourcePending && pending.schedule(row.sourcePending, dateStr)}
-                  />
-                ))}
+          taskGroups.map((group) => {
+            const isCollapsed = !!collapsedBuckets[group.bucket];
+            return (
+              <View key={`group-${group.bucket}`} style={styles.groupBlock}>
+                <TaskGroupHeader
+                  bucket={group.bucket}
+                  title={group.label}
+                  count={group.rows.length}
+                  collapsed={isCollapsed}
+                  onToggleCollapse={() => toggleGroupCollapse(group.bucket)}
+                />
+                {!isCollapsed && (
+                  <View style={styles.groupList}>
+                    {group.rows.map((row, idx) => {
+                      const rowList = lists.find((l) => l.id === resolveListId(row));
+                      return (
+                        <TaskRow
+                          key={`task-${row.kind}-${row.id}`}
+                          row={row}
+                          listDef={rowList}
+                          hideList={selectedListId !== 'all'}
+                          isFirst={idx === 0}
+                          onToggle={() => handleToggleRow(row)}
+                          onPostpone={() => handlePostponeTomorrow(row)}
+                          onDelete={() => handleDeleteRow(row)}
+                          onEdit={() => setDetailRow(row)}
+                          onAiAction={() => setDetailRow(row)}
+                          subtasks={row.sourceTodo?.subtasks}
+                          onToggleSubtask={(sid) => row.sourceTodo && onToggleSubtask(row.sourceTodo.id, sid)}
+                          onAddSubtask={(title) => row.sourceTodo && onAddSubtask(row.sourceTodo.id, title)}
+                          onDeleteSubtask={(sid) => row.sourceTodo && onDeleteSubtask(row.sourceTodo.id, sid)}
+                          onSchedule={(dateStr) => row.sourcePending && pending.schedule(row.sourcePending, dateStr)}
+                        />
+                      );
+                    })}
+                  </View>
+                )}
               </View>
-            </View>
-          ))
+            );
+          })
         )}
 
-        {/* Acordeão de tarefas concluídas (.dn e .dl) */}
         <CompletedAccordion
           completedRows={doneRows}
           onToggleRow={handleToggleRow}
-          onEditRow={handleOpenEdit}
+          onEditRow={setDetailRow}
           onDeleteRow={handleDeleteRow}
         />
       </ScrollView>
 
-      {/* Modal de filtros adicionais (Prioridade e Ordenação) */}
-      <TaskFilterModal
-        visible={filterModalVisible}
-        onClose={() => setFilterModalVisible(false)}
-        priorityFilter={priorityFilter}
-        onSelectPriority={setPriorityFilter}
-        sort={sort}
-        onSelectSort={setSort}
-        onReset={() => {
-          setPriorityFilter('all');
-          setSort('date');
-          setActiveFilter('all');
-          handleQueryChange('');
+      {/* FAB Quick Add (#tk-fab) */}
+      <TouchableOpacity
+        style={[styles.fab, { backgroundColor: colors.ink }]}
+        onPress={() => {
+          hapticFeedback.medium();
+          setQuickAddOpen(true);
         }}
-        activeCount={activeRows.length}
+        activeOpacity={0.85}
+        accessibilityRole="button"
+        accessibilityLabel="Adicionar tarefa rapidamente"
+      >
+        <MaterialIcons name="add" size={26} color={colors.bg} />
+      </TouchableOpacity>
+
+      {undoToast && (
+        <View style={[styles.toast, { backgroundColor: colors.ink }]}>
+          <Text style={[styles.toastText, { color: colors.bg }]}>{undoToast.msg}</Text>
+          {undoToast.onUndo && (
+            <TouchableOpacity
+              onPress={() => {
+                undoToast.onUndo?.();
+                setUndoToast(null);
+              }}
+            >
+              <Text style={[styles.toastUndo, { color: colors.acc }]}>Desfazer</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+
+      <TaskQuickAddSheet
+        visible={quickAddOpen}
+        onClose={() => setQuickAddOpen(false)}
+        lists={lists}
+        defaultListId={selectedListId}
+        onAddTask={async (payload) => {
+          await onSaveTodoFull(payload);
+        }}
       />
 
-      {/* Modal de Ações Contextuais Inteligentes da Tarefa (Padrão Vito) */}
-      <SmartActionSheetModal
-        visible={!!actionRow}
-        onClose={() => setActionRow(null)}
-        tag={actionRow?.kind === 'todo' ? 'TAREFA' : 'PENDÊNCIA'}
-        title={
-          actionRow?.kind === 'todo' && actionRow.sourceTodo
-            ? actionRow.sourceTodo.title
-            : actionRow?.sourcePending?.title || 'Tarefa'
-        }
-        subtitle={
-          actionRow?.done
-            ? 'Concluída'
-            : actionRow?.overdue
-            ? 'Prazo vencido'
-            : 'Em aberto'
-        }
-        actions={
-          actionRow
-            ? buildTaskSmartActions(
-                {
-                  id: actionRow.id,
-                  title:
-                    actionRow.kind === 'todo' && actionRow.sourceTodo
-                      ? actionRow.sourceTodo.title
-                      : actionRow.sourcePending?.title || 'Tarefa',
-                  isCompleted: !!actionRow.done,
-                  isOverdue: !!actionRow.overdue,
-                  kind: actionRow.kind,
-                },
-                {
-                  onToggleComplete: () => {
-                    handleToggleRow(actionRow);
-                  },
-                  onAskVitoReschedule: (prompt) => chatPromptBus.askAssistant(prompt),
-                  onAskVitoBreakdown: (prompt) => chatPromptBus.notify(prompt),
-                  onDelete: () => {
-                    handleDeleteRow(actionRow);
-                  },
-                }
-              )
-            : []
-        }
+      <TaskDetailSheet
+        visible={!!activeDetailRow}
+        row={activeDetailRow}
+        lists={lists}
+        onClose={() => setDetailRow(null)}
+        onUpdateTodo={async (id, data) => {
+          await onUpdateTodoFull(id, data);
+        }}
+        onToggleTodo={() => activeDetailRow && handleToggleRow(activeDetailRow)}
+        onToggleSubtask={(sid) => activeDetailRow?.sourceTodo && onToggleSubtask(activeDetailRow.sourceTodo.id, sid)}
+        onAddSubtask={async (title) => {
+          if (activeDetailRow?.sourceTodo) await onAddSubtask(activeDetailRow.sourceTodo.id, title);
+        }}
+        onDeleteSubtask={(sid) => activeDetailRow?.sourceTodo && onDeleteSubtask(activeDetailRow.sourceTodo.id, sid)}
+        onDeleteTask={() => activeDetailRow && handleDeleteRow(activeDetailRow)}
       />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  scroll: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 140,
-  },
-  searchSection: {
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 4,
-  },
+  container: { flex: 1 },
+  scroll: { flex: 1 },
+  scrollContent: { paddingBottom: 150 },
+  searchSection: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4 },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -423,27 +429,39 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     gap: 10,
   },
-  searchInput: {
-    flex: 1,
-    fontSize: 15,
-    fontFamily: tokens.typography.family.regular,
-    paddingVertical: 8,
-  },
-  groupBlock: {
-    marginTop: 6,
-  },
-  groupList: {
-    marginTop: 4,
-  },
-  emptyContainer: {
+  searchInput: { flex: 1, fontSize: 15, paddingVertical: 8 },
+  groupBlock: { marginTop: 4 },
+  groupList: { marginTop: 2 },
+  emptyContainer: { alignItems: 'center', justifyContent: 'center', paddingVertical: 40, paddingHorizontal: 24, gap: 8 },
+  emptyTitle: { fontSize: 17, fontWeight: '600', marginTop: 6 },
+  emptyText: { fontSize: 13.5, textAlign: 'center', maxWidth: 260, lineHeight: 20 },
+  fab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 106,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 48,
-    paddingHorizontal: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 6,
   },
-  emptyText: {
-    fontSize: 14,
-    textAlign: 'center',
-    fontFamily: tokens.typography.family.regular,
+  toast: {
+    position: 'absolute',
+    bottom: 110,
+    left: 20,
+    right: 88,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
+  toastText: { fontSize: 13.5, fontWeight: '500' },
+  toastUndo: { fontSize: 13.5, fontWeight: '700' },
 });

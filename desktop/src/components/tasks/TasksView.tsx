@@ -1,315 +1,341 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useTasks } from '../../hooks';
 import { Todo } from '../../types';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
-import { Plus, Check } from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, Clock, Plus, Sparkles } from 'lucide-react';
+import { DEFAULT_TASK_LISTS, formatIsoDate, TaskListDef } from '../../utils/taskQuickAddParser';
+import { TaskQuickAddModal } from './TaskQuickAddModal';
 
 export const TasksView: React.FC = () => {
-  const {
-    todos,
-    createTodo,
-    updateTodo,
-    toggleTodo,
-  } = useTasks();
+  const { todos, createTodo, updateTodo, toggleTodo } = useTasks();
 
-  const [selectedTaskIndex, setSelectedTaskIndex] = useState<number>(0);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
-  const [quickTitle, setQuickTitle] = useState('');
-  const [isAddingQuick, setIsAddingQuick] = useState(false);
-  const quickInputRef = useRef<HTMLInputElement>(null);
+  const [quickOpen, setQuickOpen] = useState(false);
+  const [lists, setLists] = useState<TaskListDef[]>(DEFAULT_TASK_LISTS);
+  const [selectedListId, setSelectedListId] = useState<string>('all');
+  const [newListName, setNewListName] = useState('');
+  const [addingList, setAddingList] = useState(false);
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [undoToast, setUndoToast] = useState<{ msg: string; onUndo?: () => void } | null>(null);
 
-  // Fallback com dados canônicos se lista estiver vazia
-  const displayTodos: Todo[] = useMemo(() => {
-    if (todos.length > 0) return todos;
-    return [
-      {
-        id: 'task-1',
-        title: 'Treinar mais inglês',
-        description: 'Foco no listening antes da aula de conversação.',
-        priority: 'high',
-        status: 'pending',
-        due_date: '2026-10-24T18:00:00Z',
-        subtasks: [
-          { id: 'sub-1', title: 'Revisar vocabulário', completed: true },
-          { id: 'sub-2', title: 'Podcast 20 min', completed: false },
-        ],
-      },
-      {
-        id: 'task-2',
-        title: 'Ajustar backend, dívida técnica e IA',
-        description: 'Refatoração dos logs e handlers do WhatsApp.',
-        priority: 'medium',
-        status: 'pending',
-        subtasks: [
-          { id: 'sub-3', title: 'Mapear dívida técnica', completed: false },
-          { id: 'sub-4', title: 'Leitura de contatos WhatsApp', completed: false },
-        ],
-      },
-      {
-        id: 'task-3',
-        title: 'Confirmar local exato da visita técnica à Vale',
-        description: 'Ligar para a portaria da Vale.',
-        priority: 'high',
-        status: 'pending',
-        due_date: '2026-10-25T14:00:00Z',
-        subtasks: [],
-      },
-      {
-        id: 'task-4',
-        title: 'XP multiagent kit: subagentes de verdade',
-        description: 'Orquestrador, testes e documentação contínua.',
-        priority: 'medium',
-        status: 'pending',
-        subtasks: [
-          { id: 'sub-5', title: 'Orquestrador', completed: true },
-          { id: 'sub-6', title: 'Testes de integração', completed: false },
-        ],
-      },
-      {
-        id: 'task-5',
-        title: 'Ler links salvos do radar',
-        description: '',
-        priority: 'low',
-        status: 'pending',
-        due_date: '2026-10-22T20:00:00Z',
-        subtasks: [],
-      },
-    ];
-  }, [todos]);
-
+  const displayTodos: Todo[] = useMemo(() => todos, [todos]);
   const activeTasks = useMemo(() => displayTodos.filter((t) => t.status !== 'completed'), [displayTodos]);
   const completedTasks = useMemo(() => displayTodos.filter((t) => t.status === 'completed'), [displayTodos]);
 
-  const overdueTasks = useMemo(() => {
-    const today = new Date().toISOString().split('T')[0];
-    return activeTasks.filter((t) => t.due_date && t.due_date.split('T')[0] < today);
-  }, [activeTasks]);
+  const filteredActive = useMemo(() => {
+    if (selectedListId === 'all') return activeTasks;
+    return activeTasks.filter((t) => (t.category || 'trabalho').toLowerCase() === selectedListId);
+  }, [activeTasks, selectedListId]);
 
-  const nonOverdueTasks = useMemo(() => {
-    const today = new Date().toISOString().split('T')[0];
-    return activeTasks.filter((t) => !t.due_date || t.due_date.split('T')[0] >= today);
-  }, [activeTasks]);
+  const todayIso = useMemo(() => formatIsoDate(new Date()), []);
+  const overdueTasks = useMemo(
+    () => filteredActive.filter((t) => t.due_date && t.due_date.slice(0, 10) < todayIso),
+    [filteredActive, todayIso]
+  );
+  const todayTasks = useMemo(
+    () => filteredActive.filter((t) => t.due_date && t.due_date.slice(0, 10) === todayIso),
+    [filteredActive, todayIso]
+  );
+  const upcomingTasks = useMemo(
+    () => filteredActive.filter((t) => !t.due_date || t.due_date.slice(0, 10) > todayIso),
+    [filteredActive, todayIso]
+  );
 
-  const currentTask = displayTodos[selectedTaskIndex] || displayTodos[0];
+  const currentTask =
+    displayTodos.find((t) => t.id === selectedTaskId) || filteredActive[0] || displayTodos[0];
+
+  const todayDone = completedTasks.length;
+  const todayTotal = todayTasks.length + todayDone;
+  const pct = todayTotal > 0 ? Math.round((todayDone / todayTotal) * 100) : 0;
+  const dashOffset = 138.2 * (1 - pct / 100);
+
+  const showUndo = (msg: string, onUndo?: () => void) => {
+    setUndoToast({ msg, onUndo });
+    setTimeout(() => setUndoToast((cur) => (cur?.msg === msg ? null : cur)), 3500);
+  };
 
   const handleToggleTodo = async (todo: Todo) => {
-    try {
-      await toggleTodo(todo);
-    } catch {
-      // Ignora erro em modo demo
+    await toggleTodo(todo).catch(() => {});
+    if (todo.status !== 'completed') {
+      showUndo('Tarefa concluída', () => {
+        toggleTodo({ ...todo, status: 'completed' }).catch(() => {});
+      });
     }
   };
 
-  const handleCreateNewTask = async () => {
-    if (quickTitle.trim()) {
-      try {
-        await createTodo({ title: quickTitle.trim(), priority: 'medium', status: 'pending' });
-        setQuickTitle('');
-        setIsAddingQuick(false);
-      } catch {
-        // Ignora
-      }
-    } else {
-      setIsAddingQuick(true);
-      setTimeout(() => quickInputRef.current?.focus(), 50);
-    }
+  const handlePostponeTomorrow = async (todo: Todo) => {
+    const tm = new Date();
+    tm.setDate(tm.getDate() + 1);
+    const tomorrow = formatIsoDate(tm);
+    const prev = todo.due_date;
+    await updateTodo(todo.id, { due_date: tomorrow }).catch(() => {});
+    showUndo('Adiada para amanhã', () => {
+      updateTodo(todo.id, { due_date: prev }).catch(() => {});
+    });
   };
 
-  const handleToggleSubtask = async (subtaskId: string) => {
+  const handleToggleSubtask = async (subId: string) => {
     if (!currentTask) return;
-    const nextSubtasks = (currentTask.subtasks || []).map((s) =>
-      s.id === subtaskId ? { ...s, completed: !s.completed } : s
+    const next = (currentTask.subtasks || []).map((s) =>
+      s.id === subId ? { ...s, completed: !s.completed } : s
     );
-
-    try {
-      await updateTodo(currentTask.id, { subtasks: nextSubtasks });
-    } catch {
-      // Ignora erro local
-    }
+    await updateTodo(currentTask.id, { subtasks: next }).catch(() => {});
   };
 
   const handleAddSubtask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newSubtaskTitle.trim() || !currentTask) return;
-
-    const newSub: any = {
-      id: `sub_${Date.now()}`,
-      title: newSubtaskTitle.trim(),
-      completed: false,
-    };
-
-    const nextSubtasks = [...(currentTask.subtasks || []), newSub];
+    const next = [
+      ...(currentTask.subtasks || []),
+      { id: `sub_${Date.now()}`, title: newSubtaskTitle.trim(), completed: false },
+    ];
     setNewSubtaskTitle('');
-
-    try {
-      await updateTodo(currentTask.id, { subtasks: nextSubtasks });
-    } catch {
-      // Ignora erro local
-    }
+    await updateTodo(currentTask.id, { subtasks: next }).catch(() => {});
   };
 
+  const handleAiSubtasks = async () => {
+    if (!currentTask) return;
+    const next = [
+      ...(currentTask.subtasks || []),
+      { id: `sub_ai1_${Date.now()}`, title: 'Definir escopo e checklist inicial', completed: false },
+      { id: `sub_ai2_${Date.now() + 1}`, title: 'Executar etapa principal e revisar', completed: false },
+    ];
+    await updateTodo(currentTask.id, { subtasks: next }).catch(() => {});
+  };
+
+  const handleCreateList = (e: React.FormEvent) => {
+    e.preventDefault();
+    const nm = newListName.trim();
+    if (!nm) return;
+    const id = `list_${Date.now()}`;
+    setLists((prev) => [...prev, { id, name: nm, color: '#7a4fe0' }]);
+    setSelectedListId(id);
+    setNewListName('');
+    setAddingList(false);
+  };
+
+  const groups = [
+    { key: 'atr', label: 'Atrasadas', rows: overdueTasks, danger: true },
+    { key: 'hoje', label: 'Hoje', rows: todayTasks, danger: false },
+    { key: 'prox', label: 'Próximas & Sem data', rows: upcomingTasks, danger: false },
+  ];
+
   return (
-    <div className="flex-1 h-screen flex flex-col bg-[var(--bg)] text-[var(--ink)] overflow-hidden select-none transition-colors duration-200">
-      {/* Top Header Fiel ao Vito Desktop.html */}
-      <header className="h-16 px-6 border-b border-[var(--line)] flex items-center justify-between bg-[var(--bg)] z-10 shrink-0">
+    <div className="flex-1 h-screen flex flex-col bg-[var(--bg)] text-[var(--ink)] overflow-hidden select-none">
+      <header className="h-16 px-6 border-b border-[var(--line)] flex items-center justify-between bg-[var(--bg)] shrink-0">
         <div>
-          <h1 className="text-[20px] font-extrabold tracking-tight leading-tight">
-            Tarefas & Foco
-          </h1>
-          <p className="text-sm text-[var(--muted)]">
+          <h1 className="text-[20px] font-extrabold tracking-tight leading-tight">Tarefas & Foco</h1>
+          <p className="text-sm text-[var(--muted)] tabular-nums">
             {activeTasks.length} ativas · {completedTasks.length} concluídas
           </p>
         </div>
 
-        <Button
-          variant="pri"
-          size="sm"
-          pill
-          onClick={handleCreateNewTask}
-          leftIcon={<Plus size={16} />}
-        >
-          Nova tarefa <kbd className="ml-1 text-xs opacity-70">C</kbd>
+        <Button variant="pri" size="sm" pill onClick={() => setQuickOpen(true)} leftIcon={<Plus size={16} />}>
+          Nova tarefa
         </Button>
       </header>
 
-      {/* Layout Master-Detail (Split-Pane 52% lista / 48% Inspector) */}
       <div className="flex-1 flex min-h-0 overflow-hidden">
-        {/* Coluna Esquerda: Lista de Tarefas (.lst com 52% da largura) */}
-        <div className="w-[52%] shrink-0 border-r border-[var(--line)] overflow-y-auto p-5 space-y-5 bg-[var(--bg)]">
-          {/* Campo de Adição Rápida */}
-          {isAddingQuick && (
-            <form onSubmit={(e) => { e.preventDefault(); handleCreateNewTask(); }} className="flex items-center gap-2">
+        <div className="w-[52%] shrink-0 border-r border-[var(--line)] overflow-y-auto p-5 space-y-4 bg-[var(--bg)]">
+          {/* Card diário .tk-sum com anel SVG */}
+          <div className="rounded-[22px] bg-[var(--surf)] border border-[var(--line)] p-4 flex items-center gap-4">
+            <div className="relative w-14 h-14 shrink-0">
+              <svg viewBox="0 0 56 56" className="w-full h-full -rotate-90">
+                <circle cx="28" cy="28" r="22" fill="none" stroke="var(--line)" strokeWidth="5" />
+                <circle
+                  cx="28"
+                  cy="28"
+                  r="22"
+                  fill="none"
+                  stroke="var(--purple)"
+                  strokeWidth="5"
+                  strokeLinecap="round"
+                  strokeDasharray="138.2"
+                  strokeDashoffset={dashOffset}
+                  className="transition-all duration-500"
+                />
+              </svg>
+              <span className="absolute inset-0 grid place-items-center text-xs font-bold tabular-nums">
+                {pct}%
+              </span>
+            </div>
+            <div>
+              <b className="block text-[15px] font-semibold tabular-nums">
+                {todayTotal === 0 ? 'Dia livre' : `${todayDone} de ${todayTotal} concluídas hoje`}
+              </b>
+              <p className={`text-xs mt-0.5 ${overdueTasks.length > 0 ? 'text-[var(--red)] font-semibold' : 'text-[var(--muted)]'}`}>
+                {overdueTasks.length > 0
+                  ? `${overdueTasks.length} atrasada(s)`
+                  : `${todayTasks.length} para hoje`}
+              </p>
+            </div>
+          </div>
+
+          {/* Chips de listas coloridas + "+ Lista" */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setSelectedListId('all')}
+              className={`h-8 px-3 rounded-full text-xs font-semibold border ${
+                selectedListId === 'all'
+                  ? 'bg-[var(--ink)] text-[var(--bg)] border-[var(--ink)]'
+                  : 'bg-[var(--bg)] text-[var(--ink)] border-[var(--line)]'
+              }`}
+            >
+              Todas as listas
+            </button>
+            {lists.map((l) => (
+              <button
+                key={l.id}
+                type="button"
+                onClick={() => setSelectedListId((prev) => (prev === l.id ? 'all' : l.id))}
+                className={`h-8 px-3 rounded-full text-xs font-semibold border inline-flex items-center gap-1.5 ${
+                  selectedListId === l.id
+                    ? 'bg-[var(--ink)] text-[var(--bg)] border-[var(--ink)]'
+                    : 'bg-[var(--bg)] text-[var(--ink)] border-[var(--line)]'
+                }`}
+              >
+                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: l.color }} />
+                {l.name}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => setAddingList((v) => !v)}
+              className="h-8 px-3 rounded-full text-xs font-semibold border border-[var(--line)] bg-[var(--surf)]"
+            >
+              + Lista
+            </button>
+          </div>
+
+          {addingList && (
+            <form onSubmit={handleCreateList} className="flex gap-2">
               <input
-                ref={quickInputRef}
-                value={quickTitle}
-                onChange={(e) => setQuickTitle(e.target.value)}
-                placeholder="Título da tarefa..."
-                className="flex-1 px-4 py-2 text-sm rounded-xl border border-[var(--line)] bg-[var(--surf)] focus:outline-none focus:border-[var(--blue)] font-medium"
+                value={newListName}
+                onChange={(e) => setNewListName(e.target.value)}
+                placeholder="Nome da nova lista..."
+                className="flex-1 h-9 px-3 rounded-xl border border-[var(--line)] bg-[var(--surf)] text-xs"
               />
-              <Button variant="pri" size="sm" pill type="submit">Salvar</Button>
-              <Button variant="gh" size="sm" pill type="button" onClick={() => setIsAddingQuick(false)}>Cancelar</Button>
+              <Button variant="pri" size="sm" pill type="submit">
+                Criar
+              </Button>
             </form>
           )}
 
-          {/* Seção Atrasadas */}
-          {overdueTasks.length > 0 && (
-            <div className="space-y-2">
-              <h3 className="text-sm font-bold text-[var(--red)] uppercase tracking-wider mb-2">
-                Atrasadas ({overdueTasks.length})
-              </h3>
-              {overdueTasks.map((t) => {
-                const idx = displayTodos.findIndex((x) => x.id === t.id);
-                const isSelected = idx === selectedTaskIndex;
-
-                return (
-                  <div
-                    key={t.id}
-                    onClick={() => setSelectedTaskIndex(idx)}
-                    className={`flex items-center gap-3.5 p-3.5 rounded-2xl border cursor-pointer transition-colors ${
-                      isSelected
-                        ? 'bg-[var(--surf)] border-[var(--ink)] shadow-xs'
-                        : 'border-transparent hover:bg-[var(--surf)]'
+          {/* Grupos colapsáveis */}
+          {groups.map((g) => {
+            if (g.rows.length === 0) return null;
+            const isCol = !!collapsed[g.key];
+            return (
+              <div key={g.key} className="space-y-2">
+                <button
+                  type="button"
+                  onClick={() => setCollapsed((p) => ({ ...p, [g.key]: !p[g.key] }))}
+                  className="w-full flex items-center justify-between text-left py-1"
+                >
+                  <span
+                    className={`text-xs font-bold uppercase tracking-wider flex items-center gap-2 ${
+                      g.danger ? 'text-[var(--red)]' : 'text-[var(--muted)]'
                     }`}
                   >
-                    {/* Checkbox Circular (.ck) */}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleToggleTodo(t);
-                      }}
-                      className="w-5 h-5 rounded-full border-2 border-[var(--line)] shrink-0 flex items-center justify-center transition-colors hover:border-[var(--acc)]"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <b className="text-base text-[var(--ink)] block truncate">{t.title}</b>
-                      <div className="text-xs text-[var(--red)] font-semibold mt-0.5">
-                        Atrasada · {t.due_date ? new Date(t.due_date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }) : 'Vencida'}
+                    {g.label}
+                    <span className="px-2 py-0.5 rounded-full bg-[var(--surf)] tabular-nums">
+                      {g.rows.length}
+                    </span>
+                  </span>
+                  {isCol ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
+                </button>
+
+                {!isCol &&
+                  g.rows.map((t) => {
+                    const isSelected = currentTask?.id === t.id;
+                    return (
+                      <div
+                        key={t.id}
+                        onClick={() => setSelectedTaskId(t.id)}
+                        className={`flex items-center gap-3 p-3.5 rounded-2xl border cursor-pointer transition-colors ${
+                          isSelected
+                            ? 'bg-[var(--surf)] border-[var(--ink)]'
+                            : 'border-transparent hover:bg-[var(--surf)]'
+                        }`}
+                      >
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleTodo(t);
+                          }}
+                          className="w-5 h-5 rounded-full border-2 border-[var(--line)] shrink-0 hover:border-[var(--purple)]"
+                          aria-label="Concluir tarefa"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <b className="text-sm text-[var(--ink)] block truncate">{t.title}</b>
+                          <span className="text-xs text-[var(--muted)]">
+                            {t.due_date ? t.due_date.slice(0, 10) : 'Sem prazo'}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          title="Adiar para amanhã"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handlePostponeTomorrow(t);
+                          }}
+                          className="p-1.5 rounded-full text-[var(--muted)] hover:bg-[var(--bg)]"
+                        >
+                          <Clock size={14} />
+                        </button>
                       </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Seção Sem Data / Próximas */}
-          <div className="space-y-2">
-            <h3 className="text-sm font-bold text-[var(--muted)] uppercase tracking-wider mb-2">
-              Sem data / Próximas ({nonOverdueTasks.length})
-            </h3>
-            {nonOverdueTasks.map((t) => {
-              const idx = displayTodos.findIndex((x) => x.id === t.id);
-              const isSelected = idx === selectedTaskIndex;
-
-              return (
-                <div
-                  key={t.id}
-                  onClick={() => setSelectedTaskIndex(idx)}
-                  className={`flex items-center gap-3.5 p-3.5 rounded-2xl border cursor-pointer transition-colors ${
-                    isSelected
-                      ? 'bg-[var(--surf)] border-[var(--ink)] shadow-xs'
-                      : 'border-transparent hover:bg-[var(--surf)]'
-                  }`}
-                >
-                  {/* Checkbox Circular (.ck) */}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleToggleTodo(t);
-                    }}
-                    className="w-5 h-5 rounded-full border-2 border-[var(--line)] shrink-0 flex items-center justify-center transition-colors hover:border-[var(--acc)]"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <b className="text-base text-[var(--ink)] block truncate">{t.title}</b>
-                    <div className="text-xs text-[var(--muted)] font-medium mt-0.5">
-                      {t.priority === 'high' ? 'Alta prioridade' : t.priority === 'low' ? 'Baixa prioridade' : 'Média prioridade'}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                    );
+                  })}
+              </div>
+            );
+          })}
         </div>
 
-        {/* Coluna Direita: Inspector de Tarefa (.pn com 48% de largura) */}
         <aside className="w-[48%] shrink-0 overflow-y-auto p-8 bg-[var(--surf)] space-y-5">
           {currentTask ? (
             <>
-              {/* Título e Prioridade */}
               <div>
-                <h2 className="text-2xl font-extrabold text-[var(--ink)] leading-tight m-0">
+                <h2 className="text-2xl font-extrabold text-[var(--ink)] leading-tight">
                   {currentTask.title}
                 </h2>
                 <div className="mt-2.5 flex items-center gap-2">
-                  <span
-                    className={`inline-block text-xs font-bold px-3 py-0.5 rounded-full ${
-                      currentTask.due_date ? 'bg-[var(--red-bg)] text-[var(--red)]' : 'bg-[var(--orange-bg)] text-[var(--orange)]'
-                    }`}
-                  >
-                    {currentTask.due_date ? 'Atrasada' : 'Média prioridade'}
+                  <span className="inline-block text-xs font-bold px-3 py-0.5 rounded-full bg-[var(--bg)] text-[var(--ink)]">
+                    {currentTask.priority === 'high' ? 'Alta prioridade' : 'Normal'}
                   </span>
                 </div>
               </div>
 
-              {/* Subtarefas */}
               <div className="space-y-2.5">
-                <h3 className="text-sm font-bold text-[var(--muted)] uppercase tracking-wider">
-                  Subtarefas ({(currentTask.subtasks || []).length})
-                </h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-[var(--muted)] uppercase tracking-wider">
+                    Subtarefas ({(currentTask.subtasks || []).length})
+                  </h3>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    pill
+                    onClick={handleAiSubtasks}
+                    leftIcon={<Sparkles size={13} className="text-[var(--purple)]" />}
+                  >
+                    Subtarefas IA
+                  </Button>
+                </div>
                 <Card padding="lg" className="space-y-3 bg-[var(--bg)]">
                   {(currentTask.subtasks || []).length > 0 ? (
                     currentTask.subtasks!.map((sub) => (
                       <div
                         key={sub.id}
                         onClick={() => handleToggleSubtask(sub.id)}
-                        className="flex items-center gap-3 py-2 cursor-pointer hover:opacity-80 transition-opacity"
+                        className="flex items-center gap-3 py-1.5 cursor-pointer"
                       >
                         <button
                           type="button"
-                          className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${
-                            sub.completed ? 'bg-[var(--acc)] border-[var(--acc)]' : 'border-[var(--line)]'
+                          className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                            sub.completed ? 'bg-[var(--purple)] border-[var(--purple)]' : 'border-[var(--line)]'
                           }`}
                         >
                           {sub.completed && <Check size={11} className="text-white" />}
@@ -323,54 +349,53 @@ export const TasksView: React.FC = () => {
                     <span className="text-sm text-[var(--muted)]">Sem subtarefas cadastradas.</span>
                   )}
 
-                  {/* Form de Adicionar Subtarefa */}
                   <form onSubmit={handleAddSubtask} className="pt-3 border-t border-[var(--line)] flex gap-2">
                     <input
                       value={newSubtaskTitle}
                       onChange={(e) => setNewSubtaskTitle(e.target.value)}
                       placeholder="+ Nova subtarefa..."
-                      className="flex-1 px-3 py-1.5 text-sm rounded-xl border border-[var(--line)] bg-[var(--surf)] focus:outline-none focus:border-[var(--blue)] font-medium"
+                      className="flex-1 px-3 py-1.5 text-sm rounded-xl border border-[var(--line)] bg-[var(--surf)]"
                     />
-                    <Button variant="outline" size="sm" pill type="submit">Adicionar</Button>
+                    <Button variant="outline" size="sm" pill type="submit">
+                      Adicionar
+                    </Button>
                   </form>
                 </Card>
               </div>
-
-              {/* Bloco de Notas */}
-              <div className="space-y-2.5">
-                <h3 className="text-sm font-bold text-[var(--muted)] uppercase tracking-wider">
-                  Notas
-                </h3>
-                <Card padding="lg" className="bg-[var(--bg)]">
-                  <p className="text-sm text-[var(--ink)] m-0 leading-relaxed font-normal">
-                    {currentTask.description || (
-                      <span className="text-[var(--muted)]">Sem notas adicionais para esta tarefa.</span>
-                    )}
-                  </p>
-                </Card>
-              </div>
-
-              {/* Card de Sugestão Inteligente do Vito */}
-              <div className="p-5 rounded-2xl border border-[var(--line)] border-l-4 border-l-[var(--purple)] bg-[var(--bg)] space-y-3">
-                <span className="inline-block rounded-full px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider bg-[var(--purple-bg)] text-[var(--purple)]">
-                  Sugestão do Vito
-                </span>
-                <p className="text-sm text-[var(--ink)] leading-relaxed m-0 font-medium">
-                  Há 12 h livres hoje na sua agenda. Deseja reservar um bloco de foco de 1 h para finalizar esta tarefa?
-                </p>
-                <div className="flex items-center gap-2.5 pt-1">
-                  <Button variant="pri" size="sm" pill>Reservar foco</Button>
-                  <Button variant="outline" size="sm" pill>Lembrar amanhã</Button>
-                </div>
-              </div>
             </>
           ) : (
-            <div className="text-center text-[var(--muted)] py-12">
-              Selecione uma tarefa para ver os detalhes
-            </div>
+            <p className="text-sm text-[var(--muted)]">Nenhuma tarefa selecionada.</p>
           )}
         </aside>
       </div>
+
+      {undoToast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 px-4 py-2.5 rounded-full bg-[var(--ink)] text-[var(--bg)] text-xs font-semibold flex items-center gap-3 shadow-lg z-50">
+          <span>{undoToast.msg}</span>
+          {undoToast.onUndo && (
+            <button
+              type="button"
+              onClick={() => {
+                undoToast.onUndo?.();
+                setUndoToast(null);
+              }}
+              className="text-[var(--acc)] font-bold"
+            >
+              Desfazer
+            </button>
+          )}
+        </div>
+      )}
+
+      <TaskQuickAddModal
+        open={quickOpen}
+        onClose={() => setQuickOpen(false)}
+        lists={lists}
+        defaultListId={selectedListId}
+        onCreate={async (payload) => {
+          await createTodo({ ...payload, status: 'pending' });
+        }}
+      />
     </div>
   );
 };

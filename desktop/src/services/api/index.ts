@@ -17,6 +17,8 @@ import { GmailApi, GmailStatusResponse, GmailScanResult, GmailDraftInput, GmailD
 import { P2PMeetingsApi, P2PMeetingInvite, ContactMatchResult, P2PMutualSlot, SendP2PInviteInput } from './p2pMeetingsApi';
 import { NotificationsApi } from './notificationsApi';
 import { AiProvidersApi, ConnectAiProviderInput, TestAiProviderResponse } from './aiProvidersApi';
+import { InboxNotificationsApi } from './inboxNotificationsApi';
+import { StoreComplianceApi } from './storeComplianceApi';
 import { fileUriToBase64 } from './fileUtils';
 import {
   User,
@@ -92,6 +94,8 @@ export class ApiService extends ApiClient {
   public p2pMeetingsApi = new P2PMeetingsApi(this);
   public notificationsApi = new NotificationsApi(this);
   public aiProvidersApi = new AiProvidersApi(this);
+  public inboxNotificationsApi = new InboxNotificationsApi(this);
+  public storeComplianceApi = new StoreComplianceApi(this);
 
   public getToken(): string | null {
     return this.accessToken;
@@ -398,6 +402,12 @@ export class ApiService extends ApiClient {
   }
   get aiProviders(): AiProvidersApi {
     return this.aiProvidersApi;
+  }
+  get inbox(): InboxNotificationsApi {
+    return this.inboxNotificationsApi;
+  }
+  get store(): StoreComplianceApi {
+    return this.storeComplianceApi;
   }
 }
 
