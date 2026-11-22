@@ -8,7 +8,7 @@ import { Header, HeaderPill, HeaderRoundButton } from '../components/common/Head
 import { AdaptivePager, AdaptivePagerRef } from '../components/common/AdaptivePager';
 import { ChatScreen, ChatScreenRef } from '../screens/ChatScreen';
 import { TasksScreen } from '../screens/TasksScreen';
-import { TriggersScreen } from '../screens/TriggersScreen';
+import { BotsScreen } from '../screens/BotsScreen';
 import { BookingScreen } from '../screens/BookingScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
 import { FinanceScreen } from '../screens/FinanceScreen';
@@ -147,10 +147,12 @@ const TasksTabScreen: React.FC = () => {
   );
 };
 
-const TriggersTabScreen: React.FC<{
+const BotsTabScreen: React.FC<{
   onSubViewChange: (inSubView: boolean) => void;
 }> = ({ onSubViewChange }) => {
   const [inSubView, setInSubView] = useState(false);
+  const [subtitle, setSubtitle] = useState('Mini assistentes, cada um com uma função só');
+  const [createRequestId, setCreateRequestId] = useState(0);
 
   const handleSubViewChange = (sub: boolean) => {
     setInSubView(sub);
@@ -162,20 +164,25 @@ const TriggersTabScreen: React.FC<{
       <Header
         activeTab="triggers"
         align="left"
+        subtitle={subtitle}
         hideTitle={inSubView}
         contextualActions={
           inSubView ? undefined : (
             <HeaderRoundButton
-              icon="auto-awesome"
+              icon="add"
               variant="primary"
-              onPress={() => tabNavigationBus.notify('chat')}
-              accessibilityLabel="Pedir ao Vito: novo radar"
-              size={20}
+              onPress={() => setCreateRequestId((n) => n + 1)}
+              accessibilityLabel="Novo bot"
+              size={22}
             />
           )
         }
       />
-      <TriggersScreen onSubViewChange={handleSubViewChange} />
+      <BotsScreen
+        onSubViewChange={handleSubViewChange}
+        onSubtitleChange={setSubtitle}
+        createRequestId={createRequestId}
+      />
     </View>
   );
 };
@@ -407,7 +414,7 @@ export const MainTabs: React.FC<{ route?: any }> = ({ route }) => {
         </View>
 
         <View key="4" style={[styles.pageWrapper, { width: containerWidth }]} collapsable={false}>
-          <TriggersTabScreen onSubViewChange={setInTriggersSubView} />
+          <BotsTabScreen onSubViewChange={setInTriggersSubView} />
         </View>
 
         <View key="5" style={[styles.pageWrapper, { width: containerWidth }]} collapsable={false}>

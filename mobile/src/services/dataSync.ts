@@ -5,6 +5,7 @@ export type SyncEventType =
   | 'refresh_events'
   | 'refresh_todos'
   | 'refresh_triggers'
+  | 'refresh_bots'
   | 'refresh_bookings'
   | 'refresh_pending'
   | 'refresh_finance'

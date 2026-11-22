@@ -17,6 +17,21 @@ import { GmailApi, GmailStatusResponse, GmailScanResult, GmailDraftInput, GmailD
 import { WhatsAppAuthApi, RequestWhatsAppOTPResponse, VerifyWhatsAppOTPResponse } from './whatsappAuthApi';
 import { FinanceApi } from './financeApi';
 import { AiProvidersApi } from './aiProvidersApi';
+import { BotsApi } from './botsApi';
+import type {
+  ActionPolicy,
+  Bot,
+  BotActivityItem,
+  BotAppInfo,
+  BotChatMessage,
+  BotMemoryItem,
+  BotRunReport,
+  BotTemplate,
+  CreateBotPayload,
+  PendingResolutionDecision,
+  SkillPackage,
+  UpdateBotPayload,
+} from '../../types/bots';
 import { FinancialSummary, FinanceAccount, FinanceConnection, FinanceTransaction, FinanceAlert, CategorySpendItem, SubscriptionItem, FinanceSyncPayload, FinanceConnectTokenResponse } from '../../types/finance';
 import {
   User, AuthResponse, Event, Todo, Subtask, AssistantChatResponse, ConflictInfo, Trigger, TriggerCategory,
@@ -51,6 +66,32 @@ export class ApiService extends ApiClient {
   private whatsappContextApi = new WhatsAppContextApi(this);
   private financeApi = new FinanceApi(this);
   private aiProvidersApi = new AiProvidersApi(this);
+  private botsApi = new BotsApi(this);
+
+  // Bots
+  listBots(): Promise<Bot[]> { return this.botsApi.listBots(); }
+  createBot(payload: CreateBotPayload): Promise<Bot> { return this.botsApi.createBot(payload); }
+  getBot(id: string): Promise<Bot> { return this.botsApi.getBot(id); }
+  updateBot(id: string, payload: UpdateBotPayload): Promise<Bot> { return this.botsApi.updateBot(id, payload); }
+  deleteBot(id: string): Promise<void> { return this.botsApi.deleteBot(id); }
+  runBot(id: string): Promise<BotRunReport> { return this.botsApi.runBot(id); }
+  getBotChat(id: string): Promise<BotChatMessage[]> { return this.botsApi.getBotChat(id); }
+  sendBotChat(id: string, message: string): Promise<{ reply?: BotChatMessage; messages?: BotChatMessage[] }> { return this.botsApi.sendBotChat(id, message); }
+  addBotAction(id: string, payload: { action_key: string; policy: ActionPolicy; always_ask?: boolean }): Promise<Bot> { return this.botsApi.addBotAction(id, payload); }
+  updateBotAction(id: string, actionKey: string, policy: ActionPolicy, alwaysAsk?: boolean): Promise<Bot> { return this.botsApi.updateBotAction(id, actionKey, policy, alwaysAsk); }
+  removeBotAction(id: string, actionKey: string): Promise<Bot> { return this.botsApi.removeBotAction(id, actionKey); }
+  addBotSkill(id: string, skillKey: string): Promise<Bot> { return this.botsApi.addBotSkill(id, skillKey); }
+  removeBotSkill(id: string, skillKey: string): Promise<Bot> { return this.botsApi.removeBotSkill(id, skillKey); }
+  upgradeBotSkill(id: string, skillKey: string): Promise<Bot> { return this.botsApi.upgradeBotSkill(id, skillKey); }
+  getBotMemories(id: string): Promise<BotMemoryItem[]> { return this.botsApi.getBotMemories(id); }
+  addBotMemory(id: string, content: string): Promise<BotMemoryItem> { return this.botsApi.addBotMemory(id, content); }
+  deleteBotMemory(id: string, memId: string): Promise<void> { return this.botsApi.deleteBotMemory(id, memId); }
+  resolveBotPending(id: string, confirmationId: string, decision: PendingResolutionDecision, alwaysAsk?: boolean): Promise<void> { return this.botsApi.resolvePending(id, confirmationId, decision, alwaysAsk); }
+  getBotsActivity(limit = 20): Promise<BotActivityItem[]> { return this.botsApi.getActivity(limit); }
+  getBotCatalogTemplates(): Promise<BotTemplate[]> { return this.botsApi.getCatalogTemplates(); }
+  getBotCatalogSkills(): Promise<SkillPackage[]> { return this.botsApi.getCatalogSkills(); }
+  getBotApps(): Promise<BotAppInfo[]> { return this.botsApi.getApps(); }
+  suggestBotApp(name: string, reason: string): Promise<void> { return this.botsApi.suggestApp(name, reason); }
 
   // Auth & Sessions
   login(email: string, password: string): Promise<AuthResponse> { return this.authApi.login(email, password); }

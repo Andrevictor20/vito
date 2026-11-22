@@ -133,7 +133,7 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
           />
         </TouchableOpacity>
 
-        {/* Item 5: Radares */}
+        {/* Item 5: Bots */}
         <TouchableOpacity
           style={[
             styles.tabButton,
@@ -147,10 +147,10 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
           hitSlop={tokens.hitSlop.sm}
           accessibilityRole="tab"
           accessibilityState={{ selected: activeTab === 'triggers' }}
-          accessibilityLabel="Aba Radares"
+          accessibilityLabel="Aba Bots"
         >
           <MaterialIcons
-            name={activeTab === 'triggers' ? 'radar' : 'track-changes'}
+            name="smart-toy"
             size={22}
             color={activeTab === 'triggers' ? colors.bg : colors.muted}
           />
