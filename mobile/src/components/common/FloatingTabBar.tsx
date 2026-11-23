@@ -8,7 +8,8 @@ import {
   Text,
   View,
 } from 'react-native';
-import Svg, { Circle, Path, Rect } from 'react-native-svg';
+import Svg, { Circle, Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../context/ThemeContext';
 import { getDockGlassStyle } from '../../theme/surfaces';
 import { MOTION_CURVES, MOTION_DURATIONS, PRESS_SCALE, hapticFeedback } from '../../theme/motion';
@@ -256,8 +257,45 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
 }) => {
   const { colors, isDark } = useTheme();
   const reduceMotion = useReduceMotion();
+  const insets = useSafeAreaInsets();
 
-  if (!visible) return null;
+  // `.dock` (L984–985): entra com transform 420ms ease-q + opacity 280ms ease-std;
+  // sai com transform 280ms ease-in + opacity 200ms ease-in. Nunca desmonta.
+  const slide = useRef(new Animated.Value(visible ? 1 : 0)).current;
+  const fade = useRef(new Animated.Value(visible ? 1 : 0)).current;
+
+  useEffect(() => {
+    if (reduceMotion) {
+      slide.setValue(visible ? 1 : 0);
+      fade.setValue(visible ? 1 : 0);
+      return;
+    }
+    const anim = Animated.parallel([
+      Animated.timing(slide, {
+        toValue: visible ? 1 : 0,
+        duration: visible ? 420 : 280,
+        easing: visible
+          ? Easing.bezier(MOTION_CURVES.q[0], MOTION_CURVES.q[1], MOTION_CURVES.q[2], MOTION_CURVES.q[3])
+          : Easing.bezier(MOTION_CURVES.in[0], MOTION_CURVES.in[1], MOTION_CURVES.in[2], MOTION_CURVES.in[3]),
+        useNativeDriver: true,
+      }),
+      Animated.timing(fade, {
+        toValue: visible ? 1 : 0,
+        duration: visible ? 280 : 200,
+        easing: visible
+          ? Easing.bezier(MOTION_CURVES.std[0], MOTION_CURVES.std[1], MOTION_CURVES.std[2], MOTION_CURVES.std[3])
+          : Easing.bezier(MOTION_CURVES.in[0], MOTION_CURVES.in[1], MOTION_CURVES.in[2], MOTION_CURVES.in[3]),
+        useNativeDriver: true,
+      }),
+    ]);
+    anim.start();
+    return () => anim.stop();
+  }, [visible, reduceMotion, slide, fade]);
+
+  const translateY = slide.interpolate({
+    inputRange: [0, 1],
+    outputRange: [28, 0],
+  });
 
   const handleTabPress = (tab: DockTabType) => {
     if (tab !== activeTab) {
@@ -267,7 +305,31 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
   };
 
   return (
-    <View style={styles.floatingWrapper} pointerEvents="box-none">
+    <Animated.View
+      style={[
+        styles.dockContainer,
+        {
+          paddingBottom: (insets.bottom || 8) + 8,
+          opacity: fade,
+          transform: [{ translateY }],
+        },
+      ]}
+      pointerEvents={visible ? 'box-none' : 'none'}
+      accessibilityElementsHidden={!visible}
+      importantForAccessibility={visible ? 'auto' : 'no-hide-descendants'}
+    >
+      {/* Gradiente `.dock`: transparente → bg em 36% (L160). */}
+      <Svg style={StyleSheet.absoluteFill} width="100%" height="100%" preserveAspectRatio="none">
+        <Defs>
+          <LinearGradient id="vitoDockFade" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor={colors.bg} stopOpacity="0" />
+            <Stop offset="0.36" stopColor={colors.bg} stopOpacity="1" />
+            <Stop offset="1" stopColor={colors.bg} stopOpacity="1" />
+          </LinearGradient>
+        </Defs>
+        <Rect x="0" y="0" width="100%" height="100%" fill="url(#vitoDockFade)" />
+      </Svg>
+
       <View
         style={[
           styles.dockPill,
@@ -294,18 +356,20 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
           />
         ))}
       </View>
-    </View>
+    </Animated.View>
   );
 };
 
 const styles = StyleSheet.create({
-  floatingWrapper: {
+  dockContainer: {
     position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 18 : 14,
+    bottom: 0,
     left: 0,
     right: 0,
+    paddingTop: 30,
+    paddingHorizontal: 16,
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-end',
     zIndex: 99,
   },
   dockPill: {

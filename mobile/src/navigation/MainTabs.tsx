@@ -15,7 +15,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { api } from '../services/api';
 import { notificationsInboxStore } from '../services/notificationsInboxStore';
-import { chatPromptBus, dataSync, pagerSwipeLockBus, tabNavigationBus } from '../services/dataSync';
+import { chatPromptBus, dataSync, tabNavigationBus } from '../services/dataSync';
 import { BookingScreen } from '../screens/BookingScreen';
 import { ChatScreenRef } from '../screens/ChatScreen';
 import { FinanceScreen } from '../screens/FinanceScreen';
@@ -27,7 +27,7 @@ import {
   TransitioningView,
   VfxCelebrationOverlay,
 } from '../theme/vitoMotion';
-import { determineBackAction, shouldPreventSwipe, type MainTabType } from '../utils/pagerNavigation';
+import { determineBackAction, type MainTabType } from '../utils/pagerNavigation';
 import { AgendaTabScreen } from './AgendaTabScreen';
 import { useHomeDataContext } from './HomeDataProvider';
 import {
@@ -57,7 +57,6 @@ export const MainTabs: React.FC<{ route?: { params?: { screen?: MainTabType } } 
   const [showSummaries, setShowSummaries] = useState(false);
   const [inTriggersSubView, setInTriggersSubView] = useState(false);
   const [inBookingSubView, setInBookingSubView] = useState(false);
-  const [gestureSwipeLocked, setGestureSwipeLocked] = useState(false);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
 
   const chatRef = useRef<ChatScreenRef>(null);
@@ -183,12 +182,6 @@ export const MainTabs: React.FC<{ route?: { params?: { screen?: MainTabType } } 
   }, [handleSelectTab]);
 
   useEffect(() => {
-    return pagerSwipeLockBus.subscribe((locked) => {
-      setGestureSwipeLocked(locked);
-    });
-  }, []);
-
-  useEffect(() => {
     return chatPromptBus.subscribe((prompt) => {
       if (typeof prompt === 'string') {
         chatRef.current?.submitExternalPrompt(prompt);
@@ -255,16 +248,6 @@ export const MainTabs: React.FC<{ route?: { params?: { screen?: MainTabType } } 
     handleSelectTab,
   ]);
 
-  const hasSubScreen =
-    inAgendaSubView || inTriggersSubView || inBookingSubView || overlaySubScreen !== null;
-  const hasModal = inAgendaModal;
-  const scrollEnabled =
-    !shouldPreventSwipe({
-      isKeyboardOpen: keyboardOpen,
-      hasModal,
-      hasSubScreen,
-    }) && !gestureSwipeLocked;
-
   return (
     <View
       style={[styles.mainTabsContainer, { backgroundColor: colors.bg }]}
@@ -279,7 +262,6 @@ export const MainTabs: React.FC<{ route?: { params?: { screen?: MainTabType } } 
         ref={pagerRef}
         style={styles.pager}
         initialPage={0}
-        scrollEnabled={scrollEnabled}
         onPageSelected={handlePageSelected}
       >
         <View key="0" style={[styles.pageWrapper, { width: containerWidth }]} collapsable={false}>

@@ -158,7 +158,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
 
   const showBuildToast = useCallback(() => {
     const updateId = currentlyRunning?.updateId
-    const buildText = updateId ? `OTA ${updateId.slice(0, 7)}` : 'v0.1.31'
+    const buildText = updateId ? `OTA ${updateId.slice(0, 7)}` : 'v0.1.32'
     Alert.alert('Build do Vito', buildText, [
       { text: 'Cancelar', style: 'cancel' },
       { text: 'Buscar update', onPress: handleManualCheckUpdate },
