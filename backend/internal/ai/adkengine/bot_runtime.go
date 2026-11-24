@@ -150,7 +150,7 @@ func (a *BotRuntimeAdapter) ExecuteBotTurn(ctx context.Context, req bots.BotRunt
 	}
 	maxCalls := req.MaxLLMCalls
 	if maxCalls <= 0 {
-		maxCalls = 5
+		maxCalls = 10
 	}
 
 	collector := &TurnCollector{}
@@ -184,6 +184,9 @@ func (a *BotRuntimeAdapter) ExecuteBotTurn(ctx context.Context, req bots.BotRunt
 		runner.WithStateDelta(stateDelta),
 	) {
 		if runErr != nil {
+			if strings.Contains(strings.ToLower(runErr.Error()), "max number of llm calls exceeded") {
+				break
+			}
 			return nil, runErr
 		}
 		if ev == nil || ev.Partial || ev.Content == nil || ev.Content.Role != genai.RoleModel {

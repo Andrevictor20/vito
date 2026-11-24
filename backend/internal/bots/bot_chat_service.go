@@ -198,7 +198,7 @@ func (s *BotChatService) SendMessage(ctx context.Context, userID, botID, message
 		AllowedActionKeys: allowedKeys,
 		ActionPolicies:    policies,
 		ExtraTools:        selfTools,
-		MaxLLMCalls:       5,
+		MaxLLMCalls:       10,
 	})
 	if err != nil {
 		return nil, err

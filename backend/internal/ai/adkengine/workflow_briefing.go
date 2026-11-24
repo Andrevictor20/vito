@@ -190,6 +190,9 @@ func (r *CrossDomainBriefingWorkflowRunner) GenerateBriefing(ctx context.Context
 	var lastModelText string
 	for ev, err := range r.adkRunner.Run(ctx, userID, sessionID, userContent, agent.RunConfig{MaxLLMCalls: 12}) {
 		if err != nil {
+			if strings.Contains(strings.ToLower(err.Error()), "max number of llm calls exceeded") {
+				break
+			}
 			return "", err
 		}
 		if ev == nil || ev.Partial || ev.Content == nil || ev.Content.Role != genai.RoleModel {
