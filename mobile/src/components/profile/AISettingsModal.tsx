@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { tokens, MD3Shapes } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { api } from '../../services/api';
@@ -174,7 +174,7 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
                         },
                       ]}
                     >
-                      <MaterialIcons
+                      <ProtoUiIcon
                         name="handshake"
                         size={22}
                         color={autonomyMode === 'assisted' ? colors.primary : colors.onSurfaceVariant}
@@ -202,7 +202,7 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
                     </View>
                   </View>
 
-                  <MaterialIcons
+                  <ProtoUiIcon
                     name={
                       autonomyMode === 'assisted'
                         ? 'radio-button-checked'
@@ -220,13 +220,13 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
 
                 <View style={styles.featuresList}>
                   <View style={styles.featureItem}>
-                    <MaterialIcons name="check" size={14} color={colors.primary} />
+                    <ProtoUiIcon name="check" size={14} color={colors.primary} />
                     <Text style={[styles.featureText, { color: colors.onSurfaceVariant }]}>
                       Total controle e previsibilidade sobre sua agenda
                     </Text>
                   </View>
                   <View style={styles.featureItem}>
-                    <MaterialIcons name="check" size={14} color={colors.primary} />
+                    <ProtoUiIcon name="check" size={14} color={colors.primary} />
                     <Text style={[styles.featureText, { color: colors.onSurfaceVariant }]}>
                       Perfeito para quem prefere validar cada decisão
                     </Text>
@@ -261,7 +261,7 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
                         },
                       ]}
                     >
-                      <MaterialIcons
+                      <ProtoUiIcon
                         name="auto-awesome"
                         size={22}
                         color={autonomyMode === 'proactive' ? colors.primary : colors.onSurfaceVariant}
@@ -289,7 +289,7 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
                     </View>
                   </View>
 
-                  <MaterialIcons
+                  <ProtoUiIcon
                     name={
                       autonomyMode === 'proactive'
                         ? 'radio-button-checked'
@@ -307,13 +307,13 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
 
                 <View style={styles.featuresList}>
                   <View style={styles.featureItem}>
-                    <MaterialIcons name="check" size={14} color={colors.primary} />
+                    <ProtoUiIcon name="check" size={14} color={colors.primary} />
                     <Text style={[styles.featureText, { color: colors.onSurfaceVariant }]}>
                       Menor esforço cognitivo no dia a dia
                     </Text>
                   </View>
                   <View style={styles.featureItem}>
-                    <MaterialIcons name="check" size={14} color={colors.primary} />
+                    <ProtoUiIcon name="check" size={14} color={colors.primary} />
                     <Text style={[styles.featureText, { color: colors.onSurfaceVariant }]}>
                       Resolução ágil de sobreposições e reorganização
                     </Text>
@@ -343,7 +343,7 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
                         { backgroundColor: colors.surfaceContainerHigh },
                       ]}
                     >
-                      <MaterialIcons name="timer" size={20} color={colors.primary} />
+                      <ProtoUiIcon name="timer" size={20} color={colors.primary} />
                     </View>
                     <View style={styles.optionTexts}>
                       <Text style={[styles.optionTitle, { color: colors.onSurface }]}>
@@ -385,7 +385,7 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
                 activeOpacity={0.7}
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
-                  <MaterialIcons name="psychology" size={24} color={colors.primary} />
+                  <ProtoUiIcon name="psychology" size={24} color={colors.primary} />
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.optionTitle, { color: colors.onSurface }]}>
                       O que o Vito sabe sobre mim
@@ -395,12 +395,12 @@ export const AISettingsModal: React.FC<AISettingsModalProps> = ({
                     </Text>
                   </View>
                 </View>
-                <MaterialIcons name="chevron-right" size={20} color={colors.outline} />
+                <ProtoUiIcon name="chevron-right" size={20} color={colors.outline} />
               </TouchableOpacity>
 
               {/* Nota de rodapé de segurança e privacidade */}
               <View style={styles.footerNote}>
-                <MaterialIcons name="security" size={14} color={colors.outline} />
+                <ProtoUiIcon name="security" size={14} color={colors.outline} />
                 <Text style={[styles.footerNoteText, { color: colors.outline }]}>
                   Mesmo no Modo Proativo, exclusões permanentes ou ações críticas continuam exigindo
                   sua confirmação deliberada.

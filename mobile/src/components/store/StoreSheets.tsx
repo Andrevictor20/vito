@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { useTheme } from '../../context/ThemeContext';
 import { BottomSheetModal } from '../ui/BottomSheetModal';
 import { LEGAL_DOCS } from './StoreCatalogData';
@@ -118,7 +118,7 @@ export const StoreSheets: React.FC<StoreSheetsProps> = ({
                 onPress={() => onReportAi(r)}
               >
                 <Text style={[styles.rowTitle, { color: colors.ink }]}>{r}</Text>
-                <MaterialIcons name="chevron-right" size={20} color={colors.muted} />
+                <ProtoUiIcon name="chevron-right" size={20} color={colors.muted} />
               </TouchableOpacity>
             ))}
           </View>
@@ -134,7 +134,7 @@ export const StoreSheets: React.FC<StoreSheetsProps> = ({
           <View style={styles.starsRow}>
             {[1, 2, 3, 4, 5].map((n) => (
               <TouchableOpacity key={n} onPress={() => setStars(n)} style={styles.starBtn}>
-                <MaterialIcons
+                <ProtoUiIcon
                   name={n <= stars ? 'star' : 'star-border'}
                   size={34}
                   color={n <= stars ? colors.fin : colors.muted}
@@ -173,7 +173,7 @@ export const StoreSheets: React.FC<StoreSheetsProps> = ({
             </>
           ) : (
             <>
-              <MaterialIcons name="check-circle" size={40} color={colors.acc} />
+              <ProtoUiIcon name="check-circle" size={40} color={colors.acc} />
               <Text style={[styles.docH, { color: colors.ink, textAlign: 'center' }]}>
                 Pronto! Cópia JSON gerada e enviada para seu e-mail.
               </Text>

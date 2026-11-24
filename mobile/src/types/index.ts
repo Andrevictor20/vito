@@ -1,6 +1,6 @@
-import type { MaterialIcons } from '@expo/vector-icons';
+import type { ProtoUiIconName } from '../icons/ProtoUiIcons';
 
-export type VitoIconName = keyof typeof MaterialIcons.glyphMap;
+export type VitoIconName = ProtoUiIconName;
 
 export interface User {
   id: string;
@@ -141,6 +141,17 @@ export interface DestructiveConfirmation {
   confirm_prompt: string;
 }
 
+export interface ChatCardPayload {
+  id?: string;
+  type?: string;
+  title?: string;
+  subtitle?: string;
+  action_label?: string;
+  action_value?: string;
+  confirm?: boolean;
+  dismiss?: boolean;
+}
+
 export interface AssistantChatResponse {
   action?: string;
   intent: string;
@@ -160,6 +171,8 @@ export interface AssistantChatResponse {
   meeting_short_url?: string;
   meeting_whatsapp_url?: string;
   conflict?: ConflictInfo;
+  requires_confirmation?: boolean;
+  pending_confirmation_id?: string;
   pending_confirmation?: DestructiveConfirmation;
   provider_used?: string;
   model_used?: string;
@@ -180,20 +193,8 @@ export interface AssistantChatResponse {
   gmail_message?: ChatGmailMessage;
   tts_audio_b64?: string;
   tts_audio_mime?: string;
-  cards?: Array<{
-    id?: string;
-    type?: string;
-    title?: string;
-    subtitle?: string;
-    action_label?: string;
-  }>;
-  actions?: Array<{
-    id?: string;
-    type?: string;
-    title?: string;
-    subtitle?: string;
-    action_label?: string;
-  }>;
+  cards?: ChatCardPayload[];
+  actions?: ChatCardPayload[];
 }
 
 export interface ChatWhatsAppMessage {
@@ -230,6 +231,10 @@ export interface ChatMessage {
   booking?: ChatBooking;
   meeting?: ChatMeeting;
   conflict?: ConflictInfo;
+  requires_confirmation?: boolean;
+  pending_confirmation_id?: string;
+  cards?: ChatCardPayload[];
+  confirmationStatus?: 'pending' | 'confirmed' | 'cancelled';
   pending_confirmation?: DestructiveConfirmation;
   whatsapp_message?: ChatWhatsAppMessage;
   gmail_message?: ChatGmailMessage;

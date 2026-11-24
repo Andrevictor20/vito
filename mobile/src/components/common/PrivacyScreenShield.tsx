@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, AppState, AppStateStatus, Platform } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { shouldShowPrivacyShield } from '../../utils/privacyShield';
 
 /**
@@ -34,7 +34,7 @@ export const PrivacyScreenShield: React.FC = () => {
   return (
     <View style={styles.overlay} pointerEvents="none" accessibilityElementsHidden>
       <View style={styles.lockBadge}>
-        <MaterialIcons name="lock-outline" size={28} color="#A1A1AA" />
+        <ProtoUiIcon name="lock-outline" size={28} color="#A1A1AA" />
       </View>
       <Text style={styles.brandTitle}>Vito</Text>
       <Text style={styles.brandSub}>Conteúdo protegido em segundo plano</Text>

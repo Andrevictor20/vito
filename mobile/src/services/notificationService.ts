@@ -6,6 +6,11 @@ import { NotificationPriority, NotificationSettings, ScheduleNotificationParams,
 import { isAllDayEvent, parseSafeDate } from '../utils/calendarDateUtils';
 import { findOrphanNotificationIds, shouldSkipReschedulingEvent } from '../utils/notificationReconcile';
 import { decideNotificationPermissionRequest } from '../utils/notificationPermissionPolicy';
+import {
+  buildVitoNotificationContent,
+  registerVitoNotificationChannelsAndCategories,
+  type VitoNotificationChannelId,
+} from './notificationDesign';
 
 const SETTINGS_STORAGE_KEY = '@vito_notification_settings';
 const PUSH_TOKEN_SECURE_KEY = '@vito_push_token';
@@ -128,113 +133,13 @@ export const notificationService = {
   },
 
   /**
-   * Inicializa os canais de notificação no Android com alta prioridade (Heads-Up).
+   * Inicializa os grupos de canais, canais v5 e categorias de ações rápidas no Android/iOS.
    */
   async init(): Promise<void> {
     if (!this.isAvailable()) {
       return;
     }
-    if (Platform.OS === 'android') {
-      try {
-        // 1. Canal Silencioso (Low priority)
-        await Notifications.setNotificationChannelAsync('vito_silent', {
-          name: 'Vito — Silencioso',
-          importance: Notifications.AndroidImportance.LOW,
-          enableVibrate: false,
-          sound: null,
-        });
-
-        // 2. Canal Padrão (High priority - Heads-Up banner flutuante, som e vibração)
-        await Notifications.setNotificationChannelAsync('vito_default', {
-          name: 'Vito — Lembretes',
-          importance: Notifications.AndroidImportance.HIGH,
-          enableVibrate: true,
-          vibrationPattern: [0, 250, 250, 250],
-          sound: 'default',
-          lightColor: '#3B82F6',
-          lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
-        });
-
-        // 3. Canal de Compromissos e Agenda
-        await Notifications.setNotificationChannelAsync('vito_events', {
-          name: 'Vito — Compromissos',
-          importance: Notifications.AndroidImportance.HIGH,
-          enableVibrate: true,
-          vibrationPattern: [0, 250, 250, 250],
-          sound: 'default',
-          lightColor: '#3B82F6',
-          lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
-        });
-
-        // 4. Canal de Prazos e Tarefas
-        await Notifications.setNotificationChannelAsync('vito_todos', {
-          name: 'Vito — Tarefas e Prazos',
-          importance: Notifications.AndroidImportance.HIGH,
-          enableVibrate: true,
-          vibrationPattern: [0, 250, 250, 250],
-          sound: 'default',
-          lightColor: '#10B981',
-          lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
-        });
-
-        // 5. Canal de Radares e Vigílias da Internet
-        await Notifications.setNotificationChannelAsync('vito_radar', {
-          name: 'Vito — Radares',
-          importance: Notifications.AndroidImportance.HIGH,
-          enableVibrate: true,
-          vibrationPattern: [0, 250, 250, 250],
-          sound: 'default',
-          lightColor: '#8B5CF6',
-          lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
-        });
-
-        // 6. Canal de Agendamentos (Vito Booking)
-        await Notifications.setNotificationChannelAsync('vito_booking', {
-          name: 'Vito — Agendamentos',
-          importance: Notifications.AndroidImportance.HIGH,
-          enableVibrate: true,
-          vibrationPattern: [0, 250, 250, 250],
-          sound: 'default',
-          lightColor: '#F59E0B',
-          lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
-        });
-
-        // 7. Canal de Resumos Executivos (Diário, Semanal e Mensal)
-        await Notifications.setNotificationChannelAsync('vito_summaries', {
-          name: 'Vito — Resumos Executivos',
-          importance: Notifications.AndroidImportance.HIGH,
-          enableVibrate: true,
-          vibrationPattern: [0, 250, 250, 250],
-          sound: 'default',
-          lightColor: '#6366F1',
-          lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
-        });
-
-        // 8. Canal de Início Imediato / Urgente (Max priority - Pop-up de alta prioridade)
-        await Notifications.setNotificationChannelAsync('vito_urgent', {
-          name: 'Vito — Alertas Imediatos',
-          importance: Notifications.AndroidImportance.MAX,
-          enableVibrate: true,
-          vibrationPattern: [0, 500, 250, 500],
-          sound: 'default',
-          lightColor: '#EF4444',
-          lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
-        });
-
-        // 9. Canal Wake-up Call (Max priority)
-        await Notifications.setNotificationChannelAsync('vito_wakeup', {
-          name: 'Vito — Wake-up Call',
-          importance: Notifications.AndroidImportance.MAX,
-          enableVibrate: true,
-          vibrationPattern: [0, 500, 250, 500],
-          sound: 'default',
-          lightColor: '#EF4444',
-          lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
-        });
-      } catch {
-        // Ignora silenciosamente em ambientes onde a API nativa de canais falhe
-      }
-    }
+    await registerVitoNotificationChannelsAndCategories(Notifications, Platform.OS === 'android');
   },
 
   /**
@@ -397,7 +302,7 @@ export const notificationService = {
     if (!settings.enabled) return null;
 
     const priority: NotificationPriority = params.priority || settings.defaultPriority;
-    const channelId = priority === 'silent' ? 'vito_silent' : 'vito_default';
+    const channelId: VitoNotificationChannelId = priority === 'silent' ? 'vito_silent' : 'vito_default';
 
     const minutesBefore = settings.reminderMinutesBefore || 10;
     const scheduledTime = new Date(params.triggerDate.getTime() - minutesBefore * 60 * 1000);
@@ -406,23 +311,24 @@ export const notificationService = {
       return null;
     }
 
-    const emoji = getNotificationContextEmoji(params.title);
-    const title = emoji ? `${emoji} ${params.title}` : params.title;
-
     const notificationId = await Notifications.scheduleNotificationAsync({
       identifier: params.id,
-      content: {
-        title,
-        body: params.body,
-        sound: priority !== 'silent',
-        priority: Notifications.AndroidNotificationPriority.HIGH,
-        data: {
-          eventId: params.eventId,
-          todoId: params.todoId,
-          priority,
+      content: buildVitoNotificationContent(
+        {
+          channelId,
+          isAndroid: Platform.OS === 'android',
+          title: params.title,
+          body: params.body,
+          sound: priority !== 'silent',
+          priority: priority === 'silent' ? 'low' : 'high',
+          data: {
+            eventId: params.eventId,
+            todoId: params.todoId,
+            priority,
+          },
         },
-        ...(Platform.OS === 'android' ? { channelId } : {}),
-      },
+        Notifications.AndroidNotificationPriority,
+      ),
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DATE,
         date: scheduledTime,
@@ -471,11 +377,9 @@ export const notificationService = {
     const advanceMs = minutesBefore * 60 * 1000;
 
     const priority: NotificationPriority = settings.defaultPriority;
-    const channelId = priority === 'silent' ? 'vito_silent' : 'vito_events';
-    const startChannelId = priority === 'silent' ? 'vito_silent' : 'vito_urgent';
-
-    const emoji = getNotificationContextEmoji(event.title, event.category);
-    const title = emoji ? `${emoji} ${event.title}` : event.title;
+    const channelId: VitoNotificationChannelId = priority === 'silent' ? 'vito_silent' : 'vito_events';
+    const startChannelId: VitoNotificationChannelId = priority === 'silent' ? 'vito_silent' : 'vito_urgent';
+    const locationSuffix = event.location ? ` · ${event.location}` : '';
 
     let advanceId: string | null = null;
     let startId: string | null = null;
@@ -487,19 +391,24 @@ export const notificationService = {
       try {
         advanceId = await Notifications.scheduleNotificationAsync({
           identifier: `event-reminder-adv-${event.id}`,
-          content: {
-            title,
-            body: `Começa em ${minutesBefore} minutos${event.location ? ' em ' + event.location : ''}`,
-            sound: priority !== 'silent',
-            priority: Notifications.AndroidNotificationPriority.HIGH,
-            data: {
-              eventId: event.id,
-              type: 'advance',
-              priority,
+          content: buildVitoNotificationContent(
+            {
               channelId,
+          isAndroid: Platform.OS === 'android',
+              subtitle: 'Agenda',
+              title: event.title,
+              body: `Começa em ${minutesBefore} min${locationSuffix}`,
+              sound: priority !== 'silent',
+              priority: priority === 'silent' ? 'low' : 'high',
+              categoryId: 'vito_event',
+              data: {
+                eventId: event.id,
+                type: 'advance',
+                priority,
+              },
             },
-            ...(Platform.OS === 'android' ? { channelId } : {}),
-          },
+            Notifications.AndroidNotificationPriority,
+          ),
           trigger: {
             type: Notifications.SchedulableTriggerInputTypes.DATE,
             date: advanceTime,
@@ -517,19 +426,24 @@ export const notificationService = {
         try {
           advanceId = await Notifications.scheduleNotificationAsync({
             identifier: `event-reminder-adv-${event.id}`,
-            content: {
-              title: `⚡ ${title}`,
-              body: `Começa em ${minutesLeft} minutos${event.location ? ' em ' + event.location : ''}!`,
-              sound: priority !== 'silent',
-              priority: Notifications.AndroidNotificationPriority.HIGH,
-              data: {
-                eventId: event.id,
-                type: 'advance',
-                priority,
+            content: buildVitoNotificationContent(
+              {
                 channelId,
+          isAndroid: Platform.OS === 'android',
+                subtitle: 'Agenda · Em breve',
+                title: event.title,
+                body: `Começa em ${minutesLeft} min${locationSuffix}`,
+                sound: priority !== 'silent',
+                priority: priority === 'silent' ? 'low' : 'high',
+                categoryId: 'vito_event',
+                data: {
+                  eventId: event.id,
+                  type: 'advance',
+                  priority,
+                },
               },
-              ...(Platform.OS === 'android' ? { channelId } : {}),
-            },
+              Notifications.AndroidNotificationPriority,
+            ),
             trigger: {
               type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
               seconds: 3,
@@ -547,19 +461,24 @@ export const notificationService = {
       try {
         startId = await Notifications.scheduleNotificationAsync({
           identifier: `event-reminder-start-${event.id}`,
-          content: {
-            title,
-            body: `Começando agora${event.location ? ' em ' + event.location : ''}!`,
-            sound: priority !== 'silent',
-            priority: Notifications.AndroidNotificationPriority.MAX,
-            data: {
-              eventId: event.id,
-              type: 'start',
-              priority,
+          content: buildVitoNotificationContent(
+            {
               channelId: startChannelId,
+              isAndroid: Platform.OS === 'android',
+              subtitle: 'Agenda · Agora',
+              title: event.title,
+              body: `Começando agora${locationSuffix}`,
+              sound: priority !== 'silent',
+              priority: 'max',
+              categoryId: 'vito_event',
+              data: {
+                eventId: event.id,
+                type: 'start',
+                priority,
+              },
             },
-            ...(Platform.OS === 'android' ? { channelId: startChannelId } : {}),
-          },
+            Notifications.AndroidNotificationPriority,
+          ),
           trigger: {
             type: Notifications.SchedulableTriggerInputTypes.DATE,
             date: new Date(start),
@@ -602,10 +521,8 @@ export const notificationService = {
       return { advanceId: null, dueId: null };
     }
 
-    const emoji = getNotificationContextEmoji(todo.title, 'todo') || '✓';
-    const title = `${emoji} ${todo.title}`;
     const priority = todo.priority === 'high' ? 'urgent' : settings.defaultPriority;
-    const channelId = 'vito_todos';
+    const channelId: VitoNotificationChannelId = 'vito_todos';
 
     let advanceId: string | null = null;
     let dueId: string | null = null;
@@ -617,14 +534,20 @@ export const notificationService = {
       try {
         advanceId = await Notifications.scheduleNotificationAsync({
           identifier: `todo-reminder-adv-${todo.id}`,
-          content: {
-            title,
-            body: 'Prazo em 15 minutos!',
-            sound: priority !== 'silent',
-            priority: Notifications.AndroidNotificationPriority.HIGH,
-            data: { todoId: todo.id, type: 'todo_advance', priority, channelId },
-            ...(Platform.OS === 'android' ? { channelId } : {}),
-          },
+          content: buildVitoNotificationContent(
+            {
+              channelId,
+          isAndroid: Platform.OS === 'android',
+              subtitle: 'Tarefas',
+              title: todo.title,
+              body: 'Prazo em 15 min',
+              sound: priority !== 'silent',
+              priority: 'high',
+              categoryId: 'vito_todo',
+              data: { todoId: todo.id, type: 'todo_advance', priority },
+            },
+            Notifications.AndroidNotificationPriority,
+          ),
           trigger: {
             type: Notifications.SchedulableTriggerInputTypes.DATE,
             date: advTime,
@@ -641,14 +564,20 @@ export const notificationService = {
         try {
           advanceId = await Notifications.scheduleNotificationAsync({
             identifier: `todo-reminder-adv-${todo.id}`,
-            content: {
-              title: `⏰ ${title}`,
-              body: `Prazo se encerra em ${minutesLeft} minutos!`,
-              sound: priority !== 'silent',
-              priority: Notifications.AndroidNotificationPriority.HIGH,
-              data: { todoId: todo.id, type: 'todo_advance', priority, channelId },
-              ...(Platform.OS === 'android' ? { channelId } : {}),
-            },
+            content: buildVitoNotificationContent(
+              {
+                channelId,
+          isAndroid: Platform.OS === 'android',
+                subtitle: 'Tarefas · Em breve',
+                title: todo.title,
+                body: `Prazo encerra em ${minutesLeft} min`,
+                sound: priority !== 'silent',
+                priority: 'high',
+                categoryId: 'vito_todo',
+                data: { todoId: todo.id, type: 'todo_advance', priority },
+              },
+              Notifications.AndroidNotificationPriority,
+            ),
             trigger: {
               type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
               seconds: 3,
@@ -665,14 +594,20 @@ export const notificationService = {
       try {
         dueId = await Notifications.scheduleNotificationAsync({
           identifier: `todo-reminder-due-${todo.id}`,
-          content: {
-            title: `⏰ Prazo da Tarefa: ${todo.title}`,
-            body: 'O horário estipulado para esta tarefa chegou.',
-            sound: priority !== 'silent',
-            priority: Notifications.AndroidNotificationPriority.MAX,
-            data: { todoId: todo.id, type: 'todo_due', priority: 'urgent', channelId },
-            ...(Platform.OS === 'android' ? { channelId } : {}),
-          },
+          content: buildVitoNotificationContent(
+            {
+              channelId,
+          isAndroid: Platform.OS === 'android',
+              subtitle: 'Tarefas · Prazo agora',
+              title: todo.title,
+              body: 'O horário definido para esta tarefa chegou',
+              sound: priority !== 'silent',
+              priority: 'max',
+              categoryId: 'vito_todo',
+              data: { todoId: todo.id, type: 'todo_due', priority: 'urgent' },
+            },
+            Notifications.AndroidNotificationPriority,
+          ),
           trigger: {
             type: Notifications.SchedulableTriggerInputTypes.DATE,
             date: new Date(due),
@@ -720,8 +655,7 @@ export const notificationService = {
     const at = parseSafeDate(pending.remind_at).getTime();
     if (isNaN(at) || at <= Date.now()) return { mainId: null, advanceId: null };
 
-    const channelId = 'vito_todos';
-    const emoji = getNotificationContextEmoji(pending.title, 'todo') || '📌';
+    const channelId: VitoNotificationChannelId = 'vito_todos';
     const atDate = new Date(at);
     const repeatMode = pending.remind_repeat === 'daily' ? 'daily' : pending.remind_repeat === 'weekly' ? 'weekly' : 'once';
     // Repetição usa gatilho de calendário (DATE não repete no expo-notifications).
@@ -736,14 +670,20 @@ export const notificationService = {
     try {
       const res: any = await Notifications.scheduleNotificationAsync({
         identifier: `pending-reminder-${pending.id}`,
-        content: {
-          title: `${emoji} ${pending.title}`,
-          body: repeatMode === 'once' ? 'Hora de resolver esta pendência.' : 'Lembrete de pendência (repete).',
-          sound: true,
-          priority: Notifications.AndroidNotificationPriority.HIGH,
-          data: { pendingId: pending.id, type: 'pending_reminder', channelId },
-          ...(Platform.OS === 'android' ? { channelId } : {}),
-        },
+        content: buildVitoNotificationContent(
+          {
+            channelId,
+          isAndroid: Platform.OS === 'android',
+            subtitle: 'Pendências',
+            title: pending.title,
+            body: repeatMode === 'once' ? 'Hora de resolver esta pendência' : 'Lembrete recorrente de pendência',
+            sound: true,
+            priority: 'high',
+            categoryId: 'vito_todo',
+            data: { pendingId: pending.id, type: 'pending_reminder' },
+          },
+          Notifications.AndroidNotificationPriority,
+        ),
         trigger,
       });
       mainId = typeof res === 'string' ? res : `pending-reminder-${pending.id}`;
@@ -756,14 +696,20 @@ export const notificationService = {
       try {
         const res: any = await Notifications.scheduleNotificationAsync({
           identifier: `pending-reminder-adv-${pending.id}`,
-          content: {
-            title: `${emoji} ${pending.title}`,
-            body: `Em ${advanceMin} minutos: hora de resolver.`,
-            sound: true,
-            priority: Notifications.AndroidNotificationPriority.HIGH,
-            data: { pendingId: pending.id, type: 'pending_reminder_advance', channelId },
-            ...(Platform.OS === 'android' ? { channelId } : {}),
-          },
+          content: buildVitoNotificationContent(
+            {
+              channelId,
+          isAndroid: Platform.OS === 'android',
+              subtitle: 'Pendências · Em breve',
+              title: pending.title,
+              body: `Em ${advanceMin} min · hora de resolver`,
+              sound: true,
+              priority: 'high',
+              categoryId: 'vito_todo',
+              data: { pendingId: pending.id, type: 'pending_reminder_advance' },
+            },
+            Notifications.AndroidNotificationPriority,
+          ),
           trigger: {
             type: Notifications.SchedulableTriggerInputTypes.DATE,
             date: new Date(at - advanceMin * 60000),
@@ -936,24 +882,29 @@ export const notificationService = {
   async triggerTestNotification(priority: NotificationPriority): Promise<void> {
     if (!this.isAvailable()) return;
     try {
-      const channelId = priority === 'silent' ? 'vito_silent' : 'vito_default';
+      const channelId: VitoNotificationChannelId = priority === 'silent' ? 'vito_silent' : 'vito_default';
       const title = priority === 'silent'
-        ? '[TESTE] Notificação Silenciosa'
-        : '[TESTE] Notificação Vito';
-      
+        ? 'Notificação silenciosa'
+        : 'Notificação de teste';
+
       const body = priority === 'silent'
-        ? 'Alerta sem som, mantendo total discrição.'
-        : 'Alerta com som e banner em alta prioridade.';
+        ? 'Alerta discreto sem som · organização v5 ativa'
+        : 'Alerta com som e banner · organização v5 ativa';
 
       await Notifications.scheduleNotificationAsync({
-        content: {
-          title,
-          body,
-          sound: priority !== 'silent',
-          priority: Notifications.AndroidNotificationPriority.HIGH,
-          data: { priority, isTest: true },
-          ...(Platform.OS === 'android' ? { channelId } : {}),
-        },
+        content: buildVitoNotificationContent(
+          {
+            channelId,
+          isAndroid: Platform.OS === 'android',
+            subtitle: priority === 'silent' ? 'Silencioso' : 'Teste',
+            title,
+            body,
+            sound: priority !== 'silent',
+            priority: priority === 'silent' ? 'low' : 'high',
+            data: { priority, isTest: true },
+          },
+          Notifications.AndroidNotificationPriority,
+        ),
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
           seconds: 2,
@@ -961,6 +912,46 @@ export const notificationService = {
       });
     } catch (e) {
       console.warn('[NotificationService] Erro ao disparar notificação de teste:', e);
+    }
+  },
+
+  /**
+   * Executa ações rápidas diretamente da barra de notificação (ex.: Adiar 5 min / Adiar 15 min).
+   */
+  async handleQuickActionResponse(response: any): Promise<boolean> {
+    if (!this.isAvailable() || !response) return false;
+    const actionId: string | undefined = response.actionIdentifier;
+    if (actionId !== 'snooze_5m' && actionId !== 'snooze_15m') return false;
+
+    const minutes = actionId === 'snooze_5m' ? 5 : 15;
+    const orig = response.notification?.request?.content;
+    const origData = (orig?.data || {}) as Record<string, unknown>;
+    const channelId = (origData.channelId as VitoNotificationChannelId | undefined) || 'vito_default';
+
+    try {
+      await Notifications.scheduleNotificationAsync({
+        content: buildVitoNotificationContent(
+          {
+            channelId,
+          isAndroid: Platform.OS === 'android',
+            subtitle: `${typeof orig?.subtitle === 'string' && orig.subtitle ? orig.subtitle : 'Lembrete'} · Adiado`,
+            title: typeof orig?.title === 'string' && orig.title ? orig.title : 'Lembrete do Vito',
+            body: typeof orig?.body === 'string' && orig.body ? orig.body : `Adiado por ${minutes} min`,
+            sound: true,
+            priority: 'high',
+            data: { ...origData, snoozedMinutes: minutes },
+          },
+          Notifications.AndroidNotificationPriority,
+        ),
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+          seconds: minutes * 60,
+        },
+      });
+      return true;
+    } catch (e) {
+      console.warn('[NotificationService] Falha ao adiar notificação:', e);
+      return false;
     }
   },
 

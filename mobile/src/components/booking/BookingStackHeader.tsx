@@ -1,13 +1,17 @@
 import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { useTheme } from '../../context/ThemeContext';
 
 interface BookingStackHeaderProps {
   onBack: () => void;
+  onPressNew?: () => void;
 }
 
-export const BookingStackHeader: React.FC<BookingStackHeaderProps> = ({ onBack }) => {
+export const BookingStackHeader: React.FC<BookingStackHeaderProps> = ({
+  onBack,
+  onPressNew,
+}) => {
   const { colors } = useTheme();
   return (
     <View
@@ -27,19 +31,39 @@ export const BookingStackHeader: React.FC<BookingStackHeaderProps> = ({ onBack }
           borderRadius: 21,
           borderWidth: 1,
           borderColor: colors.line,
-          backgroundColor: colors.surf,
+          backgroundColor: colors.bg,
           alignItems: 'center',
           justifyContent: 'center',
         }}
         onPress={onBack}
         accessibilityLabel="Voltar"
       >
-        <MaterialIcons name="arrow-back" size={20} color={colors.ink} />
+        <ProtoUiIcon name="arrow-back" size={20} color={colors.ink} />
       </TouchableOpacity>
       <View style={{ flex: 1 }}>
-        <Text style={{ fontSize: 22, fontWeight: '600', color: colors.ink }}>Agendamentos</Text>
-        <Text style={{ fontSize: 12.5, color: colors.muted }}>Links e votações de horário</Text>
+        <Text style={{ fontFamily: 'Geist_500Medium', fontSize: 22, color: colors.ink }}>
+          Agendamentos
+        </Text>
+        <Text style={{ fontFamily: 'Geist', fontSize: 12.5, color: colors.muted }}>
+          Links e votações de horário
+        </Text>
       </View>
+      {onPressNew && (
+        <TouchableOpacity
+          style={{
+            width: 42,
+            height: 42,
+            borderRadius: 21,
+            backgroundColor: colors.ink,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+          onPress={onPressNew}
+          accessibilityLabel="Novo link"
+        >
+          <ProtoUiIcon name="add" size={20} color={colors.bg} />
+        </TouchableOpacity>
+      )}
     </View>
   );
 };

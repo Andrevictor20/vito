@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { tokens, MD3Shapes } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { EventCard } from './EventCard';
@@ -69,7 +69,7 @@ export const SelectedDayInspector: React.FC<SelectedDayInspectorProps> = ({
           accessibilityLabel="Ver compromissos deste dia na agenda principal"
           accessibilityRole="button"
         >
-          <MaterialIcons name="visibility" size={16} color={colors.primary} />
+          <ProtoUiIcon name="visibility" size={16} color={colors.primary} />
           <Text style={[styles.viewInAgendaText, { color: colors.onSurface }]}>Ver na Agenda</Text>
         </TouchableOpacity>
       </View>
@@ -77,7 +77,7 @@ export const SelectedDayInspector: React.FC<SelectedDayInspectorProps> = ({
       {selectedDayEvents.length === 0 ? (
         <View style={[styles.emptyCard, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
           <View style={[styles.emptyIconContainer, { backgroundColor: colors.surfaceContainerHigh }]}>
-            <MaterialIcons name="event-available" size={22} color={colors.primary} />
+            <ProtoUiIcon name="event-available" size={22} color={colors.primary} />
           </View>
           <View style={styles.emptyContent}>
             <Text style={[styles.emptyTitle, { color: colors.onSurface }]}>Dia Livre</Text>
@@ -93,7 +93,7 @@ export const SelectedDayInspector: React.FC<SelectedDayInspectorProps> = ({
               accessibilityLabel="Adicionar evento neste dia"
               accessibilityRole="button"
             >
-              <MaterialIcons name="add" size={16} color={colors.primary} />
+              <ProtoUiIcon name="add" size={16} color={colors.primary} />
               <Text style={[styles.quickAddText, { color: colors.primary }]}>Adicionar</Text>
             </TouchableOpacity>
           )}
@@ -125,10 +125,12 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   selectedDayTitle: {
+    fontFamily: 'Geist_500Medium',
     fontSize: tokens.typography.size.titleMedium,
-    fontWeight: tokens.typography.weight.bold,
+    fontWeight: '500',
   },
   selectedDayMeta: {
+    fontFamily: 'Geist',
     fontSize: tokens.typography.size.bodySmall,
     marginTop: 2,
   },
@@ -139,24 +141,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: MD3Shapes.full,
-    borderWidth: 1,
+    borderWidth: 0,
   },
   viewInAgendaText: {
-    fontSize: 12,
-    fontWeight: '700',
+    fontFamily: 'Geist_500Medium',
+    fontSize: 12.5,
+    fontWeight: '500',
   },
   emptyCard: {
-    borderWidth: 1,
-    borderRadius: MD3Shapes.largeIncreased,
+    borderWidth: 0,
+    borderRadius: 22,
     padding: tokens.spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
   },
   emptyIconContainer: {
-    width: 42,
-    height: 42,
-    borderRadius: MD3Shapes.medium,
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -164,10 +167,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   emptyTitle: {
+    fontFamily: 'Geist_500Medium',
     fontSize: tokens.typography.size.titleSmall,
-    fontWeight: tokens.typography.weight.bold,
+    fontWeight: '500',
   },
   emptySub: {
+    fontFamily: 'Geist',
     fontSize: tokens.typography.size.bodySmall,
     marginTop: 2,
   },
@@ -175,13 +180,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
     borderRadius: MD3Shapes.full,
-    borderWidth: 1,
+    borderWidth: 0,
   },
   quickAddText: {
-    fontSize: 12,
-    fontWeight: '700',
+    fontFamily: 'Geist_500Medium',
+    fontSize: 12.5,
+    fontWeight: '500',
   },
 });

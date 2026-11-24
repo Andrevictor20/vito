@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../icons/ProtoUiIcons';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
 import { hapticFeedback } from '../theme/motion';
@@ -80,13 +80,13 @@ export const BehaviorScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.bg }]}>
-      <View style={[styles.sbar, { borderBottomColor: colors.line }]}>
+      <View style={styles.sbar}>
         <TouchableOpacity
-          style={[styles.rb, { backgroundColor: colors.surf, borderColor: colors.line }]}
+          style={[styles.rb, { backgroundColor: colors.bg, borderColor: colors.hairline }]}
           onPress={() => navigation.goBack()}
           accessibilityLabel="Voltar"
         >
-          <MaterialIcons name="arrow-back" size={20} color={colors.ink} />
+          <ProtoUiIcon name="arrow-back" size={20} color={colors.ink} />
         </TouchableOpacity>
         <View style={styles.ttl}>
           <Text style={[styles.h1, { color: colors.ink }]}>Autonomia do Vito</Text>
@@ -95,7 +95,7 @@ export const BehaviorScreen: React.FC = () => {
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        <View style={[styles.seg, { backgroundColor: colors.surf }]}>
+        <View style={[styles.seg, { backgroundColor: colors.surf, borderColor: colors.line }]}>
           {[
             { id: 'assisted' as const, label: 'Assistido' },
             { id: 'proactive' as const, label: 'Proativo' },
@@ -107,7 +107,13 @@ export const BehaviorScreen: React.FC = () => {
                 style={[styles.segBtn, active && { backgroundColor: colors.ink }]}
                 onPress={() => handleAutonomy(opt.id)}
               >
-                <Text style={[styles.segText, { color: active ? colors.bg : colors.ink }]}>
+                <Text
+                  style={[
+                    styles.segText,
+                    { color: active ? colors.bg : colors.muted },
+                    active && styles.segTextActive,
+                  ]}
+                >
                   {opt.label}
                 </Text>
               </TouchableOpacity>
@@ -123,7 +129,7 @@ export const BehaviorScreen: React.FC = () => {
         <View style={[styles.card, { backgroundColor: colors.surf, borderColor: colors.line }]}>
           <View style={styles.row}>
             <View style={[styles.iconBox, { backgroundColor: colors.bg }]}>
-              <MaterialIcons name="timer" size={19} color={colors.ink} />
+              <ProtoUiIcon name="timer" size={19} color={colors.ink} />
             </View>
             <View style={styles.rowText}>
               <Text style={[styles.rowTitle, { color: colors.ink }]}>Blocos de foco</Text>
@@ -171,13 +177,13 @@ export const BehaviorScreen: React.FC = () => {
             onPress={() => navigateToScreen('voiceSettings')}
           >
             <View style={[styles.iconBox, { backgroundColor: colors.bg }]}>
-              <MaterialIcons name="record-voice-over" size={19} color={colors.ink} />
+              <ProtoUiIcon name="record-voice-over" size={19} color={colors.ink} />
             </View>
             <View style={styles.rowText}>
               <Text style={[styles.rowTitle, { color: colors.ink }]}>Voz</Text>
               <Text style={[styles.rowSub, { color: colors.muted }]}>{voiceLabel}</Text>
             </View>
-            <MaterialIcons name="chevron-right" size={20} color={colors.muted} />
+            <ProtoUiIcon name="chevron-right" size={20} color={colors.muted} />
           </TouchableOpacity>
 
           <View style={[styles.divider, { backgroundColor: colors.line }]} />
@@ -187,13 +193,13 @@ export const BehaviorScreen: React.FC = () => {
             onPress={() => navigateToScreen('memory', { from: 'behavior' })}
           >
             <View style={[styles.iconBox, { backgroundColor: colors.bg }]}>
-              <MaterialIcons name="psychology" size={19} color={colors.ink} />
+              <ProtoUiIcon name="psychology" size={19} color={colors.ink} />
             </View>
             <View style={styles.rowText}>
               <Text style={[styles.rowTitle, { color: colors.ink }]}>Memória</Text>
               <Text style={[styles.rowSub, { color: colors.muted }]}>O que o Vito sabe sobre mim</Text>
             </View>
-            <MaterialIcons name="chevron-right" size={20} color={colors.muted} />
+            <ProtoUiIcon name="chevron-right" size={20} color={colors.muted} />
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -222,9 +228,10 @@ const styles = StyleSheet.create({
   h1: { fontSize: 22, fontWeight: '600', letterSpacing: -0.4 },
   sub: { fontSize: 12.5, marginTop: 1 },
   content: { padding: 16, paddingBottom: 60 },
-  seg: { flexDirection: 'row', borderRadius: 14, padding: 3 },
-  segBtn: { flex: 1, height: 38, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
-  segText: { fontSize: 13.5, fontWeight: '600' },
+  seg: { flexDirection: 'row', borderRadius: 999, borderWidth: 1, padding: 4, gap: 4 },
+  segBtn: { flex: 1, height: 40, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
+  segText: { fontFamily: 'Geist_500Medium', fontSize: 13.5 },
+  segTextActive: { fontFamily: 'Geist_600SemiBold' },
   desc: { fontSize: 13, marginTop: 10, marginBottom: 16, lineHeight: 19 },
   card: { borderRadius: 20, borderWidth: 1, overflow: 'hidden' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },

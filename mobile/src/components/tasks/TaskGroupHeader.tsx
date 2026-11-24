@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { useTheme } from '../../context/ThemeContext';
 import { tokens } from '../../theme/tokens';
 import { hapticFeedback } from '../../theme/motion';
@@ -77,7 +77,7 @@ export const TaskGroupHeader: React.FC<TaskGroupHeaderProps> = ({
       <View style={styles.spacer} />
 
       {onToggleCollapse && (
-        <MaterialIcons
+        <ProtoUiIcon
           name={collapsed ? 'keyboard-arrow-right' : 'keyboard-arrow-down'}
           size={20}
           color={colors.muted}

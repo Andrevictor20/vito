@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../../icons/ProtoUiIcons';
 import { useTheme } from '../../../context/ThemeContext';
 import { tokens } from '../../../theme/tokens';
 import type { useByokSetup } from '../../../hooks/useByokSetup';
@@ -117,7 +117,7 @@ export const ByokStepper: React.FC<{ setup: Setup }> = ({ setup: s }) => {
             accessibilityRole="button"
             accessibilityLabel={chipLabel}
           >
-            <MaterialIcons name="content-copy" size={16} color={colors.acc} />
+            <ProtoUiIcon name="content-copy" size={16} color={colors.acc} />
             <Text style={[styles.cchipText, { color: colors.ink }]} numberOfLines={1}>
               {chipLabel}
             </Text>
@@ -211,7 +211,7 @@ export const ByokStepper: React.FC<{ setup: Setup }> = ({ setup: s }) => {
             accessibilityRole="button"
             accessibilityLabel={step2ChipLabel}
           >
-            <MaterialIcons name="content-copy" size={16} color={colors.acc} />
+            <ProtoUiIcon name="content-copy" size={16} color={colors.acc} />
             <Text style={[styles.cchipText, { color: colors.ink }]} numberOfLines={1}>
               {step2ChipLabel}
             </Text>

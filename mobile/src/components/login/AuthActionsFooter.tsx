@@ -1,6 +1,7 @@
 import React from 'react'
 import {
   ActivityIndicator,
+  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -149,11 +150,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.14,
-    shadowRadius: 20,
-    elevation: 4,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000000',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.14,
+        shadowRadius: 20,
+      },
+      default: {},
+    }),
   } as ViewStyle,
   googleBadge: {
     width: 24,
@@ -164,7 +169,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   } as ViewStyle,
   primaryBtnText: {
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Geist_600SemiBold',
     fontSize: 15,
     letterSpacing: -0.15,
   } as TextStyle,
@@ -183,18 +188,18 @@ const styles = StyleSheet.create({
     gap: 8,
   } as ViewStyle,
   secBtnText: {
-    fontFamily: 'Inter_500Medium',
+    fontFamily: 'Geist_500Medium',
     fontSize: 14,
   } as TextStyle,
   legalText: {
     textAlign: 'center',
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'Geist_400Regular',
     fontSize: 11.5,
     lineHeight: 16,
     marginTop: 4,
   } as TextStyle,
   legalLink: {
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Geist_600SemiBold',
     textDecorationLine: 'underline',
   } as TextStyle,
 })

@@ -1,6 +1,6 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, ScrollView, Platform } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { tokens } from '../../theme/tokens';
 
 let Updates: typeof import('expo-updates') | null = null;
@@ -73,7 +73,7 @@ export class ErrorBoundary extends Component<Props, State> {
         <View style={styles.container}>
           <View style={styles.card}>
             <View style={styles.iconContainer}>
-              <MaterialCommunityIcons name="alert-circle-outline" size={48} color={tokens.colors.error} />
+              <ProtoUiIcon name="error-outline" size={48} color={tokens.colors.error} />
             </View>
 
             <Text style={styles.title}>{title}</Text>
@@ -81,12 +81,12 @@ export class ErrorBoundary extends Component<Props, State> {
 
             <View style={styles.buttonRow}>
               <TouchableOpacity style={[styles.button, styles.primaryButton]} onPress={this.handleReset} activeOpacity={0.8}>
-                <MaterialCommunityIcons name="refresh" size={18} color="#FFFFFF" style={styles.buttonIcon} />
+                <ProtoUiIcon name="refresh" size={18} color="#FFFFFF" style={styles.buttonIcon} />
                 <Text style={styles.primaryButtonText}>Tentar Novamente</Text>
               </TouchableOpacity>
 
               <TouchableOpacity style={[styles.button, styles.secondaryButton]} onPress={this.handleReloadApp} activeOpacity={0.8}>
-                <MaterialCommunityIcons name="power" size={18} color={tokens.colors.primary} style={styles.buttonIcon} />
+                <ProtoUiIcon name="bolt" size={18} color={tokens.colors.primary} style={styles.buttonIcon} />
                 <Text style={styles.secondaryButtonText}>Recarregar App</Text>
               </TouchableOpacity>
             </View>

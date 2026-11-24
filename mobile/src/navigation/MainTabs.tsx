@@ -22,10 +22,10 @@ import { FinanceScreen } from '../screens/FinanceScreen';
 import { NotificationsScreen } from '../screens/NotificationsScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
 import { hapticFeedback } from '../theme/motion';
+import { SectionTransition } from '../ds/SectionTransition';
 import {
-  CircularThemeRevealOverlay,
-  TransitioningView,
   VfxCelebrationOverlay,
+  useReduceMotion,
 } from '../theme/vitoMotion';
 import { determineBackAction, type MainTabType } from '../utils/pagerNavigation';
 import { AgendaTabScreen } from './AgendaTabScreen';
@@ -48,6 +48,7 @@ export const MainTabs: React.FC<{ route?: { params?: { screen?: MainTabType } } 
   const { colors } = useTheme();
   const { user } = useAuth();
   const home = useHomeDataContext();
+  const reduceMotion = useReduceMotion();
 
   const [activeTab, setActiveTab] = useState<DockTabType>('chat');
   const [overlaySubScreen, setOverlaySubScreen] = useState<OverlaySubScreen>(null);
@@ -298,10 +299,11 @@ export const MainTabs: React.FC<{ route?: { params?: { screen?: MainTabType } } 
         </View>
       </AdaptivePager>
 
-      {/* Sub-telas pushed fora da dock: Booking (#open-book) e Perfil (AV) */}
-      <TransitioningView
+      {/* Sub-telas pushed fora da dock: Booking (#open-book), Perfil (AV) e Notificações */}
+      <SectionTransition
         visible={overlaySubScreen === 'booking'}
         mode="push"
+        reduceMotion={reduceMotion}
         style={[styles.overlaySubScreen, { backgroundColor: colors.bg }]}
       >
         <SubScreenHeader
@@ -310,23 +312,24 @@ export const MainTabs: React.FC<{ route?: { params?: { screen?: MainTabType } } 
           onPressBack={() => setOverlaySubScreen(null)}
           rightAction={
             <HeaderRoundButton
-              icon="auto-awesome"
+              icon="add"
               variant="primary"
               onPress={() => {
                 setOverlaySubScreen(null);
                 handleSelectTab('chat');
               }}
-              accessibilityLabel="Pedir ao Vito: novo link"
+              accessibilityLabel="Novo link"
               size={20}
             />
           }
         />
         <BookingScreen onSubViewChange={setInBookingSubView} />
-      </TransitioningView>
+      </SectionTransition>
 
-      <TransitioningView
+      <SectionTransition
         visible={overlaySubScreen === 'profile'}
         mode="push"
+        reduceMotion={reduceMotion}
         style={[styles.overlaySubScreen, { backgroundColor: colors.bg }]}
       >
         <SubScreenHeader
@@ -339,15 +342,16 @@ export const MainTabs: React.FC<{ route?: { params?: { screen?: MainTabType } } 
           onRefresh={home.onRefresh}
           onDataChanged={home.loadData}
         />
-      </TransitioningView>
+      </SectionTransition>
 
-      <TransitioningView
+      <SectionTransition
         visible={overlaySubScreen === 'notifications'}
         mode="push"
+        reduceMotion={reduceMotion}
         style={[styles.overlaySubScreen, { backgroundColor: colors.bg }]}
       >
         <NotificationsScreen onBack={() => setOverlaySubScreen(null)} />
-      </TransitioningView>
+      </SectionTransition>
 
       <FloatingTabBar
         activeTab={activeTab}
@@ -355,7 +359,6 @@ export const MainTabs: React.FC<{ route?: { params?: { screen?: MainTabType } } 
         visible={!keyboardOpen && overlaySubScreen === null && !inAgendaSubView && !inTriggersSubView}
       />
 
-      <CircularThemeRevealOverlay />
       <VfxCelebrationOverlay />
     </View>
   );

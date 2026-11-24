@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { tokens, tabularNumbers } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { hapticFeedback } from '../../theme/motion';
@@ -95,7 +95,7 @@ export const BentoAccountHero: React.FC<BentoAccountHeroProps> = ({
             </View>
           ) : (
             <View style={[styles.avatarFallback, { backgroundColor: colors.finBg }]}>
-              <MaterialIcons name="account-balance" size={16} color={colors.fin} />
+              <ProtoUiIcon name="account-balance" size={16} color={colors.fin} />
             </View>
           )}
           <Text style={[styles.topLabel, { color: colors.ink }]}>
@@ -104,7 +104,7 @@ export const BentoAccountHero: React.FC<BentoAccountHeroProps> = ({
               : 'Nenhuma conta conectada'}
           </Text>
         </View>
-        <MaterialIcons name="chevron-right" size={18} color={colors.muted} />
+        <ProtoUiIcon name="chevron-right" size={18} color={colors.muted} />
       </TouchableOpacity>
 
       {/* Saldo consolidado */}
@@ -127,7 +127,7 @@ export const BentoAccountHero: React.FC<BentoAccountHeroProps> = ({
             <Text style={[styles.accordionTitle, { color: colors.muted }]}>
               CONTAS ATIVAS ({bankAccounts.length})
             </Text>
-            <MaterialIcons
+            <ProtoUiIcon
               name={isExpanded ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
               size={18}
               color={colors.muted}

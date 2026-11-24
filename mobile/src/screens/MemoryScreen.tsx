@@ -9,7 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../icons/ProtoUiIcons';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
 import { hapticFeedback } from '../theme/motion';
@@ -99,13 +99,13 @@ export const MemoryScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.bg }]}>
-      <View style={[styles.sbar, { borderBottomColor: colors.line }]}>
+      <View style={styles.sbar}>
         <TouchableOpacity
-          style={[styles.rb, { backgroundColor: colors.surf, borderColor: colors.line }]}
+          style={[styles.rb, { backgroundColor: colors.bg, borderColor: colors.hairline }]}
           onPress={() => navigation.goBack()}
           accessibilityLabel="Voltar"
         >
-          <MaterialIcons name="arrow-back" size={20} color={colors.ink} />
+          <ProtoUiIcon name="arrow-back" size={20} color={colors.ink} />
         </TouchableOpacity>
         <View style={styles.ttl}>
           <Text style={[styles.h1, { color: colors.ink }]}>Memória do Vito</Text>
@@ -116,12 +116,12 @@ export const MemoryScreen: React.FC = () => {
           onPress={() => setAddOpen(true)}
           accessibilityLabel="Adicionar fato ou preferência"
         >
-          <MaterialIcons name="add" size={22} color={colors.bg} />
+          <ProtoUiIcon name="add" size={22} color={colors.bg} />
         </TouchableOpacity>
       </View>
 
       <View style={styles.segWrap}>
-        <View style={[styles.seg, { backgroundColor: colors.surf }]}>
+        <View style={[styles.seg, { backgroundColor: colors.surf, borderColor: colors.line }]}>
           {[
             { id: 'themes' as MemTab, label: `Temas (${data.themes.length})` },
             { id: 'episodes' as MemTab, label: `Episódios (${data.episodes.length})` },
@@ -137,7 +137,13 @@ export const MemoryScreen: React.FC = () => {
                   setTab(t.id);
                 }}
               >
-                <Text style={[styles.segText, { color: active ? colors.bg : colors.ink }]}>
+                <Text
+                  style={[
+                    styles.segText,
+                    { color: active ? colors.bg : colors.muted },
+                    active && styles.segTextActive,
+                  ]}
+                >
                   {t.label}
                 </Text>
               </TouchableOpacity>
@@ -160,7 +166,7 @@ export const MemoryScreen: React.FC = () => {
                 <View style={styles.cardHd}>
                   <Text style={[styles.cardTitle, { color: colors.ink }]}>{t.theme_title}</Text>
                   <TouchableOpacity onPress={() => handleDeleteTheme(t.theme_slug)} hitSlop={8}>
-                    <MaterialIcons name="delete-outline" size={20} color={colors.muted} />
+                    <ProtoUiIcon name="delete-outline" size={20} color={colors.muted} />
                   </TouchableOpacity>
                 </View>
                 <Text style={[styles.cardBody, { color: colors.muted }]}>{t.consolidated_summary}</Text>
@@ -183,7 +189,7 @@ export const MemoryScreen: React.FC = () => {
                 <View style={styles.cardHd}>
                   <Text style={[styles.cardTitle, { color: colors.ink }]}>{ep.title}</Text>
                   <TouchableOpacity onPress={() => handleDeleteEpisode(ep.id)} hitSlop={8}>
-                    <MaterialIcons name="delete-outline" size={20} color={colors.muted} />
+                    <ProtoUiIcon name="delete-outline" size={20} color={colors.muted} />
                   </TouchableOpacity>
                 </View>
                 <Text style={[styles.cardBody, { color: colors.muted }]}>{ep.narrative_summary}</Text>
@@ -210,7 +216,7 @@ export const MemoryScreen: React.FC = () => {
                 <Text style={[styles.factText, { color: colors.ink }]}>{f.content}</Text>
               </View>
               <TouchableOpacity onPress={() => handleDeleteFact(f.id)} hitSlop={8}>
-                <MaterialIcons name="delete-outline" size={20} color={colors.muted} />
+                <ProtoUiIcon name="delete-outline" size={20} color={colors.muted} />
               </TouchableOpacity>
             </View>
           ))
@@ -273,9 +279,10 @@ const styles = StyleSheet.create({
   h1: { fontSize: 22, fontWeight: '600', letterSpacing: -0.4 },
   sub: { fontSize: 12.5, marginTop: 1 },
   segWrap: { paddingHorizontal: 16, paddingTop: 12 },
-  seg: { flexDirection: 'row', borderRadius: 14, padding: 3 },
-  segBtn: { flex: 1, height: 36, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
-  segText: { fontSize: 12.5, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  seg: { flexDirection: 'row', borderRadius: 999, borderWidth: 1, padding: 4, gap: 4 },
+  segBtn: { flex: 1, height: 40, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
+  segText: { fontFamily: 'Geist_500Medium', fontSize: 13, fontVariant: ['tabular-nums'] },
+  segTextActive: { fontFamily: 'Geist_600SemiBold' },
   content: { padding: 16, paddingBottom: 60, gap: 10 },
   card: { borderRadius: 20, borderWidth: 1, padding: 16, gap: 8 },
   cardHd: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10 },

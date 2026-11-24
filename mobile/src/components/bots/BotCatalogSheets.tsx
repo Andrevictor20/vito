@@ -1,6 +1,6 @@
 import React from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { useTheme } from '../../context/ThemeContext';
 import { ActionPolicy, Bot, BotAppInfo, SkillPackage } from '../../types/bots';
 import { BottomSheetModal } from '../ui/BottomSheetModal';
@@ -22,7 +22,7 @@ export const NewBotChoiceSheet: React.FC<{
             onChooseMascotStudio();
           }}
         >
-          <MaterialIcons name="palette" size={22} color={colors.ink} />
+          <ProtoUiIcon name="palette" size={22} color={colors.ink} />
           <View style={styles.col}>
             <Text style={[styles.choiceTitle, { color: colors.ink }]}>
               Configurar mascote e função
@@ -31,7 +31,7 @@ export const NewBotChoiceSheet: React.FC<{
               Escolha nome, cores próprias e personalize o bot
             </Text>
           </View>
-          <MaterialIcons name="chevron-right" size={20} color={colors.muted} />
+          <ProtoUiIcon name="chevron-right" size={20} color={colors.muted} />
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -41,14 +41,14 @@ export const NewBotChoiceSheet: React.FC<{
             onChooseAskVito();
           }}
         >
-          <MaterialIcons name="auto-awesome" size={22} color={colors.acc} />
+          <ProtoUiIcon name="auto-awesome" size={22} color={colors.acc} />
           <View style={styles.col}>
             <Text style={[styles.choiceTitle, { color: colors.ink }]}>Pedir ao Vito IA</Text>
             <Text style={[styles.choiceSub, { color: colors.muted }]}>
               Descreva o que você quer e o Vito monta o bot
             </Text>
           </View>
-          <MaterialIcons name="chevron-right" size={20} color={colors.muted} />
+          <ProtoUiIcon name="chevron-right" size={20} color={colors.muted} />
         </TouchableOpacity>
       </View>
     </BottomSheetModal>
@@ -131,7 +131,7 @@ export const SkillPickBotSheet: React.FC<{
                 <Text style={[styles.choiceTitle, { color: colors.ink }]}>{bot.title}</Text>
                 <Text style={[styles.choiceSub, { color: colors.muted }]}>{bot.category}</Text>
               </View>
-              <MaterialIcons name="add" size={20} color={colors.ink} />
+              <ProtoUiIcon name="add" size={20} color={colors.ink} />
             </TouchableOpacity>
           ))
         )}
@@ -172,7 +172,7 @@ export const AddSkillSheet: React.FC<{
                   {sk.description}
                 </Text>
               </View>
-              <MaterialIcons name="add-circle-outline" size={20} color={colors.ink} />
+              <ProtoUiIcon name="add-circle-outline" size={20} color={colors.ink} />
             </TouchableOpacity>
           ))
         )}
@@ -224,7 +224,7 @@ export const AddActionSheet: React.FC<{
                           : 'Padrão: Automática'}
                     </Text>
                   </View>
-                  <MaterialIcons name="add" size={20} color={colors.ink} />
+                  <ProtoUiIcon name="add" size={20} color={colors.ink} />
                 </TouchableOpacity>
               ))}
             </View>

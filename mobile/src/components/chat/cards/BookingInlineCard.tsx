@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { StyleSheet, View, Text } from 'react-native';
+import { ProtoUiIcon } from '../../../icons/ProtoUiIcons';
 import { copyToClipboard } from '../../../utils/clipboard';
 import { useTheme } from '../../../context/ThemeContext';
 import { ChatBooking } from '../../../types';
 import { bookingDisplayLink } from '../../../utils/chatCards';
 import { tabNavigationBus } from '../../../services/dataSync';
 import { hapticFeedback } from '../../../theme/motion';
+import { PressableScale } from '../../../theme/vitoMotion';
 
 interface BookingInlineCardProps {
   booking: ChatBooking;
@@ -44,18 +45,10 @@ export const BookingInlineCard: React.FC<BookingInlineCardProps> = ({ booking })
   return (
     <View style={styles.wrapper}>
       {/* Card Principal */}
-      <View
-        style={[
-          styles.card,
-          {
-            backgroundColor: colors.bg,
-            borderColor: colors.line,
-          },
-        ]}
-      >
-        {/* Chip Azul 44x44 com Ícone de Link */}
+      <View style={[styles.card, { backgroundColor: colors.surf }]}>
+        {/* Chip Azul 40x40 com Ícone de Link */}
         <View style={[styles.chip, { backgroundColor: colors.blueBg }]}>
-          <MaterialIcons name="link" size={24} color={colors.blue} />
+          <ProtoUiIcon name="link" size={20} color={colors.blue} />
         </View>
 
         {/* Informações do Booking */}
@@ -77,29 +70,27 @@ export const BookingInlineCard: React.FC<BookingInlineCardProps> = ({ booking })
 
       {/* Botões de Ação Abaixo do Card */}
       <View style={styles.actionsRow}>
-        <TouchableOpacity
-          style={[styles.btnOutline, { borderColor: colors.ink }]}
+        <PressableScale
+          style={[styles.btnOutline, { backgroundColor: colors.surf }]}
           onPress={handleCopy}
-          activeOpacity={0.75}
           accessibilityRole="button"
           accessibilityLabel="Copiar link"
         >
           <Text style={[styles.btnOutlineText, { color: colors.ink }]}>
             {copied ? 'Copiado!' : 'Copiar link'}
           </Text>
-        </TouchableOpacity>
+        </PressableScale>
 
-        <TouchableOpacity
+        <PressableScale
           style={[styles.btnFill, { backgroundColor: colors.ink }]}
           onPress={handleViewBooking}
-          activeOpacity={0.8}
           accessibilityRole="button"
           accessibilityLabel="Ver booking"
         >
           <Text style={[styles.btnFillText, { color: colors.bg }]}>
             Ver booking
           </Text>
-        </TouchableOpacity>
+        </PressableScale>
       </View>
     </View>
   );
@@ -111,23 +102,18 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   card: {
-    borderRadius: 16,
-    borderWidth: 1,
+    borderRadius: 22,
+    borderWidth: 0,
     paddingVertical: 12,
     paddingHorizontal: 14,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    shadowColor: '#141916',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
   },
   chip: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
@@ -138,46 +124,45 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   title: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 15.5,
-    fontWeight: '600',
-    lineHeight: 20,
+    fontFamily: 'Geist_500Medium',
+    fontSize: 14.5,
+    fontWeight: '500',
+    lineHeight: 19,
   },
   subtitle: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 13,
-    marginTop: 3,
+    fontFamily: 'Geist',
+    fontSize: 12.5,
+    marginTop: 2,
   },
   actionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    marginTop: 10,
+    gap: 8,
+    marginTop: 8,
   },
   btnOutline: {
     height: 36,
-    paddingHorizontal: 18,
-    borderRadius: 18,
-    borderWidth: 1.5,
+    paddingHorizontal: 16,
+    borderRadius: 999,
+    borderWidth: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'transparent',
   },
   btnOutlineText: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 13.5,
-    fontWeight: '600',
+    fontFamily: 'Geist_500Medium',
+    fontSize: 13,
+    fontWeight: '500',
   },
   btnFill: {
     height: 36,
-    paddingHorizontal: 18,
-    borderRadius: 18,
+    paddingHorizontal: 16,
+    borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
   },
   btnFillText: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 13.5,
-    fontWeight: '600',
+    fontFamily: 'Geist_500Medium',
+    fontSize: 13,
+    fontWeight: '500',
   },
 });

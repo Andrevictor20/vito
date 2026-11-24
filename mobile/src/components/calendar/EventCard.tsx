@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { tokens } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { Event } from '../../types';
@@ -166,7 +166,7 @@ export const EventCard: React.FC<EventCardProps> = ({
               {isRecurring && (
                 <View style={styles.inlineMeta}>
                   <Text style={[styles.metaText, { color: colors.muted }]}>·</Text>
-                  <MaterialIcons name="repeat" size={11} color={colors.muted} />
+                  <ProtoUiIcon name="repeat" size={11} color={colors.muted} />
                 </View>
               )}
             </View>
@@ -180,7 +180,7 @@ export const EventCard: React.FC<EventCardProps> = ({
                 hitSlop={tokens.hitSlop.sm}
                 accessibilityLabel="Editar com IA"
               >
-                <MaterialIcons name="auto-awesome" size={15} color={colors.purple} />
+                <ProtoUiIcon name="auto-awesome" size={15} color={colors.purple} />
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.deleteBtnSmall}
@@ -188,12 +188,12 @@ export const EventCard: React.FC<EventCardProps> = ({
                 hitSlop={tokens.hitSlop.sm}
                 accessibilityLabel="Excluir compromisso"
               >
-                <MaterialIcons name="delete-outline" size={16} color={colors.muted} />
+                <ProtoUiIcon name="delete-outline" size={16} color={colors.muted} />
               </TouchableOpacity>
             </View>
           )}
 
-          <MaterialIcons name="chevron-right" size={18} color={colors.muted} style={{ marginLeft: 2 }} />
+          <ProtoUiIcon name="chevron-right" size={18} color={colors.muted} style={{ marginLeft: 2 }} />
         </TouchableOpacity>
         {renderDeleteModal()}
       </>
@@ -217,7 +217,7 @@ export const EventCard: React.FC<EventCardProps> = ({
           accessibilityRole={canPress ? 'button' : undefined}
           accessibilityLabel={canPress ? `Abrir detalhes de ${event.title}` : `${event.title} (dia inteiro)`}
         >
-          <MaterialIcons
+          <ProtoUiIcon
             name={isGoogle ? 'event' : 'event-available'}
             size={16}
             color={catInfo.color}
@@ -240,7 +240,7 @@ export const EventCard: React.FC<EventCardProps> = ({
                 hitSlop={tokens.hitSlop.sm}
                 accessibilityLabel="Editar com IA"
               >
-                <MaterialIcons name="auto-awesome" size={15} color={catInfo.color} />
+                <ProtoUiIcon name="auto-awesome" size={15} color={catInfo.color} />
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.allDayBtn}
@@ -248,7 +248,7 @@ export const EventCard: React.FC<EventCardProps> = ({
                 hitSlop={tokens.hitSlop.sm}
                 accessibilityLabel="Excluir compromisso"
               >
-                <MaterialIcons name="delete-outline" size={16} color={catInfo.color} />
+                <ProtoUiIcon name="delete-outline" size={16} color={catInfo.color} />
               </TouchableOpacity>
             </View>
           )}
@@ -300,14 +300,14 @@ export const EventCard: React.FC<EventCardProps> = ({
             {isRecurring && (
               <View style={styles.inlineMeta}>
                 <Text style={[styles.metaText, { color: colors.muted }]}>·</Text>
-                <MaterialIcons name="repeat" size={12} color={colors.muted} />
+                <ProtoUiIcon name="repeat" size={12} color={colors.muted} />
                 <Text style={[styles.metaText, { color: colors.muted }]}>Recorrente</Text>
               </View>
             )}
             {event.location ? (
               <View style={styles.inlineMeta}>
                 <Text style={[styles.metaText, { color: colors.muted }]}>·</Text>
-                <MaterialIcons name="place" size={12} color={colors.muted} />
+                <ProtoUiIcon name="place" size={12} color={colors.muted} />
                 <Text style={[styles.metaText, { color: colors.muted }]} numberOfLines={1}>
                   {event.location}
                 </Text>
@@ -325,7 +325,7 @@ export const EventCard: React.FC<EventCardProps> = ({
                 hitSlop={tokens.hitSlop.sm}
                 accessibilityLabel="Editar com IA"
               >
-                <MaterialIcons name="auto-awesome" size={16} color={colors.purple} />
+                <ProtoUiIcon name="auto-awesome" size={16} color={colors.purple} />
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.deleteBtn}
@@ -333,7 +333,7 @@ export const EventCard: React.FC<EventCardProps> = ({
                 hitSlop={tokens.hitSlop.sm}
                 accessibilityLabel="Excluir compromisso"
               >
-                <MaterialIcons name="delete-outline" size={17} color={colors.muted} />
+                <ProtoUiIcon name="delete-outline" size={17} color={colors.muted} />
               </TouchableOpacity>
             </>
           )}
@@ -351,10 +351,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    paddingVertical: 9,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    borderWidth: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    borderWidth: 0,
     marginBottom: 8,
   },
   allDayText: {
@@ -394,15 +394,15 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
 
-  // .evc: card de evento com faixa vertical
+  // .evc: card de evento (.evc v5 sem borda, raio 20)
   evcCard: {
     flex: 1,
     minWidth: 0,
-    borderRadius: 14,
-    paddingVertical: 11,
-    paddingHorizontal: 14,
-    borderLeftWidth: 4,
-    borderWidth: 1,
+    borderRadius: 20,
+    paddingVertical: 13,
+    paddingHorizontal: 15,
+    borderLeftWidth: 0,
+    borderWidth: 0,
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',

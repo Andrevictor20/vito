@@ -3,12 +3,24 @@ import React, {
   useCallback,
   useEffect,
   useImperativeHandle,
-  useMemo,
   useRef,
   useState,
 } from 'react';
-import { Animated, Easing, StyleSheet, View } from 'react-native';
-import { MOTION_CURVES, SCREEN_TRANSITIONS } from '../../theme/motion';
+import { StyleSheet, View } from 'react-native';
+import Animated, {
+  Easing,
+  Extrapolation,
+  cancelAnimation,
+  interpolate,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withTiming,
+} from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
+import { getBezier } from '../../ds/tokens';
+import { SECTION_TRANSITION_SPECS } from '../../ds/transitionSpecs';
+import { ScreenFocusProvider } from '../../theme/screenFocusContext';
 import { useReduceMotion } from '../../theme/useReduceMotion';
 
 export interface AdaptivePagerRef {
@@ -25,12 +37,17 @@ interface AdaptivePagerProps {
   style?: object;
 }
 
+const TAB_SLIDE_Y = 8;
+const TAB_SLIDE_X = 28;
+const TAB_LEAVE_X = 18;
+
 /**
- * Host de abas fiel ao protótipo (#vito-motion):
- * - sem swipe (as abas só trocam por toque);
- * - a aba nova entra com tr-tab (translateY 6px + fade, 360ms, delay 50ms);
- * - a aba anterior sai com lv-tab (fade 170ms);
- * - todas as abas permanecem montadas (mesmo comportamento do PagerView), sem perder estado.
+ * Host de abas fluido na UI thread (Reanimated 4):
+ * - sem swipe (as abas trocam por toque na navbar);
+ * - todas as abas permanecem sempre montadas (zero remontagem / zero flash);
+ * - transição direcional horizontal acompanhando a ordem das abas na navbar
+ *   (slide direcional + micro-escala + fade em --ease-q 340ms);
+ * - limpeza de leavingIndex isolada do ciclo de entrada (nunca corta o enter no meio).
  */
 export const AdaptivePager = forwardRef<AdaptivePagerRef, AdaptivePagerProps>(
   ({ initialPage = 0, onPageSelected, children, style }, ref) => {
@@ -38,53 +55,78 @@ export const AdaptivePager = forwardRef<AdaptivePagerRef, AdaptivePagerProps>(
     const count = React.Children.count(children);
     const [activeIndex, setActiveIndex] = useState(initialPage);
     const [leavingIndex, setLeavingIndex] = useState<number | null>(null);
+    const [transitionId, setTransitionId] = useState(0);
 
-    const enter = useRef(new Animated.Value(1)).current;
-    const leave = useRef(new Animated.Value(1)).current;
+    const enter = useSharedValue(1);
+    const leave = useSharedValue(0);
+    const direction = useSharedValue(1);
     const activeRef = useRef(initialPage);
+    const leavingRef = useRef<number | null>(null);
+    const animatedRef = useRef(false);
 
-    const tabSpec = SCREEN_TRANSITIONS.tab;
+    const tabSpec = SECTION_TRANSITION_SPECS.tab;
 
     const animateTo = useCallback(
       (nextIndex: number, animated: boolean) => {
         const previous = activeRef.current;
         if (nextIndex === previous || nextIndex < 0 || nextIndex >= count) return;
 
+        const shouldAnim = animated && !reduceMotion;
+        direction.value = nextIndex > previous ? 1 : -1;
         activeRef.current = nextIndex;
-        setLeavingIndex(previous);
+        animatedRef.current = shouldAnim;
+        leavingRef.current = shouldAnim ? previous : null;
+        setLeavingIndex(shouldAnim ? previous : null);
         setActiveIndex(nextIndex);
+        setTransitionId((n) => n + 1);
         onPageSelected?.(nextIndex);
-
-        if (!animated || reduceMotion) {
-          enter.setValue(1);
-          leave.setValue(0);
-          setLeavingIndex(null);
-          return;
-        }
-
-        enter.setValue(0);
-        leave.setValue(1);
-
-        Animated.parallel([
-          Animated.timing(enter, {
-            toValue: 1,
-            duration: tabSpec.enterMs,
-            delay: tabSpec.enterDelayMs,
-            easing: Easing.bezier(...MOTION_CURVES.q),
-            useNativeDriver: true,
-          }),
-          Animated.timing(leave, {
-            toValue: 0,
-            duration: tabSpec.leaveMs,
-            easing: Easing.bezier(...MOTION_CURVES.in),
-            useNativeDriver: true,
-          }),
-        ]).start(({ finished }) => {
-          if (finished) setLeavingIndex(null);
-        });
       },
-      [count, enter, leave, onPageSelected, reduceMotion, tabSpec.enterDelayMs, tabSpec.enterMs, tabSpec.leaveMs]
+      [count, direction, onPageSelected, reduceMotion]
     );
+
+    useEffect(() => {
+      if (transitionId === 0) return;
+      cancelAnimation(enter);
+      cancelAnimation(leave);
+
+      if (!animatedRef.current || reduceMotion || leavingRef.current === null) {
+        enter.value = 1;
+        leave.value = 0;
+        return;
+      }
+
+      const [qx1, qy1, qx2, qy2] = getBezier('--ease-q');
+      const [sx1, sy1, sx2, sy2] = getBezier('--ease-std');
+
+      enter.value = 0;
+      leave.value = 1;
+
+      enter.value = withDelay(
+        16,
+        withTiming(1, {
+          duration: 340,
+          easing: Easing.bezier(qx1, qy1, qx2, qy2),
+        })
+      );
+
+      leave.value = withTiming(
+        0,
+        {
+          duration: 210,
+          easing: Easing.bezier(sx1, sy1, sx2, sy2),
+        },
+        (finished) => {
+          if (finished) {
+            scheduleOnRN(setLeavingIndex, null);
+          }
+        }
+      );
+
+      return () => {
+        cancelAnimation(enter);
+        cancelAnimation(leave);
+      };
+    }, [transitionId, reduceMotion, enter, leave]);
 
     useImperativeHandle(
       ref,
@@ -98,67 +140,71 @@ export const AdaptivePager = forwardRef<AdaptivePagerRef, AdaptivePagerProps>(
     useEffect(() => {
       if (initialPage >= 0 && initialPage < count && initialPage !== activeRef.current) {
         activeRef.current = initialPage;
+        animatedRef.current = false;
+        leavingRef.current = null;
+        setLeavingIndex(null);
         setActiveIndex(initialPage);
       }
     }, [count, initialPage]);
 
-    const enterStyle = useMemo(
-      () => ({
-        opacity: enter,
-        transform: [
-          {
-            translateY: enter.interpolate({
-              inputRange: [0, 1],
-              outputRange: [tabSpec.enterOffset.y, 0],
-            }),
-          },
-        ],
-      }),
-      [enter, tabSpec.enterOffset.y]
-    );
+    const leaveToY = tabSpec.leave.toY;
 
-    const leaveStyle = useMemo(
-      () => ({
-        opacity: leave,
+    const enterStyle = useAnimatedStyle(() => {
+      const p = enter.value;
+      const dir = direction.value;
+      return {
+        opacity: interpolate(p, [0, 0.25, 1], [0, 0.85, 1], Extrapolation.CLAMP),
         transform: [
           {
-            translateY: leave.interpolate({
-              inputRange: [0, 1],
-              outputRange: [tabSpec.leaveOffset.y, 0],
-            }),
+            translateX: interpolate(p, [0, 1], [dir * TAB_SLIDE_X, 0], Extrapolation.CLAMP),
+          },
+          {
+            translateY: interpolate(p, [0, 1], [TAB_SLIDE_Y, 0], Extrapolation.CLAMP),
+          },
+          {
+            scale: interpolate(p, [0, 1], [0.985, 1], Extrapolation.CLAMP),
           },
         ],
-      }),
-      [leave, tabSpec.leaveOffset.y]
-    );
+      };
+    });
+
+    const leaveStyle = useAnimatedStyle(() => {
+      const p = leave.value;
+      const dir = direction.value;
+      return {
+        opacity: p,
+        transform: [
+          {
+            translateX: interpolate(p, [0, 1], [-dir * TAB_LEAVE_X, 0], Extrapolation.CLAMP),
+          },
+          {
+            translateY: interpolate(p, [0, 1], [leaveToY, 0], Extrapolation.CLAMP),
+          },
+          {
+            scale: interpolate(p, [0, 1], [0.988, 1], Extrapolation.CLAMP),
+          },
+        ],
+      };
+    }, [leaveToY]);
 
     return (
       <View style={style}>
         {React.Children.map(children, (child, index) => {
           const isActive = index === activeIndex;
           const isLeaving = index === leavingIndex;
-          if (!isActive && !isLeaving) {
-            return (
-              <View
-                key={index}
-                style={styles.hiddenPage}
-                pointerEvents="none"
-                accessibilityElementsHidden
-                importantForAccessibility="no-hide-descendants"
-              >
-                {child}
-              </View>
-            );
-          }
           return (
             <Animated.View
               key={index}
-              style={[styles.page, isActive ? enterStyle : leaveStyle, { zIndex: isActive ? 2 : 1 }]}
+              style={[
+                styles.page,
+                isActive ? enterStyle : isLeaving ? leaveStyle : styles.hiddenPage,
+                { zIndex: isActive ? 2 : isLeaving ? 1 : 0 },
+              ]}
               pointerEvents={isActive ? 'auto' : 'none'}
               accessibilityElementsHidden={!isActive}
               importantForAccessibility={isActive ? 'auto' : 'no-hide-descendants'}
             >
-              {child}
+              <ScreenFocusProvider active={isActive}>{child}</ScreenFocusProvider>
             </Animated.View>
           );
         })}
@@ -176,11 +222,6 @@ const styles = StyleSheet.create({
     bottom: 0,
   },
   hiddenPage: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
     opacity: 0,
   },
 });

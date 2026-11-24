@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { useTheme } from '../../context/ThemeContext';
 import { tokens } from '../../theme/tokens';
 
@@ -8,7 +8,7 @@ export interface PersonaStyleOption {
   id: string;
   label: string;
   sub: string;
-  icon: keyof typeof MaterialIcons.glyphMap;
+  icon: string;
 }
 
 export const PERSONA_STYLES: PersonaStyleOption[] = [
@@ -58,7 +58,7 @@ export const PersonaStyleSelector: React.FC<PersonaStyleSelectorProps> = ({ valu
                     },
                   ]}
                 >
-                  <MaterialIcons
+                  <ProtoUiIcon
                     name={style.icon}
                     size={20}
                     color={isSelected ? colors.primary : colors.onSurfaceVariant}
@@ -68,7 +68,7 @@ export const PersonaStyleSelector: React.FC<PersonaStyleSelectorProps> = ({ valu
                   <Text style={[styles.title, { color: colors.onSurface }]}>{style.label}</Text>
                   <Text style={[styles.sub, { color: colors.onSurfaceVariant }]}>{style.sub}</Text>
                 </View>
-                <MaterialIcons
+                <ProtoUiIcon
                   name={isSelected ? 'radio-button-checked' : 'radio-button-unchecked'}
                   size={20}
                   color={isSelected ? colors.primary : colors.outline}

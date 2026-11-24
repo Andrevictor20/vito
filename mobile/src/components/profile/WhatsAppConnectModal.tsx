@@ -9,7 +9,7 @@ import {
   Linking,
   ScrollView,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { useTheme } from '../../context/ThemeContext';
 import { tokens } from '../../theme/tokens';
 import { BottomSheetModal } from '../ui/BottomSheetModal';
@@ -191,7 +191,7 @@ export const WhatsAppConnectModal: React.FC<WhatsAppConnectModalProps> = ({
             >
               <View style={styles.statusRow}>
                 <View style={[styles.statusBadge, { backgroundColor: '#E8F5E9' }]}>
-                  <MaterialIcons name="check-circle" size={16} color="#2E7D32" />
+                  <ProtoUiIcon name="check-circle" size={16} color="#2E7D32" />
                   <Text style={[styles.statusBadgeText, { color: '#1B5E20' }]}>CONECTADO</Text>
                 </View>
                 <Text style={[styles.phoneLabel, { color: colors.onSurface }]}>
@@ -205,19 +205,19 @@ export const WhatsAppConnectModal: React.FC<WhatsAppConnectModalProps> = ({
 
               <View style={styles.featuresList}>
                 <View style={styles.featureItem}>
-                  <MaterialIcons name="chat" size={18} color={colors.primary} />
+                  <ProtoUiIcon name="chat" size={18} color={colors.primary} />
                   <Text style={[styles.featureText, { color: colors.onSurface }]}>
                     Converse diretamente para criar tarefas e gerenciar sua agenda.
                   </Text>
                 </View>
                 <View style={styles.featureItem}>
-                  <MaterialIcons name="alternate-email" size={18} color={colors.primary} />
+                  <ProtoUiIcon name="alternate-email" size={18} color={colors.primary} />
                   <Text style={[styles.featureText, { color: colors.onSurface }]}>
                     Use <Text style={{ fontWeight: '700' }}>@vito</Text> em grupos para obter respostas instantâneas.
                   </Text>
                 </View>
                 <View style={styles.featureItem}>
-                  <MaterialIcons name="security" size={18} color={colors.primary} />
+                  <ProtoUiIcon name="security" size={18} color={colors.primary} />
                   <Text style={[styles.featureText, { color: colors.onSurface }]}>
                     Privacidade total: mensagens sem @vito em grupos são 100% ignoradas.
                   </Text>
@@ -235,7 +235,7 @@ export const WhatsAppConnectModal: React.FC<WhatsAppConnectModalProps> = ({
                   <ActivityIndicator size="small" color={colors.error} />
                 ) : (
                   <>
-                    <MaterialIcons name="link-off" size={18} color={colors.error} />
+                    <ProtoUiIcon name="link-off" size={18} color={colors.error} />
                     <Text style={[styles.disconnectBtnText, { color: colors.error }]}>
                       Desconectar WhatsApp
                     </Text>
@@ -272,7 +272,7 @@ export const WhatsAppConnectModal: React.FC<WhatsAppConnectModalProps> = ({
                   },
                 ]}
               >
-                <MaterialIcons name="phone" size={20} color={colors.onSurfaceVariant} />
+                <ProtoUiIcon name="phone" size={20} color={colors.onSurfaceVariant} />
                 <TextInput
                   style={[styles.textInput, { color: colors.onSurface }]}
                   placeholder="(11) 99999-8888"
@@ -303,7 +303,7 @@ export const WhatsAppConnectModal: React.FC<WhatsAppConnectModalProps> = ({
                   <ActivityIndicator size="small" color={colors.onPrimary} />
                 ) : (
                   <>
-                    <MaterialIcons name="vpn-key" size={18} color={colors.onPrimary} />
+                    <ProtoUiIcon name="vpn-key" size={18} color={colors.onPrimary} />
                     <Text style={[styles.primaryBtnText, { color: colors.onPrimary }]}>
                       Gerar Código de Pareamento
                     </Text>
@@ -341,7 +341,7 @@ export const WhatsAppConnectModal: React.FC<WhatsAppConnectModalProps> = ({
                   accessibilityRole="button"
                   accessibilityLabel="Copiar código"
                 >
-                  <MaterialIcons
+                  <ProtoUiIcon
                     name={copied ? 'check' : 'content-copy'}
                     size={18}
                     color={copied ? '#2E7D32' : colors.primary}
@@ -382,7 +382,7 @@ export const WhatsAppConnectModal: React.FC<WhatsAppConnectModalProps> = ({
                     accessibilityRole="button"
                     accessibilityLabel="Abrir WhatsApp"
                   >
-                    <MaterialIcons name="open-in-new" size={18} color={colors.primary} />
+                    <ProtoUiIcon name="open-in-new" size={18} color={colors.primary} />
                     <Text style={[styles.secondaryActionText, { color: colors.primary }]}>
                       Abrir WhatsApp
                     </Text>
@@ -394,7 +394,7 @@ export const WhatsAppConnectModal: React.FC<WhatsAppConnectModalProps> = ({
                     accessibilityRole="button"
                     accessibilityLabel="Verificar conexão"
                   >
-                    <MaterialIcons name="refresh" size={18} color={colors.onSurface} />
+                    <ProtoUiIcon name="refresh" size={18} color={colors.onSurface} />
                     <Text style={[styles.secondaryActionText, { color: colors.onSurface }]}>
                       Verificar Conexão
                     </Text>

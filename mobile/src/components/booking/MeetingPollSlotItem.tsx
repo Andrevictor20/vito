@@ -1,15 +1,22 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   AccessibilityInfo,
   ActivityIndicator,
-  Animated,
-  Easing,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import Animated, {
+  Easing,
+  Extrapolation,
+  interpolate,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
+import { getBezier } from '../../ds/tokens';
 import { tabularNumbers } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { MeetingSlot } from '../../types';
@@ -46,33 +53,33 @@ export const MeetingPollSlotItem: React.FC<MeetingPollSlotItemProps> = ({
   const isConfirmingThis = confirmingSlotId === slot.id;
   const percentage = computeSlotVotePercentage(votesCount, totalParticipants);
 
-  const widthAnim = useRef(new Animated.Value(0)).current;
+  const widthAnim = useSharedValue(0);
   useEffect(() => {
     let mounted = true;
     AccessibilityInfo.isReduceMotionEnabled()
       .then((reduced) => {
         if (!mounted) return;
         if (reduced) {
-          widthAnim.setValue(percentage);
+          widthAnim.value = percentage;
           return;
         }
-        Animated.timing(widthAnim, {
-          toValue: percentage,
+        const [x1, y1, x2, y2] = getBezier('--ease-q');
+        widthAnim.value = withTiming(percentage, {
           duration: 720,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: false,
-        }).start();
+          easing: Easing.bezier(x1, y1, x2, y2),
+        });
       })
-      .catch(() => widthAnim.setValue(percentage));
+      .catch(() => {
+        widthAnim.value = percentage;
+      });
     return () => {
       mounted = false;
     };
   }, [percentage, widthAnim]);
 
-  const barWidth = widthAnim.interpolate({
-    inputRange: [0, 100],
-    outputRange: ['0%', '100%'],
-    extrapolate: 'clamp',
+  const barStyle = useAnimatedStyle(() => {
+    const pct = interpolate(widthAnim.value, [0, 100], [0, 100], Extrapolation.CLAMP);
+    return { width: `${pct}%` };
   });
 
   const shownVoters = voters.slice(0, 4);
@@ -103,7 +110,7 @@ export const MeetingPollSlotItem: React.FC<MeetingPollSlotItemProps> = ({
               </Text>
               {isSlotConfirmed && (
                 <View style={[styles.okPill, { backgroundColor: colors.bg }]}>
-                  <MaterialIcons name="check" size={12} color={colors.acc} />
+                  <ProtoUiIcon name="check" size={12} color={colors.acc} />
                   <Text style={[styles.okPillText, { color: colors.acc }]}>Confirmado</Text>
                 </View>
               )}
@@ -153,9 +160,9 @@ export const MeetingPollSlotItem: React.FC<MeetingPollSlotItemProps> = ({
             style={[
               styles.barFill,
               {
-                width: barWidth,
                 backgroundColor: isSlotConfirmed ? colors.acc : colors.ink,
               },
+              barStyle,
             ]}
           />
         </View>
@@ -203,7 +210,7 @@ export const MeetingPollSlotItem: React.FC<MeetingPollSlotItemProps> = ({
             <Text style={[styles.vtrTxt, { color: colors.muted }]} numberOfLines={1}>
               {summaryNames}
             </Text>
-            <MaterialIcons name="chevron-right" size={18} color={colors.muted} />
+            <ProtoUiIcon name="chevron-right" size={18} color={colors.muted} />
           </TouchableOpacity>
         )}
       </View>

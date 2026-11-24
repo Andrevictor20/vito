@@ -1,11 +1,19 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect } from 'react';
 import {
   TouchableWithoutFeedback,
-  Animated,
   StyleSheet,
   ViewStyle,
   StyleProp,
 } from 'react-native';
+import Animated, {
+  Easing,
+  Extrapolation,
+  interpolate,
+  interpolateColor,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import { useTheme } from '../../context/ThemeContext';
 
 export interface VitoSwitchProps {
@@ -16,10 +24,9 @@ export interface VitoSwitchProps {
 }
 
 /**
- * Switch customizado (.sw) de 46x28px idêntico a vito-telas.html.
+ * Switch customizado (.sw) de 46x28px na UI thread (Reanimated 4).
  * - Desligado: background var(--line), thumb em x=3
  * - Ligado: background var(--ink), thumb em x=21
- * - Thumb: 22x22px círculo branco com leve sombra
  */
 export const VitoSwitch: React.FC<VitoSwitchProps> = ({
   value,
@@ -28,30 +35,32 @@ export const VitoSwitch: React.FC<VitoSwitchProps> = ({
   style,
 }) => {
   const { colors } = useTheme();
-  const animValue = useRef(new Animated.Value(value ? 1 : 0)).current;
+  const progress = useSharedValue(value ? 1 : 0);
 
   useEffect(() => {
-    Animated.timing(animValue, {
-      toValue: value ? 1 : 0,
+    progress.value = withTiming(value ? 1 : 0, {
       duration: 200,
-      useNativeDriver: false,
-    }).start();
-  }, [value]);
+      easing: Easing.bezier(0.2, 0.8, 0.2, 1),
+    });
+  }, [value, progress]);
+
+  const offColor = colors.line;
+  const onColor = colors.ink;
+
+  const trackStyle = useAnimatedStyle(() => ({
+    backgroundColor: interpolateColor(progress.value, [0, 1], [offColor, onColor]),
+  }), [offColor, onColor]);
+
+  const thumbStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: interpolate(progress.value, [0, 1], [3, 21], Extrapolation.CLAMP) },
+    ],
+  }));
 
   const toggle = () => {
     if (disabled) return;
     onValueChange(!value);
   };
-
-  const backgroundColor = animValue.interpolate({
-    inputRange: [0, 1],
-    outputRange: [colors.line, colors.ink],
-  });
-
-  const translateX = animValue.interpolate({
-    inputRange: [0, 1],
-    outputRange: [3, 21],
-  });
 
   return (
     <TouchableWithoutFeedback
@@ -63,21 +72,12 @@ export const VitoSwitch: React.FC<VitoSwitchProps> = ({
       <Animated.View
         style={[
           styles.track,
-          {
-            backgroundColor,
-            opacity: disabled ? 0.4 : 1,
-          },
+          { opacity: disabled ? 0.4 : 1 },
+          trackStyle,
           style,
         ]}
       >
-        <Animated.View
-          style={[
-            styles.thumb,
-            {
-              transform: [{ translateX }],
-            },
-          ]}
-        />
+        <Animated.View style={[styles.thumb, thumbStyle]} />
       </Animated.View>
     </TouchableWithoutFeedback>
   );

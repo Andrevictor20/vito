@@ -1,6 +1,14 @@
-import React, { useEffect, useRef } from 'react';
-import { AccessibilityInfo, Animated, Easing, StyleSheet, Text, View } from 'react-native';
-import Svg, { Circle } from 'react-native-svg';
+import React, { useEffect } from 'react';
+import { AccessibilityInfo, StyleSheet, Text, View } from 'react-native';
+import Animated, {
+  Easing,
+  Extrapolation,
+  interpolate,
+  useAnimatedProps,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
+import Svg, { Circle, type CircleProps } from 'react-native-svg';
 import { useTheme } from '../../context/ThemeContext';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
@@ -22,7 +30,7 @@ export const SummaryRingSvg: React.FC<SummaryRingSvgProps> = ({
   const clamped = Math.max(0, Math.min(100, Math.round(percent)));
   const r = 42;
   const circ = 2 * Math.PI * r;
-  const anim = useRef(new Animated.Value(0)).current;
+  const anim = useSharedValue(0);
 
   useEffect(() => {
     let mounted = true;
@@ -30,28 +38,26 @@ export const SummaryRingSvg: React.FC<SummaryRingSvgProps> = ({
       .then((reduced) => {
         if (!mounted) return;
         if (reduced) {
-          anim.setValue(clamped);
+          anim.value = clamped;
           return;
         }
-        anim.setValue(0);
-        Animated.timing(anim, {
-          toValue: clamped,
+        anim.value = 0;
+        anim.value = withTiming(clamped, {
           duration: 950,
           easing: Easing.out(Easing.cubic),
-          useNativeDriver: false,
-        }).start();
+        });
       })
-      .catch(() => anim.setValue(clamped));
+      .catch(() => {
+        anim.value = clamped;
+      });
     return () => {
       mounted = false;
     };
   }, [clamped, anim]);
 
-  const strokeDashoffset = anim.interpolate({
-    inputRange: [0, 100],
-    outputRange: [circ, 0],
-    extrapolate: 'clamp',
-  });
+  const circleProps = useAnimatedProps<Partial<CircleProps>>(() => ({
+    strokeDashoffset: interpolate(anim.value, [0, 100], [circ, 0], Extrapolation.CLAMP),
+  }));
 
   return (
     <View style={[styles.wrap, { width: size, height: size }]}>
@@ -73,7 +79,7 @@ export const SummaryRingSvg: React.FC<SummaryRingSvgProps> = ({
           strokeWidth={10}
           strokeLinecap="round"
           strokeDasharray={`${circ} ${circ}`}
-          strokeDashoffset={strokeDashoffset}
+          animatedProps={circleProps}
           transform="rotate(-90 50 50)"
         />
       </Svg>
@@ -110,11 +116,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   pct: {
+    fontFamily: 'Geist_600SemiBold',
     fontWeight: '600',
     letterSpacing: -0.5,
     fontVariant: ['tabular-nums'],
   },
   subLabel: {
+    fontFamily: 'Geist_500Medium',
     fontSize: 11,
     fontWeight: '500',
     marginTop: 2,

@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { useTheme } from '../../context/ThemeContext';
 import { APP_CATALOG_META } from '../../data/botsCatalogFallback';
 import { Bot, BotPendingApproval, PendingResolutionDecision } from '../../types/bots';
@@ -92,7 +92,7 @@ export const BotCard: React.FC<BotCardProps> = ({
           ]}
         >
           <View style={styles.pendHeader}>
-            <MaterialIcons name="pan-tool" size={14} color={colors.orange} />
+            <ProtoUiIcon name="pan-tool" size={14} color={colors.orange} />
             <Text style={[styles.pendTitle, { color: colors.ink }]} numberOfLines={1}>
               {firstPending.title || 'Aguardando aprovação'}
             </Text>
@@ -170,7 +170,7 @@ export const BotCard: React.FC<BotCardProps> = ({
           <Text style={[styles.actionsText, { color: colors.muted }]}>
             {actionsCount} {actionsCount === 1 ? 'ação' : 'ações'}
           </Text>
-          <MaterialIcons name="chevron-right" size={16} color={colors.muted} />
+          <ProtoUiIcon name="chevron-right" size={16} color={colors.muted} />
         </View>
       </View>
     </TouchableOpacity>

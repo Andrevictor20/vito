@@ -1,13 +1,23 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import {
-  Animated,
-  Easing,
+  type LayoutChangeEvent,
   Platform,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import Animated, {
+  Easing,
+  Extrapolation,
+  cancelAnimation,
+  interpolate,
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 import Svg, { Circle, Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../context/ThemeContext';
@@ -36,11 +46,7 @@ interface FloatingTabBarProps {
   visible?: boolean;
 }
 
-const DockSvgIcon: React.FC<{ id: DockTabType; color: string; active: boolean }> = ({
-  id,
-  color,
-  active,
-}) => {
+const DockSvgIcon: React.FC<{ id: DockTabType; color: string }> = ({ id, color }) => {
   switch (id) {
     case 'chat':
       return (
@@ -50,8 +56,7 @@ const DockSvgIcon: React.FC<{ id: DockTabType; color: string; active: boolean }>
             stroke={color}
             strokeWidth={2.1}
             strokeLinejoin="round"
-            fill={active ? color : 'none'}
-            fillOpacity={active ? 0.14 : 0}
+            fill="none"
           />
         </Svg>
       );
@@ -115,132 +120,115 @@ const DockSvgIcon: React.FC<{ id: DockTabType; color: string; active: boolean }>
   }
 };
 
+const DOCK_SPRING = { damping: 21, stiffness: 250, mass: 1 };
+const ICON_SPRING = { damping: 12, stiffness: 320, mass: 1 };
+
 const DockTabButton: React.FC<{
   tab: (typeof DOCK_TABS)[number];
   isActive: boolean;
   onPress: () => void;
-  ink: string;
+  onMeasure: (id: DockTabType, x: number, width: number) => void;
   bg: string;
   muted: string;
   reduceMotion: boolean;
-}> = ({ tab, isActive, onPress, ink, bg, muted, reduceMotion }) => {
-  const expandAnim = useRef(new Animated.Value(isActive ? 1 : 0)).current;
-  const bounceAnim = useRef(new Animated.Value(0)).current;
-  const pressScale = useRef(new Animated.Value(1)).current;
+}> = ({ tab, isActive, onPress, onMeasure, bg, muted, reduceMotion }) => {
+  const expand = useSharedValue(isActive ? 1 : 0);
+  const iconScale = useSharedValue(1);
+  const iconRotate = useSharedValue(0);
+  const pressScale = useSharedValue(1);
   const prevActive = useRef(isActive);
 
   useEffect(() => {
     if (reduceMotion) {
-      expandAnim.setValue(isActive ? 1 : 0);
-      bounceAnim.setValue(0);
+      cancelAnimation(expand);
+      cancelAnimation(iconScale);
+      cancelAnimation(iconRotate);
+      expand.value = isActive ? 1 : 0;
+      iconScale.value = 1;
+      iconRotate.value = 0;
       prevActive.current = isActive;
       return;
     }
 
-    Animated.timing(expandAnim, {
-      toValue: isActive ? 1 : 0,
-      duration: 380,
-      easing: Easing.bezier(...MOTION_CURVES.q),
-      useNativeDriver: false,
-    }).start();
+    expand.value = withSpring(isActive ? 1 : 0, DOCK_SPRING);
 
     if (isActive && !prevActive.current) {
-      bounceAnim.setValue(0);
-      Animated.timing(bounceAnim, {
-        toValue: 1,
-        duration: MOTION_DURATIONS.navBounce,
-        easing: Easing.bezier(...MOTION_CURVES.q),
-        useNativeDriver: true,
-      }).start();
+      iconScale.value = withSequence(
+        withTiming(0.82, { duration: 75, easing: Easing.out(Easing.quad) }),
+        withSpring(1, ICON_SPRING),
+      );
+      iconRotate.value = withSequence(
+        withTiming(-11, { duration: 75, easing: Easing.out(Easing.quad) }),
+        withSpring(0, ICON_SPRING),
+      );
     }
     prevActive.current = isActive;
-  }, [isActive, reduceMotion, expandAnim, bounceAnim]);
+  }, [isActive, reduceMotion, expand, iconScale, iconRotate]);
 
-  const iconScale = bounceAnim.interpolate({
-    inputRange: [0, 0.01, 0.6, 1],
-    outputRange: [1, 0.6, 1.2, 1],
-  });
-  const iconRotate = bounceAnim.interpolate({
-    inputRange: [0, 0.01, 0.6, 1],
-    outputRange: ['0deg', '-14deg', '5deg', '0deg'],
-  });
-  const labelMaxWidth = expandAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 74],
-  });
-  const labelMarginLeft = expandAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 8],
-  });
-  const labelOpacity = expandAnim.interpolate({
-    inputRange: [0, 0.35, 1],
-    outputRange: [0, 0, 1],
-  });
-  const horizontalPad = expandAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [12, 16],
-  });
+  const handleLayout = useCallback(
+    (e: LayoutChangeEvent) => {
+      const { x, width } = e.nativeEvent.layout;
+      onMeasure(tab.id, x, width);
+    },
+    [onMeasure, tab.id],
+  );
+
+  const pressStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: pressScale.value }],
+  }));
+
+  const buttonStyle = useAnimatedStyle(() => ({
+    paddingHorizontal: interpolate(expand.value, [0, 1], [12, 16], Extrapolation.CLAMP),
+  }));
+
+  const iconStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: iconScale.value }, { rotate: `${iconRotate.value}deg` }],
+  }));
+
+  const labelStyle = useAnimatedStyle(() => ({
+    maxWidth: interpolate(expand.value, [0, 1], [0, 88], Extrapolation.CLAMP),
+    marginLeft: interpolate(expand.value, [0, 1], [0, 8], Extrapolation.CLAMP),
+    opacity: interpolate(expand.value, [0, 0.28, 1], [0, 0, 1], Extrapolation.CLAMP),
+    transform: [
+      { translateX: interpolate(expand.value, [0, 1], [-6, 0], Extrapolation.CLAMP) },
+    ],
+    overflow: 'hidden',
+  }));
+
+  const stdEase = Easing.bezier(
+    MOTION_CURVES.std[0],
+    MOTION_CURVES.std[1],
+    MOTION_CURVES.std[2],
+    MOTION_CURVES.std[3]
+  );
 
   return (
     <Pressable
+      onLayout={handleLayout}
       onPress={onPress}
       onPressIn={() => {
         if (reduceMotion) return;
-        Animated.timing(pressScale, {
-          toValue: PRESS_SCALE,
+        pressScale.value = withTiming(PRESS_SCALE, {
           duration: MOTION_DURATIONS.press,
-          easing: Easing.bezier(...MOTION_CURVES.std),
-          useNativeDriver: true,
-        }).start();
+          easing: stdEase,
+        });
       }}
       onPressOut={() => {
         if (reduceMotion) return;
-        Animated.timing(pressScale, {
-          toValue: 1,
-          duration: MOTION_DURATIONS.press,
-          easing: Easing.bezier(...MOTION_CURVES.std),
-          useNativeDriver: true,
-        }).start();
+        pressScale.value = withSpring(1, ICON_SPRING);
       }}
       accessibilityRole="tab"
       accessibilityState={{ selected: isActive }}
       accessibilityLabel={tab.accessibilityLabel}
     >
-      <Animated.View style={{ transform: [{ scale: pressScale }] }}>
-        <Animated.View
-          style={[
-            styles.tabButton,
-            {
-              paddingHorizontal: horizontalPad,
-              backgroundColor: isActive ? ink : 'transparent',
-            },
-          ]}
-        >
-          <Animated.View
-            style={{
-              transform: [{ scale: iconScale }, { rotate: iconRotate }],
-            }}
-          >
-            <DockSvgIcon
-              id={tab.id}
-              color={isActive ? bg : muted}
-              active={isActive}
-            />
+      <Animated.View style={pressStyle}>
+        <Animated.View style={[styles.tabButton, buttonStyle]}>
+          <Animated.View style={iconStyle}>
+            <DockSvgIcon id={tab.id} color={isActive ? bg : muted} />
           </Animated.View>
 
-          <Animated.View
-            style={{
-              maxWidth: labelMaxWidth,
-              marginLeft: labelMarginLeft,
-              opacity: labelOpacity,
-              overflow: 'hidden',
-            }}
-          >
-            <Text
-              style={[styles.tabLabel, { color: bg }]}
-              numberOfLines={1}
-              ellipsizeMode="clip"
-            >
+          <Animated.View style={labelStyle}>
+            <Text style={[styles.tabLabel, { color: bg }]} numberOfLines={1}>
               {tab.label}
             </Text>
           </Animated.View>
@@ -261,41 +249,86 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
 
   // `.dock` (L984–985): entra com transform 420ms ease-q + opacity 280ms ease-std;
   // sai com transform 280ms ease-in + opacity 200ms ease-in. Nunca desmonta.
-  const slide = useRef(new Animated.Value(visible ? 1 : 0)).current;
-  const fade = useRef(new Animated.Value(visible ? 1 : 0)).current;
+  const slide = useSharedValue(visible ? 1 : 0);
+  const fade = useSharedValue(visible ? 1 : 0);
+
+  // Pílula deslizante do item ativo na navbar (Reanimated 4 UI thread spring)
+  const layoutsRef = useRef<Partial<Record<DockTabType, { x: number; width: number }>>>({});
+  const indicatorReadyRef = useRef(false);
+  const indicatorX = useSharedValue(8);
+  const indicatorW = useSharedValue(0);
+  const indicatorOpacity = useSharedValue(0);
+
+  const syncIndicator = useCallback(
+    (tabId: DockTabType, animate: boolean) => {
+      const m = layoutsRef.current[tabId];
+      if (!m || m.width <= 0) return;
+      if (!indicatorReadyRef.current || !animate || reduceMotion) {
+        indicatorReadyRef.current = true;
+        indicatorX.value = m.x;
+        indicatorW.value = m.width;
+        indicatorOpacity.value = 1;
+        return;
+      }
+      indicatorX.value = withSpring(m.x, DOCK_SPRING);
+      indicatorW.value = withSpring(m.width, DOCK_SPRING);
+      indicatorOpacity.value = 1;
+    },
+    [indicatorOpacity, indicatorW, indicatorX, reduceMotion],
+  );
+
+  const handleMeasureTab = useCallback(
+    (id: DockTabType, x: number, width: number) => {
+      layoutsRef.current[id] = { x, width };
+      if (id === activeTab) {
+        syncIndicator(id, indicatorReadyRef.current);
+      }
+    },
+    [activeTab, syncIndicator],
+  );
+
+  useEffect(() => {
+    if (DOCK_TABS.some((t) => t.id === activeTab)) {
+      syncIndicator(activeTab as DockTabType, true);
+    }
+  }, [activeTab, syncIndicator]);
+
+  const indicatorStyle = useAnimatedStyle(() => ({
+    opacity: indicatorOpacity.value,
+    width: indicatorW.value,
+    transform: [{ translateX: indicatorX.value }],
+  }));
 
   useEffect(() => {
     if (reduceMotion) {
-      slide.setValue(visible ? 1 : 0);
-      fade.setValue(visible ? 1 : 0);
+      cancelAnimation(slide);
+      cancelAnimation(fade);
+      slide.value = visible ? 1 : 0;
+      fade.value = visible ? 1 : 0;
       return;
     }
-    const anim = Animated.parallel([
-      Animated.timing(slide, {
-        toValue: visible ? 1 : 0,
-        duration: visible ? 420 : 280,
-        easing: visible
-          ? Easing.bezier(MOTION_CURVES.q[0], MOTION_CURVES.q[1], MOTION_CURVES.q[2], MOTION_CURVES.q[3])
-          : Easing.bezier(MOTION_CURVES.in[0], MOTION_CURVES.in[1], MOTION_CURVES.in[2], MOTION_CURVES.in[3]),
-        useNativeDriver: true,
-      }),
-      Animated.timing(fade, {
-        toValue: visible ? 1 : 0,
-        duration: visible ? 280 : 200,
-        easing: visible
-          ? Easing.bezier(MOTION_CURVES.std[0], MOTION_CURVES.std[1], MOTION_CURVES.std[2], MOTION_CURVES.std[3])
-          : Easing.bezier(MOTION_CURVES.in[0], MOTION_CURVES.in[1], MOTION_CURVES.in[2], MOTION_CURVES.in[3]),
-        useNativeDriver: true,
-      }),
-    ]);
-    anim.start();
-    return () => anim.stop();
+
+    const slideCurve = visible ? MOTION_CURVES.q : MOTION_CURVES.in;
+    const fadeCurve = visible ? MOTION_CURVES.std : MOTION_CURVES.in;
+
+    slide.value = withTiming(visible ? 1 : 0, {
+      duration: visible ? 420 : 280,
+      easing: Easing.bezier(slideCurve[0], slideCurve[1], slideCurve[2], slideCurve[3]),
+    });
+    fade.value = withTiming(visible ? 1 : 0, {
+      duration: visible ? 280 : 200,
+      easing: Easing.bezier(fadeCurve[0], fadeCurve[1], fadeCurve[2], fadeCurve[3]),
+    });
   }, [visible, reduceMotion, slide, fade]);
 
-  const translateY = slide.interpolate({
-    inputRange: [0, 1],
-    outputRange: [28, 0],
-  });
+  const dockStyle = useAnimatedStyle(() => ({
+    opacity: fade.value,
+    transform: [
+      {
+        translateY: interpolate(slide.value, [0, 1], [28, 0], Extrapolation.CLAMP),
+      },
+    ],
+  }));
 
   const handleTabPress = (tab: DockTabType) => {
     if (tab !== activeTab) {
@@ -308,27 +341,26 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
     <Animated.View
       style={[
         styles.dockContainer,
-        {
-          paddingBottom: (insets.bottom || 8) + 8,
-          opacity: fade,
-          transform: [{ translateY }],
-        },
+        { paddingBottom: (insets.bottom || 8) + 8 },
+        dockStyle,
       ]}
       pointerEvents={visible ? 'box-none' : 'none'}
       accessibilityElementsHidden={!visible}
       importantForAccessibility={visible ? 'auto' : 'no-hide-descendants'}
     >
       {/* Gradiente `.dock`: transparente → bg em 36% (L160). */}
-      <Svg style={StyleSheet.absoluteFill} width="100%" height="100%" preserveAspectRatio="none">
-        <Defs>
-          <LinearGradient id="vitoDockFade" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor={colors.bg} stopOpacity="0" />
-            <Stop offset="0.36" stopColor={colors.bg} stopOpacity="1" />
-            <Stop offset="1" stopColor={colors.bg} stopOpacity="1" />
-          </LinearGradient>
-        </Defs>
-        <Rect x="0" y="0" width="100%" height="100%" fill="url(#vitoDockFade)" />
-      </Svg>
+      <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+        <Svg width="100%" height="100%" preserveAspectRatio="none">
+          <Defs>
+            <LinearGradient id="vitoDockFade" x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0" stopColor={colors.bg} stopOpacity="0" />
+              <Stop offset="0.36" stopColor={colors.bg} stopOpacity="1" />
+              <Stop offset="1" stopColor={colors.bg} stopOpacity="1" />
+            </LinearGradient>
+          </Defs>
+          <Rect x="0" y="0" width="100%" height="100%" fill="url(#vitoDockFade)" />
+        </Svg>
+      </View>
 
       <View
         style={[
@@ -343,13 +375,22 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
         ]}
         accessibilityRole="tablist"
       >
+        {/** Indicador deslizante ativo (pílula que viaja com mola entre as abas) */}
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.slidingIndicator,
+            { backgroundColor: colors.ink },
+            indicatorStyle,
+          ]}
+        />
         {DOCK_TABS.map((tab) => (
           <DockTabButton
             key={tab.id}
             tab={tab}
             isActive={activeTab === tab.id}
             onPress={() => handleTabPress(tab.id)}
-            ink={colors.ink}
+            onMeasure={handleMeasureTab}
             bg={colors.bg}
             muted={colors.muted}
             reduceMotion={reduceMotion}
@@ -366,19 +407,27 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    paddingTop: 30,
+    paddingTop: 18,
     paddingHorizontal: 16,
     alignItems: 'center',
     justifyContent: 'flex-end',
     zIndex: 99,
   },
   dockPill: {
+    position: 'relative',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 7,
     paddingHorizontal: 8,
     gap: 6,
+  },
+  slidingIndicator: {
+    position: 'absolute',
+    left: 0,
+    top: 7,
+    height: 46,
+    borderRadius: 23,
   },
   tabButton: {
     minWidth: 46,
@@ -389,9 +438,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   tabLabel: {
-    fontFamily: 'Geist',
+    fontFamily: 'Geist_500Medium',
     fontSize: 13,
     fontWeight: '500',
     letterSpacing: -0.1,
+    paddingRight: 2,
   },
 });

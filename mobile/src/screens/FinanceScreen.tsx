@@ -8,10 +8,11 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../icons/ProtoUiIcons';
 import { tokens } from '../theme/tokens';
 import { useTheme } from '../context/ThemeContext';
 import { hapticFeedback } from '../theme/motion';
+import { StaggerItem } from '../theme/vitoMotion';
 import { api } from '../services/api';
 import { chatPromptBus, dataSync } from '../services/dataSync';
 import type {
@@ -22,8 +23,8 @@ import type {
   FinancialSummary,
 } from '../types/finance';
 import { PluggyConnectModal } from './PluggyConnectModal';
-import { BentoAccountHero } from '../components/finance/BentoAccountHero';
-import { BentoMetricsGrid } from '../components/finance/BentoMetricsGrid';
+import { FinanceHeroAndRail } from '../components/finance/FinanceHeroAndRail';
+import { FinanceMonthAndCards } from '../components/finance/FinanceMonthAndCards';
 import { RecentTransactionsList } from '../components/finance/RecentTransactionsList';
 import { FinanceGoalsCard } from '../components/finance/FinanceGoalsCard';
 import { FinanceAttentionSection } from '../components/finance/FinanceAttentionSection';
@@ -135,51 +136,45 @@ export const FinanceScreen: React.FC = () => {
         showsVerticalScrollIndicator={false}
       >
         {/* Cabeçalho Canônico (#s-fin .head) */}
+        <StaggerItem index={0}>
         <View style={styles.head}>
-          <View style={styles.headLeft}>
+          <TouchableOpacity
+            style={styles.headLeft}
+            activeOpacity={0.75}
+            onPress={() => {
+              hapticFeedback.light();
+              if (connectedCount > 0 || accounts.length > 0) {
+                setSubScreenKey('conn');
+              } else {
+                setConnectModalVisible(true);
+              }
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Gerenciar contas conectadas"
+          >
             <Text style={[styles.mainTitle, { color: colors.ink }]}>Finanças</Text>
             <Text style={[styles.mainSubtitle, { color: colors.muted }]} numberOfLines={1}>
               {connectedCount > 0
                 ? `${connectedCount} ${
                     connectedCount === 1 ? 'banco conectado' : 'bancos conectados'
                   } · Open Finance`
-                : 'Conecte seus bancos via Open Finance'}
+                : 'Conecte seus bancos'}
             </Text>
-          </View>
+          </TouchableOpacity>
 
           <View style={styles.headActs}>
             <TouchableOpacity
-              style={[styles.rb, { backgroundColor: colors.bg, borderColor: colors.line }]}
+              style={[styles.rb, { backgroundColor: colors.bg, borderColor: colors.hairline }]}
               onPress={togglePrivacy}
               hitSlop={tokens.hitSlop.sm}
               accessibilityLabel={isPrivacyHidden ? 'Mostrar valores' : 'Ocultar valores'}
               accessibilityState={{ selected: isPrivacyHidden }}
             >
-              <MaterialIcons
+              <ProtoUiIcon
                 name={isPrivacyHidden ? 'visibility-off' : 'visibility'}
-                size={19}
+                size={20}
                 color={colors.ink}
               />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.pillb, { backgroundColor: colors.bg, borderColor: colors.line }]}
-              onPress={() => {
-                hapticFeedback.light();
-                if (connectedCount > 0 || accounts.length > 0) {
-                  setSubScreenKey('conn');
-                } else {
-                  setConnectModalVisible(true);
-                }
-              }}
-              activeOpacity={0.8}
-              accessibilityLabel="Contas conectadas"
-            >
-              <MaterialIcons name="account-balance" size={17} color={colors.ink} />
-              <Text style={[styles.pillbText, { color: colors.ink }]}>Bancos</Text>
-              {connectedCount > 0 && (
-                <View style={[styles.pillbDot, { backgroundColor: colors.acc }]} />
-              )}
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -191,10 +186,11 @@ export const FinanceScreen: React.FC = () => {
               hitSlop={tokens.hitSlop.sm}
               accessibilityLabel="Pedir ao Vito: finanças"
             >
-              <MaterialIcons name="auto-awesome" size={19} color={colors.bg} />
+              <ProtoUiIcon name="auto-awesome" size={20} color={colors.bg} />
             </TouchableOpacity>
           </View>
         </View>
+        </StaggerItem>
 
         {loading && !hasConnectedData ? (
           <View style={[styles.emptyCard, { backgroundColor: colors.bg, borderColor: colors.line }]}>
@@ -207,7 +203,7 @@ export const FinanceScreen: React.FC = () => {
           <>
             <View style={[styles.emptyCard, { backgroundColor: colors.bg, borderColor: colors.line }]}>
               <View style={[styles.emptyChip, { backgroundColor: colors.finBg }]}>
-                <MaterialIcons name="account-balance" size={24} color={colors.fin} />
+                <ProtoUiIcon name="account-balance" size={24} color={colors.fin} />
               </View>
               <Text style={[styles.emptyTitle, { color: colors.ink }]}>
                 Conecte seus bancos via Open Finance
@@ -238,7 +234,7 @@ export const FinanceScreen: React.FC = () => {
               {PROMPT_CHIPS.map((item) => (
                 <TouchableOpacity
                   key={item.label}
-                  style={[styles.exChip, { backgroundColor: colors.bg, borderColor: colors.line }]}
+                  style={[styles.exChip, { backgroundColor: colors.surf, borderColor: colors.hairline }]}
                   onPress={() => sendPromptToVito(item.prompt)}
                   activeOpacity={0.75}
                 >
@@ -249,82 +245,100 @@ export const FinanceScreen: React.FC = () => {
           </>
         ) : (
           <>
-            <BentoAccountHero
-              totalBalance={summary.total_balance}
-              connectionsCount={connectedCount}
-              accounts={accounts}
-              connections={connections}
-              isPrivacyHidden={isPrivacyHidden}
-              onPressConnections={() => setSubScreenKey('conn')}
-              onPressAddBank={() => setConnectModalVisible(true)}
-              onSelectAccount={(acc) =>
-                sendPromptToVito(
-                  `Me mostre os detalhes e movimentações recentes da conta ${acc.name || acc.institution_name}.`
-                )
-              }
-            />
+            {/* Blocos 1, 2 e 3: Saldo aberto (.fx-hero), Alerta mais urgente e Carrossel de contas (.fx-rail) */}
+            <StaggerItem index={1}>
+              <FinanceHeroAndRail
+                totalBalance={summary.total_balance}
+                monthSurplus={(summary.month_income ?? 0) - (summary.month_expenses ?? summary.monthly_spend_actual ?? 0)}
+                connectionsCount={connectedCount}
+                accounts={accounts}
+                connections={connections}
+                isPrivacyHidden={isPrivacyHidden}
+                onPressConnections={() => setSubScreenKey('conn')}
+                onPressAddBank={() => setConnectModalVisible(true)}
+                onSelectAccount={(acc) =>
+                  sendPromptToVito(
+                    `Me mostre os detalhes e movimentações recentes da conta ${acc.name || acc.institution_name}.`
+                  )
+                }
+              />
+            </StaggerItem>
 
-            <BentoMetricsGrid
-              summary={summary}
-              accounts={accounts}
-              isPrivacyHidden={isPrivacyHidden}
-              onOpenSubScreen={(key) => {
-                hapticFeedback.light();
-                setSubScreenKey(key);
-              }}
-              onPressSafeToSpend={() =>
-                sendPromptToVito(
-                  `Quanto posso gastar por dia até o fim do mês? Hoje meu limite diário está em ${formatBRL(
-                    summary.safe_to_spend_daily,
-                    0
-                  )}.`
-                )
-              }
-            />
+            <StaggerItem index={2}>
+              <FinanceAttentionSection
+                alerts={summary.attention_alerts}
+                onPressAlertAction={sendPromptToVito}
+              />
+            </StaggerItem>
 
-            <FinanceGoalsCard
-              summary={summary}
-              isPrivacyHidden={isPrivacyHidden}
-              onPress={() => setSubScreenKey('goal')}
-            />
+            {/* Blocos 4, 5 e 6: Card do Mês, Atalhos (Pode gastar hoje / Assinaturas) e Cartões */}
+            <StaggerItem index={3}>
+              <FinanceMonthAndCards
+                summary={summary}
+                accounts={accounts}
+                isPrivacyHidden={isPrivacyHidden}
+                onOpenSubScreen={(key) => {
+                  hapticFeedback.light();
+                  setSubScreenKey(key);
+                }}
+                onPressSafeToSpend={() =>
+                  sendPromptToVito(
+                    `Quanto posso gastar por dia até o fim do mês? Hoje meu limite diário está em ${formatBRL(
+                      summary.safe_to_spend_daily,
+                      0
+                    )}.`
+                  )
+                }
+              />
+            </StaggerItem>
 
-            <FinanceAttentionSection
-              alerts={summary.attention_alerts}
-              onPressAlertAction={sendPromptToVito}
-            />
+            {/* Bloco 7: Metas e orçamentos */}
+            <StaggerItem index={4}>
+              <FinanceGoalsCard
+                summary={summary}
+                isPrivacyHidden={isPrivacyHidden}
+                onPress={() => setSubScreenKey('goal')}
+              />
+            </StaggerItem>
 
-            <View style={styles.secHeader}>
-              <Text style={[styles.secTitle, { color: colors.ink }]}>Pergunte ao Vito</Text>
-            </View>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.exScroll}
-            >
-              {PROMPT_CHIPS.map((item) => (
-                <TouchableOpacity
-                  key={item.label}
-                  style={[styles.exChip, { backgroundColor: colors.bg, borderColor: colors.line }]}
-                  onPress={() => sendPromptToVito(item.prompt)}
-                  activeOpacity={0.75}
-                >
-                  <Text style={[styles.exChipText, { color: colors.ink }]}>{item.label}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+            {/* Bloco 8: Perguntas rápidas */}
+            <StaggerItem index={5}>
+              <View style={styles.secHeader}>
+                <Text style={[styles.secTitle, { color: colors.ink }]}>Pergunte ao Vito</Text>
+              </View>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.exScroll}
+              >
+                {PROMPT_CHIPS.map((item) => (
+                  <TouchableOpacity
+                    key={item.label}
+                    style={[styles.exChip, { backgroundColor: colors.surf, borderColor: colors.hairline }]}
+                    onPress={() => sendPromptToVito(item.prompt)}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={[styles.exChipText, { color: colors.ink }]}>{item.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </StaggerItem>
 
-            <RecentTransactionsList
-              transactions={transactions}
-              isPrivacyHidden={isPrivacyHidden}
-              onViewAll={() => setSubScreenKey('ext')}
-              onSelectTransaction={(tx) =>
-                sendPromptToVito(
-                  `Sobre o lançamento "${tx.clean_merchant_name || tx.description}" de ${formatBRL(
-                    tx.amount
-                  )}, me ajude a analisar ou recategorizar.`
-                )
-              }
-            />
+            {/* Bloco 9: Movimentações agrupadas por dia */}
+            <StaggerItem index={6}>
+              <RecentTransactionsList
+                transactions={transactions}
+                isPrivacyHidden={isPrivacyHidden}
+                onViewAll={() => setSubScreenKey('ext')}
+                onSelectTransaction={(tx) =>
+                  sendPromptToVito(
+                    `Sobre o lançamento "${tx.clean_merchant_name || tx.description}" de ${formatBRL(
+                      tx.amount
+                    )}, me ajude a analisar ou recategorizar.`
+                  )
+                }
+              />
+            </StaggerItem>
           </>
         )}
       </ScrollView>
@@ -380,16 +394,17 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   mainTitle: {
-    fontFamily: tokens.typography.family.montserratBold,
-    fontSize: 28,
-    lineHeight: 32,
-    fontWeight: '800',
-    letterSpacing: -0.8,
+    fontFamily: 'Geist_500Medium',
+    fontSize: 32,
+    lineHeight: 34,
+    fontWeight: '500',
+    letterSpacing: -0.96,
   },
   mainSubtitle: {
-    fontSize: 13.5,
+    fontFamily: 'Geist',
+    fontSize: 14,
     marginTop: 4,
-    fontWeight: '500',
+    fontWeight: '400',
   },
   headActs: {
     flexDirection: 'row',
@@ -398,30 +413,12 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   rb: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  pillb: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-    height: 42,
-    paddingHorizontal: 13,
-    borderRadius: 21,
-    borderWidth: 1,
-  },
-  pillbText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  pillbDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
   },
   emptyCard: {
     borderRadius: 22,
@@ -440,12 +437,13 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   emptyTitle: {
-    fontFamily: tokens.typography.family.montserratBold,
+    fontFamily: 'Geist_500Medium',
     fontSize: 18,
-    fontWeight: '800',
+    fontWeight: '500',
     letterSpacing: -0.3,
   },
   emptySub: {
+    fontFamily: 'Geist',
     fontSize: 13.5,
     lineHeight: 20,
     marginTop: 6,
@@ -460,17 +458,18 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
   },
   emptyCtaText: {
+    fontFamily: 'Geist_500Medium',
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: '500',
   },
   secHeader: {
     marginTop: 14,
     marginBottom: 10,
   },
   secTitle: {
-    fontFamily: tokens.typography.family.montserratBold,
+    fontFamily: 'Geist_500Medium',
     fontSize: 17,
-    fontWeight: '800',
+    fontWeight: '500',
     letterSpacing: -0.3,
   },
   exScroll: {
@@ -478,14 +477,15 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   exChip: {
-    height: 34,
-    paddingHorizontal: 13,
-    borderRadius: 17,
+    height: 36,
+    paddingHorizontal: 14,
+    borderRadius: 18,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   exChipText: {
+    fontFamily: 'Geist_500Medium',
     fontSize: 13,
     fontWeight: '500',
   },

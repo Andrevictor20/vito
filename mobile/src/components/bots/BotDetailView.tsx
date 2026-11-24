@@ -1,7 +1,18 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import Animated, {
+  Easing,
+  Extrapolation,
+  cancelAnimation,
+  interpolate,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
+import { getBezier } from '../../ds/tokens';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { useTheme } from '../../context/ThemeContext';
+import { useReduceMotion } from '../../theme/vitoMotion';
 import { api } from '../../services/api';
 import { navigateToAiProviders } from '../../navigation/navigationRef';
 import type { ModelProviderGroup, ReasoningEffort } from '../../types/aiProviders';
@@ -67,7 +78,36 @@ export const BotDetailView: React.FC<BotDetailViewProps> = ({
   onUpgradeSkill,
 }) => {
   const { colors } = useTheme();
+  const reduceMotion = useReduceMotion();
   const [subTab, setSubTab] = useState<'chat' | 'details'>('chat');
+  const subFade = useSharedValue(1);
+  const firstTabRender = useRef(true);
+
+  useEffect(() => {
+    if (firstTabRender.current) {
+      firstTabRender.current = false;
+      return;
+    }
+    if (reduceMotion) {
+      cancelAnimation(subFade);
+      subFade.value = 1;
+      return;
+    }
+    const [x1, y1, x2, y2] = getBezier('--ease-q');
+    cancelAnimation(subFade);
+    subFade.value = 0;
+    subFade.value = withTiming(1, {
+      duration: 240,
+      easing: Easing.bezier(x1, y1, x2, y2),
+    });
+    return () => cancelAnimation(subFade);
+  }, [subTab, reduceMotion, subFade]);
+
+  const tabContentStyle = useAnimatedStyle(() => ({
+    flex: 1,
+    opacity: subFade.value,
+    transform: [{ translateY: interpolate(subFade.value, [0, 1], [8, 0], Extrapolation.CLAMP) }],
+  }));
   const [runningNow, setRunningNow] = useState(false);
   const [showAppearance, setShowAppearance] = useState(false);
   const [showAddSkill, setShowAddSkill] = useState(false);
@@ -110,9 +150,13 @@ export const BotDetailView: React.FC<BotDetailViewProps> = ({
   return (
     <View style={[styles.container, { backgroundColor: colors.surface }]}>
       {/* Cabeçalho #s-rdd */}
-      <View style={[styles.header, { borderBottomColor: colors.line }]}>
-        <TouchableOpacity style={styles.backBtn} onPress={onBack} accessibilityLabel="Voltar">
-          <MaterialIcons name="arrow-back" size={22} color={colors.ink} />
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={[styles.backBtn, { backgroundColor: colors.bg, borderColor: colors.hairline }]}
+          onPress={onBack}
+          accessibilityLabel="Voltar"
+        >
+          <ProtoUiIcon name="arrow-back" size={20} color={colors.ink} />
         </TouchableOpacity>
         <View style={styles.headerCol}>
           <Text style={[styles.title, { color: colors.ink }]} numberOfLines={1}>
@@ -130,9 +174,9 @@ export const BotDetailView: React.FC<BotDetailViewProps> = ({
 
       {/* Segmento Chat | Detalhes */}
       <View style={styles.segWrap}>
-        <View style={[styles.segTrack, { backgroundColor: colors.surf }]}>
+        <View style={[styles.segTrack, { backgroundColor: colors.btn }]}>
           <TouchableOpacity
-            style={[styles.segTab, subTab === 'chat' && { backgroundColor: colors.bg }]}
+            style={[styles.segTab, subTab === 'chat' && [styles.segTabActive, { backgroundColor: colors.bg }]]}
             onPress={() => setSubTab('chat')}
           >
             <Text style={[styles.segText, { color: subTab === 'chat' ? colors.ink : colors.muted }]}>
@@ -140,7 +184,7 @@ export const BotDetailView: React.FC<BotDetailViewProps> = ({
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.segTab, subTab === 'details' && { backgroundColor: colors.bg }]}
+            style={[styles.segTab, subTab === 'details' && [styles.segTabActive, { backgroundColor: colors.bg }]]}
             onPress={() => setSubTab('details')}
           >
             <Text
@@ -152,6 +196,7 @@ export const BotDetailView: React.FC<BotDetailViewProps> = ({
         </View>
       </View>
 
+      <Animated.View style={tabContentStyle}>
       {subTab === 'chat' ? (
         <BotChatTab
           bot={bot}
@@ -178,6 +223,7 @@ export const BotDetailView: React.FC<BotDetailViewProps> = ({
           onDeleteBot={() => setShowDeleteConfirm(true)}
         />
       )}
+      </Animated.View>
 
       <MascotStudioModal
         visible={showAppearance}
@@ -266,23 +312,37 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    gap: 10,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 8,
+    gap: 12,
   },
   backBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerCol: { flex: 1, gap: 1 },
-  title: { fontSize: 17, fontWeight: '700' },
-  subtitle: { fontSize: 12 },
-  segWrap: { paddingHorizontal: 16, paddingVertical: 10 },
-  segTrack: { flexDirection: 'row', padding: 4, borderRadius: 14 },
-  segTab: { flex: 1, paddingVertical: 8, borderRadius: 10, alignItems: 'center' },
-  segText: { fontSize: 13, fontWeight: '700' },
+  title: {
+    fontFamily: 'Geist_500Medium',
+    fontSize: 21,
+    lineHeight: 25,
+    fontWeight: '500',
+    letterSpacing: -0.42,
+  },
+  subtitle: { fontFamily: 'Geist', fontSize: 12.5 },
+  segWrap: { paddingHorizontal: 20, paddingVertical: 8 },
+  segTrack: { flexDirection: 'row', padding: 4, borderRadius: 22, gap: 4 },
+  segTab: { flex: 1, height: 38, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  segTabActive: {
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  segText: { fontFamily: 'Geist_500Medium', fontSize: 13.5, fontWeight: '500' },
 });

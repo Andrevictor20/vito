@@ -6,7 +6,7 @@ import {
   ScrollView,
   RefreshControl,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { tokens } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { BookingAppointment, Meeting } from '../../types';
@@ -111,7 +111,7 @@ export const BookingReceivedTab: React.FC<BookingReceivedTabProps> = ({
         }
       >
         <View style={[styles.emptyIconCircle, { backgroundColor: colors.surf }]}>
-          <MaterialIcons name="event-busy" size={32} color={colors.muted} />
+          <ProtoUiIcon name="event-busy" size={32} color={colors.muted} />
         </View>
         <Text
           style={[

@@ -1,8 +1,9 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { tokens, tabularNumbers } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
+import { AnimatedProgressBar, CountUpText, StaggerItem } from '../../theme/vitoMotion';
 import { getBankBrand } from '../../utils/bankBrands';
 import type {
   FinanceAccount,
@@ -16,6 +17,14 @@ import {
   hasSubscriptionIncrease,
   maskBRL,
 } from './financeHelpers';
+import {
+  CategorySemanticBadge,
+  FinanceBankBadge,
+  getFinanceChartPalette,
+  GoalSemanticBadge,
+  resolveCategoryVisual,
+  TransactionSemanticBadge,
+} from './FinanceSemanticIcons';
 import { subScreenStyles as styles } from './financeSubScreenStyles';
 
 interface SubscriptionsSubViewProps {
@@ -29,36 +38,41 @@ export const SubscriptionsSubView: React.FC<SubscriptionsSubViewProps> = ({
   isPrivacyHidden,
   onAskVito,
 }) => {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const subs = summary.subscriptions;
   const total = subs.reduce((acc, s) => acc + (s.amount || 0), 0);
   const priceIncreases = subs.filter(hasSubscriptionIncrease).length;
 
   return (
     <View>
-      <View style={[styles.card2, { backgroundColor: colors.bg, borderColor: colors.line }]}>
+      <StaggerItem index={0} style={[styles.card2, { backgroundColor: colors.surf, borderColor: colors.hairline }]}>
         <Text style={[styles.eyebrow, { color: colors.muted }]}>TOTAL POR MÊS</Text>
-        <Text style={[styles.bigValue, tabularNumbers, { color: colors.ink }]}>
-          {maskBRL(isPrivacyHidden, formatBRL(total))}
-        </Text>
+        <CountUpText
+          value={total}
+          decimals={2}
+          prefix="R$ "
+          privacyHidden={isPrivacyHidden}
+          style={[styles.bigValue, tabularNumbers, { color: colors.ink }]}
+        />
         <Text style={[styles.rowMeta, { color: colors.muted, marginTop: 8 }]}>
           {subs.length} {subs.length === 1 ? 'serviço' : 'serviços'}
           {priceIncreases > 0 ? ` · ${priceIncreases} reajuste neste mês` : ''}
         </Text>
-      </View>
+      </StaggerItem>
 
-      <View style={styles.secHeader}>
-        <Text style={[styles.secTitle, { color: colors.ink }]}>Serviços</Text>
-      </View>
+      <StaggerItem index={1}>
+        <View style={styles.secHeader}>
+          <Text style={[styles.secTitle, { color: colors.ink }]}>Serviços</Text>
+        </View>
 
       {subs.length === 0 ? (
-        <View style={[styles.card2, { backgroundColor: colors.bg, borderColor: colors.line }]}>
+        <View style={[styles.card2, { backgroundColor: colors.surf, borderColor: colors.hairline }]}>
           <Text style={[styles.emptyText, { color: colors.muted }]}>
             Nenhuma assinatura recorrente detectada até o momento.
           </Text>
         </View>
       ) : (
-        <View style={[styles.card2Flush, { backgroundColor: colors.bg, borderColor: colors.line }]}>
+        <View style={[styles.card2Flush, { backgroundColor: colors.surf, borderColor: colors.hairline }]}>
           {subs.map((sub, idx) => {
             const name = getSubscriptionName(sub);
             const increased = hasSubscriptionIncrease(sub);
@@ -80,9 +94,13 @@ export const SubscriptionsSubView: React.FC<SubscriptionsSubViewProps> = ({
                 }
                 activeOpacity={0.75}
               >
-                <View style={[styles.chip, { backgroundColor: colors.finBg }]}>
-                  <MaterialIcons name="repeat" size={20} color={colors.fin} />
-                </View>
+                <TransactionSemanticBadge
+                  merchant={name}
+                  category="Assinaturas"
+                  isDark={isDark}
+                  index={idx}
+                  size={38}
+                />
                 <View style={styles.rowBody}>
                   <Text style={[styles.rowTitle, { color: colors.ink }]} numberOfLines={1}>
                     {name}
@@ -92,8 +110,8 @@ export const SubscriptionsSubView: React.FC<SubscriptionsSubViewProps> = ({
                       {sub.frequency === 'yearly' ? 'Anual' : 'Todo mês'}
                     </Text>
                     {increased && (
-                      <View style={[localStyles.deltaBadge, { backgroundColor: colors.finBg }]}>
-                        <Text style={[localStyles.deltaBadgeText, { color: colors.fin }]}>
+                      <View style={[localStyles.deltaBadge, { backgroundColor: colors.redBg }]}>
+                        <Text style={[localStyles.deltaBadgeText, { color: colors.orange }]}>
                           {diff > 0 ? `+${formatBRL(diff)}` : 'Reajuste'}
                         </Text>
                       </View>
@@ -108,6 +126,7 @@ export const SubscriptionsSubView: React.FC<SubscriptionsSubViewProps> = ({
           })}
         </View>
       )}
+      </StaggerItem>
     </View>
   );
 };
@@ -123,7 +142,9 @@ export const GoalsSubView: React.FC<GoalsSubViewProps> = ({
   isPrivacyHidden,
   onAskVito,
 }) => {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
+  const pal = getFinanceChartPalette(isDark);
+  const goalColors = [pal[5], pal[2], pal[0], pal[4], pal[1]];
   const budgets = summary.budgets || [];
   const goals = summary.goals || [];
 
@@ -137,7 +158,7 @@ export const GoalsSubView: React.FC<GoalsSubViewProps> = ({
       </View>
 
       {budgets.length === 0 ? (
-        <View style={[styles.card2, { backgroundColor: colors.bg, borderColor: colors.line }]}>
+        <View style={[styles.card2, { backgroundColor: colors.surf, borderColor: colors.hairline }]}>
           <Text style={[styles.emptyText, { color: colors.muted }]}>
             Você ainda não configurou tetos de gasto por categoria. Peça ao Vito para criar um orçamento.
           </Text>
@@ -155,38 +176,46 @@ export const GoalsSubView: React.FC<GoalsSubViewProps> = ({
         budgets.map((b, idx) => {
           const pct = b.target_amount > 0 ? Math.round((b.used_amount / b.target_amount) * 100) : 0;
           const isHot = pct >= (b.auto_alert_threshold ?? 80);
+          const catVis = resolveCategoryVisual(b.title, isDark, idx);
+          const barCol = pct >= 100 ? colors.red : isHot ? colors.orange : catVis.color;
           return (
+            <StaggerItem key={b.id || `bd_${idx}`} index={idx}>
             <TouchableOpacity
-              key={b.id || `bd_${idx}`}
-              style={[styles.card2, { backgroundColor: colors.bg, borderColor: colors.line }]}
+              style={[styles.card2, { backgroundColor: colors.surf, borderColor: colors.hairline }]}
               onPress={() =>
                 onAskVito(`Quero ajustar o limite do orçamento "${b.title}" (${formatBRL(b.target_amount, 0)}).`)
               }
               activeOpacity={0.8}
             >
-              <View style={[styles.splitMeta, { marginTop: 0 }]}>
-                <Text style={[styles.rowTitle, { color: colors.ink }]}>{b.title}</Text>
-                <Text style={[styles.rowMeta, tabularNumbers, { color: colors.muted }]}>
-                  {maskBRL(isPrivacyHidden, formatBRL(b.used_amount, 0))} de{' '}
-                  {maskBRL(isPrivacyHidden, formatBRL(b.target_amount, 0))}
-                </Text>
+              <View style={localStyles.iconTitleRow}>
+                <CategorySemanticBadge category={b.title} isDark={isDark} index={idx} size={32} />
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <View style={[styles.splitMeta, { marginTop: 0 }]}>
+                    <Text style={[styles.rowTitle, { color: colors.ink }]} numberOfLines={1}>
+                      {b.title}
+                    </Text>
+                    <Text style={[styles.rowMeta, tabularNumbers, { color: colors.muted }]}>
+                      {maskBRL(isPrivacyHidden, formatBRL(b.used_amount, 0))} de{' '}
+                      {maskBRL(isPrivacyHidden, formatBRL(b.target_amount, 0))}
+                    </Text>
+                  </View>
+                </View>
               </View>
-              <View style={[styles.progressTrack, { backgroundColor: colors.line }]}>
-                <View
-                  style={[
-                    styles.progressFill,
-                    {
-                      width: `${Math.min(100, pct)}%`,
-                      backgroundColor: isHot ? colors.orange : colors.fin,
-                    },
-                  ]}
-                />
+              <AnimatedProgressBar
+                pct={isPrivacyHidden ? 0 : Math.min(100, pct)}
+                color={barCol}
+                trackColor={colors.line}
+                height={8}
+                delayMs={220 + idx * 80}
+                style={{ marginTop: 12, overflow: 'visible' }}
+              >
                 <View style={[localStyles.thresholdMarker, { backgroundColor: colors.ink }]} />
-              </View>
-              <Text style={[styles.rowMeta, { color: colors.muted, marginTop: 8 }]}>
+              </AnimatedProgressBar>
+              <Text style={[styles.rowMeta, { color: isHot ? barCol : colors.muted, marginTop: 8 }]}>
                 {pct}% usado{isHot ? ' · perto do limite' : ''}
               </Text>
             </TouchableOpacity>
+            </StaggerItem>
           );
         })
       )}
@@ -199,7 +228,7 @@ export const GoalsSubView: React.FC<GoalsSubViewProps> = ({
       </View>
 
       {goals.length === 0 ? (
-        <View style={[styles.card2, { backgroundColor: colors.bg, borderColor: colors.line }]}>
+        <View style={[styles.card2, { backgroundColor: colors.surf, borderColor: colors.hairline }]}>
           <Text style={[styles.emptyText, { color: colors.muted }]}>
             Nenhuma meta de economia ativa ainda.
           </Text>
@@ -216,32 +245,52 @@ export const GoalsSubView: React.FC<GoalsSubViewProps> = ({
       ) : (
         goals.map((g, idx) => {
           const pct = g.target_amount > 0 ? Math.min(100, Math.round((g.current_amount / g.target_amount) * 100)) : 0;
+          const goalColor = goalColors[idx % goalColors.length];
           return (
-            <View
+            <StaggerItem
               key={g.id || `goal_${idx}`}
-              style={[styles.card2, { backgroundColor: colors.bg, borderColor: colors.line }]}
+              index={budgets.length + idx}
+              style={[styles.card2, { backgroundColor: colors.surf, borderColor: colors.hairline }]}
             >
-              <View style={[styles.splitMeta, { marginTop: 0 }]}>
-                <Text style={[styles.rowTitle, { color: colors.ink }]}>{g.title}</Text>
-                {g.deadline_date ? (
-                  <Text style={[styles.rowMeta, { color: colors.muted }]}>até {g.deadline_date}</Text>
-                ) : null}
+              <View style={localStyles.iconTitleRow}>
+                <GoalSemanticBadge title={g.title} isDark={isDark} index={idx} size={32} />
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <View style={[styles.splitMeta, { marginTop: 0 }]}>
+                    <Text style={[styles.rowTitle, { color: colors.ink }]} numberOfLines={1}>
+                      {g.title}
+                    </Text>
+                    {g.deadline_date ? (
+                      <Text style={[styles.rowMeta, { color: colors.muted }]}>até {g.deadline_date}</Text>
+                    ) : null}
+                  </View>
+                </View>
               </View>
-              <Text style={[localStyles.goalAmount, tabularNumbers, { color: colors.ink }]}>
-                {maskBRL(isPrivacyHidden, formatBRL(g.current_amount, 0))}{' '}
-                <Text style={[localStyles.goalTarget, { color: colors.muted }]}>
-                  de {maskBRL(isPrivacyHidden, formatBRL(g.target_amount, 0))}
-                </Text>
-              </Text>
-              <View style={[styles.progressTrack, { backgroundColor: colors.line }]}>
-                <View
-                  style={[styles.progressFill, { width: `${pct}%`, backgroundColor: colors.fin }]}
+              <View style={localStyles.goalValRow}>
+                <CountUpText
+                  value={g.current_amount}
+                  decimals={0}
+                  prefix="R$ "
+                  delayMs={200 + idx * 70}
+                  privacyHidden={isPrivacyHidden}
+                  style={[localStyles.goalAmount, tabularNumbers, { color: colors.ink }]}
                 />
+                <Text style={[localStyles.goalTarget, { color: colors.muted }]}>
+                  {' de '}
+                  {maskBRL(isPrivacyHidden, formatBRL(g.target_amount, 0))}
+                </Text>
               </View>
-              <Text style={[styles.rowMeta, { color: colors.muted, marginTop: 8 }]}>
+              <AnimatedProgressBar
+                pct={isPrivacyHidden ? 0 : pct}
+                color={goalColor}
+                trackColor={colors.line}
+                height={8}
+                delayMs={260 + idx * 80}
+                style={{ marginTop: 12 }}
+              />
+              <Text style={[styles.rowMeta, { color: goalColor, marginTop: 8, fontWeight: '500' }]}>
                 {pct}% da meta
               </Text>
-            </View>
+            </StaggerItem>
           );
         })
       )}
@@ -266,9 +315,9 @@ export const ConnectionsSubView: React.FC<ConnectionsSubViewProps> = ({
 
   return (
     <View>
-      <View style={[localStyles.noticeCard, { backgroundColor: colors.bg, borderColor: colors.line }]}>
-        <View style={[styles.chip, { backgroundColor: colors.finBg }]}>
-          <MaterialIcons name="verified-user" size={20} color={colors.fin} />
+      <View style={[localStyles.noticeCard, { backgroundColor: colors.surf, borderColor: colors.hairline }]}>
+        <View style={[styles.chip, { backgroundColor: colors.greenBg }]}>
+          <ProtoUiIcon name="verified-user" size={20} color={colors.acc} />
         </View>
         <Text style={[localStyles.noticeText, { color: colors.muted }]}>
           Seus dados ficam em modo leitura no seu servidor privado. O Vito nunca movimenta dinheiro e você pode revogar quando quiser.
@@ -285,7 +334,7 @@ export const ConnectionsSubView: React.FC<ConnectionsSubViewProps> = ({
       </View>
 
       {connections.length === 0 ? (
-        <View style={[styles.card2, { backgroundColor: colors.bg, borderColor: colors.line }]}>
+        <View style={[styles.card2, { backgroundColor: colors.surf, borderColor: colors.hairline }]}>
           <Text style={[styles.emptyText, { color: colors.muted }]}>
             Nenhuma instituição conectada ainda via Open Finance.
           </Text>
@@ -301,14 +350,10 @@ export const ConnectionsSubView: React.FC<ConnectionsSubViewProps> = ({
           return (
             <View
               key={conn.id || `conn_${idx}`}
-              style={[styles.card2, { backgroundColor: colors.bg, borderColor: colors.line }]}
+              style={[styles.card2, { backgroundColor: colors.surf, borderColor: colors.hairline }]}
             >
               <View style={localStyles.connTop}>
-                <View style={[styles.avatarBig, { backgroundColor: brand.color }]}>
-                  <Text style={[styles.avatarBigText, { color: brand.textColor }]}>
-                    {brand.initials}
-                  </Text>
-                </View>
+                <FinanceBankBadge institutionName={conn.institution_name} size={40} />
                 <View style={styles.rowBody}>
                   <Text style={[styles.rowTitle, { color: colors.ink }]}>
                     {conn.institution_name || brand.name}
@@ -371,96 +416,22 @@ export const ConnectionsSubView: React.FC<ConnectionsSubViewProps> = ({
 };
 
 const localStyles = StyleSheet.create({
-  metaInline: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 2,
-  },
-  deltaBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-  deltaBadgeText: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  thresholdMarker: {
-    position: 'absolute',
-    left: '80%',
-    top: -3,
-    bottom: -3,
-    width: 2,
-    borderRadius: 1,
-  },
-  goalAmount: {
-    fontFamily: tokens.typography.family.montserratBold,
-    fontSize: 26,
-    fontWeight: '800',
-    marginTop: 10,
-  },
-  goalTarget: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  outlinePillBtn: {
-    height: 42,
-    borderRadius: 21,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 14,
-  },
-  outlinePillBtnText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  noticeCard: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
-    borderWidth: 1,
-    borderRadius: 18,
-    padding: 14,
-    marginTop: 10,
-  },
-  noticeText: {
-    flex: 1,
-    fontSize: 13.5,
-    lineHeight: 19,
-  },
-  connTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  statusPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 10,
-  },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  connAccountsList: {
-    marginTop: 10,
-  },
-  connAccRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 8,
-    marginTop: 8,
-    borderTopWidth: 1,
-  },
+  iconTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  metaInline: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
+  deltaBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 },
+  deltaBadgeText: { fontSize: 11, fontWeight: '600' },
+  thresholdMarker: { position: 'absolute', left: '80%', top: -3, bottom: -3, width: 2, borderRadius: 1 },
+  goalValRow: { flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', marginTop: 10 },
+  goalAmount: { fontFamily: tokens.typography.family.montserratBold, fontSize: 26, fontWeight: '800' },
+  goalTarget: { fontSize: 14, fontWeight: '600' },
+  outlinePillBtn: { height: 42, borderRadius: 21, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', marginTop: 14 },
+  outlinePillBtnText: { fontSize: 14, fontWeight: '600' },
+  noticeCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, borderWidth: 1, borderRadius: 18, padding: 14, marginTop: 10 },
+  noticeText: { flex: 1, fontSize: 13.5, lineHeight: 19 },
+  connTop: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  statusPill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
+  statusDot: { width: 6, height: 6, borderRadius: 3 },
+  statusText: { fontSize: 12, fontWeight: '600' },
+  connAccountsList: { marginTop: 10 },
+  connAccRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 8, marginTop: 8, borderTopWidth: 1 },
 });

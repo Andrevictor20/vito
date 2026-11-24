@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { useTheme } from '../../context/ThemeContext';
 import { tokens } from '../../theme/tokens';
 import { ChatThinkingIndicator } from './ChatThinkingIndicator';
@@ -42,13 +42,13 @@ export const ThinkingProcessAccordion: React.FC<ThinkingProcessAccordionProps> =
         accessibilityRole="button"
         accessibilityLabel="Ver etapas de raciocínio do Vito"
       >
-        <MaterialIcons name="auto-awesome" size={14} color={colors.primary || colors.ink} />
+        <ProtoUiIcon name="auto-awesome" size={14} color={colors.primary || colors.ink} />
         <Text style={[styles.headerText, { color: colors.ink }]} numberOfLines={1}>
           {isStreaming
             ? `Executando: ${steps[steps.length - 1]}`
             : `${steps.length} ${steps.length === 1 ? 'etapa concluída' : 'etapas concluídas'}`}
         </Text>
-        <MaterialIcons
+        <ProtoUiIcon
           name={expanded ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
           size={16}
           color={colors.muted}
@@ -67,7 +67,7 @@ export const ThinkingProcessAccordion: React.FC<ThinkingProcessAccordionProps> =
         >
           {steps.map((step, idx) => (
             <View key={`${step}-${idx}`} style={styles.stepRow}>
-              <MaterialIcons
+              <ProtoUiIcon
                 name="check-circle-outline"
                 size={13}
                 color={colors.primary || colors.ink}

@@ -1,6 +1,6 @@
 import React from "react";
 import { StyleSheet, View, Text, TouchableOpacity, ScrollView } from "react-native";
-import { MaterialIcons } from "@expo/vector-icons";
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { tokens, MD3Shapes, tabularNumbers } from "../../theme/tokens";
 import { useTheme } from "../../context/ThemeContext";
 import { BottomSheetModal } from "../ui/BottomSheetModal";
@@ -80,7 +80,7 @@ export const WeeklyRaioXModal: React.FC<WeeklyRaioXModalProps> = ({
         showsVerticalScrollIndicator={false}
       >
         <View style={[styles.truthBadge, { backgroundColor: colors.surfaceContainerHighest }]}>
-          <MaterialIcons name="verified" size={13} color={colors.primary} />
+          <ProtoUiIcon name="verified" size={13} color={colors.primary} />
           <Text style={[styles.truthBadgeText, { color: colors.primary }]}>
             SEM DISTORÇÃO 24H · FERIADOS = 0H
           </Text>
@@ -96,7 +96,7 @@ export const WeeklyRaioXModal: React.FC<WeeklyRaioXModalProps> = ({
           ]}
         >
           <View style={styles.synthesisHeaderBadge}>
-            <MaterialIcons name="auto-awesome" size={15} color={colors.primary} />
+            <ProtoUiIcon name="auto-awesome" size={15} color={colors.primary} />
             <Text style={[styles.bentoTag, { color: colors.primary }]}>
               DIAGNÓSTICO DA SEMANA
             </Text>
@@ -224,7 +224,7 @@ export const WeeklyRaioXModal: React.FC<WeeklyRaioXModalProps> = ({
           accessibilityRole="button"
           accessibilityLabel="Discutir no chat"
         >
-          <MaterialIcons name="chat" size={18} color={colors.onPrimary} />
+          <ProtoUiIcon name="chat" size={18} color={colors.onPrimary} />
           <Text style={[styles.modalChatButtonText, { color: colors.onPrimary }]}>
             Discutir no chat
           </Text>

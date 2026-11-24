@@ -1,9 +1,20 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, BackHandler, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Animated, {
+  Easing,
+  Extrapolation,
+  cancelAnimation,
+  interpolate,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { getBezier } from '../ds/tokens';
 import { useBots } from '../hooks/useBots';
 import { chatPromptBus, tabNavigationBus } from '../services/dataSync';
+import { StaggerItem, useReduceMotion } from '../theme/vitoMotion';
 import {
   Bot,
   BotPendingApproval,
@@ -37,8 +48,11 @@ export const BotsScreen: React.FC<BotsScreenProps> = ({
   onSubtitleChange,
   createRequestId,
 }) => {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const { user } = useAuth();
+  const reduceMotion = useReduceMotion();
+  const tabFade = useSharedValue(1);
+  const firstTabRender = useRef(true);
   const {
     bots,
     activity,
@@ -65,6 +79,32 @@ export const BotsScreen: React.FC<BotsScreenProps> = ({
   } = useBots(user?.id);
 
   const [activeTab, setActiveTab] = useState<BotsTab>('my_bots');
+
+  useEffect(() => {
+    if (firstTabRender.current) {
+      firstTabRender.current = false;
+      return;
+    }
+    if (reduceMotion) {
+      cancelAnimation(tabFade);
+      tabFade.value = 1;
+      return;
+    }
+    const [x1, y1, x2, y2] = getBezier('--ease-q');
+    cancelAnimation(tabFade);
+    tabFade.value = 0;
+    tabFade.value = withTiming(1, {
+      duration: 260,
+      easing: Easing.bezier(x1, y1, x2, y2),
+    });
+    return () => cancelAnimation(tabFade);
+  }, [activeTab, reduceMotion, tabFade]);
+
+  const tabContentStyle = useAnimatedStyle(() => ({
+    flex: 1,
+    opacity: tabFade.value,
+    transform: [{ translateY: interpolate(tabFade.value, [0, 1], [8, 0], Extrapolation.CLAMP) }],
+  }));
   const [selectedBotId, setSelectedBotId] = useState<string | null>(null);
   const [resolvingId, setResolvingId] = useState<string | null>(null);
 
@@ -191,12 +231,12 @@ export const BotsScreen: React.FC<BotsScreenProps> = ({
   return (
     <View style={[styles.container, { backgroundColor: colors.surface }]}>
       {/* Segmento 2 abas: Meus bots | Catálogo */}
-      <View style={styles.segmentContainer}>
-        <View style={[styles.segmentTrack, { backgroundColor: colors.surf }]}>
+      <StaggerItem index={0} style={styles.segmentContainer}>
+        <View style={[styles.segmentTrack, { backgroundColor: colors.surf, borderColor: colors.line }]}>
           <TouchableOpacity
             style={[
               styles.segmentTab,
-              activeTab === 'my_bots' && [styles.segmentTabActive, { backgroundColor: colors.bg }],
+              activeTab === 'my_bots' && { backgroundColor: colors.ink },
             ]}
             onPress={() => setActiveTab('my_bots')}
             accessibilityRole="tab"
@@ -205,17 +245,42 @@ export const BotsScreen: React.FC<BotsScreenProps> = ({
             <Text
               style={[
                 styles.segmentText,
-                { color: activeTab === 'my_bots' ? colors.ink : colors.muted },
+                { color: activeTab === 'my_bots' ? colors.bg : colors.muted },
+                activeTab === 'my_bots' && styles.segmentTextActive,
               ]}
             >
-              Meus bots {bots.length > 0 ? `(${bots.length})` : ''}
+              Meus bots
             </Text>
+            {bots.length > 0 && (
+              <View
+                style={[
+                  styles.segBadge,
+                  {
+                    backgroundColor:
+                      activeTab === 'my_bots'
+                        ? isDark
+                          ? 'rgba(0,0,0,0.18)'
+                          : 'rgba(255,255,255,0.22)'
+                        : colors.line,
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.segBadgeText,
+                    { color: activeTab === 'my_bots' ? colors.bg : colors.muted },
+                  ]}
+                >
+                  {bots.length}
+                </Text>
+              </View>
+            )}
           </TouchableOpacity>
 
           <TouchableOpacity
             style={[
               styles.segmentTab,
-              activeTab === 'catalog' && [styles.segmentTabActive, { backgroundColor: colors.bg }],
+              activeTab === 'catalog' && { backgroundColor: colors.ink },
             ]}
             onPress={() => setActiveTab('catalog')}
             accessibilityRole="tab"
@@ -224,50 +289,55 @@ export const BotsScreen: React.FC<BotsScreenProps> = ({
             <Text
               style={[
                 styles.segmentText,
-                { color: activeTab === 'catalog' ? colors.ink : colors.muted },
+                { color: activeTab === 'catalog' ? colors.bg : colors.muted },
+                activeTab === 'catalog' && styles.segmentTextActive,
               ]}
             >
               Catálogo
             </Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </StaggerItem>
 
-      {activeTab === 'my_bots' ? (
-        <BotsMyTab
-          bots={bots}
-          activity={activity}
-          loading={loading}
-          refreshing={refreshing}
-          error={error}
-          isOfflineCache={isOfflineCache}
-          onRefresh={onRefresh}
-          onRetry={retry}
-          onOpenBot={(b: Bot) => setSelectedBotId(b.id)}
-          onToggleBot={(b: Bot) => {
-            toggleBot(b).catch(() => {});
-          }}
-          onResolvePending={handleResolvePending}
-          onAskVitoChip={(prompt) => handleAskVito(prompt)}
-          onOpenCatalog={() => setActiveTab('catalog')}
-          onOpenMascotStudio={() => {
-            setStudioDraft({ title: '', goal: '', category: 'Personalizado' });
-            setShowMascotStudio(true);
-          }}
-          resolvingId={resolvingId}
-        />
-      ) : (
-        <BotsCatalogTab
-          templates={templates}
-          skills={skills}
-          onSelectTemplate={(tpl) => setSelectedTemplate(tpl)}
-          onSelectSkill={(sk) => setSelectedSkill(sk)}
-          onOpenMascotStudio={() => {
-            setStudioDraft({ title: '', goal: '', category: 'Personalizado' });
-            setShowMascotStudio(true);
-          }}
-        />
-      )}
+      <StaggerItem index={1} style={{ flex: 1 }}>
+      <Animated.View style={tabContentStyle}>
+        {activeTab === 'my_bots' ? (
+          <BotsMyTab
+            bots={bots}
+            activity={activity}
+            loading={loading}
+            refreshing={refreshing}
+            error={error}
+            isOfflineCache={isOfflineCache}
+            onRefresh={onRefresh}
+            onRetry={retry}
+            onOpenBot={(b: Bot) => setSelectedBotId(b.id)}
+            onToggleBot={(b: Bot) => {
+              toggleBot(b).catch(() => {});
+            }}
+            onResolvePending={handleResolvePending}
+            onAskVitoChip={(prompt) => handleAskVito(prompt)}
+            onOpenCatalog={() => setActiveTab('catalog')}
+            onOpenMascotStudio={() => {
+              setStudioDraft({ title: '', goal: '', category: 'Personalizado' });
+              setShowMascotStudio(true);
+            }}
+            resolvingId={resolvingId}
+          />
+        ) : (
+          <BotsCatalogTab
+            templates={templates}
+            skills={skills}
+            onSelectTemplate={(tpl) => setSelectedTemplate(tpl)}
+            onSelectSkill={(sk) => setSelectedSkill(sk)}
+            onOpenMascotStudio={() => {
+              setStudioDraft({ title: '', goal: '', category: 'Personalizado' });
+              setShowMascotStudio(true);
+            }}
+          />
+        )}
+      </Animated.View>
+      </StaggerItem>
 
       <NewBotChoiceSheet
         visible={showNewBotChoice}
@@ -352,26 +422,40 @@ export const BotsScreen: React.FC<BotsScreenProps> = ({
 const styles = StyleSheet.create({
   container: { flex: 1 },
   segmentContainer: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingTop: 6,
     paddingBottom: 8,
   },
   segmentTrack: {
     flexDirection: 'row',
     padding: 4,
-    borderRadius: 16,
+    borderRadius: 999,
+    borderWidth: 1,
+    gap: 4,
   },
   segmentTab: {
     flex: 1,
-    paddingVertical: 9,
-    borderRadius: 12,
+    height: 40,
+    borderRadius: 999,
+    flexDirection: 'row',
     alignItems: 'center',
-  },
-  segmentTabActive: {
-    elevation: 2,
+    justifyContent: 'center',
+    gap: 7,
   },
   segmentText: {
-    fontSize: 13,
-    fontWeight: '700',
+    fontFamily: 'Geist_500Medium',
+    fontSize: 13.5,
+  },
+  segmentTextActive: {
+    fontFamily: 'Geist_600SemiBold',
+  },
+  segBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 1.5,
+    borderRadius: 999,
+  },
+  segBadgeText: {
+    fontFamily: 'Geist_600SemiBold',
+    fontSize: 11.5,
   },
 });

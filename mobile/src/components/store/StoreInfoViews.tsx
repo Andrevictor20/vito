@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { useTheme } from '../../context/ThemeContext';
 import { VitoMascot } from '../common/VitoMascot';
 import type { NotificationCategoryPreferences } from '../../services/api/inboxNotificationsApi';
@@ -81,12 +81,12 @@ export const StoreHelpView: React.FC<StoreHelpViewProps> = ({
             ]}
             onPress={r.onPress}
           >
-            <MaterialIcons name={r.icon} size={20} color={colors.ink} />
+            <ProtoUiIcon name={r.icon} size={20} color={colors.ink} />
             <View style={styles.rowText}>
               <Text style={[styles.rowTitle, { color: colors.ink }]}>{r.title}</Text>
               <Text style={[styles.rowSub, { color: colors.muted }]}>{r.sub}</Text>
             </View>
-            <MaterialIcons name="chevron-right" size={20} color={colors.muted} />
+            <ProtoUiIcon name="chevron-right" size={20} color={colors.muted} />
           </TouchableOpacity>
         ))}
       </View>
@@ -105,7 +105,7 @@ export const StoreHelpView: React.FC<StoreHelpViewProps> = ({
                 onPress={() => setOpenFaq(open ? null : idx)}
               >
                 <Text style={[styles.faqQ, { color: colors.ink }]}>{item.q}</Text>
-                <MaterialIcons
+                <ProtoUiIcon
                   name={open ? 'keyboard-arrow-down' : 'chevron-right'}
                   size={20}
                   color={colors.muted}
@@ -156,13 +156,13 @@ export const StoreAboutView: React.FC<StoreAboutViewProps> = ({ appVersion, onOp
             ]}
             onPress={r.onPress}
           >
-            <MaterialIcons name={r.icon} size={20} color={colors.ink} />
+            <ProtoUiIcon name={r.icon} size={20} color={colors.ink} />
             <Text style={[styles.rowTitle, { color: colors.ink, flex: 1 }]}>{r.title}</Text>
-            <MaterialIcons name="chevron-right" size={20} color={colors.muted} />
+            <ProtoUiIcon name="chevron-right" size={20} color={colors.muted} />
           </TouchableOpacity>
         ))}
         <View style={[styles.row, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line }]}>
-          <MaterialIcons name="info-outline" size={20} color={colors.ink} />
+          <ProtoUiIcon name="info-outline" size={20} color={colors.ink} />
           <View style={styles.rowText}>
             <Text style={[styles.rowTitle, { color: colors.ink }]}>Versão</Text>
             <Text style={[styles.rowSub, { color: colors.muted }]}>

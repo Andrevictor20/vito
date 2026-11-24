@@ -9,6 +9,8 @@ import { SmartActionSheetModal } from '../components/ui/SmartActionSheetModal';
 import { buildAgendaSmartActions, formatEventSubtitle } from '../utils/smartActionBuilders';
 import { useHomeDataContext } from './HomeDataProvider';
 import { useTheme } from '../context/ThemeContext';
+import { SectionTransition } from '../ds/SectionTransition';
+import { useReduceMotion } from '../theme/vitoMotion';
 import { chatPromptBus, tabNavigationBus } from '../services/dataSync';
 import { navigateToTab } from './navigationRef';
 import {
@@ -36,6 +38,7 @@ export const AgendaTabScreen: React.FC<AgendaTabScreenProps> = ({
 }) => {
   const home = useHomeDataContext();
   const { colors } = useTheme();
+  const reduceMotion = useReduceMotion();
   const [showFullCalendar, setShowFullCalendar] = useState(false);
 
   // Estados de busca retrátil e modal de filtros (vito-telas.html)
@@ -71,49 +74,20 @@ export const AgendaTabScreen: React.FC<AgendaTabScreenProps> = ({
     tabNavigationBus.notify('chat');
   }, []);
 
-  // Subtítulo editorial em português com a data de hoje: ex. "sexta-feira, 23 de outubro"
+  // Subtítulo editorial compacto igual ao protótipo: "Sex, 23 out · X eventos"
   const dateSubtitle = useMemo(() => {
     const today = new Date();
-    return today.toLocaleDateString('pt-BR', {
-      weekday: 'long',
-      day: 'numeric',
-      month: 'long',
-    });
-  }, []);
-
-  if (showSummaries) {
-    return (
-      <View style={[styles.tabRoot, { backgroundColor: colors.surface }]}>
-        <ExecutiveSummariesHubView
-          onBack={() => setShowSummaries(false)}
-          onOpenChatWithPrompt={(prompt) => {
-            chatPromptBus.notify(prompt);
-            navigateToTab('chat');
-          }}
-        />
-      </View>
-    );
-  }
-
-  if (showFullCalendar) {
-    return (
-      <View style={[styles.tabRoot, { backgroundColor: colors.surface }]}>
-        <FullMonthCalendarView
-          selectedDate={home.selectedDate}
-          onSelectDate={home.setSelectedDate}
-          onBack={() => setShowFullCalendar(false)}
-          events={home.events}
-          dayEvents={home.dayEvents}
-          eventDates={home.eventDates}
-          totalTodos={home.todos.length}
-          completedTodos={home.todos.filter((t) => t.status === 'completed').length}
-          onEditEvent={handleEventAction}
-          onDeleteEvent={home.handleDeleteEvent}
-          onCreateEvent={handleCreatePrompt}
-        />
-      </View>
-    );
-  }
+    const wk = today
+      .toLocaleDateString('pt-BR', { weekday: 'short' })
+      .replace('.', '');
+    const wkCap = wk.charAt(0).toUpperCase() + wk.slice(1);
+    const mo = today
+      .toLocaleDateString('pt-BR', { month: 'short' })
+      .replace('.', '');
+    const evCount = home.dayEvents.length;
+    const evLabel = evCount === 1 ? '1 evento' : `${evCount} eventos`;
+    return `${wkCap}, ${today.getDate()} ${mo} · ${evLabel}`;
+  }, [home.dayEvents.length]);
 
   return (
     <View style={[styles.tabRoot, { backgroundColor: colors.surface }]}>
@@ -137,22 +111,13 @@ export const AgendaTabScreen: React.FC<AgendaTabScreenProps> = ({
         onPressFilter={() => setFilterModalVisible(true)}
         hasActiveFilters={activeFilterCount > 0}
         contextualActions={
-          <>
-            <HeaderRoundButton
-              icon="bar-chart"
-              onPress={() => setShowSummaries(true)}
-              accessibilityLabel="Resumos"
-              variant="default"
-              size={20}
-            />
-            <HeaderRoundButton
-              icon="auto-awesome"
-              onPress={handleCreatePrompt}
-              accessibilityLabel="Pedir ao Vito: novo evento"
-              variant="primary"
-              size={20}
-            />
-          </>
+          <HeaderRoundButton
+            icon="auto-awesome"
+            onPress={handleCreatePrompt}
+            accessibilityLabel="Pedir ao Vito: novo evento"
+            variant="primary"
+            size={20}
+          />
         }
       />
 
@@ -175,6 +140,7 @@ export const AgendaTabScreen: React.FC<AgendaTabScreenProps> = ({
         onAiEvent={handleEventAction}
         onCreateEvent={handleCreatePrompt}
         onOpenFullCalendar={() => setShowFullCalendar(true)}
+        onOpenSummaries={() => setShowSummaries(true)}
         filters={filters}
         onFiltersChange={setFilters}
         onReserveStudyBlock={async () => {
@@ -222,6 +188,42 @@ export const AgendaTabScreen: React.FC<AgendaTabScreenProps> = ({
             : []
         }
       />
+      {/* Overlays animados para Resumos e Calendário Mensal */}
+      <SectionTransition
+        visible={showSummaries}
+        mode="push"
+        reduceMotion={reduceMotion}
+        style={[styles.subOverlay, { backgroundColor: colors.bg }]}
+      >
+        <ExecutiveSummariesHubView
+          onBack={() => setShowSummaries(false)}
+          onOpenChatWithPrompt={(prompt) => {
+            chatPromptBus.notify(prompt);
+            navigateToTab('chat');
+          }}
+        />
+      </SectionTransition>
+
+      <SectionTransition
+        visible={showFullCalendar}
+        mode="push"
+        reduceMotion={reduceMotion}
+        style={[styles.subOverlay, { backgroundColor: colors.bg }]}
+      >
+        <FullMonthCalendarView
+          selectedDate={home.selectedDate}
+          onSelectDate={home.setSelectedDate}
+          onBack={() => setShowFullCalendar(false)}
+          events={home.events}
+          dayEvents={home.dayEvents}
+          eventDates={home.eventDates}
+          totalTodos={home.todos.length}
+          completedTodos={home.todos.filter((t) => t.status === 'completed').length}
+          onEditEvent={handleEventAction}
+          onDeleteEvent={home.handleDeleteEvent}
+          onCreateEvent={handleCreatePrompt}
+        />
+      </SectionTransition>
     </View>
   );
 };
@@ -229,5 +231,10 @@ export const AgendaTabScreen: React.FC<AgendaTabScreenProps> = ({
 const styles = StyleSheet.create({
   tabRoot: {
     flex: 1,
+    position: 'relative',
+  },
+  subOverlay: {
+    ...StyleSheet.absoluteFill,
+    zIndex: 40,
   },
 });

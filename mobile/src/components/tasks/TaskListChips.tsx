@@ -57,8 +57,7 @@ export const TaskListChips: React.FC<TaskListChipsProps> = ({
             style={[
               styles.chip,
               {
-                backgroundColor: selectedListId === 'all' ? colors.ink : colors.bg,
-                borderColor: selectedListId === 'all' ? colors.ink : colors.line,
+                backgroundColor: selectedListId === 'all' ? colors.ink : colors.surf,
               },
             ]}
             onPress={() => {
@@ -85,8 +84,7 @@ export const TaskListChips: React.FC<TaskListChipsProps> = ({
                 style={[
                   styles.chip,
                   {
-                    backgroundColor: active ? colors.ink : colors.bg,
-                    borderColor: active ? colors.ink : colors.line,
+                    backgroundColor: active ? colors.ink : colors.surf,
                   },
                 ]}
                 onPress={() => {
@@ -118,7 +116,7 @@ export const TaskListChips: React.FC<TaskListChipsProps> = ({
           <TouchableOpacity
             style={[
               styles.chip,
-              { backgroundColor: colors.surf, borderColor: colors.line },
+              { backgroundColor: colors.surf },
             ]}
             onPress={() => {
               hapticFeedback.selection();
@@ -207,16 +205,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    height: 34,
-    paddingHorizontal: 12,
+    height: 38,
+    paddingHorizontal: 14,
     borderRadius: 999,
-    borderWidth: 1,
+    borderWidth: 0,
   },
   dot: { width: 8, height: 8, borderRadius: 4 },
   chipText: {
-    fontSize: 12.5,
-    fontWeight: '600',
-    fontFamily: tokens.typography.family.semibold,
+    fontSize: 13,
+    fontWeight: '500',
+    fontFamily: 'Geist_500Medium',
   },
   countText: {
     fontSize: 11.5,

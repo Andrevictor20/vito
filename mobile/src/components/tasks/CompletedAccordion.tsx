@@ -8,7 +8,7 @@ import {
   Platform,
   UIManager,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { useTheme } from '../../context/ThemeContext';
 import { tokens } from '../../theme/tokens';
 import { hapticFeedback } from '../../theme/motion';
@@ -68,7 +68,7 @@ export const CompletedAccordion: React.FC<CompletedAccordionProps> = ({
         accessibilityState={{ expanded: isOpen }}
       >
         <View style={styles.left}>
-          <MaterialIcons name="done-all" size={18} color={colors.acc} />
+          <ProtoUiIcon name="done-all" size={18} color={colors.acc} />
           <Text
             style={[
               styles.barText,
@@ -82,7 +82,7 @@ export const CompletedAccordion: React.FC<CompletedAccordionProps> = ({
           </Text>
         </View>
 
-        <MaterialIcons
+        <ProtoUiIcon
           name={isOpen ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
           size={20}
           color={colors.muted}
@@ -119,7 +119,7 @@ export const CompletedAccordion: React.FC<CompletedAccordionProps> = ({
                 accessibilityState={{ checked: true }}
                 accessibilityLabel="Reabrir tarefa concluída"
               >
-                <MaterialIcons name="check" size={14} color="#ffffff" />
+                <ProtoUiIcon name="check" size={14} color="#ffffff" />
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -152,7 +152,7 @@ export const CompletedAccordion: React.FC<CompletedAccordionProps> = ({
                     activeOpacity={0.7}
                     accessibilityLabel="Ações com IA"
                   >
-                    <MaterialIcons name="auto-awesome" size={17} color={colors.purple} />
+                    <ProtoUiIcon name="auto-awesome" size={17} color={colors.purple} />
                   </TouchableOpacity>
                 )}
                 {onDeleteRow && (
@@ -167,7 +167,7 @@ export const CompletedAccordion: React.FC<CompletedAccordionProps> = ({
                     accessibilityLabel="Excluir tarefa"
                     accessibilityRole="button"
                   >
-                    <MaterialIcons name="delete-outline" size={18} color={colors.muted} />
+                    <ProtoUiIcon name="delete-outline" size={18} color={colors.muted} />
                   </TouchableOpacity>
                 )}
               </View>

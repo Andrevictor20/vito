@@ -9,12 +9,13 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../icons/ProtoUiIcons';
 import * as Updates from 'expo-updates';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { hapticFeedback } from '../theme/motion';
+import { StaggerItem } from '../theme/vitoMotion';
 import { api } from '../services/api';
 import { calendarSyncService } from '../services/calendarSyncService';
 import { useProfileAiModel } from '../hooks/useProfileAiModel';
@@ -154,22 +155,24 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         ) : undefined
       }
     >
-      <ProfileUserCard
-        name={name}
-        email={email}
-        phone={userPhone}
-        onEditPhone={() => setPhoneVisible(true)}
-      />
+      <StaggerItem index={0}>
+        <ProfileUserCard
+          name={name}
+          email={email}
+          phone={userPhone}
+          onEditPhone={() => setPhoneVisible(true)}
+        />
+      </StaggerItem>
 
       {/* Integrações -> #s-int */}
-      <View style={[styles.lst, { backgroundColor: colors.surf, borderColor: colors.line, marginTop: 12 }]}>
+      <StaggerItem index={1} style={[styles.lst, { backgroundColor: colors.surf, borderColor: colors.hairline, marginTop: 12 }]}>
         <TouchableOpacity
           style={styles.li}
           onPress={() => navigateToScreen('integrations')}
           activeOpacity={0.75}
         >
           <View style={[styles.liIconBox, { backgroundColor: colors.bg }]}>
-            <MaterialIcons name="extension" size={18} color={colors.blue} />
+            <ProtoUiIcon name="extension" size={18} color={colors.blue} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={[styles.liTitle, { color: colors.ink }]}>Integrações</Text>
@@ -177,46 +180,51 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               {connectedAppsCount} conectadas · {Math.max(0, 7 - connectedAppsCount)} disponíveis
             </Text>
           </View>
-          <MaterialIcons name="chevron-right" size={18} color={colors.muted} />
+          <ProtoUiIcon name="chevron-right" size={18} color={colors.muted} />
         </TouchableOpacity>
-      </View>
+      </StaggerItem>
 
       {/* Comportamento & autonomia -> #s-behavior */}
+      <StaggerItem index={2}>
       <Text style={[styles.lbl, { color: colors.muted }]}>Comportamento & autonomia</Text>
-      <View style={[styles.lst, { backgroundColor: colors.surf, borderColor: colors.line }]}>
+      <View style={[styles.lst, { backgroundColor: colors.surf, borderColor: colors.hairline }]}>
         <TouchableOpacity
           style={styles.li}
           onPress={() => navigateToScreen('behavior')}
           activeOpacity={0.75}
         >
           <View style={[styles.liIconBox, { backgroundColor: colors.bg }]}>
-            <MaterialIcons name="tune" size={18} color={colors.ink} />
+            <ProtoUiIcon name="tune" size={18} color={colors.ink} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={[styles.liTitle, { color: colors.ink }]}>Autonomia e comportamento</Text>
             <Text style={[styles.liMeta, { color: colors.muted }]}>{autonomyLabel}</Text>
           </View>
-          <MaterialIcons name="chevron-right" size={18} color={colors.muted} />
+          <ProtoUiIcon name="chevron-right" size={18} color={colors.muted} />
         </TouchableOpacity>
       </View>
+      </StaggerItem>
 
       {/* Inteligência artificial -> #s-ai + ModelPickerSheet */}
-      <AiSection
-        providers={aiModel.providers}
-        defaultModelName={aiModel.defaultModelName}
-        onPressProviders={() => navigateToScreen('aiProviders')}
-        onPressDefaultModel={() => aiModel.setPickerVisible(true)}
-      />
+      <StaggerItem index={3}>
+        <AiSection
+          providers={aiModel.providers}
+          defaultModelName={aiModel.defaultModelName}
+          onPressProviders={() => navigateToScreen('aiProviders')}
+          onPressDefaultModel={() => aiModel.setPickerVisible(true)}
+        />
+      </StaggerItem>
 
       {/* Preferências (Tema inline + Memória #s-memory + Voz #s-voice-cfg) */}
+      <StaggerItem index={4}>
       <Text style={[styles.lbl, { color: colors.muted }]}>Preferências</Text>
-      <View style={[styles.lst, { backgroundColor: colors.surf, borderColor: colors.line }]}>
+      <View style={[styles.lst, { backgroundColor: colors.surf, borderColor: colors.hairline }]}>
         <View style={styles.li}>
           <View style={[styles.liIconBox, { backgroundColor: colors.bg }]}>
-            <MaterialIcons name="wb-sunny" size={18} color={colors.ink} />
+            <ProtoUiIcon name="wb-sunny" size={18} color={colors.ink} />
           </View>
           <Text style={[styles.liTitle, { color: colors.ink }]}>Tema</Text>
-          <View style={[styles.themeSeg, { backgroundColor: colors.bg, borderColor: colors.line }]}>
+          <View style={[styles.themeSeg, { backgroundColor: colors.bg }]}>
             {(['light', 'dark', 'system'] as const).map((mode) => {
               const active = themeMode === mode;
               const labels = { light: 'Claro', dark: 'Escuro', system: 'Sistema' };
@@ -224,9 +232,15 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 <TouchableOpacity
                   key={mode}
                   style={[styles.themeBtn, active && [styles.themeBtnActive, { backgroundColor: colors.ink }]]}
-                  onPress={() => {
+                  onPress={(e) => {
                     hapticFeedback.selection();
-                    setThemeMode(mode);
+                    const { pageX, pageY } = e.nativeEvent;
+                    setThemeMode(
+                      mode,
+                      typeof pageX === 'number' && typeof pageY === 'number'
+                        ? { x: pageX, y: pageY }
+                        : undefined
+                    );
                   }}
                 >
                   <Text style={[styles.themeBtnText, { color: active ? colors.bg : colors.ink }]}>
@@ -242,7 +256,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
         <TouchableOpacity style={styles.li} onPress={() => navigateToScreen('memory', { from: 'profile' })}>
           <View style={[styles.liIconBox, { backgroundColor: colors.bg }]}>
-            <MaterialIcons name="psychology" size={18} color={colors.ink} />
+            <ProtoUiIcon name="psychology" size={18} color={colors.ink} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={[styles.liTitle, { color: colors.ink }]}>Memória do Vito</Text>
@@ -250,42 +264,44 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               {memorySummary ? `${memorySummary} · Ver e editar` : 'Ver e editar'}
             </Text>
           </View>
-          <MaterialIcons name="chevron-right" size={18} color={colors.muted} />
+          <ProtoUiIcon name="chevron-right" size={18} color={colors.muted} />
         </TouchableOpacity>
 
         <View style={[styles.divider, { backgroundColor: colors.line }]} />
 
         <TouchableOpacity style={styles.li} onPress={() => navigateToScreen('voiceSettings')}>
           <View style={[styles.liIconBox, { backgroundColor: colors.bg }]}>
-            <MaterialIcons name="record-voice-over" size={18} color={colors.ink} />
+            <ProtoUiIcon name="record-voice-over" size={18} color={colors.ink} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={[styles.liTitle, { color: colors.ink }]}>Voz e Ativação</Text>
             <Text style={[styles.liMeta, { color: colors.muted }]}>{voiceLabel}</Text>
           </View>
-          <MaterialIcons name="chevron-right" size={18} color={colors.muted} />
+          <ProtoUiIcon name="chevron-right" size={18} color={colors.muted} />
         </TouchableOpacity>
       </View>
+      </StaggerItem>
 
       {/* Sistema */}
+      <StaggerItem index={5}>
       <Text style={[styles.lbl, { color: colors.muted }]}>Sistema</Text>
       <View style={[styles.lst, { backgroundColor: colors.surf, borderColor: colors.line }]}>
         <TouchableOpacity style={styles.li} onPress={() => setDevicesVisible(true)}>
           <View style={[styles.liIconBox, { backgroundColor: colors.bg }]}>
-            <MaterialIcons name="devices" size={18} color={colors.ink} />
+            <ProtoUiIcon name="devices" size={18} color={colors.ink} />
           </View>
           <Text style={[styles.liTitle, { color: colors.ink }]}>Dispositivos conectados</Text>
           <Text style={[styles.liMeta, { color: colors.muted }]}>
             {sessionsCount !== null ? `${sessionsCount} ${sessionsCount === 1 ? 'ativo' : 'ativos'}` : '1 ativo'}
           </Text>
-          <MaterialIcons name="chevron-right" size={18} color={colors.muted} />
+          <ProtoUiIcon name="chevron-right" size={18} color={colors.muted} />
         </TouchableOpacity>
 
         <View style={[styles.divider, { backgroundColor: colors.line }]} />
 
         <TouchableOpacity style={styles.li} onPress={handleCheckUpdate} disabled={checking}>
           <View style={[styles.liIconBox, { backgroundColor: colors.bg }]}>
-            <MaterialIcons name="refresh" size={18} color={colors.ink} />
+            <ProtoUiIcon name="refresh" size={18} color={colors.ink} />
           </View>
           <Text style={[styles.liTitle, { color: colors.ink }]}>Atualizações</Text>
           {checking ? (
@@ -293,11 +309,13 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           ) : (
             <Text style={[styles.liMeta, { color: colors.muted }]}>Atualizado</Text>
           )}
-          <MaterialIcons name="chevron-right" size={18} color={colors.muted} />
+          <ProtoUiIcon name="chevron-right" size={18} color={colors.muted} />
         </TouchableOpacity>
       </View>
+      </StaggerItem>
 
       {/* Conta e assinatura -> #s-store */}
+      <StaggerItem index={6}>
       <Text style={[styles.lbl, { color: colors.muted }]}>Conta e assinatura</Text>
       <View style={[styles.lst, { backgroundColor: colors.surf, borderColor: colors.line }]}>
         {[
@@ -311,20 +329,22 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             {idx > 0 && <View style={[styles.divider, { backgroundColor: colors.line }]} />}
             <TouchableOpacity style={styles.li} onPress={() => navigateToStore(item.page)}>
               <View style={[styles.liIconBox, { backgroundColor: colors.bg }]}>
-                <MaterialIcons name={item.icon} size={18} color={colors.ink} />
+                <ProtoUiIcon name={item.icon} size={18} color={colors.ink} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.liTitle, { color: colors.ink }]}>{item.title}</Text>
                 <Text style={[styles.liMeta, { color: colors.muted }]}>{item.sub}</Text>
               </View>
               {item.right && <Text style={[styles.liMeta, { color: colors.ink, fontWeight: '600' }]}>{item.right}</Text>}
-              <MaterialIcons name="chevron-right" size={18} color={colors.muted} />
+              <ProtoUiIcon name="chevron-right" size={18} color={colors.muted} />
             </TouchableOpacity>
           </React.Fragment>
         ))}
       </View>
+      </StaggerItem>
 
       {/* Rodapé: Trocar / Sair / Excluir conta + OTA */}
+      <StaggerItem index={7}>
       <View style={styles.out}>
         <TouchableOpacity style={[styles.outBtn, { borderColor: colors.line }]} onPress={logout}>
           <Text style={[styles.outBtnText, { color: colors.ink }]}>Trocar de conta</Text>
@@ -347,6 +367,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
       <Text style={[styles.ver, { color: colors.muted }]}>
         Vito {appVersion} · build OTA 01a1663
       </Text>
+      </StaggerItem>
 
       <PhoneEditModal
         visible={phoneVisible}
@@ -410,13 +431,13 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-      <View style={[styles.sbar, { borderBottomColor: colors.line }]}>
+      <View style={styles.sbar}>
         <TouchableOpacity
-          style={[styles.rb, { backgroundColor: colors.surf, borderColor: colors.line }]}
+          style={[styles.rb, { backgroundColor: colors.bg, borderColor: colors.hairline }]}
           onPress={() => navigation.goBack()}
           accessibilityLabel="Voltar"
         >
-          <MaterialIcons name="arrow-back" size={20} color={colors.ink} />
+          <ProtoUiIcon name="arrow-back" size={20} color={colors.ink} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={[styles.sbarTitle, { color: colors.ink }]}>Perfil</Text>

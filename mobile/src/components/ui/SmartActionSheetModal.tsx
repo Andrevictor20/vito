@@ -9,7 +9,7 @@ import {
   ScrollView,
   BackHandler,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../context/ThemeContext';
 import { hapticFeedback } from '../../theme/motion';
@@ -158,7 +158,7 @@ export const SmartActionSheetModal: React.FC<SmartActionSheetModalProps> = ({
               accessibilityLabel="Fechar"
               accessibilityRole="button"
             >
-              <MaterialIcons name="close" size={18} color={colors.onSurfaceVariant} />
+              <ProtoUiIcon name="close" size={18} color={colors.onSurfaceVariant} />
             </TouchableOpacity>
           </View>
 
@@ -214,8 +214,8 @@ export const SmartActionSheetModal: React.FC<SmartActionSheetModalProps> = ({
                   accessibilityLabel={`${act.title}${act.subtitle ? `, ${act.subtitle}` : ''}`}
                 >
                   <View style={[styles.actionIconWrap, { backgroundColor: iconBg }]}>
-                    <MaterialIcons
-                      name={act.icon as keyof typeof MaterialIcons.glyphMap}
+                    <ProtoUiIcon
+                      name={act.icon as string}
                       size={20}
                       color={iconColor}
                     />
@@ -237,7 +237,7 @@ export const SmartActionSheetModal: React.FC<SmartActionSheetModalProps> = ({
                             },
                           ]}
                         >
-                          <MaterialIcons
+                          <ProtoUiIcon
                             name="auto-awesome"
                             size={10}
                             color={isDark ? '#34D399' : '#059669'}
@@ -265,7 +265,7 @@ export const SmartActionSheetModal: React.FC<SmartActionSheetModalProps> = ({
                     ) : null}
                   </View>
 
-                  <MaterialIcons
+                  <ProtoUiIcon
                     name="chevron-right"
                     size={20}
                     color={colors.onSurfaceVariant}
@@ -350,17 +350,17 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   tagText: {
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Geist_600SemiBold',
     fontSize: 10.5,
     letterSpacing: 0.8,
   },
   title: {
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Geist_600SemiBold',
     fontSize: 17,
     lineHeight: 22,
   },
   subtitle: {
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'Geist_400Regular',
     fontSize: 12.5,
     marginTop: 3,
     lineHeight: 17,
@@ -406,12 +406,12 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   actionTitle: {
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Geist_600SemiBold',
     fontSize: 14.5,
     lineHeight: 19,
   },
   actionSubtitle: {
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'Geist_400Regular',
     fontSize: 12,
     marginTop: 2,
     lineHeight: 16,
@@ -428,7 +428,7 @@ const styles = StyleSheet.create({
     marginTop: 0.5,
   },
   actionBadgeText: {
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Geist_600SemiBold',
     fontSize: 10,
     letterSpacing: 0.4,
   },
@@ -445,7 +445,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   cancelButtonText: {
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Geist_600SemiBold',
     fontSize: 14,
   },
 });

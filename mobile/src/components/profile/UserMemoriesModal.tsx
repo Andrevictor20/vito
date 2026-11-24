@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { useTheme } from '../../context/ThemeContext';
 import { tokens } from '../../theme/tokens';
 import { BottomSheetModal } from '../ui/BottomSheetModal';
@@ -201,7 +201,7 @@ export const UserMemoriesModal: React.FC<UserMemoriesModalProps> = ({ visible, o
                         onPress={() => handleDeleteTheme(th.theme_slug)}
                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                       >
-                        <MaterialIcons name="delete-outline" size={20} color={colors.error} />
+                        <ProtoUiIcon name="delete-outline" size={20} color={colors.error} />
                       </TouchableOpacity>
                     </View>
                     <Text style={[styles.cardBody, { color: colors.onSurfaceVariant }]}>
@@ -237,7 +237,7 @@ export const UserMemoriesModal: React.FC<UserMemoriesModalProps> = ({ visible, o
                         onPress={() => handleDeleteEpisode(ep.id)}
                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                       >
-                        <MaterialIcons name="delete-outline" size={20} color={colors.error} />
+                        <ProtoUiIcon name="delete-outline" size={20} color={colors.error} />
                       </TouchableOpacity>
                     </View>
                     <Text style={[styles.cardBody, { color: colors.onSurfaceVariant }]}>
@@ -279,7 +279,7 @@ export const UserMemoriesModal: React.FC<UserMemoriesModalProps> = ({ visible, o
                       onPress={() => handleDeleteFact(fc.id)}
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >
-                      <MaterialIcons name="delete-outline" size={20} color={colors.error} />
+                      <ProtoUiIcon name="delete-outline" size={20} color={colors.error} />
                     </TouchableOpacity>
                   </View>
                 ))

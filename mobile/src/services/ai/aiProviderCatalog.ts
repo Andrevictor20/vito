@@ -237,7 +237,13 @@ export function formatModelDisplayName(
     const byId = g.models.find((m) => m.id === rawModelUsed);
     if (byId) return byId.name;
   }
-  return rawModelUsed.includes(':') ? splitModelValue(rawModelUsed)[1] || rawModelUsed : rawModelUsed;
+  const [providerKey, withoutProvider] = splitModelValue(rawModelUsed);
+  const candidate = providerKey && withoutProvider ? withoutProvider : rawModelUsed;
+  if (candidate.includes('/')) {
+    const tail = candidate.split('/').pop() || candidate;
+    return tail.replace(/:free$/i, '');
+  }
+  return candidate;
 }
 
 export function getProviderSheetMode(

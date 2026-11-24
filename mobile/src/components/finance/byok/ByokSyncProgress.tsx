@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../../icons/ProtoUiIcons';
 import { useTheme } from '../../../context/ThemeContext';
 import { tokens } from '../../../theme/tokens';
 import type { ByokSyncPhase } from '../../../hooks/useByokSetup';
@@ -47,7 +47,7 @@ export const ByokSyncProgress: React.FC<Props> = ({
     return (
       <View style={styles.doneWrap}>
         <View style={[styles.sealBig, { backgroundColor: colors.acc }]}>
-          <MaterialIcons name="check" size={30} color="#FFFFFF" />
+          <ProtoUiIcon name="check" size={30} color="#FFFFFF" />
         </View>
         <Text style={[styles.heading, { color: colors.ink, marginTop: 20 }]}>Vito Finance conectado</Text>
         <Text style={[styles.sub, { color: colors.muted }]}>
@@ -58,7 +58,7 @@ export const ByokSyncProgress: React.FC<Props> = ({
           {activeBanks.map((bank) => (
             <View key={bank} style={[styles.bankCard, { borderColor: colors.line, backgroundColor: colors.bg }]}>
               <View style={[styles.bankChip, { backgroundColor: finBg }]}>
-                <MaterialIcons name="account-balance" size={20} color={fin} />
+                <ProtoUiIcon name="account-balance" size={20} color={fin} />
               </View>
               <View style={styles.bankBody}>
                 <Text style={[styles.bankName, { color: colors.ink }]} numberOfLines={1}>
@@ -102,7 +102,7 @@ export const ByokSyncProgress: React.FC<Props> = ({
                   },
                 ]}
               >
-                {done ? <MaterialIcons name="check" size={14} color="#FFFFFF" /> : null}
+                {done ? <ProtoUiIcon name="check" size={14} color="#FFFFFF" /> : null}
               </View>
               <View style={styles.ckBody}>
                 <Text style={[styles.ckTitle, { color: done ? colors.ink : colors.muted }]}>{cp.title}</Text>

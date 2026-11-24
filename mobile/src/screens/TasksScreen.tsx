@@ -12,13 +12,14 @@ import {
   UIManager,
   View,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../icons/ProtoUiIcons';
+import { PlusSvgIcon } from '../icons/ChatProtoIcons';
 import { tokens } from '../theme/tokens';
 import { useTheme } from '../context/ThemeContext';
 import { hapticFeedback } from '../theme/motion';
+import { StaggerItem } from '../theme/vitoMotion';
 import type { Todo } from '../types';
 import { TaskRow } from '../components/tasks/TaskRow';
-import { TaskFilterChips } from '../components/tasks/TaskFilterChips';
 import { TaskListChips } from '../components/tasks/TaskListChips';
 import { DailyTasksSummaryCard } from '../components/tasks/DailyTasksSummaryCard';
 import { TaskQuickAddSheet } from '../components/tasks/TaskQuickAddSheet';
@@ -32,7 +33,6 @@ import { DEFAULT_TASK_LISTS, formatIsoDate, TaskListDef } from '../utils/taskQui
 import {
   TaskBucket,
   TaskFilterType,
-  computeChipCounts,
   getRowDateStr,
   getTaskBucket,
   groupTasksByBucket,
@@ -103,7 +103,7 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
   searchOpen: externalSearchOpen,
 }) => {
   const { colors } = useTheme();
-  const [activeFilter, setActiveFilter] = useState<TaskFilterType>('all');
+  const [activeFilter] = useState<TaskFilterType>('all');
   const [selectedListId, setSelectedListId] = useState<string>('all');
   const [lists, setLists] = useState<TaskListDef[]>(DEFAULT_TASK_LISTS);
   const [collapsedBuckets, setCollapsedBuckets] = useState<Record<string, boolean>>({});
@@ -164,7 +164,6 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
   }, [activeRows, resolveListId]);
 
   const doneRows = useMemo(() => rawRows.filter((r) => r.done), [rawRows]);
-  const chipCounts = useMemo(() => computeChipCounts(listFilteredRows, now), [listFilteredRows, now]);
   const taskGroups = useMemo(
     () => groupTasksByBucket(listFilteredRows, activeFilter, query, now),
     [listFilteredRows, activeFilter, query, now]
@@ -241,7 +240,7 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
       {isSearchOpen && externalSearchOpen === undefined && (
         <View style={styles.searchSection}>
           <View style={[styles.searchBar, { backgroundColor: colors.surf, borderColor: colors.line }]}>
-            <MaterialIcons name="search" size={20} color={colors.muted} />
+            <ProtoUiIcon name="search" size={20} color={colors.muted} />
             <TextInput
               style={[styles.searchInput, { color: colors.ink }]}
               value={internalQuery}
@@ -253,19 +252,15 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
         </View>
       )}
 
-      <TaskFilterChips
-        selectedFilter={activeFilter}
-        onSelectFilter={setActiveFilter}
-        counts={chipCounts}
-      />
-
-      <TaskListChips
-        lists={lists}
-        selectedListId={selectedListId}
-        onSelectList={setSelectedListId}
-        countsByList={countsByList}
-        onCreateList={(newList) => setLists((prev) => [...prev, newList])}
-      />
+      <StaggerItem index={0}>
+        <TaskListChips
+          lists={lists}
+          selectedListId={selectedListId}
+          onSelectList={setSelectedListId}
+          countsByList={countsByList}
+          onCreateList={(newList) => setLists((prev) => [...prev, newList])}
+        />
+      </StaggerItem>
 
       <ScrollView
         style={styles.scroll}
@@ -283,17 +278,19 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
         }
       >
         {!query && (
-          <DailyTasksSummaryCard
-            completedTodayCount={completedTodosList.length}
-            pendingTodayCount={todayCount}
-            overdueCount={overdueCount}
-          />
+          <StaggerItem index={1}>
+            <DailyTasksSummaryCard
+              completedTodayCount={completedTodosList.length}
+              pendingTodayCount={todayCount}
+              overdueCount={overdueCount}
+            />
+          </StaggerItem>
         )}
 
         {initialLoading ? (
           <ActivityIndicator color={colors.ink} style={{ marginVertical: 32 }} />
         ) : taskGroups.length === 0 ? (
-          <View style={styles.emptyContainer}>
+          <StaggerItem index={2} style={styles.emptyContainer}>
             <VitoMascot size={72} state="success" animated />
             <Text style={[styles.emptyTitle, { color: colors.ink }]}>
               {activeFilter === 'hoje' ? 'Nada para hoje' : 'Tudo em dia!'}
@@ -303,12 +300,12 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
                 ? 'Nenhuma tarefa corresponde à busca.'
                 : 'Aproveite o tempo livre ou planeje o que vem a seguir.'}
             </Text>
-          </View>
+          </StaggerItem>
         ) : (
-          taskGroups.map((group) => {
+          taskGroups.map((group, gIdx) => {
             const isCollapsed = !!collapsedBuckets[group.bucket];
             return (
-              <View key={`group-${group.bucket}`} style={styles.groupBlock}>
+              <StaggerItem key={`group-${group.bucket}`} index={2 + gIdx} style={styles.groupBlock}>
                 <TaskGroupHeader
                   bucket={group.bucket}
                   title={group.label}
@@ -342,17 +339,19 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
                     })}
                   </View>
                 )}
-              </View>
+              </StaggerItem>
             );
           })
         )}
 
-        <CompletedAccordion
-          completedRows={doneRows}
-          onToggleRow={handleToggleRow}
-          onEditRow={setDetailRow}
-          onDeleteRow={handleDeleteRow}
-        />
+        <StaggerItem index={2 + taskGroups.length}>
+          <CompletedAccordion
+            completedRows={doneRows}
+            onToggleRow={handleToggleRow}
+            onEditRow={setDetailRow}
+            onDeleteRow={handleDeleteRow}
+          />
+        </StaggerItem>
       </ScrollView>
 
       {/* FAB Quick Add (#tk-fab) */}
@@ -366,7 +365,7 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
         accessibilityRole="button"
         accessibilityLabel="Adicionar tarefa rapidamente"
       >
-        <MaterialIcons name="add" size={26} color={colors.bg} />
+        <PlusSvgIcon size={24} color={colors.bg} />
       </TouchableOpacity>
 
       {undoToast && (

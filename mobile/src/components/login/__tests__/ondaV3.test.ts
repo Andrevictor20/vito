@@ -71,9 +71,9 @@ describe('Plano 09 Onda V3 — Splash, Onboarding, Login v5 e Permissões (Mobil
 
     const splashSrc = fs.readFileSync(path.join(mobileSrc, 'screens/SplashScreen.tsx'), 'utf8')
     assert.ok(splashSrc.includes('state="gentleman"'))
-    assert.ok(splashSrc.includes('size={140}'))
+    assert.ok(splashSrc.includes('size={SPLASH_MASCOT_SIZE}'))
     assert.ok(splashSrc.includes('speed={1.5}'))
-    assert.ok(splashSrc.includes('fontSize: 46'))
+    assert.ok(splashSrc.includes('fontSize: SPLASH_WORD_SIZE'))
 
     const loginFooterSrc = fs.readFileSync(
       path.join(mobileSrc, 'components/login/AuthActionsFooter.tsx'),

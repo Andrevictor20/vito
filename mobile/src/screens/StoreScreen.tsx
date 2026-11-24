@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../icons/ProtoUiIcons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
@@ -136,7 +136,7 @@ export const StoreScreen: React.FC = () => {
           onPress={() => navigation.goBack()}
           accessibilityLabel="Voltar"
         >
-          <MaterialIcons name="arrow-back" size={20} color={colors.ink} />
+          <ProtoUiIcon name="arrow-back" size={20} color={colors.ink} />
         </TouchableOpacity>
         <View style={styles.ttl}>
           <Text style={[styles.h1, { color: colors.ink }]}>{title}</Text>

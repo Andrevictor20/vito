@@ -194,9 +194,10 @@ export const AgendaFilterModal: React.FC<AgendaFilterModalProps> = ({
 
 const styles = StyleSheet.create({
   sheetGroupLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.6,
+    fontFamily: 'Geist_500Medium',
+    fontSize: 12,
+    fontWeight: '500',
+    letterSpacing: 0.4,
     marginTop: tokens.spacing.md,
     marginBottom: tokens.spacing.xs,
   },
@@ -206,16 +207,17 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   sheetChip: {
-    borderWidth: 1,
-    borderRadius: 12,
+    borderWidth: 0,
+    borderRadius: 999,
     paddingHorizontal: 14,
     paddingVertical: 9,
-    minHeight: 40,
+    minHeight: 38,
     justifyContent: 'center',
   },
   sheetChipText: {
+    fontFamily: 'Geist_500Medium',
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '500',
   },
   sheetFooter: {
     flexDirection: 'row',
@@ -224,25 +226,27 @@ const styles = StyleSheet.create({
   },
   sheetClearBtn: {
     flex: 1,
-    borderWidth: 1,
-    borderRadius: 12,
+    borderWidth: 0,
+    borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 48,
+    minHeight: 46,
   },
   sheetClearText: {
+    fontFamily: 'Geist_500Medium',
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: '500',
   },
   sheetApplyBtn: {
     flex: 2,
-    borderRadius: 12,
+    borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 48,
+    minHeight: 46,
   },
   sheetApplyText: {
+    fontFamily: 'Geist_500Medium',
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: '500',
   },
 });

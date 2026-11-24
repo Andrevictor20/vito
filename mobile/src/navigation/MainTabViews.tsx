@@ -218,11 +218,11 @@ export const BotsTabScreen: React.FC<{
         contextualActions={
           inSubView ? undefined : (
             <HeaderRoundButton
-              icon="add"
+              icon="auto-awesome"
               variant="primary"
               onPress={() => setCreateRequestId((n) => n + 1)}
               accessibilityLabel="Novo bot"
-              size={22}
+              size={20}
             />
           )
         }

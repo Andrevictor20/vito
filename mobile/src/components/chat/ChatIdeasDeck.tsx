@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
+import { getBezier } from '../../ds/tokens';
 import { pagerSwipeLockBus } from '../../services/dataSync';
 import { MOTION_CURVES, hapticFeedback } from '../../theme/motion';
 import { v5Radii } from '../../theme/tokens';
@@ -35,6 +36,7 @@ export { IDEA_CARDS, CAROUSEL_TIMING, getCardOffset, type IdeaCard };
 interface ChatIdeasDeckProps {
   onUseIdea: (prompt: string) => void;
   disabled?: boolean;
+  cards?: IdeaCard[];
 }
 
 function getSymmetricSpec(distance: number) {
@@ -54,19 +56,58 @@ const SPEC_P2 = getSymmetricSpec(2);
 /**
  * Deck estático e simétrico (.zc) v5 — sem rotação automática (WCAG 2.2.2) e sem faixa .sg.
  */
-export const ChatIdeasDeck: React.FC<ChatIdeasDeckProps> = ({ onUseIdea, disabled }) => {
+export const ChatIdeasDeck: React.FC<ChatIdeasDeckProps> = ({
+  onUseIdea,
+  disabled,
+  cards = IDEA_CARDS,
+}) => {
   const { colors, isDark } = useTheme();
   const reduceMotion = useReduceMotion();
-  const n = IDEA_CARDS.length;
+  const n = cards.length;
 
   const [cur, setCur] = useState(0);
   const curRef = useRef(0);
   const reduceMotionRef = useRef(reduceMotion);
   const viewportWidthRef = useRef(340);
+  const heroDeckAnim = useRef(new Animated.Value(reduceMotion ? 1 : 0)).current;
+  const heroDotsAnim = useRef(new Animated.Value(reduceMotion ? 1 : 0)).current;
 
   useEffect(() => {
     reduceMotionRef.current = reduceMotion;
   }, [reduceMotion]);
+
+  useEffect(() => {
+    if (reduceMotion) {
+      heroDeckAnim.setValue(1);
+      heroDotsAnim.setValue(1);
+      return;
+    }
+    heroDeckAnim.setValue(0);
+    heroDotsAnim.setValue(0);
+    const easeQ = Easing.bezier(...getBezier('--ease-q'));
+    const anim = Animated.parallel([
+      Animated.sequence([
+        Animated.delay(70),
+        Animated.timing(heroDeckAnim, {
+          toValue: 1,
+          duration: 620,
+          easing: easeQ,
+          useNativeDriver: true,
+        }),
+      ]),
+      Animated.sequence([
+        Animated.delay(150),
+        Animated.timing(heroDotsAnim, {
+          toValue: 1,
+          duration: 500,
+          easing: easeQ,
+          useNativeDriver: true,
+        }),
+      ]),
+    ]);
+    anim.start();
+    return () => anim.stop();
+  }, [reduceMotion, heroDeckAnim, heroDotsAnim]);
 
   const cardAnims = useRef<Animated.Value[]>(
     IDEA_CARDS.map((_, i) => new Animated.Value(getCardOffset(i, 0, n)))
@@ -215,44 +256,49 @@ export const ChatIdeasDeck: React.FC<ChatIdeasDeckProps> = ({ onUseIdea, disable
   const getVisualForLayout = (layout: IdeaCard['layout']) => {
     switch (layout) {
       case 'agenda':
-        return {
-          tintBg: isDark ? '#141b24' : '#f1f5fa',
-          chipBg: colors.blueBg,
-          icon: <CalIcon color={colors.blue} />,
-        };
+        return { tintBg: isDark ? '#192434' : '#dce9f9', chipBg: colors.blueBg, icon: <CalIcon color={colors.blue} /> };
       case 'gmail':
-        return {
-          tintBg: isDark ? '#211619' : '#fbf1f3',
-          chipBg: colors.redBg,
-          icon: <MailIcon color={colors.red} size={20} />,
-        };
+        return { tintBg: isDark ? '#2e1c1e' : '#f4dada', chipBg: colors.redBg, icon: <MailIcon color={colors.red} size={20} /> };
       case 'whatsapp':
-        return {
-          tintBg: isDark ? '#14201b' : '#eef7f2',
-          chipBg: colors.greenBg,
-          icon: <WhatsAppGlyph color={colors.acc} size={22} />,
-        };
+        return { tintBg: isDark ? '#182920' : '#dcf2e6', chipBg: colors.greenBg, icon: <WhatsAppGlyph color={colors.acc} size={22} /> };
       case 'radar':
-        return {
-          tintBg: isDark ? '#211a14' : '#fbf4ec',
-          chipBg: colors.orangeBg,
-          icon: <RadarIcon color={colors.orange} />,
-        };
+        return { tintBg: isDark ? '#2c2419' : '#ede6d6', chipBg: colors.orangeBg, icon: <RadarIcon color={colors.orange} /> };
       case 'task':
       default:
-        return {
-          tintBg: isDark ? '#21161d' : '#fbf1f6',
-          chipBg: colors.purpleBg,
-          icon: <CheckCircleIcon color={colors.purple} />,
-        };
+        return { tintBg: isDark ? '#2b1c26' : '#f3e0ec', chipBg: colors.purpleBg, icon: <CheckCircleIcon color={colors.purple} /> };
     }
+  };
+
+  const heroDeckStyle = {
+    opacity: heroDeckAnim,
+    transform: [
+      {
+        translateY: heroDeckAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [16, 0],
+        }),
+      },
+    ],
+  };
+
+  const heroDotsStyle = {
+    opacity: heroDotsAnim,
+    transform: [
+      {
+        translateY: heroDotsAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [16, 0],
+        }),
+      },
+    ],
   };
 
   return (
     <View style={styles.container}>
-      <View
+      <Animated.View
         style={[
           styles.deckViewport,
+          heroDeckStyle,
           Platform.OS === 'web'
             ? ({ touchAction: 'pan-y', userSelect: 'none' } as Record<string, string>)
             : null,
@@ -327,10 +373,10 @@ export const ChatIdeasDeck: React.FC<ChatIdeasDeckProps> = ({ onUseIdea, disable
             </Animated.View>
           );
         })}
-      </View>
+      </Animated.View>
 
       {/* .dk-dots indicador estático abaixo do deck */}
-      <View style={styles.dotsRow} accessibilityElementsHidden>
+      <Animated.View style={[styles.dotsRow, heroDotsStyle]} accessibilityElementsHidden>
         {IDEA_CARDS.map((card, i) => {
           const active = i === cur;
           return (
@@ -349,7 +395,7 @@ export const ChatIdeasDeck: React.FC<ChatIdeasDeckProps> = ({ onUseIdea, disable
             />
           );
         })}
-      </View>
+      </Animated.View>
     </View>
   );
 };
@@ -399,17 +445,17 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   zcTitle: {
-    fontFamily: 'Geist',
-    fontSize: 18,
+    fontFamily: 'Geist_500Medium',
+    fontSize: 19,
     fontWeight: '500',
-    lineHeight: 23,
-    letterSpacing: -0.36,
+    lineHeight: 24,
+    letterSpacing: -0.35,
   },
   zcBottom: {
     alignItems: 'flex-start',
   },
   useButton: {
-    height: 44,
+    height: 40,
     paddingHorizontal: 20,
     borderRadius: v5Radii.full,
     alignItems: 'center',

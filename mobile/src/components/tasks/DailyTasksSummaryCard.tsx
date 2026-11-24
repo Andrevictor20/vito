@@ -1,11 +1,9 @@
-import React, { useEffect, useRef } from 'react';
-import { AccessibilityInfo, Animated, Easing, StyleSheet, Text, View } from 'react-native';
-import Svg, { Circle } from 'react-native-svg';
+import React from 'react';
+import { StyleSheet, Text, View } from 'react-native';
+import { ProtoRingChart } from '../../charts/ProtoRingChart';
+import { token } from '../../ds/tokens';
 import { tokens } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
-
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
-const RING_CIRCUMFERENCE = 138.2;
 
 const WEEKDAYS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
 const MONTHS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
@@ -24,36 +22,6 @@ export const DailyTasksSummaryCard: React.FC<DailyTasksSummaryCardProps> = ({
   const { colors, isDark } = useTheme();
   const total = pendingTodayCount + completedTodayCount;
   const pct = total > 0 ? Math.round((completedTodayCount / total) * 100) : 0;
-
-  const progressAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    let mounted = true;
-    AccessibilityInfo.isReduceMotionEnabled()
-      .then((reduced) => {
-        if (!mounted) return;
-        if (reduced) {
-          progressAnim.setValue(pct);
-          return;
-        }
-        Animated.timing(progressAnim, {
-          toValue: pct,
-          duration: 650,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: false,
-        }).start();
-      })
-      .catch(() => progressAnim.setValue(pct));
-    return () => {
-      mounted = false;
-    };
-  }, [pct, progressAnim]);
-
-  const strokeDashoffset = progressAnim.interpolate({
-    inputRange: [0, 100],
-    outputRange: [RING_CIRCUMFERENCE, 0],
-    extrapolate: 'clamp',
-  });
 
   const now = new Date();
   const dateLabel = `${WEEKDAYS[now.getDay()]}, ${now.getDate()} ${MONTHS[now.getMonth()]}`;
@@ -75,38 +43,18 @@ export const DailyTasksSummaryCard: React.FC<DailyTasksSummaryCardProps> = ({
       style={[
         styles.card,
         {
-          backgroundColor: colors.surf,
-          borderColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(10,10,10,0.065)',
+          backgroundColor: token('--surf', isDark),
         },
       ]}
     >
-      <View style={styles.ringBox}>
-        <Svg width={56} height={56} viewBox="0 0 56 56">
-          <Circle
-            cx="28"
-            cy="28"
-            r="22"
-            fill="none"
-            stroke={colors.line}
-            strokeWidth={5}
-          />
-          <AnimatedCircle
-            cx="28"
-            cy="28"
-            r="22"
-            fill="none"
-            stroke={colors.purple}
-            strokeWidth={5}
-            strokeLinecap="round"
-            strokeDasharray={`${RING_CIRCUMFERENCE} ${RING_CIRCUMFERENCE}`}
-            strokeDashoffset={strokeDashoffset}
-            transform="rotate(-90 28 28)"
-          />
-        </Svg>
-        <View style={styles.ringLabelWrap}>
-          <Text style={[styles.ringPct, { color: colors.ink }]}>{pct}%</Text>
-        </View>
-      </View>
+      <ProtoRingChart
+        pct={pct}
+        size={56}
+        strokeWidth={5}
+        color={token('--purple', isDark)}
+        label={`${pct}%`}
+        isDark={isDark}
+      />
 
       <View style={styles.textCol}>
         <Text style={[styles.eyebrow, { color: colors.muted }]}>{dateLabel}</Text>
@@ -139,8 +87,8 @@ const styles = StyleSheet.create({
     marginTop: 10,
     marginBottom: 4,
     padding: 16,
-    borderRadius: 22,
-    borderWidth: 1,
+    borderRadius: 24,
+    borderWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,

@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { ConversationSession } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
 import { humanizePreview } from '../../utils/chatPreview';
@@ -173,8 +173,8 @@ export const SwipeableConversationRow: React.FC<SwipeableConversationRowProps> =
             accessibilityRole="button"
             accessibilityLabel={conversation.pinned ? 'Desfixar conversa' : 'Fixar conversa'}
           >
-            <MaterialIcons
-              name={conversation.pinned ? 'push-pin' : 'bookmark-outline'}
+            <ProtoUiIcon
+              name={conversation.pinned ? 'push-pin' : 'bookmark'}
               size={16}
               color={colors.blue}
             />
@@ -202,7 +202,7 @@ export const SwipeableConversationRow: React.FC<SwipeableConversationRowProps> =
             accessibilityRole="button"
             accessibilityLabel="Excluir conversa"
           >
-            <MaterialIcons name="delete-outline" size={16} color={colors.red} />
+            <ProtoUiIcon name="delete-outline" size={16} color={colors.red} />
             <Text style={[styles.actionLabel, { color: colors.red }]}>Excluir</Text>
           </TouchableOpacity>
         )}
@@ -261,12 +261,9 @@ export const SwipeableConversationRow: React.FC<SwipeableConversationRowProps> =
 
           <View style={styles.metaCol}>
             {conversation.pinned && (
-              <MaterialIcons
-                name="bookmark"
-                size={12}
-                color={colors.muted}
-                style={styles.pinBadge}
-              />
+              <View style={styles.pinBadge}>
+                <ProtoUiIcon name="bookmark" size={12} color={colors.muted} />
+              </View>
             )}
             <Text style={[styles.time, { color: colors.muted }]}>{timeLabel}</Text>
           </View>

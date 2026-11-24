@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   Animated,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { tokens } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { BookingAppointment, Meeting } from '../../types';
@@ -164,7 +164,7 @@ export const VitoReceivedItem: React.FC<VitoReceivedItemProps> = ({
         </View>
 
         {/* Chevron expansível */}
-        <MaterialIcons
+        <ProtoUiIcon
           name={isOpen ? 'expand-more' : 'chevron-right'}
           size={20}
           color={colors.muted}

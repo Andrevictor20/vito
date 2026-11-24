@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, View, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { MD3Shapes } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 
@@ -81,7 +81,7 @@ export const TokiDensitySlider: React.FC<TokiDensitySliderProps> = ({
         accessibilityLabel={isExpanded ? 'Visualização compacta com emojis' : 'Visualização expandida com cards'}
         accessibilityRole="button"
       >
-        <MaterialIcons
+        <ProtoUiIcon
           name={isExpanded ? 'zoom-in-map' : 'zoom-out-map'}
           size={20}
           color={colors.onSurface}

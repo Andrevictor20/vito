@@ -101,35 +101,78 @@ export class ChatApi {
       timezone: tz, current_local_time: currentLocalTime, history: opts.history, focus_mode: opts.focus_mode,
     });
 
+    const streamTimeoutMs = 90000;
+    const controller = new AbortController();
+    let timedOut = false;
+    const timeoutId = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, streamTimeoutMs);
+
+    const onExternalAbort = () => {
+      clearTimeout(timeoutId);
+      controller.abort();
+    };
+    if (opts.signal) {
+      if (opts.signal.aborted) {
+        clearTimeout(timeoutId);
+        controller.abort();
+      } else {
+        opts.signal.addEventListener('abort', onExternalAbort, { once: true });
+      }
+    }
+
+    let streamConnected = false;
     try {
       const res = await fetch(`${this.client.getBaseUrl()}/api/v1/assistant/chat/stream`, {
         method: 'POST',
         headers,
         body: bodyPayload,
-        signal: opts.signal,
+        signal: controller.signal,
       });
 
       if (!res.ok) {
-        return this.assistantChat(prompt, opts);
+        if (res.status === 404 || res.status === 405 || res.status === 501) {
+          return this.assistantChat(prompt, opts);
+        }
+        throw new Error(`Falha HTTP ${res.status} no streaming do chat`);
       }
 
+      streamConnected = true;
       const streamResult = await consumeSSEStream(res, onDelta);
       if (streamResult) {
         return streamResult;
       }
+      throw new Error('Stream SSE encerrado sem resposta final do assistente.');
     } catch (err: any) {
-      if (err?.name === 'AbortError' || opts.signal?.aborted) {
+      if (opts.signal?.aborted) {
         throw err;
       }
+      if (timedOut) {
+        throw new Error(`Tempo limite esgotado (${Math.round(streamTimeoutMs / 1000)}s) no streaming do chat.`);
+      }
+      if (streamConnected) {
+        throw err;
+      }
+      return this.assistantChat(prompt, opts);
+    } finally {
+      clearTimeout(timeoutId);
+      opts.signal?.removeEventListener('abort', onExternalAbort);
     }
-
-    return this.assistantChat(prompt, opts);
   }
 
-  async assistantConfirm(pendingId: string): Promise<AssistantChatResponse> {
+  async assistantConfirm(
+    pendingId: string,
+    options?: { reject?: boolean; reason?: string; threadId?: string }
+  ): Promise<AssistantChatResponse> {
     return this.client.request<AssistantChatResponse>('/api/v1/assistant/confirm', {
       method: 'POST',
-      body: JSON.stringify({ pending_id: pendingId }),
+      body: JSON.stringify({
+        pending_id: pendingId,
+        ...(options?.reject !== undefined ? { reject: options.reject } : {}),
+        ...(options?.reason ? { reason: options.reason } : {}),
+        ...(options?.threadId ? { thread_id: options.threadId } : {}),
+      }),
     });
   }
 

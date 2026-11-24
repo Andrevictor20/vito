@@ -70,6 +70,7 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(
       appendAssistantMessage,
       editAndResendMessage,
       stopGeneration,
+      resolveConfirmation,
       sendAudio,
       sendImage,
       startNewConversation,
@@ -352,6 +353,7 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(
               onEditMessage={handleEditMessage}
               onSaveEdit={(messageId, newText) => editAndResendMessage(messageId, newText)}
               onConfirmAction={handleQuickPrompt}
+              onResolveConfirmation={resolveConfirmation}
               disabled={loading}
             />
           )}

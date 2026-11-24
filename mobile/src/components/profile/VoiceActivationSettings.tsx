@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
   ScrollView,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { useTheme } from '../../context/ThemeContext';
 import { voiceActivationService } from '../../services/voice/voiceActivationService';
 import { VoiceSelector } from './VoiceSelector';
@@ -99,11 +99,11 @@ export function VoiceActivationSettings({
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.titleRow}>
-              <MaterialIcons name="record-voice-over" size={22} color={colors.ink} />
+              <ProtoUiIcon name="record-voice-over" size={22} color={colors.ink} />
               <Text style={[styles.title, { color: colors.ink }]}>Voz e Ativação do Vito</Text>
             </View>
             <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <MaterialIcons name="close" size={20} color={colors.muted} />
+              <ProtoUiIcon name="close" size={20} color={colors.muted} />
             </TouchableOpacity>
           </View>
 
@@ -119,7 +119,7 @@ export function VoiceActivationSettings({
             <View style={{ height: 1, backgroundColor: colors.line, marginVertical: 14 }} />
 
             <View style={[styles.titleRow, { marginBottom: 6 }]}>
-              <MaterialIcons name="assistant" size={20} color={colors.ink} />
+              <ProtoUiIcon name="assistant" size={20} color={colors.ink} />
               <Text style={[styles.title, { fontSize: 15, color: colors.ink }]}>Assistente Digital Android</Text>
             </View>
 
@@ -144,7 +144,7 @@ export function VoiceActivationSettings({
                     { backgroundColor: isDefault ? 'rgba(16, 185, 129, 0.15)' : 'rgba(161, 161, 170, 0.15)' },
                   ]}
                 >
-                  <MaterialIcons
+                  <ProtoUiIcon
                     name={isDefault ? 'check-circle' : 'radio-button-unchecked'}
                     size={24}
                     color={isDefault ? '#10B981' : colors.muted}
@@ -173,19 +173,19 @@ export function VoiceActivationSettings({
             {/* Seção Explicativa: Como Funciona */}
             <View style={[styles.infoBox, { backgroundColor: colors.bg, borderColor: colors.line }]}>
               <View style={styles.infoRow}>
-                <MaterialIcons name="battery-charging-full" size={18} color="#10B981" />
+                <ProtoUiIcon name="battery-charging-full" size={18} color="#10B981" />
                 <Text style={[styles.infoText, { color: colors.ink }]}>
                   <Text style={styles.bold}>Zero bateria em segundo plano:</Text> O Vito só acorda quando você aciona o botão, sem microfone ouvindo 24/7.
                 </Text>
               </View>
               <View style={styles.infoRow}>
-                <MaterialIcons name="security" size={18} color="#3B82F6" />
+                <ProtoUiIcon name="security" size={18} color="#3B82F6" />
                 <Text style={[styles.infoText, { color: colors.ink }]}>
                   <Text style={styles.bold}>Privacidade total:</Text> Sem ponto verde de microfone na barra de notificações quando em repouso.
                 </Text>
               </View>
               <View style={styles.infoRow}>
-                <MaterialIcons name="touch-app" size={18} color="#8B5CF6" />
+                <ProtoUiIcon name="touch-app" size={18} color="#8B5CF6" />
                 <Text style={[styles.infoText, { color: colors.ink }]}>
                   <Text style={styles.bold}>Acesso instantâneo:</Text> Funciona sobre qualquer aplicativo ou com a tela bloqueada.
                 </Text>
@@ -211,7 +211,7 @@ export function VoiceActivationSettings({
                   onPress={handleRequestRole}
                   disabled={loading}
                 >
-                  <MaterialIcons name="stars" size={18} color={colors.bg} style={{ marginRight: 6 }} />
+                  <ProtoUiIcon name="stars" size={18} color={colors.bg} style={{ marginRight: 6 }} />
                   <Text style={[styles.primaryBtnText, { color: colors.bg }]}>Definir como Assistente Padrão</Text>
                 </TouchableOpacity>
               ) : (
@@ -220,7 +220,7 @@ export function VoiceActivationSettings({
                   onPress={checkStatus}
                   disabled={loading}
                 >
-                  <MaterialIcons name="refresh" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
+                  <ProtoUiIcon name="refresh" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
                   <Text style={[styles.primaryBtnText, { color: '#FFFFFF' }]}>Atualizar Status</Text>
                 </TouchableOpacity>
               )}

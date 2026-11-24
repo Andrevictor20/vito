@@ -8,7 +8,7 @@ import {
   TouchableWithoutFeedback,
   BackHandler,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { useTheme } from '../../context/ThemeContext';
 import { hapticFeedback } from '../../theme/motion';
 
@@ -97,7 +97,7 @@ export const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
         >
           {/* Ícone de Perigo / Lixeira com halo */}
           <View style={[styles.iconBox, { backgroundColor: dangerBg }]}>
-            <MaterialIcons name="delete-outline" size={24} color={dangerColor} />
+            <ProtoUiIcon name="delete-outline" size={24} color={dangerColor} />
           </View>
 
           {/* Título e Mensagem */}
@@ -202,13 +202,13 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   title: {
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Geist_600SemiBold',
     fontSize: 17,
     textAlign: 'center',
     marginBottom: 6,
   },
   message: {
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'Geist_400Regular',
     fontSize: 13.5,
     lineHeight: 19,
     textAlign: 'center',
@@ -242,7 +242,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   btnDangerText: {
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Geist_600SemiBold',
     fontSize: 14,
     color: '#FFFFFF',
   },
@@ -251,7 +251,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   btnDangerOutlineText: {
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Geist_600SemiBold',
     fontSize: 14,
   },
   btnCancel: {
@@ -259,7 +259,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   btnCancelText: {
-    fontFamily: 'Inter_500Medium',
+    fontFamily: 'Geist_500Medium',
     fontSize: 14,
   },
 });

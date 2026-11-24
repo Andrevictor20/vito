@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { tokens } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { hapticFeedback } from '../../theme/motion';
@@ -82,7 +82,7 @@ export const ProfileConnectionsGrid: React.FC<ProfileConnectionsGridProps> = ({
         >
           {/* Chip com ícone */}
           <View style={[styles.chip, { backgroundColor: item.bgColor }]}>
-            <MaterialIcons name={item.icon} size={18} color={item.color} />
+            <ProtoUiIcon name={item.icon} size={18} color={item.color} />
           </View>
 
           {/* Nome da Conexão */}

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, TextInput } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../../icons/ProtoUiIcons';
 import { useTheme } from '../../../context/ThemeContext';
 import { ChatGmailMessage } from '../../../types';
 import { MailIcon } from '../../login/DemoIcons';
@@ -84,15 +84,7 @@ export const GmailMessageInlineCard: React.FC<GmailMessageInlineCardProps> = ({
   return (
     <View style={styles.wrapper}>
       {/* Card Principal */}
-      <View
-        style={[
-          styles.card,
-          {
-            backgroundColor: colors.bg,
-            borderColor: isSent ? colors.acc + '40' : colors.line,
-          },
-        ]}
-      >
+      <View style={[styles.card, { backgroundColor: colors.surf }]}>
         {/* Cabeçalho: Chip Vermelho Gmail + Destinatário + Badge */}
         <View style={styles.headerRow}>
           <View style={[styles.chip, { backgroundColor: colors.redBg }]}>
@@ -145,7 +137,7 @@ export const GmailMessageInlineCard: React.FC<GmailMessageInlineCardProps> = ({
         </View>
 
         {/* Caixa de Conteúdo do E-mail */}
-        <View style={[styles.messageBox, { backgroundColor: colors.surf, borderColor: colors.line }]}>
+        <View style={[styles.messageBox, { backgroundColor: colors.bg }]}>
           <View style={styles.messageLabelRow}>
             <Text style={[styles.messageLabel, { color: colors.muted }]}>
               {isEditing ? 'Editar mensagem do e-mail' : 'Mensagem'}
@@ -177,7 +169,7 @@ export const GmailMessageInlineCard: React.FC<GmailMessageInlineCardProps> = ({
         {/* Feedback visual de E-mail Enviado */}
         {isSent && (
           <View style={[styles.sentBanner, { backgroundColor: colors.greenBg }]}>
-            <MaterialIcons name="check-circle" size={16} color={colors.acc} />
+            <ProtoUiIcon name="check-circle" size={16} color={colors.acc} />
             <Text style={[styles.sentBannerText, { color: colors.acc }]}>
               E-mail enviado com sucesso via Gmail
             </Text>
@@ -191,7 +183,7 @@ export const GmailMessageInlineCard: React.FC<GmailMessageInlineCardProps> = ({
           {isEditing ? (
             <>
               <TouchableOpacity
-                style={[styles.btnOutline, { borderColor: colors.line }]}
+                style={[styles.btnOutline, { backgroundColor: colors.surf }]}
                 onPress={handleCancelEdit}
                 activeOpacity={0.75}
                 accessibilityRole="button"
@@ -209,7 +201,7 @@ export const GmailMessageInlineCard: React.FC<GmailMessageInlineCardProps> = ({
                 accessibilityRole="button"
                 accessibilityLabel="Salvar alterações do e-mail"
               >
-                <MaterialIcons name="done" size={16} color={colors.bg} />
+                <ProtoUiIcon name="done" size={16} color={colors.bg} />
                 <Text style={[styles.btnFillText, { color: colors.bg }]}>
                   Salvar
                 </Text>
@@ -218,14 +210,14 @@ export const GmailMessageInlineCard: React.FC<GmailMessageInlineCardProps> = ({
           ) : (
             <>
               <TouchableOpacity
-                style={[styles.btnOutline, { borderColor: colors.ink }]}
+                style={[styles.btnOutline, { backgroundColor: colors.surf }]}
                 onPress={handleStartEdit}
                 disabled={disabled}
                 activeOpacity={0.75}
                 accessibilityRole="button"
                 accessibilityLabel="Editar e-mail"
               >
-                <MaterialIcons name="edit" size={15} color={colors.ink} />
+                <ProtoUiIcon name="edit" size={15} color={colors.ink} />
                 <Text style={[styles.btnOutlineText, { color: colors.ink }]}>
                   Editar
                 </Text>
@@ -239,7 +231,7 @@ export const GmailMessageInlineCard: React.FC<GmailMessageInlineCardProps> = ({
                 accessibilityRole="button"
                 accessibilityLabel="Confirmar envio do e-mail via Gmail"
               >
-                <MaterialIcons name="send" size={15} color={colors.bg} />
+                <ProtoUiIcon name="send" size={15} color={colors.bg} />
                 <Text style={[styles.btnFillText, { color: colors.bg }]}>
                   Confirmar envio
                 </Text>
@@ -258,15 +250,10 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   card: {
-    borderRadius: 16,
-    borderWidth: 1,
-    paddingVertical: 12,
+    borderRadius: 22,
+    borderWidth: 0,
+    paddingVertical: 14,
     paddingHorizontal: 14,
-    shadowColor: '#141916',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
   },
   headerRow: {
     flexDirection: 'row',
@@ -292,13 +279,13 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   title: {
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Geist_600SemiBold',
     fontSize: 14.5,
     fontWeight: '600',
     flex: 1,
   },
   subtitle: {
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'Geist_400Regular',
     fontSize: 12.5,
     marginTop: 2,
   },
@@ -309,7 +296,7 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   tagText: {
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Geist_600SemiBold',
     fontSize: 11,
     fontWeight: '600',
   },
@@ -323,16 +310,16 @@ const styles = StyleSheet.create({
     borderTopColor: 'rgba(0,0,0,0.06)',
   },
   subjectLabel: {
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Geist_600SemiBold',
     fontSize: 12,
   },
   subjectText: {
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Geist_600SemiBold',
     fontSize: 13,
     flex: 1,
   },
   subjectInput: {
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Geist_600SemiBold',
     fontSize: 13,
     flex: 1,
     paddingVertical: 4,
@@ -342,9 +329,9 @@ const styles = StyleSheet.create({
   },
   messageBox: {
     marginTop: 8,
-    padding: 10,
-    borderRadius: 12,
-    borderWidth: 1,
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 0,
   },
   messageLabelRow: {
     flexDirection: 'row',
@@ -353,22 +340,22 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   messageLabel: {
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Geist_600SemiBold',
     fontSize: 11,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   charCounter: {
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'Geist_400Regular',
     fontSize: 11,
   },
   messageContent: {
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'Geist_400Regular',
     fontSize: 13.5,
     lineHeight: 19,
   },
   input: {
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'Geist_400Regular',
     fontSize: 13.5,
     lineHeight: 19,
     minHeight: 64,
@@ -387,7 +374,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   sentBannerText: {
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Geist_600SemiBold',
     fontSize: 12.5,
     fontWeight: '600',
   },
@@ -397,31 +384,31 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   btnFill: {
-    height: 34,
+    height: 36,
     paddingHorizontal: 16,
-    borderRadius: 17,
+    borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
     gap: 6,
   },
   btnFillText: {
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Geist_500Medium',
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '500',
   },
   btnOutline: {
-    height: 34,
+    height: 36,
     paddingHorizontal: 16,
-    borderRadius: 17,
-    borderWidth: 1.5,
+    borderRadius: 999,
+    borderWidth: 0,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
     gap: 6,
   },
   btnOutlineText: {
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Geist_600SemiBold',
     fontSize: 13,
     fontWeight: '600',
   },

@@ -197,7 +197,7 @@ const styles = StyleSheet.create({
     width: '100%',
   } as ViewStyle,
   vitoText: {
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'Geist_400Regular',
     fontSize: 15,
     lineHeight: 21.75,
   } as TextStyle,

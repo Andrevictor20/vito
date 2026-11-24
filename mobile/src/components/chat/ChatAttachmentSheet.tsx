@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon, type ProtoUiIconName } from '../../icons/ProtoUiIcons';
 import { useTheme } from '../../context/ThemeContext';
 import { v5Radii } from '../../theme/tokens';
 import { hapticFeedback } from '../../theme/motion';
@@ -23,7 +23,7 @@ interface ChatAttachmentSheetProps {
 
 const OPTIONS: ReadonlyArray<{
   id: ChatAttachmentOption;
-  icon: keyof typeof MaterialIcons.glyphMap;
+  icon: ProtoUiIconName;
   title: string;
   subtitle: string;
 }> = [
@@ -99,7 +99,7 @@ export const ChatAttachmentSheet: React.FC<ChatAttachmentSheetProps> = ({
               accessibilityLabel="Fechar"
               activeOpacity={0.75}
             >
-              <MaterialIcons name="close" size={18} color={colors.ink} />
+              <ProtoUiIcon name="close" size={18} color={colors.ink} />
             </TouchableOpacity>
           </View>
 
@@ -129,13 +129,13 @@ export const ChatAttachmentSheet: React.FC<ChatAttachmentSheetProps> = ({
                 accessibilityLabel={opt.title}
               >
                 <View style={[styles.iconBox, { backgroundColor: colors.bg }]}>
-                  <MaterialIcons name={opt.icon} size={18} color={colors.ink} />
+                  <ProtoUiIcon name={opt.icon} size={18} color={colors.ink} />
                 </View>
                 <View style={styles.rowText}>
                   <Text style={[styles.rowTitle, { color: colors.ink }]}>{opt.title}</Text>
                   <Text style={[styles.rowSub, { color: colors.muted }]}>{opt.subtitle}</Text>
                 </View>
-                <MaterialIcons name="chevron-right" size={18} color={colors.muted} />
+                <ProtoUiIcon name="chevron-right" size={18} color={colors.muted} />
               </TouchableOpacity>
             ))}
           </View>

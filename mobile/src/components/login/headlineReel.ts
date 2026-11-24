@@ -6,13 +6,13 @@ export function buildReelItems(
 ): string[] {
   const pool = allWords.filter((word) => word !== target && word !== previous)
   const fillers: string[] = []
-  while (fillers.length < 4 && pool.length > 0) {
+  while (fillers.length < 3 && pool.length > 0) {
     const index = Math.floor(pick() * pool.length)
     fillers.push(pool[index] ?? pool[0])
   }
-  return [target, ...fillers, previous]
+  return previous ? [target, ...fillers, previous] : [target, ...fillers]
 }
 
-export const REEL_LINE_EM = 1.3
-export const REEL_DURATION_MS = 1150
-export const REEL_SETTLE_MS = 1250
+export const REEL_LINE_EM = 1.25
+export const REEL_DURATION_MS = 950
+export const REEL_SETTLE_MS = 1020

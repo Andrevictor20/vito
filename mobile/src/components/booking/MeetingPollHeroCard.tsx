@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { MD3Shapes, tabularNumbers } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { Meeting } from '../../types';
@@ -37,7 +37,7 @@ export const MeetingPollHeroCard: React.FC<MeetingPollHeroCardProps> = ({
     <View style={[styles.heroCard, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
       <View style={styles.heroTopRow}>
         <View style={[styles.tagPill, { backgroundColor: colors.surfaceContainerHigh }]}>
-          <MaterialIcons name="groups" size={14} color={colors.primary} />
+          <ProtoUiIcon name="groups" size={14} color={colors.primary} />
           <Text style={[styles.tagText, { color: colors.primary }]}>Reunião em Grupo</Text>
         </View>
 
@@ -79,14 +79,14 @@ export const MeetingPollHeroCard: React.FC<MeetingPollHeroCardProps> = ({
 
       <View style={styles.metaRow}>
         <View style={[styles.metaChip, { backgroundColor: colors.surfaceContainerHigh }]}>
-          <MaterialIcons name="schedule" size={14} color={colors.onSurfaceVariant} />
+          <ProtoUiIcon name="schedule" size={14} color={colors.onSurfaceVariant} />
           <Text style={[styles.metaChipText, { color: colors.onSurface }, tabularNumbers]}>
             {meeting.duration_minutes} min de duração
           </Text>
         </View>
 
         <View style={[styles.metaChip, { backgroundColor: colors.surfaceContainerHigh }]}>
-          <MaterialIcons name="how-to-vote" size={14} color={colors.primary} />
+          <ProtoUiIcon name="how-to-vote" size={14} color={colors.primary} />
           <Text style={[styles.metaChipText, { color: colors.onSurface }, tabularNumbers]}>
             {totalParticipants} {totalParticipants === 1 ? 'voto recebido' : 'votos recebidos'}
           </Text>
@@ -106,7 +106,7 @@ export const MeetingPollHeroCard: React.FC<MeetingPollHeroCardProps> = ({
             onPress={handleCopyLink}
             activeOpacity={0.8}
           >
-            <MaterialIcons name={copied ? 'check' : 'content-copy'} size={15} color={colors.onPrimary} />
+            <ProtoUiIcon name={copied ? 'check' : 'content-copy'} size={15} color={colors.onPrimary} />
             <Text style={[styles.copyBtnText, { color: colors.onPrimary }]}>
               {copied ? 'Copiado!' : 'Copiar'}
             </Text>

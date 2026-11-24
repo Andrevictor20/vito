@@ -9,7 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../icons/ProtoUiIcons';
 import { useNavigation } from '@react-navigation/native';
 import { tokens } from '../theme/tokens';
 import { useTheme } from '../context/ThemeContext';
@@ -173,13 +173,13 @@ export const NotificationsScreen: React.FC<{ onBack?: () => void }> = ({ onBack 
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.bg }]}>
-      <View style={[styles.sbar, { borderBottomColor: colors.line }]}>
+      <View style={styles.sbar}>
         <TouchableOpacity
-          style={[styles.rb, { backgroundColor: colors.surf, borderColor: colors.line }]}
+          style={[styles.rb, { backgroundColor: colors.bg, borderColor: colors.hairline }]}
           onPress={handleBack}
           accessibilityLabel="Voltar"
         >
-          <MaterialIcons name="arrow-back" size={20} color={colors.ink} />
+          <ProtoUiIcon name="arrow-back" size={20} color={colors.ink} />
         </TouchableOpacity>
         <View style={styles.ttl}>
           <Text style={[styles.h1, { color: colors.ink }]}>Notificações</Text>

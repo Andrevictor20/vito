@@ -13,7 +13,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../context/ThemeContext';
 import { MOTION_CURVES } from '../../theme/motion';
@@ -173,7 +173,7 @@ export const ChatHistoryDrawer: React.FC<ChatHistoryDrawerProps> = ({
               accessibilityLabel="Fechar conversas"
               accessibilityRole="button"
             >
-              <MaterialIcons name="close" size={18} color={colors.ink} />
+              <ProtoUiIcon name="close" size={18} color={colors.ink} />
             </TouchableOpacity>
           </View>
 
@@ -200,7 +200,7 @@ export const ChatHistoryDrawer: React.FC<ChatHistoryDrawerProps> = ({
                 accessibilityLabel="Limpar busca"
                 accessibilityRole="button"
               >
-                <MaterialIcons name="close" size={16} color={colors.muted} />
+                <ProtoUiIcon name="close" size={16} color={colors.muted} />
               </TouchableOpacity>
             )}
           </View>

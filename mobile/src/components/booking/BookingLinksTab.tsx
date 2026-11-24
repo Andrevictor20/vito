@@ -6,17 +6,13 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
-  Linking,
-  Share,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { tokens } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
-import { VitoMascot } from '../common/VitoMascot';
 import { BookingType, Meeting } from '../../types';
 import { VitoBookingCard } from './VitoBookingCard';
 import { meetingDisplayLink } from '../../utils/chatCards';
-import { buildMeetingShareMessage } from '../../utils/meetingPollUtils';
 
 export interface BookingLinksTabProps {
   types: BookingType[];
@@ -54,48 +50,9 @@ export const BookingLinksTab: React.FC<BookingLinksTabProps> = ({
   onCreateNew,
 }) => {
   const { colors } = useTheme();
-  const [showVitoSuggestion, setShowVitoSuggestion] = useState(true);
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
 
   const totalCount = types.length + meetings.length;
-
-  // Encontrar o link mais relevante para a sugestão inteligente
-  const suggestedItem =
-    meetings.find((m) => m.status !== 'confirmed') ||
-    meetings[0] ||
-    types[0];
-
-  const handleSendViaWhatsApp = async () => {
-    setShowVitoSuggestion(false);
-    if (!suggestedItem) return;
-
-    const isGroup = 'slots' in suggestedItem;
-    const title = suggestedItem.title;
-    let url = '';
-    if (isGroup) {
-      url = meetingDisplayLink(suggestedItem as Meeting);
-    } else {
-      const bt = suggestedItem as unknown as BookingType;
-      url =
-        bt.short_url ||
-        bt.public_url ||
-        `https://vito.rasppi.cloud/book/${username}/${bt.slug}`;
-    }
-
-    try {
-      const msg = isGroup
-        ? buildMeetingShareMessage(suggestedItem as any, url)
-        : `Olá! Segue o link para agendar nossa conversa (${title}):\n${url}`;
-
-      const waUrl = `whatsapp://send?text=${encodeURIComponent(msg)}`;
-      const canOpen = await Linking.canOpenURL(waUrl);
-      if (canOpen) {
-        await Linking.openURL(waUrl);
-      } else {
-        await Share.share({ message: msg, url, title });
-      }
-    } catch {}
-  };
 
   const handleCopy = (url: string) => {
     setCopiedUrl(url);
@@ -116,7 +73,7 @@ export const BookingLinksTab: React.FC<BookingLinksTabProps> = ({
         }
       >
         <View style={[styles.emptyIconCircle, { backgroundColor: colors.surf }]}>
-          <MaterialIcons name="link-off" size={32} color={colors.muted} />
+          <ProtoUiIcon name="link-off" size={32} color={colors.muted} />
         </View>
         <Text
           style={[
@@ -137,7 +94,7 @@ export const BookingLinksTab: React.FC<BookingLinksTabProps> = ({
           onPress={onCreateNew}
           activeOpacity={0.8}
         >
-          <MaterialIcons name="add" size={20} color={colors.bg} />
+          <ProtoUiIcon name="add" size={20} color={colors.bg} />
           <Text
             style={[
               styles.emptyActionText,
@@ -163,58 +120,6 @@ export const BookingLinksTab: React.FC<BookingLinksTabProps> = ({
         />
       }
     >
-      {/* Sugestão Inteligente do Vito .vsug */}
-      {showVitoSuggestion && suggestedItem && (
-        <View
-          style={[
-            styles.vsug,
-            {
-              backgroundColor: colors.bg,
-              borderColor: colors.line,
-            },
-          ]}
-        >
-          <View style={styles.vsugIcon}>
-            <VitoMascot size={28} animated={true} />
-          </View>
-          <View style={styles.vsugContent}>
-            <Text style={[styles.vsugText, { color: colors.ink }]}>
-              Quer que eu envie o link da {suggestedItem.title} pelo WhatsApp?
-            </Text>
-            <View style={styles.vsugButtons}>
-              <TouchableOpacity
-                style={[styles.vsugBtnPrimary, { backgroundColor: colors.ink }]}
-                onPress={handleSendViaWhatsApp}
-                activeOpacity={0.8}
-              >
-                <Text
-                  style={[
-                    styles.vsugBtnTextPrimary,
-                    { color: colors.bg, fontFamily: tokens.typography.family.semibold },
-                  ]}
-                >
-                  Enviar
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.vsugBtnGhost, { borderColor: colors.ink }]}
-                onPress={() => setShowVitoSuggestion(false)}
-                activeOpacity={0.7}
-              >
-                <Text
-                  style={[
-                    styles.vsugBtnTextGhost,
-                    { color: colors.ink, fontFamily: tokens.typography.family.semibold },
-                  ]}
-                >
-                  Agora não
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      )}
-
       {/* Cards de Reuniões em Grupo */}
       {meetings.map((m) => (
         <VitoBookingCard

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   BackHandler,
   Modal,
@@ -8,13 +8,15 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { tokens } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { hapticFeedback } from '../../theme/motion';
 import { pagerSwipeLockBus } from '../../services/dataSync';
 import { resolveModalBottomInset, resolveModalTopInset } from '../../utils/safeArea';
+import { SectionTransition } from '../../ds/SectionTransition';
+import { useReduceMotion } from '../../theme/useReduceMotion';
 import type {
   FinanceAccount,
   FinanceConnection,
@@ -98,7 +100,17 @@ export const FinanceSubScreenModal: React.FC<FinanceSubScreenModalProps> = ({
 }) => {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const reduceMotion = useReduceMotion();
   const meta = SUB_SCREEN_META[screenKey];
+  const [modalMounted, setModalMounted] = useState(visible);
+
+  useEffect(() => {
+    if (visible) setModalMounted(true);
+  }, [visible]);
+
+  const handleTransitionExited = useCallback(() => {
+    setModalMounted(false);
+  }, []);
 
   useEffect(() => {
     if (!visible) return;
@@ -123,27 +135,35 @@ export const FinanceSubScreenModal: React.FC<FinanceSubScreenModalProps> = ({
     setTimeout(() => onOpenPluggyModal(), 80);
   };
 
+  if (!modalMounted) return null;
+
   return (
     <Modal
-      visible={visible}
-      animationType="slide"
-      presentationStyle="fullScreen"
+      visible={modalMounted}
+      transparent
+      animationType="none"
       statusBarTranslucent
       onRequestClose={onClose}
     >
-      <View
-        style={[
-          styles.container,
-          {
-            backgroundColor: colors.bg,
-            paddingTop: resolveModalTopInset(insets.top, 6),
-          },
-        ]}
+      <SectionTransition
+        visible={visible}
+        mode="push"
+        reduceMotion={reduceMotion}
+        onExited={handleTransitionExited}
       >
+        <View
+          style={[
+            styles.container,
+            {
+              backgroundColor: colors.bg,
+              paddingTop: resolveModalTopInset(insets.top, 6),
+            },
+          ]}
+        >
         {/* Header padrão sbar: botão voltar circular, título/subtítulo e botão circular primário Spark */}
         <View style={styles.sbar}>
           <TouchableOpacity
-            style={[styles.rb, { backgroundColor: colors.bg, borderColor: colors.line }]}
+            style={[styles.rb, { backgroundColor: colors.bg, borderColor: colors.hairline }]}
             onPress={() => {
               hapticFeedback.light();
               onClose();
@@ -151,7 +171,7 @@ export const FinanceSubScreenModal: React.FC<FinanceSubScreenModalProps> = ({
             hitSlop={tokens.hitSlop.sm}
             accessibilityLabel="Voltar"
           >
-            <MaterialIcons name="arrow-back" size={20} color={colors.ink} />
+            <ProtoUiIcon name="arrow-back" size={20} color={colors.ink} />
           </TouchableOpacity>
 
           <View style={styles.ttl}>
@@ -172,7 +192,7 @@ export const FinanceSubScreenModal: React.FC<FinanceSubScreenModalProps> = ({
             hitSlop={tokens.hitSlop.sm}
             accessibilityLabel="Pedir ao Vito"
           >
-            <MaterialIcons name="auto-awesome" size={19} color={colors.bg} />
+            <ProtoUiIcon name="auto-awesome" size={19} color={colors.bg} />
           </TouchableOpacity>
         </View>
 
@@ -242,7 +262,8 @@ export const FinanceSubScreenModal: React.FC<FinanceSubScreenModalProps> = ({
             />
           )}
         </ScrollView>
-      </View>
+        </View>
+      </SectionTransition>
     </Modal>
   );
 };
@@ -259,9 +280,9 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
   },
   rb: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
@@ -271,13 +292,14 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   title: {
-    fontFamily: tokens.typography.family.montserratBold,
-    fontSize: 24,
-    fontWeight: '800',
-    letterSpacing: -0.6,
+    fontFamily: 'Geist_500Medium',
+    fontSize: 26,
+    fontWeight: '500',
+    letterSpacing: -0.73,
   },
   subtitle: {
-    fontSize: 13.5,
+    fontFamily: 'Geist',
+    fontSize: 13,
     marginTop: 2,
   },
   scrollContent: {

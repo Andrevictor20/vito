@@ -11,7 +11,7 @@ import {
   BackHandler,
   SafeAreaView,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MD3Shapes, tabularNumbers } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
@@ -98,7 +98,7 @@ export const MeetingPollDetailView: React.FC<MeetingPollDetailViewProps> = ({
           activeOpacity={0.7}
           accessibilityLabel="Voltar para a lista de reuniões"
         >
-          <MaterialIcons name="arrow-back" size={20} color={colors.onSurface} />
+          <ProtoUiIcon name="arrow-back" size={20} color={colors.onSurface} />
           <Text style={[styles.backButtonText, { color: colors.onSurface }]}>Voltar</Text>
         </TouchableOpacity>
 
@@ -110,7 +110,7 @@ export const MeetingPollDetailView: React.FC<MeetingPollDetailViewProps> = ({
               activeOpacity={0.7}
               accessibilityLabel="Editar reunião"
             >
-              <MaterialIcons name="edit" size={17} color={colors.onSurface} />
+              <ProtoUiIcon name="edit" size={17} color={colors.onSurface} />
             </TouchableOpacity>
           )}
 
@@ -120,7 +120,7 @@ export const MeetingPollDetailView: React.FC<MeetingPollDetailViewProps> = ({
             activeOpacity={0.7}
             accessibilityLabel="Compartilhar votação"
           >
-            <MaterialIcons name="share" size={17} color={colors.onSurface} />
+            <ProtoUiIcon name="share" size={17} color={colors.onSurface} />
           </TouchableOpacity>
 
           {onDelete && (
@@ -130,7 +130,7 @@ export const MeetingPollDetailView: React.FC<MeetingPollDetailViewProps> = ({
               activeOpacity={0.7}
               accessibilityLabel="Excluir reunião"
             >
-              <MaterialIcons name="delete-outline" size={18} color={colors.error} />
+              <ProtoUiIcon name="delete-outline" size={18} color={colors.error} />
             </TouchableOpacity>
           )}
         </View>
@@ -156,7 +156,7 @@ export const MeetingPollDetailView: React.FC<MeetingPollDetailViewProps> = ({
         {/* Resumo do Consenso / Destaque */}
         {isConfirmed ? (
           <View style={[styles.alertBanner, { backgroundColor: 'rgba(46, 125, 50, 0.12)', borderColor: '#2e7d32' }]}>
-            <MaterialIcons name="check-circle" size={20} color="#2e7d32" />
+            <ProtoUiIcon name="check-circle" size={20} color="#2e7d32" />
             <View style={{ flex: 1 }}>
               <Text style={[styles.alertBannerTitle, { color: '#2e7d32' }]}>Consenso Definido!</Text>
               <Text style={[styles.alertBannerDesc, { color: colors.onSurface }]}>
@@ -166,7 +166,7 @@ export const MeetingPollDetailView: React.FC<MeetingPollDetailViewProps> = ({
           </View>
         ) : leadingInfo.votesCount > 0 ? (
           <View style={[styles.leaderBanner, { backgroundColor: colors.surfaceContainerHigh, borderColor: colors.primary }]}>
-            <MaterialIcons name="star" size={20} color={colors.primary} />
+            <ProtoUiIcon name="star" size={20} color={colors.primary} />
             <View style={{ flex: 1 }}>
               <Text style={[styles.leaderBannerTitle, { color: colors.primary }]}>Horário Mais Votado</Text>
               <Text style={[styles.leaderBannerDesc, { color: colors.onSurface }]}>
@@ -176,7 +176,7 @@ export const MeetingPollDetailView: React.FC<MeetingPollDetailViewProps> = ({
           </View>
         ) : (
           <View style={[styles.emptyVotesBanner, { backgroundColor: colors.surfaceContainerHigh, borderColor: colors.outlineVariant }]}>
-            <MaterialIcons name="info-outline" size={18} color={colors.onSurfaceVariant} />
+            <ProtoUiIcon name="info-outline" size={18} color={colors.onSurfaceVariant} />
             <Text style={[styles.emptyVotesText, { color: colors.onSurfaceVariant }]}>
               Nenhum participante votou ainda. Compartilhe o link de votação para recolher a disponibilidade do grupo.
             </Text>
@@ -216,7 +216,7 @@ export const MeetingPollDetailView: React.FC<MeetingPollDetailViewProps> = ({
           accessibilityRole="button"
           accessibilityLabel={getMeetingShareButtonLabel(isConfirmed)}
         >
-          <MaterialIcons name="share" size={18} color={colors.onPrimary} />
+          <ProtoUiIcon name="share" size={18} color={colors.onPrimary} />
           <Text style={[styles.whatsappBigBtnText, { color: colors.onPrimary }]}>
             {getMeetingShareButtonLabel(isConfirmed)}
           </Text>

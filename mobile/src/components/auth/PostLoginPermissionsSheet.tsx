@@ -11,7 +11,7 @@ import {
   type TextStyle,
   type ViewStyle,
 } from 'react-native'
-import { MaterialIcons } from '@expo/vector-icons'
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { useTheme } from '../../context/ThemeContext'
 import { loginPalette } from '../login/loginPalette'
 import { BellIcon, CalIcon, MicIcon } from '../login/DemoIcons'
@@ -124,7 +124,7 @@ export const PostLoginPermissionsSheet: React.FC<PostLoginPermissionsSheetProps>
               accessibilityLabel="Fechar"
               style={[styles.closeBtn, { backgroundColor: palette.btn }]}
             >
-              <MaterialIcons name="close" size={18} color={palette.ink} />
+              <ProtoUiIcon name="close" size={18} color={palette.ink} />
             </TouchableOpacity>
           </View>
 
@@ -211,12 +211,12 @@ const styles = StyleSheet.create({
     flex: 1,
   } as ViewStyle,
   title: {
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Geist_600SemiBold',
     fontSize: 22,
     letterSpacing: -0.44,
   } as TextStyle,
   subtitle: {
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'Geist_400Regular',
     fontSize: 13.5,
     marginTop: 2,
   } as TextStyle,
@@ -249,16 +249,16 @@ const styles = StyleSheet.create({
     minWidth: 0,
   } as ViewStyle,
   rowTitle: {
-    fontFamily: 'Inter_500Medium',
+    fontFamily: 'Geist_500Medium',
     fontSize: 15,
   } as TextStyle,
   rowSub: {
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'Geist_400Regular',
     fontSize: 12.5,
     marginTop: 2,
   } as TextStyle,
   finePrint: {
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'Geist_400Regular',
     fontSize: 11.5,
     lineHeight: 16,
     marginTop: 10,
@@ -272,7 +272,7 @@ const styles = StyleSheet.create({
     marginTop: 14,
   } as ViewStyle,
   ctaText: {
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Geist_600SemiBold',
     fontSize: 15.5,
   } as TextStyle,
 })

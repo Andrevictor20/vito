@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { useTheme } from '../../context/ThemeContext';
 import { hapticFeedback } from '../../theme/motion';
 import { BottomSheetModal } from '../ui/BottomSheetModal';
@@ -193,7 +193,7 @@ export const TaskDetailSheet: React.FC<TaskDetailSheetProps> = ({
                       ]}
                       onPress={() => onToggleSubtask(s.id)}
                     >
-                      {s.completed && <MaterialIcons name="check" size={12} color="#fff" />}
+                      {s.completed && <ProtoUiIcon name="check" size={12} color="#fff" />}
                     </TouchableOpacity>
                     <Text
                       style={[
@@ -205,7 +205,7 @@ export const TaskDetailSheet: React.FC<TaskDetailSheetProps> = ({
                       {s.title}
                     </Text>
                     <TouchableOpacity onPress={() => onDeleteSubtask(s.id)} hitSlop={8}>
-                      <MaterialIcons name="close" size={16} color={colors.muted} />
+                      <ProtoUiIcon name="close" size={16} color={colors.muted} />
                     </TouchableOpacity>
                   </View>
                 ))}
@@ -242,7 +242,7 @@ export const TaskDetailSheet: React.FC<TaskDetailSheetProps> = ({
               onPress={handleAiSubtasks}
               disabled={aiBusy}
             >
-              <MaterialIcons name="auto-awesome" size={16} color={colors.purple} />
+              <ProtoUiIcon name="auto-awesome" size={16} color={colors.purple} />
               <Text style={[styles.secBtnText, { color: colors.ink }]}>Subtarefas IA</Text>
             </TouchableOpacity>
           )}

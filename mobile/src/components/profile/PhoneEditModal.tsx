@@ -11,7 +11,7 @@ import {
   AppState,
   ScrollView,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { tokens, MD3Shapes } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { BottomSheetModal } from '../ui/BottomSheetModal';
@@ -169,7 +169,7 @@ export const PhoneEditModal: React.FC<PhoneEditModalProps> = ({
                 }}
                 activeOpacity={0.75}
               >
-                <MaterialIcons name="smartphone" size={16} color={colors.primary} />
+                <ProtoUiIcon name="smartphone" size={16} color={colors.primary} />
                 <Text style={[styles.suggestionText, { color: colors.onSurface }]}>
                   Usar número detectado: <Text style={{ fontWeight: '700' }}>{formatPhoneNumber(suggestedPhone)}</Text>
                 </Text>
@@ -179,7 +179,7 @@ export const PhoneEditModal: React.FC<PhoneEditModalProps> = ({
             <View style={styles.inputContainer}>
               <Text style={[styles.label, { color: colors.textSecondary }]}>CELULAR COM DDD</Text>
               <View style={[styles.inputBox, { backgroundColor: colors.surfaceContainerLow, borderColor: colors.outlineVariant }]}>
-                <MaterialIcons name="phone" size={18} color={colors.onSurfaceVariant} style={styles.icon} />
+                <ProtoUiIcon name="phone" size={18} color={colors.onSurfaceVariant} style={styles.icon} />
                 <TextInput
                   style={[styles.input, { color: colors.onSurface }]}
                   placeholder="+55 (11) 98765-4321"
@@ -214,7 +214,7 @@ export const PhoneEditModal: React.FC<PhoneEditModalProps> = ({
                   <ActivityIndicator size="small" color={colors.onPrimary} />
                 ) : (
                   <>
-                    <MaterialIcons name="verified-user" size={17} color={colors.onPrimary} />
+                    <ProtoUiIcon name="verified-user" size={17} color={colors.onPrimary} />
                     <Text style={[styles.primaryBtnText, { color: colors.onPrimary }]}>Confirmar via WhatsApp</Text>
                   </>
                 )}
@@ -241,7 +241,7 @@ export const PhoneEditModal: React.FC<PhoneEditModalProps> = ({
             <View style={styles.inputContainer}>
               <Text style={[styles.label, { color: colors.textSecondary }]}>CÓDIGO DE 6 DÍGITOS</Text>
               <View style={[styles.inputBox, { backgroundColor: colors.surfaceContainerLow, borderColor: colors.outlineVariant }]}>
-                <MaterialIcons name="lock-outline" size={18} color={colors.onSurfaceVariant} style={styles.icon} />
+                <ProtoUiIcon name="lock-outline" size={18} color={colors.onSurfaceVariant} style={styles.icon} />
                 <TextInput
                   style={[styles.input, styles.codeInput, { color: colors.onSurface }]}
                   placeholder="000000"
@@ -272,7 +272,7 @@ export const PhoneEditModal: React.FC<PhoneEditModalProps> = ({
                   <ActivityIndicator size="small" color={colors.onPrimary} />
                 ) : (
                   <>
-                    <MaterialIcons name="check" size={18} color={colors.onPrimary} />
+                    <ProtoUiIcon name="check" size={18} color={colors.onPrimary} />
                     <Text style={[styles.primaryBtnText, { color: colors.onPrimary }]}>Validar Código</Text>
                   </>
                 )}

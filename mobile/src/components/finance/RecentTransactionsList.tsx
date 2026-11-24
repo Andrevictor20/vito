@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
-import { tokens, tabularNumbers } from '../../theme/tokens';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
+import { tabularNumbers } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import type { FinanceTransaction } from '../../types/finance';
 import {
@@ -11,6 +11,7 @@ import {
   isCreditTransaction,
   maskBRL,
 } from './financeHelpers';
+import { TransactionSemanticBadge } from './FinanceSemanticIcons';
 
 interface RecentTransactionsListProps {
   transactions: FinanceTransaction[];
@@ -19,14 +20,33 @@ interface RecentTransactionsListProps {
   onSelectTransaction?: (tx: FinanceTransaction) => void;
 }
 
+export interface DayGroup {
+  dayLabel: string;
+  items: FinanceTransaction[];
+}
+
+export function groupTransactionsByDay(transactions: FinanceTransaction[]): DayGroup[] {
+  const groups: DayGroup[] = [];
+  for (const tx of transactions.slice(0, 5)) {
+    const label = formatShortTxDate(tx.occurred_at);
+    const last = groups[groups.length - 1];
+    if (last && last.dayLabel === label) {
+      last.items.push(tx);
+    } else {
+      groups.push({ dayLabel: label, items: [tx] });
+    }
+  }
+  return groups;
+}
+
 export const RecentTransactionsList: React.FC<RecentTransactionsListProps> = ({
   transactions,
   isPrivacyHidden,
   onViewAll,
   onSelectTransaction,
 }) => {
-  const { colors } = useTheme();
-  const displayList = transactions.slice(0, 5);
+  const { colors, isDark } = useTheme();
+  const grouped = useMemo(() => groupTransactionsByDay(transactions), [transactions]);
 
   return (
     <View style={styles.container}>
@@ -41,62 +61,68 @@ export const RecentTransactionsList: React.FC<RecentTransactionsListProps> = ({
         </TouchableOpacity>
       </View>
 
-      <View style={[styles.cardContainer, { backgroundColor: colors.bg, borderColor: colors.line }]}>
-        {displayList.length === 0 ? (
+      <View style={[styles.fxList, { backgroundColor: colors.surf }]}>
+        {grouped.length === 0 ? (
           <View style={styles.emptyBox}>
-            <MaterialIcons name="receipt-long" size={28} color={colors.muted} />
+            <ProtoUiIcon name="receipt-long" size={28} color={colors.muted} />
             <Text style={[styles.emptyText, { color: colors.muted }]}>
               As movimentações dos seus bancos aparecerão aqui após a sincronização.
             </Text>
           </View>
         ) : (
-          displayList.map((tx, idx) => {
-            const isCredit = isCreditTransaction(tx);
-            const methodKind = getPaymentMethodKind(tx);
-            const chipBg = isCredit ? colors.greenBg : colors.finBg;
-            const chipFg = isCredit ? colors.acc : colors.fin;
+          grouped.map((group, gIdx) => (
+            <View key={`${group.dayLabel}_${gIdx}`}>
+              <Text style={[styles.fxDay, { color: colors.muted }]}>{group.dayLabel}</Text>
+              {group.items.map((tx, idx) => {
+                const isCredit = isCreditTransaction(tx);
+                const methodKind = getPaymentMethodKind(tx);
+                const merchantName = tx.clean_merchant_name || tx.description || 'Lançamento bancário';
 
-            return (
-              <TouchableOpacity
-                key={tx.id || tx.pluggy_transaction_id || `tx_${idx}`}
-                style={[
-                  styles.txRow,
-                  idx > 0 && { borderTopWidth: 1, borderTopColor: colors.line },
-                ]}
-                onPress={() => onSelectTransaction?.(tx)}
-                activeOpacity={0.75}
-              >
-                <View style={[styles.chip, { backgroundColor: chipBg }]}>
-                  <MaterialIcons
-                    name={methodKind === 'pix' ? 'qr-code-2' : 'credit-card'}
-                    size={20}
-                    color={chipFg}
-                  />
-                </View>
+                return (
+                  <TouchableOpacity
+                    key={tx.id || tx.pluggy_transaction_id || `tx_${gIdx}_${idx}`}
+                    style={[
+                      styles.txRow,
+                      idx > 0 && { borderTopWidth: 1, borderTopColor: colors.line },
+                    ]}
+                    onPress={() => onSelectTransaction?.(tx)}
+                    activeOpacity={0.75}
+                  >
+                    <TransactionSemanticBadge
+                      merchant={merchantName}
+                      category={tx.category}
+                      isCredit={isCredit}
+                      isPix={methodKind === 'pix'}
+                      isDark={isDark}
+                      index={idx}
+                      size={38}
+                    />
 
-                <View style={styles.txDetailsCol}>
-                  <Text style={[styles.txDescription, { color: colors.ink }]} numberOfLines={1}>
-                    {tx.clean_merchant_name || tx.description || 'Lançamento bancário'}
-                  </Text>
-                  <Text style={[styles.txMeta, { color: colors.muted }]} numberOfLines={1}>
-                    {tx.category || 'Geral'} · {formatShortTxDate(tx.occurred_at)}
-                  </Text>
-                </View>
+                    <View style={styles.txDetailsCol}>
+                      <Text style={[styles.txDescription, { color: colors.ink }]} numberOfLines={1}>
+                        {merchantName}
+                      </Text>
+                      <Text style={[styles.txMeta, { color: colors.muted }]} numberOfLines={1}>
+                        {tx.category || 'Geral'}
+                      </Text>
+                    </View>
 
-                <Text
-                  style={[
-                    styles.txAmountText,
-                    tabularNumbers,
-                    { color: isCredit ? colors.acc : colors.ink },
-                  ]}
-                >
-                  {isPrivacyHidden
-                    ? maskBRL(true, '')
-                    : `${isCredit ? '+' : '−'}${formatBRL(tx.amount)}`}
-                </Text>
-              </TouchableOpacity>
-            );
-          })
+                    <Text
+                      style={[
+                        styles.txAmountText,
+                        tabularNumbers,
+                        { color: isCredit ? colors.acc : colors.ink },
+                      ]}
+                    >
+                      {isPrivacyHidden
+                        ? maskBRL(true, '')
+                        : `${isCredit ? '+' : '−'}${formatBRL(tx.amount)}`}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          ))
         )}
       </View>
     </View>
@@ -105,7 +131,7 @@ export const RecentTransactionsList: React.FC<RecentTransactionsListProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    marginTop: 8,
+    marginTop: 18,
     marginBottom: 24,
   },
   headerRow: {
@@ -115,26 +141,32 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   sectionTitle: {
-    fontFamily: tokens.typography.family.montserratBold,
+    fontFamily: 'Geist_500Medium',
     fontSize: 17,
-    fontWeight: '800',
     letterSpacing: -0.3,
   },
   extractPill: {
-    height: 32,
+    height: 30,
     paddingHorizontal: 12,
-    borderRadius: 16,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
   },
   extractPillText: {
+    fontFamily: 'Geist_500Medium',
     fontSize: 13,
-    fontWeight: '600',
   },
-  cardContainer: {
-    borderRadius: 20,
-    borderWidth: 1,
-    paddingHorizontal: 14,
+  fxList: {
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    paddingTop: 4,
+    paddingBottom: 8,
+  },
+  fxDay: {
+    fontFamily: 'Geist_500Medium',
+    fontSize: 12.5,
+    paddingTop: 14,
+    paddingBottom: 2,
   },
   emptyBox: {
     paddingVertical: 24,
@@ -143,6 +175,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   emptyText: {
+    fontFamily: 'Geist',
     fontSize: 13,
     textAlign: 'center',
     lineHeight: 18,
@@ -151,11 +184,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    paddingVertical: 11,
+    paddingVertical: 10,
   },
   chip: {
-    width: 40,
-    height: 40,
+    width: 38,
+    height: 38,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
@@ -165,15 +198,16 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   txDescription: {
-    fontSize: 15,
-    fontWeight: '600',
+    fontFamily: 'Geist_500Medium',
+    fontSize: 14.5,
   },
   txMeta: {
+    fontFamily: 'Geist',
     fontSize: 12,
     marginTop: 2,
   },
   txAmountText: {
-    fontSize: 15,
-    fontWeight: '600',
+    fontFamily: 'Geist_500Medium',
+    fontSize: 14.5,
   },
 });

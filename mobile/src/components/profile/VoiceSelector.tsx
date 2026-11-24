@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { useTheme } from '../../context/ThemeContext';
 import { tokens } from '../../theme/tokens';
 import {
@@ -67,7 +67,7 @@ export const VoiceSelector: React.FC<VoiceSelectorProps> = ({
                     },
                   ]}
                 >
-                  <MaterialIcons
+                  <ProtoUiIcon
                     name={opt.id === 'kore' ? 'face-3' : 'face'}
                     size={22}
                     color={isSelected ? colors.primary : colors.onSurfaceVariant}
@@ -86,7 +86,7 @@ export const VoiceSelector: React.FC<VoiceSelectorProps> = ({
                     {opt.sub}
                   </Text>
                 </View>
-                <MaterialIcons
+                <ProtoUiIcon
                   name={isSelected ? 'radio-button-checked' : 'radio-button-unchecked'}
                   size={20}
                   color={isSelected ? colors.primary : colors.outline}

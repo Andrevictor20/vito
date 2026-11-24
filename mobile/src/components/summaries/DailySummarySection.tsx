@@ -1,11 +1,24 @@
-import React, { useEffect, useMemo, useRef } from 'react';
-import { AccessibilityInfo, Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
-import { tokens } from '../../theme/tokens';
+import React, { useMemo } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ProtoRingChart } from '../../charts/ProtoRingChart';
 import { useTheme } from '../../context/ThemeContext';
-import { VitoMascot } from '../common/VitoMascot';
-import { SummaryRingSvg } from './SummaryRingSvg';
+import { hapticFeedback } from '../../theme/motion';
+import { tabularNumbers } from '../../theme/tokens';
+import {
+  AnimatedSegmentedBar,
+  CountUpText,
+  StaggerItem,
+  useReduceMotion,
+} from '../../theme/vitoMotion';
 import type { FocusBlock, TimelineSegment } from '../../utils/summaryCalculators';
+import { withHexAlpha } from '../finance/financeHelpers';
+import {
+  SummaryCard,
+  SummaryEyebrow,
+  SummaryHeroCard,
+  SummaryNowIndicator,
+  SummaryVitoNote,
+} from './SummaryPrimitives';
 
 interface TodayMetrics {
   eventsCount: number;
@@ -39,36 +52,22 @@ export const DailySummarySection: React.FC<DailySummarySectionProps> = ({
   todayFormatted,
 }) => {
   const { colors, isDark } = useTheme();
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-
-  useEffect(() => {
-    let alive = true;
-    AccessibilityInfo.isReduceMotionEnabled()
-      .then((reduced) => {
-        if (!alive || reduced) return;
-        Animated.loop(
-          Animated.sequence([
-            Animated.timing(pulseAnim, { toValue: 0.35, duration: 900, useNativeDriver: true }),
-            Animated.timing(pulseAnim, { toValue: 1, duration: 900, useNativeDriver: true }),
-          ])
-        ).start();
-      })
-      .catch(() => undefined);
-    return () => {
-      alive = false;
-    };
-  }, [pulseAnim]);
+  const reduceMotion = useReduceMotion();
 
   const committedNum = parseFloat(metrics.committedHours) || 0;
   const freeNum = parseFloat(metrics.freeHours) || 0;
-  const freePct = Math.min(100, Math.round((freeNum / 12) * 100));
-  const taskPct = metrics.totalTodos > 0 ? Math.round((metrics.completedTodos / metrics.totalTodos) * 100) : 0;
+  const freePct = Math.max(0, Math.min(100, Math.round((freeNum / 12) * 100)));
+  const taskPct =
+    metrics.totalTodos > 0 ? Math.round((metrics.completedTodos / metrics.totalTodos) * 100) : 0;
 
-  const nowPct = useMemo(() => {
+  const dayLoadLabel =
+    committedNum <= 3 ? 'Dia leve' : committedNum <= 6 ? 'Dia equilibrado' : 'Dia intenso';
+
+  const nowLeftPct = useMemo(() => {
     const now = new Date();
-    const min = now.getHours() * 60 + now.getMinutes();
-    const clamped = Math.max(480, Math.min(1200, min));
-    return Math.round(((clamped - 480) / (1200 - 480)) * 100);
+    const mins = now.getHours() * 60 + now.getMinutes();
+    const clamped = Math.max(480, Math.min(1200, mins));
+    return Math.round(((clamped - 480) / 720) * 100);
   }, []);
 
   const effectiveTimeline = useMemo<TimelineSegment[]>(() => {
@@ -84,188 +83,339 @@ export const DailySummarySection: React.FC<DailySummarySectionProps> = ({
   const effectiveFocusBlocks = useMemo<FocusBlock[]>(() => {
     if (focusBlocks !== undefined) return focusBlocks;
     if (freeNum >= 1) {
-      return [{ label: `Foco disponível · ${freeNum}h livres`, duration: `${freeNum}h`, startMinutes: 480, endMinutes: 1200 }];
+      return [
+        {
+          label: `Foco disponível · ${freeNum.toFixed(0)}h livres`,
+          duration: `${freeNum.toFixed(0)}h`,
+          startMinutes: 480,
+          endMinutes: 1200,
+        },
+      ];
     }
     return [];
   }, [focusBlocks, freeNum]);
 
+  const freeSegColor = withHexAlpha(colors.acc, isDark ? 0.36 : 0.4);
+  const segments = useMemo(
+    () =>
+      effectiveTimeline.map((seg, idx) => ({
+        key: `tl_${idx}`,
+        flex: seg.flex,
+        color: seg.type === 'free' ? freeSegColor : colors.blue,
+      })),
+    [effectiveTimeline, freeSegColor, colors.blue]
+  );
+
   const headerDate = todayFormatted || 'Hoje';
+  const freeDecimals = Number.isInteger(freeNum) ? 0 : 1;
+  const committedDecimals = Number.isInteger(committedNum) ? 0 : 1;
 
   return (
     <View style={styles.container}>
-      {/* Hero .rs-hero */}
-      <View
-        style={[
-          styles.heroCard,
-          {
-            backgroundColor: isDark ? '#141925' : '#EFF5FF',
-            borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(10,124,255,0.12)',
-          },
-        ]}
-      >
-        <View style={styles.ebRow}>
-          <MaterialIcons name="calendar-today" size={14} color={colors.muted} />
-          <Text style={[styles.eb, { color: colors.muted }]}>{headerDate}</Text>
-        </View>
-
-        <View style={styles.heroRow}>
-          <SummaryRingSvg percent={freePct} color={colors.acc} size={104} label="livre" />
-          <View style={styles.heroRight}>
-            <Text style={[styles.big, { color: colors.ink }]}>
-              {metrics.freeHours}
-              <Text style={[styles.bigSmall, { color: colors.muted }]}>h livres</Text>
-            </Text>
-            <Text style={[styles.committedLine, { color: colors.muted }]}>
-              <Text style={{ color: colors.ink, fontWeight: '600' }}>{metrics.committedHours}h</Text> comprometida
-            </Text>
-            <View style={[styles.statusChip, { backgroundColor: colors.greenBg }]}>
-              <Text style={[styles.statusChipText, { color: colors.acc }]}>
-                {committedNum <= 3 ? 'Dia leve' : committedNum <= 6 ? 'Dia equilibrado' : 'Dia intenso'}
-              </Text>
-            </View>
-          </View>
-        </View>
-      </View>
-
-      {/* Linha do dia .rs-tl com indicador "Agora" vermelho pulsante */}
-      <View style={[styles.card, { backgroundColor: colors.surf }]}>
-        <Text style={[styles.eb, { color: colors.muted }]}>Linha do dia</Text>
-        <View style={styles.tlOuter}>
-          <View style={styles.tlTrack}>
-            {effectiveTimeline.map((seg, idx) => (
-              <View
-                key={idx}
-                style={[
-                  styles.tlSeg,
-                  {
-                    flex: Math.max(0.2, seg.flex),
-                    backgroundColor: seg.type === 'free' ? colors.greenBg : colors.blue,
-                  },
-                ]}
-              />
-            ))}
-          </View>
-          <Animated.View
-            style={[
-              styles.nowLine,
-              {
-                left: `${nowPct}%`,
-                backgroundColor: colors.red,
-                opacity: pulseAnim,
-              },
-            ]}
-          />
-        </View>
-        <View style={styles.tlLabels}>
-          <Text style={[styles.tlLabel, { color: colors.muted }]}>08:00</Text>
-          <Text style={[styles.tlLabel, { color: colors.red, fontWeight: '600' }]}>Agora</Text>
-          <Text style={[styles.tlLabel, { color: colors.muted }]}>20:00</Text>
-        </View>
-        {effectiveFocusBlocks.length > 0 && (
-          <View style={styles.winsRow}>
-            {effectiveFocusBlocks.map((b, i) => (
-              <View key={i} style={[styles.winPill, { backgroundColor: colors.bg }]}>
-                <Text style={[styles.winText, { color: colors.ink }]}>{b.label}</Text>
+      {/* Bloco 1: Hero .rs-c.rs-hero com anel 104px + horas livres + chip */}
+      <StaggerItem index={0}>
+        <SummaryHeroCard>
+          <SummaryEyebrow label={headerDate} icon="calendar-month" />
+          <View style={styles.heroRow}>
+            <ProtoRingChart
+              pct={freePct}
+              size={104}
+              strokeWidth={10}
+              color={colors.acc}
+              trackColor={withHexAlpha(colors.acc, 0.16)}
+              subtitle="livre"
+              animateLabel
+              durationMs={1250}
+              isDark={isDark}
+              reduceMotion={reduceMotion}
+            />
+            <View style={styles.heroRight}>
+              <View style={styles.bigLine}>
+                <CountUpText
+                  value={freeNum}
+                  decimals={freeDecimals}
+                  durationMs={1150}
+                  style={[styles.big, { color: colors.ink }]}
+                />
+                <Text style={[styles.bigSmall, { color: colors.muted }]}> h livres</Text>
               </View>
-            ))}
-          </View>
-        )}
-      </View>
-
-      {/* Grid 2 colunas .rs-two */}
-      <View style={styles.twoRow}>
-        <View style={[styles.card, styles.halfCard, { backgroundColor: colors.surf }]}>
-          <View style={styles.ebRow}>
-            <MaterialIcons name="calendar-month" size={14} color={colors.blue} />
-            <Text style={[styles.eb, { color: colors.blue }]}>Agenda</Text>
-          </View>
-          <Text style={[styles.statBig, { color: colors.ink }]}>
-            {metrics.eventsCount}
-            <Text style={[styles.statUnit, { color: colors.muted }]}>
-              {metrics.eventsCount === 1 ? ' compromisso' : ' compromissos'}
-            </Text>
-          </Text>
-          <Text style={[styles.metaSub, { color: colors.muted }]} numberOfLines={1}>
-            {nextEventTitle || 'Sem compromissos'}
-          </Text>
-        </View>
-
-        <View style={[styles.card, styles.halfCard, { backgroundColor: colors.surf }]}>
-          <View style={styles.ebRow}>
-            <MaterialIcons name="check-circle" size={14} color={colors.purple} />
-            <Text style={[styles.eb, { color: colors.purple }]}>Tarefas</Text>
-          </View>
-          <View style={styles.taskRingRow}>
-            <SummaryRingSvg percent={taskPct} color={colors.purple} size={62} />
-            <View>
-              <Text style={[styles.taskFrac, { color: colors.ink }]}>
-                {metrics.completedTodos}/{metrics.totalTodos}
+              <Text style={[styles.metaRow, { color: colors.muted }]}>
+                <CountUpText
+                  value={committedNum}
+                  decimals={committedDecimals}
+                  suffix="h"
+                  durationMs={1150}
+                  style={[styles.metaBold, { color: colors.ink }]}
+                />
+                {' comprometida'}
               </Text>
-              <Text style={[styles.metaSub, { color: colors.muted }]}>feitas</Text>
+              <View style={[styles.chip, { backgroundColor: withHexAlpha(colors.acc, 0.16) }]}>
+                <Text style={[styles.chipText, { color: colors.acc }]}>{dayLoadLabel}</Text>
+              </View>
             </View>
           </View>
-        </View>
-      </View>
+        </SummaryHeroCard>
+      </StaggerItem>
 
-      {/* Diagnóstico .rs-vt */}
-      <View style={[styles.vtCard, { backgroundColor: colors.surf }]}>
-        <View style={[styles.vtMascot, { backgroundColor: colors.bg, borderColor: colors.line }]}>
-          <VitoMascot size={26} state="idle" />
-        </View>
-        <Text style={[styles.vtText, { color: colors.ink }]}>{synthesisText}</Text>
-      </View>
+      {/* Bloco 2: Linha do dia (.rs-tl + indicador Agora + janelas de foco) */}
+      <StaggerItem index={1}>
+        <SummaryCard>
+          <SummaryEyebrow label="Linha do dia" />
+          <View style={styles.tlWrap}>
+            <AnimatedSegmentedBar
+              segments={segments}
+              height={16}
+              borderRadius={8}
+              segmentRadius={6}
+              gap={3}
+              delayMs={180}
+              stepMs={140}
+              durationMs={900}
+            />
+            <SummaryNowIndicator leftPct={nowLeftPct} />
+          </View>
 
-      <View style={styles.btnsRow}>
-        {onReserveFocus && hasFreeWindow && (
-          <TouchableOpacity style={[styles.priBtn, { backgroundColor: colors.ink }]} onPress={onReserveFocus}>
-            <Text style={[styles.priBtnText, { color: colors.bg }]}>Reservar foco</Text>
-          </TouchableOpacity>
-        )}
-        {onViewTasks && (
-          <TouchableOpacity style={[styles.secBtn, { backgroundColor: colors.surf }]} onPress={onViewTasks}>
-            <Text style={[styles.secBtnText, { color: colors.ink }]}>Ver tarefas</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+          <View style={styles.tlLabels}>
+            <Text style={[styles.tlLbl, { color: colors.muted }]}>08:00</Text>
+            <Text style={[styles.tlLbl, { color: colors.muted }]}>14:00</Text>
+            <Text style={[styles.tlLbl, { color: colors.muted }]}>20:00</Text>
+          </View>
+
+          <View style={styles.focusWrap}>
+            {effectiveFocusBlocks.length > 0 ? (
+              effectiveFocusBlocks.map((b, i) => (
+                <View key={i} style={[styles.focusChip, { backgroundColor: colors.bg }]}>
+                  <Text style={[styles.focusChipText, { color: colors.ink }]}>{b.label}</Text>
+                </View>
+              ))
+            ) : (
+              <View style={[styles.focusChip, { backgroundColor: colors.bg }]}>
+                <Text style={[styles.focusChipText, { color: colors.muted }]}>
+                  Nenhum bloco livre disponível hoje
+                </Text>
+              </View>
+            )}
+          </View>
+        </SummaryCard>
+      </StaggerItem>
+
+      {/* Bloco 3: Grid 2 colunas (.rs-two: Agenda | Tarefas com anel 64px) */}
+      <StaggerItem index={2}>
+        <View style={styles.twoGrid}>
+          <SummaryCard style={styles.halfCard}>
+            <SummaryEyebrow label="Agenda" icon="calendar-month" color={colors.blue} />
+            <View style={[styles.bigLine, { marginTop: 14 }]}>
+              <CountUpText
+                value={metrics.eventsCount}
+                durationMs={1000}
+                style={[styles.bigMedium, { color: colors.ink }]}
+              />
+              <Text style={[styles.bigSmall, { color: colors.muted }]} numberOfLines={1}>
+                {metrics.eventsCount === 1 ? ' compromisso' : ' compromissos'}
+              </Text>
+            </View>
+            <Text style={[styles.metaSub, { color: colors.muted }]} numberOfLines={1}>
+              {nextEventTitle || 'Sem compromissos'}
+            </Text>
+          </SummaryCard>
+
+          <SummaryCard style={styles.halfCard}>
+            <SummaryEyebrow label="Tarefas" icon="check-circle" color={colors.purple} />
+            <View style={styles.tasksRow}>
+              <ProtoRingChart
+                pct={taskPct}
+                size={64}
+                strokeWidth={7}
+                color={colors.purple}
+                trackColor={withHexAlpha(colors.purple, 0.16)}
+                animateLabel
+                labelSize={15}
+                durationMs={1150}
+                isDark={isDark}
+                reduceMotion={reduceMotion}
+              />
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={[styles.tasksCount, tabularNumbers, { color: colors.ink }]}>
+                  {metrics.completedTodos}/{metrics.totalTodos}
+                </Text>
+                <Text style={[styles.tasksSub, { color: colors.muted }]}>feitas</Text>
+              </View>
+            </View>
+          </SummaryCard>
+        </View>
+      </StaggerItem>
+
+      {/* Bloco 4: Nota do Vito (.rs-vt) + botões (.brow) */}
+      <StaggerItem index={3}>
+        <SummaryVitoNote text={synthesisText} />
+        {(onReserveFocus && hasFreeWindow) || onViewTasks ? (
+          <View style={styles.btnsRow}>
+            {onReserveFocus && hasFreeWindow ? (
+              <TouchableOpacity
+                style={[styles.priBtn, { backgroundColor: colors.ink }]}
+                onPress={() => {
+                  hapticFeedback.light();
+                  onReserveFocus();
+                }}
+                activeOpacity={0.82}
+              >
+                <Text style={[styles.priBtnText, { color: colors.bg }]}>Reservar foco</Text>
+              </TouchableOpacity>
+            ) : null}
+            {onViewTasks ? (
+              <TouchableOpacity
+                style={[styles.secBtn, { backgroundColor: colors.surf }]}
+                onPress={() => {
+                  hapticFeedback.light();
+                  onViewTasks();
+                }}
+                activeOpacity={0.82}
+              >
+                <Text style={[styles.secBtnText, { color: colors.ink }]}>Ver tarefas</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        ) : null}
+      </StaggerItem>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: { gap: 12 },
-  heroCard: { borderRadius: 24, borderWidth: 1, padding: 18 },
-  card: { borderRadius: 24, padding: 18 },
-  ebRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  eb: { fontSize: 11.5, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.7 },
-  heroRow: { flexDirection: 'row', alignItems: 'center', gap: 18, marginTop: 14 },
-  heroRight: { flex: 1 },
-  big: { fontSize: 38, fontWeight: '600', letterSpacing: -1.2, fontVariant: ['tabular-nums'] },
-  bigSmall: { fontSize: 15, fontWeight: '500' },
-  committedLine: { fontSize: 13.5, marginTop: 6, fontVariant: ['tabular-nums'] },
-  statusChip: { alignSelf: 'flex-start', paddingHorizontal: 11, paddingVertical: 5, borderRadius: 12, marginTop: 10 },
-  statusChipText: { fontSize: 12, fontWeight: '600' },
-  tlOuter: { position: 'relative', marginTop: 16, height: 22, justifyContent: 'center' },
-  tlTrack: { flexDirection: 'row', height: 16, borderRadius: 8, overflow: 'hidden', gap: 3 },
-  tlSeg: { borderRadius: 6 },
-  nowLine: { position: 'absolute', top: -1, width: 3, height: 24, borderRadius: 2 },
-  tlLabels: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 },
-  tlLabel: { fontSize: 11.5, fontVariant: ['tabular-nums'] },
-  winsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
-  winPill: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 14 },
-  winText: { fontSize: 12.5, fontWeight: '500' },
-  twoRow: { flexDirection: 'row', gap: 12 },
-  halfCard: { flex: 1 },
-  statBig: { fontSize: 30, fontWeight: '600', marginTop: 12, fontVariant: ['tabular-nums'] },
-  statUnit: { fontSize: 13, fontWeight: '500' },
-  metaSub: { fontSize: 12, marginTop: 6 },
-  taskRingRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 10 },
-  taskFrac: { fontSize: 17, fontWeight: '600', fontVariant: ['tabular-nums'] },
-  vtCard: { borderRadius: 22, padding: 16, flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
-  vtMascot: { width: 36, height: 36, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  vtText: { flex: 1, fontSize: 14, lineHeight: 20, fontFamily: tokens.typography.family.regular },
-  btnsRow: { flexDirection: 'row', gap: 10 },
-  priBtn: { flex: 1, height: 46, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
-  priBtnText: { fontSize: 14, fontWeight: '600' },
-  secBtn: { flex: 1, height: 46, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
-  secBtnText: { fontSize: 14, fontWeight: '600' },
+  heroRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 18,
+    marginTop: 14,
+  },
+  heroRight: {
+    flex: 1,
+    minWidth: 0,
+  },
+  bigLine: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    flexWrap: 'wrap',
+  },
+  big: {
+    fontFamily: 'Geist_500Medium',
+    fontSize: 40,
+    lineHeight: 42,
+    letterSpacing: -1.6,
+  },
+  bigMedium: {
+    fontFamily: 'Geist_500Medium',
+    fontSize: 34,
+    lineHeight: 36,
+    letterSpacing: -1.2,
+  },
+  bigSmall: {
+    fontFamily: 'Geist_500Medium',
+    fontSize: 14,
+  },
+  metaRow: {
+    fontFamily: 'Geist',
+    fontSize: 14,
+    marginTop: 8,
+  },
+  metaBold: {
+    fontFamily: 'Geist_500Medium',
+    fontSize: 14,
+  },
+  chip: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 11,
+    paddingVertical: 5,
+    borderRadius: 12,
+    marginTop: 10,
+  },
+  chipText: {
+    fontFamily: 'Geist_500Medium',
+    fontSize: 12,
+  },
+  tlWrap: {
+    marginTop: 16,
+    position: 'relative',
+  },
+  tlLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 8,
+  },
+  tlLbl: {
+    fontFamily: 'Geist',
+    fontSize: 11.5,
+  },
+  focusWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 14,
+  },
+  focusChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 14,
+  },
+  focusChipText: {
+    fontFamily: 'Geist_500Medium',
+    fontSize: 12.5,
+  },
+  twoGrid: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  halfCard: {
+    flex: 1,
+    minWidth: 0,
+  },
+  metaSub: {
+    fontFamily: 'Geist',
+    fontSize: 12.5,
+    marginTop: 8,
+  },
+  tasksRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 12,
+  },
+  tasksCount: {
+    fontFamily: 'Geist_500Medium',
+    fontSize: 17,
+    lineHeight: 20,
+  },
+  tasksSub: {
+    fontFamily: 'Geist',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  btnsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 14,
+  },
+  priBtn: {
+    flex: 1,
+    height: 46,
+    borderRadius: 23,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  priBtnText: {
+    fontFamily: 'Geist_600SemiBold',
+    fontSize: 14.5,
+  },
+  secBtn: {
+    flex: 1,
+    height: 46,
+    borderRadius: 23,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  secBtnText: {
+    fontFamily: 'Geist_500Medium',
+    fontSize: 14.5,
+  },
 });

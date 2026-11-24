@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Linking, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../../icons/ProtoUiIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import * as WebBrowser from 'expo-web-browser';
@@ -150,13 +150,13 @@ export const PluggyPortalWebView: React.FC<Props> = ({
             accessibilityRole="button"
             accessibilityLabel="Voltar ao Vito"
           >
-            <MaterialIcons name="close" size={18} color={colors.ink} />
+            <ProtoUiIcon name="close" size={18} color={colors.ink} />
           </TouchableOpacity>
           <View style={[styles.noVitoBadge, { backgroundColor: colors.ink }]}>
             <Text style={[styles.noVitoText, { color: colors.bg }]}>no Vito</Text>
           </View>
           <View style={[styles.urlBar, { backgroundColor: colors.surf }]}>
-            <MaterialIcons name="lock" size={13} color={colors.muted} />
+            <ProtoUiIcon name="lock" size={13} color={colors.muted} />
             <Text style={[styles.urlText, { color: colors.ink }]} numberOfLines={1}>
               {formatWebViewDisplayUrl(currentUrl)}
             </Text>
@@ -168,7 +168,7 @@ export const PluggyPortalWebView: React.FC<Props> = ({
             accessibilityRole="button"
             accessibilityLabel="Limpar dados de navegação"
           >
-            <MaterialIcons name="delete-sweep" size={18} color={colors.ink} />
+            <ProtoUiIcon name="delete-sweep" size={18} color={colors.ink} />
           </TouchableOpacity>
         </View>
 
@@ -242,7 +242,7 @@ export const PluggyPortalWebView: React.FC<Props> = ({
               accessibilityRole="button"
               accessibilityLabel="Abrir no navegador"
             >
-              <MaterialIcons name="open-in-new" size={15} color={colors.ink} />
+              <ProtoUiIcon name="open-in-new" size={15} color={colors.ink} />
               <Text style={[styles.secondaryText, { color: colors.ink }]}>Navegador</Text>
             </TouchableOpacity>
             <View style={{ flex: 1 }} />
@@ -273,7 +273,9 @@ export const PluggyPortalWebView: React.FC<Props> = ({
             </TouchableOpacity>
           </View>
           <View style={styles.noteRow}>
-            <MaterialIcons name="lock-outline" size={14} color={colors.muted} style={styles.noteIcon} />
+            <View style={styles.noteIcon}>
+              <ProtoUiIcon name="lock-outline" size={14} color={colors.muted} />
+            </View>
             <Text style={[styles.noteText, { color: colors.muted }]}>
               {sessionNotice
                 ? sessionNotice

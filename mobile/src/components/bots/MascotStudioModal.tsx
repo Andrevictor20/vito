@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { useTheme } from '../../context/ThemeContext';
 import { BotSkin } from '../../types/bots';
 import { BottomSheetModal } from '../ui/BottomSheetModal';
@@ -163,14 +163,14 @@ export const MascotStudioModal: React.FC<MascotStudioModalProps> = ({
                 onPress={handleRandomize}
                 accessibilityLabel="Sortear estilo"
               >
-                <MaterialIcons name="shuffle" size={13} color={stageInk} />
+                <ProtoUiIcon name="shuffle" size={13} color={stageInk} />
                 <Text style={[styles.stagePillText, { color: stageInk }]}>Sortear</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.stagePill, { backgroundColor: stageBadgeBg }]}
                 onPress={() => setDarkStage((v) => !v)}
               >
-                <MaterialIcons
+                <ProtoUiIcon
                   name={darkStage ? 'dark-mode' : 'light-mode'}
                   size={13}
                   color={stageInk}
@@ -184,7 +184,7 @@ export const MascotStudioModal: React.FC<MascotStudioModalProps> = ({
 
           <View style={styles.rigWrap}>
             <MascotVectorRig
-              size={136}
+              size={152}
               skin={skin}
               state="idle"
               animated={true}
@@ -202,7 +202,7 @@ export const MascotStudioModal: React.FC<MascotStudioModalProps> = ({
           </TouchableOpacity>
         </View>
 
-        <Text style={[styles.label, { color: colors.muted }]}>NOME DO BOT</Text>
+        <Text style={[styles.label, { color: colors.muted }]}>Nome do bot</Text>
         <TextInput
           value={title}
           onChangeText={setTitle}
@@ -210,11 +210,11 @@ export const MascotStudioModal: React.FC<MascotStudioModalProps> = ({
           placeholderTextColor={colors.muted}
           style={[
             styles.input,
-            { backgroundColor: colors.surf, color: colors.ink, borderColor: colors.line },
+            { backgroundColor: colors.surf, color: colors.ink, borderColor: colors.hairline },
           ]}
         />
 
-        <Text style={[styles.label, { color: colors.muted }]}>FUNÇÃO (1 FRASE)</Text>
+        <Text style={[styles.label, { color: colors.muted }]}>Função (1 frase)</Text>
         <TextInput
           value={goal}
           onChangeText={setGoal}
@@ -224,11 +224,11 @@ export const MascotStudioModal: React.FC<MascotStudioModalProps> = ({
           style={[
             styles.input,
             styles.inputMulti,
-            { backgroundColor: colors.surf, color: colors.ink, borderColor: colors.line },
+            { backgroundColor: colors.surf, color: colors.ink, borderColor: colors.hairline },
           ]}
         />
 
-        <Text style={[styles.label, { color: colors.muted }]}>PRESETS DE CORES (10)</Text>
+        <Text style={[styles.label, { color: colors.muted }]}>Presets de cores</Text>
         <View style={styles.presetsGrid}>
           {MASCOT_PRESETS.map((preset) => {
             const selected = skin.preset === preset.id;
@@ -283,7 +283,7 @@ export const MascotStudioModal: React.FC<MascotStudioModalProps> = ({
           })}
         </View>
 
-        <Text style={[styles.label, { color: colors.muted }]}>CORES GERAIS, CHAPÉU E GRAVATA</Text>
+        <Text style={[styles.label, { color: colors.muted }]}>Cores gerais, chapéu e gravata</Text>
         <View style={styles.fieldsWrap}>
           {PICKER_FIELDS.map((f) => {
             const selected = activeField === f.key;
@@ -295,14 +295,15 @@ export const MascotStudioModal: React.FC<MascotStudioModalProps> = ({
                   styles.fieldChip,
                   {
                     backgroundColor: selected ? colors.ink : colors.surf,
-                    borderColor: selected ? colors.ink : colors.line,
+                    borderColor: selected ? colors.ink : colors.hairline,
                   },
                 ]}
                 onPress={() => setActiveField(f.key)}
               >
                 <View style={[styles.colorDot, { backgroundColor: currentHex }]} />
                 <Text style={[styles.fieldChipText, { color: selected ? colors.bg : colors.ink }]}>
-                  {f.label} · {currentHex.toUpperCase()}
+                  {f.label}{' '}
+                  <Text style={styles.hexMono}>{currentHex.toUpperCase()}</Text>
                 </Text>
               </TouchableOpacity>
             );
@@ -329,7 +330,7 @@ export const MascotStudioModal: React.FC<MascotStudioModalProps> = ({
                 }}
               >
                 {isCurrent && (
-                  <MaterialIcons
+                  <ProtoUiIcon
                     name="check"
                     size={14}
                     color={hex === '#FFFFFF' || hex === '#F5F5F5' ? '#0A0A0A' : '#FFFFFF'}
@@ -364,9 +365,9 @@ export const MascotStudioModal: React.FC<MascotStudioModalProps> = ({
 const styles = StyleSheet.create({
   scroll: { maxHeight: 540 },
   stageBox: {
-    borderRadius: 24,
+    borderRadius: 26,
     borderWidth: 1,
-    padding: 14,
+    padding: 16,
     marginBottom: 14,
     alignItems: 'center',
   },
@@ -394,8 +395,9 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   reactBtnText: { fontSize: 12, fontWeight: '600' },
-  label: { fontSize: 11, fontWeight: '700', letterSpacing: 0.7, marginBottom: 6 },
+  label: { fontFamily: 'Geist_500Medium', fontSize: 13, fontWeight: '500', marginBottom: 6 },
   input: {
+    fontFamily: 'Geist',
     borderRadius: 14,
     borderWidth: 1,
     paddingHorizontal: 12,
@@ -413,8 +415,8 @@ const styles = StyleSheet.create({
   presetBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 8,
-    borderRadius: 16,
+    padding: 10,
+    borderRadius: 18,
     borderWidth: 1,
     width: '48.5%',
     gap: 8,
@@ -422,13 +424,13 @@ const styles = StyleSheet.create({
   swatchThumb: {
     width: 34,
     height: 34,
-    borderRadius: 10,
+    borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
   },
   presetMeta: { flex: 1, minWidth: 0 },
-  presetName: { fontSize: 12, fontWeight: '700' },
-  presetTag: { fontSize: 10, marginTop: 1 },
+  presetName: { fontFamily: 'Geist_500Medium', fontSize: 13, fontWeight: '500' },
+  presetTag: { fontFamily: 'Geist', fontSize: 11, marginTop: 1 },
   fieldsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 },
   fieldChip: {
     flexDirection: 'row',
@@ -446,7 +448,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(0,0,0,0.18)',
   },
-  fieldChipText: { fontSize: 11, fontWeight: '600' },
+  fieldChipText: { fontFamily: 'Geist_500Medium', fontSize: 12, fontWeight: '500' },
+  hexMono: { fontFamily: 'Geist Mono', fontSize: 11 },
   swatchesRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 18 },
   swatch: {
     width: 32,

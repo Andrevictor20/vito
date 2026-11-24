@@ -92,7 +92,7 @@ const styles = StyleSheet.create({
   item: {
     height: LINE,
     lineHeight: LINE,
-    fontFamily: 'Inter_700Bold',
+    fontFamily: 'Geist_700Bold',
     fontSize: FONT,
     letterSpacing: -0.945,
   },

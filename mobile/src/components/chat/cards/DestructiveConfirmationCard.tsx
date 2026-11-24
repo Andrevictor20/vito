@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { StyleSheet, View, Text } from 'react-native';
+import { ProtoUiIcon } from '../../../icons/ProtoUiIcons';
 import { useTheme } from '../../../context/ThemeContext';
 import { DestructiveConfirmation } from '../../../types';
+import { PressableScale } from '../../../theme/vitoMotion';
 
 interface DestructiveConfirmationCardProps {
   confirmation: DestructiveConfirmation;
@@ -20,14 +21,9 @@ export const DestructiveConfirmationCard: React.FC<DestructiveConfirmationCardPr
 
   if (resolved === 'cancelled') {
     return (
-      <View
-        style={[
-          styles.resolvedBox,
-          { backgroundColor: colors.surfaceContainerHigh, borderColor: colors.outlineVariant },
-        ]}
-      >
-        <MaterialIcons name="shield" size={16} color={colors.primary} />
-        <Text style={[styles.resolvedText, { color: colors.onSurfaceVariant }]}>
+      <View style={[styles.resolvedBox, { backgroundColor: colors.surf }]}>
+        <ProtoUiIcon name="shield" size={16} color={colors.blue} />
+        <Text style={[styles.resolvedText, { color: colors.muted }]}>
           Exclusão cancelada — compromissos mantidos na agenda.
         </Text>
       </View>
@@ -36,14 +32,9 @@ export const DestructiveConfirmationCard: React.FC<DestructiveConfirmationCardPr
 
   if (resolved === 'confirmed') {
     return (
-      <View
-        style={[
-          styles.resolvedBox,
-          { backgroundColor: colors.danger + '14', borderColor: colors.danger + '40' },
-        ]}
-      >
-        <MaterialIcons name="check-circle" size={16} color={colors.danger} />
-        <Text style={[styles.resolvedText, { color: colors.danger }]}>
+      <View style={[styles.resolvedBox, { backgroundColor: colors.redBg }]}>
+        <ProtoUiIcon name="check-circle" size={16} color={colors.red} />
+        <Text style={[styles.resolvedText, { color: colors.red }]}>
           Confirmação enviada para exclusão de &ldquo;{confirmation.target_title}&rdquo;.
         </Text>
       </View>
@@ -51,24 +42,16 @@ export const DestructiveConfirmationCard: React.FC<DestructiveConfirmationCardPr
   }
 
   return (
-    <View
-      style={[
-        styles.card,
-        {
-          backgroundColor: colors.danger + '10',
-          borderColor: colors.danger + '45',
-        },
-      ]}
-    >
+    <View style={[styles.card, { backgroundColor: colors.redBg }]}>
       <View style={styles.headerRow}>
-        <View style={[styles.iconBadge, { backgroundColor: colors.danger + '20' }]}>
-          <MaterialIcons name="warning-amber" size={18} color={colors.danger} />
+        <View style={[styles.iconBadge, { backgroundColor: colors.bg }]}>
+          <ProtoUiIcon name="warning-amber" size={20} color={colors.red} />
         </View>
         <View style={styles.headerTextCol}>
-          <Text style={[styles.title, { color: colors.onSurface }]}>
+          <Text style={[styles.title, { color: colors.ink }]}>
             Confirmação Humana Obrigatória
           </Text>
-          <Text style={[styles.subtitle, { color: colors.onSurfaceVariant }]}>
+          <Text style={[styles.subtitle, { color: colors.muted }]}>
             {confirmation.impact_count} compromissos correspondem a &ldquo;
             {confirmation.target_title}&rdquo;
           </Text>
@@ -76,21 +59,18 @@ export const DestructiveConfirmationCard: React.FC<DestructiveConfirmationCardPr
       </View>
 
       <View style={styles.actionsRow}>
-        <TouchableOpacity
-          style={[
-            styles.keepBtn,
-            { backgroundColor: colors.surfaceContainerHigh, borderColor: colors.outlineVariant },
-          ]}
+        <PressableScale
+          style={[styles.keepBtn, { backgroundColor: colors.bg }]}
           onPress={() => setResolved('cancelled')}
           disabled={disabled}
           accessibilityRole="button"
           accessibilityLabel="Manter compromissos na agenda"
         >
-          <Text style={[styles.keepBtnText, { color: colors.onSurface }]}>Manter na Agenda</Text>
-        </TouchableOpacity>
+          <Text style={[styles.keepBtnText, { color: colors.ink }]}>Manter na Agenda</Text>
+        </PressableScale>
 
-        <TouchableOpacity
-          style={[styles.confirmBtn, { backgroundColor: colors.danger }]}
+        <PressableScale
+          style={[styles.confirmBtn, { backgroundColor: colors.red }]}
           onPress={() => {
             setResolved('confirmed');
             onConfirm?.(confirmation.confirm_prompt);
@@ -99,9 +79,9 @@ export const DestructiveConfirmationCard: React.FC<DestructiveConfirmationCardPr
           accessibilityRole="button"
           accessibilityLabel="Confirmar exclusão em lote"
         >
-          <MaterialIcons name="delete-forever" size={16} color="#FFFFFF" />
+          <ProtoUiIcon name="delete-forever" size={16} color="#FFFFFF" />
           <Text style={styles.confirmBtnText}>Confirmar Exclusão</Text>
-        </TouchableOpacity>
+        </PressableScale>
       </View>
     </View>
   );
@@ -109,21 +89,21 @@ export const DestructiveConfirmationCard: React.FC<DestructiveConfirmationCardPr
 
 const styles = StyleSheet.create({
   card: {
-    marginTop: 10,
-    padding: 12,
-    borderRadius: 14,
-    borderWidth: 1,
-    gap: 10,
+    marginTop: 8,
+    padding: 14,
+    borderRadius: 22,
+    borderWidth: 0,
+    gap: 12,
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
   },
   iconBadge: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -132,12 +112,14 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   title: {
-    fontSize: 13,
-    fontWeight: '700',
+    fontFamily: 'Geist_500Medium',
+    fontSize: 14.5,
+    fontWeight: '500',
   },
   subtitle: {
-    fontSize: 12,
-    lineHeight: 16,
+    fontFamily: 'Geist',
+    fontSize: 12.5,
+    lineHeight: 17,
   },
   actionsRow: {
     flexDirection: 'row',
@@ -146,41 +128,47 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   keepBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
-    borderWidth: 1,
+    paddingHorizontal: 14,
+    height: 36,
+    borderRadius: 999,
+    borderWidth: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   keepBtnText: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontFamily: 'Geist_500Medium',
+    fontSize: 13,
+    fontWeight: '500',
   },
   confirmBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
+    justifyContent: 'center',
+    gap: 5,
+    paddingHorizontal: 14,
+    height: 36,
+    borderRadius: 999,
   },
   confirmBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
+    fontFamily: 'Geist_500Medium',
+    fontSize: 13,
+    fontWeight: '500',
     color: '#FFFFFF',
   },
   resolvedBox: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginTop: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
-    borderWidth: 1,
+    marginTop: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 18,
+    borderWidth: 0,
   },
   resolvedText: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontFamily: 'Geist_500Medium',
+    fontSize: 12.5,
+    fontWeight: '500',
     flex: 1,
   },
 });

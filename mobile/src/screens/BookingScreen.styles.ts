@@ -31,6 +31,7 @@ export const bookingStyles = StyleSheet.create({
     elevation: 2,
   },
   segmentTabText: {
+    fontFamily: 'Geist_500Medium',
     fontSize: 13.5,
   },
   badge: {

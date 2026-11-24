@@ -7,7 +7,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon, type ProtoUiIconName } from '../icons/ProtoUiIcons';
+import { BrandLogo } from '../icons/IconRegistry';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
 import { hapticFeedback } from '../theme/motion';
@@ -24,7 +25,7 @@ interface IntegrationItem {
   name: string;
   desc: string;
   category: 'Agenda' | 'E-mail' | 'Mensagens' | 'Mapas' | 'Projetos' | 'Arquivos';
-  icon: keyof typeof MaterialIcons.glyphMap;
+  icon: ProtoUiIconName;
   color: string;
   connected: boolean;
   comingSoon?: boolean;
@@ -216,7 +217,7 @@ export const IntegrationsScreen: React.FC = () => {
           onPress={() => navigation.goBack()}
           accessibilityLabel="Voltar"
         >
-          <MaterialIcons name="arrow-back" size={20} color={colors.ink} />
+          <ProtoUiIcon name="arrow-back" size={20} color={colors.ink} />
         </TouchableOpacity>
         <View style={styles.ttl}>
           <Text style={[styles.h1, { color: colors.ink }]}>Integrações</Text>
@@ -229,13 +230,13 @@ export const IntegrationsScreen: React.FC = () => {
           onPress={() => setSuggestOpen(true)}
           accessibilityLabel="Sugerir um app"
         >
-          <MaterialIcons name="add" size={22} color={colors.bg} />
+          <ProtoUiIcon name="add" size={22} color={colors.bg} />
         </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={[styles.searchBox, { backgroundColor: colors.surf, borderColor: colors.line }]}>
-          <MaterialIcons name="search" size={18} color={colors.muted} />
+          <ProtoUiIcon name="search" size={18} color={colors.muted} />
           <TextInput
             style={[styles.searchInput, { color: colors.ink }]}
             value={query}
@@ -301,7 +302,11 @@ export const IntegrationsScreen: React.FC = () => {
                       }}
                     >
                       <View style={[styles.appIcon, { backgroundColor: colors.bg }]}>
-                        <MaterialIcons name={it.icon} size={20} color={it.color} />
+                        {['gcal', 'gmail', 'wa', 'maps', 'trello', 'telegram', 'gdrive', 'notion', 'slack', 'outlook'].includes(it.id) ? (
+                          <BrandLogo group="app" id={it.id} size={22} color={it.color} />
+                        ) : (
+                          <ProtoUiIcon name={it.icon} size={20} color={it.color} />
+                        )}
                       </View>
                       <View style={styles.rowText}>
                         <Text style={[styles.rowTitle, { color: colors.ink }]}>{it.name}</Text>

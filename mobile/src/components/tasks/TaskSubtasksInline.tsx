@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { StyleSheet, View, Text, TextInput, TouchableOpacity } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { tokens } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { hapticFeedback } from '../../theme/motion';
@@ -50,7 +50,7 @@ export const TaskSubtasksInline: React.FC<TaskSubtasksInlineProps> = ({
             accessibilityState={{ checked: s.completed }}
             accessibilityLabel={s.completed ? 'Reabrir subtarefa' : 'Concluir subtarefa'}
           >
-            {s.completed && <MaterialIcons name="check" size={10} color="#ffffff" />}
+            {s.completed && <ProtoUiIcon name="check" size={10} color="#ffffff" />}
           </TouchableOpacity>
 
           <Text
@@ -73,7 +73,7 @@ export const TaskSubtasksInline: React.FC<TaskSubtasksInlineProps> = ({
             accessibilityRole="button"
             accessibilityLabel="Excluir subtarefa"
           >
-            <MaterialIcons name="close" size={14} color={colors.muted} />
+            <ProtoUiIcon name="close" size={14} color={colors.muted} />
           </TouchableOpacity>
         </View>
       ))}
@@ -99,7 +99,7 @@ export const TaskSubtasksInline: React.FC<TaskSubtasksInlineProps> = ({
             accessibilityRole="button"
             accessibilityLabel="Adicionar subtarefa"
           >
-            <MaterialIcons name="add" size={18} color={colors.ink} />
+            <ProtoUiIcon name="add" size={18} color={colors.ink} />
           </TouchableOpacity>
         </View>
       )}

@@ -12,7 +12,7 @@ import {
   notifyAssistantResult,
   handleAssistantSideEffects,
 } from './chatMessageEffects';
-import { runAssistantStreamTurn } from './chatStreamRunner';
+import { formatHistoryForStream, runAssistantStreamTurn } from './chatStreamRunner';
 
 export {
   toChatMeeting,
@@ -41,6 +41,7 @@ export interface UseChatMessagesResult {
   appendAssistantMessage: (text: string) => void;
   editAndResendMessage: (messageId: string, newText: string, focusMode?: string) => Promise<void>;
   stopGeneration: () => void;
+  resolveConfirmation: (messageId: string, pendingId: string, reject: boolean) => Promise<void>;
   sendAudio: (audioUri: string, focusMode?: string) => Promise<void>;
   sendImage: (imageUri: string, prompt?: string, base64Override?: string, mimeType?: string) => Promise<void>;
   clearHistory: () => Promise<void>;
@@ -306,10 +307,7 @@ export function useChatMessages(
       setLoading(true);
 
       try {
-        const recentHistory = messages.slice(-12).map((m) => ({
-          sender: m.sender === 'user' ? ('user' as const) : ('vito' as const),
-          text: m.text,
-        }));
+        const recentHistory = formatHistoryForStream(messages);
         const res = await api.assistantAudio(audioUri, 'audio.m4a', {
           thread_id: activeRef.current || activeSessionId,
           channel: 'app_mobile',
@@ -446,6 +444,33 @@ export function useChatMessages(
     [saveMessages]
   );
 
+  const resolveConfirmation = useCallback(
+    async (messageId: string, pendingId: string, reject: boolean) => {
+      if (!pendingId) return;
+      const res = await api.assistantConfirm(pendingId, {
+        reject,
+        threadId: activeRef.current || activeSessionId,
+      });
+      const vitoMsg = buildAssistantMessage(
+        'vito-confirm',
+        res,
+        reject ? 'Ação cancelada.' : 'Ação concluída com sucesso.'
+      );
+      setMessages((prev) => {
+        const updated = prev.map((m) =>
+          m.id === messageId
+            ? { ...m, confirmationStatus: (reject ? 'cancelled' : 'confirmed') as const }
+            : m
+        );
+        const nextList = [...updated, vitoMsg];
+        saveMessages(nextList);
+        return nextList;
+      });
+      handleAssistantSideEffects(res, onDataChanged);
+    },
+    [activeSessionId, onDataChanged, saveMessages]
+  );
+
   return {
     messages,
     setMessages,
@@ -457,6 +482,7 @@ export function useChatMessages(
     appendAssistantMessage,
     editAndResendMessage,
     stopGeneration,
+    resolveConfirmation,
     sendAudio,
     sendImage,
     clearHistory,

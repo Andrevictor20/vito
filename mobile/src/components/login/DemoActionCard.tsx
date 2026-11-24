@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react'
 import {
   Animated,
+  Platform,
   StyleSheet,
   View,
   Text,
@@ -239,11 +240,15 @@ const styles = StyleSheet.create({
     gap: 12,
     marginTop: 9,
     width: '100%',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.06,
-    shadowRadius: 20,
-    elevation: 2,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000000',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.06,
+        shadowRadius: 20,
+      },
+      default: {},
+    }),
   } as ViewStyle,
   cardCol: {
     flexDirection: 'column',
@@ -252,7 +257,7 @@ const styles = StyleSheet.create({
   } as ViewStyle,
   colHeader: {
     fontSize: 12.5,
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Geist_600SemiBold',
   } as TextStyle,
   waBubble: {
     borderRadius: 12,
@@ -263,12 +268,12 @@ const styles = StyleSheet.create({
   } as ViewStyle,
   bubbleTitle: {
     fontSize: 13,
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Geist_600SemiBold',
     marginBottom: 2,
   } as TextStyle,
   bubbleText: {
     fontSize: 13.5,
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'Geist_400Regular',
     lineHeight: 19,
   } as TextStyle,
   chip: {
@@ -284,13 +289,13 @@ const styles = StyleSheet.create({
     minWidth: 0,
   } as ViewStyle,
   title: {
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Geist_600SemiBold',
     fontSize: 14,
     lineHeight: 19,
     letterSpacing: -0.14,
   } as TextStyle,
   subtitle: {
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'Geist_400Regular',
     fontSize: 12.5,
     marginTop: 2,
   } as TextStyle,
@@ -300,7 +305,7 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   } as ViewStyle,
   trailingValue: {
-    fontFamily: 'Inter_700Bold',
+    fontFamily: 'Geist_700Bold',
     fontSize: 14,
     fontVariant: ['tabular-nums'],
   } as TextStyle,
@@ -311,7 +316,7 @@ const styles = StyleSheet.create({
   } as ViewStyle,
   statusText: {
     fontSize: 11.5,
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Geist_600SemiBold',
   } as TextStyle,
   tag: {
     paddingHorizontal: 9,
@@ -322,6 +327,6 @@ const styles = StyleSheet.create({
   } as ViewStyle,
   tagText: {
     fontSize: 11.5,
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Geist_600SemiBold',
   } as TextStyle,
 })

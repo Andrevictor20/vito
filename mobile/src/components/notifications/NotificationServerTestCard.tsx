@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { tokens, MD3Shapes } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { api } from '../../services/api';
@@ -91,7 +91,7 @@ export const NotificationServerTestCard: React.FC<NotificationServerTestCardProp
     <View style={[styles.container, { backgroundColor: colors.surfaceContainerHigh, borderColor: colors.outlineVariant }]}>
       <View style={styles.headerRow}>
         <View style={styles.headerLeft}>
-          <MaterialIcons
+          <ProtoUiIcon
             name={isConnected ? 'cloud-done' : 'cloud-off'}
             size={20}
             color={isConnected ? '#10B981' : '#F59E0B'}
@@ -118,7 +118,7 @@ export const NotificationServerTestCard: React.FC<NotificationServerTestCardProp
             <ActivityIndicator size="small" color={colors.primary} />
           ) : (
             <>
-              <MaterialIcons name="sync" size={16} color={colors.primary} />
+              <ProtoUiIcon name="sync" size={16} color={colors.primary} />
               <Text style={[styles.btnTextSecondary, { color: colors.onSurface }]}>Sincronizar</Text>
             </>
           )}
@@ -134,7 +134,7 @@ export const NotificationServerTestCard: React.FC<NotificationServerTestCardProp
             <ActivityIndicator size="small" color={colors.onPrimary} />
           ) : (
             <>
-              <MaterialIcons name="send" size={16} color={colors.onPrimary} />
+              <ProtoUiIcon name="send" size={16} color={colors.onPrimary} />
               <Text style={[styles.btnTextPrimary, { color: colors.onPrimary }]}>Testar Push</Text>
             </>
           )}

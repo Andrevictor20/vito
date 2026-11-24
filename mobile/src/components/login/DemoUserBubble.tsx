@@ -187,7 +187,7 @@ const styles = StyleSheet.create({
     position: 'relative',
   } as ViewStyle,
   ghostText: {
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'Geist_400Regular',
     fontSize: 15,
     lineHeight: 20.25,
     opacity: 0,
@@ -200,12 +200,12 @@ const styles = StyleSheet.create({
     bottom: 0,
   } as ViewStyle,
   bubbleText: {
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'Geist_400Regular',
     fontSize: 15,
     lineHeight: 20.25,
   } as TextStyle,
   caret: {
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Geist_600SemiBold',
     fontSize: 15,
   } as TextStyle,
 })

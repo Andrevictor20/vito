@@ -10,7 +10,7 @@ import {
   type TextStyle,
   type ViewStyle,
 } from 'react-native'
-import { MaterialIcons } from '@expo/vector-icons'
+import { CloseSvgIcon } from '../../icons/ChatProtoIcons'
 import { useTheme } from '../../context/ThemeContext'
 import { loginPalette } from './loginPalette'
 import { LEGAL_DOCS, type LegalDocKind } from './legalDocs'
@@ -58,7 +58,7 @@ export const LegalDocModal: React.FC<LegalDocModalProps> = ({ doc, onClose }) =>
               accessibilityLabel="Fechar"
               style={[styles.closeBtn, { backgroundColor: palette.btn }]}
             >
-              <MaterialIcons name="close" size={18} color={palette.ink} />
+              <CloseSvgIcon size={18} color={palette.ink} />
             </TouchableOpacity>
           </View>
 
@@ -127,12 +127,12 @@ const styles = StyleSheet.create({
     flex: 1,
   } as ViewStyle,
   title: {
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Geist_600SemiBold',
     fontSize: 22,
     letterSpacing: -0.44,
   } as TextStyle,
   subtitle: {
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'Geist_400Regular',
     fontSize: 13.5,
     marginTop: 2,
   } as TextStyle,
@@ -150,12 +150,12 @@ const styles = StyleSheet.create({
     marginTop: 14,
   } as ViewStyle,
   secHeading: {
-    fontFamily: 'Inter_500Medium',
+    fontFamily: 'Geist_500Medium',
     fontSize: 15,
     marginBottom: 4,
   } as TextStyle,
   secBody: {
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'Geist_400Regular',
     fontSize: 13.5,
     lineHeight: 20,
   } as TextStyle,
@@ -166,7 +166,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   } as ViewStyle,
   doneText: {
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Geist_600SemiBold',
     fontSize: 14,
   } as TextStyle,
 })

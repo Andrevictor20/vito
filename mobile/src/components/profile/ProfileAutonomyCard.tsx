@@ -41,7 +41,7 @@ export const ProfileAutonomyCard: React.FC<ProfileAutonomyCardProps> = ({
   return (
     <View style={[styles.aut, { backgroundColor: colors.bg, borderColor: colors.line }]}>
       {/* Segmented Control 3 níveis (.seg) */}
-      <View style={[styles.seg, { backgroundColor: colors.surf }]}>
+      <View style={[styles.seg, { backgroundColor: colors.surf, borderColor: colors.line }]}>
         {AUTONOMY_LEVELS.map((lvl) => {
           const isActive = lvl.id === mode;
 
@@ -50,7 +50,7 @@ export const ProfileAutonomyCard: React.FC<ProfileAutonomyCardProps> = ({
               key={lvl.id}
               style={[
                 styles.segBtn,
-                isActive && [styles.segBtnActive, { backgroundColor: colors.ink }],
+                isActive && { backgroundColor: colors.ink },
               ]}
               onPress={() => {
                 hapticFeedback.selection();
@@ -62,7 +62,7 @@ export const ProfileAutonomyCard: React.FC<ProfileAutonomyCardProps> = ({
               <Text
                 style={[
                   styles.segBtnText,
-                  { color: isActive ? colors.bg : colors.ink },
+                  { color: isActive ? colors.bg : colors.muted },
                   isActive && styles.segBtnTextActive,
                 ]}
               >
@@ -91,30 +91,24 @@ const styles = StyleSheet.create({
   },
   seg: {
     flexDirection: 'row',
-    borderRadius: 12,
-    padding: 3,
+    borderRadius: 999,
+    borderWidth: 1,
+    padding: 4,
+    gap: 4,
   },
   segBtn: {
     flex: 1,
-    height: 34,
+    height: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 10,
-  },
-  segBtnActive: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    borderRadius: 999,
   },
   segBtnText: {
     fontSize: 13,
-    fontWeight: '500',
-    fontFamily: tokens.typography.family.medium,
+    fontFamily: 'Geist_500Medium',
   },
   segBtnTextActive: {
-    fontWeight: '700',
+    fontFamily: 'Geist_600SemiBold',
   },
   desc: {
     fontSize: 13.5,

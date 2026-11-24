@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, Share } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { tokens } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { copyToClipboard } from '../../utils/clipboard';
@@ -72,7 +72,7 @@ export const ChatMessageActionBar: React.FC<ChatMessageActionBarProps> = ({
           accessibilityLabel="Copiar mensagem"
           disabled={disabled}
         >
-          <MaterialIcons
+          <ProtoUiIcon
             name={copied ? 'check' : 'content-copy'}
             size={15}
             color={copied ? '#10B981' : iconColor}
@@ -95,7 +95,7 @@ export const ChatMessageActionBar: React.FC<ChatMessageActionBarProps> = ({
             accessibilityLabel="Ouvir resposta em áudio"
             disabled={disabled}
           >
-            <MaterialIcons
+            <ProtoUiIcon
               name={isPlayingAudio ? 'volume-up' : 'volume-mute'}
               size={16}
               color={isPlayingAudio ? activeColor : iconColor}
@@ -112,7 +112,7 @@ export const ChatMessageActionBar: React.FC<ChatMessageActionBarProps> = ({
           accessibilityLabel="Gostei da resposta"
           disabled={disabled}
         >
-          <MaterialIcons
+          <ProtoUiIcon
             name={feedback === 'like' ? 'thumb-up' : 'thumb-up-off-alt'}
             size={15}
             color={feedback === 'like' ? activeColor : iconColor}
@@ -128,7 +128,7 @@ export const ChatMessageActionBar: React.FC<ChatMessageActionBarProps> = ({
           accessibilityLabel="Não gostei da resposta"
           disabled={disabled}
         >
-          <MaterialIcons
+          <ProtoUiIcon
             name={feedback === 'dislike' ? 'thumb-down' : 'thumb-down-off-alt'}
             size={15}
             color={feedback === 'dislike' ? '#EF4444' : iconColor}
@@ -144,7 +144,7 @@ export const ChatMessageActionBar: React.FC<ChatMessageActionBarProps> = ({
           accessibilityLabel="Compartilhar resposta"
           disabled={disabled}
         >
-          <MaterialIcons name="share" size={15} color={iconColor} />
+          <ProtoUiIcon name="share" size={15} color={iconColor} />
         </TouchableOpacity>
       </View>
 

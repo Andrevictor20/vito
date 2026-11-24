@@ -2,9 +2,14 @@ import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { tokens, tabularNumbers } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
+import {
+  AnimatedProgressBar,
+  AnimatedSegmentedBar,
+  CountUpText,
+  StaggerItem,
+} from '../../theme/vitoMotion';
 import { getBankBrand } from '../../utils/bankBrands';
 import {
-  buildFinScale,
   buildMonthlyFlowSeries,
   computeCreditCardStats,
   formatBRL,
@@ -12,6 +17,11 @@ import {
   isCreditTransaction,
   maskBRL,
 } from './financeHelpers';
+import {
+  CategorySemanticBadge,
+  FinanceBankBadge,
+  resolveCategoryVisual,
+} from './FinanceSemanticIcons';
 import { FinanceGroupedFlowChart } from './FinanceSubScreenCharts';
 import type { SubViewCommonProps } from './FinanceSubScreenViews';
 import { subScreenStyles as styles } from './financeSubScreenStyles';
@@ -30,62 +40,80 @@ export const CashFlowSubView: React.FC<SubViewCommonProps> = ({
 
   return (
     <View>
-      <View style={[styles.card2, { backgroundColor: colors.bg, borderColor: colors.line }]}>
+      <StaggerItem index={0} style={[styles.card2, { backgroundColor: colors.surf, borderColor: colors.hairline }]}>
         <Text style={[styles.eyebrow, { color: colors.muted }]}>SOBRA NO MÊS</Text>
-        <Text
+        <CountUpText
+          value={leftover}
+          decimals={2}
+          prefix="R$ "
+          signed
+          privacyHidden={isPrivacyHidden}
           style={[
             styles.bigValue,
             tabularNumbers,
             { color: leftover >= 0 ? colors.acc : colors.red },
           ]}
-        >
-          {isPrivacyHidden
-            ? 'R$ ••••'
-            : `${leftover >= 0 ? '+' : '−'}${formatBRL(leftover)}`}
-        </Text>
+        />
 
         <View style={[localStyles.f3Row, { borderTopColor: colors.line }]}>
           <View style={localStyles.f3Col}>
-            <Text style={[localStyles.f3Val, tabularNumbers, { color: colors.acc }]}>
-              {maskBRL(isPrivacyHidden, formatBRL(income, 0))}
-            </Text>
+            <CountUpText
+              value={income}
+              decimals={0}
+              prefix="R$ "
+              delayMs={180}
+              privacyHidden={isPrivacyHidden}
+              style={[localStyles.f3Val, tabularNumbers, { color: colors.acc }]}
+            />
             <Text style={[localStyles.f3Lbl, { color: colors.muted }]}>Entradas</Text>
           </View>
           <View style={localStyles.f3Col}>
-            <Text style={[localStyles.f3Val, tabularNumbers, { color: colors.red }]}>
-              {maskBRL(isPrivacyHidden, formatBRL(expenses, 0))}
-            </Text>
+            <CountUpText
+              value={expenses}
+              decimals={0}
+              prefix="R$ "
+              delayMs={220}
+              privacyHidden={isPrivacyHidden}
+              style={[localStyles.f3Val, tabularNumbers, { color: colors.red }]}
+            />
             <Text style={[localStyles.f3Lbl, { color: colors.muted }]}>Saídas</Text>
           </View>
           <View style={localStyles.f3Col}>
-            <Text style={[localStyles.f3Val, tabularNumbers, { color: colors.ink }]}>
-              {isPrivacyHidden ? '••%' : `${savingsRate}%`}
-            </Text>
+            <CountUpText
+              value={savingsRate}
+              suffix="%"
+              delayMs={260}
+              privacyHidden={isPrivacyHidden}
+              maskedText="••%"
+              style={[localStyles.f3Val, tabularNumbers, { color: colors.ink }]}
+            />
             <Text style={[localStyles.f3Lbl, { color: colors.muted }]}>Taxa de poupança</Text>
           </View>
         </View>
-      </View>
+      </StaggerItem>
 
-      <View style={styles.secHeader}>
-        <Text style={[styles.secTitle, { color: colors.ink }]}>Histórico mensal</Text>
-      </View>
-      <View style={[styles.card2, { backgroundColor: colors.bg, borderColor: colors.line }]}>
-        <FinanceGroupedFlowChart
-          income={monthlySeries.income}
-          expenses={monthlySeries.expenses}
-          labels={monthlySeries.labels}
-        />
-        <View style={localStyles.flowLegendRow}>
-          <View style={localStyles.flowLegendItem}>
-            <View style={[localStyles.smallDot, { backgroundColor: colors.acc }]} />
-            <Text style={[styles.rowMeta, { color: colors.muted }]}>Entradas</Text>
-          </View>
-          <View style={localStyles.flowLegendItem}>
-            <View style={[localStyles.smallDot, { backgroundColor: colors.red }]} />
-            <Text style={[styles.rowMeta, { color: colors.muted }]}>Saídas</Text>
+      <StaggerItem index={1}>
+        <View style={styles.secHeader}>
+          <Text style={[styles.secTitle, { color: colors.ink }]}>Histórico mensal</Text>
+        </View>
+        <View style={[styles.card2, { backgroundColor: colors.surf, borderColor: colors.hairline }]}>
+          <FinanceGroupedFlowChart
+            income={monthlySeries.income}
+            expenses={monthlySeries.expenses}
+            labels={monthlySeries.labels}
+          />
+          <View style={localStyles.flowLegendRow}>
+            <View style={localStyles.flowLegendItem}>
+              <View style={[localStyles.smallDot, { backgroundColor: colors.acc }]} />
+              <Text style={[styles.rowMeta, { color: colors.muted }]}>Entradas</Text>
+            </View>
+            <View style={localStyles.flowLegendItem}>
+              <View style={[localStyles.smallDot, { backgroundColor: colors.red }]} />
+              <Text style={[styles.rowMeta, { color: colors.muted }]}>Saídas</Text>
+            </View>
           </View>
         </View>
-      </View>
+      </StaggerItem>
     </View>
   );
 };
@@ -97,14 +125,13 @@ export const CardsSubView: React.FC<SubViewCommonProps> = ({
   isPrivacyHidden,
   onAskVito,
 }) => {
-  const { colors } = useTheme();
-  const finScale = buildFinScale(colors.fin);
+  const { colors, isDark } = useTheme();
   const stats = computeCreditCardStats(accounts, summary);
   const primary = stats.creditAccounts[0];
 
   if (stats.creditAccounts.length === 0) {
     return (
-      <View style={[styles.card2, { backgroundColor: colors.bg, borderColor: colors.line }]}>
+      <View style={[styles.card2, { backgroundColor: colors.surf, borderColor: colors.hairline }]}>
         <Text style={[styles.rowTitle, { color: colors.ink }]}>Nenhum cartão de crédito conectado</Text>
         <Text style={[styles.rowMeta, { color: colors.muted, marginTop: 6 }]}>
           Conecte uma conta com cartão de crédito via Open Finance para acompanhar faturas e limite.
@@ -127,21 +154,25 @@ export const CardsSubView: React.FC<SubViewCommonProps> = ({
 
   return (
     <View>
-      <View style={[styles.card2, { backgroundColor: colors.bg, borderColor: colors.line }]}>
+      <StaggerItem index={0} style={[styles.card2, { backgroundColor: colors.surf, borderColor: colors.hairline }]}>
         <Text style={[styles.eyebrow, { color: colors.muted }]}>
           FATURA ATUAL · {primary?.name || 'Cartão'}
         </Text>
-        <Text style={[styles.bigValue, tabularNumbers, { color: colors.ink }]}>
-          {maskBRL(isPrivacyHidden, formatBRL(stats.totalBill))}
-        </Text>
-        <View style={[styles.progressTrack, { backgroundColor: colors.line }]}>
-          <View
-            style={[
-              styles.progressFill,
-              { width: `${stats.usedPercent}%`, backgroundColor: colors.fin },
-            ]}
-          />
-        </View>
+        <CountUpText
+          value={stats.totalBill}
+          decimals={2}
+          prefix="R$ "
+          privacyHidden={isPrivacyHidden}
+          style={[styles.bigValue, tabularNumbers, { color: colors.ink }]}
+        />
+        <AnimatedProgressBar
+          pct={isPrivacyHidden ? 0 : stats.usedPercent}
+          color={colors.fin}
+          trackColor={colors.line}
+          height={8}
+          delayMs={240}
+          style={{ marginTop: 12 }}
+        />
         <View style={styles.splitMeta}>
           <Text style={[styles.rowMeta, { color: colors.muted }]}>
             {primary?.closing_day ? `Fecha dia ${primary.closing_day}` : 'Ciclo atual'}
@@ -172,88 +203,86 @@ export const CardsSubView: React.FC<SubViewCommonProps> = ({
             Lembrar de pagar fatura
           </Text>
         </TouchableOpacity>
-      </View>
+      </StaggerItem>
 
-      <View style={styles.secHeader}>
-        <Text style={[styles.secTitle, { color: colors.ink }]}>Limite</Text>
-        <View style={[styles.countPill, { backgroundColor: colors.surf }]}>
-          <Text style={[styles.countText, { color: colors.muted }]}>
-            {stats.creditAccounts.length}{' '}
-            {stats.creditAccounts.length === 1 ? 'cartão' : 'cartões'}
-          </Text>
+      <StaggerItem index={1}>
+        <View style={styles.secHeader}>
+          <Text style={[styles.secTitle, { color: colors.ink }]}>Limite</Text>
+          <View style={[styles.countPill, { backgroundColor: colors.surf }]}>
+            <Text style={[styles.countText, { color: colors.muted }]}>
+              {stats.creditAccounts.length}{' '}
+              {stats.creditAccounts.length === 1 ? 'cartão' : 'cartões'}
+            </Text>
+          </View>
         </View>
-      </View>
-      <View style={[styles.card2, { backgroundColor: colors.bg, borderColor: colors.line }]}>
-        <View style={[styles.splitMeta, { marginTop: 0 }]}>
-          <Text style={[styles.rowTitle, tabularNumbers, { color: colors.ink }]}>
-            {maskBRL(isPrivacyHidden, formatBRL(stats.totalBill))} usados
-          </Text>
-          <Text style={[styles.rowMeta, tabularNumbers, { color: colors.muted }]}>
-            de {maskBRL(isPrivacyHidden, formatBRL(stats.totalLimit, 0))}
-          </Text>
-        </View>
-        <View style={[styles.progressTrack, { backgroundColor: colors.line }]}>
-          <View
-            style={[
-              styles.progressFill,
-              { width: `${stats.usedPercent}%`, backgroundColor: colors.acc },
-            ]}
+        <View style={[styles.card2, { backgroundColor: colors.surf, borderColor: colors.hairline }]}>
+          <View style={[styles.splitMeta, { marginTop: 0 }]}>
+            <Text style={[styles.rowTitle, tabularNumbers, { color: colors.ink }]}>
+              {maskBRL(isPrivacyHidden, formatBRL(stats.totalBill))} usados
+            </Text>
+            <Text style={[styles.rowMeta, tabularNumbers, { color: colors.muted }]}>
+              de {maskBRL(isPrivacyHidden, formatBRL(stats.totalLimit, 0))}
+            </Text>
+          </View>
+          <AnimatedProgressBar
+            pct={isPrivacyHidden ? 0 : stats.usedPercent}
+            color={colors.acc}
+            trackColor={colors.line}
+            height={8}
+            delayMs={320}
+            style={{ marginTop: 12 }}
           />
-        </View>
-        <Text style={[styles.rowMeta, { color: colors.muted, marginTop: 8 }]}>
-          {stats.usedPercent}% do limite · disponível{' '}
-          {maskBRL(isPrivacyHidden, formatBRL(stats.totalAvailable))}
-        </Text>
+          <Text style={[styles.rowMeta, { color: colors.muted, marginTop: 8 }]}>
+            {stats.usedPercent}% do limite · disponível{' '}
+            {maskBRL(isPrivacyHidden, formatBRL(stats.totalAvailable))}
+          </Text>
 
-        <View style={{ marginTop: 10 }}>
-          {stats.creditAccounts.map((card, idx) => {
-            const brand = getBankBrand(card.institution_name);
-            return (
-              <View
-                key={card.id || `card_${idx}`}
-                style={[styles.txRow, { borderTopWidth: 1, borderTopColor: colors.line }]}
-              >
-                <View style={[styles.avatarBig, { backgroundColor: brand.color }]}>
-                  <Text style={[styles.avatarBigText, { color: brand.textColor }]}>
-                    {brand.initials}
+          <View style={{ marginTop: 10 }}>
+            {stats.creditAccounts.map((card, idx) => {
+              const brand = getBankBrand(card.institution_name);
+              return (
+                <View
+                  key={card.id || `card_${idx}`}
+                  style={[styles.txRow, { borderTopWidth: 1, borderTopColor: colors.line }]}
+                >
+                  <FinanceBankBadge institutionName={card.institution_name} size={38} />
+                  <View style={styles.rowBody}>
+                    <Text style={[styles.rowTitle, { color: colors.ink }]} numberOfLines={1}>
+                      {card.name}
+                    </Text>
+                    <Text style={[styles.rowMeta, { color: colors.muted }]}>
+                      {card.due_day ? `Vence dia ${card.due_day}` : brand.name}
+                    </Text>
+                  </View>
+                  <Text style={[styles.rowAmount, tabularNumbers, { color: colors.ink }]}>
+                    {maskBRL(isPrivacyHidden, formatBRL(Math.abs(card.balance || 0)))}
                   </Text>
                 </View>
-                <View style={styles.rowBody}>
-                  <Text style={[styles.rowTitle, { color: colors.ink }]} numberOfLines={1}>
-                    {card.name}
-                  </Text>
-                  <Text style={[styles.rowMeta, { color: colors.muted }]}>
-                    {card.due_day ? `Vence dia ${card.due_day}` : brand.name}
-                  </Text>
-                </View>
-                <Text style={[styles.rowAmount, tabularNumbers, { color: colors.ink }]}>
-                  {maskBRL(isPrivacyHidden, formatBRL(Math.abs(card.balance || 0)))}
-                </Text>
-              </View>
-            );
-          })}
+              );
+            })}
+          </View>
         </View>
-      </View>
+      </StaggerItem>
 
       {catEntries.length > 0 && (
-        <>
+        <StaggerItem index={2}>
           <View style={styles.secHeader}>
             <Text style={[styles.secTitle, { color: colors.ink }]}>Compras no cartão</Text>
           </View>
-          <View style={[styles.card2, { backgroundColor: colors.bg, borderColor: colors.line }]}>
-            <View style={localStyles.stackedBar}>
-              {catEntries.map(([cat, val], idx) => (
-                <View
-                  key={cat}
-                  style={{
-                    flex: Math.max(1, val),
-                    height: '100%',
-                    borderRadius: 4,
-                    backgroundColor: finScale[idx % finScale.length],
-                  }}
-                />
-              ))}
-            </View>
+          <View style={[styles.card2, { backgroundColor: colors.surf, borderColor: colors.hairline }]}>
+            <AnimatedSegmentedBar
+              height={10}
+              borderRadius={5}
+              segmentRadius={4}
+              gap={3}
+              delayMs={260}
+              stepMs={90}
+              segments={catEntries.map(([cat, val], idx) => ({
+                key: cat,
+                flex: Math.max(1, val),
+                color: resolveCategoryVisual(cat, isDark, idx).color,
+              }))}
+            />
             <View style={styles.legendList}>
               {catEntries.map(([cat, val], idx) => (
                 <View
@@ -263,9 +292,7 @@ export const CardsSubView: React.FC<SubViewCommonProps> = ({
                     idx > 0 && { borderTopWidth: 1, borderTopColor: colors.line },
                   ]}
                 >
-                  <View
-                    style={[styles.legendDot, { backgroundColor: finScale[idx % finScale.length] }]}
-                  />
+                  <CategorySemanticBadge category={cat} isDark={isDark} index={idx} size={32} />
                   <View style={styles.rowBody}>
                     <Text style={[styles.rowTitle, { color: colors.ink }]}>{cat}</Text>
                     <Text style={[styles.rowMeta, { color: colors.muted }]}>
@@ -279,7 +306,7 @@ export const CardsSubView: React.FC<SubViewCommonProps> = ({
               ))}
             </View>
           </View>
-        </>
+        </StaggerItem>
       )}
     </View>
   );

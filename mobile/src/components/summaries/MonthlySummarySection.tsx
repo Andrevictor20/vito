@@ -1,12 +1,23 @@
 import React, { useMemo } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
-import Svg, { Circle, Defs, LinearGradient, Path, Stop, Text as SvgText } from 'react-native-svg';
+import { ProtoRingChart } from '../../charts/ProtoRingChart';
 import { useTheme } from '../../context/ThemeContext';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { hapticFeedback } from '../../theme/motion';
-import { VitoMascot } from '../common/VitoMascot';
-import { SummaryRingSvg } from './SummaryRingSvg';
+import { tabularNumbers } from '../../theme/tokens';
+import { CountUpText, StaggerItem, useReduceMotion } from '../../theme/vitoMotion';
 import type { MonthWeekItem } from '../../utils/summaryCalculators';
+import type { WeeklySummaryItem } from '../../utils/weeklySummaryCalculator';
+import { withHexAlpha } from '../finance/financeHelpers';
+import {
+  SummaryBalanceDonut,
+  SummaryCard,
+  SummaryCategoryBreakdown,
+  SummaryEyebrow,
+  SummaryHeroCard,
+  SummaryTrendLineChart,
+  SummaryVitoNote,
+} from './SummaryPrimitives';
 
 interface MonthlyMetrics {
   totalHours: string;
@@ -25,7 +36,13 @@ interface MonthlySummarySectionProps {
   onOpenRaioX: () => void;
   onAlignWeek?: () => void;
   weeks?: MonthWeekItem[];
+  weeklySummaries?: WeeklySummaryItem[];
 }
+
+const MONTH_NAMES = [
+  'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+  'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
+];
 
 export const MonthlySummarySection: React.FC<MonthlySummarySectionProps> = ({
   metrics,
@@ -33,218 +50,254 @@ export const MonthlySummarySection: React.FC<MonthlySummarySectionProps> = ({
   onOpenRaioX,
   onAlignWeek,
   weeks,
+  weeklySummaries,
 }) => {
   const { colors, isDark } = useTheme();
-  const monthNames = [
-    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
-  ];
-  const monthName = monthNames[new Date().getMonth()];
+  const reduceMotion = useReduceMotion();
+  const monthName = MONTH_NAMES[new Date().getMonth()];
 
   const effectiveWeeks = useMemo<MonthWeekItem[]>(() => {
     const raw = (weeks && weeks.length > 0 ? weeks : metrics.weeks) || [];
     if (raw.length >= 2) return raw;
     return [
-      { l: 'S1', h: 7.0 },
-      { l: 'S2', h: 7.6 },
-      { l: 'S3', h: 3.3 },
-      { l: 'S4', h: 8.2, cur: true },
+      { l: 'S1', h: 0 },
+      { l: 'S2', h: 0 },
+      { l: 'S3', h: 0 },
+      { l: 'S4', h: 0, cur: true },
     ];
   }, [weeks, metrics.weeks]);
 
-  const bezier = useMemo(() => {
-    const mx = Math.max(1, ...effectiveWeeks.map((w) => w.h));
-    const pts = effectiveWeeks.map((w, k) => [
-      24 + k * (252 / Math.max(1, effectiveWeeks.length - 1)),
-      96 - (w.h / mx) * 70,
-    ]);
-    let d = `M${pts[0][0]} ${pts[0][1]}`;
-    for (let k = 1; k < pts.length; k++) {
-      const a = pts[k - 1];
-      const b = pts[k];
-      const midX = (a[0] + b[0]) / 2;
-      d += ` C${midX} ${a[1]} ${midX} ${b[1]} ${b[0]} ${b[1]}`;
+  const aggregatedCategories = useMemo(() => {
+    const map = new Map<string, { name: string; hours: number; color: string }>();
+    if (weeklySummaries && weeklySummaries.length > 0) {
+      for (const wk of weeklySummaries) {
+        for (const cat of wk.categories) {
+          const prev = map.get(cat.name);
+          if (prev) {
+            prev.hours = Math.round((prev.hours + cat.hours) * 10) / 10;
+          } else {
+            map.set(cat.name, { name: cat.name, hours: cat.hours, color: cat.color });
+          }
+        }
+      }
     }
-    const area = `${d} L${pts[pts.length - 1][0]} 106 L${pts[0][0]} 106Z`;
-    return { pts, line: d, area };
-  }, [effectiveWeeks]);
+    return Array.from(map.values()).sort((a, b) => b.hours - a.hours);
+  }, [weeklySummaries]);
 
-  const donutCirc = 2 * Math.PI * 38;
-  const personalLen = (metrics.personalRatio / 100) * donutCirc;
-  const workLen = (metrics.workRatio / 100) * donutCirc;
+  const totalHoursNum = parseFloat(metrics.totalHours) || 0;
+  const trendPoints = useMemo(
+    () => effectiveWeeks.map((w) => ({ label: w.l.replace('Sem ', 'S'), value: w.h })),
+    [effectiveWeeks]
+  );
 
   return (
     <View style={styles.container}>
-      {/* Hero .rs-hero */}
-      <View
-        style={[
-          styles.heroCard,
-          {
-            backgroundColor: isDark ? '#141925' : '#EFF5FF',
-            borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(10,124,255,0.12)',
-          },
-        ]}
-      >
-        <View style={styles.ebRow}>
-          <MaterialIcons name="calendar-today" size={14} color={colors.muted} />
-          <Text style={[styles.eb, { color: colors.muted }]}>{monthName} · eficácia</Text>
-        </View>
-        <View style={styles.heroRow}>
-          <SummaryRingSvg percent={metrics.completionRate} color={colors.blue} size={104} label="resolvido" />
-          <View style={styles.heroRight}>
-            <Text style={[styles.big, { color: colors.ink }]}>
-              {metrics.totalHours}
-              <Text style={[styles.bigSmall, { color: colors.muted }]}>h</Text>
-            </Text>
-            <Text style={[styles.subText, { color: colors.muted }]}>em compromissos no mês</Text>
-            <View style={[styles.chip, { backgroundColor: colors.bg }]}>
-              <Text style={[styles.chipText, { color: colors.ink }]}>{metrics.totalEvents} eventos</Text>
+      {/* Bloco 1: Hero .rs-c.rs-hero com anel azul 104px + horas + chip eventos */}
+      <StaggerItem index={0}>
+        <SummaryHeroCard>
+          <SummaryEyebrow label={`${monthName} · eficácia`} icon="calendar-month" />
+          <View style={styles.heroRow}>
+            <ProtoRingChart
+              pct={metrics.completionRate}
+              size={104}
+              strokeWidth={10}
+              color={colors.blue}
+              trackColor={withHexAlpha(colors.blue, 0.16)}
+              subtitle="resolvido"
+              animateLabel
+              durationMs={1250}
+              isDark={isDark}
+              reduceMotion={reduceMotion}
+            />
+            <View style={styles.heroRight}>
+              <View style={styles.bigLine}>
+                <CountUpText
+                  value={totalHoursNum}
+                  decimals={Number.isInteger(totalHoursNum) ? 0 : 1}
+                  durationMs={1150}
+                  style={[styles.big, { color: colors.ink }]}
+                />
+                <Text style={[styles.bigSmall, { color: colors.muted }]}> h</Text>
+              </View>
+              <Text style={[styles.subText, { color: colors.muted }]}>
+                em compromissos no mês
+              </Text>
+              <View style={[styles.eventsChip, { backgroundColor: colors.btn }]}>
+                <Text style={[styles.eventsChipText, tabularNumbers, { color: colors.ink }]}>
+                  {metrics.totalEvents} {metrics.totalEvents === 1 ? 'evento' : 'eventos'}
+                </Text>
+              </View>
             </View>
           </View>
-        </View>
-      </View>
+        </SummaryHeroCard>
+      </StaggerItem>
 
-      {/* Curva Bézier mensal .rs-ln */}
-      <View style={[styles.card, { backgroundColor: colors.surf }]}>
-        <Text style={[styles.eb, { color: colors.muted }]}>Tendência semanal</Text>
-        <View style={styles.svgBox}>
-          <Svg width="100%" height={130} viewBox="0 0 300 130">
-            <Defs>
-              <LinearGradient id="rsg" x1="0" y1="0" x2="0" y2="1">
-                <Stop offset="0" stopColor={colors.blue} stopOpacity="0.28" />
-                <Stop offset="1" stopColor={colors.blue} stopOpacity="0" />
-              </LinearGradient>
-            </Defs>
-            <Path d={bezier.area} fill="url(#rsg)" />
-            <Path d={bezier.line} fill="none" stroke={colors.blue} strokeWidth={3} strokeLinecap="round" />
-            {bezier.pts.map((p, k) => (
-              <React.Fragment key={k}>
-                <Circle cx={p[0]} cy={p[1]} r={5} fill={colors.bg} stroke={colors.blue} strokeWidth={2.5} />
-                <SvgText
-                  x={p[0]}
-                  y={p[1] - 11}
-                  textAnchor="middle"
-                  fontSize="11"
-                  fontWeight="500"
-                  fill={colors.muted}
-                >
-                  {`${effectiveWeeks[k].h.toFixed(1).replace('.', ',')}h`}
-                </SvgText>
-                <SvgText
-                  x={p[0]}
-                  y={124}
-                  textAnchor="middle"
-                  fontSize="11"
-                  fontWeight="500"
-                  fill={colors.muted}
-                >
-                  {effectiveWeeks[k].l}
-                </SvgText>
-              </React.Fragment>
-            ))}
-          </Svg>
-        </View>
-      </View>
+      {/* Bloco 2: Tendência semanal (curva Bézier suave + área gradiente azul) */}
+      <StaggerItem index={1}>
+        <SummaryCard>
+          <SummaryEyebrow label="Tendência semanal" />
+          <SummaryTrendLineChart points={trendPoints} />
+        </SummaryCard>
+      </StaggerItem>
 
-      {/* Equilíbrio de vida Donut .rs-dn */}
-      <View style={[styles.card, { backgroundColor: colors.surf }]}>
-        <Text style={[styles.eb, { color: colors.muted }]}>Equilíbrio de vida</Text>
-        <View style={styles.donutRow}>
-          <View style={styles.donutBox}>
-            <Svg width={112} height={112} viewBox="0 0 100 100">
-              <Circle
-                cx="50"
-                cy="50"
-                r="38"
-                fill="none"
-                stroke={colors.acc}
-                strokeWidth={16}
-                strokeDasharray={`${personalLen} ${donutCirc}`}
-                transform="rotate(-90 50 50)"
-              />
-              <Circle
-                cx="50"
-                cy="50"
-                r="38"
-                fill="none"
-                stroke={colors.ink}
-                strokeWidth={16}
-                strokeDasharray={`${workLen} ${donutCirc}`}
-                strokeDashoffset={-personalLen}
-                transform="rotate(-90 50 50)"
-              />
-            </Svg>
-            <View style={styles.donutCenter}>
-              <Text style={[styles.donutPct, { color: colors.ink }]}>{metrics.personalRatio}%</Text>
+      {/* Bloco 3: Equilíbrio de vida (donut circular 112px + legenda vertical) */}
+      <StaggerItem index={2}>
+        <SummaryCard>
+          <SummaryEyebrow label="Equilíbrio de vida" />
+          <View style={styles.balanceRow}>
+            <SummaryBalanceDonut
+              personalRatio={metrics.personalRatio}
+              workRatio={metrics.workRatio}
+            />
+            <View style={styles.legendCol}>
+              <View style={styles.legendRow}>
+                <View style={[styles.legendDot, { backgroundColor: colors.ink }]} />
+                <Text style={[styles.legendText, tabularNumbers, { color: colors.ink }]}>
+                  Trabalho {metrics.workRatio}%
+                </Text>
+              </View>
+              <View style={styles.legendRow}>
+                <View style={[styles.legendDot, { backgroundColor: colors.acc }]} />
+                <Text style={[styles.legendText, tabularNumbers, { color: colors.ink }]}>
+                  Pessoal {metrics.personalRatio}%
+                </Text>
+              </View>
             </View>
           </View>
-          <View style={styles.legendCol}>
-            <View style={styles.legendItem}>
-              <View style={[styles.dot, { backgroundColor: colors.ink }]} />
-              <Text style={[styles.legendText, { color: colors.ink }]}>Trabalho {metrics.workRatio}%</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.dot, { backgroundColor: colors.acc }]} />
-              <Text style={[styles.legendText, { color: colors.ink }]}>Pessoal {metrics.personalRatio}%</Text>
-            </View>
-          </View>
-        </View>
-      </View>
+        </SummaryCard>
+      </StaggerItem>
 
-      <View style={[styles.vtCard, { backgroundColor: colors.surf }]}>
-        <View style={[styles.vtMascot, { backgroundColor: colors.bg, borderColor: colors.line }]}>
-          <VitoMascot size={26} state="idle" />
-        </View>
-        <Text style={[styles.vtText, { color: colors.ink }]}>{diagnosisText}</Text>
-      </View>
+      {/* Bloco 4: Onde o tempo foi (barras horizontais animadas por categoria) */}
+      {aggregatedCategories.length > 0 ? (
+        <StaggerItem index={3}>
+          <SummaryCard>
+            <SummaryEyebrow label="Onde o tempo foi" />
+            <SummaryCategoryBreakdown items={aggregatedCategories} />
+          </SummaryCard>
+        </StaggerItem>
+      ) : null}
 
-      {onAlignWeek && (
-        <TouchableOpacity style={[styles.priBtn, { backgroundColor: colors.ink }]} onPress={onAlignWeek}>
-          <Text style={[styles.priBtnText, { color: colors.bg }]}>Alinhar semana</Text>
+      {/* Bloco 5: Nota do Vito + Alinhar semana + Abrir Raio-X */}
+      <StaggerItem index={aggregatedCategories.length > 0 ? 4 : 3}>
+        <SummaryVitoNote text={diagnosisText} />
+
+        {onAlignWeek ? (
+          <TouchableOpacity
+            style={[styles.priBtn, { backgroundColor: colors.ink }]}
+            onPress={() => {
+              hapticFeedback.light();
+              onAlignWeek();
+            }}
+            activeOpacity={0.82}
+          >
+            <Text style={[styles.priBtnText, { color: colors.bg }]}>Alinhar semana</Text>
+          </TouchableOpacity>
+        ) : null}
+
+        <TouchableOpacity
+          style={[styles.lnkBtn, { backgroundColor: colors.surf }]}
+          onPress={() => {
+            hapticFeedback.light();
+            onOpenRaioX();
+          }}
+          activeOpacity={0.78}
+        >
+          <Text style={[styles.lnkText, { color: colors.ink }]}>Abrir Raio-X</Text>
+          <ProtoUiIcon name="chevron-right" size={18} color={colors.muted} />
         </TouchableOpacity>
-      )}
-
-      <TouchableOpacity
-        style={[styles.rxBtn, { backgroundColor: colors.surf }]}
-        onPress={() => {
-          hapticFeedback.light();
-          onOpenRaioX();
-        }}
-      >
-        <Text style={[styles.rxBtnText, { color: colors.ink }]}>Abrir Raio-X</Text>
-        <MaterialIcons name="chevron-right" size={18} color={colors.muted} />
-      </TouchableOpacity>
+      </StaggerItem>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: { gap: 12 },
-  heroCard: { borderRadius: 24, borderWidth: 1, padding: 18 },
-  card: { borderRadius: 24, padding: 18 },
-  ebRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  eb: { fontSize: 11.5, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.7 },
-  heroRow: { flexDirection: 'row', alignItems: 'center', gap: 18, marginTop: 14 },
-  heroRight: { flex: 1 },
-  big: { fontSize: 38, fontWeight: '600', letterSpacing: -1.2, fontVariant: ['tabular-nums'] },
-  bigSmall: { fontSize: 15, fontWeight: '500' },
-  subText: { fontSize: 13.5, marginTop: 6 },
-  chip: { alignSelf: 'flex-start', paddingHorizontal: 11, paddingVertical: 5, borderRadius: 12, marginTop: 10 },
-  chipText: { fontSize: 12, fontWeight: '600' },
-  svgBox: { marginTop: 10 },
-  donutRow: { flexDirection: 'row', alignItems: 'center', gap: 22, marginTop: 14 },
-  donutBox: { width: 112, height: 112, position: 'relative', alignItems: 'center', justifyContent: 'center' },
-  donutCenter: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
-  donutPct: { fontSize: 20, fontWeight: '600', fontVariant: ['tabular-nums'] },
-  legendCol: { gap: 10 },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  dot: { width: 10, height: 10, borderRadius: 5 },
-  legendText: { fontSize: 14, fontWeight: '500' },
-  vtCard: { borderRadius: 22, padding: 16, flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
-  vtMascot: { width: 36, height: 36, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  vtText: { flex: 1, fontSize: 14, lineHeight: 20 },
-  priBtn: { height: 46, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
-  priBtnText: { fontSize: 14.5, fontWeight: '600' },
-  rxBtn: { height: 50, borderRadius: 20, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  rxBtnText: { fontSize: 14.5, fontWeight: '600' },
+  heroRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 18,
+    marginTop: 14,
+  },
+  heroRight: {
+    flex: 1,
+    minWidth: 0,
+  },
+  bigLine: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  big: {
+    fontFamily: 'Geist_500Medium',
+    fontSize: 40,
+    lineHeight: 42,
+    letterSpacing: -1.6,
+  },
+  bigSmall: {
+    fontFamily: 'Geist_500Medium',
+    fontSize: 15,
+  },
+  subText: {
+    fontFamily: 'Geist',
+    fontSize: 14,
+    marginTop: 8,
+  },
+  eventsChip: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 11,
+    paddingVertical: 5,
+    borderRadius: 12,
+    marginTop: 10,
+  },
+  eventsChipText: {
+    fontFamily: 'Geist_500Medium',
+    fontSize: 12,
+  },
+  balanceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 22,
+    marginTop: 14,
+  },
+  legendCol: {
+    flex: 1,
+    gap: 10,
+  },
+  legendRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  legendDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  legendText: {
+    fontFamily: 'Geist_500Medium',
+    fontSize: 14,
+  },
+  priBtn: {
+    height: 46,
+    borderRadius: 23,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 14,
+  },
+  priBtnText: {
+    fontFamily: 'Geist_600SemiBold',
+    fontSize: 14.5,
+  },
+  lnkBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 10,
+    minHeight: 48,
+    paddingHorizontal: 18,
+    borderRadius: 20,
+  },
+  lnkText: {
+    fontFamily: 'Geist_500Medium',
+    fontSize: 14.5,
+  },
 });

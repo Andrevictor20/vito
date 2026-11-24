@@ -51,6 +51,7 @@ export function useNotifications() {
     });
 
     const responseSub = notificationService.addResponseListener((resp) => {
+      notificationService.handleQuickActionResponse(resp).catch(() => {});
       if (isMounted) setLastResponse(resp);
     });
 

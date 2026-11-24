@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { useTheme } from '../../context/ThemeContext';
 import { VitoMascot } from '../common/VitoMascot';
 import type {
@@ -56,14 +56,14 @@ export const StoreProView: React.FC<StoreProViewProps> = ({
         <Text style={[styles.lbl, { color: colors.muted }]}>Gerenciar</Text>
         <View style={[styles.lst, { backgroundColor: colors.surf, borderColor: colors.line }]}>
           <TouchableOpacity style={styles.row} onPress={onRestore}>
-            <MaterialIcons name="check-circle-outline" size={20} color={colors.acc} />
+            <ProtoUiIcon name="check-circle-outline" size={20} color={colors.acc} />
             <View style={styles.rowText}>
               <Text style={[styles.rowTitle, { color: colors.ink }]}>Restaurar compras</Text>
               <Text style={[styles.rowSub, { color: colors.muted }]}>
                 Recupere compras de outro aparelho
               </Text>
             </View>
-            <MaterialIcons name="chevron-right" size={20} color={colors.muted} />
+            <ProtoUiIcon name="chevron-right" size={20} color={colors.muted} />
           </TouchableOpacity>
         </View>
       </View>
@@ -82,7 +82,7 @@ export const StoreProView: React.FC<StoreProViewProps> = ({
         </Text>
       </View>
 
-      <View style={[styles.seg, { backgroundColor: colors.surf }]}>
+      <View style={[styles.seg, { backgroundColor: colors.surf, borderColor: colors.line }]}>
         {[
           { id: 'month' as BillingCycle, label: 'Mensal' },
           { id: 'year' as BillingCycle, label: 'Anual · economize até 30%' },
@@ -94,7 +94,14 @@ export const StoreProView: React.FC<StoreProViewProps> = ({
               style={[styles.segBtn, on && { backgroundColor: colors.ink }]}
               onPress={() => onChangeBilling(b.id)}
             >
-              <Text style={[styles.segText, { color: on ? colors.bg : colors.ink }]} numberOfLines={1}>
+              <Text
+                style={[
+                  styles.segText,
+                  { color: on ? colors.bg : colors.muted },
+                  on && styles.segTextActive,
+                ]}
+                numberOfLines={1}
+              >
                 {b.label}
               </Text>
             </TouchableOpacity>
@@ -142,7 +149,7 @@ export const StoreProView: React.FC<StoreProViewProps> = ({
               <View style={styles.featList}>
                 {plan.features.map((f) => (
                   <View key={f} style={styles.featRow}>
-                    <MaterialIcons name="check" size={15} color={colors.acc} />
+                    <ProtoUiIcon name="check" size={15} color={colors.acc} />
                     <Text style={[styles.featText, { color: colors.ink }]}>{f}</Text>
                   </View>
                 ))}
@@ -276,14 +283,14 @@ export const StorePrivView: React.FC<StorePrivViewProps> = ({
       <Text style={[styles.lbl, { color: colors.muted }]}>Seus direitos (LGPD)</Text>
       <View style={[styles.lst, { backgroundColor: colors.surf, borderColor: colors.line }]}>
         <TouchableOpacity style={styles.row} onPress={onExport}>
-          <MaterialIcons name="download" size={20} color={colors.ink} />
+          <ProtoUiIcon name="download" size={20} color={colors.ink} />
           <View style={styles.rowText}>
             <Text style={[styles.rowTitle, { color: colors.ink }]}>Baixar meus dados</Text>
             <Text style={[styles.rowSub, { color: colors.muted }]}>
               Receba uma cópia em JSON por e-mail
             </Text>
           </View>
-          <MaterialIcons name="chevron-right" size={20} color={colors.muted} />
+          <ProtoUiIcon name="chevron-right" size={20} color={colors.muted} />
         </TouchableOpacity>
       </View>
 
@@ -310,9 +317,10 @@ const styles = StyleSheet.create({
   },
   heroTitle: { fontSize: 24, fontWeight: '600', marginTop: 12, letterSpacing: -0.5 },
   heroSub: { fontSize: 13.5, marginTop: 4, textAlign: 'center' },
-  seg: { flexDirection: 'row', borderRadius: 14, padding: 3 },
-  segBtn: { flex: 1, height: 36, borderRadius: 11, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 },
-  segText: { fontSize: 12, fontWeight: '600' },
+  seg: { flexDirection: 'row', borderRadius: 999, borderWidth: 1, padding: 4, gap: 4 },
+  segBtn: { flex: 1, height: 38, borderRadius: 999, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 },
+  segText: { fontFamily: 'Geist_500Medium', fontSize: 12.5 },
+  segTextActive: { fontFamily: 'Geist_600SemiBold' },
   planCard: { borderRadius: 20, borderWidth: 1.5, padding: 16, flexDirection: 'row', gap: 12 },
   radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
   radioDot: { width: 10, height: 10, borderRadius: 5 },

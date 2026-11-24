@@ -6,8 +6,8 @@ export interface ApiRequestOptions extends RequestInit {
 }
 
 export interface ChatHistoryItem {
-  sender: 'user' | 'vito';
-  text: string;
+  role: 'user' | 'assistant';
+  content: string;
 }
 
 export interface AssistantChatOptions {

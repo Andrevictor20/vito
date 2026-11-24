@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, Text } from 'react-native';
 import { useTheme } from '../../../context/ThemeContext';
 import { Todo } from '../../../types';
 import { formatTodoDue } from '../../../utils/chatCards';
 import { CheckCircleIcon } from '../../login/DemoIcons';
 import { tabNavigationBus, chatPromptBus } from '../../../services/dataSync';
 import { hapticFeedback } from '../../../theme/motion';
+import { PressableScale } from '../../../theme/vitoMotion';
 
 interface TodoInlineCardProps {
   todo: Todo;
@@ -55,16 +56,13 @@ export const TodoInlineCard: React.FC<TodoInlineCardProps> = ({ todo, onToggle, 
       <View
         style={[
           styles.card,
-          {
-            backgroundColor: colors.bg,
-            borderColor: colors.line,
-          },
+          { backgroundColor: colors.surf },
           undone && { opacity: 0.5 },
         ]}
       >
-        {/* Chip Roxo 44x44 com CheckCircleIcon */}
+        {/* Chip Roxo 40x40 com CheckCircleIcon */}
         <View style={[styles.chip, { backgroundColor: colors.purpleBg }]}>
-          <CheckCircleIcon color={colors.purple} size={22} />
+          <CheckCircleIcon color={colors.purple} size={20} />
         </View>
 
         {/* Informações da Tarefa */}
@@ -87,29 +85,27 @@ export const TodoInlineCard: React.FC<TodoInlineCardProps> = ({ todo, onToggle, 
       {/* Botões de Ação Abaixo do Card */}
       {!undone && (
         <View style={styles.actionsRow}>
-          <TouchableOpacity
-            style={[styles.btnOutline, { borderColor: colors.ink }]}
+          <PressableScale
+            style={[styles.btnOutline, { backgroundColor: colors.surf }]}
             onPress={handleUndo}
-            activeOpacity={0.75}
             accessibilityRole="button"
             accessibilityLabel="Desfazer criação da tarefa"
           >
             <Text style={[styles.btnOutlineText, { color: colors.ink }]}>
               Desfazer
             </Text>
-          </TouchableOpacity>
+          </PressableScale>
 
-          <TouchableOpacity
+          <PressableScale
             style={[styles.btnFill, { backgroundColor: colors.ink }]}
             onPress={handleViewTasks}
-            activeOpacity={0.8}
             accessibilityRole="button"
             accessibilityLabel="Ver tarefas"
           >
             <Text style={[styles.btnFillText, { color: colors.bg }]}>
               Ver tarefas
             </Text>
-          </TouchableOpacity>
+          </PressableScale>
         </View>
       )}
     </View>
@@ -122,23 +118,18 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   card: {
-    borderRadius: 16,
-    borderWidth: 1,
+    borderRadius: 22,
+    borderWidth: 0,
     paddingVertical: 12,
     paddingHorizontal: 14,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    shadowColor: '#141916',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
   },
   chip: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
@@ -149,46 +140,45 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   title: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 15.5,
-    fontWeight: '600',
-    lineHeight: 20,
+    fontFamily: 'Geist_500Medium',
+    fontSize: 14.5,
+    fontWeight: '500',
+    lineHeight: 19,
   },
   subtitle: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 13,
-    marginTop: 3,
+    fontFamily: 'Geist',
+    fontSize: 12.5,
+    marginTop: 2,
   },
   actionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    marginTop: 10,
+    gap: 8,
+    marginTop: 8,
   },
   btnOutline: {
     height: 36,
-    paddingHorizontal: 18,
-    borderRadius: 18,
-    borderWidth: 1.5,
+    paddingHorizontal: 16,
+    borderRadius: 999,
+    borderWidth: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'transparent',
   },
   btnOutlineText: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 13.5,
-    fontWeight: '600',
+    fontFamily: 'Geist_500Medium',
+    fontSize: 13,
+    fontWeight: '500',
   },
   btnFill: {
     height: 36,
-    paddingHorizontal: 18,
-    borderRadius: 18,
+    paddingHorizontal: 16,
+    borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
   },
   btnFillText: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 13.5,
-    fontWeight: '600',
+    fontFamily: 'Geist_500Medium',
+    fontSize: 13,
+    fontWeight: '500',
   },
 });

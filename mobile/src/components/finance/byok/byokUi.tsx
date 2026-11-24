@@ -1,6 +1,6 @@
 import React from 'react';
 import { ActivityIndicator, StyleProp, StyleSheet, Text, TouchableOpacity, View, ViewStyle } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon, type ProtoUiIconName } from '../../../icons/ProtoUiIcons';
 import { useTheme } from '../../../context/ThemeContext';
 import type { ThemeColors } from '../../../theme/tokens';
 
@@ -19,7 +19,7 @@ export interface ActionButtonProps {
   primary?: boolean;
   busy?: boolean;
   disabled?: boolean;
-  icon?: keyof typeof MaterialIcons.glyphMap;
+  icon?: ProtoUiIconName;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -55,7 +55,7 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
         <ActivityIndicator size="small" color={fg} />
       ) : (
         <View style={styles.btnInner}>
-          {icon ? <MaterialIcons name={icon} size={17} color={fg} /> : null}
+          {icon ? <ProtoUiIcon name={icon} size={17} color={fg} /> : null}
           <Text style={[styles.btnText, { color: fg }]}>{label}</Text>
         </View>
       )}
@@ -68,7 +68,7 @@ export const ErrorText: React.FC<{ message: string }> = ({ message }) => {
   if (!message) return null;
   return (
     <View style={styles.err} accessibilityLiveRegion="polite">
-      <MaterialIcons name="error-outline" size={16} color={colors.red} />
+      <ProtoUiIcon name="error-outline" size={16} color={colors.red} />
       <Text style={[styles.errText, { color: colors.red }]}>{message}</Text>
     </View>
   );
@@ -88,7 +88,7 @@ export const StatusBanner: React.FC<{
       ) : (
         <View style={[styles.seal, { backgroundColor: kind === 'ok' ? colors.acc : colors.red }]}>
           {kind === 'ok' ? (
-            <MaterialIcons name="check" size={14} color="#FFFFFF" />
+            <ProtoUiIcon name="check" size={14} color="#FFFFFF" />
           ) : (
             <Text style={styles.sealBang}>!</Text>
           )}
@@ -123,7 +123,7 @@ export const VerticalStep: React.FC<{
       <View style={styles.vn}>
         <View style={[styles.badge, badgeStyle]}>
           {state === 'done' ? (
-            <MaterialIcons name="check" size={16} color="#FFFFFF" />
+            <ProtoUiIcon name="check" size={16} color="#FFFFFF" />
           ) : (
             <Text style={[styles.badgeNum, { color: state === 'active' ? colors.bg : colors.muted }]}>{index}</Text>
           )}

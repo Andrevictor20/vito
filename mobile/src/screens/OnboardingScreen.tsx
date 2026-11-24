@@ -1,9 +1,9 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AccessibilityInfo,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
-  ScrollView,
+  Animated,
+  Easing,
+  PanResponder,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -12,10 +12,30 @@ import {
   type TextStyle,
   type ViewStyle,
 } from 'react-native'
+import Reanimated, {
+  Easing as ReanimatedEasing,
+  cancelAnimation,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTheme } from '../context/ThemeContext'
 import { loginPalette } from '../components/login/loginPalette'
-import { LoginMascotRig } from '../components/login/LoginMascotRig'
+import { getBezier } from '../ds/tokens'
+import { MascotVectorRig } from '../components/mascot/MascotVectorRig'
+import {
+  ONBOARDING_DESC_DELAY_MS,
+  ONBOARDING_DOT_MS,
+  ONBOARDING_LIVE_DELAY_MS,
+  ONBOARDING_OUT_MS,
+  ONBOARDING_OUT_SCALE,
+  ONBOARDING_SKIP_FADE_MS,
+  ONBOARDING_SWIPE_THRESHOLD,
+  ONBOARDING_TEXT_MS,
+  ONBOARDING_TITLE_DELAY_MS,
+  ONBOARDING_TRACK_MS,
+} from '../components/login/onboardingMotion'
 import { OnboardingSlideArt } from '../components/login/OnboardingSlideArt'
 import { ONBOARDING_SLIDES } from '../components/login/onboardingSlides'
 
@@ -31,52 +51,157 @@ export interface OnboardingScreenProps {
  * - Topbar com mascote blink + "vito" + botao "Pular" (oculto no slide 4)
  * - Dots expansiveis + CTA "Continuar" / "Começar" -> #s-login
  */
+const EASE_Q = Easing.bezier(...getBezier('--ease-q'))
+const EASE_STD = Easing.bezier(...getBezier('--ease-std'))
+
+/** obUp: translateY 14 -> 0 + fade, com delay (só quando o slide está ativo). */
+const RiseText: React.FC<{
+  active: boolean
+  delay: number
+  style: TextStyle[]
+  children: string
+}> = ({ active, delay, style, children }) => {
+  const v = useRef(new Animated.Value(0)).current
+  useEffect(() => {
+    v.setValue(0)
+    if (!active) return
+    const anim = Animated.timing(v, {
+      toValue: 1,
+      duration: ONBOARDING_TEXT_MS,
+      delay,
+      easing: EASE_Q,
+      useNativeDriver: true,
+    })
+    anim.start()
+    return () => anim.stop()
+  }, [active, delay, v])
+  return (
+    <Animated.Text
+      style={[
+        ...style,
+        { opacity: v, transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) }] },
+      ]}
+    >
+      {children}
+    </Animated.Text>
+  )
+}
+
+/** .ob-dots button: largura 7 -> 24 em .35s (Reanimated 4 UI thread). */
+const Dot: React.FC<{ active: boolean; on: string; off: string }> = ({ active, on, off }) => {
+  const w = useSharedValue(active ? 24 : 7)
+  useEffect(() => {
+    const [x1, y1, x2, y2] = getBezier('--ease-q')
+    cancelAnimation(w)
+    w.value = withTiming(active ? 24 : 7, {
+      duration: ONBOARDING_DOT_MS,
+      easing: ReanimatedEasing.bezier(x1, y1, x2, y2),
+    })
+    return () => cancelAnimation(w)
+  }, [active, w])
+  const animStyle = useAnimatedStyle(() => ({
+    width: w.value,
+  }))
+  return <Reanimated.View style={[styles.dot, { backgroundColor: active ? on : off }, animStyle]} />
+}
+
 export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
   const { isDark } = useTheme()
   const palette = loginPalette(isDark)
   const insets = useSafeAreaInsets()
   const { width } = useWindowDimensions()
 
-  const scrollRef = useRef<ScrollView>(null)
   const [index, setIndex] = useState(0)
+  const [live, setLive] = useState(false)
   const [reduceMotion, setReduceMotion] = useState(false)
+  const indexRef = useRef(0)
+  const track = useRef(new Animated.Value(0)).current
+  const drag = useRef(new Animated.Value(0)).current
+  const outV = useRef(new Animated.Value(0)).current
+  const widthRef = useRef(width)
+  widthRef.current = width
 
   useEffect(() => {
+    let alive = true
     AccessibilityInfo.isReduceMotionEnabled()
-      .then(setReduceMotion)
+      .then((rm) => {
+        if (!alive) return
+        setReduceMotion(rm)
+        if (rm) setLive(true)
+      })
       .catch(() => undefined)
+    const t = setTimeout(() => setLive(true), ONBOARDING_LIVE_DELAY_MS)
+    return () => {
+      alive = false
+      clearTimeout(t)
+    }
   }, [])
 
-  const isLast = index === ONBOARDING_SLIDES.length - 1
+  const last = ONBOARDING_SLIDES.length - 1
+  const isLast = index === last
 
   const goToSlide = useCallback(
     (next: number) => {
-      const clamped = Math.max(0, Math.min(ONBOARDING_SLIDES.length - 1, next))
+      const clamped = Math.max(0, Math.min(last, next))
+      indexRef.current = clamped
       setIndex(clamped)
-      scrollRef.current?.scrollTo({ x: clamped * width, animated: !reduceMotion })
+      Animated.parallel([
+        Animated.timing(track, {
+          toValue: -clamped * widthRef.current,
+          duration: reduceMotion ? 0 : ONBOARDING_TRACK_MS,
+          easing: EASE_Q,
+          useNativeDriver: true,
+        }),
+        Animated.timing(drag, { toValue: 0, duration: 0, useNativeDriver: true }),
+      ]).start()
     },
-    [width, reduceMotion],
+    [last, reduceMotion, track, drag],
   )
 
-  const handleMomentumEnd = useCallback(
-    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-      if (width <= 0) return
-      const next = Math.round(e.nativeEvent.contentOffset.x / width)
-      setIndex(Math.max(0, Math.min(ONBOARDING_SLIDES.length - 1, next)))
-    },
-    [width],
-  )
+  useEffect(() => {
+    track.setValue(-indexRef.current * width)
+  }, [width, track])
+
+  const finish = useCallback(() => {
+    Animated.timing(outV, {
+      toValue: 1,
+      duration: reduceMotion ? 0 : ONBOARDING_OUT_MS,
+      easing: EASE_STD,
+      useNativeDriver: true,
+    }).start(() => onComplete())
+  }, [outV, reduceMotion, onComplete])
 
   const handleNext = useCallback(() => {
-    if (isLast) {
-      onComplete()
-    } else {
-      goToSlide(index + 1)
-    }
-  }, [isLast, index, goToSlide, onComplete])
+    if (indexRef.current >= last) finish()
+    else goToSlide(indexRef.current + 1)
+  }, [last, finish, goToSlide])
+
+  const pan = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_e, g) =>
+          Math.abs(g.dx) > 8 && Math.abs(g.dx) > Math.abs(g.dy),
+        onPanResponderMove: (_e, g) => drag.setValue(g.dx),
+        onPanResponderRelease: (_e, g) => {
+          const step = Math.abs(g.dx) > ONBOARDING_SWIPE_THRESHOLD ? (g.dx < 0 ? 1 : -1) : 0
+          goToSlide(indexRef.current + step)
+        },
+        onPanResponderTerminate: () => goToSlide(indexRef.current),
+      }),
+    [drag, goToSlide],
+  )
+
+  const skipOpacity = useRef(new Animated.Value(1)).current
+  useEffect(() => {
+    Animated.timing(skipOpacity, {
+      toValue: isLast ? 0 : 1,
+      duration: ONBOARDING_SKIP_FADE_MS,
+      useNativeDriver: true,
+    }).start()
+  }, [isLast, skipOpacity])
 
   return (
-    <View
+    <Animated.View
       testID="vonb"
       style={[
         styles.root,
@@ -84,54 +209,70 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }
           backgroundColor: palette.bg,
           paddingTop: Math.max(insets.top, 12),
           paddingBottom: Math.max(insets.bottom, 16),
+          opacity: outV.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }),
+          transform: [
+            { scale: outV.interpolate({ inputRange: [0, 1], outputRange: [1, ONBOARDING_OUT_SCALE] }) },
+          ],
         },
       ]}
+     
     >
       <View style={styles.topbar}>
         <View style={styles.brand}>
-          <LoginMascotRig size={36} state="blink" animated={!reduceMotion} />
+          <MascotVectorRig size={36} state="blink" animated={!reduceMotion} />
           <Text style={[styles.brandName, { color: palette.ink }]}>vito</Text>
         </View>
 
-        <TouchableOpacity
-          testID="ob-skip"
-          onPress={onComplete}
-          disabled={isLast}
-          activeOpacity={0.7}
-          accessibilityRole="button"
-          accessibilityLabel="Pular introdução"
-          style={[styles.skipBtn, isLast && styles.skipHidden]}
-        >
-          <Text style={[styles.skipText, { color: palette.muted }]}>Pular</Text>
-        </TouchableOpacity>
+        <Animated.View style={{ opacity: skipOpacity }} pointerEvents={isLast ? 'none' : 'auto'}>
+          <TouchableOpacity
+            testID="ob-skip"
+            onPress={finish}
+            disabled={isLast}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Pular introdução"
+            style={styles.skipBtn}
+          >
+            <Text style={[styles.skipText, { color: palette.muted }]}>Pular</Text>
+          </TouchableOpacity>
+        </Animated.View>
       </View>
 
-      <ScrollView
-        ref={scrollRef}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        onMomentumScrollEnd={handleMomentumEnd}
-        scrollEventThrottle={16}
-        style={styles.pager}
-      >
-        {ONBOARDING_SLIDES.map((slide, idx) => (
-          <View key={slide.id} style={[styles.slide, { width }]}>
-            <View style={styles.artContainer}>
-              <OnboardingSlideArt
-                slideIndex={idx}
-                active={idx === index}
-                reduceMotion={reduceMotion}
-                palette={palette}
-              />
+      <View style={styles.pager} {...pan.panHandlers}>
+        <Animated.View
+          style={[
+            styles.trackRow,
+            { width: width * ONBOARDING_SLIDES.length, transform: [{ translateX: Animated.add(track, drag) }] },
+          ]}
+        >
+          {ONBOARDING_SLIDES.map((slide, idx) => (
+            <View key={slide.id} style={[styles.slide, { width }]}>
+              <View style={styles.artContainer}>
+                <OnboardingSlideArt
+                  slideIndex={idx}
+                  active={live && idx === index}
+                  reduceMotion={reduceMotion}
+                  palette={palette}
+                />
+              </View>
+              <RiseText
+                active={live && idx === index}
+                delay={ONBOARDING_TITLE_DELAY_MS}
+                style={[styles.title, { color: palette.ink }]}
+              >
+                {slide.title}
+              </RiseText>
+              <RiseText
+                active={live && idx === index}
+                delay={ONBOARDING_DESC_DELAY_MS}
+                style={[styles.description, { color: palette.muted }]}
+              >
+                {slide.description}
+              </RiseText>
             </View>
-            <Text style={[styles.title, { color: palette.ink }]}>{slide.title}</Text>
-            <Text style={[styles.description, { color: palette.muted }]}>
-              {slide.description}
-            </Text>
-          </View>
-        ))}
-      </ScrollView>
+          ))}
+        </Animated.View>
+      </View>
 
       <View style={styles.footer}>
         <View style={styles.dotsRow}>
@@ -145,15 +286,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }
                 accessibilityRole="button"
                 accessibilityLabel={`Ir para o passo ${idx + 1}`}
               >
-                <View
-                  style={[
-                    styles.dot,
-                    {
-                      width: active ? 24 : 7,
-                      backgroundColor: active ? palette.ink : palette.line,
-                    },
-                  ]}
-                />
+                <Dot active={active} on={palette.ink} off={palette.line} />
               </TouchableOpacity>
             )
           })}
@@ -172,7 +305,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }
           </Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </Animated.View>
   )
 }
 
@@ -194,7 +327,7 @@ const styles = StyleSheet.create({
     gap: 8,
   } as ViewStyle,
   brandName: {
-    fontFamily: 'Inter_700Bold',
+    fontFamily: 'Geist_700Bold',
     fontSize: 20,
     letterSpacing: -0.8,
   } as TextStyle,
@@ -204,15 +337,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   } as ViewStyle,
-  skipHidden: {
-    opacity: 0,
-  } as ViewStyle,
   skipText: {
-    fontFamily: 'Inter_500Medium',
+    fontFamily: 'Geist_500Medium',
     fontSize: 14,
   } as TextStyle,
   pager: {
     flex: 1,
+    overflow: 'hidden',
+  } as ViewStyle,
+  trackRow: {
+    flex: 1,
+    flexDirection: 'row',
   } as ViewStyle,
   slide: {
     flex: 1,
@@ -226,14 +361,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   } as ViewStyle,
   title: {
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Geist_600SemiBold',
     fontSize: 28,
     lineHeight: 32,
     letterSpacing: -0.98,
     marginBottom: 10,
   } as TextStyle,
   description: {
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'Geist_400Regular',
     fontSize: 15.5,
     lineHeight: 23,
   } as TextStyle,
@@ -261,7 +396,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   } as ViewStyle,
   ctaText: {
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Geist_600SemiBold',
     fontSize: 16,
   } as TextStyle,
 })

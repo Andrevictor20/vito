@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
 import { tabularNumbers } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
+import { CountUpText, StaggerItem } from '../../theme/vitoMotion';
 import type {
   ExtractFilterKey,
   FinanceAccount,
@@ -11,7 +11,6 @@ import type {
 } from '../../types/finance';
 import {
   buildDailySpendingSeries,
-  buildFinScale,
   filterExtractTransactions,
   formatBRL,
   getCategoryAmount,
@@ -21,6 +20,10 @@ import {
   isCreditTransaction,
   maskBRL,
 } from './financeHelpers';
+import {
+  CategorySemanticBadge,
+  TransactionSemanticBadge,
+} from './FinanceSemanticIcons';
 import { FinanceDailyBarsChart, FinanceDonutChart } from './FinanceSubScreenCharts';
 import { subScreenStyles as styles } from './financeSubScreenStyles';
 
@@ -45,7 +48,7 @@ export const ExtractSubView: React.FC<SubViewCommonProps> = ({
   isPrivacyHidden,
   onAskVito,
 }) => {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const [filter, setFilter] = useState<ExtractFilterKey>('all');
 
   const filtered = filterExtractTransactions(transactions, filter);
@@ -66,8 +69,8 @@ export const ExtractSubView: React.FC<SubViewCommonProps> = ({
               style={[
                 styles.filterChip,
                 {
-                  backgroundColor: active ? colors.ink : colors.bg,
-                  borderColor: active ? colors.ink : colors.line,
+                  backgroundColor: active ? colors.ink : colors.surf,
+                  borderColor: active ? colors.ink : colors.hairline,
                 },
               ]}
               onPress={() => setFilter(f.key)}
@@ -82,21 +85,20 @@ export const ExtractSubView: React.FC<SubViewCommonProps> = ({
       </ScrollView>
 
       {groups.length === 0 ? (
-        <View style={[styles.card2, { backgroundColor: colors.bg, borderColor: colors.line }]}>
+        <View style={[styles.card2, { backgroundColor: colors.surf, borderColor: colors.hairline }]}>
           <Text style={[styles.emptyText, { color: colors.muted }]}>
             Nenhuma movimentação encontrada para este filtro.
           </Text>
         </View>
       ) : (
-        groups.map((grp) => (
-          <View key={grp.dayLabel} style={styles.dayGroup}>
+        groups.map((grp, gIdx) => (
+          <StaggerItem key={grp.dayLabel} index={gIdx} style={styles.dayGroup}>
             <Text style={[styles.dayHeader, { color: colors.muted }]}>{grp.dayLabel}</Text>
-            <View style={[styles.card2Flush, { backgroundColor: colors.bg, borderColor: colors.line }]}>
+            <View style={[styles.card2Flush, { backgroundColor: colors.surf, borderColor: colors.hairline }]}>
               {grp.items.map((tx, idx) => {
                 const isCredit = isCreditTransaction(tx);
                 const method = getPaymentMethodKind(tx);
-                const chipBg = isCredit ? colors.greenBg : colors.finBg;
-                const chipFg = isCredit ? colors.acc : colors.fin;
+                const merchantName = tx.clean_merchant_name || tx.description || 'Lançamento';
                 return (
                   <TouchableOpacity
                     key={tx.id || tx.pluggy_transaction_id || `ext_${idx}`}
@@ -106,21 +108,23 @@ export const ExtractSubView: React.FC<SubViewCommonProps> = ({
                     ]}
                     onPress={() =>
                       onAskVito(
-                        `Me explique ou ajude a recategorizar este lançamento: "${tx.clean_merchant_name || tx.description}" (${formatBRL(tx.amount)})`
+                        `Me explique ou ajude a recategorizar este lançamento: "${merchantName}" (${formatBRL(tx.amount)})`
                       )
                     }
                     activeOpacity={0.75}
                   >
-                    <View style={[styles.chip, { backgroundColor: chipBg }]}>
-                      <MaterialIcons
-                        name={method === 'pix' ? 'qr-code-2' : 'credit-card'}
-                        size={20}
-                        color={chipFg}
-                      />
-                    </View>
+                    <TransactionSemanticBadge
+                      merchant={merchantName}
+                      category={tx.category}
+                      isCredit={isCredit}
+                      isPix={method === 'pix'}
+                      isDark={isDark}
+                      index={idx}
+                      size={38}
+                    />
                     <View style={styles.rowBody}>
                       <Text style={[styles.rowTitle, { color: colors.ink }]} numberOfLines={1}>
-                        {tx.clean_merchant_name || tx.description || 'Lançamento'}
+                        {merchantName}
                       </Text>
                       <Text style={[styles.rowMeta, { color: colors.muted }]} numberOfLines={1}>
                         {tx.category || 'Geral'} · {method === 'pix' ? 'Pix' : 'Cartão / Conta'}
@@ -141,7 +145,7 @@ export const ExtractSubView: React.FC<SubViewCommonProps> = ({
                 );
               })}
             </View>
-          </View>
+          </StaggerItem>
         ))
       )}
     </View>
@@ -153,8 +157,7 @@ export const SpendingSubView: React.FC<SubViewCommonProps> = ({
   transactions,
   isPrivacyHidden,
 }) => {
-  const { colors } = useTheme();
-  const finScale = buildFinScale(colors.fin);
+  const { colors, isDark } = useTheme();
   const categories = summary.category_spending;
   const total =
     categories.reduce((acc, c) => acc + getCategoryAmount(c), 0) || (summary.month_expenses ?? 0);
@@ -167,11 +170,15 @@ export const SpendingSubView: React.FC<SubViewCommonProps> = ({
 
   return (
     <View>
-      <View style={[styles.card2, { backgroundColor: colors.bg, borderColor: colors.line }]}>
+      <StaggerItem index={0} style={[styles.card2, { backgroundColor: colors.surf, borderColor: colors.hairline }]}>
         <Text style={[styles.eyebrow, { color: colors.muted }]}>TOTAL NO MÊS</Text>
-        <Text style={[styles.bigValue, tabularNumbers, { color: colors.ink }]}>
-          {maskBRL(isPrivacyHidden, formatBRL(total))}
-        </Text>
+        <CountUpText
+          value={total}
+          decimals={2}
+          prefix="R$ "
+          privacyHidden={isPrivacyHidden}
+          style={[styles.bigValue, tabularNumbers, { color: colors.ink }]}
+        />
 
         {categories.length > 0 ? (
           <>
@@ -197,11 +204,11 @@ export const SpendingSubView: React.FC<SubViewCommonProps> = ({
                       idx > 0 && { borderTopWidth: 1, borderTopColor: colors.line },
                     ]}
                   >
-                    <View
-                      style={[
-                        styles.legendDot,
-                        { backgroundColor: finScale[idx % finScale.length] },
-                      ]}
+                    <CategorySemanticBadge
+                      category={cat.category}
+                      isDark={isDark}
+                      index={idx}
+                      size={32}
                     />
                     <View style={styles.rowBody}>
                       <Text style={[styles.rowTitle, { color: colors.ink }]}>{cat.category}</Text>
@@ -225,14 +232,14 @@ export const SpendingSubView: React.FC<SubViewCommonProps> = ({
             Nenhuma categoria de gasto registrada neste mês.
           </Text>
         )}
-      </View>
+      </StaggerItem>
 
       {dailySeries.values.length > 0 && (
-        <>
+        <StaggerItem index={1}>
           <View style={styles.secHeader}>
             <Text style={[styles.secTitle, { color: colors.ink }]}>Por dia</Text>
           </View>
-          <View style={[styles.card2, { backgroundColor: colors.bg, borderColor: colors.line }]}>
+          <View style={[styles.card2, { backgroundColor: colors.surf, borderColor: colors.hairline }]}>
             <FinanceDailyBarsChart
               values={dailySeries.values}
               labels={dailySeries.labels}
@@ -244,15 +251,15 @@ export const SpendingSubView: React.FC<SubViewCommonProps> = ({
               {dailySeries.peakDay}, {maskBRL(isPrivacyHidden, formatBRL(dailySeries.peakAmount, 0))}
             </Text>
           </View>
-        </>
+        </StaggerItem>
       )}
 
       {topExpenses.length > 0 && (
-        <>
+        <StaggerItem index={2}>
           <View style={styles.secHeader}>
             <Text style={[styles.secTitle, { color: colors.ink }]}>Maiores gastos</Text>
           </View>
-          <View style={[styles.card2Flush, { backgroundColor: colors.bg, borderColor: colors.line }]}>
+          <View style={[styles.card2Flush, { backgroundColor: colors.surf, borderColor: colors.hairline }]}>
             {topExpenses.map((tx, idx) => (
               <View
                 key={tx.id || `top_${idx}`}
@@ -261,8 +268,13 @@ export const SpendingSubView: React.FC<SubViewCommonProps> = ({
                   idx > 0 && { borderTopWidth: 1, borderTopColor: colors.line },
                 ]}
               >
-                <View
-                  style={[styles.legendDot, { backgroundColor: finScale[idx % finScale.length] }]}
+                <TransactionSemanticBadge
+                  merchant={tx.clean_merchant_name || tx.description}
+                  category={tx.category}
+                  isPix={getPaymentMethodKind(tx) === 'pix'}
+                  isDark={isDark}
+                  index={idx}
+                  size={34}
                 />
                 <View style={styles.rowBody}>
                   <Text style={[styles.rowTitle, { color: colors.ink }]} numberOfLines={1}>
@@ -278,7 +290,7 @@ export const SpendingSubView: React.FC<SubViewCommonProps> = ({
               </View>
             ))}
           </View>
-        </>
+        </StaggerItem>
       )}
     </View>
   );

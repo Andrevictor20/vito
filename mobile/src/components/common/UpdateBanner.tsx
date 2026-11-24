@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import * as Updates from 'expo-updates';
 import { tokens, MD3Shapes } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
@@ -56,7 +56,7 @@ export const UpdateBanner: React.FC = () => {
         <View style={[styles.pill, { backgroundColor: colors.surfaceContainerHighest, borderColor: colors.outlineVariant }]}>
           <View style={styles.leftRow}>
             <View style={[styles.iconBox, { backgroundColor: isDark ? '#1E293B' : '#E0F2FE' }]}>
-              <MaterialIcons name="auto-awesome" size={16} color={colors.primary} />
+              <ProtoUiIcon name="auto-awesome" size={16} color={colors.primary} />
             </View>
             <Text style={[styles.text, { color: colors.onSurface, fontWeight: '700' }]}>
               Nova versão pronta
@@ -78,7 +78,7 @@ export const UpdateBanner: React.FC = () => {
         <View style={[styles.pill, { backgroundColor: colors.surfaceContainerHighest, borderColor: colors.outlineVariant }]}>
           <View style={styles.leftRow}>
             <View style={[styles.iconBox, { backgroundColor: isDark ? '#1E293B' : '#E0F2FE' }]}>
-              <MaterialIcons name="system-update" size={16} color={colors.primary} />
+              <ProtoUiIcon name="system-update" size={16} color={colors.primary} />
             </View>
             <Text style={[styles.text, { color: colors.onSurface }]}>
               Atualização disponível
@@ -98,7 +98,7 @@ export const UpdateBanner: React.FC = () => {
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               accessibilityLabel="Ignorar aviso"
             >
-              <MaterialIcons name="close" size={16} color={colors.onSurfaceVariant} />
+              <ProtoUiIcon name="close" size={16} color={colors.onSurfaceVariant} />
             </TouchableOpacity>
           </View>
         </View>

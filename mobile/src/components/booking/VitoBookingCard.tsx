@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   Share,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { tokens } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { BookingType, Meeting } from '../../types';
@@ -124,7 +124,7 @@ export const VitoBookingCard: React.FC<VitoBookingCardProps> = ({
       {/* Header: Chip + Title + Status Pill */}
       <View style={styles.rtop}>
         <View style={[styles.chip, { backgroundColor: colors.tealBg }]}>
-          <MaterialIcons
+          <ProtoUiIcon
             name={isGroup ? 'groups' : 'link'}
             size={20}
             color={colors.teal}
@@ -169,7 +169,7 @@ export const VitoBookingCard: React.FC<VitoBookingCardProps> = ({
       {/* Confirmation green banner */}
       {isConfirmed && !!confirmedLabel && (
         <View style={[styles.okb, { backgroundColor: colors.greenBg }]}>
-          <MaterialIcons name="check" size={16} color={colors.acc} />
+          <ProtoUiIcon name="check" size={16} color={colors.acc} />
           <Text
             style={[
               styles.okbText,
@@ -199,7 +199,7 @@ export const VitoBookingCard: React.FC<VitoBookingCardProps> = ({
           accessibilityRole="button"
           accessibilityLabel="Compartilhar"
         >
-          <MaterialIcons name="share" size={18} color={colors.ink} />
+          <ProtoUiIcon name="share" size={18} color={colors.ink} />
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -213,7 +213,7 @@ export const VitoBookingCard: React.FC<VitoBookingCardProps> = ({
           accessibilityRole="button"
           accessibilityLabel="Copiar link"
         >
-          <MaterialIcons
+          <ProtoUiIcon
             name={isCopied ? 'check' : 'content-copy'}
             size={16}
             color={colors.bg}
@@ -258,7 +258,7 @@ export const VitoBookingCard: React.FC<VitoBookingCardProps> = ({
           accessibilityRole="button"
           accessibilityLabel="Mais ações"
         >
-          <MaterialIcons name="more-horiz" size={18} color={colors.ink} />
+          <ProtoUiIcon name="more-horiz" size={18} color={colors.ink} />
         </TouchableOpacity>
       </View>
 

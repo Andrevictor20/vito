@@ -1,6 +1,6 @@
 import React from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../../icons/ProtoUiIcons';
 import { useTheme } from '../../../context/ThemeContext';
 import { tokens } from '../../../theme/tokens';
 import type { useByokSetup } from '../../../hooks/useByokSetup';
@@ -28,7 +28,7 @@ export const ByokShortcut: React.FC<{ setup: Setup }> = ({ setup: s }) => {
           accessibilityLabel="Abrir Meu Pluggy"
         >
           <View style={[styles.chip, { backgroundColor: finBg }]}>
-            <MaterialIcons name="open-in-new" size={20} color={fin} />
+            <ProtoUiIcon name="open-in-new" size={20} color={fin} />
           </View>
           <View style={styles.cardBody}>
             <Text style={[styles.cardTitle, { color: colors.ink }]}>Abrir Meu Pluggy</Text>
@@ -48,7 +48,7 @@ export const ByokShortcut: React.FC<{ setup: Setup }> = ({ setup: s }) => {
             {s.busy ? (
               <ActivityIndicator size="small" color={fin} />
             ) : (
-              <MaterialIcons name="account-balance" size={20} color={fin} />
+              <ProtoUiIcon name="account-balance" size={20} color={fin} />
             )}
           </View>
           <View style={styles.cardBody}>
@@ -59,7 +59,7 @@ export const ByokShortcut: React.FC<{ setup: Setup }> = ({ setup: s }) => {
       </View>
 
       <View style={styles.kmeta}>
-        <MaterialIcons name="lock-outline" size={15} color={colors.muted} />
+        <ProtoUiIcon name="lock-outline" size={15} color={colors.muted} />
         <Text style={[styles.kmetaText, { color: colors.muted }]}>
           Client ID {maskClientIdShort(s.clientId)} · validadas
         </Text>

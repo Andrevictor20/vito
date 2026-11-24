@@ -189,7 +189,7 @@ const styles = StyleSheet.create({
     borderRadius: 2.5,
   },
   phraseText: {
-    fontFamily: 'Inter_500Medium',
+    fontFamily: 'Geist_500Medium',
     fontSize: 13.5,
     fontWeight: '500',
     letterSpacing: 0.15,

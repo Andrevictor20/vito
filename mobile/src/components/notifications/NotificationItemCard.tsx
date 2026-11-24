@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { tokens } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { hapticFeedback } from '../../theme/motion';
@@ -16,7 +16,7 @@ interface NotificationItemCardProps {
   onAction: (item: InboxNotification, action: InboxNotificationAction) => void;
 }
 
-function getDomainIcon(domain: string): keyof typeof MaterialIcons.glyphMap {
+function getDomainIcon(domain: string): string {
   if (domain === 'tasks') return 'check-circle-outline';
   if (domain === 'booking' || domain === 'calendar') return 'calendar-today';
   if (domain === 'bots') return 'smart-toy';
@@ -78,7 +78,7 @@ export const NotificationItemCard: React.FC<NotificationItemCardProps> = ({
               },
             ]}
           >
-            <MaterialIcons
+            <ProtoUiIcon
               name={getDomainIcon(item.source_domain)}
               size={19}
               color={colors.ink}

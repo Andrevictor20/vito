@@ -29,17 +29,17 @@ export const voiceFullscreenStyles = StyleSheet.create({
     marginHorizontal: 12,
   },
   vctxTitle: {
-    fontFamily: 'Montserrat_800ExtraBold',
+    fontFamily: 'Geist_700Bold',
     fontSize: 15.5,
     letterSpacing: -0.2,
   },
   vctxSub: {
-    fontFamily: 'Inter_500Medium',
+    fontFamily: 'Geist_500Medium',
     fontSize: 12,
     marginTop: 2,
   },
   vtime: {
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Geist_600SemiBold',
     fontSize: 13,
     minWidth: 44,
     textAlign: 'right',
@@ -96,13 +96,13 @@ export const voiceFullscreenStyles = StyleSheet.create({
     borderRadius: 2,
   },
   vstate: {
-    fontFamily: 'Montserrat_700Bold',
+    fontFamily: 'Geist_600SemiBold',
     fontSize: 15.5,
     marginTop: 6,
     textAlign: 'center',
   },
   vhint: {
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'Geist_400Regular',
     fontSize: 12,
     marginTop: 3,
     textAlign: 'center',
@@ -115,13 +115,13 @@ export const voiceFullscreenStyles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   vcapWho: {
-    fontFamily: 'Inter_700Bold',
+    fontFamily: 'Geist_700Bold',
     fontSize: 11,
     letterSpacing: 1.2,
     marginBottom: 6,
   },
   vcapText: {
-    fontFamily: 'Montserrat_600SemiBold',
+    fontFamily: 'Geist_600SemiBold',
     fontSize: 18,
     lineHeight: 25,
     textAlign: 'center',
@@ -149,7 +149,7 @@ export const voiceFullscreenStyles = StyleSheet.create({
     marginRight: 6,
   },
   whatsAppText: {
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Geist_600SemiBold',
     fontSize: 13,
     flexShrink: 1,
   },
@@ -160,7 +160,7 @@ export const voiceFullscreenStyles = StyleSheet.create({
     borderRadius: 14,
   },
   whatsAppBtnText: {
-    fontFamily: 'Inter_700Bold',
+    fontFamily: 'Geist_700Bold',
     fontSize: 11.5,
     color: '#000000',
   },
@@ -198,7 +198,7 @@ export const voiceFullscreenStyles = StyleSheet.create({
     shadowRadius: 10,
   },
   vbLabel: {
-    fontFamily: 'Inter_500Medium',
+    fontFamily: 'Geist_500Medium',
     fontSize: 12,
   },
 });

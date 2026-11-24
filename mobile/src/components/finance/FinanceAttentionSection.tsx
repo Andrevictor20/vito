@@ -1,7 +1,6 @@
 import React from 'react';
 import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
-import { tokens } from '../../theme/tokens';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { useTheme } from '../../context/ThemeContext';
 import { hapticFeedback } from '../../theme/motion';
 import type { FinanceAlert } from '../../types/finance';
@@ -20,98 +19,59 @@ export const FinanceAttentionSection: React.FC<FinanceAttentionSectionProps> = (
 
   if (!alerts || alerts.length === 0) return null;
 
-  const resolveChipTokens = (alert: FinanceAlert) => {
-    const severity = (alert.severity || alert.urgency || '').toLowerCase();
-    if (severity === 'critical' || severity === 'high' || alert.kind === 'DUPLICATE_CHARGE') {
-      return { bg: colors.redBg, fg: colors.red, icon: 'repeat' as const };
-    }
-    if (severity === 'warning' || severity === 'medium' || alert.kind === 'BUDGET_CEILING') {
-      return { bg: colors.orangeBg, fg: colors.orange, icon: 'local-offer' as const };
-    }
-    return { bg: colors.finBg, fg: colors.fin, icon: 'credit-card' as const };
-  };
+  const topAlert = alerts[0];
+  const severity = (topAlert.severity || topAlert.urgency || '').toLowerCase();
+  const chip =
+    severity === 'critical' || severity === 'high' || topAlert.kind === 'DUPLICATE_CHARGE'
+      ? { bg: colors.redBg, fg: colors.red, icon: 'repeat' as const }
+      : severity === 'warning' || severity === 'medium' || topAlert.kind === 'BUDGET_CEILING'
+        ? { bg: colors.orangeBg, fg: colors.orange, icon: 'local-offer' as const }
+        : { bg: colors.finBg, fg: colors.fin, icon: 'credit-card' as const };
+
+  const msg = getAlertMessage(topAlert);
+  const actionLabel = topAlert.action_label || 'Perguntar ao Vito';
 
   return (
-    <View style={styles.section}>
-      <View style={styles.secHeader}>
-        <Text style={[styles.secTitle, { color: colors.ink }]}>Atenção</Text>
-        <View style={[styles.countPill, { backgroundColor: colors.surf }]}>
-          <Text style={[styles.countText, { color: colors.muted }]}>{alerts.length}</Text>
+    <View style={[styles.alertCard, { backgroundColor: colors.bg, borderColor: colors.line }]}>
+      <View style={styles.alertTop}>
+        <View style={[styles.chip, { backgroundColor: chip.bg }]}>
+          <ProtoUiIcon name={chip.icon} size={20} color={chip.fg} />
         </View>
+        <View style={styles.alertBody}>
+          <Text style={[styles.alertTitle, { color: colors.ink }]}>{topAlert.title}</Text>
+          {msg ? (
+            <Text style={[styles.alertDesc, { color: colors.muted }]}>{msg}</Text>
+          ) : null}
+        </View>
+        {alerts.length > 1 && (
+          <View style={[styles.countPill, { backgroundColor: colors.surf }]}>
+            <Text style={[styles.countText, { color: colors.muted }]}>1 de {alerts.length}</Text>
+          </View>
+        )}
       </View>
 
-      {alerts.map((alert, idx) => {
-        const chip = resolveChipTokens(alert);
-        const msg = getAlertMessage(alert);
-        const actionLabel = alert.action_label || 'Perguntar ao Vito';
-
-        return (
-          <View
-            key={alert.id || `alert_${idx}`}
-            style={[styles.alertCard, { backgroundColor: colors.bg, borderColor: colors.line }]}
-          >
-            <View style={styles.alertTop}>
-              <View style={[styles.chip, { backgroundColor: chip.bg }]}>
-                <MaterialIcons name={chip.icon} size={20} color={chip.fg} />
-              </View>
-              <View style={styles.alertBody}>
-                <Text style={[styles.alertTitle, { color: colors.ink }]}>{alert.title}</Text>
-                {msg ? (
-                  <Text style={[styles.alertDesc, { color: colors.muted }]}>{msg}</Text>
-                ) : null}
-              </View>
-            </View>
-
-            <View style={styles.optsRow}>
-              <TouchableOpacity
-                style={[styles.optBtn, { backgroundColor: colors.bg, borderColor: colors.line }]}
-                onPress={() => {
-                  hapticFeedback.selection();
-                  onPressAlertAction(getAlertPrompt(alert));
-                }}
-                activeOpacity={0.75}
-              >
-                <Text style={[styles.optBtnText, { color: colors.ink }]}>{actionLabel}</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        );
-      })}
+      <View style={styles.optsRow}>
+        <TouchableOpacity
+          style={[styles.optBtn, { backgroundColor: colors.bg, borderColor: colors.line }]}
+          onPress={() => {
+            hapticFeedback.selection();
+            onPressAlertAction(getAlertPrompt(topAlert));
+          }}
+          activeOpacity={0.75}
+        >
+          <Text style={[styles.optBtnText, { color: colors.ink }]}>{actionLabel}</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  section: {
-    marginTop: 8,
-    marginBottom: 8,
-  },
-  secHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-  },
-  secTitle: {
-    fontFamily: tokens.typography.family.montserratBold,
-    fontSize: 17,
-    fontWeight: '800',
-    letterSpacing: -0.3,
-  },
-  countPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  countText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
   alertCard: {
     borderWidth: 1,
-    borderRadius: 18,
+    borderRadius: 20,
     padding: 14,
-    marginBottom: 10,
+    marginTop: 18,
   },
   alertTop: {
     flexDirection: 'row',
@@ -119,8 +79,8 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   chip: {
-    width: 40,
-    height: 40,
+    width: 38,
+    height: 38,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
@@ -130,14 +90,24 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   alertTitle: {
+    fontFamily: 'Geist_500Medium',
     fontSize: 15,
-    fontWeight: '600',
     lineHeight: 20,
   },
   alertDesc: {
+    fontFamily: 'Geist',
     fontSize: 13,
     lineHeight: 18,
-    marginTop: 3,
+    marginTop: 2,
+  },
+  countPill: {
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  countText: {
+    fontFamily: 'Geist_500Medium',
+    fontSize: 11.5,
   },
   optsRow: {
     flexDirection: 'row',
@@ -146,15 +116,15 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   optBtn: {
-    height: 36,
-    paddingHorizontal: 16,
-    borderRadius: 18,
+    height: 34,
+    paddingHorizontal: 14,
+    borderRadius: 17,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   optBtnText: {
-    fontSize: 13.5,
-    fontWeight: '500',
+    fontFamily: 'Geist_500Medium',
+    fontSize: 13,
   },
 });

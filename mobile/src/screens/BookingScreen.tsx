@@ -9,7 +9,6 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import { MaterialIcons } from '@expo/vector-icons';
 import { tokens } from '../theme/tokens';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
@@ -341,7 +340,7 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({
       <StatusBar style={isDark ? 'light' : 'dark'} />
 
       {showBackHeader && (
-        <BookingStackHeader onBack={() => (onBack ? onBack() : navigation.goBack())} />
+        <BookingStackHeader onBack={() => (onBack ? onBack() : navigation.goBack())} onPressNew={handleBookingPrompt} />
       )}
 
       {/* Segmented Control .seg: Links [N] | Recebidos [N] */}

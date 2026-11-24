@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { useTheme } from '../../context/ThemeContext';
 import { tokens } from '../../theme/tokens';
 import type { AIProviderKey, UserAIProvider } from '../../types/aiProviders';
@@ -28,8 +28,8 @@ export const AiSection: React.FC<AiSectionProps> = ({
 
   return (
     <>
-      <Text style={[styles.lbl, { color: colors.muted }]}>INTELIGÊNCIA ARTIFICIAL</Text>
-      <View style={[styles.lst, { backgroundColor: colors.surf, borderColor: colors.line }]}>
+      <Text style={[styles.lbl, { color: colors.muted }]}>Inteligência artificial</Text>
+      <View style={[styles.lst, { backgroundColor: colors.surf, borderColor: colors.hairline }]}>
         <TouchableOpacity
           style={styles.li}
           onPress={onPressProviders}
@@ -45,7 +45,7 @@ export const AiSection: React.FC<AiSectionProps> = ({
               {providersSummary}
             </Text>
           </View>
-          <MaterialIcons name="chevron-right" size={18} color={colors.muted} />
+          <ProtoUiIcon name="chevron-right" size={18} color={colors.muted} />
         </TouchableOpacity>
 
         <View style={[styles.divider, { backgroundColor: colors.line }]} />
@@ -57,7 +57,7 @@ export const AiSection: React.FC<AiSectionProps> = ({
           accessibilityLabel="Modelo padrão"
         >
           <View style={[styles.liIconBox, { backgroundColor: colors.bg }]}>
-            <MaterialIcons name="memory" size={18} color={colors.ink} />
+            <ProtoUiIcon name="memory" size={18} color={colors.ink} />
           </View>
           <View style={styles.textCol}>
             <Text style={[styles.liTitle, { color: colors.ink }]}>Modelo padrão</Text>
@@ -65,7 +65,7 @@ export const AiSection: React.FC<AiSectionProps> = ({
               {defaultModelName || 'Vito Auto'}
             </Text>
           </View>
-          <MaterialIcons name="chevron-right" size={18} color={colors.muted} />
+          <ProtoUiIcon name="chevron-right" size={18} color={colors.muted} />
         </TouchableOpacity>
       </View>
     </>
@@ -74,20 +74,19 @@ export const AiSection: React.FC<AiSectionProps> = ({
 
 const styles = StyleSheet.create({
   lbl: {
-    fontFamily: tokens.typography.family.semibold,
-    fontSize: 12,
-    fontWeight: '600',
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
+    fontFamily: 'Geist_500Medium',
+    fontSize: 13,
+    fontWeight: '500',
+    letterSpacing: 0,
     marginTop: 22,
     marginBottom: 8,
     marginHorizontal: 2,
   },
   lst: {
-    borderRadius: 18,
+    borderRadius: 22,
     borderWidth: 1,
     overflow: 'hidden',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   li: {
     flexDirection: 'row',

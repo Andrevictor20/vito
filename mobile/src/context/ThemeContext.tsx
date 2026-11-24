@@ -2,16 +2,22 @@ import React, { createContext, useContext, useState, useEffect, useMemo, ReactNo
 import { useColorScheme } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { tokens as staticTokens, getThemeTokens, ThemeTokens, ThemeColors } from '../theme/tokens';
+import { triggerThemeReveal } from '../theme/vitoMotion';
 
 export type ThemeMode = 'light' | 'dark' | 'system';
+
+export interface ThemeRevealOrigin {
+  x: number;
+  y: number;
+}
 
 interface ThemeContextType {
   themeMode: ThemeMode;
   isDark: boolean;
   tokens: ThemeTokens;
   colors: ThemeColors;
-  toggleTheme: () => void;
-  setThemeMode: (mode: ThemeMode) => void;
+  toggleTheme: (origin?: ThemeRevealOrigin) => void;
+  setThemeMode: (mode: ThemeMode, origin?: ThemeRevealOrigin) => void;
 }
 
 const THEME_STORAGE_KEY = '@vito_theme_mode';
@@ -40,21 +46,31 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     loadSavedTheme();
   }, []);
 
-  const setThemeMode = async (mode: ThemeMode) => {
-    setThemeModeState(mode);
-    try {
-      await AsyncStorage.setItem(THEME_STORAGE_KEY, mode);
-    } catch (err) {
-      console.warn('[Theme] Falha ao salvar preferência de tema:', err);
-    }
-  };
-
   const isDark = useMemo(() => {
     if (themeMode === 'system') {
       return systemColorScheme === 'dark';
     }
     return themeMode === 'dark';
   }, [themeMode, systemColorScheme]);
+
+  const setThemeMode = async (mode: ThemeMode, origin?: ThemeRevealOrigin) => {
+    const nextIsDark = mode === 'system' ? systemColorScheme === 'dark' : mode === 'dark';
+    if (nextIsDark !== isDark) {
+      triggerThemeReveal({
+        x: origin?.x,
+        y: origin?.y,
+        backgroundColor: nextIsDark ? '#0a0a0a' : '#ffffff',
+        applyTheme: () => setThemeModeState(mode),
+      });
+    } else {
+      setThemeModeState(mode);
+    }
+    try {
+      await AsyncStorage.setItem(THEME_STORAGE_KEY, mode);
+    } catch (err) {
+      console.warn('[Theme] Falha ao salvar preferência de tema:', err);
+    }
+  };
 
   const activeTokens = useMemo(() => {
     const t = getThemeTokens(isDark);
@@ -63,8 +79,8 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     return t;
   }, [isDark]);
 
-  const toggleTheme = () => {
-    setThemeMode(isDark ? 'light' : 'dark');
+  const toggleTheme = (origin?: ThemeRevealOrigin) => {
+    void setThemeMode(isDark ? 'light' : 'dark', origin);
   };
 
   const value = useMemo(

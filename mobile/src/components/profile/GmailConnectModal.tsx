@@ -7,7 +7,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { copyToClipboard } from '../../utils/clipboard';
 import { useTheme } from '../../context/ThemeContext';
 import { BottomSheetModal } from '../ui/BottomSheetModal';
@@ -163,7 +163,7 @@ export const GmailConnectModal: React.FC<GmailConnectModalProps> = ({
           /* Estado Desconectado */
           <View style={styles.disconnectedBox}>
             <View style={[styles.heroIconBox, { backgroundColor: colors.surfaceContainerHigh }]}>
-              <MaterialIcons name="mail-outline" size={32} color={colors.primary} />
+              <ProtoUiIcon name="mail-outline" size={32} color={colors.primary} />
             </View>
 
             <Text style={[styles.heroTitle, { color: colors.onSurface }]}>
@@ -176,21 +176,21 @@ export const GmailConnectModal: React.FC<GmailConnectModalProps> = ({
 
             <View style={styles.featureList}>
               <View style={styles.featureItem}>
-                <MaterialIcons name="receipt-long" size={20} color="#0D9488" />
+                <ProtoUiIcon name="receipt-long" size={20} color="#0D9488" />
                 <Text style={[styles.featureText, { color: colors.onSurface }]}>
                   <Text style={{ fontWeight: '700' }}>Boletos a pagar:</Text> valor, vencimento e linha digitável pronta para copiar e pagar no banco.
                 </Text>
               </View>
 
               <View style={styles.featureItem}>
-                <MaterialIcons name="flight-takeoff" size={20} color="#2563EB" />
+                <ProtoUiIcon name="flight-takeoff" size={20} color="#2563EB" />
                 <Text style={[styles.featureText, { color: colors.onSurface }]}>
                   <Text style={{ fontWeight: '700' }}>Reservas de voos:</Text> código localizador, companhia aérea e horários de embarque.
                 </Text>
               </View>
 
               <View style={styles.featureItem}>
-                <MaterialIcons name="priority-high" size={20} color="#DC2626" />
+                <ProtoUiIcon name="priority-high" size={20} color="#DC2626" />
                 <Text style={[styles.featureText, { color: colors.onSurface }]}>
                   <Text style={{ fontWeight: '700' }}>E-mails críticos:</Text> avisos urgentes resumidos para você não perder prazos.
                 </Text>
@@ -198,7 +198,7 @@ export const GmailConnectModal: React.FC<GmailConnectModalProps> = ({
             </View>
 
             <View style={[styles.privacyBox, { backgroundColor: colors.surfaceContainerLow }]}>
-              <MaterialIcons name="security" size={16} color={colors.primary} />
+              <ProtoUiIcon name="security" size={16} color={colors.primary} />
               <Text style={[styles.privacyText, { color: colors.onSurfaceVariant }]}>
                 Seus dados são criptografados com chave AES-256 militar no seu servidor isolado. O Vito nunca vende nem compartilha suas mensagens.
               </Text>
@@ -207,7 +207,7 @@ export const GmailConnectModal: React.FC<GmailConnectModalProps> = ({
             <Button
               label="Conectar Gmail com Google"
               variant="filled"
-              icon={<MaterialIcons name="mail" size={18} color={colors.onPrimary} />}
+              icon={<ProtoUiIcon name="mail" size={18} color={colors.onPrimary} />}
               onPress={handleConnect}
               style={{ marginTop: tokens.spacing.sm }}
             />
@@ -249,7 +249,7 @@ export const GmailConnectModal: React.FC<GmailConnectModalProps> = ({
             <Button
               label={scanning ? 'Analisando mensagens...' : 'Escanear E-mails Agora'}
               variant="filled"
-              icon={<MaterialIcons name="sync" size={18} color={colors.onPrimary} />}
+              icon={<ProtoUiIcon name="sync" size={18} color={colors.onPrimary} />}
               onPress={handleScan}
               isLoading={scanning}
               style={{ marginTop: tokens.spacing.xs }}
@@ -270,7 +270,7 @@ export const GmailConnectModal: React.FC<GmailConnectModalProps> = ({
                   >
                     <View style={styles.cardHeader}>
                       <View style={styles.cardIconTitle}>
-                        <MaterialIcons name="receipt" size={18} color="#0D9488" />
+                        <ProtoUiIcon name="receipt" size={18} color="#0D9488" />
                         <Text style={[styles.cardTitle, { color: colors.onSurface }]} numberOfLines={1}>
                           {bill.subject || 'Boleto'}
                         </Text>
@@ -295,7 +295,7 @@ export const GmailConnectModal: React.FC<GmailConnectModalProps> = ({
                           style={styles.copyBtn}
                           onPress={() => copyToClipboardHandler(bill.linha_digitavel, bill.id)}
                         >
-                          <MaterialIcons
+                          <ProtoUiIcon
                             name={copiedIndex === bill.id ? 'check' : 'content-copy'}
                             size={16}
                             color={copiedIndex === bill.id ? '#16A34A' : colors.primary}
@@ -322,7 +322,7 @@ export const GmailConnectModal: React.FC<GmailConnectModalProps> = ({
                   >
                     <View style={styles.cardHeader}>
                       <View style={styles.cardIconTitle}>
-                        <MaterialIcons name="flight" size={18} color="#2563EB" />
+                        <ProtoUiIcon name="flight" size={18} color="#2563EB" />
                         <Text style={[styles.cardTitle, { color: colors.onSurface }]}>
                           {flight.airline || 'Voo'} {flight.flight_number || ''}
                         </Text>
@@ -346,7 +346,7 @@ export const GmailConnectModal: React.FC<GmailConnectModalProps> = ({
                   >
                     <View style={styles.cardHeader}>
                       <View style={styles.cardIconTitle}>
-                        <MaterialIcons name="warning" size={18} color="#DC2626" />
+                        <ProtoUiIcon name="warning" size={18} color="#DC2626" />
                         <Text style={[styles.cardTitle, { color: colors.onSurface }]} numberOfLines={1}>
                           {urgent.subject}
                         </Text>

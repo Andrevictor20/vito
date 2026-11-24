@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, Text } from 'react-native';
 import { useTheme } from '../../../context/ThemeContext';
 import { Event } from '../../../types';
 import { formatEventDuration } from '../../../utils/chatCards';
 import { CalIcon } from '../../login/DemoIcons';
 import { tabNavigationBus, chatPromptBus } from '../../../services/dataSync';
 import { hapticFeedback } from '../../../theme/motion';
+import { PressableScale } from '../../../theme/vitoMotion';
 
 interface EventInlineCardProps {
   event: Event;
@@ -58,16 +59,13 @@ export const EventInlineCard: React.FC<EventInlineCardProps> = ({ event, onPress
       <View
         style={[
           styles.card,
-          {
-            backgroundColor: colors.bg,
-            borderColor: colors.line,
-          },
+          { backgroundColor: colors.surf },
           undone && { opacity: 0.5 },
         ]}
       >
-        {/* Chip Azul 44x44 com CalIcon */}
+        {/* Chip Azul 40x40 com CalIcon */}
         <View style={[styles.chip, { backgroundColor: colors.blueBg }]}>
-          <CalIcon color={colors.blue} size={22} />
+          <CalIcon color={colors.blue} size={20} />
         </View>
 
         {/* Informações do Evento */}
@@ -90,29 +88,27 @@ export const EventInlineCard: React.FC<EventInlineCardProps> = ({ event, onPress
       {/* Botões de Ação Abaixo do Card */}
       {!undone && (
         <View style={styles.actionsRow}>
-          <TouchableOpacity
-            style={[styles.btnOutline, { borderColor: colors.ink }]}
+          <PressableScale
+            style={[styles.btnOutline, { backgroundColor: colors.surf }]}
             onPress={handleUndo}
-            activeOpacity={0.75}
             accessibilityRole="button"
             accessibilityLabel="Desfazer evento"
           >
             <Text style={[styles.btnOutlineText, { color: colors.ink }]}>
               Desfazer
             </Text>
-          </TouchableOpacity>
+          </PressableScale>
 
-          <TouchableOpacity
+          <PressableScale
             style={[styles.btnFill, { backgroundColor: colors.ink }]}
             onPress={handleViewAgenda}
-            activeOpacity={0.8}
             accessibilityRole="button"
             accessibilityLabel="Ver agenda"
           >
             <Text style={[styles.btnFillText, { color: colors.bg }]}>
               Ver agenda
             </Text>
-          </TouchableOpacity>
+          </PressableScale>
         </View>
       )}
     </View>
@@ -125,23 +121,18 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   card: {
-    borderRadius: 16,
-    borderWidth: 1,
+    borderRadius: 22,
+    borderWidth: 0,
     paddingVertical: 12,
     paddingHorizontal: 14,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    shadowColor: '#141916',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
   },
   chip: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
@@ -152,46 +143,45 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   title: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 15.5,
-    fontWeight: '600',
-    lineHeight: 20,
+    fontFamily: 'Geist_500Medium',
+    fontSize: 14.5,
+    fontWeight: '500',
+    lineHeight: 19,
   },
   subtitle: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 13,
-    marginTop: 3,
+    fontFamily: 'Geist',
+    fontSize: 12.5,
+    marginTop: 2,
   },
   actionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    marginTop: 10,
+    gap: 8,
+    marginTop: 8,
   },
   btnOutline: {
     height: 36,
-    paddingHorizontal: 18,
-    borderRadius: 18,
-    borderWidth: 1.5,
+    paddingHorizontal: 16,
+    borderRadius: 999,
+    borderWidth: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'transparent',
   },
   btnOutlineText: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 13.5,
-    fontWeight: '600',
+    fontFamily: 'Geist_500Medium',
+    fontSize: 13,
+    fontWeight: '500',
   },
   btnFill: {
     height: 36,
-    paddingHorizontal: 18,
-    borderRadius: 18,
+    paddingHorizontal: 16,
+    borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
   },
   btnFillText: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 13.5,
-    fontWeight: '600',
+    fontFamily: 'Geist_500Medium',
+    fontSize: 13,
+    fontWeight: '500',
   },
 });

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { tokens } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { syncSavedContactNames } from '../../services/whatsappContactNames';
@@ -80,7 +80,7 @@ export const WhatsAppContactNamesImport: React.FC<WhatsAppContactNamesImportProp
           {isSyncing ? (
             <ActivityIndicator size="small" color={colors.primary} />
           ) : (
-            <MaterialIcons name="contacts" size={18} color={colors.primary} />
+            <ProtoUiIcon name="contacts" size={18} color={colors.primary} />
           )}
           <Text style={[styles.buttonText, { color: colors.primary }]}>Importar nomes</Text>
         </TouchableOpacity>

@@ -12,7 +12,7 @@ import {
   BackHandler,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../icons/ProtoUiIcons';
 import { tokens } from '../theme/tokens';
 import { useTheme } from '../context/ThemeContext';
 import { hapticFeedback } from '../theme/motion';
@@ -159,7 +159,7 @@ export const ExecutiveSummariesHubView: React.FC<ExecutiveSummariesHubViewProps>
 
   const horizonSubtitles: Record<SummaryHorizon, string> = {
     daily: 'Visão diária',
-    weekly: 'Ciclos semanais',
+    weekly: 'Visão semanal',
     monthly: 'Visão mensal',
   };
 
@@ -178,7 +178,7 @@ export const ExecutiveSummariesHubView: React.FC<ExecutiveSummariesHubViewProps>
           activeOpacity={0.7}
           accessibilityLabel="Voltar"
         >
-          <MaterialIcons name="arrow-back" size={20} color={colors.ink} />
+          <ProtoUiIcon name="arrow-back" size={20} color={colors.ink} />
         </TouchableOpacity>
 
         <View style={styles.ttl}>
@@ -194,13 +194,13 @@ export const ExecutiveSummariesHubView: React.FC<ExecutiveSummariesHubViewProps>
           activeOpacity={0.7}
           accessibilityLabel="Compartilhar resumo"
         >
-          <MaterialIcons name="share" size={20} color={colors.ink} />
+          <ProtoUiIcon name="share" size={20} color={colors.ink} />
         </TouchableOpacity>
       </View>
 
       {/* Segmented Control .seg ("Diário", "Semanal", "Mensal") */}
       <View style={styles.segWrapper}>
-        <View style={[styles.seg, { backgroundColor: colors.surf }]}>
+        <View style={[styles.seg, { backgroundColor: colors.surf, borderColor: colors.line }]}>
           {(['daily', 'weekly', 'monthly'] as SummaryHorizon[]).map((h) => {
             const isActive = horizon === h;
             const labels: Record<SummaryHorizon, string> = {
@@ -256,6 +256,7 @@ export const ExecutiveSummariesHubView: React.FC<ExecutiveSummariesHubViewProps>
           </View>
         ) : horizon === 'daily' ? (
           <DailySummarySection
+            key="sum_daily"
             metrics={dailySummary.metrics}
             hasFreeWindow={dailySummary.hasFreeWindow}
             synthesisText={dailySummary.synthesisText}
@@ -268,14 +269,17 @@ export const ExecutiveSummariesHubView: React.FC<ExecutiveSummariesHubViewProps>
           />
         ) : horizon === 'weekly' ? (
           <WeeklySummarySection
+            key="sum_weekly"
             summaries={weeklySummaries}
             onSelectWeek={setSelectedWeekModal}
           />
         ) : (
           <MonthlySummarySection
+            key="sum_monthly"
             metrics={monthlyMetrics}
             diagnosisText={monthlyDiagnosisText}
             weeks={monthlyMetrics.weeks}
+            weeklySummaries={weeklySummaries}
             onOpenRaioX={() => setShowMonthlyModal(true)}
             onAlignWeek={() => onOpenChatWithPrompt?.('Vamos fazer o alinhamento semanal?')}
           />
@@ -326,12 +330,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   h1: {
-    fontSize: 26,
-    fontFamily: tokens.typography.family.montserratBold,
-    fontWeight: '800',
-    letterSpacing: -0.5,
+    fontSize: 24,
+    fontFamily: 'Geist_500Medium',
+    letterSpacing: -0.6,
   },
   sub: {
+    fontFamily: 'Geist',
     fontSize: 13,
     marginTop: 1,
   },
@@ -341,30 +345,25 @@ const styles = StyleSheet.create({
   },
   seg: {
     flexDirection: 'row',
-    borderRadius: 14,
-    padding: 3,
+    borderRadius: 999,
+    borderWidth: 1,
+    padding: 4,
+    gap: 4,
   },
   segBtn: {
     flex: 1,
-    height: 36,
-    borderRadius: 11,
+    height: 40,
+    borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  segBtnActive: {
-    shadowColor: '#141916',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 2,
-  },
+  segBtnActive: {},
   segBtnText: {
     fontSize: 13.5,
-    fontWeight: '500',
-    fontFamily: tokens.typography.family.medium,
+    fontFamily: 'Geist_500Medium',
   },
   segBtnTextActive: {
-    fontWeight: '700',
+    fontFamily: 'Geist_600SemiBold',
   },
   container: {
     flex: 1,

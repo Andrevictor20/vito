@@ -8,7 +8,7 @@ import {
   TextInput,
   ActivityIndicator,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { MD3Shapes, tabularNumbers } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { SelectableChip } from '../ui/SelectableChip';
@@ -311,9 +311,9 @@ export const MeetingPollForm: React.FC<MeetingPollFormProps> = ({
                   {hour}
                 </Text>
                 {isSlotSelected ? (
-                  <MaterialIcons name="check" size={13} color={colors.onPrimary} />
+                  <ProtoUiIcon name="check" size={13} color={colors.onPrimary} />
                 ) : hasConflict ? (
-                  <MaterialIcons name="event-busy" size={12} color={colors.error} />
+                  <ProtoUiIcon name="event-busy" size={12} color={colors.error} />
                 ) : null}
               </TouchableOpacity>
             );
@@ -343,7 +343,7 @@ export const MeetingPollForm: React.FC<MeetingPollFormProps> = ({
                   <Text style={[styles.selectedSlotChipText, { color: colors.onSurface }, tabularNumbers]}>
                     {formatDateBadge(s.date)} • {s.time}
                   </Text>
-                  <MaterialIcons name="close" size={14} color={colors.onSurfaceVariant} />
+                  <ProtoUiIcon name="close" size={14} color={colors.onSurfaceVariant} />
                 </TouchableOpacity>
               ))}
             </View>

@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, View, Text, Image, TouchableOpacity, TextInput } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { tokens, MD3Shapes } from '../../theme/tokens';
 import { ChatMessage, TimeSlot } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
@@ -16,6 +16,7 @@ interface ChatMessageBubbleProps {
   onEditMessage?: (text: string) => void;
   onSaveEdit?: (messageId: string, newText: string) => void;
   onConfirmAction?: (confirmPrompt: string) => void;
+  onResolveConfirmation?: (messageId: string, pendingId: string, reject: boolean) => Promise<void> | void;
   onPlayAudio?: () => void;
   disabled?: boolean;
 }
@@ -26,6 +27,7 @@ const ChatMessageBubbleComponent: React.FC<ChatMessageBubbleProps> = ({
   onEditMessage,
   onSaveEdit,
   onConfirmAction,
+  onResolveConfirmation,
   onPlayAudio,
   disabled = false,
 }) => {
@@ -114,7 +116,7 @@ const ChatMessageBubbleComponent: React.FC<ChatMessageBubbleProps> = ({
                     activeOpacity={0.7}
                     accessibilityLabel="Cancelar edição"
                   >
-                    <MaterialIcons name="close" size={14} color={colors.bg} />
+                    <ProtoUiIcon name="close" size={14} color={colors.bg} />
                     <Text style={[styles.inlineEditButtonText, { color: colors.bg }]}>
                       Cancelar
                     </Text>
@@ -131,7 +133,7 @@ const ChatMessageBubbleComponent: React.FC<ChatMessageBubbleProps> = ({
                     activeOpacity={0.7}
                     accessibilityLabel="Salvar e reenviar mensagem"
                   >
-                    <MaterialIcons name="send" size={14} color={colors.ink} />
+                    <ProtoUiIcon name="send" size={14} color={colors.ink} />
                     <Text
                       style={[
                         styles.inlineEditButtonText,
@@ -146,12 +148,9 @@ const ChatMessageBubbleComponent: React.FC<ChatMessageBubbleProps> = ({
             ) : (
               <View style={message.id.includes('audio') ? styles.voiceTextRow : undefined}>
                 {message.id.includes('audio') && (
-                  <MaterialIcons
-                    name="mic"
-                    size={16}
-                    color={colors.bg}
-                    style={{ marginRight: 6, marginTop: 2 }}
-                  />
+                  <View style={{ marginRight: 6, marginTop: 2 }}>
+                    <ProtoUiIcon name="mic" size={16} color={colors.bg} />
+                  </View>
                 )}
                 <FormattedChatMessageText
                   text={message.text}
@@ -176,7 +175,9 @@ const ChatMessageBubbleComponent: React.FC<ChatMessageBubbleProps> = ({
                   activeOpacity={0.7}
                   accessibilityLabel="Editar e reenviar mensagem"
                 >
-                  <MaterialIcons name="edit" size={12} color={colors.bg} style={{ opacity: 0.75 }} />
+                  <View style={{ opacity: 0.75 }}>
+                    <ProtoUiIcon name="edit" size={12} color={colors.bg} />
+                  </View>
                   <Text style={[styles.actionButtonText, { color: colors.bg, opacity: 0.8 }]}>
                     Editar
                   </Text>
@@ -190,7 +191,9 @@ const ChatMessageBubbleComponent: React.FC<ChatMessageBubbleProps> = ({
                 })}
               </Text>
 
-              <MaterialIcons name="done-all" size={13} color={colors.bg} style={{ opacity: 0.75 }} />
+              <View style={{ opacity: 0.75 }}>
+                <ProtoUiIcon name="done-all" size={13} color={colors.bg} />
+              </View>
             </View>
         </View>
       ) : (
@@ -206,12 +209,9 @@ const ChatMessageBubbleComponent: React.FC<ChatMessageBubbleProps> = ({
 
           <View style={message.id.includes('audio') ? styles.voiceTextRow : undefined}>
             {message.id.includes('audio') && (
-              <MaterialIcons
-                name="mic"
-                size={16}
-                color={colors.primary}
-                style={{ marginRight: 6, marginTop: 2 }}
-              />
+              <View style={{ marginRight: 6, marginTop: 2 }}>
+                <ProtoUiIcon name="mic" size={16} color={colors.primary} />
+              </View>
             )}
             <FormattedChatMessageText
               text={displayText}
@@ -230,6 +230,7 @@ const ChatMessageBubbleComponent: React.FC<ChatMessageBubbleProps> = ({
             message={message}
             onSelectSlot={onSelectSlot}
             onConfirmAction={onConfirmAction}
+            onResolveConfirmation={onResolveConfirmation}
             disabled={disabled}
           />
 

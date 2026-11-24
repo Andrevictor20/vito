@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { useTheme } from '../../context/ThemeContext';
 import { api } from '../../services/api';
 import { UserSession } from '../../types';
@@ -20,7 +20,7 @@ interface ConnectedDevicesModalProps {
   onSessionsChanged?: (count: number) => void;
 }
 
-const getDeviceIcon = (os?: string, deviceName?: string): keyof typeof MaterialIcons.glyphMap => {
+const getDeviceIcon = (os?: string, deviceName?: string): string => {
   const lowerOs = (os || '').toLowerCase();
   const lowerName = (deviceName || '').toLowerCase();
   if (lowerOs.includes('android') || lowerName.includes('android')) return 'phone-android';
@@ -174,7 +174,7 @@ export const ConnectedDevicesModal: React.FC<ConnectedDevicesModalProps> = ({
                       },
                     ]}
                   >
-                    <MaterialIcons
+                    <ProtoUiIcon
                       name={getDeviceIcon(session.device_name, session.device_name)}
                       size={22}
                       color={session.is_current ? colors.primary : colors.onSurfaceVariant}
@@ -238,7 +238,7 @@ export const ConnectedDevicesModal: React.FC<ConnectedDevicesModalProps> = ({
                 <ActivityIndicator size="small" color={colors.danger} />
               ) : (
                 <>
-                  <MaterialIcons name="phonelink-erase" size={18} color={colors.danger} />
+                  <ProtoUiIcon name="phonelink-erase" size={18} color={colors.danger} />
                   <Text style={[styles.revokeAllText, { color: colors.danger }]}>
                     Desconectar de todos os outros dispositivos ({otherSessionsCount})
                   </Text>

@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { useTheme } from '../../context/ThemeContext';
 import { ActionPolicy, Bot } from '../../types/bots';
 import {
@@ -54,8 +54,8 @@ export const BotDetailsTab: React.FC<BotDetailsTabProps> = ({
   return (
     <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
       {/* Resumo da função + Executar agora */}
-      <View style={[styles.card, { backgroundColor: colors.bg, borderColor: colors.line }]}>
-        <Text style={[styles.sectionLabel, { color: colors.muted }]}>FUNÇÃO DO BOT</Text>
+      <View style={[styles.card, { backgroundColor: colors.surf, borderColor: colors.hairline }]}>
+        <Text style={[styles.sectionLabel, { color: colors.muted }]}>Função do bot</Text>
         <Text style={[styles.goalText, { color: colors.ink }]}>{bot.goal}</Text>
         <TouchableOpacity
           style={[styles.primaryBtn, { backgroundColor: colors.ink }]}
@@ -65,7 +65,7 @@ export const BotDetailsTab: React.FC<BotDetailsTabProps> = ({
           {runningNow ? (
             <ActivityIndicator size="small" color={colors.bg} />
           ) : (
-            <MaterialIcons name="play-arrow" size={18} color={colors.bg} />
+            <ProtoUiIcon name="play-arrow" size={18} color={colors.bg} />
           )}
           <Text style={[styles.primaryBtnText, { color: colors.bg }]}>
             {runningNow ? 'Executando...' : 'Executar agora'}
@@ -75,21 +75,21 @@ export const BotDetailsTab: React.FC<BotDetailsTabProps> = ({
 
       {/* Aparência -> #s-mascot */}
       <TouchableOpacity
-        style={[styles.rowCard, { backgroundColor: colors.bg, borderColor: colors.line }]}
+        style={[styles.rowCard, { backgroundColor: colors.surf, borderColor: colors.hairline }]}
         onPress={onOpenAppearance}
       >
-        <MaterialIcons name="palette" size={20} color={colors.ink} />
+        <ProtoUiIcon name="palette" size={20} color={colors.ink} />
         <View style={styles.rowCol}>
           <Text style={[styles.rowTitle, { color: colors.ink }]}>Aparência</Text>
           <Text style={[styles.rowSub, { color: colors.muted }]}>
             Editar nome, função e cores do mascote
           </Text>
         </View>
-        <MaterialIcons name="chevron-right" size={20} color={colors.muted} />
+        <ProtoUiIcon name="chevron-right" size={20} color={colors.muted} />
       </TouchableOpacity>
 
       {/* Acordeão 1: Ações e Habilidades */}
-      <View style={[styles.accordion, { backgroundColor: colors.bg, borderColor: colors.line }]}>
+      <View style={[styles.accordion, { backgroundColor: colors.surf, borderColor: colors.hairline }]}>
         <TouchableOpacity
           style={styles.accHeader}
           onPress={() => setOpenActions((p) => !p)}
@@ -97,7 +97,7 @@ export const BotDetailsTab: React.FC<BotDetailsTabProps> = ({
           <Text style={[styles.accTitle, { color: colors.ink }]}>
             Ações ({bot.actions.length}) · Habilidades ({bot.skills.length})
           </Text>
-          <MaterialIcons
+          <ProtoUiIcon
             name={openActions ? 'expand-less' : 'expand-more'}
             size={22}
             color={colors.muted}
@@ -127,7 +127,7 @@ export const BotDetailsTab: React.FC<BotDetailsTabProps> = ({
                   )}
                 </View>
                 <TouchableOpacity onPress={() => onRemoveSkill(skill.skill_key)}>
-                  <MaterialIcons name="close" size={18} color={colors.muted} />
+                  <ProtoUiIcon name="close" size={18} color={colors.muted} />
                 </TouchableOpacity>
               </View>
             ))}
@@ -183,14 +183,14 @@ export const BotDetailsTab: React.FC<BotDetailsTabProps> = ({
                 style={[styles.addBtn, { borderColor: colors.line }]}
                 onPress={onOpenAddSkill}
               >
-                <MaterialIcons name="add" size={16} color={colors.ink} />
+                <ProtoUiIcon name="add" size={16} color={colors.ink} />
                 <Text style={[styles.addBtnText, { color: colors.ink }]}>Habilidade</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.addBtn, { borderColor: colors.line }]}
                 onPress={onOpenAddAction}
               >
-                <MaterialIcons name="add" size={16} color={colors.ink} />
+                <ProtoUiIcon name="add" size={16} color={colors.ink} />
                 <Text style={[styles.addBtnText, { color: colors.ink }]}>Ação</Text>
               </TouchableOpacity>
             </View>
@@ -199,13 +199,13 @@ export const BotDetailsTab: React.FC<BotDetailsTabProps> = ({
       </View>
 
       {/* Acordeão 2: Quando executar + Alterar modelo */}
-      <View style={[styles.accordion, { backgroundColor: colors.bg, borderColor: colors.line }]}>
+      <View style={[styles.accordion, { backgroundColor: colors.surf, borderColor: colors.hairline }]}>
         <TouchableOpacity
           style={styles.accHeader}
           onPress={() => setOpenSchedule((p) => !p)}
         >
           <Text style={[styles.accTitle, { color: colors.ink }]}>Quando executar</Text>
-          <MaterialIcons
+          <ProtoUiIcon
             name={openSchedule ? 'expand-less' : 'expand-more'}
             size={22}
             color={colors.muted}
@@ -227,27 +227,27 @@ export const BotDetailsTab: React.FC<BotDetailsTabProps> = ({
               style={[styles.modelBtn, { backgroundColor: colors.surf, borderColor: colors.line }]}
               onPress={onOpenModelPicker}
             >
-              <MaterialIcons name="psychology" size={18} color={colors.ink} />
+              <ProtoUiIcon name="psychology" size={18} color={colors.ink} />
               <View style={styles.rowCol}>
                 <Text style={[styles.itemTitle, { color: colors.ink }]}>Alterar modelo</Text>
                 <Text style={[styles.rowSub, { color: colors.muted }]}>
                   {bot.model_pref || 'Segue o padrão do Vito'}
                 </Text>
               </View>
-              <MaterialIcons name="chevron-right" size={18} color={colors.muted} />
+              <ProtoUiIcon name="chevron-right" size={18} color={colors.muted} />
             </TouchableOpacity>
           </View>
         )}
       </View>
 
       {/* Acordeão 3: Histórico e regras */}
-      <View style={[styles.accordion, { backgroundColor: colors.bg, borderColor: colors.line }]}>
+      <View style={[styles.accordion, { backgroundColor: colors.surf, borderColor: colors.hairline }]}>
         <TouchableOpacity
           style={styles.accHeader}
           onPress={() => setOpenHistory((p) => !p)}
         >
           <Text style={[styles.accTitle, { color: colors.ink }]}>Histórico e regras</Text>
-          <MaterialIcons
+          <ProtoUiIcon
             name={openHistory ? 'expand-less' : 'expand-more'}
             size={22}
             color={colors.muted}
@@ -328,7 +328,7 @@ export const BotDetailsTab: React.FC<BotDetailsTabProps> = ({
         style={[styles.deleteBtn, { borderColor: colors.red, backgroundColor: colors.redBg }]}
         onPress={onDeleteBot}
       >
-        <MaterialIcons name="delete-outline" size={18} color={colors.red} />
+        <ProtoUiIcon name="delete-outline" size={18} color={colors.red} />
         <Text style={[styles.deleteBtnText, { color: colors.red }]}>Excluir bot</Text>
       </TouchableOpacity>
     </ScrollView>

@@ -139,20 +139,21 @@ const MainNavigator: React.FC = () => {
   );
 };
 
-import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold, Inter_800ExtraBold } from '@expo-google-fonts/inter';
-import { Montserrat_600SemiBold, Montserrat_800ExtraBold } from '@expo-google-fonts/montserrat';
+import { useFonts, Geist_400Regular, Geist_500Medium, Geist_600SemiBold, Geist_700Bold } from '@expo-google-fonts/geist';
+import { GeistMono_400Regular, GeistMono_500Medium, GeistMono_600SemiBold, GeistMono_700Bold } from '@expo-google-fonts/geist-mono';
 
 export const AppRoot: React.FC = () => {
   const [fontsLoaded, fontError] = useFonts({
-    Geist: Inter_400Regular,
-    'Geist Mono': Inter_500Medium,
-    Inter_400Regular,
-    Inter_500Medium,
-    Inter_600SemiBold,
-    Inter_700Bold,
-    Inter_800ExtraBold,
-    Montserrat_600SemiBold,
-    Montserrat_800ExtraBold,
+    Geist: Geist_400Regular,
+    Geist_400Regular,
+    Geist_500Medium,
+    Geist_600SemiBold,
+    Geist_700Bold,
+    'Geist Mono': GeistMono_400Regular,
+    GeistMono_400Regular,
+    GeistMono_500Medium,
+    GeistMono_600SemiBold,
+    GeistMono_700Bold,
   });
   const [fontTimedOut, setFontTimedOut] = useState(false);
 

@@ -9,7 +9,7 @@ import {
   UIManager,
   View,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { tokens } from '../../theme/tokens';
 import { getFloatingSurfaceShadow } from '../../theme/surfaces';
 import { PressableScale } from '../../theme/vitoMotion';
@@ -205,11 +205,7 @@ export const Header: React.FC<HeaderProps> = ({
         ) : null}
 
         {isChat ? (
-          <View style={styles.chatTitleSlot}>
-            <Text style={[styles.chatHeaderLabel, { color: colors.ink }]} numberOfLines={1}>
-              {title ?? 'Conversas'}
-            </Text>
-          </View>
+          <View style={styles.flexEmpty} />
         ) : displayTitle ? (
           <View style={[styles.titleSlot, centered && styles.titleSlotCenter]}>
             {onPressTitle ? (
@@ -311,7 +307,7 @@ export const Header: React.FC<HeaderProps> = ({
               },
             ]}
           >
-            <MaterialIcons name="search" size={20} color={colors.muted} />
+            <ProtoUiIcon name="search" size={20} color={colors.muted} />
             <TextInput
               style={[styles.searchInput, { color: colors.ink }]}
               value={currentQuery}
@@ -329,7 +325,7 @@ export const Header: React.FC<HeaderProps> = ({
                 accessibilityLabel="Limpar busca"
                 accessibilityRole="button"
               >
-                <MaterialIcons name="close" size={18} color={colors.muted} />
+                <ProtoUiIcon name="close" size={18} color={colors.muted} />
               </TouchableOpacity>
             )}
             {onPressFilter && (
@@ -343,7 +339,7 @@ export const Header: React.FC<HeaderProps> = ({
                 accessibilityLabel="Filtros avançados"
                 accessibilityRole="button"
               >
-                <MaterialIcons
+                <ProtoUiIcon
                   name="tune"
                   size={18}
                   color={hasActiveFilters ? colors.bg : colors.ink}
@@ -405,10 +401,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   h1Title: {
-    fontFamily: 'Geist',
-    fontSize: 30,
-    lineHeight: 33,
-    letterSpacing: -1.05,
+    fontFamily: 'Geist_500Medium',
+    fontSize: 32,
+    lineHeight: 34,
+    letterSpacing: -0.96,
     fontWeight: '500',
   },
   titleCenter: {

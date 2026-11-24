@@ -9,8 +9,15 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
-import Svg, { Path } from 'react-native-svg';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
+import {
+  ChevronDownSvgIcon,
+  CloseSvgIcon,
+  MicSvgIcon,
+  PlusSvgIcon,
+  SendUpSvgIcon,
+  WaveSvgIcon,
+} from '../../icons/ChatProtoIcons';
 import { useTheme } from '../../context/ThemeContext';
 import { getFloatingSurfaceShadow } from '../../theme/surfaces';
 import { tokens, v5Radii } from '../../theme/tokens';
@@ -148,7 +155,7 @@ export const ChatInputDock = forwardRef<ChatInputDockRef, ChatInputDockProps>(
               hitSlop={tokens.hitSlop.sm}
               accessibilityLabel="Remover foto anexada"
             >
-              <MaterialIcons name="close" size={13} color={colors.bg} />
+              <CloseSvgIcon size={13} color={colors.bg} />
             </TouchableOpacity>
           </View>
         )}
@@ -175,7 +182,7 @@ export const ChatInputDock = forwardRef<ChatInputDockRef, ChatInputDockProps>(
                 accessibilityLabel="Anexar arquivo ou imagem"
                 testID="c-attach"
               >
-                <MaterialIcons name="add" size={19} color={colors.ink} />
+                <PlusSvgIcon size={19} color={colors.ink} />
               </TouchableOpacity>
             )}
 
@@ -197,7 +204,7 @@ export const ChatInputDock = forwardRef<ChatInputDockRef, ChatInputDockProps>(
                 <Text style={[styles.modelText, { color: colors.ink }]} numberOfLines={1}>
                   {modelLabel}
                 </Text>
-                <MaterialIcons name="keyboard-arrow-down" size={13} color={colors.muted} />
+                <ChevronDownSvgIcon size={13} color={colors.muted} />
               </TouchableOpacity>
             )}
           </View>
@@ -229,7 +236,7 @@ export const ChatInputDock = forwardRef<ChatInputDockRef, ChatInputDockProps>(
                 hitSlop={tokens.hitSlop.sm}
                 accessibilityLabel="Cancelar gravação"
               >
-                <MaterialIcons name="delete-outline" size={18} color={colors.red} />
+                <ProtoUiIcon name="delete-outline" size={18} color={colors.red} />
               </TouchableOpacity>
             )}
 
@@ -244,11 +251,11 @@ export const ChatInputDock = forwardRef<ChatInputDockRef, ChatInputDockProps>(
               accessibilityLabel={isRecording ? 'Concluir gravação' : 'Gravar áudio'}
               testID="c-mic"
             >
-              <MaterialIcons
-                name={isRecording ? 'check' : 'mic'}
-                size={18}
-                color={isRecording ? '#ffffff' : colors.ink}
-              />
+              {isRecording ? (
+                <ProtoUiIcon name="check" size={18} color="#ffffff" />
+              ) : (
+                <MicSvgIcon size={18} color={colors.ink} />
+              )}
             </TouchableOpacity>
 
             {/* Slot dinâmico: Parar (loading) | Enviar (.send) | Voz (.wv) */}
@@ -260,7 +267,7 @@ export const ChatInputDock = forwardRef<ChatInputDockRef, ChatInputDockProps>(
                 hitSlop={tokens.hitSlop.sm}
                 accessibilityLabel="Interromper geração"
               >
-                <MaterialIcons name="stop" size={18} color="#ffffff" />
+                <ProtoUiIcon name="stop" size={18} color="#ffffff" />
               </TouchableOpacity>
             ) : canSend ? (
               <Animated.View style={{ transform: [{ scale: sendPopAnim }] }}>
@@ -272,7 +279,7 @@ export const ChatInputDock = forwardRef<ChatInputDockRef, ChatInputDockProps>(
                   accessibilityLabel="Enviar"
                   testID="c-send"
                 >
-                  <MaterialIcons name="arrow-upward" size={18} color={colors.bg} />
+                  <SendUpSvgIcon size={18} color={colors.bg} />
                 </TouchableOpacity>
               </Animated.View>
             ) : (
@@ -287,14 +294,7 @@ export const ChatInputDock = forwardRef<ChatInputDockRef, ChatInputDockProps>(
                 accessibilityLabel="Conversar por voz"
                 testID="c-voice"
               >
-                <Svg width={17} height={17} viewBox="0 0 24 24" fill="none">
-                  <Path
-                    d="M4 10v4M8 6v12M12 9v6M16 4v16M20 10v4"
-                    stroke={colors.bg}
-                    strokeWidth={2.6}
-                    strokeLinecap="round"
-                  />
-                </Svg>
+                <WaveSvgIcon size={17} color={colors.bg} />
               </TouchableOpacity>
             )}
           </View>

@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { BottomSheetModal } from '../ui/BottomSheetModal';
 import { TextInput } from '../ui/TextInput';
 import { Button } from '../ui/Button';
@@ -108,7 +108,7 @@ export const WhatsAppAuthModal: React.FC<WhatsAppAuthModalProps> = ({ visible, o
       <View style={styles.container}>
         {/* Banner Informativo */}
         <View style={[styles.infoCard, { backgroundColor: colors.surfaceContainerHigh }]}>
-          <MaterialIcons name="chat" size={24} color="#25D366" />
+          <ProtoUiIcon name="chat" size={24} color="#25D366" />
           <Text style={[styles.infoText, { color: colors.onSurfaceVariant }]}>
             {step === 'phone'
               ? 'Enviaremos um código numérico de 6 dígitos para o seu WhatsApp oficial.'
@@ -118,7 +118,7 @@ export const WhatsAppAuthModal: React.FC<WhatsAppAuthModalProps> = ({ visible, o
 
         {!!error && (
           <View style={[styles.errorBox, { backgroundColor: colors.errorContainer }]}>
-            <MaterialIcons name="error-outline" size={16} color={colors.onErrorContainer} />
+            <ProtoUiIcon name="error-outline" size={16} color={colors.onErrorContainer} />
             <Text style={[styles.errorText, { color: colors.onErrorContainer }]}>{error}</Text>
           </View>
         )}

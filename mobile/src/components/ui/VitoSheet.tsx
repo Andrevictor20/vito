@@ -1,8 +1,6 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Animated,
   BackHandler,
-  Easing,
   Keyboard,
   type KeyboardEvent,
   Modal,
@@ -13,7 +11,19 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import Animated, {
+  Easing,
+  Extrapolation,
+  cancelAnimation,
+  interpolate,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { scheduleOnRN } from 'react-native-worklets';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../context/ThemeContext';
@@ -32,7 +42,8 @@ export interface VitoSheetProps {
 }
 
 /**
- * VitoSheet — port fiel do `.sheet2` de Vito-telas-atualizadas.html (L511–L516, L1126–L1130).
+ * VitoSheet — port fiel do `.sheet2` de Vito-telas-atualizadas.html (L511–L516, L1126–L1130)
+ * na UI thread (Reanimated 4 + Gesture Handler Pan para arrastar e fechar).
  *
  * - scrim `rgba(0,0,0,.4)` com `backdrop-filter: blur(6px)`, fade 340ms ease-std;
  * - sheet sobe de `translateY(105%)` para `0` em 460ms ease-q e desce em 300ms ease-in;
@@ -58,9 +69,9 @@ export const VitoSheet: React.FC<VitoSheetProps> = ({
   const keyboardOpenRef = useRef(false);
   const keyboardHeightRef = useRef(0);
 
-  const progress = useRef(new Animated.Value(visible ? 1 : 0)).current;
-  const scrim = useRef(new Animated.Value(visible ? 1 : 0)).current;
-  const animationRef = useRef<Animated.CompositeAnimation | null>(null);
+  const progress = useSharedValue(visible ? 1 : 0);
+  const scrim = useSharedValue(visible ? 1 : 0);
+  const dragY = useSharedValue(0);
 
   const handleClose = useCallback(() => {
     hapticFeedback.light();
@@ -107,76 +118,97 @@ export const VitoSheet: React.FC<VitoSheetProps> = ({
   }, [visible]);
 
   useEffect(() => {
-    animationRef.current?.stop();
+    cancelAnimation(progress);
+    cancelAnimation(scrim);
+    cancelAnimation(dragY);
 
     if (visible) {
       setMounted(true);
+      dragY.value = 0;
       if (reduceMotion) {
-        progress.setValue(1);
-        scrim.setValue(1);
+        progress.value = 1;
+        scrim.value = 1;
         return;
       }
-      progress.setValue(0);
-      scrim.setValue(0);
-      animationRef.current = Animated.parallel([
-        Animated.timing(progress, {
-          toValue: 1,
-          duration: 460,
-          easing: Easing.bezier(0.22, 1, 0.36, 1),
-          useNativeDriver: true,
-        }),
-        Animated.timing(scrim, {
-          toValue: 1,
-          duration: 340,
-          easing: Easing.bezier(0.2, 0.8, 0.2, 1),
-          useNativeDriver: true,
-        }),
-      ]);
-      animationRef.current.start();
+      progress.value = 0;
+      scrim.value = 0;
+      progress.value = withTiming(1, {
+        duration: 460,
+        easing: Easing.bezier(0.22, 1, 0.36, 1),
+      });
+      scrim.value = withTiming(1, {
+        duration: 340,
+        easing: Easing.bezier(0.2, 0.8, 0.2, 1),
+      });
       return;
     }
 
     if (!mounted) return;
     if (reduceMotion) {
-      progress.setValue(0);
-      scrim.setValue(0);
+      progress.value = 0;
+      scrim.value = 0;
+      dragY.value = 0;
       setMounted(false);
       return;
     }
-    animationRef.current = Animated.parallel([
-      Animated.timing(progress, {
-        toValue: 0,
+    progress.value = withTiming(
+      0,
+      {
         duration: 300,
         easing: Easing.bezier(0.4, 0, 1, 1),
-        useNativeDriver: true,
-      }),
-      Animated.timing(scrim, {
-        toValue: 0,
-        duration: 340,
-        easing: Easing.bezier(0.2, 0.8, 0.2, 1),
-        useNativeDriver: true,
-      }),
-    ]);
-    animationRef.current.start(({ finished }) => {
-      if (finished) setMounted(false);
+      },
+      (finished) => {
+        if (finished) {
+          dragY.value = 0;
+          scheduleOnRN(setMounted, false);
+        }
+      }
+    );
+    scrim.value = withTiming(0, {
+      duration: 340,
+      easing: Easing.bezier(0.2, 0.8, 0.2, 1),
     });
-  }, [visible, reduceMotion, progress, scrim, mounted]);
+  }, [visible, reduceMotion, progress, scrim, dragY, mounted]);
+
+  const panGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .onUpdate((e) => {
+          dragY.value = Math.max(0, e.translationY);
+        })
+        .onEnd((e) => {
+          const shouldClose = e.translationY > 110 || e.velocityY > 750;
+          if (shouldClose) {
+            scheduleOnRN(handleClose);
+          } else {
+            dragY.value = withSpring(0, { damping: 24, stiffness: 260, mass: 1 });
+          }
+        }),
+    [dragY, handleClose]
+  );
+
+  const scrimAnimatedStyle = useAnimatedStyle(() => {
+    const dragFade = interpolate(dragY.value, [0, 260], [1, 0.25], Extrapolation.CLAMP);
+    return { opacity: scrim.value * dragFade };
+  });
+
+  const sheetAnimatedStyle = useAnimatedStyle(() => {
+    const baseY = interpolate(progress.value, [0, 1], [windowHeight, 0], Extrapolation.CLAMP);
+    return {
+      transform: [{ translateY: baseY + dragY.value }],
+    };
+  }, [windowHeight]);
 
   if (!mounted) return null;
 
-  const translateY = progress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [windowHeight, 0],
-  });
-
-  const scrimColor = isDark ? 'rgba(0, 0, 0, 0.6)' : 'rgba(0, 0, 0, 0.4)';
+  const scrimColor = 'rgba(0, 0, 0, 0.4)';
   const sheetBg = colors.surface ?? colors.bg;
   const bottomPad = keyboardHeight > 0 ? keyboardHeight + 8 : insets.bottom + 20;
 
   return (
     <Modal visible={mounted} transparent animationType="none" statusBarTranslucent onRequestClose={handleClose}>
       <View style={styles.root}>
-        <Animated.View style={[StyleSheet.absoluteFill, { opacity: scrim }]}>
+        <Animated.View style={[StyleSheet.absoluteFill, scrimAnimatedStyle]}>
           <BlurView
             intensity={22}
             tint={isDark ? 'dark' : 'light'}
@@ -199,20 +231,22 @@ export const VitoSheet: React.FC<VitoSheetProps> = ({
               backgroundColor: sheetBg,
               maxHeight: windowHeight * 0.94,
               paddingBottom: bottomPad,
-              transform: [{ translateY }],
             },
+            sheetAnimatedStyle,
           ]}
         >
           {showHandle ? (
-            <Pressable
-              onPress={handleClose}
-              style={styles.handleHit}
-              accessibilityLabel="Arrastar ou fechar"
-              accessibilityRole="button"
-              hitSlop={8}
-            >
-              <View style={[styles.handleBar, { backgroundColor: colors.outlineVariant }]} />
-            </Pressable>
+            <GestureDetector gesture={panGesture}>
+              <Pressable
+                onPress={handleClose}
+                style={styles.handleHit}
+                accessibilityLabel="Arrastar ou fechar"
+                accessibilityRole="button"
+                hitSlop={8}
+              >
+                <View style={[styles.handleBar, { backgroundColor: colors.outlineVariant }]} />
+              </Pressable>
+            </GestureDetector>
           ) : null}
 
           {title || subtitle ? (
@@ -236,7 +270,7 @@ export const VitoSheet: React.FC<VitoSheetProps> = ({
                 accessibilityRole="button"
                 hitSlop={6}
               >
-                <MaterialIcons name="close" size={18} color={colors.onSurface} />
+                <ProtoUiIcon name="close" size={18} color={colors.onSurface} />
               </Pressable>
             </View>
           ) : null}
@@ -292,11 +326,13 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   title: {
+    fontFamily: 'Geist_500Medium',
     fontSize: 20,
     fontWeight: '500',
     letterSpacing: -0.5,
   },
   subtitle: {
+    fontFamily: 'Geist',
     fontSize: 13,
     lineHeight: 18,
   },

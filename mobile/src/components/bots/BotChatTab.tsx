@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { useTheme } from '../../context/ThemeContext';
 import { api } from '../../services/api';
 import {
@@ -216,7 +216,7 @@ export const BotChatTab: React.FC<BotChatTabProps> = ({
             onPress={onRunNow}
             disabled={runningNow}
           >
-            <MaterialIcons name="play-arrow" size={14} color={colors.ink} />
+            <ProtoUiIcon name="play-arrow" size={14} color={colors.ink} />
             <Text style={[styles.quickChipText, { color: colors.ink }]}>
               {runningNow ? 'Executando...' : 'Executar agora'}
             </Text>
@@ -226,7 +226,7 @@ export const BotChatTab: React.FC<BotChatTabProps> = ({
             style={[styles.quickChip, { backgroundColor: colors.surf, borderColor: colors.line }]}
             onPress={() => handleSend('Quais foram suas últimas ações?')}
           >
-            <MaterialIcons name="history" size={14} color={colors.ink} />
+            <ProtoUiIcon name="history" size={14} color={colors.ink} />
             <Text style={[styles.quickChipText, { color: colors.ink }]}>Últimas ações</Text>
           </TouchableOpacity>
         </ScrollView>
@@ -252,7 +252,7 @@ export const BotChatTab: React.FC<BotChatTabProps> = ({
             onPress={() => handleSend()}
             disabled={!draft.trim() || sending}
           >
-            <MaterialIcons name="arrow-upward" size={20} color={colors.bg} />
+            <ProtoUiIcon name="arrow-upward" size={20} color={colors.bg} />
           </TouchableOpacity>
         </View>
       </View>

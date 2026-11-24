@@ -1,6 +1,6 @@
 import React from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { BottomSheetModal } from '../ui/BottomSheetModal';
 import { useTheme } from '../../context/ThemeContext';
 import { tokens } from '../../theme/tokens';
@@ -72,7 +72,7 @@ export const ModelPickerSheet: React.FC<ModelPickerSheetProps> = ({
               </Text>
             </View>
             {!vm.hasExplicitValidSelection && (
-              <MaterialIcons name="check" size={18} color={colors.ink} />
+              <ProtoUiIcon name="check" size={18} color={colors.ink} />
             )}
           </TouchableOpacity>
         )}
@@ -112,7 +112,7 @@ export const ModelPickerSheet: React.FC<ModelPickerSheetProps> = ({
                         {(model.note || 'Modelo disponível') + (model.reasoning ? ' · raciocínio' : '')}
                       </Text>
                     </View>
-                    {isSelected && <MaterialIcons name="check" size={18} color={accent} />}
+                    {isSelected && <ProtoUiIcon name="check" size={18} color={accent} />}
                   </TouchableOpacity>
                 );
               })}

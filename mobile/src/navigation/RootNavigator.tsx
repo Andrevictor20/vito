@@ -1,5 +1,5 @@
 import React from 'react';
-import { Easing } from 'react-native';
+import { Easing, View } from 'react-native';
 import {
   createStackNavigator,
   type StackCardStyleInterpolator,
@@ -7,6 +7,7 @@ import {
 } from '@react-navigation/stack';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { CircularThemeRevealOverlay } from '../theme/vitoMotion';
 import { LoginScreen } from '../components/login/LoginScreen';
 import { MainTabs } from './MainTabs';
 import { HomeDataProvider } from './HomeDataProvider';
@@ -55,19 +56,26 @@ const vitoCardInterpolator: StackCardStyleInterpolator = ({ current, next, closi
   if (next) {
     const translateX = next.progress.interpolate({
       inputRange: [0, 1],
-      outputRange: closing ? [0, -22] : [0, -24],
+      outputRange: closing ? [0, -24] : [0, -28],
     });
-    return { cardStyle: { opacity: 1, transform: [{ translateX }] } };
+    const opacity = next.progress.interpolate({
+      inputRange: [0, 1],
+      outputRange: [1, 0.88],
+    });
+    return { cardStyle: { opacity, transform: [{ translateX }] } };
   }
 
   return {
     cardStyle: {
-      opacity: current.progress,
+      opacity: current.progress.interpolate({
+        inputRange: [0, 0.35, 1],
+        outputRange: [0, 0.85, 1],
+      }),
       transform: [
         {
           translateX: current.progress.interpolate({
             inputRange: [0, 1],
-            outputRange: [30, 0],
+            outputRange: [64, 0],
           }),
         },
       ],
@@ -77,12 +85,12 @@ const vitoCardInterpolator: StackCardStyleInterpolator = ({ current, next, closi
 
 const OPEN_SPEC = {
   animation: 'timing',
-  config: { duration: 440, easing: Easing.bezier(0.22, 1, 0.36, 1) },
+  config: { duration: 380, easing: Easing.bezier(0.22, 1, 0.36, 1) },
 } as const;
 
 const CLOSE_SPEC = {
   animation: 'timing',
-  config: { duration: 400, easing: Easing.bezier(0.22, 1, 0.36, 1) },
+  config: { duration: 320, easing: Easing.bezier(0.22, 1, 0.36, 1) },
 } as const;
 
 // MOB-02: AuthStack pública separada da área autenticada (MainTabs + sub-telas v5).
@@ -92,6 +100,7 @@ export const RootNavigator: React.FC<RootNavigatorProps> = ({ serverUrl, onToggl
 
   const screenOptions = {
     headerShown: false,
+    animationEnabled: true,
     gestureEnabled: false,
     detachPreviousScreen: false,
     cardStyleInterpolator: vitoCardInterpolator,
@@ -103,28 +112,34 @@ export const RootNavigator: React.FC<RootNavigatorProps> = ({ serverUrl, onToggl
 
   if (!user) {
     return (
-      <Stack.Navigator screenOptions={screenOptions}>
-        <Stack.Screen name="auth">
-          {() => <LoginScreen serverUrl={serverUrl} onToggleServer={onToggleServer} />}
-        </Stack.Screen>
-      </Stack.Navigator>
+      <View style={{ flex: 1 }}>
+        <Stack.Navigator screenOptions={screenOptions}>
+          <Stack.Screen name="auth">
+            {() => <LoginScreen serverUrl={serverUrl} onToggleServer={onToggleServer} />}
+          </Stack.Screen>
+        </Stack.Navigator>
+        <CircularThemeRevealOverlay />
+      </View>
     );
   }
 
   return (
     <HomeDataProvider>
-      <Stack.Navigator screenOptions={screenOptions}>
-        <Stack.Screen name="main" component={MainTabs} />
-        <Stack.Screen name="notifications" component={NotificationsScreen} />
-        <Stack.Screen name="profile" component={ProfileStackWrapper} />
-        <Stack.Screen name="booking" component={BookingStackWrapper} />
-        <Stack.Screen name="store" component={StoreScreen} />
-        <Stack.Screen name="integrations" component={IntegrationsScreen} />
-        <Stack.Screen name="aiProviders" component={AiProvidersScreen} />
-        <Stack.Screen name="behavior" component={BehaviorScreen} />
-        <Stack.Screen name="voiceSettings" component={VoiceSettingsScreen} />
-        <Stack.Screen name="memory" component={MemoryScreen} />
-      </Stack.Navigator>
+      <View style={{ flex: 1 }}>
+        <Stack.Navigator screenOptions={screenOptions}>
+          <Stack.Screen name="main" component={MainTabs} />
+          <Stack.Screen name="notifications" component={NotificationsScreen} />
+          <Stack.Screen name="profile" component={ProfileStackWrapper} />
+          <Stack.Screen name="booking" component={BookingStackWrapper} />
+          <Stack.Screen name="store" component={StoreScreen} />
+          <Stack.Screen name="integrations" component={IntegrationsScreen} />
+          <Stack.Screen name="aiProviders" component={AiProvidersScreen} />
+          <Stack.Screen name="behavior" component={BehaviorScreen} />
+          <Stack.Screen name="voiceSettings" component={VoiceSettingsScreen} />
+          <Stack.Screen name="memory" component={MemoryScreen} />
+        </Stack.Navigator>
+        <CircularThemeRevealOverlay />
+      </View>
     </HomeDataProvider>
   );
 };

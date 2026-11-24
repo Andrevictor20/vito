@@ -1,5 +1,4 @@
 import { StyleSheet } from 'react-native';
-import { tokens } from '../../theme/tokens';
 
 export const subScreenStyles = StyleSheet.create({
   chipsRow: {
@@ -9,50 +8,51 @@ export const subScreenStyles = StyleSheet.create({
   filterChip: {
     height: 36,
     paddingHorizontal: 14,
-    borderRadius: 18,
+    borderRadius: 999,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   filterChipText: {
+    fontFamily: 'Geist_500Medium',
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '500',
   },
   dayGroup: {
     marginTop: 6,
   },
   dayHeader: {
-    fontSize: 12,
-    fontWeight: '600',
-    letterSpacing: 0.7,
-    textTransform: 'uppercase',
+    fontFamily: 'Geist_500Medium',
+    fontSize: 13,
+    fontWeight: '500',
+    letterSpacing: 0,
     marginTop: 10,
     marginBottom: 6,
   },
   card2: {
     borderWidth: 1,
-    borderRadius: 20,
+    borderRadius: 22,
     padding: 16,
     marginTop: 8,
   },
   card2Flush: {
     borderWidth: 1,
-    borderRadius: 20,
+    borderRadius: 22,
     paddingHorizontal: 14,
     marginTop: 4,
   },
   eyebrow: {
-    fontSize: 11.5,
-    fontWeight: '600',
-    letterSpacing: 0.7,
-    textTransform: 'uppercase',
+    fontFamily: 'Geist_500Medium',
+    fontSize: 13,
+    fontWeight: '500',
+    letterSpacing: 0,
   },
   bigValue: {
-    fontFamily: tokens.typography.family.montserratBold,
-    fontSize: 32,
-    lineHeight: 36,
-    fontWeight: '800',
-    letterSpacing: -0.8,
+    fontFamily: 'Geist_500Medium',
+    fontSize: 34,
+    lineHeight: 38,
+    fontWeight: '500',
+    letterSpacing: -1.02,
     marginTop: 8,
   },
   secHeader: {
@@ -63,19 +63,20 @@ export const subScreenStyles = StyleSheet.create({
     marginBottom: 8,
   },
   secTitle: {
-    fontFamily: tokens.typography.family.montserratBold,
+    fontFamily: 'Geist_500Medium',
     fontSize: 17,
-    fontWeight: '800',
-    letterSpacing: -0.3,
+    fontWeight: '500',
+    letterSpacing: -0.34,
   },
   countPill: {
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 999,
   },
   countText: {
+    fontFamily: 'Geist_500Medium',
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '500',
   },
   txRow: {
     flexDirection: 'row',
@@ -95,16 +96,19 @@ export const subScreenStyles = StyleSheet.create({
     minWidth: 0,
   },
   rowTitle: {
+    fontFamily: 'Geist_500Medium',
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: '500',
   },
   rowMeta: {
+    fontFamily: 'Geist',
     fontSize: 12.5,
     marginTop: 2,
   },
   rowAmount: {
+    fontFamily: 'Geist_500Medium',
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: '500',
   },
   legendList: {
     marginTop: 10,
@@ -145,8 +149,9 @@ export const subScreenStyles = StyleSheet.create({
     marginTop: 14,
   },
   primaryPillBtnText: {
+    fontFamily: 'Geist_500Medium',
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '500',
   },
   avatarBig: {
     width: 38,
@@ -156,10 +161,12 @@ export const subScreenStyles = StyleSheet.create({
     justifyContent: 'center',
   },
   avatarBigText: {
+    fontFamily: 'Geist_600SemiBold',
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   emptyText: {
+    fontFamily: 'Geist',
     fontSize: 13.5,
     lineHeight: 20,
     textAlign: 'center',

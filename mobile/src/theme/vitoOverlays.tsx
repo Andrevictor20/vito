@@ -1,5 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Dimensions, Easing, Platform, StyleSheet, View } from 'react-native';
+import { Dimensions, Platform, StyleSheet, View } from 'react-native';
+import Animated, {
+  Easing,
+  Extrapolation,
+  interpolate,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 import { MOTION_CURVES, MOTION_DURATIONS, VFX_COLORS } from './motion';
 import { useReduceMotion } from './useReduceMotion';
 
@@ -12,7 +21,7 @@ export interface ThemeRevealPayload {
 
 const themeRevealListeners = new Set<(payload: ThemeRevealPayload) => void>();
 
-/** Revelação circular na troca de tema (720ms View Transitions no Web / radial fallback nativo). */
+/** Revelação circular na troca de tema (720ms View Transitions no Web / radial Reanimated 4 nativo). */
 export function triggerThemeReveal(payload: ThemeRevealPayload): void {
   if (Platform.OS === 'web' && typeof document !== 'undefined') {
     const doc = document as Document & {
@@ -71,7 +80,7 @@ export const CircularThemeRevealOverlay: React.FC = () => {
     color: string;
     radius: number;
   } | null>(null);
-  const anim = useRef(new Animated.Value(0)).current;
+  const anim = useSharedValue(0);
 
   useEffect(() => {
     const handler = (payload: ThemeRevealPayload) => {
@@ -84,14 +93,25 @@ export const CircularThemeRevealOverlay: React.FC = () => {
       const y = payload.y ?? height / 2;
       const radius = Math.hypot(Math.max(x, width - x), Math.max(y, height - y));
       setReveal({ x, y, color: payload.backgroundColor, radius });
-      anim.setValue(0);
+      anim.value = 0;
       payload.applyTheme();
-      Animated.timing(anim, {
-        toValue: 1,
-        duration: MOTION_DURATIONS.themeReveal,
-        easing: Easing.bezier(...MOTION_CURVES.q),
-        useNativeDriver: true,
-      }).start(() => setReveal(null));
+      anim.value = withTiming(
+        1,
+        {
+          duration: MOTION_DURATIONS.themeReveal,
+          easing: Easing.bezier(
+            MOTION_CURVES.q[0],
+            MOTION_CURVES.q[1],
+            MOTION_CURVES.q[2],
+            MOTION_CURVES.q[3]
+          ),
+        },
+        (finished) => {
+          if (finished) {
+            scheduleOnRN(setReveal, null);
+          }
+        }
+      );
     };
 
     themeRevealListeners.add(handler);
@@ -100,26 +120,32 @@ export const CircularThemeRevealOverlay: React.FC = () => {
     };
   }, [anim, reduceMotion]);
 
+  const circleStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(anim.value, [0, 0.7, 1], [0.85, 0.45, 0], Extrapolation.CLAMP),
+    transform: [
+      { scale: interpolate(anim.value, [0, 1], [0.02, 1], Extrapolation.CLAMP) },
+    ],
+  }));
+
   if (!reveal) return null;
 
   const size = reveal.radius * 2;
-  const scale = anim.interpolate({ inputRange: [0, 1], outputRange: [0.02, 1] });
-  const opacity = anim.interpolate({ inputRange: [0, 0.75, 1], outputRange: [0.22, 0.12, 0] });
 
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+    <View style={[StyleSheet.absoluteFill, { zIndex: 9999, elevation: 9999 }]} pointerEvents="none">
       <Animated.View
-        style={{
-          position: 'absolute',
-          left: reveal.x - reveal.radius,
-          top: reveal.y - reveal.radius,
-          width: size,
-          height: size,
-          borderRadius: reveal.radius,
-          backgroundColor: reveal.color,
-          opacity,
-          transform: [{ scale }],
-        }}
+        style={[
+          {
+            position: 'absolute',
+            left: reveal.x - reveal.radius,
+            top: reveal.y - reveal.radius,
+            width: size,
+            height: size,
+            borderRadius: reveal.radius,
+            backgroundColor: reveal.color,
+          },
+          circleStyle,
+        ]}
       />
     </View>
   );
@@ -168,9 +194,42 @@ export const VfxCelebrationOverlay: React.FC = () => {
   );
 };
 
+const VfxParticle: React.FC<{
+  dx: number;
+  dy: number;
+  color: string;
+  progress: ReturnType<typeof useSharedValue<number>>;
+}> = ({ dx, dy, color, progress }) => {
+  const particleStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(progress.value, [0, 0.8, 1], [1, 0.7, 0], Extrapolation.CLAMP),
+    transform: [
+      { translateX: interpolate(progress.value, [0, 1], [0, dx], Extrapolation.CLAMP) },
+      { translateY: interpolate(progress.value, [0, 1], [0, dy], Extrapolation.CLAMP) },
+      { scale: interpolate(progress.value, [0, 1], [1, 0], Extrapolation.CLAMP) },
+    ],
+  }));
+
+  return (
+    <Animated.View
+      style={[
+        {
+          position: 'absolute',
+          left: -3,
+          top: -3,
+          width: 6,
+          height: 6,
+          borderRadius: 3,
+          backgroundColor: color,
+        },
+        particleStyle,
+      ]}
+    />
+  );
+};
+
 const VfxBurstNode: React.FC<{ x: number; y: number }> = ({ x, y }) => {
-  const ringAnim = useRef(new Animated.Value(0)).current;
-  const particleAnim = useRef(new Animated.Value(0)).current;
+  const ringAnim = useSharedValue(0);
+  const particleAnim = useSharedValue(0);
   const vectors = useMemo(
     () =>
       Array.from({ length: 12 }, (_, i) => {
@@ -186,69 +245,45 @@ const VfxBurstNode: React.FC<{ x: number; y: number }> = ({ x, y }) => {
   );
 
   useEffect(() => {
-    Animated.parallel([
-      Animated.timing(ringAnim, {
-        toValue: 1,
-        duration: MOTION_DURATIONS.vfxRing,
-        easing: Easing.out(Easing.ease),
-        useNativeDriver: true,
-      }),
-      Animated.timing(particleAnim, {
-        toValue: 1,
-        duration: MOTION_DURATIONS.vfxParticleMax,
-        easing: Easing.bezier(...MOTION_CURVES.std),
-        useNativeDriver: true,
-      }),
-    ]).start();
+    ringAnim.value = withTiming(1, {
+      duration: MOTION_DURATIONS.vfxRing,
+      easing: Easing.out(Easing.ease),
+    });
+    particleAnim.value = withTiming(1, {
+      duration: MOTION_DURATIONS.vfxParticleMax,
+      easing: Easing.bezier(
+        MOTION_CURVES.std[0],
+        MOTION_CURVES.std[1],
+        MOTION_CURVES.std[2],
+        MOTION_CURVES.std[3]
+      ),
+    });
   }, [ringAnim, particleAnim]);
+
+  const ringStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(ringAnim.value, [0, 1], [0.9, 0], Extrapolation.CLAMP),
+    transform: [{ scale: interpolate(ringAnim.value, [0, 1], [0.6, 2.3], Extrapolation.CLAMP) }],
+  }));
 
   return (
     <View style={{ position: 'absolute', left: x, top: y }} pointerEvents="none">
       <Animated.View
-        style={{
-          position: 'absolute',
-          left: -13,
-          top: -13,
-          width: 26,
-          height: 26,
-          borderRadius: 13,
-          borderWidth: 2,
-          borderColor: VFX_COLORS[0],
-          opacity: ringAnim.interpolate({ inputRange: [0, 1], outputRange: [0.9, 0] }),
-          transform: [
-            { scale: ringAnim.interpolate({ inputRange: [0, 1], outputRange: [0.6, 2.3] }) },
-          ],
-        }}
+        style={[
+          {
+            position: 'absolute',
+            left: -13,
+            top: -13,
+            width: 26,
+            height: 26,
+            borderRadius: 13,
+            borderWidth: 2,
+            borderColor: VFX_COLORS[0],
+          },
+          ringStyle,
+        ]}
       />
       {vectors.map((v, idx) => (
-        <Animated.View
-          key={idx}
-          style={{
-            position: 'absolute',
-            left: -3,
-            top: -3,
-            width: 6,
-            height: 6,
-            borderRadius: 3,
-            backgroundColor: v.color,
-            opacity: particleAnim.interpolate({ inputRange: [0, 0.8, 1], outputRange: [1, 0.7, 0] }),
-            transform: [
-              {
-                translateX: particleAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0, v.dx],
-                }),
-              },
-              {
-                translateY: particleAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0, v.dy],
-                }),
-              },
-              { scale: particleAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }) },
-            ],
-          }}
-        />
+        <VfxParticle key={idx} dx={v.dx} dy={v.dy} color={v.color} progress={particleAnim} />
       ))}
     </View>
   );

@@ -4,12 +4,10 @@ import {
   Easing,
   StyleSheet,
   View,
-  useWindowDimensions,
   type StyleProp,
   type ViewStyle,
 } from 'react-native'
 import { DEMO_SCENES, DemoScene } from './demoScenes'
-import { GradientOverlay } from './GradientOverlay'
 import { useDemoLoop, DemoLoopState } from './useDemoLoop'
 import { DemoExchange } from './DemoExchange'
 import { useTheme } from '../../context/ThemeContext'
@@ -53,7 +51,6 @@ export const DemoStage: React.FC<DemoStageProps> = ({
   const state = externalState ?? internalLoop.state
   const advanceScene = externalAdvance ?? internalLoop.advanceScene
   const reduceMotion = externalReduceMotion ?? internalLoop.reduceMotion
-  const { height: windowHeight } = useWindowDimensions()
 
   const prevIndexRef = useRef<number>(state.sceneIndex)
   const [exitingScene, setExitingScene] = useState<DemoScene | null>(null)
@@ -91,8 +88,6 @@ export const DemoStage: React.FC<DemoStageProps> = ({
     advanceScene()
     onAdvance()
   }, [advanceScene, onAdvance])
-
-  const gradientHeight = Math.max(72, Math.round(windowHeight * 0.1))
 
   return (
     <View
@@ -183,12 +178,6 @@ export const DemoStage: React.FC<DemoStageProps> = ({
             />
           </Animated.View>
         )}
-
-        <GradientOverlay
-          height={gradientHeight}
-          isDark={isDark}
-          pointerEvents="none"
-        />
       </View>
 
       <View style={styles.dotsBar} accessibilityElementsHidden>
@@ -223,7 +212,7 @@ const styles = StyleSheet.create({
   } as ViewStyle,
   feed: {
     flex: 1,
-    minHeight: 240,
+    minHeight: 310,
     position: 'relative',
     overflow: 'hidden',
   } as ViewStyle,

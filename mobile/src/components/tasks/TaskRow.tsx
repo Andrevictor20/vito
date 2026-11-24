@@ -10,7 +10,7 @@ import {
   UIManager,
   View,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { tokens } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { hapticFeedback } from '../../theme/motion';
@@ -164,7 +164,7 @@ export const TaskRow: React.FC<TaskRowProps> = ({
               },
             ]}
           >
-            <MaterialIcons
+            <ProtoUiIcon
               name={swipeSide === 'right' ? 'check-circle' : 'schedule'}
               size={20}
               color={swipeSide === 'right' ? colors.acc : colors.blue}
@@ -205,7 +205,7 @@ export const TaskRow: React.FC<TaskRowProps> = ({
             accessibilityState={{ checked: row.done }}
             accessibilityLabel={row.done ? 'Reabrir tarefa' : 'Concluir tarefa'}
           >
-            {row.done && <MaterialIcons name="check" size={14} color="#ffffff" />}
+            {row.done && <ProtoUiIcon name="check" size={14} color="#ffffff" />}
           </TouchableOpacity>
 
           <View style={styles.body}>
@@ -308,7 +308,7 @@ export const TaskRow: React.FC<TaskRowProps> = ({
 
                 {hasReminder && !row.done && (
                   <View style={[styles.pill, styles.bellPill, { backgroundColor: colors.surf }]}>
-                    <MaterialIcons name="notifications" size={12} color={colors.purple} />
+                    <ProtoUiIcon name="notifications" size={12} color={colors.purple} />
                   </View>
                 )}
               </View>
@@ -344,7 +344,7 @@ export const TaskRow: React.FC<TaskRowProps> = ({
           <View style={styles.actions}>
             {onReminder && !row.done && (
               <TouchableOpacity style={styles.actionBtn} onPress={onReminder} hitSlop={tokens.hitSlop.sm}>
-                <MaterialIcons
+                <ProtoUiIcon
                   name={hasReminder ? 'notifications' : 'notifications-none'}
                   size={18}
                   color={hasReminder ? colors.purple : colors.muted}
@@ -352,14 +352,14 @@ export const TaskRow: React.FC<TaskRowProps> = ({
               </TouchableOpacity>
             )}
             <TouchableOpacity style={styles.actionBtn} onPress={onAiAction || onEdit} hitSlop={tokens.hitSlop.sm}>
-              <MaterialIcons name="auto-awesome" size={17} color={colors.purple} />
+              <ProtoUiIcon name="auto-awesome" size={17} color={colors.purple} />
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.actionBtn}
               onPress={() => setDeleteModalVisible(true)}
               hitSlop={tokens.hitSlop.sm}
             >
-              <MaterialIcons name="delete-outline" size={18} color={colors.muted} />
+              <ProtoUiIcon name="delete-outline" size={18} color={colors.muted} />
             </TouchableOpacity>
           </View>
         </Animated.View>

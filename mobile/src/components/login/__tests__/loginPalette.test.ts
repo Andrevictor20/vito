@@ -18,6 +18,7 @@ describe('loginPalette — tokens v5 Light e Dark', () => {
     assert.equal(p.purple, '#ff2fa0')
     assert.equal(p.orange, '#f08300')
     assert.equal(p.fin, '#d98a00')
+    assert.equal(p.finBarBg, '#c2deff')
     assert.equal(p.wa, '#25d366')
   })
 
@@ -36,5 +37,6 @@ describe('loginPalette — tokens v5 Light e Dark', () => {
     assert.equal(p.purple, '#ff55b0')
     assert.equal(p.orange, '#ffa733')
     assert.equal(p.fin, '#ffb938')
+    assert.equal(p.finBarBg, '#162c47')
   })
 })

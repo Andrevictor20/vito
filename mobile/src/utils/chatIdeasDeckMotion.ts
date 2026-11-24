@@ -62,7 +62,7 @@ export const IDEA_CARDS: IdeaCard[] = [
     title: 'Resumo executivo',
     subtitle: 'Síntese diária de foco e prioridades',
     prompt: 'Manda um resumo executivo do meu dia toda manhã',
-    layout: 'agenda',
+    layout: 'radar',
   },
 ];
 

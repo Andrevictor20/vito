@@ -9,7 +9,7 @@ import {
   type ViewStyle,
   type TextStyle,
 } from 'react-native'
-import { LoginMascotRig } from './LoginMascotRig'
+import { MascotVectorRig } from '../mascot/MascotVectorRig'
 import { HeadlineReel } from './HeadlineReel'
 import { SunIcon } from './DemoIcons'
 import { loginPalette } from './loginPalette'
@@ -19,7 +19,7 @@ const THEME_BTN_SIZE = 40
 
 export interface LoginHeaderProps {
   isDark: boolean
-  toggleTheme: () => void
+  toggleTheme: (origin?: { x: number; y: number }) => void
   currentHeadline?: string
   currentTone?: DemoTone
   reduceMotion?: boolean
@@ -42,9 +42,18 @@ export const LoginHeader: React.FC<LoginHeaderProps> = ({
   const palette = loginPalette(isDark)
   const activeColor = headlineColor(currentTone, palette)
 
-  const handleThemePress = useCallback(() => {
-    toggleTheme()
-  }, [toggleTheme])
+  const handleThemePress = useCallback(
+    (e: { nativeEvent?: { pageX?: number; pageY?: number } }) => {
+      const x = e?.nativeEvent?.pageX
+      const y = e?.nativeEvent?.pageY
+      if (typeof x === 'number' && typeof y === 'number') {
+        toggleTheme({ x, y })
+      } else {
+        toggleTheme()
+      }
+    },
+    [toggleTheme],
+  )
 
   return (
     <View style={[styles.hero, style]}>
@@ -52,7 +61,7 @@ export const LoginHeader: React.FC<LoginHeaderProps> = ({
 
       <View style={styles.topRow}>
         <View style={styles.brand}>
-          <LoginMascotRig size={38} state="blink" animated={!reduceMotion} />
+          <MascotVectorRig size={38} state="blink" animated={!reduceMotion} />
           <Text
             style={[styles.wordmark, { color: palette.ink }]}
             maxFontSizeMultiplier={1.3}
@@ -117,7 +126,7 @@ const styles = StyleSheet.create({
     gap: 10,
   } as ViewStyle,
   wordmark: {
-    fontFamily: 'Inter_700Bold',
+    fontFamily: 'Geist_700Bold',
     fontSize: 22,
     letterSpacing: -0.88,
   } as TextStyle,
@@ -133,7 +142,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   } as ViewStyle,
   l1: {
-    fontFamily: 'Inter_500Medium',
+    fontFamily: 'Geist_500Medium',
     fontSize: 21,
     lineHeight: 26,
     letterSpacing: -0.4,

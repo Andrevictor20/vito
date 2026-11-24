@@ -34,14 +34,11 @@ describe('demoMachine — máquina de estados da demonstração', () => {
   })
 
   it('DEMO_TIMING respeita os valores do HTML (ms)', () => {
-    assert.equal(DEMO_TIMING.userAppearMs, 350)
-    assert.equal(DEMO_TIMING.typeCharMs, 36)
-    assert.equal(DEMO_TIMING.thinkingDelayMs, 450)
-    assert.equal(DEMO_TIMING.dotsMs, 1000)
-    assert.equal(DEMO_TIMING.vitoFadeMs, 400)
-    assert.equal(DEMO_TIMING.cardDelayMs, 250)
-    assert.equal(DEMO_TIMING.cardFadeMs, 450)
-    assert.equal(DEMO_TIMING.pauseMs, 3300)
+    assert.equal(DEMO_TIMING.userAppearMs, 220)
+    assert.equal(DEMO_TIMING.typeCharMs, 28)
+    assert.equal(DEMO_TIMING.dotsDelayMs, 320)
+    assert.equal(DEMO_TIMING.dotsMs, 750)
+    assert.equal(DEMO_TIMING.pauseMs, 3200)
   })
 
   it('advanceScene cicla as seis cenas e reinicia a fase', () => {

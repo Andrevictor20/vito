@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, ActivityIndicator, FlatList, Share, Alert } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { tokens, MD3Shapes } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { BottomSheetModal } from '../ui/BottomSheetModal';
@@ -147,7 +147,7 @@ export const ContactsSyncModal: React.FC<ContactsSyncModalProps> = ({
           }}
           activeOpacity={0.7}
         >
-          <MaterialIcons name="event" size={16} color={accent} />
+          <ProtoUiIcon name="event" size={16} color={accent} />
           <Text style={[styles.meetingActionText, { color: accent }]}>
             Reunião
           </Text>
@@ -173,7 +173,7 @@ export const ContactsSyncModal: React.FC<ContactsSyncModalProps> = ({
             onPress={() => setActiveSource('device')}
             activeOpacity={0.7}
           >
-            <MaterialIcons
+            <ProtoUiIcon
               name="contacts"
               size={16}
               color={activeSource === 'device' ? colors.primary : colors.outline}
@@ -196,7 +196,7 @@ export const ContactsSyncModal: React.FC<ContactsSyncModalProps> = ({
             onPress={() => setActiveSource('whatsapp')}
             activeOpacity={0.7}
           >
-            <MaterialIcons
+            <ProtoUiIcon
               name="chat"
               size={16}
               color={activeSource === 'whatsapp' ? '#10B981' : colors.outline}
@@ -216,7 +216,7 @@ export const ContactsSyncModal: React.FC<ContactsSyncModalProps> = ({
           <>
         {/* Privacy Card */}
         <View style={[styles.privacyBanner, { backgroundColor: colors.surfaceContainerHighest, borderColor: colors.outlineVariant }]}>
-          <MaterialIcons name="security" size={20} color={colors.primary} style={styles.privacyIcon} />
+          <ProtoUiIcon name="security" size={20} color={colors.primary} style={styles.privacyIcon} />
           <View style={styles.privacyTextCol}>
             <Text style={[styles.privacyTitle, { color: colors.onSurface }]}>
               Privacidade e Segurança
@@ -230,7 +230,7 @@ export const ContactsSyncModal: React.FC<ContactsSyncModalProps> = ({
         {/* Permission Denied Notice */}
         {permissionDenied && (
           <View style={[styles.alertBanner, { backgroundColor: '#3E1C1A', borderColor: '#7E2A24' }]}>
-            <MaterialIcons name="error-outline" size={20} color="#FF8E85" />
+            <ProtoUiIcon name="error-outline" size={20} color="#FF8E85" />
             <Text style={styles.alertText}>
               Permissão negada. O Vito precisa de acesso aos contatos para encontrar quem já utiliza o aplicativo.
             </Text>
@@ -248,7 +248,7 @@ export const ContactsSyncModal: React.FC<ContactsSyncModalProps> = ({
             <ActivityIndicator color={colors.onPrimary} size="small" />
           ) : (
             <>
-              <MaterialIcons name="sync" size={18} color={colors.onPrimary} />
+              <ProtoUiIcon name="sync" size={18} color={colors.onPrimary} />
               <Text style={[styles.syncButtonText, { color: colors.onPrimary }]}>
                 {hasScanned ? 'Atualizar Lista' : 'Buscar Amigos na Agenda'}
               </Text>
@@ -270,7 +270,7 @@ export const ContactsSyncModal: React.FC<ContactsSyncModalProps> = ({
 
             {matches.length === 0 ? (
               <View style={[styles.emptyCard, { backgroundColor: colors.surfaceContainer }]}>
-                <MaterialIcons name="group-off" size={36} color={colors.outline} />
+                <ProtoUiIcon name="group-off" size={36} color={colors.outline} />
                 <Text style={[styles.emptyTitle, { color: colors.onSurface }]}>
                   Nenhum contato encontrado ainda
                 </Text>
@@ -282,7 +282,7 @@ export const ContactsSyncModal: React.FC<ContactsSyncModalProps> = ({
                   onPress={handleShareInvite}
                   activeOpacity={0.7}
                 >
-                  <MaterialIcons name="share" size={16} color={colors.primary} />
+                  <ProtoUiIcon name="share" size={16} color={colors.primary} />
                   <Text style={[styles.inviteButtonText, { color: colors.primary }]}>
                     Compartilhar Convite
                   </Text>
@@ -306,7 +306,7 @@ export const ContactsSyncModal: React.FC<ContactsSyncModalProps> = ({
           <>
             {waConnected === false ? (
               <View style={[styles.emptyCard, { backgroundColor: colors.surfaceContainer }]}>
-                <MaterialIcons name="link-off" size={36} color={colors.outline} />
+                <ProtoUiIcon name="link-off" size={36} color={colors.outline} />
                 <Text style={[styles.emptyTitle, { color: colors.onSurface }]}>
                   WhatsApp Não Conectado
                 </Text>
@@ -326,7 +326,7 @@ export const ContactsSyncModal: React.FC<ContactsSyncModalProps> = ({
                     <ActivityIndicator color="#FFFFFF" size="small" />
                   ) : (
                     <>
-                      <MaterialIcons name="sync" size={18} color="#FFFFFF" />
+                      <ProtoUiIcon name="sync" size={18} color="#FFFFFF" />
                       <Text style={[styles.syncButtonText, { color: '#FFFFFF' }]}>
                         {waHasScanned ? 'Atualizar Contatos WhatsApp' : 'Buscar Amigos no WhatsApp'}
                       </Text>
@@ -353,7 +353,7 @@ export const ContactsSyncModal: React.FC<ContactsSyncModalProps> = ({
 
                     {waMatches.length === 0 ? (
                       <View style={[styles.emptyCard, { backgroundColor: colors.surfaceContainer }]}>
-                        <MaterialIcons name="group-off" size={36} color={colors.outline} />
+                        <ProtoUiIcon name="group-off" size={36} color={colors.outline} />
                         <Text style={[styles.emptyTitle, { color: colors.onSurface }]}>
                           Nenhum contato encontrado
                         </Text>

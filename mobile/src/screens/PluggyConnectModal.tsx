@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../icons/ProtoUiIcons';
+import { BrandLogo } from '../icons/IconRegistry';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
 import { hapticFeedback } from '../theme/motion';
@@ -187,7 +188,7 @@ export const PluggyConnectModal: React.FC<PluggyConnectModalProps> = ({ visible,
             accessibilityRole="button"
             accessibilityLabel="Fechar"
           >
-            <MaterialIcons name="close" size={20} color={colors.ink} />
+            <ProtoUiIcon name="close" size={20} color={colors.ink} />
           </TouchableOpacity>
           <Text style={[styles.contextLabel, { color: colors.muted }]}>{contextLabel}</Text>
         </View>
@@ -211,7 +212,13 @@ export const PluggyConnectModal: React.FC<PluggyConnectModalProps> = ({ visible,
                   const ok = item.status === 'UPDATED';
                   return (
                     <View key={item.id} style={[styles.connCard, { backgroundColor: colors.bg, borderColor: colors.line }]}>
-                      <MaterialIcons name="account-balance" size={20} color={colors.ink} style={{ marginRight: 12 }} />
+                      <View style={{ marginRight: 12 }}>
+                        {['Nubank', 'Itaú', 'Inter', 'Banco do Brasil', 'Bradesco', 'Santander', 'C6 Bank', 'Caixa'].includes(item.institution_name || '') ? (
+                          <BrandLogo group="bank" id={item.institution_name!} size={22} color={colors.ink} />
+                        ) : (
+                          <ProtoUiIcon name="account-balance" size={20} color={colors.ink} />
+                        )}
+                      </View>
                       <View style={{ flex: 1 }}>
                         <Text style={[styles.connName, { color: colors.ink }]}>
                           {item.institution_name || 'Meu Pluggy'}
@@ -229,7 +236,7 @@ export const PluggyConnectModal: React.FC<PluggyConnectModalProps> = ({ visible,
                         {syncingId === item.id ? (
                           <ActivityIndicator size="small" color={colors.ink} />
                         ) : (
-                          <MaterialIcons name="sync" size={22} color={colors.ink} />
+                          <ProtoUiIcon name="sync" size={22} color={colors.ink} />
                         )}
                       </TouchableOpacity>
                       <TouchableOpacity
@@ -237,7 +244,7 @@ export const PluggyConnectModal: React.FC<PluggyConnectModalProps> = ({ visible,
                         style={styles.iconBtn}
                         accessibilityLabel="Desconectar banco"
                       >
-                        <MaterialIcons name="delete-outline" size={22} color={colors.red} />
+                        <ProtoUiIcon name="delete-outline" size={22} color={colors.red} />
                       </TouchableOpacity>
                     </View>
                   );

@@ -7,7 +7,7 @@ import {
   ScrollView,
   BackHandler,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { tokens, MD3Shapes } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
@@ -105,7 +105,7 @@ export const FullMonthCalendarView: React.FC<FullMonthCalendarViewProps> = ({
             accessibilityRole="button"
             accessibilityLabel="Voltar para a agenda"
           >
-            <MaterialIcons name="arrow-back" size={20} color={colors.ink} />
+            <ProtoUiIcon name="arrow-back" size={20} color={colors.ink} />
           </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: colors.ink }]}>
             {currentMonthTitle}
@@ -131,7 +131,7 @@ export const FullMonthCalendarView: React.FC<FullMonthCalendarViewProps> = ({
               accessibilityRole="button"
               accessibilityLabel="Novo evento"
             >
-              <MaterialIcons name="add" size={20} color={colors.bg} />
+              <ProtoUiIcon name="add" size={20} color={colors.bg} />
             </TouchableOpacity>
           )}
         </View>
@@ -209,7 +209,7 @@ export const FullMonthCalendarView: React.FC<FullMonthCalendarViewProps> = ({
               accessibilityRole="button"
               accessibilityLabel="Fechar detalhes do dia"
             >
-              <MaterialIcons name="close" size={18} color={colors.muted} />
+              <ProtoUiIcon name="close" size={18} color={colors.muted} />
             </TouchableOpacity>
           </View>
           <SelectedDayInspector
@@ -260,9 +260,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTitle: {
-    fontFamily: 'Montserrat_800ExtraBold',
+    fontFamily: 'Geist_500Medium',
     fontSize: 18,
-    fontWeight: '800',
+    fontWeight: '500',
     letterSpacing: -0.36,
   },
   headerRight: {

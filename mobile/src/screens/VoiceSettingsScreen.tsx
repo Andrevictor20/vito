@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../icons/ProtoUiIcons';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
 import { hapticFeedback } from '../theme/motion';
@@ -81,13 +81,13 @@ export const VoiceSettingsScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.bg }]}>
-      <View style={[styles.sbar, { borderBottomColor: colors.line }]}>
+      <View style={styles.sbar}>
         <TouchableOpacity
-          style={[styles.rb, { backgroundColor: colors.surf, borderColor: colors.line }]}
+          style={[styles.rb, { backgroundColor: colors.bg, borderColor: colors.hairline }]}
           onPress={() => navigation.goBack()}
           accessibilityLabel="Voltar"
         >
-          <MaterialIcons name="arrow-back" size={20} color={colors.ink} />
+          <ProtoUiIcon name="arrow-back" size={20} color={colors.ink} />
         </TouchableOpacity>
         <View style={styles.ttl}>
           <Text style={[styles.h1, { color: colors.ink }]}>Voz e Ativação</Text>
@@ -101,7 +101,7 @@ export const VoiceSettingsScreen: React.FC = () => {
           }}
           accessibilityLabel="Testar conversa por voz"
         >
-          <MaterialIcons name="mic" size={20} color={colors.ink} />
+          <ProtoUiIcon name="mic" size={20} color={colors.ink} />
         </TouchableOpacity>
       </View>
 
@@ -125,7 +125,7 @@ export const VoiceSettingsScreen: React.FC = () => {
                 { backgroundColor: isDefault ? colors.greenBg : colors.bg },
               ]}
             >
-              <MaterialIcons
+              <ProtoUiIcon
                 name={isDefault ? 'check-circle' : 'radio-button-unchecked'}
                 size={22}
                 color={isDefault ? colors.acc : colors.muted}
@@ -159,7 +159,7 @@ export const VoiceSettingsScreen: React.FC = () => {
             onPress={handleRequestRole}
             disabled={loading}
           >
-            <MaterialIcons name="sync" size={18} color={colors.bg} />
+            <ProtoUiIcon name="sync" size={18} color={colors.bg} />
             <Text style={[styles.priBtnText, { color: colors.bg }]}>
               Ativar como assistente padrão
             </Text>

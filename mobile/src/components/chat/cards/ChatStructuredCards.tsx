@@ -10,12 +10,14 @@ import { MeetingInlineCard } from './MeetingInlineCard';
 import { WhatsAppMessageInlineCard } from './WhatsAppMessageInlineCard';
 import { GmailMessageInlineCard } from './GmailMessageInlineCard';
 import { DestructiveConfirmationCard } from './DestructiveConfirmationCard';
+import { ActionConfirmationCard } from './ActionConfirmationCard';
 import { SmoothCardEntrance } from './SmoothCardEntrance';
 
 export interface ChatStructuredCardsProps {
   message: ChatMessage;
   onSelectSlot?: (slot: TimeSlot, message: ChatMessage) => void;
   onConfirmAction?: (confirmPrompt: string) => void;
+  onResolveConfirmation?: (messageId: string, pendingId: string, reject: boolean) => Promise<void> | void;
   disabled?: boolean;
 }
 
@@ -27,8 +29,18 @@ export const ChatStructuredCards: React.FC<ChatStructuredCardsProps> = ({
   message,
   onSelectSlot,
   onConfirmAction,
+  onResolveConfirmation,
   disabled = false,
 }) => {
+  const confirmCard = message.cards?.find((c) => c.type === 'confirm');
+  const pendingConfId = message.pending_confirmation_id || confirmCard?.id || '';
+  const showActionConfirm =
+    Boolean(message.requires_confirmation || confirmCard) &&
+    Boolean(pendingConfId) &&
+    !message.pending_confirmation &&
+    !message.whatsapp_message &&
+    !message.gmail_message;
+
   return (
     <>
       {message.event && (
@@ -82,6 +94,17 @@ export const ChatStructuredCards: React.FC<ChatStructuredCardsProps> = ({
           <GmailMessageInlineCard
             messageData={message.gmail_message}
             disabled={disabled}
+          />
+        </SmoothCardEntrance>
+      )}
+      {showActionConfirm && (
+        <SmoothCardEntrance>
+          <ActionConfirmationCard
+            pendingId={pendingConfId}
+            card={confirmCard}
+            status={message.confirmationStatus}
+            disabled={disabled}
+            onResolve={(id, reject) => onResolveConfirmation?.(message.id, id, reject)}
           />
         </SmoothCardEntrance>
       )}

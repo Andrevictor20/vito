@@ -1,12 +1,18 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect } from 'react';
 import {
   TouchableWithoutFeedback,
-  Animated,
   StyleSheet,
-  View,
   ViewStyle,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import Animated, {
+  Extrapolation,
+  interpolate,
+  interpolateColor,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from 'react-native-reanimated';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { useTheme } from '../../context/ThemeContext';
 
 export interface M3SwitchProps {
@@ -16,6 +22,7 @@ export interface M3SwitchProps {
   style?: ViewStyle;
 }
 
+/** Switch M3 na UI thread (Reanimated 4, spring com mass: 1). */
 export const M3Switch: React.FC<M3SwitchProps> = ({
   value,
   onValueChange,
@@ -23,84 +30,58 @@ export const M3Switch: React.FC<M3SwitchProps> = ({
   style,
 }) => {
   const { colors, isDark } = useTheme();
-  const animValue = useRef(new Animated.Value(value ? 1 : 0)).current;
+  const progress = useSharedValue(value ? 1 : 0);
 
   useEffect(() => {
-    Animated.spring(animValue, {
-      toValue: value ? 1 : 0,
-      useNativeDriver: false,
-      bounciness: 4,
-      speed: 18,
-    }).start();
-  }, [value]);
+    progress.value = withSpring(value ? 1 : 0, {
+      damping: 18,
+      stiffness: 260,
+      mass: 1,
+    });
+  }, [value, progress]);
 
   const toggle = () => {
     if (disabled) return;
     onValueChange(!value);
   };
 
-  // M3 Canonical Switch Specs:
-  // Track: 52dp x 32dp (radius 16dp)
-  // Inactive thumb: 16dp diameter, centered at left (margin 8dp)
-  // Active thumb: 24dp diameter, shifted to right
-  const trackColor = animValue.interpolate({
-    inputRange: [0, 1],
-    outputRange: [
-      colors.surfaceContainerHighest,
-      isDark ? '#FFFFFF' : '#18181B',
-    ],
-  });
+  const trackOff = colors.surfaceContainerHighest;
+  const trackOn = isDark ? '#FFFFFF' : '#18181B';
+  const outlineCol = colors.outline;
+  const thumbOn = isDark ? '#09090B' : '#FFFFFF';
 
-  const borderColor = animValue.interpolate({
-    inputRange: [0, 1],
-    outputRange: [colors.outline, 'transparent'],
-  });
+  const trackStyle = useAnimatedStyle(() => ({
+    backgroundColor: interpolateColor(progress.value, [0, 1], [trackOff, trackOn]),
+    borderColor: interpolateColor(progress.value, [0, 1], [outlineCol, 'rgba(0,0,0,0)']),
+  }), [trackOff, trackOn, outlineCol]);
 
-  const thumbColor = animValue.interpolate({
-    inputRange: [0, 1],
-    outputRange: [
-      colors.outline,
-      isDark ? '#09090B' : '#FFFFFF',
-    ],
-  });
-
-  const thumbSize = animValue.interpolate({
-    inputRange: [0, 1],
-    outputRange: [16, 24],
-  });
-
-  const thumbTranslateX = animValue.interpolate({
-    inputRange: [0, 1],
-    outputRange: [4, 24],
-  });
+  const thumbStyle = useAnimatedStyle(() => {
+    const scale = interpolate(progress.value, [0, 1], [16 / 24, 1], Extrapolation.CLAMP);
+    const tx = interpolate(progress.value, [0, 1], [2, 22], Extrapolation.CLAMP);
+    return {
+      backgroundColor: interpolateColor(progress.value, [0, 1], [outlineCol, thumbOn]),
+      transform: [{ translateX: tx }, { scale }],
+    };
+  }, [outlineCol, thumbOn]);
 
   return (
-    <TouchableWithoutFeedback onPress={toggle} disabled={disabled} accessibilityRole="switch" accessibilityState={{ checked: value }}>
+    <TouchableWithoutFeedback
+      onPress={toggle}
+      disabled={disabled}
+      accessibilityRole="switch"
+      accessibilityState={{ checked: value }}
+    >
       <Animated.View
         style={[
           styles.track,
-          {
-            backgroundColor: trackColor,
-            borderColor: borderColor,
-            opacity: disabled ? 0.38 : 1,
-          },
+          { opacity: disabled ? 0.38 : 1 },
+          trackStyle,
           style,
         ]}
       >
-        <Animated.View
-          style={[
-            styles.thumb,
-            {
-              backgroundColor: thumbColor,
-              width: thumbSize,
-              height: thumbSize,
-              borderRadius: 12,
-              transform: [{ translateX: thumbTranslateX }],
-            },
-          ]}
-        >
+        <Animated.View style={[styles.thumb, thumbStyle]}>
           {value && (
-            <MaterialIcons
+            <ProtoUiIcon
               name="check"
               size={12}
               color={isDark ? '#09090B' : '#18181B'}
@@ -121,6 +102,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   thumb: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -9,7 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../icons/ProtoUiIcons';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
 import { tokens } from '../theme/tokens';
@@ -141,14 +141,14 @@ export const AiProvidersScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.bg }]}>
-      <View style={[styles.header, { borderBottomColor: colors.line }]}>
+      <View style={styles.header}>
         <TouchableOpacity
-          style={[styles.roundBtn, { backgroundColor: colors.surf, borderColor: colors.line }]}
+          style={[styles.roundBtn, { backgroundColor: colors.bg, borderColor: colors.hairline }]}
           onPress={() => navigation.goBack()}
           hitSlop={tokens.hitSlop.sm}
           accessibilityLabel="Voltar"
         >
-          <MaterialIcons name="arrow-back" size={20} color={colors.ink} />
+          <ProtoUiIcon name="arrow-back" size={20} color={colors.ink} />
         </TouchableOpacity>
         <View style={styles.headerText}>
           <Text style={[styles.headerTitle, { color: colors.ink }]}>Provedores de IA</Text>
@@ -162,13 +162,13 @@ export const AiProvidersScreen: React.FC = () => {
           hitSlop={tokens.hitSlop.sm}
           accessibilityLabel="Adicionar endpoint compatível"
         >
-          <MaterialIcons name="add" size={21} color={colors.bg} />
+          <ProtoUiIcon name="add" size={21} color={colors.bg} />
         </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={[styles.searchBox, { backgroundColor: colors.surf, borderColor: colors.line }]}>
-          <MaterialIcons name="search" size={18} color={colors.muted} />
+          <ProtoUiIcon name="search" size={18} color={colors.muted} />
           <TextInput
             style={[styles.searchInput, { color: colors.ink }]}
             placeholder="Buscar provedores ou modelos"
@@ -214,10 +214,10 @@ export const AiProvidersScreen: React.FC = () => {
             {activeProviders.length > 0 && (
               <>
                 <View style={styles.secHeader}>
-                  <Text style={[styles.secTitle, { color: colors.muted }]}>ATIVOS</Text>
+                  <Text style={[styles.secTitle, { color: colors.muted }]}>Ativos</Text>
                   <Text style={[styles.secCount, { color: colors.muted }]}>{activeProviders.length}</Text>
                 </View>
-                <View style={[styles.listCard, { backgroundColor: colors.surf, borderColor: colors.line }]}>
+                <View style={[styles.listCard, { backgroundColor: colors.surf, borderColor: colors.hairline }]}>
                   {activeProviders.map(renderProviderRow)}
                 </View>
               </>
@@ -226,10 +226,10 @@ export const AiProvidersScreen: React.FC = () => {
             {availableProviders.length > 0 && (
               <>
                 <View style={styles.secHeader}>
-                  <Text style={[styles.secTitle, { color: colors.muted }]}>COM CHAVE PRÓPRIA</Text>
+                  <Text style={[styles.secTitle, { color: colors.muted }]}>Com chave própria</Text>
                   <Text style={[styles.secCount, { color: colors.muted }]}>{availableProviders.length}</Text>
                 </View>
-                <View style={[styles.listCard, { backgroundColor: colors.surf, borderColor: colors.line }]}>
+                <View style={[styles.listCard, { backgroundColor: colors.surf, borderColor: colors.hairline }]}>
                   {availableProviders.map(renderProviderRow)}
                 </View>
               </>
@@ -264,9 +264,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 8,
   },
   roundBtn: {
     width: 44,
@@ -277,9 +277,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerText: { flex: 1 },
-  headerTitle: { fontSize: 18, fontWeight: '700', fontFamily: tokens.typography.family.semibold },
-  headerSub: { fontSize: 12.5, marginTop: 1 },
-  content: { padding: 16, paddingBottom: 48 },
+  headerTitle: {
+    fontFamily: 'Geist_500Medium',
+    fontSize: 26,
+    fontWeight: '500',
+    letterSpacing: -0.73,
+  },
+  headerSub: { fontFamily: 'Geist', fontSize: 13, marginTop: 1 },
+  content: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 48 },
   searchBox: {
     minHeight: 46,
     borderRadius: 14,
@@ -308,9 +313,9 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     paddingHorizontal: 2,
   },
-  secTitle: { fontSize: 12, fontWeight: '700', letterSpacing: 0.7 },
-  secCount: { fontSize: 12, fontWeight: '600' },
-  listCard: { borderRadius: 18, borderWidth: 1, overflow: 'hidden' },
+  secTitle: { fontFamily: 'Geist_500Medium', fontSize: 13, fontWeight: '500', letterSpacing: 0 },
+  secCount: { fontFamily: 'Geist_500Medium', fontSize: 12, fontWeight: '500' },
+  listCard: { borderRadius: 22, borderWidth: 1, overflow: 'hidden' },
   row: {
     minHeight: 62,
     flexDirection: 'row',

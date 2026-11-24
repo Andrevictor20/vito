@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { useTheme } from '../../context/ThemeContext';
 import { MASCOT_PRESETS } from '../../data/botsCatalogFallback';
 import { BotAppInfo, BotSkin, BotTemplate } from '../../types/bots';
@@ -93,7 +93,7 @@ export const TemplateSheet: React.FC<TemplateSheetProps> = ({
             onCustomizeMascot(template, activeSkin);
           }}
         >
-          <MaterialIcons name="palette" size={16} color={colors.ink} />
+          <ProtoUiIcon name="palette" size={16} color={colors.ink} />
           <Text style={[styles.customizeText, { color: colors.ink }]}>
             Personalizar cores do bot
           </Text>
@@ -115,7 +115,7 @@ export const TemplateSheet: React.FC<TemplateSheetProps> = ({
               { backgroundColor: colors.orangeBg, borderColor: colors.orange },
             ]}
           >
-            <MaterialIcons name="info-outline" size={16} color={colors.orange} />
+            <ProtoUiIcon name="info-outline" size={16} color={colors.orange} />
             <Text style={[styles.warnText, { color: colors.ink }]}>
               Dá para ativar agora. As ações de {missingApps.map((a) => a.name).join(' e ')} ficam
               travadas até você conectar o app em Perfil › Integrações.

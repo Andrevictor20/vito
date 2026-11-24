@@ -10,7 +10,7 @@ import {
   Alert,
   Platform,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { useTheme } from '../../context/ThemeContext';
 import { BottomSheetModal } from '../ui/BottomSheetModal';
 import { useCalendarSync } from '../../hooks/useCalendarSync';
@@ -127,7 +127,7 @@ export const CalendarSyncSettingsModal: React.FC<CalendarSyncSettingsModalProps>
               <View style={styles.cardHeader}>
                 <View style={styles.cardHeaderLeft}>
                   <View style={[styles.providerIconBox, { backgroundColor: '#EA4335' + '1A' }]}>
-                    <MaterialIcons name="event" size={20} color="#EA4335" />
+                    <ProtoUiIcon name="event" size={20} color="#EA4335" />
                   </View>
                   <View>
                     <Text style={[styles.cardTitle, { color: colors.onSurface }]}>
@@ -173,7 +173,7 @@ export const CalendarSyncSettingsModal: React.FC<CalendarSyncSettingsModalProps>
                         <ActivityIndicator size="small" color={isDark ? colors.onSurface : '#FFFFFF'} />
                       ) : (
                         <>
-                          <MaterialIcons name="refresh" size={16} color={isDark ? colors.onSurface : '#FFFFFF'} />
+                          <ProtoUiIcon name="refresh" size={16} color={isDark ? colors.onSurface : '#FFFFFF'} />
                           <Text style={[styles.primaryActionText, { color: isDark ? colors.onSurface : '#FFFFFF' }]}>
                             Sincronizar
                           </Text>
@@ -221,7 +221,7 @@ export const CalendarSyncSettingsModal: React.FC<CalendarSyncSettingsModalProps>
                       <ActivityIndicator size="small" color={isDark ? colors.onSurface : '#FFFFFF'} />
                     ) : (
                       <>
-                        <MaterialIcons name="sync" size={16} color={isDark ? colors.onSurface : '#FFFFFF'} />
+                        <ProtoUiIcon name="sync" size={16} color={isDark ? colors.onSurface : '#FFFFFF'} />
                         <Text style={[styles.connectBtnText, { color: isDark ? colors.onSurface : '#FFFFFF' }]}>
                           Conectar Conta Google
                         </Text>
@@ -242,7 +242,7 @@ export const CalendarSyncSettingsModal: React.FC<CalendarSyncSettingsModalProps>
               <View style={styles.cardHeader}>
                 <View style={styles.cardHeaderLeft}>
                   <View style={[styles.providerIconBox, { backgroundColor: isDark ? '#FFFFFF15' : '#00000010' }]}>
-                    <MaterialIcons
+                    <ProtoUiIcon
                       name={Platform.OS === 'ios' ? 'phone-iphone' : 'smartphone'}
                       size={20}
                       color={colors.onSurface}
@@ -304,7 +304,7 @@ export const CalendarSyncSettingsModal: React.FC<CalendarSyncSettingsModalProps>
                     onPress={handleToggleNativeApple}
                     activeOpacity={0.8}
                   >
-                    <MaterialIcons name="sync" size={16} color={isDark ? colors.onSurface : '#FFFFFF'} />
+                    <ProtoUiIcon name="sync" size={16} color={isDark ? colors.onSurface : '#FFFFFF'} />
                     <Text style={[styles.connectBtnText, { color: isDark ? colors.onSurface : '#FFFFFF' }]}>
                       Ativar Calendário do Aparelho
                     </Text>

@@ -1,8 +1,10 @@
-import React, { useMemo, useState } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, Easing, StyleSheet, View, Text, TouchableOpacity } from 'react-native';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
+import { getBezier } from '../../ds/tokens';
 import { tokens } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
+import { useReduceMotion } from '../../theme/vitoMotion';
 import { Event } from '../../types';
 
 export interface AgendaWeekStripProps {
@@ -15,18 +17,8 @@ export interface AgendaWeekStripProps {
 
 const DN = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
 const MN = [
-  'janeiro',
-  'fevereiro',
-  'março',
-  'abril',
-  'maio',
-  'junho',
-  'julho',
-  'agosto',
-  'setembro',
-  'outubro',
-  'novembro',
-  'dezembro',
+  'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
+  'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro',
 ];
 
 /**
@@ -44,9 +36,38 @@ export const AgendaWeekStrip: React.FC<AgendaWeekStripProps> = ({
   eventDates = new Set(),
   events = [],
 }) => {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
+  const reduceMotion = useReduceMotion();
   const [isMonthView, setIsMonthView] = useState(false);
   const today = useMemo(() => new Date(), []);
+  const dayPopScale = useRef(new Animated.Value(1)).current;
+  const selectedKey = `${selectedDate.getFullYear()}-${selectedDate.getMonth()}-${selectedDate.getDate()}`;
+  const prevSelectedKeyRef = useRef(selectedKey);
+
+  useEffect(() => {
+    if (prevSelectedKeyRef.current === selectedKey) return;
+    prevSelectedKeyRef.current = selectedKey;
+    if (reduceMotion) {
+      dayPopScale.setValue(1);
+      return;
+    }
+    dayPopScale.setValue(0.7);
+    const easeQ = Easing.bezier(...getBezier('--ease-q'));
+    Animated.sequence([
+      Animated.timing(dayPopScale, {
+        toValue: 1.12,
+        duration: 270,
+        easing: easeQ,
+        useNativeDriver: true,
+      }),
+      Animated.timing(dayPopScale, {
+        toValue: 1,
+        duration: 180,
+        easing: easeQ,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [selectedKey, reduceMotion, dayPopScale]);
 
   const isSameDay = (d1: Date, d2: Date) =>
     d1.getDate() === d2.getDate() &&
@@ -167,7 +188,7 @@ export const AgendaWeekStrip: React.FC<AgendaWeekStripProps> = ({
             accessibilityLabel="Anterior"
             accessibilityRole="button"
           >
-            <MaterialIcons name="chevron-left" size={18} color={colors.ink} />
+            <ProtoUiIcon name="chevron-left" size={18} color={colors.ink} />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -177,7 +198,7 @@ export const AgendaWeekStrip: React.FC<AgendaWeekStripProps> = ({
             accessibilityLabel="Próxima"
             accessibilityRole="button"
           >
-            <MaterialIcons name="chevron-right" size={18} color={colors.ink} />
+            <ProtoUiIcon name="chevron-right" size={18} color={colors.ink} />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -199,7 +220,7 @@ export const AgendaWeekStrip: React.FC<AgendaWeekStripProps> = ({
             accessibilityLabel="Abrir calendário infinito"
             accessibilityRole="button"
           >
-            <MaterialIcons name="open-in-full" size={16} color={colors.ink} />
+            <ProtoUiIcon name="open-in-full" size={16} color={colors.ink} />
           </TouchableOpacity>
         </View>
       </View>
@@ -225,10 +246,13 @@ export const AgendaWeekStrip: React.FC<AgendaWeekStripProps> = ({
                   {DN[d.getDay()]}
                 </Text>
 
-                <View
+                <Animated.View
                   style={[
                     styles.dayCircle,
-                    isSelected && { backgroundColor: colors.blue },
+                    isSelected && {
+                      backgroundColor: colors.ink,
+                      transform: [{ scale: dayPopScale }],
+                    },
                     !isSelected && isToday && {
                       borderWidth: 1.5,
                       borderColor: colors.blue,
@@ -239,14 +263,14 @@ export const AgendaWeekStrip: React.FC<AgendaWeekStripProps> = ({
                     style={[
                       styles.dayNumber,
                       {
-                        color: isSelected ? '#ffffff' : colors.ink,
+                        color: isSelected ? colors.bg : colors.ink,
                         fontWeight: isSelected || isToday ? '700' : '600',
                       },
                     ]}
                   >
                     {d.getDate()}
                   </Text>
-                </View>
+                </Animated.View>
 
                 {/* Dots coloridos */}
                 <View style={styles.dotsRow}>
@@ -290,10 +314,13 @@ export const AgendaWeekStrip: React.FC<AgendaWeekStripProps> = ({
                   accessibilityLabel={`${d.getDate()} de ${MN[d.getMonth()]}`}
                   accessibilityRole="button"
                 >
-                  <View
+                  <Animated.View
                     style={[
                       styles.monthDayCircle,
-                      isSelected && { backgroundColor: colors.blue },
+                      isSelected && {
+                        backgroundColor: colors.ink,
+                        transform: [{ scale: dayPopScale }],
+                      },
                       !isSelected && isToday && {
                         borderWidth: 1.5,
                         borderColor: colors.blue,
@@ -305,7 +332,7 @@ export const AgendaWeekStrip: React.FC<AgendaWeekStripProps> = ({
                         styles.monthDayNumber,
                         {
                           color: isSelected
-                            ? '#ffffff'
+                            ? colors.bg
                             : isDim
                             ? colors.muted
                             : colors.ink,
@@ -316,7 +343,7 @@ export const AgendaWeekStrip: React.FC<AgendaWeekStripProps> = ({
                     >
                       {d.getDate()}
                     </Text>
-                  </View>
+                  </Animated.View>
 
                   <View style={styles.dotsRow}>
                     {dots.map((dotColor, dotIdx) => (
@@ -402,7 +429,7 @@ const styles = StyleSheet.create({
     fontFamily: tokens.typography.family.semibold,
     fontSize: 10.5,
     letterSpacing: 0.4,
-    textTransform: 'lowercase',
+    textTransform: 'uppercase',
   },
   dayCircle: {
     width: 36,

@@ -348,13 +348,13 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   } as ViewStyle,
   title: {
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Geist_600SemiBold',
     fontSize: 22,
     letterSpacing: -0.44,
     marginBottom: 4,
   } as TextStyle,
   subtitle: {
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'Geist_400Regular',
     fontSize: 14,
     marginBottom: 16,
   } as TextStyle,
@@ -368,7 +368,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     paddingHorizontal: 14,
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'Geist_400Regular',
     fontSize: 15,
   } as TextStyle,
   eyeBtn: {
@@ -381,7 +381,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   } as ViewStyle,
   feedbackText: {
-    fontFamily: 'Inter_500Medium',
+    fontFamily: 'Geist_500Medium',
     fontSize: 12.5,
     marginBottom: 8,
   } as TextStyle,
@@ -394,7 +394,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
   } as ViewStyle,
   ctaText: {
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Geist_600SemiBold',
     fontSize: 15.5,
   } as TextStyle,
   footerLinks: {
@@ -406,7 +406,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   } as ViewStyle,
   switchModeText: {
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Geist_600SemiBold',
     fontSize: 14,
   } as TextStyle,
   forgotWrap: {
@@ -414,7 +414,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   } as ViewStyle,
   forgotText: {
-    fontFamily: 'Inter_500Medium',
+    fontFamily: 'Geist_500Medium',
     fontSize: 13.5,
   } as TextStyle,
 })

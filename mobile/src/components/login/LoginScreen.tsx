@@ -203,8 +203,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
       <View style={styles.glowBackdrop} pointerEvents="none">
         <Svg width="100%" height="100%">
           <Defs>
-            <RadialGradient id="lgGlowGrad" cx="50%" cy="32%" r="55%">
-              <Stop offset="0%" stopColor={glowColor} stopOpacity={isDark ? '0.22' : '0.15'} />
+            <RadialGradient id="lgGlowGrad" cx="50%" cy="50%" r="50%">
+              <Stop offset="0%" stopColor={glowColor} stopOpacity={isDark ? GLOW_OPACITY_DARK : GLOW_OPACITY_LIGHT} />
               <Stop offset="100%" stopColor={glowColor} stopOpacity="0" />
             </RadialGradient>
           </Defs>
@@ -274,9 +274,19 @@ export const LoginScreen: React.FC<LoginScreenProps> = () => {
   )
 }
 
+/** .lg-glow: 320px, opacity .14 (claro) / .20 (escuro). */
+export const GLOW_SIZE = 320
+const GLOW_OPACITY_LIGHT = '0.14'
+const GLOW_OPACITY_DARK = '0.20'
+
 const styles = StyleSheet.create({
   glowBackdrop: {
-    ...StyleSheet.absoluteFill,
+    position: 'absolute',
+    top: '16%',
+    left: '50%',
+    width: GLOW_SIZE,
+    height: GLOW_SIZE,
+    marginLeft: -GLOW_SIZE / 2,
     zIndex: 0,
   } as ViewStyle,
   stage: {

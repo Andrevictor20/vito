@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { tokens } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { formatPhoneNumber } from '../../utils/phoneFormat';
@@ -29,8 +29,8 @@ export const ProfileUserCard: React.FC<ProfileUserCardProps> = ({
     .toUpperCase() || 'U';
 
   return (
-    <View style={[styles.pf, { backgroundColor: colors.surf, borderColor: colors.line }]}>
-      {/* Avatar circular de 60px (.av) */}
+    <View style={[styles.pf, { backgroundColor: colors.surf, borderColor: colors.hairline }]}>
+      {/* Avatar circular (.av) */}
       <View style={[styles.av, { backgroundColor: colors.ink }]}>
         <Text style={[styles.avText, { color: colors.bg }]}>
           {initials || 'U'}
@@ -43,7 +43,7 @@ export const ProfileUserCard: React.FC<ProfileUserCardProps> = ({
           <Text style={[styles.name, { color: colors.ink }]} numberOfLines={1}>
             {name}
           </Text>
-          <MaterialIcons name="check-circle" size={18} color={colors.blue} />
+          <ProtoUiIcon name="check-circle" size={18} color={colors.blue} />
         </View>
 
         <Text style={[styles.email, { color: colors.muted }]} numberOfLines={1}>
@@ -57,7 +57,7 @@ export const ProfileUserCard: React.FC<ProfileUserCardProps> = ({
             activeOpacity={0.7}
             accessibilityLabel="Editar ou confirmar telefone"
           >
-            <MaterialIcons name="verified-user" size={13} color={colors.acc} />
+            <ProtoUiIcon name="verified-user" size={13} color={colors.acc} />
             <Text style={[styles.phnText, { color: colors.acc }]}>
               {phone ? formatPhoneNumber(phone) : '+ Confirmar telefone'}
             </Text>
@@ -73,23 +73,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
-    borderRadius: 20,
+    borderRadius: 24,
     padding: 16,
     borderWidth: 1,
     marginTop: 6,
     marginBottom: 8,
   },
   av: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avText: {
-    fontSize: 20,
-    fontFamily: tokens.typography.family.montserratBold,
-    fontWeight: '800',
+    fontSize: 13.5,
+    fontFamily: 'Geist_600SemiBold',
+    fontWeight: '600',
   },
   infoCol: {
     flex: 1,
@@ -102,11 +102,12 @@ const styles = StyleSheet.create({
   },
   name: {
     fontSize: 18,
-    fontFamily: tokens.typography.family.montserratBold,
-    fontWeight: '800',
-    letterSpacing: -0.3,
+    fontFamily: 'Geist_500Medium',
+    fontWeight: '500',
+    letterSpacing: -0.35,
   },
   email: {
+    fontFamily: 'Geist',
     fontSize: 13.5,
     marginTop: 2,
   },

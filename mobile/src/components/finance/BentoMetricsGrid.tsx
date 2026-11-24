@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { tokens, tabularNumbers } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import type { FinanceAccount, FinanceSubScreenKey, FinancialSummary } from '../../types/finance';
@@ -53,7 +53,7 @@ export const BentoMetricsGrid: React.FC<BentoMetricsGridProps> = ({
         >
           <View style={styles.tileHeader}>
             <Text style={[styles.tileTitle, { color: colors.muted }]}>Gastos do mês</Text>
-            <MaterialIcons name="chevron-right" size={16} color={colors.muted} />
+            <ProtoUiIcon name="chevron-right" size={16} color={colors.muted} />
           </View>
           <Text style={[styles.tileValue, tabularNumbers, { color: colors.ink }]}>
             {maskBRL(isPrivacyHidden, formatBRL(monthExpenses))}
@@ -89,7 +89,7 @@ export const BentoMetricsGrid: React.FC<BentoMetricsGridProps> = ({
         >
           <View style={styles.tileHeader}>
             <Text style={[styles.tileTitle, { color: colors.muted }]}>Fluxo de caixa</Text>
-            <MaterialIcons name="chevron-right" size={16} color={colors.muted} />
+            <ProtoUiIcon name="chevron-right" size={16} color={colors.muted} />
           </View>
           <Text
             style={[
@@ -158,7 +158,7 @@ export const BentoMetricsGrid: React.FC<BentoMetricsGridProps> = ({
                   </Text>
                 </View>
               ) : (
-                <MaterialIcons name="credit-card" size={16} color={colors.muted} />
+                <ProtoUiIcon name="credit-card" size={16} color={colors.muted} />
               )}
               <Text style={[styles.tileTitle, { color: colors.muted }]}>
                 {creditStats.creditAccounts.length > 0
@@ -168,7 +168,7 @@ export const BentoMetricsGrid: React.FC<BentoMetricsGridProps> = ({
                   : 'Cartões'}
               </Text>
             </View>
-            <MaterialIcons name="chevron-right" size={16} color={colors.muted} />
+            <ProtoUiIcon name="chevron-right" size={16} color={colors.muted} />
           </View>
           <Text style={[styles.tileSub, { color: colors.muted, marginTop: 6 }]}>Fatura atual</Text>
           <Text style={[styles.tileValue, tabularNumbers, { color: colors.ink, marginTop: 2 }]}>
@@ -194,7 +194,7 @@ export const BentoMetricsGrid: React.FC<BentoMetricsGridProps> = ({
         >
           <View style={styles.tileHeader}>
             <Text style={[styles.tileTitle, { color: colors.muted }]}>Limite usado</Text>
-            <MaterialIcons name="chevron-right" size={16} color={colors.muted} />
+            <ProtoUiIcon name="chevron-right" size={16} color={colors.muted} />
           </View>
           <Text style={[styles.tileValue, tabularNumbers, { color: colors.ink }]}>
             {maskBRL(isPrivacyHidden, formatBRL(creditStats.totalBill))}
@@ -227,7 +227,7 @@ export const BentoMetricsGrid: React.FC<BentoMetricsGridProps> = ({
         >
           <View style={styles.tileHeader}>
             <Text style={[styles.tileTitle, { color: colors.muted }]}>Assinaturas</Text>
-            <MaterialIcons name="chevron-right" size={16} color={colors.muted} />
+            <ProtoUiIcon name="chevron-right" size={16} color={colors.muted} />
           </View>
           <Text style={[styles.tileValue, tabularNumbers, { color: colors.ink }]}>
             {maskBRL(isPrivacyHidden, formatBRL(subscriptionsTotal))}

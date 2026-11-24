@@ -1,15 +1,15 @@
-import React from 'react';
-import { Platform, StyleSheet, Text, View } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import React, { useEffect, useRef } from 'react';
+import { Animated, Easing, Platform, StyleSheet, Text, View } from 'react-native';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { tokens } from '../../theme/tokens';
 import { getFloatingSurfaceShadow, getSbarGlassStyle } from '../../theme/surfaces';
-import { PressableScale } from '../../theme/vitoMotion';
+import { PressableScale, useReduceMotion } from '../../theme/vitoMotion';
 import { useTheme } from '../../context/ThemeContext';
 
 export type HeaderRoundButtonVariant = 'default' | 'primary';
 
 export interface HeaderRoundButtonProps {
-  icon: keyof typeof MaterialIcons.glyphMap;
+  icon: string;
   onPress: () => void;
   accessibilityLabel: string;
   variant?: HeaderRoundButtonVariant;
@@ -20,7 +20,8 @@ export interface HeaderRoundButtonProps {
 }
 
 /**
- * Botão circular v5 (.rb) de 44x44px com micro-compressão tátil e sombra flutuante.
+ * Botão circular v5 (.rb) de 44x44px com micro-compressão tátil, sombra flutuante
+ * e badge pulsante (badgeRing 2.4s ease-out infinite).
  */
 export const HeaderRoundButton: React.FC<HeaderRoundButtonProps> = ({
   icon,
@@ -33,7 +34,43 @@ export const HeaderRoundButton: React.FC<HeaderRoundButtonProps> = ({
   badgeCount = 0,
 }) => {
   const { colors, isDark } = useTheme();
+  const reduceMotion = useReduceMotion();
+  const ringAnim = useRef(new Animated.Value(0)).current;
   const isPri = variant === 'primary';
+
+  useEffect(() => {
+    if (badgeCount <= 0 || reduceMotion) {
+      ringAnim.setValue(0);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(ringAnim, {
+          toValue: 1,
+          duration: 1680,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.delay(720),
+        Animated.timing(ringAnim, {
+          toValue: 0,
+          duration: 0,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [badgeCount, reduceMotion, ringAnim]);
+
+  const ringScale = ringAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 2.1],
+  });
+  const ringOpacity = ringAnim.interpolate({
+    inputRange: [0, 0.7, 1],
+    outputRange: [0.55, 0, 0],
+  });
 
   return (
     <PressableScale
@@ -53,21 +90,36 @@ export const HeaderRoundButton: React.FC<HeaderRoundButtonProps> = ({
         disabled && controlStyles.btnDisabled,
       ]}
     >
-      <MaterialIcons name={icon} size={size} color={isPri ? colors.bg : colors.ink} />
+      <ProtoUiIcon name={icon} size={size} color={isPri ? colors.bg : colors.ink} />
       {badgeCount > 0 && (
-        <View
-          style={[
-            controlStyles.bellBadge,
-            { backgroundColor: colors.red, borderColor: colors.bg },
-          ]}
-        />
+        <>
+          {!reduceMotion && (
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                controlStyles.bellBadgeRing,
+                {
+                  backgroundColor: colors.red,
+                  opacity: ringOpacity,
+                  transform: [{ scale: ringScale }],
+                },
+              ]}
+            />
+          )}
+          <View
+            style={[
+              controlStyles.bellBadge,
+              { backgroundColor: colors.red, borderColor: colors.bg },
+            ]}
+          />
+        </>
       )}
     </PressableScale>
   );
 };
 
 export interface HeaderIconButtonProps {
-  icon: keyof typeof MaterialIcons.glyphMap;
+  icon: string;
   onPress: () => void;
   accessibilityLabel: string;
   size?: number;
@@ -93,7 +145,7 @@ export interface HeaderPillProps {
   onPress: () => void;
   accessibilityLabel: string;
   variant?: 'solid' | 'ghost';
-  icon?: keyof typeof MaterialIcons.glyphMap;
+  icon?: string;
 }
 
 export const HeaderPill: React.FC<HeaderPillProps> = ({
@@ -117,7 +169,7 @@ export const HeaderPill: React.FC<HeaderPillProps> = ({
       accessibilityRole="button"
     >
       {icon ? (
-        <MaterialIcons name={icon} size={16} color={ghost ? colors.ink : colors.bg} />
+        <ProtoUiIcon name={icon} size={16} color={ghost ? colors.ink : colors.bg} />
       ) : null}
       <Text
         style={[controlStyles.pillText, { color: ghost ? colors.ink : colors.bg }]}
@@ -215,6 +267,14 @@ const controlStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
+  },
+  bellBadgeRing: {
+    position: 'absolute',
+    top: 9,
+    right: 10,
+    width: 9,
+    height: 9,
+    borderRadius: 4.5,
   },
   bellBadge: {
     position: 'absolute',

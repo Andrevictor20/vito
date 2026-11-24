@@ -3,7 +3,7 @@
     "name": "Vito",
     "slug": "vito",
     "scheme": "vito",
-    "version": "0.1.32",
+    "version": "0.1.36",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -22,7 +22,7 @@
     },
     "android": {
       "package": "com.andrevmp.vito",
-      "versionCode": 32,
+      "versionCode": 36,
       "googleServicesFile": "./google-services.json",
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
@@ -82,7 +82,7 @@
     },
     "notification": {
       "icon": "./assets/notification-icon.png",
-      "color": "#1A1A1E"
+      "color": "#0B7A53"
     },
     "plugins": [
       "expo-asset",
@@ -99,7 +99,7 @@
         "expo-notifications",
         {
           "icon": "./assets/notification-icon.png",
-          "color": "#1A1A1E"
+          "color": "#0B7A53"
         }
       ],
       [

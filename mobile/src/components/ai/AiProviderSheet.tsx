@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { BottomSheetModal } from '../ui/BottomSheetModal';
 import { useTheme } from '../../context/ThemeContext';
 import { tokens } from '../../theme/tokens';
@@ -155,7 +155,7 @@ export const AiProviderSheet: React.FC<AiProviderSheetProps> = ({
           <>
             <View style={[styles.card, { backgroundColor: colors.surf, borderColor: colors.line }]}>
               <View style={styles.infoRow}>
-                <MaterialIcons name="vpn-key" size={18} color={colors.ink} />
+                <ProtoUiIcon name="vpn-key" size={18} color={colors.ink} />
                 <View style={styles.infoCol}>
                   <Text style={[styles.infoTitle, { color: colors.ink }]}>Chave {maskText}</Text>
                   <Text style={[styles.infoSub, { color: colors.muted }]}>
@@ -177,7 +177,7 @@ export const AiProviderSheet: React.FC<AiProviderSheetProps> = ({
                     idx > 0 && { borderTopWidth: 1, borderTopColor: colors.line },
                   ]}
                 >
-                  <MaterialIcons name="memory" size={17} color={colors.muted} />
+                  <ProtoUiIcon name="memory" size={17} color={colors.muted} />
                   <View style={styles.infoCol}>
                     <Text style={[styles.infoTitle, { color: colors.ink }]}>{m.name}</Text>
                     <Text style={[styles.infoSub, { color: colors.muted }]}>

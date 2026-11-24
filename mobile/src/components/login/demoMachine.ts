@@ -21,14 +21,11 @@ export interface DemoLoopState {
 
 /** Tempos da sequência, em ms, conforme protótipo (seção 4). */
 export const DEMO_TIMING = {
-  userAppearMs: 350,
-  typeCharMs: 36,
-  thinkingDelayMs: 450,
-  dotsMs: 1000,
-  vitoFadeMs: 400,
-  cardDelayMs: 250,
-  cardFadeMs: 450,
-  pauseMs: 3300,
+  userAppearMs: 220,
+  typeCharMs: 28,
+  dotsDelayMs: 320,
+  dotsMs: 750,
+  pauseMs: 3200,
   oldFadeOutMs: 400,
   slideUpMs: 500,
 } as const
@@ -104,18 +101,20 @@ export function createDemoMachine() {
       schedule(typeNextChar, DEMO_TIMING.typeCharMs)
     } else {
       setPhase({ userComplete: true })
-      schedule(startThinking, DEMO_TIMING.thinkingDelayMs)
+      schedule(startThinking, DEMO_TIMING.dotsDelayMs)
     }
   }
 
   const startThinking = () => {
     setPhase({ dotsVisible: true, phase: 'thinking' })
     schedule(() => {
-      setPhase({ dotsVisible: false, phase: 'showing-vito', vitoVisible: true })
-      schedule(() => {
-        setPhase({ phase: 'showing-card', cardVisible: true })
-        schedule(advanceScene, DEMO_TIMING.pauseMs)
-      }, DEMO_TIMING.cardDelayMs)
+      setPhase({
+        dotsVisible: false,
+        phase: 'showing-card',
+        vitoVisible: true,
+        cardVisible: true,
+      })
+      schedule(advanceScene, DEMO_TIMING.pauseMs)
     }, DEMO_TIMING.dotsMs)
   }
 

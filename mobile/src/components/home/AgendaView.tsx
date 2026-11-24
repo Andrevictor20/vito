@@ -8,11 +8,13 @@ import {
   ActivityIndicator,
   TouchableOpacity,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { tokens } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
+import { StaggerItem } from '../../theme/vitoMotion';
 import { EventCard } from '../calendar/EventCard';
 import { AgendaWeekStrip } from '../calendar/AgendaWeekStrip';
+import { AgendaSummariesCard } from '../calendar/AgendaSummariesCard';
 import { VitoLoginMark } from '../login/VitoLoginMark';
 import { chatPromptBus } from '../../services/dataSync';
 import { navigateToTab } from '../../navigation/navigationRef';
@@ -44,6 +46,7 @@ export interface AgendaViewProps {
   onAiEvent?: (ev: Event) => void;
   onCreateEvent: () => void;
   onOpenFullCalendar?: () => void;
+  onOpenSummaries?: () => void;
   filters?: AgendaFilterState;
   onFiltersChange?: (f: AgendaFilterState) => void;
   onReserveStudyBlock?: () => void;
@@ -74,6 +77,7 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
   onEditEvent,
   onAiEvent,
   onOpenFullCalendar,
+  onOpenSummaries,
   filters: controlledFilters,
   onFiltersChange: controlledOnFiltersChange,
   onReserveStudyBlock,
@@ -142,13 +146,15 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
         }
       >
         {/* Faixa semanal / Navegação mensal (.strip) */}
-        <AgendaWeekStrip
-          selectedDate={selectedDate}
-          onSelectDate={onSelectDate}
-          onExpandCalendar={onOpenFullCalendar || (() => {})}
-          eventDates={eventDates}
-          events={events}
-        />
+        <StaggerItem index={0}>
+          <AgendaWeekStrip
+            selectedDate={selectedDate}
+            onSelectDate={onSelectDate}
+            onExpandCalendar={onOpenFullCalendar || (() => {})}
+            eventDates={eventDates}
+            events={events}
+          />
+        </StaggerItem>
 
         {/* Conteúdo Principal */}
         {loading && events.length === 0 ? (
@@ -177,7 +183,7 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
                   },
                 ]}
               >
-                <MaterialIcons name="search-off" size={24} color={colors.muted} />
+                <ProtoUiIcon name="search-off" size={24} color={colors.muted} />
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.emptyFilterTitle, { color: colors.ink }]}>
                     Nenhum evento encontrado
@@ -213,6 +219,7 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
           /* Visualização Padrão da Agenda */
           <View style={styles.sectionContainer}>
             {/* Seção .sec do dia selecionado */}
+            <StaggerItem index={1}>
             <View style={styles.sec}>
               <Text style={[styles.secH2, { color: colors.ink }]}>
                 {daySectionTitle}
@@ -254,9 +261,11 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
                 Nada marcado para este dia.
               </Text>
             )}
+            </StaggerItem>
 
             {/* Sugestão Inteligente do Vito (.vsug) */}
             {isTodaySelected && !sugDismissed && (
+              <StaggerItem index={2}>
               <View
                 style={[
                   styles.vsugCard,
@@ -296,6 +305,7 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
                   </View>
                 </View>
               </View>
+              </StaggerItem>
             )}
 
             {!isTodaySelected && dayEvents.length === 0 && (
@@ -328,9 +338,16 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
               </View>
             )}
 
+            {/* Card Resumos da semana (.vsum do protótipo) */}
+            {onOpenSummaries && (
+              <StaggerItem index={3}>
+                <AgendaSummariesCard eventsCount={events.length} onPress={onOpenSummaries} />
+              </StaggerItem>
+            )}
+
             {/* Seção 'Em seguida' (.sec + .next com .db) */}
             {upcomingEvents.length > 0 && (
-              <View style={styles.nextSection}>
+              <StaggerItem index={4} style={styles.nextSection}>
                 <View style={styles.sec}>
                   <Text style={[styles.secH2, { color: colors.ink }]}>
                     Em seguida
@@ -352,7 +369,7 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
                     onAiAction={onAiEvent || onEditEvent}
                   />
                 ))}
-              </View>
+              </StaggerItem>
             )}
           </View>
         )}
@@ -362,121 +379,25 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
 };
 
 const styles = StyleSheet.create({
-  scroll: {
-    flex: 1,
-  },
-  content: {
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 120,
-    maxWidth: 640,
-    width: '100%',
-    alignSelf: 'center',
-  },
-  sectionContainer: {
-    marginTop: 4,
-  },
-  sec: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 18,
-    marginBottom: 10,
-  },
-  secH2: {
-    fontFamily: tokens.typography.family.montserratBold,
-    fontSize: 17,
-    letterSpacing: -0.34,
-  },
-  cntBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  cntText: {
-    fontFamily: tokens.typography.family.semibold,
-    fontSize: 12,
-  },
-  emptyDayText: {
-    fontFamily: tokens.typography.family.regular,
-    fontSize: 14,
-    textAlign: 'center',
-    paddingVertical: 18,
-  },
-  emptyFilterCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    borderWidth: 1,
-    borderRadius: 16,
-    padding: 16,
-    marginTop: 8,
-  },
-  emptyFilterTitle: {
-    fontFamily: tokens.typography.family.semibold,
-    fontSize: 15,
-  },
-  emptyFilterSub: {
-    fontFamily: tokens.typography.family.regular,
-    fontSize: 13,
-    marginTop: 2,
-  },
-  clearLinkText: {
-    fontFamily: tokens.typography.family.semibold,
-    fontSize: 13,
-  },
-  vsugCard: {
-    flexDirection: 'row',
-    gap: 12,
-    alignItems: 'flex-start',
-    borderWidth: 1,
-    borderRadius: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    marginVertical: 10,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-  },
-  vsugBody: {
-    flex: 1,
-  },
-  vsugText: {
-    fontFamily: tokens.typography.family.medium,
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  vsugButtons: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 10,
-  },
-  vsugPrimaryBtn: {
-    height: 32,
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  vsugPrimaryBtnText: {
-    fontFamily: tokens.typography.family.semibold,
-    fontSize: 13,
-  },
-  vsugSecondaryBtn: {
-    height: 32,
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  vsugSecondaryBtnText: {
-    fontFamily: tokens.typography.family.semibold,
-    fontSize: 13,
-  },
-  nextSection: {
-    marginTop: 10,
-  },
+  scroll: { flex: 1 },
+  content: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 120, maxWidth: 640, width: '100%', alignSelf: 'center' },
+  sectionContainer: { marginTop: 4 },
+  sec: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 18, marginBottom: 10 },
+  secH2: { fontFamily: tokens.typography.family.montserratBold, fontSize: 17, letterSpacing: -0.34 },
+  cntBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
+  cntText: { fontFamily: tokens.typography.family.semibold, fontSize: 12 },
+  emptyDayText: { fontFamily: tokens.typography.family.regular, fontSize: 14, textAlign: 'center', paddingVertical: 18 },
+  emptyFilterCard: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderRadius: 16, padding: 16, marginTop: 8 },
+  emptyFilterTitle: { fontFamily: tokens.typography.family.semibold, fontSize: 15 },
+  emptyFilterSub: { fontFamily: tokens.typography.family.regular, fontSize: 13, marginTop: 2 },
+  clearLinkText: { fontFamily: tokens.typography.family.semibold, fontSize: 13 },
+  vsugCard: { flexDirection: 'row', gap: 12, alignItems: 'flex-start', borderWidth: 1, borderRadius: 16, paddingVertical: 12, paddingHorizontal: 14, marginVertical: 10, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8 },
+  vsugBody: { flex: 1 },
+  vsugText: { fontFamily: tokens.typography.family.medium, fontSize: 14, lineHeight: 20 },
+  vsugButtons: { flexDirection: 'row', gap: 8, marginTop: 10 },
+  vsugPrimaryBtn: { height: 32, borderRadius: 16, paddingHorizontal: 14, alignItems: 'center', justifyContent: 'center' },
+  vsugPrimaryBtnText: { fontFamily: tokens.typography.family.semibold, fontSize: 13 },
+  vsugSecondaryBtn: { height: 32, borderRadius: 16, paddingHorizontal: 14, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  vsugSecondaryBtnText: { fontFamily: tokens.typography.family.semibold, fontSize: 13 },
+  nextSection: { marginTop: 10 },
 });

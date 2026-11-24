@@ -7,7 +7,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
+import { PressableScale } from '../../theme/vitoMotion';
 import { useTheme } from '../../context/ThemeContext';
 import { ASK_VITO_CHIPS } from '../../data/botsCatalogFallback';
 import { Bot, BotActivityItem, BotPendingApproval, PendingResolutionDecision } from '../../types/bots';
@@ -83,7 +84,7 @@ export const BotsMyTab: React.FC<BotsMyTabProps> = ({
   if (error && bots.length === 0) {
     return (
       <View style={styles.centerBox}>
-        <MaterialIcons name="cloud-off" size={40} color={colors.red} />
+        <ProtoUiIcon name="cloud-off" size={40} color={colors.red} />
         <Text style={[styles.centerTitle, { color: colors.ink }]}>
           Não foi possível carregar seus bots
         </Text>
@@ -113,7 +114,7 @@ export const BotsMyTab: React.FC<BotsMyTabProps> = ({
             { backgroundColor: colors.finBg, borderColor: colors.fin },
           ]}
         >
-          <MaterialIcons name="wifi-off" size={16} color={colors.fin} />
+          <ProtoUiIcon name="wifi-off" size={16} color={colors.fin} />
           <Text style={[styles.offlineText, { color: colors.ink }]}>
             Sem conexão · exibindo cache local dos seus bots
           </Text>
@@ -122,22 +123,20 @@ export const BotsMyTab: React.FC<BotsMyTabProps> = ({
 
       {/* Bloco Peça ao Vito */}
       <View style={styles.sectionBlock}>
-        <Text style={[styles.sectionLabel, { color: colors.muted }]}>PEÇA AO VITO</Text>
+        <Text style={[styles.askLabel, { color: colors.muted }]}>Peça ao Vito</Text>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.chipsRow}
         >
           {ASK_VITO_CHIPS.map((chip) => (
-            <TouchableOpacity
+            <PressableScale
               key={chip.label}
-              style={[styles.chip, { backgroundColor: colors.bg, borderColor: colors.line }]}
+              style={[styles.chip, { backgroundColor: colors.surf }]}
               onPress={() => onAskVitoChip(chip.prompt)}
-              activeOpacity={0.75}
             >
-              <MaterialIcons name="auto-awesome" size={14} color={colors.acc} />
               <Text style={[styles.chipText, { color: colors.ink }]}>{chip.label}</Text>
-            </TouchableOpacity>
+            </PressableScale>
           ))}
         </ScrollView>
       </View>
@@ -330,6 +329,12 @@ const styles = StyleSheet.create({
     letterSpacing: 0.7,
     marginBottom: 8,
   },
+  askLabel: {
+    fontFamily: 'Geist',
+    fontSize: 14,
+    fontWeight: '400',
+    marginBottom: 10,
+  },
   chipsRow: {
     gap: 8,
     paddingRight: 16,
@@ -337,15 +342,15 @@ const styles = StyleSheet.create({
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    height: 38,
+    paddingHorizontal: 14,
     borderRadius: 999,
-    borderWidth: 1,
+    borderWidth: 0,
   },
   chipText: {
+    fontFamily: 'Geist_500Medium',
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '500',
   },
   emptyCard: {
     borderRadius: 24,

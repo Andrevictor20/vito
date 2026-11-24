@@ -9,12 +9,12 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon, type ProtoUiIconName } from '../../../icons/ProtoUiIcons';
 import { useTheme } from '../../../context/ThemeContext';
 import { tokens } from '../../../theme/tokens';
 import { getFinTokens } from './byokUi';
 
-const CARDS: { icon: keyof typeof MaterialIcons.glyphMap; title: string; text: string }[] = [
+const CARDS: { icon: ProtoUiIconName; title: string; text: string }[] = [
   {
     icon: 'lock-outline',
     title: 'Privacidade total',
@@ -74,7 +74,7 @@ export const ByokTutorialCards: React.FC<Props> = ({ onDone }) => {
         renderItem={({ item, index: itemIdx }) => (
           <View style={[styles.slide, { width: cardW }]}>
             <View style={[styles.chipBig, { backgroundColor: finBg }]}>
-              <MaterialIcons name={item.icon} size={30} color={fin} />
+              <ProtoUiIcon name={item.icon} size={30} color={fin} />
             </View>
             <Text style={[styles.eyebrow, { color: colors.muted }]}>{itemIdx + 1} DE 3</Text>
             <Text style={[styles.title, { color: colors.ink }]}>{item.title}</Text>

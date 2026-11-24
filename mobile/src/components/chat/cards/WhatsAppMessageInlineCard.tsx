@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, TextInput, Image } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ProtoUiIcon } from '../../../icons/ProtoUiIcons';
 import { useTheme } from '../../../context/ThemeContext';
 import { ChatWhatsAppMessage } from '../../../types';
 import { WhatsAppGlyph } from '../../login/DemoIcons';
@@ -80,15 +80,7 @@ export const WhatsAppMessageInlineCard: React.FC<WhatsAppMessageInlineCardProps>
   return (
     <View style={styles.wrapper}>
       {/* Card Principal */}
-      <View
-        style={[
-          styles.card,
-          {
-            backgroundColor: colors.bg,
-            borderColor: isSent ? colors.acc + '40' : colors.line,
-          },
-        ]}
-      >
+      <View style={[styles.card, { backgroundColor: colors.surf }]}>
         {/* Cabeçalho: Foto / Avatar do Contato + Destinatário + Badge WhatsApp */}
         <View style={styles.headerRow}>
           {/* Avatar com foto da pessoa ou fallback de iniciais */}
@@ -124,7 +116,7 @@ export const WhatsAppMessageInlineCard: React.FC<WhatsAppMessageInlineCardProps>
               >
                 {messageData.recipient_name || 'Contato'}
               </Text>
-              <View style={[styles.tag, { backgroundColor: isSent ? colors.greenBg : colors.surf }]}>
+              <View style={[styles.tag, { backgroundColor: isSent ? colors.greenBg : colors.bg }]}>
                 <Text style={[styles.tagText, { color: isSent ? colors.acc : colors.muted }]}>
                   {isSent ? 'Enviado' : 'WhatsApp'}
                 </Text>
@@ -140,7 +132,7 @@ export const WhatsAppMessageInlineCard: React.FC<WhatsAppMessageInlineCardProps>
         </View>
 
         {/* Caixa de Mensagem / Edição */}
-        <View style={[styles.messageBox, { backgroundColor: colors.surf, borderColor: colors.line }]}>
+        <View style={[styles.messageBox, { backgroundColor: colors.bg }]}>
           <View style={styles.messageLabelRow}>
             <Text style={[styles.messageLabel, { color: colors.muted }]}>
               {isEditing ? 'Editar mensagem' : 'Prévia da mensagem'}
@@ -173,7 +165,7 @@ export const WhatsAppMessageInlineCard: React.FC<WhatsAppMessageInlineCardProps>
         {/* Feedback visual de Mensagem Enviada */}
         {isSent && (
           <View style={[styles.sentBanner, { backgroundColor: colors.greenBg }]}>
-            <MaterialIcons name="check-circle" size={16} color={colors.acc} />
+            <ProtoUiIcon name="check-circle" size={16} color={colors.acc} />
             <Text style={[styles.sentBannerText, { color: colors.acc }]}>
               Mensagem enviada com sucesso para o WhatsApp
             </Text>
@@ -187,7 +179,7 @@ export const WhatsAppMessageInlineCard: React.FC<WhatsAppMessageInlineCardProps>
           {isEditing ? (
             <>
               <TouchableOpacity
-                style={[styles.btnOutline, { borderColor: colors.line }]}
+                style={[styles.btnOutline, { backgroundColor: colors.surf }]}
                 onPress={handleCancelEdit}
                 activeOpacity={0.75}
                 accessibilityRole="button"
@@ -205,7 +197,7 @@ export const WhatsAppMessageInlineCard: React.FC<WhatsAppMessageInlineCardProps>
                 accessibilityRole="button"
                 accessibilityLabel="Salvar texto da mensagem"
               >
-                <MaterialIcons name="done" size={16} color={colors.bg} />
+                <ProtoUiIcon name="done" size={16} color={colors.bg} />
                 <Text style={[styles.btnFillText, { color: colors.bg }]}>
                   Salvar
                 </Text>
@@ -214,14 +206,14 @@ export const WhatsAppMessageInlineCard: React.FC<WhatsAppMessageInlineCardProps>
           ) : (
             <>
               <TouchableOpacity
-                style={[styles.btnOutline, { borderColor: colors.ink }]}
+                style={[styles.btnOutline, { backgroundColor: colors.surf }]}
                 onPress={handleStartEdit}
                 disabled={disabled}
                 activeOpacity={0.75}
                 accessibilityRole="button"
                 accessibilityLabel="Editar texto da mensagem"
               >
-                <MaterialIcons name="edit" size={15} color={colors.ink} />
+                <ProtoUiIcon name="edit" size={15} color={colors.ink} />
                 <Text style={[styles.btnOutlineText, { color: colors.ink }]}>
                   Editar
                 </Text>
@@ -235,7 +227,7 @@ export const WhatsAppMessageInlineCard: React.FC<WhatsAppMessageInlineCardProps>
                 accessibilityRole="button"
                 accessibilityLabel="Confirmar envio da mensagem via WhatsApp"
               >
-                <MaterialIcons name="send" size={15} color="#ffffff" />
+                <ProtoUiIcon name="send" size={15} color="#ffffff" />
                 <Text style={[styles.btnFillText, { color: '#ffffff' }]}>
                   Confirmar envio
                 </Text>
@@ -254,15 +246,10 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   card: {
-    borderRadius: 16,
-    borderWidth: 1,
-    paddingVertical: 12,
+    borderRadius: 22,
+    borderWidth: 0,
+    paddingVertical: 14,
     paddingHorizontal: 14,
-    shadowColor: '#141916',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
   },
   headerRow: {
     flexDirection: 'row',
@@ -289,7 +276,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   avatarInitials: {
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Geist_600SemiBold',
     fontSize: 16,
     fontWeight: '600',
   },
@@ -315,13 +302,13 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   title: {
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Geist_600SemiBold',
     fontSize: 14.5,
     fontWeight: '600',
     flex: 1,
   },
   subtitle: {
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'Geist_400Regular',
     fontSize: 12.5,
     marginTop: 2,
   },
@@ -332,15 +319,15 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   tagText: {
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Geist_600SemiBold',
     fontSize: 11,
     fontWeight: '600',
   },
   messageBox: {
     marginTop: 10,
-    padding: 10,
-    borderRadius: 12,
-    borderWidth: 1,
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 0,
   },
   messageLabelRow: {
     flexDirection: 'row',
@@ -349,22 +336,22 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   messageLabel: {
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Geist_600SemiBold',
     fontSize: 11,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   charCounter: {
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'Geist_400Regular',
     fontSize: 11,
   },
   messageContent: {
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'Geist_400Regular',
     fontSize: 13.5,
     lineHeight: 19,
   },
   input: {
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'Geist_400Regular',
     fontSize: 13.5,
     lineHeight: 19,
     minHeight: 64,
@@ -383,7 +370,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   sentBannerText: {
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Geist_600SemiBold',
     fontSize: 12.5,
     fontWeight: '600',
   },
@@ -393,32 +380,32 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   btnFill: {
-    height: 34,
+    height: 36,
     paddingHorizontal: 16,
-    borderRadius: 17,
+    borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
     gap: 6,
   },
   btnFillText: {
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Geist_500Medium',
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '500',
   },
   btnOutline: {
-    height: 34,
+    height: 36,
     paddingHorizontal: 16,
-    borderRadius: 17,
-    borderWidth: 1.5,
+    borderRadius: 999,
+    borderWidth: 0,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
     gap: 6,
   },
   btnOutlineText: {
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Geist_500Medium',
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '500',
   },
 });

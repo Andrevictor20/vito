@@ -1,35 +1,35 @@
 import React from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, ScrollView } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
-import { tokens } from '../../theme/tokens';
+import { token } from '../../ds/tokens';
+import { SgCalIcon, SgCupIcon, SgTasksIcon } from '../../icons/ChatProtoIcons';
 import { useTheme } from '../../context/ThemeContext';
 import { hapticFeedback } from '../../theme/motion';
 
 interface PromptChipItem {
-  icon: keyof typeof MaterialIcons.glyphMap;
+  kind: 'cal' | 'tasks' | 'cup';
   label: string;
   prompt: string;
-  colorKey: 'blue' | 'purple' | 'orange' | 'acc';
+  colorVar: '--blue' | '--purple' | '--orange';
 }
 
 const QUICK_PROMPTS: PromptChipItem[] = [
   {
-    icon: 'calendar-month',
+    kind: 'cal',
     label: 'O que tenho hoje?',
     prompt: 'O que tenho hoje?',
-    colorKey: 'blue',
+    colorVar: '--blue',
   },
   {
-    icon: 'check-circle-outline',
+    kind: 'tasks',
     label: 'Minhas tarefas',
     prompt: 'Minhas tarefas',
-    colorKey: 'purple',
+    colorVar: '--purple',
   },
   {
-    icon: 'local-cafe',
+    kind: 'cup',
     label: 'Almoço amanhã',
     prompt: 'Almoço amanhã',
-    colorKey: 'orange',
+    colorVar: '--orange',
   },
 ];
 
@@ -39,7 +39,10 @@ interface ChatQuickChipsProps {
 }
 
 export const ChatQuickChips: React.FC<ChatQuickChipsProps> = ({ onSelectPrompt, disabled }) => {
-  const { colors } = useTheme();
+  const { isDark } = useTheme();
+  const surf = token('--surf', isDark);
+  const line = token('--line', isDark);
+  const ink = token('--ink', isDark);
 
   return (
     <View style={styles.container}>
@@ -49,7 +52,9 @@ export const ChatQuickChips: React.FC<ChatQuickChipsProps> = ({ onSelectPrompt, 
         contentContainerStyle={styles.scrollList}
       >
         {QUICK_PROMPTS.map((item, idx) => {
-          const iconColor = colors[item.colorKey] || colors.ink;
+          const iconColor = token(item.colorVar, isDark);
+          const IconComp =
+            item.kind === 'cal' ? SgCalIcon : item.kind === 'tasks' ? SgTasksIcon : SgCupIcon;
 
           return (
             <TouchableOpacity
@@ -57,8 +62,8 @@ export const ChatQuickChips: React.FC<ChatQuickChipsProps> = ({ onSelectPrompt, 
               style={[
                 styles.chip,
                 {
-                  backgroundColor: colors.surf,
-                  borderColor: colors.line,
+                  backgroundColor: surf,
+                  borderColor: line,
                 },
               ]}
               onPress={() => {
@@ -68,8 +73,8 @@ export const ChatQuickChips: React.FC<ChatQuickChipsProps> = ({ onSelectPrompt, 
               disabled={disabled}
               activeOpacity={0.75}
             >
-              <MaterialIcons name={item.icon} size={15} color={iconColor} />
-              <Text style={[styles.chipLabel, { color: colors.ink }]}>{item.label}</Text>
+              <IconComp size={15} color={iconColor} />
+              <Text style={[styles.chipLabel, { color: ink }]}>{item.label}</Text>
             </TouchableOpacity>
           );
         })}
@@ -83,7 +88,7 @@ const styles = StyleSheet.create({
     marginVertical: 4,
   },
   scrollList: {
-    paddingHorizontal: tokens.spacing.md,
+    paddingHorizontal: 16,
     gap: 8,
   },
   chip: {
@@ -98,6 +103,6 @@ const styles = StyleSheet.create({
   chipLabel: {
     fontSize: 13,
     fontWeight: '500',
-    fontFamily: tokens.typography.family.medium,
+    fontFamily: 'Geist_500Medium',
   },
 });
