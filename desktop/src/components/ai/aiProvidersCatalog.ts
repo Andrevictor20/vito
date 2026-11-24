@@ -6,6 +6,8 @@ import {
   AiReasoningEffort,
 } from '../../types';
 
+export type AiProviderPricingTone = 'free' | 'freemium' | 'paid' | 'variable';
+
 export interface AiProviderCatalogMeta {
   key: AiProviderKey;
   name: string;
@@ -16,6 +18,11 @@ export interface AiProviderCatalogMeta {
   requiresUrl: boolean;
   fixed: boolean;
   help: string;
+  pricingLabel: string;
+  pricingTone: AiProviderPricingTone;
+  pricingDescription: string;
+  keyUrl?: string;
+  keyUrlLabel?: string;
   defaultModels: AiModelItem[];
 }
 
@@ -40,6 +47,9 @@ export const AI_PROVIDERS_CATALOG: Record<AiProviderKey, AiProviderCatalogMeta> 
     requiresUrl: false,
     fixed: true,
     help: 'O Vito Auto usa a cota do servidor e escolhe o modelo certo para cada tarefa. Não precisa de chave.',
+    pricingLabel: 'Grátis (cota do Vito)',
+    pricingTone: 'free',
+    pricingDescription: 'Incluso no Vito com limite diário do servidor. Não precisa de chave nem cartão.',
     defaultModels: [
       {
         id: 'auto',
@@ -59,6 +69,11 @@ export const AI_PROVIDERS_CATALOG: Record<AiProviderKey, AiProviderCatalogMeta> 
     requiresUrl: false,
     fixed: false,
     help: 'Crie a chave no console da Anthropic. O gasto fica na sua conta.',
+    pricingLabel: 'Paga (pré-pago)',
+    pricingTone: 'paid',
+    pricingDescription: 'Exige compra de créditos pré-pagos na Anthropic (pay-as-you-go); não possui plano gratuito permanente para API.',
+    keyUrl: 'https://console.anthropic.com/settings/keys',
+    keyUrlLabel: 'Abrir Console da Anthropic',
     defaultModels: [
       { id: 'haiku', name: 'Claude Haiku 5.5', note: 'Rápido e econômico', reasoning: false },
       { id: 'sonnet', name: 'Claude Sonnet 5.5', note: 'Equilibrado', reasoning: true },
@@ -75,6 +90,11 @@ export const AI_PROVIDERS_CATALOG: Record<AiProviderKey, AiProviderCatalogMeta> 
     requiresUrl: false,
     fixed: false,
     help: 'Crie a chave no Google AI Studio. O gasto fica na sua conta.',
+    pricingLabel: 'Tem plano grátis',
+    pricingTone: 'freemium',
+    pricingDescription: 'O Google AI Studio oferece nível gratuito com limite por minuto (ideal para uso pessoal) e plano pago conforme o consumo.',
+    keyUrl: 'https://aistudio.google.com/apikey',
+    keyUrlLabel: 'Abrir Google AI Studio',
     defaultModels: [
       { id: 'g36f', name: 'Gemini 3.6 Flash', note: 'Rápido', reasoning: true },
       { id: 'g25f', name: 'Gemini 2.5 Flash', note: 'Econômico', reasoning: true },
@@ -90,6 +110,11 @@ export const AI_PROVIDERS_CATALOG: Record<AiProviderKey, AiProviderCatalogMeta> 
     requiresUrl: false,
     fixed: false,
     help: 'Crie a chave na plataforma da OpenAI. O gasto fica na sua conta.',
+    pricingLabel: 'Paga (pré-pago)',
+    pricingTone: 'paid',
+    pricingDescription: 'Exige compra de créditos pré-pagos na OpenAI (pay-as-you-go); não possui plano gratuito permanente para API.',
+    keyUrl: 'https://platform.openai.com/api-keys',
+    keyUrlLabel: 'Abrir Plataforma OpenAI',
     defaultModels: [
       { id: 'gpt55', name: 'GPT-5.5', note: 'Uso geral', reasoning: true },
       { id: 'g4om', name: 'GPT-4o mini', note: 'Econômico', reasoning: false },
@@ -105,6 +130,11 @@ export const AI_PROVIDERS_CATALOG: Record<AiProviderKey, AiProviderCatalogMeta> 
     requiresUrl: false,
     fixed: false,
     help: 'Crie a chave no console da Groq. Respostas muito rápidas.',
+    pricingLabel: 'Tem plano grátis',
+    pricingTone: 'freemium',
+    pricingDescription: 'A Groq oferece nível gratuito com limites por minuto para testar e usar modelos rápidos, além de plano pago para maior volume.',
+    keyUrl: 'https://console.groq.com/keys',
+    keyUrlLabel: 'Abrir Console da Groq',
     defaultModels: [
       { id: 'l70', name: 'Llama 3.3 70B', note: 'Muito rápido', reasoning: false },
       { id: 'oss', name: 'GPT-OSS 120B', note: 'Raciocínio rápido', reasoning: true },
@@ -120,6 +150,11 @@ export const AI_PROVIDERS_CATALOG: Record<AiProviderKey, AiProviderCatalogMeta> 
     requiresUrl: false,
     fixed: false,
     help: 'Uma chave para vários provedores. Escolha qualquer modelo do catálogo.',
+    pricingLabel: 'Grátis e pago',
+    pricingTone: 'freemium',
+    pricingDescription: 'Possui vários modelos gratuitos (marcados como :free) com limite diário, e modelos pagos por uso via créditos pré-pagos.',
+    keyUrl: 'https://openrouter.ai/keys',
+    keyUrlLabel: 'Abrir OpenRouter Keys',
     defaultModels: [
       { id: 'sonnet', name: 'anthropic/claude-sonnet-5-5', note: 'Via OpenRouter', reasoning: true },
       { id: 'gem', name: 'google/gemini-2.5-flash', note: 'Via OpenRouter', reasoning: true },
@@ -136,6 +171,9 @@ export const AI_PROVIDERS_CATALOG: Record<AiProviderKey, AiProviderCatalogMeta> 
     requiresUrl: true,
     fixed: false,
     help: 'Qualquer endpoint no formato da API da OpenAI: gateways, proxies ou um modelo no seu próprio hardware.',
+    pricingLabel: 'Depende do endpoint',
+    pricingTone: 'variable',
+    pricingDescription: 'Grátis se rodar localmente (ex.: Ollama ou LM Studio) ou cobrado conforme o serviço/gateway escolhido.',
     defaultModels: [
       { id: 'm', name: 'Modelo do endpoint', note: 'Nome como o endpoint publica', reasoning: false },
     ],
@@ -168,7 +206,7 @@ export function validateProviderCredentials(
   const meta = AI_PROVIDERS_CATALOG[providerKey];
   if (!meta) return 'Provedor inválido.';
 
-  const trimmedKey = apiKey.trim();
+  const trimmedKey = apiKey.trim().replace(/^["']+|["']+$/g, '');
   const trimmedUrl = (baseUrl ?? '').trim();
 
   if (meta.requiresUrl) {
@@ -187,6 +225,13 @@ export function validateProviderCredentials(
 
   if (providerKey === 'openai' && /^sk-(ant|or)-/.test(trimmedKey)) {
     return 'Esta chave parece ser de outro provedor.';
+  }
+
+  if (providerKey === 'google') {
+    if (!trimmedKey.startsWith('AIza') && !trimmedKey.startsWith('AQ.')) {
+      return `Esta chave não parece ser do ${meta.name}. Ela deve começar com ${meta.prefix}.`;
+    }
+    return null;
   }
 
   if (meta.prefix && !trimmedKey.startsWith(meta.prefix)) {

@@ -16,7 +16,7 @@ export function validateProviderCredentials(
   baseUrl?: string
 ): ProviderCredentialValidationResult {
   const entry = AI_PROVIDER_CATALOG[providerKey];
-  const trimmedKey = (apiKey || '').trim();
+  const trimmedKey = (apiKey || '').trim().replace(/^["']+|["']+$/g, '');
   const trimmedUrl = (baseUrl || '').trim();
 
   if (entry.requiresUrl) {
@@ -35,6 +35,16 @@ export function validateProviderCredentials(
 
   if (providerKey === 'openai' && /^sk-(ant|or)-/.test(trimmedKey)) {
     return { valid: false, error: 'Esta chave parece ser de outro provedor.' };
+  }
+
+  if (providerKey === 'google') {
+    if (!trimmedKey.startsWith('AIza') && !trimmedKey.startsWith('AQ.')) {
+      return {
+        valid: false,
+        error: `Esta chave não parece ser do ${entry.name}. Ela deve começar com ${entry.keyPrefix}.`,
+      };
+    }
+    return { valid: true };
   }
 
   if (entry.keyPrefix && !trimmedKey.startsWith(entry.keyPrefix)) {

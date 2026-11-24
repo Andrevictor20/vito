@@ -129,6 +129,11 @@ func TestParseProviderModels_OpenAIAndGroqAndCustom(t *testing.T) {
 			{"id": "whisper-large-v3-turbo", "context_window": 448, "active": true},
 			{"id": "playai-tts", "context_window": 8192, "active": true},
 			{"id": "llama-guard-3-8b", "context_window": 8192, "active": true},
+			{"id": "openai/gpt-oss-safeguard-20b", "context_window": 131072, "active": true},
+			{"id": "meta-llama/llama-prompt-guard-2-22m", "context_window": 512, "active": true},
+			{"id": "meta-llama/llama-prompt-guard-2-86m", "context_window": 512, "active": true},
+			{"id": "canopylabs/orpheus-v1-english", "context_window": 4000, "active": true},
+			{"id": "canopylabs/orpheus-arabic-saudi", "context_window": 4000, "active": true},
 			{"id": "deprecated-model", "context_window": 8192, "active": false}
 		]
 	}`)
@@ -138,6 +143,9 @@ func TestParseProviderModels_OpenAIAndGroqAndCustom(t *testing.T) {
 	}
 	if len(groqModels) != 1 || groqModels[0].ID != "llama-3.3-70b-versatile" {
 		t.Fatalf("modelos Groq inesperados: %+v", groqModels)
+	}
+	if !IsNonChatModelID("openai/gpt-oss-safeguard-20b") || !IsNonChatModelID("canopylabs/orpheus-v1-english") {
+		t.Fatalf("esperava IsNonChatModelID=true para safeguard e orpheus")
 	}
 
 	customBody := []byte(`{

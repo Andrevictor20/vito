@@ -64,6 +64,7 @@ describe('Validação & Catálogo de Provedores IA (Plano 03 §2)', () => {
       'Esta chave parece ser de outro provedor.'
     );
     expect(validateProviderCredentials('openai', 'sk-proj-valid')).toBeNull();
+    expect(validateProviderCredentials('google', 'AQ.Ab8RN6abcdef')).toBeNull();
   });
 
   it('formata resumo Só o servidor vs Servidor + N próprio(s)', () => {
@@ -158,6 +159,8 @@ describe('Renderização dos Componentes Desktop AI (Onda D & E)', () => {
     );
     expect(unconnHtml).toContain('Salvar e verificar');
     expect(unconnHtml).toContain('type="password"');
+    expect(unconnHtml).toContain('console.anthropic.com');
+    expect(unconnHtml).toContain('Paga');
 
     const connHtml = renderToStaticMarkup(
       React.createElement(AiProviderModal, {

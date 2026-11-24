@@ -61,6 +61,7 @@ func TestValidateProviderKeyFormat(t *testing.T) {
 		{"openai wrong prefix", domain.ProviderKeyOpenAI, "AIza123", "", "Esta chave não parece ser do OpenAI. Ela deve começar com sk-."},
 		{"valid anthropic", domain.ProviderKeyAnthropic, "sk-ant-1234", "", ""},
 		{"valid google", domain.ProviderKeyGoogle, "AIzaSy1234", "", ""},
+		{"valid google aq", domain.ProviderKeyGoogle, "AQ.Ab8RN6abcdef123456", "", ""},
 		{"valid openai", domain.ProviderKeyOpenAI, "sk-proj-1234", "", ""},
 		{"valid groq", domain.ProviderKeyGroq, "gsk_1234", "", ""},
 		{"valid openrouter", domain.ProviderKeyOpenRouter, "sk-or-v1-1234", "", ""},

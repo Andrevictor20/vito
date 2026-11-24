@@ -65,6 +65,8 @@ export interface UpdateModelPrefPayload {
   effort_pref: ReasoningEffort | '';
 }
 
+export type AIProviderPricingTone = 'free' | 'freemium' | 'paid' | 'variable';
+
 export interface AIProviderCatalogEntry {
   key: AIProviderKey;
   name: string;
@@ -75,5 +77,10 @@ export interface AIProviderCatalogEntry {
   keyPrefix: string;
   placeholder: string;
   helpText: string;
+  pricingLabel: string;
+  pricingTone: AIProviderPricingTone;
+  pricingDescription: string;
+  keyUrl?: string;
+  keyUrlLabel?: string;
   defaultModels: ProviderModelInfo[];
 }

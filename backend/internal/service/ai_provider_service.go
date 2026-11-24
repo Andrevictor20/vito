@@ -250,14 +250,15 @@ func (s *AIProviderService) ListProviders(ctx context.Context, userID string) ([
 			Status:      "disconnected",
 		}
 		if c, ok := byKey[pk]; ok {
+			filtered := filterChatProviderModels(c.Models)
 			item.Connected = true
 			item.Status = c.Status
 			item.BaseURL = c.BaseURL
 			item.KeyLast4 = c.KeyLast4
-			item.ModelCount = c.ModelCount
+			item.ModelCount = len(filtered)
 			item.VerifiedAt = c.VerifiedAt
 			item.ModelsFetchedAt = c.ModelsFetchedAt
-			item.Models = c.Models
+			item.Models = filtered
 		}
 		catalog = append(catalog, item)
 	}
@@ -308,17 +309,32 @@ func (s *AIProviderService) ListSelectableModels(ctx context.Context, userID str
 		return nil, err
 	}
 	for _, c := range connected {
-		if c.Status != domain.ProviderStatusOK || len(c.Models) == 0 {
+		filtered := filterChatProviderModels(c.Models)
+		if c.Status != domain.ProviderStatusOK || len(filtered) == 0 {
 			continue
 		}
 		name, _ := providerCatalogMeta(c.ProviderKey)
 		groups = append(groups, SelectableModelGroup{
 			ProviderKey: c.ProviderKey,
 			DisplayName: name,
-			Models:      c.Models,
+			Models:      filtered,
 		})
 	}
 	return groups, nil
+}
+
+func filterChatProviderModels(models []domain.ProviderModelInfo) []domain.ProviderModelInfo {
+	if len(models) == 0 {
+		return nil
+	}
+	out := make([]domain.ProviderModelInfo, 0, len(models))
+	for _, m := range models {
+		if byok.IsNonChatModelID(m.ID) {
+			continue
+		}
+		out = append(out, m)
+	}
+	return out
 }
 
 func (s *AIProviderService) fetchAndVerifyModels(ctx context.Context, key domain.ProviderKey, apiKey, baseURL string) ([]domain.ProviderModelInfo, error) {

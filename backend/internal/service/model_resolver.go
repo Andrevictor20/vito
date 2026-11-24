@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/andrevmp/vito/backend/internal/ai/byok"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/repository"
 )
@@ -146,7 +147,7 @@ func (r *ModelResolver) Resolve(ctx context.Context, req ModelResolveRequest) (*
 		}
 
 		modelInfo, found := findProviderModel(prov.Models, modelID)
-		if !found {
+		if !found || byok.IsNonChatModelID(modelInfo.ID) {
 			continue
 		}
 		if req.RequireTools && (modelInfo.QualityTier == 1 || !modelInfo.SupportsTools) {

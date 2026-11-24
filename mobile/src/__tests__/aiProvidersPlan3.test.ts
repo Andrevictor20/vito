@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateProviderCredentials } from '../services/ai/aiProviderValidation';
 import {
+  AI_PROVIDER_CATALOG,
   filterConnectedGroups,
   mergeProvidersWithCatalog,
   resolveEffectiveModel,
@@ -59,6 +60,19 @@ describe('Plano 03 — Provedores de IA BYOK & Seletor de Modelo (Ondas D & E)',
     assert.deepEqual(validateProviderCredentials('openai', 'sk-proj-123456'), {
       valid: true,
     });
+
+    // Google aceita AIza e AQ.
+    assert.deepEqual(validateProviderCredentials('google', 'AIzaSy123456'), { valid: true });
+    assert.deepEqual(validateProviderCredentials('google', 'AQ.Ab8RN6abcdef'), { valid: true });
+
+    // Catálogo possui info de preço e link nos provedores BYOK com URL
+    assert.ok(AI_PROVIDER_CATALOG.google.keyUrl?.includes('aistudio.google.com'));
+    assert.ok(AI_PROVIDER_CATALOG.groq.keyUrl?.includes('console.groq.com'));
+    assert.ok(AI_PROVIDER_CATALOG.anthropic.keyUrl?.includes('console.anthropic.com'));
+    assert.ok(AI_PROVIDER_CATALOG.openai.keyUrl?.includes('platform.openai.com'));
+    assert.ok(AI_PROVIDER_CATALOG.openrouter.keyUrl?.includes('openrouter.ai'));
+    assert.ok(AI_PROVIDER_CATALOG.google.pricingLabel.length > 0);
+    assert.ok(AI_PROVIDER_CATALOG.anthropic.pricingDescription.length > 0);
   });
 
   it('Onda D: helpers da sheet e resumo do Perfil refletem estados conectado/desconectado/inválido', () => {

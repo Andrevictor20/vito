@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, KeyRound, Cpu, RefreshCw, CheckCircle2, Trash2, Eye, EyeOff, AlertTriangle } from 'lucide-react';
+import { X, KeyRound, Cpu, RefreshCw, CheckCircle2, Trash2, Eye, EyeOff, AlertTriangle, ExternalLink } from 'lucide-react';
 import { AiModelItem, AiProviderInfo, AiProviderKey } from '../../types';
 import { TestAiProviderResponse } from '../../services/api/bots/aiProvidersApi';
 import { Button } from '../ui/Button';
@@ -77,7 +77,7 @@ export const AiProviderModal: React.FC<AiProviderModalProps> = ({
     setSaving(true);
     try {
       await onConnect(provider.provider_key, {
-        api_key: apiKey.trim(),
+        api_key: apiKey.trim().replace(/^["']+|["']+$/g, ''),
         ...(meta.requiresUrl ? { base_url: baseUrl.trim() } : {}),
       });
       setApiKey('');
@@ -181,6 +181,32 @@ export const AiProviderModal: React.FC<AiProviderModalProps> = ({
         </div>
 
         <div className="p-5 overflow-y-auto space-y-4">
+          <div className="p-3.5 rounded-2xl bg-[var(--surf)] border border-[var(--line)] space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <span
+                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
+                  meta.pricingTone === 'free' || meta.pricingTone === 'freemium'
+                    ? 'bg-[var(--green-bg)] text-[var(--acc)] border-[var(--acc)]/30'
+                    : 'bg-[var(--bg)] text-[var(--ink)] border-[var(--line)]'
+                }`}
+              >
+                {meta.pricingLabel}
+              </span>
+            </div>
+            <p className="text-xs text-[var(--muted)] leading-relaxed">{meta.pricingDescription}</p>
+            {meta.keyUrl && (
+              <a
+                href={meta.keyUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--ink)] hover:underline pt-0.5"
+              >
+                <ExternalLink size={13} />
+                <span>{meta.keyUrlLabel || 'Criar ou pegar chave de API'}</span>
+              </a>
+            )}
+          </div>
+
           {isFixed && (
             <div className="p-4 rounded-2xl bg-[var(--surf)] border border-[var(--line)] text-sm text-[var(--ink)] leading-relaxed">
               O Vito Auto usa a cota do servidor e escolhe o modelo certo para cada tarefa. Não precisa de chave.

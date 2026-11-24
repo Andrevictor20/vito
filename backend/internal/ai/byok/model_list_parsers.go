@@ -77,7 +77,7 @@ func parseAnthropicModels(body []byte) ([]ParsedModel, error) {
 	out := make([]ParsedModel, 0, len(payload.Data))
 	for _, item := range payload.Data {
 		id := strings.TrimSpace(item.ID)
-		if id == "" || isNonChatModelID(id) {
+		if id == "" || IsNonChatModelID(id) {
 			continue
 		}
 		caps := inferParsedModelCapabilities("anthropic", id)
@@ -109,7 +109,7 @@ func parseGoogleModels(body []byte) ([]ParsedModel, error) {
 			continue
 		}
 		id := strings.TrimPrefix(strings.TrimSpace(item.Name), "models/")
-		if id == "" || isNonChatModelID(id) {
+		if id == "" || IsNonChatModelID(id) {
 			continue
 		}
 		caps := inferParsedModelCapabilities("google", id)
@@ -145,7 +145,7 @@ func parseOpenAICompatModels(providerKey string, body []byte) ([]ParsedModel, er
 			continue
 		}
 		id := strings.TrimSpace(item.ID)
-		if id == "" || isNonChatModelID(id) {
+		if id == "" || IsNonChatModelID(id) {
 			continue
 		}
 		caps := inferParsedModelCapabilities(providerKey, id)
@@ -181,7 +181,7 @@ func parseOpenRouterModels(body []byte) ([]ParsedModel, error) {
 	out := make([]ParsedModel, 0, len(payload.Data))
 	for _, item := range payload.Data {
 		id := strings.TrimSpace(item.ID)
-		if id == "" || isNonChatModelID(id) {
+		if id == "" || IsNonChatModelID(id) {
 			continue
 		}
 		if len(item.Architecture.OutputModalities) > 0 && !slices.Contains(item.Architecture.OutputModalities, "text") {
@@ -210,17 +210,18 @@ func parseOpenRouterModels(body []byte) ([]ParsedModel, error) {
 	return out, nil
 }
 
-func isNonChatModelID(modelID string) bool {
+// IsNonChatModelID indica se o ID do modelo corresponde a um modelo não-chat (áudio, TTS, imagem, guarda/moderação, embedding).
+func IsNonChatModelID(modelID string) bool {
 	lower := strings.ToLower(strings.TrimSpace(modelID))
 	if lower == "" {
 		return true
 	}
 	blockedSubstrings := []string{
-		"embedding", "embed-", "-embed", "text-embedding",
+		"embedding", "embed-", "-embed", "text-embedding", "rerank",
 		"whisper", "distil-whisper", "transcribe",
-		"tts", "-audio", "audio-", "realtime", "speech",
+		"tts", "-audio", "audio-", "realtime", "speech", "orpheus", "kokoro",
 		"dall-e", "imagen", "sora", "veo-", "flux", "stable-diffusion", "sdxl",
-		"moderation", "llama-guard", "shieldgemma", "aqa",
+		"moderation", "llama-guard", "prompt-guard", "safeguard", "shieldgemma", "aqa",
 		"babbage-002", "davinci-002",
 	}
 	for _, sub := range blockedSubstrings {

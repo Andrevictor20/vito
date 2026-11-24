@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Linking,
   ScrollView,
   StyleSheet,
   Text,
@@ -67,7 +68,7 @@ export const AiProviderSheet: React.FC<AiProviderSheetProps> = ({
 
     setErrorMsg('');
     setSaving(true);
-    const submittedKey = apiKeyInput.trim();
+    const submittedKey = apiKeyInput.trim().replace(/^["']+|["']+$/g, '');
     const submittedUrl = entry.requiresUrl ? baseUrlInput.trim() : undefined;
     setApiKeyInput('');
 
@@ -143,6 +144,53 @@ export const AiProviderSheet: React.FC<AiProviderSheetProps> = ({
             <Text style={[styles.heroTitle, { color: colors.ink }]}>{entry.name}</Text>
             <Text style={[styles.heroSub, { color: colors.muted }]}>{subtitle}</Text>
           </View>
+        </View>
+
+        <View style={[styles.pricingCard, { backgroundColor: colors.surf, borderColor: colors.line }]}>
+          <View style={styles.pricingHeader}>
+            <View
+              style={[
+                styles.pricingBadge,
+                {
+                  backgroundColor:
+                    entry.pricingTone === 'free' || entry.pricingTone === 'freemium'
+                      ? colors.greenBg
+                      : colors.bg,
+                  borderColor:
+                    entry.pricingTone === 'free' || entry.pricingTone === 'freemium'
+                      ? colors.acc
+                      : colors.line,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.pricingBadgeText,
+                  {
+                    color:
+                      entry.pricingTone === 'free' || entry.pricingTone === 'freemium'
+                        ? colors.acc
+                        : colors.ink,
+                  },
+                ]}
+              >
+                {entry.pricingLabel}
+              </Text>
+            </View>
+          </View>
+          <Text style={[styles.pricingDesc, { color: colors.muted }]}>{entry.pricingDescription}</Text>
+          {!!entry.keyUrl && (
+            <TouchableOpacity
+              style={[styles.keyLinkBtn, { borderColor: colors.line, backgroundColor: colors.bg }]}
+              onPress={() => Linking.openURL(entry.keyUrl!)}
+              activeOpacity={0.75}
+            >
+              <ProtoUiIcon name="open-in-new" size={15} color={colors.ink} />
+              <Text style={[styles.keyLinkText, { color: colors.ink }]}>
+                {entry.keyUrlLabel || 'Criar ou pegar chave de API'}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {mode === 'srv' && (
@@ -292,6 +340,23 @@ const styles = StyleSheet.create({
   heroTextWrap: { flex: 1 },
   heroTitle: { fontSize: 17, fontWeight: '600', fontFamily: tokens.typography.family.semibold },
   heroSub: { fontSize: 13, marginTop: 2 },
+  pricingCard: { borderRadius: 14, borderWidth: 1, padding: 12, marginBottom: 12, gap: 8 },
+  pricingHeader: { flexDirection: 'row', alignItems: 'center' },
+  pricingBadge: { borderRadius: 999, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 3 },
+  pricingBadgeText: { fontSize: 11.5, fontWeight: '700' },
+  pricingDesc: { fontSize: 12.5, lineHeight: 18 },
+  keyLinkBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    minHeight: 38,
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    marginTop: 2,
+  },
+  keyLinkText: { fontSize: 13, fontWeight: '600' },
   card: { borderRadius: 16, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10 },
   bodyText: { fontSize: 14, lineHeight: 20 },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 4 },

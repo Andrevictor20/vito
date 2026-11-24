@@ -138,7 +138,7 @@ func ValidateProviderKeyFormat(providerKey domain.ProviderKey, apiKey, baseURL s
 		return domain.ErrInvalidProviderKey
 	}
 
-	trimmedKey := strings.TrimSpace(apiKey)
+	trimmedKey := strings.Trim(strings.TrimSpace(apiKey), `"'`)
 	trimmedURL := strings.TrimSpace(baseURL)
 
 	if providerKey == domain.ProviderKeyCustom {
@@ -164,6 +164,13 @@ func ValidateProviderKeyFormat(providerKey domain.ProviderKey, apiKey, baseURL s
 		if strings.HasPrefix(trimmedKey, "sk-ant-") || strings.HasPrefix(trimmedKey, "sk-or-") {
 			return errors.New("Esta chave parece ser de outro provedor.")
 		}
+	}
+
+	if providerKey == domain.ProviderKeyGoogle {
+		if !strings.HasPrefix(trimmedKey, "AIza") && !strings.HasPrefix(trimmedKey, "AQ.") {
+			return fmt.Errorf("Esta chave não parece ser do Gemini. Ela deve começar com AIza.")
+		}
+		return nil
 	}
 
 	meta, ok := providerValidationCatalog[providerKey]
