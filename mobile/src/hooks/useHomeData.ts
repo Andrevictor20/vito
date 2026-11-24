@@ -2,12 +2,6 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Event, Todo, AssistantChatResponse } from '../types';
 import { api } from '../services/api';
-import { notificationService } from '../services/notificationService';
-import {
-  cancelEventRemindersAndAlarms,
-  scheduleEventRemindersAndAlarm,
-  syncEventsAndTodosReminders,
-} from '../services/eventReminderSync';
 import { dataSync } from '../services/dataSync';
 import { readHomeCache } from './homeDataCache';
 
@@ -54,8 +48,6 @@ export function useHomeData(currentUserId?: string) {
       setTodos(fetchedTodos || []);
       AsyncStorage.setItem(cacheKeys.eventsKey, JSON.stringify(fetchedEvents || [])).catch(() => {});
       AsyncStorage.setItem(cacheKeys.todosKey, JSON.stringify(fetchedTodos || [])).catch(() => {});
-      // Purga órfãos primeiro (série deletada / Google inbound / outro device), depois agenda de forma idempotente + alarmes críticos.
-      await syncEventsAndTodosReminders(fetchedEvents || [], fetchedTodos || []);
     } catch (e: any) {
       if (e?.status === 401 || e?.message?.includes('autorização ausente') || e?.message?.includes('não autorizado')) {
         console.warn('[useHomeData] Sessão desautenticada ao carregar dados:', e?.message || e);
@@ -148,7 +140,6 @@ export function useHomeData(currentUserId?: string) {
           AsyncStorage.setItem(cacheKeys.eventsKey, JSON.stringify(next)).catch(() => {});
           return next;
         });
-        scheduleEventRemindersAndAlarm(res.event);
       }
       await loadData(true);
       // Reconciliação transparente em segundo plano com o Google Calendar
@@ -169,10 +160,6 @@ export function useHomeData(currentUserId?: string) {
           AsyncStorage.setItem(cacheKeys.todosKey, JSON.stringify(next)).catch(() => {});
           return next;
         });
-        notificationService.scheduleTodoReminder(newTodo).catch(() => {});
-        if (newTodo.remind_at) {
-          notificationService.schedulePendingReminder(newTodo).catch(() => {});
-        }
       }
       await loadData(true);
       return newTodo;
@@ -191,13 +178,6 @@ export function useHomeData(currentUserId?: string) {
           AsyncStorage.setItem(cacheKeys.todosKey, JSON.stringify(next)).catch(() => {});
           return next;
         });
-        notificationService.cancelTodoReminder(id).catch(() => {});
-        if (updated.status !== 'completed') {
-          notificationService.scheduleTodoReminder(updated).catch(() => {});
-          if (updated.remind_at) {
-            notificationService.schedulePendingReminder(updated).catch(() => {});
-          }
-        }
       }
       await loadData(true);
       return updated;
@@ -229,11 +209,9 @@ export function useHomeData(currentUserId?: string) {
     }
     setEvents(nextEvents);
     AsyncStorage.setItem(cacheKeys.eventsKey, JSON.stringify(nextEvents)).catch(() => {});
-    notificationService.reconcileOrphanReminders(nextEvents, todos).catch(() => {});
 
     try {
       await api.deleteEvent(id, allSeries);
-      cancelEventRemindersAndAlarms(seriesIds);
       dataSync.notify('refresh_events');
       if (allSeries) {
         loadData(true);
@@ -241,7 +219,6 @@ export function useHomeData(currentUserId?: string) {
     } catch (e: any) {
       // Se o backend retornar 404 (já removido no banco/sync), mantém a exclusão otimista
       if (e?.status === 404 || e?.message?.includes('404') || e?.message?.includes('não encontrado')) {
-        cancelEventRemindersAndAlarms(seriesIds);
         return;
       }
       console.error('Erro ao deletar evento, revertendo:', e);
@@ -262,7 +239,6 @@ export function useHomeData(currentUserId?: string) {
           AsyncStorage.setItem(cacheKeys.eventsKey, JSON.stringify(next)).catch(() => {});
           return next;
         });
-        scheduleEventRemindersAndAlarm(res.event);
       }
       return res;
     } catch (e) {
@@ -290,7 +266,6 @@ export function useHomeData(currentUserId?: string) {
         await api.reopenTodo(id);
       } else {
         await api.completeTodo(id);
-        notificationService.cancelTodoReminder(id).catch(() => {});
       }
       dataSync.notify('refresh_todos');
     } catch (e) {
@@ -312,7 +287,6 @@ export function useHomeData(currentUserId?: string) {
 
     try {
       await api.deleteTodo(id);
-      notificationService.cancelTodoReminder(id).catch(() => {});
       dataSync.notify('refresh_todos');
     } catch (e) {
       console.error('Erro ao deletar tarefa, revertendo:', e);

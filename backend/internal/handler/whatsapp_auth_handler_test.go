@@ -62,7 +62,7 @@ func (m *mockEvolutionClientForAuthHandler) GetMediaBase64(ctx context.Context, 
 func (m *mockEvolutionClientForAuthHandler) FindContacts(ctx context.Context, instanceName string) ([]service.WhatsAppContact, error) {
 	return nil, nil
 }
-func (m *mockEvolutionClientForAuthHandler) SendReaction(ctx context.Context, instanceName, remoteJid, messageID, reaction string) error {
+func (m *mockEvolutionClientForAuthHandler) SendReaction(ctx context.Context, instanceName, remoteJid, messageID, reaction string, fromMe bool) error {
 	return nil
 }
 

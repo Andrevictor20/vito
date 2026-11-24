@@ -45,9 +45,11 @@ func StripVitoSignature(text string) (string, bool) {
 type inboundMessage struct {
 	MessageID      string
 	RemoteJID      string
+	RawRemoteJID   string
 	RemoteJIDAlt   string
 	FromMe         bool
 	Participant    string
+	RawParticipant string
 	ParticipantAlt string
 	PushName       string
 	MessageType    string
@@ -152,11 +154,13 @@ func parseInboundMessage(data json.RawMessage) (*inboundMessage, error) {
 
 	rawMessage := unwrapMessageSubtypes(raw.Message)
 
-	remoteJID := strings.TrimSpace(raw.Key.RemoteJID)
+	rawRemoteJID := strings.TrimSpace(raw.Key.RemoteJID)
+	remoteJID := rawRemoteJID
 	if strings.HasSuffix(remoteJID, "@lid") && strings.HasSuffix(strings.TrimSpace(raw.Key.RemoteJIDAlt), "@s.whatsapp.net") {
 		remoteJID = strings.TrimSpace(raw.Key.RemoteJIDAlt)
 	}
-	participant := strings.TrimSpace(raw.Key.Participant)
+	rawParticipant := strings.TrimSpace(raw.Key.Participant)
+	participant := rawParticipant
 	if strings.HasSuffix(participant, "@lid") && strings.HasSuffix(strings.TrimSpace(raw.Key.ParticipantAlt), "@s.whatsapp.net") {
 		participant = strings.TrimSpace(raw.Key.ParticipantAlt)
 	}
@@ -164,9 +168,11 @@ func parseInboundMessage(data json.RawMessage) (*inboundMessage, error) {
 	msg := &inboundMessage{
 		MessageID:      raw.Key.ID,
 		RemoteJID:      remoteJID,
+		RawRemoteJID:   rawRemoteJID,
 		RemoteJIDAlt:   strings.TrimSpace(raw.Key.RemoteJIDAlt),
 		FromMe:         raw.Key.FromMe,
 		Participant:    participant,
+		RawParticipant: rawParticipant,
 		ParticipantAlt: strings.TrimSpace(raw.Key.ParticipantAlt),
 		PushName:       strings.TrimSpace(raw.PushName),
 		MessageType:    raw.MessageType,

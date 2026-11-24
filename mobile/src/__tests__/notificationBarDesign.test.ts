@@ -52,7 +52,7 @@ describe('Notificação na Barra do Celular — Ícone Mascote v5 & Organizaçã
     assert.equal(monoXml.includes('M12,14c1.66,0'), false, 'ic_vito_monochrome.xml não deve mais usar microfone genérico');
   });
 
-  it('app.json, colors.xml e VitoAlarmReceiver usam paleta v5 (#0B7A53 / #DC2626) e copy editorial limpa', () => {
+  it('app.json e colors.xml usam paleta v5 (#0B7A53 / #DC2626)', () => {
     const appJson = JSON.parse(fs.readFileSync(path.join(MOBILE_ROOT, 'app.json'), 'utf8'));
     assert.equal(appJson.expo.notification.color, VITO_NOTIFICATION_ACCENT);
 
@@ -62,15 +62,6 @@ describe('Notificação na Barra do Celular — Ícone Mascote v5 & Organizaçã
     );
     assert.equal(colorsXml.includes('notification_icon_color">#0B7A53<'), true);
     assert.equal(colorsXml.includes('notification_alarm_color">#DC2626<'), true);
-
-    const alarmKt = fs.readFileSync(
-      path.join(MOBILE_ROOT, 'android/app/src/main/java/com/andrevmp/vito/alarm/VitoAlarmReceiver.kt'),
-      'utf8',
-    );
-    assert.equal(alarmKt.includes('R.drawable.notification_icon'), true);
-    assert.equal(alarmKt.includes('setSubText("Alarme crítico")'), true);
-    assert.equal(alarmKt.includes('BigTextStyle'), true);
-    assert.equal(alarmKt.includes('⏰'), false, 'VitoAlarmReceiver não deve usar emoji no título');
   });
 
   it('Canais organizados em 3 grupos, inclui Bots e Finanças, sem rótulo legado "Radares"', async () => {

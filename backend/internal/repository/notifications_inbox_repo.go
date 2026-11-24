@@ -38,6 +38,38 @@ func normalizeActionsJSON(n *domain.UserNotification) string {
 	return string(b)
 }
 
+// ComputeGroupKey calcula o grupo temporal dinâmico ("Agora", "Hoje", "Ontem", "Anteriores") no fuso local.
+func ComputeGroupKey(createdAt, now time.Time, loc *time.Location) string {
+	if loc == nil {
+		var err error
+		loc, err = time.LoadLocation("America/Sao_Paulo")
+		if err != nil {
+			loc = time.UTC
+		}
+	}
+	if now.IsZero() {
+		now = time.Now()
+	}
+	localNow := now.In(loc)
+	localCreated := createdAt.In(loc)
+
+	diff := localNow.Sub(localCreated)
+	if diff <= time.Hour && diff >= -5*time.Minute {
+		return "Agora"
+	}
+	ny, nm, nd := localNow.Date()
+	cy, cm, cd := localCreated.Date()
+	if ny == cy && nm == cm && nd == cd {
+		return "Hoje"
+	}
+	yesterday := localNow.AddDate(0, 0, -1)
+	yy, ym, yd := yesterday.Date()
+	if yy == cy && ym == cm && yd == cd {
+		return "Ontem"
+	}
+	return "Anteriores"
+}
+
 func normalizeGroupKey(raw string, createdAt time.Time, now time.Time) string {
 	switch strings.ToLower(strings.TrimSpace(raw)) {
 	case "agora":
@@ -46,20 +78,10 @@ func normalizeGroupKey(raw string, createdAt time.Time, now time.Time) string {
 		return "Hoje"
 	case "ontem":
 		return "Ontem"
+	case "anteriores":
+		return "Anteriores"
 	}
-	if now.IsZero() {
-		now = time.Now().UTC()
-	}
-	diff := now.Sub(createdAt)
-	if diff <= time.Hour {
-		return "Agora"
-	}
-	ny, nm, nd := now.UTC().Date()
-	cy, cm, cd := createdAt.UTC().Date()
-	if ny == cy && nm == cm && nd == cd {
-		return "Hoje"
-	}
-	return "Ontem"
+	return ComputeGroupKey(createdAt, now, nil)
 }
 
 func scanUserNotification(scanner interface{ Scan(dest ...any) error }) (*domain.UserNotification, error) {
@@ -135,29 +157,46 @@ func (r *NotificationsInboxRepositorySQLite) Create(ctx context.Context, n *doma
 	})
 }
 
-// UpsertBySource cria ou atualiza uma notificação ativa deduplicada por (user_id, source_domain, source_id).
+// UpsertBySource cria ou atualiza atomicamente uma notificação ativa deduplicada por (user_id, source_domain, source_id).
 func (r *NotificationsInboxRepositorySQLite) UpsertBySource(ctx context.Context, n *domain.UserNotification) error {
 	if strings.TrimSpace(n.SourceDomain) == "" || strings.TrimSpace(n.SourceID) == "" {
 		return r.Create(ctx, n)
 	}
-	var existingID string
-	err := r.db.QueryRowContext(ctx, `
-		SELECT id FROM user_notifications
-		WHERE user_id = ? AND source_domain = ? AND source_id = ? AND is_dismissed = 0
-		LIMIT 1
-	`, n.UserID, n.SourceDomain, n.SourceID).Scan(&existingID)
-	if err == nil && existingID != "" {
-		actionsJSON := normalizeActionsJSON(n)
-		return ExecuteQueuedWrite(ctx, func() error {
-			_, execErr := r.db.ExecContext(ctx, `
-				UPDATE user_notifications
-				SET title = ?, body = ?, actions_json = ?, bot_id = ?
-				WHERE id = ? AND user_id = ?
-			`, n.Title, n.Body, actionsJSON, n.BotID, existingID, n.UserID)
-			return execErr
-		})
+	if n.ID == "" {
+		n.ID = uuid.NewString()
 	}
-	return r.Create(ctx, n)
+	if n.CreatedAt.IsZero() {
+		n.CreatedAt = time.Now().UTC()
+	}
+	if n.Type == "" {
+		n.Type = domain.NotificationTypeInfo
+	}
+	n.GroupKey = normalizeGroupKey(n.GroupKey, n.CreatedAt, time.Now().UTC())
+	actionsJSON := normalizeActionsJSON(n)
+	unread := 0
+	if n.IsUnread {
+		unread = 1
+	}
+
+	const q = `
+		INSERT INTO user_notifications (
+			id, user_id, group_key, type, source_domain, source_id, bot_id,
+			title, body, actions_json, is_unread, is_dismissed, created_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
+		ON CONFLICT(user_id, source_domain, source_id) WHERE is_dismissed = 0 AND source_id <> ''
+		DO UPDATE SET
+			title = excluded.title,
+			body = excluded.body,
+			actions_json = excluded.actions_json,
+			bot_id = excluded.bot_id
+	`
+	return ExecuteQueuedWrite(ctx, func() error {
+		_, err := r.db.ExecContext(ctx, q,
+			n.ID, n.UserID, n.GroupKey, string(n.Type), n.SourceDomain, n.SourceID, n.BotID,
+			n.Title, n.Body, actionsJSON, unread, n.CreatedAt,
+		)
+		return err
+	})
 }
 
 // GetByID busca uma notificação isolada pelo par (id, user_id).

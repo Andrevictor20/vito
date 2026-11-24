@@ -11,15 +11,18 @@ import (
 
 // CognitiveRuntimeConfig agrupa dependências de Onda 2 e Onda 3 conectadas após o setup do agente.
 type CognitiveRuntimeConfig struct {
-	DB                    *sql.DB
-	EventRepo             domain.EventRepository
-	NotifSvc              service.PushDispatcher
-	PendingSvc            *service.PendingService
-	ReminderWorker        *service.ReminderWorker
-	TriggerWorker         *service.TriggerWorker
-	MorningBriefingWorker *service.MorningBriefingWorker
-	BehavioralWorker      *service.BehavioralWorker
-	AgentSys              *AgentSubsystem
+	DB                     *sql.DB
+	EventRepo              domain.EventRepository
+	NotifSvc               service.PushDispatcher
+	PendingSvc             *service.PendingService
+	ReminderWorker         *service.ReminderWorker
+	TodoReminderWorker     *service.TodoReminderWorker
+	PendingNudgeWorker     *service.PendingNudgeWorker
+	ExecutiveSummaryWorker *service.ExecutiveSummaryWorker
+	TriggerWorker          *service.TriggerWorker
+	MorningBriefingWorker  *service.MorningBriefingWorker
+	BehavioralWorker       *service.BehavioralWorker
+	AgentSys               *AgentSubsystem
 }
 
 // CognitiveRuntimeResult expõe referências construídas para testes e inspeção.
@@ -42,6 +45,15 @@ func wireCognitiveRuntime(c CognitiveRuntimeConfig) CognitiveRuntimeResult {
 		res.BudgetSvc = budgetSvc
 		if c.ReminderWorker != nil {
 			c.ReminderWorker.SetAttentionBudget(budgetSvc)
+		}
+		if c.TodoReminderWorker != nil {
+			c.TodoReminderWorker.SetAttentionBudget(budgetSvc)
+		}
+		if c.PendingNudgeWorker != nil {
+			c.PendingNudgeWorker.SetAttentionBudget(budgetSvc)
+		}
+		if c.ExecutiveSummaryWorker != nil {
+			c.ExecutiveSummaryWorker.SetAttentionBudget(budgetSvc)
 		}
 		if c.TriggerWorker != nil {
 			c.TriggerWorker.SetAttentionBudget(budgetSvc)

@@ -102,7 +102,7 @@ func (m *mockEvolutionClient) FindContacts(ctx context.Context, instanceName str
 	return nil, nil
 }
 
-func (m *mockEvolutionClient) SendReaction(ctx context.Context, instanceName, remoteJid, messageID, reaction string) error {
+func (m *mockEvolutionClient) SendReaction(ctx context.Context, instanceName, remoteJid, messageID, reaction string, fromMe bool) error {
 	m.sentReactions = append(m.sentReactions, struct {
 		Instance  string
 		RemoteJid string

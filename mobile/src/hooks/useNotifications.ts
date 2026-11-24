@@ -80,8 +80,8 @@ export function useNotifications() {
     return updated;
   }, []);
 
-  const scheduleReminder = useCallback(async (params: ScheduleNotificationParams) => {
-    return notificationService.scheduleEventReminder(params);
+  const scheduleReminder = useCallback(async (_params: ScheduleNotificationParams) => {
+    return null;
   }, []);
 
   return {

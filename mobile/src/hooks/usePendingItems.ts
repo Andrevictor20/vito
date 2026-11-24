@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '../services/api';
 import { dataSync } from '../services/dataSync';
-import { notificationService } from '../services/notificationService';
 import { hapticFeedback } from '../theme/motion';
 import { useAuth } from '../context/AuthContext';
 import { getPendingCacheKey, parseCachedPendingItems, isNetworkError } from '../utils/pendingCache';
@@ -85,9 +84,6 @@ export function usePendingItems(onScheduled?: (title: string, dateStr: string) =
       hapticFeedback.medium();
       const created = await api.createPendingItem({ title: trimmed, category, ...(extra || {}) });
       setItems((prev) => [created, ...prev]);
-      if (created.status !== 'done' && created.remind_at) {
-        await notificationService.schedulePendingReminder(created).catch(() => {});
-      }
       hapticFeedback.success();
       return created;
     },
@@ -102,7 +98,6 @@ export function usePendingItems(onScheduled?: (title: string, dateStr: string) =
     } else {
       const completed = await api.completePendingItem(item.id);
       setItems((prev) => prev.map((i) => (i.id === item.id ? completed : i)));
-      notificationService.cancelPendingReminder(item.id).catch(() => {});
       hapticFeedback.success();
     }
   }, []);
@@ -112,7 +107,6 @@ export function usePendingItems(onScheduled?: (title: string, dateStr: string) =
       hapticFeedback.light();
       // 1. Optimistic update instantâneo (< 16ms)
       setItems((prev) => prev.filter((i) => i.id !== id));
-      notificationService.cancelPendingReminder(id).catch(() => {});
       try {
         await api.deletePendingItem(id);
       } catch (err) {
@@ -131,10 +125,6 @@ export function usePendingItems(onScheduled?: (title: string, dateStr: string) =
       hapticFeedback.medium();
       const updated = await api.updatePendingItem(item.id, reminder);
       setItems((prev) => prev.map((i) => (i.id === item.id ? updated : i)));
-      await notificationService.cancelPendingReminder(item.id).catch(() => {});
-      if (updated.status !== 'done' && updated.remind_at) {
-        await notificationService.schedulePendingReminder(updated).catch(() => {});
-      }
       hapticFeedback.success();
       return updated;
     },
@@ -161,10 +151,6 @@ export function usePendingItems(onScheduled?: (title: string, dateStr: string) =
       hapticFeedback.medium();
       const updated = await api.updatePendingItem(item.id, data);
       setItems((prev) => prev.map((i) => (i.id === item.id ? updated : i)));
-      await notificationService.cancelPendingReminder(item.id).catch(() => {});
-      if (updated.status !== 'done' && updated.remind_at) {
-        await notificationService.schedulePendingReminder(updated).catch(() => {});
-      }
       hapticFeedback.success();
       return updated;
     },

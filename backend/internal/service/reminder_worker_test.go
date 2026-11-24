@@ -424,13 +424,13 @@ func TestReminderWorker_AttentionBudget_DeferDedupAndCriticalBypass(t *testing.T
 	if err != nil {
 		t.Fatalf("erro inesperado: %v", err)
 	}
-	// Apenas o critical_alarm deve furar o silêncio da reunião em andamento
-	if count != 1 {
-		t.Fatalf("esperava exatamente 1 push entregue (critical_alarm bypass), obteve %d", count)
+	// Sem bypass de critical_alarm (Onda 02.3): ambos devem ser adiados (DEFERRED) durante a reunião em andamento
+	if count != 0 {
+		t.Fatalf("esperava 0 push entregue durante reunião em andamento (DEFERRED), obteve %d", count)
 	}
 	mu.Lock()
-	if len(receivedPush) != 1 || receivedPush[0].Title != "Tomar insulina agora" {
-		t.Fatalf("push inesperado: %+v", receivedPush)
+	if len(receivedPush) != 0 {
+		t.Fatalf("esperava 0 pushes durante reunião, obteve %+v", receivedPush)
 	}
 	mu.Unlock()
 

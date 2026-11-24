@@ -3,7 +3,7 @@ import type {
   InboxNotificationGroup,
 } from '../../services/api/inboxNotificationsApi';
 
-export type NotificationFilter = 'all' | 'aprovar' | 'alerta';
+export type NotificationFilter = 'all' | 'aprovar' | 'alerta' | 'info';
 
 export const NOTIFICATION_GROUPS: InboxNotificationGroup[] = ['Agora', 'Hoje', 'Ontem'];
 
@@ -13,6 +13,7 @@ export function filterNotifications(
 ): InboxNotification[] {
   if (filter === 'all') return items;
   if (filter === 'aprovar') return items.filter((i) => i.type === 'aprovar');
+  if (filter === 'info') return items.filter((i) => i.type === 'info');
   return items.filter((i) => i.type === 'alerta');
 }
 

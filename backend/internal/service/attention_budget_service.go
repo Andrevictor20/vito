@@ -130,12 +130,13 @@ func (s *AttentionBudgetService) Evaluate(ctx context.Context, cand AttentionCan
 	if urgency == "" {
 		urgency = "normal"
 	}
-	isCritical := urgency == "critical" || category == "critical_alarm"
+	isCritical := urgency == "critical"
 
 	dedupKey := strings.TrimSpace(cand.DedupKey)
 	if dedupKey == "" {
 		dedupKey = buildSemanticDedupKey(cand.Title, cand.Body)
 	}
+	cand.DedupKey = dedupKey
 
 	decision := &AttentionDecision{
 		ID:     uuid.New().String(),
@@ -219,7 +220,7 @@ func (s *AttentionBudgetService) isCategoryAllowed(userID, category string) bool
 		col = "tarefas"
 	case "financas":
 		col = "financas"
-	case "bots":
+	case "bots", "radar":
 		col = "bots"
 	case "resumo":
 		col = "resumo"

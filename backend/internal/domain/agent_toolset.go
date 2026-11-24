@@ -146,8 +146,9 @@ type UnifiedAssistantRequest struct {
 	QuotedContext    string                    `json:"quoted_context,omitempty"`
 	ImageB64         string                    `json:"image_b64,omitempty"`
 	ImageMime        string                    `json:"image_mime,omitempty"`
-	History          []ConversationHistoryItem `json:"history,omitempty"`
-	IsNewSession     bool                      `json:"is_new_session,omitempty"`
+	History              []ConversationHistoryItem `json:"history,omitempty"`
+	IsNewSession         bool                      `json:"is_new_session,omitempty"`
+	WhatsAppPrivateScope bool                      `json:"whatsapp_private_scope,omitempty"`
 }
 
 // UnifiedAssistantResponse é o contrato único de saída para todos os canais (§5.6.7).

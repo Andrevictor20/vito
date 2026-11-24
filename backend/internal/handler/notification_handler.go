@@ -101,11 +101,11 @@ func (h *NotificationHandler) SendTestNotification(w http.ResponseWriter, r *htt
 
 	title := req.Title
 	if title == "" {
-		title = "Vito — Lembrete de Teste"
+		title = "Notificação de teste"
 	}
 	body := req.Body
 	if body == "" {
-		body = "Notificação de lembrete do Vito entregue com sucesso."
+		body = "Tudo pronto · seus alertas do Vito estão chegando com o novo visual."
 	}
 	priority := req.Priority
 	if priority == "" {

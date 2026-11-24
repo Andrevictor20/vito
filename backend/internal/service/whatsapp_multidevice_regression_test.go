@@ -260,7 +260,7 @@ func (c *recordingEvolutionClient) SendTextWithQuoted(ctx context.Context, insta
 	c.sentMessages = append(c.sentMessages, text)
 	return nil
 }
-func (c *recordingEvolutionClient) SendReaction(ctx context.Context, instanceName, remoteJID, messageID, reaction string) error {
+func (c *recordingEvolutionClient) SendReaction(ctx context.Context, instanceName, remoteJID, messageID, reaction string, fromMe bool) error {
 	return nil
 }
 func (c *recordingEvolutionClient) GetMediaBase64(ctx context.Context, instanceName string, messagePayload interface{}) (string, error) {

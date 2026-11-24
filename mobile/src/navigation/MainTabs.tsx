@@ -83,9 +83,17 @@ export const MainTabs: React.FC<{ route?: { params?: { screen?: MainTabType } } 
     const unsubStore = notificationsInboxStore.subscribe((count) => {
       setUnreadNotificationsCount(Math.max(0, count));
     });
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const scheduleRefresh = () => {
+      if (debounceTimer) return;
+      debounceTimer = setTimeout(() => {
+        debounceTimer = null;
+        void refreshUnreadCount();
+      }, 5000);
+    };
     void refreshUnreadCount();
-    const unsubPending = dataSync.subscribe('refresh_pending', refreshUnreadCount);
-    const unsubAll = dataSync.subscribe('refresh_all', refreshUnreadCount);
+    const unsubNotifs = dataSync.subscribe('refresh_notifications', scheduleRefresh);
+    const unsubPending = dataSync.subscribe('refresh_pending', scheduleRefresh);
     const badgeSub = DeviceEventEmitter.addListener(
       'vito:notifications-unread',
       (count: unknown) => {
@@ -95,9 +103,10 @@ export const MainTabs: React.FC<{ route?: { params?: { screen?: MainTabType } } 
       }
     );
     return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
       unsubStore();
+      unsubNotifs();
       unsubPending();
-      unsubAll();
       badgeSub.remove();
     };
   }, [refreshUnreadCount]);

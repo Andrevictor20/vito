@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"log"
 	"strings"
 	"time"
 )
@@ -31,18 +32,21 @@ func (s *WhatsAppService) replyOnlyOwnerCanCommand(ctx context.Context, instance
 	// Busca o userID da instância para montar a assinatura com nome (quando
 	// houver 2+ chamadores distintos no chat).
 	userID := ""
+	ownerPhone := ""
 	if integration, err := s.repo.GetByInstanceName(ctx, instanceName); err == nil && integration != nil {
 		userID = integration.UserID
+		ownerPhone = integration.Phone
+	}
+	ownerJID := ""
+	if s.ownerCache != nil {
+		ownerJID, _ = s.ownerCache.JID(instanceName)
 	}
 	assinatura := VitoSignature(ctx, s.contextSvc, userID, msg.RemoteJID, msg.PushName)
 	formatted := assinatura + "\n\n" + onlyOwnerCanCommandMessage
-	isGroup := strings.HasSuffix(msg.RemoteJID, "@g.us")
-	targetJID := NormalizeJIDForSend(msg.RemoteJID)
-	if isGroup && msg.MessageID != "" {
-		_ = s.client.SendTextWithQuoted(ctx, instanceName, targetJID, formatted, msg.MessageID)
-		return
+	targetJID := s.resolveTargetJIDForMessage(ctx, instanceName, msg, chatKind, ownerJID, ownerPhone)
+	if sendErr := s.sendWhatsAppReplyWithFallback(ctx, instanceName, targetJID, "", chatKind, formatted, msg); sendErr != nil {
+		log.Printf("⚠️ [WhatsAppService] falha ao enviar recusa educativa para %s: %v", targetJID, sendErr)
 	}
-	_ = s.client.SendText(ctx, instanceName, targetJID, formatted)
 }
 
 // allowBlockedReply aplica o cooldown por conversa.

@@ -71,6 +71,10 @@ export const NotificationsScreen: React.FC<{ onBack?: () => void }> = ({ onBack 
     () => items.filter((i) => i.type === 'alerta').length,
     [items]
   );
+  const infoCount = useMemo(
+    () => items.filter((i) => i.type === 'info').length,
+    [items]
+  );
   const grouped = useMemo(
     () => groupNotifications(filterNotifications(items, filter)),
     [items, filter]
@@ -84,8 +88,6 @@ export const NotificationsScreen: React.FC<{ onBack?: () => void }> = ({ onBack 
 
   const handleMarkAllRead = async () => {
     hapticFeedback.selection();
-    const keys = items.map((i) => i.id);
-    notificationsInboxStore.dismissAllKeys(keys);
     setItems((prev) => prev.map((x) => ({ ...x, is_unread: false })));
     notificationsInboxStore.setUnreadCount(0);
     try {
@@ -112,11 +114,11 @@ export const NotificationsScreen: React.FC<{ onBack?: () => void }> = ({ onBack 
         const decision = actionKey === 'always_allow' ? 'always_allow' : isReject ? 'deny' : 'allow_once';
         const botId = item.bot_id || act.value || '';
         const confId = item.source_id || '';
-        if (botId && confId) {
+        if (botId && confId && item.id.startsWith('bot-')) {
           await api.resolveBotPending(botId, confId, decision).catch(() => {});
+        } else {
+          await api.inbox.performAction(item.id, actionKey).catch(() => {});
         }
-        await api.inbox.performAction(item.id, actionKey).catch(() => {});
-        notificationsInboxStore.dismissKey(item.id);
         setItems((prev) => {
           const next = prev.filter((x) => x.id !== item.id);
           notificationsInboxStore.setUnreadCount(countUnreadNotifications(next));
@@ -128,14 +130,17 @@ export const NotificationsScreen: React.FC<{ onBack?: () => void }> = ({ onBack 
       }
 
       if (actionKey === 'reschedule_overdue' || actionKey === 'reschedule_today') {
-        const todayIso = new Date().toISOString().split('T')[0];
-        const todos = await api.getTodos('pending').catch(() => []);
-        const overdue = (todos || []).filter((t) => getTaskBucket(t.due_date) === 'atr');
-        await Promise.all(
-          overdue.map((t) => api.updateTodo(t.id, { due_date: todayIso }).catch(() => null))
-        );
-        await api.inbox.performAction(item.id, actionKey).catch(() => {});
-        notificationsInboxStore.dismissKey(item.id);
+        if (item.id === 'tasks-atr') {
+          const endOfDay = new Date();
+          endOfDay.setHours(23, 59, 59, 0);
+          const todos = await api.getTodos('pending').catch(() => []);
+          const overdue = (todos || []).filter((t) => getTaskBucket(t.due_date) === 'atr');
+          await Promise.all(
+            overdue.map((t) => api.updateTodo(t.id, { due_date: endOfDay.toISOString() }).catch(() => null))
+          );
+        } else {
+          await api.inbox.performAction(item.id, 'reschedule_today').catch(() => {});
+        }
         setItems((prev) => {
           const next = prev.filter((x) => x.id !== item.id);
           notificationsInboxStore.setUnreadCount(countUnreadNotifications(next));
@@ -147,20 +152,26 @@ export const NotificationsScreen: React.FC<{ onBack?: () => void }> = ({ onBack 
       }
 
       if (actionKey === 'go_tasks' || actionKey === 'view_tasks') {
+        if (item.id !== 'tasks-atr') {
+          await api.inbox.performAction(item.id, 'view_tasks').catch(() => {});
+        }
+        setItems((prev) => {
+          const next = prev.map((x) => (x.id === item.id ? { ...x, is_unread: false } : x));
+          notificationsInboxStore.setUnreadCount(countUnreadNotifications(next));
+          return next;
+        });
         handleBack();
         navigateToTab('tasks');
         return;
       }
 
       if (actionKey === 'go_booking') {
-        notificationsInboxStore.dismissKey(item.id);
         handleBack();
         navigateToBooking();
         return;
       }
 
       await api.inbox.performAction(item.id, actionKey).catch(() => {});
-      notificationsInboxStore.dismissKey(item.id);
       setItems((prev) => {
         const next = prev.filter((x) => x.id !== item.id);
         notificationsInboxStore.setUnreadCount(countUnreadNotifications(next));
@@ -206,6 +217,7 @@ export const NotificationsScreen: React.FC<{ onBack?: () => void }> = ({ onBack 
             { id: 'all' as NotificationFilter, label: 'Tudo', count: items.length },
             { id: 'aprovar' as NotificationFilter, label: 'Aprovações', count: approveCount },
             { id: 'alerta' as NotificationFilter, label: 'Alertas', count: alertCount },
+            { id: 'info' as NotificationFilter, label: 'Avisos', count: infoCount },
           ].map((c) => {
             const active = filter === c.id;
             return (

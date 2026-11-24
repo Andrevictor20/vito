@@ -21,13 +21,15 @@ var (
 
 // PushMessage define o payload enviado para o serviço Expo Push API.
 type PushMessage struct {
-	To        string                 `json:"to"`
-	Title     string                 `json:"title"`
-	Body      string                 `json:"body"`
-	Data      map[string]interface{} `json:"data,omitempty"`
-	Sound     string                 `json:"sound,omitempty"`
-	ChannelID string                 `json:"channelId,omitempty"`
-	Priority  string                 `json:"priority,omitempty"` // "default" | "normal" | "high"
+	To         string                 `json:"to"`
+	Title      string                 `json:"title"`
+	Subtitle   string                 `json:"subtitle,omitempty"`
+	Body       string                 `json:"body"`
+	Data       map[string]interface{} `json:"data,omitempty"`
+	Sound      string                 `json:"sound,omitempty"`
+	ChannelID  string                 `json:"channelId,omitempty"`
+	CategoryID string                 `json:"categoryId,omitempty"`
+	Priority   string                 `json:"priority,omitempty"` // "default" | "normal" | "high"
 }
 
 // NotificationService gerencia registro de tokens e despacho de notificações.
@@ -109,6 +111,8 @@ func (s *NotificationService) SendPushToUser(userID, title, body, priority strin
 	}
 
 	channelID := "vito_default"
+	subtitle := "Vito"
+	categoryID := ""
 	expoPriority := "high"
 	sound := "default"
 
@@ -117,12 +121,16 @@ func (s *NotificationService) SendPushToUser(userID, title, body, priority strin
 		channelID = ch
 	} else if dataType, ok := data["type"].(string); ok {
 		switch dataType {
-		case "todo_reminder", "todo_due":
+		case "event_reminder", "event_advance", "event_start":
+			channelID = "vito_events"
+		case "todo_reminder", "todo_due", "pending_nudge", "pending_reminder":
 			channelID = "vito_todos"
-		case "trigger_report":
+		case "bot_run", "bot_alert", "bot_approval", "bot_report":
+			channelID = "vito_bots"
+		case "trigger_report", "RADAR_TRIGGERED":
 			channelID = "vito_radar"
-		case "RADAR_TRIGGERED":
-			channelID = "vito_radar"
+		case "finance_alert", "finance_sync", "bill_due", "budget_alert":
+			channelID = "vito_finance"
 		case "booking_appointment", "meeting_vote", "meeting_confirmed":
 			channelID = "vito_booking"
 		case "executive_summary", "daily_summary", "weekly_summary", "monthly_summary":
@@ -131,9 +139,6 @@ func (s *NotificationService) SendPushToUser(userID, title, body, priority strin
 	}
 
 	switch priority {
-	case "wakeup":
-		channelID = "vito_wakeup"
-		expoPriority = "high"
 	case "urgent":
 		channelID = "vito_urgent"
 		expoPriority = "high"
@@ -143,16 +148,53 @@ func (s *NotificationService) SendPushToUser(userID, title, body, priority strin
 		expoPriority = "normal"
 	}
 
+	switch channelID {
+	case "vito_events":
+		subtitle = "Agenda"
+		categoryID = "vito_event"
+	case "vito_todos":
+		subtitle = "Tarefas"
+		categoryID = "vito_todo"
+	case "vito_bots", "vito_radar":
+		subtitle = "Bots"
+		categoryID = "vito_bot"
+	case "vito_finance":
+		subtitle = "Finanças"
+		categoryID = "vito_finance"
+	case "vito_booking":
+		subtitle = "Agendamentos"
+	case "vito_summaries":
+		subtitle = "Resumo"
+	case "vito_urgent":
+		subtitle = "Agora"
+	case "vito_silent":
+		subtitle = "Silencioso"
+	}
+	if customSub, ok := data["subtitle"].(string); ok && strings.TrimSpace(customSub) != "" {
+		subtitle = strings.TrimSpace(customSub)
+	}
+
 	var messages []PushMessage
+	seenTokens := make(map[string]struct{}, len(tokens))
 	for _, t := range tokens {
+		tok := strings.TrimSpace(t.Token)
+		if tok == "" {
+			continue
+		}
+		if _, dup := seenTokens[tok]; dup {
+			continue
+		}
+		seenTokens[tok] = struct{}{}
 		messages = append(messages, PushMessage{
-			To:        t.Token,
-			Title:     title,
-			Body:      body,
-			Data:      data,
-			Sound:     sound,
-			ChannelID: channelID,
-			Priority:  expoPriority,
+			To:         tok,
+			Title:      title,
+			Subtitle:   subtitle,
+			Body:       body,
+			Data:       data,
+			Sound:      sound,
+			ChannelID:  channelID,
+			CategoryID: categoryID,
+			Priority:   expoPriority,
 		})
 	}
 

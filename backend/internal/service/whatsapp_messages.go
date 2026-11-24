@@ -68,11 +68,10 @@ func (s *WhatsAppService) processInboundItem(ctx context.Context, instanceName, 
 	}
 
 	if msg.MessageID != "" {
-		if s.isMessageIDProcessed(msg.MessageID) {
+		if !s.claimMessageID(msg.MessageID) {
 			log.Printf("ℹ️ [WhatsAppInbound] MessageID %s duplicado ignorado", msg.MessageID)
 			return nil
 		}
-		s.markMessageIDProcessed(msg.MessageID)
 	}
 
 	if s.inboundCoord != nil {
@@ -84,18 +83,16 @@ func (s *WhatsAppService) processInboundItem(ctx context.Context, instanceName, 
 	if err != nil || integration == nil {
 		if connInteg, connErr := s.repo.FindConnectedInstance(ctx); connErr == nil && connInteg != nil {
 			integration = connInteg
+			if integration.InstanceName != "" {
+				instanceName = integration.InstanceName
+			}
 		} else {
 			log.Printf("⚠️ [WhatsAppInbound] integração não encontrada para instância %q: %v", instanceName, err)
 			return nil
 		}
 	}
 
-	// Quando o próprio dono envia mensagem (fromMe=true) e a Evolution API informa
-	// o participant em formato @lid, registramos o LID do dono para reconhecer o
-	// chat "Você" (@lid) e validar autoria mesmo quando fromMe vier false.
-	if msg.FromMe && strings.HasSuffix(msg.Participant, "@lid") && s.ownerCache != nil {
-		s.ownerCache.SetLID(instanceName, msg.Participant)
-	}
+	s.learnOwnerAndLIDFromMessage(instanceName, integration, msg)
 
 	// Blindagem pós-queda/reinício: mensagens já arquivadas no banco ou antigas/append
 	// NÃO devem disparar Whisper, reação 👀 nem fila de IA.
@@ -227,7 +224,16 @@ func (s *WhatsAppService) processInboundItem(ctx context.Context, instanceName, 
 	}
 
 	s.archiveMessage(ctx, integration.UserID, instanceName, msg, chatKind, rawText, "user")
-	threadID := s.recordBridgeIncoming(ctx, integration.UserID, msg.RemoteJID, rawText)
+	var threadID string
+	if s.agentLoop != nil {
+		if s.convBridge != nil {
+			if thread, tErr := s.convBridge.GetOrCreateThread(ctx, integration.UserID, msg.RemoteJID); tErr == nil && thread != nil {
+				threadID = thread.ID
+			}
+		}
+	} else {
+		threadID = s.recordBridgeIncoming(ctx, integration.UserID, msg.RemoteJID, rawText)
+	}
 
 	if s.agentLoop == nil && s.assistantSvc == nil {
 		return nil
@@ -235,9 +241,11 @@ func (s *WhatsAppService) processInboundItem(ctx context.Context, instanceName, 
 
 	// Feedback visual imediato: reagir com olhinho para confirmar leitura (timeout curto).
 	if msg.MessageID != "" && msg.RemoteJID != "" {
-		targetJID := NormalizeJIDForSend(msg.RemoteJID)
+		reactTarget := s.resolveTargetJIDForMessage(ctx, instanceName, msg, chatKind, ownerJID, integration.Phone)
 		reactCtx, reactCancel := context.WithTimeout(ctx, 5*time.Second)
-		_ = s.client.SendReaction(reactCtx, instanceName, targetJID, msg.MessageID, "👀")
+		if reactErr := s.client.SendReaction(reactCtx, instanceName, reactTarget, msg.MessageID, "👀", msg.FromMe); reactErr != nil {
+			log.Printf("⚠️ [WhatsAppService] falha ao enviar reação 👀 para %s: %v", reactTarget, reactErr)
+		}
 		reactCancel()
 	}
 
@@ -347,13 +355,14 @@ func (s *WhatsAppService) processPendingMessage(pending *pendingMessage) error {
 			quotedParts = append(quotedParts, "Janela recente do WhatsApp:\n"+strings.Join(winLines, "\n"))
 		}
 		adkResp, adkErr := s.agentLoop.Run(ctx, domain.UnifiedAssistantRequest{
-			UserID:        integration.UserID,
-			ThreadID:      pending.threadID,
-			Channel:       "whatsapp",
-			Message:       rawText,
-			QuotedContext: strings.Join(quotedParts, "\n\n"),
-			ImageB64:      imageB64,
-			ImageMime:     imageMime,
+			UserID:               integration.UserID,
+			ThreadID:             pending.threadID,
+			Channel:              "whatsapp",
+			Message:              rawText,
+			QuotedContext:        strings.Join(quotedParts, "\n\n"),
+			WhatsAppPrivateScope: privateScope,
+			ImageB64:             imageB64,
+			ImageMime:            imageMime,
 		})
 		err = adkErr
 		if adkResp != nil {
@@ -389,64 +398,43 @@ func (s *WhatsAppService) processPendingMessage(pending *pendingMessage) error {
 		log.Printf("⚠️ [WhatsAppService] Erro ao processar mensagem do WhatsApp: %v", err)
 		assinatura := VitoSignature(ctx, s.contextSvc, integration.UserID, msg.RemoteJID, msg.PushName)
 		fallbackReply := fmt.Sprintf("%s\n\nEstou com uma instabilidade temporária nos meus provedores de IA agora. Pode tentar novamente em alguns instantes?", assinatura)
-		targetJID := ResolveReplyJID(msg.RemoteJID, msg.RemoteJIDAlt, chatKind, ownerJID, integration.Phone)
+		targetJID := s.resolveTargetJIDForMessage(ctx, instanceName, msg, chatKind, ownerJID, integration.Phone)
+		canonicalOwnerJID := ResolveReplyJID(msg.RemoteJID, msg.RemoteJIDAlt, domain.WhatsAppChatKindSelf, ownerJID, integration.Phone)
 		s.markOutboundReply(fallbackReply)
-		if strings.HasSuffix(msg.RemoteJID, "@g.us") && msg.MessageID != "" {
-			_ = s.client.SendTextWithQuoted(ctx, instanceName, targetJID, fallbackReply, msg.MessageID)
-		} else {
-			_ = s.client.SendText(ctx, instanceName, targetJID, fallbackReply)
+		if sendErr := s.sendWhatsAppReplyWithFallback(ctx, instanceName, targetJID, canonicalOwnerJID, chatKind, fallbackReply, msg); sendErr != nil {
+			log.Printf("❌ [WhatsAppService] falha ao enviar fallback de erro para %s: %v", targetJID, sendErr)
 		}
 		return nil
 	}
 
-	s.memory.AddMessage(convKey, "user", rawText)
-
 	if replyText == "" {
+		s.memory.AddMessage(convKey, "user", rawText)
 		return nil
 	}
-	s.memory.AddMessage(convKey, "vito", replyText)
 
 	if modelUsed == "" {
 		modelUsed = "vito-assistant"
 	}
-	s.recordBridgeOutgoing(ctx, integration.UserID, pending.threadID, msg.RemoteJID, replyText, modelUsed)
 
 	assinatura := VitoSignature(ctx, s.contextSvc, integration.UserID, msg.RemoteJID, msg.PushName)
 	formattedReply := fmt.Sprintf("%s\n\n%s", assinatura, replyText)
-	isGroup := strings.HasSuffix(msg.RemoteJID, "@g.us")
-	targetJID := ResolveReplyJID(msg.RemoteJID, msg.RemoteJIDAlt, chatKind, ownerJID, integration.Phone)
+	targetJID := s.resolveTargetJIDForMessage(ctx, instanceName, msg, chatKind, ownerJID, integration.Phone)
 	canonicalOwnerJID := ResolveReplyJID(msg.RemoteJID, msg.RemoteJIDAlt, domain.WhatsAppChatKindSelf, ownerJID, integration.Phone)
 	s.markOutboundReply(formattedReply)
 
-	var sendErr error
-	if isGroup && msg.MessageID != "" {
-		sendErr = s.client.SendTextWithQuoted(ctx, instanceName, targetJID, formattedReply, msg.MessageID)
-	} else {
-		sendErr = s.client.SendText(ctx, instanceName, targetJID, formattedReply)
-		if sendErr != nil && canonicalOwnerJID != "" && targetJID != canonicalOwnerJID {
-			log.Printf("⚠️ [WhatsAppService] tentativa inicial falhou para %s (%v); tentando fallback para ownerJID %s", targetJID, sendErr, canonicalOwnerJID)
-			sendErr = s.client.SendText(ctx, instanceName, canonicalOwnerJID, formattedReply)
-		}
-	}
+	sendErr := s.sendWhatsAppReplyWithFallback(ctx, instanceName, targetJID, canonicalOwnerJID, chatKind, formattedReply, msg)
 	if sendErr != nil {
-		log.Printf("❌ [WhatsAppService] falha ao enviar resposta para %s: %v", targetJID, sendErr)
-	} else {
-		log.Printf("📤 [WhatsAppService] resposta enviada com sucesso para %s (%d bytes)", targetJID, len(formattedReply))
+		log.Printf("❌ [WhatsAppService] falha definitiva ao enviar resposta para %s: %v", targetJID, sendErr)
+		return nil
 	}
 
-	if s.notifSender != nil {
-		notifBody := replyText
-		if isGroup {
-			notifBody = fmt.Sprintf("Respondeu no grupo: %s", replyText)
-		}
-		if len(notifBody) > 150 {
-			notifBody = notifBody[:147] + "..."
-		}
-		_, _ = s.notifSender.SendPushToUser(integration.UserID, "💬 Vito (WhatsApp)", notifBody, "default", map[string]interface{}{
-			"type":      "whatsapp_response",
-			"remoteJid": msg.RemoteJID,
-		})
+	log.Printf("📤 [WhatsAppService] resposta enviada com sucesso para %s (%d bytes)", targetJID, len(formattedReply))
+	s.memory.AddMessage(convKey, "user", rawText)
+	s.memory.AddMessage(convKey, "vito", replyText)
+	if s.agentLoop == nil {
+		s.recordBridgeOutgoing(ctx, integration.UserID, pending.threadID, msg.RemoteJID, replyText, modelUsed)
 	}
+	s.notifyWhatsAppReplyIfAllowed(ctx, integration.UserID, chatKind, msg, replyText)
 
 	return nil
 }

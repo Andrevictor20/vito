@@ -81,6 +81,7 @@ docs/auditoria-vito/
 backups/
 craft/
 .agents/
+.commandcode/
 .githooks/
 AGENTS.md
 CLAUDE.md

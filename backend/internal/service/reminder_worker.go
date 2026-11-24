@@ -53,10 +53,6 @@ func buildReminderAttentionCandidate(event domain.Event, kind, title, body, urge
 	if kind == "start" {
 		dedupKey = fmt.Sprintf("event_start:%s", event.ID)
 	}
-	if strings.EqualFold(strings.TrimSpace(event.Category), "critical_alarm") {
-		category = "critical_alarm"
-		urgency = "critical"
-	}
 	return AttentionCandidate{
 		UserID:       event.UserID,
 		SourceWorker: "reminder_worker",
@@ -171,7 +167,11 @@ func (w *ReminderWorker) CheckAndDispatchReminders(now time.Time) (int, error) {
 			}
 
 			cand := buildReminderAttentionCandidate(event, "advance", title, body, "normal", now)
-			if allowed, _ := w.getAttentionBudget().ShouldDeliver(context.Background(), cand); allowed && w.notifSvc != nil {
+			allowed, dec := w.getAttentionBudget().ShouldDeliver(context.Background(), cand)
+			if dec != nil && dec.Status == AttentionStatusDeferred {
+				continue
+			}
+			if allowed && w.notifSvc != nil {
 				sent, pushErr := w.notifSvc.SendPushToUser(event.UserID, title, body, priority, data)
 				if pushErr != nil {
 					log.Printf("[ReminderWorker] Erro ao enviar push de antecedência para evento %s (user %s): %v", event.ID, event.UserID, pushErr)
@@ -221,7 +221,11 @@ func (w *ReminderWorker) CheckAndDispatchReminders(now time.Time) (int, error) {
 			}
 
 			cand := buildReminderAttentionCandidate(event, "start", title, body, "high", now)
-			if allowed, _ := w.getAttentionBudget().ShouldDeliver(context.Background(), cand); allowed && w.notifSvc != nil {
+			allowed, dec := w.getAttentionBudget().ShouldDeliver(context.Background(), cand)
+			if dec != nil && dec.Status == AttentionStatusDeferred {
+				continue
+			}
+			if allowed && w.notifSvc != nil {
 				sent, pushErr := w.notifSvc.SendPushToUser(event.UserID, title, body, priority, data)
 				if pushErr != nil {
 					log.Printf("[ReminderWorker] Erro ao enviar push de início para evento %s (user %s): %v", event.ID, event.UserID, pushErr)

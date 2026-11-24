@@ -4,13 +4,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  scheduleCriticalAlarm,
-  cancelCriticalAlarm,
-  syncCriticalAlarmsFromEvents,
-  consumePendingDismissedAlarm,
-  buildMorningBriefingPromptFromAlarm,
-} from '../services/criticalAlarmService';
-import {
   parseSSEFrame,
   buildStreamFallbackResponse,
   normalizeStreamResponse,
@@ -114,92 +107,25 @@ describe('Plano 02 — Elevação Premium (SSE, Zero-Jank, Barge-In Kotlin & Ala
     assert.ok(ktSrc.includes('stopBotPlaybackInternal'));
   });
 
-  it('Passo D: Subsistema Kotlin de Alarme Crítico e AndroidManifest estão configurados e ligados ao JS', () => {
-    const receiverPath = path.resolve(
+  it('AC-07: Subsistema de Alarme Crítico removido do AndroidManifest, Kotlin e JS', () => {
+    const alarmDir = path.resolve(
       __dirname,
-      '../../android/app/src/main/java/com/andrevmp/vito/alarm/VitoAlarmReceiver.kt'
-    );
-    const activityPath = path.resolve(
-      __dirname,
-      '../../android/app/src/main/java/com/andrevmp/vito/alarm/VitoAlarmActivity.kt'
-    );
-    const modulePath = path.resolve(
-      __dirname,
-      '../../android/app/src/main/java/com/andrevmp/vito/alarm/VitoAlarmModule.kt'
+      '../../android/app/src/main/java/com/andrevmp/vito/alarm'
     );
     const manifestPath = path.resolve(__dirname, '../../android/app/src/main/AndroidManifest.xml');
 
-    assert.equal(fs.existsSync(receiverPath), true);
-    assert.equal(fs.existsSync(activityPath), true);
-    assert.equal(fs.existsSync(modulePath), true);
+    assert.equal(fs.existsSync(alarmDir), false);
 
     const manifestSrc = fs.readFileSync(manifestPath, 'utf8');
-    assert.ok(manifestSrc.includes('VitoAlarmActivity'));
-    assert.ok(manifestSrc.includes('VitoAlarmReceiver'));
-    assert.ok(manifestSrc.includes('USE_FULL_SCREEN_INTENT'));
+    assert.equal(manifestSrc.includes('VitoAlarmActivity'), false);
+    assert.equal(manifestSrc.includes('VitoAlarmReceiver'), false);
+    assert.equal(manifestSrc.includes('USE_FULL_SCREEN_INTENT'), false);
 
     const appRootSrc = fs.readFileSync(path.resolve(__dirname, '../AppRoot.tsx'), 'utf8');
     const homeDataSrc = fs.readFileSync(path.resolve(__dirname, '../hooks/useHomeData.ts'), 'utf8');
-    assert.ok(appRootSrc.includes('subscribeCriticalAlarmDismissed'));
-    assert.ok(homeDataSrc.includes('syncEventsAndTodosReminders'));
-    assert.ok(homeDataSrc.includes('scheduleEventRemindersAndAlarm'));
-    assert.ok(homeDataSrc.includes('cancelEventRemindersAndAlarms'));
-  });
-
-  it('Passo D: criticalAlarmService agenda, sincroniza, cancela e consome alarme dispensado', async () => {
-    const scheduled: Array<{ id: string; triggerEpochMs: number; title: string }> = [];
-    const cancelled: string[] = [];
-    const fakeNative = {
-      scheduleCriticalAlarm: async (id: string, triggerEpochMs: number, title: string) => {
-        scheduled.push({ id, triggerEpochMs, title });
-        return true;
-      },
-      cancelCriticalAlarm: async (id: string) => {
-        cancelled.push(id);
-        return true;
-      },
-      consumePendingDismissedAlarm: async () => ({
-        alarmId: 'ev-2',
-        eventTitle: 'Reunião Diretoria',
-        dismissedAt: 1700000000000,
-      }),
-    };
-
-    const futureTime = Date.now() + 3600_000;
-    const ok = await scheduleCriticalAlarm('ev-1', futureTime, 'Voo para São Paulo', fakeNative);
-    assert.equal(ok, true);
-    assert.equal(scheduled.length, 1);
-    assert.equal(scheduled[0].id, 'ev-1');
-
-    const count = await syncCriticalAlarmsFromEvents(
-      [
-        {
-          id: 'ev-2',
-          title: '[ALARME] Reunião Diretoria',
-          start_at: new Date(Date.now() + 7200_000).toISOString(),
-          critical_alarm: true,
-          wake_offset_minutes: 30,
-        },
-        {
-          id: 'ev-normal',
-          title: 'Almoço',
-          start_at: new Date(Date.now() + 7200_000).toISOString(),
-        },
-      ],
-      fakeNative
-    );
-    assert.equal(count, 1);
-    assert.equal(scheduled.length, 2);
-    assert.equal(scheduled[1].title, 'Reunião Diretoria');
-
-    const cancelOk = await cancelCriticalAlarm('ev-1', fakeNative);
-    assert.equal(cancelOk, true);
-    assert.ok(cancelled.includes('ev-1'));
-
-    const dismissed = await consumePendingDismissedAlarm(fakeNative);
-    assert.equal(dismissed?.alarmId, 'ev-2');
-    const prompt = buildMorningBriefingPromptFromAlarm(dismissed!);
-    assert.ok(prompt.includes('Reunião Diretoria'));
-    assert.ok(prompt.includes('briefing matinal'));
+    assert.equal(appRootSrc.includes('subscribeCriticalAlarmDismissed'), false);
+    assert.equal(homeDataSrc.includes('syncEventsAndTodosReminders'), false);
+    assert.equal(homeDataSrc.includes('scheduleEventRemindersAndAlarm'), false);
+    assert.equal(homeDataSrc.includes('cancelEventRemindersAndAlarms'), false);
   });
 });

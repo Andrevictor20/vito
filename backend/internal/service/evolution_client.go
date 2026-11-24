@@ -20,6 +20,21 @@ type WhatsAppContact struct {
 	ProfilePicURL string `json:"profilePicUrl,omitempty"`
 }
 
+// QuotedMessageRef carrega os metadados completos exigidos pela Evolution API v2.3.7 / Baileys
+// para responder citando uma mensagem específica.
+type QuotedMessageRef struct {
+	ID        string
+	RemoteJID string
+	FromMe    bool
+	Text      string
+}
+
+// QuotedRefEvolutionClient é uma extensão opcional de EvolutionAPIClient para envio
+// com referência de citação completa (compatível com Evolution API v2.3.7).
+type QuotedRefEvolutionClient interface {
+	SendTextWithQuotedRef(ctx context.Context, instanceName, to, text string, quoted QuotedMessageRef) error
+}
+
 // EvolutionAPIClient abstrai as chamadas HTTP para o container da Evolution API v2.
 type EvolutionAPIClient interface {
 	CreateInstance(ctx context.Context, instanceName, phone string) error
@@ -33,7 +48,7 @@ type EvolutionAPIClient interface {
 	SendTextWithQuoted(ctx context.Context, instanceName, to, text, quotedID string) error
 	GetMediaBase64(ctx context.Context, instanceName string, messagePayload interface{}) (string, error)
 	FindContacts(ctx context.Context, instanceName string) ([]WhatsAppContact, error)
-	SendReaction(ctx context.Context, instanceName, remoteJid, messageID, reaction string) error
+	SendReaction(ctx context.Context, instanceName, remoteJid, messageID, reaction string, fromMe bool) error
 	FindMessages(ctx context.Context, in EvolutionFindMessagesInput) ([]WhatsAppChatMessage, error)
 	FindGroups(ctx context.Context, instanceName string) ([]WhatsAppGroup, error)
 	FindParticipants(ctx context.Context, instanceName, groupJid string) ([]string, error)
@@ -127,7 +142,6 @@ func (c *DefaultEvolutionClient) SetWebhook(ctx context.Context, instanceName, w
 			"byEvents": false,
 			"events": []string{
 				"MESSAGES_UPSERT",
-				"SEND_MESSAGE",
 				"CONNECTION_UPDATE",
 			},
 		},
@@ -290,19 +304,64 @@ func (c *DefaultEvolutionClient) Logout(ctx context.Context, instanceName string
 	return nil
 }
 
+func normalizeEvolutionTargetNumber(to string) (string, error) {
+	trimmed := strings.TrimSpace(to)
+	if trimmed == "" {
+		return "", fmt.Errorf("destino vazio para sendText")
+	}
+	if strings.HasSuffix(trimmed, "@lid") {
+		return "", fmt.Errorf("destino @lid não resolvido para número E.164: %s", trimmed)
+	}
+	if strings.HasSuffix(trimmed, "@g.us") {
+		return trimmed, nil
+	}
+	if strings.HasSuffix(trimmed, "@s.whatsapp.net") {
+		userPart := strings.Split(strings.Split(trimmed, "@")[0], ":")[0]
+		digits := phoneDigits(userPart)
+		if digits == "" {
+			return "", fmt.Errorf("JID inválido sem dígitos E.164: %s", trimmed)
+		}
+		return digits, nil
+	}
+	if digits := phoneDigits(strings.Split(trimmed, ":")[0]); digits != "" {
+		return digits, nil
+	}
+	return trimmed, nil
+}
+
 func (c *DefaultEvolutionClient) SendText(ctx context.Context, instanceName, to, text string) error {
-	return c.SendTextWithQuoted(ctx, instanceName, to, text, "")
+	return c.SendTextWithQuotedRef(ctx, instanceName, to, text, QuotedMessageRef{})
 }
 
 func (c *DefaultEvolutionClient) SendTextWithQuoted(ctx context.Context, instanceName, to, text, quotedID string) error {
+	return c.SendTextWithQuotedRef(ctx, instanceName, to, text, QuotedMessageRef{
+		ID:        quotedID,
+		RemoteJID: NormalizeJIDForSend(to),
+	})
+}
+
+func (c *DefaultEvolutionClient) SendTextWithQuotedRef(ctx context.Context, instanceName, to, text string, quoted QuotedMessageRef) error {
+	number, err := normalizeEvolutionTargetNumber(to)
+	if err != nil {
+		return err
+	}
 	payload := map[string]interface{}{
-		"number": to,
+		"number": number,
 		"text":   text,
 	}
-	if quotedID != "" {
+	if quoted.ID != "" {
+		quotedRemote := strings.TrimSpace(quoted.RemoteJID)
+		if quotedRemote == "" {
+			quotedRemote = NormalizeJIDForSend(to)
+		}
 		payload["quoted"] = map[string]interface{}{
 			"key": map[string]interface{}{
-				"id": quotedID,
+				"id":        quoted.ID,
+				"remoteJid": quotedRemote,
+				"fromMe":    quoted.FromMe,
+			},
+			"message": map[string]interface{}{
+				"conversation": quoted.Text,
 			},
 		}
 	}
@@ -313,10 +372,19 @@ func (c *DefaultEvolutionClient) SendTextWithQuoted(ctx context.Context, instanc
 	}
 	defer resp.Body.Close()
 
+	bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		var ack struct {
+			Status string `json:"status"`
+			Key    struct {
+				ID        string `json:"id"`
+				RemoteJID string `json:"remoteJid"`
+			} `json:"key"`
+		}
+		_ = json.Unmarshal(bodyBytes, &ack)
+		fmt.Printf("📤 [Evolution] sendText %d remoteJid=%s status=%s id=%s\n", resp.StatusCode, ack.Key.RemoteJID, ack.Status, ack.Key.ID)
 		return nil
 	}
-	bodyBytes, _ := io.ReadAll(resp.Body)
 	return fmt.Errorf("evolution api sendText falhou (status %d): %s", resp.StatusCode, string(bodyBytes))
 }
 
@@ -399,7 +467,7 @@ func (c *DefaultEvolutionClient) findContacts(ctx context.Context, instanceName 
 }
 
 // SendReaction envia uma reação (emoji) a uma mensagem específica no WhatsApp via Evolution API v2.
-func (c *DefaultEvolutionClient) SendReaction(ctx context.Context, instanceName, remoteJid, messageID, reaction string) error {
+func (c *DefaultEvolutionClient) SendReaction(ctx context.Context, instanceName, remoteJid, messageID, reaction string, fromMe bool) error {
 	if instanceName == "" || remoteJid == "" || messageID == "" || reaction == "" {
 		return nil
 	}
@@ -407,7 +475,7 @@ func (c *DefaultEvolutionClient) SendReaction(ctx context.Context, instanceName,
 	payload := map[string]interface{}{
 		"key": map[string]interface{}{
 			"remoteJid": remoteJid,
-			"fromMe":    false,
+			"fromMe":    fromMe,
 			"id":        messageID,
 		},
 		"reaction": reaction,

@@ -252,7 +252,7 @@ func (w *MorningBriefingWorker) ProcessBriefings(now time.Time) (int, error) {
 			firstStart := events[0].StartAt.In(loc)
 			diff := firstStart.Sub(userNow)
 			if diff > 0 && diff <= 45*time.Minute {
-				priority = "wakeup"
+				priority = "high"
 				urgency = "high"
 			}
 		}

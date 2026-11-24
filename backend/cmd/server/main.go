@@ -159,10 +159,8 @@ func main() {
 	syncSvc.RegisterProvider(calendar.NewAppleCalDAVProvider(calendar.AppleCalDAVConfig{}))
 	calSvc.SetSyncPusher(syncSvc)
 
-	// Worker em segundo plano para lembretes de compromissos
+	// Worker em segundo plano para lembretes de compromissos (iniciado após wiring cognitivo)
 	reminderWorker := service.NewReminderWorker(eventRepo, notifSvc, 15*time.Minute)
-	reminderWorker.Start()
-	defer reminderWorker.Stop()
 
 	// Worker em segundo plano para vigília autônoma de disparadores com cascata completa de IA (Groq -> Mistral -> Gemini -> OpenRouter)
 	var triggerEvaluator service.TriggerEvaluator = &service.DefaultTriggerEvaluator{}
@@ -213,26 +211,18 @@ func main() {
 		}
 		return 0, "", false, nil
 	})
-	triggerWorker.Start()
-	defer triggerWorker.Stop()
 
 	// Worker em segundo plano para briefing matinal proativo com síntese de IA em cascata
 	morningBriefingWorker := service.NewMorningBriefingWorker(briefingRepo, eventRepo, todoRepo, userRepo, notifSvc, 1*time.Minute)
 	if len(aiProviders) > 0 {
 		morningBriefingWorker.SetTextGenerator(aiGateway)
 	}
-	morningBriefingWorker.Start()
-	defer morningBriefingWorker.Stop()
 
 	// Worker em segundo plano para lembretes de pendências (nudge diário)
 	pendingNudgeWorker := service.NewPendingNudgeWorker(pendingRepo, userRepo, notifSvc, 1*time.Minute)
-	pendingNudgeWorker.Start()
-	defer pendingNudgeWorker.Stop()
 
 	// Worker em segundo plano para lembretes de tarefas com prazo
 	todoReminderWorker := service.NewTodoReminderWorker(todoRepo, notifSvc, 15*time.Minute)
-	todoReminderWorker.Start()
-	defer todoReminderWorker.Stop()
 
 	// Worker em segundo plano para limpeza de contas placeholder órfãs (@vito.local)
 	// criadas por logins de WhatsApp — libera o número de telefone de terceiros.
@@ -243,19 +233,9 @@ func main() {
 
 	// Worker em segundo plano para consolidação comportamental noturna (§8.4 ciclo 3)
 	behavioralWorker := service.NewBehavioralWorker(todoRepo, eventRepo, memoryRepo)
-	behavioralWorker.Start(func() []string {
-		ids, err := userRepo.ListIDs()
-		if err != nil {
-			return nil
-		}
-		return ids
-	})
-	defer behavioralWorker.Stop()
 
 	// Worker em segundo plano para resumos executivos (diário, semanal e mensal)
 	executiveSummaryWorker := service.NewExecutiveSummaryWorker(db, userRepo, notifSvc, 1*time.Minute)
-	executiveSummaryWorker.Start()
-	defer executiveSummaryWorker.Stop()
 
 	googleAuthCfg := service.GoogleAuthConfig{
 		ClientID:       cfg.GoogleClientID,
@@ -404,11 +384,35 @@ func main() {
 	morningBriefingWorker.SetProactiveBridge(proactiveBridge)
 	cognitiveRes := wireCognitiveRuntime(CognitiveRuntimeConfig{
 		DB: db, EventRepo: eventRepo, NotifSvc: notifSvc, PendingSvc: pendingSvc,
-		ReminderWorker: reminderWorker, TriggerWorker: triggerWorker,
-		MorningBriefingWorker: morningBriefingWorker, BehavioralWorker: behavioralWorker, AgentSys: agentSys,
+		ReminderWorker: reminderWorker, TodoReminderWorker: todoReminderWorker,
+		PendingNudgeWorker: pendingNudgeWorker, ExecutiveSummaryWorker: executiveSummaryWorker,
+		TriggerWorker: triggerWorker, MorningBriefingWorker: morningBriefingWorker,
+		BehavioralWorker: behavioralWorker, AgentSys: agentSys,
 	})
 	botHandler := setupBotSubsystem(db, triggerRepo, notifSvc, cognitiveRes.BudgetSvc, agentSys)
 	v5Sys := setupV5Subsystem(db, cognitiveRes.BudgetSvc, agentSys, todoRepo)
+
+	// Inicia workers proativos somente após AttentionBudgetService e inboxRecorder estarem conectados.
+	reminderWorker.Start()
+	defer reminderWorker.Stop()
+	triggerWorker.Start()
+	defer triggerWorker.Stop()
+	morningBriefingWorker.Start()
+	defer morningBriefingWorker.Stop()
+	pendingNudgeWorker.Start()
+	defer pendingNudgeWorker.Stop()
+	todoReminderWorker.Start()
+	defer todoReminderWorker.Stop()
+	behavioralWorker.Start(func() []string {
+		ids, err := userRepo.ListIDs()
+		if err != nil {
+			return nil
+		}
+		return ids
+	})
+	defer behavioralWorker.Stop()
+	executiveSummaryWorker.Start()
+	defer executiveSummaryWorker.Stop()
 
 	// Handler de voz bidirecional conectado ao Loop de Agente e TTS
 	voiceStreamHandler := handler.NewVoiceStreamHandler(astSvc)

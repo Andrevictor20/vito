@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"log"
@@ -15,15 +16,29 @@ import (
 // ExecutiveSummaryWorker monitora os horários de fechamento de ciclos (diário, semanal e mensal)
 // e despacha notificações executivas informando que os resumos estão disponíveis.
 type ExecutiveSummaryWorker struct {
-	db            *sql.DB
-	userRepo      domain.UserRepository
-	notifSvc      *NotificationService
-	checkInterval time.Duration
-	location      *time.Location
-	stopCh        chan struct{}
-	wg            sync.WaitGroup
-	running       bool
-	mu            sync.Mutex
+	db              *sql.DB
+	userRepo        domain.UserRepository
+	notifSvc        *NotificationService
+	attentionBudget *AttentionBudgetService
+	checkInterval   time.Duration
+	location        *time.Location
+	stopCh          chan struct{}
+	wg              sync.WaitGroup
+	running         bool
+	mu              sync.Mutex
+}
+
+// SetAttentionBudget injeta o controlador de orçamento de atenção no worker de resumos.
+func (w *ExecutiveSummaryWorker) SetAttentionBudget(ab *AttentionBudgetService) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.attentionBudget = ab
+}
+
+func (w *ExecutiveSummaryWorker) getAttentionBudget() *AttentionBudgetService {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.attentionBudget
 }
 
 // NewExecutiveSummaryWorker instancia o worker de resumos executivos.
@@ -135,14 +150,26 @@ func (w *ExecutiveSummaryWorker) CheckAndDispatchSummaries(now time.Time) (int, 
 					"channelId": "vito_summaries",
 				}
 				if w.notifSvc != nil {
-					_, _ = w.notifSvc.SendPushToUser(userID, title, body, "default", data)
+					cand := AttentionCandidate{
+						UserID:       userID,
+						SourceWorker: "executive_summary_worker",
+						Category:     "resumo",
+						Urgency:      "normal",
+						DedupKey:     "summary:daily:" + periodKey,
+						Title:        title,
+						Body:         body,
+						Now:          now,
+					}
+					if allowed, _ := w.getAttentionBudget().ShouldDeliver(context.Background(), cand); allowed {
+						_, _ = w.notifSvc.SendPushToUser(userID, title, body, "default", data)
+					}
 				}
 				_ = w.markDispatched(userID, "daily", periodKey, now)
 				dispatchedCount++
 			}
 		}
 
-		// 2. Balanço Semanal (Domingos às 20:00)
+				// 2. Balanço Semanal (Domingos às 20:00)
 		if userNow.Weekday() == time.Sunday && timeHM == "20:00" {
 			_, week := userNow.ISOWeek()
 			periodKey := fmt.Sprintf("%d-W%02d", userNow.Year(), week)
@@ -155,7 +182,19 @@ func (w *ExecutiveSummaryWorker) CheckAndDispatchSummaries(now time.Time) (int, 
 					"channelId": "vito_summaries",
 				}
 				if w.notifSvc != nil {
-					_, _ = w.notifSvc.SendPushToUser(userID, title, body, "default", data)
+					cand := AttentionCandidate{
+						UserID:       userID,
+						SourceWorker: "executive_summary_worker",
+						Category:     "resumo",
+						Urgency:      "normal",
+						DedupKey:     "summary:weekly:" + periodKey,
+						Title:        title,
+						Body:         body,
+						Now:          now,
+					}
+					if allowed, _ := w.getAttentionBudget().ShouldDeliver(context.Background(), cand); allowed {
+						_, _ = w.notifSvc.SendPushToUser(userID, title, body, "default", data)
+					}
 				}
 				_ = w.markDispatched(userID, "weekly", periodKey, now)
 				dispatchedCount++
@@ -174,7 +213,19 @@ func (w *ExecutiveSummaryWorker) CheckAndDispatchSummaries(now time.Time) (int, 
 					"channelId": "vito_summaries",
 				}
 				if w.notifSvc != nil {
-					_, _ = w.notifSvc.SendPushToUser(userID, title, body, "default", data)
+					cand := AttentionCandidate{
+						UserID:       userID,
+						SourceWorker: "executive_summary_worker",
+						Category:     "resumo",
+						Urgency:      "normal",
+						DedupKey:     "summary:monthly:" + periodKey,
+						Title:        title,
+						Body:         body,
+						Now:          now,
+					}
+					if allowed, _ := w.getAttentionBudget().ShouldDeliver(context.Background(), cand); allowed {
+						_, _ = w.notifSvc.SendPushToUser(userID, title, body, "default", data)
+					}
 				}
 				_ = w.markDispatched(userID, "monthly", periodKey, now)
 				dispatchedCount++

@@ -166,7 +166,7 @@ func TestEvolutionClient_SendReaction(t *testing.T) {
 	defer server.Close()
 
 	client := service.NewDefaultEvolutionClient(server.URL, "test_api_key", server.Client())
-	err := client.SendReaction(context.Background(), "test_inst", "559884417165@s.whatsapp.net", "MSG-12345", "👀")
+	err := client.SendReaction(context.Background(), "test_inst", "559884417165@s.whatsapp.net", "MSG-12345", "👀", true)
 	if err != nil {
 		t.Fatalf("esperava sucesso no SendReaction, obteve: %v", err)
 	}
@@ -177,7 +177,15 @@ func TestEvolutionClient_SendReaction(t *testing.T) {
 		t.Fatalf("esperava reaction 👀, obteve: %v", capturedPayload["reaction"])
 	}
 	key, ok := capturedPayload["key"].(map[string]interface{})
-	if !ok || key["id"] != "MSG-12345" || key["remoteJid"] != "559884417165@s.whatsapp.net" {
+	if !ok || key["id"] != "MSG-12345" || key["remoteJid"] != "559884417165@s.whatsapp.net" || key["fromMe"] != true {
 		t.Fatalf("key inválida no payload: %+v", capturedPayload["key"])
+	}
+}
+
+func TestEvolutionClient_SendText_RejectsUnresolvedLID(t *testing.T) {
+	client := service.NewDefaultEvolutionClient("http://127.0.0.1:0", "test_api_key", nil)
+	err := client.SendText(context.Background(), "test_inst", "1234567890@lid", "ola")
+	if err == nil {
+		t.Fatalf("esperava erro ao tentar enviar para @lid não resolvido")
 	}
 }

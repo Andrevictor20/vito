@@ -97,8 +97,8 @@ func TestNotificationService_SendPushToUser(t *testing.T) {
 	svc := service.NewNotificationService(repo, ts.Client())
 	svc.SetExpoAPIURL(ts.URL)
 
-	// Enviar notificação wakeup
-	count, err := svc.SendPushToUser("user-1", "Alerta Crítico", "Compromisso importante", "wakeup", map[string]interface{}{"eventId": "e-1"})
+	// Enviar notificação urgente
+	count, err := svc.SendPushToUser("user-1", "Alerta Urgente", "Compromisso importante", "urgent", map[string]interface{}{"eventId": "e-1"})
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
@@ -108,8 +108,8 @@ func TestNotificationService_SendPushToUser(t *testing.T) {
 	if len(receivedMessages) != 1 {
 		t.Fatalf("expected 1 received message on server, got %d", len(receivedMessages))
 	}
-	if receivedMessages[0].ChannelID != "vito_wakeup" {
-		t.Errorf("expected channel vito_wakeup, got %s", receivedMessages[0].ChannelID)
+	if receivedMessages[0].ChannelID != "vito_urgent" {
+		t.Errorf("expected channel vito_urgent, got %s", receivedMessages[0].ChannelID)
 	}
 	if receivedMessages[0].Priority != "high" {
 		t.Errorf("expected priority high, got %s", receivedMessages[0].Priority)
@@ -169,5 +169,60 @@ func TestNotificationService_SendPushToUser_PrunesInvalidTokens(t *testing.T) {
 	tokens, _ := repo.FindByUserID("user-stale")
 	if len(tokens) != 0 {
 		t.Errorf("esperava que token 'DeviceNotRegistered' fosse removido do repositório, mas ainda existem %d tokens", len(tokens))
+	}
+}
+
+func TestNotificationService_DomainChannelsSubtitlesAndCategories(t *testing.T) {
+	repo := &mockDeviceTokenRepo{
+		tokens: []domain.DeviceToken{
+			{ID: "dt-v5", UserID: "user-v5", Token: "ExponentPushToken[v5-test]", Platform: "android"},
+		},
+	}
+
+	var last []service.PushMessage
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var msgs []service.PushMessage
+		_ = json.NewDecoder(r.Body).Decode(&msgs)
+		last = msgs
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"data":[{"status":"ok"}]}`))
+	}))
+	defer ts.Close()
+
+	svc := service.NewNotificationService(repo, ts.Client())
+	svc.SetExpoAPIURL(ts.URL)
+
+	cases := []struct {
+		name       string
+		dataType   string
+		wantChan   string
+		wantSub    string
+		wantCat    string
+	}{
+		{"bots", "bot_alert", "vito_bots", "Bots", "vito_bot"},
+		{"finance", "finance_alert", "vito_finance", "Finanças", "vito_finance"},
+		{"events", "event_reminder", "vito_events", "Agenda", "vito_event"},
+		{"todos", "todo_due", "vito_todos", "Tarefas", "vito_todo"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := svc.SendPushToUser("user-v5", "Título", "Corpo", "default", map[string]interface{}{"type": tc.dataType})
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if len(last) != 1 {
+				t.Fatalf("expected 1 push, got %d", len(last))
+			}
+			if last[0].ChannelID != tc.wantChan {
+				t.Errorf("channelId = %q, want %q", last[0].ChannelID, tc.wantChan)
+			}
+			if last[0].Subtitle != tc.wantSub {
+				t.Errorf("subtitle = %q, want %q", last[0].Subtitle, tc.wantSub)
+			}
+			if last[0].CategoryID != tc.wantCat {
+				t.Errorf("categoryId = %q, want %q", last[0].CategoryID, tc.wantCat)
+			}
+		})
 	}
 }

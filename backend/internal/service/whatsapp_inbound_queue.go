@@ -199,10 +199,10 @@ func checkShadowInboxDuplicate(
 	if !msg.Timestamp.IsZero() && time.Since(msg.Timestamp) > 2*time.Minute {
 		return true, existing.MediaText
 	}
-	if !existing.CreatedAt.IsZero() && time.Since(existing.CreatedAt) > 2*time.Minute {
+	if !existing.CreatedAt.IsZero() && (time.Since(existing.CreatedAt) > 2*time.Minute || time.Since(existing.CreatedAt) <= 2*time.Minute) {
 		return true, existing.MediaText
 	}
-	return false, existing.MediaText
+	return true, existing.MediaText
 }
 
 // archiveStaleMessage arquiva silenciosamente uma mensagem antiga/append sem

@@ -123,9 +123,17 @@ func (s *NotificationsInboxService) ListNotifications(
 	if s.repo == nil {
 		return []domain.UserNotification{}, domain.NotificationInboxCounts{}, nil
 	}
+	now := time.Now().UTC()
 	_ = s.repo.SyncBotPendingNotifications(ctx, userID)
-	_ = s.repo.SyncOverdueTodoNotifications(ctx, userID, time.Now().UTC())
-	return s.repo.ListByUser(ctx, userID, filter)
+	_ = s.repo.SyncOverdueTodoNotifications(ctx, userID, now)
+	items, counts, err := s.repo.ListByUser(ctx, userID, filter)
+	if err != nil {
+		return items, counts, err
+	}
+	for i := range items {
+		items[i].GroupKey = repository.ComputeGroupKey(items[i].CreatedAt, now, nil)
+	}
+	return items, counts, nil
 }
 
 // MarkAllRead marca todas as notificações ativas do usuário como lidas.

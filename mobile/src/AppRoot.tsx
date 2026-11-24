@@ -12,11 +12,6 @@ import { navigationRef, navigateToTab } from './navigation/navigationRef';
 import { tokens } from './theme/tokens';
 import { api, DEFAULT_SERVER_URL, CLOUDFLARE_SERVER_URL, PI_SERVER_URL, isCloudServer } from './services/api';
 import { notificationService } from './services/notificationService';
-import { chatPromptBus } from './services/dataSync';
-import {
-  buildMorningBriefingPromptFromAlarm,
-  subscribeCriticalAlarmDismissed,
-} from './services/criticalAlarmService';
 import { UpdateBanner } from './components/common/UpdateBanner';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { PrivacyScreenShield } from './components/common/PrivacyScreenShield';
@@ -94,14 +89,6 @@ const MainNavigator: React.FC = () => {
     return () => {
       if (timer) clearTimeout(timer);
     };
-  }, [user?.id, isInitialLoading]);
-
-  useEffect(() => {
-    if (!user || isInitialLoading) return;
-    return subscribeCriticalAlarmDismissed((payload) => {
-      navigateToTab('chat');
-      chatPromptBus.notify(buildMorningBriefingPromptFromAlarm(payload));
-    });
   }, [user?.id, isInitialLoading]);
 
   useEffect(() => {

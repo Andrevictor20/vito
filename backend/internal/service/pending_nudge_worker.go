@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"strings"
@@ -12,16 +13,30 @@ import (
 
 // PendingNudgeWorker monitora pendências sem data agendada paradas há > 24h e envia nudges executivos.
 type PendingNudgeWorker struct {
-	pendingRepo   domain.PendingRepository
-	userRepo      domain.UserRepository
-	notifSvc      *NotificationService
-	checkInterval time.Duration
-	targetTime    string // ex: "17:30"
-	stopCh        chan struct{}
-	wg            sync.WaitGroup
-	running       bool
-	mu            sync.Mutex
-	location      *time.Location
+	pendingRepo     domain.PendingRepository
+	userRepo        domain.UserRepository
+	notifSvc        *NotificationService
+	attentionBudget *AttentionBudgetService
+	checkInterval   time.Duration
+	targetTime      string // ex: "17:30"
+	stopCh          chan struct{}
+	wg              sync.WaitGroup
+	running         bool
+	mu              sync.Mutex
+	location        *time.Location
+}
+
+// SetAttentionBudget injeta o controlador de orçamento de atenção no worker de nudges.
+func (w *PendingNudgeWorker) SetAttentionBudget(ab *AttentionBudgetService) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.attentionBudget = ab
+}
+
+func (w *PendingNudgeWorker) getAttentionBudget() *AttentionBudgetService {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.attentionBudget
 }
 
 // NewPendingNudgeWorker instancia o worker de lembretes diários para pendências.
@@ -146,11 +161,23 @@ func (w *PendingNudgeWorker) ProcessNudges(now time.Time) (int, error) {
 			"itemsCount": len(items),
 		}
 
-		sentCount, err := w.notifSvc.SendPushToUser(userID, title, body, "default", data)
-		if err != nil {
-			log.Printf("[PendingNudgeWorker] Erro ao enviar push de nudge para %s: %v", userID, err)
-		} else if sentCount > 0 {
-			dispatchedUsers++
+		cand := AttentionCandidate{
+			UserID:       userID,
+			SourceWorker: "pending_nudge_worker",
+			Category:     "tarefas",
+			Urgency:      "normal",
+			DedupKey:     "pending_nudge:" + todayStr,
+			Title:        title,
+			Body:         body,
+			Now:          now,
+		}
+		if allowed, _ := w.getAttentionBudget().ShouldDeliver(context.Background(), cand); allowed && w.notifSvc != nil {
+			sentCount, err := w.notifSvc.SendPushToUser(userID, title, body, "default", data)
+			if err != nil {
+				log.Printf("[PendingNudgeWorker] Erro ao enviar push de nudge para %s: %v", userID, err)
+			} else if sentCount > 0 {
+				dispatchedUsers++
+			}
 		}
 
 		// Marca todos os itens notificados com o timestamp de hoje

@@ -56,7 +56,7 @@ func (m *mockEvoClientWiring) GetMediaBase64(ctx context.Context, instanceName s
 func (m *mockEvoClientWiring) FindContacts(ctx context.Context, instanceName string) ([]service.WhatsAppContact, error) {
 	return nil, nil
 }
-func (m *mockEvoClientWiring) SendReaction(ctx context.Context, instanceName, remoteJid, messageID, reaction string) error {
+func (m *mockEvoClientWiring) SendReaction(ctx context.Context, instanceName, remoteJid, messageID, reaction string, fromMe bool) error {
 	return nil
 }
 func (m *mockEvoClientWiring) FindMessages(ctx context.Context, in service.EvolutionFindMessagesInput) ([]service.WhatsAppChatMessage, error) {

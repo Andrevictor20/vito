@@ -250,6 +250,32 @@ func (s *WhatsAppService) isOutboundReply(text string) bool {
 	return false
 }
 
+// claimMessageID verifica e reivindica atomicamente o MessageID sob mutex,
+// impedindo processamento paralelo por webhooks duplicados (messages.upsert + send.message).
+func (s *WhatsAppService) claimMessageID(id string) bool {
+	if s == nil || id == "" {
+		return true
+	}
+	s.outboundMu.Lock()
+	defer s.outboundMu.Unlock()
+	if s.processedMsgIDs == nil {
+		s.processedMsgIDs = make(map[string]time.Time)
+	}
+	now := time.Now()
+	if exp, ok := s.processedMsgIDs[id]; ok {
+		if now.Sub(exp) <= 5*time.Minute {
+			return false
+		}
+	}
+	for k, exp := range s.processedMsgIDs {
+		if now.Sub(exp) > 5*time.Minute {
+			delete(s.processedMsgIDs, k)
+		}
+	}
+	s.processedMsgIDs[id] = now
+	return true
+}
+
 // markMessageIDProcessed registra o ID de mensagem para evitar reprocessamento em caso de webhooks duplicados.
 func (s *WhatsAppService) markMessageIDProcessed(id string) {
 	if s == nil || id == "" {

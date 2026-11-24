@@ -63,6 +63,9 @@ type WhatsAppService struct {
 	outboundMu          sync.Mutex
 	recentOutboundTexts map[string]time.Time
 	processedMsgIDs     map[string]time.Time
+	attentionBudget     *AttentionBudgetService
+	lidMu               sync.RWMutex
+	lidToPN             map[string]string
 }
 
 // AsyncRunner executa uma tarefa em background (ou de forma síncrona, em testes).
@@ -169,21 +172,6 @@ func (s *WhatsAppService) MarkMediaAnalyzed(ctx context.Context, userID, id, tex
 		return nil
 	}
 	return s.contextSvc.SaveMediaText(ctx, userID, id, text)
-}
-
-// SetNotificationSender injeta o serviço de notificações push no WhatsAppService.
-func (s *WhatsAppService) SetNotificationSender(sender NotificationSender) {
-	s.notifSender = sender
-}
-
-// SetAudioTranscriber injeta o transcritor de áudio (Groq Whisper) no WhatsAppService.
-func (s *WhatsAppService) SetAudioTranscriber(transcriber ai.AudioTranscriber) {
-	s.audioTranscriber = transcriber
-}
-
-// SetUserRepo injeta o repositório de usuários para discovery social de contatos.
-func (s *WhatsAppService) SetUserRepo(userRepo domain.UserRepository) {
-	s.userRepo = userRepo
 }
 
 // SetContextService injeta o serviço de contexto conversacional do WhatsApp.
@@ -447,8 +435,13 @@ func (s *WhatsAppService) HandleWebhook(ctx context.Context, eventType string, p
 		log.Printf("❌ [WhatsAppWebhook] Erro no unmarshal base: %v", err)
 		return err
 	}
-	if s.ownerCache != nil && base.Instance != "" && strings.Contains(base.Sender, "@s.whatsapp.net") {
-		s.ownerCache.Set(base.Instance, strings.TrimSpace(base.Sender))
+	if s.ownerCache != nil && base.Instance != "" {
+		sender := strings.TrimSpace(base.Sender)
+		if strings.Contains(sender, "@s.whatsapp.net") {
+			s.ownerCache.Set(base.Instance, sender)
+		} else if strings.HasSuffix(sender, "@lid") {
+			s.ownerCache.SetLID(base.Instance, sender)
+		}
 	}
 
 	event := strings.ToLower(base.Event)

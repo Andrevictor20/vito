@@ -209,6 +209,9 @@ func (f *ADKLoopFacade) RunStream(ctx context.Context, req domain.UnifiedAssista
 	if strings.TrimSpace(req.QuotedContext) != "" {
 		volatileParts = append(volatileParts, "### CONTEXTO CITADO / TELA\n"+strings.TrimSpace(req.QuotedContext))
 	}
+	if req.Channel == "whatsapp" && !req.WhatsAppPrivateScope {
+		volatileParts = append(volatileParts, "### ESCOPO DE PRIVACIDADE WHATSAPP\nConversa visível para terceiros: NUNCA revele dados privados de outros chats, pendências pessoais ou informações confidenciais do dono.")
+	}
 	volatileContext := strings.Join(volatileParts, "\n\n")
 
 	// 4. Sincronização de histórico enviado pelo cliente caso a sessão seja recém-criada

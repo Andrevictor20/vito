@@ -43,7 +43,7 @@ func (noopEvolutionClient) GetMediaBase64(context.Context, string, interface{}) 
 func (noopEvolutionClient) FindContacts(context.Context, string) ([]service.WhatsAppContact, error) {
 	return nil, nil
 }
-func (noopEvolutionClient) SendReaction(context.Context, string, string, string, string) error {
+func (noopEvolutionClient) SendReaction(context.Context, string, string, string, string, bool) error {
 	return nil
 }
 func (noopEvolutionClient) FindMessages(context.Context, service.EvolutionFindMessagesInput) ([]service.WhatsAppChatMessage, error) {

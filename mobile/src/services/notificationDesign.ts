@@ -20,7 +20,6 @@ export type VitoNotificationChannelId =
   | 'vito_finance'
   | 'vito_default'
   | 'vito_urgent'
-  | 'vito_wakeup'
   | 'vito_silent';
 
 export type VitoNotificationCategoryId =
@@ -182,18 +181,6 @@ export const VITO_NOTIFICATION_CHANNELS: readonly VitoChannelSpec[] = [
     showBadge: true,
   },
   {
-    id: 'vito_wakeup',
-    groupId: 'vito_group_system',
-    name: 'Wake-up Call',
-    description: 'Chamadas prioritárias para compromissos inadiáveis',
-    importance: 'max',
-    lightColor: '#DC2626',
-    vibrate: true,
-    vibrationPattern: [0, 420, 200, 420],
-    sound: 'default',
-    showBadge: true,
-  },
-  {
     id: 'vito_silent',
     groupId: 'vito_group_system',
     name: 'Silencioso',
@@ -216,7 +203,6 @@ export const NOTIFICATION_DOMAIN_META: Record<VitoNotificationChannelId, VitoNot
   vito_finance: { subtitle: 'Finanças', color: '#0F766E', categoryId: 'vito_finance' },
   vito_default: { subtitle: 'Vito', color: '#0B7A53' },
   vito_urgent: { subtitle: 'Agora', color: '#DC2626', categoryId: 'vito_event' },
-  vito_wakeup: { subtitle: 'Alarme', color: '#DC2626' },
   vito_silent: { subtitle: 'Silencioso', color: '#595959' },
 };
 

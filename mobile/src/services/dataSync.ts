@@ -8,6 +8,7 @@ export type SyncEventType =
   | 'refresh_bots'
   | 'refresh_bookings'
   | 'refresh_pending'
+  | 'refresh_notifications'
   | 'refresh_finance'
   | 'refresh_ai_providers';
 

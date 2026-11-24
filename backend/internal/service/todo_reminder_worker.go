@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"sync"
@@ -11,14 +12,28 @@ import (
 
 // TodoReminderWorker monitora tarefas pendentes com prazo iminente e despacha notificações push.
 type TodoReminderWorker struct {
-	todoRepo      domain.TodoRepository
-	notifSvc      *NotificationService
-	windowAhead   time.Duration
-	checkInterval time.Duration
-	stopCh        chan struct{}
-	wg            sync.WaitGroup
-	running       bool
-	mu            sync.Mutex
+	todoRepo        domain.TodoRepository
+	notifSvc        *NotificationService
+	attentionBudget *AttentionBudgetService
+	windowAhead     time.Duration
+	checkInterval   time.Duration
+	stopCh          chan struct{}
+	wg              sync.WaitGroup
+	running         bool
+	mu              sync.Mutex
+}
+
+// SetAttentionBudget injeta o controlador de orçamento de atenção no worker de tarefas.
+func (w *TodoReminderWorker) SetAttentionBudget(ab *AttentionBudgetService) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.attentionBudget = ab
+}
+
+func (w *TodoReminderWorker) getAttentionBudget() *AttentionBudgetService {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.attentionBudget
 }
 
 // NewTodoReminderWorker instancia o worker de lembretes para tarefas.
@@ -92,11 +107,27 @@ func (w *TodoReminderWorker) CheckAndDispatchReminders(now time.Time) (int, erro
 				"channelId": "vito_todos",
 			}
 
-			sent, pushErr := w.notifSvc.SendPushToUser(todo.UserID, title, body, priority, data)
-			if pushErr != nil {
-				log.Printf("[TodoReminderWorker] Erro ao enviar push para tarefa %s (user %s): %v", todo.ID, todo.UserID, pushErr)
-			} else if sent > 0 {
-				dispatchedCount++
+			cand := AttentionCandidate{
+				UserID:       todo.UserID,
+				SourceWorker: "todo_reminder_worker",
+				Category:     "tarefas",
+				Urgency:      "normal",
+				DedupKey:     "todo_adv:" + todo.ID,
+				Title:        title,
+				Body:         body,
+				Now:          now,
+			}
+			allowed, dec := w.getAttentionBudget().ShouldDeliver(context.Background(), cand)
+			if dec != nil && dec.Status == AttentionStatusDeferred {
+				continue
+			}
+			if allowed && w.notifSvc != nil {
+				sent, pushErr := w.notifSvc.SendPushToUser(todo.UserID, title, body, priority, data)
+				if pushErr != nil {
+					log.Printf("[TodoReminderWorker] Erro ao enviar push para tarefa %s (user %s): %v", todo.ID, todo.UserID, pushErr)
+				} else if sent > 0 {
+					dispatchedCount++
+				}
 			}
 
 			if markErr := w.todoRepo.MarkReminderSent(todo.ID, now); markErr != nil {
@@ -125,11 +156,27 @@ func (w *TodoReminderWorker) CheckAndDispatchReminders(now time.Time) (int, erro
 				"channelId": "vito_todos",
 			}
 
-			sent, pushErr := w.notifSvc.SendPushToUser(todo.UserID, title, body, "urgent", data)
-			if pushErr != nil {
-				log.Printf("[TodoReminderWorker] Erro ao enviar push de prazo para tarefa %s (user %s): %v", todo.ID, todo.UserID, pushErr)
-			} else if sent > 0 {
-				dispatchedCount++
+			cand := AttentionCandidate{
+				UserID:       todo.UserID,
+				SourceWorker: "todo_reminder_worker",
+				Category:     "tarefas",
+				Urgency:      "high",
+				DedupKey:     "todo_due:" + todo.ID,
+				Title:        title,
+				Body:         body,
+				Now:          now,
+			}
+			allowed, dec := w.getAttentionBudget().ShouldDeliver(context.Background(), cand)
+			if dec != nil && dec.Status == AttentionStatusDeferred {
+				continue
+			}
+			if allowed && w.notifSvc != nil {
+				sent, pushErr := w.notifSvc.SendPushToUser(todo.UserID, title, body, "urgent", data)
+				if pushErr != nil {
+					log.Printf("[TodoReminderWorker] Erro ao enviar push de prazo para tarefa %s (user %s): %v", todo.ID, todo.UserID, pushErr)
+				} else if sent > 0 {
+					dispatchedCount++
+				}
 			}
 
 			if markErr := w.todoRepo.MarkDueReminderSent(todo.ID, now); markErr != nil {
