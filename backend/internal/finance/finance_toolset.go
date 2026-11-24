@@ -63,6 +63,7 @@ func (t *FinanceToolset) JSONSchema() json.RawMessage {
 func (t *FinanceToolset) Operations() []string {
 	return []string{
 		"get_summary",
+		"get_accounts",
 		"list_transactions",
 		"get_budgets",
 		"get_cards",
@@ -77,6 +78,7 @@ func (t *FinanceToolset) Operations() []string {
 func (t *FinanceToolset) readOnlyOperations() []string {
 	return []string{
 		"get_summary",
+		"get_accounts",
 		"list_transactions",
 		"get_budgets",
 		"get_cards",
@@ -165,11 +167,38 @@ func (t *FinanceToolset) Execute(ctx context.Context, execCtx *domain.ToolExecut
 			"Safe-to-Spend diário: R$ %.2f | Saldo consolidado: R$ %.2f | Gastos do mês: R$ %.2f | Faturas abertas: R$ %.2f | Instituições conectadas: %d.",
 			summary.SafeToSpendDaily, summary.ConsolidatedBalance, summary.MonthExpenses, summary.OpenInvoicesTotal, summary.ConnectedInstitutionsCount,
 		)
+		if !isVoice {
+			if accounts, accErr := t.svc.ListAccounts(ctx, execCtx.UserID); accErr == nil && len(accounts) > 0 {
+				var accLines []string
+				for _, acc := range accounts {
+					accLines = append(accLines, fmt.Sprintf("- %s (%s, %s, id=%s): R$ %.2f", sanitizeFinanceText(acc.Name), sanitizeFinanceText(acc.InstitutionName), acc.AccountType, acc.ID, acc.Balance))
+				}
+				text += "\nContas conectadas:\n" + strings.Join(accLines, "\n")
+			}
+		}
 		if isVoice {
 			text = fmt.Sprintf("Você pode gastar até R$ %.2f por dia neste mês. Seu saldo consolidado é R$ %.2f e as faturas abertas somam R$ %.2f.",
 				summary.SafeToSpendDaily, summary.ConsolidatedBalance, summary.OpenInvoicesTotal)
 		}
 		return &domain.ToolExecutionResult{Status: "COMPLETED", SummaryForLLM: text, Data: summary}, nil
+
+	case "get_accounts":
+		accounts, err := t.svc.ListAccounts(ctx, execCtx.UserID)
+		if err != nil {
+			return nil, err
+		}
+		if len(accounts) == 0 {
+			return &domain.ToolExecutionResult{Status: "COMPLETED", SummaryForLLM: "Nenhuma conta conectada no momento.", Data: accounts}, nil
+		}
+		var lines []string
+		for _, acc := range accounts {
+			extra := ""
+			if acc.AvailableCreditLimit != nil {
+				extra = fmt.Sprintf(" | limite disponível R$ %.2f", *acc.AvailableCreditLimit)
+			}
+			lines = append(lines, fmt.Sprintf("- %s (%s, %s, id=%s): saldo/fatura R$ %.2f%s", sanitizeFinanceText(acc.Name), sanitizeFinanceText(acc.InstitutionName), acc.AccountType, acc.ID, acc.Balance, extra))
+		}
+		return &domain.ToolExecutionResult{Status: "COMPLETED", SummaryForLLM: fmt.Sprintf("Contas conectadas (%d):\n%s", len(accounts), strings.Join(lines, "\n")), Data: accounts}, nil
 
 	case "list_transactions":
 		limit := params.Limit
@@ -182,11 +211,32 @@ func (t *FinanceToolset) Execute(ctx context.Context, execCtx *domain.ToolExecut
 		}
 		q := strings.ToLower(strings.TrimSpace(params.Query))
 		cat := strings.ToLower(strings.TrimSpace(params.Category))
+		accIDFilter := strings.TrimSpace(params.AccountID)
+		matchedAccountIDs := map[string]bool{}
+		if q != "" && accIDFilter == "" {
+			if accounts, accErr := t.svc.ListAccounts(ctx, execCtx.UserID); accErr == nil {
+				for _, acc := range accounts {
+					inst := strings.ToLower(acc.InstitutionName)
+					name := strings.ToLower(acc.Name)
+					if (inst != "" && (strings.Contains(inst, q) || strings.Contains(q, inst))) ||
+						(name != "" && (strings.Contains(name, q) || strings.Contains(q, name))) {
+						matchedAccountIDs[acc.ID] = true
+					}
+				}
+			}
+		}
 		var lines []string
 		var filtered []domain.FinanceTransaction
 		for _, tx := range txs {
-			if q != "" && !strings.Contains(strings.ToLower(tx.Description+" "+tx.CleanMerchantName), q) {
+			if accIDFilter != "" && tx.AccountID != accIDFilter && tx.PluggyAccountID != accIDFilter {
 				continue
+			}
+			if q != "" {
+				textMatch := strings.Contains(strings.ToLower(tx.Description+" "+tx.CleanMerchantName), q)
+				accountMatch := matchedAccountIDs[tx.AccountID]
+				if !textMatch && !accountMatch {
+					continue
+				}
 			}
 			if cat != "" && !strings.Contains(strings.ToLower(tx.Category), cat) {
 				continue

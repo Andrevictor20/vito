@@ -130,9 +130,10 @@ type FinanceSummaryArgs struct {
 }
 
 type FinanceTransactionsArgs struct {
-	Query    string `json:"query,omitempty" jsonschema:"Filtro opcional por estabelecimento ou descrição."`
-	Category string `json:"category,omitempty" jsonschema:"Categoria opcional de gasto."`
-	Limit    int    `json:"limit,omitempty" jsonschema:"Quantidade máxima de transações (padrão 15)."`
+	Query     string `json:"query,omitempty" jsonschema:"Filtro opcional por estabelecimento, descrição ou nome da conta/instituição."`
+	AccountID string `json:"account_id,omitempty" jsonschema:"ID opcional da conta para filtrar movimentações."`
+	Category  string `json:"category,omitempty" jsonschema:"Categoria opcional de gasto."`
+	Limit     int    `json:"limit,omitempty" jsonschema:"Quantidade máxima de transações (padrão 15)."`
 }
 
 type FinanceSimulateSavingsArgs struct {
@@ -212,7 +213,7 @@ func (b *ToolsetBridge) buildTypedAtomicFunctionTool(spec AtomicToolSpec, ts dom
 		return newTypedAtomicTool[BotCreateArgs](b, spec, ts)
 	case "bot_delete_bot", "radar_delete_trigger":
 		return newTypedAtomicTool[BotDeleteArgs](b, spec, ts)
-	case "finance_get_summary", "finance_get_budgets", "finance_get_cards", "finance_get_spending_by_category", "finance_detect_subscriptions":
+	case "finance_get_summary", "finance_get_accounts", "finance_get_budgets", "finance_get_cards", "finance_get_spending_by_category", "finance_detect_subscriptions":
 		return newTypedAtomicTool[FinanceSummaryArgs](b, spec, ts)
 	case "finance_list_transactions":
 		return newTypedAtomicTool[FinanceTransactionsArgs](b, spec, ts)

@@ -23,8 +23,8 @@ import (
 )
 
 const (
-	// DefaultMaxADKSteps define o limite de chamadas de modelo por turno no Runner (elevado de 4 para 7 na Onda 0).
-	DefaultMaxADKSteps = 7
+	// DefaultMaxADKSteps define o limite de chamadas de modelo por turno no Runner (elevado de 7 para 12 para comportar transfer_to_agent + multi-tool + síntese).
+	DefaultMaxADKSteps = 12
 	adkAppName         = "vito"
 )
 
@@ -277,7 +277,7 @@ func (f *ADKLoopFacade) RunStream(ctx context.Context, req domain.UnifiedAssista
 		"volatile_turn_context":      volatileContext,
 	}
 
-	// 6. Execução do grafo de agentes via adk/v2/runner.Runner (teto de 7 chamadas de modelo)
+	// 6. Execução do grafo de agentes via adk/v2/runner.Runner
 	var finalAnswerParts []string
 	emittedThinkingStatus := false
 	for event, err := range f.adkRunner.Run(
@@ -292,6 +292,9 @@ func (f *ADKLoopFacade) RunStream(ctx context.Context, req domain.UnifiedAssista
 		runner.WithStateDelta(stateDelta),
 	) {
 		if err != nil {
+			if strings.Contains(strings.ToLower(err.Error()), "max number of llm calls exceeded") {
+				break
+			}
 			return nil, err
 		}
 		if event == nil {

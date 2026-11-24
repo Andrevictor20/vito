@@ -96,3 +96,49 @@ func TestFinanceToolset_Onda2_Operations_HITL_And_Voice(t *testing.T) {
 		t.Fatalf("simulate_savings_plan inesperado: %v (err=%v)", resSim, err)
 	}
 }
+
+func TestFinanceToolset_GetAccountsAndInstitutionFilter(t *testing.T) {
+	db, err := database.Open(filepath.Join(t.TempDir(), "fin_toolset_accounts.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+
+	userID := "user-ft-acc"
+	_ = repository.NewUserRepository(db).Create(&domain.User{
+		ID: userID, Name: "FT Acc", Email: "ftacc@test.com", PasswordHash: "h",
+		CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
+	})
+
+	finRepo := finance.NewFinanceRepository(db)
+	finSvc := finance.NewFinanceService(finRepo)
+	now := time.Now().UTC()
+	_ = finSvc.IngestSyncPayload(context.Background(), userID, &domain.FinanceSyncPayload{
+		PluggyItemID: "item-nu",
+		Accounts: []domain.FinanceAccount{
+			{ID: "acc-nu-1", PluggyAccountID: "p-nu-1", InstitutionName: "Nu Pagamentos S.A. - Instituição de Pagamento", AccountType: domain.AccountTypeBank, Name: "Conta Nu", Balance: 1500},
+			{ID: "acc-itau-1", PluggyAccountID: "p-itau-1", InstitutionName: "Itaú Unibanco", AccountType: domain.AccountTypeBank, Name: "Conta Itaú", Balance: 900},
+		},
+		Transactions: []domain.FinanceTransaction{
+			{ID: "tx-nu-1", PluggyTransactionID: "p-tx-nu", PluggyAccountID: "p-nu-1", Description: "Pix Recebido", Amount: 500, TransactionType: domain.TxCredit, Category: "Transferência", OccurredAt: now},
+			{ID: "tx-itau-1", PluggyTransactionID: "p-tx-itau", PluggyAccountID: "p-itau-1", Description: "Padaria Central", Amount: -25, TransactionType: domain.TxDebit, Category: "Alimentação", OccurredAt: now},
+		},
+	})
+
+	ts := finance.NewFinanceToolset(finSvc, finRepo)
+	ctx := context.Background()
+	execText := &domain.ToolExecutionContext{UserID: userID, Channel: "chat"}
+
+	resAcc, err := ts.Execute(ctx, execText, "get_accounts", nil)
+	if err != nil || !strings.Contains(resAcc.SummaryForLLM, "Nu Pagamentos") || !strings.Contains(resAcc.SummaryForLLM, "Itaú Unibanco") {
+		t.Fatalf("get_accounts inesperado: %v (err=%v)", resAcc, err)
+	}
+
+	resTx, err := ts.Execute(ctx, execText, "list_transactions", json.RawMessage(`{"query":"Nu Pagamentos S.A. - Instituição de Pagamento"}`))
+	if err != nil {
+		t.Fatalf("list_transactions por instituição falhou: %v", err)
+	}
+	if !strings.Contains(resTx.SummaryForLLM, "Pix Recebido") || strings.Contains(resTx.SummaryForLLM, "Padaria Central") {
+		t.Fatalf("filtro por instituição não isolou conta Nu: %s", resTx.SummaryForLLM)
+	}
+}

@@ -62,7 +62,8 @@ var canonicalAtomicSpecs = []AtomicToolSpec{
 	{AtomicName: "bot_delete_bot", ToolsetName: domain.ToolsetRadarTrigger, Operation: "delete_trigger", Description: "Exclui um bot ou vigília proativa existente.", ActionKey: "bot:delete"},
 	// Finanças (Plano 05)
 	{AtomicName: "finance_get_summary", ToolsetName: domain.ToolsetName("finance_manager"), Operation: "get_summary", Description: "Obtém o resumo financeiro Safe-to-Spend, faturas e despesas por categoria.", ActionKey: "fin:summary"},
-	{AtomicName: "finance_list_transactions", ToolsetName: domain.ToolsetName("finance_manager"), Operation: "list_transactions", Description: "Lista as transações financeiras recentes com filtros opcionais.", ActionKey: "fin:summary"},
+	{AtomicName: "finance_get_accounts", ToolsetName: domain.ToolsetName("finance_manager"), Operation: "get_accounts", Description: "Lista todas as contas bancárias, poupanças, investimentos e cartões conectados com saldos e IDs.", ActionKey: "fin:summary"},
+	{AtomicName: "finance_list_transactions", ToolsetName: domain.ToolsetName("finance_manager"), Operation: "list_transactions", Description: "Lista as transações financeiras recentes com filtros opcionais por conta, instituição, descrição ou categoria.", ActionKey: "fin:summary"},
 	{AtomicName: "finance_get_budgets", ToolsetName: domain.ToolsetName("finance_manager"), Operation: "get_budgets", Description: "Consulta os orçamentos por categoria e o progresso no mês.", ActionKey: "fin:summary"},
 	{AtomicName: "finance_get_cards", ToolsetName: domain.ToolsetName("finance_manager"), Operation: "get_cards", Description: "Lista os cartões de crédito conectados e suas faturas atuais.", ActionKey: "fin:summary"},
 	{AtomicName: "finance_get_spending_by_category", ToolsetName: domain.ToolsetName("finance_manager"), Operation: "get_spending_by_category", Description: "Agrega gastos por categoria no mês com comparação histórica.", ActionKey: "fin:analytics"},
