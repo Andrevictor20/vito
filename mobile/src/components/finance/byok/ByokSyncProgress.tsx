@@ -1,12 +1,17 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { ProtoUiIcon } from '../../../icons/ProtoUiIcons';
+import { BrandLogo } from '../../../icons/IconRegistry';
 import { useTheme } from '../../../context/ThemeContext';
 import { tokens } from '../../../theme/tokens';
 import type { ByokSyncPhase } from '../../../hooks/useByokSetup';
+import type { FinanceLimitSuggestion } from '../../../types/finance';
 import { BYOK_SYNC_CHECKPOINTS } from '../../../utils/byokFlow';
 import { ActionButton, StatusBanner, getFinTokens } from './byokUi';
+import { ByokQuickLimitsCard } from './ByokQuickLimitsCard';
 import { KeyPasteField } from './KeyPasteField';
+
+const KNOWN_BANKS = ['Nubank', 'Itaú', 'Inter', 'Banco do Brasil', 'Bradesco', 'Santander', 'C6 Bank', 'Caixa'];
 
 interface Props {
   phase: Exclude<ByokSyncPhase, 'idle'>;
@@ -14,6 +19,9 @@ interface Props {
   banks: string[];
   error: string;
   connectionItemId?: string;
+  limitSuggestions?: FinanceLimitSuggestion[];
+  onActivateSuggestion?: (s: FinanceLimitSuggestion) => Promise<void> | void;
+  onOpenCustomLimits?: () => void;
   onUpdateItemId?: (v: string) => void;
   onPasteItemId?: () => void;
   onSyncWithItemId?: (id?: string) => void;
@@ -32,6 +40,9 @@ export const ByokSyncProgress: React.FC<Props> = ({
   banks,
   error,
   connectionItemId,
+  limitSuggestions,
+  onActivateSuggestion,
+  onOpenCustomLimits,
   onUpdateItemId,
   onPasteItemId,
   onSyncWithItemId,
@@ -58,7 +69,11 @@ export const ByokSyncProgress: React.FC<Props> = ({
           {activeBanks.map((bank) => (
             <View key={bank} style={[styles.bankCard, { borderColor: colors.line, backgroundColor: colors.bg }]}>
               <View style={[styles.bankChip, { backgroundColor: finBg }]}>
-                <ProtoUiIcon name="account-balance" size={20} color={fin} />
+                {KNOWN_BANKS.includes(bank) ? (
+                  <BrandLogo group="bank" id={bank} size={20} color={fin} />
+                ) : (
+                  <ProtoUiIcon name="account-balance" size={20} color={fin} />
+                )}
               </View>
               <View style={styles.bankBody}>
                 <Text style={[styles.bankName, { color: colors.ink }]} numberOfLines={1}>
@@ -73,6 +88,16 @@ export const ByokSyncProgress: React.FC<Props> = ({
             </View>
           ))}
         </View>
+
+        {limitSuggestions && limitSuggestions.length > 0 && onActivateSuggestion && onOpenCustomLimits ? (
+          <View style={{ marginTop: 18 }}>
+            <ByokQuickLimitsCard
+              suggestions={limitSuggestions}
+              onActivateSuggestion={onActivateSuggestion}
+              onOpenCustom={onOpenCustomLimits}
+            />
+          </View>
+        ) : null}
 
         <View style={styles.footer}>
           <ActionButton primary label="Ver minhas finanças" onPress={onFinish} style={styles.pillFull} />

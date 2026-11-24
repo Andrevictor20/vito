@@ -365,3 +365,31 @@ export async function syncPluggyItem(
     status: 'UPDATED',
   };
 }
+
+/** Descobre e sincroniza todos os itens conectados na Pluggy durante o onboarding (multi-banco). */
+export async function syncAllDiscoveredItems(
+  apiKey: string,
+  onProgress?: (completedCheckpoints: number) => void,
+  options?: SyncPluggyItemOptions,
+): Promise<PluggySyncResult[]> {
+  let items: PluggyItem[] = [];
+  try {
+    const clientUserId = await byokStore.getClientUserId().catch(() => '');
+    if (clientUserId) items = await listItems(apiKey, clientUserId).catch(() => []);
+    if (!items || items.length === 0) items = await listItems(apiKey).catch(() => []);
+  } catch (e) {
+    if (e instanceof PluggyError && (e.kind === 'list_items_disabled' || e.kind === 'http')) {
+      return [];
+    }
+    throw e;
+  }
+  if (!items || items.length === 0) return [];
+
+  const out: PluggySyncResult[] = [];
+  for (const item of items) {
+    if (!item?.id) continue;
+    const res = await syncPluggyItem(apiKey, item.id, onProgress, options);
+    out.push(res);
+  }
+  return out;
+}

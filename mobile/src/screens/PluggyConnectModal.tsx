@@ -67,9 +67,26 @@ export const PluggyConnectModal: React.FC<PluggyConnectModalProps> = ({ visible,
       const keys = await byokStore.getKeys();
       if (!keys) throw new Error('Chaves não configuradas. Refaça o cadastro das chaves da Pluggy.');
       const apiKey = await authenticate(keys.clientId, keys.clientSecret);
-      const res = await syncPluggyItem(apiKey, conn.pluggy_item_id);
+      const res = await syncPluggyItem(apiKey, conn.pluggy_item_id, undefined, {
+        mode: 'manual',
+        connectionId: conn.id,
+        lastSyncAt: conn.last_sync_at,
+        lastBankRefreshAt: conn.last_bank_refresh_at,
+        onRefreshApiKey: () => authenticate(keys.clientId, keys.clientSecret),
+      });
       dataSync.notify('refresh_finance');
       await loadConnections();
+      if (res.needsReconnect) {
+        Alert.alert(
+          'Reconexão necessária',
+          `O banco "${res.institutionName || conn.institution_name}" precisa de nova autorização no Pluggy Connect.`,
+          [
+            { text: 'Depois', style: 'cancel' },
+            { text: 'Reconectar', onPress: () => void setup.openReconnectExternal(conn.pluggy_item_id) },
+          ],
+        );
+        return;
+      }
       Alert.alert(
         'Sincronização concluída',
         `${res.accountsCount} contas e ${res.transactionsCount} transações de "${res.institutionName || conn.institution_name}".`,
@@ -119,7 +136,7 @@ export const PluggyConnectModal: React.FC<PluggyConnectModalProps> = ({ visible,
   const handleConfirmResetAll = () => {
     Alert.alert(
       'Começar do zero',
-      'Apaga Client ID, Client Secret, backup cifrado e os cookies/sessão do navegador interno.',
+      'Apaga Client ID, Client Secret e o backup cifrado armazenado no servidor.',
       [
         { text: 'Cancelar', style: 'cancel' },
         { text: 'Apagar e recomeçar', style: 'destructive', onPress: () => void setup.resetFromScratch() },
@@ -137,6 +154,9 @@ export const PluggyConnectModal: React.FC<PluggyConnectModalProps> = ({ visible,
           banks={setup.syncedBanks}
           error={setup.error}
           connectionItemId={setup.connectionItemId}
+          limitSuggestions={setup.limitSuggestions}
+          onActivateSuggestion={setup.activateLimitSuggestion}
+          onOpenCustomLimits={onClose}
           onUpdateItemId={setup.updateConnectionItemId}
           onPasteItemId={setup.pasteConnectionItemId}
           onSyncWithItemId={setup.completeConnectSync}
@@ -227,6 +247,15 @@ export const PluggyConnectModal: React.FC<PluggyConnectModalProps> = ({ visible,
                           {ok ? 'Sincronizado' : 'Atenção necessária'}
                         </Text>
                       </View>
+                      {!ok && (
+                        <TouchableOpacity
+                          onPress={() => void setup.openReconnectExternal(item.pluggy_item_id)}
+                          style={[styles.reconnectBtn, { borderColor: colors.red }]}
+                          accessibilityLabel="Reconectar banco"
+                        >
+                          <Text style={[styles.reconnectText, { color: colors.red }]}>Reconectar</Text>
+                        </TouchableOpacity>
+                      )}
                       <TouchableOpacity
                         onPress={() => handleSyncConnection(item)}
                         disabled={syncingId === item.id}
@@ -272,5 +301,7 @@ const styles = StyleSheet.create({
   connCard: { flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 18, borderWidth: 1, marginBottom: 8 },
   connName: { fontSize: 14.5, fontWeight: '600' },
   connStatus: { fontSize: 12, fontWeight: '600', marginTop: 2 },
+  reconnectBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, borderWidth: 1, marginRight: 4 },
+  reconnectText: { fontSize: 12, fontWeight: '700' },
   iconBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
 });

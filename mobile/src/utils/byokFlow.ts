@@ -1,6 +1,22 @@
 /** Máquina de estados pura do onboarding BYOK Pluggy (Plano 26). */
 
 import { isPluggyUuid, normalizeKey } from './pluggyKeys';
+import type { FinanceLimitRule, FinanceLimitSuggestion } from '../types/finance';
+
+export function buildLimitRuleFromSuggestion(s: FinanceLimitSuggestion): FinanceLimitRule {
+  return {
+    kind: 'CATEGORY_LIMIT',
+    scope_type: s.scope_type,
+    title: s.title,
+    category_filter: s.category_filter,
+    account_id: s.account_id,
+    period_type: 'MONTHLY',
+    target_amount: s.suggested_amount,
+    alert_thresholds: [80, 100],
+    notify_channels: ['in_app', 'push'],
+    pace_alert_enabled: true,
+  };
+}
 
 export type ByokStep = 'tutorial' | '1' | '2' | '3' | 'done';
 

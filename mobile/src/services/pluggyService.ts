@@ -63,11 +63,12 @@ export async function authenticate(
   return json.apiKey;
 }
 
-/** Gera o connectToken (~30 min) usado pelo widget Pluggy Connect. */
+/** Gera o connectToken (~30 min) usado pelo widget Pluggy Connect; aceita itemId para reconexão 1-toque. */
 export async function createConnectToken(
   apiKey: string,
   clientUserId: string,
   fetchImpl: typeof fetch = fetch,
+  itemId?: string,
 ): Promise<string> {
   const res = await call(fetchImpl, '/connect_token', {
     method: 'POST',
@@ -76,6 +77,7 @@ export async function createConnectToken(
       options: {
         clientUserId,
         oauthRedirectUri: 'vito://pluggy-success',
+        ...(itemId ? { itemId } : {}),
       },
     }),
   });
