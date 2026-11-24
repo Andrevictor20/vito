@@ -3,6 +3,7 @@ package adkengine
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -55,10 +56,12 @@ func (r *RoutedLLM) generateFromServerPool(
 			return
 		}
 		if yieldedAny {
+			log.Printf("⚠️ [ADK Server Pool] %s (%s) falhou após stream parcial: %v", entry.DisplayName, entry.ModelID, stepErr)
 			yield(nil, stepErr)
 			return
 		}
-		lastErr = stepErr
+		log.Printf("⚠️ [ADK Server Pool] %s (%s) falhou, tentando próximo provedor: %v", entry.DisplayName, entry.ModelID, stepErr)
+		lastErr = fmt.Errorf("%s (%s): %w", entry.DisplayName, entry.ModelID, stepErr)
 	}
 
 	if lastErr == nil {

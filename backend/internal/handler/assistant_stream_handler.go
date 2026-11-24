@@ -117,6 +117,7 @@ func (h *AssistantStreamHandler) Stream(w http.ResponseWriter, r *http.Request) 
 
 	resp, err := h.loop.RunStream(r.Context(), req, onDelta)
 	if err != nil {
+		log.Printf("❌ [AssistantStreamHandler] Erro no stream: %v", err)
 		_, _ = fmt.Fprintf(w, "event: error\ndata: %s\n\n", err.Error())
 		flusher.Flush()
 		return
