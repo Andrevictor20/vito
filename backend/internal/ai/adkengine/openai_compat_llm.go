@@ -76,8 +76,12 @@ type oaiCompatMessage struct {
 	Name       string              `json:"name,omitempty"`
 }
 type oaiCompatToolCall struct {
-	ID, Type string
-	Function struct{ Name, Arguments string }
+	ID       string `json:"id"`
+	Type     string `json:"type"`
+	Function struct {
+		Name      string `json:"name"`
+		Arguments string `json:"arguments"`
+	} `json:"function"`
 }
 
 // GenerateContent executa a chamada síncrona ou SSE streaming contra /chat/completions.
@@ -131,6 +135,23 @@ func (o *OpenAICompatLLM) buildRequestPayload(ctx context.Context, req *model.LL
 		}
 		if req.Config.Temperature != nil {
 			payload["temperature"] = float64(*req.Config.Temperature)
+		}
+		if req.Config.ResponseSchema != nil {
+			if b, err := json.Marshal(req.Config.ResponseSchema); err == nil && len(b) > 0 {
+				var schemaObj any
+				if json.Unmarshal(b, &schemaObj) == nil {
+					payload["response_format"] = map[string]any{
+						"type": "json_schema",
+						"json_schema": map[string]any{
+							"name":   "structured_output",
+							"strict": false,
+							"schema": schemaObj,
+						},
+					}
+				}
+			}
+		} else if strings.EqualFold(strings.TrimSpace(req.Config.ResponseMIMEType), "application/json") {
+			payload["response_format"] = map[string]any{"type": "json_object"}
 		}
 		if o.supportsTools {
 			var tools []map[string]any

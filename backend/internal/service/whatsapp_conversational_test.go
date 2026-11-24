@@ -101,10 +101,8 @@ func setupConversationalWhatsAppTest(t *testing.T) (*service.WhatsAppService, *m
 		EvolutionAPIKey: "secret-key",
 	}
 
-	mockAI := &mockWhatsAppAIGateway{}
-	assistantSvc := service.NewAssistantService(mockAI, nil, nil, nil)
-
-	svc := service.NewWhatsAppService(cfg, waRepo, mockClient, assistantSvc)
+	svc := service.NewWhatsAppService(cfg, waRepo, mockClient)
+	svc.SetAgentLoop(&mockWhatsAppAIGateway{})
 	svc.SetUserRepo(userRepo)
 	// Shadow inbox: sem ele as mensagens não são arquivadas e o contexto
 	// (janela + citada) fica vazio.

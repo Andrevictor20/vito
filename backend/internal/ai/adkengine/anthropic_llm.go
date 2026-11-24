@@ -124,6 +124,23 @@ func (a *AnthropicLLM) buildRequestPayload(ctx context.Context, req *model.LLMRe
 		if req.Config.Temperature != nil {
 			payload["temperature"] = float64(*req.Config.Temperature)
 		}
+		if req.Config.ResponseSchema != nil {
+			if b, err := json.Marshal(req.Config.ResponseSchema); err == nil && len(b) > 0 {
+				sysSuffix := fmt.Sprintf("Responda EXCLUSIVAMENTE em JSON válido compatível com o seguinte JSON Schema:\n%s", string(b))
+				if existing, ok := payload["system"].(string); ok && existing != "" {
+					payload["system"] = existing + "\n\n" + sysSuffix
+				} else {
+					payload["system"] = sysSuffix
+				}
+			}
+		} else if strings.EqualFold(strings.TrimSpace(req.Config.ResponseMIMEType), "application/json") {
+			sysSuffix := "Responda EXCLUSIVAMENTE em JSON válido."
+			if existing, ok := payload["system"].(string); ok && existing != "" {
+				payload["system"] = existing + "\n\n" + sysSuffix
+			} else {
+				payload["system"] = sysSuffix
+			}
+		}
 		var tools []map[string]any
 		for _, gt := range req.Config.Tools {
 			if gt == nil {

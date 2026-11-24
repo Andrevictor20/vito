@@ -92,6 +92,77 @@ export class ChatApi {
     };
   }
 
+  async assistantChatStream(
+    prompt: string,
+    onDelta: (delta: { type?: string; text_delta?: string; reasoning_delta?: string; tool_name?: string; done?: boolean }) => void,
+    context?: any
+  ): Promise<any> {
+    const tz = context?.timezone || this.getUserTimezone();
+    const currentLocalTime = this.getCurrentLocalTimeISO();
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      Accept: 'text/event-stream',
+    };
+    const clientMeta = this.client as unknown as {
+      getToken?: () => string | null;
+      token?: string;
+      getBaseUrl?: () => string;
+      baseUrl?: string;
+    };
+    const token = clientMeta.getToken?.() || clientMeta.token;
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    const baseUrl = clientMeta.getBaseUrl?.() || clientMeta.baseUrl || '';
+    const res = await fetch(`${baseUrl}/api/v1/assistant/chat/stream`, {
+      method: 'POST',
+      headers,
+      signal: context?.signal,
+      body: JSON.stringify({
+        thread_id: context?.thread_id,
+        channel: context?.channel || 'app_desktop',
+        prompt,
+        text: prompt,
+        timezone: tz,
+        current_local_time: currentLocalTime,
+        history: context?.history,
+        focus_mode: context?.focus_mode,
+        ...context,
+      }),
+    });
+    if (!res.ok || !res.body) {
+      return this.assistantChat(prompt, context);
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let finalPayload: any = null;
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+      for (const rawLine of lines) {
+        const line = rawLine.trim();
+        if (!line.startsWith('data:')) continue;
+        const data = line.slice(5).trim();
+        if (!data || data === '[DONE]') continue;
+        try {
+          const parsed = JSON.parse(data);
+          if (parsed.type === 'final' || parsed.reply !== undefined || parsed.text !== undefined) {
+            finalPayload = parsed;
+          } else {
+            onDelta(parsed);
+          }
+        } catch {
+          // ignore malformed SSE chunk
+        }
+      }
+    }
+    return finalPayload || { reply: '', message: '' };
+  }
+
   async assistantConfirm(
     pendingId: string,
     options?: { reject?: boolean; reason?: string; threadId?: string }

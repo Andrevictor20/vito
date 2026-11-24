@@ -8,20 +8,26 @@ import (
 	"testing"
 
 	"github.com/andrevmp/vito/backend/internal/ai"
-	"github.com/andrevmp/vito/backend/internal/service"
+	"github.com/andrevmp/vito/backend/internal/domain"
 )
 
 // mockGatewayCapturador registra o input recebido pela IA.
 type mockGatewayCapturador struct {
-	input ai.UserInput
+	input domain.UnifiedAssistantRequest
 }
 
-func (m *mockGatewayCapturador) ParseIntent(ctx context.Context, input ai.UserInput) (*ai.ParsedIntent, error) {
-	m.input = input
-	return &ai.ParsedIntent{
-		Action:  ai.ActionGeneralChat,
-		Message: "É um recibo de R$ 45,00.",
+func (m *mockGatewayCapturador) Run(_ context.Context, req domain.UnifiedAssistantRequest) (*domain.UnifiedAssistantResponse, error) {
+	m.input = req
+	msg := "É um recibo de R$ 45,00."
+	return &domain.UnifiedAssistantResponse{
+		Text:    msg,
+		Reply:   msg,
+		Message: msg,
 	}, nil
+}
+
+func (m *mockGatewayCapturador) RunStream(ctx context.Context, req domain.UnifiedAssistantRequest, _ func(ai.StreamDelta) error) (*domain.UnifiedAssistantResponse, error) {
+	return m.Run(ctx, req)
 }
 
 // payloadImagem monta um payload de webhook da Evolution com imagem.
@@ -61,8 +67,7 @@ func TestWhatsAppService_ImagemSemLegendaNoChatVoce_NaoGeraResposta(t *testing.T
 	_ = userRepo
 
 	gateway := &mockGatewayCapturador{}
-	assistantSvc := service.NewAssistantService(gateway, nil, nil, nil)
-	svc.SetAssistantService(assistantSvc)
+	svc.SetAgentLoop(gateway)
 	svc.SetAsyncRunner(func(fn func()) { fn() })
 
 	mockClient.mockMediaBase64 = base64.StdEncoding.EncodeToString([]byte("bytes-de-imagem-fake"))
@@ -92,8 +97,7 @@ func TestWhatsAppService_ImagemComChamadaAoVito_AnalisaEGeraResposta(t *testing.
 	svc, mockClient, _, _ := setupConversationalWhatsAppTest(t)
 
 	gateway := &mockGatewayCapturador{}
-	assistantSvc := service.NewAssistantService(gateway, nil, nil, nil)
-	svc.SetAssistantService(assistantSvc)
+	svc.SetAgentLoop(gateway)
 	svc.SetAsyncRunner(func(fn func()) { fn() })
 
 	mockClient.mockMediaBase64 = base64.StdEncoding.EncodeToString([]byte("bytes-de-imagem-fake"))
@@ -113,8 +117,8 @@ func TestWhatsAppService_ImagemComChamadaAoVito_AnalisaEGeraResposta(t *testing.
 	if gateway.input.ImageMime != "image/jpeg" {
 		t.Errorf("mime esperado image/jpeg, obteve %q", gateway.input.ImageMime)
 	}
-	if !strings.Contains(gateway.input.Text, "analisa este boleto") {
-		t.Errorf("esperava prompt com a instrução do usuário, obteve: %q", gateway.input.Text)
+	if !strings.Contains(gateway.input.Message, "analisa este boleto") {
+		t.Errorf("esperava prompt com a instrução do usuário, obteve: %q", gateway.input.Message)
 	}
 	if len(mockClient.sentMessages) == 0 {
 		t.Fatal("esperava resposta do Vito no chat")
@@ -133,7 +137,7 @@ func TestWhatsAppService_ImagemComLegendaSemVito_NaoGeraResposta(t *testing.T) {
 	svc, mockClient, _, _ := setupConversationalWhatsAppTest(t)
 
 	gateway := &mockGatewayCapturador{}
-	svc.SetAssistantService(service.NewAssistantService(gateway, nil, nil, nil))
+	svc.SetAgentLoop(gateway)
 	svc.SetAsyncRunner(func(fn func()) { fn() })
 
 	err := svc.HandleWebhook(context.Background(), "messages.upsert",
@@ -159,7 +163,7 @@ func TestWhatsAppService_ImagemNoChatVoce_ExigePrefixoExplicito(t *testing.T) {
 	svc, mockClient, _, _ := setupConversationalWhatsAppTest(t)
 
 	gateway := &mockGatewayCapturador{}
-	svc.SetAssistantService(service.NewAssistantService(gateway, nil, nil, nil))
+	svc.SetAgentLoop(gateway)
 	svc.SetAsyncRunner(func(fn func()) { fn() })
 
 	mockClient.mockMediaBase64 = base64.StdEncoding.EncodeToString([]byte("bytes-de-imagem-fake"))
@@ -199,7 +203,7 @@ func TestWhatsAppService_ImagemEmGrupoSemMencao_NaoProcessaNemBaixa(t *testing.T
 	svc, mockClient, _, _ := setupConversationalWhatsAppTest(t)
 
 	gateway := &mockGatewayCapturador{}
-	svc.SetAssistantService(service.NewAssistantService(gateway, nil, nil, nil))
+	svc.SetAgentLoop(gateway)
 	svc.SetAsyncRunner(func(fn func()) { fn() })
 
 	err := svc.HandleWebhook(context.Background(), "messages.upsert",
@@ -225,7 +229,7 @@ func TestWhatsAppService_ImagemIndisponivel_RespostaHonesta(t *testing.T) {
 	svc, mockClient, _, _ := setupConversationalWhatsAppTest(t)
 
 	gateway := &mockGatewayCapturador{}
-	svc.SetAssistantService(service.NewAssistantService(gateway, nil, nil, nil))
+	svc.SetAgentLoop(gateway)
 	svc.SetAsyncRunner(func(fn func()) { fn() })
 
 	// Mídia vazia => download falha.
@@ -239,9 +243,9 @@ func TestWhatsAppService_ImagemIndisponivel_RespostaHonesta(t *testing.T) {
 	if gateway.input.ImageB64 != "" {
 		t.Error("não deveria haver imagem entregue à IA quando o download falha")
 	}
-	if !strings.Contains(gateway.input.Text, "não consegui baixar a imagem") &&
-		!strings.Contains(strings.ToLower(gateway.input.Text), "não foi possível ler a imagem") {
-		t.Errorf("esperava prompt honesto sobre a falha do download, obteve: %q", gateway.input.Text)
+	if !strings.Contains(gateway.input.Message, "não consegui baixar a imagem") &&
+		!strings.Contains(strings.ToLower(gateway.input.Message), "não foi possível ler a imagem") {
+		t.Errorf("esperava prompt honesto sobre a falha do download, obteve: %q", gateway.input.Message)
 	}
 }
 
@@ -254,7 +258,7 @@ func TestWhatsAppService_ProcessamentoEmBackground(t *testing.T) {
 	svc, mockClient, _, _ := setupConversationalWhatsAppTest(t)
 
 	gateway := &mockGatewayCapturador{}
-	svc.SetAssistantService(service.NewAssistantService(gateway, nil, nil, nil))
+	svc.SetAgentLoop(gateway)
 
 	agendado := false
 	executado := false

@@ -76,8 +76,8 @@ func setupAIProviderHandlerTest(t *testing.T, verifyStatus int) (*chi.Mux, strin
 	aiH := handler.NewAIProviderHandler(svc)
 	chatH := handler.NewChatHandler(service.NewChatService(chatRepo))
 	chatH.SetAIProviderService(svc)
-	trigH := handler.NewTriggerHandler(service.NewTriggerService(triggerRepo), nil)
-	trigH.SetAIProviderService(svc)
+	botH := handler.NewBotHandler(db, repository.NewBotRepository(db), nil)
+	botH.SetAIProviderService(svc)
 
 	r := chi.NewRouter()
 	r.Use(func(next http.Handler) http.Handler {
@@ -94,7 +94,7 @@ func setupAIProviderHandlerTest(t *testing.T, verifyStatus int) (*chi.Mux, strin
 	r.Get("/api/v1/ai/preferences", aiH.GetPreferences)
 	r.Put("/api/v1/ai/preferences", aiH.UpdatePreferences)
 	r.Patch("/api/v1/threads/{id}/model", chatH.UpdateThreadModelPref)
-	r.Patch("/api/v1/bots/{id}/model", trigH.UpdateBotModelPref)
+	r.Patch("/api/v1/bots/{id}/model", botH.UpdateBotModelPref)
 
 	return r, userID, th.ID, "bot-h-1"
 }

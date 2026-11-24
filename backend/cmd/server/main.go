@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/andrevmp/vito/backend/internal/ai"
+	"github.com/andrevmp/vito/backend/internal/ai/adkengine"
 	"github.com/andrevmp/vito/backend/internal/config"
 	"github.com/andrevmp/vito/backend/internal/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
@@ -77,7 +78,6 @@ func main() {
 	eventRepo := repository.NewEventRepository(db)
 	todoRepo := repository.NewTodoRepository(db)
 	memoryRepo := repository.NewMemoryRepository(db)
-	coreProfileRepo := repository.NewCoreProfileRepository(db)
 	notifRepo := repository.NewDeviceTokenRepository(db)
 	triggerRepo := repository.NewTriggerRepository(db)
 	briefingRepo := repository.NewBriefingRepository(db)
@@ -92,31 +92,6 @@ func main() {
 	// Ordem: Gemini 2.5 Flash primário (forte em resolução de referência e
 	// diretivas de contexto), Groq/Mistral como fallback de cota e OpenRouter por
 	// último. O modelo pequeno do Groq (gpt-oss-20b) ignorava o bloco de
-	// contexto e respondia "não sei" mesmo com a janela montada.
-	var aiProviders []ai.Provider
-	if cfg.GeminiAPIKey != "" {
-		log.Printf("🤖 [AI Provider] Google AI Studio primário (%s).", cfg.GeminiModel)
-		aiProviders = append(aiProviders, ai.NewGeminiProvider(cfg.GeminiAPIKey, cfg.GeminiModel))
-	}
-	if cfg.GroqAPIKey != "" {
-		log.Printf("🤖 [AI Provider] Groq Cloud como fallback (%s).", cfg.GroqModel)
-		aiProviders = append(aiProviders, ai.NewGroqProvider(cfg.GroqAPIKey, cfg.GroqModel))
-	}
-	if cfg.MistralAPIKey != "" {
-		log.Printf("🤖 [AI Provider] Mistral La Plateforme como fallback (%s).", cfg.MistralModel)
-		aiProviders = append(aiProviders, ai.NewMistralProvider(cfg.MistralAPIKey, cfg.MistralModel))
-	}
-	if cfg.OpenRouterAPIKey != "" {
-		log.Printf("🤖 [AI Provider] OpenRouter ativado como fallback (%s).", cfg.OpenRouterModel)
-		aiProviders = append(aiProviders, ai.NewOpenRouterProvider(cfg.OpenRouterAPIKey, cfg.OpenRouterModel))
-		// Elo de VISÃO: cota separada da do Google AI Studio, garante que a
-		// leitura de imagens continue funcionando quando a cota do Gemini acaba.
-		log.Printf("🤖 [AI Provider] OpenRouter Visão ativado como fallback de imagem (%s).", cfg.OpenRouterVisionModel)
-		aiProviders = append(aiProviders, ai.NewOpenRouterVisionProvider(cfg.OpenRouterAPIKey, cfg.OpenRouterVisionModel))
-	}
-
-	aiGateway := ai.NewGateway(aiProviders...)
-
 	// 4. Serviços
 	sessionRepo := repository.NewSessionRepository(db)
 	authSvc := service.NewAuthService(userRepo, cfg.JWTSecret)
@@ -126,11 +101,6 @@ func main() {
 	notifSvc := service.NewNotificationService(notifRepo)
 	triggerSvc := service.NewTriggerService(triggerRepo)
 	pendingSvc := service.NewPendingService(pendingRepo)
-	astSvc := service.NewAssistantService(aiGateway, calSvc, todoSvc, memoryRepo, triggerSvc)
-	astSvc.SetUserRepository(userRepo)
-	astSvc.SetAISettingsRepository(aiSettingsRepo)
-	astSvc.SetCoreProfileRepository(coreProfileRepo)
-	astSvc.SetPendingService(pendingSvc)
 	// Ciclo 2 §8.4: correção manual rápida vira learned_preference (opt-out via VITO_DISABLE_IMPLICIT_FEEDBACK=1).
 	if os.Getenv("VITO_DISABLE_IMPLICIT_FEEDBACK") == "1" {
 		service.ImplicitFeedbackDisabled = true
@@ -162,14 +132,8 @@ func main() {
 	// Worker em segundo plano para lembretes de compromissos (iniciado após wiring cognitivo)
 	reminderWorker := service.NewReminderWorker(eventRepo, notifSvc, 15*time.Minute)
 
-	// Worker em segundo plano para vigília autônoma de disparadores com cascata completa de IA (Groq -> Mistral -> Gemini -> OpenRouter)
-	var triggerEvaluator service.TriggerEvaluator = &service.DefaultTriggerEvaluator{}
-	if len(aiProviders) > 0 {
-		triggerEvaluator = service.NewAITriggerEvaluator(func(ctx context.Context, t *domain.Trigger) (*domain.TriggerTestResult, error) {
-			return aiGateway.EvaluateTrigger(ctx, t)
-		})
-	}
-	triggerWorker := service.NewTriggerWorker(triggerRepo, notifSvc, triggerEvaluator, 1*time.Minute)
+	// Worker em segundo plano para vigília autônoma de bots/disparadores (motor ADK v2 conectado via BotRunner)
+	triggerWorker := service.NewTriggerWorker(triggerRepo, notifSvc, &service.DefaultTriggerEvaluator{}, 1*time.Minute)
 	// Delta gate pré-IA (§9.3): hashes dos fatos atuais via conectores por categoria.
 	triggerWorker.SetDeltaFetcher(func(fetchCtx context.Context, t *domain.Trigger) ([]string, []string, error) {
 		items, err := ai.RouteTriggerSource(t).Fetch(fetchCtx, t)
@@ -212,11 +176,8 @@ func main() {
 		return 0, "", false, nil
 	})
 
-	// Worker em segundo plano para briefing matinal proativo com síntese de IA em cascata
+	// Worker em segundo plano para briefing matinal proativo (ADK CrossDomainBriefingWorkflow conectado em wireCognitiveRuntime)
 	morningBriefingWorker := service.NewMorningBriefingWorker(briefingRepo, eventRepo, todoRepo, userRepo, notifSvc, 1*time.Minute)
-	if len(aiProviders) > 0 {
-		morningBriefingWorker.SetTextGenerator(aiGateway)
-	}
 
 	// Worker em segundo plano para lembretes de pendências (nudge diário)
 	pendingNudgeWorker := service.NewPendingNudgeWorker(pendingRepo, userRepo, notifSvc, 1*time.Minute)
@@ -258,10 +219,8 @@ func main() {
 	googleAuthHandler := handler.NewGoogleAuthHandler(googleAuthSvc, authSvc)
 	calHandler := handler.NewCalendarHandler(calSvc)
 	todoHandler := handler.NewTodoHandler(todoSvc)
-	astHandler := handler.NewAssistantHandler(astSvc, whisperTranscriber)
 	notifHandler := handler.NewNotificationHandler(notifSvc)
 	syncHandler := handler.NewCalendarSyncHandler(syncSvc)
-	triggerHandler := handler.NewTriggerHandler(triggerSvc, triggerWorker)
 	briefingHandler := handler.NewBriefingHandler(briefingRepo)
 	aiSettingsHandler := handler.NewAISettingsHandler(aiSettingsRepo)
 	pendingHandler := handler.NewPendingHandler(pendingSvc)
@@ -270,7 +229,6 @@ func main() {
 	turnstileValidator := service.NewTurnstileValidator(cfg.TurnstileSecretKey)
 	bookingSvc := service.NewBookingService(bookingRepo, eventRepo, userRepo, notifSvc, linkShortener, turnstileValidator, cfg.PublicBaseURL)
 	bookingSvc.SetSyncPusher(syncSvc)
-	astSvc.SetBookingService(bookingSvc)
 	bookingHandler := handler.NewBookingHandler(bookingSvc)
 
 	emailSvc := service.NewEmailService(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUser, cfg.SMTPPassword, cfg.SMTPFrom)
@@ -280,7 +238,6 @@ func main() {
 	meetingSvc.SetUserRepository(userRepo)
 	meetingSvc.SetSyncPusher(syncSvc)
 	meetingSvc.SetEmailService(emailSvc)
-	astSvc.SetMeetingService(meetingSvc)
 	meetingHandler := handler.NewMeetingHandler(meetingSvc)
 
 	waRepo := repository.NewWhatsAppRepository(db)
@@ -300,7 +257,7 @@ func main() {
 		WebhookBaseURL:  service.ResolveWhatsAppWebhookBaseURL(cfg.PublicBaseURL, cfg.EvolutionAPIURL, cfg.Port),
 		EvolutionAPIURL: cfg.EvolutionAPIURL,
 		EvolutionAPIKey: cfg.EvolutionAPIKey,
-	}, waRepo, evoClient, astSvc)
+	}, waRepo, evoClient)
 	waSvc.SetNotificationSender(notifSvc)
 	waSvc.SetUserRepo(userRepo)
 	var audioTranscriber ai.AudioTranscriber
@@ -309,17 +266,15 @@ func main() {
 		waSvc.SetAudioTranscriber(audioTranscriber)
 	}
 
-	// Elo de VISÃO para o enriquecimento da mídia do histórico: OpenRouter tem
-	// cota separada da do Google AI Studio (que é compartilhada por todos os
-	// modelos do Gemini e já esgotou o free tier).
+	// Elo de VISÃO para o enriquecimento da mídia do histórico via ADK v2 (OpenRouter).
 	var mediaVision ai.ImageDescriber
 	if cfg.OpenRouterAPIKey != "" {
-		mediaVision = ai.NewOpenRouterVisionProvider(cfg.OpenRouterAPIKey, cfg.WhatsAppMediaVisionModel)
-		log.Printf("🖼️ [AI Provider] Visão do histórico do WhatsApp via %s.", cfg.WhatsAppMediaVisionModel)
+		mediaVision = adkengine.NewOpenRouterADKImageDescriber(cfg.OpenRouterAPIKey, cfg.WhatsAppMediaVisionModel)
+		log.Printf("🖼️ [AI Provider] Visão do histórico do WhatsApp via ADK (%s).", cfg.WhatsAppMediaVisionModel)
 	}
 
 	// Assistente de WhatsApp: contexto, diretório de contatos, backfill e enriquecimento de mídia.
-	waWiring := setupWhatsAppAssistant(cfg, db, waRepo, evoClient, waSvc, astSvc, notifSvc, accountCleanupWorker, mediaVision, audioTranscriber)
+	waWiring := setupWhatsAppAssistant(cfg, db, waRepo, evoClient, waSvc, notifSvc, accountCleanupWorker, mediaVision, audioTranscriber)
 	if waWiring.BackfillWorker != nil {
 		defer waWiring.BackfillWorker.Stop()
 	}
@@ -338,15 +293,10 @@ func main() {
 		// também continham as mensagens apagadas.
 		whatsappHandler.SetBackupManager(bkpMgr)
 	}
-	// O app e o desktop também recebem o contexto do WhatsApp (a resposta só é
-	// vista pelo usuário, então o escopo "todos os chats" é seguro nessas surfaces).
-	astHandler.SetContextService(waWiring.ContextSvc)
-
 	// Gmail Conector & Scanner
 	gmailRepo := repository.NewGmailRepository(db)
 	gmailSvc := service.NewGmailService(gmailRepo, cfg.DataEncryptionKey, cfg.GoogleClientID, cfg.GoogleClientSecret)
 	googleAuthSvc.SetGmailRepository(gmailRepo, cfg.DataEncryptionKey)
-	astSvc.SetGmailService(gmailSvc)
 	gmailHandler := handler.NewGmailHandler(gmailSvc)
 
 	// WhatsApp Passwordless Login OTP
@@ -389,7 +339,10 @@ func main() {
 		TriggerWorker: triggerWorker, MorningBriefingWorker: morningBriefingWorker,
 		BehavioralWorker: behavioralWorker, AgentSys: agentSys,
 	})
-	botHandler := setupBotSubsystem(db, triggerRepo, notifSvc, cognitiveRes.BudgetSvc, agentSys)
+	botHandler, botRunner := setupBotSubsystem(db, triggerRepo, notifSvc, cognitiveRes.BudgetSvc, agentSys)
+	if botRunner != nil {
+		triggerWorker.SetEvaluator(botRunner)
+	}
 	v5Sys := setupV5Subsystem(db, cognitiveRes.BudgetSvc, agentSys, todoRepo)
 
 	// Inicia workers proativos somente após AttentionBudgetService e inboxRecorder estarem conectados.
@@ -415,7 +368,7 @@ func main() {
 	defer executiveSummaryWorker.Stop()
 
 	// Handler de voz bidirecional conectado ao Loop de Agente e TTS
-	voiceStreamHandler := handler.NewVoiceStreamHandler(astSvc)
+	voiceStreamHandler := handler.NewVoiceStreamHandler()
 	if agentSys.AgentLoop != nil {
 		voiceStreamHandler.SetAgentLoop(agentSys.AgentLoop, agentSys.ConversationStore)
 		voiceStreamHandler.SetAudioServices(whisperTranscriber, ttsSvc, cfg.GeminiAPIKey)
@@ -423,7 +376,6 @@ func main() {
 
 	if agentSys.AIProviderSvc != nil {
 		chatHandler.SetAIProviderService(agentSys.AIProviderSvc)
-		triggerHandler.SetAIProviderService(agentSys.AIProviderSvc)
 	}
 
 	// 6. Servidor HTTP
@@ -432,14 +384,12 @@ func main() {
 		GoogleAuthHandler:   googleAuthHandler,
 		CalHandler:          calHandler,
 		TodoHandler:         todoHandler,
-		AstHandler:          astHandler,
 		AstStreamHandler:    agentSys.StreamHandler,
 		MemoryHandler:          agentSys.MemoryHandler,
 		NotifHandler:           notifHandler,
 		NotifInboxHandler:      v5Sys.NotifInboxHandler,
 		StoreComplianceHandler: v5Sys.StoreComplianceHandler,
 		SyncHandler:         syncHandler,
-		TriggerHandler:      triggerHandler,
 		BotHandler:          botHandler,
 		BriefingHandler:     briefingHandler,
 		AISettingsHandler:   aiSettingsHandler,

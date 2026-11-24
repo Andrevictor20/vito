@@ -16,7 +16,6 @@ import {
   SummaryEyebrow,
   SummaryHeroCard,
   SummaryInteractiveBars,
-  SummaryVitoNote,
 } from './SummaryPrimitives';
 
 interface WeeklySummarySectionProps {
@@ -49,6 +48,7 @@ export const WeeklySummarySection: React.FC<WeeklySummarySectionProps> = ({
   const { colors } = useTheme();
   const chronological = useMemo(() => [...summaries].reverse(), [summaries]);
   const [selectedIdx, setSelectedIdx] = useState<number>(-1);
+  const [selectedDayIdx, setSelectedDayIdx] = useState<number>(-1);
 
   if (chronological.length === 0) return null;
 
@@ -116,11 +116,14 @@ export const WeeklySummarySection: React.FC<WeeklySummarySectionProps> = ({
             items={weekBars}
             showAvg
             selectable
-            onSelectIndex={(idx) => setSelectedIdx(idx)}
+            onSelectIndex={(idx) => {
+              setSelectedIdx(idx);
+              setSelectedDayIdx(-1);
+            }}
           />
 
           <Text style={[styles.tapHint, { color: colors.muted }]}>
-            Toque em uma semana para ver os detalhes
+            Toque em uma semana para alternar · {activeWeek.eventsCount} {activeWeek.eventsCount === 1 ? 'evento' : 'eventos'}
           </Text>
         </SummaryHeroCard>
       </StaggerItem>
@@ -130,10 +133,26 @@ export const WeeklySummarySection: React.FC<WeeklySummarySectionProps> = ({
         <SummaryCard>
           <SummaryEyebrow label="Carga diária" />
           <SummaryInteractiveBars
-            items={dailyBars}
+            items={dailyBars.map((d, idx) => ({
+              ...d,
+              selected: selectedDayIdx >= 0 ? idx === selectedDayIdx : d.selected,
+            }))}
             compact
+            selectable
             replayKey={activeIdx}
+            onSelectIndex={(idx) => setSelectedDayIdx((prev) => (prev === idx ? -1 : idx))}
           />
+          {selectedDayIdx >= 0 && activeWeek.dailyActivity[selectedDayIdx] ? (
+            <View style={[styles.dayDetailPill, { backgroundColor: colors.bg }]}>
+              <Text style={[styles.dayDetailText, tabularNumbers, { color: colors.ink }]}>
+                {activeWeek.dailyActivity[selectedDayIdx].dayLabel}:{' '}
+                {activeWeek.dailyActivity[selectedDayIdx].hours.toFixed(1).replace('.', ',')}h
+                {activeWeek.hours > 0
+                  ? ` (${Math.round((activeWeek.dailyActivity[selectedDayIdx].hours / activeWeek.hours) * 100)}% da semana)`
+                  : ''}
+              </Text>
+            </View>
+          ) : null}
         </SummaryCard>
       </StaggerItem>
 
@@ -168,7 +187,7 @@ export const WeeklySummarySection: React.FC<WeeklySummarySectionProps> = ({
             </View>
           </View>
 
-          {catSegments.length > 0 ? (
+          {catSegments.length > 1 ? (
             <View style={styles.stkWrap}>
               <AnimatedSegmentedBar
                 segments={catSegments}
@@ -194,9 +213,8 @@ export const WeeklySummarySection: React.FC<WeeklySummarySectionProps> = ({
         </SummaryCard>
       </StaggerItem>
 
-      {/* Bloco 4: Nota do Vito + Abrir Raio-X */}
+      {/* Bloco 4: Abrir Raio-X */}
       <StaggerItem index={3}>
-        <SummaryVitoNote text={activeWeek.narrative} />
         <TouchableOpacity
           style={[styles.lnkBtn, { backgroundColor: colors.surf }]}
           onPress={() => {
@@ -280,5 +298,16 @@ const styles = StyleSheet.create({
   lnkText: {
     fontFamily: 'Geist_500Medium',
     fontSize: 14.5,
+  },
+  dayDetailPill: {
+    alignSelf: 'center',
+    marginTop: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 12,
+  },
+  dayDetailText: {
+    fontFamily: 'Geist_500Medium',
+    fontSize: 12,
   },
 });

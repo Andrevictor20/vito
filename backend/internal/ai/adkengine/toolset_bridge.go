@@ -7,7 +7,6 @@ import (
 
 	"google.golang.org/adk/v2/agent"
 	"google.golang.org/adk/v2/tool"
-	"google.golang.org/adk/v2/tool/functiontool"
 
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/service/toolsets"
@@ -57,12 +56,15 @@ var canonicalAtomicSpecs = []AtomicToolSpec{
 	{AtomicName: "memory_search", ToolsetName: domain.ToolsetMemoryProfile, Operation: "search_memories", Description: "Pesquisa fatos e preferências nas memórias de longo prazo do usuário.", ActionKey: "mem:read"},
 	{AtomicName: "memory_get_profile", ToolsetName: domain.ToolsetMemoryProfile, Operation: "get_profile", Description: "Obtém o perfil permanente e preferências conhecidas do usuário.", ActionKey: "mem:read"},
 	{AtomicName: "memory_update_profile", ToolsetName: domain.ToolsetMemoryProfile, Operation: "update_profile", Description: "Registra uma nova preferência ou fato de longo prazo sobre o usuário.", ActionKey: "mem:write"},
-	// Radares e Bots
-	{AtomicName: "radar_list_triggers", ToolsetName: domain.ToolsetRadarTrigger, Operation: "list_triggers", Description: "Lista os radares e vigílias proativas ativas do usuário.", ActionKey: "bot:list"},
-	{AtomicName: "radar_create_trigger", ToolsetName: domain.ToolsetRadarTrigger, Operation: "create_trigger", Description: "Cria um novo radar ou vigília proativa para monitorar preços, notícias ou mudanças.", ActionKey: "bot:create"},
-	{AtomicName: "radar_delete_trigger", ToolsetName: domain.ToolsetRadarTrigger, Operation: "delete_trigger", Description: "Exclui um radar ou vigília proativa existente.", ActionKey: "bot:delete"},
+	// Bots e Vigílias
+	{AtomicName: "bot_list_bots", ToolsetName: domain.ToolsetRadarTrigger, Operation: "list_triggers", Description: "Lista os bots e vigílias proativas ativas do usuário.", ActionKey: "bot:list"},
+	{AtomicName: "bot_create_bot", ToolsetName: domain.ToolsetRadarTrigger, Operation: "create_trigger", Description: "Cria um novo bot ou vigília proativa para monitorar preços, notícias ou mudanças.", ActionKey: "bot:create"},
+	{AtomicName: "bot_delete_bot", ToolsetName: domain.ToolsetRadarTrigger, Operation: "delete_trigger", Description: "Exclui um bot ou vigília proativa existente.", ActionKey: "bot:delete"},
 	// Finanças (Plano 05)
 	{AtomicName: "finance_get_summary", ToolsetName: domain.ToolsetName("finance_manager"), Operation: "get_summary", Description: "Obtém o resumo financeiro Safe-to-Spend, faturas e despesas por categoria.", ActionKey: "fin:summary"},
+	{AtomicName: "finance_list_transactions", ToolsetName: domain.ToolsetName("finance_manager"), Operation: "list_transactions", Description: "Lista as transações financeiras recentes com filtros opcionais.", ActionKey: "fin:summary"},
+	{AtomicName: "finance_get_budgets", ToolsetName: domain.ToolsetName("finance_manager"), Operation: "get_budgets", Description: "Consulta os orçamentos por categoria e o progresso no mês.", ActionKey: "fin:summary"},
+	{AtomicName: "finance_get_cards", ToolsetName: domain.ToolsetName("finance_manager"), Operation: "get_cards", Description: "Lista os cartões de crédito conectados e suas faturas atuais.", ActionKey: "fin:summary"},
 }
 
 // canonicalActionAliases mapeia action_keys curtas/canônicas do Plano 04 §3 para as specs atômicas do bridge.
@@ -286,19 +288,9 @@ func (b *ToolsetBridge) SpecForTool(toolName string) (AtomicToolSpec, bool) {
 	return spec, ok
 }
 
-// BuildAllRegisteredTools retorna tanto as functiontool.New(...) atômicas quanto os adaptadores de macro-toolset
-// para manter 100% de compatibilidade com chamadas atômicas e chamadas em formato envelope.
+// BuildAllRegisteredTools retorna todas as functiontool.New(...) atômicas tipadas registradas no bridge.
 func (b *ToolsetBridge) BuildAllRegisteredTools() []tool.Tool {
-	tools := b.BuildAtomicTools()
-	if b.registry == nil {
-		return tools
-	}
-	for _, ts := range b.registry.All() {
-		if macroTool, err := b.buildLegacyMacroTool(ts); err == nil && macroTool != nil {
-			tools = append(tools, macroTool)
-		}
-	}
-	return tools
+	return b.BuildAtomicTools()
 }
 
 func (b *ToolsetBridge) buildToolsFiltered(allowed map[domain.ToolsetName]bool) []tool.Tool {
@@ -323,25 +315,7 @@ func (b *ToolsetBridge) buildToolsFiltered(allowed map[domain.ToolsetName]bool) 
 }
 
 func (b *ToolsetBridge) newAtomicFunctionTool(spec AtomicToolSpec, ts domain.DomainToolset) (tool.Tool, error) {
-	return functiontool.New(functiontool.Config{
-		Name:        spec.AtomicName,
-		Description: spec.Description,
-	}, func(ctx agent.Context, args map[string]any) (map[string]any, error) {
-		return b.executeResolved(ctx, ts, spec.Operation, extractCleanParams(args))
-	})
-}
-
-func (b *ToolsetBridge) buildLegacyMacroTool(ts domain.DomainToolset) (tool.Tool, error) {
-	return functiontool.New(functiontool.Config{
-		Name:        string(ts.Name()),
-		Description: ts.Description(),
-	}, func(ctx agent.Context, args map[string]any) (map[string]any, error) {
-		op := "default"
-		if opVal, ok := args["operation"].(string); ok && strings.TrimSpace(opVal) != "" {
-			op = strings.TrimSpace(opVal)
-		}
-		return b.executeResolved(ctx, ts, op, extractCleanParams(args))
-	})
+	return b.buildTypedAtomicFunctionTool(spec, ts)
 }
 
 func (b *ToolsetBridge) executeResolved(ctx agent.Context, ts domain.DomainToolset, operation string, rawParams json.RawMessage) (map[string]any, error) {

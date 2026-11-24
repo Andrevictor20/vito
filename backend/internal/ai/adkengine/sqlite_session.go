@@ -21,12 +21,19 @@ import (
 	"github.com/andrevmp/vito/backend/internal/repository"
 )
 
+const (
+	defaultMaxCachedSessions = 128
+	defaultSessionCacheTTL   = 30 * time.Minute
+)
+
 // SQLiteSessionService implementa google.golang.org/adk/v2/session.Service
-// adaptando conversation_threads e conversation_turns com suporte a DefaultWriterQueue().
+// adaptando conversation_threads e conversation_turns com suporte a DefaultWriterQueue() e cache LRU limitado.
 type SQLiteSessionService struct {
-	convRepo *repository.ConversationStoreRepository
-	mu       sync.RWMutex
-	sessions map[string]*sqliteSession
+	convRepo    *repository.ConversationStoreRepository
+	mu          sync.RWMutex
+	sessions    map[string]*sqliteSession
+	maxSessions int
+	ttl         time.Duration
 }
 
 type sqliteSession struct {
@@ -116,8 +123,56 @@ func (e sqliteEvents) At(i int) *session.Event {
 // NewSQLiteSessionService cria o serviço de sessão ADK sobre ConversationStoreRepository.
 func NewSQLiteSessionService(convRepo *repository.ConversationStoreRepository) *SQLiteSessionService {
 	return &SQLiteSessionService{
-		convRepo: convRepo,
-		sessions: make(map[string]*sqliteSession),
+		convRepo:    convRepo,
+		sessions:    make(map[string]*sqliteSession),
+		maxSessions: defaultMaxCachedSessions,
+		ttl:         defaultSessionCacheTTL,
+	}
+}
+
+// SetCacheLimitsForTest configura limites de LRU e TTL para testes determinísticos.
+func (s *SQLiteSessionService) SetCacheLimitsForTest(maxSessions int, ttl time.Duration) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if maxSessions > 0 {
+		s.maxSessions = maxSessions
+	}
+	if ttl > 0 {
+		s.ttl = ttl
+	}
+}
+
+func (s *SQLiteSessionService) evictLocked(now time.Time) {
+	if s.ttl > 0 {
+		for k, sess := range s.sessions {
+			sess.mu.RLock()
+			expired := now.Sub(sess.updatedAt) > s.ttl
+			sess.mu.RUnlock()
+			if expired {
+				delete(s.sessions, k)
+			}
+		}
+	}
+	limit := s.maxSessions
+	if limit <= 0 {
+		limit = defaultMaxCachedSessions
+	}
+	for len(s.sessions) >= limit {
+		var oldestKey string
+		var oldestTime time.Time
+		for k, sess := range s.sessions {
+			sess.mu.RLock()
+			ut := sess.updatedAt
+			sess.mu.RUnlock()
+			if oldestKey == "" || ut.Before(oldestTime) {
+				oldestKey = k
+				oldestTime = ut
+			}
+		}
+		if oldestKey == "" {
+			break
+		}
+		delete(s.sessions, oldestKey)
 	}
 }
 
@@ -162,6 +217,7 @@ func (s *SQLiteSessionService) Create(ctx context.Context, req *session.CreateRe
 	}
 
 	s.mu.Lock()
+	s.evictLocked(now)
 	s.sessions[sessionMapKey(req.AppName, req.UserID, sessionID)] = sess
 	s.mu.Unlock()
 
@@ -197,6 +253,7 @@ func (s *SQLiteSessionService) Get(ctx context.Context, req *session.GetRequest)
 				updatedAt: thread.UpdatedAt,
 			}
 			s.mu.Lock()
+			s.evictLocked(time.Now().UTC())
 			s.sessions[key] = sess
 			s.mu.Unlock()
 			return &session.GetResponse{Session: sess}, nil

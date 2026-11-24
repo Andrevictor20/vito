@@ -54,40 +54,41 @@ func (r *RoutedLLM) tryGenerateBYOK(
 		}
 
 		stepStart := time.Now()
-		var buffered []*model.LLMResponse
+		yieldedAny := false
 		stepErr := consumeLLMStep(ctx, resolved.VitoLLM.LLM, req, stream, func(resp *model.LLMResponse) {
 			if resp != nil {
-				buffered = append(buffered, resp)
+				yieldedAny = true
+				yield(resp, nil)
 			}
 		})
 
 		if stepErr == nil {
-			for _, resp := range buffered {
-				if !yield(resp, nil) {
-					break
-				}
-			}
 			r.recordBYOKSuccess(meta, resolved, stepStart)
+			return true
+		}
+
+		if yieldedAny {
+			yield(nil, stepErr)
 			return true
 		}
 
 		action, notice, reason, inheritNext := r.handleBYOKError(ctx, meta.UserID, resolved, stepErr, needsTools)
 		if action == byokErrRetrySame {
 			if waitErr := sleepWithContext(ctx, r.byokBackoff()); waitErr == nil {
-				buffered = nil
 				retryStart := time.Now()
+				retryYielded := false
 				retryErr := consumeLLMStep(ctx, resolved.VitoLLM.LLM, req, stream, func(resp *model.LLMResponse) {
 					if resp != nil {
-						buffered = append(buffered, resp)
+						retryYielded = true
+						yield(resp, nil)
 					}
 				})
 				if retryErr == nil {
-					for _, resp := range buffered {
-						if !yield(resp, nil) {
-							break
-						}
-					}
 					r.recordBYOKSuccess(meta, resolved, retryStart)
+					return true
+				}
+				if retryYielded {
+					yield(nil, retryErr)
 					return true
 				}
 				stepErr = retryErr

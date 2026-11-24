@@ -4,7 +4,6 @@ import { CalendarEvent, Todo } from '../../types';
 import { calculateWeeklySummaries } from '../../utils/weeklySummaryCalculator';
 import { Drawer } from '../ui/Drawer';
 import { Button } from '../ui/Button';
-import { VitoMascot } from '../common/VitoMascot';
 import { ArrowLeft, Loader2, Sparkles } from 'lucide-react';
 
 interface ExecutiveSummariesViewProps {
@@ -254,15 +253,6 @@ export const ExecutiveSummariesView: React.FC<ExecutiveSummariesViewProps> = ({
                     <span>20:00</span>
                   </div>
                 </div>
-
-                <div className="rounded-[22px] p-4 bg-[var(--surf)] border border-[var(--line)] flex items-start gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-[var(--bg)] border border-[var(--line)] flex items-center justify-center shrink-0">
-                    <VitoMascot size={24} state="idle" />
-                  </div>
-                  <p className="text-sm leading-relaxed">
-                    Dia com {todayMetrics.eventsCount} compromisso(s) e {todayMetrics.freeHours}h livres. Boa hora para avançar nas tarefas ({todayMetrics.completedTodos}/{todayMetrics.todosCount}).
-                  </p>
-                </div>
               </>
             )}
 
@@ -313,13 +303,6 @@ export const ExecutiveSummariesView: React.FC<ExecutiveSummariesViewProps> = ({
                       })}
                     </div>
                   </div>
-                </div>
-
-                <div className="rounded-[22px] p-4 bg-[var(--surf)] border border-[var(--line)] flex items-start gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-[var(--bg)] border border-[var(--line)] flex items-center justify-center shrink-0">
-                    <VitoMascot size={24} state="idle" />
-                  </div>
-                  <p className="text-sm leading-relaxed flex-1">{activeWeek.narrative}</p>
                 </div>
 
                 <Button variant="outline" size="md" pill onClick={() => setActiveDrawer('weekly')}>

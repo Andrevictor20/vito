@@ -57,14 +57,14 @@ func TestServer_AIRoutesIntegration(t *testing.T) {
 	aiH := handler.NewAIProviderHandler(aiProvSvc)
 	chatH := handler.NewChatHandler(service.NewChatService(chatRepo))
 	chatH.SetAIProviderService(aiProvSvc)
-	trigH := handler.NewTriggerHandler(service.NewTriggerService(triggerRepo), nil)
-	trigH.SetAIProviderService(aiProvSvc)
+	botH := handler.NewBotHandler(db, repository.NewBotRepository(db), nil)
+	botH.SetAIProviderService(aiProvSvc)
 
 	srv := server.New(server.Config{
 		AuthHandler:       authH,
 		AIProviderHandler: aiH,
 		ChatHandler:       chatH,
-		TriggerHandler:    trigH,
+		BotHandler:        botH,
 		AuthSvc:           authSvc,
 	})
 	ts := httptest.NewServer(srv.Router())

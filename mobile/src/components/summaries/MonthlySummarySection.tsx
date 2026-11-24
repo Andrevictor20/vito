@@ -16,7 +16,6 @@ import {
   SummaryEyebrow,
   SummaryHeroCard,
   SummaryTrendLineChart,
-  SummaryVitoNote,
 } from './SummaryPrimitives';
 
 interface MonthlyMetrics {
@@ -177,10 +176,8 @@ export const MonthlySummarySection: React.FC<MonthlySummarySectionProps> = ({
         </StaggerItem>
       ) : null}
 
-      {/* Bloco 5: Nota do Vito + Alinhar semana + Abrir Raio-X */}
+      {/* Bloco 5: Alinhar semana + Abrir Raio-X */}
       <StaggerItem index={aggregatedCategories.length > 0 ? 4 : 3}>
-        <SummaryVitoNote text={diagnosisText} />
-
         {onAlignWeek ? (
           <TouchableOpacity
             style={[styles.priBtn, { backgroundColor: colors.ink }]}

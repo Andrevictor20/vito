@@ -20,11 +20,16 @@ type BotChatServicer interface {
 
 // BotChatMessageDTO representa uma mensagem do chat isolado do bot.
 type BotChatMessageDTO struct {
-	ID        string `json:"id"`
-	Role      string `json:"role"`
-	Content   string `json:"content"`
-	CreatedAt string `json:"created_at"`
-	ModelUsed string `json:"model_used,omitempty"`
+	ID                    string                `json:"id"`
+	Role                  string                `json:"role"`
+	Content               string                `json:"content"`
+	CreatedAt             string                `json:"created_at"`
+	ModelUsed             string                `json:"model_used,omitempty"`
+	Cards                 []domain.ChatCard     `json:"cards,omitempty"`
+	ToolCalls             []domain.ExecutedTool `json:"tool_calls,omitempty"`
+	RequiresConfirmation  bool                  `json:"requires_confirmation,omitempty"`
+	PendingConfirmationID string                `json:"pending_confirmation_id,omitempty"`
+	SuggestedChips        []string              `json:"suggested_chips,omitempty"`
 }
 
 // BotActionDTO enriquece domain.BotAction com metadados do catálogo e conexão do app.

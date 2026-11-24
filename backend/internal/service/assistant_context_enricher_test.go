@@ -158,14 +158,18 @@ func TestAgentLoop_ContextEnricherInjected(t *testing.T) {
 	)
 
 	mockProv := &mockLoopEnricherProvider{}
-	router := ai.NewModelRouter(mockProv)
+	enricherEngine := &mockEnricherEngine{
+		enricher: enricher,
+		prov:     mockProv,
+	}
 	guard := service.NewScopeGuard()
 	gate := service.NewConfirmationGateService(db)
 	registry := toolsets.NewToolsetsRegistry()
 	convRepo := repository.NewConversationStoreRepository(db)
 
-	loop := service.NewAgentLoop(router, registry, guard, gate, convRepo, nil)
+	loop := service.NewAgentLoop(nil, registry, guard, gate, convRepo, nil)
 	loop.SetContextEnricher(enricher)
+	loop.SetEngine(enricherEngine)
 
 	req := domain.UnifiedAssistantRequest{
 		UserID:   userID,
@@ -193,4 +197,32 @@ func TestAgentLoop_ContextEnricherInjected(t *testing.T) {
 	if !strings.Contains(sysPrompt, "Engenheiro Chefe") {
 		t.Errorf("SystemPrompt deve conter o perfil injetado: %s", sysPrompt)
 	}
+}
+
+type mockEnricherEngine struct {
+	enricher *service.AssistantContextEnricher
+	prov     *mockLoopEnricherProvider
+}
+
+func (m *mockEnricherEngine) Run(ctx context.Context, req domain.UnifiedAssistantRequest) (*domain.UnifiedAssistantResponse, error) {
+	lvl1 := m.enricher.BuildLevel1Context(ctx, req.UserID, req.Message, time.Now())
+	resp, err := m.prov.Chat(ctx, ai.AgentChatRequest{
+		UserID:       req.UserID,
+		ThreadID:     req.ThreadID,
+		Channel:      req.Channel,
+		SystemPrompt: lvl1,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &domain.UnifiedAssistantResponse{
+		ThreadID: req.ThreadID,
+		Text:     resp.Text,
+		Reply:    resp.Text,
+		Message:  resp.Text,
+	}, nil
+}
+
+func (m *mockEnricherEngine) RunStream(ctx context.Context, req domain.UnifiedAssistantRequest, _ func(ai.StreamDelta) error) (*domain.UnifiedAssistantResponse, error) {
+	return m.Run(ctx, req)
 }

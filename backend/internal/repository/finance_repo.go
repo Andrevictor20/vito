@@ -68,14 +68,12 @@ func (r *sqliteFinanceRepo) UpsertConnection(ctx context.Context, conn *domain.F
 			updated_at = excluded.updated_at
 		WHERE finance_connections.user_id = excluded.user_id
 	`
-	res, err := r.db.ExecContext(ctx, query,
-		conn.ID, conn.UserID, conn.PluggyItemID, conn.ConnectorID, conn.InstitutionName,
-		conn.Status, conn.LastSyncAt, conn.ConsentExpiresAt, conn.CreatedAt, conn.UpdatedAt,
-	)
-	if err != nil {
-		return err
-	}
-	rows, err := res.RowsAffected()
+	rows, err := ExecuteQueuedWriteRows(ctx, func() (sql.Result, error) {
+		return r.db.ExecContext(ctx, query,
+			conn.ID, conn.UserID, conn.PluggyItemID, conn.ConnectorID, conn.InstitutionName,
+			conn.Status, conn.LastSyncAt, conn.ConsentExpiresAt, conn.CreatedAt, conn.UpdatedAt,
+		)
+	})
 	if err != nil {
 		return err
 	}
@@ -157,11 +155,9 @@ func (r *sqliteFinanceRepo) ListConnections(ctx context.Context, userID string) 
 }
 
 func (r *sqliteFinanceRepo) DeleteConnection(ctx context.Context, userID, connectionID string) error {
-	res, err := r.db.ExecContext(ctx, `DELETE FROM finance_connections WHERE user_id = ? AND id = ?`, userID, connectionID)
-	if err != nil {
-		return err
-	}
-	rows, err := res.RowsAffected()
+	rows, err := ExecuteQueuedWriteRows(ctx, func() (sql.Result, error) {
+		return r.db.ExecContext(ctx, `DELETE FROM finance_connections WHERE user_id = ? AND id = ?`, userID, connectionID)
+	})
 	if err != nil {
 		return err
 	}
@@ -175,62 +171,64 @@ func (r *sqliteFinanceRepo) UpsertAccountsBatch(ctx context.Context, userID stri
 	if len(accounts) == 0 {
 		return nil
 	}
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	stmt, err := tx.PrepareContext(ctx, `
-		INSERT INTO finance_accounts (
-			id, user_id, connection_id, pluggy_account_id, institution_name,
-			account_type, account_subtype, name, balance, credit_limit,
-			available_credit_limit, currency_code, closing_day, due_day, minimum_payment, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		ON CONFLICT(pluggy_account_id) DO UPDATE SET
-			institution_name = excluded.institution_name,
-			account_type = excluded.account_type,
-			account_subtype = excluded.account_subtype,
-			name = excluded.name,
-			balance = excluded.balance,
-			credit_limit = excluded.credit_limit,
-			available_credit_limit = excluded.available_credit_limit,
-			currency_code = excluded.currency_code,
-			closing_day = COALESCE(excluded.closing_day, finance_accounts.closing_day),
-			due_day = COALESCE(excluded.due_day, finance_accounts.due_day),
-			minimum_payment = COALESCE(excluded.minimum_payment, finance_accounts.minimum_payment),
-			updated_at = excluded.updated_at
-		WHERE finance_accounts.user_id = excluded.user_id
-	`)
-	if err != nil {
-		return err
-	}
-	defer stmt.Close()
-
-	now := time.Now().UTC()
-	for _, a := range accounts {
-		id := a.ID
-		if id == "" {
-			id = uuid.NewString()
-		}
-		currency := a.CurrencyCode
-		if currency == "" {
-			currency = "BRL"
-		}
-		var connID any = a.ConnectionID
-		if a.ConnectionID == "" {
-			connID = nil
-		}
-		_, err := stmt.ExecContext(ctx,
-			id, userID, connID, a.PluggyAccountID, a.InstitutionName,
-			a.AccountType, a.AccountSubtype, a.Name, a.Balance, a.CreditLimit,
-			a.AvailableCreditLimit, currency, a.ClosingDay, a.DueDay, a.MinimumPayment, now,
-		)
+	return ExecuteQueuedWrite(ctx, func() error {
+		tx, err := r.db.BeginTx(ctx, nil)
 		if err != nil {
 			return err
 		}
-	}
-	return tx.Commit()
+		defer tx.Rollback()
+
+		stmt, err := tx.PrepareContext(ctx, `
+			INSERT INTO finance_accounts (
+				id, user_id, connection_id, pluggy_account_id, institution_name,
+				account_type, account_subtype, name, balance, credit_limit,
+				available_credit_limit, currency_code, closing_day, due_day, minimum_payment, updated_at
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			ON CONFLICT(pluggy_account_id) DO UPDATE SET
+				institution_name = excluded.institution_name,
+				account_type = excluded.account_type,
+				account_subtype = excluded.account_subtype,
+				name = excluded.name,
+				balance = excluded.balance,
+				credit_limit = excluded.credit_limit,
+				available_credit_limit = excluded.available_credit_limit,
+				currency_code = excluded.currency_code,
+				closing_day = COALESCE(excluded.closing_day, finance_accounts.closing_day),
+				due_day = COALESCE(excluded.due_day, finance_accounts.due_day),
+				minimum_payment = COALESCE(excluded.minimum_payment, finance_accounts.minimum_payment),
+				updated_at = excluded.updated_at
+			WHERE finance_accounts.user_id = excluded.user_id
+		`)
+		if err != nil {
+			return err
+		}
+		defer stmt.Close()
+
+		now := time.Now().UTC()
+		for _, a := range accounts {
+			id := a.ID
+			if id == "" {
+				id = uuid.NewString()
+			}
+			currency := a.CurrencyCode
+			if currency == "" {
+				currency = "BRL"
+			}
+			var connID any = a.ConnectionID
+			if a.ConnectionID == "" {
+				connID = nil
+			}
+			_, err := stmt.ExecContext(ctx,
+				id, userID, connID, a.PluggyAccountID, a.InstitutionName,
+				a.AccountType, a.AccountSubtype, a.Name, a.Balance, a.CreditLimit,
+				a.AvailableCreditLimit, currency, a.ClosingDay, a.DueDay, a.MinimumPayment, now,
+			)
+			if err != nil {
+				return err
+			}
+		}
+		return tx.Commit()
+	})
 }
 
 func (r *sqliteFinanceRepo) ListAccounts(ctx context.Context, userID string) ([]domain.FinanceAccount, error) {
@@ -385,12 +383,14 @@ func (r *sqliteFinanceRepo) UpsertBudgetOrGoal(ctx context.Context, item *domain
 			auto_alert_threshold = excluded.auto_alert_threshold,
 			updated_at = excluded.updated_at
 	`
-	_, err := r.db.ExecContext(ctx, query,
-		item.ID, item.UserID, item.Kind, item.Title, item.CategoryFilter,
-		item.TargetAmount, item.CurrentAmount, item.DeadlineDate,
-		item.AutoAlertThreshold, item.CreatedAt, item.UpdatedAt,
-	)
-	return err
+	return ExecuteQueuedWrite(ctx, func() error {
+		_, err := r.db.ExecContext(ctx, query,
+			item.ID, item.UserID, item.Kind, item.Title, item.CategoryFilter,
+			item.TargetAmount, item.CurrentAmount, item.DeadlineDate,
+			item.AutoAlertThreshold, item.CreatedAt, item.UpdatedAt,
+		)
+		return err
+	})
 }
 
 // applyAccountCycle copia os campos opcionais do ciclo do cartão (fechamento, vencimento, mínimo).

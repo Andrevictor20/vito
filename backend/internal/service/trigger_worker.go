@@ -182,6 +182,13 @@ type TriggerWorker struct {
 	priceFetcher func(ctx context.Context, t *domain.Trigger) (value float64, display string, ok bool, err error)
 }
 
+// SetEvaluator substitui o avaliador do TriggerWorker (ex.: pelo BotRunner ADK v2).
+func (w *TriggerWorker) SetEvaluator(eval TriggerEvaluator) {
+	if eval != nil {
+		w.evaluator = eval
+	}
+}
+
 // SetPriceFetcher instala o fast-path determinístico de preço-alvo (Fase 1).
 func (w *TriggerWorker) SetPriceFetcher(fn func(ctx context.Context, t *domain.Trigger) (float64, string, bool, error)) {
 	w.priceFetcher = fn

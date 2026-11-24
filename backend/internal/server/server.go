@@ -24,14 +24,12 @@ type Server struct {
 	googleAuthHandler   *handler.GoogleAuthHandler
 	calHandler          *handler.CalendarHandler
 	todoHandler         *handler.TodoHandler
-	astHandler          *handler.AssistantHandler
 	astStreamHandler    *handler.AssistantStreamHandler
 	memoryHandler          *handler.MemoryHandler
 	notifHandler           *handler.NotificationHandler
 	notifInboxHandler      *handler.NotificationsInboxHandler
 	storeComplianceHandler *handler.StoreComplianceHandler
 	syncHandler         *handler.CalendarSyncHandler
-	triggerHandler      *handler.TriggerHandler
 	botHandler          *handler.BotHandler
 	briefingHandler     *handler.BriefingHandler
 	aiSettingsHandler   *handler.AISettingsHandler
@@ -58,14 +56,12 @@ type Config struct {
 	GoogleAuthHandler   *handler.GoogleAuthHandler
 	CalHandler          *handler.CalendarHandler
 	TodoHandler         *handler.TodoHandler
-	AstHandler          *handler.AssistantHandler
 	AstStreamHandler    *handler.AssistantStreamHandler
 	MemoryHandler          *handler.MemoryHandler
 	NotifHandler           *handler.NotificationHandler
 	NotifInboxHandler      *handler.NotificationsInboxHandler
 	StoreComplianceHandler *handler.StoreComplianceHandler
 	SyncHandler         *handler.CalendarSyncHandler
-	TriggerHandler      *handler.TriggerHandler
 	BotHandler          *handler.BotHandler
 	BriefingHandler     *handler.BriefingHandler
 	AISettingsHandler   *handler.AISettingsHandler
@@ -100,14 +96,12 @@ func New(cfg ...Config) *Server {
 		s.googleAuthHandler = cfg[0].GoogleAuthHandler
 		s.calHandler = cfg[0].CalHandler
 		s.todoHandler = cfg[0].TodoHandler
-		s.astHandler = cfg[0].AstHandler
 		s.astStreamHandler = cfg[0].AstStreamHandler
 		s.memoryHandler = cfg[0].MemoryHandler
 		s.notifHandler = cfg[0].NotifHandler
 		s.notifInboxHandler = cfg[0].NotifInboxHandler
 		s.storeComplianceHandler = cfg[0].StoreComplianceHandler
 		s.syncHandler = cfg[0].SyncHandler
-		s.triggerHandler = cfg[0].TriggerHandler
 		s.botHandler = cfg[0].BotHandler
 		s.briefingHandler = cfg[0].BriefingHandler
 		s.aiSettingsHandler = cfg[0].AISettingsHandler
@@ -175,8 +169,13 @@ func (s *Server) registerRoutes() {
 	s.router.Get("/apple-app-site-association", s.handleAppleAppSiteAssociation)
 
 	if s.voiceHandler != nil {
-		s.router.Handle("/v1/voice/stream", s.voiceHandler.Handler())
-		s.router.Handle("/api/v1/voice/stream", s.voiceHandler.Handler())
+		s.router.Group(func(vr chi.Router) {
+			if s.authSvc != nil {
+				vr.Use(middleware.AuthMiddleware(s.authSvc))
+			}
+			vr.Handle("/v1/voice/stream", s.voiceHandler.Handler())
+			vr.Handle("/api/v1/voice/stream", s.voiceHandler.Handler())
+		})
 	}
 
 	bookingLimiter := middleware.NewRateLimiter(60, 1*time.Minute)
@@ -244,39 +243,6 @@ func (s *Server) registerRoutes() {
 				r.Post("/contacts/match", s.p2pHandler.MatchContacts)
 			}
 
-		if s.triggerHandler != nil {
-			r.Route("/triggers", func(tr chi.Router) {
-				tr.Use(func(next http.Handler) http.Handler {
-					return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-						w.Header().Set("Deprecation", "true")
-						next.ServeHTTP(w, req)
-					})
-				})
-				tr.Get("/templates", s.triggerHandler.ListTemplates)
-
-				tr.Group(func(ptr chi.Router) {
-					if s.authSvc != nil {
-						ptr.Use(middleware.AuthMiddleware(s.authSvc))
-					}
-					ptr.Post("/", s.triggerHandler.CreateTrigger)
-					ptr.Get("/", s.triggerHandler.ListTriggers)
-					ptr.Post("/templates/{id}/activate", s.triggerHandler.ActivateTemplate)
-					ptr.Post("/parse", s.triggerHandler.ParsePrompt)
-					ptr.Route("/{id}", func(idr chi.Router) {
-						idr.Get("/", s.triggerHandler.GetTrigger)
-						idr.Patch("/", s.triggerHandler.UpdateTrigger)
-						idr.Delete("/", s.triggerHandler.DeleteTrigger)
-						idr.Patch("/toggle", s.triggerHandler.ToggleStatus)
-						idr.Post("/test", s.triggerHandler.TestTrigger)
-						idr.Post("/run", s.triggerHandler.RunTrigger)
-						idr.Get("/logs", s.triggerHandler.ListLogs)
-						idr.Delete("/logs", s.triggerHandler.ClearLogs)
-						idr.Delete("/logs/{logId}", s.triggerHandler.DeleteLog)
-					})
-				})
-			})
-		}
-
 		// Rotas protegidas por JWT
 		if s.authSvc != nil {
 			r.Group(func(protected chi.Router) {
@@ -322,18 +288,12 @@ func (s *Server) registerRoutes() {
 						air.Post("/assistant/audio", s.astStreamHandler.AudioChat)
 						air.Post("/assistant/vision", s.astStreamHandler.VisionChat)
 					})
-				} else if s.astHandler != nil {
-					protected.Group(func(air chi.Router) {
-						air.Use(aiLimiter)
-						air.Post("/assistant/chat", s.astHandler.Chat)
-						air.Post("/assistant/audio", s.astHandler.AudioChat)
-						air.Post("/assistant/vision", s.astHandler.VisionChat)
-					})
 				}
 
 				if s.memoryHandler != nil {
 					protected.Route("/memories", func(mr chi.Router) {
 						mr.Get("/", s.memoryHandler.ListMemories)
+						mr.Post("/facts", s.memoryHandler.CreateFact)
 						mr.Delete("/episodes/{id}", s.memoryHandler.DeleteEpisode)
 						mr.Delete("/themes/{slug}", s.memoryHandler.DeleteThematicSummary)
 						mr.Delete("/facts/{id}", s.memoryHandler.DeleteFact)

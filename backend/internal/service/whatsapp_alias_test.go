@@ -6,11 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/repository"
-	"github.com/andrevmp/vito/backend/internal/service"
 )
 
 // TestWhatsAppDirectory_AliasAprendidoResolveContato
@@ -40,111 +38,6 @@ func TestWhatsAppDirectory_AliasAprendidoResolveContato(t *testing.T) {
 	}
 	if chat.ChatJID != jidIsaSalvo {
 		t.Errorf("esperava o chat %q, obteve %q", jidIsaSalvo, chat.ChatJID)
-	}
-}
-
-// TestAssistantService_AprendeApelidoQuandoUsuarioConfirma
-//
-// Fluxo completo: o Vito não conhece "isa" → pergunta → o usuário responde
-// "a Bella" → o Vito resolve Bella e APRENDE que Isa é Bella.
-func TestAssistantService_AprendeApelidoQuandoUsuarioConfirma(t *testing.T) {
-	ctx := context.Background()
-	dir, _, cleanup := setupDiretorioComNomes(t, "bella", "bella")
-	defer cleanup()
-
-	ast := service.NewAssistantService(&mockGatewayIntent{intent: &ai.ParsedIntent{
-		Action:       ai.ActionQueryConversation,
-		Conversation: &ai.ParsedConversationQuery{Chat: "isa"},
-		Message:      "o que ela mandou?",
-	}}, nil, nil, nil)
-	ast.SetWhatsAppDirectory(dir)
-
-	// 1ª rodada: "isa" não existe → o Vito pergunta.
-	res, err := ast.Process(ctx, "user-dir-1", ai.UserInput{Text: "o que a isa mandou?"})
-	if err != nil {
-		t.Fatalf("Process falhou: %v", err)
-	}
-	if res.Message == "" {
-		t.Fatal("esperava uma resposta de esclarecimento")
-	}
-
-	// 2ª rodada: o usuário confirma ("a Bella") → o Vito resolve.
-	gateway, ok := ast.AIGatewayForTest().(*mockGatewayIntent)
-	if !ok {
-		t.Fatal("esperava o gateway de teste")
-	}
-	gateway.intent = &ai.ParsedIntent{
-		Action:       ai.ActionQueryConversation,
-		Conversation: &ai.ParsedConversationQuery{Chat: "bella"},
-		Message:      "o que ela mandou?",
-	}
-	if _, err := ast.Process(ctx, "user-dir-1", ai.UserInput{Text: "é a bella"}); err != nil {
-		t.Fatalf("Process (2ª rodada) falhou: %v", err)
-	}
-
-	// O apelido aprendido precisa resolver na próxima consulta.
-	chat, err := dir.ResolveChat(ctx, "user-dir-1", "isa")
-	if err != nil {
-		t.Fatalf("o apelido deveria ter sido aprendido: %v", err)
-	}
-	if chat.ChatJID != jidIsaSalvo {
-		t.Errorf("esperava o chat %q, obteve %q", jidIsaSalvo, chat.ChatJID)
-	}
-}
-
-// Bug Isa -> Pai: O Vito NUNCA pode aprender apelido se o usuário simplesmente
-// mudou de assunto e perguntou por outro contato em vez de desambiguar.
-func TestAssistantService_NaoAprendeApelidoQuandoUsuarioPerguntaOutroContato(t *testing.T) {
-	ctx := context.Background()
-	dir, convRepo, cleanup := setupDiretorioComNomes(t, "bella", "bella")
-	defer cleanup()
-
-	// Adiciona a conversa do Pai
-	jidPai := "5511988887777@s.whatsapp.net"
-	now := time.Now().UTC()
-	if err := convRepo.SaveMessage(ctx, &domain.WhatsAppConversationMessage{
-		ID: "dir-msg-pai", UserID: "user-dir-1", InstanceName: "inst",
-		ChatJID: jidPai, ChatKind: domain.WhatsAppChatKindDirect,
-		ChatLabel: "Pai", SenderName: "Pai", Kind: "text",
-		Text: "bênção meu filho", MessageTimestamp: now,
-	}); err != nil {
-		t.Fatalf("falha ao arquivar mensagem do Pai: %v", err)
-	}
-
-	ast := service.NewAssistantService(&mockGatewayIntent{intent: &ai.ParsedIntent{
-		Action:       ai.ActionQueryConversation,
-		Conversation: &ai.ParsedConversationQuery{Chat: "isa"},
-		Message:      "o que ela mandou?",
-	}}, nil, nil, nil)
-	ast.SetWhatsAppDirectory(dir)
-
-	// 1ª rodada: "isa" não existe → o Vito pergunta quem é.
-	res, err := ast.Process(ctx, "user-dir-1", ai.UserInput{Text: "o que a isa mandou?"})
-	if err != nil {
-		t.Fatalf("Process falhou: %v", err)
-	}
-	if res.Message == "" {
-		t.Fatal("esperava resposta pedindo esclarecimento")
-	}
-
-	// 2ª rodada: o usuário NÃO desambiguou! Ele perguntou sobre OUTRO contato ("o que o Pai mandou?")
-	gateway, ok := ast.AIGatewayForTest().(*mockGatewayIntent)
-	if !ok {
-		t.Fatal("esperava o gateway de teste")
-	}
-	gateway.intent = &ai.ParsedIntent{
-		Action:       ai.ActionQueryConversation,
-		Conversation: &ai.ParsedConversationQuery{Chat: "Pai"},
-		Message:      "o que ele mandou?",
-	}
-	if _, err := ast.Process(ctx, "user-dir-1", ai.UserInput{Text: "o que o Pai mandou?"}); err != nil {
-		t.Fatalf("Process (2ª rodada) falhou: %v", err)
-	}
-
-	// O apelido "isa" NUNCA pode ter sido aprendido apontando para o Pai!
-	_, err = dir.ResolveChat(ctx, "user-dir-1", "isa")
-	if err == nil {
-		t.Fatal("ERRO GRAVE: 'isa' foi indevidamente associada ao Pai!")
 	}
 }
 
@@ -193,20 +86,6 @@ func TestWhatsAppDirectory_FiltraELimpaApelidosCoincidentesComContatosReais(t *t
 	if len(aliases) > 0 {
 		t.Errorf("o alias espúrio deveria ter sido limpo, mas ainda existem %d registros", len(aliases))
 	}
-}
-
-// mockGatewayIntent devolve a intenção configurada (mutável entre rodadas).
-type mockGatewayIntent struct {
-	intent *ai.ParsedIntent
-}
-
-func (m *mockGatewayIntent) ParseIntent(ctx context.Context, input ai.UserInput) (*ai.ParsedIntent, error) {
-	if m.intent == nil {
-		return &ai.ParsedIntent{Action: ai.ActionGeneralChat, Message: "ok"}, nil
-	}
-	res := *m.intent
-	res.ProviderUsed = "mock"
-	return &res, nil
 }
 
 // novoShadowInboxDB cria um shadow inbox isolado.

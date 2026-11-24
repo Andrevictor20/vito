@@ -84,18 +84,20 @@ func (r *GmailRepositorySQLite) Upsert(ctx context.Context, g *domain.GmailInteg
 			last_scanned_at = COALESCE(excluded.last_scanned_at, gmail_integrations.last_scanned_at),
 			updated_at = excluded.updated_at
 	`
-	_, err := r.db.ExecContext(ctx, query,
-		g.ID,
-		g.UserID,
-		g.AccountEmail,
-		g.EncryptedCredentials,
-		g.Status,
-		g.HistoryID,
-		g.LastScannedAt,
-		g.CreatedAt,
-		g.UpdatedAt,
-	)
-	return err
+	return ExecuteQueuedWrite(ctx, func() error {
+		_, err := r.db.ExecContext(ctx, query,
+			g.ID,
+			g.UserID,
+			g.AccountEmail,
+			g.EncryptedCredentials,
+			g.Status,
+			g.HistoryID,
+			g.LastScannedAt,
+			g.CreatedAt,
+			g.UpdatedAt,
+		)
+		return err
+	})
 }
 
 // UpdateStatus altera o status da integração (ex: active, reauth_required, disconnected).
@@ -105,11 +107,9 @@ func (r *GmailRepositorySQLite) UpdateStatus(ctx context.Context, userID, status
 		SET status = ?, updated_at = ?
 		WHERE user_id = ?
 	`
-	res, err := r.db.ExecContext(ctx, query, status, time.Now().UTC(), userID)
-	if err != nil {
-		return err
-	}
-	rows, err := res.RowsAffected()
+	rows, err := ExecuteQueuedWriteRows(ctx, func() (sql.Result, error) {
+		return r.db.ExecContext(ctx, query, status, time.Now().UTC(), userID)
+	})
 	if err != nil {
 		return err
 	}
@@ -126,11 +126,9 @@ func (r *GmailRepositorySQLite) UpdateLastScanned(ctx context.Context, userID, h
 		SET history_id = ?, last_scanned_at = ?, updated_at = ?
 		WHERE user_id = ?
 	`
-	res, err := r.db.ExecContext(ctx, query, historyID, scannedAt, time.Now().UTC(), userID)
-	if err != nil {
-		return err
-	}
-	rows, err := res.RowsAffected()
+	rows, err := ExecuteQueuedWriteRows(ctx, func() (sql.Result, error) {
+		return r.db.ExecContext(ctx, query, historyID, scannedAt, time.Now().UTC(), userID)
+	})
 	if err != nil {
 		return err
 	}
@@ -143,6 +141,8 @@ func (r *GmailRepositorySQLite) UpdateLastScanned(ctx context.Context, userID, h
 // DeleteByUserID remove o registro da integração do usuário.
 func (r *GmailRepositorySQLite) DeleteByUserID(ctx context.Context, userID string) error {
 	query := `DELETE FROM gmail_integrations WHERE user_id = ?`
-	_, err := r.db.ExecContext(ctx, query, userID)
-	return err
+	return ExecuteQueuedWrite(ctx, func() error {
+		_, err := r.db.ExecContext(ctx, query, userID)
+		return err
+	})
 }

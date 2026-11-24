@@ -8,7 +8,6 @@ import (
 
 	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/domain"
-	"github.com/andrevmp/vito/backend/internal/service"
 )
 
 type spyADKEngine struct {
@@ -33,9 +32,6 @@ func (s *spyADKEngine) RunStream(ctx context.Context, req domain.UnifiedAssistan
 func TestWhatsAppService_ADKPrimaryPath_SkipsLegacyV1(t *testing.T) {
 	svc, mockClient, _, _ := setupConversationalWhatsAppTest(t)
 	ctx := context.Background()
-
-	legacyGateway := &mockGatewayCapturador{}
-	svc.SetAssistantService(service.NewAssistantService(legacyGateway, nil, nil, nil))
 
 	adkSpy := &spyADKEngine{
 		response: &domain.UnifiedAssistantResponse{
@@ -71,9 +67,6 @@ func TestWhatsAppService_ADKPrimaryPath_SkipsLegacyV1(t *testing.T) {
 	}
 	if adkSpy.lastReq.Channel != "whatsapp" {
 		t.Errorf("esperava channel='whatsapp', obteve %q", adkSpy.lastReq.Channel)
-	}
-	if legacyGateway.input.Text != "" {
-		t.Errorf("fallback v1 AssistantService NÃO deve ser chamado quando agentLoop/ADK está ativo, recebeu %q", legacyGateway.input.Text)
 	}
 	if len(mockClient.sentMessages) == 0 || !strings.Contains(mockClient.sentMessages[0].Text, "Respondido pelo motor ADK primário.") {
 		t.Errorf("resposta ADK não foi enviada pelo cliente WhatsApp: %+v", mockClient.sentMessages)

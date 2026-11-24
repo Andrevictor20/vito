@@ -1,5 +1,6 @@
-import React, { useEffect, useId } from 'react';
+import React, { useEffect } from 'react';
 import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   Easing,
   cancelAnimation,
@@ -9,12 +10,11 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
-import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { useTheme } from '../../context/ThemeContext';
 import { ProtoUiIcon, type ProtoUiIconName } from '../../icons/ProtoUiIcons';
 import { tabularNumbers } from '../../theme/tokens';
 import { AnimatedProgressBar, useReduceMotion } from '../../theme/vitoMotion';
-import { VitoMascot } from '../common/VitoMascot';
+import { withHexAlpha } from '../finance/financeHelpers';
 
 export {
   SummaryBalanceDonut,
@@ -27,27 +27,21 @@ export const SummaryHeroCard: React.FC<{
   children: React.ReactNode;
   style?: StyleProp<ViewStyle>;
 }> = ({ children, style }) => {
-  const { colors } = useTheme();
-  const gradId = useId().replace(/:/g, '');
+  const { colors, isDark } = useTheme();
   return (
     <View style={[styles.heroCard, { backgroundColor: colors.bg }, style]}>
-      <Svg
+      <LinearGradient
         pointerEvents="none"
+        colors={[
+          withHexAlpha(colors.blue, isDark ? 0.22 : 0.16),
+          withHexAlpha(colors.purple, isDark ? 0.16 : 0.12),
+          colors.bg,
+        ]}
+        locations={[0, 0.68, 1]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0.9, y: 1 }}
         style={StyleSheet.absoluteFill}
-        width="100%"
-        height="100%"
-        preserveAspectRatio="none"
-        viewBox="0 0 100 100"
-      >
-        <Defs>
-          <LinearGradient id={`hero_${gradId}`} x1="0" y1="0" x2="0.85" y2="1">
-            <Stop offset="0" stopColor={colors.blue} stopOpacity={0.16} />
-            <Stop offset="0.65" stopColor={colors.purple} stopOpacity={0.12} />
-            <Stop offset="1" stopColor={colors.bg} stopOpacity={0} />
-          </LinearGradient>
-        </Defs>
-        <Rect x="0" y="0" width="100" height="100" fill={`url(#hero_${gradId})`} />
-      </Svg>
+      />
       {children}
     </View>
   );
@@ -111,7 +105,7 @@ export const SummaryCategoryBreakdown: React.FC<{
               />
             </View>
             <Text style={[styles.catVal, tabularNumbers, { color: colors.muted }]} numberOfLines={1}>
-              {item.name} · {item.hours.toFixed(1).replace('.', ',')}h
+              {item.name} · {item.hours.toFixed(1).replace('.', ',')}h ({Math.round((item.hours / total) * 100)}%)
             </Text>
           </View>
         );
@@ -159,21 +153,9 @@ export const SummaryNowIndicator: React.FC<{ leftPct: number }> = ({ leftPct }) 
   );
 };
 
-export const SummaryVitoNote: React.FC<{ text: string }> = ({ text }) => {
-  const { colors } = useTheme();
-  return (
-    <View style={[styles.vitoNote, { backgroundColor: colors.surf }]}>
-      <View style={styles.vitoBox}>
-        <VitoMascot size={22} state="idle" />
-      </View>
-      <Text style={[styles.vitoText, { color: colors.ink }]}>{text}</Text>
-    </View>
-  );
-};
-
 const styles = StyleSheet.create({
-  heroCard: { borderRadius: 24, padding: 18, overflow: 'hidden' },
-  card: { borderRadius: 24, padding: 18 },
+  heroCard: { width: '100%', borderRadius: 24, padding: 18, overflow: 'hidden' },
+  card: { width: '100%', borderRadius: 24, padding: 18 },
   ebRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   eyebrow: { fontFamily: 'Geist_500Medium', fontSize: 11.5, letterSpacing: 0.7, textTransform: 'uppercase' },
   catList: { marginTop: 14, gap: 10 },
@@ -182,7 +164,4 @@ const styles = StyleSheet.create({
   catBarCol: { flex: 1, minWidth: 60 },
   catVal: { fontFamily: 'Geist_500Medium', fontSize: 12.5, flexShrink: 0 },
   nowMarker: { position: 'absolute', top: -4, width: 3, height: 24, borderRadius: 2, marginLeft: -1.5 },
-  vitoNote: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, borderRadius: 22, padding: 16 },
-  vitoBox: { width: 36, height: 36, borderRadius: 12, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#D9D9D9', alignItems: 'center', justifyContent: 'center' },
-  vitoText: { flex: 1, fontFamily: 'Geist', fontSize: 14, lineHeight: 21 },
 });

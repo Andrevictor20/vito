@@ -25,10 +25,12 @@ func (r *sqliteFinanceRepo) UpsertByokBackup(ctx context.Context, backup *domain
 			key_version = excluded.key_version,
 			updated_at = excluded.updated_at
 	`
-	_, err := r.db.ExecContext(ctx, query,
-		backup.UserID, backup.Ciphertext, backup.Nonce, backup.KeyVersion, backup.UpdatedAt,
-	)
-	return err
+	return ExecuteQueuedWrite(ctx, func() error {
+		_, err := r.db.ExecContext(ctx, query,
+			backup.UserID, backup.Ciphertext, backup.Nonce, backup.KeyVersion, backup.UpdatedAt,
+		)
+		return err
+	})
 }
 
 func (r *sqliteFinanceRepo) GetByokBackup(ctx context.Context, userID string) (*domain.FinanceByokBackup, error) {
@@ -52,6 +54,8 @@ func (r *sqliteFinanceRepo) GetByokBackup(ctx context.Context, userID string) (*
 }
 
 func (r *sqliteFinanceRepo) DeleteByokBackup(ctx context.Context, userID string) error {
-	_, err := r.db.ExecContext(ctx, `DELETE FROM finance_byok_backup WHERE user_id = ?`, userID)
-	return err
+	return ExecuteQueuedWrite(ctx, func() error {
+		_, err := r.db.ExecContext(ctx, `DELETE FROM finance_byok_backup WHERE user_id = ?`, userID)
+		return err
+	})
 }

@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/andrevmp/vito/backend/internal/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
 )
 
@@ -138,7 +137,7 @@ func (r *WhatsAppConversationRepositorySQLite) UpdateMediaResult(ctx context.Con
 	if userID == "" || id == "" || status == "" {
 		return errors.New("resultado de mídia inválido")
 	}
-	return database.WithBusyRetry(4, func() error {
+	return ExecuteQueuedWrite(ctx, func() error {
 		_, err := r.db.ExecContext(ctx, `
 			UPDATE whatsapp_conversation_messages
 			SET media_status = ?, media_text = ?
@@ -179,7 +178,7 @@ func (r *WhatsAppConversationRepositorySQLite) SaveAlias(ctx context.Context, us
 	if userID == "" || chatJID == "" || strings.TrimSpace(alias) == "" {
 		return errors.New("apelido inválido")
 	}
-	return database.WithBusyRetry(4, func() error {
+	return ExecuteQueuedWrite(ctx, func() error {
 		_, err := r.db.ExecContext(ctx, `
 			INSERT INTO whatsapp_contact_aliases (user_id, chat_jid, alias, created_at)
 			VALUES (?, ?, ?, ?)
@@ -219,7 +218,7 @@ func (r *WhatsAppConversationRepositorySQLite) DeleteAlias(ctx context.Context, 
 	if userID == "" || chatJID == "" || strings.TrimSpace(alias) == "" {
 		return nil
 	}
-	return database.WithBusyRetry(4, func() error {
+	return ExecuteQueuedWrite(ctx, func() error {
 		_, err := r.db.ExecContext(ctx, `
 			DELETE FROM whatsapp_contact_aliases
 			WHERE user_id = ? AND chat_jid = ? AND LOWER(alias) = LOWER(?)
@@ -233,7 +232,7 @@ func (r *WhatsAppConversationRepositorySQLite) DeleteAliasesByName(ctx context.C
 	if userID == "" || strings.TrimSpace(alias) == "" {
 		return nil
 	}
-	return database.WithBusyRetry(4, func() error {
+	return ExecuteQueuedWrite(ctx, func() error {
 		_, err := r.db.ExecContext(ctx, `
 			DELETE FROM whatsapp_contact_aliases
 			WHERE user_id = ? AND LOWER(alias) = LOWER(?)
@@ -304,7 +303,7 @@ func (r *WhatsAppConversationRepositorySQLite) SaveSavedNames(ctx context.Contex
 		if !ok || name == "" {
 			continue
 		}
-		if err := database.WithBusyRetry(4, func() error {
+		if err := ExecuteQueuedWrite(ctx, func() error {
 			_, execErr := r.db.ExecContext(ctx, `
 				UPDATE whatsapp_conversation_messages SET chat_label = ?
 				WHERE user_id = ? AND chat_jid = ?

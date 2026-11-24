@@ -36,7 +36,6 @@ type WhatsAppService struct {
 	cfg              WhatsAppServiceConfig
 	repo             domain.WhatsAppRepository
 	client           EvolutionAPIClient
-	assistantSvc     *AssistantService
 	agentLoop        AssistantEngine
 	notifSender      NotificationSender
 	audioTranscriber ai.AudioTranscriber
@@ -76,14 +75,12 @@ func NewWhatsAppService(
 	cfg WhatsAppServiceConfig,
 	repo domain.WhatsAppRepository,
 	client EvolutionAPIClient,
-	assistantSvc *AssistantService,
 ) *WhatsAppService {
 	coord := newWhatsAppInboundCoordinator(defaultMaxInboundConcurrency, defaultMaxInboundQueue)
 	return &WhatsAppService{
 		cfg:                 cfg,
 		repo:                repo,
 		client:              client,
-		assistantSvc:        assistantSvc,
 		memory:              NewWhatsAppConversationMemory(),
 		inboundCoord:        coord,
 		maxInboundAge:       defaultMaxInboundAge,
@@ -97,11 +94,6 @@ func NewWhatsAppService(
 // acionarem transcrição/IA (evita processar backlog antigo após quedas do servidor).
 func (s *WhatsAppService) SetMaxInboundAge(maxAge time.Duration) {
 	s.maxInboundAge = maxAge
-}
-
-// SetAssistantService injeta o serviço de assistente (usado em testes e recargas).
-func (s *WhatsAppService) SetAssistantService(assistantSvc *AssistantService) {
-	s.assistantSvc = assistantSvc
 }
 
 // SetAgentLoop conecta o motor Google ADK / AgentLoop ao canal do WhatsApp.

@@ -6,7 +6,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/andrevmp/vito/backend/internal/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
 )
 
@@ -42,7 +41,7 @@ func (r *WhatsAppConversationRepositorySQLite) SaveMessage(ctx context.Context, 
 		msg.MessageTimestamp = msg.CreatedAt
 	}
 
-	return database.WithBusyRetry(4, func() error {
+	return ExecuteQueuedWrite(ctx, func() error {
 		_, err := r.db.ExecContext(ctx, `
 			INSERT INTO whatsapp_conversation_messages
 				(id, user_id, instance_name, chat_jid, chat_kind, chat_label, sender_jid, sender_name,
@@ -184,7 +183,7 @@ func (r *WhatsAppConversationRepositorySQLite) UpdateChatLabels(ctx context.Cont
 			continue
 		}
 		var affected int64
-		if err := database.WithBusyRetry(4, func() error {
+		if err := ExecuteQueuedWrite(ctx, func() error {
 			res, execErr := r.db.ExecContext(ctx, `
 				UPDATE whatsapp_conversation_messages
 				SET chat_label = ?
@@ -257,7 +256,7 @@ func (r *WhatsAppConversationRepositorySQLite) SavePendingState(ctx context.Cont
 	if state.UpdatedAt.IsZero() {
 		state.UpdatedAt = time.Now().UTC()
 	}
-	return database.WithBusyRetry(4, func() error {
+	return ExecuteQueuedWrite(ctx, func() error {
 		_, err := r.db.ExecContext(ctx, `
 			INSERT INTO whatsapp_pending_state
 				(user_id, chat_jid, last_nudged_at, snoozed_until, dismissed_at, updated_at)
@@ -300,7 +299,7 @@ func (r *WhatsAppConversationRepositorySQLite) SaveContextSettings(ctx context.C
 	if settings.UpdatedAt.IsZero() {
 		settings.UpdatedAt = time.Now().UTC()
 	}
-	return database.WithBusyRetry(4, func() error {
+	return ExecuteQueuedWrite(ctx, func() error {
 		_, err := r.db.ExecContext(ctx, `
 			INSERT INTO whatsapp_context_settings (user_id, scope, window_size, updated_at)
 			VALUES (?, ?, ?, ?)
@@ -318,7 +317,7 @@ func (r *WhatsAppConversationRepositorySQLite) DeleteMessages(ctx context.Contex
 	if userID == "" {
 		return errors.New("userID obrigatório")
 	}
-	return database.WithBusyRetry(4, func() error {
+	return ExecuteQueuedWrite(ctx, func() error {
 		_, err := r.db.ExecContext(ctx, `DELETE FROM whatsapp_conversation_messages WHERE user_id = ?`, userID)
 		return err
 	})
@@ -327,7 +326,7 @@ func (r *WhatsAppConversationRepositorySQLite) DeleteMessages(ctx context.Contex
 // PruneOlderThan remove mensagens anteriores ao limite de retenção e devolve quantas saiuíram.
 func (r *WhatsAppConversationRepositorySQLite) PruneOlderThan(ctx context.Context, cutoff time.Time) (int64, error) {
 	var removed int64
-	err := database.WithBusyRetry(4, func() error {
+	err := ExecuteQueuedWrite(ctx, func() error {
 		res, err := r.db.ExecContext(ctx, `DELETE FROM whatsapp_conversation_messages WHERE message_timestamp < ?`, cutoff)
 		if err != nil {
 			return err

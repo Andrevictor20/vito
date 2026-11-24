@@ -20,7 +20,7 @@ type slowCountingGateway struct {
 	doneCh     chan struct{}
 }
 
-func (g *slowCountingGateway) ParseIntent(ctx context.Context, input ai.UserInput) (*ai.ParsedIntent, error) {
+func (g *slowCountingGateway) Run(ctx context.Context, _ domain.UnifiedAssistantRequest) (*domain.UnifiedAssistantResponse, error) {
 	cur := g.inFlight.Add(1)
 	for {
 		prev := g.maxInFlight.Load()
@@ -44,16 +44,21 @@ func (g *slowCountingGateway) ParseIntent(ctx context.Context, input ai.UserInpu
 		default:
 		}
 	}
-	return &ai.ParsedIntent{
-		Action:  ai.ActionGeneralChat,
+	return &domain.UnifiedAssistantResponse{
+		Text:    "Respondido!",
+		Reply:   "Respondido!",
 		Message: "Respondido!",
 	}, nil
+}
+
+func (g *slowCountingGateway) RunStream(ctx context.Context, req domain.UnifiedAssistantRequest, _ func(ai.StreamDelta) error) (*domain.UnifiedAssistantResponse, error) {
+	return g.Run(ctx, req)
 }
 
 func TestHandleWebhook_IgnoresMessagesUpdateAndDelete(t *testing.T) {
 	svc, mockClient, _, _ := setupConversationalWhatsAppTest(t)
 	gw := &slowCountingGateway{}
-	svc.SetAssistantService(service.NewAssistantService(gw, nil, nil, nil))
+	svc.SetAgentLoop(gw)
 
 	for _, ev := range []string{"messages.update", "messages_update", "messages.delete", "messages.set"} {
 		payload, _ := json.Marshal(map[string]any{
@@ -84,7 +89,7 @@ func TestHandleWebhook_IgnoresMessagesUpdateAndDelete(t *testing.T) {
 func TestHandleWebhook_ProcessesAllMessagesInBatchArray(t *testing.T) {
 	svc, mockClient, _, _ := setupConversationalWhatsAppTest(t)
 	gw := &slowCountingGateway{}
-	svc.SetAssistantService(service.NewAssistantService(gw, nil, nil, nil))
+	svc.SetAgentLoop(gw)
 
 	nowUnix := time.Now().UTC().Unix()
 	payload, _ := json.Marshal(map[string]any{
@@ -129,7 +134,7 @@ func TestHandleWebhook_ProcessesAllMessagesInBatchArray(t *testing.T) {
 func TestHandleWebhook_SkipsStaleAndAppendReplayAfterPowerLoss(t *testing.T) {
 	svc, mockClient, _, _ := setupConversationalWhatsAppTest(t)
 	gw := &slowCountingGateway{}
-	svc.SetAssistantService(service.NewAssistantService(gw, nil, nil, nil))
+	svc.SetAgentLoop(gw)
 	tr := &simpleTranscriber{transcribedText: "@vito áudio antigo"}
 	svc.SetAudioTranscriber(tr)
 
@@ -278,8 +283,8 @@ func TestHandleWebhook_FastAckAndBoundedConcurrency(t *testing.T) {
 		delay:  80 * time.Millisecond,
 		doneCh: make(chan struct{}, 20),
 	}
-	astSvc := service.NewAssistantService(gw, nil, nil, nil)
-	asyncSvc := service.NewWhatsAppService(service.WhatsAppServiceConfig{}, waRepo, mockClient, astSvc)
+	asyncSvc := service.NewWhatsAppService(service.WhatsAppServiceConfig{}, waRepo, mockClient)
+	asyncSvc.SetAgentLoop(gw)
 
 	start := time.Now()
 	const total = 10

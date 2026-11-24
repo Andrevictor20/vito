@@ -296,7 +296,12 @@ export function buildDailySpendingSeries(txs: FinanceTransaction[]): {
   }
 
   const labels: Array<{ index: number; label: string }> = [{ index: 0, label: '1' }];
-  if (maxDay >= 10) labels.push({ index: Math.floor(maxDay / 2) - 1, label: String(Math.floor(maxDay / 2)) });
+  if (maxDay >= 7) {
+    const step = Math.max(4, Math.round((maxDay - 1) / 4));
+    for (let d = 1 + step; d < maxDay - 1; d += step) {
+      labels.push({ index: d - 1, label: String(d) });
+    }
+  }
   if (maxDay > 1) labels.push({ index: maxDay - 1, label: String(maxDay) });
 
   return {

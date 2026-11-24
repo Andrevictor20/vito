@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 
@@ -36,12 +37,14 @@ func (r *CalendarSyncRepositorySQLite) UpsertIntegration(i *domain.CalendarInteg
 			last_synced_at = excluded.last_synced_at,
 			updated_at = excluded.updated_at
 	`
-	_, err := r.db.Exec(query,
-		i.ID, i.UserID, i.Provider, i.AccountEmail, i.EncryptedCredentials,
-		i.CalendarID, i.CalendarName, i.SyncToken, i.ChannelID, i.ChannelExpiration,
-		i.Status, i.LastSyncedAt, i.CreatedAt, i.UpdatedAt,
-	)
-	return err
+	return ExecuteQueuedWrite(context.Background(), func() error {
+		_, err := r.db.Exec(query,
+			i.ID, i.UserID, i.Provider, i.AccountEmail, i.EncryptedCredentials,
+			i.CalendarID, i.CalendarName, i.SyncToken, i.ChannelID, i.ChannelExpiration,
+			i.Status, i.LastSyncedAt, i.CreatedAt, i.UpdatedAt,
+		)
+		return err
+	})
 }
 
 // GetIntegration busca uma integração específica por usuário e provedor.
@@ -150,8 +153,10 @@ func (r *CalendarSyncRepositorySQLite) ListIntegrationsByUser(userID string) ([]
 // DeleteIntegration remove uma integração de calendário de um usuário.
 func (r *CalendarSyncRepositorySQLite) DeleteIntegration(userID, provider string) error {
 	query := `DELETE FROM calendar_integrations WHERE user_id = ? AND provider = ?`
-	_, err := r.db.Exec(query, userID, provider)
-	return err
+	return ExecuteQueuedWrite(context.Background(), func() error {
+		_, err := r.db.Exec(query, userID, provider)
+		return err
+	})
 }
 
 // UpsertMapping insere ou atualiza um mapeamento de evento entre o Vito e o calendário externo.
@@ -168,11 +173,13 @@ func (r *CalendarSyncRepositorySQLite) UpsertMapping(m *domain.ExternalEventMapp
 			last_synced_at = excluded.last_synced_at,
 			status = excluded.status
 	`
-	_, err := r.db.Exec(query,
-		m.ID, m.EventID, m.UserID, m.Provider, m.ExternalEventID,
-		m.ExternalETag, m.ContentHash, m.LastSyncedAt, m.Status,
-	)
-	return err
+	return ExecuteQueuedWrite(context.Background(), func() error {
+		_, err := r.db.Exec(query,
+			m.ID, m.EventID, m.UserID, m.Provider, m.ExternalEventID,
+			m.ExternalETag, m.ContentHash, m.LastSyncedAt, m.Status,
+		)
+		return err
+	})
 }
 
 // GetMappingByExternalID localiza o mapeamento correspondente a um ID externo.
@@ -232,8 +239,10 @@ func (r *CalendarSyncRepositorySQLite) GetMappingByEventID(eventID, provider str
 // DeleteMapping remove um mapeamento por ID.
 func (r *CalendarSyncRepositorySQLite) DeleteMapping(id string) error {
 	query := `DELETE FROM external_event_mappings WHERE id = ?`
-	_, err := r.db.Exec(query, id)
-	return err
+	return ExecuteQueuedWrite(context.Background(), func() error {
+		_, err := r.db.Exec(query, id)
+		return err
+	})
 }
 
 // CreateTombstone registra um tombstone para exclusão remota posterior.
@@ -242,8 +251,10 @@ func (r *CalendarSyncRepositorySQLite) CreateTombstone(t *domain.CalendarTombsto
 		INSERT INTO calendar_tombstones (id, user_id, provider, external_event_id, deleted_at)
 		VALUES (?, ?, ?, ?, ?)
 	`
-	_, err := r.db.Exec(query, t.ID, t.UserID, t.Provider, t.ExternalEventID, t.DeletedAt)
-	return err
+	return ExecuteQueuedWrite(context.Background(), func() error {
+		_, err := r.db.Exec(query, t.ID, t.UserID, t.Provider, t.ExternalEventID, t.DeletedAt)
+		return err
+	})
 }
 
 // ListTombstones lista todos os tombstones pendentes para um usuário e provedor.
@@ -274,6 +285,8 @@ func (r *CalendarSyncRepositorySQLite) ListTombstones(userID, provider string) (
 // DeleteTombstone remove um tombstone após sua propagação concluída.
 func (r *CalendarSyncRepositorySQLite) DeleteTombstone(id string) error {
 	query := `DELETE FROM calendar_tombstones WHERE id = ?`
-	_, err := r.db.Exec(query, id)
-	return err
+	return ExecuteQueuedWrite(context.Background(), func() error {
+		_, err := r.db.Exec(query, id)
+		return err
+	})
 }

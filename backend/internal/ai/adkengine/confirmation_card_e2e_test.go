@@ -177,10 +177,24 @@ func TestAC03_ChatToolsReturnRealTypedEntitiesAndCards(t *testing.T) {
 				ProviderName: "Fake-Direct",
 				ModelName:    "gemini-2.5-flash",
 				ToolCalls: []ai.ToolCall{
+					{ID: "tr1", Name: "transfer_to_agent", Arguments: json.RawMessage(`{"agent_name":"vito_routine_agent"}`)},
+				},
+			},
+			{
+				ProviderName: "Fake-Direct",
+				ModelName:    "gemini-2.5-flash",
+				ToolCalls: []ai.ToolCall{
 					{ID: "t1", Name: "todo_create_todo", Arguments: json.RawMessage(`{"title":"Revisar orçamento"}`)},
 				},
 			},
 			{Text: "Tarefa criada!", ProviderName: "Fake-Direct", ModelName: "gemini-2.5-flash"},
+			{
+				ProviderName: "Fake-Direct",
+				ModelName:    "gemini-2.5-flash",
+				ToolCalls: []ai.ToolCall{
+					{ID: "tr2", Name: "transfer_to_agent", Arguments: json.RawMessage(`{"agent_name":"vito_routine_agent"}`)},
+				},
+			},
 			{
 				ProviderName: "Fake-Direct",
 				ModelName:    "gemini-2.5-flash",
@@ -193,6 +207,13 @@ func TestAC03_ChatToolsReturnRealTypedEntitiesAndCards(t *testing.T) {
 				ProviderName: "Fake-Direct",
 				ModelName:    "gemini-2.5-flash",
 				ToolCalls: []ai.ToolCall{
+					{ID: "tr3", Name: "transfer_to_agent", Arguments: json.RawMessage(`{"agent_name":"vito_routine_agent"}`)},
+				},
+			},
+			{
+				ProviderName: "Fake-Direct",
+				ModelName:    "gemini-2.5-flash",
+				ToolCalls: []ai.ToolCall{
 					{ID: "t3", Name: "booking_create_link", Arguments: json.RawMessage(`{"title":"Café 30 min","duration_minutes":30}`)},
 				},
 			},
@@ -201,7 +222,14 @@ func TestAC03_ChatToolsReturnRealTypedEntitiesAndCards(t *testing.T) {
 				ProviderName: "Fake-Direct",
 				ModelName:    "gemini-2.5-flash",
 				ToolCalls: []ai.ToolCall{
-					{ID: "t4", Name: "radar_create_trigger", Arguments: json.RawMessage(`{"title":"Monitor Dólar","goal":"Avisar quando dólar cair"}`)},
+					{ID: "tr4", Name: "transfer_to_agent", Arguments: json.RawMessage(`{"agent_name":"vito_bots_architect"}`)},
+				},
+			},
+			{
+				ProviderName: "Fake-Direct",
+				ModelName:    "gemini-2.5-flash",
+				ToolCalls: []ai.ToolCall{
+					{ID: "t4", Name: "bot_create_bot", Arguments: json.RawMessage(`{"title":"Monitor Dólar","goal":"Avisar quando dólar cair"}`)},
 				},
 			},
 			{Text: "Bot criado!", ProviderName: "Fake-Direct", ModelName: "gemini-2.5-flash"},
@@ -272,6 +300,13 @@ func TestAC03_ChatToolsReturnRealTypedEntitiesAndCards(t *testing.T) {
 		tier:          3,
 		supportsTools: true,
 		responses: []*ai.AgentChatResponse{
+			{
+				ProviderName: "Fake-HITL",
+				ModelName:    "gemini-2.5-flash",
+				ToolCalls: []ai.ToolCall{
+					{ID: "trh1", Name: "transfer_to_agent", Arguments: json.RawMessage(`{"agent_name":"vito_routine_agent"}`)},
+				},
+			},
 			{
 				ProviderName: "Fake-HITL",
 				ModelName:    "gemini-2.5-flash",

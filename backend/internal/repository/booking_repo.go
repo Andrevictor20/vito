@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"strings"
@@ -57,12 +58,14 @@ func (r *BookingRepositorySQLite) CreateType(bt *domain.BookingType) error {
 		bt.UpdatedAt = now
 	}
 
-	_, err := r.db.Exec(query,
-		bt.ID, bt.UserID, bt.Slug, bt.Title, bt.Description, bt.DurationMinutes, bt.BufferMinutes,
-		bt.DaysOfWeek, bt.StartHour, bt.EndHour, bookingTimeVal(bt.ValidFrom), bookingTimeVal(bt.ValidUntil), bt.AllowedDates,
-		bt.IsActive, bt.CreatedAt, bt.UpdatedAt,
-	)
-	return err
+	return ExecuteQueuedWrite(context.Background(), func() error {
+		_, err := r.db.Exec(query,
+			bt.ID, bt.UserID, bt.Slug, bt.Title, bt.Description, bt.DurationMinutes, bt.BufferMinutes,
+			bt.DaysOfWeek, bt.StartHour, bt.EndHour, bookingTimeVal(bt.ValidFrom), bookingTimeVal(bt.ValidUntil), bt.AllowedDates,
+			bt.IsActive, bt.CreatedAt, bt.UpdatedAt,
+		)
+		return err
+	})
 }
 
 func (r *BookingRepositorySQLite) UpdateType(bt *domain.BookingType) error {
@@ -74,16 +77,14 @@ func (r *BookingRepositorySQLite) UpdateType(bt *domain.BookingType) error {
 		WHERE id = ? AND user_id = ?
 	`
 	bt.UpdatedAt = time.Now().UTC()
-	res, err := r.db.Exec(query,
-		bt.Slug, bt.Title, bt.Description, bt.DurationMinutes, bt.BufferMinutes,
-		bt.DaysOfWeek, bt.StartHour, bt.EndHour, bookingTimeVal(bt.ValidFrom), bookingTimeVal(bt.ValidUntil),
-		bt.AllowedDates, bt.IsActive, bt.UpdatedAt,
-		bt.ID, bt.UserID,
-	)
-	if err != nil {
-		return err
-	}
-	rows, err := res.RowsAffected()
+	rows, err := ExecuteQueuedWriteRows(context.Background(), func() (sql.Result, error) {
+		return r.db.Exec(query,
+			bt.Slug, bt.Title, bt.Description, bt.DurationMinutes, bt.BufferMinutes,
+			bt.DaysOfWeek, bt.StartHour, bt.EndHour, bookingTimeVal(bt.ValidFrom), bookingTimeVal(bt.ValidUntil),
+			bt.AllowedDates, bt.IsActive, bt.UpdatedAt,
+			bt.ID, bt.UserID,
+		)
+	})
 	if err != nil {
 		return err
 	}
@@ -95,11 +96,9 @@ func (r *BookingRepositorySQLite) UpdateType(bt *domain.BookingType) error {
 
 func (r *BookingRepositorySQLite) DeleteType(id, userID string) error {
 	query := `DELETE FROM booking_types WHERE id = ? AND user_id = ?`
-	res, err := r.db.Exec(query, id, userID)
-	if err != nil {
-		return err
-	}
-	rows, err := res.RowsAffected()
+	rows, err := ExecuteQueuedWriteRows(context.Background(), func() (sql.Result, error) {
+		return r.db.Exec(query, id, userID)
+	})
 	if err != nil {
 		return err
 	}
@@ -230,11 +229,13 @@ func (r *BookingRepositorySQLite) CreateAppointment(appt *domain.BookingAppointm
 		eventIDVal = appt.EventID
 	}
 
-	_, err := r.db.Exec(query,
-		appt.ID, appt.BookingTypeID, appt.UserID, appt.GuestName, appt.GuestEmail, appt.GuestNotes,
-		appt.StartAt.UTC(), appt.EndAt.UTC(), appt.Status, eventIDVal, appt.CreatedAt.UTC(),
-	)
-	return err
+	return ExecuteQueuedWrite(context.Background(), func() error {
+		_, err := r.db.Exec(query,
+			appt.ID, appt.BookingTypeID, appt.UserID, appt.GuestName, appt.GuestEmail, appt.GuestNotes,
+			appt.StartAt.UTC(), appt.EndAt.UTC(), appt.Status, eventIDVal, appt.CreatedAt.UTC(),
+		)
+		return err
+	})
 }
 
 func (r *BookingRepositorySQLite) GetAppointmentByID(id, userID string) (*domain.BookingAppointment, error) {
@@ -296,11 +297,9 @@ func (r *BookingRepositorySQLite) ListAppointmentsByUser(userID string, from, to
 
 func (r *BookingRepositorySQLite) DeleteAppointment(id, userID string) error {
 	query := `DELETE FROM booking_appointments WHERE id = ? AND user_id = ?`
-	res, err := r.db.Exec(query, id, userID)
-	if err != nil {
-		return err
-	}
-	rows, err := res.RowsAffected()
+	rows, err := ExecuteQueuedWriteRows(context.Background(), func() (sql.Result, error) {
+		return r.db.Exec(query, id, userID)
+	})
 	if err != nil {
 		return err
 	}

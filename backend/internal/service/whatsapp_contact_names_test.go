@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -102,19 +101,6 @@ func TestWhatsAppDirectory_ResolveChatAceitaSalvoEPerfil(t *testing.T) {
 	}
 }
 
-// TestPrompt_BlocoContatosMostraOsDoisNomes: o prompt precisa expor o alias.
-func TestPrompt_BlocoContatosMostraOsDoisNomes(t *testing.T) {
-	bloco := ai.ContactDirectoryBlock([]ai.ChatContactSummary{
-		{Name: nomeSalvoIsa, Alias: nomePerfilBel, Age: "há 2h"},
-	})
-	if !strings.Contains(bloco, nomeSalvoIsa) {
-		t.Errorf("o bloco deveria conter o nome salvo, obteve: %s", bloco)
-	}
-	if !strings.Contains(bloco, nomePerfilBel) {
-		t.Errorf("o bloco deveria conter o nome de perfil (alias), obteve: %s", bloco)
-	}
-}
-
 // TestWhatsAppService_RotuloDoUsaNomeSalvo: o chat arquivado é rotulado pelo
 // nome salvo pelo dono, não pelo nome de perfil.
 func TestWhatsAppService_RotuloDoUsaNomeSalvo(t *testing.T) {
@@ -130,7 +116,7 @@ func TestWhatsAppService_RotuloDoUsaNomeSalvo(t *testing.T) {
 	svc.SetContactsCache(cache)
 
 	gateway := &mockGatewayCapturador{}
-	svc.SetAssistantService(service.NewAssistantService(gateway, nil, nil, nil))
+	svc.SetAgentLoop(gateway)
 	svc.SetAsyncRunner(func(fn func()) { fn() })
 
 	// Mensagem recebida da pessoa (pushName = "bella").

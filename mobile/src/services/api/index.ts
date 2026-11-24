@@ -5,7 +5,6 @@ import { AuthApi } from './authApi';
 import { CalendarApi } from './calendarApi';
 import { TodosApi } from './todosApi';
 import { ChatApi, ChatStreamDelta } from './chatApi';
-import { TriggersApi } from './triggersApi';
 import { PendingApi } from './pendingApi';
 import { BookingApi } from './bookingApi';
 import { MeetingsApi } from './meetingsApi';
@@ -56,7 +55,6 @@ export class ApiService extends ApiClient {
   private calendarApi = new CalendarApi(this);
   private todosApi = new TodosApi(this);
   private chatApi = new ChatApi(this);
-  private triggersApi = new TriggersApi(this);
   private pendingApi = new PendingApi(this);
   private bookingApi = new BookingApi(this);
   private meetingsApi = new MeetingsApi(this);
@@ -220,65 +218,6 @@ export class ApiService extends ApiClient {
     voice?: string
   ): Promise<{ audio_b64: string; mime: string; voice: string }> {
     return this.chatApi.voiceTTS(text, voice);
-  }
-
-  // Triggers / Radares
-  getTriggers(category?: TriggerCategory, status?: TriggerStatus): Promise<Trigger[]> {
-    return this.triggersApi.getTriggers(category, status);
-  }
-  getTrigger(id: string): Promise<Trigger> {
-    return this.triggersApi.getTrigger(id);
-  }
-  createTrigger(input: CreateTriggerInput): Promise<Trigger> {
-    return this.triggersApi.createTrigger(input);
-  }
-  toggleTrigger(id: string): Promise<Trigger> {
-    return this.triggersApi.toggleTrigger(id);
-  }
-  updateTrigger(
-    id: string,
-    input: Partial<CreateTriggerInput> & {
-      status?: TriggerStatus;
-      scheduled_time?: string;
-      days_of_week?: string;
-    }
-  ): Promise<Trigger> {
-    return this.triggersApi.updateTrigger(id, input);
-  }
-  testTrigger(id: string): Promise<TriggerTestResult> {
-    return this.triggersApi.testTrigger(id);
-  }
-  runTrigger(id: string): Promise<TriggerLog> {
-    return this.triggersApi.runTrigger(id);
-  }
-  deleteTrigger(id: string): Promise<void> {
-    return this.triggersApi.deleteTrigger(id);
-  }
-  deleteTriggerLog(triggerId: string, logId: string): Promise<void> {
-    return this.triggersApi.deleteTriggerLog(triggerId, logId);
-  }
-  clearTriggerLogs(triggerId: string): Promise<void> {
-    return this.triggersApi.clearTriggerLogs(triggerId);
-  }
-  parseTriggerPrompt(prompt: string): Promise<{
-    category: TriggerCategory;
-    suggested_title: string;
-    query: string;
-    condition_type: string;
-  }> {
-    return this.triggersApi.parseTriggerPrompt(prompt);
-  }
-  getTriggerLogs(id: string): Promise<TriggerLog[]> {
-    return this.triggersApi.getTriggerLogs(id);
-  }
-  getTriggerTemplates(): Promise<TriggerTemplate[]> {
-    return this.triggersApi.getTemplates();
-  }
-  activateTriggerTemplate(
-    templateId: string,
-    overrides?: { title?: string; query?: string; target_value?: string }
-  ): Promise<Trigger> {
-    return this.triggersApi.activateTemplate(templateId, overrides);
   }
 
   // Pendências

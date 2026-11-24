@@ -64,10 +64,10 @@ func TestParseInboundMessage_EphemeralMessage(t *testing.T) {
 
 func TestHandleWebhook_AcceptsDataArray(t *testing.T) {
 	mockClient := &recordingEvolutionClient{}
-	astSvc := setupMockAssistantForRegression()
 	repo := newMockWhatsAppRepoForRegression("inst-test", "559884417165")
 
-	svc := service.NewWhatsAppService(service.WhatsAppServiceConfig{}, repo, mockClient, astSvc)
+	svc := service.NewWhatsAppService(service.WhatsAppServiceConfig{}, repo, mockClient)
+	svc.SetAgentLoop(&mockProviderForRegression{})
 	svc.SetAsyncRunner(func(fn func()) { fn() }) // Síncrono
 
 	// Payload onde "data" é uma lista [ {...} ]
@@ -99,11 +99,11 @@ func TestHandleWebhook_AcceptsDataArray(t *testing.T) {
 
 func TestHandleWebhook_OwnerInGroupWithFromMeFalse(t *testing.T) {
 	mockClient := &recordingEvolutionClient{}
-	astSvc := setupMockAssistantForRegression()
 	// Dono cadastrado com telefone 559884417165
 	repo := newMockWhatsAppRepoForRegression("inst-group", "559884417165")
 
-	svc := service.NewWhatsAppService(service.WhatsAppServiceConfig{}, repo, mockClient, astSvc)
+	svc := service.NewWhatsAppService(service.WhatsAppServiceConfig{}, repo, mockClient)
+	svc.SetAgentLoop(&mockProviderForRegression{})
 	svc.SetAsyncRunner(func(fn func()) { fn() }) // Síncrono
 
 	// No grupo, fromMe vem como false, mas o participant é o dono com device ID :33
@@ -332,19 +332,15 @@ func (m *mockWhatsAppRepoForRegression) UpdateStatus(ctx context.Context, id, st
 
 type mockProviderForRegression struct{}
 
-func (p *mockProviderForRegression) Name() string { return "mock" }
-func (p *mockProviderForRegression) Model() string { return "mock-model" }
-func (p *mockProviderForRegression) ParseIntent(ctx context.Context, input ai.UserInput) (*ai.ParsedIntent, error) {
-	return &ai.ParsedIntent{
-		Action:  ai.ActionGeneralChat,
-		Message: "Olá! Tudo em ordem.",
+func (p *mockProviderForRegression) Run(_ context.Context, _ domain.UnifiedAssistantRequest) (*domain.UnifiedAssistantResponse, error) {
+	msg := "Olá! Tudo em ordem."
+	return &domain.UnifiedAssistantResponse{
+		Text:    msg,
+		Reply:   msg,
+		Message: msg,
 	}, nil
 }
-func (p *mockProviderForRegression) GenerateText(ctx context.Context, prompt string) (string, error) {
-	return "Olá! Tudo em ordem.", nil
-}
 
-func setupMockAssistantForRegression() *service.AssistantService {
-	gateway := ai.NewGateway(&mockProviderForRegression{})
-	return service.NewAssistantService(gateway, nil, nil, nil, nil)
+func (p *mockProviderForRegression) RunStream(ctx context.Context, req domain.UnifiedAssistantRequest, _ func(ai.StreamDelta) error) (*domain.UnifiedAssistantResponse, error) {
+	return p.Run(ctx, req)
 }

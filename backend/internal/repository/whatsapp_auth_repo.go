@@ -30,8 +30,10 @@ func (r *WhatsAppAuthRepositorySQLite) SaveOTP(ctx context.Context, phone, otpHa
 			expires_at = excluded.expires_at,
 			created_at = excluded.created_at
 	`
-	_, err := r.db.ExecContext(ctx, query, phone, otpHash, expiresAt.UTC(), time.Now().UTC())
-	return err
+	return ExecuteQueuedWrite(ctx, func() error {
+		_, err := r.db.ExecContext(ctx, query, phone, otpHash, expiresAt.UTC(), time.Now().UTC())
+		return err
+	})
 }
 
 // GetOTP busca o registro de OTP pelo telefone.
@@ -66,11 +68,9 @@ func (r *WhatsAppAuthRepositorySQLite) IncrementAttempts(ctx context.Context, ph
 		SET attempts = attempts + 1
 		WHERE phone = ?
 	`
-	res, err := r.db.ExecContext(ctx, query, phone)
-	if err != nil {
-		return err
-	}
-	rows, err := res.RowsAffected()
+	rows, err := ExecuteQueuedWriteRows(ctx, func() (sql.Result, error) {
+		return r.db.ExecContext(ctx, query, phone)
+	})
 	if err != nil {
 		return err
 	}
@@ -83,13 +83,17 @@ func (r *WhatsAppAuthRepositorySQLite) IncrementAttempts(ctx context.Context, ph
 // DeleteOTP remove o código após uso bem-sucedido ou invalidação.
 func (r *WhatsAppAuthRepositorySQLite) DeleteOTP(ctx context.Context, phone string) error {
 	query := `DELETE FROM whatsapp_auth_otps WHERE phone = ?`
-	_, err := r.db.ExecContext(ctx, query, phone)
-	return err
+	return ExecuteQueuedWrite(ctx, func() error {
+		_, err := r.db.ExecContext(ctx, query, phone)
+		return err
+	})
 }
 
 // PruneExpired purga códigos expirados do banco de dados.
 func (r *WhatsAppAuthRepositorySQLite) PruneExpired(ctx context.Context) error {
 	query := `DELETE FROM whatsapp_auth_otps WHERE expires_at < ?`
-	_, err := r.db.ExecContext(ctx, query, time.Now().UTC())
-	return err
+	return ExecuteQueuedWrite(ctx, func() error {
+		_, err := r.db.ExecContext(ctx, query, time.Now().UTC())
+		return err
+	})
 }

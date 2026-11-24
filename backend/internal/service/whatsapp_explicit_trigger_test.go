@@ -18,7 +18,7 @@ func TestWhatsApp_ExplicitTriggerRequiredInAllChats(t *testing.T) {
 	ctx := context.Background()
 
 	gateway := &mockGatewayCapturador{}
-	svc.SetAssistantService(service.NewAssistantService(gateway, nil, nil, nil))
+	svc.SetAgentLoop(gateway)
 	svc.SetAsyncRunner(func(fn func()) { fn() })
 
 	selfGroupJID := "12036399999999@g.us"
@@ -178,7 +178,7 @@ func TestWhatsApp_ExplicitTriggerRequiredInAllChats(t *testing.T) {
 	for i, tc := range cenariosAtivados {
 		mockClient.sentMessages = nil
 		mockClient.sentReactions = nil
-		gateway.input.Text = ""
+		gateway.input.Message = ""
 
 		msgID := "msg-ativa-" + string(rune('a'+i))
 		payload := map[string]interface{}{
@@ -202,8 +202,8 @@ func TestWhatsApp_ExplicitTriggerRequiredInAllChats(t *testing.T) {
 		if len(mockClient.sentMessages) != 1 {
 			t.Fatalf("[%s] esperava 1 resposta do Vito, obteve %d", tc.nome, len(mockClient.sentMessages))
 		}
-		if gateway.input.Text != tc.esperadoNaIA {
-			t.Errorf("[%s] texto enviado à IA: obteve %q, esperava %q", tc.nome, gateway.input.Text, tc.esperadoNaIA)
+		if gateway.input.Message != tc.esperadoNaIA {
+			t.Errorf("[%s] texto enviado à IA: obteve %q, esperava %q", tc.nome, gateway.input.Message, tc.esperadoNaIA)
 		}
 		if len(mockClient.sentReactions) != 1 || mockClient.sentReactions[0].Reaction != "👀" {
 			t.Errorf("[%s] esperava reação 👀 para a mensagem ativada", tc.nome)

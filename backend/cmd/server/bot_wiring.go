@@ -6,6 +6,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/ai/adkengine"
 	"github.com/andrevmp/vito/backend/internal/catalog"
 	"github.com/andrevmp/vito/backend/internal/domain"
@@ -49,11 +50,16 @@ func (a *botChatAdapter) SendMessage(ctx context.Context, userID, botID, message
 		return nil, err
 	}
 	return &handler.BotChatMessageDTO{
-		ID:        resp.ThreadID + "_reply",
-		Role:      "assistant",
-		Content:   resp.Reply,
-		CreatedAt: time.Now().UTC().Format(time.RFC3339),
-		ModelUsed: resp.ModelUsed,
+		ID:                    resp.ThreadID + "_reply",
+		Role:                  "assistant",
+		Content:               resp.Reply,
+		CreatedAt:             time.Now().UTC().Format(time.RFC3339),
+		ModelUsed:             resp.ModelUsed,
+		Cards:                 resp.Cards,
+		ToolCalls:             resp.ToolCalls,
+		RequiresConfirmation:  resp.RequiresConfirmation,
+		PendingConfirmationID: resp.PendingConfirmationID,
+		SuggestedChips:        resp.SuggestedChips,
 	}, nil
 }
 
@@ -64,7 +70,7 @@ func setupBotSubsystem(
 	notifSvc service.PushDispatcher,
 	budgetSvc *service.AttentionBudgetService,
 	agentSys *AgentSubsystem,
-) *handler.BotHandler {
+) (*handler.BotHandler, *service.BotRunner) {
 	botRepo := repository.NewBotRepository(db)
 	cat, err := catalog.LoadDefaultCatalog()
 	if err != nil {
@@ -88,6 +94,57 @@ func setupBotSubsystem(
 		convRepo = agentSys.ConversationStore
 	}
 	botRunner := service.NewBotRunner(botRepo, triggerRepo, convRepo, cat, botRuntime, notifSvc, budgetSvc)
+	if triggerRepo != nil {
+		botRunner.SetDeltaFetcher(func(fetchCtx context.Context, b *domain.Bot) ([]string, []string, error) {
+			if b == nil {
+				return nil, nil, nil
+			}
+			t := &domain.Trigger{
+				ID: b.ID, UserID: b.UserID, Title: b.Title, Query: b.Query,
+				Category: domain.TriggerCategory(b.Category), ConditionType: domain.TriggerConditionType(b.ConditionType),
+			}
+			items, err := ai.RouteTriggerSource(t).Fetch(fetchCtx, t)
+			if err != nil {
+				return nil, nil, err
+			}
+			stored, err := triggerRepo.GetSeenHashes(b.ID)
+			if err != nil {
+				return nil, nil, err
+			}
+			seen := make(map[string]bool, len(stored))
+			for _, h := range stored {
+				seen[h] = true
+			}
+			var fresh, all []string
+			for _, it := range items {
+				h := ai.HashDataPoint(it)
+				all = append(all, h)
+				if !seen[h] {
+					fresh = append(fresh, h)
+				}
+			}
+			return fresh, all, nil
+		})
+		botRunner.SetPriceFetcher(func(fetchCtx context.Context, b *domain.Bot) (float64, string, bool, error) {
+			if b == nil || (domain.TriggerConditionType(b.ConditionType) != domain.ConditionPriceAbove && domain.TriggerConditionType(b.ConditionType) != domain.ConditionPriceBelow) {
+				return 0, "", false, nil
+			}
+			t := &domain.Trigger{
+				ID: b.ID, UserID: b.UserID, Title: b.Title, Query: b.Query,
+				Category: domain.TriggerCategory(b.Category), ConditionType: domain.TriggerConditionType(b.ConditionType),
+			}
+			items, err := ai.RouteTriggerSource(t).Fetch(fetchCtx, t)
+			if err != nil {
+				return 0, "", false, err
+			}
+			for _, it := range items {
+				if v, ok := service.ParseMoneyValue(it.Value); ok {
+					return v, it.Value, true, nil
+				}
+			}
+			return 0, "", false, nil
+		})
+	}
 	botChatSvc := service.NewBotChatService(botRepo, triggerRepo, convRepo, cat, botRuntime, botRunner)
 
 	botHandler := handler.NewBotHandler(db, botRepo, cat)
@@ -100,6 +157,12 @@ func setupBotSubsystem(
 		if agentSys.AIProviderSvc != nil {
 			botHandler.SetAIProviderService(agentSys.AIProviderSvc)
 		}
+		if agentSys.ToolsetRegistry != nil {
+			botHandler.SetToolsetRegistry(agentSys.ToolsetRegistry)
+		}
+		if agentSys.ConversationStore != nil {
+			botHandler.SetConversationStore(agentSys.ConversationStore)
+		}
 	}
-	return botHandler
+	return botHandler, botRunner
 }

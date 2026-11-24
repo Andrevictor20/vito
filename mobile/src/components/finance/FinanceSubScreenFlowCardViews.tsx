@@ -101,6 +101,7 @@ export const CashFlowSubView: React.FC<SubViewCommonProps> = ({
             income={monthlySeries.income}
             expenses={monthlySeries.expenses}
             labels={monthlySeries.labels}
+            isPrivacyHidden={isPrivacyHidden}
           />
           <View style={localStyles.flowLegendRow}>
             <View style={localStyles.flowLegendItem}>

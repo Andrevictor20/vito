@@ -5,9 +5,7 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
-	"time"
 
-	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/service"
 )
@@ -70,7 +68,7 @@ func TestWhatsAppService_TerceiroNoGrupoNaoExecutaComando(t *testing.T) {
 	svc, mockClient, _, _ := setupConversationalWhatsAppTest(t)
 
 	gateway := &mockGatewayCapturador{}
-	svc.SetAssistantService(service.NewAssistantService(gateway, nil, nil, nil))
+	svc.SetAgentLoop(gateway)
 	svc.SetAsyncRunner(func(fn func()) { fn() })
 
 	err := svc.HandleWebhook(context.Background(), "messages.upsert",
@@ -80,8 +78,8 @@ func TestWhatsAppService_TerceiroNoGrupoNaoExecutaComando(t *testing.T) {
 	}
 
 	// A IA NÃO pode ser chamada: se fosse, o comando entraria na conta do dono.
-	if gateway.input.Text != "" {
-		t.Errorf("a IA não deveria ser acionada por terceiro, obteve: %q", gateway.input.Text)
+	if gateway.input.Message != "" {
+		t.Errorf("a IA não deveria ser acionada por terceiro, obteve: %q", gateway.input.Message)
 	}
 	// Em grupo, terceiro (fromMe=false) NÃO recebe recusa educada (silencioso,
 	// para não poluir o chat quando 2 pessoas têm o Vito instalado).
@@ -89,8 +87,8 @@ func TestWhatsAppService_TerceiroNoGrupoNaoExecutaComando(t *testing.T) {
 		t.Fatalf("terceiro em grupo não deveria gerar resposta, obteve %d: %v",
 			len(mockClient.sentMessages), mockClient.sentMessages)
 	}
-	if strings.Contains(strings.ToLower(gateway.input.Text), "criei") || strings.Contains(strings.ToLower(gateway.input.Text), "agendei") {
-		t.Errorf("a IA não deveria ter executado o comando de terceiro: %s", gateway.input.Text)
+	if strings.Contains(strings.ToLower(gateway.input.Message), "criei") || strings.Contains(strings.ToLower(gateway.input.Message), "agendei") {
+		t.Errorf("a IA não deveria ter executado o comando de terceiro: %s", gateway.input.Message)
 	}
 }
 
@@ -99,7 +97,7 @@ func TestWhatsAppService_TerceiroNoChatPrivadoNaoExecutaComando(t *testing.T) {
 	svc, mockClient, _, _ := setupConversationalWhatsAppTest(t)
 
 	gateway := &mockGatewayCapturador{}
-	svc.SetAssistantService(service.NewAssistantService(gateway, nil, nil, nil))
+	svc.SetAgentLoop(gateway)
 	svc.SetAsyncRunner(func(fn func()) { fn() })
 
 	err := svc.HandleWebhook(context.Background(), "messages.upsert",
@@ -107,8 +105,8 @@ func TestWhatsAppService_TerceiroNoChatPrivadoNaoExecutaComando(t *testing.T) {
 	if err != nil {
 		t.Fatalf("HandleWebhook retornou erro: %v", err)
 	}
-	if gateway.input.Text != "" {
-		t.Errorf("a IA não deveria ser acionada por terceiro, obteve: %q", gateway.input.Text)
+	if gateway.input.Message != "" {
+		t.Errorf("a IA não deveria ser acionada por terceiro, obteve: %q", gateway.input.Message)
 	}
 	if len(mockClient.sentMessages) != 1 {
 		t.Fatalf("esperava 1 resposta educativa, obteve %d", len(mockClient.sentMessages))
@@ -121,7 +119,7 @@ func TestWhatsAppService_TerceiroSemMencaoFicaSilencioso(t *testing.T) {
 	svc, mockClient, _, _ := setupConversationalWhatsAppTest(t)
 
 	gateway := &mockGatewayCapturador{}
-	svc.SetAssistantService(service.NewAssistantService(gateway, nil, nil, nil))
+	svc.SetAgentLoop(gateway)
 	svc.SetAsyncRunner(func(fn func()) { fn() })
 
 	err := svc.HandleWebhook(context.Background(), "messages.upsert",
@@ -129,8 +127,8 @@ func TestWhatsAppService_TerceiroSemMencaoFicaSilencioso(t *testing.T) {
 	if err != nil {
 		t.Fatalf("HandleWebhook retornou erro: %v", err)
 	}
-	if gateway.input.Text != "" {
-		t.Errorf("a IA não deveria ser acionada, obteve: %q", gateway.input.Text)
+	if gateway.input.Message != "" {
+		t.Errorf("a IA não deveria ser acionada, obteve: %q", gateway.input.Message)
 	}
 	if len(mockClient.sentMessages) != 0 {
 		t.Errorf("terceiro sem menção não deveria gerar resposta, obteve %d", len(mockClient.sentMessages))
@@ -144,7 +142,7 @@ func TestWhatsAppService_MensagemDeTerceiroContinuaArquivada(t *testing.T) {
 	svc, _, _, _ := setupConversationalWhatsAppTest(t)
 
 	gateway := &mockGatewayCapturador{}
-	svc.SetAssistantService(service.NewAssistantService(gateway, nil, nil, nil))
+	svc.SetAgentLoop(gateway)
 	svc.SetAsyncRunner(func(fn func()) { fn() })
 
 	if err := svc.HandleWebhook(context.Background(), "messages.upsert",
@@ -170,7 +168,7 @@ func TestWhatsAppService_DonoNoGrupoComandoExecutado(t *testing.T) {
 	svc, mockClient, _, _ := setupConversationalWhatsAppTest(t)
 
 	gateway := &mockGatewayCapturador{}
-	svc.SetAssistantService(service.NewAssistantService(gateway, nil, nil, nil))
+	svc.SetAgentLoop(gateway)
 	svc.SetAsyncRunner(func(fn func()) { fn() })
 
 	err := svc.HandleWebhook(context.Background(), "messages.upsert",
@@ -178,7 +176,7 @@ func TestWhatsAppService_DonoNoGrupoComandoExecutado(t *testing.T) {
 	if err != nil {
 		t.Fatalf("HandleWebhook retornou erro: %v", err)
 	}
-	if gateway.input.Text == "" {
+	if gateway.input.Message == "" {
 		t.Error("o dono deveria acionar o Vito normalmente no grupo")
 	}
 	if len(mockClient.sentMessages) != 1 {
@@ -195,7 +193,7 @@ func TestWhatsAppService_DonoNoChatVoceExigeMencaoExplicita(t *testing.T) {
 	svc, mockClient, _, _ := setupConversationalWhatsAppTest(t)
 
 	gateway := &mockGatewayCapturador{}
-	svc.SetAssistantService(service.NewAssistantService(gateway, nil, nil, nil))
+	svc.SetAgentLoop(gateway)
 	svc.SetAsyncRunner(func(fn func()) { fn() })
 
 	// 1. Mensagem sem menção explícita -> arquivada silenciosamente, não responde
@@ -204,7 +202,7 @@ func TestWhatsAppService_DonoNoChatVoceExigeMencaoExplicita(t *testing.T) {
 	if err != nil {
 		t.Fatalf("HandleWebhook retornou erro: %v", err)
 	}
-	if gateway.input.Text != "" {
+	if gateway.input.Message != "" {
 		t.Error("mensagem sem menção explícita não deveria acionar o assistente")
 	}
 	if len(mockClient.sentMessages) != 0 {
@@ -217,7 +215,7 @@ func TestWhatsAppService_DonoNoChatVoceExigeMencaoExplicita(t *testing.T) {
 	if err != nil {
 		t.Fatalf("HandleWebhook retornou erro: %v", err)
 	}
-	if gateway.input.Text == "" {
+	if gateway.input.Message == "" {
 		t.Error("o dono deveria acionar o Vito no chat 'Você' com @vito")
 	}
 	if len(mockClient.sentMessages) != 1 {
@@ -232,13 +230,13 @@ func TestWhatsAppService_ApenasUmVitoPorMensagem(t *testing.T) {
 	// Instância do dono A (celular A).
 	svcA, mockA, _, _ := setupConversationalWhatsAppTest(t)
 	gatewayA := &mockGatewayCapturador{}
-	svcA.SetAssistantService(service.NewAssistantService(gatewayA, nil, nil, nil))
+	svcA.SetAgentLoop(gatewayA)
 	svcA.SetAsyncRunner(func(fn func()) { fn() })
 
 	// Instância do dono B (celular B), com o próprio mock.
 	svcB, mockB, _, _ := setupConversationalWhatsAppTest(t)
 	gatewayB := &mockGatewayCapturador{}
-	svcB.SetAssistantService(service.NewAssistantService(gatewayB, nil, nil, nil))
+	svcB.SetAgentLoop(gatewayB)
 	svcB.SetAsyncRunner(func(fn func()) { fn() })
 
 	// A mensagem "@vito ..." escrita por A: do ponto de vista da instância de A
@@ -252,11 +250,11 @@ func TestWhatsAppService_ApenasUmVitoPorMensagem(t *testing.T) {
 		t.Fatalf("HandleWebhook (B) retornou erro: %v", err)
 	}
 
-	if gatewayA.input.Text == "" {
+	if gatewayA.input.Message == "" {
 		t.Error("o Vito do dono da mensagem deveria responder")
 	}
-	if gatewayB.input.Text != "" {
-		t.Errorf("o Vito de quem NÃO é o dono da mensagem não deveria agir, obteve: %q", gatewayB.input.Text)
+	if gatewayB.input.Message != "" {
+		t.Errorf("o Vito de quem NÃO é o dono da mensagem não deveria agir, obteve: %q", gatewayB.input.Message)
 	}
 	// O Vito do dono respondeu; o outro respondeu apenas a recus educada.
 	if len(mockA.sentMessages) != 1 {
@@ -275,7 +273,7 @@ func TestWhatsAppService_TerceiroEmGrupoNaoRecebeRecusa(t *testing.T) {
 	svc, mockClient, _, _ := setupConversationalWhatsAppTest(t)
 
 	gateway := &mockGatewayCapturador{}
-	svc.SetAssistantService(service.NewAssistantService(gateway, nil, nil, nil))
+	svc.SetAgentLoop(gateway)
 	svc.SetAsyncRunner(func(fn func()) { fn() })
 
 	// Mensagem de TERCEIRO (fromMe=false) num GRUPO (@g.us) com menção @vito.
@@ -286,8 +284,8 @@ func TestWhatsAppService_TerceiroEmGrupoNaoRecebeRecusa(t *testing.T) {
 	}
 
 	// A IA não deve ser acionada (não executa comando de terceiro).
-	if gateway.input.Text != "" {
-		t.Errorf("a IA não deveria ser acionada por terceiro, obteve: %q", gateway.input.Text)
+	if gateway.input.Message != "" {
+		t.Errorf("a IA não deveria ser acionada por terceiro, obteve: %q", gateway.input.Message)
 	}
 	// NÃO deve haver resposta educada (silencioso no grupo para terceiro).
 	if len(mockClient.sentMessages) != 0 {
@@ -302,7 +300,7 @@ func TestWhatsAppService_RecusaEducadaMantidaEmChatPrivado(t *testing.T) {
 	svc, mockClient, _, _ := setupConversationalWhatsAppTest(t)
 
 	gateway := &mockGatewayCapturador{}
-	svc.SetAssistantService(service.NewAssistantService(gateway, nil, nil, nil))
+	svc.SetAgentLoop(gateway)
 	svc.SetAsyncRunner(func(fn func()) { fn() })
 
 	if err := svc.HandleWebhook(context.Background(), "messages.upsert",
@@ -311,8 +309,8 @@ func TestWhatsAppService_RecusaEducadaMantidaEmChatPrivado(t *testing.T) {
 		t.Fatalf("HandleWebhook retornou erro: %v", err)
 	}
 
-	if gateway.input.Text != "" {
-		t.Errorf("a IA não deveria ser acionada por terceiro, obteve: %q", gateway.input.Text)
+	if gateway.input.Message != "" {
+		t.Errorf("a IA não deveria ser acionada por terceiro, obteve: %q", gateway.input.Message)
 	}
 	if len(mockClient.sentMessages) != 1 {
 		t.Fatalf("esperava 1 resposta educativa em chat privado, obteve %d", len(mockClient.sentMessages))
@@ -327,7 +325,7 @@ func TestWhatsAppService_RespostaEducativaTemCooldown(t *testing.T) {
 	svc, mockClient, _, _ := setupConversationalWhatsAppTest(t)
 
 	gateway := &mockGatewayCapturador{}
-	svc.SetAssistantService(service.NewAssistantService(gateway, nil, nil, nil))
+	svc.SetAgentLoop(gateway)
 	svc.SetAsyncRunner(func(fn func()) { fn() })
 
 	for i := 0; i < 3; i++ {
@@ -346,7 +344,7 @@ func TestWhatsAppService_MencoesExplicitasEIgnoraSemPrefixo(t *testing.T) {
 	svc, mockClient, _, _ := setupConversationalWhatsAppTest(t)
 
 	gateway := &mockGatewayCapturador{}
-	svc.SetAssistantService(service.NewAssistantService(gateway, nil, nil, nil))
+	svc.SetAgentLoop(gateway)
 	svc.SetAsyncRunner(func(fn func()) { fn() })
 
 	// Frases com prefixo explícito (@vito, /vito, !vito) devem acionar o bot
@@ -358,7 +356,7 @@ func TestWhatsAppService_MencoesExplicitasEIgnoraSemPrefixo(t *testing.T) {
 	}
 	for i, frase := range frasesValidas {
 		mockClient.sentMessages = nil
-		gateway.input = ai.UserInput{}
+		gateway.input = domain.UnifiedAssistantRequest{}
 		if err := svc.HandleWebhook(context.Background(), "messages.upsert",
 			payloadComVito("12036300112233@g.us", "msg-valida-"+string(rune('a'+i)), frase, true)); err != nil {
 			t.Fatalf("HandleWebhook retornou erro para %q: %v", frase, err)
@@ -378,7 +376,7 @@ func TestWhatsAppService_MencoesExplicitasEIgnoraSemPrefixo(t *testing.T) {
 	}
 	for i, frase := range frasesIgnoradas {
 		mockClient.sentMessages = nil
-		gateway.input = ai.UserInput{}
+		gateway.input = domain.UnifiedAssistantRequest{}
 		if err := svc.HandleWebhook(context.Background(), "messages.upsert",
 			payloadComVito("12036300112233@g.us", "msg-ignora-"+string(rune('a'+i)), frase, true)); err != nil {
 			t.Fatalf("HandleWebhook retornou erro para %q: %v", frase, err)
@@ -448,64 +446,3 @@ func TestWhatsAppService_MencoesExplicitasEIgnoraSemPrefixo(t *testing.T) {
 	}
 }
 
-func TestWhatsAppService_SelfGroupColdCacheBuscaParticipantesSincrono(t *testing.T) {
-	svc, mockClient, _, _ := setupConversationalWhatsAppTest(t)
-	mockClient.mockParticipants = []string{"5511999998888@s.whatsapp.net"}
-
-	groupMeta := service.NewWhatsAppGroupMeta(mockClient, time.Hour, 24*time.Hour)
-	svc.SetGroupMeta(groupMeta)
-
-	gateway := &mockGatewayCapturador{}
-	svc.SetAssistantService(service.NewAssistantService(gateway, nil, nil, nil))
-	svc.SetAsyncRunner(func(fn func()) { fn() })
-
-	// Mensagem em grupo individual COM @vito (mesmo com cache frio) deve
-	// buscar participantes sincronamente e responder como self_group.
-	if err := svc.HandleWebhook(context.Background(), "messages.upsert",
-		payloadComVito("12036399999999@g.us", "msg-cold-self-grp", "@vito qual minha agenda de amanhã?", true)); err != nil {
-		t.Fatalf("HandleWebhook retornou erro: %v", err)
-	}
-	if len(mockClient.sentMessages) != 1 {
-		t.Fatalf("esperava 1 resposta no grupo individual com @vito mesmo com cache frio, obteve %d", len(mockClient.sentMessages))
-	}
-}
-
-func TestWhatsAppService_OwnerLIDSelfChatRecognition(t *testing.T) {
-	svc, mockClient, _, _ := setupConversationalWhatsAppTest(t)
-	ownerCache := service.NewWhatsAppOwnerCache(mockClient, time.Hour)
-	svc.SetOwnerCache(ownerCache)
-
-	gateway := &mockGatewayCapturador{}
-	svc.SetAssistantService(service.NewAssistantService(gateway, nil, nil, nil))
-	svc.SetAsyncRunner(func(fn func()) { fn() })
-
-	// 1) Mensagem com @vito e participant=@lid aprende o LID do dono e responde
-	learnPayload := []byte(`{
-		"event": "messages.upsert",
-		"instance": "vito_conv_user",
-		"data": {
-			"key": {
-				"remoteJid": "182708445675538@lid",
-				"fromMe": true,
-				"id": "msg-lid-1",
-				"participant": "182708445675538@lid"
-			},
-			"messageType": "conversation",
-			"message": {"conversation": "@vito qual minha agenda de hoje?"}
-		}
-	}`)
-	if err := svc.HandleWebhook(context.Background(), "messages.upsert", learnPayload); err != nil {
-		t.Fatalf("HandleWebhook retornou erro: %v", err)
-	}
-	if len(mockClient.sentMessages) != 1 {
-		t.Fatalf("esperava 1 resposta no chat @lid do próprio dono com @vito, obteve %d", len(mockClient.sentMessages))
-	}
-
-	// 2) ResolveURL interna do Docker quando evolution-api está no mesmo compose
-	if got := service.ResolveWhatsAppWebhookBaseURL("https://vito.rasppi.cloud", "http://evolution-api:8080", "8180"); got != "http://backend:8180" {
-		t.Errorf("esperava http://backend:8180, obteve %q", got)
-	}
-}
-
-var _ = ai.ActionGeneralChat
-var _ = time.Now

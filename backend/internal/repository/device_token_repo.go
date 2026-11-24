@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"database/sql"
 	"time"
 
@@ -19,37 +20,39 @@ func NewDeviceTokenRepository(db *sql.DB) *DeviceTokenRepositorySQLite {
 
 // Save insere ou atualiza um token de dispositivo garantindo isolamento por user_id e exclusividade de hardware.
 func (r *DeviceTokenRepositorySQLite) Save(dt *domain.DeviceToken) error {
-	tx, err := r.db.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
+	return ExecuteQueuedWrite(context.Background(), func() error {
+		tx, err := r.db.Begin()
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
 
-	// 1. Desassocia o token físico de qualquer conta anterior no mesmo aparelho para prevenir push leakage
-	cleanupQuery := `DELETE FROM device_tokens WHERE token = ? AND user_id != ?`
-	if _, err := tx.Exec(cleanupQuery, dt.Token, dt.UserID); err != nil {
-		return err
-	}
+		// 1. Desassocia o token físico de qualquer conta anterior no mesmo aparelho para prevenir push leakage
+		cleanupQuery := `DELETE FROM device_tokens WHERE token = ? AND user_id != ?`
+		if _, err := tx.Exec(cleanupQuery, dt.Token, dt.UserID); err != nil {
+			return err
+		}
 
-	// 2. Insere ou atualiza para o usuário atual
-	query := `
-		INSERT INTO device_tokens (id, user_id, token, platform, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?)
-		ON CONFLICT(user_id, token) DO UPDATE SET
-			platform = excluded.platform,
-			updated_at = excluded.updated_at
-	`
-	now := time.Now().UTC()
-	if dt.CreatedAt.IsZero() {
-		dt.CreatedAt = now
-	}
-	dt.UpdatedAt = now
+		// 2. Insere ou atualiza para o usuário atual
+		query := `
+			INSERT INTO device_tokens (id, user_id, token, platform, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?)
+			ON CONFLICT(user_id, token) DO UPDATE SET
+				platform = excluded.platform,
+				updated_at = excluded.updated_at
+		`
+		now := time.Now().UTC()
+		if dt.CreatedAt.IsZero() {
+			dt.CreatedAt = now
+		}
+		dt.UpdatedAt = now
 
-	if _, err := tx.Exec(query, dt.ID, dt.UserID, dt.Token, dt.Platform, dt.CreatedAt, dt.UpdatedAt); err != nil {
-		return err
-	}
+		if _, err := tx.Exec(query, dt.ID, dt.UserID, dt.Token, dt.Platform, dt.CreatedAt, dt.UpdatedAt); err != nil {
+			return err
+		}
 
-	return tx.Commit()
+		return tx.Commit()
+	})
 }
 
 // FindByUserID recupera todos os tokens de dispositivo associados a um usuário.
@@ -81,6 +84,8 @@ func (r *DeviceTokenRepositorySQLite) FindByUserID(userID string) ([]domain.Devi
 // Delete remove um token de dispositivo específico de um usuário.
 func (r *DeviceTokenRepositorySQLite) Delete(userID, token string) error {
 	query := `DELETE FROM device_tokens WHERE user_id = ? AND token = ?`
-	_, err := r.db.Exec(query, userID, token)
-	return err
+	return ExecuteQueuedWrite(context.Background(), func() error {
+		_, err := r.db.Exec(query, userID, token)
+		return err
+	})
 }

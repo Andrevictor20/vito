@@ -126,14 +126,47 @@ export function useChatMessages(
           content: m.text,
         }));
 
-        const res = await api.assistantChat(text.trim(), {
-          thread_id: activeSessionId,
-          channel: 'app_desktop',
-          history,
-          focus_mode: focusMode,
-          ...(modelOptions?.model_pref ? { model_pref: modelOptions.model_pref } : {}),
-          ...(modelOptions?.effort_pref ? { effort_pref: modelOptions.effort_pref } : {}),
-        });
+        const streamMsgId = `vito-stream-${Date.now()}`;
+        let streamedText = '';
+        let streamedReasoning: string[] = [];
+        const res = await api.assistantChatStream(
+          text.trim(),
+          (delta) => {
+            if (delta.reasoning_delta) {
+              streamedReasoning = [...streamedReasoning, delta.reasoning_delta];
+            }
+            if (delta.text_delta) {
+              streamedText += delta.text_delta;
+            }
+            if (delta.text_delta || delta.reasoning_delta) {
+              setMessages((prev) => {
+                const idx = prev.findIndex((m) => m.id === streamMsgId);
+                const partial: ChatMessage = {
+                  id: streamMsgId,
+                  sender: 'vito',
+                  text: streamedText,
+                  timestamp: new Date().toISOString(),
+                  ...(streamedReasoning.length > 0 ? { reasoning: streamedReasoning } : {}),
+                };
+                if (idx >= 0) {
+                  const copy = [...prev];
+                  copy[idx] = partial;
+                  return copy;
+                }
+                return [...prev, partial];
+              });
+            }
+          },
+          {
+            thread_id: activeSessionId,
+            channel: 'app_desktop',
+            history,
+            focus_mode: focusMode,
+            signal: controller.signal,
+            ...(modelOptions?.model_pref ? { model_pref: modelOptions.model_pref } : {}),
+            ...(modelOptions?.effort_pref ? { effort_pref: modelOptions.effort_pref } : {}),
+          }
+        );
 
         const vitoMsg = buildAssistantMessage('vito', res, 'Instrução processada com sucesso.');
         const withVito = [...withUser, vitoMsg];

@@ -15,76 +15,78 @@ func (r *sqliteFinanceRepo) UpsertTransactionsBatch(ctx context.Context, userID 
 	if len(transactions) == 0 {
 		return nil
 	}
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	stmt, err := tx.PrepareContext(ctx, `
-		INSERT INTO finance_transactions (
-			id, user_id, account_id, pluggy_transaction_id, description,
-			clean_merchant_name, amount, transaction_type, payment_method,
-			category, is_recurring, occurred_at, created_at,
-			installment_number, total_installments, payment_type, mcc, tx_status
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		ON CONFLICT(pluggy_transaction_id) DO UPDATE SET
-			installment_number = excluded.installment_number,
-			total_installments = excluded.total_installments,
-			payment_type = excluded.payment_type,
-			mcc = excluded.mcc,
-			tx_status = excluded.tx_status,
-			description = excluded.description,
-			clean_merchant_name = excluded.clean_merchant_name,
-			amount = excluded.amount,
-			transaction_type = excluded.transaction_type,
-			payment_method = excluded.payment_method,
-			category = excluded.category,
-			is_recurring = excluded.is_recurring,
-			occurred_at = excluded.occurred_at
-		WHERE finance_transactions.user_id = excluded.user_id
-	`)
-	if err != nil {
-		return err
-	}
-	defer stmt.Close()
-
-	now := time.Now().UTC()
-	for _, t := range transactions {
-		id := t.ID
-		if id == "" {
-			id = uuid.NewString()
-		}
-		isRec := 0
-		if t.IsRecurring {
-			isRec = 1
-		}
-		cat := t.Category
-		if cat == "" {
-			cat = "Outros"
-		}
-		accountID, ok, err := resolveTxAccountID(ctx, tx, userID, t)
+	return ExecuteQueuedWrite(ctx, func() error {
+		tx, err := r.db.BeginTx(ctx, nil)
 		if err != nil {
 			return err
 		}
-		if !ok {
-			continue // conta desconhecida: ignora a transação órfã sem derrubar o lote
-		}
-		status := t.Status
-		if status == "" {
-			status = "POSTED"
-		}
-		_, err = stmt.ExecContext(ctx,
-			id, userID, accountID, t.PluggyTransactionID, t.Description,
-			t.CleanMerchantName, t.Amount, t.TransactionType, t.PaymentMethod,
-			cat, isRec, t.OccurredAt.UTC(), now,
-			t.InstallmentNumber, t.TotalInstallments, nullIfEmpty(t.PaymentType), t.MCC, status,
-		)
+		defer tx.Rollback()
+
+		stmt, err := tx.PrepareContext(ctx, `
+			INSERT INTO finance_transactions (
+				id, user_id, account_id, pluggy_transaction_id, description,
+				clean_merchant_name, amount, transaction_type, payment_method,
+				category, is_recurring, occurred_at, created_at,
+				installment_number, total_installments, payment_type, mcc, tx_status
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			ON CONFLICT(pluggy_transaction_id) DO UPDATE SET
+				installment_number = excluded.installment_number,
+				total_installments = excluded.total_installments,
+				payment_type = excluded.payment_type,
+				mcc = excluded.mcc,
+				tx_status = excluded.tx_status,
+				description = excluded.description,
+				clean_merchant_name = excluded.clean_merchant_name,
+				amount = excluded.amount,
+				transaction_type = excluded.transaction_type,
+				payment_method = excluded.payment_method,
+				category = excluded.category,
+				is_recurring = excluded.is_recurring,
+				occurred_at = excluded.occurred_at
+			WHERE finance_transactions.user_id = excluded.user_id
+		`)
 		if err != nil {
 			return err
 		}
-	}
-	return tx.Commit()
+		defer stmt.Close()
+
+		now := time.Now().UTC()
+		for _, t := range transactions {
+			id := t.ID
+			if id == "" {
+				id = uuid.NewString()
+			}
+			isRec := 0
+			if t.IsRecurring {
+				isRec = 1
+			}
+			cat := t.Category
+			if cat == "" {
+				cat = "Outros"
+			}
+			accountID, ok, err := resolveTxAccountID(ctx, tx, userID, t)
+			if err != nil {
+				return err
+			}
+			if !ok {
+				continue // conta desconhecida: ignora a transação órfã sem derrubar o lote
+			}
+			status := t.Status
+			if status == "" {
+				status = "POSTED"
+			}
+			_, err = stmt.ExecContext(ctx,
+				id, userID, accountID, t.PluggyTransactionID, t.Description,
+				t.CleanMerchantName, t.Amount, t.TransactionType, t.PaymentMethod,
+				cat, isRec, t.OccurredAt.UTC(), now,
+				t.InstallmentNumber, t.TotalInstallments, nullIfEmpty(t.PaymentType), t.MCC, status,
+			)
+			if err != nil {
+				return err
+			}
+		}
+		return tx.Commit()
+	})
 }
 
 func (r *sqliteFinanceRepo) ListTransactions(ctx context.Context, userID string, limit, offset int) ([]domain.FinanceTransaction, error) {

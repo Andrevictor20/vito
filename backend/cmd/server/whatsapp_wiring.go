@@ -35,7 +35,6 @@ func setupWhatsAppAssistant(
 	waRepo domain.WhatsAppRepository,
 	evoClient service.EvolutionAPIClient,
 	waSvc *service.WhatsAppService,
-	astSvc *service.AssistantService,
 	notifSvc *service.NotificationService,
 	accountCleanupWorker *service.AccountCleanupWorker,
 	visionProvider ai.ImageDescriber,
@@ -71,11 +70,6 @@ func setupWhatsAppAssistant(
 	waSvc.SetOwnerCache(ownerCache)
 	waSvc.SetContactsCache(contactsCache)
 	waSvc.SetContextDebugLog(cfg.WhatsAppContextDebugLog)
-
-	// O assistente (app, desktop e chat "Você") passa a ter o diretório de
-	// contatos e as pendências de resposta do WhatsApp.
-	astSvc.SetWhatsAppDirectory(directory)
-	astSvc.SetWhatsAppSender(waSvc)
 
 	accountCleanupWorker.SetContextService(contextSvc, cfg.WhatsAppContextRetentionDays)
 

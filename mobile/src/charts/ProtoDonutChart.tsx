@@ -33,6 +33,8 @@ export interface ProtoDonutChartProps {
   isDark?: boolean
   reduceMotion?: boolean
   size?: number
+  selectedIndex?: number | null
+  onSelectIndex?: (index: number | null) => void
 }
 
 const PAL_KEYS = ['--blue', '--teal', '--red', '--purple', '--orange'] as const
@@ -41,10 +43,12 @@ const AnimatedDonutSegment: React.FC<{
   dashLen: number
   dashOffset: number
   stroke: string
+  opacity?: number
+  strokeWidth?: number
   delayMs: number
   reduceMotion: boolean
   animKey: string
-}> = ({ dashLen, dashOffset, stroke, delayMs, reduceMotion, animKey }) => {
+}> = ({ dashLen, dashOffset, stroke, opacity = 1, strokeWidth = DONUT_STROKE, delayMs, reduceMotion, animKey }) => {
   const progress = useSharedValue(reduceMotion ? 1 : 0)
 
   useEffect(() => {
@@ -80,7 +84,8 @@ const AnimatedDonutSegment: React.FC<{
       r={DONUT_R}
       fill="none"
       stroke={stroke}
-      strokeWidth={DONUT_STROKE}
+      strokeOpacity={opacity}
+      strokeWidth={strokeWidth}
       animatedProps={animatedProps}
     />
   )
@@ -94,6 +99,8 @@ export const ProtoDonutChart: React.FC<ProtoDonutChartProps> = ({
   isDark = false,
   reduceMotion = false,
   size = DONUT_SIZE,
+  selectedIndex = null,
+  onSelectIndex,
 }) => {
   const enterKey = useScreenEnterKey()
   const segments = computeDonutSegments(data)
@@ -117,15 +124,20 @@ export const ProtoDonutChart: React.FC<ProtoDonutChartProps> = ({
         <G rotation={-90} origin="60, 60">
           {segments.map((seg, idx) => {
             const stroke = seg.color ?? token(PAL_KEYS[seg.colorIndex], isDark)
+            const hasSel = selectedIndex !== null && selectedIndex !== undefined && selectedIndex >= 0
+            const isSel = hasSel && selectedIndex === idx
             return (
               <AnimatedDonutSegment
                 key={`${seg.label}-${idx}`}
                 dashLen={seg.dashArray[0]}
                 dashOffset={seg.dashOffset}
                 stroke={stroke}
+                opacity={hasSel ? (isSel ? 1 : 0.32) : 1}
+                strokeWidth={isSel ? DONUT_STROKE + 2.5 : DONUT_STROKE}
                 delayMs={DONUT_STAGGER_BASE_MS + idx * DONUT_STAGGER_STEP_MS}
                 reduceMotion={reduceMotion}
                 animKey={animKey}
+                {...(onSelectIndex ? {} : {})}
               />
             )
           })}

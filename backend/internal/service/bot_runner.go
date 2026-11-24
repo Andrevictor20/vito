@@ -34,6 +34,7 @@ type BotRunner struct {
 	sem             chan struct{}
 	deltaFetcher    func(ctx context.Context, b *domain.Bot) (fresh []string, all []string, err error)
 	priceFetcher    func(ctx context.Context, b *domain.Bot) (value float64, display string, ok bool, err error)
+	appChecker      func(ctx context.Context, userID string) map[string]bool
 }
 
 // NewBotRunner instancia o executor autônomo de Bots com semáforo de concorrência = 2.
@@ -66,6 +67,11 @@ func (r *BotRunner) SetDeltaFetcher(fn func(ctx context.Context, b *domain.Bot) 
 // SetPriceFetcher configura o fast-path determinístico de preço-alvo pré-LLM.
 func (r *BotRunner) SetPriceFetcher(fn func(ctx context.Context, b *domain.Bot) (value float64, display string, ok bool, err error)) {
 	r.priceFetcher = fn
+}
+
+// SetAppConnectionChecker configura o verificador de apps conectados para popular `locked` (AC-07).
+func (r *BotRunner) SetAppConnectionChecker(fn func(ctx context.Context, userID string) map[string]bool) {
+	r.appChecker = fn
 }
 
 // Evaluate implementa TriggerEvaluator para integração transparente com TriggerWorker.
@@ -312,13 +318,24 @@ func (r *BotRunner) buildExecutionInputs(bot *domain.Bot) (
 	connected []string,
 	locked []string,
 ) {
+	var connApps map[string]bool
+	if r.appChecker != nil && bot != nil {
+		connApps = r.appChecker(context.Background(), bot.UserID)
+	}
 	policies = make(map[string]domain.ActionPolicy, len(bot.Actions))
 	for _, a := range bot.Actions {
 		policies[a.ActionKey] = a.Policy
-		if a.Policy != domain.ActionPolicyOff {
-			allowedKeys = append(allowedKeys, a.ActionKey)
-			connected = append(connected, fmt.Sprintf("%s (%s)", a.ActionKey, a.Policy))
+		if a.Policy == domain.ActionPolicyOff {
+			continue
 		}
+		if spec, ok := domain.ActionCatalog[a.ActionKey]; ok && spec.AppKey != "" && connApps != nil {
+			if isConnected, known := connApps[spec.AppKey]; known && !isConnected {
+				locked = append(locked, fmt.Sprintf("%s (app '%s' desconectado)", a.ActionKey, spec.AppKey))
+				continue
+			}
+		}
+		allowedKeys = append(allowedKeys, a.ActionKey)
+		connected = append(connected, fmt.Sprintf("%s (%s)", a.ActionKey, a.Policy))
 	}
 	if r.catalog != nil {
 		for _, bs := range bot.Skills {

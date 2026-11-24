@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/andrevmp/vito/backend/internal/ai"
+	"github.com/andrevmp/vito/backend/internal/ai/adkengine"
 	"github.com/andrevmp/vito/backend/internal/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/handler"
@@ -67,6 +68,17 @@ func setupStreamHandlerTest(t *testing.T) (*handler.AssistantStreamHandler, stri
 	gate := service.NewConfirmationGateService(db)
 	reg := toolsets.NewToolsetsRegistry()
 	loop := service.NewAgentLoop(router, reg, guard, gate, convRepo, nil)
+	facade, fErr := adkengine.NewADKLoopFacade(adkengine.FacadeConfig{
+		Router:           router,
+		Registry:         reg,
+		ScopeGuard:       guard,
+		ConfirmationGate: gate,
+		ConvRepo:         convRepo,
+	})
+	if fErr != nil {
+		t.Fatalf("NewADKLoopFacade falhou: %v", fErr)
+	}
+	loop.SetEngine(facade)
 
 	return handler.NewAssistantStreamHandler(loop), userID
 }
@@ -308,6 +320,17 @@ func TestAssistantStreamHandler_AudioChat_CleansMarkdownAndIsolatesThread(t *tes
 	gate := service.NewConfirmationGateService(db)
 	reg := toolsets.NewToolsetsRegistry()
 	loop := service.NewAgentLoop(router, reg, guard, gate, convRepo, nil)
+	facade, fErr := adkengine.NewADKLoopFacade(adkengine.FacadeConfig{
+		Router:           router,
+		Registry:         reg,
+		ScopeGuard:       guard,
+		ConfirmationGate: gate,
+		ConvRepo:         convRepo,
+	})
+	if fErr != nil {
+		t.Fatalf("NewADKLoopFacade falhou: %v", fErr)
+	}
+	loop.SetEngine(facade)
 	loop.SetUserRepositories(userRepo, nil)
 
 	h := handler.NewAssistantStreamHandler(loop)

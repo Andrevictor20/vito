@@ -20,7 +20,5 @@ func (s *Server) registerAIRoutes(protected chi.Router) {
 	}
 	if s.botHandler != nil {
 		protected.Patch("/bots/{id}/model", s.botHandler.UpdateBotModelPref)
-	} else if s.triggerHandler != nil {
-		protected.Patch("/bots/{id}/model", s.triggerHandler.UpdateBotModelPref)
 	}
 }

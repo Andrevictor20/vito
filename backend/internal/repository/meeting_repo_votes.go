@@ -72,11 +72,13 @@ func (r *MeetingRepositorySQLite) AddParticipant(ctx context.Context, p *domain.
 			id, meeting_id, name, contact_info, vito_user_id, responded_at, created_at
 		) VALUES (?, ?, ?, ?, ?, ?, ?)
 	`
-	_, err := r.db.ExecContext(ctx, query,
-		p.ID, p.MeetingID, p.Name, p.ContactInfo, p.VitoUserID,
-		p.RespondedAt.UTC(), p.CreatedAt.UTC(),
-	)
-	return err
+	return ExecuteQueuedWrite(ctx, func() error {
+		_, err := r.db.ExecContext(ctx, query,
+			p.ID, p.MeetingID, p.Name, p.ContactInfo, p.VitoUserID,
+			p.RespondedAt.UTC(), p.CreatedAt.UTC(),
+		)
+		return err
+	})
 }
 
 func (r *MeetingRepositorySQLite) ListParticipants(ctx context.Context, meetingID string) ([]domain.MeetingParticipant, error) {
@@ -107,37 +109,39 @@ func (r *MeetingRepositorySQLite) ListParticipants(ctx context.Context, meetingI
 }
 
 func (r *MeetingRepositorySQLite) RecordVote(ctx context.Context, vote *domain.MeetingVote) error {
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	now := time.Now().UTC()
-	if vote.CreatedAt.IsZero() {
-		vote.CreatedAt = now
-	}
-
-	queryVote := `
-		INSERT INTO meeting_votes (id, meeting_id, slot_id, participant_id, created_at)
-		VALUES (?, ?, ?, ?, ?)
-	`
-	_, err = tx.ExecContext(ctx, queryVote, vote.ID, vote.MeetingID, vote.SlotID, vote.ParticipantID, vote.CreatedAt.UTC())
-	if err != nil {
-		if strings.Contains(err.Error(), "UNIQUE") {
-			return domain.ErrParticipantAlreadyVoted
+	return ExecuteQueuedWrite(ctx, func() error {
+		tx, err := r.db.BeginTx(ctx, nil)
+		if err != nil {
+			return err
 		}
-		return err
-	}
+		defer tx.Rollback()
 
-	// Incrementa votes_count no slot
-	querySlot := `UPDATE meeting_slots SET votes_count = votes_count + 1 WHERE id = ?`
-	_, err = tx.ExecContext(ctx, querySlot, vote.SlotID)
-	if err != nil {
-		return err
-	}
+		now := time.Now().UTC()
+		if vote.CreatedAt.IsZero() {
+			vote.CreatedAt = now
+		}
 
-	return tx.Commit()
+		queryVote := `
+			INSERT INTO meeting_votes (id, meeting_id, slot_id, participant_id, created_at)
+			VALUES (?, ?, ?, ?, ?)
+		`
+		_, err = tx.ExecContext(ctx, queryVote, vote.ID, vote.MeetingID, vote.SlotID, vote.ParticipantID, vote.CreatedAt.UTC())
+		if err != nil {
+			if strings.Contains(err.Error(), "UNIQUE") {
+				return domain.ErrParticipantAlreadyVoted
+			}
+			return err
+		}
+
+		// Incrementa votes_count no slot
+		querySlot := `UPDATE meeting_slots SET votes_count = votes_count + 1 WHERE id = ?`
+		_, err = tx.ExecContext(ctx, querySlot, vote.SlotID)
+		if err != nil {
+			return err
+		}
+
+		return tx.Commit()
+	})
 }
 
 func (r *MeetingRepositorySQLite) ListVotesByMeeting(ctx context.Context, meetingID string) ([]domain.MeetingVote, error) {
@@ -177,13 +181,11 @@ func (r *MeetingRepositorySQLite) ConfirmMeetingSlot(ctx context.Context, meetin
 			updated_at = ?
 		WHERE id = ?
 	`
-	res, err := r.db.ExecContext(ctx, query,
-		domain.MeetingStatusConfirmed, slotID, startAt.UTC(), endAt.UTC(), now, meetingID,
-	)
-	if err != nil {
-		return err
-	}
-	rows, err := res.RowsAffected()
+	rows, err := ExecuteQueuedWriteRows(ctx, func() (sql.Result, error) {
+		return r.db.ExecContext(ctx, query,
+			domain.MeetingStatusConfirmed, slotID, startAt.UTC(), endAt.UTC(), now, meetingID,
+		)
+	})
 	if err != nil {
 		return err
 	}

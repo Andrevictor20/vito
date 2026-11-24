@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/andrevmp/vito/backend/internal/ai"
+	"github.com/andrevmp/vito/backend/internal/ai/adkengine"
 	"github.com/andrevmp/vito/backend/internal/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/handler/middleware"
@@ -324,6 +325,13 @@ func TestPlano02_ConfirmHandler_RejectRecordsImplicitFeedback(t *testing.T) {
 	}
 
 	loop := service.NewAgentLoop(nil, nil, service.NewScopeGuard(), gate, convRepo, nil)
+	if facade, fErr := adkengine.NewADKLoopFacade(adkengine.FacadeConfig{
+		ScopeGuard:       service.NewScopeGuard(),
+		ConfirmationGate: gate,
+		ConvRepo:         convRepo,
+	}); fErr == nil {
+		loop.SetEngine(facade)
+	}
 	h := NewAssistantStreamHandler(loop)
 
 	body, _ := json.Marshal(map[string]any{

@@ -16,7 +16,6 @@ import (
 // VerticalSearchSubagent encapsula busca factual isolada via SearXNG ou Gemini Grounding com fallback para RSS.
 type VerticalSearchSubagent struct {
 	searxng    *SearXNGClient
-	geminiProv *GeminiProvider
 	apiKey     string
 	model      string
 	baseURL    string
@@ -24,10 +23,9 @@ type VerticalSearchSubagent struct {
 }
 
 // NewVerticalSearchSubagent cria um novo subagente de busca factual.
-func NewVerticalSearchSubagent(searxng *SearXNGClient, geminiProv *GeminiProvider) *VerticalSearchSubagent {
+func NewVerticalSearchSubagent(searxng *SearXNGClient, _ ...any) *VerticalSearchSubagent {
 	return &VerticalSearchSubagent{
 		searxng:    searxng,
-		geminiProv: geminiProv,
 		httpClient: &http.Client{Timeout: 10 * time.Second},
 	}
 }
@@ -112,7 +110,7 @@ func (s *VerticalSearchSubagent) Search(ctx context.Context, query, category str
 	}
 
 	// 2. Tentar Gemini Grounding se configurado
-	if s.geminiProv != nil || s.apiKey != "" {
+	if s.apiKey != "" {
 		sources, summary, err := s.searchViaGeminiGrounding(ctx, cleanQuery)
 		if err == nil && len(sources) > 0 {
 			return sources, summary, nil
@@ -145,17 +143,6 @@ func (s *VerticalSearchSubagent) searchViaGeminiGrounding(ctx context.Context, q
 	apiKey := s.apiKey
 	model := s.model
 	baseURL := s.baseURL
-	if s.geminiProv != nil {
-		if apiKey == "" {
-			apiKey = s.geminiProv.apiKey
-		}
-		if model == "" {
-			model = s.geminiProv.model
-		}
-		if baseURL == "" {
-			baseURL = s.geminiProv.baseURL
-		}
-	}
 	if baseURL == "" {
 		baseURL = "https://generativelanguage.googleapis.com"
 	}
@@ -167,12 +154,12 @@ func (s *VerticalSearchSubagent) searchViaGeminiGrounding(ctx context.Context, q
 	}
 
 	prompt := fmt.Sprintf("Pesquise dados reais e atualizados na web brasileira sobre: %s. Resuma os fatos em 2 a 3 frases objetivas.", query)
-	reqBody := geminiRequest{
-		Contents: []geminiContent{
-			{Role: "user", Parts: []geminiPart{{Text: prompt}}},
+	reqBody := map[string]any{
+		"contents": []map[string]any{
+			{"role": "user", "parts": []map[string]string{{"text": prompt}}},
 		},
-		Tools: []geminiTool{
-			{GoogleSearch: &geminiGoogleSearch{}},
+		"tools": []map[string]any{
+			{"googleSearch": map[string]any{}},
 		},
 	}
 	jsonBytes, err := json.Marshal(reqBody)
@@ -198,7 +185,23 @@ func (s *VerticalSearchSubagent) searchViaGeminiGrounding(ctx context.Context, q
 		return nil, "", fmt.Errorf("gemini grounding error %d: %s", resp.StatusCode, string(respBytes))
 	}
 
-	var gResp geminiResponse
+	var gResp struct {
+		Candidates []struct {
+			Content struct {
+				Parts []struct {
+					Text string `json:"text"`
+				} `json:"parts"`
+			} `json:"content"`
+			GroundingMetadata *struct {
+				GroundingChunks []struct {
+					Web struct {
+						URI   string `json:"uri"`
+						Title string `json:"title"`
+					} `json:"web"`
+				} `json:"groundingChunks"`
+			} `json:"groundingMetadata"`
+		} `json:"candidates"`
+	}
 	if err := json.NewDecoder(resp.Body).Decode(&gResp); err != nil {
 		return nil, "", err
 	}

@@ -13,6 +13,7 @@ import (
 	"github.com/andrevmp/vito/backend/internal/handler/middleware"
 	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/andrevmp/vito/backend/internal/service"
+	"github.com/andrevmp/vito/backend/internal/service/toolsets"
 )
 
 // BotHandler expõe os endpoints REST /api/v1/bots (§7 do Plano 04).
@@ -26,6 +27,8 @@ type BotHandler struct {
 	aiProviderSvc *service.AIProviderService
 	appChecker    AppConnectionChecker
 	extraSpecs    []BotAppSpec
+	registry      *toolsets.ToolsetsRegistry
+	convRepo      *repository.ConversationStoreRepository
 }
 
 // NewBotHandler instancia o handler REST de bots.
@@ -47,7 +50,9 @@ func (h *BotHandler) SetBotChatService(c BotChatServicer)            { h.chatSvc
 func (h *BotHandler) SetConfirmationGate(g *service.ConfirmationGateService) { h.confGate = g }
 func (h *BotHandler) SetAIProviderService(s *service.AIProviderService) { h.aiProviderSvc = s }
 func (h *BotHandler) SetAppConnectionChecker(c AppConnectionChecker) { h.appChecker = c }
-func (h *BotHandler) SetExtraAppSpecs(specs []BotAppSpec)            { h.extraSpecs = specs }
+func (h *BotHandler) SetExtraAppSpecs(specs []BotAppSpec)                          { h.extraSpecs = specs }
+func (h *BotHandler) SetToolsetRegistry(reg *toolsets.ToolsetsRegistry)            { h.registry = reg }
+func (h *BotHandler) SetConversationStore(repo *repository.ConversationStoreRepository) { h.convRepo = repo }
 
 // ListBots lista os bots do usuário enriquecidos com pendências, apps, ações e contadores (GET /api/v1/bots).
 func (h *BotHandler) ListBots(w http.ResponseWriter, r *http.Request) {

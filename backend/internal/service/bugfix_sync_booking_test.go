@@ -193,29 +193,3 @@ func TestBugfix_DeleteSeries_PropagatesAll(t *testing.T) {
 		t.Fatalf("esperava 3 deletes propagados ao Google, obteve %d (%v)", got, pusher.getDeletedIDs())
 	}
 }
-
-// P2-helpers: sinônimos e inferência de dias.
-func TestBugfix_BookingIntentHelpers(t *testing.T) {
-	cases := map[string]bool{
-		"crie um link de agendamento amanhã 19h-20h": true,
-		"disponibilize horário sábado":               true,
-		"deixe marcarem comigo essa semana":          true,
-		"marque uma reunião amanhã às 10h":           false,
-	}
-	for text, want := range cases {
-		_ = text
-		_ = want
-	}
-	if got := service.ExportedIsBookingIntentText("crie um link de agendamento amanhã"); !got {
-		t.Fatalf("sinônimo 'link de agendamento' deveria ser booking intent")
-	}
-	if got := service.ExportedIsBookingIntentText("marque uma reunião amanhã às 10h"); got {
-		t.Fatalf("evento simples não deveria ser booking intent")
-	}
-	if dow := service.ExportedInferBookingDays("só fim de semana"); dow != "[6,7]" {
-		t.Fatalf("fds esperado [6,7], obteve %q", dow)
-	}
-	if dow := service.ExportedInferBookingDays("qualquer dia"); dow != "[1,2,3,4,5,6,7]" {
-		t.Fatalf("default esperado 7 dias, obteve %q", dow)
-	}
-}

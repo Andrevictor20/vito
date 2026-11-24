@@ -15,9 +15,6 @@ import { StaggerItem } from '../../theme/vitoMotion';
 import { EventCard } from '../calendar/EventCard';
 import { AgendaWeekStrip } from '../calendar/AgendaWeekStrip';
 import { AgendaSummariesCard } from '../calendar/AgendaSummariesCard';
-import { VitoLoginMark } from '../login/VitoLoginMark';
-import { chatPromptBus } from '../../services/dataSync';
-import { navigateToTab } from '../../navigation/navigationRef';
 import {
   AgendaFilterState,
   DEFAULT_AGENDA_FILTER,
@@ -80,11 +77,9 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
   onOpenSummaries,
   filters: controlledFilters,
   onFiltersChange: controlledOnFiltersChange,
-  onReserveStudyBlock,
 }) => {
   const { colors, isDark } = useTheme();
   const [internalFilters, setInternalFilters] = useState<AgendaFilterState>(DEFAULT_AGENDA_FILTER);
-  const [sugDismissed, setSugDismissed] = useState(false);
 
   const filters = controlledFilters ?? internalFilters;
   const setFilters = controlledOnFiltersChange ?? setInternalFilters;
@@ -117,18 +112,6 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
     dayEvents.length > 0
       ? `${dayEvents.length} ${dayEvents.length > 1 ? 'eventos' : 'evento'}`
       : 'Dia livre';
-
-  const handleStudyBlockReservation = () => {
-    setSugDismissed(true);
-    if (onReserveStudyBlock) {
-      onReserveStudyBlock();
-    }
-  };
-
-  const handleAskVitoFreeDay = () => {
-    chatPromptBus.notify('Tenho um dia livre na minha agenda. O que sugere encaixar?');
-    navigateToTab('chat');
-  };
 
   return (
     <View style={{ flex: 1 }}>
@@ -263,81 +246,6 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
             )}
             </StaggerItem>
 
-            {/* Sugestão Inteligente do Vito (.vsug) */}
-            {isTodaySelected && !sugDismissed && (
-              <StaggerItem index={2}>
-              <View
-                style={[
-                  styles.vsugCard,
-                  {
-                    backgroundColor: colors.bg,
-                    borderColor: colors.line,
-                  },
-                ]}
-              >
-                <VitoLoginMark color={colors.ink} width={28} height={30} />
-                <View style={styles.vsugBody}>
-                  <Text style={[styles.vsugText, { color: colors.ink }]}>
-                    Você está livre depois das 13:00. Quer que eu reserve um bloco de estudo?
-                  </Text>
-                  <View style={styles.vsugButtons}>
-                    <TouchableOpacity
-                      style={[styles.vsugPrimaryBtn, { backgroundColor: colors.ink }]}
-                      onPress={handleStudyBlockReservation}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={[styles.vsugPrimaryBtnText, { color: colors.bg }]}>
-                        Reservar
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[
-                        styles.vsugSecondaryBtn,
-                        { borderColor: colors.line, backgroundColor: 'transparent' },
-                      ]}
-                      onPress={() => setSugDismissed(true)}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={[styles.vsugSecondaryBtnText, { color: colors.ink }]}>
-                        Agora não
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </View>
-              </StaggerItem>
-            )}
-
-            {!isTodaySelected && dayEvents.length === 0 && (
-              <View
-                style={[
-                  styles.vsugCard,
-                  {
-                    backgroundColor: colors.bg,
-                    borderColor: colors.line,
-                  },
-                ]}
-              >
-                <VitoLoginMark color={colors.ink} width={28} height={30} />
-                <View style={styles.vsugBody}>
-                  <Text style={[styles.vsugText, { color: colors.ink }]}>
-                    Dia livre. Quer que eu encaixe algo, como uma reunião ou uma tarefa?
-                  </Text>
-                  <View style={styles.vsugButtons}>
-                    <TouchableOpacity
-                      style={[styles.vsugPrimaryBtn, { backgroundColor: colors.ink }]}
-                      onPress={handleAskVitoFreeDay}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={[styles.vsugPrimaryBtnText, { color: colors.bg }]}>
-                        Pedir ao Vito
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </View>
-            )}
-
             {/* Card Resumos da semana (.vsum do protótipo) */}
             {onOpenSummaries && (
               <StaggerItem index={3}>
@@ -391,13 +299,5 @@ const styles = StyleSheet.create({
   emptyFilterTitle: { fontFamily: tokens.typography.family.semibold, fontSize: 15 },
   emptyFilterSub: { fontFamily: tokens.typography.family.regular, fontSize: 13, marginTop: 2 },
   clearLinkText: { fontFamily: tokens.typography.family.semibold, fontSize: 13 },
-  vsugCard: { flexDirection: 'row', gap: 12, alignItems: 'flex-start', borderWidth: 1, borderRadius: 16, paddingVertical: 12, paddingHorizontal: 14, marginVertical: 10, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8 },
-  vsugBody: { flex: 1 },
-  vsugText: { fontFamily: tokens.typography.family.medium, fontSize: 14, lineHeight: 20 },
-  vsugButtons: { flexDirection: 'row', gap: 8, marginTop: 10 },
-  vsugPrimaryBtn: { height: 32, borderRadius: 16, paddingHorizontal: 14, alignItems: 'center', justifyContent: 'center' },
-  vsugPrimaryBtnText: { fontFamily: tokens.typography.family.semibold, fontSize: 13 },
-  vsugSecondaryBtn: { height: 32, borderRadius: 16, paddingHorizontal: 14, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
-  vsugSecondaryBtnText: { fontFamily: tokens.typography.family.semibold, fontSize: 13 },
   nextSection: { marginTop: 10 },
 });

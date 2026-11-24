@@ -11,6 +11,7 @@ import (
 	"google.golang.org/adk/v2/agent/workflowagents/parallelagent"
 	"google.golang.org/adk/v2/agent/workflowagents/sequentialagent"
 	"google.golang.org/adk/v2/model"
+	"google.golang.org/adk/v2/plugin"
 	"google.golang.org/adk/v2/runner"
 	"google.golang.org/adk/v2/session"
 	"google.golang.org/adk/v2/tool"
@@ -115,12 +116,13 @@ func BuildCrossDomainBriefingWorkflow(llm model.LLM, bridge *ToolsetBridge) (*Cr
 // CrossDomainBriefingWorkflowRunner adapta CrossDomainBriefingWorkflow para service.BriefingWorkflowRunner,
 // executando ParallelAgent + SequentialAgent via adk/v2/runner.Runner.
 type CrossDomainBriefingWorkflowRunner struct {
-	workflow  *CrossDomainBriefingWorkflow
-	adkRunner *runner.Runner
+	workflow   *CrossDomainBriefingWorkflow
+	adkRunner  *runner.Runner
+	sessionSvc session.Service
 }
 
 // NewCrossDomainBriefingWorkflowRunner instancia o workflow cross-domain e um Runner ADK dedicado.
-func NewCrossDomainBriefingWorkflowRunner(llm model.LLM, bridge *ToolsetBridge) (*CrossDomainBriefingWorkflowRunner, error) {
+func NewCrossDomainBriefingWorkflowRunner(llm model.LLM, bridge *ToolsetBridge, guardrails ...*GuardrailPlugin) (*CrossDomainBriefingWorkflowRunner, error) {
 	if llm == nil {
 		return nil, fmt.Errorf("llm não pode ser nil para o briefing cross-domain")
 	}
@@ -128,18 +130,29 @@ func NewCrossDomainBriefingWorkflowRunner(llm model.LLM, bridge *ToolsetBridge) 
 	if err != nil {
 		return nil, err
 	}
+	sessSvc := session.InMemoryService()
+	var plugins []*plugin.Plugin
+	if len(guardrails) > 0 && guardrails[0] != nil {
+		if p, pErr := guardrails[0].BuildADKPlugin(); pErr == nil && p != nil {
+			plugins = append(plugins, p)
+		}
+	}
 	r, err := runner.New(runner.Config{
 		AppName:           "vito_briefing",
 		Agent:             wf.SequentialPipeline,
-		SessionService:    session.InMemoryService(),
+		SessionService:    sessSvc,
 		AutoCreateSession: true,
+		PluginConfig: runner.PluginConfig{
+			Plugins: plugins,
+		},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("falha ao criar runner para briefing cross-domain: %w", err)
 	}
 	return &CrossDomainBriefingWorkflowRunner{
-		workflow:  wf,
-		adkRunner: r,
+		workflow:   wf,
+		adkRunner:  r,
+		sessionSvc: sessSvc,
 	}, nil
 }
 
@@ -153,6 +166,20 @@ func (r *CrossDomainBriefingWorkflowRunner) GenerateBriefing(ctx context.Context
 		userID = "briefing_user"
 	}
 	sessionID := fmt.Sprintf("briefing_%s_%s_%d", userID, input.Date, time.Now().UnixNano())
+	ctx = WithTurnExecutionMeta(ctx, &TurnExecutionMeta{
+		UserID:   userID,
+		ThreadID: sessionID,
+		Channel:  "briefing",
+	})
+	if r.sessionSvc != nil {
+		defer func() {
+			_ = r.sessionSvc.Delete(context.Background(), &session.DeleteRequest{
+				AppName:   "vito_briefing",
+				UserID:    userID,
+				SessionID: sessionID,
+			})
+		}()
+	}
 	prompt := fmt.Sprintf(
 		"Gere um briefing matinal executivo conciso (máximo 2 frases, sem emojis) para %s (%s) na data %s. Compromissos hoje: %d. Tarefas pendentes: %d. Resumo base: %s",
 		input.UserName, userID, input.Date, input.EventsCount, input.TodosCount, input.BaseSummary,

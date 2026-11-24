@@ -3,10 +3,13 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
+	"time"
 
 	"github.com/andrevmp/vito/backend/internal/handler/middleware"
 	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 )
 
 // MemoryHandler expõe a API para o usuário inspecionar e gerenciar memórias ("O que o Vito sabe sobre mim").
@@ -123,4 +126,49 @@ func (h *MemoryHandler) DeleteFact(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]bool{"success": true})
+}
+
+// CreateFact cria um novo fato atômico na memória do usuário (#s-memory).
+func (h *MemoryHandler) CreateFact(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok || userID == "" {
+		http.Error(w, `{"error":"não autorizado"}`, http.StatusUnauthorized)
+		return
+	}
+
+	var req struct {
+		Category string `json:"category"`
+		Content  string `json:"content"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error":"payload inválido"}`, http.StatusBadRequest)
+		return
+	}
+	content := strings.TrimSpace(req.Content)
+	if content == "" {
+		http.Error(w, `{"error":"content obrigatório"}`, http.StatusBadRequest)
+		return
+	}
+	category := strings.TrimSpace(req.Category)
+	if category == "" {
+		category = "preference"
+	}
+
+	fact := &repository.UserMemoryFact{
+		ID:         uuid.New().String(),
+		UserID:     userID,
+		Category:   category,
+		Content:    content,
+		Confidence: 1.0,
+		CreatedAt:  time.Now().UTC(),
+		UpdatedAt:  time.Now().UTC(),
+	}
+	if err := h.repo.CreateAtomicFact(r.Context(), fact); err != nil {
+		http.Error(w, `{"error":"falha ao salvar fato"}`, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	_ = json.NewEncoder(w).Encode(fact)
 }

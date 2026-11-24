@@ -7,10 +7,26 @@ import (
 	"sync"
 	"time"
 
+	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/repository"
-	"github.com/andrevmp/vito/backend/internal/service/assistant"
 )
+
+// FormatScheduleLine formata um compromisso da agenda em uma linha legível para o contexto Nível 1.
+func FormatScheduleLine(ev domain.Event, loc *time.Location) string {
+	evStart, evEnd := ev.StartAt.In(loc), ev.EndAt.In(loc)
+	line := fmt.Sprintf("%s (%s, das %s às %s): %s",
+		evStart.Format("02/01/2006"),
+		ai.WeekdayPT(evStart.Weekday()),
+		evStart.Format("15:04"),
+		evEnd.Format("15:04"),
+		ev.Title,
+	)
+	if strings.TrimSpace(ev.ID) != "" {
+		line += fmt.Sprintf(" [ID: %s]", strings.TrimSpace(ev.ID))
+	}
+	return line
+}
 
 // FinanceSnapshotProvider fornece o resumo enxuto Safe-to-Spend e faturas próximas (Plano 05) ao contexto Nível 1.
 type FinanceSnapshotProvider interface {
@@ -217,7 +233,7 @@ func (e *AssistantContextEnricher) BuildLevel1Context(ctx context.Context, userI
 						limit = len(events)
 					}
 					for _, ev := range events[:limit] {
-						line := assistant.FormatScheduleLine(ev, loc)
+						line := FormatScheduleLine(ev, loc)
 						scheduleLines = append(scheduleLines, line)
 					}
 				}

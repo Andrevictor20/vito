@@ -85,11 +85,18 @@ func ApplyBeforeModelConfig(
 		llmReq.Config = &genai.GenerateContentConfig{}
 	}
 
-	// 1. Separação de Prefixo Estático Cacheável + Sufixo Dinâmico
-	if staticPrompt != "" || volatileContext != "" {
+	// 1. Separação de Prefixo Estático Cacheável + Instrução do Sub-Agente ADK + Sufixo Dinâmico
+	if staticPrompt != "" || volatileContext != "" || (llmReq.Config.SystemInstruction != nil && len(llmReq.Config.SystemInstruction.Parts) > 0) {
 		var parts []*genai.Part
 		if staticPrompt != "" {
 			parts = append(parts, genai.NewPartFromText(staticPrompt))
+		}
+		if llmReq.Config.SystemInstruction != nil {
+			for _, p := range llmReq.Config.SystemInstruction.Parts {
+				if p != nil {
+					parts = append(parts, p)
+				}
+			}
 		}
 		if volatileContext != "" {
 			parts = append(parts, genai.NewPartFromText(volatileContext))

@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/domain"
 )
 
@@ -235,7 +234,7 @@ func (s *WhatsAppService) processInboundItem(ctx context.Context, instanceName, 
 		threadID = s.recordBridgeIncoming(ctx, integration.UserID, msg.RemoteJID, rawText)
 	}
 
-	if s.agentLoop == nil && s.assistantSvc == nil {
+	if s.agentLoop == nil {
 		return nil
 	}
 
@@ -328,11 +327,6 @@ func (s *WhatsAppService) processPendingMessage(pending *pendingMessage) error {
 	}
 
 	convKey := fmt.Sprintf("%s:%s", instanceName, msg.RemoteJID)
-	history := s.memory.GetHistory(convKey)
-	if len(window) > 0 {
-		// A janela é superset do histórico da conversa: evita duplicar tokens no prompt.
-		history = nil
-	}
 
 	ownerJID := ""
 	if s.ownerCache != nil {
@@ -374,24 +368,6 @@ func (s *WhatsAppService) processPendingMessage(pending *pendingMessage) error {
 				replyText = adkResp.Message
 			}
 			modelUsed = adkResp.Telemetry.ProviderUsed
-		}
-	} else if s.assistantSvc != nil {
-		var resp *AssistantResponse
-		resp, err = s.assistantSvc.Process(ctx, integration.UserID, ai.UserInput{
-			Text:                 rawText,
-			ConversationHistory:  history,
-			QuotedContext:        quoted,
-			ConversationWindow:   window,
-			WhatsAppPrivateScope: privateScope,
-			ImageB64:             imageB64,
-			ImageMime:            imageMime,
-		})
-		if resp != nil {
-			replyText = resp.Reply
-			if replyText == "" {
-				replyText = resp.Message
-			}
-			modelUsed = resp.ProviderUsed
 		}
 	}
 	if err != nil {

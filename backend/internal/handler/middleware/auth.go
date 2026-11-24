@@ -20,19 +20,25 @@ const (
 func AuthMiddleware(authSvc *service.AuthService) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			tokenStr := ""
 			authHeader := r.Header.Get("Authorization")
-			if authHeader == "" {
+			if authHeader != "" {
+				parts := strings.SplitN(authHeader, " ", 2)
+				if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
+					http.Error(w, `{"error":"formato de token inválido (esperado: Bearer <token>)"}`, http.StatusUnauthorized)
+					return
+				}
+				tokenStr = parts[1]
+			} else if qToken := strings.TrimSpace(r.URL.Query().Get("token")); qToken != "" {
+				tokenStr = qToken
+			}
+
+			if tokenStr == "" {
 				http.Error(w, `{"error":"cabeçalho de autorização ausente"}`, http.StatusUnauthorized)
 				return
 			}
 
-			parts := strings.SplitN(authHeader, " ", 2)
-			if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
-				http.Error(w, `{"error":"formato de token inválido (esperado: Bearer <token>)"}`, http.StatusUnauthorized)
-				return
-			}
-
-			claims, err := authSvc.ValidateToken(parts[1])
+			claims, err := authSvc.ValidateToken(tokenStr)
 			if err != nil {
 				http.Error(w, `{"error":"token inválido ou expirado"}`, http.StatusUnauthorized)
 				return

@@ -55,16 +55,9 @@ func doProviderJSONPost(ctx context.Context, client *http.Client, provider, endp
 	}
 	return resp.Body, nil
 }
-func emitStreamPartial(meta *TurnExecutionMeta, yield func(*model.LLMResponse, error) bool, isThought bool, text string) bool {
+func emitStreamPartial(_ *TurnExecutionMeta, yield func(*model.LLMResponse, error) bool, isThought bool, text string) bool {
 	if text == "" {
 		return true
-	}
-	if meta != nil && meta.OnDelta != nil {
-		d := ai.StreamDelta{Type: "text", TextDelta: text}
-		if isThought {
-			d = ai.StreamDelta{Type: "reasoning", ReasoningDelta: text}
-		}
-		_ = meta.OnDelta(d)
 	}
 	return yield(&model.LLMResponse{Partial: true, Content: &genai.Content{Role: genai.RoleModel, Parts: []*genai.Part{{Text: text, Thought: isThought}}}}, nil)
 }

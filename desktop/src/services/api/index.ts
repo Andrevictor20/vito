@@ -3,7 +3,6 @@ import { AuthApi } from './authApi';
 import { CalendarApi } from './calendarApi';
 import { TodosApi } from './todosApi';
 import { ChatApi } from './chatApi';
-import { TriggersApi } from './triggersApi';
 import { BotsApi } from './botsApi';
 import { BookingApi } from './bookingApi';
 import { MeetingsApi } from './meetingsApi';
@@ -27,8 +26,6 @@ import {
   CalendarEvent,
   Todo,
   Subtask,
-  Trigger,
-  TriggerLog,
   BookingType,
   Meeting,
   ConversationSession,
@@ -80,7 +77,6 @@ export class ApiService extends ApiClient {
   public calendarApi = new CalendarApi(this);
   public todosApi = new TodosApi(this);
   public chatApi = new ChatApi(this);
-  public triggersApi = new TriggersApi(this);
   public botsApi = new BotsApi(this);
   public bookingApi = new BookingApi(this);
   public meetingsApi = new MeetingsApi(this);
@@ -183,6 +179,14 @@ export class ApiService extends ApiClient {
   assistantChat(prompt: string, context?: any): Promise<any> {
     return this.chatApi.assistantChat(prompt, context);
   }
+
+  assistantChatStream(
+    prompt: string,
+    onDelta: (delta: { type?: string; text_delta?: string; reasoning_delta?: string; tool_name?: string; done?: boolean }) => void,
+    context?: any
+  ): Promise<any> {
+    return this.chatApi.assistantChatStream(prompt, onDelta, context);
+  }
   assistantConfirm(
     pendingId: string,
     options?: { reject?: boolean; reason?: string; threadId?: string }
@@ -206,47 +210,6 @@ export class ApiService extends ApiClient {
   }
   syncChatSession(session: any, messages: any[]): Promise<any> {
     return this.chatApi.syncChatSession(session, messages);
-  }
-
-  // --- Triggers / Radares ---
-  getTriggers(): Promise<Trigger[]> {
-    return this.triggersApi.getTriggers();
-  }
-  getTrigger(id: string): Promise<Trigger> {
-    return this.triggersApi.getTrigger(id);
-  }
-  createTrigger(input: Partial<Trigger> & { title: string; query: string }): Promise<Trigger> {
-    return this.triggersApi.createTrigger(input);
-  }
-  updateTrigger(id: string, updates: Partial<Trigger>): Promise<Trigger> {
-    return this.triggersApi.updateTrigger(id, updates);
-  }
-  deleteTrigger(id: string): Promise<void> {
-    return this.triggersApi.deleteTrigger(id);
-  }
-  getTriggerLogs(id: string): Promise<TriggerLog[]> {
-    return this.triggersApi.getTriggerLogs(id);
-  }
-  deleteTriggerLog(triggerId: string, logId: string): Promise<void> {
-    return this.triggersApi.deleteTriggerLog(triggerId, logId);
-  }
-  clearTriggerLogs(triggerId: string): Promise<void> {
-    return this.triggersApi.clearTriggerLogs(triggerId);
-  }
-  testTrigger(id: string): Promise<any> {
-    return this.triggersApi.testTrigger(id);
-  }
-  runTrigger(id: string): Promise<TriggerLog> {
-    return this.triggersApi.runTrigger(id);
-  }
-  toggleTrigger(id: string, active?: boolean): Promise<any> {
-    return this.triggersApi.toggleTrigger(id, active ?? true);
-  }
-  getTriggerTemplates(): Promise<any[]> {
-    return this.triggersApi.getTriggerTemplates();
-  }
-  activateTriggerTemplate(templateId: string): Promise<Trigger> {
-    return this.triggersApi.activateTriggerTemplate(templateId);
   }
 
   // --- Booking & Appointments ---
@@ -387,9 +350,6 @@ export class ApiService extends ApiClient {
   }
   get pending(): PendingApi {
     return this.pendingApi;
-  }
-  get triggers(): TriggersApi {
-    return this.triggersApi;
   }
   get calendar(): CalendarApi {
     return this.calendarApi;

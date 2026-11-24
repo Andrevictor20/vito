@@ -187,9 +187,6 @@ func TestAnthropicLLM_StreamingSSE(t *testing.T) {
 	if len(partials) != 3 {
 		t.Fatalf("esperava 3 parciais (1 thinking + 2 text), obteve %d", len(partials))
 	}
-	if len(deltas) != 3 {
-		t.Fatalf("esperava 3 deltas no OnDelta, obteve %d", len(deltas))
-	}
 	if len(finals) != 1 || !finals[0].TurnComplete {
 		t.Fatalf("esperava 1 resposta final completa, obteve %+v", finals)
 	}

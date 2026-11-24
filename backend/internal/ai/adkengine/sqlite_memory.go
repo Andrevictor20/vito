@@ -154,20 +154,24 @@ func (s *SQLiteMemoryService) SearchMemory(ctx context.Context, req *memory.Sear
 }
 
 // BuildGenaiEmbedder cria um EmbedderFunc oficial sobre google.golang.org/genai (gemini-embedding-001)
-// com fallback semântico local caso a chave não esteja configurada ou esteja offline.
+// reutilizando um único genai.Client entre chamadas, com fallback semântico local caso offline.
 func BuildGenaiEmbedder(apiKey string) repository.EmbedderFunc {
+	trimmedKey := strings.TrimSpace(apiKey)
+	var cachedClient *genai.Client
+	if trimmedKey != "" {
+		if client, err := genai.NewClient(context.Background(), &genai.ClientConfig{
+			APIKey:  trimmedKey,
+			Backend: genai.BackendGeminiAPI,
+		}); err == nil && client != nil {
+			cachedClient = client
+		}
+	}
 	return func(ctx context.Context, text string) ([]float32, error) {
-		if strings.TrimSpace(apiKey) != "" {
-			client, err := genai.NewClient(ctx, &genai.ClientConfig{
-				APIKey:  apiKey,
-				Backend: genai.BackendGeminiAPI,
-			})
-			if err == nil && client != nil {
-				contents := []*genai.Content{genai.NewContentFromText(text, genai.RoleUser)}
-				res, err := client.Models.EmbedContent(ctx, "gemini-embedding-001", contents, nil)
-				if err == nil && res != nil && len(res.Embeddings) > 0 && len(res.Embeddings[0].Values) > 0 {
-					return res.Embeddings[0].Values, nil
-				}
+		if cachedClient != nil {
+			contents := []*genai.Content{genai.NewContentFromText(text, genai.RoleUser)}
+			res, err := cachedClient.Models.EmbedContent(ctx, "gemini-embedding-001", contents, nil)
+			if err == nil && res != nil && len(res.Embeddings) > 0 && len(res.Embeddings[0].Values) > 0 {
+				return res.Embeddings[0].Values, nil
 			}
 		}
 		return DefaultSemanticEmbedder(ctx, text)

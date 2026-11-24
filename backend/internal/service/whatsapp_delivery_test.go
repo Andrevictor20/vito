@@ -99,7 +99,7 @@ func newDeliveryTestService(t *testing.T, handler http.HandlerFunc, instanceName
 
 	evoClient := service.NewDefaultEvolutionClient(srv.URL, "test-key", srv.Client())
 	repo := newDeliveryTestRepo(instanceName, phone)
-	svc := service.NewWhatsAppService(service.WhatsAppServiceConfig{}, repo, evoClient, nil)
+	svc := service.NewWhatsAppService(service.WhatsAppServiceConfig{}, repo, evoClient)
 	svc.SetAsyncRunner(func(fn func()) { fn() })
 
 	notif := &spyNotifSender{}
@@ -316,7 +316,7 @@ func TestAC04_FallbackUpdatesInstanceName(t *testing.T) {
 
 	evoClient := service.NewDefaultEvolutionClient(srv.URL, "test-key", srv.Client())
 	repo := &fallbackWhatsAppRepo{mockWhatsAppRepoForRegression: newDeliveryTestRepo("vito_inst_real", "559884097322")}
-	svc := service.NewWhatsAppService(service.WhatsAppServiceConfig{}, repo, evoClient, nil)
+	svc := service.NewWhatsAppService(service.WhatsAppServiceConfig{}, repo, evoClient)
 	svc.SetAsyncRunner(func(fn func()) { fn() })
 	svc.SetAgentLoop(&spyAgentEngine{})
 	ownerCache := service.NewWhatsAppOwnerCache(evoClient, time.Hour)

@@ -62,58 +62,23 @@ func TestTriggersRouting_PublicTemplates_And_ProtectedCRUD(t *testing.T) {
 
 	userRepo := repository.NewUserRepository(db)
 	authSvc := service.NewAuthService(userRepo, "test-secret")
-	triggerRepo := repository.NewTriggerRepository(db)
-	triggerSvc := service.NewTriggerService(triggerRepo)
-	triggerHandler := handler.NewTriggerHandler(triggerSvc)
 
 	srv := server.New(server.Config{
-		AuthSvc:        authSvc,
-		TriggerHandler: triggerHandler,
+		AuthSvc: authSvc,
 	})
 	ts := httptest.NewServer(srv.Router())
 	defer ts.Close()
 
-	// 1. GET /api/v1/triggers/templates SEM cabeçalho Authorization DEVE retornar 200 OK
-	res, err := http.Get(ts.URL + "/api/v1/triggers/templates")
-	if err != nil {
-		t.Fatalf("falha ao consultar templates: %v", err)
-	}
-	defer res.Body.Close()
-
-	if res.StatusCode != http.StatusOK {
-		t.Fatalf("esperava status 200 para templates públicos, veio %d", res.StatusCode)
-	}
-
-	var payload struct {
-		Templates []domain.TriggerTemplate `json:"templates"`
-	}
-	if err := json.NewDecoder(res.Body).Decode(&payload); err != nil {
-		t.Fatalf("falha ao deserializar templates: %v", err)
-	}
-	if len(payload.Templates) < 8 {
-		t.Errorf("esperava ao menos 8 templates, obteve %d", len(payload.Templates))
-	}
-
-	// 2. GET /api/v1/triggers SEM cabeçalho Authorization DEVE ser protegido (401)
-	resTriggers, err := http.Get(ts.URL + "/api/v1/triggers")
-	if err != nil {
-		t.Fatalf("falha ao consultar triggers: %v", err)
-	}
-	defer resTriggers.Body.Close()
-
-	if resTriggers.StatusCode != http.StatusUnauthorized {
-		t.Errorf("esperava status 401 para /api/v1/triggers desprotegido, veio %d", resTriggers.StatusCode)
-	}
-
-	// 3. POST /api/v1/triggers/templates/tmpl-career-jobs/activate SEM Authorization DEVE ser protegido (401)
-	resActivate, err := http.Post(ts.URL+"/api/v1/triggers/templates/tmpl-career-jobs/activate", "application/json", nil)
-	if err != nil {
-		t.Fatalf("falha ao tentar ativar template: %v", err)
-	}
-	defer resActivate.Body.Close()
-
-	if resActivate.StatusCode != http.StatusUnauthorized {
-		t.Errorf("esperava status 401 para activate sem token, veio %d", resActivate.StatusCode)
+	// Rotas depreciadas /api/v1/triggers/* devem retornar 404 após a extinção do legado (AC-08)
+	for _, path := range []string{"/api/v1/triggers/templates", "/api/v1/triggers", "/api/v1/triggers/123"} {
+		res, err := http.Get(ts.URL + path)
+		if err != nil {
+			t.Fatalf("falha ao consultar %s: %v", path, err)
+		}
+		res.Body.Close()
+		if res.StatusCode != http.StatusNotFound {
+			t.Fatalf("esperava 404 para rota depreciada %s, veio %d", path, res.StatusCode)
+		}
 	}
 }
 

@@ -3,11 +3,8 @@ package main
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"log"
-	"strings"
 	"time"
-	"unicode"
 
 	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/ai/adkengine"
@@ -109,9 +106,14 @@ func setupAgentSubsystem(
 		registry.Register(toolsets.NewMeetingBookingToolset())
 	}
 	if triggerSvc != nil {
-		registry.Register(toolsets.NewRadarTriggerToolset(&triggerServiceAdapter{triggerSvc}))
+		registry.Register(toolsets.NewBotTriggerToolset(&triggerServiceAdapter{triggerSvc}))
 	} else {
-		registry.Register(toolsets.NewRadarTriggerToolset())
+		registry.Register(toolsets.NewBotTriggerToolset())
+	}
+	if finRepo != nil {
+		registry.Register(toolsets.NewFinanceToolset(service.NewFinanceService(finRepo), finRepo))
+	} else {
+		registry.Register(toolsets.NewFinanceToolset(nil))
 	}
 	if memoryRepo != nil {
 		registry.Register(toolsets.NewMemoryProfileToolset(memoryRepo))
@@ -119,16 +121,25 @@ func setupAgentSubsystem(
 		registry.Register(toolsets.NewMemoryProfileToolset())
 	}
 
-	// 4. ModelRouter com provedores reais disponíveis
-	router := ai.NewModelRouter()
+	// 4. Pool de Modelos ADK v2 do Servidor (Gemini nativo + OpenRouter + Groq)
+	var serverPool []adkengine.ServerPoolEntry
 	if cfg.GeminiAPIKey != "" {
 		geminiModel := cfg.GeminiModel
 		if geminiModel == "" {
 			geminiModel = "gemini-2.5-flash"
 		}
-		p := ai.NewGeminiAgentProvider(cfg.GeminiAPIKey, geminiModel)
-		router.AddProvider(p)
-		log.Printf("🤖 [Agent Loop] Provedor Gemini Nativo registrado (%s, Tier 3)", geminiModel)
+		if gLLM, gErr := adkengine.NewGeminiBYOKLLM(context.Background(), geminiModel, cfg.GeminiAPIKey); gErr == nil && gLLM != nil {
+			serverPool = append(serverPool, adkengine.ServerPoolEntry{
+				ProviderKey: "gemini",
+				DisplayName: "Gemini",
+				ModelID:     geminiModel,
+				Tier:        3,
+				LLM:         gLLM,
+			})
+			log.Printf("🤖 [ADK Server Pool] Provedor Gemini nativo registrado (%s, Tier 3)", geminiModel)
+		} else if gErr != nil {
+			log.Printf("⚠️ [ADK Server Pool] Falha ao inicializar Gemini nativo: %v", gErr)
+		}
 	}
 
 	if cfg.OpenRouterAPIKey != "" {
@@ -136,18 +147,26 @@ func setupAgentSubsystem(
 		if openRouterModel == "" {
 			openRouterModel = "google/gemini-2.5-flash"
 		}
-		p := ai.NewOpenAICompatAgentProvider(
-			"OpenRouter",
+		orLLM := adkengine.NewOpenAICompatLLM(
+			"openrouter",
 			openRouterModel,
 			"https://openrouter.ai/api/v1/chat/completions",
 			cfg.OpenRouterAPIKey,
-			3,
-			true,
-			true,
-			16384,
+			adkengine.WithOpenAISupportsReasoning(true),
+			adkengine.WithOpenAISupportsTools(true),
+			adkengine.WithOpenAIHeaders(map[string]string{
+				"HTTP-Referer": "https://vito.app",
+				"X-Title":      "Vito Assistant",
+			}),
 		)
-		router.AddProvider(p)
-		log.Printf("🤖 [Agent Loop] Provedor OpenRouter registrado (%s, Tier 3)", openRouterModel)
+		serverPool = append(serverPool, adkengine.ServerPoolEntry{
+			ProviderKey: "openrouter",
+			DisplayName: "OpenRouter",
+			ModelID:     openRouterModel,
+			Tier:        3,
+			LLM:         orLLM,
+		})
+		log.Printf("🤖 [ADK Server Pool] Provedor OpenRouter ADK registrado (%s, Tier 3)", openRouterModel)
 	}
 
 	if cfg.GroqAPIKey != "" {
@@ -155,23 +174,27 @@ func setupAgentSubsystem(
 		if groqModel == "" {
 			groqModel = "qwen/qwen3.8-27b"
 		}
-		p := ai.NewOpenAICompatAgentProvider(
-			"Groq",
+		groqLLM := adkengine.NewOpenAICompatLLM(
+			"groq",
 			groqModel,
 			"https://api.groq.com/openai/v1/chat/completions",
 			cfg.GroqAPIKey,
-			2,
-			true,
-			false,
-			8192,
+			adkengine.WithOpenAISupportsReasoning(false),
+			adkengine.WithOpenAISupportsTools(true),
 		)
-		router.AddProvider(p)
-		log.Printf("⚡ [Agent Loop] Provedor Groq registrado (%s, Tier 2)", groqModel)
+		serverPool = append(serverPool, adkengine.ServerPoolEntry{
+			ProviderKey: "groq",
+			DisplayName: "Groq",
+			ModelID:     groqModel,
+			Tier:        2,
+			LLM:         groqLLM,
+		})
+		log.Printf("⚡ [ADK Server Pool] Provedor Groq ADK registrado (%s, Tier 2)", groqModel)
 	}
 
-	// 5. Loop ReAct Central
+	// 5. Fachada AgentLoop (delega ao ADKLoopFacade)
 	loop := service.NewAgentLoop(
-		router,
+		nil,
 		registry,
 		scopeGuard,
 		confGate,
@@ -209,7 +232,7 @@ func setupAgentSubsystem(
 
 	// 6.5 Motor Google ADK Go v2 (ADKLoopFacade) plugado ao AgentLoop e ao WhatsAppService
 	adkFacade, adkErr := adkengine.NewADKLoopFacade(adkengine.FacadeConfig{
-		Router:              router,
+		ServerPool:          serverPool,
 		Registry:            registry,
 		ScopeGuard:          scopeGuard,
 		ConfirmationGate:    confGate,
@@ -256,226 +279,4 @@ func setupAgentSubsystem(
 		ScopeGuard:          scopeGuard,
 		ConfGate:            confGate,
 	}
-}
-
-type calendarServiceAdapter struct {
-	svc *service.CalendarService
-}
-
-func (a *calendarServiceAdapter) GetEvents(ctx context.Context, userID string, start, end time.Time) ([]*domain.Event, error) {
-	events, err := a.svc.ListEvents(userID, start, end)
-	if err != nil {
-		return nil, err
-	}
-	var res []*domain.Event
-	for i := range events {
-		res = append(res, &events[i])
-	}
-	return res, nil
-}
-
-func (a *calendarServiceAdapter) CreateEvent(ctx context.Context, event *domain.Event) error {
-	_, err := a.CreateEventWithConflict(ctx, event)
-	return err
-}
-
-func (a *calendarServiceAdapter) CreateEventWithConflict(ctx context.Context, event *domain.Event) (*domain.ConflictInfo, error) {
-	created, conflict, err := a.svc.CreateEvent(event.UserID, event.Title, event.Description, event.Location, event.StartAt, event.EndAt)
-	if err != nil {
-		return nil, err
-	}
-	if created != nil {
-		*event = *created
-	}
-	return conflict, nil
-}
-
-func (a *calendarServiceAdapter) DeleteEvent(ctx context.Context, id, userID string) error {
-	return a.svc.DeleteEvent(id, userID)
-}
-
-type todoServiceAdapter struct {
-	svc *service.TodoService
-}
-
-func (a *todoServiceAdapter) GetTodos(ctx context.Context, userID string) ([]*domain.Todo, error) {
-	todos, err := a.svc.ListTodos(userID, "")
-	if err != nil {
-		return nil, err
-	}
-	var res []*domain.Todo
-	for i := range todos {
-		res = append(res, &todos[i])
-	}
-	return res, nil
-}
-
-func (a *todoServiceAdapter) CreateTodo(ctx context.Context, todo *domain.Todo) error {
-	created, err := a.svc.CreateTodo(todo.UserID, todo.Title, string(todo.Priority), todo.DueDate)
-	if err != nil {
-		return err
-	}
-	if created != nil {
-		*todo = *created
-	}
-	return nil
-}
-
-func (a *todoServiceAdapter) CompleteTodo(ctx context.Context, id, userID string) error {
-	return a.svc.CompleteTodo(id, userID)
-}
-
-func (a *todoServiceAdapter) DeleteTodo(ctx context.Context, id, userID string) error {
-	return a.svc.DeleteTodo(id, userID)
-}
-
-type whatsAppServiceAdapter struct {
-	svc *service.WhatsAppService
-	dir *service.WhatsAppDirectoryService
-}
-
-func (a *whatsAppServiceAdapter) SendMessage(ctx context.Context, userID, phone, message string) error {
-	target := strings.TrimSpace(phone)
-	if target == "" {
-		return fmt.Errorf("destinatário do WhatsApp é obrigatório")
-	}
-
-	// 1. Se já for um JID válido (@s.whatsapp.net ou @g.us)
-	if strings.Contains(target, "@s.whatsapp.net") || strings.Contains(target, "@g.us") {
-		return a.svc.SendWhatsAppMessage(ctx, userID, service.NormalizeJIDForSend(target), message)
-	}
-
-	// 2. Se for número com dígitos suficientes
-	digits := 0
-	for _, r := range target {
-		if unicode.IsDigit(r) {
-			digits++
-		}
-	}
-	if digits >= 8 {
-		normalized := domain.NormalizePhone(target)
-		if normalized != "" {
-			cleanDigits := strings.TrimPrefix(normalized, "+")
-			return a.svc.SendWhatsAppMessage(ctx, userID, cleanDigits+"@s.whatsapp.net", message)
-		}
-	}
-
-	// 3. Se for nome de contato (ex: "Carlos", "Maria")
-	if a.dir != nil {
-		chat, err := a.dir.ResolveChat(ctx, userID, target)
-		if err == nil && chat != nil && chat.ChatJID != "" {
-			return a.svc.SendWhatsAppMessage(ctx, userID, service.NormalizeJIDForSend(chat.ChatJID), message)
-		}
-	}
-
-	return fmt.Errorf("contato %q não encontrado na sua agenda do WhatsApp. Por favor, confirme o número com DDD", target)
-}
-
-func (a *whatsAppServiceAdapter) SearchMessages(ctx context.Context, userID, query string, limit int) ([]domain.WhatsAppConversationMessage, error) {
-	if a.dir != nil {
-		return a.dir.SearchMessages(ctx, userID, query, limit)
-	}
-	return nil, nil
-}
-
-func (a *whatsAppServiceAdapter) RecentChats(ctx context.Context, userID string) ([]ai.ChatContactSummary, error) {
-	if a.dir != nil {
-		return a.dir.Directory(ctx, userID)
-	}
-	return nil, nil
-}
-
-type gmailServiceAdapter struct {
-	svc *service.GmailService
-}
-
-func (a *gmailServiceAdapter) SendEmail(ctx context.Context, userID, to, subject, body string) error {
-	cleanSubj := strings.TrimSpace(subject)
-	if cleanSubj == "" {
-		cleanSubj = "Mensagem enviada pelo Vito"
-	}
-	_, err := a.svc.SendEmail(ctx, userID, to, cleanSubj, body)
-	return err
-}
-
-func (a *gmailServiceAdapter) CreateDraft(ctx context.Context, userID, to, subject, body string) error {
-	_, err := a.svc.CreateDraft(ctx, userID, to, subject, body)
-	return err
-}
-
-func (a *gmailServiceAdapter) ScanEmails(ctx context.Context, userID string) (*domain.GmailScanResult, error) {
-	return a.svc.ScanEmails(ctx, userID)
-}
-
-type bookingServiceAdapter struct {
-	svc *service.BookingService
-}
-
-func (a *bookingServiceAdapter) ListBookingTypes(ctx context.Context, userID string) ([]*domain.BookingType, error) {
-	list, err := a.svc.ListBookingTypes(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-	var res []*domain.BookingType
-	for i := range list {
-		bt := list[i].BookingType
-		res = append(res, &bt)
-	}
-	return res, nil
-}
-
-func (a *bookingServiceAdapter) CreateBookingType(ctx context.Context, userID string, bt *domain.BookingType) (*domain.BookingType, string, error) {
-	created, err := a.svc.CreateBookingType(ctx, userID, bt)
-	if err != nil {
-		return nil, "", err
-	}
-	return &created.BookingType, created.PublicURL, nil
-}
-
-func (a *bookingServiceAdapter) CreateBookingTypeWithLinks(ctx context.Context, userID string, bt *domain.BookingType) (*domain.BookingType, string, string, error) {
-	created, err := a.svc.CreateBookingType(ctx, userID, bt)
-	if err != nil {
-		return nil, "", "", err
-	}
-	return &created.BookingType, created.PublicURL, created.ShortURL, nil
-}
-
-type triggerServiceAdapter struct {
-	svc *service.TriggerService
-}
-
-func (a *triggerServiceAdapter) ListTriggers(userID string) ([]*domain.Trigger, error) {
-	list, err := a.svc.ListTriggers(userID, "", "")
-	if err != nil {
-		return nil, err
-	}
-	var res []*domain.Trigger
-	for i := range list {
-		tr := list[i]
-		res = append(res, &tr)
-	}
-	return res, nil
-}
-
-func (a *triggerServiceAdapter) CreateTrigger(t *domain.Trigger) error {
-	input := domain.CreateTriggerInput{
-		Title:         t.Title,
-		Category:      domain.CategoryCustom,
-		Query:         t.UserIntent,
-		ConditionType: domain.ConditionChangeDetected,
-		TargetValue:   "alert",
-		Frequency:     domain.FrequencyDailyMorning,
-	}
-	created, err := a.svc.CreateTrigger(t.UserID, input)
-	if err != nil {
-		return err
-	}
-	if created != nil {
-		*t = *created
-	}
-	return nil
-}
-
-func (a *triggerServiceAdapter) DeleteTrigger(id, userID string) error {
-	return a.svc.DeleteTrigger(id, userID)
 }

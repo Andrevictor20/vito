@@ -41,10 +41,9 @@ func setupWhatsAppContextHandlerTest(t *testing.T) (*handler.WhatsAppHandler, *s
 
 	waRepo := repository.NewWhatsAppRepository(db)
 	mockClient := &mockEvolutionAPIClientForHandler{}
-	astSvc := service.NewAssistantService(&mockHandlerAIGateway{}, nil, nil, nil)
 	waSvc := service.NewWhatsAppService(service.WhatsAppServiceConfig{
 		WebhookBaseURL: "http://localhost:8180",
-	}, waRepo, mockClient, astSvc)
+	}, waRepo, mockClient)
 
 	convRepo := repository.NewWhatsAppConversationRepository(db)
 	contextSvc := service.NewWhatsAppContextService(convRepo, service.DefaultWhatsAppContextConfig())

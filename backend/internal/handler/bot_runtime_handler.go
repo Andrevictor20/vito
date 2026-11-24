@@ -3,13 +3,17 @@ package handler
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/handler/middleware"
+	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/andrevmp/vito/backend/internal/service"
 )
 
@@ -157,14 +161,87 @@ func (h *BotHandler) ResolvePending(w http.ResponseWriter, r *http.Request) {
 			writeJSONError(w, http.StatusConflict, err.Error())
 			return
 		}
+		if h.botRepo != nil {
+			_ = h.botRepo.AddMemory(r.Context(), &domain.BotMemory{
+				ID:        uuid.NewString(),
+				BotID:     botID,
+				UserID:    userID,
+				Source:    "user_denied",
+				IsActive:  true,
+				Content:   fmt.Sprintf("Usuário recusou a ação '%s' (%s). Não repetir sem pedir permissão explícita.", actionKey, pending.Operation),
+				CreatedAt: time.Now().UTC(),
+				UpdatedAt: time.Now().UTC(),
+			})
+		}
+		if h.convRepo != nil {
+			_ = h.convRepo.CreateTurn(r.Context(), &repository.ConversationTurn{
+				ID:        uuid.NewString(),
+				ThreadID:  "bot_" + botID,
+				UserID:    userID,
+				Channel:   "bot_chat",
+				Role:      "assistant",
+				Content:   fmt.Sprintf("Entendido, não executei a ação (%s) e anotei sua preferência.", pending.Operation),
+				CreatedAt: time.Now().UTC(),
+			})
+		}
 		writeJSON(w, http.StatusOK, map[string]string{"status": "denied", "decision": decision})
 		return
 	}
-	if _, err := h.confGate.Resume(r.Context(), confID, userID); err != nil {
+	resumed, err := h.confGate.Resume(r.Context(), confID, userID)
+	if err != nil {
 		writeJSONError(w, http.StatusConflict, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"status": "approved", "decision": decision, "action_key": actionKey})
+
+	var execSummary string
+	if h.registry != nil {
+		ts, exists := h.registry.Get(domain.ToolsetName(resumed.ToolsetName))
+		if !exists || ts == nil {
+			_ = h.confGate.SaveExecutionResult(r.Context(), confID, `{"error":"toolset não encontrado"}`)
+			writeJSONError(w, http.StatusUnprocessableEntity, fmt.Sprintf("toolset '%s' não encontrado", resumed.ToolsetName))
+			return
+		}
+		execCtx := &domain.ToolExecutionContext{
+			UserID:                  userID,
+			ThreadID:                resumed.ThreadID,
+			Channel:                 resumed.Channel,
+			BotID:                   botID,
+			AutonomyLevel:           "confirmed",
+			TaintedByUntrustedInput: resumed.TaintedContext,
+		}
+		res, execErr := ts.Execute(r.Context(), execCtx, resumed.Operation, json.RawMessage(resumed.ArgumentsJSON))
+		if execErr != nil {
+			_ = h.confGate.SaveExecutionResult(r.Context(), confID, fmt.Sprintf(`{"error":%q}`, execErr.Error()))
+			writeJSONError(w, http.StatusInternalServerError, fmt.Sprintf("falha ao executar ação aprovada: %v", execErr))
+			return
+		}
+		if res != nil {
+			execSummary = res.SummaryForLLM
+		}
+		resJSON, _ := json.Marshal(res)
+		_ = h.confGate.SaveExecutionResult(r.Context(), confID, string(resJSON))
+	}
+	if h.convRepo != nil {
+		msg := fmt.Sprintf("Ação aprovada (%s) executada com sucesso.", resumed.Operation)
+		if execSummary != "" {
+			msg = execSummary
+		}
+		_ = h.convRepo.CreateTurn(r.Context(), &repository.ConversationTurn{
+			ID:        uuid.NewString(),
+			ThreadID:  "bot_" + botID,
+			UserID:    userID,
+			Channel:   "bot_chat",
+			Role:      "assistant",
+			Content:   msg,
+			CreatedAt: time.Now().UTC(),
+		})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"status":     "approved",
+		"decision":   decision,
+		"action_key": actionKey,
+		"summary":    execSummary,
+	})
 }
 
 // UpdateBotModelPref atualiza o modelo preferido do bot (PATCH /api/v1/bots/{id}/model).

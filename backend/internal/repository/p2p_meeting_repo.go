@@ -40,12 +40,14 @@ func (r *P2PInviteRepositorySQLite) Create(ctx context.Context, inv *domain.P2PM
 			duration_minutes, status, event_id_from, event_id_to, created_at, updated_at
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
-	_, err := r.db.ExecContext(ctx, query,
-		inv.ID, inv.FromUserID, inv.ToUserID, inv.Title, inv.Description,
-		inv.StartAt.UTC(), inv.EndAt.UTC(), inv.DurationMinutes, inv.Status,
-		inv.EventIDFrom, inv.EventIDTo, inv.CreatedAt.UTC(), inv.UpdatedAt.UTC(),
-	)
-	return err
+	return ExecuteQueuedWrite(ctx, func() error {
+		_, err := r.db.ExecContext(ctx, query,
+			inv.ID, inv.FromUserID, inv.ToUserID, inv.Title, inv.Description,
+			inv.StartAt.UTC(), inv.EndAt.UTC(), inv.DurationMinutes, inv.Status,
+			inv.EventIDFrom, inv.EventIDTo, inv.CreatedAt.UTC(), inv.UpdatedAt.UTC(),
+		)
+		return err
+	})
 }
 
 func (r *P2PInviteRepositorySQLite) scanInvite(row interface{ Scan(dest ...any) error }) (*domain.P2PMeetingInvite, error) {
@@ -169,11 +171,9 @@ func (r *P2PInviteRepositorySQLite) UpdateStatus(ctx context.Context, id string,
 			updated_at = ?
 		WHERE id = ?
 	`
-	res, err := r.db.ExecContext(ctx, query, status, eventIDFrom, eventIDTo, now, id)
-	if err != nil {
-		return err
-	}
-	rows, err := res.RowsAffected()
+	rows, err := ExecuteQueuedWriteRows(ctx, func() (sql.Result, error) {
+		return r.db.ExecContext(ctx, query, status, eventIDFrom, eventIDTo, now, id)
+	})
 	if err != nil {
 		return err
 	}

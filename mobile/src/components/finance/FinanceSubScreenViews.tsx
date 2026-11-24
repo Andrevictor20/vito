@@ -158,6 +158,7 @@ export const SpendingSubView: React.FC<SubViewCommonProps> = ({
   isPrivacyHidden,
 }) => {
   const { colors, isDark } = useTheme();
+  const [selectedCatIdx, setSelectedCatIdx] = useState<number | null>(null);
   const categories = summary.category_spending;
   const total =
     categories.reduce((acc, c) => acc + getCategoryAmount(c), 0) || (summary.month_expenses ?? 0);
@@ -167,6 +168,14 @@ export const SpendingSubView: React.FC<SubViewCommonProps> = ({
     .slice()
     .sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount))
     .slice(0, 5);
+
+  const activeCat =
+    selectedCatIdx !== null && selectedCatIdx >= 0 && selectedCatIdx < categories.length
+      ? categories[selectedCatIdx]
+      : null;
+  const activeCatAmt = activeCat ? getCategoryAmount(activeCat) : total;
+  const activeCatPct =
+    activeCat && total > 0 ? Math.round((activeCatAmt / total) * 100) : null;
 
   return (
     <View>
@@ -187,8 +196,12 @@ export const SpendingSubView: React.FC<SubViewCommonProps> = ({
                 label: c.category,
                 value: getCategoryAmount(c),
               }))}
-              centerPrimary={maskBRL(isPrivacyHidden, formatBRL(total, 0))}
-              centerSecondary="gasto no mês"
+              centerPrimary={maskBRL(isPrivacyHidden, formatBRL(activeCatAmt, 0))}
+              centerSecondary={
+                activeCat ? `${activeCat.category} · ${activeCatPct ?? 0}%` : 'gasto no mês'
+              }
+              selectedIndex={selectedCatIdx}
+              onSelectIndex={setSelectedCatIdx}
             />
             <View style={styles.legendList}>
               {categories.map((cat, idx) => {
@@ -196,13 +209,18 @@ export const SpendingSubView: React.FC<SubViewCommonProps> = ({
                 const pct =
                   total > 0 ? Math.round((amt / total) * 100) : Math.round(cat.percentage || 0);
                 const delta = getCategoryDelta(cat);
+                const isSel = selectedCatIdx === idx;
                 return (
-                  <View
+                  <TouchableOpacity
                     key={`${cat.category}_${idx}`}
                     style={[
                       styles.legendRow,
                       idx > 0 && { borderTopWidth: 1, borderTopColor: colors.line },
+                      isSel && { opacity: 1 },
+                      selectedCatIdx !== null && !isSel && { opacity: 0.5 },
                     ]}
+                    onPress={() => setSelectedCatIdx((prev) => (prev === idx ? null : idx))}
+                    activeOpacity={0.75}
                   >
                     <CategorySemanticBadge
                       category={cat.category}
@@ -222,7 +240,7 @@ export const SpendingSubView: React.FC<SubViewCommonProps> = ({
                     <Text style={[styles.rowAmount, tabularNumbers, { color: colors.ink }]}>
                       {maskBRL(isPrivacyHidden, formatBRL(amt, 0))}
                     </Text>
-                  </View>
+                  </TouchableOpacity>
                 );
               })}
             </View>
@@ -245,6 +263,7 @@ export const SpendingSubView: React.FC<SubViewCommonProps> = ({
               labels={dailySeries.labels}
               highlightIndex={dailySeries.peakIndex}
               averageValue={dailySeries.avg}
+              isPrivacyHidden={isPrivacyHidden}
             />
             <Text style={[styles.rowMeta, { color: colors.muted, marginTop: 10 }]}>
               Média de {maskBRL(isPrivacyHidden, formatBRL(dailySeries.avg, 0))} por dia · maior dia: dia{' '}

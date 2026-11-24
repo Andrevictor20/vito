@@ -37,7 +37,7 @@ func BuildAgentTopology(llm model.LLM, bridge *ToolsetBridge) (*AgentTopology, e
 		return nil, fmt.Errorf("model.LLM é obrigatório para construir a topologia de agentes")
 	}
 
-	var routineTools, commsTools, financeTools, researchTools, workspaceTools, botsTools, allTools []tool.Tool
+	var routineTools, commsTools, financeTools, researchTools, workspaceTools, botsTools, rootTools []tool.Tool
 	if bridge != nil {
 		routineTools = bridge.BuildDomainTools(
 			domain.ToolsetCalendar,
@@ -48,6 +48,9 @@ func BuildAgentTopology(llm model.LLM, bridge *ToolsetBridge) (*AgentTopology, e
 			domain.ToolsetWhatsApp,
 			domain.ToolsetGmail,
 		)
+		financeTools = bridge.BuildDomainTools(
+			domain.ToolsetName("finance_manager"),
+		)
 		researchTools = bridge.BuildDomainTools(
 			domain.ToolsetWebSearch,
 		)
@@ -57,7 +60,9 @@ func BuildAgentTopology(llm model.LLM, bridge *ToolsetBridge) (*AgentTopology, e
 		botsTools = bridge.BuildDomainTools(
 			domain.ToolsetRadarTrigger,
 		)
-		allTools = bridge.BuildAllRegisteredTools()
+		rootTools = bridge.BuildDomainTools(
+			domain.ToolsetMemoryProfile,
+		)
 	}
 
 	routineAgent, err := llmagent.New(llmagent.Config{
@@ -137,10 +142,10 @@ func BuildAgentTopology(llm model.LLM, bridge *ToolsetBridge) (*AgentTopology, e
 
 	rootAgent, err := llmagent.New(llmagent.Config{
 		Name:        "vito_executive",
-		Description: "Coordenador executivo pessoal Vito: conversa natural, memória rápida, execução direta em 1 RTT e orquestração multi-domínio.",
+		Description: "Coordenador executivo pessoal Vito: conversa natural, memória rápida e orquestração multi-domínio via sub-agentes especialistas.",
 		Model:       llm,
-		Instruction: "Você é o Vito, parceiro pessoal inteligente e secretário executivo do usuário. Responda sempre em português do Brasil com naturalidade e precisão.",
-		Tools:       allTools,
+		Instruction: "Você é o Vito, parceiro pessoal inteligente e secretário executivo do usuário. Responda sempre em português do Brasil com naturalidade e precisão, delegando operações de domínio aos sub-agentes especialistas.",
+		Tools:       rootTools,
 		SubAgents:   subAgents,
 	})
 	if err != nil {

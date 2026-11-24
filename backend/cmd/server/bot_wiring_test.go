@@ -31,8 +31,8 @@ func TestSetupBotSubsystem_Wiring(t *testing.T) {
 		agentSys.ConsolidationWorker.Stop()
 	})
 
-	botH := setupBotSubsystem(db, triggerRepo, nil, nil, agentSys)
-	if botH == nil {
-		t.Fatal("esperava BotHandler não-nulo do setupBotSubsystem")
+	botH, botR := setupBotSubsystem(db, triggerRepo, nil, nil, agentSys)
+	if botH == nil || botR == nil {
+		t.Fatal("esperava BotHandler e BotRunner não-nulos do setupBotSubsystem")
 	}
 }

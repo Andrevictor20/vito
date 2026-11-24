@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"time"
@@ -30,11 +31,13 @@ func (r *SessionRepositorySQLite) Create(rt *domain.RefreshToken) error {
 		rt.DeviceName = "Dispositivo Vito"
 	}
 
-	_, err := r.db.Exec(`
-		INSERT INTO refresh_tokens (id, user_id, token_hash, device_name, ip_address, expires_at, revoked_at, created_at, last_used_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, rt.ID, rt.UserID, rt.TokenHash, rt.DeviceName, rt.IPAddress, rt.ExpiresAt.UTC(), rt.RevokedAt, rt.CreatedAt.UTC(), rt.LastUsedAt.UTC())
-	return err
+	return ExecuteQueuedWrite(context.Background(), func() error {
+		_, err := r.db.Exec(`
+			INSERT INTO refresh_tokens (id, user_id, token_hash, device_name, ip_address, expires_at, revoked_at, created_at, last_used_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`, rt.ID, rt.UserID, rt.TokenHash, rt.DeviceName, rt.IPAddress, rt.ExpiresAt.UTC(), rt.RevokedAt, rt.CreatedAt.UTC(), rt.LastUsedAt.UTC())
+		return err
+	})
 }
 
 func (r *SessionRepositorySQLite) scanSession(row interface{ Scan(dest ...any) error }) (*domain.RefreshToken, error) {
@@ -125,11 +128,9 @@ func (r *SessionRepositorySQLite) RotateToken(id, userID, newTokenHash, ipAddres
 		args = []any{newTokenHash, newExpiresAt.UTC(), now.UTC(), id, userID}
 	}
 
-	res, err := r.db.Exec(query, args...)
-	if err != nil {
-		return err
-	}
-	affected, err := res.RowsAffected()
+	affected, err := ExecuteQueuedWriteRows(context.Background(), func() (sql.Result, error) {
+		return r.db.Exec(query, args...)
+	})
 	if err != nil {
 		return err
 	}
@@ -140,15 +141,13 @@ func (r *SessionRepositorySQLite) RotateToken(id, userID, newTokenHash, ipAddres
 }
 
 func (r *SessionRepositorySQLite) RevokeByID(id, userID string, revokedAt time.Time) error {
-	res, err := r.db.Exec(`
-		UPDATE refresh_tokens
-		SET revoked_at = ?
-		WHERE id = ? AND user_id = ? AND revoked_at IS NULL
-	`, revokedAt.UTC(), id, userID)
-	if err != nil {
-		return err
-	}
-	affected, err := res.RowsAffected()
+	affected, err := ExecuteQueuedWriteRows(context.Background(), func() (sql.Result, error) {
+		return r.db.Exec(`
+			UPDATE refresh_tokens
+			SET revoked_at = ?
+			WHERE id = ? AND user_id = ? AND revoked_at IS NULL
+		`, revokedAt.UTC(), id, userID)
+	})
 	if err != nil {
 		return err
 	}
@@ -159,28 +158,34 @@ func (r *SessionRepositorySQLite) RevokeByID(id, userID string, revokedAt time.T
 }
 
 func (r *SessionRepositorySQLite) RevokeByHash(tokenHash string, revokedAt time.Time) error {
-	_, err := r.db.Exec(`
-		UPDATE refresh_tokens
-		SET revoked_at = ?
-		WHERE token_hash = ? AND revoked_at IS NULL
-	`, revokedAt.UTC(), tokenHash)
-	return err
+	return ExecuteQueuedWrite(context.Background(), func() error {
+		_, err := r.db.Exec(`
+			UPDATE refresh_tokens
+			SET revoked_at = ?
+			WHERE token_hash = ? AND revoked_at IS NULL
+		`, revokedAt.UTC(), tokenHash)
+		return err
+	})
 }
 
 func (r *SessionRepositorySQLite) RevokeAllByUserExcept(userID, keepID string, revokedAt time.Time) error {
-	_, err := r.db.Exec(`
-		UPDATE refresh_tokens
-		SET revoked_at = ?
-		WHERE user_id = ? AND id != ? AND revoked_at IS NULL
-	`, revokedAt.UTC(), userID, keepID)
-	return err
+	return ExecuteQueuedWrite(context.Background(), func() error {
+		_, err := r.db.Exec(`
+			UPDATE refresh_tokens
+			SET revoked_at = ?
+			WHERE user_id = ? AND id != ? AND revoked_at IS NULL
+		`, revokedAt.UTC(), userID, keepID)
+		return err
+	})
 }
 
 func (r *SessionRepositorySQLite) RevokeAllByUser(userID string, revokedAt time.Time) error {
-	_, err := r.db.Exec(`
-		UPDATE refresh_tokens
-		SET revoked_at = ?
-		WHERE user_id = ? AND revoked_at IS NULL
-	`, revokedAt.UTC(), userID)
-	return err
+	return ExecuteQueuedWrite(context.Background(), func() error {
+		_, err := r.db.Exec(`
+			UPDATE refresh_tokens
+			SET revoked_at = ?
+			WHERE user_id = ? AND revoked_at IS NULL
+		`, revokedAt.UTC(), userID)
+		return err
+	})
 }

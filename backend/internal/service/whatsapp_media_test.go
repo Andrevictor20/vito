@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/service"
 )
@@ -21,7 +20,7 @@ func TestWhatsAppService_ArquivaMidiaDaMensagem(t *testing.T) {
 	svc, mockClient, _, _ := setupConversationalWhatsAppTest(t)
 
 	gateway := &mockGatewayCapturador{}
-	svc.SetAssistantService(service.NewAssistantService(gateway, nil, nil, nil))
+	svc.SetAgentLoop(gateway)
 	svc.SetAsyncRunner(func(fn func()) { fn() })
 
 	mockClient.mockMediaBase64 = base64.StdEncoding.EncodeToString([]byte("bytes-de-imagem-fake"))
@@ -73,7 +72,7 @@ func TestWhatsAppService_CitadaResolvidaPorStanzaID(t *testing.T) {
 	svc, mockClient, _, _ := setupConversationalWhatsAppTest(t)
 
 	gateway := &mockGatewayCapturador{}
-	svc.SetAssistantService(service.NewAssistantService(gateway, nil, nil, nil))
+	svc.SetAgentLoop(gateway)
 	svc.SetAsyncRunner(func(fn func()) { fn() })
 	mockClient.mockMediaBase64 = base64.StdEncoding.EncodeToString([]byte("bytes-de-imagem-fake"))
 
@@ -122,7 +121,7 @@ func TestWhatsAppService_CitadaDeImagemUsaOMediaText(t *testing.T) {
 	svc, mockClient, _, _ := setupConversationalWhatsAppTest(t)
 
 	gateway := &mockGatewayCapturador{}
-	svc.SetAssistantService(service.NewAssistantService(gateway, nil, nil, nil))
+	svc.SetAgentLoop(gateway)
 	svc.SetAsyncRunner(func(fn func()) { fn() })
 	mockClient.mockMediaBase64 = base64.StdEncoding.EncodeToString([]byte("bytes-de-imagem-fake"))
 
@@ -212,7 +211,7 @@ func TestWhatsAppService_JanelaIncluiACitadaDasMensagensPassadas(t *testing.T) {
 	svc, _, _, _ := setupConversationalWhatsAppTest(t)
 
 	gateway := &mockGatewayCapturador{}
-	svc.SetAssistantService(service.NewAssistantService(gateway, nil, nil, nil))
+	svc.SetAgentLoop(gateway)
 	svc.SetAsyncRunner(func(fn func()) { fn() })
 
 	// Arquiva uma mensagem com a marcação "respondeu a X".
@@ -251,4 +250,3 @@ func TestWhatsAppService_JanelaIncluiACitadaDasMensagensPassadas(t *testing.T) {
 
 // novoShadowInboxCriado fica reservado para os testes de repositório (ver o
 // pacote repository).
-var _ = ai.ActionGeneralChat

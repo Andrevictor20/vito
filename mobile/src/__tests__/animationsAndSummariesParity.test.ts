@@ -48,12 +48,17 @@ describe('Animações de entrada global, Resumos v5 e barras/contadores em Finan
       'components/summaries/SummaryPrimitives.tsx deve existir'
     );
 
+    const primitives = readSrc('components/summaries/SummaryPrimitives.tsx');
+    assert.equal(primitives.includes('expo-linear-gradient'), true, 'SummaryHeroCard deve usar expo-linear-gradient para preencher 100% no Android');
+    assert.equal(primitives.includes('SummaryVitoNote'), false, 'Mensagens de sugestão do Vito devem ser removidas dos Resumos');
+
     const daily = readSrc('components/summaries/DailySummarySection.tsx');
     assert.equal(daily.includes('SummaryHeroCard'), true, 'Daily deve usar SummaryHeroCard com gradiente .rs-hero');
     assert.equal(daily.includes('ProtoRingChart'), true, 'Daily deve renderizar anéis ProtoRingChart (104px livre + 64px tarefas)');
     assert.equal(daily.includes('CountUpText'), true, 'Daily deve animar números com CountUpText');
     assert.equal(daily.includes('AnimatedSegmentedBar'), true, 'Daily deve animar linha do dia');
     assert.equal(daily.includes('StaggerItem'), true, 'Daily deve animar blocos com StaggerItem');
+    assert.equal(daily.includes('SummaryVitoNote'), false, 'Daily não deve renderizar SummaryVitoNote');
 
     const weekly = readSrc('components/summaries/WeeklySummarySection.tsx');
     assert.equal(weekly.includes('SummaryHeroCard'), true, 'Weekly deve usar SummaryHeroCard');
@@ -61,6 +66,7 @@ describe('Animações de entrada global, Resumos v5 e barras/contadores em Finan
     assert.equal(weekly.includes('SummaryCategoryBreakdown'), true, 'Weekly deve mostrar distribuição de categorias animada');
     assert.equal(weekly.includes('CountUpText'), true, 'Weekly deve animar KPIs com CountUpText');
     assert.equal(weekly.includes('StaggerItem'), true, 'Weekly deve animar blocos com StaggerItem');
+    assert.equal(weekly.includes('SummaryVitoNote'), false, 'Weekly não deve renderizar SummaryVitoNote');
 
     const monthly = readSrc('components/summaries/MonthlySummarySection.tsx');
     assert.equal(monthly.includes('SummaryHeroCard'), true, 'Monthly deve usar SummaryHeroCard');
@@ -69,6 +75,10 @@ describe('Animações de entrada global, Resumos v5 e barras/contadores em Finan
     assert.equal(monthly.includes('SummaryCategoryBreakdown'), true, 'Monthly deve ter seção Onde o tempo foi');
     assert.equal(monthly.includes('CountUpText'), true, 'Monthly deve animar números com CountUpText');
     assert.equal(monthly.includes('StaggerItem'), true, 'Monthly deve animar blocos com StaggerItem');
+    assert.equal(monthly.includes('SummaryVitoNote'), false, 'Monthly não deve renderizar SummaryVitoNote');
+
+    const agenda = readSrc('components/home/AgendaView.tsx');
+    assert.equal(agenda.includes('vsugCard'), false, 'AgendaView não deve renderizar card de sugestão do Vito');
   });
 
   it('4. Finanças (Home e Sub-telas) animam barras carregando e números contando/aumentando', () => {

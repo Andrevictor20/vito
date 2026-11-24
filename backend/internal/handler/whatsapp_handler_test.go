@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/handler"
@@ -62,15 +61,6 @@ func (m *mockEvolutionAPIClientForHandler) SendReaction(ctx context.Context, ins
 	return nil
 }
 
-type mockHandlerAIGateway struct{}
-
-func (m *mockHandlerAIGateway) ParseIntent(ctx context.Context, input ai.UserInput) (*ai.ParsedIntent, error) {
-	return &ai.ParsedIntent{
-		Action:  ai.ActionGeneralChat,
-		Message: "Olá!",
-	}, nil
-}
-
 func setupWhatsAppHandlerTest(t *testing.T) (*handler.WhatsAppHandler, *repository.WhatsAppRepositorySQLite) {
 	tmpDir := t.TempDir()
 	db, err := database.Open(filepath.Join(tmpDir, "test_wa_handler.db"))
@@ -93,10 +83,9 @@ func setupWhatsAppHandlerTest(t *testing.T) (*handler.WhatsAppHandler, *reposito
 		pairingCode: "5678-ABCD",
 	}
 
-	astSvc := service.NewAssistantService(&mockHandlerAIGateway{}, nil, nil, nil)
 	waSvc := service.NewWhatsAppService(service.WhatsAppServiceConfig{
 		WebhookBaseURL: "http://localhost:8180",
-	}, waRepo, mockClient, astSvc)
+	}, waRepo, mockClient)
 
 	return handler.NewWhatsAppHandler(waSvc), waRepo
 }

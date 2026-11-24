@@ -121,10 +121,12 @@ func (r *ChatRepositorySQLite) SaveSession(ctx context.Context, session *domain.
 			preview = excluded.preview,
 			updated_at = excluded.updated_at
 	`
-	_, err := r.db.ExecContext(ctx, query,
-		session.ID, session.UserID, session.Title, session.Preview, session.CreatedAt, session.UpdatedAt,
-	)
-	return err
+	return ExecuteQueuedWrite(ctx, func() error {
+		_, err := r.db.ExecContext(ctx, query,
+			session.ID, session.UserID, session.Title, session.Preview, session.CreatedAt, session.UpdatedAt,
+		)
+		return err
+	})
 }
 
 // SaveMessages insere ou atualiza um lote de mensagens dentro de uma transação SQLite.
@@ -133,47 +135,51 @@ func (r *ChatRepositorySQLite) SaveMessages(ctx context.Context, messages []doma
 		return nil
 	}
 
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	stmt, err := tx.PrepareContext(ctx, `
-		INSERT INTO chat_messages (id, session_id, user_id, sender, text, timestamp, image_uri, action_performed, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-		ON CONFLICT(id) DO UPDATE SET
-			text = excluded.text,
-			image_uri = excluded.image_uri,
-			action_performed = excluded.action_performed
-	`)
-	if err != nil {
-		return err
-	}
-	defer stmt.Close()
-
-	now := time.Now().UTC()
-	for _, m := range messages {
-		if m.CreatedAt.IsZero() {
-			m.CreatedAt = now
-		}
-		if m.Timestamp.IsZero() {
-			m.Timestamp = now
-		}
-		_, err := stmt.ExecContext(ctx,
-			m.ID, m.SessionID, m.UserID, m.Sender, m.Text, m.Timestamp, m.ImageURI, m.ActionPerformed, m.CreatedAt,
-		)
+	return ExecuteQueuedWrite(ctx, func() error {
+		tx, err := r.db.BeginTx(ctx, nil)
 		if err != nil {
 			return err
 		}
-	}
+		defer func() { _ = tx.Rollback() }()
 
-	return tx.Commit()
+		stmt, err := tx.PrepareContext(ctx, `
+			INSERT INTO chat_messages (id, session_id, user_id, sender, text, timestamp, image_uri, action_performed, created_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+			ON CONFLICT(id) DO UPDATE SET
+				text = excluded.text,
+				image_uri = excluded.image_uri,
+				action_performed = excluded.action_performed
+		`)
+		if err != nil {
+			return err
+		}
+		defer stmt.Close()
+
+		now := time.Now().UTC()
+		for _, m := range messages {
+			if m.CreatedAt.IsZero() {
+				m.CreatedAt = now
+			}
+			if m.Timestamp.IsZero() {
+				m.Timestamp = now
+			}
+			_, err := stmt.ExecContext(ctx,
+				m.ID, m.SessionID, m.UserID, m.Sender, m.Text, m.Timestamp, m.ImageURI, m.ActionPerformed, m.CreatedAt,
+			)
+			if err != nil {
+				return err
+			}
+		}
+
+		return tx.Commit()
+	})
 }
 
 // DeleteSession remove a sessão e cascateia a remoção das mensagens.
 func (r *ChatRepositorySQLite) DeleteSession(ctx context.Context, id, userID string) error {
 	query := `DELETE FROM chat_sessions WHERE id = ? AND user_id = ?`
-	_, err := r.db.ExecContext(ctx, query, id, userID)
-	return err
+	return ExecuteQueuedWrite(ctx, func() error {
+		_, err := r.db.ExecContext(ctx, query, id, userID)
+		return err
+	})
 }

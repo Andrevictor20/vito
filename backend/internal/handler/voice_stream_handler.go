@@ -16,6 +16,7 @@ import (
 
 	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/domain"
+	"github.com/andrevmp/vito/backend/internal/handler/middleware"
 	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/andrevmp/vito/backend/internal/service"
 	"golang.org/x/net/websocket"
@@ -42,7 +43,6 @@ type VoiceServerEvent struct {
 
 // VoiceStreamHandler gerencia streaming de voz bidirecional WebSocket conectando ao AgentLoop e TTS.
 type VoiceStreamHandler struct {
-	astSvc      *service.AssistantService
 	loop        *service.AgentLoop
 	convRepo    *repository.ConversationStoreRepository
 	transcriber ai.AudioTranscriber
@@ -50,10 +50,8 @@ type VoiceStreamHandler struct {
 	geminiKey   string
 }
 
-func NewVoiceStreamHandler(astSvc *service.AssistantService) *VoiceStreamHandler {
-	return &VoiceStreamHandler{
-		astSvc: astSvc,
-	}
+func NewVoiceStreamHandler(_ ...any) *VoiceStreamHandler {
+	return &VoiceStreamHandler{}
 }
 
 // SetAgentLoop conecta o cérebro único e o repositório de conversas.
@@ -167,15 +165,20 @@ func (h *VoiceStreamHandler) handleWebSocket(ws *websocket.Conn) {
 							transcript = "Olá Vito, estou falando por comando de voz."
 						}
 
-						userID := meta.UserID
-						if userID == "" {
-							userID = "default_user"
+						userID, ok := middleware.UserIDFromContext(ws.Request().Context())
+						if !ok || strings.TrimSpace(userID) == "" {
+							sendEvent(VoiceServerEvent{
+								Type: "ERROR",
+								Text: "Sessão de voz não autenticada.",
+							})
+							return
 						}
 
 						req := domain.UnifiedAssistantRequest{
-							UserID:  userID,
-							Channel: "voice",
-							Message: transcript,
+							UserID:        userID,
+							Channel:       "voice",
+							Message:       transcript,
+							QuotedContext: meta.ScreenContext,
 						}
 						if err := h.ProcessVoiceUtteranceStream(ctx, req, sendEvent); err != nil {
 							sendEvent(VoiceServerEvent{

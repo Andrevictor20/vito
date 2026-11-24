@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/handler"
@@ -57,12 +56,6 @@ func (noopEvolutionClient) FindParticipants(context.Context, string, string) ([]
 }
 func (noopEvolutionClient) FindOwnerJID(context.Context, string) (string, error) { return "", nil }
 
-type noopGateway struct{}
-
-func (noopGateway) ParseIntent(context.Context, ai.UserInput) (*ai.ParsedIntent, error) {
-	return &ai.ParsedIntent{Action: ai.ActionGeneralChat, Message: "ok"}, nil
-}
-
 // TestWhatsAppWebhook_NotThrottledByGlobalAPIRateLimiter garante que rajadas de
 // webhooks vindas do container Evolution API após reconexão não recebem HTTP 429,
 // enquanto demais rotas /api/v1 continuam protegidas pelo apiLimiter (120/min).
@@ -74,16 +67,18 @@ func TestWhatsAppWebhook_NotThrottledByGlobalAPIRateLimiter(t *testing.T) {
 	defer db.Close()
 
 	waRepo := repository.NewWhatsAppRepository(db)
-	astSvc := service.NewAssistantService(noopGateway{}, nil, nil, nil)
-	waSvc := service.NewWhatsAppService(service.WhatsAppServiceConfig{}, waRepo, noopEvolutionClient{}, astSvc)
+	waSvc := service.NewWhatsAppService(service.WhatsAppServiceConfig{}, waRepo, noopEvolutionClient{})
 	waHandler := handler.NewWhatsAppHandler(waSvc)
 
-	triggerRepo := repository.NewTriggerRepository(db)
-	triggerHandler := handler.NewTriggerHandler(service.NewTriggerService(triggerRepo))
+	botRepo := repository.NewBotRepository(db)
+	botHandler := handler.NewBotHandler(db, botRepo, nil)
+
+	p2pHandler := handler.NewP2PMeetingHandler(nil, nil, nil)
 
 	srv := server.New(server.Config{
 		WhatsAppHandler: waHandler,
-		TriggerHandler:  triggerHandler,
+		BotHandler:      botHandler,
+		P2PHandler:      p2pHandler,
 	})
 	router := srv.Router()
 
@@ -104,7 +99,7 @@ func TestWhatsAppWebhook_NotThrottledByGlobalAPIRateLimiter(t *testing.T) {
 	// Rotas normais em /api/v1 continuam limitadas a 120 req/min por IP.
 	throttled := false
 	for i := 0; i < 130; i++ {
-		req := httptest.NewRequest(http.MethodGet, "/api/v1/triggers/templates", nil)
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/contacts/challenge", nil)
 		req.RemoteAddr = "198.51.100.10:12345"
 		rec := httptest.NewRecorder()
 		router.ServeHTTP(rec, req)

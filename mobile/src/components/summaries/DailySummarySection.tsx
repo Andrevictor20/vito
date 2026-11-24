@@ -17,7 +17,6 @@ import {
   SummaryEyebrow,
   SummaryHeroCard,
   SummaryNowIndicator,
-  SummaryVitoNote,
 } from './SummaryPrimitives';
 
 interface TodayMetrics {
@@ -106,6 +105,11 @@ export const DailySummarySection: React.FC<DailySummarySectionProps> = ({
     [effectiveTimeline, freeSegColor, colors.blue]
   );
 
+  const nowFormatted = useMemo(() => {
+    const now = new Date();
+    return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  }, []);
+
   const headerDate = todayFormatted || 'Hoje';
   const freeDecimals = Number.isInteger(freeNum) ? 0 : 1;
   const committedDecimals = Number.isInteger(committedNum) ? 0 : 1;
@@ -160,7 +164,15 @@ export const DailySummarySection: React.FC<DailySummarySectionProps> = ({
       {/* Bloco 2: Linha do dia (.rs-tl + indicador Agora + janelas de foco) */}
       <StaggerItem index={1}>
         <SummaryCard>
-          <SummaryEyebrow label="Linha do dia" />
+          <View style={styles.tlHeader}>
+            <SummaryEyebrow label="Linha do dia" />
+            <View style={[styles.nowPill, { backgroundColor: withHexAlpha(colors.red, 0.12) }]}>
+              <View style={[styles.nowDot, { backgroundColor: colors.red }]} />
+              <Text style={[styles.nowPillText, tabularNumbers, { color: colors.red }]}>
+                Agora · {nowFormatted}
+              </Text>
+            </View>
+          </View>
           <View style={styles.tlWrap}>
             <AnimatedSegmentedBar
               segments={segments}
@@ -245,10 +257,9 @@ export const DailySummarySection: React.FC<DailySummarySectionProps> = ({
         </View>
       </StaggerItem>
 
-      {/* Bloco 4: Nota do Vito (.rs-vt) + botões (.brow) */}
-      <StaggerItem index={3}>
-        <SummaryVitoNote text={synthesisText} />
-        {(onReserveFocus && hasFreeWindow) || onViewTasks ? (
+      {/* Bloco 4: Botões de ação (.brow) */}
+      {(onReserveFocus && hasFreeWindow) || onViewTasks ? (
+        <StaggerItem index={3}>
           <View style={styles.btnsRow}>
             {onReserveFocus && hasFreeWindow ? (
               <TouchableOpacity
@@ -275,8 +286,8 @@ export const DailySummarySection: React.FC<DailySummarySectionProps> = ({
               </TouchableOpacity>
             ) : null}
           </View>
-        ) : null}
-      </StaggerItem>
+        </StaggerItem>
+      ) : null}
     </View>
   );
 };
@@ -333,6 +344,29 @@ const styles = StyleSheet.create({
   chipText: {
     fontFamily: 'Geist_500Medium',
     fontSize: 12,
+  },
+  tlHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  nowPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  nowDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  nowPillText: {
+    fontFamily: 'Geist_500Medium',
+    fontSize: 11,
   },
   tlWrap: {
     marginTop: 16,

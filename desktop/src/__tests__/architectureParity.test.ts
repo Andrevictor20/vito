@@ -140,7 +140,6 @@ describe('Paridade Arquitetural Desktop ↔ Mobile (Plano 13)', () => {
       'useHomeData.ts',
       'useCalendarSync.ts',
       'usePendingItems.ts',
-      'useTriggers.ts',
       'useBots.ts',
       'useNotifications.ts',
       'chatMessageEffects.ts',

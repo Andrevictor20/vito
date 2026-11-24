@@ -142,7 +142,9 @@ func BuildTriggerSearchPlan(title, query string, category domain.TriggerCategory
 }
 
 // BuildTriggerSearchPlanWithAI utiliza o modelo de linguagem para refinar o plano de busca se disponível.
-func BuildTriggerSearchPlanWithAI(ctx context.Context, generator TextGeneratorProvider, userPrompt string, defaultCat domain.TriggerCategory) (domain.TriggerSearchConfig, error) {
+func BuildTriggerSearchPlanWithAI(ctx context.Context, generator interface {
+	GenerateText(ctx context.Context, systemPrompt, userPrompt string) (string, error)
+}, userPrompt string, defaultCat domain.TriggerCategory) (domain.TriggerSearchConfig, error) {
 	if generator == nil {
 		return BuildTriggerSearchPlan("Radar", userPrompt, defaultCat), nil
 	}

@@ -268,21 +268,55 @@ func (p *scriptedEvalProvider) SupportsVision() bool  { return true }
 func (p *scriptedEvalProvider) QualityTier() int      { return 3 }
 func (p *scriptedEvalProvider) MaxContextTokens() int { return 65536 }
 
+func subAgentForTool(toolName string) string {
+	switch {
+	case strings.HasPrefix(toolName, "calendar_"), strings.HasPrefix(toolName, "todo_"), strings.HasPrefix(toolName, "booking_"):
+		return "vito_routine_agent"
+	case strings.HasPrefix(toolName, "whatsapp_"), strings.HasPrefix(toolName, "gmail_"):
+		return "vito_comms_agent"
+	case strings.HasPrefix(toolName, "finance_"):
+		return "vito_finance_agent"
+	case strings.HasPrefix(toolName, "web_"):
+		return "vito_research_agent"
+	case strings.HasPrefix(toolName, "bot_"), strings.HasPrefix(toolName, "radar_"):
+		return "vito_bots_architect"
+	default:
+		return ""
+	}
+}
+
 func (p *scriptedEvalProvider) Chat(_ context.Context, _ ai.AgentChatRequest) (*ai.AgentChatResponse, error) {
 	p.step++
-	if p.step == 1 && p.toolName != "" {
-		rawArgs, _ := json.Marshal(p.toolArgs)
-		return &ai.AgentChatResponse{
-			ProviderName: p.Name(),
-			ModelName:    p.ModelName(),
-			ToolCalls: []ai.ToolCall{
-				{
-					ID:        "call_" + p.toolName,
-					Name:      p.toolName,
-					Arguments: rawArgs,
+	if p.toolName != "" {
+		targetAgent := subAgentForTool(p.toolName)
+		if targetAgent != "" && p.step == 1 {
+			transferArgs, _ := json.Marshal(map[string]string{"agent_name": targetAgent})
+			return &ai.AgentChatResponse{
+				ProviderName: p.Name(),
+				ModelName:    p.ModelName(),
+				ToolCalls: []ai.ToolCall{
+					{
+						ID:        "call_transfer_" + targetAgent,
+						Name:      "transfer_to_agent",
+						Arguments: transferArgs,
+					},
 				},
-			},
-		}, nil
+			}, nil
+		}
+		if (targetAgent != "" && p.step == 2) || (targetAgent == "" && p.step == 1) {
+			rawArgs, _ := json.Marshal(p.toolArgs)
+			return &ai.AgentChatResponse{
+				ProviderName: p.Name(),
+				ModelName:    p.ModelName(),
+				ToolCalls: []ai.ToolCall{
+					{
+						ID:        "call_" + p.toolName,
+						Name:      p.toolName,
+						Arguments: rawArgs,
+					},
+				},
+			}, nil
+		}
 	}
 	return &ai.AgentChatResponse{
 		Text:         p.reply,

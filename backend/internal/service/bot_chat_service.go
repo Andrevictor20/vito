@@ -270,10 +270,18 @@ func (s *BotChatService) buildBotExecutionInputs(bot *domain.Bot) (
 	policies = make(map[string]domain.ActionPolicy, len(bot.Actions))
 	for _, a := range bot.Actions {
 		policies[a.ActionKey] = a.Policy
-		if a.Policy != domain.ActionPolicyOff {
-			allowedKeys = append(allowedKeys, a.ActionKey)
-			connected = append(connected, fmt.Sprintf("%s (%s)", a.ActionKey, a.Policy))
+		if a.Policy == domain.ActionPolicyOff {
+			continue
 		}
+		if spec, ok := domain.ActionCatalog[a.ActionKey]; ok && spec.AppKey != "" && s.runner != nil && s.runner.appChecker != nil {
+			connApps := s.runner.appChecker(context.Background(), bot.UserID)
+			if isConnected, known := connApps[spec.AppKey]; known && !isConnected {
+				locked = append(locked, fmt.Sprintf("%s (app '%s' desconectado)", a.ActionKey, spec.AppKey))
+				continue
+			}
+		}
+		allowedKeys = append(allowedKeys, a.ActionKey)
+		connected = append(connected, fmt.Sprintf("%s (%s)", a.ActionKey, a.Policy))
 	}
 	if s.catalog != nil {
 		for _, bs := range bot.Skills {
@@ -323,46 +331,83 @@ func (s *BotChatService) BuildContextualChips(bot *domain.Bot) []string {
 	return chips
 }
 
-// buildSelfConfigTools expõe as 8 operações de BotSelfConfigToolset como functiontools ADK no chat do bot.
+type botSelfEmptyArgs struct{}
+type botSelfGoalArgs struct {
+	Goal string `json:"goal" jsonschema:"Nova função ou objetivo principal do bot."`
+}
+type botSelfScheduleArgs struct {
+	Schedule  string `json:"schedule,omitempty" jsonschema:"Horário no formato HH:MM."`
+	Frequency string `json:"frequency,omitempty" jsonschema:"Frequência de execução (ex.: daily, hourly, weekly)."`
+}
+type botSelfActionArgs struct {
+	ActionKey   string `json:"action_key" jsonschema:"Chave da ação a adicionar (ex.: cal:list, wa:waread)."`
+	ActionLabel string `json:"action_label,omitempty" jsonschema:"Rótulo amigável opcional da ação."`
+}
+type botSelfSkillArgs struct {
+	SkillKey  string `json:"skill_key" jsonschema:"Chave do pacote de habilidade."`
+	SkillName string `json:"skill_name,omitempty" jsonschema:"Nome opcional da habilidade."`
+}
+type botSelfMemoryArgs struct {
+	Content string `json:"content" jsonschema:"Preferência ou instrução permanente para a memória isolada do bot."`
+}
+type botSelfPauseArgs struct {
+	Reason string `json:"reason,omitempty" jsonschema:"Motivo opcional para pausar o bot."`
+}
+
+func newTypedBotSelfTool[T any](ts *toolsets.BotSelfConfigToolset, userID, botID, name, op, desc string) (tool.Tool, error) {
+	return functiontool.New(functiontool.Config{
+		Name:        name,
+		Description: desc,
+	}, func(ctx agent.Context, args T) (map[string]any, error) {
+		raw, _ := json.Marshal(args)
+		res, err := ts.Execute(ctx, &domain.ToolExecutionContext{UserID: userID, BotID: botID}, op, raw)
+		if err != nil {
+			return map[string]any{"status": "ERROR", "error": err.Error()}, nil
+		}
+		outMap := map[string]any{
+			"status":          res.Status,
+			"summary_for_llm": res.SummaryForLLM,
+		}
+		if len(res.Cards) > 0 {
+			outMap["cards"] = res.Cards
+		}
+		return outMap, nil
+	})
+}
+
+// buildSelfConfigTools expõe as 8 operações de BotSelfConfigToolset como functiontools ADK tipadas no chat do bot.
 func (s *BotChatService) buildSelfConfigTools(userID, botID string) []tool.Tool {
 	adapter := &botSelfConfigAdapter{chatSvc: s, userID: userID, botID: botID}
 	ts := toolsets.NewBotSelfConfigToolset(adapter)
-	ops := []struct {
-		name string
-		op   string
-		desc string
-	}{
-		{"run_now", "run_now", "Executa o bot agora mesmo de forma real."},
-		{"explain_last_gaps", "explain_last_gaps", "Explica o que o bot não conseguiu verificar na última execução."},
-		{"propose_update_goal", "propose_update_goal", "Propõe alterar a função principal do bot (exige confirmação do usuário)."},
-		{"propose_update_schedule", "propose_update_schedule", "Propõe alterar o horário ou frequência de execução do bot."},
-		{"propose_add_action", "propose_add_action", "Propõe adicionar uma nova ação ao bot."},
-		{"propose_add_skill", "propose_add_skill", "Propõe adicionar um pacote de habilidade ao bot."},
-		{"save_bot_memory", "save_bot_memory", "Salva uma preferência ou instrução permanente na memória isolada deste bot."},
-		{"propose_pause_bot", "propose_pause_bot", "Propõe pausar este bot."},
+	candidates := []func() (tool.Tool, error){
+		func() (tool.Tool, error) {
+			return newTypedBotSelfTool[botSelfEmptyArgs](ts, userID, botID, "run_now", "run_now", "Executa o bot agora mesmo de forma real.")
+		},
+		func() (tool.Tool, error) {
+			return newTypedBotSelfTool[botSelfEmptyArgs](ts, userID, botID, "explain_last_gaps", "explain_last_gaps", "Explica o que o bot não conseguiu verificar na última execução.")
+		},
+		func() (tool.Tool, error) {
+			return newTypedBotSelfTool[botSelfGoalArgs](ts, userID, botID, "propose_update_goal", "propose_update_goal", "Propõe alterar a função principal do bot (exige confirmação do usuário).")
+		},
+		func() (tool.Tool, error) {
+			return newTypedBotSelfTool[botSelfScheduleArgs](ts, userID, botID, "propose_update_schedule", "propose_update_schedule", "Propõe alterar o horário ou frequência de execução do bot.")
+		},
+		func() (tool.Tool, error) {
+			return newTypedBotSelfTool[botSelfActionArgs](ts, userID, botID, "propose_add_action", "propose_add_action", "Propõe adicionar uma nova ação ao bot.")
+		},
+		func() (tool.Tool, error) {
+			return newTypedBotSelfTool[botSelfSkillArgs](ts, userID, botID, "propose_add_skill", "propose_add_skill", "Propõe adicionar um pacote de habilidade ao bot.")
+		},
+		func() (tool.Tool, error) {
+			return newTypedBotSelfTool[botSelfMemoryArgs](ts, userID, botID, "save_bot_memory", "save_bot_memory", "Salva uma preferência ou instrução permanente na memória isolada deste bot.")
+		},
+		func() (tool.Tool, error) {
+			return newTypedBotSelfTool[botSelfPauseArgs](ts, userID, botID, "propose_pause_bot", "propose_pause_bot", "Propõe pausar este bot.")
+		},
 	}
 	var out []tool.Tool
-	for _, item := range ops {
-		spec := item
-		ft, err := functiontool.New(functiontool.Config{
-			Name:        spec.name,
-			Description: spec.desc,
-		}, func(ctx agent.Context, args map[string]any) (map[string]any, error) {
-			raw, _ := json.Marshal(args)
-			res, err := ts.Execute(ctx, &domain.ToolExecutionContext{UserID: userID, BotID: botID}, spec.op, raw)
-			if err != nil {
-				return map[string]any{"status": "ERROR", "error": err.Error()}, nil
-			}
-			outMap := map[string]any{
-				"status":          res.Status,
-				"summary_for_llm": res.SummaryForLLM,
-			}
-			if len(res.Cards) > 0 {
-				outMap["cards"] = res.Cards
-			}
-			return outMap, nil
-		})
-		if err == nil && ft != nil {
+	for _, build := range candidates {
+		if ft, err := build(); err == nil && ft != nil {
 			out = append(out, ft)
 		}
 	}

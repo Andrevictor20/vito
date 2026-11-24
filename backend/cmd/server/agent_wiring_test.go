@@ -137,7 +137,7 @@ func TestWhatsAppServiceAdapter_SendMessage_ResolvesContactName(t *testing.T) {
 	mockClient := &mockEvoClientWiring{}
 	waSvc := service.NewWhatsAppService(service.WhatsAppServiceConfig{
 		WebhookBaseURL: "https://vito.rasppi.cloud",
-	}, waRepo, mockClient, nil)
+	}, waRepo, mockClient)
 
 	contactRepo := &mockSyncedRepoWiring{
 		contacts: []domain.SyncedContact{
@@ -219,7 +219,7 @@ func TestProductionCognitiveWiring_Onda2AndOnda3(t *testing.T) {
 	triggerSvc := service.NewTriggerService(triggerRepo)
 	pendingSvc := service.NewPendingService(pendingRepo)
 	notifSvc := service.NewNotificationService(notifRepo)
-	waSvc := service.NewWhatsAppService(service.WhatsAppServiceConfig{}, waRepo, &mockEvoClientWiring{}, nil)
+	waSvc := service.NewWhatsAppService(service.WhatsAppServiceConfig{}, waRepo, &mockEvoClientWiring{})
 
 	agentSys := setupAgentSubsystem(
 		&config.Config{}, db, calSvc, todoSvc, waSvc, nil,
