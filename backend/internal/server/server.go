@@ -44,8 +44,10 @@ type Server struct {
 	whatsappAuthHandler *handler.WhatsAppAuthHandler
 	voiceHandler        *handler.VoiceStreamHandler
 	voiceTTSHandler     *handler.VoiceTTSHandler
-	financeHandler      *handler.FinanceHandler
-	authSvc             *service.AuthService
+	financeHandler          *handler.FinanceHandler
+	financeLimitHandler     *handler.FinanceLimitHandler
+	financeAnalyticsHandler *handler.FinanceAnalyticsHandler
+	authSvc                 *service.AuthService
 }
 
 // Config contém as dependências necessárias para inicializar o Server.
@@ -76,8 +78,10 @@ type Config struct {
 	WhatsAppAuthHandler *handler.WhatsAppAuthHandler
 	VoiceHandler        *handler.VoiceStreamHandler
 	VoiceTTSHandler     *handler.VoiceTTSHandler
-	FinanceHandler      *handler.FinanceHandler
-	AuthSvc             *service.AuthService
+	FinanceHandler          *handler.FinanceHandler
+	FinanceLimitHandler     *handler.FinanceLimitHandler
+	FinanceAnalyticsHandler *handler.FinanceAnalyticsHandler
+	AuthSvc                 *service.AuthService
 	// AllowedOrigins restringe o CORS (SEC-03). Vazio = ["*"] apenas fora
 	// de produção (dev/testes); em produção, vazio nega origens (fail-closed).
 	AllowedOrigins []string
@@ -117,6 +121,8 @@ func New(cfg ...Config) *Server {
 		s.voiceHandler = cfg[0].VoiceHandler
 		s.voiceTTSHandler = cfg[0].VoiceTTSHandler
 		s.financeHandler = cfg[0].FinanceHandler
+		s.financeLimitHandler = cfg[0].FinanceLimitHandler
+		s.financeAnalyticsHandler = cfg[0].FinanceAnalyticsHandler
 		s.authSvc = cfg[0].AuthSvc
 	}
 
@@ -421,18 +427,48 @@ func (s *Server) registerRoutes() {
 					})
 				}
 
-				if s.financeHandler != nil {
+				if s.financeHandler != nil || s.financeLimitHandler != nil || s.financeAnalyticsHandler != nil {
 					protected.Route("/finance", func(fr chi.Router) {
-						fr.Get("/summary", s.financeHandler.GetSummary)
-						fr.Get("/accounts", s.financeHandler.ListAccounts)
-						fr.Get("/transactions", s.financeHandler.ListTransactions)
-						fr.Get("/connections", s.financeHandler.ListConnections)
-						fr.Post("/connections", s.financeHandler.CreateConnection)
-						fr.Delete("/connections/{id}", s.financeHandler.DeleteConnection)
-						fr.Post("/sync", s.financeHandler.SyncPayload)
-						fr.Put("/byok-backup", s.financeHandler.PutByokBackup)
-						fr.Get("/byok-backup", s.financeHandler.GetByokBackup)
-						fr.Delete("/byok-backup", s.financeHandler.DeleteByokBackup)
+						if s.financeHandler != nil {
+							fr.Get("/summary", s.financeHandler.GetSummary)
+							fr.Get("/accounts", s.financeHandler.ListAccounts)
+							if s.financeAnalyticsHandler == nil {
+								fr.Get("/transactions", s.financeHandler.ListTransactions)
+							}
+							fr.Get("/connections", s.financeHandler.ListConnections)
+							fr.Post("/connections", s.financeHandler.CreateConnection)
+							fr.Patch("/connections/{id}/status", s.financeHandler.UpdateConnectionStatus)
+							fr.Delete("/connections/{id}", s.financeHandler.DeleteConnection)
+							fr.Post("/sync", s.financeHandler.SyncPayload)
+							fr.Put("/byok-backup", s.financeHandler.PutByokBackup)
+							fr.Get("/byok-backup", s.financeHandler.GetByokBackup)
+							fr.Delete("/byok-backup", s.financeHandler.DeleteByokBackup)
+						}
+						if s.financeLimitHandler != nil {
+							fr.Get("/limits", s.financeLimitHandler.ListLimits)
+							fr.Post("/limits", s.financeLimitHandler.UpsertLimit)
+							fr.Get("/limits/suggestions", s.financeLimitHandler.GetLimitSuggestions)
+							fr.Put("/limits/{id}", s.financeLimitHandler.UpsertLimit)
+							fr.Delete("/limits/{id}", s.financeLimitHandler.DeleteLimit)
+							fr.Get("/limits/{id}/history", s.financeLimitHandler.GetLimitHistory)
+							fr.Post("/limits/{id}/mute", s.financeLimitHandler.MuteLimit)
+							// Aliases retrocompatíveis /finance/budgets
+							fr.Get("/budgets", s.financeLimitHandler.ListLimits)
+							fr.Post("/budgets", s.financeLimitHandler.UpsertLimit)
+							fr.Put("/budgets/{id}", s.financeLimitHandler.UpsertLimit)
+							fr.Delete("/budgets/{id}", s.financeLimitHandler.DeleteLimit)
+						}
+						if s.financeAnalyticsHandler != nil {
+							fr.Get("/transactions", s.financeAnalyticsHandler.SearchTransactions)
+							fr.Patch("/transactions/{id}", s.financeAnalyticsHandler.RecategorizeTransaction)
+							fr.Get("/analytics/spending", s.financeAnalyticsHandler.GetSpendingAnalytics)
+							fr.Get("/analytics/cashflow", s.financeAnalyticsHandler.GetCashFlowAnalytics)
+							fr.Get("/cards", s.financeAnalyticsHandler.GetCardsOverview)
+							fr.Get("/cards/{id}/bills", s.financeAnalyticsHandler.GetCardBills)
+							fr.Get("/installments", s.financeAnalyticsHandler.GetInstallmentsOverview)
+							fr.Get("/installments/projection", s.financeAnalyticsHandler.GetInstallmentsOverview)
+							fr.Get("/calendar", s.financeAnalyticsHandler.GetFinanceCalendar)
+						}
 					})
 				}
 

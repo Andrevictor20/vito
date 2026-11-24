@@ -45,6 +45,7 @@ type ConnectionStatus string
 
 const (
 	ConnectionStatusUpdated      ConnectionStatus = "UPDATED"
+	ConnectionStatusUpdating     ConnectionStatus = "UPDATING"
 	ConnectionStatusLoginError   ConnectionStatus = "LOGIN_ERROR"
 	ConnectionStatusOutdated     ConnectionStatus = "OUTDATED"
 	ConnectionStatusWaitingInput ConnectionStatus = "WAITING_USER_INPUT"
@@ -52,16 +53,34 @@ const (
 
 // FinanceConnection representa uma instituição conectada via Open Finance (Pluggy Item).
 type FinanceConnection struct {
-	ID               string           `json:"id"`
-	UserID           string           `json:"user_id"`
-	PluggyItemID     string           `json:"pluggy_item_id"`
-	ConnectorID      int              `json:"connector_id"`
-	InstitutionName  string           `json:"institution_name"`
-	Status           ConnectionStatus `json:"status"`
-	LastSyncAt       *time.Time       `json:"last_sync_at,omitempty"`
-	ConsentExpiresAt *time.Time       `json:"consent_expires_at,omitempty"`
-	CreatedAt        time.Time        `json:"created_at"`
-	UpdatedAt        time.Time        `json:"updated_at"`
+	ID                    string           `json:"id"`
+	UserID                string           `json:"user_id"`
+	PluggyItemID          string           `json:"pluggy_item_id"`
+	ConnectorID           int              `json:"connector_id"`
+	InstitutionName       string           `json:"institution_name"`
+	Status                ConnectionStatus `json:"status"`
+	LastSyncAt            *time.Time       `json:"last_sync_at,omitempty"`
+	LastAttemptAt         *time.Time       `json:"last_attempt_at,omitempty"`
+	LastBankRefreshAt     *time.Time       `json:"last_bank_refresh_at,omitempty"`
+	PluggyExecutionStatus string           `json:"pluggy_execution_status,omitempty"`
+	LastErrorCode         string           `json:"last_error_code,omitempty"`
+	LastErrorMessage      string           `json:"last_error_message,omitempty"`
+	ConsecutiveFailures   int              `json:"consecutive_failures"`
+	ConsentExpiresAt      *time.Time       `json:"consent_expires_at,omitempty"`
+	CreatedAt             time.Time        `json:"created_at"`
+	UpdatedAt             time.Time        `json:"updated_at"`
+}
+
+// FinanceConnectionStatusUpdate atualiza telemetria/status de uma conexão após tentativa de sync.
+type FinanceConnectionStatusUpdate struct {
+	Status                ConnectionStatus `json:"status"`
+	PluggyExecutionStatus string           `json:"pluggy_execution_status,omitempty"`
+	LastErrorCode         string           `json:"last_error_code,omitempty"`
+	LastErrorMessage      string           `json:"last_error_message,omitempty"`
+	LastAttemptAt         *time.Time       `json:"last_attempt_at,omitempty"`
+	LastBankRefreshAt     *time.Time       `json:"last_bank_refresh_at,omitempty"`
+	ConsentExpiresAt      *time.Time       `json:"consent_expires_at,omitempty"`
+	ResetFailures         bool             `json:"reset_failures,omitempty"`
 }
 
 // FinanceAccount representa uma conta corrente, poupança ou cartão de crédito.
@@ -180,11 +199,18 @@ type FinancialSummary struct {
 
 // FinanceSyncPayload é o envelope enviado pelo app mobile no Edge-Sync.
 type FinanceSyncPayload struct {
-	ConnectionID    string               `json:"connection_id,omitempty"`
-	PluggyItemID    string               `json:"pluggy_item_id,omitempty"`
-	InstitutionName string               `json:"institution_name,omitempty"`
-	Accounts        []FinanceAccount     `json:"accounts"`
-	Transactions    []FinanceTransaction `json:"transactions"`
+	ConnectionID          string               `json:"connection_id,omitempty"`
+	PluggyItemID          string               `json:"pluggy_item_id,omitempty"`
+	ConnectorID           int                  `json:"connector_id,omitempty"`
+	InstitutionName       string               `json:"institution_name,omitempty"`
+	Status                ConnectionStatus     `json:"status,omitempty"`
+	PluggyExecutionStatus string               `json:"pluggy_execution_status,omitempty"`
+	LastBankRefreshAt     *time.Time           `json:"last_bank_refresh_at,omitempty"`
+	ConsentExpiresAt      *time.Time           `json:"consent_expires_at,omitempty"`
+	LastErrorCode         string               `json:"last_error_code,omitempty"`
+	LastErrorMessage      string               `json:"last_error_message,omitempty"`
+	Accounts              []FinanceAccount     `json:"accounts"`
+	Transactions          []FinanceTransaction `json:"transactions"`
 }
 
 // FinanceByokBackup representa o blob opaco cifrado no cliente contendo as chaves BYOK do usuário.

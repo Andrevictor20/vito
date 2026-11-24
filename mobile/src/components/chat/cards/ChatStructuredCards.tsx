@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChatMessage, TimeSlot } from '../../../types';
+import { ChatCardPayload, ChatMessage, TimeSlot } from '../../../types';
 import { EventInlineCard } from './EventInlineCard';
 import { ConflictInlineCard } from './ConflictInlineCard';
 import { TodoInlineCard } from './TodoInlineCard';
@@ -11,6 +11,8 @@ import { WhatsAppMessageInlineCard } from './WhatsAppMessageInlineCard';
 import { GmailMessageInlineCard } from './GmailMessageInlineCard';
 import { DestructiveConfirmationCard } from './DestructiveConfirmationCard';
 import { ActionConfirmationCard } from './ActionConfirmationCard';
+import { FinanceSummaryCard } from './FinanceSummaryCard';
+import { SpendingLimitAlertCard } from './SpendingLimitAlertCard';
 import { SmoothCardEntrance } from './SmoothCardEntrance';
 
 export interface ChatStructuredCardsProps {
@@ -33,6 +35,12 @@ export const ChatStructuredCards: React.FC<ChatStructuredCardsProps> = ({
   disabled = false,
 }) => {
   const confirmCard = message.cards?.find((c) => c.type === 'confirm');
+  const financeSummaryCard = message.cards?.find((c) => c.type === 'finance_summary') as
+    | (ChatCardPayload & { data?: Record<string, unknown> })
+    | undefined;
+  const limitAlertCard = message.cards?.find((c) => c.type === 'spending_limit_alert') as
+    | (ChatCardPayload & { data?: Record<string, unknown> })
+    | undefined;
   const pendingConfId = message.pending_confirmation_id || confirmCard?.id || '';
   const showActionConfirm =
     Boolean(message.requires_confirmation || confirmCard) &&
@@ -95,6 +103,16 @@ export const ChatStructuredCards: React.FC<ChatStructuredCardsProps> = ({
             messageData={message.gmail_message}
             disabled={disabled}
           />
+        </SmoothCardEntrance>
+      )}
+      {financeSummaryCard && (
+        <SmoothCardEntrance>
+          <FinanceSummaryCard title={financeSummaryCard.title} data={financeSummaryCard.data} />
+        </SmoothCardEntrance>
+      )}
+      {limitAlertCard && (
+        <SmoothCardEntrance>
+          <SpendingLimitAlertCard title={limitAlertCard.title} data={limitAlertCard.data} />
         </SmoothCardEntrance>
       )}
       {showActionConfirm && (

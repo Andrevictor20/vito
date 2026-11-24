@@ -111,7 +111,10 @@ func setupAgentSubsystem(
 		registry.Register(toolsets.NewBotTriggerToolset())
 	}
 	if finRepo != nil {
-		registry.Register(toolsets.NewFinanceToolset(service.NewFinanceService(finRepo), finRepo))
+		finToolset := toolsets.NewFinanceToolset(service.NewFinanceService(finRepo), finRepo)
+		finLimitRepo := repository.NewFinanceLimitRepository(db)
+		finToolset.SetLimitService(service.NewFinanceLimitService(finLimitRepo, finRepo))
+		registry.Register(finToolset)
 	} else {
 		registry.Register(toolsets.NewFinanceToolset(nil))
 	}

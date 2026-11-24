@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowLeft, BarChart3, Bell, Link2, Wallet } from 'lucide-react';
+import { ArrowLeft, BarChart3, Bell, Link2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useReduceMotion } from '../../theme/motion';
 import { BotsView } from '../bots/BotsView';
@@ -11,6 +11,7 @@ import { SettingsModal } from '../profile/SettingsModal';
 import { SettingsView } from '../profile/SettingsView';
 import { ExecutiveSummariesView } from '../summaries/ExecutiveSummariesView';
 import { TasksView } from '../tasks/TasksView';
+import { FinanceView } from '../../pages/Finance/FinanceView';
 import { CommandPalette } from './CommandPalette';
 import { DesktopTab, Sidebar } from './Sidebar';
 
@@ -179,21 +180,7 @@ export const DesktopLayout: React.FC = () => {
       case 'tasks':
         return <TasksView />;
       case 'finance':
-        return (
-          <div className="flex-1 flex items-center justify-center p-8 bg-[var(--bg)]">
-            <div className="v5-card max-w-md w-full p-7 text-center space-y-3">
-              <div className="w-12 h-12 rounded-2xl bg-[var(--fin-bg)] text-[var(--fin)] mx-auto flex items-center justify-center">
-                <Wallet size={22} />
-              </div>
-              <h2 className="text-xl font-medium text-[var(--ink)] tracking-tight">
-                Finanças
-              </h2>
-              <p className="text-sm text-[var(--muted)] leading-relaxed">
-                O módulo Open Finance e Pluggy BYOK está disponível no app mobile e será integrado nesta visualização em breve.
-              </p>
-            </div>
-          </div>
-        );
+        return <FinanceView />;
       case 'triggers':
         return (
           <BotsView

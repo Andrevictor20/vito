@@ -36,6 +36,7 @@ import {
   normalizeSummary,
 } from '../components/finance/financeHelpers';
 import { syncAllUserConnections } from '../services/financeSyncRunner';
+import { useFinanceAutoSync } from '../hooks/useFinanceAutoSync';
 
 const PROMPT_CHIPS: ReadonlyArray<{ label: string; prompt: string }> = [
   { label: 'Quanto gastei com Uber?', prompt: 'Quanto gastei com Uber este mês em comparação com minha média?' },
@@ -92,14 +93,10 @@ export const FinanceScreen: React.FC = () => {
     return () => unsub();
   }, [loadAllFinanceData]);
 
-  useEffect(() => {
-    if (!loading && connections.length > 0 && transactions.length === 0) {
-      void (async () => {
-        const synced = await syncAllUserConnections();
-        if (synced > 0) void loadAllFinanceData();
-      })();
-    }
-  }, [loading, connections.length, transactions.length, loadAllFinanceData]);
+  useFinanceAutoSync({
+    connections,
+    enabled: !loading && connections.length > 0,
+  });
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);

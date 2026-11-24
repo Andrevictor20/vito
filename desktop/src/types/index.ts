@@ -189,6 +189,7 @@ export interface ChatCardPayload {
   action_value?: string;
   confirm?: boolean;
   dismiss?: boolean;
+  data?: Record<string, unknown>;
 }
 
 export interface ChatMessage {

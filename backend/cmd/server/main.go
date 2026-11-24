@@ -249,8 +249,18 @@ func main() {
 	chatHandler := handler.NewChatHandler(chatSvc)
 
 	financeRepo := repository.NewFinanceRepository(db)
+	financeLimitRepo := repository.NewFinanceLimitRepository(db)
+	financeAnalyticsRepo := repository.NewFinanceAnalyticsRepository(db)
 	financeSvc := service.NewFinanceService(financeRepo)
+	financeLimitSvc := service.NewFinanceLimitService(financeLimitRepo, financeRepo)
+	financeAnalyticsSvc := service.NewFinanceAnalyticsService(financeAnalyticsRepo, financeRepo)
+	spendingLimitEval := service.NewSpendingLimitEvaluator(financeLimitRepo, nil)
+	financeSvc.SetOnSyncComplete(func(ctx context.Context, userID string) {
+		_, _ = spendingLimitEval.EvaluateUserLimits(ctx, userID, time.Now().UTC())
+	})
 	financeHandler := handler.NewFinanceHandler(financeSvc)
+	financeLimitHandler := handler.NewFinanceLimitHandler(financeLimitSvc)
+	financeAnalyticsHandler := handler.NewFinanceAnalyticsHandler(financeAnalyticsSvc)
 
 	evoClient := service.NewDefaultEvolutionClient(cfg.EvolutionAPIURL, cfg.EvolutionAPIKey, nil)
 	waSvc := service.NewWhatsAppService(service.WhatsAppServiceConfig{
@@ -404,8 +414,10 @@ func main() {
 		WhatsAppAuthHandler: whatsappAuthHandler,
 		VoiceHandler:        voiceStreamHandler,
 		VoiceTTSHandler:     voiceTTSHandler,
-		FinanceHandler:      financeHandler,
-		AuthSvc:             authSvc,
+		FinanceHandler:          financeHandler,
+		FinanceLimitHandler:     financeLimitHandler,
+		FinanceAnalyticsHandler: financeAnalyticsHandler,
+		AuthSvc:                 authSvc,
 		AllowedOrigins:      cfg.AllowedOrigins(),
 		Environment:         cfg.Environment,
 	})

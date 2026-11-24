@@ -253,6 +253,42 @@ func (h *FinanceHandler) DeleteByokBackup(w http.ResponseWriter, r *http.Request
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// UpdateConnectionStatus atualiza o status e telemetria de uma conexão bancária (SyncEngine v2).
+func (h *FinanceHandler) UpdateConnectionStatus(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok || userID == "" {
+		http.Error(w, "não autorizado", http.StatusUnauthorized)
+		return
+	}
+
+	connectionID := chi.URLParam(r, "id")
+	if connectionID == "" {
+		http.Error(w, "id da conexão obrigatório", http.StatusBadRequest)
+		return
+	}
+
+	var req domain.FinanceConnectionStatusUpdate
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Status == "" {
+		http.Error(w, "payload json inválido", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.financeSvc.UpdateConnectionStatus(r.Context(), userID, connectionID, req); err != nil {
+		if errors.Is(err, domain.ErrFinanceConnectionNotFound) {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		if errors.Is(err, domain.ErrFinanceInvalidPayload) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		http.Error(w, "erro ao atualizar status da conexão", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // ListTransactions lista transações com paginação.
 func (h *FinanceHandler) ListTransactions(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())

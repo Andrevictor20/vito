@@ -11,6 +11,8 @@ import { ConflictInlineCard, ConflictInfo, TimeSlot } from './ConflictInlineCard
 import { MeetingInlineCard } from './MeetingInlineCard';
 import { PendingInlineCard } from './PendingInlineCard';
 import { TriggerInlineCard } from './TriggerInlineCard';
+import { FinanceSummaryCard } from './FinanceSummaryCard';
+import { SpendingLimitAlertCard } from './SpendingLimitAlertCard';
 import { SmoothCardEntrance } from './SmoothCardEntrance';
 
 export interface ChatStructuredCardsProps {
@@ -42,6 +44,8 @@ export const ChatStructuredCards: React.FC<ChatStructuredCardsProps> = ({
   const conflict = message.conflict as ConflictInfo | undefined;
   const pendingItem = message.pending;
   const confirmCard = message.cards?.find((c) => c.type === 'confirm');
+  const financeSummaryCard = message.cards?.find((c) => c.type === 'finance_summary');
+  const limitAlertCard = message.cards?.find((c) => c.type === 'spending_limit_alert');
   const pendingConfId = message.pending_confirmation_id || confirmCard?.id || '';
   const showActionConfirm =
     Boolean(message.requires_confirmation || confirmCard) &&
@@ -118,6 +122,24 @@ export const ChatStructuredCards: React.FC<ChatStructuredCardsProps> = ({
         </SmoothCardEntrance>
       )}
 
+      {financeSummaryCard && (
+        <SmoothCardEntrance>
+          <FinanceSummaryCard
+            title={financeSummaryCard.title}
+            data={financeSummaryCard.data}
+            onNavigateTab={onNavigateTab}
+          />
+        </SmoothCardEntrance>
+      )}
+      {limitAlertCard && (
+        <SmoothCardEntrance>
+          <SpendingLimitAlertCard
+            title={limitAlertCard.title}
+            data={limitAlertCard.data}
+            onNavigateTab={onNavigateTab}
+          />
+        </SmoothCardEntrance>
+      )}
       {showActionConfirm && (
         <SmoothCardEntrance>
           <ActionConfirmationCard

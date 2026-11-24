@@ -18,6 +18,7 @@ import { NotificationsApi } from './notificationsApi';
 import { AiProvidersApi, ConnectAiProviderInput, TestAiProviderResponse } from './aiProvidersApi';
 import { InboxNotificationsApi } from './inboxNotificationsApi';
 import { StoreComplianceApi } from './storeComplianceApi';
+import { FinanceApi } from './financeApi';
 import { fileUriToBase64 } from './fileUtils';
 import {
   User,
@@ -92,6 +93,7 @@ export class ApiService extends ApiClient {
   public aiProvidersApi = new AiProvidersApi(this);
   public inboxNotificationsApi = new InboxNotificationsApi(this);
   public storeComplianceApi = new StoreComplianceApi(this);
+  public financeApi = new FinanceApi(this);
 
   public getToken(): string | null {
     return this.accessToken;
@@ -374,6 +376,9 @@ export class ApiService extends ApiClient {
   }
   get store(): StoreComplianceApi {
     return this.storeComplianceApi;
+  }
+  get finance(): FinanceApi {
+    return this.financeApi;
   }
 }
 

@@ -16,6 +16,7 @@ type FinanceRepository interface {
 	GetConnection(ctx context.Context, userID, connectionID string) (*domain.FinanceConnection, error)
 	GetConnectionByPluggyItemID(ctx context.Context, userID, pluggyItemID string) (*domain.FinanceConnection, error)
 	ListConnections(ctx context.Context, userID string) ([]domain.FinanceConnection, error)
+	UpdateConnectionStatus(ctx context.Context, userID, connectionID string, upd domain.FinanceConnectionStatusUpdate) error
 	DeleteConnection(ctx context.Context, userID, connectionID string) error
 
 	UpsertAccountsBatch(ctx context.Context, userID string, accounts []domain.FinanceAccount) error
@@ -57,21 +58,31 @@ func (r *sqliteFinanceRepo) UpsertConnection(ctx context.Context, conn *domain.F
 	query := `
 		INSERT INTO finance_connections (
 			id, user_id, pluggy_item_id, connector_id, institution_name, status,
-			last_sync_at, consent_expires_at, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			last_sync_at, last_attempt_at, last_bank_refresh_at,
+			pluggy_execution_status, last_error_code, last_error_message,
+			consecutive_failures, consent_expires_at, created_at, updated_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(pluggy_item_id) DO UPDATE SET
-			connector_id = excluded.connector_id,
+			connector_id = CASE WHEN excluded.connector_id > 0 THEN excluded.connector_id ELSE finance_connections.connector_id END,
 			institution_name = excluded.institution_name,
 			status = excluded.status,
-			last_sync_at = excluded.last_sync_at,
-			consent_expires_at = excluded.consent_expires_at,
+			last_sync_at = COALESCE(excluded.last_sync_at, finance_connections.last_sync_at),
+			last_attempt_at = COALESCE(excluded.last_attempt_at, finance_connections.last_attempt_at),
+			last_bank_refresh_at = COALESCE(excluded.last_bank_refresh_at, finance_connections.last_bank_refresh_at),
+			pluggy_execution_status = excluded.pluggy_execution_status,
+			last_error_code = excluded.last_error_code,
+			last_error_message = excluded.last_error_message,
+			consecutive_failures = excluded.consecutive_failures,
+			consent_expires_at = COALESCE(excluded.consent_expires_at, finance_connections.consent_expires_at),
 			updated_at = excluded.updated_at
 		WHERE finance_connections.user_id = excluded.user_id
 	`
 	rows, err := ExecuteQueuedWriteRows(ctx, func() (sql.Result, error) {
 		return r.db.ExecContext(ctx, query,
 			conn.ID, conn.UserID, conn.PluggyItemID, conn.ConnectorID, conn.InstitutionName,
-			conn.Status, conn.LastSyncAt, conn.ConsentExpiresAt, conn.CreatedAt, conn.UpdatedAt,
+			conn.Status, conn.LastSyncAt, conn.LastAttemptAt, conn.LastBankRefreshAt,
+			conn.PluggyExecutionStatus, conn.LastErrorCode, conn.LastErrorMessage,
+			conn.ConsecutiveFailures, conn.ConsentExpiresAt, conn.CreatedAt, conn.UpdatedAt,
 		)
 	})
 	if err != nil {
@@ -83,34 +94,33 @@ func (r *sqliteFinanceRepo) UpsertConnection(ctx context.Context, conn *domain.F
 	return nil
 }
 
+const connectionSelectCols = `
+	id, user_id, pluggy_item_id, connector_id, institution_name, status,
+	last_sync_at, last_attempt_at, last_bank_refresh_at,
+	COALESCE(pluggy_execution_status, ''), COALESCE(last_error_code, ''), COALESCE(last_error_message, ''),
+	COALESCE(consecutive_failures, 0), consent_expires_at, created_at, updated_at
+`
+
 func (r *sqliteFinanceRepo) GetConnection(ctx context.Context, userID, connectionID string) (*domain.FinanceConnection, error) {
-	query := `
-		SELECT id, user_id, pluggy_item_id, connector_id, institution_name, status,
-		       last_sync_at, consent_expires_at, created_at, updated_at
-		FROM finance_connections
-		WHERE user_id = ? AND id = ?
-	`
+	query := `SELECT ` + connectionSelectCols + ` FROM finance_connections WHERE user_id = ? AND id = ?`
 	row := r.db.QueryRowContext(ctx, query, userID, connectionID)
 	return scanConnection(row)
 }
 
 func (r *sqliteFinanceRepo) GetConnectionByPluggyItemID(ctx context.Context, userID, pluggyItemID string) (*domain.FinanceConnection, error) {
-	query := `
-		SELECT id, user_id, pluggy_item_id, connector_id, institution_name, status,
-		       last_sync_at, consent_expires_at, created_at, updated_at
-		FROM finance_connections
-		WHERE user_id = ? AND pluggy_item_id = ?
-	`
+	query := `SELECT ` + connectionSelectCols + ` FROM finance_connections WHERE user_id = ? AND pluggy_item_id = ?`
 	row := r.db.QueryRowContext(ctx, query, userID, pluggyItemID)
 	return scanConnection(row)
 }
 
 func scanConnection(scanner interface{ Scan(dest ...any) error }) (*domain.FinanceConnection, error) {
 	var conn domain.FinanceConnection
-	var lastSync, consentExp sql.NullTime
+	var lastSync, lastAttempt, lastRefresh, consentExp sql.NullTime
 	err := scanner.Scan(
 		&conn.ID, &conn.UserID, &conn.PluggyItemID, &conn.ConnectorID, &conn.InstitutionName,
-		&conn.Status, &lastSync, &consentExp, &conn.CreatedAt, &conn.UpdatedAt,
+		&conn.Status, &lastSync, &lastAttempt, &lastRefresh,
+		&conn.PluggyExecutionStatus, &conn.LastErrorCode, &conn.LastErrorMessage,
+		&conn.ConsecutiveFailures, &consentExp, &conn.CreatedAt, &conn.UpdatedAt,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, domain.ErrFinanceConnectionNotFound
@@ -122,6 +132,14 @@ func scanConnection(scanner interface{ Scan(dest ...any) error }) (*domain.Finan
 		t := lastSync.Time.UTC()
 		conn.LastSyncAt = &t
 	}
+	if lastAttempt.Valid {
+		t := lastAttempt.Time.UTC()
+		conn.LastAttemptAt = &t
+	}
+	if lastRefresh.Valid {
+		t := lastRefresh.Time.UTC()
+		conn.LastBankRefreshAt = &t
+	}
 	if consentExp.Valid {
 		t := consentExp.Time.UTC()
 		conn.ConsentExpiresAt = &t
@@ -130,13 +148,7 @@ func scanConnection(scanner interface{ Scan(dest ...any) error }) (*domain.Finan
 }
 
 func (r *sqliteFinanceRepo) ListConnections(ctx context.Context, userID string) ([]domain.FinanceConnection, error) {
-	query := `
-		SELECT id, user_id, pluggy_item_id, connector_id, institution_name, status,
-		       last_sync_at, consent_expires_at, created_at, updated_at
-		FROM finance_connections
-		WHERE user_id = ?
-		ORDER BY created_at DESC
-	`
+	query := `SELECT ` + connectionSelectCols + ` FROM finance_connections WHERE user_id = ? ORDER BY created_at DESC`
 	rows, err := r.db.QueryContext(ctx, query, userID)
 	if err != nil {
 		return nil, err
@@ -152,6 +164,43 @@ func (r *sqliteFinanceRepo) ListConnections(ctx context.Context, userID string) 
 		list = append(list, *c)
 	}
 	return list, rows.Err()
+}
+
+func (r *sqliteFinanceRepo) UpdateConnectionStatus(ctx context.Context, userID, connectionID string, upd domain.FinanceConnectionStatusUpdate) error {
+	now := time.Now().UTC()
+	attemptAt := now
+	if upd.LastAttemptAt != nil {
+		attemptAt = upd.LastAttemptAt.UTC()
+	}
+	query := `
+		UPDATE finance_connections
+		SET status = ?,
+		    pluggy_execution_status = COALESCE(NULLIF(?, ''), pluggy_execution_status),
+		    last_error_code = ?,
+		    last_error_message = ?,
+		    last_attempt_at = ?,
+		    last_bank_refresh_at = COALESCE(?, last_bank_refresh_at),
+		    consent_expires_at = COALESCE(?, consent_expires_at),
+		    consecutive_failures = CASE WHEN ? THEN 0 ELSE consecutive_failures + 1 END,
+		    updated_at = ?
+		WHERE user_id = ? AND id = ?
+	`
+	rows, err := ExecuteQueuedWriteRows(ctx, func() (sql.Result, error) {
+		return r.db.ExecContext(ctx, query,
+			upd.Status, upd.PluggyExecutionStatus,
+			upd.LastErrorCode, upd.LastErrorMessage,
+			attemptAt, upd.LastBankRefreshAt, upd.ConsentExpiresAt,
+			upd.ResetFailures, now,
+			userID, connectionID,
+		)
+	})
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return domain.ErrFinanceConnectionNotFound
+	}
+	return nil
 }
 
 func (r *sqliteFinanceRepo) DeleteConnection(ctx context.Context, userID, connectionID string) error {

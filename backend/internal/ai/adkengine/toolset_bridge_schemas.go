@@ -135,6 +135,26 @@ type FinanceTransactionsArgs struct {
 	Limit    int    `json:"limit,omitempty" jsonschema:"Quantidade máxima de transações (padrão 15)."`
 }
 
+type FinanceSimulateSavingsArgs struct {
+	TargetAmount float64 `json:"target_amount" jsonschema:"Valor alvo em reais que o usuário deseja juntar."`
+	Months       int     `json:"months,omitempty" jsonschema:"Prazo em meses para atingir a meta (padrão 6)."`
+}
+
+type FinanceLimitsStatusArgs struct {
+	ScopeType string `json:"scope_type,omitempty" jsonschema:"Escopo opcional (CARD, CATEGORY, SUBSCRIPTIONS, MERCHANT, GLOBAL_MONTHLY)."`
+}
+
+type FinanceUpsertLimitArgs struct {
+	ScopeType       string  `json:"scope_type" jsonschema:"Escopo do limite: CARD, CATEGORY, SUBSCRIPTIONS, MERCHANT ou GLOBAL_MONTHLY."`
+	Title           string  `json:"title" jsonschema:"Nome descritivo do limite (ex.: Cartão Nubank, Delivery)."`
+	TargetAmount    float64 `json:"target_amount" jsonschema:"Valor teto do limite em reais."`
+	Category        string  `json:"category,omitempty" jsonschema:"Categoria filtrada quando scope_type=CATEGORY."`
+	AccountID       string  `json:"account_id,omitempty" jsonschema:"ID do cartão quando scope_type=CARD."`
+	MerchantPattern string  `json:"merchant_pattern,omitempty" jsonschema:"Nome do estabelecimento quando scope_type=MERCHANT ou SUBSCRIPTIONS."`
+	PeriodType      string  `json:"period_type,omitempty" jsonschema:"Período: MONTHLY, BILLING_CYCLE, WEEKLY ou DAILY."`
+	AlertThreshold  int     `json:"alert_threshold,omitempty" jsonschema:"Percentual inicial de alerta (padrão 80)."`
+}
+
 func newTypedAtomicTool[T any](b *ToolsetBridge, spec AtomicToolSpec, ts domain.DomainToolset) (tool.Tool, error) {
 	return functiontool.New(functiontool.Config{
 		Name:        spec.AtomicName,
@@ -192,10 +212,16 @@ func (b *ToolsetBridge) buildTypedAtomicFunctionTool(spec AtomicToolSpec, ts dom
 		return newTypedAtomicTool[BotCreateArgs](b, spec, ts)
 	case "bot_delete_bot", "radar_delete_trigger":
 		return newTypedAtomicTool[BotDeleteArgs](b, spec, ts)
-	case "finance_get_summary", "finance_get_budgets", "finance_get_cards":
+	case "finance_get_summary", "finance_get_budgets", "finance_get_cards", "finance_get_spending_by_category", "finance_detect_subscriptions":
 		return newTypedAtomicTool[FinanceSummaryArgs](b, spec, ts)
 	case "finance_list_transactions":
 		return newTypedAtomicTool[FinanceTransactionsArgs](b, spec, ts)
+	case "finance_simulate_savings_plan":
+		return newTypedAtomicTool[FinanceSimulateSavingsArgs](b, spec, ts)
+	case "finance_get_limits_status":
+		return newTypedAtomicTool[FinanceLimitsStatusArgs](b, spec, ts)
+	case "finance_upsert_spending_limit":
+		return newTypedAtomicTool[FinanceUpsertLimitArgs](b, spec, ts)
 	default:
 		return newTypedAtomicTool[map[string]any](b, spec, ts)
 	}

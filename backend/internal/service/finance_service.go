@@ -23,12 +23,18 @@ var (
 
 // FinanceService gerencia regras de negócio, ingestão edge-sync, segurança e backup opaco BYOK.
 type FinanceService struct {
-	repo repository.FinanceRepository
+	repo           repository.FinanceRepository
+	onSyncComplete func(ctx context.Context, userID string)
 }
 
 // NewFinanceService instancia o serviço financeiro (modelo 100% BYOK sem credencial mestra no servidor).
 func NewFinanceService(repo repository.FinanceRepository) *FinanceService {
 	return &FinanceService{repo: repo}
+}
+
+// SetOnSyncComplete registra um callback assíncrono disparado após ingestão de transações (ex.: SpendingLimitEvaluator).
+func (s *FinanceService) SetOnSyncComplete(fn func(ctx context.Context, userID string)) {
+	s.onSyncComplete = fn
 }
 
 // IngestSyncPayload processa o lote de contas e transações enviado pelo Edge-Sync mobile.
@@ -57,14 +63,29 @@ func (s *FinanceService) IngestSyncPayload(ctx context.Context, userID string, p
 		if instName == "" {
 			instName = "Meu Pluggy"
 		}
+		connectorID := payload.ConnectorID
+		if connectorID <= 0 {
+			connectorID = 200
+		}
+		status := payload.Status
+		if status == "" {
+			status = domain.ConnectionStatusUpdated
+		}
 		_ = s.repo.UpsertConnection(ctx, &domain.FinanceConnection{
-			ID:              connID,
-			UserID:          userID,
-			PluggyItemID:    payload.PluggyItemID,
-			ConnectorID:     200,
-			InstitutionName: instName,
-			LastSyncAt:      &now,
-			Status:          domain.ConnectionStatusUpdated,
+			ID:                    connID,
+			UserID:                userID,
+			PluggyItemID:          payload.PluggyItemID,
+			ConnectorID:           connectorID,
+			InstitutionName:       instName,
+			LastSyncAt:            &now,
+			LastAttemptAt:         &now,
+			LastBankRefreshAt:     payload.LastBankRefreshAt,
+			PluggyExecutionStatus: payload.PluggyExecutionStatus,
+			LastErrorCode:         payload.LastErrorCode,
+			LastErrorMessage:      payload.LastErrorMessage,
+			ConsecutiveFailures:   0,
+			ConsentExpiresAt:      payload.ConsentExpiresAt,
+			Status:                status,
 		})
 	}
 
@@ -99,7 +120,22 @@ func (s *FinanceService) IngestSyncPayload(ctx context.Context, userID string, p
 		}
 	}
 
+	if s.onSyncComplete != nil {
+		go s.onSyncComplete(context.Background(), userID)
+	}
+
 	return nil
+}
+
+// UpdateConnectionStatus atualiza o status operacional e telemetria de uma conexão Open Finance.
+func (s *FinanceService) UpdateConnectionStatus(ctx context.Context, userID, connectionID string, upd domain.FinanceConnectionStatusUpdate) error {
+	if strings.TrimSpace(userID) == "" || strings.TrimSpace(connectionID) == "" || upd.Status == "" {
+		return domain.ErrFinanceInvalidPayload
+	}
+	if upd.Status == domain.ConnectionStatusUpdated {
+		upd.ResetFailures = true
+	}
+	return s.repo.UpdateConnectionStatus(ctx, userID, connectionID, upd)
 }
 
 // GetFinancialSummary obtém o raio-x financeiro enriquecido com alertas proativos.
