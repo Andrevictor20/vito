@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import * as fs from 'fs';
 import * as path from 'path';
 import { ChatStructuredCards } from '../cards/ChatStructuredCards';
-import { ChatApi } from '../../../services/api/chatApi';
+import { ChatApi } from '../../../services/api/chat/chatApi';
 import type { ApiClient } from '../../../services/api/client';
 import type { ChatMessage } from '../../../types';
 

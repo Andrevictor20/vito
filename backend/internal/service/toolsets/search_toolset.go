@@ -4,52 +4,52 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/andrevmp/vito/backend/internal/ai/search"
 	"strings"
 	"time"
 
-	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/domain"
 )
 
 // SearchToolset implementa a Macro-Ferramenta web_and_vertical_search com coletores especializados
 // e leitor web aprofundado (read_page) com fallback Jina.
 type SearchToolset struct {
-	subagent          *ai.VerticalSearchSubagent
-	financeCollector  *ai.FinanceCollector
-	shoppingCollector *ai.ShoppingCollector
-	webReader         ai.WebReader
+	subagent          *search.VerticalSearchSubagent
+	financeCollector  *search.FinanceCollector
+	shoppingCollector *search.ShoppingCollector
+	webReader         search.WebReader
 }
 
 // NewSearchToolset instancia o toolset conectando os coletores verticais, o subagente factual e o leitor web.
-func NewSearchToolset(subagent ...*ai.VerticalSearchSubagent) *SearchToolset {
-	var sub *ai.VerticalSearchSubagent
+func NewSearchToolset(subagent ...*search.VerticalSearchSubagent) *SearchToolset {
+	var sub *search.VerticalSearchSubagent
 	if len(subagent) > 0 && subagent[0] != nil {
 		sub = subagent[0]
 	} else {
-		sub = ai.NewVerticalSearchSubagent(ai.DefaultSearXNGClient(), nil)
+		sub = search.NewVerticalSearchSubagent(search.DefaultSearXNGClient(), nil)
 	}
 
 	return &SearchToolset{
 		subagent:          sub,
-		financeCollector:  &ai.FinanceCollector{},
-		shoppingCollector: &ai.ShoppingCollector{SearXNG: ai.DefaultSearXNGClient()},
-		webReader:         ai.DefaultWebReader(),
+		financeCollector:  &search.FinanceCollector{},
+		shoppingCollector: &search.ShoppingCollector{SearXNG: search.DefaultSearXNGClient()},
+		webReader:         search.DefaultWebReader(),
 	}
 }
 
-func (t *SearchToolset) SetFinanceCollector(fc *ai.FinanceCollector) {
+func (t *SearchToolset) SetFinanceCollector(fc *search.FinanceCollector) {
 	t.financeCollector = fc
 }
 
-func (t *SearchToolset) SetShoppingCollector(sc *ai.ShoppingCollector) {
+func (t *SearchToolset) SetShoppingCollector(sc *search.ShoppingCollector) {
 	t.shoppingCollector = sc
 }
 
-func (t *SearchToolset) SetSubagent(sub *ai.VerticalSearchSubagent) {
+func (t *SearchToolset) SetSubagent(sub *search.VerticalSearchSubagent) {
 	t.subagent = sub
 }
 
-func (t *SearchToolset) SetWebReader(wr ai.WebReader) {
+func (t *SearchToolset) SetWebReader(wr search.WebReader) {
 	t.webReader = wr
 }
 
@@ -131,7 +131,7 @@ func (t *SearchToolset) Execute(ctx context.Context, execCtx *domain.ToolExecuti
 
 		reader := t.webReader
 		if reader == nil {
-			reader = ai.DefaultWebReader()
+			reader = search.DefaultWebReader()
 		}
 
 		page, err := reader.ReadURL(ctx, targetURL)
@@ -169,7 +169,7 @@ func (t *SearchToolset) Execute(ctx context.Context, execCtx *domain.ToolExecuti
 
 	cat := strings.ToLower(strings.TrimSpace(params.Category))
 	if cat == "" || cat == "general" {
-		if len(ai.DetectCurrencies(query)) > 0 || (t.financeCollector != nil && t.financeCollector.Supports(&domain.Trigger{Title: query, Query: query})) {
+		if len(search.DetectCurrencies(query)) > 0 || (t.financeCollector != nil && t.financeCollector.Supports(&domain.Trigger{Title: query, Query: query})) {
 			cat = "finance"
 		} else if cat == "" {
 			cat = "general"
@@ -237,7 +237,7 @@ func (t *SearchToolset) Execute(ctx context.Context, execCtx *domain.ToolExecuti
 		}
 
 	case "news":
-		items, err := ai.FetchGoogleNews(ctx, query, 5)
+		items, err := search.FetchGoogleNews(ctx, query, 5)
 		if err == nil && len(items) > 0 {
 			var summaries []string
 			for _, it := range items {

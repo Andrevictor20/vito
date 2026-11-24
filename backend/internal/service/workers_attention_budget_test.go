@@ -2,6 +2,8 @@ package service_test
 
 import (
 	"encoding/json"
+	"github.com/andrevmp/vito/backend/internal/calendar"
+	"github.com/andrevmp/vito/backend/internal/tasks"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -9,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/andrevmp/vito/backend/internal/database"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/andrevmp/vito/backend/internal/service"
@@ -53,10 +55,10 @@ func TestAC04_AllReminderWorkersUseAttentionBudget(t *testing.T) {
 	notifSvc := service.NewNotificationService(tokenRepo, ts.Client())
 	notifSvc.SetExpoAPIURL(ts.URL)
 
-	eventRepo := repository.NewEventRepository(db)
-	todoRepo := repository.NewTodoRepository(db)
+	eventRepo := calendar.NewEventRepository(db)
+	todoRepo := tasks.NewTodoRepository(db)
 	userRepo := repository.NewUserRepository(db)
-	pendingRepo := repository.NewPendingRepository(db)
+	pendingRepo := tasks.NewPendingRepository(db)
 
 	budgetSvc := service.NewAttentionBudgetService(db, eventRepo)
 	budgetSvc.SetCategoryPreference(userID, "tarefas", false)
@@ -76,7 +78,7 @@ func TestAC04_AllReminderWorkersUseAttentionBudget(t *testing.T) {
 		t.Fatalf("create todo: %v", err)
 	}
 
-	todoWorker := service.NewTodoReminderWorker(todoRepo, notifSvc, 15*time.Minute)
+	todoWorker := tasks.NewTodoReminderWorker(todoRepo, notifSvc, 15*time.Minute)
 	todoWorker.SetAttentionBudget(budgetSvc)
 
 	sent, err := todoWorker.CheckAndDispatchReminders(now)
@@ -89,8 +91,8 @@ func TestAC04_AllReminderWorkersUseAttentionBudget(t *testing.T) {
 
 	// Reabilita e garante envio único + instanciação dos outros workers com SetAttentionBudget
 	budgetSvc.SetCategoryPreference(userID, "tarefas", true)
-	pendingWorker := service.NewPendingNudgeWorker(pendingRepo, userRepo, notifSvc, 1*time.Minute)
+	pendingWorker := tasks.NewPendingNudgeWorker(pendingRepo, userRepo, notifSvc, 1*time.Minute)
 	pendingWorker.SetAttentionBudget(budgetSvc)
-	summaryWorker := service.NewExecutiveSummaryWorker(db, userRepo, notifSvc, 1*time.Minute)
+	summaryWorker := calendar.NewExecutiveSummaryWorker(db, userRepo, notifSvc, 1*time.Minute)
 	summaryWorker.SetAttentionBudget(budgetSvc)
 }

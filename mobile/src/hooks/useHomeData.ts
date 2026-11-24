@@ -5,7 +5,7 @@ import { api } from '../services/api';
 import { dataSync } from '../services/dataSync';
 import { readHomeCache } from './homeDataCache';
 
-import { toLocalDateString, parseSafeDate, isEventOnDate, getEventDays, getUpcomingGroupedEvents } from '../utils/calendarDateUtils';
+import { toLocalDateString, parseSafeDate, isEventOnDate, getEventDays, getUpcomingGroupedEvents } from '../features/calendar/utils/calendarDateUtils';
 
 export const getHomeCacheKeys = (userId?: string) => {
   const suffix = userId ? `_${userId}` : '';

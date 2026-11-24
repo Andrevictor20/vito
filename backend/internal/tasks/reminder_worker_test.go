@@ -1,0 +1,495 @@
+package tasks_test
+
+import (
+	"context"
+	"encoding/json"
+	"github.com/andrevmp/vito/backend/internal/calendar"
+	"github.com/andrevmp/vito/backend/internal/tasks"
+	"net/http"
+	"net/http/httptest"
+	"path/filepath"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/andrevmp/vito/backend/internal/platform/database"
+	"github.com/andrevmp/vito/backend/internal/domain"
+	"github.com/andrevmp/vito/backend/internal/service"
+)
+
+type mockDeviceTokenRepo struct {
+	tokens []domain.DeviceToken
+}
+
+func (m *mockDeviceTokenRepo) Save(dt *domain.DeviceToken) error {
+	m.tokens = append(m.tokens, *dt)
+	return nil
+}
+
+func (m *mockDeviceTokenRepo) FindByUserID(userID string) ([]domain.DeviceToken, error) {
+	var result []domain.DeviceToken
+	for _, tk := range m.tokens {
+		if tk.UserID == userID {
+			result = append(result, tk)
+		}
+	}
+	return result, nil
+}
+
+func (m *mockDeviceTokenRepo) Delete(userID, token string) error {
+	var filtered []domain.DeviceToken
+	for _, tk := range m.tokens {
+		if !(tk.UserID == userID && tk.Token == token) {
+			filtered = append(filtered, tk)
+		}
+	}
+	m.tokens = filtered
+	return nil
+}
+
+type mockReminderEventRepo struct {
+	events []domain.Event
+}
+
+func (m *mockReminderEventRepo) Create(e *domain.Event) error {
+	m.events = append(m.events, *e)
+	return nil
+}
+func (m *mockReminderEventRepo) GetByID(id, userID string) (*domain.Event, error) {
+	for _, e := range m.events {
+		if e.ID == id && e.UserID == userID {
+			return &e, nil
+		}
+	}
+	return nil, domain.ErrEventNotFound
+}
+func (m *mockReminderEventRepo) ListByUser(userID string, from, to time.Time) ([]domain.Event, error) {
+	return m.events, nil
+}
+func (m *mockReminderEventRepo) ListByUserPaged(userID string, from, to time.Time, limit, offset int) ([]domain.Event, error) {
+	return m.events, nil
+}
+func (m *mockReminderEventRepo) ListUpcomingUnreminded(from, to time.Time) ([]domain.Event, error) {
+	var res []domain.Event
+	for _, e := range m.events {
+		if e.StartAt.After(from.Add(-time.Second)) && e.StartAt.Before(to.Add(time.Second)) && e.ReminderSentAt == nil {
+			res = append(res, e)
+		}
+	}
+	return res, nil
+}
+func (m *mockReminderEventRepo) ListStartingNowUnreminded(from, to time.Time) ([]domain.Event, error) {
+	var res []domain.Event
+	for _, e := range m.events {
+		if e.StartAt.After(from.Add(-time.Second)) && e.StartAt.Before(to.Add(time.Second)) && e.StartReminderSentAt == nil {
+			res = append(res, e)
+		}
+	}
+	return res, nil
+}
+func (m *mockReminderEventRepo) MarkReminderSent(eventID string, sentAt time.Time) error {
+	for i, e := range m.events {
+		if e.ID == eventID {
+			t := sentAt
+			m.events[i].ReminderSentAt = &t
+			return nil
+		}
+	}
+	return domain.ErrEventNotFound
+}
+func (m *mockReminderEventRepo) MarkStartReminderSent(eventID string, sentAt time.Time) error {
+	for i, e := range m.events {
+		if e.ID == eventID {
+			t := sentAt
+			m.events[i].StartReminderSentAt = &t
+			return nil
+		}
+	}
+	return domain.ErrEventNotFound
+}
+func (m *mockReminderEventRepo) CheckConflict(userID string, startAt, endAt time.Time, excludeEventID string) (*domain.ConflictInfo, error) {
+	return &domain.ConflictInfo{HasConflict: false}, nil
+}
+func (m *mockReminderEventRepo) Delete(id, userID string) error                       { return nil }
+func (m *mockReminderEventRepo) DeleteByTitle(userID, titleQuery string) (int, error) { return 0, nil }
+func (m *mockReminderEventRepo) DeleteSeries(id, userID string) (int, error)          { return 0, nil }
+func (m *mockReminderEventRepo) Update(event *domain.Event) error                     { return nil }
+func (m *mockReminderEventRepo) UpdateSeries(event *domain.Event) (int, error)        { return 0, nil }
+func (m *mockReminderEventRepo) UpdateTimesByTitle(userID, titleQuery string, newStart, newEnd time.Time) (int, error) {
+	return 0, nil
+}
+
+func TestReminderWorker_CheckAndDispatchReminders(t *testing.T) {
+	// 1. Mock do servidor Expo
+	var receivedPush []service.PushMessage
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var msgs []service.PushMessage
+		_ = json.NewDecoder(r.Body).Decode(&msgs)
+		receivedPush = append(receivedPush, msgs...)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"data":[{"status":"ok"}]}`))
+	}))
+	defer server.Close()
+
+	// 2. Mock repositórios
+	tokenRepo := &mockDeviceTokenRepo{
+		tokens: []domain.DeviceToken{
+			{ID: "tok-1", UserID: "user-1", Token: "ExponentPushToken[user1]", Platform: "android"},
+		},
+	}
+	notifSvc := service.NewNotificationService(tokenRepo, server.Client())
+	notifSvc.SetExpoAPIURL(server.URL)
+
+	now := time.Date(2026, 10, 8, 14, 0, 0, 0, time.UTC)
+	eventIn10Min := domain.Event{
+		ID:        "evt-10m",
+		UserID:    "user-1",
+		Title:     "Reunião de Diretoria",
+		Location:  "Sala 3",
+		StartAt:   now.Add(10 * time.Minute), // 14:10
+		EndAt:     now.Add(40 * time.Minute),
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	eventRepo := &mockReminderEventRepo{
+		events: []domain.Event{eventIn10Min},
+	}
+
+	worker := tasks.NewReminderWorker(eventRepo, notifSvc, 15*time.Minute)
+
+	// 3. Executa a checagem no tempo 'now'
+	count, err := worker.CheckAndDispatchReminders(now)
+	if err != nil {
+		t.Fatalf("esperado nil error, obteve %v", err)
+	}
+
+	if count != 1 {
+		t.Errorf("esperado 1 lembrete despachado, obteve %d", count)
+	}
+
+	if len(receivedPush) != 1 {
+		t.Fatalf("esperado 1 push recebido no servidor Expo, obteve %d", len(receivedPush))
+	}
+
+	if receivedPush[0].To != "ExponentPushToken[user1]" {
+		t.Errorf("esperado push para ExponentPushToken[user1], obteve %s", receivedPush[0].To)
+	}
+
+	// 4. Segunda execução no mesmo instante: deve ser deduplicada (0 lembretes)
+	count2, err := worker.CheckAndDispatchReminders(now)
+	if err != nil {
+		t.Fatalf("esperado nil error no ciclo 2, obteve %v", err)
+	}
+
+	if count2 != 0 {
+		t.Errorf("esperado 0 lembretes por deduplicação, obteve %d", count2)
+	}
+}
+
+func TestReminderWorker_NotificationTimezone_SaoPaulo(t *testing.T) {
+	var receivedPush []service.PushMessage
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var msgs []service.PushMessage
+		_ = json.NewDecoder(r.Body).Decode(&msgs)
+		receivedPush = append(receivedPush, msgs...)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"data":[{"status":"ok"}]}`))
+	}))
+	defer server.Close()
+
+	tokenRepo := &mockDeviceTokenRepo{
+		tokens: []domain.DeviceToken{
+			{ID: "tok-1", UserID: "user-1", Token: "ExponentPushToken[user1]", Platform: "android"},
+		},
+	}
+	notifSvc := service.NewNotificationService(tokenRepo, server.Client())
+	notifSvc.SetExpoAPIURL(server.URL)
+
+	// Almoço às 12:00 BRT (15:00 UTC)
+	lunchStartUTC := time.Date(2026, 10, 8, 15, 0, 0, 0, time.UTC)
+	now := lunchStartUTC.Add(-10 * time.Minute) // 14:50 UTC
+	lunchEvent := domain.Event{
+		ID:        "evt-lunch",
+		UserID:    "user-1",
+		Title:     "Almoço",
+		StartAt:   lunchStartUTC,
+		EndAt:     lunchStartUTC.Add(time.Hour),
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	eventRepo := &mockReminderEventRepo{
+		events: []domain.Event{lunchEvent},
+	}
+
+	worker := tasks.NewReminderWorker(eventRepo, notifSvc, 15*time.Minute)
+	_, err := worker.CheckAndDispatchReminders(now)
+	if err != nil {
+		t.Fatalf("erro inesperado: %v", err)
+	}
+
+	if len(receivedPush) != 1 {
+		t.Fatalf("esperava 1 push, obteve %d", len(receivedPush))
+	}
+
+	expectedBody := "Começa às 12:00"
+	if receivedPush[0].Body != expectedBody {
+		t.Errorf("esperava %q, obteve %q", expectedBody, receivedPush[0].Body)
+	}
+}
+
+func TestReminderWorker_DualNotification_AdvanceAndStart(t *testing.T) {
+	var receivedPush []service.PushMessage
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var msgs []service.PushMessage
+		_ = json.NewDecoder(r.Body).Decode(&msgs)
+		receivedPush = append(receivedPush, msgs...)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"data":[{"status":"ok"}]}`))
+	}))
+	defer server.Close()
+
+	tokenRepo := &mockDeviceTokenRepo{
+		tokens: []domain.DeviceToken{
+			{ID: "tok-1", UserID: "user-1", Token: "ExponentPushToken[user1]", Platform: "android"},
+		},
+	}
+	notifSvc := service.NewNotificationService(tokenRepo, server.Client())
+	notifSvc.SetExpoAPIURL(server.URL)
+
+	t0 := time.Date(2026, 10, 8, 14, 0, 0, 0, time.UTC)
+	eventStartAt := t0.Add(10 * time.Minute) // 14:10
+
+	event := domain.Event{
+		ID:        "evt-dual",
+		UserID:    "user-1",
+		Title:     "Consulta Médica",
+		Location:  "Consultório 4",
+		StartAt:   eventStartAt,
+		EndAt:     eventStartAt.Add(30 * time.Minute),
+		CreatedAt: t0,
+		UpdatedAt: t0,
+	}
+
+	eventRepo := &mockReminderEventRepo{
+		events: []domain.Event{event},
+	}
+
+	worker := tasks.NewReminderWorker(eventRepo, notifSvc, 15*time.Minute)
+
+	// Turno 1 (14:00): Deve disparar aviso prévio de antecedência ("Começa às ...")
+	c1, err := worker.CheckAndDispatchReminders(t0)
+	if err != nil {
+		t.Fatalf("erro inesperado no turno 1: %v", err)
+	}
+	if c1 != 1 {
+		t.Errorf("esperado 1 lembrete de antecedência, obteve %d", c1)
+	}
+	if len(receivedPush) != 1 {
+		t.Fatalf("esperado 1 push recebido, obteve %d", len(receivedPush))
+	}
+	if receivedPush[0].Data["type"] != "advance" {
+		t.Errorf("esperado type advance, obteve %v", receivedPush[0].Data["type"])
+	}
+
+	// Turno 2 (14:10): Horário exato de início do evento -> Deve disparar aviso de início ("Começando agora!")
+	c2, err := worker.CheckAndDispatchReminders(eventStartAt)
+	if err != nil {
+		t.Fatalf("erro inesperado no turno 2: %v", err)
+	}
+	if c2 != 1 {
+		t.Errorf("esperado 1 alerta de início, obteve %d", c2)
+	}
+	if len(receivedPush) != 2 {
+		t.Fatalf("esperado 2 pushes totais recebidos, obteve %d", len(receivedPush))
+	}
+	if receivedPush[1].Data["type"] != "start" {
+		t.Errorf("esperado type start, obteve %v", receivedPush[1].Data["type"])
+	}
+	if receivedPush[1].Body != "Começando agora em Consultório 4!" {
+		t.Errorf("corpo inesperado do alerta de início: %q", receivedPush[1].Body)
+	}
+
+	// Turno 3 (14:11): Evento já teve ambos os alertas despachados -> 0 notificações
+	c3, err := worker.CheckAndDispatchReminders(eventStartAt.Add(time.Minute))
+	if err != nil {
+		t.Fatalf("erro inesperado no turno 3: %v", err)
+	}
+	if c3 != 0 {
+		t.Errorf("esperado 0 novos alertas (deduplicação total), obteve %d", c3)
+	}
+}
+
+func TestReminderWorker_SkipsAllDayEventsAndHolidays(t *testing.T) {
+	var receivedPush []service.PushMessage
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var msgs []service.PushMessage
+		_ = json.NewDecoder(r.Body).Decode(&msgs)
+		receivedPush = append(receivedPush, msgs...)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"data":[{"status":"ok"}]}`))
+	}))
+	defer server.Close()
+
+	tokenRepo := &mockDeviceTokenRepo{
+		tokens: []domain.DeviceToken{
+			{ID: "tok-1", UserID: "user-1", Token: "ExponentPushToken[user1]", Platform: "android"},
+		},
+	}
+	notifSvc := service.NewNotificationService(tokenRepo, server.Client())
+	notifSvc.SetExpoAPIURL(server.URL)
+
+	now := time.Date(2026, 10, 11, 23, 15, 0, 0, time.UTC)
+
+	// Feriado "Nossa Senhora Aparecida" (All-day do Google Calendar iniciando às 00:00 UTC do dia 12)
+	holiday := domain.Event{
+		ID:        "evt-holiday",
+		UserID:    "user-1",
+		Title:     "Nossa Senhora Aparecida",
+		StartAt:   time.Date(2026, 10, 12, 0, 0, 0, 0, time.UTC),
+		EndAt:     time.Date(2026, 10, 12, 23, 59, 59, 0, time.UTC),
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	eventRepo := &mockReminderEventRepo{
+		events: []domain.Event{holiday},
+	}
+
+	worker := tasks.NewReminderWorker(eventRepo, notifSvc, 60*time.Minute)
+
+	// Executa a checagem 45 min antes da meia-noite (now = 23:15 UTC)
+	count, err := worker.CheckAndDispatchReminders(now)
+	if err != nil {
+		t.Fatalf("esperado nil error, obteve %v", err)
+	}
+
+	if count != 0 {
+		t.Errorf("esperado 0 lembretes para feriado/evento de dia inteiro, obteve %d", count)
+	}
+
+	if len(receivedPush) != 0 {
+		t.Errorf("esperado 0 pushes para feriado, obteve %d", len(receivedPush))
+	}
+
+	// O evento deve ter sido marcado como notificado para não ficar sendo consultado sem parar
+	if holidayFromRepo, _ := eventRepo.GetByID("evt-holiday", "user-1"); holidayFromRepo.ReminderSentAt == nil {
+		t.Errorf("esperava que ReminderSentAt fosse marcado para o evento de dia inteiro")
+	}
+}
+
+func TestReminderWorker_AttentionBudget_DeferDedupAndCriticalBypass(t *testing.T) {
+	var mu sync.Mutex
+	var receivedPush []service.PushMessage
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var msgs []service.PushMessage
+		_ = json.NewDecoder(r.Body).Decode(&msgs)
+		mu.Lock()
+		receivedPush = append(receivedPush, msgs...)
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":[{"status":"ok"}]}`))
+	}))
+	defer server.Close()
+
+	db, err := database.Open(filepath.Join(t.TempDir(), "rem_budget.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+
+	userID := "user-rem-budget"
+	now := time.Date(2026, 11, 21, 14, 5, 0, 0, time.UTC)
+	_, err = db.Exec(`INSERT INTO users (id, email, name, password_hash, created_at, updated_at) VALUES (?,?,?,?,?,?)`,
+		userID, "rem@vito.ai", "Rem", "h", now, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tokenRepo := &mockDeviceTokenRepo{
+		tokens: []domain.DeviceToken{{ID: "tok-1", UserID: userID, Token: "ExponentPushToken[rem]", Platform: "android"}},
+	}
+	notifSvc := service.NewNotificationService(tokenRepo, server.Client())
+	notifSvc.SetExpoAPIURL(server.URL)
+
+	// Reunião ativa 14:00..15:00 + lembrete normal às 14:15 + alarme crítico às 14:15
+	eventRepo := calendar.NewEventRepository(db)
+	_ = eventRepo.Create(&domain.Event{
+		ID:        "evt-active-mtg",
+		UserID:    userID,
+		Title:     "Daily Sync",
+		StartAt:   now.Add(-5 * time.Minute),
+		EndAt:     now.Add(55 * time.Minute),
+		CreatedAt: now,
+		UpdatedAt: now,
+	})
+	// Marca reminder_sent na reunião ativa para testar apenas os dois próximos eventos
+	_ = eventRepo.MarkReminderSent("evt-active-mtg", now.Add(-15*time.Minute))
+
+	_ = eventRepo.Create(&domain.Event{
+		ID:        "evt-normal-upcoming",
+		UserID:    userID,
+		Title:     "Dentista",
+		StartAt:   now.Add(10 * time.Minute),
+		EndAt:     now.Add(40 * time.Minute),
+		CreatedAt: now,
+		UpdatedAt: now,
+	})
+	_ = eventRepo.Create(&domain.Event{
+		ID:        "evt-critical-alarm",
+		UserID:    userID,
+		Title:     "Tomar insulina agora",
+		Category:  "critical_alarm",
+		StartAt:   now.Add(10 * time.Minute),
+		EndAt:     now.Add(25 * time.Minute),
+		CreatedAt: now,
+		UpdatedAt: now,
+	})
+
+	budget := service.NewAttentionBudgetService(db, eventRepo)
+	worker := tasks.NewReminderWorker(eventRepo, notifSvc, 15*time.Minute)
+	worker.SetAttentionBudget(budget)
+
+	count, err := worker.CheckAndDispatchReminders(now)
+	if err != nil {
+		t.Fatalf("erro inesperado: %v", err)
+	}
+	// Sem bypass de critical_alarm (Onda 02.3): ambos devem ser adiados (DEFERRED) durante a reunião em andamento
+	if count != 0 {
+		t.Fatalf("esperava 0 push entregue durante reunião em andamento (DEFERRED), obteve %d", count)
+	}
+	mu.Lock()
+	if len(receivedPush) != 0 {
+		t.Fatalf("esperava 0 pushes durante reunião, obteve %+v", receivedPush)
+	}
+	mu.Unlock()
+
+	// Cross-worker semantic dedup após a reunião terminar (15:10)
+	afterMtg := now.Add(65 * time.Minute) // 15:10
+	_, _ = budget.Evaluate(context.Background(), service.AttentionCandidate{
+		UserID:       userID,
+		SourceWorker: "bot_runner",
+		Category:     "agenda",
+		Urgency:      "normal",
+		Title:        "Consulta Cardiologista",
+		Body:         "Começa às 12:20",
+		Now:          afterMtg,
+	})
+	_ = eventRepo.Create(&domain.Event{
+		ID:        "evt-dedup-cardio",
+		UserID:    userID,
+		Title:     "Consulta Cardiologista",
+		StartAt:   afterMtg.Add(10 * time.Minute), // 15:20 UTC = 12:20 BRT
+		EndAt:     afterMtg.Add(40 * time.Minute),
+		CreatedAt: afterMtg,
+		UpdatedAt: afterMtg,
+	})
+	countDedup, err := worker.CheckAndDispatchReminders(afterMtg)
+	if err != nil {
+		t.Fatalf("erro no ciclo de dedup: %v", err)
+	}
+	if countDedup != 0 {
+		t.Fatalf("esperava 0 pushes por deduplicação semântica cross-worker, obteve %d", countDedup)
+	}
+}

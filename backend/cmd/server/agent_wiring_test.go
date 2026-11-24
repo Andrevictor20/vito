@@ -2,13 +2,18 @@ package main
 
 import (
 	"context"
+	"github.com/andrevmp/vito/backend/internal/bots"
+	"github.com/andrevmp/vito/backend/internal/calendar"
+	"github.com/andrevmp/vito/backend/internal/finance"
+	"github.com/andrevmp/vito/backend/internal/tasks"
+	"github.com/andrevmp/vito/backend/internal/whatsapp"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/andrevmp/vito/backend/internal/config"
-	"github.com/andrevmp/vito/backend/internal/database"
+	"github.com/andrevmp/vito/backend/internal/platform/config"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/andrevmp/vito/backend/internal/service"
@@ -53,16 +58,16 @@ func (m *mockEvoClientWiring) SendTextWithQuoted(ctx context.Context, instanceNa
 func (m *mockEvoClientWiring) GetMediaBase64(ctx context.Context, instanceName string, messagePayload interface{}) (string, error) {
 	return "", nil
 }
-func (m *mockEvoClientWiring) FindContacts(ctx context.Context, instanceName string) ([]service.WhatsAppContact, error) {
+func (m *mockEvoClientWiring) FindContacts(ctx context.Context, instanceName string) ([]whatsapp.WhatsAppContact, error) {
 	return nil, nil
 }
 func (m *mockEvoClientWiring) SendReaction(ctx context.Context, instanceName, remoteJid, messageID, reaction string, fromMe bool) error {
 	return nil
 }
-func (m *mockEvoClientWiring) FindMessages(ctx context.Context, in service.EvolutionFindMessagesInput) ([]service.WhatsAppChatMessage, error) {
+func (m *mockEvoClientWiring) FindMessages(ctx context.Context, in whatsapp.EvolutionFindMessagesInput) ([]whatsapp.WhatsAppChatMessage, error) {
 	return nil, nil
 }
-func (m *mockEvoClientWiring) FindGroups(ctx context.Context, instanceName string) ([]service.WhatsAppGroup, error) {
+func (m *mockEvoClientWiring) FindGroups(ctx context.Context, instanceName string) ([]whatsapp.WhatsAppGroup, error) {
 	return nil, nil
 }
 func (m *mockEvoClientWiring) FindParticipants(ctx context.Context, instanceName, groupJid string) ([]string, error) {
@@ -122,7 +127,7 @@ func TestWhatsAppServiceAdapter_SendMessage_ResolvesContactName(t *testing.T) {
 		UpdatedAt:    time.Now().UTC(),
 	})
 
-	waRepo := repository.NewWhatsAppRepository(db)
+	waRepo := whatsapp.NewWhatsAppRepository(db)
 	now := time.Now().UTC()
 	_ = waRepo.Upsert(context.Background(), &domain.WhatsAppIntegration{
 		UserID:          userID,
@@ -135,7 +140,7 @@ func TestWhatsAppServiceAdapter_SendMessage_ResolvesContactName(t *testing.T) {
 	})
 
 	mockClient := &mockEvoClientWiring{}
-	waSvc := service.NewWhatsAppService(service.WhatsAppServiceConfig{
+	waSvc := whatsapp.NewWhatsAppService(whatsapp.WhatsAppServiceConfig{
 		WebhookBaseURL: "https://vito.rasppi.cloud",
 	}, waRepo, mockClient)
 
@@ -149,7 +154,7 @@ func TestWhatsAppServiceAdapter_SendMessage_ResolvesContactName(t *testing.T) {
 			},
 		},
 	}
-	dir := service.NewWhatsAppDirectoryService(nil, service.DefaultWhatsAppContextConfig(), nil)
+	dir := whatsapp.NewWhatsAppDirectoryService(nil, whatsapp.DefaultWhatsAppContextConfig(), nil)
 	dir.SetContactRepository(contactRepo)
 
 	adapter := &whatsAppServiceAdapter{
@@ -203,23 +208,23 @@ func TestProductionCognitiveWiring_Onda2AndOnda3(t *testing.T) {
 		ID: userID, Name: "Prod Wire", Email: "prodwire@vito.test", CreatedAt: now, UpdatedAt: now,
 	})
 
-	eventRepo := repository.NewEventRepository(db)
-	todoRepo := repository.NewTodoRepository(db)
+	eventRepo := calendar.NewEventRepository(db)
+	todoRepo := tasks.NewTodoRepository(db)
 	memoryRepo := repository.NewMemoryRepository(db)
 	aiSettingsRepo := repository.NewAISettingsRepository(db)
-	triggerRepo := repository.NewTriggerRepository(db)
+	triggerRepo := bots.NewTriggerRepository(db)
 	briefingRepo := repository.NewBriefingRepository(db)
-	pendingRepo := repository.NewPendingRepository(db)
+	pendingRepo := tasks.NewPendingRepository(db)
 	notifRepo := repository.NewDeviceTokenRepository(db)
-	finRepo := repository.NewFinanceRepository(db)
-	waRepo := repository.NewWhatsAppRepository(db)
+	finRepo := finance.NewFinanceRepository(db)
+	waRepo := whatsapp.NewWhatsAppRepository(db)
 
-	calSvc := service.NewCalendarService(eventRepo)
-	todoSvc := service.NewTodoService(todoRepo)
-	triggerSvc := service.NewTriggerService(triggerRepo)
-	pendingSvc := service.NewPendingService(pendingRepo)
+	calSvc := calendar.NewCalendarService(eventRepo)
+	todoSvc := tasks.NewTodoService(todoRepo)
+	triggerSvc := bots.NewTriggerService(triggerRepo)
+	pendingSvc := tasks.NewPendingService(pendingRepo)
 	notifSvc := service.NewNotificationService(notifRepo)
-	waSvc := service.NewWhatsAppService(service.WhatsAppServiceConfig{}, waRepo, &mockEvoClientWiring{})
+	waSvc := whatsapp.NewWhatsAppService(whatsapp.WhatsAppServiceConfig{}, waRepo, &mockEvoClientWiring{})
 
 	agentSys := setupAgentSubsystem(
 		&config.Config{}, db, calSvc, todoSvc, waSvc, nil,
@@ -231,8 +236,8 @@ func TestProductionCognitiveWiring_Onda2AndOnda3(t *testing.T) {
 	defer agentSys.TraceRecorder.Close()
 	defer agentSys.ConsolidationWorker.Stop()
 
-	reminderWorker := service.NewReminderWorker(eventRepo, notifSvc, 15*time.Minute)
-	triggerWorker := service.NewTriggerWorker(triggerRepo, notifSvc, &service.DefaultTriggerEvaluator{}, time.Minute)
+	reminderWorker := tasks.NewReminderWorker(eventRepo, notifSvc, 15*time.Minute)
+	triggerWorker := bots.NewTriggerWorker(triggerRepo, notifSvc, &bots.DefaultTriggerEvaluator{}, time.Minute)
 	morningWorker := service.NewMorningBriefingWorker(briefingRepo, eventRepo, todoRepo, userRepo, notifSvc, time.Minute)
 	behavioralWorker := service.NewBehavioralWorker(todoRepo, eventRepo, memoryRepo)
 

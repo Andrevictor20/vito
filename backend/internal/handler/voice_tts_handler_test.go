@@ -17,7 +17,7 @@ import (
 const testVoiceDefault = "pt-BR-AntonioNeural"
 
 // mockTTSService é um stub injetável para o serviço de TTS nos testes do handler.
-// Implementa ai.TTSService (Synthesize com contexto). Não é um "blind mock":
+// Implementa voice.TTSService (Synthesize com contexto). Não é um "blind mock":
 // retorna valores fixos e expõe o número de chamadas e os argumentos capturados.
 type mockTTSService struct {
 	calls         int

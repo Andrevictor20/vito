@@ -3,13 +3,15 @@ package server_test
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/andrevmp/vito/backend/internal/calendar"
+	"github.com/andrevmp/vito/backend/internal/tasks"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/andrevmp/vito/backend/internal/database"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/handler"
 	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/andrevmp/vito/backend/internal/server"
@@ -28,16 +30,16 @@ func setupFullServer(t *testing.T) (*httptest.Server, string) {
 
 	jwtSecret := "integration-test-secret"
 	userRepo := repository.NewUserRepository(db)
-	eventRepo := repository.NewEventRepository(db)
-	todoRepo := repository.NewTodoRepository(db)
+	eventRepo := calendar.NewEventRepository(db)
+	todoRepo := tasks.NewTodoRepository(db)
 
 	authSvc := service.NewAuthService(userRepo, jwtSecret)
-	calSvc := service.NewCalendarService(eventRepo)
-	todoSvc := service.NewTodoService(todoRepo)
+	calSvc := calendar.NewCalendarService(eventRepo)
+	todoSvc := tasks.NewTodoService(todoRepo)
 
 	authHandler := handler.NewAuthHandler(authSvc, userRepo)
-	calHandler := handler.NewCalendarHandler(calSvc)
-	todoHandler := handler.NewTodoHandler(todoSvc)
+	calHandler := calendar.NewCalendarHandler(calSvc)
+	todoHandler := tasks.NewTodoHandler(todoSvc)
 
 	srv := server.New(server.Config{
 		AuthHandler: authHandler,

@@ -1,14 +1,14 @@
 package server_test
 
 import (
+	"github.com/andrevmp/vito/backend/internal/bots"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
 	"testing"
 
 	"github.com/andrevmp/vito/backend/internal/catalog"
-	"github.com/andrevmp/vito/backend/internal/database"
-	"github.com/andrevmp/vito/backend/internal/handler"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/andrevmp/vito/backend/internal/server"
 	"github.com/andrevmp/vito/backend/internal/service"
@@ -22,14 +22,14 @@ func TestServer_TriggersDeprecationHeaderAndBotsRoutes(t *testing.T) {
 	t.Cleanup(func() { db.Close() })
 
 	userRepo := repository.NewUserRepository(db)
-	botRepo := repository.NewBotRepository(db)
+	botRepo := bots.NewBotRepository(db)
 	cat, err := catalog.LoadDefaultCatalog()
 	if err != nil {
 		t.Fatalf("LoadDefaultCatalog: %v", err)
 	}
 
 	authSvc := service.NewAuthService(userRepo, "bots-route-secret")
-	botH := handler.NewBotHandler(db, botRepo, cat)
+	botH := bots.NewBotHandler(db, botRepo, cat)
 
 	srv := server.New(server.Config{
 		AuthSvc:    authSvc,

@@ -1,8 +1,17 @@
 package main
 
 import (
+	"github.com/andrevmp/vito/backend/internal/gmail"
+	"github.com/andrevmp/vito/backend/internal/calendar/p2p"
 	"context"
 	"errors"
+	"github.com/andrevmp/vito/backend/internal/ai/search"
+	"github.com/andrevmp/vito/backend/internal/ai/voice"
+	"github.com/andrevmp/vito/backend/internal/bots"
+	"github.com/andrevmp/vito/backend/internal/calendar"
+	"github.com/andrevmp/vito/backend/internal/finance"
+	"github.com/andrevmp/vito/backend/internal/tasks"
+	"github.com/andrevmp/vito/backend/internal/whatsapp"
 	"log"
 	"net/http"
 	"os"
@@ -12,11 +21,11 @@ import (
 
 	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/ai/adkengine"
-	"github.com/andrevmp/vito/backend/internal/config"
-	"github.com/andrevmp/vito/backend/internal/database"
+	"github.com/andrevmp/vito/backend/internal/platform/config"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/handler"
-	"github.com/andrevmp/vito/backend/internal/integrations/calendar"
+	intcal "github.com/andrevmp/vito/backend/internal/integrations/calendar"
 	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/andrevmp/vito/backend/internal/server"
 	"github.com/andrevmp/vito/backend/internal/service"
@@ -75,17 +84,17 @@ func main() {
 
 	// 2. Repositórios
 	userRepo := repository.NewUserRepository(db)
-	eventRepo := repository.NewEventRepository(db)
-	todoRepo := repository.NewTodoRepository(db)
+	eventRepo := calendar.NewEventRepository(db)
+	todoRepo := tasks.NewTodoRepository(db)
 	memoryRepo := repository.NewMemoryRepository(db)
 	notifRepo := repository.NewDeviceTokenRepository(db)
-	triggerRepo := repository.NewTriggerRepository(db)
+	triggerRepo := bots.NewTriggerRepository(db)
 	briefingRepo := repository.NewBriefingRepository(db)
 	aiSettingsRepo := repository.NewAISettingsRepository(db)
-	pendingRepo := repository.NewPendingRepository(db)
-	bookingRepo := repository.NewBookingRepositorySQLite(db)
-	meetingRepo := repository.NewMeetingRepositorySQLite(db)
-	p2pRepo := repository.NewP2PInviteRepositorySQLite(db)
+	pendingRepo := tasks.NewPendingRepository(db)
+	bookingRepo := calendar.NewBookingRepositorySQLite(db)
+	meetingRepo := calendar.NewMeetingRepositorySQLite(db)
+	p2pRepo := p2p.NewP2PInviteRepositorySQLite(db)
 	chatRepo := repository.NewChatRepository(db)
 
 	// 3. Provedores de IA & AI Gateway com Failover.
@@ -96,11 +105,11 @@ func main() {
 	sessionRepo := repository.NewSessionRepository(db)
 	authSvc := service.NewAuthService(userRepo, cfg.JWTSecret)
 	authSvc.SetSessionRepository(sessionRepo)
-	calSvc := service.NewCalendarService(eventRepo)
-	todoSvc := service.NewTodoService(todoRepo)
+	calSvc := calendar.NewCalendarService(eventRepo)
+	todoSvc := tasks.NewTodoService(todoRepo)
 	notifSvc := service.NewNotificationService(notifRepo)
-	triggerSvc := service.NewTriggerService(triggerRepo)
-	pendingSvc := service.NewPendingService(pendingRepo)
+	triggerSvc := bots.NewTriggerService(triggerRepo)
+	pendingSvc := tasks.NewPendingService(pendingRepo)
 	// Ciclo 2 §8.4: correção manual rápida vira learned_preference (opt-out via VITO_DISABLE_IMPLICIT_FEEDBACK=1).
 	if os.Getenv("VITO_DISABLE_IMPLICIT_FEEDBACK") == "1" {
 		service.ImplicitFeedbackDisabled = true
@@ -118,25 +127,25 @@ func main() {
 		})
 	}
 
-	syncRepo := repository.NewCalendarSyncRepository(db)
-	syncSvc := service.NewCalendarSyncService(syncRepo, eventRepo, cfg.DataEncryptionKey)
-	googleCalCfg := calendar.GoogleConfig{
+	syncRepo := calendar.NewCalendarSyncRepository(db)
+	syncSvc := calendar.NewCalendarSyncService(syncRepo, eventRepo, cfg.DataEncryptionKey)
+	googleCalCfg := intcal.GoogleConfig{
 		ClientID:     cfg.GoogleClientID,
 		ClientSecret: cfg.GoogleClientSecret,
 		RedirectURI:  cfg.GoogleRedirectURL,
 	}
-	syncSvc.RegisterProvider(calendar.NewGoogleProvider(googleCalCfg))
-	syncSvc.RegisterProvider(calendar.NewAppleCalDAVProvider(calendar.AppleCalDAVConfig{}))
+	syncSvc.RegisterProvider(intcal.NewGoogleProvider(googleCalCfg))
+	syncSvc.RegisterProvider(intcal.NewAppleCalDAVProvider(intcal.AppleCalDAVConfig{}))
 	calSvc.SetSyncPusher(syncSvc)
 
 	// Worker em segundo plano para lembretes de compromissos (iniciado após wiring cognitivo)
-	reminderWorker := service.NewReminderWorker(eventRepo, notifSvc, 15*time.Minute)
+	reminderWorker := tasks.NewReminderWorker(eventRepo, notifSvc, 15*time.Minute)
 
 	// Worker em segundo plano para vigília autônoma de bots/disparadores (motor ADK v2 conectado via BotRunner)
-	triggerWorker := service.NewTriggerWorker(triggerRepo, notifSvc, &service.DefaultTriggerEvaluator{}, 1*time.Minute)
+	triggerWorker := bots.NewTriggerWorker(triggerRepo, notifSvc, &bots.DefaultTriggerEvaluator{}, 1*time.Minute)
 	// Delta gate pré-IA (§9.3): hashes dos fatos atuais via conectores por categoria.
 	triggerWorker.SetDeltaFetcher(func(fetchCtx context.Context, t *domain.Trigger) ([]string, []string, error) {
-		items, err := ai.RouteTriggerSource(t).Fetch(fetchCtx, t)
+		items, err := search.RouteTriggerSource(t).Fetch(fetchCtx, t)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -150,7 +159,7 @@ func main() {
 		}
 		var fresh, all []string
 		for _, it := range items {
-			h := ai.HashDataPoint(it)
+			h := search.HashDataPoint(it)
 			all = append(all, h)
 			if !seen[h] {
 				fresh = append(fresh, h)
@@ -164,12 +173,12 @@ func main() {
 		if t.ConditionType != domain.ConditionPriceAbove && t.ConditionType != domain.ConditionPriceBelow {
 			return 0, "", false, nil
 		}
-		items, err := ai.RouteTriggerSource(t).Fetch(fetchCtx, t)
+		items, err := search.RouteTriggerSource(t).Fetch(fetchCtx, t)
 		if err != nil {
 			return 0, "", false, err
 		}
 		for _, it := range items {
-			if v, ok := service.ParseMoneyValue(it.Value); ok {
+			if v, ok := bots.ParseMoneyValue(it.Value); ok {
 				return v, it.Value, true, nil
 			}
 		}
@@ -180,10 +189,10 @@ func main() {
 	morningBriefingWorker := service.NewMorningBriefingWorker(briefingRepo, eventRepo, todoRepo, userRepo, notifSvc, 1*time.Minute)
 
 	// Worker em segundo plano para lembretes de pendências (nudge diário)
-	pendingNudgeWorker := service.NewPendingNudgeWorker(pendingRepo, userRepo, notifSvc, 1*time.Minute)
+	pendingNudgeWorker := tasks.NewPendingNudgeWorker(pendingRepo, userRepo, notifSvc, 1*time.Minute)
 
 	// Worker em segundo plano para lembretes de tarefas com prazo
-	todoReminderWorker := service.NewTodoReminderWorker(todoRepo, notifSvc, 15*time.Minute)
+	todoReminderWorker := tasks.NewTodoReminderWorker(todoRepo, notifSvc, 15*time.Minute)
 
 	// Worker em segundo plano para limpeza de contas placeholder órfãs (@vito.local)
 	// criadas por logins de WhatsApp — libera o número de telefone de terceiros.
@@ -196,7 +205,7 @@ func main() {
 	behavioralWorker := service.NewBehavioralWorker(todoRepo, eventRepo, memoryRepo)
 
 	// Worker em segundo plano para resumos executivos (diário, semanal e mensal)
-	executiveSummaryWorker := service.NewExecutiveSummaryWorker(db, userRepo, notifSvc, 1*time.Minute)
+	executiveSummaryWorker := calendar.NewExecutiveSummaryWorker(db, userRepo, notifSvc, 1*time.Minute)
 
 	googleAuthCfg := service.GoogleAuthConfig{
 		ClientID:       cfg.GoogleClientID,
@@ -208,71 +217,71 @@ func main() {
 	googleAuthSvc := service.NewGoogleAuthService(googleAuthCfg, userRepo, authSvc, syncSvc)
 
 	// Transcritor de voz Whisper
-	var whisperTranscriber ai.AudioTranscriber
+	var whisperTranscriber voice.AudioTranscriber
 	if cfg.GroqAPIKey != "" {
-		whisperTranscriber = ai.NewGroqWhisper(cfg.GroqAPIKey)
+		whisperTranscriber = voice.NewGroqWhisper(cfg.GroqAPIKey)
 		log.Println("🎙️ [Audio Whisper] Groq Whisper Large v3 ativado para transcrição de voz.")
 	}
 
 	// 5. Handlers HTTP
 	authHandler := handler.NewAuthHandler(authSvc, userRepo)
 	googleAuthHandler := handler.NewGoogleAuthHandler(googleAuthSvc, authSvc)
-	calHandler := handler.NewCalendarHandler(calSvc)
-	todoHandler := handler.NewTodoHandler(todoSvc)
+	calHandler := calendar.NewCalendarHandler(calSvc)
+	todoHandler := tasks.NewTodoHandler(todoSvc)
 	notifHandler := handler.NewNotificationHandler(notifSvc)
-	syncHandler := handler.NewCalendarSyncHandler(syncSvc)
+	syncHandler := calendar.NewCalendarSyncHandler(syncSvc)
 	briefingHandler := handler.NewBriefingHandler(briefingRepo)
 	aiSettingsHandler := handler.NewAISettingsHandler(aiSettingsRepo)
-	pendingHandler := handler.NewPendingHandler(pendingSvc)
+	pendingHandler := tasks.NewPendingHandler(pendingSvc)
 
 	linkShortener := service.NewShortIoShortenerService(cfg.ShortIoAPIKey, cfg.ShortIoDomain, cfg.PublicBaseURL)
 	turnstileValidator := service.NewTurnstileValidator(cfg.TurnstileSecretKey)
-	bookingSvc := service.NewBookingService(bookingRepo, eventRepo, userRepo, notifSvc, linkShortener, turnstileValidator, cfg.PublicBaseURL)
+	bookingSvc := calendar.NewBookingService(bookingRepo, eventRepo, userRepo, notifSvc, linkShortener, turnstileValidator, cfg.PublicBaseURL)
 	bookingSvc.SetSyncPusher(syncSvc)
-	bookingHandler := handler.NewBookingHandler(bookingSvc)
+	bookingHandler := calendar.NewBookingHandler(bookingSvc)
 
 	emailSvc := service.NewEmailService(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUser, cfg.SMTPPassword, cfg.SMTPFrom)
 	bookingSvc.SetEmailService(emailSvc)
 
-	meetingSvc := service.NewMeetingService(meetingRepo, eventRepo, notifSvc, linkShortener, cfg.PublicBaseURL)
+	meetingSvc := calendar.NewMeetingService(meetingRepo, eventRepo, notifSvc, linkShortener, cfg.PublicBaseURL)
 	meetingSvc.SetUserRepository(userRepo)
 	meetingSvc.SetSyncPusher(syncSvc)
 	meetingSvc.SetEmailService(emailSvc)
-	meetingHandler := handler.NewMeetingHandler(meetingSvc)
+	meetingHandler := calendar.NewMeetingHandler(meetingSvc)
 
-	waRepo := repository.NewWhatsAppRepository(db)
+	waRepo := whatsapp.NewWhatsAppRepository(db)
 
-	p2pSvc := service.NewP2PMeetingService(p2pRepo, userRepo, calSvc, notifSvc)
-	p2pHandler := handler.NewP2PMeetingHandler(p2pSvc, userRepo, waRepo)
+	p2pSvc := p2p.NewP2PMeetingService(p2pRepo, userRepo, calSvc, notifSvc)
+	p2pHandler := p2p.NewP2PMeetingHandler(p2pSvc, userRepo, waRepo)
 
 	chatSvc := service.NewChatService(chatRepo)
 	chatHandler := handler.NewChatHandler(chatSvc)
 
-	financeRepo := repository.NewFinanceRepository(db)
-	financeLimitRepo := repository.NewFinanceLimitRepository(db)
-	financeAnalyticsRepo := repository.NewFinanceAnalyticsRepository(db)
-	financeSvc := service.NewFinanceService(financeRepo)
-	financeLimitSvc := service.NewFinanceLimitService(financeLimitRepo, financeRepo)
-	financeAnalyticsSvc := service.NewFinanceAnalyticsService(financeAnalyticsRepo, financeRepo)
-	spendingLimitEval := service.NewSpendingLimitEvaluator(financeLimitRepo, nil)
+	financeRepo := finance.NewFinanceRepository(db)
+	financeLimitRepo := finance.NewFinanceLimitRepository(db)
+	financeAnalyticsRepo := finance.NewFinanceAnalyticsRepository(db)
+	financeSvc := finance.NewFinanceService(financeRepo)
+	financeLimitSvc := finance.NewFinanceLimitService(financeLimitRepo, financeRepo)
+	financeAnalyticsSvc := finance.NewFinanceAnalyticsService(financeAnalyticsRepo, financeRepo)
+	spendingLimitEval := finance.NewSpendingLimitEvaluator(financeLimitRepo, nil)
 	financeSvc.SetOnSyncComplete(func(ctx context.Context, userID string) {
 		_, _ = spendingLimitEval.EvaluateUserLimits(ctx, userID, time.Now().UTC())
 	})
-	financeHandler := handler.NewFinanceHandler(financeSvc)
-	financeLimitHandler := handler.NewFinanceLimitHandler(financeLimitSvc)
-	financeAnalyticsHandler := handler.NewFinanceAnalyticsHandler(financeAnalyticsSvc)
+	financeHandler := finance.NewFinanceHandler(financeSvc)
+	financeLimitHandler := finance.NewFinanceLimitHandler(financeLimitSvc)
+	financeAnalyticsHandler := finance.NewFinanceAnalyticsHandler(financeAnalyticsSvc)
 
-	evoClient := service.NewDefaultEvolutionClient(cfg.EvolutionAPIURL, cfg.EvolutionAPIKey, nil)
-	waSvc := service.NewWhatsAppService(service.WhatsAppServiceConfig{
-		WebhookBaseURL:  service.ResolveWhatsAppWebhookBaseURL(cfg.PublicBaseURL, cfg.EvolutionAPIURL, cfg.Port),
+	evoClient := whatsapp.NewDefaultEvolutionClient(cfg.EvolutionAPIURL, cfg.EvolutionAPIKey, nil)
+	waSvc := whatsapp.NewWhatsAppService(whatsapp.WhatsAppServiceConfig{
+		WebhookBaseURL:  whatsapp.ResolveWhatsAppWebhookBaseURL(cfg.PublicBaseURL, cfg.EvolutionAPIURL, cfg.Port),
 		EvolutionAPIURL: cfg.EvolutionAPIURL,
 		EvolutionAPIKey: cfg.EvolutionAPIKey,
 	}, waRepo, evoClient)
 	waSvc.SetNotificationSender(notifSvc)
 	waSvc.SetUserRepo(userRepo)
-	var audioTranscriber ai.AudioTranscriber
+	var audioTranscriber voice.AudioTranscriber
 	if cfg.GroqAPIKey != "" {
-		audioTranscriber = ai.NewGroqWhisper(cfg.GroqAPIKey)
+		audioTranscriber = voice.NewGroqWhisper(cfg.GroqAPIKey)
 		waSvc.SetAudioTranscriber(audioTranscriber)
 	}
 
@@ -292,7 +301,7 @@ func main() {
 		defer waWiring.MediaWorker.Stop()
 	}
 
-	whatsappHandler := handler.NewWhatsAppHandler(waSvc)
+	whatsappHandler := whatsapp.NewWhatsAppHandler(waSvc)
 	whatsappHandler.SetContextService(waWiring.ContextSvc)
 	whatsappHandler.SetDirectoryService(waWiring.Directory)
 	whatsappHandler.SetMediaEnricher(waWiring.MediaEnricher)
@@ -304,28 +313,28 @@ func main() {
 		whatsappHandler.SetBackupManager(bkpMgr)
 	}
 	// Gmail Conector & Scanner
-	gmailRepo := repository.NewGmailRepository(db)
-	gmailSvc := service.NewGmailService(gmailRepo, cfg.DataEncryptionKey, cfg.GoogleClientID, cfg.GoogleClientSecret)
+	gmailRepo := gmail.NewGmailRepository(db)
+	gmailSvc := gmail.NewGmailService(gmailRepo, cfg.DataEncryptionKey, cfg.GoogleClientID, cfg.GoogleClientSecret)
 	googleAuthSvc.SetGmailRepository(gmailRepo, cfg.DataEncryptionKey)
-	gmailHandler := handler.NewGmailHandler(gmailSvc)
+	gmailHandler := gmail.NewGmailHandler(gmailSvc)
 
 	// WhatsApp Passwordless Login OTP
-	waAuthRepo := repository.NewWhatsAppAuthRepository(db)
-	waAuthSvc := service.NewWhatsAppAuthService(waAuthRepo, userRepo, authSvc, evoClient, "vito_system", cfg.JWTSecret)
+	waAuthRepo := whatsapp.NewWhatsAppAuthRepository(db)
+	waAuthSvc := whatsapp.NewWhatsAppAuthService(waAuthRepo, userRepo, authSvc, evoClient, "vito_system", cfg.JWTSecret)
 	waAuthSvc.SetWhatsAppRepo(waRepo)
-	whatsappAuthHandler := handler.NewWhatsAppAuthHandler(waAuthSvc)
+	whatsappAuthHandler := whatsapp.NewWhatsAppAuthHandler(waAuthSvc)
 
 	// Síntese de voz: Gemini TTS nativo (Google AI Studio) como motor primário
 	// com fallback em cascata para sintetizador neural pt-BR via HTTP.
-	var synth ai.TTSSynthesizer = ai.NewNeuralHTTPTTSSynthesizer()
+	var synth voice.TTSSynthesizer = voice.NewNeuralHTTPTTSSynthesizer()
 	if cfg.GeminiAPIKey != "" {
-		geminiSynth := ai.NewGeminiTTSProvider(cfg.GeminiAPIKey, cfg.GeminiModel)
-		synth = ai.NewCascadeTTSSynthesizer(geminiSynth, synth)
+		geminiSynth := voice.NewGeminiTTSProvider(cfg.GeminiAPIKey, cfg.GeminiModel)
+		synth = voice.NewCascadeTTSSynthesizer(geminiSynth, synth)
 		log.Printf("🗣️ [TTS] Síntese de voz Gemini TTS ativada (modelo=%s, voz=%s) com fallback neural pt-BR.", cfg.GeminiModel, cfg.TTSVoice)
 	} else {
 		log.Printf("⚠️ [TTS] Gemini API Key não configurada; usando sintetizador neural HTTP pt-BR.")
 	}
-	ttsSvc := ai.NewTTSService(synth, cfg.TTSCacheDir, cfg.TTSVoice)
+	ttsSvc := voice.NewTTSService(synth, cfg.TTSCacheDir, cfg.TTSVoice)
 	voiceTTSHandler := handler.NewVoiceTTSHandler(ttsSvc)
 
 	// 5.5 Inteligência Conversacional v2 (Loop de Agente, Toolsets e Memória Hierárquica)
@@ -390,36 +399,36 @@ func main() {
 
 	// 6. Servidor HTTP
 	srv := server.New(server.Config{
-		AuthHandler:         authHandler,
-		GoogleAuthHandler:   googleAuthHandler,
-		CalHandler:          calHandler,
-		TodoHandler:         todoHandler,
-		AstStreamHandler:    agentSys.StreamHandler,
-		MemoryHandler:          agentSys.MemoryHandler,
-		NotifHandler:           notifHandler,
-		NotifInboxHandler:      v5Sys.NotifInboxHandler,
-		StoreComplianceHandler: v5Sys.StoreComplianceHandler,
-		SyncHandler:         syncHandler,
-		BotHandler:          botHandler,
-		BriefingHandler:     briefingHandler,
-		AISettingsHandler:   aiSettingsHandler,
-		AIProviderHandler:   agentSys.AIProviderHandler,
-		PendingHandler:      pendingHandler,
-		BookingHandler:      bookingHandler,
-		MeetingHandler:      meetingHandler,
-		P2PHandler:          p2pHandler,
-		ChatHandler:         chatHandler,
-		WhatsAppHandler:     whatsappHandler,
-		GmailHandler:        gmailHandler,
-		WhatsAppAuthHandler: whatsappAuthHandler,
-		VoiceHandler:        voiceStreamHandler,
-		VoiceTTSHandler:     voiceTTSHandler,
+		AuthHandler:             authHandler,
+		GoogleAuthHandler:       googleAuthHandler,
+		CalHandler:              calHandler,
+		TodoHandler:             todoHandler,
+		AstStreamHandler:        agentSys.StreamHandler,
+		MemoryHandler:           agentSys.MemoryHandler,
+		NotifHandler:            notifHandler,
+		NotifInboxHandler:       v5Sys.NotifInboxHandler,
+		StoreComplianceHandler:  v5Sys.StoreComplianceHandler,
+		SyncHandler:             syncHandler,
+		BotHandler:              botHandler,
+		BriefingHandler:         briefingHandler,
+		AISettingsHandler:       aiSettingsHandler,
+		AIProviderHandler:       agentSys.AIProviderHandler,
+		PendingHandler:          pendingHandler,
+		BookingHandler:          bookingHandler,
+		MeetingHandler:          meetingHandler,
+		P2PHandler:              p2pHandler,
+		ChatHandler:             chatHandler,
+		WhatsAppHandler:         whatsappHandler,
+		GmailHandler:            gmailHandler,
+		WhatsAppAuthHandler:     whatsappAuthHandler,
+		VoiceHandler:            voiceStreamHandler,
+		VoiceTTSHandler:         voiceTTSHandler,
 		FinanceHandler:          financeHandler,
 		FinanceLimitHandler:     financeLimitHandler,
 		FinanceAnalyticsHandler: financeAnalyticsHandler,
 		AuthSvc:                 authSvc,
-		AllowedOrigins:      cfg.AllowedOrigins(),
-		Environment:         cfg.Environment,
+		AllowedOrigins:          cfg.AllowedOrigins(),
+		Environment:             cfg.Environment,
 	})
 
 	httpServer := &http.Server{

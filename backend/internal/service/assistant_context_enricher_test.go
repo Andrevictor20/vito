@@ -2,13 +2,16 @@ package service_test
 
 import (
 	"context"
+	"github.com/andrevmp/vito/backend/internal/bots"
+	"github.com/andrevmp/vito/backend/internal/calendar"
+	"github.com/andrevmp/vito/backend/internal/tasks"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/andrevmp/vito/backend/internal/ai"
-	"github.com/andrevmp/vito/backend/internal/database"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/andrevmp/vito/backend/internal/service"
@@ -74,26 +77,26 @@ func TestAssistantContextEnricher_BuildLevel1Context(t *testing.T) {
 		UpdatedAt:  time.Now().UTC(),
 	})
 
-	eventRepo := repository.NewEventRepository(db)
-	calSvc := service.NewCalendarService(eventRepo)
+	eventRepo := calendar.NewEventRepository(db)
+	calSvc := calendar.NewCalendarService(eventRepo)
 	now := time.Now()
 	_, _, _ = calSvc.CreateEvent(userID, "Reunião de Arquitetura", "Alinhamento com time", "Sala 2", now.Add(2*time.Hour), now.Add(3*time.Hour))
 
-	todoRepo := repository.NewTodoRepository(db)
-	todoSvc := service.NewTodoService(todoRepo)
+	todoRepo := tasks.NewTodoRepository(db)
+	todoSvc := tasks.NewTodoService(todoRepo)
 	_, _ = todoSvc.CreateTodo(userID, "Revisar PR de IA", "high", nil)
 
-	triggerRepo := repository.NewTriggerRepository(db)
-	triggerSvc := service.NewTriggerService(triggerRepo)
+	triggerRepo := bots.NewTriggerRepository(db)
+	triggerSvc := bots.NewTriggerService(triggerRepo)
 	_ = triggerRepo.Create(&domain.Trigger{
-		ID:         uuid.New().String(),
-		UserID:     userID,
-		Title:      "Cotação Dólar",
-		Category:   domain.CategoryFinance,
-		Status:     domain.TriggerStatusActive,
-		Frequency:  domain.FrequencyDailyMorning,
-		CreatedAt:  time.Now().UTC(),
-		UpdatedAt:  time.Now().UTC(),
+		ID:        uuid.New().String(),
+		UserID:    userID,
+		Title:     "Cotação Dólar",
+		Category:  domain.CategoryFinance,
+		Status:    domain.TriggerStatusActive,
+		Frequency: domain.FrequencyDailyMorning,
+		CreatedAt: time.Now().UTC(),
+		UpdatedAt: time.Now().UTC(),
 	})
 
 	aiSettingsRepo := repository.NewAISettingsRepository(db)

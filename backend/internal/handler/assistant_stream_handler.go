@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	aivoice "github.com/andrevmp/vito/backend/internal/ai/voice"
 	"io"
 	"log"
 	"net/http"
@@ -21,8 +22,8 @@ import (
 // AssistantStreamHandler expõe os endpoints unificados REST, SSE e multimodais para o Loop de Agente.
 type AssistantStreamHandler struct {
 	loop        *service.AgentLoop
-	transcriber ai.AudioTranscriber
-	ttsService  ai.TTSService
+	transcriber aivoice.AudioTranscriber
+	ttsService  aivoice.TTSService
 }
 
 // NewAssistantStreamHandler cria o handler.
@@ -31,12 +32,12 @@ func NewAssistantStreamHandler(loop *service.AgentLoop) *AssistantStreamHandler 
 }
 
 // SetTranscriber configura o transcritor Whisper para áudio.
-func (h *AssistantStreamHandler) SetTranscriber(t ai.AudioTranscriber) {
+func (h *AssistantStreamHandler) SetTranscriber(t aivoice.AudioTranscriber) {
 	h.transcriber = t
 }
 
 // SetTTSService configura o serviço de síntese de voz (Gemini TTS + fallback neural) para respostas de áudio inline.
-func (h *AssistantStreamHandler) SetTTSService(tts ai.TTSService) {
+func (h *AssistantStreamHandler) SetTTSService(tts aivoice.TTSService) {
 	h.ttsService = tts
 }
 
@@ -341,7 +342,7 @@ func (h *AssistantStreamHandler) AudioChat(w http.ResponseWriter, r *http.Reques
 	// Sanitiza formatação markdown para canal de voz, eliminando asteriscos e títulos das legendas
 	cleanReplyText := resp.Text
 	if strings.Contains(strings.ToLower(channel), "voice") {
-		cleanReplyText = ai.StripMarkdownForSpeech(resp.Text)
+		cleanReplyText = aivoice.StripMarkdownForSpeech(resp.Text)
 	}
 
 	var actions []map[string]any
@@ -378,7 +379,7 @@ func (h *AssistantStreamHandler) AudioChat(w http.ResponseWriter, r *http.Reques
 	}
 
 	if includeTTS && h.ttsService != nil && strings.TrimSpace(cleanReplyText) != "" {
-		speechText := ai.StripMarkdownForSpeech(cleanReplyText)
+		speechText := aivoice.StripMarkdownForSpeech(cleanReplyText)
 		if speechText != "" {
 			if audioBytes, audioMime, ttsErr := h.ttsService.Synthesize(r.Context(), speechText, voice); ttsErr == nil && len(audioBytes) > 0 {
 				result["tts_audio_b64"] = base64.StdEncoding.EncodeToString(audioBytes)

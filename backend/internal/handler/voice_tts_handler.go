@@ -3,20 +3,20 @@ package handler
 import (
 	"encoding/base64"
 	"encoding/json"
+	"github.com/andrevmp/vito/backend/internal/ai/voice"
 	"net/http"
 	"strings"
 
-	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/handler/middleware"
 )
 
 // VoiceTTSHandler processa requisições de síntese de fala (TTS).
 type VoiceTTSHandler struct {
-	ttsSvc ai.TTSService
+	ttsSvc voice.TTSService
 }
 
 // NewVoiceTTSHandler cria uma nova instância do handler.
-func NewVoiceTTSHandler(ttsSvc ai.TTSService) *VoiceTTSHandler {
+func NewVoiceTTSHandler(ttsSvc voice.TTSService) *VoiceTTSHandler {
 	return &VoiceTTSHandler{ttsSvc: ttsSvc}
 }
 

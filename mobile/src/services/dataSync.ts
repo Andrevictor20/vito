@@ -1,4 +1,4 @@
-import type { MainTabType } from '../utils/pagerNavigation';
+import type { MainTabType } from '../utils/navigation/pagerNavigation';
 
 export type SyncEventType =
   | 'refresh_all'

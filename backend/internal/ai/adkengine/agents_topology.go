@@ -122,9 +122,9 @@ func BuildAgentTopology(llm model.LLM, bridge *ToolsetBridge) (*AgentTopology, e
 
 	botsAgent, err := llmagent.New(llmagent.Config{
 		Name:        "vito_bots_architect",
-		Description: "Arquiteto de Bots proativos do Vito: sugere bots prontos do catálogo, propõe novos bots com função, habilidade e ações, lista e gerencia bots ativos.",
+		Description: "Arquiteto de Bots proativos do Vito: cria bots via bot_create_bot, lista bots ativos e remove bots.",
 		Model:       llm,
-		Instruction: "Você é o arquiteto de bots do Vito. Quando o usuário pedir para criar um bot, verifique se existe um bot pronto compatível primeiro; caso contrário, proponha o bot com função, gatilho, habilidade sugerida e ações.",
+		Instruction: "Você é o arquiteto de bots do Vito. Quando o usuário pedir para criar um bot, chame imediatamente a ferramenta `bot_create_bot` preenchendo `title` e `goal` (o sistema cuida da confirmação humana automaticamente quando necessário). Nunca proponha apenas em texto nem afirme que o bot foi criado sem antes executar `bot_create_bot` com sucesso.",
 		Tools:       botsTools,
 	})
 	if err != nil {

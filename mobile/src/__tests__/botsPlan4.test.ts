@@ -2,14 +2,14 @@ import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { BotsApi } from '../services/api/botsApi';
+import { BotsApi } from '../features/bots/services/botsApi';
 import type { ApiClient } from '../services/api/client';
 import {
   ASK_VITO_CHIPS,
   DEFAULT_BOT_TEMPLATES,
   DEFAULT_SKILL_PACKAGES,
   MASCOT_PRESETS,
-} from '../data/botsCatalogFallback';
+} from '../features/bots/data/botsCatalogFallback';
 import {
   BOTS_DEFAULT_SUBTITLE,
   findRadarCopyViolations,
@@ -18,27 +18,27 @@ import {
   isAlwaysAskAction,
   parseBotSkin,
   resolveBotAnimState,
-} from '../utils/botsHelpers';
+} from '../features/bots/utils/botsHelpers';
 
 const MOBILE_SRC = path.resolve(__dirname, '..');
 
 describe('Plano 04 — Bots UI Mobile (AC-03, AC-13, AC-14 & §7)', () => {
   test('AC-13: zero ocorrências de "radar" ou "radares" nas telas e componentes de Bots', () => {
     const filesToCheck = [
-      'screens/BotsScreen.tsx',
+      'features/bots/screens/BotsScreen.tsx',
       'components/common/FloatingTabBar.tsx',
       'components/common/Header.tsx',
-      'data/botsCatalogFallback.ts',
-      'data/botsSkillsFallback.ts',
-      'components/bots/BotCard.tsx',
-      'components/bots/BotsMyTab.tsx',
-      'components/bots/BotsCatalogTab.tsx',
-      'components/bots/BotDetailView.tsx',
-      'components/bots/BotChatTab.tsx',
-      'components/bots/BotDetailsTab.tsx',
-      'components/bots/MascotStudioModal.tsx',
-      'components/bots/TemplateSheet.tsx',
-      'components/bots/BotCatalogSheets.tsx',
+      'features/bots/data/botsCatalogFallback.ts',
+      'features/bots/data/botsSkillsFallback.ts',
+      'features/bots/components/BotCard.tsx',
+      'features/bots/components/BotsMyTab.tsx',
+      'features/bots/components/BotsCatalogTab.tsx',
+      'features/bots/components/BotDetailView.tsx',
+      'features/bots/components/BotChatTab.tsx',
+      'features/bots/components/BotDetailsTab.tsx',
+      'features/bots/components/MascotStudioModal.tsx',
+      'features/bots/components/TemplateSheet.tsx',
+      'features/bots/components/BotCatalogSheets.tsx',
     ];
 
     for (const rel of filesToCheck) {

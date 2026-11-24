@@ -11,11 +11,11 @@ import { RootNavigator } from './navigation/RootNavigator';
 import { navigationRef, navigateToTab } from './navigation/navigationRef';
 import { tokens } from './theme/tokens';
 import { api, DEFAULT_SERVER_URL, CLOUDFLARE_SERVER_URL, PI_SERVER_URL, isCloudServer } from './services/api';
-import { notificationService } from './services/notificationService';
+import { notificationService } from './features/notifications/services/notificationService';
 import { UpdateBanner } from './components/common/UpdateBanner';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { PrivacyScreenShield } from './components/common/PrivacyScreenShield';
-import { SplashScreen } from './screens/SplashScreen';
+import { SplashScreen } from './features/auth/screens/SplashScreen';
 import { PostLoginPermissionsSheet } from './components/auth/PostLoginPermissionsSheet';
 import { hasPromptedPostLoginPerms } from './components/auth/onboardingStorage';
 

@@ -2,6 +2,8 @@ package adkengine_test
 
 import (
 	"context"
+	aimemory "github.com/andrevmp/vito/backend/internal/ai/memory"
+	"github.com/andrevmp/vito/backend/internal/calendar"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -12,7 +14,7 @@ import (
 	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/ai/adkengine"
 	"github.com/andrevmp/vito/backend/internal/ai/evals"
-	"github.com/andrevmp/vito/backend/internal/database"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/andrevmp/vito/backend/internal/service"
@@ -21,7 +23,7 @@ import (
 // TestAC04_COG04_MemoryConsolidationAndHybridSearch valida AC-04 (COG-04 / Onda 2):
 // Dado o encerramento de uma conversa contendo uma nova preferência que contradiz uma anterior,
 // quando o MemoryConsolidationWorker executa via extrator ADK, então extrai o fato real,
-// substitui a contradição via superseded_by e o SQLiteMemoryService (adk/v2/memory.Service)
+// substitui a contradição via superseded_by e o aimemory.SQLiteMemoryService (adk/v2/memory.Service)
 // recupera o fato por busca híbrida (FTS5 + embedding vetorial) mesmo perguntado com sinônimo.
 func TestAC04_COG04_MemoryConsolidationAndHybridSearch(t *testing.T) {
 	ctx := context.Background()
@@ -49,7 +51,7 @@ func TestAC04_COG04_MemoryConsolidationAndHybridSearch(t *testing.T) {
 	hierarchyRepo := repository.NewMemoryHierarchyRepository(db)
 	convRepo := repository.NewConversationStoreRepository(db)
 
-	memSvc := adkengine.NewSQLiteMemoryService(factRepo, hierarchyRepo, adkengine.DefaultSemanticEmbedder)
+	memSvc := aimemory.NewSQLiteMemoryService(factRepo, hierarchyRepo, aimemory.DefaultSemanticEmbedder)
 
 	// 1. Insere preferência antiga: "Prefiro reuniões pela manhã"
 	oldFactID := "fact-old-morning"
@@ -66,7 +68,7 @@ func TestAC04_COG04_MemoryConsolidationAndHybridSearch(t *testing.T) {
 	if err := factRepo.Create(oldFact); err != nil {
 		t.Fatalf("falha ao gravar fato antigo: %v", err)
 	}
-	if vec, err := adkengine.DefaultSemanticEmbedder(ctx, oldFact.Content); err == nil {
+	if vec, err := aimemory.DefaultSemanticEmbedder(ctx, oldFact.Content); err == nil {
 		_ = factRepo.UpsertEmbedding(ctx, oldFactID, userID, "gemini-embedding-001", vec)
 	}
 
@@ -103,8 +105,8 @@ func TestAC04_COG04_MemoryConsolidationAndHybridSearch(t *testing.T) {
 	routed := adkengine.NewRoutedLLM(router)
 
 	worker := service.NewMemoryConsolidationWorker(convRepo, hierarchyRepo, 50*time.Millisecond)
-	worker.SetFactRepository(factRepo, adkengine.DefaultSemanticEmbedder)
-	worker.SetSemanticExtractor(adkengine.NewADKMemoryExtractor(routed))
+	worker.SetFactRepository(factRepo, aimemory.DefaultSemanticEmbedder)
+	worker.SetSemanticExtractor(aimemory.NewADKMemoryExtractor(routed))
 
 	if err := worker.ConsolidateThread(ctx, thread.ID, userID); err != nil {
 		t.Fatalf("AC-04: falha no ConsolidateThread: %v", err)
@@ -119,7 +121,7 @@ func TestAC04_COG04_MemoryConsolidationAndHybridSearch(t *testing.T) {
 		t.Fatalf("AC-04: esperava que o fato antigo (%s) tivesse superseded_by preenchido", oldFactID)
 	}
 
-	// 5. Busca no SQLiteMemoryService (adk/v2/memory.Service) usando sinônimo "tarde" (que não aparece literalmente em "vespertino")
+	// 5. Busca no aimemory.SQLiteMemoryService (adk/v2/memory.Service) usando sinônimo "tarde" (que não aparece literalmente em "vespertino")
 	searchResp, err := memSvc.SearchMemory(ctx, &memory.SearchRequest{
 		AppName: "vito",
 		UserID:  userID,
@@ -142,7 +144,7 @@ func TestAC04_COG04_MemoryConsolidationAndHybridSearch(t *testing.T) {
 		}
 	}
 	if !foundVespertino {
-		t.Errorf("AC-04: esperava encontrar o fato consolidado 'vespertino' nos resultados do SQLiteMemoryService")
+		t.Errorf("AC-04: esperava encontrar o fato consolidado 'vespertino' nos resultados do aimemory.SQLiteMemoryService")
 	}
 }
 
@@ -160,7 +162,7 @@ func TestAC05_COG05_AttentionBudgetService_CalendarSilenceAndDedup(t *testing.T)
 	defer db.Close()
 
 	userRepo := repository.NewUserRepository(db)
-	eventRepo := repository.NewEventRepository(db)
+	eventRepo := calendar.NewEventRepository(db)
 	userID := "user-cog05"
 	now := time.Date(2026, 11, 21, 15, 0, 0, 0, time.UTC)
 

@@ -1,19 +1,23 @@
 package main
 
 import (
+	"github.com/andrevmp/vito/backend/internal/gmail"
 	"context"
 	"fmt"
+	"github.com/andrevmp/vito/backend/internal/bots"
+	"github.com/andrevmp/vito/backend/internal/calendar"
+	"github.com/andrevmp/vito/backend/internal/tasks"
+	"github.com/andrevmp/vito/backend/internal/whatsapp"
 	"strings"
 	"time"
 	"unicode"
 
 	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/domain"
-	"github.com/andrevmp/vito/backend/internal/service"
 )
 
 type calendarServiceAdapter struct {
-	svc *service.CalendarService
+	svc *calendar.CalendarService
 }
 
 func (a *calendarServiceAdapter) GetEvents(ctx context.Context, userID string, start, end time.Time) ([]*domain.Event, error) {
@@ -49,7 +53,7 @@ func (a *calendarServiceAdapter) DeleteEvent(ctx context.Context, id, userID str
 }
 
 type todoServiceAdapter struct {
-	svc *service.TodoService
+	svc *tasks.TodoService
 }
 
 func (a *todoServiceAdapter) GetTodos(ctx context.Context, userID string) ([]*domain.Todo, error) {
@@ -84,8 +88,8 @@ func (a *todoServiceAdapter) DeleteTodo(ctx context.Context, id, userID string) 
 }
 
 type whatsAppServiceAdapter struct {
-	svc *service.WhatsAppService
-	dir *service.WhatsAppDirectoryService
+	svc *whatsapp.WhatsAppService
+	dir *whatsapp.WhatsAppDirectoryService
 }
 
 func (a *whatsAppServiceAdapter) SendMessage(ctx context.Context, userID, phone, message string) error {
@@ -95,7 +99,7 @@ func (a *whatsAppServiceAdapter) SendMessage(ctx context.Context, userID, phone,
 	}
 
 	if strings.Contains(target, "@s.whatsapp.net") || strings.Contains(target, "@g.us") {
-		return a.svc.SendWhatsAppMessage(ctx, userID, service.NormalizeJIDForSend(target), message)
+		return a.svc.SendWhatsAppMessage(ctx, userID, whatsapp.NormalizeJIDForSend(target), message)
 	}
 
 	digits := 0
@@ -115,7 +119,7 @@ func (a *whatsAppServiceAdapter) SendMessage(ctx context.Context, userID, phone,
 	if a.dir != nil {
 		chat, err := a.dir.ResolveChat(ctx, userID, target)
 		if err == nil && chat != nil && chat.ChatJID != "" {
-			return a.svc.SendWhatsAppMessage(ctx, userID, service.NormalizeJIDForSend(chat.ChatJID), message)
+			return a.svc.SendWhatsAppMessage(ctx, userID, whatsapp.NormalizeJIDForSend(chat.ChatJID), message)
 		}
 	}
 
@@ -137,7 +141,7 @@ func (a *whatsAppServiceAdapter) RecentChats(ctx context.Context, userID string)
 }
 
 type gmailServiceAdapter struct {
-	svc *service.GmailService
+	svc *gmail.GmailService
 }
 
 func (a *gmailServiceAdapter) SendEmail(ctx context.Context, userID, to, subject, body string) error {
@@ -159,7 +163,7 @@ func (a *gmailServiceAdapter) ScanEmails(ctx context.Context, userID string) (*d
 }
 
 type bookingServiceAdapter struct {
-	svc *service.BookingService
+	svc *calendar.BookingService
 }
 
 func (a *bookingServiceAdapter) ListBookingTypes(ctx context.Context, userID string) ([]*domain.BookingType, error) {
@@ -192,7 +196,7 @@ func (a *bookingServiceAdapter) CreateBookingTypeWithLinks(ctx context.Context, 
 }
 
 type triggerServiceAdapter struct {
-	svc *service.TriggerService
+	svc *bots.TriggerService
 }
 
 func (a *triggerServiceAdapter) ListTriggers(userID string) ([]*domain.Trigger, error) {

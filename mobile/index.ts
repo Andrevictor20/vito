@@ -4,7 +4,7 @@ import { AppRegistry } from 'react-native';
 import { registerRootComponent } from 'expo';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import App from './App';
-import { VitoVoiceOverlayRoot } from './src/overlay/VitoVoiceOverlay';
+import { VitoVoiceOverlayRoot } from './src/features/chat/overlay/VitoVoiceOverlay';
 
 // Sanitização de logs em ambiente de produção (elimina vazamento de PII em logcat/console)
 if (!__DEV__) {

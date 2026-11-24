@@ -6,7 +6,7 @@ import { User } from '../types';
 import { api } from '../services/api';
 import { googleAuthService } from '../services/googleAuthService';
 import { parseGoogleOAuthCallback } from '../services/googleOAuthCallback';
-import { notificationService } from '../services/notificationService';
+import { notificationService } from '../features/notifications/services/notificationService';
 
 
 const USER_KEY = '@vito_user';

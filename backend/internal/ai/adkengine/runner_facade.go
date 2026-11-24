@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	aimemory "github.com/andrevmp/vito/backend/internal/ai/memory"
 	"strings"
 	"time"
 
@@ -50,7 +51,7 @@ type FacadeConfig struct {
 	AISettingsRepo      domain.AISettingsRepository
 	ContextEnricher     ContextEnricherProvider
 	ConsolidationWorker ActivityNotifier
-	MemoryService       *SQLiteMemoryService
+	MemoryService       *aimemory.SQLiteMemoryService
 	ModelResolver       *service.ModelResolver
 	AIProviderRepo      domain.AIProviderRepository
 	UserRegistry        *service.UserProviderRegistry
@@ -62,7 +63,7 @@ type ADKLoopFacade struct {
 	cfg                 FacadeConfig
 	routedLLM           *RoutedLLM
 	sessionService      *SQLiteSessionService
-	memoryService       *SQLiteMemoryService
+	memoryService       *aimemory.SQLiteMemoryService
 	bridge              *ToolsetBridge
 	guardrail           *GuardrailPlugin
 	topology            *AgentTopology
@@ -127,8 +128,8 @@ func NewADKLoopFacade(cfg FacadeConfig) (*ADKLoopFacade, error) {
 	}, nil
 }
 
-// MemoryService retorna o SQLiteMemoryService subjacente.
-func (f *ADKLoopFacade) MemoryService() *SQLiteMemoryService {
+// MemoryService retorna o aimemory.SQLiteMemoryService subjacente.
+func (f *ADKLoopFacade) MemoryService() *aimemory.SQLiteMemoryService {
 	return f.memoryService
 }
 
@@ -278,6 +279,7 @@ func (f *ADKLoopFacade) RunStream(ctx context.Context, req domain.UnifiedAssista
 
 	// 6. Execução do grafo de agentes via adk/v2/runner.Runner (teto de 7 chamadas de modelo)
 	var finalAnswerParts []string
+	emittedThinkingStatus := false
 	for event, err := range f.adkRunner.Run(
 		runCtx,
 		userID,
@@ -302,7 +304,10 @@ func (f *ADKLoopFacade) RunStream(ctx context.Context, req domain.UnifiedAssista
 						continue
 					}
 					if p.Thought {
-						_ = onDelta(ai.StreamDelta{Type: "reasoning", ReasoningDelta: p.Text})
+						if !emittedThinkingStatus {
+							emittedThinkingStatus = true
+							_ = onDelta(ai.StreamDelta{Type: "status", ToolName: "Analisando solicitação"})
+						}
 					} else {
 						_ = onDelta(ai.StreamDelta{Type: "text", TextDelta: p.Text})
 					}
@@ -427,5 +432,3 @@ func buildUserGenaiContent(req domain.UnifiedAssistantRequest) *genai.Content {
 		Parts: parts,
 	}
 }
-
-

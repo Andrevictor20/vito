@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { ActionPolicy, Bot, BotChatMessage, BotMemory, SkillPackage } from '../../types/bot';
-import { PendingDecision } from '../../services/api/botsApi';
+import { PendingDecision } from '../../services/api/bots/botsApi';
 import { VitoSwitch } from '../ui/VitoSwitch';
 import { BotDetailChatTab } from './BotDetailChatTab';
 import { BotDetailDetailsTab } from './BotDetailDetailsTab';

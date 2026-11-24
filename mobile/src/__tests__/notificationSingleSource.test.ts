@@ -10,7 +10,7 @@ const __dirname = path.dirname(__filename);
 describe('AC-06: Fonte unica de notificacoes na barra do Android (sem agendamento local duplicado)', () => {
   it('test_ac_06_init_clears_legacy_local_schedules', () => {
     const svcSrc = fs.readFileSync(
-      path.resolve(__dirname, '../services/notificationService.ts'),
+      path.resolve(__dirname, '../features/notifications/services/notificationService.ts'),
       'utf8',
     );
     assert.equal(svcSrc.includes('cancelAllScheduledNotificationsAsync'), true);
@@ -21,9 +21,9 @@ describe('AC-06: Fonte unica de notificacoes na barra do Android (sem agendament
     const srcRoot = path.resolve(__dirname, '..');
     const files = [
       'hooks/useHomeData.ts',
-      'hooks/chatMessageEffects.ts',
-      'hooks/usePendingItems.ts',
-      'services/notificationService.ts',
+      'features/chat/hooks/chatMessageEffects.ts',
+      'features/tasks/hooks/usePendingItems.ts',
+      'features/notifications/services/notificationService.ts',
     ];
     for (const rel of files) {
       const content = fs.readFileSync(path.join(srcRoot, rel), 'utf8');

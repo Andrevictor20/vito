@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/andrevmp/vito/backend/internal/bots"
 	"iter"
 	"net/http"
 	"net/http/httptest"
@@ -15,7 +16,7 @@ import (
 
 	"google.golang.org/adk/v2/model"
 
-	"github.com/andrevmp/vito/backend/internal/database"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/andrevmp/vito/backend/internal/service"
@@ -44,7 +45,7 @@ type svcTestFixture struct {
 	providerRepo *repository.AIProviderRepositorySQLite
 	settingsRepo *repository.AISettingsRepositorySQLite
 	convRepo     *repository.ConversationStoreRepository
-	triggerRepo  *repository.TriggerRepositorySQLite
+	triggerRepo  *bots.TriggerRepositorySQLite
 	vault        *service.AIKeyVault
 	factory      *stubFactory
 	registry     *service.UserProviderRegistry
@@ -70,7 +71,7 @@ func setupAIServiceTest(t *testing.T) *svcTestFixture {
 	providerRepo := repository.NewAIProviderRepository(db)
 	settingsRepo := repository.NewAISettingsRepository(db)
 	convRepo := repository.NewConversationStoreRepository(db)
-	triggerRepo := repository.NewTriggerRepository(db)
+	triggerRepo := bots.NewTriggerRepository(db)
 	vault := service.NewAIKeyVault("0123456789abcdef0123456789abcdef")
 	factory := &stubFactory{}
 	registry := service.NewUserProviderRegistry(vault, factory, providerRepo, 0)

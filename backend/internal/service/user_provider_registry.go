@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/andrevmp/vito/backend/internal/ai/byok"
 	"net/http"
 	"strings"
 	"sync"
@@ -12,7 +13,6 @@ import (
 
 	"google.golang.org/adk/v2/model"
 
-	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/domain"
 )
 
@@ -148,10 +148,10 @@ func (r *UserProviderRegistry) GetOrCreate(
 
 	var httpClient *http.Client
 	if provider.ProviderKey == domain.ProviderKeyCustom {
-		if _, err := ai.ValidateCustomBaseURL(provider.BaseURL, r.blockedLocalPort); err != nil {
+		if _, err := byok.ValidateCustomBaseURL(provider.BaseURL, r.blockedLocalPort); err != nil {
 			return nil, err
 		}
-		httpClient = ai.NewSafeHTTPClient(ai.DefaultSSRFTimeout, ai.DefaultSSRFMaxBodyBytes, r.blockedLocalPort)
+		httpClient = byok.NewSafeHTTPClient(byok.DefaultSSRFTimeout, byok.DefaultSSRFMaxBodyBytes, r.blockedLocalPort)
 	} else {
 		r.mu.Lock()
 		httpClient = r.testHTTPClient

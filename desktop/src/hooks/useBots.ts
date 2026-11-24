@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../services/api';
-import { CreateBotInput, PendingDecision } from '../services/api/botsApi';
+import { CreateBotInput, PendingDecision } from '../services/api/bots/botsApi';
 import {
   ActionPolicy,
   Bot,

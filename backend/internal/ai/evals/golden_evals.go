@@ -14,7 +14,7 @@ import (
 
 	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/ai/adkengine"
-	"github.com/andrevmp/vito/backend/internal/database"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/andrevmp/vito/backend/internal/service"
@@ -341,9 +341,9 @@ type stubDomainToolset struct {
 	name domain.ToolsetName
 }
 
-func (s *stubDomainToolset) Name() domain.ToolsetName     { return s.name }
-func (s *stubDomainToolset) Description() string          { return "Stub eval toolset " + string(s.name) }
-func (s *stubDomainToolset) JSONSchema() json.RawMessage  { return json.RawMessage(`{"type":"object"}`) }
+func (s *stubDomainToolset) Name() domain.ToolsetName    { return s.name }
+func (s *stubDomainToolset) Description() string         { return "Stub eval toolset " + string(s.name) }
+func (s *stubDomainToolset) JSONSchema() json.RawMessage { return json.RawMessage(`{"type":"object"}`) }
 func (s *stubDomainToolset) IsWriteOperation(op string, _ json.RawMessage) (bool, bool, map[string]any) {
 	isSendOrDelete := strings.Contains(op, "send") || strings.Contains(op, "delete")
 	return isSendOrDelete, isSendOrDelete, nil

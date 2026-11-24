@@ -14,8 +14,8 @@ import (
 
 var (
 	ErrConfirmationNotFound   = errors.New("confirmação pendente não encontrada")
-	ErrConfirmationNotPending  = errors.New("a confirmação já foi resolvida ou expirou")
-	ErrConfirmationExpired     = errors.New("o prazo para confirmação expirou")
+	ErrConfirmationNotPending = errors.New("a confirmação já foi resolvida ou expirou")
+	ErrConfirmationExpired    = errors.New("o prazo para confirmação expirou")
 )
 
 // PendingConfirmationStatus define os estados da máquina de confirmação.

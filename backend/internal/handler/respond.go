@@ -1,77 +1,11 @@
 package handler
 
 import (
-	"encoding/json"
-	"errors"
 	"net/http"
 
-	"github.com/andrevmp/vito/backend/internal/domain"
+	"github.com/andrevmp/vito/backend/internal/handler/middleware"
 )
 
-// apiError padroniza o corpo de erro (BACK-04).
-type apiError struct {
-	Error apiErrorBody `json:"error"`
-}
-
-type apiErrorBody struct {
-	Code    string `json:"code"`
-	Message string `json:"message"`
-}
-
-// respondError traduz erros de domínio para o HTTP correspondente em JSON único.
 func respondError(w http.ResponseWriter, err error) {
-	w.Header().Set("Content-Type", "application/json")
-	switch {
-	case errors.Is(err, domain.ErrTodoNotFound),
-		errors.Is(err, domain.ErrSubtaskNotFound),
-		errors.Is(err, domain.ErrEventNotFound),
-		errors.Is(err, domain.ErrMemoryNotFound),
-		errors.Is(err, domain.ErrPendingItemNotFound),
-		errors.Is(err, domain.ErrTriggerNotFound),
-		errors.Is(err, domain.ErrChatSessionNotFound),
-		errors.Is(err, domain.ErrIntegrationNotFound),
-		errors.Is(err, domain.ErrMeetingNotFound),
-		errors.Is(err, domain.ErrMeetingSlotNotFound),
-		errors.Is(err, domain.ErrP2PInviteNotFound),
-		errors.Is(err, domain.ErrBotNotFound),
-		errors.Is(err, domain.ErrSkillNotFound),
-		errors.Is(err, domain.ErrNotificationNotFound):
-		w.WriteHeader(http.StatusNotFound)
-		_ = json.NewEncoder(w).Encode(apiError{Error: apiErrorBody{Code: "not_found", Message: err.Error()}})
-	case errors.Is(err, domain.ErrP2PInviteUnauthorized):
-		w.WriteHeader(http.StatusForbidden)
-		_ = json.NewEncoder(w).Encode(apiError{Error: apiErrorBody{Code: "forbidden", Message: err.Error()}})
-	case errors.Is(err, domain.ErrConflict),
-		errors.Is(err, domain.ErrScheduleConflict),
-		errors.Is(err, domain.ErrBookingTypeSlugExists),
-		errors.Is(err, domain.ErrUserAlreadyExists),
-		errors.Is(err, domain.ErrMeetingAlreadyConfirmed),
-		errors.Is(err, domain.ErrParticipantAlreadyVoted),
-		errors.Is(err, domain.ErrP2PSlotConflict),
-		errors.Is(err, domain.ErrP2PInviteNotPending):
-		w.WriteHeader(http.StatusConflict)
-		_ = json.NewEncoder(w).Encode(apiError{Error: apiErrorBody{Code: "conflict", Message: err.Error()}})
-	case errors.Is(err, domain.ErrValidation),
-		errors.Is(err, domain.ErrInvalidAutonomyMode),
-		errors.Is(err, domain.ErrHolidayReadOnly),
-		errors.Is(err, domain.ErrMeetingExpired),
-		errors.Is(err, domain.ErrInvalidMeetingData),
-		errors.Is(err, domain.ErrP2PSelfInvite),
-		errors.Is(err, domain.ErrAlwaysAskPolicyViolation),
-		errors.Is(err, domain.ErrInvalidActionPolicy),
-		errors.Is(err, domain.ErrUnknownAction),
-		errors.Is(err, domain.ErrMaxSkillsExceeded),
-		errors.Is(err, domain.ErrInvalidNotificationAction),
-		errors.Is(err, domain.ErrInvalidNotificationType),
-		errors.Is(err, domain.ErrInvalidPlan),
-		errors.Is(err, domain.ErrInvalidBillingCycle),
-		errors.Is(err, domain.ErrInvalidDeleteConfirm),
-		errors.Is(err, domain.ErrInvalidReportReason),
-		errors.Is(err, domain.ErrInvalidSupportMsg):
-		w.WriteHeader(http.StatusUnprocessableEntity)
-		_ = json.NewEncoder(w).Encode(apiError{Error: apiErrorBody{Code: "validation", Message: err.Error()}})
-	default:
-		w.WriteHeader(http.StatusBadRequest)
-		_ = json.NewEncoder(w).Encode(apiError{Error: apiErrorBody{Code: "bad_request", Message: err.Error()}})
-	}
+	middleware.RespondError(w, err)
 }

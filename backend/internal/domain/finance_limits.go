@@ -26,29 +26,29 @@ const (
 
 // FinanceLimitRule representa um limite de gasto multi-escopo ou meta de economia.
 type FinanceLimitRule struct {
-	ID                   string             `json:"id"`
-	UserID               string             `json:"user_id"`
-	Kind                 BudgetKind         `json:"kind"`
-	ScopeType            SpendingLimitScope `json:"scope_type"`
-	Title                string             `json:"title"`
-	CategoryFilter       string             `json:"category_filter,omitempty"`
-	AccountID            string             `json:"account_id,omitempty"`
-	MerchantID           string             `json:"merchant_id,omitempty"`
-	MerchantPattern      string             `json:"merchant_pattern,omitempty"`
-	PeriodType           LimitPeriodType    `json:"period_type"`
-	TargetAmount         float64            `json:"target_amount"`
-	CurrentAmount        float64            `json:"current_amount"`
-	DeadlineDate         string             `json:"deadline_date,omitempty"`
-	AutoAlertThreshold   int                `json:"auto_alert_threshold"`
-	AlertThresholds      []int              `json:"alert_thresholds"`
-	RepeatOverStepPct    int                `json:"repeat_over_step_percent"`
-	PaceAlertEnabled     bool               `json:"pace_alert_enabled"`
-	NotifyChannels       []string           `json:"notify_channels"`
-	IncludePending       bool               `json:"include_pending"`
-	IsActive             bool               `json:"is_active"`
-	MutedUntil           *time.Time         `json:"muted_until,omitempty"`
-	CreatedAt            time.Time          `json:"created_at"`
-	UpdatedAt            time.Time          `json:"updated_at"`
+	ID                 string             `json:"id"`
+	UserID             string             `json:"user_id"`
+	Kind               BudgetKind         `json:"kind"`
+	ScopeType          SpendingLimitScope `json:"scope_type"`
+	Title              string             `json:"title"`
+	CategoryFilter     string             `json:"category_filter,omitempty"`
+	AccountID          string             `json:"account_id,omitempty"`
+	MerchantID         string             `json:"merchant_id,omitempty"`
+	MerchantPattern    string             `json:"merchant_pattern,omitempty"`
+	PeriodType         LimitPeriodType    `json:"period_type"`
+	TargetAmount       float64            `json:"target_amount"`
+	CurrentAmount      float64            `json:"current_amount"`
+	DeadlineDate       string             `json:"deadline_date,omitempty"`
+	AutoAlertThreshold int                `json:"auto_alert_threshold"`
+	AlertThresholds    []int              `json:"alert_thresholds"`
+	RepeatOverStepPct  int                `json:"repeat_over_step_percent"`
+	PaceAlertEnabled   bool               `json:"pace_alert_enabled"`
+	NotifyChannels     []string           `json:"notify_channels"`
+	IncludePending     bool               `json:"include_pending"`
+	IsActive           bool               `json:"is_active"`
+	MutedUntil         *time.Time         `json:"muted_until,omitempty"`
+	CreatedAt          time.Time          `json:"created_at"`
+	UpdatedAt          time.Time          `json:"updated_at"`
 }
 
 // FinanceLimitStatus combina a regra de limite com o consumo calculado em SQL/Go.

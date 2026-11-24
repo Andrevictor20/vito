@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"github.com/andrevmp/vito/backend/internal/bots"
 
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/handler"
@@ -24,7 +25,7 @@ func setupV5Subsystem(
 	inboxSvc := service.NewNotificationsInboxService(inboxRepo)
 	inboxSvc.SetAttentionBudget(budgetSvc)
 	inboxSvc.SetTodoRepository(todoRepo)
-	inboxSvc.SetBotRepository(repository.NewBotRepository(db))
+	inboxSvc.SetBotRepository(bots.NewBotRepository(db))
 	if agentSys != nil && agentSys.ConfGate != nil {
 		inboxSvc.SetConfirmationGate(agentSys.ConfGate)
 	}

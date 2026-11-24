@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { IDEA_CARDS } from '../utils/chatIdeasDeckMotion';
+import { IDEA_CARDS } from '../features/chat/utils/chatIdeasDeckMotion';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -41,21 +41,21 @@ describe('Fatia 2 — Paridade Visual das 5 Abas Principais & Tipografia Geist G
 
     assert.equal(IDEA_CARDS[IDEA_CARDS.length - 1].layout, 'radar', 'Card lateral esquerdo do deck deve usar tom âmbar (radar)');
 
-    const tasks = fs.readFileSync(path.join(SRC, 'screens/TasksScreen.tsx'), 'utf8');
+    const tasks = fs.readFileSync(path.join(SRC, 'features/tasks/screens/TasksScreen.tsx'), 'utf8');
     assert.equal(tasks.includes('<TaskFilterChips'), false, 'TasksScreen não deve renderizar a faixa oculta TaskFilterChips');
     assert.equal(tasks.includes('<TaskListChips'), true, 'TasksScreen deve renderizar apenas TaskListChips');
   });
 
   it('FinanceScreen e BotsCatalogTab/BotsScreen alinhados ao protótipo + Reanimated 4', () => {
-    const fin = fs.readFileSync(path.join(SRC, 'screens/FinanceScreen.tsx'), 'utf8');
+    const fin = fs.readFileSync(path.join(SRC, 'features/finance/screens/FinanceScreen.tsx'), 'utf8');
     assert.equal(fin.includes("Conecte seus bancos via Open Finance'"), false, 'Subtítulo do header de Finanças não deve truncar');
     assert.equal(fin.includes('backgroundColor: colors.surf, borderColor: colors.hairline'), true, 'Chips Pergunte ao Vito devem usar superfície --surf');
 
-    const bots = fs.readFileSync(path.join(SRC, 'screens/BotsScreen.tsx'), 'utf8');
+    const bots = fs.readFileSync(path.join(SRC, 'features/bots/screens/BotsScreen.tsx'), 'utf8');
     assert.equal(bots.includes("from 'react-native-reanimated'"), true, 'BotsScreen deve usar Reanimated 4');
     assert.equal(bots.includes('new Animated.Value'), false);
 
-    const catalog = fs.readFileSync(path.join(SRC, 'components/bots/BotsCatalogTab.tsx'), 'utf8');
+    const catalog = fs.readFileSync(path.join(SRC, 'features/bots/components/BotsCatalogTab.tsx'), 'utf8');
     assert.equal(catalog.includes("from 'react-native-reanimated'"), true, 'BotsCatalogTab deve usar Reanimated 4');
     assert.equal(catalog.includes('new Animated.Value'), false);
     assert.equal(catalog.includes('Personalize corpo, olhos, chapéu e gravata antes de ativar'), true);

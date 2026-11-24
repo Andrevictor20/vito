@@ -1,14 +1,22 @@
 package main
 
 import (
+	"github.com/andrevmp/vito/backend/internal/gmail"
 	"context"
 	"database/sql"
+	aimemory "github.com/andrevmp/vito/backend/internal/ai/memory"
+	"github.com/andrevmp/vito/backend/internal/ai/search"
+	"github.com/andrevmp/vito/backend/internal/bots"
+	"github.com/andrevmp/vito/backend/internal/calendar"
+	"github.com/andrevmp/vito/backend/internal/finance"
+	"github.com/andrevmp/vito/backend/internal/tasks"
+	"github.com/andrevmp/vito/backend/internal/whatsapp"
 	"log"
 	"time"
 
 	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/ai/adkengine"
-	"github.com/andrevmp/vito/backend/internal/config"
+	"github.com/andrevmp/vito/backend/internal/platform/config"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/handler"
 	"github.com/andrevmp/vito/backend/internal/repository"
@@ -39,22 +47,22 @@ type AgentSubsystem struct {
 func setupAgentSubsystem(
 	cfg *config.Config,
 	db *sql.DB,
-	calSvc *service.CalendarService,
-	todoSvc *service.TodoService,
-	waSvc *service.WhatsAppService,
-	gmailSvc *service.GmailService,
+	calSvc *calendar.CalendarService,
+	todoSvc *tasks.TodoService,
+	waSvc *whatsapp.WhatsAppService,
+	gmailSvc *gmail.GmailService,
 	userRepo domain.UserRepository,
 	aiSettingsRepo domain.AISettingsRepository,
-	triggerSvc *service.TriggerService,
-	bookingSvc *service.BookingService,
+	triggerSvc *bots.TriggerService,
+	bookingSvc *calendar.BookingService,
 	memoryRepo *repository.MemoryRepositorySQLite,
-	waDir ...*service.WhatsAppDirectoryService,
+	waDir ...*whatsapp.WhatsAppDirectoryService,
 ) *AgentSubsystem {
 	// 1. Repositórios e Serviços de Memória e Confirmação
 	convRepo := repository.NewConversationStoreRepository(db)
 	memRepo := repository.NewMemoryHierarchyRepository(db)
 	entityLinkRepo := repository.NewEntityLinkRepository(db)
-	finRepo := repository.NewFinanceRepository(db)
+	finRepo := finance.NewFinanceRepository(db)
 	confGate := service.NewConfirmationGateService(db)
 	scopeGuard := service.NewMemoryScopeGuard()
 
@@ -65,21 +73,21 @@ func setupAgentSubsystem(
 	registry := toolsets.NewToolsetsRegistry()
 	if calSvc != nil {
 		calSvc.SetEntityLinkRepository(entityLinkRepo)
-		registry.Register(toolsets.NewCalendarToolset(&calendarServiceAdapter{calSvc}))
+		registry.Register(calendar.NewCalendarToolset(&calendarServiceAdapter{calSvc}))
 	}
 	if todoSvc != nil {
 		todoSvc.SetEntityLinkRepository(entityLinkRepo)
-		registry.Register(toolsets.NewTaskPendingToolset(&todoServiceAdapter{todoSvc}))
+		registry.Register(tasks.NewTaskPendingToolset(&todoServiceAdapter{todoSvc}))
 	}
 	if waSvc != nil {
-		waBridge := service.NewWhatsAppConversationBridge(convRepo)
+		waBridge := whatsapp.NewWhatsAppConversationBridge(convRepo)
 		waSvc.SetConversationBridge(waBridge)
 		waSvc.SetEntityLinkRepository(entityLinkRepo)
-		var directory *service.WhatsAppDirectoryService
+		var directory *whatsapp.WhatsAppDirectoryService
 		if len(waDir) > 0 {
 			directory = waDir[0]
 		}
-		waTS := toolsets.NewWhatsAppToolset(&whatsAppServiceAdapter{svc: waSvc, dir: directory})
+		waTS := whatsapp.NewWhatsAppToolset(&whatsAppServiceAdapter{svc: waSvc, dir: directory})
 		waTS.SetEntityLinkResolver(entityLinkRepo)
 		registry.Register(waTS)
 	}
@@ -89,34 +97,34 @@ func setupAgentSubsystem(
 		registry.Register(gmailTS)
 	}
 
-	var searxClient *ai.SearXNGClient
+	var searxClient *search.SearXNGClient
 	if cfg.SearXNGURL != "" {
-		searxClient = ai.NewSearXNGClient(cfg.SearXNGURL)
-		ai.SetDefaultSearXNGClient(searxClient)
+		searxClient = search.NewSearXNGClient(cfg.SearXNGURL)
+		search.SetDefaultSearXNGClient(searxClient)
 	}
 
-	searchSubagent := ai.NewVerticalSearchSubagent(searxClient, nil)
+	searchSubagent := search.NewVerticalSearchSubagent(searxClient, nil)
 	if cfg.GeminiAPIKey != "" {
 		searchSubagent.SetGeminiConfig(cfg.GeminiAPIKey, cfg.GeminiModel, "")
 	}
 	registry.Register(toolsets.NewSearchToolset(searchSubagent))
 	if bookingSvc != nil {
-		registry.Register(toolsets.NewMeetingBookingToolset(&bookingServiceAdapter{bookingSvc}))
+		registry.Register(calendar.NewMeetingBookingToolset(&bookingServiceAdapter{bookingSvc}))
 	} else {
-		registry.Register(toolsets.NewMeetingBookingToolset())
+		registry.Register(calendar.NewMeetingBookingToolset())
 	}
 	if triggerSvc != nil {
-		registry.Register(toolsets.NewBotTriggerToolset(&triggerServiceAdapter{triggerSvc}))
+		registry.Register(bots.NewBotTriggerToolset(&triggerServiceAdapter{triggerSvc}))
 	} else {
-		registry.Register(toolsets.NewBotTriggerToolset())
+		registry.Register(bots.NewBotTriggerToolset())
 	}
 	if finRepo != nil {
-		finToolset := toolsets.NewFinanceToolset(service.NewFinanceService(finRepo), finRepo)
-		finLimitRepo := repository.NewFinanceLimitRepository(db)
-		finToolset.SetLimitService(service.NewFinanceLimitService(finLimitRepo, finRepo))
+		finToolset := finance.NewFinanceToolset(finance.NewFinanceService(finRepo), finRepo)
+		finLimitRepo := finance.NewFinanceLimitRepository(db)
+		finToolset.SetLimitService(finance.NewFinanceLimitService(finLimitRepo, finRepo))
 		registry.Register(finToolset)
 	} else {
-		registry.Register(toolsets.NewFinanceToolset(nil))
+		registry.Register(finance.NewFinanceToolset(nil))
 	}
 	if memoryRepo != nil {
 		registry.Register(toolsets.NewMemoryProfileToolset(memoryRepo))
@@ -219,13 +227,13 @@ func setupAgentSubsystem(
 		triggerSvc,
 	)
 	contextEnricher.SetMemoryHierarchyRepository(memRepo)
-	contextEnricher.SetFinanceSnapshotProvider(service.NewSQLiteFinanceSnapshotProvider(finRepo))
+	contextEnricher.SetFinanceSnapshotProvider(finance.NewSQLiteFinanceSnapshotProvider(finRepo))
 	contextEnricher.SetEntityLinkRepository(entityLinkRepo)
 	loop.SetContextEnricher(contextEnricher)
 
-	// 6. Worker de Consolidação com debounce de 150s + SQLiteMemoryService Híbrido (FTS5 + Embeddings 036)
-	embedder := adkengine.BuildGenaiEmbedder(cfg.GeminiAPIKey)
-	sqliteMemorySvc := adkengine.NewSQLiteMemoryService(memoryRepo, memRepo, embedder)
+	// 6. Worker de Consolidação com debounce de 150s + aimemory.SQLiteMemoryService Híbrido (FTS5 + Embeddings 036)
+	embedder := aimemory.BuildGenaiEmbedder(cfg.GeminiAPIKey)
+	sqliteMemorySvc := aimemory.NewSQLiteMemoryService(memoryRepo, memRepo, embedder)
 	consolidationWorker := service.NewMemoryConsolidationWorker(convRepo, memRepo, 150*time.Second)
 	consolidationWorker.SetFactRepository(memoryRepo, embedder)
 	confGate.SetFeedbackRecorder(consolidationWorker)
@@ -251,7 +259,7 @@ func setupAgentSubsystem(
 		UserRegistry:        aiProviderRT.Registry,
 	})
 	if adkErr == nil && adkFacade != nil {
-		consolidationWorker.SetSemanticExtractor(adkengine.NewADKMemoryExtractor(adkFacade.RoutedLLM()))
+		consolidationWorker.SetSemanticExtractor(aimemory.NewADKMemoryExtractor(adkFacade.RoutedLLM()))
 		loop.SetEngine(adkFacade)
 		if waSvc != nil {
 			waSvc.SetAgentLoop(adkFacade)

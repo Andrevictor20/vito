@@ -1,0 +1,487 @@
+package whatsapp
+
+import (
+	"encoding/json"
+	"io"
+	"net/http"
+	"strings"
+	"time"
+
+	"github.com/andrevmp/vito/backend/internal/platform/database"
+	"github.com/andrevmp/vito/backend/internal/domain"
+	"github.com/andrevmp/vito/backend/internal/handler/middleware"
+	"github.com/go-chi/chi/v5"
+)
+
+// WhatsAppHandler gerencia as rotas HTTP de integração com o WhatsApp.
+type WhatsAppHandler struct {
+	waSvc         *WhatsAppService
+	contextSvc    *WhatsAppContextService
+	directorySvc  *WhatsAppDirectoryService
+	mediaEnricher *WhatsAppMediaEnricher
+	contactsCache *WhatsAppContactsCache
+	// contactsInstance é o nome da instância da Evolution (para as buscas por
+	// contato da agenda).
+	contactsInstance string
+	backupMgr        *database.BackupManager
+	contactRepo      domain.SyncedContactRepository
+}
+
+// NewWhatsAppHandler instancia o handler para rotas de WhatsApp.
+func NewWhatsAppHandler(waSvc *WhatsAppService) *WhatsAppHandler {
+	return &WhatsAppHandler{waSvc: waSvc}
+}
+
+// SetContextService injeta o serviço de contexto conversacional do WhatsApp.
+func (h *WhatsAppHandler) SetContextService(contextSvc *WhatsAppContextService) {
+	h.contextSvc = contextSvc
+}
+
+// SetDirectoryService injeta o diretório de conversas do WhatsApp.
+func (h *WhatsAppHandler) SetDirectoryService(directorySvc *WhatsAppDirectoryService) {
+	h.directorySvc = directorySvc
+}
+
+// SetContactsCache injeta o cache de nomes dos contatos (diagnóstico).
+func (h *WhatsAppHandler) SetContactsCache(cache *WhatsAppContactsCache, instanceName string) {
+	h.contactsCache = cache
+	h.contactsInstance = instanceName
+}
+
+// SetMediaEnricher injeta o enriquecedor de mídia (áudio/imagem do histórico).
+func (h *WhatsAppHandler) SetMediaEnricher(enricher *WhatsAppMediaEnricher) {
+	h.mediaEnricher = enricher
+}
+
+// SetBackupManager injeta o gerenciador de backups.
+//
+// Necessário para a privacidade: o backup é de arquivo, então as cópias
+// criptografadas continuariam contendo as mensagens que o usuário mandou
+// apagar. "Limpar histórico" invalida os snapshots.
+func (h *WhatsAppHandler) SetBackupManager(backupMgr *database.BackupManager) {
+	h.backupMgr = backupMgr
+}
+
+type requestPairingCodeInput struct {
+	Phone string `json:"phone"`
+}
+
+func writeJSON(w http.ResponseWriter, status int, data interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(data)
+}
+
+// RequestPairingCode gera ou recupera o código de pareamento de 8 dígitos para o WhatsApp do usuário.
+func (h *WhatsAppHandler) RequestPairingCode(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "não autorizado"})
+		return
+	}
+
+	var input requestPairingCodeInput
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "payload JSON inválido"})
+		return
+	}
+
+	if input.Phone == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "o campo 'phone' é obrigatório"})
+		return
+	}
+
+	code, err := h.waSvc.RequestPairingCode(r.Context(), userID, input.Phone)
+	if err != nil {
+		if err == domain.ErrWhatsAppInvalidPhone {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "número de telefone inválido"})
+			return
+		}
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"pairing_code": code,
+		"status":       domain.WhatsAppStatusConnecting,
+	})
+}
+
+// GetStatus retorna o estado atual da conexão com o WhatsApp.
+func (h *WhatsAppHandler) GetStatus(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "não autorizado"})
+		return
+	}
+
+	status, err := h.waSvc.GetStatus(r.Context(), userID)
+	if err != nil {
+		if err == domain.ErrWhatsAppIntegrationNotFound {
+			writeJSON(w, http.StatusOK, map[string]interface{}{
+				"status": domain.WhatsAppStatusDisconnected,
+			})
+			return
+		}
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "falha ao buscar status do whatsapp"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"id":                status.ID,
+		"status":            status.Status,
+		"phone":             status.Phone,
+		"pairing_code":      status.PairingCode,
+		"last_connected_at": status.LastConnectedAt,
+	})
+}
+
+// Disconnect desconecta a sessão ativa do WhatsApp.
+func (h *WhatsAppHandler) Disconnect(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "não autorizado"})
+		return
+	}
+
+	if err := h.waSvc.Disconnect(r.Context(), userID); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "falha ao desconectar whatsapp"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{
+		"message": "WhatsApp desconectado com sucesso",
+		"status":  domain.WhatsAppStatusDisconnected,
+	})
+}
+
+// GetContacts retorna os contatos do WhatsApp que possuem conta ativa no Vito.
+func (h *WhatsAppHandler) GetContacts(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "não autorizado"})
+		return
+	}
+
+	matches, err := h.waSvc.MatchWhatsAppContacts(r.Context(), userID)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "falha ao buscar contatos do whatsapp"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"contacts": matches,
+		"count":    len(matches),
+	})
+}
+
+// Webhook recebe notificações assíncronas enviadas pela Evolution API v2.
+func (h *WhatsAppHandler) Webhook(w http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "falha ao ler corpo da requisição"})
+		return
+	}
+
+	eventType := chi.URLParam(r, "event")
+	if eventType == "" {
+		for _, hKey := range []string{"x-webhook-event", "x-event-type", "event"} {
+			if v := r.Header.Get(hKey); v != "" {
+				eventType = v
+				break
+			}
+		}
+	}
+	_ = h.waSvc.HandleWebhook(r.Context(), eventType, body)
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "received"})
+}
+
+type contextSettingsInput struct {
+	Scope      string `json:"scope"`
+	WindowSize int    `json:"window_size"`
+}
+
+// GetContextSettings devolve o escopo e o tamanho da janela de contexto do WhatsApp.
+func (h *WhatsAppHandler) GetContextSettings(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "não autorizado"})
+		return
+	}
+	if h.contextSvc == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "contexto do WhatsApp indisponível"})
+		return
+	}
+
+	settings, err := h.contextSvc.Settings(r.Context(), userID)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "falha ao ler as preferências de contexto"})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"scope":       settings.Scope,
+		"window_size": settings.WindowSize,
+	})
+}
+
+// UpdateContextSettings atualiza o escopo e o tamanho da janela de contexto.
+func (h *WhatsAppHandler) UpdateContextSettings(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "não autorizado"})
+		return
+	}
+	if h.contextSvc == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "contexto do WhatsApp indisponível"})
+		return
+	}
+
+	var input contextSettingsInput
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "payload JSON inválido"})
+		return
+	}
+
+	settings, err := h.contextSvc.UpdateSettings(r.Context(), userID, input.Scope, input.WindowSize)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"scope":       settings.Scope,
+		"window_size": settings.WindowSize,
+	})
+}
+
+// GetContextPreview mostra ao usuário o que o Vito está enxergando agora:
+// quantas mensagens estão arquivadas, quantas entram na janela e de quais chats.
+func (h *WhatsAppHandler) GetContextPreview(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "não autorizado"})
+		return
+	}
+	if h.contextSvc == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "contexto do WhatsApp indisponível"})
+		return
+	}
+
+	preview, err := h.contextSvc.Preview(r.Context(), userID)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "falha ao montar a prévia do contexto"})
+		return
+	}
+	writeJSON(w, http.StatusOK, preview)
+}
+
+// GetContextDirectory devolve o diretório de contatos e as pendências de resposta.
+func (h *WhatsAppHandler) GetContextDirectory(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "não autorizado"})
+		return
+	}
+	if h.directorySvc == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "diretório do WhatsApp indisponível"})
+		return
+	}
+
+	preview, err := h.directorySvc.Preview(r.Context(), userID)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "falha ao montar o diretório de conversas"})
+		return
+	}
+	writeJSON(w, http.StatusOK, preview)
+}
+
+// GetMediaStatus mostra o estado do enriquecimento de mídia do histórico:
+// quantas imagens/áudios já foram lidos pelo Vito e quantas faltam.
+func (h *WhatsAppHandler) GetMediaStatus(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "não autorizado"})
+		return
+	}
+	if h.contextSvc == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "contexto do WhatsApp indisponível"})
+		return
+	}
+
+	since := time.Now().UTC().Add(-90 * 24 * time.Hour)
+	counts, err := h.contextSvc.MediaStatus(r.Context(), userID, since)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "falha ao contar as mídias do WhatsApp"})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"pending": counts[domain.WhatsAppMediaStatusPending],
+		"done":    counts[domain.WhatsAppMediaStatusDone],
+		"failed":  counts[domain.WhatsAppMediaStatusFailed],
+	})
+}
+
+// ProcessMedia dispara o enriquecimento de mídia sob demanda (o usuário pede
+// "analisar agora" em vez de esperar o worker de background).
+func (h *WhatsAppHandler) ProcessMedia(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "não autorizado"})
+		return
+	}
+	if h.mediaEnricher == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "enriquecimento de mídia indisponível"})
+		return
+	}
+
+	var input struct {
+		Limit int `json:"limit"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&input)
+	if input.Limit <= 0 || input.Limit > 20 {
+		input.Limit = 5
+	}
+
+	enriched, err := h.mediaEnricher.EnrichPending(r.Context(), userID, input.Limit)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "falha ao analisar as mídias do WhatsApp"})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"enriched": enriched})
+}
+
+// ImportContactNames recebe os nomes SALVOS dos contatos (lidos pela agenda do
+// celular pelo app) para o Vito reconhecer o contato como o usuário o salvou.
+//
+// Necessário porque o nome salvo vive no celular: a Evolution nem sempre
+// expõe a agenda (no Pi devolvia 0 contato), então era a única via de o Vito
+// entender "isa" quando o perfil do WhatsApp é "bella".
+func (h *WhatsAppHandler) ImportContactNames(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "não autorizado"})
+		return
+	}
+	if h.contactsCache == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "cache de contatos indisponível"})
+		return
+	}
+
+	var input struct {
+		Names []SavedContactName `json:"names"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "payload inválido"})
+		return
+	}
+	if len(input.Names) == 0 {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "envie ao menos um contato"})
+		return
+	}
+	if len(input.Names) > 5000 {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "limite de 5000 contatos por envio"})
+		return
+	}
+
+	instanceName := h.contactsInstance
+	if h.waSvc != nil {
+		if resolved, err := h.waSvc.InstanceNameOf(r.Context(), userID); err == nil && resolved != "" {
+			instanceName = resolved
+		}
+	}
+	imported := h.contactsCache.ImportSavedNames(r.Context(), instanceName, input.Names)
+
+	// Persiste no shadow inbox: o cache vive em RAM e se perde a cada deploy.
+	byNumber := make(map[string]string, len(input.Names))
+	for _, n := range input.Names {
+		if strings.TrimSpace(n.Phone) != "" && strings.TrimSpace(n.Name) != "" {
+			byNumber[n.Phone] = n.Name
+		}
+	}
+	persisted := int64(0)
+	if n := h.persistSyncedContacts(r.Context(), userID, input.Names); n > 0 {
+		persisted = n
+	}
+	if h.contextSvc != nil {
+		if n, err := h.contextSvc.SaveSavedNames(r.Context(), userID, byNumber); err == nil && persisted == 0 {
+			persisted = n
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"imported": imported, "persisted": persisted})
+}
+
+// GetContactsCache mostra o estado do cache de nomes dos contatos.
+//
+// Diagnóstico: o Vito precisa reconhecer o contato pelo nome SALVO pelo dono
+// ("isa") e também pelo nome de perfil do WhatsApp ("bella"). Este endpoint
+// mostra de onde cada nome veio.
+func (h *WhatsAppHandler) GetContactsCache(w http.ResponseWriter, r *http.Request) {
+	if _, ok := middleware.UserIDFromContext(r.Context()); !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "não autorizado"})
+		return
+	}
+	if h.contactsCache == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "cache de contatos indisponível"})
+		return
+	}
+	writeJSON(w, http.StatusOK, h.contactsCache.Snapshot())
+}
+
+// UpdateContactProfile permite sobrescrever manualmente o nome de perfil de um contato.
+func (h *WhatsAppHandler) UpdateContactProfile(w http.ResponseWriter, r *http.Request) {
+	_, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "não autorizado"})
+		return
+	}
+	if h.contactsCache == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "cache de contatos indisponível"})
+		return
+	}
+
+	var input struct {
+		JID     string `json:"jid"`
+		Profile string `json:"profile"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "payload inválido"})
+		return
+	}
+	if strings.TrimSpace(input.JID) == "" || strings.TrimSpace(input.Profile) == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "jid e profile são obrigatórios"})
+		return
+	}
+
+	h.contactsCache.SetProfile(input.JID, input.Profile)
+	writeJSON(w, http.StatusOK, map[string]string{"message": "perfil atualizado"})
+}
+
+// PurgeContextMessages apaga todo o histórico de conversa arquivado do WhatsApp.
+func (h *WhatsAppHandler) PurgeContextMessages(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "não autorizado"})
+		return
+	}
+	if h.contextSvc == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "contexto do WhatsApp indisponível"})
+		return
+	}
+
+	if err := h.contextSvc.PurgeMessages(r.Context(), userID); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "falha ao limpar o histórico do WhatsApp"})
+		return
+	}
+
+	// As cópias criptografadas do banco também continham as mensagens apagadas.
+	invalidated := 0
+	if h.backupMgr != nil {
+		if n, err := h.backupMgr.InvalidateSnapshots(); err == nil {
+			invalidated = n
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"message":             "Histórico do WhatsApp limpo com sucesso",
+		"backups_invalidated": invalidated,
+	})
+}

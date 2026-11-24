@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { formatModelDisplayName } from '../services/ai/aiProviderCatalog';
-import { formatHistoryForStream, formatToolCallStepLabel } from '../utils/chatMessageBuilder';
+import { formatHistoryForStream, formatToolCallStepLabel } from '../features/chat/utils/chatMessageBuilder';
 
 describe('AC-05: Metadata de modelo, histórico { role, content } e status HITL no stream', () => {
   test('test_ac_05_formatModelDisplayName_preserva_sufixo_free', () => {
@@ -33,7 +33,7 @@ describe('AC-05: Metadata de modelo, histórico { role, content } e status HITL 
       'Aguardando sua confirmação'
     );
 
-    const runnerSrc = fs.readFileSync(path.resolve(__dirname, '../hooks/chatStreamRunner.ts'), 'utf8');
+    const runnerSrc = fs.readFileSync(path.resolve(__dirname, '../features/chat/hooks/chatStreamRunner.ts'), 'utf8');
     assert.equal(runnerSrc.includes("sender: m.sender === 'user'"), false);
   });
 });

@@ -15,7 +15,7 @@ import { getFloatingSurfaceShadow } from '../../theme/surfaces';
 import { PressableScale } from '../../theme/vitoMotion';
 import { useTheme } from '../../context/ThemeContext';
 import { tabNavigationBus } from '../../services/dataSync';
-import type { MainTabType } from '../../utils/pagerNavigation';
+import type { MainTabType } from '../../utils/navigation/pagerNavigation';
 import {
   HeaderIconButton,
   HeaderPill,

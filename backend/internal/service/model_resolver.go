@@ -36,12 +36,17 @@ type ResolvedModel struct {
 	NextLevelIdx      int
 }
 
+// BotModelPrefGetter consulta preferências de modelo/esforço de um Bot por ID.
+type BotModelPrefGetter interface {
+	GetByID(id, userID string) (*domain.Trigger, error)
+}
+
 // ModelResolver resolve a preferência de modelo (thread -> bot -> padrão -> srv:auto).
 type ModelResolver struct {
 	providerRepo domain.AIProviderRepository
 	settingsRepo domain.AISettingsRepository
 	convRepo     *repository.ConversationStoreRepository
-	triggerRepo  *repository.TriggerRepositorySQLite
+	triggerRepo  BotModelPrefGetter
 	registry     *UserProviderRegistry
 }
 
@@ -50,7 +55,7 @@ func NewModelResolver(
 	providerRepo domain.AIProviderRepository,
 	settingsRepo domain.AISettingsRepository,
 	convRepo *repository.ConversationStoreRepository,
-	triggerRepo *repository.TriggerRepositorySQLite,
+	triggerRepo BotModelPrefGetter,
 	registry *UserProviderRegistry,
 ) *ModelResolver {
 	return &ModelResolver{

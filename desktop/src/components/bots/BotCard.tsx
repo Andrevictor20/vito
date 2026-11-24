@@ -1,7 +1,7 @@
 import React from 'react';
 import { ChevronRight, AlertCircle } from 'lucide-react';
 import { Bot, BotAppStatus, isAlwaysAskAction } from '../../types/bot';
-import { PendingDecision } from '../../services/api/botsApi';
+import { PendingDecision } from '../../services/api/bots/botsApi';
 import { VitoSwitch } from '../ui/VitoSwitch';
 import { BotMascotRig } from './BotMascotRig';
 import { getBotAnimState, parseBotSkin } from './mascotPalettes';

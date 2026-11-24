@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/andrevmp/vito/backend/internal/bots"
 	"io"
 	"log"
 	"net/http"
@@ -18,7 +19,7 @@ import (
 	"time"
 
 	"github.com/andrevmp/vito/backend/internal/ai"
-	"github.com/andrevmp/vito/backend/internal/database"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/andrevmp/vito/backend/internal/service"
@@ -48,7 +49,7 @@ type runtimeFixture struct {
 	providerRepo *repository.AIProviderRepositorySQLite
 	settingsRepo *repository.AISettingsRepositorySQLite
 	convRepo     *repository.ConversationStoreRepository
-	triggerRepo  *repository.TriggerRepositorySQLite
+	triggerRepo  *bots.TriggerRepositorySQLite
 	traceRec     *ai.RingBufferTraceRecorder
 	registry     *service.UserProviderRegistry
 	resolver     *service.ModelResolver
@@ -101,7 +102,7 @@ func setupBYOKRuntime(t *testing.T, routes map[string]http.Handler) *runtimeFixt
 	providerRepo := repository.NewAIProviderRepository(db)
 	settingsRepo := repository.NewAISettingsRepository(db)
 	convRepo := repository.NewConversationStoreRepository(db)
-	triggerRepo := repository.NewTriggerRepository(db)
+	triggerRepo := bots.NewTriggerRepository(db)
 	traceRec := ai.NewRingBufferTraceRecorder(db, 100, time.Hour)
 	t.Cleanup(func() { _ = traceRec.Close() })
 

@@ -1,8 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { secureStorage } from '../secureStore';
-import { isAbortLike } from '../../utils/requestTimeout';
+import { isAbortLike } from '../../utils/network/requestTimeout';
 import { ApiRequestOptions } from './types';
-import { getMobileDeviceName } from '../../utils/platformInfo';
+import { getMobileDeviceName } from '../../utils/device/platformInfo';
 
 const TOKEN_KEY = '@vito_jwt_token';
 const REFRESH_TOKEN_KEY = '@vito_refresh_token';

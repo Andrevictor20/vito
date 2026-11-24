@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Send, AlertCircle, ExternalLink } from 'lucide-react';
 import { Bot, BotChatMessage, isAlwaysAskAction } from '../../types/bot';
-import { PendingDecision } from '../../services/api/botsApi';
+import { PendingDecision } from '../../services/api/bots/botsApi';
 import { BotMascotRig } from './BotMascotRig';
 import { getBotAnimState, parseBotSkin } from './mascotPalettes';
 

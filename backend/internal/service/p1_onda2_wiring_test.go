@@ -3,13 +3,17 @@ package service_test
 import (
 	"context"
 	"encoding/json"
+	"github.com/andrevmp/vito/backend/internal/calendar"
+	"github.com/andrevmp/vito/backend/internal/finance"
+	"github.com/andrevmp/vito/backend/internal/tasks"
+	"github.com/andrevmp/vito/backend/internal/whatsapp"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/andrevmp/vito/backend/internal/ai"
-	"github.com/andrevmp/vito/backend/internal/database"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/andrevmp/vito/backend/internal/service"
@@ -30,8 +34,8 @@ func TestSQLiteFinanceSnapshotProvider_CompactContextAndEnricher(t *testing.T) {
 		ID: "u-fin-1", Name: "Fin User", Email: "fin@vito.test", CreatedAt: now, UpdatedAt: now,
 	})
 
-	finRepo := repository.NewFinanceRepository(db)
-	provider := service.NewSQLiteFinanceSnapshotProvider(finRepo)
+	finRepo := finance.NewFinanceRepository(db)
+	provider := finance.NewSQLiteFinanceSnapshotProvider(finRepo)
 	if empty := provider.GetCompactFinanceContext(ctx, "u-fin-1"); empty != "" {
 		t.Fatalf("usuário sem contas deveria retornar vazio, obteve %q", empty)
 	}
@@ -101,7 +105,7 @@ func TestEntityLinkRepository_ProductionFlows(t *testing.T) {
 
 	entityRepo := repository.NewEntityLinkRepository(db)
 
-	todoSvc := service.NewTodoService(repository.NewTodoRepository(db))
+	todoSvc := tasks.NewTodoService(tasks.NewTodoRepository(db))
 	todoSvc.SetEntityLinkRepository(entityRepo)
 	createdTodo, err := todoSvc.CreateTodoWithOptions(userID, domain.CreateTodoInput{
 		Title: "Enviar ata", EventID: "evt-123", EventTitle: "Alinhamento Q4",
@@ -113,7 +117,7 @@ func TestEntityLinkRepository_ProductionFlows(t *testing.T) {
 		t.Fatalf("link event<->todo não criado: %+v err=%v", links, err)
 	}
 
-	pendSvc := service.NewPendingService(repository.NewPendingRepository(db))
+	pendSvc := tasks.NewPendingService(tasks.NewPendingRepository(db))
 	pendSvc.SetEntityLinkRepository(entityRepo)
 	if _, err := pendSvc.CreatePending(userID, domain.CreatePendingInput{
 		Title: "Renovar CNH", ScheduledDate: "2026-12-01",
@@ -124,7 +128,7 @@ func TestEntityLinkRepository_ProductionFlows(t *testing.T) {
 		t.Fatalf("link pending não criado: %+v err=%v", links, err)
 	}
 
-	calSvc := service.NewCalendarService(repository.NewEventRepository(db))
+	calSvc := calendar.NewCalendarService(calendar.NewEventRepository(db))
 	calSvc.SetEntityLinkRepository(entityRepo)
 	if _, _, err := calSvc.CreateEvent(userID, "Café com marina@empresa.com", "", "", now.Add(time.Hour), now.Add(2*time.Hour)); err != nil {
 		t.Fatalf("CreateEvent: %v", err)
@@ -147,7 +151,7 @@ func TestEntityLinkRepository_ProductionFlows(t *testing.T) {
 	}
 
 	fakeWA := &fakeWAContract{}
-	waTS := toolsets.NewWhatsAppToolset(fakeWA)
+	waTS := whatsapp.NewWhatsAppToolset(fakeWA)
 	waTS.SetEntityLinkResolver(entityRepo)
 	if _, err := waTS.Execute(ctx, &domain.ToolExecutionContext{UserID: userID}, "send_message", json.RawMessage(`{"recipient":"Marina Costa","message":"Oi"}`)); err != nil {
 		t.Fatalf("WhatsAppToolset.Execute: %v", err)

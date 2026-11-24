@@ -1,25 +1,25 @@
 import { ApiClient, getDesktopDeviceName } from './client';
-import { AuthApi } from './authApi';
-import { CalendarApi } from './calendarApi';
-import { TodosApi } from './todosApi';
-import { ChatApi } from './chatApi';
-import { BotsApi } from './botsApi';
-import { BookingApi } from './bookingApi';
-import { MeetingsApi } from './meetingsApi';
-import { IntegrationsApi } from './integrationsApi';
-import { PendingApi } from './pendingApi';
-import { MemoriesApi } from './memoriesApi';
-import { WhatsAppApi, WhatsAppIntegrationStatus, WhatsAppMatchedContact } from './whatsappApi';
-import { WhatsAppAuthApi, RequestWhatsAppOTPResponse, VerifyWhatsAppOTPResponse, LinkPhoneResponse } from './whatsappAuthApi';
-import { WhatsAppContextApi, WhatsAppContextScope, WhatsAppContextSettings, WhatsAppContextPreview, WhatsAppDirectory } from './whatsappContextApi';
-import { GmailApi, GmailStatusResponse, GmailScanResult, GmailDraftInput, GmailDraftResponse, GmailSendResponse } from './gmailApi';
-import { P2PMeetingsApi, P2PMeetingInvite, ContactMatchResult, P2PMutualSlot, SendP2PInviteInput } from './p2pMeetingsApi';
-import { NotificationsApi } from './notificationsApi';
-import { AiProvidersApi, ConnectAiProviderInput, TestAiProviderResponse } from './aiProvidersApi';
-import { InboxNotificationsApi } from './inboxNotificationsApi';
-import { StoreComplianceApi } from './storeComplianceApi';
-import { FinanceApi } from './financeApi';
-import { fileUriToBase64 } from './fileUtils';
+import { AuthApi } from './auth/authApi';
+import { CalendarApi } from './calendar/calendarApi';
+import { TodosApi } from './tasks/todosApi';
+import { ChatApi } from './chat/chatApi';
+import { BotsApi } from './bots/botsApi';
+import { BookingApi } from './calendar/bookingApi';
+import { MeetingsApi } from './calendar/meetingsApi';
+import { IntegrationsApi } from './integrations/integrationsApi';
+import { PendingApi } from './chat/pendingApi';
+import { MemoriesApi } from './chat/memoriesApi';
+import { WhatsAppApi, WhatsAppIntegrationStatus, WhatsAppMatchedContact } from './integrations/whatsappApi';
+import { WhatsAppAuthApi, RequestWhatsAppOTPResponse, VerifyWhatsAppOTPResponse, LinkPhoneResponse } from './integrations/whatsappAuthApi';
+import { WhatsAppContextApi, WhatsAppContextScope, WhatsAppContextSettings, WhatsAppContextPreview, WhatsAppDirectory } from './integrations/whatsappContextApi';
+import { GmailApi, GmailStatusResponse, GmailScanResult, GmailDraftInput, GmailDraftResponse, GmailSendResponse } from './integrations/gmailApi';
+import { P2PMeetingsApi, P2PMeetingInvite, ContactMatchResult, P2PMutualSlot, SendP2PInviteInput } from './calendar/p2pMeetingsApi';
+import { NotificationsApi } from './notifications/notificationsApi';
+import { AiProvidersApi, ConnectAiProviderInput, TestAiProviderResponse } from './bots/aiProvidersApi';
+import { InboxNotificationsApi } from './notifications/inboxNotificationsApi';
+import { StoreComplianceApi } from './system/storeComplianceApi';
+import { FinanceApi } from './finance/financeApi';
+import { fileUriToBase64 } from './system/fileUtils';
 import {
   User,
   AuthTokens,

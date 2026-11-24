@@ -1,6 +1,13 @@
 package server
 
 import (
+	"github.com/andrevmp/vito/backend/internal/gmail"
+	"github.com/andrevmp/vito/backend/internal/calendar/p2p"
+	"github.com/andrevmp/vito/backend/internal/bots"
+	"github.com/andrevmp/vito/backend/internal/calendar"
+	"github.com/andrevmp/vito/backend/internal/finance"
+	"github.com/andrevmp/vito/backend/internal/tasks"
+	"github.com/andrevmp/vito/backend/internal/whatsapp"
 	"net/http"
 	"strings"
 	"time"
@@ -17,70 +24,70 @@ import (
 
 // Server encapsula o roteador Chi e dependências HTTP do Vito.
 type Server struct {
-	router              *chi.Mux
-	allowedOrigins      []string
-	environment         string
-	authHandler         *handler.AuthHandler
-	googleAuthHandler   *handler.GoogleAuthHandler
-	calHandler          *handler.CalendarHandler
-	todoHandler         *handler.TodoHandler
-	astStreamHandler    *handler.AssistantStreamHandler
-	memoryHandler          *handler.MemoryHandler
-	notifHandler           *handler.NotificationHandler
-	notifInboxHandler      *handler.NotificationsInboxHandler
-	storeComplianceHandler *handler.StoreComplianceHandler
-	syncHandler         *handler.CalendarSyncHandler
-	botHandler          *handler.BotHandler
-	briefingHandler     *handler.BriefingHandler
-	aiSettingsHandler   *handler.AISettingsHandler
-	aiProviderHandler   *handler.AIProviderHandler
-	pendingHandler      *handler.PendingHandler
-	bookingHandler      *handler.BookingHandler
-	meetingHandler      *handler.MeetingHandler
-	p2pHandler          *handler.P2PMeetingHandler
-	chatHandler         *handler.ChatHandler
-	whatsappHandler     *handler.WhatsAppHandler
-	gmailHandler        *handler.GmailHandler
-	whatsappAuthHandler *handler.WhatsAppAuthHandler
-	voiceHandler        *handler.VoiceStreamHandler
-	voiceTTSHandler     *handler.VoiceTTSHandler
-	financeHandler          *handler.FinanceHandler
-	financeLimitHandler     *handler.FinanceLimitHandler
-	financeAnalyticsHandler *handler.FinanceAnalyticsHandler
+	router                  *chi.Mux
+	allowedOrigins          []string
+	environment             string
+	authHandler             *handler.AuthHandler
+	googleAuthHandler       *handler.GoogleAuthHandler
+	calHandler              *calendar.CalendarHandler
+	todoHandler             *tasks.TodoHandler
+	astStreamHandler        *handler.AssistantStreamHandler
+	memoryHandler           *handler.MemoryHandler
+	notifHandler            *handler.NotificationHandler
+	notifInboxHandler       *handler.NotificationsInboxHandler
+	storeComplianceHandler  *handler.StoreComplianceHandler
+	syncHandler             *calendar.CalendarSyncHandler
+	botHandler              *bots.BotHandler
+	briefingHandler         *handler.BriefingHandler
+	aiSettingsHandler       *handler.AISettingsHandler
+	aiProviderHandler       *handler.AIProviderHandler
+	pendingHandler          *tasks.PendingHandler
+	bookingHandler          *calendar.BookingHandler
+	meetingHandler          *calendar.MeetingHandler
+	p2pHandler              *p2p.P2PMeetingHandler
+	chatHandler             *handler.ChatHandler
+	whatsappHandler         *whatsapp.WhatsAppHandler
+	gmailHandler            *gmail.GmailHandler
+	whatsappAuthHandler     *whatsapp.WhatsAppAuthHandler
+	voiceHandler            *handler.VoiceStreamHandler
+	voiceTTSHandler         *handler.VoiceTTSHandler
+	financeHandler          *finance.FinanceHandler
+	financeLimitHandler     *finance.FinanceLimitHandler
+	financeAnalyticsHandler *finance.FinanceAnalyticsHandler
 	authSvc                 *service.AuthService
 }
 
 // Config contém as dependências necessárias para inicializar o Server.
 type Config struct {
 	// Environment espelha APP_ENV (development/production) para o fail-closed do CORS.
-	Environment         string
-	AuthHandler         *handler.AuthHandler
-	GoogleAuthHandler   *handler.GoogleAuthHandler
-	CalHandler          *handler.CalendarHandler
-	TodoHandler         *handler.TodoHandler
-	AstStreamHandler    *handler.AssistantStreamHandler
-	MemoryHandler          *handler.MemoryHandler
-	NotifHandler           *handler.NotificationHandler
-	NotifInboxHandler      *handler.NotificationsInboxHandler
-	StoreComplianceHandler *handler.StoreComplianceHandler
-	SyncHandler         *handler.CalendarSyncHandler
-	BotHandler          *handler.BotHandler
-	BriefingHandler     *handler.BriefingHandler
-	AISettingsHandler   *handler.AISettingsHandler
-	AIProviderHandler   *handler.AIProviderHandler
-	PendingHandler      *handler.PendingHandler
-	BookingHandler      *handler.BookingHandler
-	MeetingHandler      *handler.MeetingHandler
-	P2PHandler          *handler.P2PMeetingHandler
-	ChatHandler         *handler.ChatHandler
-	WhatsAppHandler     *handler.WhatsAppHandler
-	GmailHandler        *handler.GmailHandler
-	WhatsAppAuthHandler *handler.WhatsAppAuthHandler
-	VoiceHandler        *handler.VoiceStreamHandler
-	VoiceTTSHandler     *handler.VoiceTTSHandler
-	FinanceHandler          *handler.FinanceHandler
-	FinanceLimitHandler     *handler.FinanceLimitHandler
-	FinanceAnalyticsHandler *handler.FinanceAnalyticsHandler
+	Environment             string
+	AuthHandler             *handler.AuthHandler
+	GoogleAuthHandler       *handler.GoogleAuthHandler
+	CalHandler              *calendar.CalendarHandler
+	TodoHandler             *tasks.TodoHandler
+	AstStreamHandler        *handler.AssistantStreamHandler
+	MemoryHandler           *handler.MemoryHandler
+	NotifHandler            *handler.NotificationHandler
+	NotifInboxHandler       *handler.NotificationsInboxHandler
+	StoreComplianceHandler  *handler.StoreComplianceHandler
+	SyncHandler             *calendar.CalendarSyncHandler
+	BotHandler              *bots.BotHandler
+	BriefingHandler         *handler.BriefingHandler
+	AISettingsHandler       *handler.AISettingsHandler
+	AIProviderHandler       *handler.AIProviderHandler
+	PendingHandler          *tasks.PendingHandler
+	BookingHandler          *calendar.BookingHandler
+	MeetingHandler          *calendar.MeetingHandler
+	P2PHandler              *p2p.P2PMeetingHandler
+	ChatHandler             *handler.ChatHandler
+	WhatsAppHandler         *whatsapp.WhatsAppHandler
+	GmailHandler            *gmail.GmailHandler
+	WhatsAppAuthHandler     *whatsapp.WhatsAppAuthHandler
+	VoiceHandler            *handler.VoiceStreamHandler
+	VoiceTTSHandler         *handler.VoiceTTSHandler
+	FinanceHandler          *finance.FinanceHandler
+	FinanceLimitHandler     *finance.FinanceLimitHandler
+	FinanceAnalyticsHandler *finance.FinanceAnalyticsHandler
 	AuthSvc                 *service.AuthService
 	// AllowedOrigins restringe o CORS (SEC-03). Vazio = ["*"] apenas fora
 	// de produção (dev/testes); em produção, vazio nega origens (fail-closed).
@@ -249,234 +256,234 @@ func (s *Server) registerRoutes() {
 				r.Post("/contacts/match", s.p2pHandler.MatchContacts)
 			}
 
-		// Rotas protegidas por JWT
-		if s.authSvc != nil {
-			r.Group(func(protected chi.Router) {
-				protected.Use(middleware.AuthMiddleware(s.authSvc))
+			// Rotas protegidas por JWT
+			if s.authSvc != nil {
+				r.Group(func(protected chi.Router) {
+					protected.Use(middleware.AuthMiddleware(s.authSvc))
 
-				if s.authHandler != nil {
-					protected.Get("/auth/me", s.authHandler.Me)
-					protected.Get("/auth/sessions", s.authHandler.ListSessions)
-					protected.Delete("/auth/sessions/{id}", s.authHandler.RevokeSession)
-					protected.Post("/auth/logout", s.authHandler.Logout)
-				}
+					if s.authHandler != nil {
+						protected.Get("/auth/me", s.authHandler.Me)
+						protected.Get("/auth/sessions", s.authHandler.ListSessions)
+						protected.Delete("/auth/sessions/{id}", s.authHandler.RevokeSession)
+						protected.Post("/auth/logout", s.authHandler.Logout)
+					}
 
-				if s.calHandler != nil {
-					protected.Route("/events", func(cr chi.Router) {
-						cr.Post("/", s.calHandler.CreateEvent)
-						cr.Get("/", s.calHandler.ListEvents)
-						cr.Patch("/{id}", s.calHandler.UpdateEvent)
-						cr.Delete("/{id}", s.calHandler.DeleteEvent)
-					})
-				}
+					if s.calHandler != nil {
+						protected.Route("/events", func(cr chi.Router) {
+							cr.Post("/", s.calHandler.CreateEvent)
+							cr.Get("/", s.calHandler.ListEvents)
+							cr.Patch("/{id}", s.calHandler.UpdateEvent)
+							cr.Delete("/{id}", s.calHandler.DeleteEvent)
+						})
+					}
 
-				if s.todoHandler != nil {
-					protected.Route("/todos", func(tr chi.Router) {
-						tr.Post("/", s.todoHandler.CreateTodo)
-						tr.Get("/", s.todoHandler.ListTodos)
-						tr.Patch("/{id}", s.todoHandler.UpdateTodo)
-						tr.Patch("/{id}/complete", s.todoHandler.CompleteTodo)
-						tr.Patch("/{id}/reopen", s.todoHandler.ReopenTodo)
-						tr.Delete("/{id}", s.todoHandler.DeleteTodo)
-						tr.Post("/{id}/subtasks", s.todoHandler.AddSubtask)
-						tr.Patch("/{id}/subtasks/{subtaskId}/toggle", s.todoHandler.ToggleSubtask)
-						tr.Delete("/{id}/subtasks/{subtaskId}", s.todoHandler.DeleteSubtask)
-					})
-				}
+					if s.todoHandler != nil {
+						protected.Route("/todos", func(tr chi.Router) {
+							tr.Post("/", s.todoHandler.CreateTodo)
+							tr.Get("/", s.todoHandler.ListTodos)
+							tr.Patch("/{id}", s.todoHandler.UpdateTodo)
+							tr.Patch("/{id}/complete", s.todoHandler.CompleteTodo)
+							tr.Patch("/{id}/reopen", s.todoHandler.ReopenTodo)
+							tr.Delete("/{id}", s.todoHandler.DeleteTodo)
+							tr.Post("/{id}/subtasks", s.todoHandler.AddSubtask)
+							tr.Patch("/{id}/subtasks/{subtaskId}/toggle", s.todoHandler.ToggleSubtask)
+							tr.Delete("/{id}/subtasks/{subtaskId}", s.todoHandler.DeleteSubtask)
+						})
+					}
 
-				if s.astStreamHandler != nil {
-					protected.Group(func(air chi.Router) {
-						air.Use(aiLimiter)
-						air.Post("/assistant/chat", s.astStreamHandler.Chat)
-						air.Post("/assistant/stream", s.astStreamHandler.Stream)
-						air.Post("/assistant/chat/stream", s.astStreamHandler.Stream)
-						air.Post("/assistant/confirm", s.astStreamHandler.Confirm)
-						air.Post("/assistant/audio", s.astStreamHandler.AudioChat)
-						air.Post("/assistant/vision", s.astStreamHandler.VisionChat)
-					})
-				}
+					if s.astStreamHandler != nil {
+						protected.Group(func(air chi.Router) {
+							air.Use(aiLimiter)
+							air.Post("/assistant/chat", s.astStreamHandler.Chat)
+							air.Post("/assistant/stream", s.astStreamHandler.Stream)
+							air.Post("/assistant/chat/stream", s.astStreamHandler.Stream)
+							air.Post("/assistant/confirm", s.astStreamHandler.Confirm)
+							air.Post("/assistant/audio", s.astStreamHandler.AudioChat)
+							air.Post("/assistant/vision", s.astStreamHandler.VisionChat)
+						})
+					}
 
-				if s.memoryHandler != nil {
-					protected.Route("/memories", func(mr chi.Router) {
-						mr.Get("/", s.memoryHandler.ListMemories)
-						mr.Post("/facts", s.memoryHandler.CreateFact)
-						mr.Delete("/episodes/{id}", s.memoryHandler.DeleteEpisode)
-						mr.Delete("/themes/{slug}", s.memoryHandler.DeleteThematicSummary)
-						mr.Delete("/facts/{id}", s.memoryHandler.DeleteFact)
-					})
-				}
+					if s.memoryHandler != nil {
+						protected.Route("/memories", func(mr chi.Router) {
+							mr.Get("/", s.memoryHandler.ListMemories)
+							mr.Post("/facts", s.memoryHandler.CreateFact)
+							mr.Delete("/episodes/{id}", s.memoryHandler.DeleteEpisode)
+							mr.Delete("/themes/{slug}", s.memoryHandler.DeleteThematicSummary)
+							mr.Delete("/facts/{id}", s.memoryHandler.DeleteFact)
+						})
+					}
 
-				if s.voiceTTSHandler != nil {
-					protected.Post("/voice/tts", s.voiceTTSHandler.HandleTTS)
-				}
+					if s.voiceTTSHandler != nil {
+						protected.Post("/voice/tts", s.voiceTTSHandler.HandleTTS)
+					}
 
-				if s.syncHandler != nil {
-					protected.Route("/integrations/calendars", func(ir chi.Router) {
-						ir.Get("/", s.syncHandler.ListIntegrations)
-						ir.Post("/connect", s.syncHandler.ConnectIntegration)
-						ir.Post("/{provider}/sync", s.syncHandler.SyncIntegration)
-						ir.Delete("/{provider}", s.syncHandler.DisconnectIntegration)
-						ir.Post("/google/webhook", s.syncHandler.GoogleWebhook)
-					})
-				}
+					if s.syncHandler != nil {
+						protected.Route("/integrations/calendars", func(ir chi.Router) {
+							ir.Get("/", s.syncHandler.ListIntegrations)
+							ir.Post("/connect", s.syncHandler.ConnectIntegration)
+							ir.Post("/{provider}/sync", s.syncHandler.SyncIntegration)
+							ir.Delete("/{provider}", s.syncHandler.DisconnectIntegration)
+							ir.Post("/google/webhook", s.syncHandler.GoogleWebhook)
+						})
+					}
 
-				if s.whatsappHandler != nil {
-					protected.Route("/integrations/whatsapp", func(wr chi.Router) {
-						wr.Get("/status", s.whatsappHandler.GetStatus)
-						wr.Post("/pairing-code", s.whatsappHandler.RequestPairingCode)
-						wr.Delete("/disconnect", s.whatsappHandler.Disconnect)
-						wr.Get("/contacts", s.whatsappHandler.GetContacts)
-						wr.Get("/context-settings", s.whatsappHandler.GetContextSettings)
-						wr.Put("/context-settings", s.whatsappHandler.UpdateContextSettings)
-						wr.Get("/context-preview", s.whatsappHandler.GetContextPreview)
-						wr.Get("/context-directory", s.whatsappHandler.GetContextDirectory)
-						wr.Get("/media-status", s.whatsappHandler.GetMediaStatus)
-						wr.Get("/contacts-cache", s.whatsappHandler.GetContactsCache)
-						wr.Put("/contact-profile", s.whatsappHandler.UpdateContactProfile)
-						wr.Post("/contact-names", s.whatsappHandler.ImportContactNames)
-						wr.Post("/media-process", s.whatsappHandler.ProcessMedia)
-						wr.Delete("/context-messages", s.whatsappHandler.PurgeContextMessages)
-					})
-				}
+					if s.whatsappHandler != nil {
+						protected.Route("/integrations/whatsapp", func(wr chi.Router) {
+							wr.Get("/status", s.whatsappHandler.GetStatus)
+							wr.Post("/pairing-code", s.whatsappHandler.RequestPairingCode)
+							wr.Delete("/disconnect", s.whatsappHandler.Disconnect)
+							wr.Get("/contacts", s.whatsappHandler.GetContacts)
+							wr.Get("/context-settings", s.whatsappHandler.GetContextSettings)
+							wr.Put("/context-settings", s.whatsappHandler.UpdateContextSettings)
+							wr.Get("/context-preview", s.whatsappHandler.GetContextPreview)
+							wr.Get("/context-directory", s.whatsappHandler.GetContextDirectory)
+							wr.Get("/media-status", s.whatsappHandler.GetMediaStatus)
+							wr.Get("/contacts-cache", s.whatsappHandler.GetContactsCache)
+							wr.Put("/contact-profile", s.whatsappHandler.UpdateContactProfile)
+							wr.Post("/contact-names", s.whatsappHandler.ImportContactNames)
+							wr.Post("/media-process", s.whatsappHandler.ProcessMedia)
+							wr.Delete("/context-messages", s.whatsappHandler.PurgeContextMessages)
+						})
+					}
 
-				if s.gmailHandler != nil {
-					protected.Route("/integrations/gmail", func(gr chi.Router) {
-						gr.Get("/status", s.gmailHandler.GetStatus)
-						gr.Post("/scan", s.gmailHandler.ScanEmails)
-						gr.Delete("/disconnect", s.gmailHandler.Disconnect)
-						gr.Post("/draft", s.gmailHandler.CreateDraft)
-						gr.Post("/send", s.gmailHandler.SendEmail)
-					})
-				}
+					if s.gmailHandler != nil {
+						protected.Route("/integrations/gmail", func(gr chi.Router) {
+							gr.Get("/status", s.gmailHandler.GetStatus)
+							gr.Post("/scan", s.gmailHandler.ScanEmails)
+							gr.Delete("/disconnect", s.gmailHandler.Disconnect)
+							gr.Post("/draft", s.gmailHandler.CreateDraft)
+							gr.Post("/send", s.gmailHandler.SendEmail)
+						})
+					}
 
-				if s.briefingHandler != nil {
-					protected.Route("/users/briefing", func(br chi.Router) {
-						br.Get("/", s.briefingHandler.GetSettings)
-						br.Put("/", s.briefingHandler.UpdateSettings)
-					})
-				}
+					if s.briefingHandler != nil {
+						protected.Route("/users/briefing", func(br chi.Router) {
+							br.Get("/", s.briefingHandler.GetSettings)
+							br.Put("/", s.briefingHandler.UpdateSettings)
+						})
+					}
 
-				if s.aiSettingsHandler != nil {
-					protected.Route("/users/ai-settings", func(air chi.Router) {
-						air.Get("/", s.aiSettingsHandler.GetSettings)
-						air.Put("/", s.aiSettingsHandler.UpdateSettings)
-					})
-				}
+					if s.aiSettingsHandler != nil {
+						protected.Route("/users/ai-settings", func(air chi.Router) {
+							air.Get("/", s.aiSettingsHandler.GetSettings)
+							air.Put("/", s.aiSettingsHandler.UpdateSettings)
+						})
+					}
 
-				if s.pendingHandler != nil {
-					protected.Route("/pending", func(pr chi.Router) {
-						pr.Get("/", s.pendingHandler.ListPending)
-						pr.Post("/", s.pendingHandler.CreatePending)
-						pr.Get("/{id}", s.pendingHandler.GetPending)
-						pr.Patch("/{id}", s.pendingHandler.UpdatePending)
-						pr.Post("/{id}/schedule", s.pendingHandler.SchedulePending)
-						pr.Post("/{id}/complete", s.pendingHandler.CompletePending)
-						pr.Delete("/{id}", s.pendingHandler.DeletePending)
-					})
-				}
+					if s.pendingHandler != nil {
+						protected.Route("/pending", func(pr chi.Router) {
+							pr.Get("/", s.pendingHandler.ListPending)
+							pr.Post("/", s.pendingHandler.CreatePending)
+							pr.Get("/{id}", s.pendingHandler.GetPending)
+							pr.Patch("/{id}", s.pendingHandler.UpdatePending)
+							pr.Post("/{id}/schedule", s.pendingHandler.SchedulePending)
+							pr.Post("/{id}/complete", s.pendingHandler.CompletePending)
+							pr.Delete("/{id}", s.pendingHandler.DeletePending)
+						})
+					}
 
-				if s.bookingHandler != nil {
-					protected.Route("/booking", func(br chi.Router) {
-						br.Get("/types", s.bookingHandler.ListTypes)
-						br.Post("/types", s.bookingHandler.CreateType)
-						br.Put("/types/{id}", s.bookingHandler.UpdateType)
-						br.Delete("/types/{id}", s.bookingHandler.DeleteType)
-						br.Get("/appointments", s.bookingHandler.ListAppointments)
-						br.Delete("/appointments/{id}", s.bookingHandler.DeleteAppointment)
-					})
-				}
+					if s.bookingHandler != nil {
+						protected.Route("/booking", func(br chi.Router) {
+							br.Get("/types", s.bookingHandler.ListTypes)
+							br.Post("/types", s.bookingHandler.CreateType)
+							br.Put("/types/{id}", s.bookingHandler.UpdateType)
+							br.Delete("/types/{id}", s.bookingHandler.DeleteType)
+							br.Get("/appointments", s.bookingHandler.ListAppointments)
+							br.Delete("/appointments/{id}", s.bookingHandler.DeleteAppointment)
+						})
+					}
 
-				if s.meetingHandler != nil {
-					protected.Route("/meetings", func(mr chi.Router) {
-						mr.Get("/", s.meetingHandler.ListMeetings)
-						mr.Post("/", s.meetingHandler.CreateMeeting)
-						mr.Get("/{id}", s.meetingHandler.GetMeeting)
-						mr.Put("/{id}", s.meetingHandler.UpdateMeeting)
-						mr.Patch("/{id}", s.meetingHandler.UpdateMeeting)
-						mr.Delete("/{id}", s.meetingHandler.DeleteMeeting)
-						mr.Post("/{id}/confirm", s.meetingHandler.ConfirmConsensus)
-						mr.Get("/{id}/share", s.meetingHandler.GetWhatsAppShare)
-					})
-				}
+					if s.meetingHandler != nil {
+						protected.Route("/meetings", func(mr chi.Router) {
+							mr.Get("/", s.meetingHandler.ListMeetings)
+							mr.Post("/", s.meetingHandler.CreateMeeting)
+							mr.Get("/{id}", s.meetingHandler.GetMeeting)
+							mr.Put("/{id}", s.meetingHandler.UpdateMeeting)
+							mr.Patch("/{id}", s.meetingHandler.UpdateMeeting)
+							mr.Delete("/{id}", s.meetingHandler.DeleteMeeting)
+							mr.Post("/{id}/confirm", s.meetingHandler.ConfirmConsensus)
+							mr.Get("/{id}/share", s.meetingHandler.GetWhatsAppShare)
+						})
+					}
 
-				if s.whatsappAuthHandler != nil {
-					protected.Post("/auth/whatsapp/link", s.whatsappAuthHandler.LinkPhone)
-				}
+					if s.whatsappAuthHandler != nil {
+						protected.Post("/auth/whatsapp/link", s.whatsappAuthHandler.LinkPhone)
+					}
 
-				if s.p2pHandler != nil {
-					protected.Post("/users/phone", s.p2pHandler.UpdatePhone)
-					protected.Post("/users/phone/request-verification", s.p2pHandler.RequestPhoneVerification)
-					protected.Post("/users/phone/verify", s.p2pHandler.VerifyPhoneCode)
-					protected.Route("/meetings/p2p", func(p2pr chi.Router) {
-						p2pr.Get("/mutual-slots", s.p2pHandler.GetMutualSlots)
-						p2pr.Post("/invite", s.p2pHandler.SendInvite)
-						p2pr.Get("/invites/pending", s.p2pHandler.ListPendingInvites)
-						p2pr.Get("/invites", s.p2pHandler.ListUserInvites)
-						p2pr.Post("/invites/{id}/accept", s.p2pHandler.AcceptInvite)
-						p2pr.Post("/invites/{id}/decline", s.p2pHandler.DeclineInvite)
-						p2pr.Post("/invites/{id}/cancel", s.p2pHandler.CancelInvite)
-					})
-				}
+					if s.p2pHandler != nil {
+						protected.Post("/users/phone", s.p2pHandler.UpdatePhone)
+						protected.Post("/users/phone/request-verification", s.p2pHandler.RequestPhoneVerification)
+						protected.Post("/users/phone/verify", s.p2pHandler.VerifyPhoneCode)
+						protected.Route("/meetings/p2p", func(p2pr chi.Router) {
+							p2pr.Get("/mutual-slots", s.p2pHandler.GetMutualSlots)
+							p2pr.Post("/invite", s.p2pHandler.SendInvite)
+							p2pr.Get("/invites/pending", s.p2pHandler.ListPendingInvites)
+							p2pr.Get("/invites", s.p2pHandler.ListUserInvites)
+							p2pr.Post("/invites/{id}/accept", s.p2pHandler.AcceptInvite)
+							p2pr.Post("/invites/{id}/decline", s.p2pHandler.DeclineInvite)
+							p2pr.Post("/invites/{id}/cancel", s.p2pHandler.CancelInvite)
+						})
+					}
 
-				if s.chatHandler != nil {
-					protected.Route("/chat", func(cr chi.Router) {
-						cr.Get("/sessions", s.chatHandler.ListSessions)
-						cr.Get("/sessions/{id}", s.chatHandler.GetSessionMessages)
-						cr.Post("/sync", s.chatHandler.SyncSession)
-						cr.Delete("/sessions/{id}", s.chatHandler.DeleteSession)
-					})
-				}
+					if s.chatHandler != nil {
+						protected.Route("/chat", func(cr chi.Router) {
+							cr.Get("/sessions", s.chatHandler.ListSessions)
+							cr.Get("/sessions/{id}", s.chatHandler.GetSessionMessages)
+							cr.Post("/sync", s.chatHandler.SyncSession)
+							cr.Delete("/sessions/{id}", s.chatHandler.DeleteSession)
+						})
+					}
 
-				if s.financeHandler != nil || s.financeLimitHandler != nil || s.financeAnalyticsHandler != nil {
-					protected.Route("/finance", func(fr chi.Router) {
-						if s.financeHandler != nil {
-							fr.Get("/summary", s.financeHandler.GetSummary)
-							fr.Get("/accounts", s.financeHandler.ListAccounts)
-							if s.financeAnalyticsHandler == nil {
-								fr.Get("/transactions", s.financeHandler.ListTransactions)
+					if s.financeHandler != nil || s.financeLimitHandler != nil || s.financeAnalyticsHandler != nil {
+						protected.Route("/finance", func(fr chi.Router) {
+							if s.financeHandler != nil {
+								fr.Get("/summary", s.financeHandler.GetSummary)
+								fr.Get("/accounts", s.financeHandler.ListAccounts)
+								if s.financeAnalyticsHandler == nil {
+									fr.Get("/transactions", s.financeHandler.ListTransactions)
+								}
+								fr.Get("/connections", s.financeHandler.ListConnections)
+								fr.Post("/connections", s.financeHandler.CreateConnection)
+								fr.Patch("/connections/{id}/status", s.financeHandler.UpdateConnectionStatus)
+								fr.Delete("/connections/{id}", s.financeHandler.DeleteConnection)
+								fr.Post("/sync", s.financeHandler.SyncPayload)
+								fr.Put("/byok-backup", s.financeHandler.PutByokBackup)
+								fr.Get("/byok-backup", s.financeHandler.GetByokBackup)
+								fr.Delete("/byok-backup", s.financeHandler.DeleteByokBackup)
 							}
-							fr.Get("/connections", s.financeHandler.ListConnections)
-							fr.Post("/connections", s.financeHandler.CreateConnection)
-							fr.Patch("/connections/{id}/status", s.financeHandler.UpdateConnectionStatus)
-							fr.Delete("/connections/{id}", s.financeHandler.DeleteConnection)
-							fr.Post("/sync", s.financeHandler.SyncPayload)
-							fr.Put("/byok-backup", s.financeHandler.PutByokBackup)
-							fr.Get("/byok-backup", s.financeHandler.GetByokBackup)
-							fr.Delete("/byok-backup", s.financeHandler.DeleteByokBackup)
-						}
-						if s.financeLimitHandler != nil {
-							fr.Get("/limits", s.financeLimitHandler.ListLimits)
-							fr.Post("/limits", s.financeLimitHandler.UpsertLimit)
-							fr.Get("/limits/suggestions", s.financeLimitHandler.GetLimitSuggestions)
-							fr.Put("/limits/{id}", s.financeLimitHandler.UpsertLimit)
-							fr.Delete("/limits/{id}", s.financeLimitHandler.DeleteLimit)
-							fr.Get("/limits/{id}/history", s.financeLimitHandler.GetLimitHistory)
-							fr.Post("/limits/{id}/mute", s.financeLimitHandler.MuteLimit)
-							// Aliases retrocompatíveis /finance/budgets
-							fr.Get("/budgets", s.financeLimitHandler.ListLimits)
-							fr.Post("/budgets", s.financeLimitHandler.UpsertLimit)
-							fr.Put("/budgets/{id}", s.financeLimitHandler.UpsertLimit)
-							fr.Delete("/budgets/{id}", s.financeLimitHandler.DeleteLimit)
-						}
-						if s.financeAnalyticsHandler != nil {
-							fr.Get("/transactions", s.financeAnalyticsHandler.SearchTransactions)
-							fr.Patch("/transactions/{id}", s.financeAnalyticsHandler.RecategorizeTransaction)
-							fr.Get("/analytics/spending", s.financeAnalyticsHandler.GetSpendingAnalytics)
-							fr.Get("/analytics/cashflow", s.financeAnalyticsHandler.GetCashFlowAnalytics)
-							fr.Get("/cards", s.financeAnalyticsHandler.GetCardsOverview)
-							fr.Get("/cards/{id}/bills", s.financeAnalyticsHandler.GetCardBills)
-							fr.Get("/installments", s.financeAnalyticsHandler.GetInstallmentsOverview)
-							fr.Get("/installments/projection", s.financeAnalyticsHandler.GetInstallmentsOverview)
-							fr.Get("/calendar", s.financeAnalyticsHandler.GetFinanceCalendar)
-						}
-					})
-				}
+							if s.financeLimitHandler != nil {
+								fr.Get("/limits", s.financeLimitHandler.ListLimits)
+								fr.Post("/limits", s.financeLimitHandler.UpsertLimit)
+								fr.Get("/limits/suggestions", s.financeLimitHandler.GetLimitSuggestions)
+								fr.Put("/limits/{id}", s.financeLimitHandler.UpsertLimit)
+								fr.Delete("/limits/{id}", s.financeLimitHandler.DeleteLimit)
+								fr.Get("/limits/{id}/history", s.financeLimitHandler.GetLimitHistory)
+								fr.Post("/limits/{id}/mute", s.financeLimitHandler.MuteLimit)
+								// Aliases retrocompatíveis /finance/budgets
+								fr.Get("/budgets", s.financeLimitHandler.ListLimits)
+								fr.Post("/budgets", s.financeLimitHandler.UpsertLimit)
+								fr.Put("/budgets/{id}", s.financeLimitHandler.UpsertLimit)
+								fr.Delete("/budgets/{id}", s.financeLimitHandler.DeleteLimit)
+							}
+							if s.financeAnalyticsHandler != nil {
+								fr.Get("/transactions", s.financeAnalyticsHandler.SearchTransactions)
+								fr.Patch("/transactions/{id}", s.financeAnalyticsHandler.RecategorizeTransaction)
+								fr.Get("/analytics/spending", s.financeAnalyticsHandler.GetSpendingAnalytics)
+								fr.Get("/analytics/cashflow", s.financeAnalyticsHandler.GetCashFlowAnalytics)
+								fr.Get("/cards", s.financeAnalyticsHandler.GetCardsOverview)
+								fr.Get("/cards/{id}/bills", s.financeAnalyticsHandler.GetCardBills)
+								fr.Get("/installments", s.financeAnalyticsHandler.GetInstallmentsOverview)
+								fr.Get("/installments/projection", s.financeAnalyticsHandler.GetInstallmentsOverview)
+								fr.Get("/calendar", s.financeAnalyticsHandler.GetFinanceCalendar)
+							}
+						})
+					}
 
-				s.registerBotRoutes(protected)
-				s.registerAIRoutes(protected)
-				s.registerV5Routes(protected)
-			})
-		}
+					s.registerBotRoutes(protected)
+					s.registerAIRoutes(protected)
+					s.registerV5Routes(protected)
+				})
+			}
 		})
 	})
 }

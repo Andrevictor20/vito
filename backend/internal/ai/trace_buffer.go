@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/andrevmp/vito/backend/internal/ai/byok"
 	"sync"
 	"time"
 
@@ -58,9 +59,9 @@ func (r *RingBufferTraceRecorder) RecordAsync(trace AITrace) {
 	if trace.CredentialSource == "" {
 		trace.CredentialSource = "server"
 	}
-	trace.FallbackReason = RedactSecrets(trace.FallbackReason)
-	trace.ErrorCode = RedactSecrets(trace.ErrorCode)
-	trace.ProviderName = RedactSecrets(trace.ProviderName)
+	trace.FallbackReason = byok.RedactSecrets(trace.FallbackReason)
+	trace.ErrorCode = byok.RedactSecrets(trace.ErrorCode)
+	trace.ProviderName = byok.RedactSecrets(trace.ProviderName)
 
 	r.mu.Lock()
 	defer r.mu.Unlock()

@@ -2,6 +2,9 @@ package main
 
 import (
 	"database/sql"
+	"github.com/andrevmp/vito/backend/internal/bots"
+	"github.com/andrevmp/vito/backend/internal/calendar"
+	"github.com/andrevmp/vito/backend/internal/tasks"
 	"log"
 
 	"github.com/andrevmp/vito/backend/internal/ai/adkengine"
@@ -13,13 +16,13 @@ import (
 type CognitiveRuntimeConfig struct {
 	DB                     *sql.DB
 	EventRepo              domain.EventRepository
-	NotifSvc               service.PushDispatcher
-	PendingSvc             *service.PendingService
-	ReminderWorker         *service.ReminderWorker
-	TodoReminderWorker     *service.TodoReminderWorker
-	PendingNudgeWorker     *service.PendingNudgeWorker
-	ExecutiveSummaryWorker *service.ExecutiveSummaryWorker
-	TriggerWorker          *service.TriggerWorker
+	NotifSvc               bots.PushDispatcher
+	PendingSvc             *tasks.PendingService
+	ReminderWorker         *tasks.ReminderWorker
+	TodoReminderWorker     *tasks.TodoReminderWorker
+	PendingNudgeWorker     *tasks.PendingNudgeWorker
+	ExecutiveSummaryWorker *calendar.ExecutiveSummaryWorker
+	TriggerWorker          *bots.TriggerWorker
 	MorningBriefingWorker  *service.MorningBriefingWorker
 	BehavioralWorker       *service.BehavioralWorker
 	AgentSys               *AgentSubsystem

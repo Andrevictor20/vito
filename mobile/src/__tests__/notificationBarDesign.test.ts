@@ -12,7 +12,7 @@ import {
   VITO_NOTIFICATION_ACCENT,
   VITO_NOTIFICATION_CATEGORIES,
   VITO_NOTIFICATION_CHANNELS,
-} from '../services/notificationDesign';
+} from '../features/notifications/services/notificationDesign';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

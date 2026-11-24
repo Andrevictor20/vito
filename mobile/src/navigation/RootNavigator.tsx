@@ -8,18 +8,18 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { CircularThemeRevealOverlay } from '../theme/vitoMotion';
-import { LoginScreen } from '../components/login/LoginScreen';
+import { LoginScreen } from '../features/auth/screens/LoginScreen';
 import { MainTabs } from './MainTabs';
 import { HomeDataProvider } from './HomeDataProvider';
-import { AiProvidersScreen } from '../screens/AiProvidersScreen';
-import { NotificationsScreen } from '../screens/NotificationsScreen';
-import { ProfileScreen } from '../screens/ProfileScreen';
-import { BookingScreen } from '../screens/BookingScreen';
-import { StoreScreen } from '../screens/StoreScreen';
-import { IntegrationsScreen } from '../screens/IntegrationsScreen';
-import { BehaviorScreen } from '../screens/BehaviorScreen';
-import { VoiceSettingsScreen } from '../screens/VoiceSettingsScreen';
-import { MemoryScreen } from '../screens/MemoryScreen';
+import { AiProvidersScreen } from '../features/profile/screens/AiProvidersScreen';
+import { NotificationsScreen } from '../features/notifications/screens/NotificationsScreen';
+import { ProfileScreen } from '../features/profile/screens/ProfileScreen';
+import { BookingScreen } from '../features/calendar/screens/BookingScreen';
+import { StoreScreen } from '../features/store/screens/StoreScreen';
+import { IntegrationsScreen } from '../features/profile/screens/IntegrationsScreen';
+import { BehaviorScreen } from '../features/profile/screens/BehaviorScreen';
+import { VoiceSettingsScreen } from '../features/profile/screens/VoiceSettingsScreen';
+import { MemoryScreen } from '../features/profile/screens/MemoryScreen';
 import type { RootStackParamList } from '../AppRoot';
 import type { StorePage } from './screensNav';
 

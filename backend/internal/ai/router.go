@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	ErrNoProviderAvailable = errors.New("nenhum provedor de IA disponível para esta categoria de tarefa")
+	ErrNoProviderAvailable  = errors.New("nenhum provedor de IA disponível para esta categoria de tarefa")
 	ErrTierTooLowForWriting = errors.New("provedores de Tier 1 não têm permissão para executar operações de escrita")
 )
 
@@ -20,10 +20,10 @@ type stickyEntry struct {
 
 // ModelRouter gerencia a seleção de provedor com piso de qualidade e retenção de fio fixado (Sticky Thread).
 type ModelRouter struct {
-	mu           sync.RWMutex
-	providers    []AgentProvider
-	stickyMap    map[string]stickyEntry
-	stickyTTL    time.Duration
+	mu        sync.RWMutex
+	providers []AgentProvider
+	stickyMap map[string]stickyEntry
+	stickyTTL time.Duration
 }
 
 // NewModelRouter cria um roteador com os provedores fornecidos.

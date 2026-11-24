@@ -2,7 +2,7 @@ import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { buildAssistantMessage } from '../utils/chatMessageBuilder';
+import { buildAssistantMessage } from '../features/chat/utils/chatMessageBuilder';
 import type { AssistantChatResponse } from '../types';
 
 const MOBILE_SRC = path.resolve(__dirname, '..');
@@ -60,7 +60,7 @@ describe('AC-04: Cards HITL (ActionConfirmationCard) e Cards Inline no Mobile', 
   });
 
   test('test_ac_04_action_confirmation_card_e_wiring_mobile', () => {
-    const cardPath = path.join(MOBILE_SRC, 'components/chat/cards/ActionConfirmationCard.tsx');
+    const cardPath = path.join(MOBILE_SRC, 'features/chat/components/cards/ActionConfirmationCard.tsx');
     assert.equal(fs.existsSync(cardPath), true, 'ActionConfirmationCard.tsx deve existir');
     const cardSrc = fs.readFileSync(cardPath, 'utf8');
     assert.equal(cardSrc.includes('@expo/vector-icons'), false);
@@ -69,7 +69,7 @@ describe('AC-04: Cards HITL (ActionConfirmationCard) e Cards Inline no Mobile', 
     assert.ok(cardSrc.includes('Cancelar'));
     assert.ok(cardSrc.split('\n').length < 200, 'ActionConfirmationCard.tsx deve ter < 200 linhas');
 
-    const structuredSrc = fs.readFileSync(path.join(MOBILE_SRC, 'components/chat/cards/ChatStructuredCards.tsx'), 'utf8');
+    const structuredSrc = fs.readFileSync(path.join(MOBILE_SRC, 'features/chat/components/cards/ChatStructuredCards.tsx'), 'utf8');
     assert.ok(structuredSrc.includes('ActionConfirmationCard'));
     assert.ok(structuredSrc.includes('TodoInlineCard'));
     assert.ok(structuredSrc.includes('EventInlineCard'));
@@ -79,11 +79,11 @@ describe('AC-04: Cards HITL (ActionConfirmationCard) e Cards Inline no Mobile', 
     assert.ok(structuredSrc.includes('PendingInlineCard'));
     assert.ok(structuredSrc.includes('TriggerInlineCard'));
 
-    const useMessagesSrc = fs.readFileSync(path.join(MOBILE_SRC, 'hooks/useChatMessages.ts'), 'utf8');
+    const useMessagesSrc = fs.readFileSync(path.join(MOBILE_SRC, 'features/chat/hooks/useChatMessages.ts'), 'utf8');
     assert.ok(useMessagesSrc.includes('resolveConfirmation'));
     assert.ok(useMessagesSrc.includes('assistantConfirm'));
 
-    const chatScreenSrc = fs.readFileSync(path.join(MOBILE_SRC, 'screens/ChatScreen.tsx'), 'utf8');
+    const chatScreenSrc = fs.readFileSync(path.join(MOBILE_SRC, 'features/chat/screens/ChatScreen.tsx'), 'utf8');
     assert.ok(chatScreenSrc.includes('resolveConfirmation'));
   });
 });

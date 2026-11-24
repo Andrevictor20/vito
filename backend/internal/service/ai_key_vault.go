@@ -11,7 +11,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/andrevmp/vito/backend/internal/crypto"
+	"github.com/andrevmp/vito/backend/internal/platform/crypto"
 	"github.com/andrevmp/vito/backend/internal/domain"
 )
 

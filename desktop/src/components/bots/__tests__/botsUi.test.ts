@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { getBotsHeaderSubtitle, getAllowedPolicyOptions } from '../botHelpers';
 import { MASCOT_PRESETS, getBotAnimState, resolveSkin } from '../mascotPalettes';
-import { BotsApi } from '../../../services/api/botsApi';
+import { BotsApi } from '../../../services/api/bots/botsApi';
 import { ApiClient } from '../../../services/api/client';
 import { Bot } from '../../../types/bot';
 

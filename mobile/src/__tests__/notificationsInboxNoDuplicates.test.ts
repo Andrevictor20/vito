@@ -6,8 +6,8 @@ import { fileURLToPath } from 'node:url';
 import {
   filterNotifications,
   type NotificationFilter,
-} from '../components/notifications/notificationHelpers';
-import type { InboxNotification } from '../services/api/inboxNotificationsApi';
+} from '../features/notifications/components/notificationHelpers';
+import type { InboxNotification } from '../features/notifications/services/inboxNotificationsApi';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -15,7 +15,7 @@ const __dirname = path.dirname(__filename);
 describe('AC-05: Inbox sem duplicacao sintetica e filtro Avisos (info)', () => {
   it('test_ac_05_store_only_synthesizes_local_when_api_fails', () => {
     const storeSrc = fs.readFileSync(
-      path.resolve(__dirname, '../services/notificationsInboxStore.ts'),
+      path.resolve(__dirname, '../features/notifications/services/notificationsInboxStore.ts'),
       'utf8',
     );
     assert.equal(storeSrc.includes('let apiResponded = false;'), true);
@@ -40,7 +40,7 @@ describe('AC-05: Inbox sem duplicacao sintetica e filtro Avisos (info)', () => {
     assert.equal(approveCount + alertCount + infoCount, items.length);
 
     const screenSrc = fs.readFileSync(
-      path.resolve(__dirname, '../screens/NotificationsScreen.tsx'),
+      path.resolve(__dirname, '../features/notifications/screens/NotificationsScreen.tsx'),
       'utf8',
     );
     assert.equal(screenSrc.includes("label: 'Avisos'"), true);

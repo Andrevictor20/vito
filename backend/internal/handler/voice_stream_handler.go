@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
+	"github.com/andrevmp/vito/backend/internal/ai/voice"
 	"io"
 	"log"
 	"math"
@@ -45,8 +46,8 @@ type VoiceServerEvent struct {
 type VoiceStreamHandler struct {
 	loop        *service.AgentLoop
 	convRepo    *repository.ConversationStoreRepository
-	transcriber ai.AudioTranscriber
-	ttsSvc      ai.TTSService
+	transcriber voice.AudioTranscriber
+	ttsSvc      voice.TTSService
 	geminiKey   string
 }
 
@@ -61,7 +62,7 @@ func (h *VoiceStreamHandler) SetAgentLoop(loop *service.AgentLoop, convRepo *rep
 }
 
 // SetAudioServices configura o transcritor de entrada, sintetizador TTS e chave Gemini.
-func (h *VoiceStreamHandler) SetAudioServices(transcriber ai.AudioTranscriber, ttsSvc ai.TTSService, geminiKey string) {
+func (h *VoiceStreamHandler) SetAudioServices(transcriber voice.AudioTranscriber, ttsSvc voice.TTSService, geminiKey string) {
 	h.transcriber = transcriber
 	h.ttsSvc = ttsSvc
 	h.geminiKey = geminiKey
@@ -155,7 +156,7 @@ func (h *VoiceStreamHandler) handleWebSocket(ws *websocket.Conn) {
 					if h.loop != nil {
 						var transcript string
 						if h.transcriber != nil {
-							wav := ai.PCMToWAV(pcm, 16000, 1, 16)
+							wav := voice.PCMToWAV(pcm, 16000, 1, 16)
 							tr, err := h.transcriber.Transcribe(ctx, bytes.NewReader(wav), "voice.wav")
 							if err == nil && strings.TrimSpace(tr) != "" {
 								transcript = tr
@@ -213,7 +214,7 @@ func (h *VoiceStreamHandler) ProcessVoiceUtteranceStream(
 		return nil
 	}
 
-	chunker := ai.NewSentenceChunker()
+	chunker := voice.NewSentenceChunker()
 	synthesizedCount := 0
 	emitSentenceAudio := func(sentence string) {
 		trimmed := strings.TrimSpace(sentence)

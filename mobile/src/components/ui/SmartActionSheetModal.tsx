@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../context/ThemeContext';
 import { hapticFeedback } from '../../theme/motion';
 import { pagerSwipeLockBus } from '../../services/dataSync';
-import { SmartActionItem } from '../../utils/smartActionBuilders';
+import { SmartActionItem } from '../../utils/formatting/smartActionBuilders';
 
 export interface SmartActionSheetModalProps {
   visible: boolean;

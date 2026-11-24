@@ -257,16 +257,34 @@ func (r *StoreComplianceRepositorySQLite) CollectLGPDExportData(ctx context.Cont
 		data.User = u
 	}
 
-	eventRepo := NewEventRepository(r.db)
-	from := time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)
-	to := time.Date(2100, 1, 1, 0, 0, 0, 0, time.UTC)
-	if evs, err := eventRepo.ListByUser(userID, from, to); err == nil && evs != nil {
-		data.Events = evs
+	if rows, err := r.db.QueryContext(ctx, `SELECT id, title, description, start_at, end_at, created_at FROM events WHERE user_id = ? ORDER BY start_at ASC`, userID); err == nil {
+		defer rows.Close()
+		var evs []domain.Event
+		for rows.Next() {
+			var e domain.Event
+			if scanErr := rows.Scan(&e.ID, &e.Title, &e.Description, &e.StartAt, &e.EndAt, &e.CreatedAt); scanErr == nil {
+				e.UserID = userID
+				evs = append(evs, e)
+			}
+		}
+		if evs != nil {
+			data.Events = evs
+		}
 	}
 
-	todoRepo := NewTodoRepository(r.db)
-	if tds, err := todoRepo.ListByUser(userID, ""); err == nil && tds != nil {
-		data.Todos = tds
+	if rows, err := r.db.QueryContext(ctx, `SELECT id, title, status, priority, created_at FROM todos WHERE user_id = ? ORDER BY created_at DESC`, userID); err == nil {
+		defer rows.Close()
+		var tds []domain.Todo
+		for rows.Next() {
+			var td domain.Todo
+			if scanErr := rows.Scan(&td.ID, &td.Title, &td.Status, &td.Priority, &td.CreatedAt); scanErr == nil {
+				td.UserID = userID
+				tds = append(tds, td)
+			}
+		}
+		if tds != nil {
+			data.Todos = tds
+		}
 	}
 
 	memRepo := NewMemoryRepository(r.db)
@@ -274,9 +292,19 @@ func (r *StoreComplianceRepositorySQLite) CollectLGPDExportData(ctx context.Cont
 		data.Memories = mems
 	}
 
-	botRepo := NewBotRepository(r.db)
-	if bots, err := botRepo.ListByUser(ctx, userID); err == nil && bots != nil {
-		data.Bots = bots
+	if rows, err := r.db.QueryContext(ctx, `SELECT id, title, goal, status, created_at FROM triggers WHERE user_id = ? ORDER BY created_at DESC`, userID); err == nil {
+		defer rows.Close()
+		var exportedBots []domain.Bot
+		for rows.Next() {
+			var b domain.Bot
+			if scanErr := rows.Scan(&b.ID, &b.Title, &b.Goal, &b.Status, &b.CreatedAt); scanErr == nil {
+				b.UserID = userID
+				exportedBots = append(exportedBots, b)
+			}
+		}
+		if exportedBots != nil {
+			data.Bots = exportedBots
+		}
 	}
 
 	inboxRepo := NewNotificationsInboxRepository(r.db)

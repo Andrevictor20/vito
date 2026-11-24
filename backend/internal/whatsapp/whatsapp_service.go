@@ -1,0 +1,482 @@
+package whatsapp
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"github.com/andrevmp/vito/backend/internal/ai/voice"
+	"github.com/andrevmp/vito/backend/internal/service"
+	"log"
+	"net/http"
+	"regexp"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/google/uuid"
+
+	"github.com/andrevmp/vito/backend/internal/domain"
+	"github.com/andrevmp/vito/backend/internal/repository"
+)
+
+// WhatsAppServiceConfig armazena parâmetros do serviço de integração com WhatsApp.
+type WhatsAppServiceConfig struct {
+	WebhookBaseURL  string
+	EvolutionAPIURL string
+	EvolutionAPIKey string
+	HTTPClient      *http.Client
+}
+
+// NotificationSender define a interface para despacho de push notifications.
+type NotificationSender interface {
+	SendPushToUser(userID, title, body, priority string, data map[string]interface{}) (int, error)
+}
+
+// WhatsAppService gerencia o pareamento, sincronização de estado e webhook do WhatsApp.
+type WhatsAppService struct {
+	cfg              WhatsAppServiceConfig
+	repo             domain.WhatsAppRepository
+	client           EvolutionAPIClient
+	agentLoop        service.AssistantEngine
+	notifSender      NotificationSender
+	audioTranscriber voice.AudioTranscriber
+	userRepo         domain.UserRepository
+	memory           *WhatsAppConversationMemory
+	contextSvc       *WhatsAppContextService
+	groupMeta        *WhatsAppGroupMeta
+	ownerCache       *WhatsAppOwnerCache
+	contactsCache    *WhatsAppContactsCache
+	contextDebugLog  bool
+	convBridge       *WhatsAppConversationBridge
+	labelsMu         sync.RWMutex
+	chatLabels       map[string]string
+	// runAsync executa o processamento de webhooks em background com concorrência limitada.
+	runAsync      AsyncRunner
+	inboundCoord  *whatsappInboundCoordinator
+	maxInboundAge time.Duration
+	// enricher lê a mídia (áudio/imagem) das mensagens do WhatsApp.
+	enricher       *WhatsAppMediaEnricher
+	entityLinkRepo *repository.EntityLinkRepository
+	// blockedReplies guarda a última resposta educativa enviada por conversa
+	blockedMu           sync.Mutex
+	blockedReplies      map[string]time.Time
+	outboundMu          sync.Mutex
+	recentOutboundTexts map[string]time.Time
+	processedMsgIDs     map[string]time.Time
+	attentionBudget     *service.AttentionBudgetService
+	lidMu               sync.RWMutex
+	lidToPN             map[string]string
+}
+
+// AsyncRunner executa uma tarefa em background (ou de forma síncrona, em testes).
+type AsyncRunner func(func())
+
+// NewWhatsAppService instancia o serviço do WhatsApp.
+func NewWhatsAppService(
+	cfg WhatsAppServiceConfig,
+	repo domain.WhatsAppRepository,
+	client EvolutionAPIClient,
+) *WhatsAppService {
+	coord := newWhatsAppInboundCoordinator(defaultMaxInboundConcurrency, defaultMaxInboundQueue)
+	return &WhatsAppService{
+		cfg:                 cfg,
+		repo:                repo,
+		client:              client,
+		memory:              NewWhatsAppConversationMemory(),
+		inboundCoord:        coord,
+		maxInboundAge:       defaultMaxInboundAge,
+		runAsync:            coord.run,
+		recentOutboundTexts: make(map[string]time.Time),
+		processedMsgIDs:     make(map[string]time.Time),
+	}
+}
+
+// SetMaxInboundAge configura o limite máximo de idade para mensagens recebidas
+// acionarem transcrição/IA (evita processar backlog antigo após quedas do servidor).
+func (s *WhatsAppService) SetMaxInboundAge(maxAge time.Duration) {
+	s.maxInboundAge = maxAge
+}
+
+// SetAgentLoop conecta o motor Google ADK / service.AgentLoop ao canal do WhatsApp.
+func (s *WhatsAppService) SetAgentLoop(loop service.AssistantEngine) { s.agentLoop = loop }
+
+// SetAsyncRunner injeta o executor de tarefas em background.
+func (s *WhatsAppService) SetAsyncRunner(runner AsyncRunner) {
+	if runner == nil {
+		return
+	}
+	s.runAsync = runner
+}
+
+// InstanceNameOf devolve o nome da instância da Evolution do usuário.
+func (s *WhatsAppService) InstanceNameOf(ctx context.Context, userID string) (string, error) {
+	if s == nil || s.repo == nil || userID == "" {
+		return "", nil
+	}
+	integration, err := s.repo.GetByUserID(ctx, userID)
+	if err != nil {
+		return "", err
+	}
+	if integration == nil {
+		return "", nil
+	}
+	return integration.InstanceName, nil
+}
+
+// SetMediaEnricher injeta o enriquecedor de mídia (áudio/imagem do histórico).
+func (s *WhatsAppService) SetMediaEnricher(enricher *WhatsAppMediaEnricher) {
+	s.enricher = enricher
+}
+
+// ContextMessageByID devolve uma mensagem arquivada do shadow inbox.
+func (s *WhatsAppService) ContextMessageByID(ctx context.Context, userID, id string) (*domain.WhatsAppConversationMessage, error) {
+	if s.contextSvc == nil {
+		return nil, nil
+	}
+	return s.contextSvc.MessageByID(ctx, userID, id)
+}
+
+// QuotedContextOf devolve a mensagem marcada de uma mensagem arquivada.
+//
+// É o que permite ao Vito entender a que uma resposta se refere, mesmo quando
+// a citada é antiga ou é uma imagem/áudio. Devolve string vazia quando a
+// mensagem não tem citação (o texto da PRÓPRIA mensagem não é a citação).
+func (s *WhatsAppService) QuotedContextOf(ctx context.Context, userID, messageID string) string {
+	if s.contextSvc == nil || messageID == "" {
+		return ""
+	}
+	msg, err := s.contextSvc.MessageByID(ctx, userID, messageID)
+	if err != nil || msg == nil {
+		return ""
+	}
+	if msg.QuotedID != "" {
+		if cited, err := s.contextSvc.MessageByID(ctx, userID, msg.QuotedID); err == nil && cited != nil {
+			if text := quotedTextOf(cited); text != "" {
+				return text
+			}
+		}
+	}
+	return strings.TrimSpace(msg.QuotedText)
+}
+
+// MarkMediaAnalyzed grava o que o Vito leu de uma mídia (transcrição/descrição).
+func (s *WhatsAppService) MarkMediaAnalyzed(ctx context.Context, userID, id, text string) error {
+	if s.contextSvc == nil {
+		return nil
+	}
+	return s.contextSvc.SaveMediaText(ctx, userID, id, text)
+}
+
+// SetContextService injeta o serviço de contexto conversacional do WhatsApp.
+func (s *WhatsAppService) SetContextService(contextSvc *WhatsAppContextService) {
+	s.contextSvc = contextSvc
+}
+
+// SetGroupMeta injeta o cache de metadados de grupo (participantes e nomes).
+func (s *WhatsAppService) SetGroupMeta(groupMeta *WhatsAppGroupMeta) {
+	s.groupMeta = groupMeta
+}
+
+// SetOwnerCache injeta o cache do JID do owner (número realmente pareado).
+func (s *WhatsAppService) SetOwnerCache(ownerCache *WhatsAppOwnerCache) {
+	s.ownerCache = ownerCache
+}
+
+// SetContactsCache injeta o cache de nomes de contato ( chats @lid chegam sem pushName).
+func (s *WhatsAppService) SetContactsCache(cache *WhatsAppContactsCache) {
+	s.contactsCache = cache
+}
+
+// SetContextDebugLog habilita o log do CONTEÚDO da janela de contexto.
+// Opt-in: o conteúdo pode ter dados sensíveis e não deve ir para o log
+// de produção sem uma decisão explícita.
+func (s *WhatsAppService) SetContextDebugLog(enabled bool) {
+	s.contextDebugLog = enabled
+}
+
+// ContextSvcForTest expõe o serviço de contexto apenas para testes.
+func (s *WhatsAppService) ContextSvcForTest() *WhatsAppContextService {
+	return s.contextSvc
+}
+
+// SanitizePhoneNumber limpa e normaliza o número para o padrão internacional E.164 sem o '+'.
+func SanitizePhoneNumber(raw string) (string, error) {
+	re := regexp.MustCompile(`\D+`)
+	digits := re.ReplaceAllString(raw, "")
+
+	if len(digits) < 10 {
+		return "", domain.ErrWhatsAppInvalidPhone
+	}
+
+	// Brasil: 10 ou 11 dígitos sem DDI (ex: 11988887777 ou 1188887777)
+	if len(digits) == 10 || len(digits) == 11 {
+		digits = "55" + digits
+	}
+
+	return digits, nil
+}
+
+// isMatchingPhone compara dois números considerando possíveis variações do 9º dígito brasileiro (DDI 55).
+func isMatchingPhone(a, b string) bool {
+	if a == b {
+		return true
+	}
+	re := regexp.MustCompile(`\D+`)
+	da := re.ReplaceAllString(a, "")
+	db := re.ReplaceAllString(b, "")
+	if da == db {
+		return true
+	}
+	if strings.HasPrefix(da, "55") && strings.HasPrefix(db, "55") {
+		if len(da) == 13 && len(db) == 12 && da[:4] == db[:4] && da[5:] == db[4:] {
+			return true
+		}
+		if len(db) == 13 && len(da) == 12 && db[:4] == da[:4] && db[5:] == da[4:] {
+			return true
+		}
+	}
+	return false
+}
+
+// MakeInstanceName gera o identificador único da instância para a Evolution API.
+func MakeInstanceName(userID string) string {
+	clean := strings.ReplaceAll(userID, "-", "_")
+	return fmt.Sprintf("vito_user_%s", clean)
+}
+
+// RequestPairingCode inicia a criação da instância e obtém o código de pareamento de 8 dígitos.
+func (s *WhatsAppService) RequestPairingCode(ctx context.Context, userID, rawPhone string) (string, error) {
+	phone, err := SanitizePhoneNumber(rawPhone)
+	if err != nil {
+		return "", err
+	}
+
+	instanceName := MakeInstanceName(userID)
+
+	// Se a instância já existe mas não está conectada ("open"), remove a instância anterior
+	// para evitar que um socket zumbi ou estado "connecting" com count:0 bloqueie o novo código.
+	state, _ := s.client.GetConnectionState(ctx, instanceName)
+	if !strings.EqualFold(state, "open") {
+		_ = s.client.DeleteInstance(ctx, instanceName)
+	}
+
+	if err := s.client.CreateInstance(ctx, instanceName, phone); err != nil {
+		log.Printf("⚠️ [WhatsAppService] Erro ao criar instância %s: %v", instanceName, err)
+	}
+
+	webhookURL := fmt.Sprintf("%s/api/v1/integrations/whatsapp/webhook", strings.TrimRight(s.cfg.WebhookBaseURL, "/"))
+	if err := s.client.SetWebhook(ctx, instanceName, webhookURL); err != nil {
+		log.Printf("⚠️ [WhatsAppService] Aviso ao configurar webhook para %s: %v", instanceName, err)
+	}
+
+	_ = s.client.SetSettings(ctx, instanceName, map[string]interface{}{
+		"rejectCall":      false,
+		"groupsIgnore":    false,
+		"alwaysOnline":    false,
+		"readMessages":    false,
+		"readStatus":      false,
+		"syncFullHistory": false,
+	})
+
+	code, err := s.client.GetPairingCode(ctx, instanceName, phone)
+	if err != nil {
+		// Tolerância para o Baileys inicializar pre-keys caso o primeiro GET ocorra durante o boot da instância
+		time.Sleep(1 * time.Second)
+		code, err = s.client.GetPairingCode(ctx, instanceName, phone)
+		if err != nil {
+			return "", fmt.Errorf("falha ao gerar código de pareamento: %w", err)
+		}
+	}
+
+	existing, err := s.repo.GetByUserID(ctx, userID)
+	integrationID := uuid.New().String()
+	if err == nil && existing != nil {
+		integrationID = existing.ID
+	}
+
+	integration := &domain.WhatsAppIntegration{
+		ID:           integrationID,
+		UserID:       userID,
+		InstanceName: instanceName,
+		Phone:        phone,
+		Status:       domain.WhatsAppStatusConnecting,
+		PairingCode:  code,
+		CreatedAt:    time.Now().UTC(),
+		UpdatedAt:    time.Now().UTC(),
+	}
+
+	if err := s.repo.Upsert(ctx, integration); err != nil {
+		return "", fmt.Errorf("falha ao persistir sessão whatsapp: %w", err)
+	}
+
+	// Vincula o número de telefone à conta do usuário autenticado (Account Linking)
+	if s.userRepo != nil && phone != "" {
+		if existingUser, err := s.userRepo.GetByPhone(phone); err == nil && existingUser != nil {
+			if existingUser.ID != userID && strings.HasSuffix(strings.ToLower(existingUser.Email), "@vito.local") {
+				_ = s.userRepo.UpdatePhone(existingUser.ID, "")
+			}
+		}
+		_ = s.userRepo.UpdatePhone(userID, phone)
+	}
+
+	return code, nil
+}
+
+// GetStatus retorna a sessão atual do WhatsApp sincronizando com a Evolution API se necessário.
+func (s *WhatsAppService) GetStatus(ctx context.Context, userID string) (*domain.WhatsAppIntegration, error) {
+	integration, err := s.repo.GetByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	state, err := s.client.GetConnectionState(ctx, integration.InstanceName)
+	if err == nil && state != "" {
+		if strings.EqualFold(state, "open") && integration.Status != domain.WhatsAppStatusConnected {
+			now := time.Now().UTC()
+			integration.Status = domain.WhatsAppStatusConnected
+			integration.LastConnectedAt = &now
+			_ = s.repo.UpdateStatus(ctx, integration.ID, domain.WhatsAppStatusConnected, &now)
+		} else if (strings.EqualFold(state, "close") || strings.EqualFold(state, "refused")) && integration.Status == domain.WhatsAppStatusConnected {
+			integration.Status = domain.WhatsAppStatusDisconnected
+			_ = s.repo.UpdateStatus(ctx, integration.ID, domain.WhatsAppStatusDisconnected, nil)
+		}
+	}
+
+	return integration, nil
+}
+
+// Disconnect desvincula a conta do WhatsApp deslogando da Evolution API.
+func (s *WhatsAppService) Disconnect(ctx context.Context, userID string) error {
+	integration, err := s.repo.GetByUserID(ctx, userID)
+	if err != nil {
+		return err
+	}
+
+	_ = s.client.Logout(ctx, integration.InstanceName)
+	return s.repo.UpdateStatus(ctx, integration.ID, domain.WhatsAppStatusDisconnected, nil)
+}
+
+// MatchWhatsAppContacts cruza os contatos da agenda do WhatsApp (importados pelo
+// app via POST /contact-names e persistidos no contactsCache) com a base de
+// usuários do Vito.
+//
+// A Evolution não expõe a agenda do celular: findContacts devolve 0 contato,
+// então nunca houve matches por esta via. A fonte confiável é o contactsCache,
+// populado pelo próprio usuário quando importa a agenda do aparelho.
+func (s *WhatsAppService) MatchWhatsAppContacts(ctx context.Context, userID string) ([]domain.ContactMatchResult, error) {
+	integration, err := s.repo.GetByUserID(ctx, userID)
+	if err != nil {
+		if err == domain.ErrWhatsAppIntegrationNotFound {
+			return []domain.ContactMatchResult{}, nil
+		}
+		return nil, err
+	}
+	if integration == nil || integration.Status != domain.WhatsAppStatusConnected {
+		return []domain.ContactMatchResult{}, nil
+	}
+
+	contactsByNumber := map[string]string{}
+	if s.contactsCache != nil {
+		contactsByNumber = s.contactsCache.SavedContactsByNumber()
+	}
+	log.Printf("[WhatsAppService] MatchWhatsAppContacts user=%s cache_entries=%d", userID, len(contactsByNumber))
+
+	var results []domain.ContactMatchResult
+	seenUserIDs := make(map[string]bool)
+
+	for rawPhone, savedName := range contactsByNumber {
+		cleanPhone, err := SanitizePhoneNumber(rawPhone)
+		if err != nil || cleanPhone == "" {
+			log.Printf("[WhatsAppService] MatchWhatsAppContacts ignorando telefone invalido '%s': %v", rawPhone, err)
+			continue
+		}
+
+		if s.userRepo != nil {
+			user, err := s.userRepo.GetByPhone(cleanPhone)
+			if err == nil && user != nil && user.ID != userID && !seenUserIDs[user.ID] {
+				seenUserIDs[user.ID] = true
+				contactName := savedName
+				if contactName == "" {
+					contactName = user.Name
+				}
+				results = append(results, domain.ContactMatchResult{
+					UserID: user.ID,
+					Name:   contactName,
+					Phone:  cleanPhone,
+					Email:  user.Email,
+				})
+			}
+		}
+	}
+
+	if results == nil {
+		results = []domain.ContactMatchResult{}
+	}
+	log.Printf("[WhatsAppService] MatchWhatsAppContacts user=%s matches=%d", userID, len(results))
+	return results, nil
+}
+
+// HandleWebhook processa eventos de atualização de conexão e mensagens recebidas.
+func (s *WhatsAppService) HandleWebhook(ctx context.Context, eventType string, payload []byte) error {
+	var base struct {
+		Event    string          `json:"event"`
+		Instance string          `json:"instance"`
+		Sender   string          `json:"sender"`
+		Data     json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal(payload, &base); err != nil {
+		log.Printf("❌ [WhatsAppWebhook] Erro no unmarshal base: %v", err)
+		return err
+	}
+	if s.ownerCache != nil && base.Instance != "" {
+		sender := strings.TrimSpace(base.Sender)
+		if strings.Contains(sender, "@s.whatsapp.net") {
+			s.ownerCache.Set(base.Instance, sender)
+		} else if strings.HasSuffix(sender, "@lid") {
+			s.ownerCache.SetLID(base.Instance, sender)
+		}
+	}
+
+	event := strings.ToLower(base.Event)
+	if event == "" {
+		event = strings.ToLower(eventType)
+	}
+
+	log.Printf("📥 [WhatsAppWebhook] evento=%q instance=%q bytes=%d", event, base.Instance, len(payload))
+
+	if strings.Contains(event, "connection") {
+		var connData struct {
+			State string `json:"state"`
+		}
+		_ = json.Unmarshal(base.Data, &connData)
+
+		integration, err := s.repo.GetByInstanceName(ctx, base.Instance)
+		if err == nil && integration != nil {
+			if strings.EqualFold(connData.State, "open") {
+				now := time.Now().UTC()
+				_ = s.repo.UpdateStatus(ctx, integration.ID, domain.WhatsAppStatusConnected, &now)
+				if s.userRepo != nil && integration.Phone != "" {
+					if existingUser, err := s.userRepo.GetByPhone(integration.Phone); err == nil && existingUser != nil {
+						if existingUser.ID != integration.UserID && strings.HasSuffix(strings.ToLower(existingUser.Email), "@vito.local") {
+							_ = s.userRepo.UpdatePhone(existingUser.ID, "")
+						}
+					}
+					_ = s.userRepo.UpdatePhone(integration.UserID, integration.Phone)
+				}
+			} else if strings.EqualFold(connData.State, "close") || strings.EqualFold(connData.State, "refused") {
+				_ = s.repo.UpdateStatus(ctx, integration.ID, domain.WhatsAppStatusDisconnected, nil)
+			}
+		}
+		return nil
+	}
+
+	if strings.Contains(event, "reaction") {
+		return nil
+	}
+
+	if isSupportedMessagesWebhookEvent(event) {
+		return s.handleMessagesEvent(ctx, base.Instance, base.Data)
+	}
+
+	return nil
+}

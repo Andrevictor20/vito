@@ -2,11 +2,13 @@ package service_test
 
 import (
 	"context"
+	"github.com/andrevmp/vito/backend/internal/calendar"
+	"github.com/andrevmp/vito/backend/internal/tasks"
 	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/andrevmp/vito/backend/internal/database"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/andrevmp/vito/backend/internal/service"
@@ -78,8 +80,8 @@ func TestMorningBriefingWorker_RecordsTurnInBridge(t *testing.T) {
 	defer db.Close()
 
 	briefingRepo := repository.NewBriefingRepository(db)
-	eventRepo := repository.NewEventRepository(db)
-	todoRepo := repository.NewTodoRepository(db)
+	eventRepo := calendar.NewEventRepository(db)
+	todoRepo := tasks.NewTodoRepository(db)
 	userRepo := repository.NewUserRepository(db)
 	notifRepo := repository.NewDeviceTokenRepository(db)
 	notifSvc := service.NewNotificationService(notifRepo)

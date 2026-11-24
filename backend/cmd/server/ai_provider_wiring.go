@@ -2,10 +2,11 @@ package main
 
 import (
 	"database/sql"
+	"github.com/andrevmp/vito/backend/internal/bots"
 	"strconv"
 
 	"github.com/andrevmp/vito/backend/internal/ai/adkengine"
-	"github.com/andrevmp/vito/backend/internal/config"
+	"github.com/andrevmp/vito/backend/internal/platform/config"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/handler"
 	"github.com/andrevmp/vito/backend/internal/repository"
@@ -40,7 +41,7 @@ func setupAIProviderSubsystem(
 	}
 
 	aiProviderRepo := repository.NewAIProviderRepository(db)
-	triggerRepo := repository.NewTriggerRepository(db)
+	triggerRepo := bots.NewTriggerRepository(db)
 	vault := service.NewAIKeyVault(encKey)
 	registry := service.NewUserProviderRegistry(vault, adkengine.NewADKLLMFactory(), aiProviderRepo, portNum)
 	resolver := service.NewModelResolver(aiProviderRepo, aiSettingsRepo, convRepo, triggerRepo, registry)

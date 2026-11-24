@@ -3,13 +3,16 @@ package adkengine_test
 import (
 	"context"
 	"encoding/json"
+	"github.com/andrevmp/vito/backend/internal/bots"
+	"github.com/andrevmp/vito/backend/internal/calendar"
+	"github.com/andrevmp/vito/backend/internal/tasks"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/ai/adkengine"
-	"github.com/andrevmp/vito/backend/internal/database"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/andrevmp/vito/backend/internal/service"
@@ -17,7 +20,7 @@ import (
 )
 
 type testAC03CalSvc struct {
-	svc *service.CalendarService
+	svc *calendar.CalendarService
 }
 
 func (a *testAC03CalSvc) GetEvents(ctx context.Context, userID string, start, end time.Time) ([]*domain.Event, error) {
@@ -59,7 +62,7 @@ func (a *testAC03CalSvc) DeleteEvent(ctx context.Context, id, userID string) err
 }
 
 type testAC03BookingSvc struct {
-	svc *service.BookingService
+	svc *calendar.BookingService
 }
 
 func (a *testAC03BookingSvc) ListBookingTypes(ctx context.Context, userID string) ([]*domain.BookingType, error) {
@@ -84,7 +87,7 @@ func (a *testAC03BookingSvc) CreateBookingType(ctx context.Context, userID strin
 }
 
 type testAC03TriggerSvc struct {
-	svc *service.TriggerService
+	svc *bots.TriggerService
 }
 
 func (a *testAC03TriggerSvc) ListTriggers(userID string) ([]*domain.Trigger, error) {
@@ -145,19 +148,19 @@ func TestAC03_ChatToolsReturnRealTypedEntitiesAndCards(t *testing.T) {
 
 	aiSettingsRepo := repository.NewAISettingsRepository(db)
 	convRepo := repository.NewConversationStoreRepository(db)
-	todoSvc := service.NewTodoService(repository.NewTodoRepository(db))
-	eventRepo := repository.NewEventRepository(db)
-	calSvc := service.NewCalendarService(eventRepo)
-	bookingSvc := service.NewBookingService(repository.NewBookingRepositorySQLite(db), eventRepo, userRepo, nil, nil, nil, "https://vito.local")
-	triggerSvc := service.NewTriggerService(repository.NewTriggerRepository(db))
+	todoSvc := tasks.NewTodoService(tasks.NewTodoRepository(db))
+	eventRepo := calendar.NewEventRepository(db)
+	calSvc := calendar.NewCalendarService(eventRepo)
+	bookingSvc := calendar.NewBookingService(calendar.NewBookingRepositorySQLite(db), eventRepo, userRepo, nil, nil, nil, "https://vito.local")
+	triggerSvc := bots.NewTriggerService(bots.NewTriggerRepository(db))
 	confGate := service.NewConfirmationGateService(db)
 	scopeGuard := service.NewScopeGuard()
 
 	reg := toolsets.NewToolsetsRegistry()
-	reg.Register(toolsets.NewTaskPendingToolset(&testAC01TodoSvc{svc: todoSvc}))
-	reg.Register(toolsets.NewCalendarToolset(&testAC03CalSvc{svc: calSvc}))
-	reg.Register(toolsets.NewMeetingBookingToolset(&testAC03BookingSvc{svc: bookingSvc}))
-	reg.Register(toolsets.NewBotTriggerToolset(&testAC03TriggerSvc{svc: triggerSvc}))
+	reg.Register(tasks.NewTaskPendingToolset(&testAC01TodoSvc{svc: todoSvc}))
+	reg.Register(calendar.NewCalendarToolset(&testAC03CalSvc{svc: calSvc}))
+	reg.Register(calendar.NewMeetingBookingToolset(&testAC03BookingSvc{svc: bookingSvc}))
+	reg.Register(bots.NewBotTriggerToolset(&testAC03TriggerSvc{svc: triggerSvc}))
 
 	ctx := context.Background()
 
@@ -347,5 +350,15 @@ func TestAC03_ChatToolsReturnRealTypedEntitiesAndCards(t *testing.T) {
 	rawJSON, _ := json.Marshal(confirmed)
 	if confirmed.Todo == nil || confirmed.Todo.ID == "" || len(confirmed.Cards) == 0 {
 		t.Fatalf("AC-03 confirmação HITL deveria retornar Todo real e Cards: %s", string(rawJSON))
+	}
+
+	// Regressão: bot_create_bot com goal vazio faz fallback para title e não falha no TriggerService
+	ts, ok := reg.Get(domain.ToolsetRadarTrigger)
+	if !ok || ts == nil {
+		t.Fatalf("ToolsetRadarTrigger não registrado")
+	}
+	botRes, botErr := ts.Execute(ctx, &domain.ToolExecutionContext{UserID: userID}, "create_bot", json.RawMessage(`{"title":"Rastreador Poco x8 Pro"}`))
+	if botErr != nil || botRes == nil || botRes.Status != "COMPLETED" {
+		t.Fatalf("create_bot com fallback de goal deveria concluir, obteve res=%+v err=%v", botRes, botErr)
 	}
 }

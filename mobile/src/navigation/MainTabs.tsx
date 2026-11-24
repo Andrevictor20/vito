@@ -14,20 +14,20 @@ import { HeaderRoundButton, SubScreenHeader } from '../components/common/Header'
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { api } from '../services/api';
-import { notificationsInboxStore } from '../services/notificationsInboxStore';
+import { notificationsInboxStore } from '../features/notifications/services/notificationsInboxStore';
 import { chatPromptBus, dataSync, tabNavigationBus } from '../services/dataSync';
-import { BookingScreen } from '../screens/BookingScreen';
-import { ChatScreenRef } from '../screens/ChatScreen';
-import { FinanceScreen } from '../screens/FinanceScreen';
-import { NotificationsScreen } from '../screens/NotificationsScreen';
-import { ProfileScreen } from '../screens/ProfileScreen';
+import { BookingScreen } from '../features/calendar/screens/BookingScreen';
+import { ChatScreenRef } from '../features/chat/screens/ChatScreen';
+import { FinanceScreen } from '../features/finance/screens/FinanceScreen';
+import { NotificationsScreen } from '../features/notifications/screens/NotificationsScreen';
+import { ProfileScreen } from '../features/profile/screens/ProfileScreen';
 import { hapticFeedback } from '../theme/motion';
 import { SectionTransition } from '../ds/SectionTransition';
 import {
   VfxCelebrationOverlay,
   useReduceMotion,
 } from '../theme/vitoMotion';
-import { determineBackAction, type MainTabType } from '../utils/pagerNavigation';
+import { determineBackAction, type MainTabType } from '../utils/navigation/pagerNavigation';
 import { AgendaTabScreen } from './AgendaTabScreen';
 import { useHomeDataContext } from './HomeDataProvider';
 import {

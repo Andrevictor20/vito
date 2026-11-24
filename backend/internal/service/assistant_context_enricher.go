@@ -43,10 +43,25 @@ type AssistantContextEnricher struct {
 	hierarchyRepo   *repository.MemoryHierarchyRepository
 	entityLinkRepo  *repository.EntityLinkRepository
 	financeProvider FinanceSnapshotProvider
-	calSvc          *CalendarService
-	todoSvc         *TodoService
-	triggerSvc      *TriggerService
+	calSvc          CalendarContextLister
+	todoSvc         TodoContextLister
+	triggerSvc      ActiveTriggerLister
 	level1Timeout   time.Duration
+}
+
+// CalendarContextLister lista eventos de agenda para enriquecimento de contexto.
+type CalendarContextLister interface {
+	ListEvents(userID string, start, end time.Time) ([]domain.Event, error)
+}
+
+// TodoContextLister lista tarefas pendentes para enriquecimento de contexto.
+type TodoContextLister interface {
+	ListTodos(userID string, status domain.TodoStatus) ([]domain.Todo, error)
+}
+
+// ActiveTriggerLister lista gatilhos/bots ativos para enriquecimento de contexto.
+type ActiveTriggerLister interface {
+	ListTriggers(userID string, category domain.TriggerCategory, status domain.TriggerStatus) ([]domain.Trigger, error)
 }
 
 // NewAssistantContextEnricher instancia o enriquecedor de contexto do agente.
@@ -55,9 +70,9 @@ func NewAssistantContextEnricher(
 	aiSettingsRepo domain.AISettingsRepository,
 	coreProfileRepo domain.CoreProfileRepository,
 	memoryRepo domain.MemoryRepository,
-	calSvc *CalendarService,
-	todoSvc *TodoService,
-	triggerSvc *TriggerService,
+	calSvc CalendarContextLister,
+	todoSvc TodoContextLister,
+	triggerSvc ActiveTriggerLister,
 ) *AssistantContextEnricher {
 	return &AssistantContextEnricher{
 		userRepo:        userRepo,

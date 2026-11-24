@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/andrevmp/vito/backend/internal/ai/byok"
 	"io"
 	"iter"
 	"net/http"
@@ -15,8 +16,6 @@ import (
 
 	"google.golang.org/adk/v2/model"
 	"google.golang.org/genai"
-
-	"github.com/andrevmp/vito/backend/internal/ai"
 )
 
 const (
@@ -27,6 +26,7 @@ const (
 
 // AnthropicOption configura o adaptador AnthropicLLM.
 type AnthropicOption func(*AnthropicLLM)
+
 // WithAnthropicBaseURL define a URL base da API Anthropic (útil para testes e proxies).
 func WithAnthropicBaseURL(baseURL string) AnthropicOption {
 	return func(a *AnthropicLLM) {
@@ -35,6 +35,7 @@ func WithAnthropicBaseURL(baseURL string) AnthropicOption {
 		}
 	}
 }
+
 // WithAnthropicHTTPClient injeta um *http.Client customizado.
 func WithAnthropicHTTPClient(client *http.Client) AnthropicOption {
 	return func(a *AnthropicLLM) {
@@ -43,11 +44,13 @@ func WithAnthropicHTTPClient(client *http.Client) AnthropicOption {
 		}
 	}
 }
+
 // AnthropicLLM implementa google.golang.org/adk/v2/model.LLM sobre a API Messages da Anthropic.
 type AnthropicLLM struct {
 	modelID, apiKey, baseURL string
 	client                   *http.Client
 }
+
 // NewAnthropicLLM cria um adaptador model.LLM nativo para Claude (Anthropic /v1/messages).
 func NewAnthropicLLM(modelID, apiKey string, opts ...AnthropicOption) *AnthropicLLM {
 	llm := &AnthropicLLM{modelID: strings.TrimSpace(modelID), apiKey: strings.TrimSpace(apiKey), baseURL: defaultAnthropicBaseURL, client: &http.Client{Timeout: 60 * time.Second}}
@@ -58,8 +61,10 @@ func NewAnthropicLLM(modelID, apiKey string, opts ...AnthropicOption) *Anthropic
 	}
 	return llm
 }
+
 // Name retorna o identificador do modelo configurado.
 func (a *AnthropicLLM) Name() string { return a.modelID }
+
 type anthropicMessage struct {
 	Role    string           `json:"role"`
 	Content []anthropicBlock `json:"content"`
@@ -77,6 +82,7 @@ type anthropicBlock struct {
 	IsError   bool              `json:"is_error,omitempty"`
 	Source    map[string]string `json:"source,omitempty"`
 }
+
 // GenerateContent executa a chamada síncrona ou SSE streaming contra /v1/messages.
 func (a *AnthropicLLM) GenerateContent(ctx context.Context, req *model.LLMRequest, stream bool) iter.Seq2[*model.LLMResponse, error] {
 	return func(yield func(*model.LLMResponse, error) bool) {
@@ -298,7 +304,7 @@ func (a *AnthropicLLM) parseSyncResponse(body io.Reader) (*model.LLMResponse, er
 }
 
 type anthropicStreamBlock struct {
-	blockType, id, name         string
+	blockType, id, name       string
 	text, signature, jsonArgs strings.Builder
 }
 
@@ -325,8 +331,12 @@ type anthropicSSEEvent struct {
 		PartialJSON string `json:"partial_json"`
 		StopReason  string `json:"stop_reason"`
 	} `json:"delta"`
-	Usage struct{ OutputTokens int `json:"output_tokens"` } `json:"usage"`
-	Error struct{ Message string `json:"message"` }      `json:"error"`
+	Usage struct {
+		OutputTokens int `json:"output_tokens"`
+	} `json:"usage"`
+	Error struct {
+		Message string `json:"message"`
+	} `json:"error"`
 }
 
 func (a *AnthropicLLM) consumeStream(body io.Reader, meta *TurnExecutionMeta, yield func(*model.LLMResponse, error) bool) {
@@ -362,7 +372,7 @@ func (a *AnthropicLLM) consumeStream(body io.Reader, meta *TurnExecutionMeta, yi
 		}
 		switch ev.Type {
 		case "error":
-			yield(nil, &ProviderHTTPError{Provider: "anthropic", StatusCode: 502, Body: ai.RedactSecrets(ev.Error.Message)})
+			yield(nil, &ProviderHTTPError{Provider: "anthropic", StatusCode: 502, Body: byok.RedactSecrets(ev.Error.Message)})
 			return
 		case "message_start":
 			modelVersion, inTokens = ev.Message.Model, ev.Message.Usage.InputTokens

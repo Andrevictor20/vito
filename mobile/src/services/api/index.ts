@@ -2,23 +2,23 @@ import { ApiClient, PI_SERVER_URL, CLOUDFLARE_SERVER_URL, DEFAULT_SERVER_URL, is
 import { fileUriToBase64 } from './fileUtils';
 import { ApiRequestOptions, ChatHistoryItem, AssistantChatOptions } from './types';
 import { AuthApi } from './authApi';
-import { CalendarApi } from './calendarApi';
-import { TodosApi } from './todosApi';
-import { ChatApi, ChatStreamDelta } from './chatApi';
-import { PendingApi } from './pendingApi';
-import { BookingApi } from './bookingApi';
-import { MeetingsApi } from './meetingsApi';
-import { P2PMeetingsApi } from './p2pMeetingsApi';
-import { NotificationsApi } from './notificationsApi';
-import { WhatsAppApi, WhatsAppIntegrationStatus } from './whatsappApi';
-import { WhatsAppContextApi, WhatsAppContextScope, WhatsAppContextSettings, WhatsAppContextPreview, WhatsAppDirectory, WhatsAppMediaStatus } from './whatsappContextApi';
-import { GmailApi, GmailStatusResponse, GmailScanResult, GmailDraftInput, GmailDraftResponse, GmailSendResponse, ScannedBill, ScannedFlight, UrgentEmail } from './gmailApi';
-import { WhatsAppAuthApi, RequestWhatsAppOTPResponse, VerifyWhatsAppOTPResponse } from './whatsappAuthApi';
-import { FinanceApi } from './financeApi';
-import { AiProvidersApi } from './aiProvidersApi';
-import { BotsApi } from './botsApi';
-import { InboxNotificationsApi } from './inboxNotificationsApi';
-import { StoreComplianceApi } from './storeComplianceApi';
+import { CalendarApi } from '../../features/calendar/services/calendarApi';
+import { TodosApi } from '../../features/tasks/services/todosApi';
+import { ChatApi, ChatStreamDelta } from '../../features/chat/services/chatApi';
+import { PendingApi } from '../../features/tasks/services/pendingApi';
+import { BookingApi } from '../../features/calendar/services/bookingApi';
+import { MeetingsApi } from '../../features/calendar/services/meetingsApi';
+import { P2PMeetingsApi } from '../../features/calendar/services/p2pMeetingsApi';
+import { NotificationsApi } from '../../features/notifications/services/notificationsApi';
+import { WhatsAppApi, WhatsAppIntegrationStatus } from '../../features/profile/services/whatsappApi';
+import { WhatsAppContextApi, WhatsAppContextScope, WhatsAppContextSettings, WhatsAppContextPreview, WhatsAppDirectory, WhatsAppMediaStatus } from '../../features/profile/services/whatsappContextApi';
+import { GmailApi, GmailStatusResponse, GmailScanResult, GmailDraftInput, GmailDraftResponse, GmailSendResponse, ScannedBill, ScannedFlight, UrgentEmail } from '../../features/profile/services/gmailApi';
+import { WhatsAppAuthApi, RequestWhatsAppOTPResponse, VerifyWhatsAppOTPResponse } from '../../features/profile/services/whatsappAuthApi';
+import { FinanceApi } from '../../features/finance/services/financeApi';
+import { AiProvidersApi } from '../../features/profile/services/aiProvidersApi';
+import { BotsApi } from '../../features/bots/services/botsApi';
+import { InboxNotificationsApi } from '../../features/notifications/services/inboxNotificationsApi';
+import { StoreComplianceApi } from '../../features/store/services/storeComplianceApi';
 import type {
   ActionPolicy,
   Bot,
@@ -32,8 +32,8 @@ import type {
   PendingResolutionDecision,
   SkillPackage,
   UpdateBotPayload,
-} from '../../types/bots';
-import { FinancialSummary, FinanceAccount, FinanceConnection, FinanceTransaction, FinanceAlert, CategorySpendItem, SubscriptionItem, FinanceSyncPayload, FinanceConnectTokenResponse } from '../../types/finance';
+} from '../../features/bots/types/bots';
+import { FinancialSummary, FinanceAccount, FinanceConnection, FinanceTransaction, FinanceAlert, CategorySpendItem, SubscriptionItem, FinanceSyncPayload, FinanceConnectTokenResponse } from '../../features/finance/types/finance';
 import {
   User, AuthResponse, Event, Todo, Subtask, AssistantChatResponse, ConflictInfo, Trigger, TriggerCategory,
   TriggerLog, TriggerTestResult, TriggerStatus, CreateTriggerInput, TriggerTemplate, MorningBriefingSettings,
@@ -365,7 +365,7 @@ export class ApiService extends ApiClient {
   requestWhatsAppPairingCode = (phone: string): Promise<{ pairing_code: string; status: string }> =>
     this.whatsappApi.requestPairingCode(phone);
   disconnectWhatsApp = (): Promise<{ message: string; status: string }> => this.whatsappApi.disconnect();
-  getWhatsAppContacts = (): Promise<{ contacts: import('./whatsappApi').WhatsAppMatchedContact[]; count: number }> =>
+  getWhatsAppContacts = (): Promise<{ contacts: import('../../features/profile/services/whatsappApi').WhatsAppMatchedContact[]; count: number }> =>
     this.whatsappApi.getContacts();
   getWhatsAppContextSettings = (): Promise<WhatsAppContextSettings> => this.whatsappContextApi.getSettings();
   getWhatsAppContextPreview = (): Promise<WhatsAppContextPreview> => this.whatsappContextApi.getPreview();

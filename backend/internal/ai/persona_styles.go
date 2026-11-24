@@ -8,12 +8,12 @@ import (
 
 // PersonaStyleConfig define as regras de calibração para cada estilo do Vito.
 type PersonaStyleConfig struct {
-	Style            PersonaStyle
-	Name             string
-	Description      string
-	ToneDirective    string
-	EmojiPolicy      string
-	FormattingRule   string
+	Style          PersonaStyle
+	Name           string
+	Description    string
+	ToneDirective  string
+	EmojiPolicy    string
+	FormattingRule string
 }
 
 // GetPersonaStyleConfig retorna a configuração completa para o estilo solicitado.

@@ -4,14 +4,14 @@ import { api } from '../../services/api';
 import {
   DEFAULT_NOTIFICATION_PREFS,
   NotificationCategoryPreferences,
-} from '../../services/api/inboxNotificationsApi';
+} from '../../services/api/notifications/inboxNotificationsApi';
 import {
   BillingCycle,
   DEFAULT_PRIVACY_SETTINGS,
   PrivacyPermissionsState,
   PrivacySettingsState,
   UserSubscriptionState,
-} from '../../services/api/storeComplianceApi';
+} from '../../services/api/system/storeComplianceApi';
 import {
   DEVICE_PERMISSION_ROWS,
   formatBrl,

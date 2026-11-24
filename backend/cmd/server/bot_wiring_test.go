@@ -1,11 +1,12 @@
 package main
 
 import (
+	"github.com/andrevmp/vito/backend/internal/bots"
 	"path/filepath"
 	"testing"
 
-	"github.com/andrevmp/vito/backend/internal/config"
-	"github.com/andrevmp/vito/backend/internal/database"
+	"github.com/andrevmp/vito/backend/internal/platform/config"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/repository"
 )
 
@@ -22,7 +23,7 @@ func TestSetupBotSubsystem_Wiring(t *testing.T) {
 	}
 	userRepo := repository.NewUserRepository(db)
 	aiSettingsRepo := repository.NewAISettingsRepository(db)
-	triggerRepo := repository.NewTriggerRepository(db)
+	triggerRepo := bots.NewTriggerRepository(db)
 	memoryRepo := repository.NewMemoryRepository(db)
 
 	agentSys := setupAgentSubsystem(cfg, db, nil, nil, nil, nil, userRepo, aiSettingsRepo, nil, nil, memoryRepo)

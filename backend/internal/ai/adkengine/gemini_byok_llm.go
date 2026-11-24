@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/andrevmp/vito/backend/internal/ai/byok"
 	"io"
 	"iter"
 	"net/http"
@@ -14,8 +15,6 @@ import (
 	"google.golang.org/adk/v2/model"
 	"google.golang.org/adk/v2/model/gemini"
 	"google.golang.org/genai"
-
-	"github.com/andrevmp/vito/backend/internal/ai"
 )
 
 // ProviderHTTPError representa uma falha HTTP retornada por um provedor externo com corpo redigido.
@@ -46,12 +45,12 @@ func doProviderJSONPost(ctx context.Context, client *http.Client, provider, endp
 	}
 	resp, err := client.Do(httpReq)
 	if err != nil {
-		return nil, fmt.Errorf("falha de rede %s: %s", provider, ai.RedactSecrets(err.Error()))
+		return nil, fmt.Errorf("falha de rede %s: %s", provider, byok.RedactSecrets(err.Error()))
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		defer resp.Body.Close()
 		b, _ := io.ReadAll(io.LimitReader(resp.Body, 32*1024))
-		return nil, &ProviderHTTPError{Provider: provider, StatusCode: resp.StatusCode, Body: ai.RedactSecrets(strings.TrimSpace(string(b)))}
+		return nil, &ProviderHTTPError{Provider: provider, StatusCode: resp.StatusCode, Body: byok.RedactSecrets(strings.TrimSpace(string(b)))}
 	}
 	return resp.Body, nil
 }
@@ -116,8 +115,10 @@ func effectiveModelName(req *model.LLMRequest, fallback string) string {
 	}
 	return fallback
 }
+
 // GeminiBYOKOption configura opções adicionais para o adaptador GeminiBYOKLLM.
 type GeminiBYOKOption func(*genai.ClientConfig)
+
 // WithGeminiHTTPClient injeta um *http.Client customizado no ClientConfig do GenAI.
 func WithGeminiHTTPClient(client *http.Client) GeminiBYOKOption {
 	return func(cfg *genai.ClientConfig) {
@@ -126,6 +127,7 @@ func WithGeminiHTTPClient(client *http.Client) GeminiBYOKOption {
 		}
 	}
 }
+
 // WithGeminiBaseURL sobrescreve a URL base do SDK GenAI (útil para testes contra httptest.Server).
 func WithGeminiBaseURL(baseURL string) GeminiBYOKOption {
 	return func(cfg *genai.ClientConfig) {
@@ -134,11 +136,13 @@ func WithGeminiBaseURL(baseURL string) GeminiBYOKOption {
 		}
 	}
 }
+
 // GeminiBYOKLLM encapsula o adaptador oficial google.golang.org/adk/v2/model/gemini.NewModel.
 type GeminiBYOKLLM struct {
 	modelID string
 	inner   model.LLM
 }
+
 // NewGeminiBYOKLLM instancia um model.LLM Gemini com a chave de API do usuário.
 func NewGeminiBYOKLLM(ctx context.Context, modelID, apiKey string, opts ...GeminiBYOKOption) (*GeminiBYOKLLM, error) {
 	cleanModel, cleanKey := strings.TrimSpace(modelID), strings.TrimSpace(apiKey)
@@ -157,8 +161,10 @@ func NewGeminiBYOKLLM(ctx context.Context, modelID, apiKey string, opts ...Gemin
 	}
 	return &GeminiBYOKLLM{modelID: cleanModel, inner: inner}, nil
 }
+
 // Name retorna o identificador do modelo Gemini configurado.
 func (g *GeminiBYOKLLM) Name() string { return g.inner.Name() }
+
 // GenerateContent delega ao modelo Gemini oficial do ADK v2 normalizando erros HTTP e telemetria.
 func (g *GeminiBYOKLLM) GenerateContent(ctx context.Context, req *model.LLMRequest, stream bool) iter.Seq2[*model.LLMResponse, error] {
 	return func(yield func(*model.LLMResponse, error) bool) {
@@ -168,11 +174,11 @@ func (g *GeminiBYOKLLM) GenerateContent(ctx context.Context, req *model.LLMReque
 				var apiErr genai.APIError
 				var apiErrPtr *genai.APIError
 				if errors.As(err, &apiErr) && apiErr.Code > 0 {
-					yield(nil, &ProviderHTTPError{Provider: "google", StatusCode: apiErr.Code, Body: ai.RedactSecrets(apiErr.Message)})
+					yield(nil, &ProviderHTTPError{Provider: "google", StatusCode: apiErr.Code, Body: byok.RedactSecrets(apiErr.Message)})
 				} else if errors.As(err, &apiErrPtr) && apiErrPtr != nil && apiErrPtr.Code > 0 {
-					yield(nil, &ProviderHTTPError{Provider: "google", StatusCode: apiErrPtr.Code, Body: ai.RedactSecrets(apiErrPtr.Message)})
+					yield(nil, &ProviderHTTPError{Provider: "google", StatusCode: apiErrPtr.Code, Body: byok.RedactSecrets(apiErrPtr.Message)})
 				} else {
-					yield(nil, errors.New(ai.RedactSecrets(err.Error())))
+					yield(nil, errors.New(byok.RedactSecrets(err.Error())))
 				}
 				return
 			}

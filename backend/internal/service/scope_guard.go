@@ -91,21 +91,21 @@ func resolveBotOperationPolicy(policies map[string]domain.ActionPolicy, operatio
 		return p, true
 	}
 	opToKeys := map[string][]string{
-		"list_events":    {"free", "gcal:free", "cal:list"},
+		"list_events":     {"free", "gcal:free", "cal:list"},
 		"check_conflicts": {"free", "gcal:free", "cal:list"},
-		"create_event":   {"evt", "gcal:evt", "cal:create"},
-		"create_todo":    {"task", "vito:task", "todo:create"},
-		"list_todos":     {"task", "vito:task", "todo:list"},
+		"create_event":    {"evt", "gcal:evt", "cal:create"},
+		"create_todo":     {"task", "vito:task", "todo:create"},
+		"list_todos":      {"task", "vito:task", "todo:list"},
 		"search_messages": {"waread", "wa:waread"},
-		"recent_chats":   {"waread", "wa:waread"},
-		"send_message":   {"wasend", "wa:wasend"},
-		"search_emails":  {"mailr", "gmail:mailr"},
-		"scan_emails":    {"mailr", "gmail:mailr"},
-		"create_draft":   {"draft", "gmail:draft"},
-		"send_email":     {"mailsend", "gmail:mailsend"},
-		"search":         {"search", "web:search"},
-		"read_page":      {"search", "web:search", "web:read"},
-		"get_summary":    {"spend", "fin:spend", "fin:summary"},
+		"recent_chats":    {"waread", "wa:waread"},
+		"send_message":    {"wasend", "wa:wasend"},
+		"search_emails":   {"mailr", "gmail:mailr"},
+		"scan_emails":     {"mailr", "gmail:mailr"},
+		"create_draft":    {"draft", "gmail:draft"},
+		"send_email":      {"mailsend", "gmail:mailsend"},
+		"search":          {"search", "web:search"},
+		"read_page":       {"search", "web:search", "web:read"},
+		"get_summary":     {"spend", "fin:spend", "fin:summary"},
 	}
 	for _, k := range opToKeys[operation] {
 		if p, ok := policies[k]; ok {

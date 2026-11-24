@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/andrevmp/vito/backend/internal/calendar"
+	"github.com/andrevmp/vito/backend/internal/tasks"
+	"github.com/andrevmp/vito/backend/internal/whatsapp"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -15,7 +18,7 @@ import (
 
 	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/ai/adkengine"
-	"github.com/andrevmp/vito/backend/internal/database"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/andrevmp/vito/backend/internal/service"
@@ -214,9 +217,9 @@ func TestAC03_COG03_ToolsetBridgeAndMultiAgentTopologyAndSession(t *testing.T) {
 
 	// 2. Verifica ToolsetBridge gerando functiontools atômicas sem envelope polimórfico
 	registry := toolsets.NewToolsetsRegistry()
-	registry.Register(toolsets.NewCalendarToolset(nil))
-	registry.Register(toolsets.NewTaskPendingToolset(nil))
-	registry.Register(toolsets.NewWhatsAppToolset(nil))
+	registry.Register(calendar.NewCalendarToolset(nil))
+	registry.Register(tasks.NewTaskPendingToolset(nil))
+	registry.Register(whatsapp.NewWhatsAppToolset(nil))
 	registry.Register(toolsets.NewGmailToolset(nil))
 	registry.Register(toolsets.NewSearchToolset())
 

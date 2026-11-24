@@ -18,12 +18,12 @@ type mockAgentProvider struct {
 	maxContextTokens int
 }
 
-func (m *mockAgentProvider) Name() string             { return m.name }
-func (m *mockAgentProvider) ModelName() string        { return m.modelName }
-func (m *mockAgentProvider) QualityTier() int         { return m.tier }
-func (m *mockAgentProvider) SupportsTools() bool      { return m.supportsTools }
-func (m *mockAgentProvider) SupportsVision() bool     { return m.supportsVision }
-func (m *mockAgentProvider) MaxContextTokens() int    { return m.maxContextTokens }
+func (m *mockAgentProvider) Name() string          { return m.name }
+func (m *mockAgentProvider) ModelName() string     { return m.modelName }
+func (m *mockAgentProvider) QualityTier() int      { return m.tier }
+func (m *mockAgentProvider) SupportsTools() bool   { return m.supportsTools }
+func (m *mockAgentProvider) SupportsVision() bool  { return m.supportsVision }
+func (m *mockAgentProvider) MaxContextTokens() int { return m.maxContextTokens }
 func (m *mockAgentProvider) Chat(ctx context.Context, req AgentChatRequest) (*AgentChatResponse, error) {
 	return &AgentChatResponse{Text: "mock reply", ProviderName: m.name, ModelName: m.modelName}, nil
 }

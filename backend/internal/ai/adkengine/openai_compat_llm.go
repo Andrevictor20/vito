@@ -19,7 +19,8 @@ import (
 
 // OpenAICompatOption configura o adaptador OpenAICompatLLM.
 type OpenAICompatOption func(*OpenAICompatLLM)
-// WithOpenAIHTTPClient injeta um *http.Client (ex.: ai.NewSafeHTTPClient para custom).
+
+// WithOpenAIHTTPClient injeta um *http.Client (ex.: byok.NewSafeHTTPClient para custom).
 func WithOpenAIHTTPClient(client *http.Client) OpenAICompatOption {
 	return func(o *OpenAICompatLLM) {
 		if client != nil {
@@ -27,14 +28,17 @@ func WithOpenAIHTTPClient(client *http.Client) OpenAICompatOption {
 		}
 	}
 }
+
 // WithOpenAISupportsReasoning habilita o envio de parâmetros de raciocínio (low/medium/high).
 func WithOpenAISupportsReasoning(enabled bool) OpenAICompatOption {
 	return func(o *OpenAICompatLLM) { o.supportsReasoning = enabled }
 }
+
 // WithOpenAISupportsTools habilita ou desabilita o envio de declarações de ferramentas.
 func WithOpenAISupportsTools(enabled bool) OpenAICompatOption {
 	return func(o *OpenAICompatLLM) { o.supportsTools = enabled }
 }
+
 // WithOpenAIHeaders adiciona cabeçalhos extras (ex.: HTTP-Referer / X-Title para OpenRouter).
 func WithOpenAIHeaders(headers map[string]string) OpenAICompatOption {
 	return func(o *OpenAICompatLLM) {
@@ -45,6 +49,7 @@ func WithOpenAIHeaders(headers map[string]string) OpenAICompatOption {
 		}
 	}
 }
+
 // OpenAICompatLLM implementa google.golang.org/adk/v2/model.LLM sobre endpoints /chat/completions.
 type OpenAICompatLLM struct {
 	providerKey, modelID, baseURL, apiKey string
@@ -52,6 +57,7 @@ type OpenAICompatLLM struct {
 	extraHeaders                          map[string]string
 	client                                *http.Client
 }
+
 // NewOpenAICompatLLM cria um adaptador model.LLM compatível com OpenAI/Groq/OpenRouter/Custom.
 func NewOpenAICompatLLM(providerKey, modelID, baseURL, apiKey string, opts ...OpenAICompatOption) *OpenAICompatLLM {
 	llm := &OpenAICompatLLM{
@@ -66,8 +72,10 @@ func NewOpenAICompatLLM(providerKey, modelID, baseURL, apiKey string, opts ...Op
 	}
 	return llm
 }
+
 // Name retorna o identificador do modelo configurado.
 func (o *OpenAICompatLLM) Name() string { return o.modelID }
+
 type oaiCompatMessage struct {
 	Role       string              `json:"role"`
 	Content    any                 `json:"content,omitempty"`

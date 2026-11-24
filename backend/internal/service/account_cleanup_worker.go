@@ -7,10 +7,15 @@ import (
 	"time"
 )
 
+// WhatsAppContextPruner remove mensagens antigas do shadow inbox do WhatsApp.
+type WhatsAppContextPruner interface {
+	PruneOlderThan(ctx context.Context, cutoff time.Time) (int64, error)
+}
+
 // AccountCleanupWorker executa periodicamente a limpeza de contas placeholder órfãs.
 type AccountCleanupWorker struct {
 	cleanupSvc    *AccountCleanupService
-	contextSvc    *WhatsAppContextService
+	contextSvc    WhatsAppContextPruner
 	retentionDays int
 	checkInterval time.Duration
 	stopCh        chan struct{}
@@ -34,7 +39,7 @@ func NewAccountCleanupWorker(cleanupSvc *AccountCleanupService, checkInterval ..
 
 // SetContextService injeta o serviço de contexto do WhatsApp para podar o shadow inbox.
 // Reutiliza o mesmo ticker de 15 min, sem criar uma goroutine nova.
-func (w *AccountCleanupWorker) SetContextService(contextSvc *WhatsAppContextService, retentionDays int) {
+func (w *AccountCleanupWorker) SetContextService(contextSvc WhatsAppContextPruner, retentionDays int) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	w.contextSvc = contextSvc

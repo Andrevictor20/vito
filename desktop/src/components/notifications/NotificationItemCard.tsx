@@ -4,7 +4,7 @@ import { BotMascotRig } from '../bots/BotMascotRig';
 import type {
   InboxNotification,
   InboxNotificationAction,
-} from '../../services/api/inboxNotificationsApi';
+} from '../../services/api/notifications/inboxNotificationsApi';
 
 interface NotificationItemCardProps {
   item: InboxNotification;

@@ -133,11 +133,11 @@ type SupportRequest struct {
 
 // LGPDExportBundle agrupa os dados portáveis do usuário autenticado.
 type LGPDExportBundle struct {
-	RequestID               string                   `json:"request_id"`
-	Kind                    ComplianceRequestKind    `json:"kind"`
-	Status                  string                   `json:"status"`
-	ExportedAt              time.Time                `json:"exported_at"`
-	Data                    LGPDExportData           `json:"data"`
+	RequestID  string                `json:"request_id"`
+	Kind       ComplianceRequestKind `json:"kind"`
+	Status     string                `json:"status"`
+	ExportedAt time.Time             `json:"exported_at"`
+	Data       LGPDExportData        `json:"data"`
 }
 
 // LGPDExportData contém todas as coleções do usuário sem campos sensíveis (ex.: password_hash).

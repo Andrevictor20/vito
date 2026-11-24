@@ -1,13 +1,15 @@
 package repository_test
 
 import (
+	"github.com/andrevmp/vito/backend/internal/bots"
+	"github.com/andrevmp/vito/backend/internal/tasks"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/andrevmp/vito/backend/internal/database"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/repository"
 )
@@ -23,7 +25,7 @@ func TestTodoRepository_BatchSubtasksInListByUserAndListPaged(t *testing.T) {
 	userRepo := repository.NewUserRepository(db)
 	_ = userRepo.Create(&domain.User{ID: "u-pkg2-1", Name: "Tester", Email: "pkg2@test.com", PasswordHash: "x"})
 
-	todoRepo := repository.NewTodoRepository(db)
+	todoRepo := tasks.NewTodoRepository(db)
 	now := time.Now().UTC()
 
 	for i, id := range []string{"td-1", "td-2", "td-3"} {
@@ -94,7 +96,7 @@ func TestTriggerRepository_ListUnreadLogsByTriggerIDs(t *testing.T) {
 	userRepo := repository.NewUserRepository(db)
 	_ = userRepo.Create(&domain.User{ID: "u-pkg2-2", Name: "RadarUser", Email: "radar@test.com", PasswordHash: "x"})
 
-	trigRepo := repository.NewTriggerRepository(db)
+	trigRepo := bots.NewTriggerRepository(db)
 	now := time.Now().UTC()
 
 	for _, id := range []string{"tr-1", "tr-2"} {

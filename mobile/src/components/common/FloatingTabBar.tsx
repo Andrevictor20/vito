@@ -24,7 +24,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { getDockGlassStyle } from '../../theme/surfaces';
 import { MOTION_CURVES, MOTION_DURATIONS, PRESS_SCALE, hapticFeedback } from '../../theme/motion';
 import { useReduceMotion } from '../../theme/vitoMotion';
-import type { MainTabType } from '../../utils/pagerNavigation';
+import type { MainTabType } from '../../utils/navigation/pagerNavigation';
 
 export type DockTabType = 'chat' | 'calendar' | 'tasks' | 'finance' | 'triggers';
 

@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { StyleProp, TouchableOpacity, ViewStyle } from 'react-native';
-import { MascotVectorRig } from '../mascot/MascotVectorRig';
+import { MascotVectorRig } from '../../features/bots/mascot/MascotVectorRig';
 import {
   MascotAnimationState,
   MascotSkin,
   nextHeroAnimState,
   normalizeMascotState,
-} from '../mascot/mascotPalettes';
+} from '../../features/bots/mascot/mascotPalettes';
 
 export interface VitoMascotProps {
   size?: number;

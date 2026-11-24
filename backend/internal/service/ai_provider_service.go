@@ -4,13 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/andrevmp/vito/backend/internal/ai/byok"
 	"io"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/repository"
 )
@@ -49,12 +49,18 @@ type SelectableModelGroup struct {
 	Models      []domain.ProviderModelInfo `json:"models"`
 }
 
+// BotProviderPrefCleaner limpa ou atualiza preferências de provedor/modelo em bots.
+type BotProviderPrefCleaner interface {
+	ClearProviderPrefs(ctx context.Context, userID, providerKey string) error
+	UpdateTriggerModelPref(ctx context.Context, userID, triggerID, modelPref, effortPref string) error
+}
+
 // AIProviderService gerencia conexão, verificação, catálogo de modelos e preferências BYOK.
 type AIProviderService struct {
 	repo             domain.AIProviderRepository
 	settingsRepo     domain.AISettingsRepository
 	convRepo         *repository.ConversationStoreRepository
-	triggerRepo      *repository.TriggerRepositorySQLite
+	triggerRepo      BotProviderPrefCleaner
 	vault            *AIKeyVault
 	registry         *UserProviderRegistry
 	blockedLocalPort int
@@ -70,7 +76,7 @@ func NewAIProviderService(
 	repo domain.AIProviderRepository,
 	settingsRepo domain.AISettingsRepository,
 	convRepo *repository.ConversationStoreRepository,
-	triggerRepo *repository.TriggerRepositorySQLite,
+	triggerRepo BotProviderPrefCleaner,
 	vault *AIKeyVault,
 	registry *UserProviderRegistry,
 	blockedLocalPort int,
@@ -102,7 +108,7 @@ func (s *AIProviderService) Connect(ctx context.Context, userID string, key doma
 		return nil, err
 	}
 	if key == domain.ProviderKeyCustom {
-		if _, err := ai.ValidateCustomBaseURL(baseURL, s.blockedLocalPort); err != nil {
+		if _, err := byok.ValidateCustomBaseURL(baseURL, s.blockedLocalPort); err != nil {
 			return nil, err
 		}
 	}
@@ -316,7 +322,7 @@ func (s *AIProviderService) ListSelectableModels(ctx context.Context, userID str
 }
 
 func (s *AIProviderService) fetchAndVerifyModels(ctx context.Context, key domain.ProviderKey, apiKey, baseURL string) ([]domain.ProviderModelInfo, error) {
-	verifyURL, err := ai.VerifyEndpoint(string(key), baseURL)
+	verifyURL, err := byok.VerifyEndpoint(string(key), baseURL)
 	if err != nil {
 		return nil, err
 	}
@@ -326,20 +332,20 @@ func (s *AIProviderService) fetchAndVerifyModels(ctx context.Context, key domain
 
 	httpReq, err := http.NewRequestWithContext(reqCtx, http.MethodGet, verifyURL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("falha ao montar requisição de verificação: %s", ai.RedactSecrets(err.Error()))
+		return nil, fmt.Errorf("falha ao montar requisição de verificação: %s", byok.RedactSecrets(err.Error()))
 	}
 	applyVerifyAuthHeader(httpReq, key, apiKey)
 
 	client := s.httpClientForVerify(key)
 	resp, err := client.Do(httpReq)
 	if err != nil {
-		return nil, fmt.Errorf("não foi possível conectar ao provedor: %s", ai.RedactSecrets(err.Error()))
+		return nil, fmt.Errorf("não foi possível conectar ao provedor: %s", byok.RedactSecrets(err.Error()))
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(io.LimitReader(resp.Body, ai.DefaultSSRFMaxBodyBytes))
+	body, err := io.ReadAll(io.LimitReader(resp.Body, byok.DefaultSSRFMaxBodyBytes))
 	if err != nil {
-		return nil, fmt.Errorf("falha ao ler resposta do provedor: %s", ai.RedactSecrets(err.Error()))
+		return nil, fmt.Errorf("falha ao ler resposta do provedor: %s", byok.RedactSecrets(err.Error()))
 	}
 
 	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
@@ -347,19 +353,19 @@ func (s *AIProviderService) fetchAndVerifyModels(ctx context.Context, key domain
 		return nil, fmt.Errorf("%w: O %s recusou esta chave. Confira se ela está ativa.", ErrProviderAuthRejected, name)
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("provedor retornou HTTP %d: %s", resp.StatusCode, ai.RedactSecrets(strings.TrimSpace(string(body))))
+		return nil, fmt.Errorf("provedor retornou HTTP %d: %s", resp.StatusCode, byok.RedactSecrets(strings.TrimSpace(string(body))))
 	}
 
-	parsed, err := ai.ParseProviderModels(string(key), body)
+	parsed, err := byok.ParseProviderModels(string(key), body)
 	if err != nil {
-		return nil, fmt.Errorf("falha ao interpretar catálogo de modelos: %s", ai.RedactSecrets(err.Error()))
+		return nil, fmt.Errorf("falha ao interpretar catálogo de modelos: %s", byok.RedactSecrets(err.Error()))
 	}
 	if len(parsed) == 0 && key == domain.ProviderKeyCustom {
 		return nil, errors.New("endpoint compatível respondeu sem nenhum modelo de chat")
 	}
 	out := make([]domain.ProviderModelInfo, 0, len(parsed))
 	for _, pm := range parsed {
-		caps := ai.LookupModelCapabilities(string(key), pm.ID)
+		caps := byok.LookupModelCapabilities(string(key), pm.ID)
 		if pm.QualityTier > 0 {
 			caps.QualityTier = pm.QualityTier
 		}
@@ -385,7 +391,7 @@ func (s *AIProviderService) httpClientForVerify(key domain.ProviderKey) *http.Cl
 		return s.verifyClient
 	}
 	if key == domain.ProviderKeyCustom {
-		return ai.NewSafeHTTPClient(verifyTimeoutSeconds, ai.DefaultSSRFMaxBodyBytes, s.blockedLocalPort)
+		return byok.NewSafeHTTPClient(verifyTimeoutSeconds, byok.DefaultSSRFMaxBodyBytes, s.blockedLocalPort)
 	}
 	return &http.Client{
 		Timeout: verifyTimeoutSeconds,

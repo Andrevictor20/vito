@@ -64,7 +64,7 @@ describe('Onda 3B — Design System literal + ícones + transições', () => {
         .filter((f) => f.endsWith('.ts') || f.endsWith('.tsx'))
       for (const f of files) {
         const content = fs.readFileSync(path.join(srcDir, dir, f), 'utf8')
-        assert.ok(!content.includes('../theme/'), `${dir}/${f} não pode importar ../theme/`)
+        assert.ok(!content.includes('../theme'), `${dir}/${f} não pode importar ../theme/`)
       }
     }
   })

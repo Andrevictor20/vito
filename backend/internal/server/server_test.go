@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"github.com/andrevmp/vito/backend/internal/finance"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -13,7 +14,7 @@ import (
 	"testing"
 
 	"github.com/andrevmp/vito/backend/internal/ai"
-	"github.com/andrevmp/vito/backend/internal/database"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/handler"
 	"github.com/andrevmp/vito/backend/internal/repository"
@@ -92,9 +93,9 @@ func TestFinanceRouting_ByokBackupAndLegacyRemoved(t *testing.T) {
 	userRepo := repository.NewUserRepository(db)
 	authSvc := service.NewAuthService(userRepo, "test-secret")
 	authHandler := handler.NewAuthHandler(authSvc, userRepo)
-	financeRepo := repository.NewFinanceRepository(db)
-	financeSvc := service.NewFinanceService(financeRepo)
-	financeHandler := handler.NewFinanceHandler(financeSvc)
+	financeRepo := finance.NewFinanceRepository(db)
+	financeSvc := finance.NewFinanceService(financeRepo)
+	financeHandler := finance.NewFinanceHandler(financeSvc)
 
 	srv := server.New(server.Config{
 		AuthSvc:        authSvc,

@@ -1,5 +1,5 @@
 import { api } from './api';
-import type { InboxNotification } from './api/inboxNotificationsApi';
+import type { InboxNotification } from './api/notifications/inboxNotificationsApi';
 import type { Meeting, Todo } from '../types';
 
 type UnreadListener = (count: number) => void;

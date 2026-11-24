@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/andrevmp/vito/backend/internal/ai/voice"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -16,7 +17,7 @@ import (
 
 	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/ai/adkengine"
-	"github.com/andrevmp/vito/backend/internal/database"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/handler"
 	"github.com/andrevmp/vito/backend/internal/handler/middleware"
@@ -27,12 +28,12 @@ import (
 
 type testHandlerMockProvider struct{}
 
-func (m *testHandlerMockProvider) Name() string             { return "test-provider" }
-func (m *testHandlerMockProvider) ModelName() string        { return "test-model" }
-func (m *testHandlerMockProvider) SupportsTools() bool      { return true }
-func (m *testHandlerMockProvider) SupportsVision() bool     { return false }
-func (m *testHandlerMockProvider) QualityTier() int         { return 3 }
-func (m *testHandlerMockProvider) MaxContextTokens() int    { return 100000 }
+func (m *testHandlerMockProvider) Name() string          { return "test-provider" }
+func (m *testHandlerMockProvider) ModelName() string     { return "test-model" }
+func (m *testHandlerMockProvider) SupportsTools() bool   { return true }
+func (m *testHandlerMockProvider) SupportsVision() bool  { return false }
+func (m *testHandlerMockProvider) QualityTier() int      { return 3 }
+func (m *testHandlerMockProvider) MaxContextTokens() int { return 100000 }
 func (m *testHandlerMockProvider) Chat(ctx context.Context, req ai.AgentChatRequest) (*ai.AgentChatResponse, error) {
 	return &ai.AgentChatResponse{Text: "Resposta do endpoint", ProviderName: "test-provider", ModelName: "test-model"}, nil
 }
@@ -183,7 +184,7 @@ func TestAssistantStreamHandler_AudioChat_InlineTTSAndContext(t *testing.T) {
 	h.SetTranscriber(&streamMockTranscriber{})
 
 	mockSynth := &streamMockTTSSynthesizer{}
-	ttsSvc := ai.NewTTSService(mockSynth, t.TempDir(), "Puck")
+	ttsSvc := voice.NewTTSService(mockSynth, t.TempDir(), "Puck")
 	h.SetTTSService(ttsSvc)
 
 	bodyBytes, _ := json.Marshal(map[string]any{

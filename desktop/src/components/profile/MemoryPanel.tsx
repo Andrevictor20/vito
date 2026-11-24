@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { api } from '../../services/api';
-import { MemoriesResponse } from '../../services/api/memoriesApi';
+import { MemoriesResponse } from '../../services/api/chat/memoriesApi';
 import { Button } from '../ui/Button';
 
 type MemTab = 'themes' | 'episodes' | 'facts';

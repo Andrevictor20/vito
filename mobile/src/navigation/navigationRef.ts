@@ -1,7 +1,7 @@
 import { createNavigationContainerRef } from '@react-navigation/native';
 import type { RootStackParamList, MainTabParamList } from '../AppRoot';
 import { tabNavigationBus } from '../services/dataSync';
-import type { MainTabType } from '../utils/pagerNavigation';
+import type { MainTabType } from '../utils/navigation/pagerNavigation';
 
 // Ref global p/ navegar a partir de listeners (push) fora de telas (§9.4).
 export const navigationRef = createNavigationContainerRef<RootStackParamList>();

@@ -28,7 +28,7 @@ import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../context/ThemeContext';
 import { hapticFeedback } from '../../theme/motion';
-import { resolveKeyboardHeight } from '../../utils/keyboardHeight';
+import { resolveKeyboardHeight } from '../../utils/device/keyboardHeight';
 import { useReduceMotion } from '../../theme/useReduceMotion';
 
 export interface VitoSheetProps {

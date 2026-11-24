@@ -2,11 +2,12 @@ package repository_test
 
 import (
 	"context"
+	"github.com/andrevmp/vito/backend/internal/tasks"
 	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/andrevmp/vito/backend/internal/database"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/andrevmp/vito/backend/internal/service"
@@ -42,7 +43,7 @@ func TestAC01_OverdueSyncIdempotentAcrossRepeatedReads(t *testing.T) {
 
 	// Cria 1 tarefa atrasada com timestamp Go real (time.Now().UTC()).
 	overdueAt := time.Now().UTC().Add(-4 * time.Hour)
-	todoRepo := repository.NewTodoRepository(nil)
+	todoRepo := tasks.NewTodoRepository(nil)
 	_ = todoRepo
 	// Inserção direta no banco real para testar o SQL exato de SyncOverdueTodoNotifications.
 	dbPath := filepath.Join(t.TempDir(), "notif_ac01.db")

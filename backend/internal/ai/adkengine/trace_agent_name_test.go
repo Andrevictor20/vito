@@ -3,6 +3,7 @@ package adkengine_test
 import (
 	"context"
 	"encoding/json"
+	"github.com/andrevmp/vito/backend/internal/calendar"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -10,7 +11,7 @@ import (
 
 	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/ai/adkengine"
-	"github.com/andrevmp/vito/backend/internal/database"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/andrevmp/vito/backend/internal/service"
@@ -36,7 +37,7 @@ func TestAITrace_AgentNameRecordedAndPersisted(t *testing.T) {
 
 	convRepo := repository.NewConversationStoreRepository(db)
 	registry := toolsets.NewToolsetsRegistry()
-	registry.Register(toolsets.NewCalendarToolset(nil))
+	registry.Register(calendar.NewCalendarToolset(nil))
 
 	argsBytes, _ := json.Marshal(map[string]any{"date": "2026-11-21"})
 	prov := &fakeAgentProvider{

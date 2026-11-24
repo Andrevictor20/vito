@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/andrevmp/vito/backend/internal/database"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 )
 
 // ExecuteQueuedWrite serializa operações de escrita no SQLite (INSERT, UPDATE, DELETE)

@@ -193,11 +193,11 @@ func TestNotificationService_DomainChannelsSubtitlesAndCategories(t *testing.T) 
 	svc.SetExpoAPIURL(ts.URL)
 
 	cases := []struct {
-		name       string
-		dataType   string
-		wantChan   string
-		wantSub    string
-		wantCat    string
+		name     string
+		dataType string
+		wantChan string
+		wantSub  string
+		wantCat  string
 	}{
 		{"bots", "bot_alert", "vito_bots", "Bots", "vito_bot"},
 		{"finance", "finance_alert", "vito_finance", "Finanças", "vito_finance"},

@@ -4,11 +4,14 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"github.com/andrevmp/vito/backend/internal/bots"
+	"github.com/andrevmp/vito/backend/internal/calendar"
+	"github.com/andrevmp/vito/backend/internal/tasks"
 	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/andrevmp/vito/backend/internal/database"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/andrevmp/vito/backend/internal/service"
@@ -44,7 +47,7 @@ func TestNotificationsInbox_AttentionBudgetAndSync(t *testing.T) {
 	ctx := context.Background()
 
 	inboxRepo := repository.NewNotificationsInboxRepository(db)
-	budgetSvc := service.NewAttentionBudgetService(db, repository.NewEventRepository(db))
+	budgetSvc := service.NewAttentionBudgetService(db, calendar.NewEventRepository(db))
 	inboxSvc := service.NewNotificationsInboxService(inboxRepo)
 	inboxSvc.SetAttentionBudget(budgetSvc)
 
@@ -116,8 +119,8 @@ func TestNotificationsInbox_BotPendingAndOverdueTodoActions(t *testing.T) {
 	db := setupV5ServiceDB(t)
 	ctx := context.Background()
 
-	botRepo := repository.NewBotRepository(db)
-	todoRepo := repository.NewTodoRepository(db)
+	botRepo := bots.NewBotRepository(db)
+	todoRepo := tasks.NewTodoRepository(db)
 	convRepo := repository.NewConversationStoreRepository(db)
 	confGate := service.NewConfirmationGateService(db)
 	inboxRepo := repository.NewNotificationsInboxRepository(db)

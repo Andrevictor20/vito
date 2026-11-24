@@ -232,4 +232,3 @@ func (s *ConfirmationGateService) SaveExecutionResult(ctx context.Context, id, r
 		return err
 	})
 }
-

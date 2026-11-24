@@ -28,19 +28,19 @@ type TurnExecutionMeta struct {
 	Channel           string
 	FocusMode         string
 	Effort            string
-	AgentName        string
-	OnDelta          func(ai.StreamDelta) error
-	Mu               sync.Mutex
-	CredentialSource string
-	ProviderKey      string
-	ProviderUsed     string
-	ModelUsed        string
-	ModelDisplayName string
-	FallbackNotice   string
-	FallbackReason   string
-	TokensIn         int
-	TokensOut        int
-	FallbackUsed     bool
+	AgentName         string
+	OnDelta           func(ai.StreamDelta) error
+	Mu                sync.Mutex
+	CredentialSource  string
+	ProviderKey       string
+	ProviderUsed      string
+	ModelUsed         string
+	ModelDisplayName  string
+	FallbackNotice    string
+	FallbackReason    string
+	TokensIn          int
+	TokensOut         int
+	FallbackUsed      bool
 }
 
 // WithTurnExecutionMeta anexa metadados do turno ao context.Context.

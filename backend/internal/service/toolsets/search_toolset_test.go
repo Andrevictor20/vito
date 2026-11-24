@@ -4,12 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/andrevmp/vito/backend/internal/ai/search"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
-	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/service/toolsets"
 )
@@ -37,7 +37,7 @@ func TestSearchToolset_FinanceRouting(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	finCollector := &ai.FinanceCollector{
+	finCollector := &search.FinanceCollector{
 		Client:            ts.Client(),
 		AwesomeAPIBaseURL: ts.URL,
 	}
@@ -81,8 +81,8 @@ func TestSearchToolset_FallbackToSubagent(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	searxng := ai.NewSearXNGClient(ts.URL, ts.Client())
-	subagent := ai.NewVerticalSearchSubagent(searxng, nil)
+	searxng := search.NewSearXNGClient(ts.URL, ts.Client())
+	subagent := search.NewVerticalSearchSubagent(searxng, nil)
 
 	toolset := toolsets.NewSearchToolset(subagent)
 
@@ -105,25 +105,25 @@ func TestSearchToolset_FallbackToSubagent(t *testing.T) {
 }
 
 type mockWebReader struct {
-	readURLFn func(ctx context.Context, targetURL string) (*ai.WebPageContent, error)
+	readURLFn func(ctx context.Context, targetURL string) (*search.WebPageContent, error)
 }
 
-func (m *mockWebReader) ReadURL(ctx context.Context, targetURL string) (*ai.WebPageContent, error) {
+func (m *mockWebReader) ReadURL(ctx context.Context, targetURL string) (*search.WebPageContent, error) {
 	if m.readURLFn != nil {
 		return m.readURLFn(ctx, targetURL)
 	}
-	return &ai.WebPageContent{
-		URL:       targetURL,
-		Title:     "Página de Teste",
-		Markdown:  "# Artigo Completo\n\nTexto extraído em markdown com sucesso.",
-		Source:    "native",
+	return &search.WebPageContent{
+		URL:      targetURL,
+		Title:    "Página de Teste",
+		Markdown: "# Artigo Completo\n\nTexto extraído em markdown com sucesso.",
+		Source:   "native",
 	}, nil
 }
 
 func TestSearchToolset_ReadPage_Success(t *testing.T) {
 	mockReader := &mockWebReader{
-		readURLFn: func(ctx context.Context, targetURL string) (*ai.WebPageContent, error) {
-			return &ai.WebPageContent{
+		readURLFn: func(ctx context.Context, targetURL string) (*search.WebPageContent, error) {
+			return &search.WebPageContent{
 				URL:      targetURL,
 				Title:    "Edital de Concurso 2026",
 				Markdown: "# Edital 01/2026\n\nInscrições abertas de 10 a 25 de novembro com 150 vagas.",
@@ -173,8 +173,8 @@ func TestSearchToolset_ReadPage_MissingURL(t *testing.T) {
 
 func TestSearchToolset_ReadPage_AutoRouteFromSearch(t *testing.T) {
 	mockReader := &mockWebReader{
-		readURLFn: func(ctx context.Context, targetURL string) (*ai.WebPageContent, error) {
-			return &ai.WebPageContent{
+		readURLFn: func(ctx context.Context, targetURL string) (*search.WebPageContent, error) {
+			return &search.WebPageContent{
 				URL:      targetURL,
 				Title:    "Notícia de Economia",
 				Markdown: "# PIB Brasileiro Cresce\n\nO PIB subiu no último trimestre.",
@@ -217,15 +217,15 @@ func TestSearchToolset_DeepWebScrapingOnSearchResult(t *testing.T) {
 	}))
 	defer tsSearx.Close()
 
-	searxng := ai.NewSearXNGClient(tsSearx.URL, tsSearx.Client())
-	subagent := ai.NewVerticalSearchSubagent(searxng, nil)
+	searxng := search.NewSearXNGClient(tsSearx.URL, tsSearx.Client())
+	subagent := search.NewVerticalSearchSubagent(searxng, nil)
 
 	mockReader := &mockWebReader{
-		readURLFn: func(ctx context.Context, targetURL string) (*ai.WebPageContent, error) {
+		readURLFn: func(ctx context.Context, targetURL string) (*search.WebPageContent, error) {
 			if targetURL != "https://noticias.exemplo.com.br/eleicoes-2022" {
 				return nil, fmt.Errorf("url inesperada: %s", targetURL)
 			}
-			return &ai.WebPageContent{
+			return &search.WebPageContent{
 				URL:      targetURL,
 				Title:    "TSE divulga resultado oficial da eleição 2022",
 				Markdown: "# Relatório Oficial da Apuração\n\nNo segundo turno realizado em 30 de outubro de 2022, Luiz Inácio Lula da Silva obteve 60.345.999 votos (50,90%), sendo eleito presidente.",
@@ -269,7 +269,7 @@ func TestSearchToolset_AutoFinanceFromNaturalLanguage(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	finCollector := &ai.FinanceCollector{
+	finCollector := &search.FinanceCollector{
 		Client:            ts.Client(),
 		AwesomeAPIBaseURL: ts.URL,
 	}

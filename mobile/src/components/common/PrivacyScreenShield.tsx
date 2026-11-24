@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, AppState, AppStateStatus, Platform } from 'react-native';
 import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
-import { shouldShowPrivacyShield } from '../../utils/privacyShield';
+import { shouldShowPrivacyShield } from '../../utils/formatting/privacyShield';
 
 /**
  * Escudo de Privacidade do SO (Sprint 14):

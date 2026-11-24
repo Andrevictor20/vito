@@ -13,11 +13,11 @@ import {
 } from 'react-native'
 import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { useTheme } from '../../context/ThemeContext'
-import { loginPalette } from '../login/loginPalette'
-import { BellIcon, CalIcon, MicIcon } from '../login/DemoIcons'
-import { notificationService } from '../../services/notificationService'
-import { nativeCalendarService } from '../../services/nativeCalendarService'
-import { SafeAudioRecorder } from '../../services/audioRecorder'
+import { loginPalette } from '../../features/auth/utils/loginPalette'
+import { BellIcon, CalIcon, MicIcon } from '../../features/auth/demo/DemoIcons'
+import { notificationService } from '../../features/notifications/services/notificationService'
+import { nativeCalendarService } from '../../features/calendar/services/nativeCalendarService'
+import { SafeAudioRecorder } from '../../features/chat/services/audioRecorder'
 import {
   DEFAULT_PERM_PREFS,
   markPostLoginPermsPrompted,

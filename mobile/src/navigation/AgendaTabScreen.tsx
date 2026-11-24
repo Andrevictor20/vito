@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Header, HeaderRoundButton } from '../components/common/Header';
-import { ExecutiveSummariesHubView } from '../screens/ExecutiveSummariesHubView';
-import { FullMonthCalendarView } from '../components/calendar/FullMonthCalendarView';
+import { ExecutiveSummariesHubView } from '../features/calendar/screens/ExecutiveSummariesHubView';
+import { FullMonthCalendarView } from '../features/calendar/components/calendar/FullMonthCalendarView';
 import { AgendaView } from '../components/home/AgendaView';
-import { AgendaFilterModal } from '../components/calendar/AgendaFilterModal';
+import { AgendaFilterModal } from '../features/calendar/components/calendar/AgendaFilterModal';
 import { SmartActionSheetModal } from '../components/ui/SmartActionSheetModal';
-import { buildAgendaSmartActions, formatEventSubtitle } from '../utils/smartActionBuilders';
+import { buildAgendaSmartActions, formatEventSubtitle } from '../utils/formatting/smartActionBuilders';
 import { useHomeDataContext } from './HomeDataProvider';
 import { useTheme } from '../context/ThemeContext';
 import { SectionTransition } from '../ds/SectionTransition';
@@ -18,7 +18,7 @@ import {
   DEFAULT_AGENDA_FILTER,
   countActiveAgendaFilters,
   filterAgendaEvents,
-} from '../utils/agendaFilter';
+} from '../features/calendar/utils/agendaFilter';
 import type { Event } from '../types';
 
 export interface AgendaTabScreenProps {

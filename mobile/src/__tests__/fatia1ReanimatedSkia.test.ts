@@ -21,7 +21,7 @@ describe('Fatia 1 (Base Global) — Paleta Light/Dark, Mascote Skia+Reanimated 4
     const protoDock = readSrc('ds/ProtoDock.tsx');
     assert.equal(protoDock.includes('rgba(24, 24, 26, 0.78)'), true, 'ProtoDock dark deve usar glass rgba(24, 24, 26, 0.78)');
     assert.equal(protoDock.includes('rgba(244, 244, 244, 0.80)'), true, 'ProtoDock light deve usar glass rgba(244, 244, 244, 0.80)');
-    assert.equal(protoDock.includes('../theme/'), false, 'ProtoDock deve permanecer isolado de ../theme/');
+    assert.equal(protoDock.includes('../theme'), false, 'ProtoDock deve permanecer isolado de ../theme/');
 
     const dock = readSrc('components/common/FloatingTabBar.tsx');
     assert.equal(dock.includes('paddingTop: 18'), true, 'FloatingTabBar .dock deve usar paddingTop: 18');
@@ -33,11 +33,11 @@ describe('Fatia 1 (Base Global) — Paleta Light/Dark, Mascote Skia+Reanimated 4
   });
 
   it('Mascote (MascotVectorRig): 100% UI thread via Reanimated 4 + GPU Skia nativo', () => {
-    const builders = readSrc('components/mascot/mascotAnimationBuilders.ts');
-    const hook = readSrc('components/mascot/useMascotAnimation.ts');
-    const rig = readSrc('components/mascot/MascotVectorRig.tsx');
-    const skiaNative = readSrc('components/mascot/MascotSkiaCanvas.native.tsx');
-    const geom = readSrc('components/mascot/mascotGeometry.ts');
+    const builders = readSrc('features/bots/mascot/mascotAnimationBuilders.ts');
+    const hook = readSrc('features/bots/mascot/useMascotAnimation.ts');
+    const rig = readSrc('features/bots/mascot/MascotVectorRig.tsx');
+    const skiaNative = readSrc('features/bots/mascot/MascotSkiaCanvas.native.tsx');
+    const geom = readSrc('features/bots/mascot/mascotGeometry.ts');
 
     assert.equal(builders.includes("from 'react-native-reanimated'"), true);
     assert.equal(builders.includes('useNativeDriver: false'), false);
@@ -86,9 +86,9 @@ describe('Fatia 1 (Base Global) — Paleta Light/Dark, Mascote Skia+Reanimated 4
 
     const sectionTr = readSrc('ds/SectionTransition.tsx');
     assert.equal(sectionTr.includes('scheduleOnRN'), true, 'SectionTransition deve usar scheduleOnRN');
-    assert.equal(sectionTr.includes('../theme/'), false, 'SectionTransition deve permanecer isolado de ../theme/');
+    assert.equal(sectionTr.includes('../theme'), false, 'SectionTransition deve permanecer isolado de ../theme/');
 
     const protoSheet = readSrc('ds/ProtoSheet.tsx');
-    assert.equal(protoSheet.includes('../theme/'), false, 'ProtoSheet deve permanecer isolado de ../theme/');
+    assert.equal(protoSheet.includes('../theme'), false, 'ProtoSheet deve permanecer isolado de ../theme/');
   });
 });

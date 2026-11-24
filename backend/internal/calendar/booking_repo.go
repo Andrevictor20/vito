@@ -1,0 +1,367 @@
+package calendar
+
+import (
+	"context"
+	"database/sql"
+	"errors"
+	"github.com/andrevmp/vito/backend/internal/repository"
+	"strings"
+	"time"
+
+	"github.com/andrevmp/vito/backend/internal/domain"
+)
+
+func parseBookingDBTime(v any) time.Time {
+	switch t := v.(type) {
+	case time.Time:
+		return t.UTC()
+	case string:
+		for _, layout := range []string{time.RFC3339, "2006-01-02 15:04:05", "2006-01-02T15:04:05Z07:00", "2006-01-02 15:04:05.999999999-07:00"} {
+			if parsed, err := time.Parse(layout, t); err == nil {
+				return parsed.UTC()
+			}
+		}
+	}
+	return time.Time{}
+}
+
+// BookingRepositorySQLite implementa domain.BookingRepository sobre SQLite.
+type BookingRepositorySQLite struct {
+	db *sql.DB
+}
+
+// NewBookingRepositorySQLite instancia o repositório de booking.
+func NewBookingRepositorySQLite(db *sql.DB) *BookingRepositorySQLite {
+	return &BookingRepositorySQLite{db: db}
+}
+
+// bookingTimeVal converte *time.Time em valor gravável (NULL quando ausente).
+func bookingTimeVal(t *time.Time) any {
+	if t == nil || t.IsZero() {
+		return nil
+	}
+	return t.UTC()
+}
+
+func (r *BookingRepositorySQLite) CreateType(bt *domain.BookingType) error {
+	query := `
+		INSERT INTO booking_types (
+			id, user_id, slug, title, description, duration_minutes, buffer_minutes,
+			days_of_week, start_hour, end_hour, valid_from, valid_until, allowed_dates,
+			is_active, created_at, updated_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`
+	now := time.Now().UTC()
+	if bt.CreatedAt.IsZero() {
+		bt.CreatedAt = now
+	}
+	if bt.UpdatedAt.IsZero() {
+		bt.UpdatedAt = now
+	}
+
+	return repository.ExecuteQueuedWrite(context.Background(), func() error {
+		_, err := r.db.Exec(query,
+			bt.ID, bt.UserID, bt.Slug, bt.Title, bt.Description, bt.DurationMinutes, bt.BufferMinutes,
+			bt.DaysOfWeek, bt.StartHour, bt.EndHour, bookingTimeVal(bt.ValidFrom), bookingTimeVal(bt.ValidUntil), bt.AllowedDates,
+			bt.IsActive, bt.CreatedAt, bt.UpdatedAt,
+		)
+		return err
+	})
+}
+
+func (r *BookingRepositorySQLite) UpdateType(bt *domain.BookingType) error {
+	query := `
+		UPDATE booking_types SET
+			slug = ?, title = ?, description = ?, duration_minutes = ?, buffer_minutes = ?,
+			days_of_week = ?, start_hour = ?, end_hour = ?, valid_from = ?, valid_until = ?,
+			allowed_dates = ?, is_active = ?, updated_at = ?
+		WHERE id = ? AND user_id = ?
+	`
+	bt.UpdatedAt = time.Now().UTC()
+	rows, err := repository.ExecuteQueuedWriteRows(context.Background(), func() (sql.Result, error) {
+		return r.db.Exec(query,
+			bt.Slug, bt.Title, bt.Description, bt.DurationMinutes, bt.BufferMinutes,
+			bt.DaysOfWeek, bt.StartHour, bt.EndHour, bookingTimeVal(bt.ValidFrom), bookingTimeVal(bt.ValidUntil),
+			bt.AllowedDates, bt.IsActive, bt.UpdatedAt,
+			bt.ID, bt.UserID,
+		)
+	})
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return domain.ErrBookingTypeNotFound
+	}
+	return nil
+}
+
+func (r *BookingRepositorySQLite) DeleteType(id, userID string) error {
+	query := `DELETE FROM booking_types WHERE id = ? AND user_id = ?`
+	rows, err := repository.ExecuteQueuedWriteRows(context.Background(), func() (sql.Result, error) {
+		return r.db.Exec(query, id, userID)
+	})
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return domain.ErrBookingTypeNotFound
+	}
+	return nil
+}
+
+// scanBookingType lê uma linha de booking_types (ordem canônica das colunas).
+func scanBookingType(bt *domain.BookingType, scanner interface {
+	Scan(dest ...any) error
+}) error {
+	var rawValidFrom, rawValidUntil, rawCreated, rawUpdated any
+	err := scanner.Scan(
+		&bt.ID, &bt.UserID, &bt.Slug, &bt.Title, &bt.Description, &bt.DurationMinutes, &bt.BufferMinutes,
+		&bt.DaysOfWeek, &bt.StartHour, &bt.EndHour, &rawValidFrom, &rawValidUntil, &bt.AllowedDates,
+		&bt.IsActive, &rawCreated, &rawUpdated,
+	)
+	if err != nil {
+		return err
+	}
+	if vf := parseBookingDBTime(rawValidFrom); !vf.IsZero() {
+		vf = vf.UTC()
+		bt.ValidFrom = &vf
+	}
+	if vu := parseBookingDBTime(rawValidUntil); !vu.IsZero() {
+		vu = vu.UTC()
+		bt.ValidUntil = &vu
+	}
+	bt.CreatedAt = parseDBTime(rawCreated)
+	bt.UpdatedAt = parseDBTime(rawUpdated)
+	return nil
+}
+
+func (r *BookingRepositorySQLite) GetTypeByID(id, userID string) (*domain.BookingType, error) {
+	query := `
+		SELECT id, user_id, slug, title, COALESCE(description, ''), duration_minutes, buffer_minutes,
+		       days_of_week, start_hour, end_hour, valid_from, valid_until, COALESCE(allowed_dates, ''),
+		       is_active, created_at, updated_at
+		FROM booking_types
+		WHERE id = ? AND user_id = ?
+	`
+	var bt domain.BookingType
+	err := scanBookingType(&bt, r.db.QueryRow(query, id, userID))
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, domain.ErrBookingTypeNotFound
+		}
+		return nil, err
+	}
+	return &bt, nil
+}
+
+func (r *BookingRepositorySQLite) GetTypeBySlug(userIdentifier, slug string) (*domain.BookingType, error) {
+	query := `
+		SELECT bt.id, bt.user_id, bt.slug, bt.title, COALESCE(bt.description, ''), bt.duration_minutes, bt.buffer_minutes,
+		       bt.days_of_week, bt.start_hour, bt.end_hour, bt.valid_from, bt.valid_until, COALESCE(bt.allowed_dates, ''),
+		       bt.is_active, bt.created_at, bt.updated_at
+		FROM booking_types bt
+		LEFT JOIN users u ON bt.user_id = u.id
+		WHERE (
+			bt.user_id = ?
+			OR LOWER(u.name) = LOWER(?)
+			OR LOWER(u.email) = LOWER(?)
+			OR LOWER(u.email) LIKE LOWER(?) || '@%'
+			OR LOWER(u.name) LIKE LOWER(?) || ' %'
+			OR REPLACE(LOWER(u.name), 'é', 'e') LIKE LOWER(?) || ' %'
+			OR REPLACE(LOWER(u.name), 'é', 'e') = LOWER(?)
+		)
+		  AND bt.slug = ?
+		LIMIT 1
+	`
+	cleanID := strings.TrimSpace(userIdentifier)
+	var bt domain.BookingType
+	err := scanBookingType(&bt, r.db.QueryRow(query, cleanID, cleanID, cleanID, cleanID, cleanID, cleanID, cleanID, slug))
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, domain.ErrBookingTypeNotFound
+		}
+		return nil, err
+	}
+	return &bt, nil
+}
+
+func (r *BookingRepositorySQLite) ListTypesByUser(userID string) ([]domain.BookingType, error) {
+	query := `
+		SELECT id, user_id, slug, title, COALESCE(description, ''), duration_minutes, buffer_minutes,
+		       days_of_week, start_hour, end_hour, valid_from, valid_until, COALESCE(allowed_dates, ''),
+		       is_active, created_at, updated_at
+		FROM booking_types
+		WHERE user_id = ?
+		ORDER BY created_at ASC
+	`
+	rows, err := r.db.Query(query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	list := make([]domain.BookingType, 0)
+	for rows.Next() {
+		var bt domain.BookingType
+		if err := scanBookingType(&bt, rows); err != nil {
+			return nil, err
+		}
+		list = append(list, bt)
+	}
+	return list, nil
+}
+
+func (r *BookingRepositorySQLite) CreateAppointment(appt *domain.BookingAppointment) error {
+	query := `
+		INSERT INTO booking_appointments (
+			id, booking_type_id, user_id, guest_name, guest_email, guest_notes,
+			start_at, end_at, status, event_id, created_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`
+	if appt.CreatedAt.IsZero() {
+		appt.CreatedAt = time.Now().UTC()
+	}
+	if appt.Status == "" {
+		appt.Status = "confirmed"
+	}
+
+	var eventIDVal any
+	if appt.EventID != "" {
+		eventIDVal = appt.EventID
+	}
+
+	return repository.ExecuteQueuedWrite(context.Background(), func() error {
+		_, err := r.db.Exec(query,
+			appt.ID, appt.BookingTypeID, appt.UserID, appt.GuestName, appt.GuestEmail, appt.GuestNotes,
+			appt.StartAt.UTC(), appt.EndAt.UTC(), appt.Status, eventIDVal, appt.CreatedAt.UTC(),
+		)
+		return err
+	})
+}
+
+func (r *BookingRepositorySQLite) GetAppointmentByID(id, userID string) (*domain.BookingAppointment, error) {
+	query := `
+		SELECT id, booking_type_id, user_id, guest_name, guest_email, COALESCE(guest_notes, ''),
+		       start_at, end_at, status, COALESCE(event_id, ''), created_at
+		FROM booking_appointments
+		WHERE id = ? AND user_id = ?
+	`
+	var a domain.BookingAppointment
+	var rawStart, rawEnd, rawCreated any
+	err := r.db.QueryRow(query, id, userID).Scan(
+		&a.ID, &a.BookingTypeID, &a.UserID, &a.GuestName, &a.GuestEmail, &a.GuestNotes,
+		&rawStart, &rawEnd, &a.Status, &a.EventID, &rawCreated,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, errors.New("agendamento não encontrado")
+		}
+		return nil, err
+	}
+	a.StartAt = parseDBTime(rawStart)
+	a.EndAt = parseDBTime(rawEnd)
+	a.CreatedAt = parseDBTime(rawCreated)
+	return &a, nil
+}
+
+func (r *BookingRepositorySQLite) ListAppointmentsByUser(userID string, from, to time.Time) ([]domain.BookingAppointment, error) {
+	query := `
+		SELECT id, booking_type_id, user_id, guest_name, guest_email, COALESCE(guest_notes, ''),
+		       start_at, end_at, status, COALESCE(event_id, ''), created_at
+		FROM booking_appointments
+		WHERE user_id = ? AND start_at >= ? AND end_at <= ?
+		ORDER BY start_at ASC
+	`
+	rows, err := r.db.Query(query, userID, from.UTC(), to.UTC())
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	list := make([]domain.BookingAppointment, 0)
+	for rows.Next() {
+		var a domain.BookingAppointment
+		var rawStart, rawEnd, rawCreated any
+		if err := rows.Scan(
+			&a.ID, &a.BookingTypeID, &a.UserID, &a.GuestName, &a.GuestEmail, &a.GuestNotes,
+			&rawStart, &rawEnd, &a.Status, &a.EventID, &rawCreated,
+		); err != nil {
+			return nil, err
+		}
+		a.StartAt = parseDBTime(rawStart)
+		a.EndAt = parseDBTime(rawEnd)
+		a.CreatedAt = parseDBTime(rawCreated)
+		list = append(list, a)
+	}
+	return list, nil
+}
+
+func (r *BookingRepositorySQLite) DeleteAppointment(id, userID string) error {
+	query := `DELETE FROM booking_appointments WHERE id = ? AND user_id = ?`
+	rows, err := repository.ExecuteQueuedWriteRows(context.Background(), func() (sql.Result, error) {
+		return r.db.Exec(query, id, userID)
+	})
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return errors.New("agendamento não encontrado")
+	}
+	return nil
+}
+
+func (r *BookingRepositorySQLite) CheckSlotConflict(userID string, startAt, endAt time.Time, bufferMinutes int) (bool, error) {
+	startBuf := startAt.Add(-time.Duration(bufferMinutes) * time.Minute).UTC()
+	endBuf := endAt.Add(time.Duration(bufferMinutes) * time.Minute).UTC()
+
+	// 1. Checa conflito na agenda pessoal IGNORANDO feriados e all-day (>=20h).
+	// Feriados (inclusive importados do Google) nunca bloqueiam booking — decisão P2.
+	eventQuery := `
+		SELECT id, title, category, start_at, end_at, description
+		FROM events
+		WHERE user_id = ?
+		  AND start_at < ?
+		  AND end_at > ?
+		  AND LOWER(COALESCE(category,'')) NOT IN ('holiday','feriado')
+	`
+	rows, err := r.db.Query(eventQuery, userID, endBuf, startBuf)
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var cid, title, category, rawStart, rawEnd, desc string
+		if err := rows.Scan(&cid, &title, &category, &rawStart, &rawEnd, &desc); err != nil {
+			continue
+		}
+		combined := strings.ToLower(title + " " + desc)
+		if strings.Contains(combined, "feriado") || strings.Contains(combined, "holiday") ||
+			strings.Contains(combined, "natal") || strings.Contains(combined, "ano novo") ||
+			strings.Contains(combined, "carnaval") || strings.Contains(combined, "tiradentes") {
+			continue
+		}
+		startEv := parseBookingDBTime(rawStart)
+		endEv := parseBookingDBTime(rawEnd)
+		if endEv.Sub(startEv) >= 20*time.Hour {
+			continue
+		}
+		return true, nil
+	}
+	if err := rows.Err(); err != nil {
+		return false, err
+	}
+
+	// 2. Checa conflito na tabela de agendamentos de booking ativos
+	apptQuery := `
+		SELECT COUNT(*) FROM booking_appointments
+		WHERE user_id = ?
+		  AND status = 'confirmed'
+		  AND start_at < ?
+		  AND end_at > ?
+	`
+	var apptCount int
+	if err := r.db.QueryRow(apptQuery, userID, endBuf, startBuf).Scan(&apptCount); err != nil {
+		return false, err
+	}
+	return apptCount > 0, nil
+}

@@ -3,6 +3,9 @@ package adkengine_test
 import (
 	"context"
 	"encoding/json"
+	"github.com/andrevmp/vito/backend/internal/calendar"
+	"github.com/andrevmp/vito/backend/internal/tasks"
+	"github.com/andrevmp/vito/backend/internal/whatsapp"
 	"strings"
 	"testing"
 
@@ -172,9 +175,9 @@ func TestBuildBotLLMAgent_InstructionAndTools(t *testing.T) {
 
 func TestToolsetsRegistry_BotActionSpecs(t *testing.T) {
 	reg := toolsets.NewToolsetsRegistry()
-	reg.Register(toolsets.NewCalendarToolset(nil))
-	reg.Register(toolsets.NewTaskPendingToolset(nil))
-	reg.Register(toolsets.NewWhatsAppToolset(nil))
+	reg.Register(calendar.NewCalendarToolset(nil))
+	reg.Register(tasks.NewTaskPendingToolset(nil))
+	reg.Register(whatsapp.NewWhatsAppToolset(nil))
 	reg.Register(toolsets.NewGmailToolset(nil))
 	reg.Register(toolsets.NewSearchToolset(nil))
 

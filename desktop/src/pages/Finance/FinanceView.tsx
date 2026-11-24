@@ -6,7 +6,7 @@ import type {
   DesktopFinanceLimitStatus,
   DesktopFinanceSummary,
   DesktopFinanceTransaction,
-} from '../../services/api/financeApi';
+} from '../../services/api/finance/financeApi';
 
 const formatBRL = (val: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);

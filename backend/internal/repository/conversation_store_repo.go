@@ -34,7 +34,7 @@ type ConversationTurn struct {
 	ThreadID          string    `json:"thread_id"`
 	UserID            string    `json:"user_id"`
 	Channel           string    `json:"channel"`
-	Role              string    `json:"role"` // 'user', 'assistant', 'tool'
+	Role              string    `json:"role"`   // 'user', 'assistant', 'tool'
 	Origin            string    `json:"origin"` // 'direct', 'proactive_worker', 'voice_live'
 	WorkerType        string    `json:"worker_type"`
 	Content           string    `json:"content"`

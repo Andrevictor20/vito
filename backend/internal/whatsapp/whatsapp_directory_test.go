@@ -1,0 +1,220 @@
+package whatsapp_test
+
+import (
+	"context"
+	"fmt"
+	"github.com/andrevmp/vito/backend/internal/whatsapp"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/andrevmp/vito/backend/internal/domain"
+)
+
+// archiveChat grava uma mensagem de uma conversa qualquer.
+func archiveChat(t *testing.T, fx *contextualFixture, id, chatJID, chatKind, label, text string, fromMe bool, ts time.Time) {
+	t.Helper()
+	if err := fx.repo.SaveMessage(context.Background(), &domain.WhatsAppConversationMessage{
+		ID:               id,
+		UserID:           "user-ctx-1",
+		InstanceName:     "vito_ctx_user",
+		ChatJID:          chatJID,
+		ChatKind:         chatKind,
+		ChatLabel:        label,
+		SenderName:       "André",
+		FromMe:           fromMe,
+		Text:             text,
+		MessageTimestamp: ts,
+		CreatedAt:        ts,
+	}); err != nil {
+		t.Fatalf("SaveMessage: %v", err)
+	}
+}
+
+// O diretório devolve uma linha por conversa, com a última mensagem.
+func TestWhatsAppDirectory_ChatsSummarizesEachConversation(t *testing.T) {
+	fx := setupContextualWhatsApp(t)
+	now := time.Now().UTC()
+	dir := whatsapp.NewWhatsAppDirectoryService(fx.repo, whatsapp.DefaultWhatsAppContextConfig(), nil)
+
+	archiveChat(t, fx, "d1", friendJID(), domain.WhatsAppChatKindDirect, "Ana", "oi", false, now.Add(-2*time.Hour))
+	archiveChat(t, fx, "d2", friendJID(), domain.WhatsAppChatKindDirect, "Ana", "pode ser quinta?", false, now.Add(-time.Hour))
+	archiveChat(t, fx, "d3", "471331507024120@lid", domain.WhatsAppChatKindDirect, "Contato", "oi tbm", false, now.Add(-3*time.Hour))
+
+	chats, err := dir.Chats(context.Background(), "user-ctx-1")
+	if err != nil {
+		t.Fatalf("Chats: %v", err)
+	}
+	if len(chats) != 2 {
+		t.Fatalf("esperava 2 conversas, obteve %d", len(chats))
+	}
+	for _, c := range chats {
+		if c.ChatJID == friendJID() {
+			if c.LastText != "pode ser quinta?" {
+				t.Errorf("esperava a última mensagem da conversa, obteve %q", c.LastText)
+			}
+			if c.MessageCount != 2 {
+				t.Errorf("esperava 2 mensagens na conversa, obteve %d", c.MessageCount)
+			}
+		}
+	}
+}
+
+// Pendência = conversa direta cuja última mensagem NÃO é do usuário.
+func TestWhatsAppDirectory_PendingOnlyDirectAndNotAnswered(t *testing.T) {
+	fx := setupContextualWhatsApp(t)
+	now := time.Now().UTC()
+	dir := whatsapp.NewWhatsAppDirectoryService(fx.repo, whatsapp.DefaultWhatsAppContextConfig(), nil)
+
+	// 1) direta sem resposta => pendente
+	archiveChat(t, fx, "p1", friendJID(), domain.WhatsAppChatKindDirect, "Ana", "me ajuda aqui", false, now.Add(-30*time.Hour))
+	// 2) direta já respondida => não é pendente
+	archiveChat(t, fx, "p2", "5511888887778@s.whatsapp.net", domain.WhatsAppChatKindDirect, "João", "beleza", false, now.Add(-40*time.Hour))
+	archiveChat(t, fx, "p3", "5511888887778@s.whatsapp.net", domain.WhatsAppChatKindDirect, "João", "obrigado", true, now.Add(-39*time.Hour))
+	// 3) grupo => fora do escopo
+	archiveChat(t, fx, "p4", groupJID(), domain.WhatsAppChatKindGroup, "Grupo", "alguem me ajuda", false, now.Add(-30*time.Hour))
+	// 4) o próprio "Você" => fora do escopo
+	archiveChat(t, fx, "p5", selfJID(), domain.WhatsAppChatKindSelf, "Você", "oi", false, now.Add(-30*time.Hour))
+
+	pending, err := dir.Pending(context.Background(), "user-ctx-1")
+	if err != nil {
+		t.Fatalf("Pending: %v", err)
+	}
+	if len(pending) != 1 {
+		t.Fatalf("esperava 1 pendência, obteve %d: %+v", len(pending), pending)
+	}
+	if pending[0].ChatLabel != "Ana" {
+		t.Errorf("esperava a pendência da Ana, obteve %q", pending[0].ChatLabel)
+	}
+}
+
+// Resolver o nome do contato: exato, por JID e ambíguo.
+func TestWhatsAppDirectory_ResolveChat(t *testing.T) {
+	fx := setupContextualWhatsApp(t)
+	now := time.Now().UTC()
+	dir := whatsapp.NewWhatsAppDirectoryService(fx.repo, whatsapp.DefaultWhatsAppContextConfig(), nil)
+
+	archiveChat(t, fx, "r1", friendJID(), domain.WhatsAppChatKindDirect, "Ana", "oi", false, now)
+	archiveChat(t, fx, "r2", "5511888887778@s.whatsapp.net", domain.WhatsAppChatKindDirect, "Ana Souza", "oi", false, now)
+
+	chat, err := dir.ResolveChat(context.Background(), "user-ctx-1", "Ana Souza")
+	if err != nil {
+		t.Fatalf("ResolveChat: %v", err)
+	}
+	if chat.ChatJID != "5511888887778@s.whatsapp.net" {
+		t.Errorf("resolveu para o JID errado: %q", chat.ChatJID)
+	}
+
+	// Se não houver nome exato "Ana", mas houver "Ana Souza" e "Ana Lima", a busca parcial "Ana" deve retornar ambíguo com opções distintas.
+	archiveChat(t, fx, "r3", "5511888887779@s.whatsapp.net", domain.WhatsAppChatKindDirect, "Ana Lima", "oi", false, now)
+	_, err = dir.ResolveChat(context.Background(), "user-ctx-1", "Souza")
+	if err != nil {
+		t.Fatalf("esperava resolver 'Souza' para Ana Souza, obteve: %v", err)
+	}
+
+	// Nome inexistente.
+	_, err = dir.ResolveChat(context.Background(), "user-ctx-1", "Fulano")
+	if err == nil {
+		t.Fatal("esperava erro de não encontrado")
+	}
+}
+
+// asAmbiguous evita importar errors no teste com o helper do serviço.
+func asAmbiguous(err error, target **whatsapp.ErrAmbiguousChat) bool {
+	if e, ok := err.(*whatsapp.ErrAmbiguousChat); ok {
+		*target = e
+		return true
+	}
+	return false
+}
+
+// As mensagens de uma conversa vêm do shadow inbox (não da janela).
+func TestWhatsAppDirectory_MessagesOfReadsInbox(t *testing.T) {
+	fx := setupContextualWhatsApp(t)
+	now := time.Now().UTC()
+	dir := whatsapp.NewWhatsAppDirectoryService(fx.repo, whatsapp.DefaultWhatsAppContextConfig(), nil)
+
+	for i := 0; i < 5; i++ {
+		archiveChat(t, fx, fmt.Sprintf("m-%d", i), friendJID(), domain.WhatsAppChatKindDirect, "Ana",
+			fmt.Sprintf("mensagem %d", i), false, now.Add(-time.Duration(i)*time.Minute))
+	}
+
+	messages, err := dir.MessagesOf(context.Background(), "user-ctx-1", friendJID(), 3)
+	if err != nil {
+		t.Fatalf("MessagesOf: %v", err)
+	}
+	if len(messages) != 3 {
+		t.Fatalf("esperava 3 mensagens, obteve %d", len(messages))
+	}
+	// As mais recentes vêm primeiro (o repositório devolve em ordem cronológica).
+	if !strings.Contains(messages[len(messages)-1].Text, "mensagem 0") {
+		t.Errorf("esperava a mensagem mais antiga no fim, obteve %q", messages[len(messages)-1].Text)
+	}
+}
+
+// Bug Beto Fantasma: status@broadcast e canais @newsletter nunca podem aparecer em Pending nem em Chats.
+func TestWhatsAppDirectory_PendingExcludesBroadcastAndNewsletter(t *testing.T) {
+	fx := setupContextualWhatsApp(t)
+	now := time.Now().UTC()
+	dir := whatsapp.NewWhatsAppDirectoryService(fx.repo, whatsapp.DefaultWhatsAppContextConfig(), nil)
+
+	// Status do WhatsApp (ex: Beto postou status)
+	archiveChat(t, fx, "b1", "status@broadcast", domain.WhatsAppChatKindBroadcast, "Beto", "novo status", false, now.Add(-5*time.Minute))
+	// Canal / newsletter
+	archiveChat(t, fx, "n1", "12036399999999@newsletter", domain.WhatsAppChatKindNewsletter, "Tech News", "noticia", false, now.Add(-10*time.Minute))
+	// Conversa direta real
+	archiveChat(t, fx, "d1", friendJID(), domain.WhatsAppChatKindDirect, "Ana", "preciso de ajuda", false, now.Add(-2*time.Minute))
+
+	pending, err := dir.Pending(context.Background(), "user-ctx-1")
+	if err != nil {
+		t.Fatalf("Pending: %v", err)
+	}
+	if len(pending) != 1 {
+		t.Fatalf("esperava apenas 1 pendencia real, obteve %d: %+v", len(pending), pending)
+	}
+	if pending[0].ChatJID != friendJID() {
+		t.Errorf("esperava pendencia de %s, obteve %s (%s)", friendJID(), pending[0].ChatJID, pending[0].ChatLabel)
+	}
+
+	chats, err := dir.Chats(context.Background(), "user-ctx-1")
+	if err != nil {
+		t.Fatalf("Chats: %v", err)
+	}
+	for _, c := range chats {
+		if c.ChatJID == "status@broadcast" || strings.HasSuffix(c.ChatJID, "@broadcast") || strings.HasSuffix(c.ChatJID, "@newsletter") {
+			t.Errorf("broadcast/newsletter %q nao deveria constar em Chats", c.ChatJID)
+		}
+	}
+}
+
+// Bug Isa -> Pai: contato real na agenda ou ChatLabel SEMPRE tem precedencia sobre apelido aprendido.
+func TestWhatsAppDirectory_ResolveChat_RealContactPrecedesLearnedAlias(t *testing.T) {
+	fx := setupContextualWhatsApp(t)
+	now := time.Now().UTC()
+
+	jidIsa := "5511999990001@s.whatsapp.net"
+	jidPai := "5511999990002@s.whatsapp.net"
+
+	archiveChat(t, fx, "msg-isa", jidIsa, domain.WhatsAppChatKindDirect, "Isa", "oi filho", false, now)
+	archiveChat(t, fx, "msg-pai", jidPai, domain.WhatsAppChatKindDirect, "Pai", "bênção", false, now)
+
+	// Grava um apelido espúrio "isa" apontando para o Pai
+	if err := fx.repo.SaveAlias(context.Background(), "user-ctx-1", jidPai, "isa"); err != nil {
+		t.Fatalf("SaveAlias: %v", err)
+	}
+
+	contacts := whatsapp.NewWhatsAppContactsCache(nil, time.Hour)
+	contacts.Set(jidIsa, "Isa", "isabella")
+	contacts.Set(jidPai, "Pai", "pai")
+
+	dir := whatsapp.NewWhatsAppDirectoryService(fx.repo, whatsapp.DefaultWhatsAppContextConfig(), contacts)
+
+	// Resolver "isa" DEVE trazer a Isa real, NUNCA o Pai!
+	resolved, err := dir.ResolveChat(context.Background(), "user-ctx-1", "isa")
+	if err != nil {
+		t.Fatalf("ResolveChat falhou: %v", err)
+	}
+	if resolved.ChatJID != jidIsa {
+		t.Fatalf("ESPERAVA JID DA ISA (%s), mas resolveu para %s (ChatLabel: %s)", jidIsa, resolved.ChatJID, resolved.ChatLabel)
+	}
+}

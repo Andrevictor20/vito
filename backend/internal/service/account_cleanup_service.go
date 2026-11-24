@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/andrevmp/vito/backend/internal/domain"
@@ -121,4 +122,8 @@ func (s *AccountCleanupService) PurgeOrphanPlaceholderAccounts(ctx context.Conte
 	}
 
 	return purged, nil
+}
+
+func isPlaceholderEmail(email string) bool {
+	return strings.HasSuffix(strings.ToLower(strings.TrimSpace(email)), "@vito.local")
 }

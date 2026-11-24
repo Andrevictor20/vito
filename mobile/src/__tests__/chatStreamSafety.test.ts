@@ -2,7 +2,7 @@ import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { buildAssistantConfirmPayload, executeChatStreamFetch } from '../services/api/chatStreamHelper';
+import { buildAssistantConfirmPayload, executeChatStreamFetch } from '../features/chat/services/chatStreamHelper';
 
 describe('AC-06: Segurança do Stream SSE (timeout 90s e sem retry cego após 200 OK)', () => {
   test('test_ac_06_nao_reexecuta_post_chat_apos_stream_200_ok', async () => {
@@ -42,8 +42,8 @@ describe('AC-06: Segurança do Stream SSE (timeout 90s e sem retry cego após 20
   });
 
   test('test_ac_06_assistantConfirm_suporta_reject_reason_threadId_e_timeout_90s', async () => {
-    const helperSrc = fs.readFileSync(path.resolve(__dirname, '../services/api/chatStreamHelper.ts'), 'utf8');
-    const chatApiSrc = fs.readFileSync(path.resolve(__dirname, '../services/api/chatApi.ts'), 'utf8');
+    const helperSrc = fs.readFileSync(path.resolve(__dirname, '../features/chat/services/chatStreamHelper.ts'), 'utf8');
+    const chatApiSrc = fs.readFileSync(path.resolve(__dirname, '../features/chat/services/chatApi.ts'), 'utf8');
     assert.ok(helperSrc.includes('90000') && chatApiSrc.includes('90000'), 'assistantChatStream deve configurar timeout de 90s (90000ms)');
 
     const payload = buildAssistantConfirmPayload('pend-99', {

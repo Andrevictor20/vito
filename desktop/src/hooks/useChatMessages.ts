@@ -132,13 +132,13 @@ export function useChatMessages(
         const res = await api.assistantChatStream(
           text.trim(),
           (delta) => {
-            if (delta.reasoning_delta) {
-              streamedReasoning = [...streamedReasoning, delta.reasoning_delta];
+            if (delta.tool_name && !streamedReasoning.includes(delta.tool_name)) {
+              streamedReasoning = [...streamedReasoning, delta.tool_name];
             }
             if (delta.text_delta) {
               streamedText += delta.text_delta;
             }
-            if (delta.text_delta || delta.reasoning_delta) {
+            if (delta.text_delta || delta.tool_name) {
               setMessages((prev) => {
                 const idx = prev.findIndex((m) => m.id === streamMsgId);
                 const partial: ChatMessage = {

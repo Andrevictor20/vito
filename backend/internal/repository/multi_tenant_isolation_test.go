@@ -2,16 +2,18 @@ package repository_test
 
 import (
 	"errors"
+	"github.com/andrevmp/vito/backend/internal/calendar"
+	"github.com/andrevmp/vito/backend/internal/tasks"
 	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/andrevmp/vito/backend/internal/database"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/repository"
 )
 
-func setupMultiTenantTest(t *testing.T) (*repository.EventRepositorySQLite, *repository.TodoRepositorySQLite, *repository.MemoryRepositorySQLite) {
+func setupMultiTenantTest(t *testing.T) (*calendar.EventRepositorySQLite, *tasks.TodoRepositorySQLite, *repository.MemoryRepositorySQLite) {
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "test_multitenant.db")
 
@@ -22,8 +24,8 @@ func setupMultiTenantTest(t *testing.T) (*repository.EventRepositorySQLite, *rep
 	t.Cleanup(func() { db.Close() })
 
 	userRepo := repository.NewUserRepository(db)
-	eventRepo := repository.NewEventRepository(db)
-	todoRepo := repository.NewTodoRepository(db)
+	eventRepo := calendar.NewEventRepository(db)
+	todoRepo := tasks.NewTodoRepository(db)
 	memoryRepo := repository.NewMemoryRepository(db)
 
 	now := time.Now().UTC()

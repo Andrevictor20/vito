@@ -35,6 +35,11 @@ func BuildCorrectionInsight(entity, before, after string, createdAt, updatedAt t
 // ImplicitFeedbackDisabled permite desligar o Ciclo 2 via env/config.
 var ImplicitFeedbackDisabled = false
 
+// EmitImplicitFeedback publica um insight implícito quando o hook global está configurado.
+func EmitImplicitFeedback(userID, insight string) {
+	emitImplicitFeedback(userID, insight)
+}
+
 func emitImplicitFeedback(userID, insight string) {
 	if insight == "" || ImplicitFeedbackHook == nil {
 		return

@@ -2,7 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { createConnectToken } from '../services/pluggyService';
+import { createConnectToken } from '../features/finance/services/pluggyService';
 
 const MOBILE_SRC = path.resolve(__dirname, '..');
 
@@ -44,14 +44,14 @@ describe('BYOK fixes & cleanup', () => {
       'pluggyWebViewBridge.ts deve ser removido',
     );
 
-    const hookSrc = fs.readFileSync(path.join(MOBILE_SRC, 'hooks/useByokSetup.ts'), 'utf8');
+    const hookSrc = fs.readFileSync(path.join(MOBILE_SRC, 'features/finance/hooks/useByokSetup.ts'), 'utf8');
     assert.equal(hookSrc.includes('PluggyPortalWebView'), false, 'useByokSetup não deve importar PluggyPortalWebView');
     assert.equal(hookSrc.includes('setPortalMode'), false, 'useByokSetup não deve manter portalMode morto');
     assert.equal(hookSrc.includes('setWebViewOpen'), false, 'useByokSetup não deve manter webViewOpen morto');
   });
 
   it('PluggyConnectModal usa mode manual + connectionId no sync e oferece Reconectar para bancos com erro', () => {
-    const modalSrc = fs.readFileSync(path.join(MOBILE_SRC, 'screens/PluggyConnectModal.tsx'), 'utf8');
+    const modalSrc = fs.readFileSync(path.join(MOBILE_SRC, 'features/finance/screens/PluggyConnectModal.tsx'), 'utf8');
     assert.equal(modalSrc.includes("mode: 'manual'"), true, 'handleSyncConnection deve usar mode: manual');
     assert.equal(modalSrc.includes('connectionId: conn.id'), true, 'handleSyncConnection deve passar connectionId');
     assert.equal(modalSrc.includes('openReconnectExternal'), true, 'PluggyConnectModal deve oferecer reconexão 1-toque');
@@ -59,13 +59,13 @@ describe('BYOK fixes & cleanup', () => {
   });
 
   it('ByokSyncProgress pluga ByokQuickLimitsCard em doneV e usa BrandLogo', () => {
-    const progSrc = fs.readFileSync(path.join(MOBILE_SRC, 'components/finance/byok/ByokSyncProgress.tsx'), 'utf8');
+    const progSrc = fs.readFileSync(path.join(MOBILE_SRC, 'features/finance/components/byok/ByokSyncProgress.tsx'), 'utf8');
     assert.equal(progSrc.includes('ByokQuickLimitsCard'), true, 'ByokSyncProgress deve renderizar ByokQuickLimitsCard');
     assert.equal(progSrc.includes('BrandLogo'), true, 'ByokSyncProgress deve usar BrandLogo para bancos conhecidos');
   });
 
   it('pluggySync suporta sincronização multi-item no onboarding quando itemId é omitido', () => {
-    const syncSrc = fs.readFileSync(path.join(MOBILE_SRC, 'services/pluggySync.ts'), 'utf8');
+    const syncSrc = fs.readFileSync(path.join(MOBILE_SRC, 'features/finance/services/pluggySync.ts'), 'utf8');
     assert.equal(syncSrc.includes('syncAllDiscoveredItems'), true, 'pluggySync deve exportar syncAllDiscoveredItems');
   });
 });

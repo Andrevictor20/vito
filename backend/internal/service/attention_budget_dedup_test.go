@@ -2,11 +2,12 @@ package service_test
 
 import (
 	"context"
+	"github.com/andrevmp/vito/backend/internal/calendar"
 	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/andrevmp/vito/backend/internal/database"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/andrevmp/vito/backend/internal/service"
@@ -27,7 +28,7 @@ func TestAC03_DedupKeyPropagatesToInboxUpsert(t *testing.T) {
 		t.Fatalf("insert user: %v", err)
 	}
 
-	eventRepo := repository.NewEventRepository(db)
+	eventRepo := calendar.NewEventRepository(db)
 	budgetSvc := service.NewAttentionBudgetService(db, eventRepo)
 	inboxRepo := repository.NewNotificationsInboxRepository(db)
 	inboxSvc := service.NewNotificationsInboxService(inboxRepo)

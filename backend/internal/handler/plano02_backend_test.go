@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/andrevmp/vito/backend/internal/bots"
+	"github.com/andrevmp/vito/backend/internal/tasks"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -15,7 +17,7 @@ import (
 
 	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/ai/adkengine"
-	"github.com/andrevmp/vito/backend/internal/database"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/handler/middleware"
 	"github.com/andrevmp/vito/backend/internal/repository"
@@ -148,7 +150,7 @@ func TestPlano02_RepositoryUsesDefaultWriterQueue(t *testing.T) {
 		t.Fatalf("userRepo.Create: %v", err)
 	}
 
-	todoRepo := repository.NewTodoRepository(db)
+	todoRepo := tasks.NewTodoRepository(db)
 	todo := &domain.Todo{ID: "todo-wq-1", UserID: "u-wq-1", Title: "Teste WQ", Status: domain.TodoStatusPending, Priority: "high", CreatedAt: now, UpdatedAt: now}
 	if err := todoRepo.Create(todo); err != nil {
 		t.Fatalf("todoRepo.Create: %v", err)
@@ -170,7 +172,7 @@ func TestPlano02_RepositoryUsesDefaultWriterQueue(t *testing.T) {
 		t.Fatalf("todoRepo.DeleteSubtask: %v", err)
 	}
 
-	trigRepo := repository.NewTriggerRepository(db)
+	trigRepo := bots.NewTriggerRepository(db)
 	trig := &domain.Trigger{
 		ID: "trig-wq-1", UserID: "u-wq-1", Title: "Radar WQ", Category: domain.CategoryFinance,
 		Query: "PETR4", ConditionType: domain.ConditionPriceAbove, TargetValue: "40",
@@ -204,7 +206,7 @@ func TestPlano02_RepositoryUsesDefaultWriterQueue(t *testing.T) {
 		t.Fatalf("briefRepo.MarkSent: %v", err)
 	}
 
-	pendRepo := repository.NewPendingRepository(db)
+	pendRepo := tasks.NewPendingRepository(db)
 	if err := pendRepo.Create(&domain.PendingItem{
 		ID: "pend-wq-1", UserID: "u-wq-1", Title: "Pend", Category: "geral",
 		Status: domain.PendingStatusInbox, CreatedAt: now, UpdatedAt: now,

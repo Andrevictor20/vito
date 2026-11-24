@@ -2,6 +2,8 @@ package adkengine_test
 
 import (
 	"context"
+	"github.com/andrevmp/vito/backend/internal/calendar"
+	"github.com/andrevmp/vito/backend/internal/tasks"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -12,7 +14,7 @@ import (
 
 	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/ai/adkengine"
-	"github.com/andrevmp/vito/backend/internal/database"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/andrevmp/vito/backend/internal/service"
@@ -108,8 +110,8 @@ func TestCrossDomainBriefingWorkflowRunner_WiredIntoMorningBriefingWorker(t *tes
 
 	worker := service.NewMorningBriefingWorker(
 		briefingRepo,
-		repository.NewEventRepository(db),
-		repository.NewTodoRepository(db),
+		calendar.NewEventRepository(db),
+		tasks.NewTodoRepository(db),
 		userRepo,
 		notifSvc,
 		time.Minute,

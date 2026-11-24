@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { AiProvidersApi } from '../aiProvidersApi';
+import { AiProvidersApi } from '../bots/aiProvidersApi';
 import type { ApiClient } from '../client';
 
 function createMockClient() {

@@ -34,38 +34,38 @@ describe('Polimento — Transições Direcionais, Navbar Animada, Gráficos Mult
   });
 
   it('Gráficos financeiros usam paleta multicolorida variada e animações Reanimated 4 (sem escala monocromática)', () => {
-    const charts = readSrc('components/finance/FinanceSubScreenCharts.tsx');
+    const charts = readSrc('features/finance/components/subscreens/FinanceSubScreenCharts.tsx');
     assert.equal(charts.includes('buildFinScale'), false, 'FinanceSubScreenCharts não deve usar escala monocromática buildFinScale');
     assert.equal(charts.includes('resolveCategoryVisual'), true, 'FinanceDonutChart deve colorir cada categoria com cor semântica distinta');
     assert.equal(charts.includes("from 'react-native-reanimated'"), true, 'Barras diárias e fluxo mensal devem animar em Reanimated 4');
 
-    const monthCards = readSrc('components/finance/FinanceMonthAndCards.tsx');
+    const monthCards = readSrc('features/finance/components/dashboard/FinanceMonthAndCards.tsx');
     assert.equal(monthCards.includes('resolveCategoryVisual'), true, 'Barra segmentada do mês deve usar cores variadas por categoria');
     assert.equal(monthCards.includes('FinanceBankBadge'), true, 'Lista de cartões na Home deve usar FinanceBankBadge');
   });
 
   it('Sub-telas e Home de Finanças exibem ícones semânticos coloridos de marcas, categorias e bancos', () => {
-    const semantic = readSrc('components/finance/FinanceSemanticIcons.tsx');
+    const semantic = readSrc('features/finance/components/shared/FinanceSemanticIcons.tsx');
     assert.equal(semantic.includes('@expo/vector-icons'), false, 'FinanceSemanticIcons deve usar apenas SVGs próprios e BrandLogo');
 
-    const views = readSrc('components/finance/FinanceSubScreenViews.tsx');
+    const views = readSrc('features/finance/components/subscreens/FinanceSubScreenViews.tsx');
     assert.equal(views.includes('TransactionSemanticBadge'), true, 'ExtractSubView e Maiores Gastos devem usar TransactionSemanticBadge');
     assert.equal(views.includes('CategorySemanticBadge'), true, 'SpendingSubView deve usar CategorySemanticBadge na legenda');
 
-    const flowCards = readSrc('components/finance/FinanceSubScreenFlowCardViews.tsx');
+    const flowCards = readSrc('features/finance/components/subscreens/FinanceSubScreenFlowCardViews.tsx');
     assert.equal(flowCards.includes('FinanceBankBadge'), true, 'CardsSubView deve usar FinanceBankBadge');
     assert.equal(flowCards.includes('CategorySemanticBadge'), true, 'CardsSubView deve usar CategorySemanticBadge');
 
-    const secondary = readSrc('components/finance/FinanceSubScreenSecondaryViews.tsx');
+    const secondary = readSrc('features/finance/components/subscreens/FinanceSubScreenSecondaryViews.tsx');
     assert.equal(secondary.includes('TransactionSemanticBadge'), true, 'SubscriptionsSubView deve usar TransactionSemanticBadge');
     assert.equal(secondary.includes('CategorySemanticBadge'), true, 'GoalsSubView (orçamentos) deve usar CategorySemanticBadge');
     assert.equal(secondary.includes('GoalSemanticBadge'), true, 'GoalsSubView (metas) deve usar GoalSemanticBadge');
     assert.equal(secondary.includes('FinanceBankBadge'), true, 'ConnectionsSubView deve usar FinanceBankBadge');
 
-    const homeGoals = readSrc('components/finance/FinanceGoalsCard.tsx');
+    const homeGoals = readSrc('features/finance/components/dashboard/FinanceGoalsCard.tsx');
     assert.equal(homeGoals.includes('CategorySemanticBadge'), true, 'FinanceGoalsCard na Home deve usar CategorySemanticBadge');
 
-    const homeRecent = readSrc('components/finance/RecentTransactionsList.tsx');
+    const homeRecent = readSrc('features/finance/components/dashboard/RecentTransactionsList.tsx');
     assert.equal(homeRecent.includes('TransactionSemanticBadge'), true, 'RecentTransactionsList na Home deve usar TransactionSemanticBadge');
   });
 });

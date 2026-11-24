@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../services/api';
-import { MemoriesResponse } from '../../services/api/memoriesApi';
+import { MemoriesResponse } from '../../services/api/chat/memoriesApi';
 import { X, Trash2, Brain, Sparkles, BookOpen, Clock } from 'lucide-react';
 
 interface UserMemoriesModalProps {

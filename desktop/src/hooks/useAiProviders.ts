@@ -16,7 +16,7 @@ import {
   mergeProvidersWithCatalog,
   resolveModelRef,
 } from '../components/ai/aiProvidersCatalog';
-import { ConnectAiProviderInput, TestAiProviderResponse } from '../services/api/aiProvidersApi';
+import { ConnectAiProviderInput, TestAiProviderResponse } from '../services/api/bots/aiProvidersApi';
 
 export function useAiProviders() {
   const [rawProviders, setRawProviders] = useState<AiProviderInfo[]>([]);

@@ -9,12 +9,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/andrevmp/vito/backend/internal/database"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
-	"github.com/andrevmp/vito/backend/internal/handler"
-	"github.com/andrevmp/vito/backend/internal/repository"
+	"github.com/andrevmp/vito/backend/internal/bots"
+	"github.com/andrevmp/vito/backend/internal/calendar/p2p"
 	"github.com/andrevmp/vito/backend/internal/server"
-	"github.com/andrevmp/vito/backend/internal/service"
+	"github.com/andrevmp/vito/backend/internal/whatsapp"
 )
 
 type noopEvolutionClient struct{}
@@ -39,16 +39,16 @@ func (noopEvolutionClient) SendTextWithQuoted(context.Context, string, string, s
 func (noopEvolutionClient) GetMediaBase64(context.Context, string, interface{}) (string, error) {
 	return "", nil
 }
-func (noopEvolutionClient) FindContacts(context.Context, string) ([]service.WhatsAppContact, error) {
+func (noopEvolutionClient) FindContacts(context.Context, string) ([]whatsapp.WhatsAppContact, error) {
 	return nil, nil
 }
 func (noopEvolutionClient) SendReaction(context.Context, string, string, string, string, bool) error {
 	return nil
 }
-func (noopEvolutionClient) FindMessages(context.Context, service.EvolutionFindMessagesInput) ([]service.WhatsAppChatMessage, error) {
+func (noopEvolutionClient) FindMessages(context.Context, whatsapp.EvolutionFindMessagesInput) ([]whatsapp.WhatsAppChatMessage, error) {
 	return nil, nil
 }
-func (noopEvolutionClient) FindGroups(context.Context, string) ([]service.WhatsAppGroup, error) {
+func (noopEvolutionClient) FindGroups(context.Context, string) ([]whatsapp.WhatsAppGroup, error) {
 	return nil, nil
 }
 func (noopEvolutionClient) FindParticipants(context.Context, string, string) ([]string, error) {
@@ -66,14 +66,14 @@ func TestWhatsAppWebhook_NotThrottledByGlobalAPIRateLimiter(t *testing.T) {
 	}
 	defer db.Close()
 
-	waRepo := repository.NewWhatsAppRepository(db)
-	waSvc := service.NewWhatsAppService(service.WhatsAppServiceConfig{}, waRepo, noopEvolutionClient{})
-	waHandler := handler.NewWhatsAppHandler(waSvc)
+	waRepo := whatsapp.NewWhatsAppRepository(db)
+	waSvc := whatsapp.NewWhatsAppService(whatsapp.WhatsAppServiceConfig{}, waRepo, noopEvolutionClient{})
+	waHandler := whatsapp.NewWhatsAppHandler(waSvc)
 
-	botRepo := repository.NewBotRepository(db)
-	botHandler := handler.NewBotHandler(db, botRepo, nil)
+	botRepo := bots.NewBotRepository(db)
+	botHandler := bots.NewBotHandler(db, botRepo, nil)
 
-	p2pHandler := handler.NewP2PMeetingHandler(nil, nil, nil)
+	p2pHandler := p2p.NewP2PMeetingHandler(nil, nil, nil)
 
 	srv := server.New(server.Config{
 		WhatsAppHandler: waHandler,

@@ -1,6 +1,6 @@
 import * as Linking from 'expo-linking';
 import { User } from '../types';
-import { getMobileDeviceName, IN_APP_BROWSER_OPTIONS, IN_APP_BROWSER_OPTIONS_WITH_PROXY } from '../utils/platformInfo';
+import { getMobileDeviceName, IN_APP_BROWSER_OPTIONS, IN_APP_BROWSER_OPTIONS_WITH_PROXY } from '../utils/device/platformInfo';
 import {
   isGoogleOAuthCallbackUrl,
   parseGoogleOAuthCallback,

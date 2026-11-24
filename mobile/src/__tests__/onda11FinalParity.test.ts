@@ -26,14 +26,14 @@ test('Onda 11 — Zero @expo/vector-icons em mobile/src e integridade de mascote
   }
   assert.deepEqual(offenders, [], `Nenhum arquivo de produção deve importar @expo/vector-icons: ${offenders.join(', ')}`)
 
-  const builders = fs.readFileSync(path.join(MOBILE_SRC, 'components/mascot/mascotAnimationBuilders.ts'), 'utf8')
+  const builders = fs.readFileSync(path.join(MOBILE_SRC, 'features/bots/mascot/mascotAnimationBuilders.ts'), 'utf8')
   assert.equal(builders.includes('mascotSpecs'), true, 'mascotAnimationBuilders deve consumir mascotSpecs')
 
-  const aiLogo = fs.readFileSync(path.join(MOBILE_SRC, 'components/ai/AiProviderLogo.tsx'), 'utf8')
+  const aiLogo = fs.readFileSync(path.join(MOBILE_SRC, 'features/profile/components/ai/AiProviderLogo.tsx'), 'utf8')
   assert.equal(aiLogo.includes('MascotVectorRig'), true, 'AiProviderLogo deve usar MascotVectorRig para Servidor do Vito')
   assert.equal(aiLogo.includes('useTheme'), true, 'AiProviderLogo deve adaptar o ícone do Vito ao tema')
 
-  const catalog = fs.readFileSync(path.join(MOBILE_SRC, 'components/bots/BotsCatalogTab.tsx'), 'utf8')
+  const catalog = fs.readFileSync(path.join(MOBILE_SRC, 'features/bots/components/BotsCatalogTab.tsx'), 'utf8')
   assert.equal(catalog.includes('tileCell'), true, 'BotsCatalogTab deve manter grid de 2 colunas via tileCell')
   assert.equal(catalog.includes('ProtoUiIcon'), true, 'BotsCatalogTab deve usar ProtoUiIcon')
 })

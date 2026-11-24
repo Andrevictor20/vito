@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/andrevmp/vito/backend/internal/bots"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -13,7 +14,7 @@ import (
 	"time"
 
 	"github.com/andrevmp/vito/backend/internal/ai/adkengine"
-	"github.com/andrevmp/vito/backend/internal/database"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/handler"
 	"github.com/andrevmp/vito/backend/internal/repository"
@@ -36,7 +37,7 @@ func TestServer_AIRoutesIntegration(t *testing.T) {
 	aiProvRepo := repository.NewAIProviderRepository(db)
 	aiSettingsRepo := repository.NewAISettingsRepository(db)
 	convRepo := repository.NewConversationStoreRepository(db)
-	triggerRepo := repository.NewTriggerRepository(db)
+	triggerRepo := bots.NewTriggerRepository(db)
 	chatRepo := repository.NewChatRepository(db)
 
 	authSvc := service.NewAuthService(userRepo, "server-ai-jwt-secret")
@@ -57,7 +58,7 @@ func TestServer_AIRoutesIntegration(t *testing.T) {
 	aiH := handler.NewAIProviderHandler(aiProvSvc)
 	chatH := handler.NewChatHandler(service.NewChatService(chatRepo))
 	chatH.SetAIProviderService(aiProvSvc)
-	botH := handler.NewBotHandler(db, repository.NewBotRepository(db), nil)
+	botH := bots.NewBotHandler(db, bots.NewBotRepository(db), nil)
 	botH.SetAIProviderService(aiProvSvc)
 
 	srv := server.New(server.Config{

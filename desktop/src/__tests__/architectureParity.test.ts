@@ -48,7 +48,7 @@ describe('Paridade Arquitetural Desktop ↔ Mobile (Plano 13)', () => {
   // Requisito 2: Paridade dos 11 Cartões Estruturados de Chat
   // =========================================================================
   it('AC-05: todos os 11 cartões estruturados de chat do mobile devem existir no desktop', () => {
-    const mobileCardsDir = path.resolve(mobileSrcDir, 'components/chat/cards');
+    const mobileCardsDir = path.resolve(mobileSrcDir, 'features/chat/components/cards');
     const desktopCardsDir = path.resolve(desktopSrcDir, 'components/chat/cards');
 
     expect(

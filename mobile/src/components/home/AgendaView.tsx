@@ -12,16 +12,16 @@ import { ProtoUiIcon } from '../../icons/ProtoUiIcons';
 import { tokens } from '../../theme/tokens';
 import { useTheme } from '../../context/ThemeContext';
 import { StaggerItem } from '../../theme/vitoMotion';
-import { EventCard } from '../calendar/EventCard';
-import { AgendaWeekStrip } from '../calendar/AgendaWeekStrip';
-import { AgendaSummariesCard } from '../calendar/AgendaSummariesCard';
+import { EventCard } from '../../features/calendar/components/calendar/EventCard';
+import { AgendaWeekStrip } from '../../features/calendar/components/calendar/AgendaWeekStrip';
+import { AgendaSummariesCard } from '../../features/calendar/components/calendar/AgendaSummariesCard';
 import {
   AgendaFilterState,
   DEFAULT_AGENDA_FILTER,
   countActiveAgendaFilters,
   filterAgendaEvents,
-} from '../../utils/agendaFilter';
-import { isAllDayEvent } from '../../utils/calendarDateUtils';
+} from '../../features/calendar/utils/agendaFilter';
+import { isAllDayEvent } from '../../features/calendar/utils/calendarDateUtils';
 import type { Event } from '../../types';
 
 export interface AgendaViewProps {

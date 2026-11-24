@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/andrevmp/vito/backend/internal/calendar"
+	"github.com/andrevmp/vito/backend/internal/tasks"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -11,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/andrevmp/vito/backend/internal/database"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/andrevmp/vito/backend/internal/service"
@@ -425,8 +427,8 @@ func TestMorningBriefingWorker_AttentionBudget_DefersAndDeduplicates(t *testing.
 	}
 
 	briefingRepo := repository.NewBriefingRepository(db)
-	eventRepo := repository.NewEventRepository(db)
-	todoRepo := repository.NewTodoRepository(db)
+	eventRepo := calendar.NewEventRepository(db)
+	todoRepo := tasks.NewTodoRepository(db)
 	userRepo := repository.NewUserRepository(db)
 	tokenRepo := &mockTokenRepoForBriefing{
 		token: domain.DeviceToken{UserID: userID, Token: "ExponentPushToken[bb]", Platform: "android"},

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/andrevmp/vito/backend/internal/database"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
 )
 
@@ -126,7 +126,8 @@ func (r *MemoryRepositorySQLite) loadUserEmbeddings(userID string) map[string][]
 }
 
 // ftsQuery monta uma consulta FTS5 segura a partir do texto (OR entre termos).
-func ftsQuery(raw string) string {
+// FTSQuery normaliza uma consulta textual em termos FTS5 entre aspas.
+func FTSQuery(raw string) string {
 	terms := strings.FieldsFunc(strings.ToLower(raw), func(r rune) bool {
 		return !(r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r >= 'à' && r <= 'ÿ')
 	})
@@ -145,7 +146,7 @@ func ftsQuery(raw string) string {
 }
 
 // SearchRelevant ranqueia memórias combinando busca híbrida FTS5 BM25 + Cosine Similarity vetorial + importância + recência.
-// Memórias substituídas (superseded_by != '') nunca retornam.
+// Memórias substituídas (superseded_by != ”) nunca retornam.
 func (r *MemoryRepositorySQLite) SearchRelevant(userID, query string, limit int) ([]domain.Memory, error) {
 	var queryVec []float32
 	if r.embedder != nil && strings.TrimSpace(query) != "" {
@@ -168,7 +169,7 @@ func (r *MemoryRepositorySQLite) SearchRelevantHybrid(userID, query string, limi
 	bm25ByID := make(map[string]float64)
 	memByID := make(map[string]domain.Memory)
 
-	match := ftsQuery(query)
+	match := FTSQuery(query)
 	if match != "" {
 		rows, err := r.db.Query(`
 			SELECT m.id, m.user_id, m.category, m.content,

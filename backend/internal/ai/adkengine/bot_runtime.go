@@ -3,6 +3,7 @@ package adkengine
 import (
 	"context"
 	"fmt"
+	"github.com/andrevmp/vito/backend/internal/bots"
 	"strings"
 
 	"github.com/google/uuid"
@@ -13,10 +14,9 @@ import (
 	"google.golang.org/genai"
 
 	"github.com/andrevmp/vito/backend/internal/domain"
-	"github.com/andrevmp/vito/backend/internal/service"
 )
 
-// BotRuntimeAdapter implementa service.BotADKRuntime sobre RoutedLLM, ToolsetBridge, GuardrailPlugin e SQLiteSessionService.
+// BotRuntimeAdapter implementa bots.BotADKRuntime sobre RoutedLLM, ToolsetBridge, GuardrailPlugin e SQLiteSessionService.
 type BotRuntimeAdapter struct {
 	routedLLM      *RoutedLLM
 	sessionService *SQLiteSessionService
@@ -78,7 +78,7 @@ func (a *BotRuntimeAdapter) EnsureBotSession(ctx context.Context, userID, botID,
 }
 
 // ExecuteBotTurn instancia o llmagent isolado do bot e executa um turno via adk/v2/runner.Runner.
-func (a *BotRuntimeAdapter) ExecuteBotTurn(ctx context.Context, req service.BotRuntimeRequest) (*service.BotRuntimeResult, error) {
+func (a *BotRuntimeAdapter) ExecuteBotTurn(ctx context.Context, req bots.BotRuntimeRequest) (*bots.BotRuntimeResult, error) {
 	if a.routedLLM == nil {
 		return nil, fmt.Errorf("RoutedLLM não configurado no BotRuntimeAdapter")
 	}
@@ -197,7 +197,7 @@ func (a *BotRuntimeAdapter) ExecuteBotTurn(ctx context.Context, req service.BotR
 	}
 
 	collector.Mu.Lock()
-	res := &service.BotRuntimeResult{
+	res := &bots.BotRuntimeResult{
 		Cards:                 append([]domain.ChatCard(nil), collector.Cards...),
 		ExecutedTools:         append([]domain.ExecutedTool(nil), collector.ExecutedTools...),
 		RequiresConfirmation:  collector.RequiresConfirmation,

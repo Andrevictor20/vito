@@ -4,10 +4,10 @@ import * as Notifications from 'expo-notifications';
 import { DOCK_TABS, type DockTabType } from '../components/common/FloatingTabBar';
 import { Header, HeaderRoundButton } from '../components/common/Header';
 import { dataSync, tabNavigationBus } from '../services/dataSync';
-import { BotsScreen } from '../screens/BotsScreen';
-import { ChatScreen, ChatScreenRef } from '../screens/ChatScreen';
-import { TasksScreen } from '../screens/TasksScreen';
-import type { MainTabType } from '../utils/pagerNavigation';
+import { BotsScreen } from '../features/bots/screens/BotsScreen';
+import { ChatScreen, ChatScreenRef } from '../features/chat/screens/ChatScreen';
+import { TasksScreen } from '../features/tasks/screens/TasksScreen';
+import type { MainTabType } from '../utils/navigation/pagerNavigation';
 import { useHomeDataContext } from './HomeDataProvider';
 import { navigationRef } from './navigationRef';
 

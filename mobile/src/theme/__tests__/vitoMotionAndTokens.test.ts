@@ -99,11 +99,11 @@ describe('Design System v5 & Global vito-motion (Mobile)', () => {
       'utf8'
     );
     const inputDockSrc = fs.readFileSync(
-      path.join(MOBILE_SRC, 'components/chat/ChatInputDock.tsx'),
+      path.join(MOBILE_SRC, 'features/chat/components/ChatInputDock.tsx'),
       'utf8'
     );
     const chatScreenSrc = fs.readFileSync(
-      path.join(MOBILE_SRC, 'screens/ChatScreen.tsx'),
+      path.join(MOBILE_SRC, 'features/chat/screens/ChatScreen.tsx'),
       'utf8'
     );
 

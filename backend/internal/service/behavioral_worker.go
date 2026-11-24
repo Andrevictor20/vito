@@ -13,6 +13,11 @@ import (
 	"github.com/andrevmp/vito/backend/internal/domain"
 )
 
+// PushDispatcher define o contrato mínimo de envio de push notifications usado pelos workers.
+type PushDispatcher interface {
+	SendPushToUser(userID, title, body, priority string, data map[string]interface{}) (int, error)
+}
+
 // BehavioralWorker consolida padrões de uso em insights ("dream worker", §8.4 ciclo 3).
 // Roda 1x/dia e grava até 3 memórias category=behavioral_insight (rotaciona as antigas).
 type BehavioralWorker struct {

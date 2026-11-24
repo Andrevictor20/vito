@@ -4,13 +4,15 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"github.com/andrevmp/vito/backend/internal/calendar"
+	"github.com/andrevmp/vito/backend/internal/tasks"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/andrevmp/vito/backend/internal/database"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/handler"
 	"github.com/andrevmp/vito/backend/internal/repository"
@@ -52,10 +54,10 @@ func setupV5HTTPServer(t *testing.T) (*httptest.Server, string, string, *reposit
 	}
 
 	inboxRepo := repository.NewNotificationsInboxRepository(db)
-	budgetSvc := service.NewAttentionBudgetService(db, repository.NewEventRepository(db))
+	budgetSvc := service.NewAttentionBudgetService(db, calendar.NewEventRepository(db))
 	inboxSvc := service.NewNotificationsInboxService(inboxRepo)
 	inboxSvc.SetAttentionBudget(budgetSvc)
-	inboxSvc.SetTodoRepository(repository.NewTodoRepository(db))
+	inboxSvc.SetTodoRepository(tasks.NewTodoRepository(db))
 
 	storeRepo := repository.NewStoreComplianceRepository(db)
 	storeSvc := service.NewStoreComplianceService(storeRepo)

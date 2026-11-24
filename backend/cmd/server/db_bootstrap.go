@@ -4,8 +4,8 @@ import (
 	"log"
 	"os"
 
-	"github.com/andrevmp/vito/backend/internal/config"
-	"github.com/andrevmp/vito/backend/internal/database"
+	"github.com/andrevmp/vito/backend/internal/platform/config"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 )
 
 // bootstrapDatabaseIntegrity verifica (e repara) o banco SQLite antes de abri-lo.

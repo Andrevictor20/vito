@@ -1,11 +1,11 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { qaParse, DEFAULT_TASK_LISTS, formatIsoDate } from '../utils/taskQuickAddParser';
+import { qaParse, DEFAULT_TASK_LISTS, formatIsoDate } from '../features/tasks/utils/taskQuickAddParser';
 import {
   countUnreadNotifications,
   filterNotifications,
   groupNotifications,
-} from '../components/notifications/notificationHelpers';
+} from '../features/notifications/components/notificationHelpers';
 import {
   DEVICE_PERMISSION_ROWS,
   FAQ_ITEMS,
@@ -13,8 +13,8 @@ import {
   LEGAL_DOCS,
   NOTIFICATION_CATEGORY_ROWS,
   STORE_PLANS,
-} from '../components/store/StoreCatalogData';
-import type { InboxNotification } from '../services/api/inboxNotificationsApi';
+} from '../features/store/components/StoreCatalogData';
+import type { InboxNotification } from '../features/notifications/services/inboxNotificationsApi';
 
 describe('Onda V5 qaParse (mobile)', () => {
   const ref = new Date(2026, 3, 20, 10, 0, 0); // Segunda-feira, 20/04/2026

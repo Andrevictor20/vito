@@ -316,7 +316,7 @@ func (s *EmailService) SendMeetingConfirmation(ctx context.Context, toEmail, toN
 		return fmt.Errorf("destinatário inválido: %s", toEmail)
 	}
 
-	loc := brtLocation()
+	loc := time.FixedZone("BRT", -3*3600)
 	localStart := startAt.In(loc)
 	localEnd := endAt.In(loc)
 	dateFormatted := localStart.Format("02/01/2006 (Monday)")

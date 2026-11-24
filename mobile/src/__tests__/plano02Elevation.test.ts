@@ -8,7 +8,7 @@ import {
   buildStreamFallbackResponse,
   normalizeStreamResponse,
   extractDeltaSteps,
-} from '../services/api/chatStreamHelper';
+} from '../features/chat/services/chatStreamHelper';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -16,11 +16,11 @@ const __dirname = path.dirname(__filename);
 describe('Plano 02 — Elevação Premium (SSE, Zero-Jank, Barge-In Kotlin & Alarme Crítico Nativo)', () => {
   it('Passo B: FormattedChatMessageText e ChatMessageBubble usam memoização (React.memo + useMemo)', () => {
     const formattedSrc = fs.readFileSync(
-      path.resolve(__dirname, '../components/chat/FormattedChatMessageText.tsx'),
+      path.resolve(__dirname, '../features/chat/components/FormattedChatMessageText.tsx'),
       'utf8'
     );
     const bubbleSrc = fs.readFileSync(
-      path.resolve(__dirname, '../components/chat/ChatMessageBubble.tsx'),
+      path.resolve(__dirname, '../features/chat/components/ChatMessageBubble.tsx'),
       'utf8'
     );
     assert.ok(formattedSrc.includes('useMemo'));
@@ -30,11 +30,11 @@ describe('Plano 02 — Elevação Premium (SSE, Zero-Jank, Barge-In Kotlin & Ala
 
   it('Passo B: inputText isolado em ChatInputDock (ChatScreen não mantém estado de digitação por tecla)', () => {
     const chatScreenSrc = fs.readFileSync(
-      path.resolve(__dirname, '../screens/ChatScreen.tsx'),
+      path.resolve(__dirname, '../features/chat/screens/ChatScreen.tsx'),
       'utf8'
     );
     const dockSrc = fs.readFileSync(
-      path.resolve(__dirname, '../components/chat/ChatInputDock.tsx'),
+      path.resolve(__dirname, '../features/chat/components/ChatInputDock.tsx'),
       'utf8'
     );
     assert.equal(chatScreenSrc.includes('const [inputText, setInputText]'), false);
@@ -43,11 +43,11 @@ describe('Plano 02 — Elevação Premium (SSE, Zero-Jank, Barge-In Kotlin & Ala
   });
 
   it('Passo B: ThinkingProcessAccordion integrado com touch target >= 44dp e edit buttons >= 44dp', () => {
-    const accordionPath = path.resolve(__dirname, '../components/chat/ThinkingProcessAccordion.tsx');
+    const accordionPath = path.resolve(__dirname, '../features/chat/components/ThinkingProcessAccordion.tsx');
     assert.equal(fs.existsSync(accordionPath), true);
     const accordionSrc = fs.readFileSync(accordionPath, 'utf8');
-    const chatScreenSrc = fs.readFileSync(path.resolve(__dirname, '../screens/ChatScreen.tsx'), 'utf8');
-    const bubbleSrc = fs.readFileSync(path.resolve(__dirname, '../components/chat/ChatMessageBubble.tsx'), 'utf8');
+    const chatScreenSrc = fs.readFileSync(path.resolve(__dirname, '../features/chat/screens/ChatScreen.tsx'), 'utf8');
+    const bubbleSrc = fs.readFileSync(path.resolve(__dirname, '../features/chat/components/ChatMessageBubble.tsx'), 'utf8');
 
     assert.ok(accordionSrc.includes('minHeight: 44'));
     assert.ok(accordionSrc.includes('hitSlop'));
@@ -58,15 +58,15 @@ describe('Plano 02 — Elevação Premium (SSE, Zero-Jank, Barge-In Kotlin & Ala
 
   it('Passo B: ChatApi + chatStreamHelper consomem /api/v1/assistant/chat/stream com intent obrigatório e deltas de raciocínio', () => {
     const chatApiSrc = fs.readFileSync(
-      path.resolve(__dirname, '../services/api/chatApi.ts'),
+      path.resolve(__dirname, '../features/chat/services/chatApi.ts'),
       'utf8'
     );
     const runnerSrc = fs.readFileSync(
-      path.resolve(__dirname, '../hooks/chatStreamRunner.ts'),
+      path.resolve(__dirname, '../features/chat/hooks/chatStreamRunner.ts'),
       'utf8'
     );
     const useMessagesSrc = fs.readFileSync(
-      path.resolve(__dirname, '../hooks/useChatMessages.ts'),
+      path.resolve(__dirname, '../features/chat/hooks/useChatMessages.ts'),
       'utf8'
     );
     assert.ok(chatApiSrc.includes('assistantChatStream'));

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, KeyRound, Cpu, RefreshCw, CheckCircle2, Trash2, Eye, EyeOff, AlertTriangle } from 'lucide-react';
 import { AiModelItem, AiProviderInfo, AiProviderKey } from '../../types';
-import { TestAiProviderResponse } from '../../services/api/aiProvidersApi';
+import { TestAiProviderResponse } from '../../services/api/bots/aiProvidersApi';
 import { Button } from '../ui/Button';
 import { AiProviderLogo } from './AiProviderLogo';
 import {

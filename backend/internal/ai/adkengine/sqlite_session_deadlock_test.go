@@ -3,13 +3,14 @@ package adkengine_test
 import (
 	"context"
 	"encoding/json"
+	"github.com/andrevmp/vito/backend/internal/tasks"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/ai/adkengine"
-	"github.com/andrevmp/vito/backend/internal/database"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/andrevmp/vito/backend/internal/service"
@@ -17,7 +18,7 @@ import (
 )
 
 type testAC01TodoSvc struct {
-	svc *service.TodoService
+	svc *tasks.TodoService
 }
 
 func (a *testAC01TodoSvc) GetTodos(ctx context.Context, userID string) ([]*domain.Todo, error) {
@@ -81,13 +82,13 @@ func TestAC01_NoDeadlockWithActiveWriterQueue(t *testing.T) {
 	}
 
 	convRepo := repository.NewConversationStoreRepository(db)
-	todoRepo := repository.NewTodoRepository(db)
-	todoSvc := service.NewTodoService(todoRepo)
+	todoRepo := tasks.NewTodoRepository(db)
+	todoSvc := tasks.NewTodoService(todoRepo)
 	confGate := service.NewConfirmationGateService(db)
 	scopeGuard := service.NewScopeGuard()
 
 	reg := toolsets.NewToolsetsRegistry()
-	reg.Register(toolsets.NewTaskPendingToolset(&testAC01TodoSvc{svc: todoSvc}))
+	reg.Register(tasks.NewTaskPendingToolset(&testAC01TodoSvc{svc: todoSvc}))
 
 	provider := &fakeAgentProvider{
 		name:          "Fake-Gemini",

@@ -14,7 +14,7 @@ import {
   getPickerViewModel,
   resolveSessionModelPref,
 } from '../services/ai/aiProviderCatalog';
-import { buildAssistantMessage } from '../utils/chatMessageBuilder';
+import { buildAssistantMessage } from '../features/chat/utils/chatMessageBuilder';
 import type { ModelProviderGroup } from '../types/aiProviders';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -196,7 +196,7 @@ describe('Plano 03 — Provedores de IA BYOK & Seletor de Modelo (Ondas D & E)',
     assert.equal(formatModelDisplayName('srv:auto'), 'Vito Auto');
 
     const sheetSrc = fs.readFileSync(
-      path.resolve(__dirname, '../components/ai/AiProviderSheet.tsx'),
+      path.resolve(__dirname, '../features/profile/components/ai/AiProviderSheet.tsx'),
       'utf8'
     );
     assert.equal(sheetSrc.includes('SecureStore'), false);
@@ -206,7 +206,7 @@ describe('Plano 03 — Provedores de IA BYOK & Seletor de Modelo (Ondas D & E)',
     assert.ok(sheetSrc.includes('accessibilityRole="alert"'));
 
     const dockSrc = fs.readFileSync(
-      path.resolve(__dirname, '../components/chat/ChatInputDock.tsx'),
+      path.resolve(__dirname, '../features/chat/components/ChatInputDock.tsx'),
       'utf8'
     );
     assert.equal(dockSrc.includes('Foco em'), false);

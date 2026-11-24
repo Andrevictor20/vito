@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/andrevmp/vito/backend/internal/bots"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -15,7 +16,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/andrevmp/vito/backend/internal/ai/adkengine"
-	"github.com/andrevmp/vito/backend/internal/database"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/handler"
 	"github.com/andrevmp/vito/backend/internal/handler/middleware"
@@ -43,7 +44,7 @@ func setupAIProviderHandlerTest(t *testing.T, verifyStatus int) (*chi.Mux, strin
 	aiProvRepo := repository.NewAIProviderRepository(db)
 	aiSettingsRepo := repository.NewAISettingsRepository(db)
 	convRepo := repository.NewConversationStoreRepository(db)
-	triggerRepo := repository.NewTriggerRepository(db)
+	triggerRepo := bots.NewTriggerRepository(db)
 	chatRepo := repository.NewChatRepository(db)
 
 	vault := service.NewAIKeyVault("0123456789abcdef0123456789abcdef")
@@ -76,7 +77,7 @@ func setupAIProviderHandlerTest(t *testing.T, verifyStatus int) (*chi.Mux, strin
 	aiH := handler.NewAIProviderHandler(svc)
 	chatH := handler.NewChatHandler(service.NewChatService(chatRepo))
 	chatH.SetAIProviderService(svc)
-	botH := handler.NewBotHandler(db, repository.NewBotRepository(db), nil)
+	botH := bots.NewBotHandler(db, bots.NewBotRepository(db), nil)
 	botH.SetAIProviderService(svc)
 
 	r := chi.NewRouter()

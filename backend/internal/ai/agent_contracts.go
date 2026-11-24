@@ -41,14 +41,14 @@ const (
 
 // TurnMessage representa um turno real enviado ao modelo.
 type TurnMessage struct {
-	Role       ChatRole        `json:"role"`
-	Content    string          `json:"content,omitempty"`
-	Thought    string          `json:"thought,omitempty"`
-	ToolCalls  []ToolCall      `json:"tool_calls,omitempty"`
-	ToolCallID string          `json:"tool_call_id,omitempty"`
-	Name       string          `json:"name,omitempty"`
-	ImageBytes []byte          `json:"-"`
-	ImageMIME  string          `json:"-"`
+	Role       ChatRole   `json:"role"`
+	Content    string     `json:"content,omitempty"`
+	Thought    string     `json:"thought,omitempty"`
+	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
+	ToolCallID string     `json:"tool_call_id,omitempty"`
+	Name       string     `json:"name,omitempty"`
+	ImageBytes []byte     `json:"-"`
+	ImageMIME  string     `json:"-"`
 }
 
 // ToolDefinition descreve uma das 8 Macro-Ferramentas (Domain Toolsets) para Function Calling.

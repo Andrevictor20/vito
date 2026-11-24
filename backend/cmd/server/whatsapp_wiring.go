@@ -3,10 +3,12 @@ package main
 import (
 	"context"
 	"database/sql"
+	"github.com/andrevmp/vito/backend/internal/ai/voice"
+	"github.com/andrevmp/vito/backend/internal/whatsapp"
 	"time"
 
 	"github.com/andrevmp/vito/backend/internal/ai"
-	"github.com/andrevmp/vito/backend/internal/config"
+	"github.com/andrevmp/vito/backend/internal/platform/config"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/andrevmp/vito/backend/internal/service"
@@ -15,15 +17,15 @@ import (
 // whatsappWiring concentra as peças do assistente de WhatsApp para manter o
 // main.go legível (e abaixo do teto de 500 linhas).
 type whatsappWiring struct {
-	ContextSvc     *service.WhatsAppContextService
-	Directory      *service.WhatsAppDirectoryService
-	ContactsCache  *service.WhatsAppContactsCache
+	ContextSvc     *whatsapp.WhatsAppContextService
+	Directory      *whatsapp.WhatsAppDirectoryService
+	ContactsCache  *whatsapp.WhatsAppContactsCache
 	ContactRepo    domain.SyncedContactRepository
-	OwnerCache     *service.WhatsAppOwnerCache
-	GroupMeta      *service.WhatsAppGroupMeta
-	BackfillWorker *service.WhatsAppBackfillWorker
-	MediaEnricher  *service.WhatsAppMediaEnricher
-	MediaWorker    *service.WhatsAppMediaWorker
+	OwnerCache     *whatsapp.WhatsAppOwnerCache
+	GroupMeta      *whatsapp.WhatsAppGroupMeta
+	BackfillWorker *whatsapp.WhatsAppBackfillWorker
+	MediaEnricher  *whatsapp.WhatsAppMediaEnricher
+	MediaWorker    *whatsapp.WhatsAppMediaWorker
 }
 
 // setupWhatsAppAssistant monta o assistente de WhatsApp (contexto, diretório de
@@ -33,16 +35,16 @@ func setupWhatsAppAssistant(
 	cfg *config.Config,
 	db *sql.DB,
 	waRepo domain.WhatsAppRepository,
-	evoClient service.EvolutionAPIClient,
-	waSvc *service.WhatsAppService,
+	evoClient whatsapp.EvolutionAPIClient,
+	waSvc *whatsapp.WhatsAppService,
 	notifSvc *service.NotificationService,
 	accountCleanupWorker *service.AccountCleanupWorker,
 	visionProvider ai.ImageDescriber,
-	audioTranscriber ai.AudioTranscriber,
+	audioTranscriber voice.AudioTranscriber,
 ) *whatsappWiring {
-	waConvRepo := repository.NewWhatsAppConversationRepository(db)
+	waConvRepo := whatsapp.NewWhatsAppConversationRepository(db)
 
-	waContextCfg := service.DefaultWhatsAppContextConfig()
+	waContextCfg := whatsapp.DefaultWhatsAppContextConfig()
 	if cfg.WhatsAppContextScope != "" {
 		waContextCfg.ScopeDefault = cfg.WhatsAppContextScope
 	}
@@ -54,15 +56,15 @@ func setupWhatsAppAssistant(
 		waContextCfg.MaxAge = time.Duration(cfg.WhatsAppContextMaxAgeDays) * 24 * time.Hour
 	}
 
-	contextSvc := service.NewWhatsAppContextService(waConvRepo, waContextCfg)
-	groupMeta := service.NewWhatsAppGroupMeta(evoClient, time.Hour, 24*time.Hour)
-	ownerCache := service.NewWhatsAppOwnerCache(evoClient, time.Hour)
+	contextSvc := whatsapp.NewWhatsAppContextService(waConvRepo, waContextCfg)
+	groupMeta := whatsapp.NewWhatsAppGroupMeta(evoClient, time.Hour, 24*time.Hour)
+	ownerCache := whatsapp.NewWhatsAppOwnerCache(evoClient, time.Hour)
 	contactRepo := repository.NewContactRepository(db)
-	contactsCache := service.NewWhatsAppContactsCache(evoClient, time.Hour)
+	contactsCache := whatsapp.NewWhatsAppContactsCache(evoClient, time.Hour)
 	if allContacts, err := contactRepo.ListAll(context.Background()); err == nil && len(allContacts) > 0 {
 		contactsCache.HydrateFromContacts(allContacts)
 	}
-	directory := service.NewWhatsAppDirectoryService(waConvRepo, waContextCfg, contactsCache)
+	directory := whatsapp.NewWhatsAppDirectoryService(waConvRepo, waContextCfg, contactsCache)
 	directory.SetContactRepository(contactRepo)
 
 	waSvc.SetContextService(contextSvc)
@@ -88,15 +90,15 @@ func setupWhatsAppAssistant(
 	// Backfill do contexto do WhatsApp: importa o histórico recente da Evolution API.
 	// Roda em background (nunca no caminho quente) e é idempotente.
 	if cfg.WhatsAppBackfillEnabled {
-		backfillCfg := service.DefaultWhatsAppBackfillConfig()
+		backfillCfg := whatsapp.DefaultWhatsAppBackfillConfig()
 		if cfg.WhatsAppBackfillLookbackDays > 0 {
 			backfillCfg.LookbackDay = cfg.WhatsAppBackfillLookbackDays
 		}
 		if cfg.WhatsAppBackfillMaxMessages > 0 {
 			backfillCfg.MaxMessages = cfg.WhatsAppBackfillMaxMessages
 		}
-		backfill := service.NewWhatsAppBackfillService(evoClient, contextSvc, groupMeta, ownerCache, contactsCache, waRepo, backfillCfg)
-		backfillWorker := service.NewWhatsAppBackfillWorker(backfill, groupMeta, 6*time.Hour)
+		backfill := whatsapp.NewWhatsAppBackfillService(evoClient, contextSvc, groupMeta, ownerCache, contactsCache, waRepo, backfillCfg)
+		backfillWorker := whatsapp.NewWhatsAppBackfillWorker(backfill, groupMeta, 6*time.Hour)
 		backfillWorker.Start()
 		wiring.BackfillWorker = backfillWorker
 	}
@@ -105,15 +107,15 @@ func setupWhatsAppAssistant(
 	// "ler" mensagens que já passaram. O provider de visão é o OpenRouter (cota
 	// separada) — o Gemini free tier fica reservado ao chat.
 	if cfg.WhatsAppMediaEnrichEnabled {
-		enricherCfg := service.DefaultWhatsAppMediaEnricherConfig()
+		enricherCfg := whatsapp.DefaultWhatsAppMediaEnricherConfig()
 		if cfg.WhatsAppMediaMaxAgeDays > 0 {
 			enricherCfg.MaxAge = time.Duration(cfg.WhatsAppMediaMaxAgeDays) * 24 * time.Hour
 		}
-		enricher := service.NewWhatsAppMediaEnricher(evoClient, contextSvc, audioTranscriber, visionProvider, enricherCfg)
+		enricher := whatsapp.NewWhatsAppMediaEnricher(evoClient, contextSvc, audioTranscriber, visionProvider, enricherCfg)
 		waSvc.SetMediaEnricher(enricher)
 		wiring.MediaEnricher = enricher
 
-		mediaWorker := service.NewWhatsAppMediaWorker(enricher, waRepo, cfg.WhatsAppMediaEnrichPerCycle, time.Duration(cfg.WhatsAppMediaEnrichIntervalMin)*time.Minute)
+		mediaWorker := whatsapp.NewWhatsAppMediaWorker(enricher, waRepo, cfg.WhatsAppMediaEnrichPerCycle, time.Duration(cfg.WhatsAppMediaEnrichIntervalMin)*time.Minute)
 		mediaWorker.Start()
 		wiring.MediaWorker = mediaWorker
 	}

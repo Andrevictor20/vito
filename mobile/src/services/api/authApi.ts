@@ -1,6 +1,6 @@
 import { ApiClient } from './client';
 import { User, AuthResponse, UserSession } from '../../types';
-import { getMobileDeviceName } from '../../utils/platformInfo';
+import { getMobileDeviceName } from '../../utils/device/platformInfo';
 
 export class AuthApi {
   constructor(private client: ApiClient) {}

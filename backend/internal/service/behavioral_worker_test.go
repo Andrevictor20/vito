@@ -2,12 +2,14 @@ package service_test
 
 import (
 	"context"
+	"github.com/andrevmp/vito/backend/internal/calendar"
+	"github.com/andrevmp/vito/backend/internal/tasks"
 	"path/filepath"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/andrevmp/vito/backend/internal/database"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/andrevmp/vito/backend/internal/service"
@@ -44,8 +46,8 @@ func TestBehavioralWorker_Consolidate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	todoRepo := repository.NewTodoRepository(db)
-	eventRepo := repository.NewEventRepository(db)
+	todoRepo := tasks.NewTodoRepository(db)
+	eventRepo := calendar.NewEventRepository(db)
 	memRepo := repository.NewMemoryRepository(db)
 
 	// 3 tarefas concluídas às 09h (janela de pico) + 1 pendente antiga de estudos.
@@ -136,8 +138,8 @@ func TestBehavioralWorker_AttentionBudget_DefersAndDeduplicates(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	todoRepo := repository.NewTodoRepository(db)
-	eventRepo := repository.NewEventRepository(db)
+	todoRepo := tasks.NewTodoRepository(db)
+	eventRepo := calendar.NewEventRepository(db)
 	memRepo := repository.NewMemoryRepository(db)
 
 	for i := 0; i < 2; i++ {
