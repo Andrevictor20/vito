@@ -3,7 +3,12 @@ import { Bell, PanelLeft, PanelLeftClose, Plus } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useAiProviders, useChat } from '../../hooks';
 import type { AiReasoningEffort, ChatMessage, ConversationSession } from '../../types';
-import { toChatGmailMessage, toChatWhatsAppMessage } from '../../utils/chatCardExtractors';
+import {
+  buildDesktopAssistantMessage,
+  mergeDesktopSessionMessages,
+  saveDesktopSessionMessages,
+} from '../../utils/chatCardExtractors';
+import { handleAssistantSideEffects } from '../../hooks/chatMessageEffects';
 import { getResolvedModelDisplay, resolveModelRef } from '../ai/aiProvidersCatalog';
 import { ModelPickerModal } from '../ai/ModelPickerModal';
 import { VitoMascot } from '../common/VitoMascot';
@@ -14,8 +19,6 @@ import { ChatMessageActionBar } from './ChatMessageActionBar';
 import { ChatThinkingIndicator } from './ChatThinkingIndicator';
 import type { FocusMode } from './FocusMenu';
 import { FormattedChatMessageText } from './FormattedChatMessageText';
-import { GmailMessageCard } from './GmailMessageCard';
-import { WhatsAppMessageCard } from './WhatsAppMessageCard';
 import { ChatStructuredCards } from './cards/ChatStructuredCards';
 
 const HERO_STATES = ['gentleman', 'happy', 'curious', 'dance', 'idle'] as const;
@@ -44,6 +47,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
     loadSessionWithMessages,
     deleteChatSession,
     askAssistant,
+    confirmAssistantAction,
     syncChatSession,
     togglePinConversation,
   } = useChat({ currentUserId: user?.id });
@@ -108,7 +112,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
     try {
       const detailed = await loadSessionWithMessages(id);
       if (detailed?.messages) {
-        setMessages(detailed.messages);
+        setMessages(mergeDesktopSessionMessages(user?.id, id, detailed.messages));
       }
       if (detailed?.session) {
         setThreadModelPref(detailed.session.model_pref || null);
@@ -167,20 +171,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
       }
 
       const res = await askAssistant(textToSend, contextPayload);
-      const vitoMsg: ChatMessage = {
-        id: `vito-${Date.now()}`,
-        sender: 'vito',
-        text: res.reply || res.message || 'Instrução recebida e processada com sucesso.',
-        timestamp: new Date().toISOString(),
-        model_used: res.model_used,
-        fallback_notice: res.fallback_notice,
-        todo: res.todo,
-        event: res.event,
-        trigger: res.trigger,
-        booking: res.booking,
-        whatsapp_message: toChatWhatsAppMessage(res, textToSend),
-        gmail_message: toChatGmailMessage(res, textToSend),
-      };
+      const vitoMsg = buildDesktopAssistantMessage(res, 'Instrução recebida e processada com sucesso.', textToSend);
 
       const updated = [...messages, userMsg, vitoMsg];
       setMessages(updated);
@@ -198,7 +189,9 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
         setConversations((prev) => [newSession, ...prev]);
       }
 
+      saveDesktopSessionMessages(user?.id, newSession.id, updated);
       await syncChatSession(newSession, updated);
+      handleAssistantSideEffects(res);
     } catch (err: unknown) {
       const messageText =
         err instanceof Error ? err.message : 'Verifique sua conexão.';
@@ -233,6 +226,29 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
       `Enviar mensagem WhatsApp para ${updated.recipient_name}: "${updated.message}"`,
       null
     );
+  };
+
+  const handleResolveConfirmation = async (messageId: string, pendingId: string, reject: boolean) => {
+    const res = await confirmAssistantAction(pendingId, { reject, threadId: activeSessionId || undefined });
+    const vitoMsg = buildDesktopAssistantMessage(res, reject ? 'Ação cancelada.' : 'Ação concluída com sucesso.');
+    const nextList = [
+      ...messages.map((m) =>
+        m.id === messageId
+          ? { ...m, confirmationStatus: (reject ? 'cancelled' : 'confirmed') as 'cancelled' | 'confirmed' }
+          : m
+      ),
+      vitoMsg,
+    ];
+    setMessages(nextList);
+    const sid = activeSessionId || res.thread_id || '';
+    if (sid) {
+      saveDesktopSessionMessages(user?.id, sid, nextList);
+      void syncChatSession(
+        { id: sid, title: 'Conversa', preview: vitoMsg.text.slice(0, 50), timestamp: new Date().toISOString() },
+        nextList
+      );
+    }
+    handleAssistantSideEffects(res);
   };
 
   const handleStartNewChat = () => {
@@ -377,26 +393,15 @@ export const ChatView: React.FC<ChatViewProps> = ({ initialPrompt, onNavigateTab
                       <FormattedChatMessageText text={msg.text} isUser={false} />
                     </div>
 
-                    {msg.gmail_message && (
-                      <GmailMessageCard
-                        messageData={msg.gmail_message}
-                        onConfirmSend={handleConfirmEmail}
-                      />
-                    )}
-
-                    {msg.whatsapp_message && (
-                      <WhatsAppMessageCard
-                        messageData={msg.whatsapp_message}
-                        onConfirmSend={handleConfirmWhatsApp}
-                      />
-                    )}
-
                     <ChatStructuredCards
                       message={msg}
                       onNavigateTab={onNavigateTab}
+                      onConfirmWhatsApp={handleConfirmWhatsApp}
+                      onConfirmEmail={handleConfirmEmail}
                       onConfirmAction={(pendingID) => {
                         void handleSendPrompt(`confirmar ${pendingID}`);
                       }}
+                      onResolveConfirmation={handleResolveConfirmation}
                     />
 
                     {msg.fallback_notice && (

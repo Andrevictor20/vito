@@ -423,5 +423,11 @@ func encodeToolExecutionResultMap(res *domain.ToolExecutionResult, toolsetName, 
 	if len(res.Sources) > 0 {
 		out["sources"] = res.Sources
 	}
+	if res.Data != nil {
+		out["_entity_data"] = res.Data
+	}
+	if operation != "" {
+		out["_action_performed"] = operation
+	}
 	return out
 }

@@ -2,7 +2,11 @@ import { Platform } from 'react-native';
 import { ApiClient } from './client';
 import { fileUriToBase64 } from './fileUtils';
 import { AssistantChatOptions } from './types';
-import { ChatStreamDelta, consumeSSEStream } from './chatStreamHelper';
+import {
+  ChatStreamDelta,
+  buildAssistantConfirmPayload,
+  executeChatStreamFetch,
+} from './chatStreamHelper';
 import {
   AssistantChatResponse,
   ConversationSession,
@@ -101,64 +105,15 @@ export class ChatApi {
       timezone: tz, current_local_time: currentLocalTime, history: opts.history, focus_mode: opts.focus_mode,
     });
 
-    const streamTimeoutMs = 90000;
-    const controller = new AbortController();
-    let timedOut = false;
-    const timeoutId = setTimeout(() => {
-      timedOut = true;
-      controller.abort();
-    }, streamTimeoutMs);
-
-    const onExternalAbort = () => {
-      clearTimeout(timeoutId);
-      controller.abort();
-    };
-    if (opts.signal) {
-      if (opts.signal.aborted) {
-        clearTimeout(timeoutId);
-        controller.abort();
-      } else {
-        opts.signal.addEventListener('abort', onExternalAbort, { once: true });
-      }
-    }
-
-    let streamConnected = false;
-    try {
-      const res = await fetch(`${this.client.getBaseUrl()}/api/v1/assistant/chat/stream`, {
-        method: 'POST',
-        headers,
-        body: bodyPayload,
-        signal: controller.signal,
-      });
-
-      if (!res.ok) {
-        if (res.status === 404 || res.status === 405 || res.status === 501) {
-          return this.assistantChat(prompt, opts);
-        }
-        throw new Error(`Falha HTTP ${res.status} no streaming do chat`);
-      }
-
-      streamConnected = true;
-      const streamResult = await consumeSSEStream(res, onDelta);
-      if (streamResult) {
-        return streamResult;
-      }
-      throw new Error('Stream SSE encerrado sem resposta final do assistente.');
-    } catch (err: any) {
-      if (opts.signal?.aborted) {
-        throw err;
-      }
-      if (timedOut) {
-        throw new Error(`Tempo limite esgotado (${Math.round(streamTimeoutMs / 1000)}s) no streaming do chat.`);
-      }
-      if (streamConnected) {
-        throw err;
-      }
-      return this.assistantChat(prompt, opts);
-    } finally {
-      clearTimeout(timeoutId);
-      opts.signal?.removeEventListener('abort', onExternalAbort);
-    }
+    return executeChatStreamFetch({
+      url: `${this.client.getBaseUrl()}/api/v1/assistant/chat/stream`,
+      headers,
+      bodyPayload,
+      externalSignal: opts.signal,
+      timeoutMs: 90000,
+      onDelta,
+      fallbackChat: () => this.assistantChat(prompt, opts),
+    });
   }
 
   async assistantConfirm(
@@ -167,12 +122,7 @@ export class ChatApi {
   ): Promise<AssistantChatResponse> {
     return this.client.request<AssistantChatResponse>('/api/v1/assistant/confirm', {
       method: 'POST',
-      body: JSON.stringify({
-        pending_id: pendingId,
-        ...(options?.reject !== undefined ? { reject: options.reject } : {}),
-        ...(options?.reason ? { reason: options.reason } : {}),
-        ...(options?.threadId ? { thread_id: options.threadId } : {}),
-      }),
+      body: JSON.stringify(buildAssistantConfirmPayload(pendingId, options)),
     });
   }
 

@@ -34,19 +34,19 @@ describe('AC-04: Cards HITL (ActionConfirmationCard) e Cards Inline no Mobile', 
     assert.ok(Array.isArray(hitlMsg.cards) && hitlMsg.cards.length === 1);
     assert.equal(hitlMsg.cards[0].type, 'confirm');
 
-    const entitiesRes: AssistantChatResponse & Record<string, any> = {
+    const entitiesRes: AssistantChatResponse = {
       intent: 'multi_cards',
       reply: 'Itens criados.',
       action_performed: 'create_todo',
-      todo: { id: 'todo-1', title: 'Pagar boleto', priority: 'medium', status: 'pending', created_at: '2026-11-24T10:00:00Z' },
-      event: { id: 'evt-1', title: 'Alinhamento', start_at: '2026-11-25T10:00:00Z', end_at: '2026-11-25T11:00:00Z' },
+      todo: { id: 'todo-1', user_id: 'u-1', title: 'Pagar boleto', priority: 'medium', status: 'pending', created_at: '2026-11-24T10:00:00Z' },
+      event: { id: 'evt-1', user_id: 'u-1', title: 'Alinhamento', start_at: '2026-11-25T10:00:00Z', end_at: '2026-11-25T11:00:00Z', created_at: '2026-11-24T10:00:00Z' },
       conflict: { has_conflict: true, conflicting_title: 'Call', suggested_slots: [] },
       booking: { id: 'bk-1', title: 'Café', duration_minutes: 30, public_url: 'https://vito.local/book/andre/cafe' },
       booking_url: 'https://vito.local/book/andre/cafe',
-      meeting: { id: 'mt-1', title: 'Sync', duration_minutes: 45, mode: 'one_on_one', status: 'pending' },
+      meeting: { id: 'mt-1', user_id: 'u-1', title: 'Sync', duration_minutes: 45, mode: 'one_on_one', status: 'open', expires_at: '2026-12-01T10:00:00Z', created_at: '2026-11-24T10:00:00Z', updated_at: '2026-11-24T10:00:00Z', slots: [], participants: [] },
       meeting_url: 'https://vito.local/m/sync',
-      pending: { id: 'pd-1', title: 'Responder contrato', source: 'gmail', status: 'pending' },
-      trigger: { id: 'tr-1', title: 'Monitor Dólar', status: 'active' },
+      pending: { id: 'pd-1', user_id: 'u-1', title: 'Responder contrato', category: 'geral', status: 'inbox', created_at: '2026-11-24T10:00:00Z', updated_at: '2026-11-24T10:00:00Z' },
+      trigger: { id: 'tr-1', user_id: 'u-1', title: 'Monitor Dólar', category: 'custom', query: 'dolar', condition_type: 'change_detected', target_value: 'alert', current_value: '', frequency: 'daily_morning', status: 'active', created_at: '2026-11-24T10:00:00Z', updated_at: '2026-11-24T10:00:00Z' },
     };
 
     const entityMsg: any = buildAssistantMessage('vito', entitiesRes, 'OK');

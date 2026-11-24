@@ -12,6 +12,7 @@ import (
 	"google.golang.org/adk/v2/model"
 	"google.golang.org/adk/v2/tool"
 
+	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/service"
 )
@@ -162,6 +163,7 @@ func (f *ADKLoopFacade) tryHandlePendingConfirmation(
 	req domain.UnifiedAssistantRequest,
 	userID, threadID, turnID string,
 	startTime time.Time,
+	onDelta func(ai.StreamDelta) error,
 ) (*domain.UnifiedAssistantResponse, bool, error) {
 	if f.cfg.ConfirmationGate == nil {
 		return nil, false, nil
@@ -179,8 +181,20 @@ func (f *ADKLoopFacade) tryHandlePendingConfirmation(
 	var err error
 	if req.ConfirmPendingID != "" {
 		pending, err = f.cfg.ConfirmationGate.GetByID(ctx, req.ConfirmPendingID, userID)
+		if err != nil || pending == nil {
+			if err == nil {
+				err = service.ErrConfirmationNotFound
+			}
+			return nil, true, err
+		}
 	} else if req.RejectPendingID != "" {
 		pending, err = f.cfg.ConfirmationGate.GetByID(ctx, req.RejectPendingID, userID)
+		if err != nil || pending == nil {
+			if err == nil {
+				err = service.ErrConfirmationNotFound
+			}
+			return nil, true, err
+		}
 	} else {
 		pending, err = f.cfg.ConfirmationGate.GetLatestPending(ctx, userID, threadID)
 	}
@@ -188,10 +202,20 @@ func (f *ADKLoopFacade) tryHandlePendingConfirmation(
 		return nil, false, nil
 	}
 
+	emitStreamFinal := func(msg string) {
+		if onDelta != nil {
+			if msg != "" {
+				_ = onDelta(ai.StreamDelta{TextDelta: msg})
+			}
+			_ = onDelta(ai.StreamDelta{Done: true})
+		}
+	}
+
 	if isCancel {
 		_ = f.cfg.ConfirmationGate.CancelWithReason(ctx, pending.ID, userID, userMsg)
-		cancelMsg := fmt.Sprintf("Ação de envio (%s) cancelada. Nada foi enviado.", pending.Operation)
+		cancelMsg := FormatCancelledAction(pending.Operation)
 		f.recordSimpleTurns(ctx, threadID, turnID, userID, req.Channel, userMsg, cancelMsg, startTime)
+		emitStreamFinal(cancelMsg)
 		return &domain.UnifiedAssistantResponse{
 			ThreadID:  threadID,
 			TurnID:    turnID,
@@ -232,8 +256,9 @@ func (f *ADKLoopFacade) tryHandlePendingConfirmation(
 
 	res, execErr := toolset.Execute(ctx, execCtx, resumed.Operation, rawArgs)
 	if execErr != nil {
-		errMsg := fmt.Sprintf("Não consegui concluir o envio (%s): %v", resumed.Operation, execErr)
+		errMsg := FormatActionError(resumed.Operation, execErr)
 		f.recordSimpleTurns(ctx, threadID, turnID, userID, req.Channel, userMsg, errMsg, startTime)
+		emitStreamFinal(errMsg)
 		return &domain.UnifiedAssistantResponse{
 			ThreadID:  threadID,
 			TurnID:    turnID,
@@ -261,6 +286,7 @@ func (f *ADKLoopFacade) tryHandlePendingConfirmation(
 		Cards:     res.Cards,
 		Telemetry: domain.TurnTelemetry{LatencyMs: time.Since(startTime).Milliseconds()},
 	}
+	ExtractToolEntities(resumed.Operation, res.Data).ApplyToResponse(resp)
 	for _, c := range res.Cards {
 		if c.Type == "whatsapp" {
 			resp.WhatsAppMessage = &domain.ChatWhatsAppMessage{
@@ -282,5 +308,6 @@ func (f *ADKLoopFacade) tryHandlePendingConfirmation(
 	}
 
 	f.recordSimpleTurns(ctx, threadID, turnID, userID, req.Channel, userMsg, successMsg, startTime)
+	emitStreamFinal(successMsg)
 	return resp, true, nil
 }

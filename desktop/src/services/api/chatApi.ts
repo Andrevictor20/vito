@@ -70,13 +70,45 @@ export class ChatApi {
       thread_id: res.thread_id,
       model_used: res.model_used,
       fallback_notice: res.fallback_notice,
+      action_performed: res.action_performed,
+      requires_confirmation: res.requires_confirmation,
+      pending_confirmation_id: res.pending_confirmation_id,
+      cards: res.cards,
       actions: res.actions,
       event: res.event,
+      conflict: res.conflict,
       todo: res.todo,
+      pending: res.pending,
       trigger: res.trigger,
       booking: res.booking,
+      booking_url: res.booking_url,
+      booking_short_url: res.booking_short_url,
+      meeting: res.meeting,
+      meeting_url: res.meeting_url,
+      meeting_short_url: res.meeting_short_url,
+      meeting_whatsapp_url: res.meeting_whatsapp_url,
       whatsapp_message: res.whatsapp_message,
       gmail_message: res.gmail_message,
+    };
+  }
+
+  async assistantConfirm(
+    pendingId: string,
+    options?: { reject?: boolean; reason?: string; threadId?: string }
+  ): Promise<any> {
+    const res = await this.client.request<any>('/api/v1/assistant/confirm', {
+      method: 'POST',
+      body: JSON.stringify({
+        pending_id: pendingId,
+        ...(options?.reject !== undefined ? { reject: options.reject } : {}),
+        ...(options?.reason ? { reason: options.reason } : {}),
+        ...(options?.threadId ? { thread_id: options.threadId } : {}),
+      }),
+    });
+    return {
+      ...res,
+      reply: res.reply || res.message || res.text || '',
+      message: res.message || res.reply || '',
     };
   }
 
@@ -134,12 +166,16 @@ export class ChatApi {
   }
 
   async syncChatSession(session: any, messages: any[]): Promise<any> {
-    return this.client.request('/api/v1/chat/sessions', {
+    return this.client.request('/api/v1/chat/sync', {
       method: 'POST',
       body: JSON.stringify({
-        session_id: session.id,
-        title: session.title,
-        preview: session.preview,
+        session: {
+          id: session.id,
+          title: session.title,
+          preview: session.preview,
+          created_at: session.timestamp,
+          updated_at: new Date().toISOString(),
+        },
         messages,
       }),
     });

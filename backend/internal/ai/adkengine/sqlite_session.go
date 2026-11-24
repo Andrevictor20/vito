@@ -17,7 +17,6 @@ import (
 	"google.golang.org/adk/v2/session"
 	"google.golang.org/genai"
 
-	"github.com/andrevmp/vito/backend/internal/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/repository"
 )
@@ -126,7 +125,7 @@ func sessionMapKey(appName, userID, sessionID string) string {
 	return appName + "|" + userID + "|" + sessionID
 }
 
-// Create cria ou inicializa uma sessão ADK persistindo a thread no SQLite via DefaultWriterQueue().
+// Create cria ou inicializa uma sessão ADK persistindo a thread no SQLite via ConvRepo (que já usa ExecuteQueuedWrite).
 func (s *SQLiteSessionService) Create(ctx context.Context, req *session.CreateRequest) (*session.CreateResponse, error) {
 	if req.AppName == "" || req.UserID == "" {
 		return nil, fmt.Errorf("app_name e user_id são obrigatórios")
@@ -144,15 +143,7 @@ func (s *SQLiteSessionService) Create(ctx context.Context, req *session.CreateRe
 	}
 
 	if s.convRepo != nil {
-		writeOp := func() error {
-			_, err := s.convRepo.GetOrCreateThread(ctx, req.UserID, channel, sessionID)
-			return err
-		}
-		if q := database.DefaultWriterQueue(); q != nil {
-			_ = q.Execute(ctx, writeOp)
-		} else {
-			_ = writeOp()
-		}
+		_, _ = s.convRepo.GetOrCreateThread(ctx, req.UserID, channel, sessionID)
 	}
 
 	initialState := make(map[string]any)
@@ -236,13 +227,7 @@ func (s *SQLiteSessionService) Delete(ctx context.Context, req *session.DeleteRe
 	s.mu.Unlock()
 
 	if s.convRepo != nil && req.SessionID != "" {
-		writeOp := func() error {
-			return s.convRepo.DeleteThread(ctx, req.SessionID)
-		}
-		if q := database.DefaultWriterQueue(); q != nil {
-			return q.Execute(ctx, writeOp)
-		}
-		return writeOp()
+		return s.convRepo.DeleteThread(ctx, req.SessionID)
 	}
 	return nil
 }
@@ -386,37 +371,29 @@ func (f *ADKLoopFacade) persistCompletedTurn(
 	toolsBytes, _ := json.Marshal(executedTools)
 	reasonBytes, _ := json.Marshal(collectedReasoning)
 
-	writeOp := func() error {
-		_ = f.cfg.ConvRepo.CreateTurn(ctx, &repository.ConversationTurn{
-			ID:        turnID,
-			ThreadID:  threadID,
-			UserID:    req.UserID,
-			Channel:   req.Channel,
-			Role:      "user",
-			Content:   req.Message,
-			CreatedAt: startTime,
-		})
-		return f.cfg.ConvRepo.CreateTurn(ctx, &repository.ConversationTurn{
-			ID:            uuid.New().String(),
-			ThreadID:      threadID,
-			UserID:        req.UserID,
-			Channel:       req.Channel,
-			Role:          "assistant",
-			Content:       finalAnswer,
-			ReasoningJSON: string(reasonBytes),
-			ToolCallsJSON: string(toolsBytes),
-			CardsJSON:     string(cardsBytes),
-			ModelUsed:     modelUsed,
-			LatencyMs:     time.Since(startTime).Milliseconds(),
-			CreatedAt:     time.Now().UTC(),
-		})
-	}
-
-	if q := database.DefaultWriterQueue(); q != nil {
-		_ = q.Execute(ctx, writeOp)
-	} else {
-		_ = writeOp()
-	}
+	_ = f.cfg.ConvRepo.CreateTurn(ctx, &repository.ConversationTurn{
+		ID:        turnID,
+		ThreadID:  threadID,
+		UserID:    req.UserID,
+		Channel:   req.Channel,
+		Role:      "user",
+		Content:   req.Message,
+		CreatedAt: startTime,
+	})
+	_ = f.cfg.ConvRepo.CreateTurn(ctx, &repository.ConversationTurn{
+		ID:            uuid.New().String(),
+		ThreadID:      threadID,
+		UserID:        req.UserID,
+		Channel:       req.Channel,
+		Role:          "assistant",
+		Content:       finalAnswer,
+		ReasoningJSON: string(reasonBytes),
+		ToolCallsJSON: string(toolsBytes),
+		CardsJSON:     string(cardsBytes),
+		ModelUsed:     modelUsed,
+		LatencyMs:     time.Since(startTime).Milliseconds(),
+		CreatedAt:     time.Now().UTC(),
+	})
 }
 
 func (f *ADKLoopFacade) recordSimpleTurns(
@@ -427,32 +404,24 @@ func (f *ADKLoopFacade) recordSimpleTurns(
 	if f.cfg.ConvRepo == nil {
 		return
 	}
-	writeOp := func() error {
-		if userMsg != "" {
-			_ = f.cfg.ConvRepo.CreateTurn(ctx, &repository.ConversationTurn{
-				ID:        turnID,
-				ThreadID:  threadID,
-				UserID:    userID,
-				Role:      "user",
-				Content:   userMsg,
-				Channel:   channel,
-				CreatedAt: startTime,
-			})
-		}
-		return f.cfg.ConvRepo.CreateTurn(ctx, &repository.ConversationTurn{
-			ID:        uuid.New().String(),
+	if userMsg != "" {
+		_ = f.cfg.ConvRepo.CreateTurn(ctx, &repository.ConversationTurn{
+			ID:        turnID,
 			ThreadID:  threadID,
 			UserID:    userID,
-			Role:      "assistant",
-			Content:   assistantMsg,
+			Role:      "user",
+			Content:   userMsg,
 			Channel:   channel,
-			CreatedAt: time.Now().UTC(),
+			CreatedAt: startTime,
 		})
 	}
-
-	if q := database.DefaultWriterQueue(); q != nil {
-		_ = q.Execute(ctx, writeOp)
-	} else {
-		_ = writeOp()
-	}
+	_ = f.cfg.ConvRepo.CreateTurn(ctx, &repository.ConversationTurn{
+		ID:        uuid.New().String(),
+		ThreadID:  threadID,
+		UserID:    userID,
+		Role:      "assistant",
+		Content:   assistantMsg,
+		Channel:   channel,
+		CreatedAt: time.Now().UTC(),
+	})
 }

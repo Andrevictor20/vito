@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"unicode"
 
 	"github.com/andrevmp/vito/backend/internal/domain"
+	"github.com/google/uuid"
 )
 
 type BookingServiceContract interface {
@@ -85,21 +87,37 @@ func (t *MeetingBookingToolset) Execute(ctx context.Context, execCtx *domain.Too
 		if duration <= 0 {
 			duration = 30
 		}
-		title := params.Title
+		title := strings.TrimSpace(params.Title)
 		if title == "" {
 			title = "Conversa com Vito"
 		}
 		bt := &domain.BookingType{
 			Title:           title,
+			Slug:            fmt.Sprintf("%s-%s", slugifyBookingTitle(title), uuid.New().String()[:6]),
 			DurationMinutes: duration,
 			IsActive:        true,
 		}
-		saved, link, err := t.svc.CreateBookingType(ctx, execCtx.UserID, bt)
+		var saved *domain.BookingType
+		var link, shortLink string
+		var err error
+		if fullSvc, ok := t.svc.(interface {
+			CreateBookingTypeWithLinks(ctx context.Context, userID string, bt *domain.BookingType) (*domain.BookingType, string, string, error)
+		}); ok {
+			saved, link, shortLink, err = fullSvc.CreateBookingTypeWithLinks(ctx, execCtx.UserID, bt)
+		} else {
+			saved, link, err = t.svc.CreateBookingType(ctx, execCtx.UserID, bt)
+			shortLink = link
+		}
 		if err != nil {
 			return nil, err
 		}
 		return &domain.ToolExecutionResult{
-			Status:        "COMPLETED",
+			Status: "COMPLETED",
+			Data: map[string]any{
+				"booking":           saved,
+				"booking_url":       link,
+				"booking_short_url": shortLink,
+			},
 			SummaryForLLM: fmt.Sprintf("Link de agendamento '%s' criado com sucesso: %s", saved.Title, link),
 			Cards: []domain.ChatCard{{
 				ID:          saved.ID,
@@ -141,4 +159,41 @@ func (t *MeetingBookingToolset) Execute(ctx context.Context, execCtx *domain.Too
 			Cards:         cards,
 		}, nil
 	}
+}
+
+func slugifyBookingTitle(title string) string {
+	var b strings.Builder
+	lastDash := false
+	for _, r := range strings.ToLower(strings.TrimSpace(title)) {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			if r > 127 {
+				switch r {
+				case 'á', 'à', 'â', 'ã':
+					r = 'a'
+				case 'é', 'ê':
+					r = 'e'
+				case 'í':
+					r = 'i'
+				case 'ó', 'ô', 'õ':
+					r = 'o'
+				case 'ú':
+					r = 'u'
+				case 'ç':
+					r = 'c'
+				default:
+					continue
+				}
+			}
+			b.WriteRune(r)
+			lastDash = false
+		} else if !lastDash && b.Len() > 0 {
+			b.WriteByte('-')
+			lastDash = true
+		}
+	}
+	res := strings.Trim(b.String(), "-")
+	if res == "" {
+		return "agendamento"
+	}
+	return res
 }

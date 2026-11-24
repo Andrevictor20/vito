@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/google/uuid"
 )
 
@@ -226,7 +227,9 @@ func (s *ConfirmationGateService) SaveExecutionResult(ctx context.Context, id, r
 		return nil
 	}
 	query := `UPDATE pending_confirmations SET execution_result_json = ? WHERE id = ?`
-	_, err := s.db.ExecContext(ctx, query, resultJSON, id)
-	return err
+	return repository.ExecuteQueuedWrite(ctx, func() error {
+		_, err := s.db.ExecContext(ctx, query, resultJSON, id)
+		return err
+	})
 }
 

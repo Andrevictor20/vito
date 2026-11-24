@@ -145,3 +145,86 @@ export async function consumeSSEStream(
   }
   return null;
 }
+
+export function buildAssistantConfirmPayload(
+  pendingId: string,
+  options?: { reject?: boolean; reason?: string; threadId?: string }
+): Record<string, unknown> {
+  return {
+    pending_id: pendingId,
+    ...(options?.reject !== undefined ? { reject: options.reject } : {}),
+    ...(options?.reason ? { reason: options.reason } : {}),
+    ...(options?.threadId ? { thread_id: options.threadId } : {}),
+  };
+}
+
+export async function executeChatStreamFetch(params: {
+  url: string;
+  headers: Record<string, string>;
+  bodyPayload: string;
+  externalSignal?: AbortSignal;
+  timeoutMs?: number;
+  onDelta?: (delta: ChatStreamDelta) => void;
+  fallbackChat: () => Promise<AssistantChatResponse>;
+}): Promise<AssistantChatResponse> {
+  const streamTimeoutMs = params.timeoutMs ?? 90000;
+  const controller = new AbortController();
+  let timedOut = false;
+  const timeoutId = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, streamTimeoutMs);
+
+  const onExternalAbort = () => {
+    clearTimeout(timeoutId);
+    controller.abort();
+  };
+  if (params.externalSignal) {
+    if (params.externalSignal.aborted) {
+      clearTimeout(timeoutId);
+      controller.abort();
+    } else {
+      params.externalSignal.addEventListener('abort', onExternalAbort, { once: true });
+    }
+  }
+
+  let streamConnected = false;
+  try {
+    const res = await fetch(params.url, {
+      method: 'POST',
+      headers: params.headers,
+      body: params.bodyPayload,
+      signal: controller.signal,
+    });
+
+    if (!res.ok) {
+      if (res.status === 404 || res.status === 405 || res.status === 501) {
+        return params.fallbackChat();
+      }
+      throw new Error(`Falha HTTP ${res.status} no streaming do chat`);
+    }
+
+    streamConnected = true;
+    const streamResult = await consumeSSEStream(res, params.onDelta);
+    if (streamResult) {
+      return streamResult;
+    }
+    throw new Error('Stream SSE encerrado sem resposta final do assistente.');
+  } catch (err: any) {
+    if (params.externalSignal?.aborted) {
+      throw err;
+    }
+    if (timedOut) {
+      throw new Error(
+        `Tempo limite esgotado (${Math.round(streamTimeoutMs / 1000)}s) no streaming do chat.`
+      );
+    }
+    if (streamConnected) {
+      throw err;
+    }
+    return params.fallbackChat();
+  } finally {
+    clearTimeout(timeoutId);
+    params.externalSignal?.removeEventListener('abort', onExternalAbort);
+  }
+}

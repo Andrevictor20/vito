@@ -111,7 +111,9 @@ export const meetingDisplayLink = (meeting: ChatMeeting): string =>
 export const toChatMeeting = (res: AssistantChatResponse): ChatMeeting | undefined => {
   if (!res.meeting) return undefined;
   const m = res.meeting;
-  const slotsCount = Array.isArray((m as any).slots) ? (m as any).slots.length : undefined;
+  const slotsCount = 'slots' in m && Array.isArray(m.slots) ? m.slots.length : undefined;
+  const shortUrl = 'short_url' in m ? m.short_url : undefined;
+  const publicUrl = 'public_url' in m ? m.public_url : undefined;
 
   return {
     id: m.id,
@@ -120,8 +122,8 @@ export const toChatMeeting = (res: AssistantChatResponse): ChatMeeting | undefin
     duration_minutes: m.duration_minutes,
     mode: m.mode,
     status: m.status,
-    short_url: (m as any).short_url || res.meeting_short_url || undefined,
-    public_url: (m as any).public_url || res.meeting_url || undefined,
+    short_url: shortUrl || res.meeting_short_url || undefined,
+    public_url: publicUrl || res.meeting_url || undefined,
     whatsapp_url: res.meeting_whatsapp_url || undefined,
     slots_count: slotsCount,
   };
@@ -213,7 +215,7 @@ export const toChatWhatsAppMessage = (res: AssistantChatResponse): ChatWhatsAppM
   if (res.cards && Array.isArray(res.cards)) {
     const waCard = res.cards.find((c) => c.type === 'whatsapp');
     if (waCard) {
-      const isSent = waCard.action_label === 'Enviado' || !(waCard as any).confirm;
+      const isSent = waCard.action_label === 'Enviado' || !waCard.confirm;
       const recName = waCard.title ? waCard.title.replace(/^WhatsApp para\s+/i, '') : 'Contato';
       return {
         id: waCard.id,
@@ -259,7 +261,7 @@ export const toChatGmailMessage = (res: AssistantChatResponse): ChatGmailMessage
   if (res.cards && Array.isArray(res.cards)) {
     const gmCard = res.cards.find((c) => c.type === 'gmail');
     if (gmCard) {
-      const isSent = gmCard.action_label === 'Enviado' || !(gmCard as any).confirm;
+      const isSent = gmCard.action_label === 'Enviado' || !gmCard.confirm;
       return {
         id: gmCard.id,
         recipient_email: gmCard.subtitle ? gmCard.subtitle.replace(/^Para:\s+/i, '') : '',

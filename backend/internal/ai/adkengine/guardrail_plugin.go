@@ -30,6 +30,7 @@ type TurnCollector struct {
 	SuspendedPromptText   string
 	WhatsAppMessage       *domain.ChatWhatsAppMessage
 	GmailMessage          *domain.ChatGmailMessage
+	Entities              ExtractedToolEntities
 	Tainted               bool
 }
 
@@ -400,8 +401,19 @@ func (g *GuardrailPlugin) AfterTool(ctx agent.Context, t tool.Tool, args, result
 				col.Sources = append(col.Sources, sources...)
 			}
 		}
+		if rawEntityData, ok := result["_entity_data"]; ok && rawEntityData != nil {
+			actionOp, _ := result["_action_performed"].(string)
+			if actionOp == "" {
+				actionOp = operation
+			}
+			col.Entities.Merge(ExtractToolEntities(actionOp, rawEntityData))
+		} else if actionOp, ok := result["_action_performed"].(string); ok && actionOp != "" {
+			col.Entities.Merge(ExtractedToolEntities{ActionPerformed: actionOp})
+		}
 		col.Mu.Unlock()
 	}
+	delete(result, "_entity_data")
+	delete(result, "_action_performed")
 
 	if g.traceRecorder != nil {
 		meta := TurnExecutionMetaFromContext(ctx)

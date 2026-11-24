@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { formatModelDisplayName } from '../services/ai/aiProviderCatalog';
-import * as chatStreamRunner from '../hooks/chatStreamRunner';
+import { formatHistoryForStream, formatToolCallStepLabel } from '../utils/chatMessageBuilder';
 
 describe('AC-05: Metadata de modelo, histórico { role, content } e status HITL no stream', () => {
   test('test_ac_05_formatModelDisplayName_preserva_sufixo_free', () => {
@@ -19,9 +19,7 @@ describe('AC-05: Metadata de modelo, histórico { role, content } e status HITL 
   });
 
   test('test_ac_05_chatStreamRunner_history_role_content_e_status_confirmacao', () => {
-    const fnHistory = (chatStreamRunner as Record<string, any>).formatHistoryForStream;
-    assert.equal(typeof fnHistory, 'function', 'formatHistoryForStream deve ser exportada');
-    const serialized = fnHistory([
+    const serialized = formatHistoryForStream([
       { id: '1', sender: 'user', text: 'Oi', timestamp: '' },
       { id: '2', sender: 'vito', text: 'Olá!', timestamp: '' },
     ]);
@@ -30,10 +28,8 @@ describe('AC-05: Metadata de modelo, histórico { role, content } e status HITL 
       { role: 'assistant', content: 'Olá!' },
     ]);
 
-    const fnStep = (chatStreamRunner as Record<string, any>).formatToolCallStepLabel;
-    assert.equal(typeof fnStep, 'function', 'formatToolCallStepLabel deve ser exportada');
     assert.equal(
-      fnStep({ tool: 'task_and_pending_manager', operation: 'create_todo', status: 'AWAITING_USER_CONFIRMATION' }),
+      formatToolCallStepLabel({ tool: 'task_and_pending_manager', operation: 'create_todo', status: 'AWAITING_USER_CONFIRMATION' }),
       'Aguardando sua confirmação'
     );
 

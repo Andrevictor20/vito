@@ -214,8 +214,8 @@ export function VitoVoiceOverlay({
       setTranscript(cleanReply);
       onMessageExchange?.(userText || 'Áudio enviado', cleanReply);
 
-      if (userText) conversationHistoryRef.current.push({ sender: 'user', text: userText });
-      conversationHistoryRef.current.push({ sender: 'vito', text: cleanReply });
+      if (userText) conversationHistoryRef.current.push({ role: 'user', content: userText });
+      conversationHistoryRef.current.push({ role: 'assistant', content: cleanReply });
 
       setWhatsappCard(extractWhatsAppCardData(resPayload));
       setActionCard(extractOverlayActionCard(resPayload));

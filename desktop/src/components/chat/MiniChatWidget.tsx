@@ -7,7 +7,8 @@ import { ChatIdeasDeck } from './ChatIdeasDeck';
 import { FormattedChatMessageText } from './FormattedChatMessageText';
 import { ChatThinkingIndicator } from './ChatThinkingIndicator';
 import { ChatStructuredCards } from './cards/ChatStructuredCards';
-import { toChatGmailMessage, toChatWhatsAppMessage } from '../../utils/chatCardExtractors';
+import { buildDesktopAssistantMessage } from '../../utils/chatCardExtractors';
+import { handleAssistantSideEffects } from '../../hooks/chatMessageEffects';
 import {
   X,
   Maximize2,
@@ -61,18 +62,10 @@ export const MiniChatWidget: React.FC<MiniChatWidgetProps> = ({ onExpandToFullCh
       };
 
       const res = await api.askAssistant(textToSend, contextPayload);
-      const vitoMsg: ChatMessage = {
-        id: `vito-${Date.now()}`,
-        sender: 'vito',
-        text: res.reply || 'Instrução recebida com sucesso.',
-        timestamp: new Date().toISOString(),
-        todo: res.todo,
-        event: res.event,
-        whatsapp_message: toChatWhatsAppMessage(res, textToSend),
-        gmail_message: toChatGmailMessage(res, textToSend),
-      };
+      const vitoMsg = buildDesktopAssistantMessage(res, 'Instrução recebida com sucesso.', textToSend);
 
       setMessages((prev) => [...prev, vitoMsg]);
+      handleAssistantSideEffects(res);
     } catch (err: any) {
       const errorMsg: ChatMessage = {
         id: `vito-error-${Date.now()}`,
@@ -96,6 +89,20 @@ export const MiniChatWidget: React.FC<MiniChatWidgetProps> = ({ onExpandToFullCh
     handleSendPrompt(
       `Enviar mensagem WhatsApp para ${updated.recipient_name}: "${updated.message}"`
     );
+  };
+
+  const handleResolveConfirmation = async (messageId: string, pendingId: string, reject: boolean) => {
+    const res = await api.assistantConfirm(pendingId, { reject });
+    const vitoMsg = buildDesktopAssistantMessage(res, reject ? 'Ação cancelada.' : 'Ação concluída com sucesso.');
+    setMessages((prev) => [
+      ...prev.map((m) =>
+        m.id === messageId
+          ? { ...m, confirmationStatus: (reject ? 'cancelled' : 'confirmed') as 'cancelled' | 'confirmed' }
+          : m
+      ),
+      vitoMsg,
+    ]);
+    handleAssistantSideEffects(res);
   };
 
   return (
@@ -209,6 +216,7 @@ export const MiniChatWidget: React.FC<MiniChatWidgetProps> = ({ onExpandToFullCh
                         message={m}
                         onConfirmEmail={handleConfirmEmail}
                         onConfirmWhatsApp={handleConfirmWhatsApp}
+                        onResolveConfirmation={handleResolveConfirmation}
                         onNavigateTab={() => {
                           setOpen(false);
                           onExpandToFullChat();

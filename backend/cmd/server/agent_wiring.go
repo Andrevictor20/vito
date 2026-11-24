@@ -275,8 +275,19 @@ func (a *calendarServiceAdapter) GetEvents(ctx context.Context, userID string, s
 }
 
 func (a *calendarServiceAdapter) CreateEvent(ctx context.Context, event *domain.Event) error {
-	_, _, err := a.svc.CreateEvent(event.UserID, event.Title, event.Description, event.Location, event.StartAt, event.EndAt)
+	_, err := a.CreateEventWithConflict(ctx, event)
 	return err
+}
+
+func (a *calendarServiceAdapter) CreateEventWithConflict(ctx context.Context, event *domain.Event) (*domain.ConflictInfo, error) {
+	created, conflict, err := a.svc.CreateEvent(event.UserID, event.Title, event.Description, event.Location, event.StartAt, event.EndAt)
+	if err != nil {
+		return nil, err
+	}
+	if created != nil {
+		*event = *created
+	}
+	return conflict, nil
 }
 
 func (a *calendarServiceAdapter) DeleteEvent(ctx context.Context, id, userID string) error {
@@ -300,8 +311,14 @@ func (a *todoServiceAdapter) GetTodos(ctx context.Context, userID string) ([]*do
 }
 
 func (a *todoServiceAdapter) CreateTodo(ctx context.Context, todo *domain.Todo) error {
-	_, err := a.svc.CreateTodo(todo.UserID, todo.Title, string(todo.Priority), todo.DueDate)
-	return err
+	created, err := a.svc.CreateTodo(todo.UserID, todo.Title, string(todo.Priority), todo.DueDate)
+	if err != nil {
+		return err
+	}
+	if created != nil {
+		*todo = *created
+	}
+	return nil
 }
 
 func (a *todoServiceAdapter) CompleteTodo(ctx context.Context, id, userID string) error {
@@ -415,6 +432,14 @@ func (a *bookingServiceAdapter) CreateBookingType(ctx context.Context, userID st
 	return &created.BookingType, created.PublicURL, nil
 }
 
+func (a *bookingServiceAdapter) CreateBookingTypeWithLinks(ctx context.Context, userID string, bt *domain.BookingType) (*domain.BookingType, string, string, error) {
+	created, err := a.svc.CreateBookingType(ctx, userID, bt)
+	if err != nil {
+		return nil, "", "", err
+	}
+	return &created.BookingType, created.PublicURL, created.ShortURL, nil
+}
+
 type triggerServiceAdapter struct {
 	svc *service.TriggerService
 }
@@ -441,8 +466,14 @@ func (a *triggerServiceAdapter) CreateTrigger(t *domain.Trigger) error {
 		TargetValue:   "alert",
 		Frequency:     domain.FrequencyDailyMorning,
 	}
-	_, err := a.svc.CreateTrigger(t.UserID, input)
-	return err
+	created, err := a.svc.CreateTrigger(t.UserID, input)
+	if err != nil {
+		return err
+	}
+	if created != nil {
+		*t = *created
+	}
+	return nil
 }
 
 func (a *triggerServiceAdapter) DeleteTrigger(id, userID string) error {

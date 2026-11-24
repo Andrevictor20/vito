@@ -1,4 +1,4 @@
-import { ChatGmailMessage, ChatWhatsAppMessage } from '../types';
+import { ChatGmailMessage, ChatMessage, ChatWhatsAppMessage } from '../types';
 
 export interface AssistantChatResponse {
   reply?: string;
@@ -149,4 +149,84 @@ export const toChatWhatsAppMessage = (
   }
 
   return undefined;
+};
+
+export const buildDesktopAssistantMessage = (
+  res: AssistantChatResponse,
+  defaultReply: string,
+  userPrompt?: string
+): ChatMessage => {
+  const booking = res.booking
+    ? {
+        ...res.booking,
+        public_url: res.booking.public_url || res.booking_url || undefined,
+        short_url: res.booking.short_url || res.booking_short_url || undefined,
+      }
+    : undefined;
+  const meeting = res.meeting
+    ? {
+        ...res.meeting,
+        public_url: res.meeting.public_url || res.meeting_url || undefined,
+        short_url: res.meeting.short_url || res.meeting_short_url || undefined,
+      }
+    : undefined;
+
+  return {
+    id: `vito-${Date.now()}`,
+    sender: 'vito',
+    text: res.reply || res.message || defaultReply,
+    timestamp: new Date().toISOString(),
+    model_used: res.model_used,
+    fallback_notice: res.fallback_notice,
+    action_performed: res.action_performed,
+    todo: res.todo,
+    event: res.event,
+    conflict: res.conflict,
+    pending: res.pending,
+    trigger: res.trigger,
+    booking,
+    meeting,
+    requires_confirmation: res.requires_confirmation,
+    pending_confirmation_id: res.pending_confirmation_id,
+    cards: res.cards,
+    confirmationStatus: res.requires_confirmation ? 'pending' : undefined,
+    whatsapp_message: toChatWhatsAppMessage(res, userPrompt),
+    gmail_message: toChatGmailMessage(res, userPrompt),
+  };
+};
+
+const desktopCacheKey = (userId: string | undefined, sessionId: string) =>
+  `@vito_desktop_chat_cards_${userId || 'anon'}_${sessionId}`;
+
+export const saveDesktopSessionMessages = (
+  userId: string | undefined,
+  sessionId: string,
+  messages: ChatMessage[]
+): void => {
+  if (typeof localStorage === 'undefined' || !sessionId) return;
+  try {
+    localStorage.setItem(desktopCacheKey(userId, sessionId), JSON.stringify(messages.slice(-100)));
+  } catch {}
+};
+
+export const mergeDesktopSessionMessages = (
+  userId: string | undefined,
+  sessionId: string,
+  remoteMessages: ChatMessage[]
+): ChatMessage[] => {
+  if (typeof localStorage === 'undefined' || !sessionId) return remoteMessages;
+  try {
+    const raw = localStorage.getItem(desktopCacheKey(userId, sessionId));
+    if (!raw) return remoteMessages;
+    const cached = JSON.parse(raw) as ChatMessage[];
+    if (!Array.isArray(cached) || cached.length === 0) return remoteMessages;
+    if (remoteMessages.length === 0) return cached;
+    const byId = new Map(cached.map((m) => [m.id, m]));
+    return remoteMessages.map((rm) => {
+      const local = byId.get(rm.id);
+      return local ? { ...local, ...rm } : rm;
+    });
+  } catch {
+    return remoteMessages;
+  }
 };

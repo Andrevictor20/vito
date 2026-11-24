@@ -1,11 +1,15 @@
 package database
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"errors"
 	"fmt"
+	"runtime"
+	"strconv"
 	"sync"
+	"sync/atomic"
 )
 
 var (
@@ -13,6 +17,8 @@ var (
 	ErrQueueClosed = errors.New("writer queue is closed")
 	// ErrQueueTimeout indica que a escrita expirou antes de ser processada.
 	ErrQueueTimeout = errors.New("writer queue operation timed out")
+	// ErrQueueReentrant indica tentativa de enfileirar uma escrita a partir da própria goroutine do worker.
+	ErrQueueReentrant = errors.New("writer queue reentrant call detected (self-deadlock prevented)")
 
 	defaultQueueMu sync.RWMutex
 	defaultQueue   *SingleWriterQueue
@@ -41,12 +47,35 @@ type writeRequest struct {
 // SingleWriterQueue serializa todas as operações de escrita no SQLite
 // através de um canal único e um único loop consumidor dedicado, eliminando
 // definitivamente conflitos SQLITE_BUSY entre workers em segundo plano e a API HTTP.
+// Nunca chame Execute/ExecuteQueuedWrite de forma reentrante dentro de outra op enfileirada;
+// a fila detecta reentrância na mesma goroutine e retorna ErrQueueReentrant em vez de travar.
 type SingleWriterQueue struct {
-	requests chan writeRequest
-	quit     chan struct{}
-	wg       sync.WaitGroup
-	closed   bool
-	mu       sync.Mutex
+	requests  chan writeRequest
+	quit      chan struct{}
+	wg        sync.WaitGroup
+	closed    bool
+	mu        sync.Mutex
+	workerGID atomic.Int64
+}
+
+func currentGoroutineID() int64 {
+	var buf [64]byte
+	n := runtime.Stack(buf[:], false)
+	line := buf[:n]
+	const prefix = "goroutine "
+	if !bytes.HasPrefix(line, []byte(prefix)) {
+		return 0
+	}
+	line = line[len(prefix):]
+	idx := bytes.IndexByte(line, ' ')
+	if idx <= 0 {
+		return 0
+	}
+	id, err := strconv.ParseInt(string(line[:idx]), 10, 64)
+	if err != nil {
+		return 0
+	}
+	return id
 }
 
 // NewSingleWriterQueue inicializa a fila de escrita com buffer configurável.
@@ -66,6 +95,7 @@ func NewSingleWriterQueue(bufferSize int) *SingleWriterQueue {
 // worker consome e executa as escritas sequencialmente.
 func (q *SingleWriterQueue) worker() {
 	defer q.wg.Done()
+	q.workerGID.Store(currentGoroutineID())
 	for {
 		select {
 		case req := <-q.requests:
@@ -92,6 +122,10 @@ func (q *SingleWriterQueue) worker() {
 
 // Execute enfileira a operação de escrita e aguarda sua conclusão com respeito ao contexto.
 func (q *SingleWriterQueue) Execute(ctx context.Context, op func() error) error {
+	if gid := q.workerGID.Load(); gid != 0 && currentGoroutineID() == gid {
+		return ErrQueueReentrant
+	}
+
 	q.mu.Lock()
 	if q.closed {
 		q.mu.Unlock()
@@ -119,6 +153,8 @@ func (q *SingleWriterQueue) Execute(ctx context.Context, op func() error) error 
 		return err
 	case <-ctx.Done():
 		return ctx.Err()
+	case <-q.quit:
+		return ErrQueueClosed
 	}
 }
 

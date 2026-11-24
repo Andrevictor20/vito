@@ -459,7 +459,7 @@ export function useChatMessages(
       setMessages((prev) => {
         const updated = prev.map((m) =>
           m.id === messageId
-            ? { ...m, confirmationStatus: (reject ? 'cancelled' : 'confirmed') as const }
+            ? { ...m, confirmationStatus: (reject ? 'cancelled' : 'confirmed') as 'cancelled' | 'confirmed' }
             : m
         );
         const nextList = [...updated, vitoMsg];

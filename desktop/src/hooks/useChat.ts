@@ -83,6 +83,13 @@ export function useChat(options?: UseChatOptions) {
     return api.askAssistant(prompt, context);
   }, []);
 
+  const confirmAssistantAction = useCallback(
+    async (pendingId: string, options?: { reject?: boolean; reason?: string; threadId?: string }) => {
+      return api.assistantConfirm(pendingId, options);
+    },
+    []
+  );
+
   const syncChatSession = useCallback(async (session: ConversationSession, chatMessages: ChatMessage[]) => {
     return api.syncChatSession(session, chatMessages);
   }, []);
@@ -122,6 +129,7 @@ export function useChat(options?: UseChatOptions) {
     loadSessionWithMessages,
     deleteChatSession,
     askAssistant,
+    confirmAssistantAction,
     syncChatSession,
   };
 }

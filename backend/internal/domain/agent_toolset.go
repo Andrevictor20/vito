@@ -152,14 +152,27 @@ type UnifiedAssistantRequest struct {
 
 // UnifiedAssistantResponse é o contrato único de saída para todos os canais (§5.6.7).
 type UnifiedAssistantResponse struct {
-	ThreadID              string         `json:"thread_id"`
-	TurnID                string         `json:"turn_id"`
-	Text                  string         `json:"text"`
-	Reply                 string         `json:"reply,omitempty"`   // Paridade com Mobile e Desktop
-	Message               string         `json:"message,omitempty"` // Paridade com Mobile e Desktop
-	Reasoning             []string       `json:"reasoning,omitempty"`
-	ToolCalls             []ExecutedTool `json:"tool_calls,omitempty"`
-	Cards                 []ChatCard     `json:"cards,omitempty"`
+	ThreadID              string               `json:"thread_id"`
+	TurnID                string               `json:"turn_id"`
+	Text                  string               `json:"text"`
+	Reply                 string               `json:"reply,omitempty"`   // Paridade com Mobile e Desktop
+	Message               string               `json:"message,omitempty"` // Paridade com Mobile e Desktop
+	ActionPerformed       string               `json:"action_performed,omitempty"`
+	Event                 *Event               `json:"event,omitempty"`
+	Conflict              *ConflictInfo        `json:"conflict,omitempty"`
+	Todo                  *Todo                `json:"todo,omitempty"`
+	Trigger               *Trigger             `json:"trigger,omitempty"`
+	Pending               *PendingItem         `json:"pending,omitempty"`
+	Booking               *BookingType         `json:"booking,omitempty"`
+	BookingURL            string               `json:"booking_url,omitempty"`
+	BookingShortURL       string               `json:"booking_short_url,omitempty"`
+	Meeting               *MeetingWithDetails  `json:"meeting,omitempty"`
+	MeetingURL            string               `json:"meeting_url,omitempty"`
+	MeetingShortURL       string               `json:"meeting_short_url,omitempty"`
+	MeetingWhatsAppURL    string               `json:"meeting_whatsapp_url,omitempty"`
+	Reasoning             []string             `json:"reasoning,omitempty"`
+	ToolCalls             []ExecutedTool       `json:"tool_calls,omitempty"`
+	Cards                 []ChatCard           `json:"cards,omitempty"`
 	Sources               []SearchSource       `json:"sources,omitempty"`
 	RequiresConfirmation  bool                 `json:"requires_confirmation"`
 	PendingConfirmationID string               `json:"pending_confirmation_id,omitempty"`

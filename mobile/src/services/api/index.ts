@@ -187,10 +187,8 @@ export class ApiService extends ApiClient {
   ): Promise<AssistantChatResponse> {
     return this.chatApi.assistantChatStream(prompt, options, onDelta);
   }
-  assistantConfirm = (
-    pendingId: string,
-    options?: { reject?: boolean; reason?: string; threadId?: string }
-  ): Promise<AssistantChatResponse> => this.chatApi.assistantConfirm(pendingId, options);
+  assistantConfirm = (pendingId: string, options?: { reject?: boolean; reason?: string; threadId?: string }): Promise<AssistantChatResponse> =>
+    this.chatApi.assistantConfirm(pendingId, options);
   assistantAudio(audioUri: string, filename: string = 'audio.m4a', options?: string | AssistantChatOptions): Promise<AssistantChatResponse> {
     return this.chatApi.assistantAudio(audioUri, filename, options);
   }
@@ -477,18 +475,10 @@ export class ApiService extends ApiClient {
   }
 
   // Finance & Open Finance (Vito Finance MVP)
-  get finance(): FinanceApi {
-    return this.financeApi;
-  }
-  get aiProviders(): AiProvidersApi {
-    return this.aiProvidersApi;
-  }
-  get inbox(): InboxNotificationsApi {
-    return this.inboxNotificationsApi;
-  }
-  get store(): StoreComplianceApi {
-    return this.storeComplianceApi;
-  }
+  get finance(): FinanceApi { return this.financeApi; }
+  get aiProviders(): AiProvidersApi { return this.aiProvidersApi; }
+  get inbox(): InboxNotificationsApi { return this.inboxNotificationsApi; }
+  get store(): StoreComplianceApi { return this.storeComplianceApi; }
   getFinancialSummary(): Promise<FinancialSummary> {
     return this.financeApi.getSummary();
   }

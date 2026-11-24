@@ -193,7 +193,7 @@ func (f *ADKLoopFacade) RunStream(ctx context.Context, req domain.UnifiedAssista
 	}
 
 	// 2. Interceptação determinística de confirmação/cancelamento pendente no ConfirmationGate
-	if confResp, handled, confErr := f.tryHandlePendingConfirmation(ctx, req, userID, threadID, turnID, startTime); handled {
+	if confResp, handled, confErr := f.tryHandlePendingConfirmation(ctx, req, userID, threadID, turnID, startTime, onDelta); handled {
 		return confResp, confErr
 	}
 
@@ -314,6 +314,7 @@ func (f *ADKLoopFacade) RunStream(ctx context.Context, req domain.UnifiedAssista
 	collectedReasoning := collector.Reasoning
 	respWhatsApp := collector.WhatsAppMessage
 	respGmail := collector.GmailMessage
+	collectedEntities := collector.Entities
 	collector.Mu.Unlock()
 
 	meta.Mu.Lock()
@@ -352,7 +353,7 @@ func (f *ADKLoopFacade) RunStream(ctx context.Context, req domain.UnifiedAssista
 		}
 	}
 
-	return &domain.UnifiedAssistantResponse{
+	out := &domain.UnifiedAssistantResponse{
 		ThreadID:              threadID,
 		TurnID:                turnID,
 		Text:                  finalAnswer,
@@ -376,7 +377,9 @@ func (f *ADKLoopFacade) RunStream(ctx context.Context, req domain.UnifiedAssista
 			TokensOut:      tokensOut,
 			LatencyMs:      time.Since(startTime).Milliseconds(),
 		},
-	}, nil
+	}
+	collectedEntities.ApplyToResponse(out)
+	return out, nil
 }
 
 func buildUserGenaiContent(req domain.UnifiedAssistantRequest) *genai.Content {

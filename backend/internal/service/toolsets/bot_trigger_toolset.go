@@ -171,6 +171,7 @@ func (t *BotTriggerToolset) Execute(ctx context.Context, execCtx *domain.ToolExe
 		}
 		return &domain.ToolExecutionResult{
 			Status:        "COMPLETED",
+			Data:          tr,
 			SummaryForLLM: fmt.Sprintf("Bot '%s' criado com sucesso.", tr.Title),
 			Cards: []domain.ChatCard{{
 				ID:          tr.ID,

@@ -180,6 +180,17 @@ export interface ChatGmailMessage {
   sent_at?: string;
 }
 
+export interface ChatCardPayload {
+  id?: string;
+  type?: string;
+  title?: string;
+  subtitle?: string;
+  action_label?: string;
+  action_value?: string;
+  confirm?: boolean;
+  dismiss?: boolean;
+}
+
 export interface ChatMessage {
   id: string;
   sender: 'user' | 'vito';
@@ -190,11 +201,24 @@ export interface ChatMessage {
   created_at?: string;
   model_used?: string;
   fallback_notice?: string;
+  action_performed?: string;
   event?: CalendarEvent;
   todo?: Todo;
   trigger?: Trigger;
+  pending?: PendingItem;
   booking?: BookingType;
   meeting?: Meeting;
+  conflict?: {
+    has_conflict: boolean;
+    conflicting_title?: string;
+    conflicting_event_id?: string;
+    suggested_slots?: Array<{ start_at: string; end_at: string; label: string }>;
+  };
+  requires_confirmation?: boolean;
+  pending_confirmation_id?: string;
+  cards?: ChatCardPayload[];
+  confirmationStatus?: 'pending' | 'confirmed' | 'cancelled';
+  pending_confirmation?: any;
   whatsapp_message?: ChatWhatsAppMessage;
   gmail_message?: ChatGmailMessage;
 }

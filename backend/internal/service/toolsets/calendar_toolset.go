@@ -110,15 +110,33 @@ func (t *CalendarToolset) Execute(ctx context.Context, execCtx *domain.ToolExecu
 			CreatedAt:   time.Now().UTC(),
 			UpdatedAt:   time.Now().UTC(),
 		}
+		var conflict *domain.ConflictInfo
 		if t.calService != nil {
-			if err := t.calService.CreateEvent(ctx, evt); err != nil {
+			if conflictAware, ok := t.calService.(interface {
+				CreateEventWithConflict(ctx context.Context, event *domain.Event) (*domain.ConflictInfo, error)
+			}); ok {
+				var err error
+				conflict, err = conflictAware.CreateEventWithConflict(ctx, evt)
+				if err != nil {
+					return nil, err
+				}
+			} else if err := t.calService.CreateEvent(ctx, evt); err != nil {
 				return nil, err
+			}
+		}
+		summary := fmt.Sprintf("Evento '%s' agendado com sucesso para %s até %s.", evt.Title, evt.StartAt.Format("02/01 15:04"), evt.EndAt.Format("15:04"))
+		var data any = evt
+		if conflict != nil && conflict.HasConflict {
+			summary = fmt.Sprintf("Evento '%s' agendado para %s até %s, mas há conflito com '%s'.", evt.Title, evt.StartAt.Format("02/01 15:04"), evt.EndAt.Format("15:04"), conflict.ConflictingTitle)
+			data = map[string]any{
+				"event":    evt,
+				"conflict": conflict,
 			}
 		}
 		return &domain.ToolExecutionResult{
 			Status:        "COMPLETED",
-			Data:          evt,
-			SummaryForLLM: fmt.Sprintf("Evento '%s' agendado com sucesso para %s até %s.", evt.Title, evt.StartAt.Format("02/01 15:04"), evt.EndAt.Format("15:04")),
+			Data:          data,
+			SummaryForLLM: summary,
 			Cards: []domain.ChatCard{{
 				ID:          evt.ID,
 				Type:        "event",

@@ -1,50 +1,11 @@
 import type { AssistantChatResponse, ChatMessage } from '../types';
 import { api } from '../services/api';
-import type { ChatHistoryItem } from '../services/api/types';
 import type { ChatStreamDelta } from '../services/api/chatStreamHelper';
 import { extractDeltaSteps } from '../services/api/chatStreamHelper';
 import { buildAssistantMessage } from './chatMessageEffects';
+import { formatHistoryForStream, formatToolCallStepLabel } from '../utils/chatMessageBuilder';
 
-export function formatHistoryForStream(historySource: ChatMessage[]): ChatHistoryItem[] {
-  return historySource.slice(-12).map((m) => ({
-    role: m.sender === 'user' ? 'user' : 'assistant',
-    content: m.text,
-  }));
-}
-
-export function formatToolCallStepLabel(tc: {
-  tool?: string;
-  operation?: string;
-  status?: string;
-}): string {
-  if (tc.status === 'AWAITING_USER_CONFIRMATION') {
-    return 'Aguardando sua confirmação';
-  }
-  const opMap: Record<string, string> = {
-    create_todo: 'Criando tarefa',
-    list_todos: 'Consultando tarefas',
-    complete_todo: 'Concluindo tarefa',
-    delete_todo: 'Excluindo tarefa',
-    create_event: 'Agendando compromisso',
-    list_events: 'Consultando agenda',
-    delete_event: 'Removendo compromisso',
-    create_booking_link: 'Criando link de agendamento',
-    list_booking_types: 'Consultando links de agendamento',
-    create_bot: 'Criando bot',
-    create_trigger: 'Criando bot',
-    list_bots: 'Consultando bots',
-    send_message: 'Preparando mensagem de WhatsApp',
-    send_email: 'Preparando e-mail',
-    search_messages: 'Pesquisando conversas',
-    search_emails: 'Pesquisando e-mails',
-    search: 'Pesquisando na web',
-    get_summary: 'Analisando finanças',
-  };
-  if (tc.operation && opMap[tc.operation]) {
-    return opMap[tc.operation];
-  }
-  return tc.operation || tc.tool || '';
-}
+export { formatHistoryForStream, formatToolCallStepLabel };
 
 export interface RunAssistantStreamTurnParams {
   prompt: string;
