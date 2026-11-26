@@ -10,7 +10,6 @@ import {
 import {
   ActionPolicy,
   Bot,
-  BotActivityItem,
   BotAppInfo,
   BotTemplate,
   CreateBotPayload,
@@ -19,19 +18,17 @@ import {
   UpdateBotPayload,
 } from '../types/bots';
 import { isAlwaysAskAction } from '../utils/botsHelpers';
-import { normalizeBot, normalizeBotActivity } from '../utils/botsNormalizers';
+import { normalizeBot } from '../utils/botsNormalizers';
 
 const BOTS_CACHE_PREFIX = '@vito_bots_cache_v1';
 
 interface CachedBotsBundle {
   bots: Bot[];
-  activity: BotActivityItem[];
   savedAt: string;
 }
 
 export const useBots = (userId?: string) => {
   const [bots, setBots] = useState<Bot[]>([]);
-  const [activity, setActivity] = useState<BotActivityItem[]>([]);
   const [templates, setTemplates] = useState<BotTemplate[]>(DEFAULT_BOT_TEMPLATES);
   const [skills, setSkills] = useState<SkillPackage[]>(DEFAULT_SKILL_PACKAGES);
   const [apps, setApps] = useState<BotAppInfo[]>(DEFAULT_APPS_CATALOG);
@@ -44,11 +41,10 @@ export const useBots = (userId?: string) => {
   const cacheKey = `${BOTS_CACHE_PREFIX}_${userId || 'anon'}`;
 
   const saveCache = useCallback(
-    async (nextBots: Bot[], nextActivity: BotActivityItem[]) => {
+    async (nextBots: Bot[]) => {
       try {
         const bundle: CachedBotsBundle = {
           bots: nextBots,
-          activity: nextActivity,
           savedAt: new Date().toISOString(),
         };
         await AsyncStorage.setItem(cacheKey, JSON.stringify(bundle));
@@ -66,7 +62,6 @@ export const useBots = (userId?: string) => {
       const parsed = JSON.parse(raw) as CachedBotsBundle;
       if (Array.isArray(parsed.bots)) {
         setBots(parsed.bots.map(normalizeBot));
-        setActivity(Array.isArray(parsed.activity) ? normalizeBotActivity(parsed.activity) : []);
         return true;
       }
     } catch {
@@ -82,20 +77,18 @@ export const useBots = (userId?: string) => {
       }
       setError(null);
       try {
-        const [botsRes, actRes, tplRes, skillRes, appsRes] = await Promise.all([
+        const [botsRes, tplRes, skillRes, appsRes] = await Promise.all([
           api.listBots(),
-          api.getBotsActivity(20).catch(() => []),
           api.getBotCatalogTemplates(),
           api.getBotCatalogSkills(),
           api.getBotApps(),
         ]);
         setBots(botsRes);
-        setActivity(actRes);
         setTemplates(tplRes);
         setSkills(skillRes);
         setApps(appsRes);
         setIsOfflineCache(false);
-        await saveCache(botsRes, actRes);
+        await saveCache(botsRes);
       } catch (err) {
         const hasCache = await loadCache();
         if (hasCache) {
@@ -262,7 +255,6 @@ export const useBots = (userId?: string) => {
 
   return {
     bots,
-    activity,
     templates,
     skills,
     apps,

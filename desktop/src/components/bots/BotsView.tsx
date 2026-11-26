@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Sparkles, Bot as BotIcon, RefreshCw, WifiOff, Activity, Undo2 } from 'lucide-react';
+import { Sparkles, Bot as BotIcon, RefreshCw, WifiOff, Undo2 } from 'lucide-react';
 import { useBots } from '../../hooks/useBots';
 import { Bot, BotSkin, BotTemplate, SkillPackage } from '../../types/bot';
 import { BotCard } from './BotCard';
@@ -20,7 +20,6 @@ export const BotsView: React.FC<BotsViewProps> = ({ onOpenChatWithPrompt }) => {
     templates,
     skills,
     apps,
-    activity,
     selectedBotId,
     setSelectedBotId,
     selectedBot,
@@ -261,28 +260,6 @@ export const BotsView: React.FC<BotsViewProps> = ({ onOpenChatWithPrompt }) => {
                   </div>
                 )}
               </section>
-
-              {/* Atividade recente */}
-              {activity.length > 0 && (
-                <section className="space-y-2.5">
-                  <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[var(--muted)]">
-                    <Activity size={13} /> Atividade recente
-                  </div>
-                  <div className="rounded-2xl border border-[var(--line)] bg-[var(--bg)] divide-y divide-[var(--line)]">
-                    {activity.slice(0, 8).map((item) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => setSelectedBotId(item.bot_id)}
-                        className="w-full text-left px-3.5 py-2.5 hover:bg-[var(--surf)] transition-colors"
-                      >
-                        <div className="text-xs font-bold text-[var(--ink)]">{item.bot_title}</div>
-                        <div className="text-xs text-[var(--muted)] line-clamp-1">{item.summary}</div>
-                      </button>
-                    ))}
-                  </div>
-                </section>
-              )}
             </>
           )}
         </div>

@@ -11,14 +11,12 @@ import { ProtoUiIcon } from '../../../icons/ProtoUiIcons';
 import { PressableScale } from '../../../theme/vitoMotion';
 import { useTheme } from '../../../context/ThemeContext';
 import { ASK_VITO_CHIPS } from '../data/botsCatalogFallback';
-import { Bot, BotActivityItem, BotPendingApproval, PendingResolutionDecision } from '../types/bots';
-import { formatTimeAgoPt } from '../utils/botsHelpers';
+import { Bot, BotPendingApproval, PendingResolutionDecision } from '../types/bots';
 import { BotCard } from './BotCard';
 import { BotMascotAvatar } from './BotMascotAvatar';
 
 export interface BotsMyTabProps {
   bots: Bot[];
-  activity: BotActivityItem[];
   loading: boolean;
   refreshing: boolean;
   error: string | null;
@@ -40,7 +38,6 @@ export interface BotsMyTabProps {
 
 export const BotsMyTab: React.FC<BotsMyTabProps> = ({
   bots,
-  activity,
   loading,
   refreshing,
   error,
@@ -205,48 +202,6 @@ export const BotsMyTab: React.FC<BotsMyTabProps> = ({
           )}
         </>
       )}
-
-      {activity.length > 0 && (
-        <View style={styles.activityBlock}>
-          <Text style={[styles.sectionLabel, { color: colors.muted }]}>ATIVIDADE RECENTE</Text>
-          <View style={[styles.feedBox, { backgroundColor: colors.bg, borderColor: colors.line }]}>
-            {activity.slice(0, 8).map((item, idx) => (
-              <View
-                key={item.id}
-                style={[
-                  styles.feedRow,
-                  idx > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line },
-                ]}
-              >
-                <View
-                  style={[
-                    styles.feedDot,
-                    {
-                      backgroundColor:
-                        item.kind === 'error'
-                          ? colors.red
-                          : item.kind === 'pending'
-                            ? colors.orange
-                            : colors.acc,
-                    },
-                  ]}
-                />
-                <View style={styles.feedTextCol}>
-                  <Text style={[styles.feedTitle, { color: colors.ink }]} numberOfLines={1}>
-                    {item.bot_title}
-                  </Text>
-                  <Text style={[styles.feedDesc, { color: colors.muted }]} numberOfLines={2}>
-                    {item.text}
-                  </Text>
-                </View>
-                <Text style={[styles.feedTime, { color: colors.muted }]}>
-                  {formatTimeAgoPt(item.created_at)}
-                </Text>
-              </View>
-            ))}
-          </View>
-        </View>
-      )}
     </ScrollView>
   );
 };
@@ -396,39 +351,5 @@ const styles = StyleSheet.create({
   },
   pausedBlock: {
     marginTop: 8,
-  },
-  activityBlock: {
-    marginTop: 14,
-  },
-  feedBox: {
-    borderRadius: 18,
-    borderWidth: 1,
-    overflow: 'hidden',
-  },
-  feedRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    gap: 10,
-  },
-  feedDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  feedTextCol: {
-    flex: 1,
-    gap: 2,
-  },
-  feedTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  feedDesc: {
-    fontSize: 12,
-    lineHeight: 16,
-  },
-  feedTime: {
-    fontSize: 11,
   },
 });

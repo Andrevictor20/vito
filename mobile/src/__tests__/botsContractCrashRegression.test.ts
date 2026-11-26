@@ -127,4 +127,19 @@ describe('Regressão de Contrato e Crash em Bots (BotCard / AddActionSheet / Mai
     const matches = mainTabs.match(/<ErrorBoundary\b/g) ?? [];
     assert.ok(matches.length >= 5, `MainTabs deve isolar todas as 5 abas com ErrorBoundary (encontrados: ${matches.length})`);
   });
+
+  test('Meus Bots não exibe bloco redundante Atividade Recente no Mobile nem no Desktop', () => {
+    const botsMyTab = fs.readFileSync(
+      path.join(MOBILE_SRC, 'features/bots/components/BotsMyTab.tsx'),
+      'utf8'
+    );
+    assert.equal(botsMyTab.includes('ATIVIDADE RECENTE'), false);
+    assert.equal(botsMyTab.includes('activityBlock'), false);
+
+    const desktopBotsView = fs.readFileSync(
+      path.resolve(MOBILE_SRC, '../../desktop/src/components/bots/BotsView.tsx'),
+      'utf8'
+    );
+    assert.equal(desktopBotsView.includes('Atividade recente'), false);
+  });
 });

@@ -55,7 +55,6 @@ export const BotsScreen: React.FC<BotsScreenProps> = ({
   const firstTabRender = useRef(true);
   const {
     bots,
-    activity,
     templates,
     skills,
     apps,
@@ -304,7 +303,6 @@ export const BotsScreen: React.FC<BotsScreenProps> = ({
         {activeTab === 'my_bots' ? (
           <BotsMyTab
             bots={bots}
-            activity={activity}
             loading={loading}
             refreshing={refreshing}
             error={error}
