@@ -215,7 +215,7 @@ func (a *triggerServiceAdapter) ListTriggers(userID string) ([]*domain.Trigger, 
 func (a *triggerServiceAdapter) CreateTrigger(t *domain.Trigger) error {
 	input := domain.CreateTriggerInput{
 		Title:         t.Title,
-		Category:      domain.CategoryCustom,
+		Category:      "",
 		Query:         t.UserIntent,
 		ConditionType: domain.ConditionChangeDetected,
 		TargetValue:   "alert",

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -25,13 +26,23 @@ type BotAppSpec struct {
 	AlwaysLocal bool   `json:"always_local,omitempty"`
 }
 
+// BotAppActionDTO descreve uma ação disponível em um app integrável.
+type BotAppActionDTO struct {
+	ActionKey     string              `json:"action_key"`
+	Label         string              `json:"label"`
+	IsWrite       bool                `json:"is_write"`
+	AlwaysAsk     bool                `json:"always_ask"`
+	DefaultPolicy domain.ActionPolicy `json:"default_policy,omitempty"`
+}
+
 // BotAppStatusDTO representa o status de conexão de um app para o usuário atual.
 type BotAppStatusDTO struct {
-	AppKey      string `json:"app_key"`
-	Name        string `json:"name"`
-	Category    string `json:"category,omitempty"`
-	Description string `json:"description,omitempty"`
-	Connected   bool   `json:"connected"`
+	AppKey      string            `json:"app_key"`
+	Name        string            `json:"name"`
+	Category    string            `json:"category,omitempty"`
+	Description string            `json:"description,omitempty"`
+	Connected   bool              `json:"connected"`
+	Actions     []BotAppActionDTO `json:"actions,omitempty"`
 }
 
 // AppConnectionChecker verifica quais apps externos estão conectados para o usuário.
@@ -123,9 +134,30 @@ func (h *BotHandler) ListApps(w http.ResponseWriter, r *http.Request) {
 			Category:    s.Category,
 			Description: s.Description,
 			Connected:   s.AlwaysLocal || connMap[s.AppKey],
+			Actions:     actionsForAppKey(s.AppKey),
 		})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"apps": apps})
+}
+
+func actionsForAppKey(appKey string) []BotAppActionDTO {
+	out := make([]BotAppActionDTO, 0)
+	for _, spec := range domain.ActionCatalog {
+		if spec.AppKey != appKey {
+			continue
+		}
+		out = append(out, BotAppActionDTO{
+			ActionKey:     spec.ActionKey,
+			Label:         spec.Label,
+			IsWrite:       spec.IsWrite,
+			AlwaysAsk:     spec.AlwaysAsk || domain.IsAlwaysAskAction(spec.ActionKey),
+			DefaultPolicy: spec.DefaultPolicy,
+		})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].ActionKey < out[j].ActionKey
+	})
+	return out
 }
 
 // SuggestApp registra uma sugestão de novo app integrável (POST /api/v1/bots/apps/suggest).

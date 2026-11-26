@@ -16,6 +16,7 @@ import (
 
 	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/ai/adkengine"
+	"github.com/andrevmp/vito/backend/internal/catalog"
 	"github.com/andrevmp/vito/backend/internal/platform/config"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/handler"
@@ -113,11 +114,18 @@ func setupAgentSubsystem(
 	} else {
 		registry.Register(calendar.NewMeetingBookingToolset())
 	}
+	var botTS *bots.BotTriggerToolset
 	if triggerSvc != nil {
-		registry.Register(bots.NewBotTriggerToolset(&triggerServiceAdapter{triggerSvc}))
+		botTS = bots.NewBotTriggerToolset(&triggerServiceAdapter{triggerSvc})
 	} else {
-		registry.Register(bots.NewBotTriggerToolset())
+		botTS = bots.NewBotTriggerToolset()
 	}
+	if db != nil {
+		botRepo := bots.NewBotRepository(db)
+		cat, _ := catalog.LoadDefaultCatalog()
+		botTS.SetBotRepository(botRepo, cat)
+	}
+	registry.Register(botTS)
 	if finRepo != nil {
 		finToolset := finance.NewFinanceToolset(finance.NewFinanceService(finRepo), finRepo)
 		finLimitRepo := finance.NewFinanceLimitRepository(db)

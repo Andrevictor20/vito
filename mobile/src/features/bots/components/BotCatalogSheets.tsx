@@ -75,13 +75,13 @@ export const SkillDetailSheet: React.FC<{
         <Text style={[styles.label, { color: colors.muted }]}>QUANDO USAR</Text>
         <Text style={[styles.desc, { color: colors.muted }]}>{skill.when}</Text>
         <Text style={[styles.label, { color: colors.muted }]}>PASSOS</Text>
-        {skill.steps.map((step, i) => (
+        {(skill.steps ?? []).map((step, i) => (
           <Text key={i} style={[styles.stepText, { color: colors.ink }]}>
             {i + 1}. {step}
           </Text>
         ))}
         <Text style={[styles.label, { color: colors.muted, marginTop: 10 }]}>AÇÕES QUE USA</Text>
-        <Text style={[styles.desc, { color: colors.acc }]}>{skill.actions.join(', ')}</Text>
+        <Text style={[styles.desc, { color: colors.acc }]}>{(skill.actions ?? []).join(', ')}</Text>
         <TouchableOpacity
           style={[styles.primaryBtn, { backgroundColor: colors.ink }]}
           onPress={() => {
@@ -148,7 +148,8 @@ export const AddSkillSheet: React.FC<{
   onAddSkill: (skillKey: string) => void;
 }> = ({ visible, skills, existingSkillKeys, onClose, onAddSkill }) => {
   const { colors } = useTheme();
-  const available = skills.filter((s) => !existingSkillKeys.includes(s.key));
+  const safeExisting = Array.isArray(existingSkillKeys) ? existingSkillKeys : [];
+  const available = (skills ?? []).filter((s) => !safeExisting.includes(s.key));
   return (
     <BottomSheetModal visible={visible} onClose={onClose} title="Adicionar habilidade">
       <ScrollView style={styles.scroll}>
@@ -189,16 +190,18 @@ export const AddActionSheet: React.FC<{
   onAddAction: (actionKey: string, policy: ActionPolicy, alwaysAsk?: boolean) => void;
 }> = ({ visible, apps, existingActionKeys, onClose, onAddAction }) => {
   const { colors } = useTheme();
+  const safeExisting = Array.isArray(existingActionKeys) ? existingActionKeys : [];
   return (
     <BottomSheetModal visible={visible} onClose={onClose} title="Adicionar ação">
       <ScrollView style={styles.scroll}>
-        {apps.map((app) => {
-          const actions = app.actions.filter((a) => !existingActionKeys.includes(a.action_key));
+        {(apps ?? []).map((app) => {
+          const appActions = Array.isArray(app?.actions) ? app.actions : [];
+          const actions = appActions.filter((a) => !safeExisting.includes(a.action_key));
           if (actions.length === 0) return null;
           return (
             <View key={app.app_key} style={styles.appGroup}>
               <Text style={[styles.label, { color: colors.muted }]}>
-                {app.name.toUpperCase()} {!app.connected ? '(NÃO CONECTADO)' : ''}
+                {(app?.name || app?.app_key || '').toUpperCase()} {!app.connected ? '(NÃO CONECTADO)' : ''}
               </Text>
               {actions.map((act) => (
                 <TouchableOpacity

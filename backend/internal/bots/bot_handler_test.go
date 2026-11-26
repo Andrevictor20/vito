@@ -289,3 +289,75 @@ func TestBotHandler_ResolvePending_AC02_AC03(t *testing.T) {
 		t.Fatalf("allow_once em wasend = %d: %s", rec.Code, rec.Body.String())
 	}
 }
+
+func TestBotHandler_ListAppsIncludesActionsAndBotTriggerToolsetCreatesFullBot(t *testing.T) {
+	_, h, _, botRepo, userID := setupBotHandlerTest(t)
+	r := mountBotRoutes(h)
+
+	// 1. GET /api/v1/bots/apps deve incluir actions não vazias para apps conhecidos
+	rec := doBotReq(t, r, userID, http.MethodGet, "/api/v1/bots/apps", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /api/v1/bots/apps = %d: %s", rec.Code, rec.Body.String())
+	}
+	var appsResp struct {
+		Apps []bots.BotAppStatusDTO `json:"apps"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &appsResp); err != nil {
+		t.Fatalf("unmarshal apps: %v", err)
+	}
+	checked := map[string]bool{}
+	for _, app := range appsResp.Apps {
+		if app.AppKey == "vito" || app.AppKey == "web" || app.AppKey == "gcal" || app.AppKey == "wa" {
+			checked[app.AppKey] = true
+			if len(app.Actions) == 0 {
+				t.Fatalf("app %q deveria retornar actions preenchido em GET /api/v1/bots/apps", app.AppKey)
+			}
+			for _, act := range app.Actions {
+				if act.ActionKey == "" || act.Label == "" {
+					t.Fatalf("action inválida no app %q: %+v", app.AppKey, act)
+				}
+			}
+		}
+	}
+	if len(checked) < 4 {
+		t.Fatalf("apps esperados ausentes em /api/v1/bots/apps: %+v", checked)
+	}
+
+	// 2. BotTriggerToolset com SetBotRepository cria bot completo com ações em bot_actions
+	cat, err := catalog.LoadDefaultCatalog()
+	if err != nil {
+		t.Fatalf("LoadDefaultCatalog: %v", err)
+	}
+	ts := bots.NewBotTriggerToolset()
+	ts.SetBotRepository(botRepo, cat)
+
+	res, err := ts.Execute(context.Background(), &domain.ToolExecutionContext{UserID: userID}, "create_bot", json.RawMessage(`{
+		"title": "Monitor Dólar",
+		"goal": "Avisar quando o dólar cair abaixo de R$ 5,50",
+		"suggested_skill": "cmp"
+	}`))
+	if err != nil {
+		t.Fatalf("ts.Execute create_bot: %v", err)
+	}
+	if res == nil || res.Status != "COMPLETED" {
+		t.Fatalf("resultado inesperado: %+v", res)
+	}
+	tr, ok := res.Data.(*domain.Trigger)
+	if !ok || tr == nil || tr.ID == "" {
+		t.Fatalf("esperava *domain.Trigger em res.Data, obteve %T (%+v)", res.Data, res.Data)
+	}
+
+	list, err := botRepo.ListByUser(context.Background(), userID)
+	if err != nil {
+		t.Fatalf("botRepo.ListByUser: %v", err)
+	}
+	if len(list) != 1 {
+		t.Fatalf("esperava 1 bot persistido em botRepo, obteve %d", len(list))
+	}
+	if len(list[0].Actions) < 2 {
+		t.Fatalf("esperava bot_actions preenchidas (ex: notify + search), obteve %+v", list[0].Actions)
+	}
+	if len(list[0].Skills) != 1 || list[0].Skills[0].SkillKey != "cmp" {
+		t.Fatalf("esperava skill 'cmp' persistida, obteve %+v", list[0].Skills)
+	}
+}

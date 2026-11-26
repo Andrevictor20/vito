@@ -29,6 +29,9 @@ func IsExplicitSendConfirmationText(text string) bool {
 		"pode enviar o email", "pode mandar o email", "pode mandar o e-mail",
 		"pode mandar a mensagem", "sim", "confirmo", "manda ver", "pode ir",
 		"beleza, manda", "sim, confirmo", "sim confirmo",
+		"pode criar", "sim, pode criar", "sim pode criar",
+		"cria o bot", "crie o bot", "pode fazer", "sim, pode fazer", "sim pode fazer",
+		"confirmar", "confirma", "beleza, pode criar", "ok, pode criar", "sim, cria",
 	}
 	for _, phrase := range explicitPhrases {
 		if lower == phrase || strings.HasPrefix(lower, phrase+" ") || strings.HasPrefix(lower, phrase+",") || strings.HasPrefix(lower, phrase+"!") || strings.HasPrefix(lower, phrase+".") {

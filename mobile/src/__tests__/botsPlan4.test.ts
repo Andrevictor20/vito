@@ -2,6 +2,7 @@ import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import './botsContractCrashRegression.test';
 import { BotsApi } from '../features/bots/services/botsApi';
 import type { ApiClient } from '../services/api/client';
 import {

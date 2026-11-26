@@ -57,6 +57,7 @@ export interface BotPendingApproval {
   action_key: string;
   app_key?: string;
   title: string;
+  label?: string;
   summary: string;
   always_ask: boolean;
   created_at: string;
@@ -195,6 +196,7 @@ export interface UpdateBotPayload {
   goal?: string;
   status?: BotStatus;
   quiet?: boolean;
+  quiet_only_on_change?: boolean;
   skin_json?: string;
   triggers?: BotTriggerRule[];
   rules?: string[];

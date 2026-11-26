@@ -361,4 +361,50 @@ func TestAC03_ChatToolsReturnRealTypedEntitiesAndCards(t *testing.T) {
 	if botErr != nil || botRes == nil || botRes.Status != "COMPLETED" {
 		t.Fatalf("create_bot com fallback de goal deveria concluir, obteve res=%+v err=%v", botRes, botErr)
 	}
+
+	// Regressão: vito_executive deve conseguir invocar bot_create_bot diretamente sem transfer_to_agent
+	_ = aiSettingsRepo.UpsertSettings(&domain.AISettings{
+		UserID:       userID,
+		AutonomyMode: domain.AutonomyModeProactive,
+	})
+	providerRootBot := &fakeAgentProvider{
+		name:          "Fake-RootBot",
+		model:         "gemini-2.5-flash",
+		tier:          3,
+		supportsTools: true,
+		responses: []*ai.AgentChatResponse{
+			{
+				ProviderName: "Fake-RootBot",
+				ModelName:    "gemini-2.5-flash",
+				ToolCalls: []ai.ToolCall{
+					{ID: "rb1", Name: "bot_create_bot", Arguments: json.RawMessage(`{"title":"Bot Direto Root","goal":"Monitorar promoções"}`)},
+				},
+			},
+			{Text: "Bot Direto Root criado!", ProviderName: "Fake-RootBot", ModelName: "gemini-2.5-flash"},
+		},
+	}
+	facadeRootBot, err := adkengine.NewADKLoopFacade(adkengine.FacadeConfig{
+		Router:           ai.NewModelRouter(providerRootBot),
+		Registry:         reg,
+		ScopeGuard:       scopeGuard,
+		ConfirmationGate: confGate,
+		ConvRepo:         convRepo,
+		UserRepo:         userRepo,
+		AISettingsRepo:   aiSettingsRepo,
+	})
+	if err != nil {
+		t.Fatalf("facadeRootBot: %v", err)
+	}
+	rRootBot, err := facadeRootBot.Run(ctx, domain.UnifiedAssistantRequest{
+		UserID:   userID,
+		ThreadID: "th-root-bot",
+		Channel:  "app_mobile",
+		Message:  "Crie um bot para monitorar promoções",
+	})
+	if err != nil {
+		t.Fatalf("vito_executive bot_create_bot direto falhou: %v", err)
+	}
+	if rRootBot.Trigger == nil || rRootBot.Trigger.ID == "" {
+		t.Fatalf("esperava Trigger criado diretamente por vito_executive, obteve %+v", rRootBot)
+	}
 }

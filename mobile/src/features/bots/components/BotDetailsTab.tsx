@@ -95,7 +95,7 @@ export const BotDetailsTab: React.FC<BotDetailsTabProps> = ({
           onPress={() => setOpenActions((p) => !p)}
         >
           <Text style={[styles.accTitle, { color: colors.ink }]}>
-            Ações ({bot.actions.length}) · Habilidades ({bot.skills.length})
+            Ações ({(bot.actions ?? []).length}) · Habilidades ({(bot.skills ?? []).length})
           </Text>
           <ProtoUiIcon
             name={openActions ? 'expand-less' : 'expand-more'}
@@ -106,7 +106,7 @@ export const BotDetailsTab: React.FC<BotDetailsTabProps> = ({
 
         {openActions && (
           <View style={styles.accBody}>
-            {bot.skills.map((skill) => (
+            {(bot.skills ?? []).map((skill) => (
               <View
                 key={skill.skill_key}
                 style={[styles.skillRow, { backgroundColor: colors.surf, borderColor: colors.line }]}
@@ -132,7 +132,7 @@ export const BotDetailsTab: React.FC<BotDetailsTabProps> = ({
               </View>
             ))}
 
-            {bot.actions.map((act) => {
+            {(bot.actions ?? []).map((act) => {
               const policies = getAvailablePoliciesForAction(act.action_key, act.always_ask);
               return (
                 <View
@@ -270,24 +270,24 @@ export const BotDetailsTab: React.FC<BotDetailsTabProps> = ({
                     {formatTimeAgoPt(run.ran_at)} · {run.status}
                   </Text>
                   <Text style={[styles.rowSub, { color: colors.muted }]}>{run.summary}</Text>
-                  {run.verified.length > 0 && (
+                  {(run.verified ?? []).length > 0 && (
                     <Text style={[styles.runList, { color: colors.acc }]}>
-                      Verificado: {run.verified.join('; ')}
+                      Verificado: {(run.verified ?? []).join('; ')}
                     </Text>
                   )}
-                  {run.actions_done.length > 0 && (
+                  {(run.actions_done ?? []).length > 0 && (
                     <Text style={[styles.runList, { color: colors.blue }]}>
-                      Ações feitas: {run.actions_done.join('; ')}
+                      Ações feitas: {(run.actions_done ?? []).join('; ')}
                     </Text>
                   )}
-                  {run.pending.length > 0 && (
+                  {(run.pending ?? []).length > 0 && (
                     <Text style={[styles.runList, { color: colors.orange }]}>
-                      Aguardando: {run.pending.join('; ')}
+                      Aguardando: {(run.pending ?? []).join('; ')}
                     </Text>
                   )}
-                  {run.cant.length > 0 && (
+                  {(run.cant ?? []).length > 0 && (
                     <Text style={[styles.runList, { color: colors.red }]}>
-                      Não consegui verificar: {run.cant.join('; ')}
+                      Não consegui verificar: {(run.cant ?? []).join('; ')}
                     </Text>
                   )}
                 </View>

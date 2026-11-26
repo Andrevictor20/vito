@@ -9,6 +9,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { AdaptivePager, AdaptivePagerRef } from '../components/common/AdaptivePager';
+import { ErrorBoundary } from '../components/common/ErrorBoundary';
 import { DOCK_TABS, FloatingTabBar, type DockTabType } from '../components/common/FloatingTabBar';
 import { HeaderRoundButton, SubScreenHeader } from '../components/common/Header';
 import { useAuth } from '../context/AuthContext';
@@ -275,36 +276,61 @@ export const MainTabs: React.FC<{ route?: { params?: { screen?: MainTabType } } 
         onPageSelected={handlePageSelected}
       >
         <View key="0" style={[styles.pageWrapper, { width: containerWidth }]} collapsable={false}>
-          <ChatTabScreen
-            chatRef={chatRef}
-            onKeyboardStateChange={setKeyboardOpen}
-            unreadNotificationsCount={unreadNotificationsCount}
-            profileInitials={profileInitials}
-            onOpenNotifications={handleOpenNotifications}
-            onOpenProfile={handleOpenProfile}
-          />
+          <ErrorBoundary
+            fallbackTitle="Algo deu errado nesta aba"
+            fallbackMessage="Você pode tentar recarregar apenas esta aba ou continuar usando as outras normalmente."
+          >
+            <ChatTabScreen
+              chatRef={chatRef}
+              onKeyboardStateChange={setKeyboardOpen}
+              unreadNotificationsCount={unreadNotificationsCount}
+              profileInitials={profileInitials}
+              onOpenNotifications={handleOpenNotifications}
+              onOpenProfile={handleOpenProfile}
+            />
+          </ErrorBoundary>
         </View>
 
         <View key="1" style={[styles.pageWrapper, { width: containerWidth }]} collapsable={false}>
-          <AgendaTabScreen
-            onSubViewChange={setInAgendaSubView}
-            onModalChange={setInAgendaModal}
-            showSummaries={showSummaries}
-            setShowSummaries={setShowSummaries}
-            keyboardOpen={keyboardOpen}
-          />
+          <ErrorBoundary
+            fallbackTitle="Algo deu errado nesta aba"
+            fallbackMessage="Você pode tentar recarregar apenas esta aba ou continuar usando as outras normalmente."
+          >
+            <AgendaTabScreen
+              onSubViewChange={setInAgendaSubView}
+              onModalChange={setInAgendaModal}
+              showSummaries={showSummaries}
+              setShowSummaries={setShowSummaries}
+              keyboardOpen={keyboardOpen}
+            />
+          </ErrorBoundary>
         </View>
 
         <View key="2" style={[styles.pageWrapper, { width: containerWidth }]} collapsable={false}>
-          <TasksTabScreen />
+          <ErrorBoundary
+            fallbackTitle="Algo deu errado nesta aba"
+            fallbackMessage="Você pode tentar recarregar apenas esta aba ou continuar usando as outras normalmente."
+          >
+            <TasksTabScreen />
+          </ErrorBoundary>
         </View>
 
         <View key="3" style={[styles.pageWrapper, { width: containerWidth }]} collapsable={false}>
-          <FinanceScreen />
+          <ErrorBoundary
+            fallbackTitle="Algo deu errado nesta aba"
+            fallbackMessage="Você pode tentar recarregar apenas esta aba ou continuar usando as outras normalmente."
+          >
+            <FinanceScreen />
+          </ErrorBoundary>
         </View>
 
         <View key="4" style={[styles.pageWrapper, { width: containerWidth }]} collapsable={false}>
-          <BotsTabScreen onSubViewChange={setInTriggersSubView} />
+          <ErrorBoundary
+            fallbackTitle="Algo deu errado nesta aba"
+            fallbackMessage="Você pode tentar recarregar apenas esta aba ou continuar usando as outras normalmente."
+          >
+            <BotsTabScreen onSubViewChange={setInTriggersSubView} />
+          </ErrorBoundary>
         </View>
       </AdaptivePager>
 

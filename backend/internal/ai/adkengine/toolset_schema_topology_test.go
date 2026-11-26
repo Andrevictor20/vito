@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/andrevmp/vito/backend/internal/domain"
+	"github.com/andrevmp/vito/backend/internal/service"
 	"github.com/andrevmp/vito/backend/internal/service/toolsets"
 )
 
@@ -75,5 +76,12 @@ func TestAC02_TypedSchemasAndCleanRootTopology(t *testing.T) {
 	}
 	if len(topology.RootAgent.SubAgents()) != 6 {
 		t.Fatalf("esperava 6 sub-agentes em vito_executive, obteve %d", len(topology.RootAgent.SubAgents()))
+	}
+
+	// Verifica frases naturais de confirmação para criação de bot
+	for _, phrase := range []string{"pode criar", "sim, pode criar", "cria o bot", "confirmar", "pode fazer"} {
+		if !service.IsExplicitSendConfirmationText(phrase) {
+			t.Errorf("esperava que IsExplicitSendConfirmationText(%q) retornasse true", phrase)
+		}
 	}
 }

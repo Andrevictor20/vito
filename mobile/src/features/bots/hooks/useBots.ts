@@ -19,6 +19,7 @@ import {
   UpdateBotPayload,
 } from '../types/bots';
 import { isAlwaysAskAction } from '../utils/botsHelpers';
+import { normalizeBot, normalizeBotActivity } from '../utils/botsNormalizers';
 
 const BOTS_CACHE_PREFIX = '@vito_bots_cache_v1';
 
@@ -64,8 +65,8 @@ export const useBots = (userId?: string) => {
       if (!raw) return false;
       const parsed = JSON.parse(raw) as CachedBotsBundle;
       if (Array.isArray(parsed.bots)) {
-        setBots(parsed.bots);
-        setActivity(Array.isArray(parsed.activity) ? parsed.activity : []);
+        setBots(parsed.bots.map(normalizeBot));
+        setActivity(Array.isArray(parsed.activity) ? normalizeBotActivity(parsed.activity) : []);
         return true;
       }
     } catch {

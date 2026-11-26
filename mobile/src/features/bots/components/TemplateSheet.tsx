@@ -32,9 +32,11 @@ export const TemplateSheet: React.FC<TemplateSheetProps> = ({
 
   const activeSkin = MASCOT_PRESETS[selectedPresetIdx]?.skin ?? MASCOT_PRESETS[0].skin;
   const templateActions = template.actions ?? ['notify'];
-  const missingApps = apps.filter(
-    (app) => !app.connected && app.actions.some((a) => templateActions.includes(a.action_key))
-  );
+  const missingApps = (apps ?? []).filter((app) => {
+    if (app?.connected) return false;
+    const appActions = Array.isArray(app?.actions) ? app.actions : [];
+    return appActions.some((a) => templateActions.includes(a.action_key));
+  });
 
   const handleActivate = async () => {
     if (activating) return;
@@ -101,7 +103,7 @@ export const TemplateSheet: React.FC<TemplateSheetProps> = ({
 
         <Text style={[styles.sectionLabel, { color: colors.muted }]}>HABILIDADES INCLUÍDAS</Text>
         <View style={styles.tagsRow}>
-          {template.skills.map((sk) => (
+          {(template.skills ?? []).map((sk) => (
             <View key={sk} style={[styles.tag, { backgroundColor: colors.surf }]}>
               <Text style={[styles.tagText, { color: colors.ink }]}>{sk}</Text>
             </View>

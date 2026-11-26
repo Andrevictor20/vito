@@ -20,6 +20,13 @@ import {
   UpdateBotPayload,
 } from '../types/bots';
 import { isAlwaysAskAction } from '../utils/botsHelpers';
+import {
+  normalizeBot,
+  normalizeBotActivity,
+  normalizeBotApps,
+  normalizeBotTemplates,
+  normalizeSkillPackages,
+} from '../utils/botsNormalizers';
 import type { UpdateModelPrefPayload } from '../../../types/aiProviders';
 
 export class BotsApi {
@@ -27,26 +34,33 @@ export class BotsApi {
 
   async listBots(): Promise<Bot[]> {
     const raw = await this.client.request<Bot[] | { bots?: Bot[]; data?: Bot[] }>('/api/v1/bots');
-    if (Array.isArray(raw)) return raw;
-    return raw?.bots ?? raw?.data ?? [];
+    const list = Array.isArray(raw) ? raw : raw?.bots ?? raw?.data ?? [];
+    return list.map(normalizeBot);
   }
 
   async createBot(payload: CreateBotPayload): Promise<Bot> {
-    return this.client.request<Bot>('/api/v1/bots', {
+    const raw = await this.client.request<Bot>('/api/v1/bots', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
+    return normalizeBot(raw);
   }
 
   async getBot(id: string): Promise<Bot> {
-    return this.client.request<Bot>(`/api/v1/bots/${id}`);
+    const raw = await this.client.request<Bot>(`/api/v1/bots/${id}`);
+    return normalizeBot(raw);
   }
 
   async updateBot(id: string, payload: UpdateBotPayload): Promise<Bot> {
-    return this.client.request<Bot>(`/api/v1/bots/${id}`, {
+    const body: UpdateBotPayload = { ...payload };
+    if (body.quiet !== undefined && body.quiet_only_on_change === undefined) {
+      body.quiet_only_on_change = body.quiet;
+    }
+    const raw = await this.client.request<Bot>(`/api/v1/bots/${id}`, {
       method: 'PATCH',
-      body: JSON.stringify(payload),
+      body: JSON.stringify(body),
     });
+    return normalizeBot(raw);
   }
 
   async deleteBot(id: string): Promise<void> {
@@ -89,10 +103,11 @@ export class BotsApi {
       isAlwaysAskAction(payload.action_key, payload.always_ask) && payload.policy === 'auto'
         ? 'ask'
         : payload.policy;
-    return this.client.request<Bot>(`/api/v1/bots/${id}/actions`, {
+    const raw = await this.client.request<Bot>(`/api/v1/bots/${id}/actions`, {
       method: 'POST',
       body: JSON.stringify({ action_key: payload.action_key, policy: safePolicy }),
     });
+    return normalizeBot(raw);
   }
 
   async updateBotAction(
@@ -104,35 +119,40 @@ export class BotsApi {
     if (isAlwaysAskAction(actionKey, alwaysAsk) && policy === 'auto') {
       throw new Error('Esta ação sempre exige aprovação antes de executar.');
     }
-    return this.client.request<Bot>(`/api/v1/bots/${id}/actions/${actionKey}`, {
+    const raw = await this.client.request<Bot>(`/api/v1/bots/${id}/actions/${actionKey}`, {
       method: 'PATCH',
       body: JSON.stringify({ policy }),
     });
+    return normalizeBot(raw);
   }
 
   async removeBotAction(id: string, actionKey: string): Promise<Bot> {
-    return this.client.request<Bot>(`/api/v1/bots/${id}/actions/${actionKey}`, {
+    const raw = await this.client.request<Bot>(`/api/v1/bots/${id}/actions/${actionKey}`, {
       method: 'DELETE',
     });
+    return normalizeBot(raw);
   }
 
   async addBotSkill(id: string, skillKey: string): Promise<Bot> {
-    return this.client.request<Bot>(`/api/v1/bots/${id}/skills`, {
+    const raw = await this.client.request<Bot>(`/api/v1/bots/${id}/skills`, {
       method: 'POST',
       body: JSON.stringify({ skill_key: skillKey }),
     });
+    return normalizeBot(raw);
   }
 
   async removeBotSkill(id: string, skillKey: string): Promise<Bot> {
-    return this.client.request<Bot>(`/api/v1/bots/${id}/skills/${skillKey}`, {
+    const raw = await this.client.request<Bot>(`/api/v1/bots/${id}/skills/${skillKey}`, {
       method: 'DELETE',
     });
+    return normalizeBot(raw);
   }
 
   async upgradeBotSkill(id: string, skillKey: string): Promise<Bot> {
-    return this.client.request<Bot>(`/api/v1/bots/${id}/skills/${skillKey}/upgrade`, {
+    const raw = await this.client.request<Bot>(`/api/v1/bots/${id}/skills/${skillKey}/upgrade`, {
       method: 'POST',
     });
+    return normalizeBot(raw);
   }
 
   async getBotMemories(id: string): Promise<BotMemoryItem[]> {
@@ -182,8 +202,8 @@ export class BotsApi {
     const raw = await this.client.request<
       BotActivityItem[] | { activity?: BotActivityItem[]; items?: BotActivityItem[] }
     >(`/api/v1/bots/activity?limit=${limit}`);
-    if (Array.isArray(raw)) return raw;
-    return raw?.activity ?? raw?.items ?? [];
+    const list = Array.isArray(raw) ? raw : raw?.activity ?? raw?.items ?? [];
+    return normalizeBotActivity(list);
   }
 
   async getCatalogTemplates(): Promise<BotTemplate[]> {
@@ -192,7 +212,7 @@ export class BotsApi {
         BotTemplate[] | { templates?: BotTemplate[]; data?: BotTemplate[] }
       >('/api/v1/bots/catalog/templates');
       const list = Array.isArray(raw) ? raw : raw?.templates ?? raw?.data ?? [];
-      return list.length > 0 ? list : DEFAULT_BOT_TEMPLATES;
+      return list.length > 0 ? normalizeBotTemplates(list) : DEFAULT_BOT_TEMPLATES;
     } catch {
       return DEFAULT_BOT_TEMPLATES;
     }
@@ -204,7 +224,7 @@ export class BotsApi {
         SkillPackage[] | { skills?: SkillPackage[]; data?: SkillPackage[] }
       >('/api/v1/bots/catalog/skills');
       const list = Array.isArray(raw) ? raw : raw?.skills ?? raw?.data ?? [];
-      return list.length > 0 ? list : DEFAULT_SKILL_PACKAGES;
+      return list.length > 0 ? normalizeSkillPackages(list) : DEFAULT_SKILL_PACKAGES;
     } catch {
       return DEFAULT_SKILL_PACKAGES;
     }
@@ -216,7 +236,7 @@ export class BotsApi {
         BotAppInfo[] | { apps?: BotAppInfo[]; data?: BotAppInfo[] }
       >('/api/v1/bots/apps');
       const list = Array.isArray(raw) ? raw : raw?.apps ?? raw?.data ?? [];
-      return list.length > 0 ? list : DEFAULT_APPS_CATALOG;
+      return list.length > 0 ? normalizeBotApps(list) : DEFAULT_APPS_CATALOG;
     } catch {
       return DEFAULT_APPS_CATALOG;
     }

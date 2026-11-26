@@ -246,7 +246,7 @@ export const BotDetailView: React.FC<BotDetailViewProps> = ({
       <AddSkillSheet
         visible={showAddSkill}
         skills={skills}
-        existingSkillKeys={bot.skills.map((s) => s.skill_key)}
+        existingSkillKeys={(bot.skills ?? []).map((s) => s.skill_key)}
         onClose={() => setShowAddSkill(false)}
         onAddSkill={(skillKey) => onAddSkill(bot.id, skillKey)}
       />
@@ -254,7 +254,7 @@ export const BotDetailView: React.FC<BotDetailViewProps> = ({
       <AddActionSheet
         visible={showAddAction}
         apps={apps}
-        existingActionKeys={bot.actions.map((a) => a.action_key)}
+        existingActionKeys={(bot.actions ?? []).map((a) => a.action_key)}
         onClose={() => setShowAddAction(false)}
         onAddAction={(actionKey, policy, alwaysAsk) =>
           onAddAction(bot.id, actionKey, policy, alwaysAsk)

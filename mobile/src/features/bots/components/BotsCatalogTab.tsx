@@ -215,7 +215,7 @@ export const BotsCatalogTab: React.FC<BotsCatalogTabProps> = ({
                       {skill.description}
                     </Text>
                     <Text style={[styles.skillActions, { color: tone.fg }]} numberOfLines={1}>
-                      Usa: {skill.actions.join(', ')}
+                      Usa: {(skill.actions ?? []).join(', ')}
                     </Text>
                   </View>
                   <ProtoUiIcon name="chevron-right" size={20} color={colors.muted} />

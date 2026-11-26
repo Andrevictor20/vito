@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
+	"github.com/andrevmp/vito/backend/internal/catalog"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/google/uuid"
 )
@@ -19,7 +21,15 @@ type TriggerServiceContract interface {
 
 // BotTriggerToolset implementa o toolset do sub-agente vito_bots_architect (substitui RadarTriggerToolset).
 type BotTriggerToolset struct {
-	svc TriggerServiceContract
+	svc     TriggerServiceContract
+	botRepo *BotRepositorySQLite
+	cat     *catalog.Catalog
+}
+
+// SetBotRepository conecta o repositório v2 de bots e o catálogo para persistir bot_actions e bot_skills na criação via chat.
+func (t *BotTriggerToolset) SetBotRepository(repo *BotRepositorySQLite, cat *catalog.Catalog) {
+	t.botRepo = repo
+	t.cat = cat
 }
 
 // RadarTriggerToolset é um alias de compatibilidade para wiring legado até a migração completa.
@@ -137,7 +147,7 @@ func (t *BotTriggerToolset) Execute(ctx context.Context, execCtx *domain.ToolExe
 		}, nil
 	}
 
-	if t.svc == nil {
+	if t.svc == nil && t.botRepo == nil {
 		return &domain.ToolExecutionResult{
 			Status:        "COMPLETED",
 			SummaryForLLM: "Serviço de bots não configurado.",
@@ -161,6 +171,25 @@ func (t *BotTriggerToolset) Execute(ctx context.Context, execCtx *domain.ToolExe
 		}
 		if intent == "" {
 			intent = title
+		}
+		if t.botRepo != nil {
+			bot := t.buildBotForCreation(execCtx.UserID, title, intent, params.TemplateKey, params.SuggestedSkill, params.Actions)
+			if err := t.botRepo.Create(ctx, bot); err != nil {
+				return nil, err
+			}
+			tr := triggerFromBot(bot)
+			return &domain.ToolExecutionResult{
+				Status:        "COMPLETED",
+				Data:          tr,
+				SummaryForLLM: fmt.Sprintf("Bot '%s' criado com sucesso.", bot.Title),
+				Cards: []domain.ChatCard{{
+					ID:          bot.ID,
+					Type:        "bot",
+					Title:       bot.Title,
+					Subtitle:    "Bot ativo",
+					ActionLabel: "Ver Bot",
+				}},
+			}, nil
 		}
 		tr := &domain.Trigger{
 			ID:         uuid.New().String(),
@@ -187,7 +216,11 @@ func (t *BotTriggerToolset) Execute(ctx context.Context, execCtx *domain.ToolExe
 		}, nil
 
 	case "delete_bot", "delete_trigger":
-		if err := t.svc.DeleteTrigger(targetID, execCtx.UserID); err != nil {
+		if t.svc != nil {
+			if err := t.svc.DeleteTrigger(targetID, execCtx.UserID); err != nil {
+				return nil, err
+			}
+		} else if err := t.botRepo.Delete(ctx, targetID, execCtx.UserID); err != nil {
 			return nil, err
 		}
 		return &domain.ToolExecutionResult{
@@ -196,9 +229,21 @@ func (t *BotTriggerToolset) Execute(ctx context.Context, execCtx *domain.ToolExe
 		}, nil
 
 	default: // "list_bots", "list_triggers"
-		list, err := t.svc.ListTriggers(execCtx.UserID)
-		if err != nil {
-			return nil, err
+		var list []*domain.Trigger
+		if t.svc != nil {
+			var err error
+			list, err = t.svc.ListTriggers(execCtx.UserID)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			botsList, err := t.botRepo.ListByUser(ctx, execCtx.UserID)
+			if err != nil {
+				return nil, err
+			}
+			for i := range botsList {
+				list = append(list, triggerFromBot(&botsList[i]))
+			}
 		}
 		if len(list) == 0 {
 			return &domain.ToolExecutionResult{
@@ -224,5 +269,127 @@ func (t *BotTriggerToolset) Execute(ctx context.Context, execCtx *domain.ToolExe
 			SummaryForLLM: sb.String(),
 			Cards:         cards,
 		}, nil
+	}
+}
+
+func (t *BotTriggerToolset) buildBotForCreation(
+	userID, title, intent, templateKey, suggestedSkill string,
+	actionKeys []string,
+) *domain.Bot {
+	now := time.Now().UTC()
+	loc := time.FixedZone("BRT", -3*3600)
+	nextCheck := CalculateNextCheck("", domain.FrequencyDailyMorning, now, loc)
+	bot := &domain.Bot{
+		ID:                uuid.NewString(),
+		UserID:            userID,
+		Title:             title,
+		Goal:              intent,
+		Query:             intent,
+		ConditionType:     string(domain.ConditionDailyBrief),
+		Status:            domain.TriggerStatusActive,
+		Frequency:         domain.FrequencyDailyMorning,
+		DaysOfWeek:        "DAILY",
+		QuietOnlyOnChange: true,
+		TemplateKey:       strings.TrimSpace(templateKey),
+		NextCheckAt:       &nextCheck,
+		CreatedAt:         now,
+		UpdatedAt:         now,
+	}
+
+	if bot.TemplateKey != "" && t.cat != nil {
+		if tpl, ok := t.cat.Template(bot.TemplateKey); ok {
+			if bot.Title == "" {
+				bot.Title = tpl.Name
+			}
+			if bot.Goal == "" {
+				bot.Goal = tpl.Goal
+			}
+			bot.Category = tpl.Category
+			bot.Icon = tpl.Icon
+			bot.Color = tpl.Color
+			if len(tpl.DefaultRules) > 0 {
+				bot.Rules = append([]string{}, tpl.DefaultRules...)
+			}
+			for _, skKey := range tpl.Skills {
+				ver := 1
+				if sk, exists := t.cat.Skill(skKey); exists && sk.Version > 0 {
+					ver = sk.Version
+				}
+				bot.Skills = append(bot.Skills, domain.BotSkill{SkillKey: skKey, Version: ver})
+			}
+			if actionsMap, err := t.cat.ActionsForTemplate(tpl.Key); err == nil {
+				for actKey, pol := range actionsMap {
+					bot.Actions = upsertActionSlice(bot.Actions, actKey, pol)
+				}
+			}
+		}
+	}
+
+	if bot.Category == "" {
+		bot.Category = string(HeuristicClassifyCategory(bot.Title + " " + bot.Goal))
+	}
+
+	if skKey := strings.TrimSpace(suggestedSkill); skKey != "" && t.cat != nil {
+		if sk, ok := t.cat.Skill(skKey); ok {
+			already := false
+			for _, existing := range bot.Skills {
+				if existing.SkillKey == sk.Key {
+					already = true
+					break
+				}
+			}
+			if !already {
+				ver := sk.Version
+				if ver <= 0 {
+					ver = 1
+				}
+				bot.Skills = append(bot.Skills, domain.BotSkill{SkillKey: sk.Key, Version: ver})
+			}
+			for _, actKey := range sk.Actions {
+				if spec, exists := domain.ActionCatalog[actKey]; exists {
+					bot.Actions = upsertActionSlice(bot.Actions, actKey, spec.DefaultPolicy)
+				}
+			}
+		}
+	}
+
+	for _, rawKey := range actionKeys {
+		actKey := strings.TrimSpace(rawKey)
+		if spec, exists := domain.ActionCatalog[actKey]; exists {
+			if domain.ValidateActionPolicy(actKey, spec.DefaultPolicy) == nil {
+				bot.Actions = upsertActionSlice(bot.Actions, actKey, spec.DefaultPolicy)
+			}
+		}
+	}
+
+	bot.Actions = upsertActionSlice(bot.Actions, "notify", domain.ActionPolicyAuto)
+	if len(bot.Actions) <= 1 {
+		bot.Actions = upsertActionSlice(bot.Actions, "search", domain.ActionCatalog["search"].DefaultPolicy)
+	}
+	return bot
+}
+
+func triggerFromBot(b *domain.Bot) *domain.Trigger {
+	if b == nil {
+		return nil
+	}
+	return &domain.Trigger{
+		ID:            b.ID,
+		UserID:        b.UserID,
+		Title:         b.Title,
+		Category:      domain.TriggerCategory(b.Category),
+		Query:         b.Query,
+		UserIntent:    b.Goal,
+		ConditionType: domain.TriggerConditionType(b.ConditionType),
+		TargetValue:   b.TargetValue,
+		CurrentValue:  b.CurrentValue,
+		Status:        b.Status,
+		Frequency:     b.Frequency,
+		ScheduledTime: b.ScheduledTime,
+		DaysOfWeek:    b.DaysOfWeek,
+		LastCheckedAt: b.LastCheckedAt,
+		NextCheckAt:   b.NextCheckAt,
+		CreatedAt:     b.CreatedAt,
+		UpdatedAt:     b.UpdatedAt,
 	}
 }

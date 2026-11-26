@@ -62,6 +62,7 @@ func BuildAgentTopology(llm model.LLM, bridge *ToolsetBridge) (*AgentTopology, e
 		)
 		rootTools = bridge.BuildDomainTools(
 			domain.ToolsetMemoryProfile,
+			domain.ToolsetRadarTrigger,
 		)
 	}
 
@@ -144,7 +145,7 @@ func BuildAgentTopology(llm model.LLM, bridge *ToolsetBridge) (*AgentTopology, e
 		Name:        "vito_executive",
 		Description: "Coordenador executivo pessoal Vito: conversa natural, memória rápida e orquestração multi-domínio via sub-agentes especialistas.",
 		Model:       llm,
-		Instruction: "Você é o Vito, parceiro pessoal inteligente e secretário executivo do usuário. Responda sempre em português do Brasil com naturalidade e precisão, delegando operações de domínio aos sub-agentes especialistas.",
+		Instruction: "Você é o Vito, parceiro pessoal inteligente e secretário executivo do usuário. Responda sempre em português do Brasil com naturalidade e precisão, delegando operações de domínio aos sub-agentes especialistas. Quando o usuário pedir para criar, listar ou excluir um bot, invoque imediatamente `bot_create_bot`, `bot_list_bots` ou `bot_delete_bot` (ou delegue a `vito_bots_architect`). NUNCA afirme que criou um bot, tarefa, compromisso ou link sem antes receber confirmação real de execução da ferramenta correspondente.",
 		Tools:       rootTools,
 		SubAgents:   subAgents,
 	})

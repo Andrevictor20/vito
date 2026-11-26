@@ -5,6 +5,7 @@ import { useTheme } from '../../../context/ThemeContext';
 import { APP_CATALOG_META } from '../data/botsCatalogFallback';
 import { Bot, BotPendingApproval, PendingResolutionDecision } from '../types/bots';
 import { formatTimeAgoPt, isAlwaysAskAction, resolveBotAnimState } from '../utils/botsHelpers';
+import { extractAppKey } from '../utils/botsNormalizers';
 import { VitoSwitch } from '../../../components/ui/VitoSwitch';
 import { BotMascotAvatar } from './BotMascotAvatar';
 
@@ -34,7 +35,10 @@ export const BotCard: React.FC<BotCardProps> = ({
   const canAlwaysAllow = firstPending
     ? !isAlwaysAskAction(firstPending.action_key, firstPending.always_ask)
     : false;
-  const appKeys = (bot.apps && bot.apps.length > 0 ? bot.apps : ['vito']).slice(0, 4);
+  const rawAppKeys = Array.isArray(bot.apps)
+    ? bot.apps.map(extractAppKey).filter((k) => k.length > 0)
+    : [];
+  const appKeys = (rawAppKeys.length > 0 ? rawAppKeys : ['vito']).slice(0, 4);
   const actionsCount = bot.actions?.length ?? 0;
 
   return (
@@ -94,7 +98,7 @@ export const BotCard: React.FC<BotCardProps> = ({
           <View style={styles.pendHeader}>
             <ProtoUiIcon name="pan-tool" size={14} color={colors.orange} />
             <Text style={[styles.pendTitle, { color: colors.ink }]} numberOfLines={1}>
-              {firstPending.title || 'Aguardando aprovação'}
+              {firstPending.title || firstPending.label || 'Aguardando aprovação'}
             </Text>
           </View>
           <Text style={[styles.pendSummary, { color: colors.muted }]} numberOfLines={2}>
