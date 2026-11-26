@@ -60,7 +60,12 @@ func (s *ConfirmationGateService) SetFeedbackRecorder(recorder ImplicitFeedbackR
 
 // CreatePending registra uma nova pendência de confirmação.
 func (s *ConfirmationGateService) CreatePending(ctx context.Context, req *CreatePendingRequest) (*PendingConfirmationRecord, error) {
-	if req.IdempotencyKey != "" {
+	now := time.Now().UTC()
+	_ = s.fsm.ExpireStaleForUser(ctx, req.UserID, now)
+
+	recordID := uuid.New().String()
+	idempotencyKey := strings.TrimSpace(req.IdempotencyKey)
+	if idempotencyKey != "" {
 		// Checa se já existe item suspenso com a mesma idempotency key
 		query := `
 			SELECT id, user_id, thread_id, channel, toolset_name, operation,
@@ -69,21 +74,26 @@ func (s *ConfirmationGateService) CreatePending(ctx context.Context, req *Create
 			FROM pending_confirmations
 			WHERE user_id = ? AND idempotency_key = ? AND status = 'SUSPENDED'
 		`
-		row := s.db.QueryRowContext(ctx, query, req.UserID, req.IdempotencyKey)
+		row := s.db.QueryRowContext(ctx, query, req.UserID, idempotencyKey)
 		existing, err := scanPendingConfirmation(row)
 		if err == nil && existing != nil {
-			return existing, nil
+			if !now.After(existing.ExpiresAt) {
+				return existing, nil
+			}
+			_ = s.fsm.ExpireAction(ctx, existing.ID)
 		}
+	} else {
+		_ = s.fsm.SupersedePendingForOperation(ctx, req.UserID, req.ThreadID, req.ToolsetName, req.Operation, now)
+		idempotencyKey = fmt.Sprintf("%s:%s:%s:%s", req.UserID, req.ToolsetName, req.Operation, recordID)
 	}
 
 	ttl := req.TTL
 	if ttl == 0 {
 		ttl = 24 * time.Hour
 	}
-	now := time.Now().UTC()
 
 	record := &PendingConfirmationRecord{
-		ID:             uuid.New().String(),
+		ID:             recordID,
 		UserID:         req.UserID,
 		ThreadID:       req.ThreadID,
 		Channel:        req.Channel,
@@ -91,7 +101,7 @@ func (s *ConfirmationGateService) CreatePending(ctx context.Context, req *Create
 		Operation:      req.Operation,
 		ArgumentsJSON:  req.ArgumentsJSON,
 		PreviewJSON:    req.PreviewJSON,
-		IdempotencyKey: req.IdempotencyKey,
+		IdempotencyKey: idempotencyKey,
 		TaintedContext: req.TaintedContext,
 		Status:         StatusSuspended,
 		ExpiresAt:      now.Add(ttl),
@@ -190,33 +200,44 @@ func (s *ConfirmationGateService) GetLatestPending(ctx context.Context, userID, 
 		return nil, sql.ErrNoRows
 	}
 
+	now := time.Now().UTC()
 	query := `
 		SELECT id, user_id, thread_id, channel, toolset_name, operation,
 		       arguments_json, preview_json, idempotency_key, tainted_context,
 		       status, expires_at, resolved_at, execution_result_json, created_at
 		FROM pending_confirmations
-		WHERE user_id = ? AND (thread_id = ? OR ? = '') AND status = 'SUSPENDED' AND expires_at > CURRENT_TIMESTAMP
+		WHERE user_id = ? AND (thread_id = ? OR ? = '') AND status = 'SUSPENDED' AND expires_at > ?
 		ORDER BY created_at DESC
 		LIMIT 1
 	`
-	row := s.db.QueryRowContext(ctx, query, userID, threadID, threadID)
+	row := s.db.QueryRowContext(ctx, query, userID, threadID, threadID, now)
 	p, err := scanPendingConfirmation(row)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) && threadID != "" {
+		if (errors.Is(err, sql.ErrNoRows) || errors.Is(err, ErrConfirmationNotFound)) && threadID != "" {
 			// Fallback: busca qualquer pendência recente do usuário em outra thread (ex: iniciou no app e confirmou na voz)
 			queryAny := `
 				SELECT id, user_id, thread_id, channel, toolset_name, operation,
 				       arguments_json, preview_json, idempotency_key, tainted_context,
 				       status, expires_at, resolved_at, execution_result_json, created_at
 				FROM pending_confirmations
-				WHERE user_id = ? AND status = 'SUSPENDED' AND expires_at > CURRENT_TIMESTAMP
+				WHERE user_id = ? AND status = 'SUSPENDED' AND expires_at > ?
 				ORDER BY created_at DESC
 				LIMIT 1
 			`
-			rowAny := s.db.QueryRowContext(ctx, queryAny, userID)
-			return scanPendingConfirmation(rowAny)
+			rowAny := s.db.QueryRowContext(ctx, queryAny, userID, now)
+			pAny, errAny := scanPendingConfirmation(rowAny)
+			if errAny != nil || pAny == nil || now.After(pAny.ExpiresAt) {
+				if errAny == nil && pAny != nil && now.After(pAny.ExpiresAt) {
+					return nil, ErrConfirmationExpired
+				}
+				return nil, errAny
+			}
+			return pAny, nil
 		}
 		return nil, err
+	}
+	if p != nil && now.After(p.ExpiresAt) {
+		return nil, ErrConfirmationExpired
 	}
 	return p, nil
 }

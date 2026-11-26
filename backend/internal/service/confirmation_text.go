@@ -49,6 +49,27 @@ func IsExplicitSendConfirmationText(text string) bool {
 	return false
 }
 
+// IsShortConfirmationReply reconhece também respostas curtas afirmativas em PT-BR quando já há uma ação pendente aguardando confirmação.
+func IsShortConfirmationReply(text string) bool {
+	if IsExplicitSendConfirmationText(text) {
+		return true
+	}
+	clean := strings.TrimSpace(strings.ToLower(text))
+	clean = strings.TrimRight(clean, ".!? ")
+	shortReplies := map[string]bool{
+		"ok": true, "okay": true, "beleza": true, "blz": true,
+		"pode": true, "claro": true, "bora": true, "perfeito": true,
+		"fechado": true, "isso": true, "isso mesmo": true, "exato": true,
+		"faz isso": true, "faça isso": true, "faca isso": true,
+		"tá bom": true, "ta bom": true, "tudo bem": true,
+		"aceito": true, "autorizo": true, "pode sim": true, "sim pode": true,
+		"com certeza": true, "positivo": true,
+		"cria aí": true, "cria ai": true, "cria agora": true, "crie agora": true,
+		"quero sim": true, "manda": true, "vai": true, "vai lá": true, "vai la": true,
+	}
+	return shortReplies[clean]
+}
+
 // IsExplicitSendCancellationText avalia se o usuário está cancelando a ação pendente.
 func IsExplicitSendCancellationText(text string) bool {
 	raw := strings.TrimSpace(text)

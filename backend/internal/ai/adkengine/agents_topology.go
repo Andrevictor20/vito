@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -176,7 +177,7 @@ func (f *ADKLoopFacade) tryHandlePendingConfirmation(
 	}
 
 	userMsg := strings.TrimSpace(req.Message)
-	isConfirm := req.ConfirmPendingID != "" || service.IsExplicitSendConfirmationText(userMsg)
+	isConfirm := req.ConfirmPendingID != "" || service.IsShortConfirmationReply(userMsg)
 	isCancel := req.RejectPendingID != "" || service.IsExplicitSendCancellationText(userMsg)
 
 	if !isConfirm && !isCancel {
@@ -234,6 +235,9 @@ func (f *ADKLoopFacade) tryHandlePendingConfirmation(
 
 	resumed, err := f.cfg.ConfirmationGate.Resume(ctx, pending.ID, userID)
 	if err != nil {
+		if req.ConfirmPendingID != "" {
+			return nil, true, err
+		}
 		return nil, false, err
 	}
 	if f.cfg.Registry == nil {
@@ -262,6 +266,7 @@ func (f *ADKLoopFacade) tryHandlePendingConfirmation(
 
 	res, execErr := toolset.Execute(ctx, execCtx, resumed.Operation, rawArgs)
 	if execErr != nil {
+		log.Printf("⚠️ [ADKLoopFacade] falha ao executar ação confirmada %s.%s: %v", resumed.ToolsetName, resumed.Operation, execErr)
 		errMsg := FormatActionError(resumed.Operation, execErr)
 		f.recordSimpleTurns(ctx, threadID, turnID, userID, req.Channel, userMsg, errMsg, startTime)
 		emitStreamFinal(errMsg)

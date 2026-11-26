@@ -3,6 +3,7 @@ package adkengine
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"strings"
 
 	"google.golang.org/adk/v2/agent"
@@ -328,6 +329,7 @@ func (b *ToolsetBridge) executeResolved(ctx agent.Context, ts domain.DomainTools
 	execCtx := buildToolExecutionContextFromAgent(ctx)
 	res, err := ts.Execute(ctx, execCtx, operation, rawParams)
 	if err != nil {
+		log.Printf("⚠️ [ToolsetBridge] falha ao executar %s.%s: %v", ts.Name(), operation, err)
 		return map[string]any{
 			"status":          "ERROR",
 			"summary_for_llm": fmt.Sprintf("Falha ao executar %s (%s): %v", ts.Name(), operation, err),

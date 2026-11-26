@@ -246,3 +246,141 @@ func TestConfirmationGate_TenantIsolation(t *testing.T) {
 		t.Fatal("FALHA DE ISOLAMENTO: Usuário não-proprietário conseguiu aprovar ação alheia!")
 	}
 }
+
+func TestConfirmationGate_RepeatedEmptyIdempotencyKey_SupersedesAndSucceeds(t *testing.T) {
+	gate, userID := setupConfirmationTestDB(t)
+	ctx := context.Background()
+
+	first, err := gate.CreatePending(ctx, &service.CreatePendingRequest{
+		UserID:        userID,
+		ThreadID:      "thread-1",
+		Channel:       "app_mobile",
+		ToolsetName:   "radar_and_trigger_manager",
+		Operation:     "create_trigger",
+		ArgumentsJSON: `{"title":"Bot Antigo","goal":"Monitorar dólar"}`,
+		TTL:           15 * time.Minute,
+	})
+	if err != nil {
+		t.Fatalf("falha na 1ª pendência: %v", err)
+	}
+
+	second, err := gate.CreatePending(ctx, &service.CreatePendingRequest{
+		UserID:        userID,
+		ThreadID:      "thread-1",
+		Channel:       "app_mobile",
+		ToolsetName:   "radar_and_trigger_manager",
+		Operation:     "create_trigger",
+		ArgumentsJSON: `{"title":"Bot Novo","goal":"Monitorar Poco X8 Pro"}`,
+		TTL:           15 * time.Minute,
+	})
+	if err != nil {
+		t.Fatalf("falha na 2ª pendência repetida sem idempotency_key: %v", err)
+	}
+	if second.ID == "" || second.ID == first.ID {
+		t.Fatalf("esperava novo ID distinto de %s, obteve %q", first.ID, second.ID)
+	}
+
+	prev, err := gate.GetByID(ctx, first.ID, userID)
+	if err != nil {
+		t.Fatalf("falha ao consultar 1ª pendência: %v", err)
+	}
+	if prev.Status != service.StatusCancelled {
+		t.Errorf("esperava 1ª pendência marcada como CANCELLED, obteve %s", prev.Status)
+	}
+
+	latest, err := gate.GetLatestPending(ctx, userID, "thread-1")
+	if err != nil || latest == nil {
+		t.Fatalf("GetLatestPending falhou: err=%v latest=%+v", err, latest)
+	}
+	if latest.ID != second.ID {
+		t.Errorf("esperava GetLatestPending retornar %s, obteve %s", second.ID, latest.ID)
+	}
+}
+
+func TestConfirmationGate_ExpiredSuspendedRowDoesNotBlockNewPending(t *testing.T) {
+	gate, userID := setupConfirmationTestDB(t)
+	ctx := context.Background()
+
+	if _, err := gate.CreatePending(ctx, &service.CreatePendingRequest{
+		UserID:        userID,
+		ThreadID:      "thread-1",
+		Channel:       "app_mobile",
+		ToolsetName:   "radar_and_trigger_manager",
+		Operation:     "create_trigger",
+		ArgumentsJSON: `{"title":"Bot Expirado"}`,
+		TTL:           -1 * time.Minute,
+	}); err != nil {
+		t.Fatalf("falha ao criar pendência expirada sem chave: %v", err)
+	}
+
+	if _, err := gate.CreatePending(ctx, &service.CreatePendingRequest{
+		UserID:         userID,
+		ThreadID:       "thread-1",
+		Channel:        "app_mobile",
+		ToolsetName:    "radar_and_trigger_manager",
+		Operation:      "create_trigger",
+		ArgumentsJSON:  `{"title":"Bot Expirado Com Chave"}`,
+		IdempotencyKey: "same-key",
+		TTL:            -1 * time.Minute,
+	}); err != nil {
+		t.Fatalf("falha ao criar pendência expirada com chave: %v", err)
+	}
+
+	freshEmpty, err := gate.CreatePending(ctx, &service.CreatePendingRequest{
+		UserID:        userID,
+		ThreadID:      "thread-1",
+		Channel:       "app_mobile",
+		ToolsetName:   "radar_and_trigger_manager",
+		Operation:     "create_trigger",
+		ArgumentsJSON: `{"title":"Bot Novo"}`,
+		TTL:           10 * time.Minute,
+	})
+	if err != nil {
+		t.Fatalf("linha expirada não deveria bloquear nova pendência sem chave: %v", err)
+	}
+
+	freshKey, err := gate.CreatePending(ctx, &service.CreatePendingRequest{
+		UserID:         userID,
+		ThreadID:       "thread-1",
+		Channel:        "app_mobile",
+		ToolsetName:    "radar_and_trigger_manager",
+		Operation:      "create_trigger",
+		ArgumentsJSON:  `{"title":"Bot Novo Chave"}`,
+		IdempotencyKey: "same-key",
+		TTL:            10 * time.Minute,
+	})
+	if err != nil {
+		t.Fatalf("linha expirada não deveria bloquear nova pendência com mesma chave: %v", err)
+	}
+	if freshKey.ID == "" {
+		t.Fatal("freshKey.ID vazio")
+	}
+
+	latest, err := gate.GetLatestPending(ctx, userID, "thread-1")
+	if err != nil || latest == nil || latest.ID != freshKey.ID {
+		t.Fatalf("esperava GetLatestPending retornar %s (e freshEmpty=%s válido), obteve latest=%+v err=%v", freshKey.ID, freshEmpty.ID, latest, err)
+	}
+}
+
+func TestIsShortConfirmationReply_NaturalPortuguesePhrases(t *testing.T) {
+	positives := []string{
+		"ok", "beleza", "pode", "claro", "perfeito", "faz isso", "tá bom", "cria aí", "pode sim", "sim",
+	}
+	for _, phrase := range positives {
+		if !service.IsShortConfirmationReply(phrase) {
+			t.Errorf("esperava IsShortConfirmationReply(%q) == true", phrase)
+		}
+	}
+
+	negatives := []string{
+		"Crie um bot para monitorar dólar",
+		"Quero criar um bot",
+		"cancelar",
+		"não",
+	}
+	for _, phrase := range negatives {
+		if service.IsShortConfirmationReply(phrase) {
+			t.Errorf("esperava IsShortConfirmationReply(%q) == false", phrase)
+		}
+	}
+}

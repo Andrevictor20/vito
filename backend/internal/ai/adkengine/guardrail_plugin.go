@@ -3,6 +3,7 @@ package adkengine
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"strings"
 	"sync"
 	"time"
@@ -282,7 +283,9 @@ func (g *GuardrailPlugin) BeforeTool(ctx agent.Context, t tool.Tool, args map[st
 				PreviewJSON:    string(previewBytes),
 				TaintedContext: execCtx.TaintedByUntrustedInput,
 			})
-			if err == nil && p != nil {
+			if err != nil {
+				log.Printf("⚠️ [GuardrailPlugin] falha ao criar pending_confirmation (%s.%s): %v", res.Toolset.Name(), res.Operation, err)
+			} else if p != nil {
 				pendingID = p.ID
 			}
 		}

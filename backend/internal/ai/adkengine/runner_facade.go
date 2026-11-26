@@ -376,11 +376,9 @@ func (f *ADKLoopFacade) RunStream(ctx context.Context, req domain.UnifiedAssista
 	}
 
 	// 8. Persistência no ConversationStore via DefaultWriterQueue() e notificação de consolidação
-	if !requiresConf {
-		f.persistCompletedTurn(ctx, threadID, turnID, req, finalAnswer, collectedCards, executedTools, collectedReasoning, modelDisplay, startTime)
-		if f.consolidationWorker != nil && userID != "" && threadID != "" {
-			f.consolidationWorker.NotifyActivity(threadID, userID)
-		}
+	f.persistCompletedTurn(ctx, threadID, turnID, req, finalAnswer, collectedCards, executedTools, collectedReasoning, modelDisplay, startTime)
+	if !requiresConf && f.consolidationWorker != nil && userID != "" && threadID != "" {
+		f.consolidationWorker.NotifyActivity(threadID, userID)
 	}
 
 	out := &domain.UnifiedAssistantResponse{

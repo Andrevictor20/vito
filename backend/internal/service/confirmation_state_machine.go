@@ -81,7 +81,7 @@ func (sm *ConfirmationStateMachine) SuspendAction(ctx context.Context, p *Pendin
 		p.ExecutionResultJSON = "{}"
 	}
 	if p.IdempotencyKey == "" {
-		p.IdempotencyKey = fmt.Sprintf("%s:%s:%s", p.UserID, p.ToolsetName, p.Operation)
+		p.IdempotencyKey = fmt.Sprintf("%s:%s:%s:%s", p.UserID, p.ToolsetName, p.Operation, p.ID)
 	}
 
 	taintedInt := 0
@@ -188,6 +188,32 @@ func (sm *ConfirmationStateMachine) ExpireAction(ctx context.Context, id string)
 	`
 	return repository.ExecuteQueuedWrite(ctx, func() error {
 		_, err := sm.db.ExecContext(ctx, query, string(StatusExpired), now, id, string(StatusSuspended))
+		return err
+	})
+}
+
+// ExpireStaleForUser marca como EXPIRED todas as pendências vencidas do usuário que ainda estão SUSPENDED.
+func (sm *ConfirmationStateMachine) ExpireStaleForUser(ctx context.Context, userID string, now time.Time) error {
+	query := `
+		UPDATE pending_confirmations
+		SET status = ?, resolved_at = ?
+		WHERE user_id = ? AND status = ? AND expires_at <= ?
+	`
+	return repository.ExecuteQueuedWrite(ctx, func() error {
+		_, err := sm.db.ExecContext(ctx, query, string(StatusExpired), now, userID, string(StatusSuspended), now)
+		return err
+	})
+}
+
+// SupersedePendingForOperation cancela pendências SUSPENDED anteriores da mesma operação na thread.
+func (sm *ConfirmationStateMachine) SupersedePendingForOperation(ctx context.Context, userID, threadID, toolsetName, operation string, now time.Time) error {
+	query := `
+		UPDATE pending_confirmations
+		SET status = ?, resolved_at = ?
+		WHERE user_id = ? AND thread_id = ? AND toolset_name = ? AND operation = ? AND status = ?
+	`
+	return repository.ExecuteQueuedWrite(ctx, func() error {
+		_, err := sm.db.ExecContext(ctx, query, string(StatusCancelled), now, userID, threadID, toolsetName, operation, string(StatusSuspended))
 		return err
 	})
 }
