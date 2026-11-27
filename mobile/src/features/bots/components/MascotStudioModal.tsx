@@ -10,7 +10,7 @@ import {
 import { ProtoUiIcon } from '../../../icons/ProtoUiIcons';
 import { useTheme } from '../../../context/ThemeContext';
 import { BotSkin } from '../types/bots';
-import { BottomSheetModal } from '../../../components/ui/BottomSheetModal';
+import { VitoSheet } from '../../../components/ui/VitoSheet';
 import { MascotVectorRig } from '../mascot/MascotVectorRig';
 import {
   MASCOT_PRESETS,
@@ -145,7 +145,7 @@ export const MascotStudioModal: React.FC<MascotStudioModalProps> = ({
   const stageBadgeBg = darkStage ? 'rgba(255,255,255,0.12)' : colors.bg;
 
   return (
-    <BottomSheetModal
+    <VitoSheet
       visible={visible}
       onClose={onClose}
       title={mode === 'create' ? 'Criar bot e mascote' : 'Aparência do bot'}
@@ -358,7 +358,7 @@ export const MascotStudioModal: React.FC<MascotStudioModalProps> = ({
           </Text>
         </TouchableOpacity>
       </ScrollView>
-    </BottomSheetModal>
+    </VitoSheet>
   );
 };
 

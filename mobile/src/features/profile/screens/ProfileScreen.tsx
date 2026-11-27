@@ -17,15 +17,15 @@ import { useTheme } from '../../../context/ThemeContext';
 import { hapticFeedback } from '../../../theme/motion';
 import { StaggerItem } from '../../../theme/vitoMotion';
 import { api } from '../../../services/api';
-import { calendarSyncService } from '../../calendar/services/calendarSyncService';
+import { calendarSyncService } from '../../calendar/services/calendarApi';
 import { useProfileAiModel } from '../hooks/useProfileAiModel';
 import { navigateToScreen, navigateToStore } from '../../../navigation/screensNav';
-import { ProfileUserCard } from '../components/profile/ProfileUserCard';
-import { AiSection } from '../components/profile/AiSection';
-import { PhoneEditModal } from '../components/profile/PhoneEditModal';
-import { ConnectedDevicesModal } from '../components/profile/ConnectedDevicesModal';
+import { ProfileUserCard } from '../components/ProfileUserCard';
+import { AiSection } from '../components/AiSection';
+import { PhoneEditModal } from '../components/PhoneEditModal';
+import { ConnectedDevicesModal } from '../components/ConnectedDevicesModal';
 import { ModelPickerSheet } from '../components/ai/ModelPickerSheet';
-import { BottomSheetModal } from '../../../components/ui/BottomSheetModal';
+import { VitoSheet } from '../../../components/ui/VitoSheet';
 import { profileStyles as styles } from './ProfileScreen.styles';
 import appJson from '../../../../app.json';
 
@@ -76,7 +76,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     ]);
 
     if (aiSet) {
-      const modeName = aiSet.autonomy_mode === 'autonomous' ? 'Modo Proativo' : 'Modo Assistido';
+      const modeName =
+        aiSet.autonomy_mode === 'proactive' || aiSet.autonomy_mode === 'autonomous'
+          ? 'Modo Proativo'
+          : 'Modo Assistido';
       const toneMap: Record<string, string> = {
         balanced: 'Equilibrado',
         direct: 'Direto',
@@ -85,7 +88,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         relaxed: 'Descontraído',
       };
       const tone = toneMap[aiSet.persona_style || 'balanced'] || 'Equilibrado';
-      const foc = aiSet.auto_focus_blocks !== false ? ' · Foco ativo' : '';
+      const foc = aiSet.auto_focus_blocks === true ? ' · Foco ativo' : '';
       setAutonomyLabel(`${modeName} · ${tone}${foc}`);
       if (aiSet.preferred_voice) {
         setVoiceLabel(aiSet.preferred_voice.toLowerCase().includes('kore') ? 'Voz Feminina' : 'Voz Masculina');
@@ -400,7 +403,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           navigateToScreen('aiProviders');
         }}
       />
-      <BottomSheetModal
+      <VitoSheet
         visible={logoutSheetOpen}
         onClose={() => setLogoutSheetOpen(false)}
         title="Encerrar sessão?"
@@ -423,7 +426,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             <Text style={[styles.outBtnText, { color: colors.ink }]}>Cancelar</Text>
           </TouchableOpacity>
         </View>
-      </BottomSheetModal>
+      </VitoSheet>
     </ScrollView>
   );
 

@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/andrevmp/vito/backend/internal/repository"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"strings"
 	"time"
 
@@ -28,7 +28,7 @@ func (r *PendingRepositorySQLite) Create(item *domain.PendingItem) error {
 			id, user_id, title, description, category, status, scheduled_date, remind_at, remind_repeat, remind_advance, nudge_sent_at, created_at, updated_at
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
-	return repository.ExecuteQueuedWrite(context.Background(), func() error {
+	return database.ExecuteQueuedWrite(context.Background(), func() error {
 		_, err := r.db.Exec(
 			query,
 			item.ID,
@@ -143,7 +143,7 @@ func (r *PendingRepositorySQLite) Update(item *domain.PendingItem) error {
 		WHERE id = ? AND user_id = ?
 	`
 	item.UpdatedAt = time.Now().UTC()
-	affected, err := repository.ExecuteQueuedWriteRows(context.Background(), func() (sql.Result, error) {
+	affected, err := database.ExecuteQueuedWriteRows(context.Background(), func() (sql.Result, error) {
 		return r.db.Exec(
 			query,
 			item.Title,
@@ -171,7 +171,7 @@ func (r *PendingRepositorySQLite) Update(item *domain.PendingItem) error {
 
 func (r *PendingRepositorySQLite) Delete(id, userID string) error {
 	query := `DELETE FROM pending_items WHERE id = ? AND user_id = ?`
-	affected, err := repository.ExecuteQueuedWriteRows(context.Background(), func() (sql.Result, error) {
+	affected, err := database.ExecuteQueuedWriteRows(context.Background(), func() (sql.Result, error) {
 		return r.db.Exec(query, id, userID)
 	})
 	if err != nil {
@@ -273,7 +273,7 @@ func (r *PendingRepositorySQLite) ListScheduledDueForNudge(today string, since t
 
 func (r *PendingRepositorySQLite) MarkNudgeSent(id string, sentAt time.Time) error {
 	query := `UPDATE pending_items SET nudge_sent_at = ? WHERE id = ?`
-	return repository.ExecuteQueuedWrite(context.Background(), func() error {
+	return database.ExecuteQueuedWrite(context.Background(), func() error {
 		_, err := r.db.Exec(query, sentAt, id)
 		return err
 	})

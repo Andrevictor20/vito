@@ -9,9 +9,9 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated'
 import Svg, { Circle, G } from 'react-native-svg'
-import { getBezier, token } from '../ds/tokens'
+import { MOTION_CURVES } from '../theme/motion'
 import { useScreenEnterKey } from '../theme/screenFocusContext'
-import { tabularNumbers } from '../theme/tokens'
+import { darkColors, lightColors, tabularNumbers } from '../theme/tokens'
 import {
   computeDonutSegments,
   DONUT_CIRCUMFERENCE,
@@ -37,7 +37,7 @@ export interface ProtoDonutChartProps {
   onSelectIndex?: (index: number | null) => void
 }
 
-const PAL_KEYS = ['--blue', '--teal', '--red', '--purple', '--orange'] as const
+const PAL_KEYS = ['blue', 'teal', 'red', 'purple', 'orange'] as const
 
 const AnimatedDonutSegment: React.FC<{
   dashLen: number
@@ -57,7 +57,7 @@ const AnimatedDonutSegment: React.FC<{
       progress.value = 1
       return
     }
-    const [x1, y1, x2, y2] = getBezier('--ease-q')
+    const [x1, y1, x2, y2] = MOTION_CURVES.q
     progress.value = 0
     progress.value = withDelay(
       delayMs,
@@ -106,9 +106,10 @@ export const ProtoDonutChart: React.FC<ProtoDonutChartProps> = ({
   const segments = computeDonutSegments(data)
   const animKey = `${enterKey}|${segments.map((s) => `${s.label}:${s.dashArray[0]}:${s.dashOffset}`).join('|')}`
 
-  const lineCol = token('--line', isDark)
-  const inkCol = token('--ink', isDark)
-  const mutedCol = token('--muted', isDark)
+  const pal = isDark ? darkColors : lightColors
+  const lineCol = pal.line
+  const inkCol = pal.ink
+  const mutedCol = pal.muted
 
   return (
     <View style={[styles.wrap, { width: size, height: size }]}>
@@ -123,7 +124,7 @@ export const ProtoDonutChart: React.FC<ProtoDonutChartProps> = ({
         />
         <G rotation={-90} origin="60, 60">
           {segments.map((seg, idx) => {
-            const stroke = seg.color ?? token(PAL_KEYS[seg.colorIndex], isDark)
+            const stroke = seg.color ?? pal[PAL_KEYS[seg.colorIndex]]
             const hasSel = selectedIndex !== null && selectedIndex !== undefined && selectedIndex >= 0
             const isSel = hasSel && selectedIndex === idx
             return (

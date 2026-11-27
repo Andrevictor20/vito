@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/andrevmp/vito/backend/internal/bots"
 	"io"
+	"iter"
 	"log"
 	"net/http"
 	"net/http/httptest"
@@ -18,9 +19,12 @@ import (
 	"testing"
 	"time"
 
+	"google.golang.org/adk/v2/model"
+	"google.golang.org/genai"
+
 	"github.com/andrevmp/vito/backend/internal/ai"
-	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/andrevmp/vito/backend/internal/service"
 	"github.com/andrevmp/vito/backend/internal/service/toolsets"
@@ -55,35 +59,37 @@ type runtimeFixture struct {
 	resolver     *service.ModelResolver
 	svc          *service.AIProviderService
 	facade       *ADKLoopFacade
-	serverProv   *mockServerProvider
+	serverProv   *mockServerLLM
 	rt           *hostRouterRT
 }
 
-type mockServerProvider struct {
+type mockServerLLM struct {
 	calls atomic.Int32
 	reply string
 }
 
-func (m *mockServerProvider) Name() string          { return "server-gemini" }
-func (m *mockServerProvider) ModelName() string     { return "gemini-2.5-flash" }
-func (m *mockServerProvider) SupportsTools() bool   { return true }
-func (m *mockServerProvider) SupportsVision() bool  { return true }
-func (m *mockServerProvider) QualityTier() int      { return 3 }
-func (m *mockServerProvider) MaxContextTokens() int { return 65536 }
-func (m *mockServerProvider) Chat(_ context.Context, _ ai.AgentChatRequest) (*ai.AgentChatResponse, error) {
-	m.calls.Add(1)
-	reply := m.reply
-	if reply == "" {
-		reply = "Resposta via servidor Vito"
+func (m *mockServerLLM) Name() string { return "gemini-2.5-flash" }
+func (m *mockServerLLM) GenerateContent(_ context.Context, _ *model.LLMRequest, _ bool) iter.Seq2[*model.LLMResponse, error] {
+	return func(yield func(*model.LLMResponse, error) bool) {
+		m.calls.Add(1)
+		reply := m.reply
+		if reply == "" {
+			reply = "Resposta via servidor Vito"
+		}
+		yield(&model.LLMResponse{
+			ModelVersion: m.Name(),
+			TurnComplete: true,
+			Content: &genai.Content{
+				Role:  genai.RoleModel,
+				Parts: []*genai.Part{{Text: reply}},
+			},
+			UsageMetadata: &genai.GenerateContentResponseUsageMetadata{
+				PromptTokenCount:     10,
+				CandidatesTokenCount: 5,
+				TotalTokenCount:      15,
+			},
+		}, nil)
 	}
-	return &ai.AgentChatResponse{Text: reply, ProviderName: m.Name(), ModelName: m.ModelName(), TokensIn: 10, TokensOut: 5}, nil
-}
-func (m *mockServerProvider) StreamChat(ctx context.Context, req ai.AgentChatRequest, onDelta func(ai.StreamDelta) error) (*ai.AgentChatResponse, error) {
-	resp, err := m.Chat(ctx, req)
-	if err == nil && onDelta != nil {
-		_ = onDelta(ai.StreamDelta{Type: "text", TextDelta: resp.Text})
-	}
-	return resp, err
 }
 
 func setupBYOKRuntime(t *testing.T, routes map[string]http.Handler) *runtimeFixture {
@@ -116,10 +122,15 @@ func setupBYOKRuntime(t *testing.T, routes map[string]http.Handler) *runtimeFixt
 	svc := service.NewAIProviderService(providerRepo, settingsRepo, convRepo, triggerRepo, vault, registry, 0)
 	svc.SetVerifyHTTPClientForTest(httpClient)
 
-	serverProv := &mockServerProvider{}
-	router := ai.NewModelRouter(serverProv)
+	serverProv := &mockServerLLM{}
 	facade, err := NewADKLoopFacade(FacadeConfig{
-		Router:           router,
+		ServerPool: []ServerPoolEntry{{
+			ProviderKey: "gemini",
+			DisplayName: "server-gemini",
+			ModelID:     "gemini-2.5-flash",
+			Tier:        3,
+			LLM:         serverProv,
+		}},
 		Registry:         toolsets.NewToolsetsRegistry(),
 		ScopeGuard:       service.NewScopeGuard(),
 		ConfirmationGate: service.NewConfirmationGateService(db),

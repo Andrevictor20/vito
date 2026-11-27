@@ -11,7 +11,7 @@ import (
 	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/ai/adkengine"
 	"github.com/andrevmp/vito/backend/internal/bots"
-	"github.com/andrevmp/vito/backend/internal/catalog"
+	"github.com/andrevmp/vito/backend/internal/bots/catalog"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/repository"
@@ -19,7 +19,7 @@ import (
 	"github.com/andrevmp/vito/backend/internal/service/toolsets"
 )
 
-func setupBotCreationHITLFixture(t *testing.T, provider *fakeAgentProvider) (*adkengine.ADKLoopFacade, *bots.BotRepositorySQLite, *service.ConfirmationGateService, *repository.ConversationStoreRepository, string) {
+func setupBotCreationHITLFixture(t *testing.T, provider *fakeADKLLM) (*adkengine.ADKLoopFacade, *bots.BotRepositorySQLite, *service.ConfirmationGateService, *repository.ConversationStoreRepository, string) {
 	t.Helper()
 	db, err := database.Open(filepath.Join(t.TempDir(), "bot_hitl_reg.db"))
 	if err != nil {
@@ -59,7 +59,7 @@ func setupBotCreationHITLFixture(t *testing.T, provider *fakeAgentProvider) (*ad
 	reg.Register(botTS)
 
 	facade, err := adkengine.NewADKLoopFacade(adkengine.FacadeConfig{
-		Router:           ai.NewModelRouter(provider),
+		ServerPool:       testServerPool("Fake-HITL-Bot", "gemini-2.5-flash", provider),
 		Registry:         reg,
 		ScopeGuard:       scopeGuard,
 		ConfirmationGate: confGate,
@@ -77,26 +77,11 @@ func setupBotCreationHITLFixture(t *testing.T, provider *fakeAgentProvider) (*ad
 // de criar bot sem confirmação prévia não sofrem colisão de idempotency_key e que resposta curta "beleza"
 // confirma e persiste o bot mais recente via BotRepositorySQLite real.
 func TestBotCreationHITL_RepeatedAttemptAndNaturalReplyPersistsNewBot(t *testing.T) {
-	provider := &fakeAgentProvider{
-		name:          "Fake-HITL-Bot",
-		model:         "gemini-2.5-flash",
-		tier:          3,
-		supportsTools: true,
-		responses: []*ai.AgentChatResponse{
-			{
-				ProviderName: "Fake-HITL-Bot",
-				ModelName:    "gemini-2.5-flash",
-				ToolCalls: []ai.ToolCall{
-					{ID: "b1", Name: "bot_create_bot", Arguments: json.RawMessage(`{"title":"Bot Antigo","goal":"Dólar"}`)},
-				},
-			},
-			{
-				ProviderName: "Fake-HITL-Bot",
-				ModelName:    "gemini-2.5-flash",
-				ToolCalls: []ai.ToolCall{
-					{ID: "b2", Name: "bot_create_bot", Arguments: json.RawMessage(`{"title":"Monitor Poco X8 Pro","goal":"Acompanhar preço do Poco X8 Pro"}`)},
-				},
-			},
+	provider := &fakeADKLLM{
+		model: "gemini-2.5-flash",
+		responses: []scriptedModelResponse{
+			{ToolCalls: []ai.ToolCall{{ID: "b1", Name: "bot_create_bot", Arguments: json.RawMessage(`{"title":"Bot Antigo","goal":"Dólar"}`)}}},
+			{ToolCalls: []ai.ToolCall{{ID: "b2", Name: "bot_create_bot", Arguments: json.RawMessage(`{"title":"Monitor Poco X8 Pro","goal":"Acompanhar preço do Poco X8 Pro"}`)}}},
 		},
 	}
 
@@ -178,11 +163,8 @@ func TestBotCreationHITL_RepeatedAttemptAndNaturalReplyPersistsNewBot(t *testing
 // TestBotCreationHITL_ExpiredConfirmPendingIDReturnsErrorNotFallbackLLM garante que clique em card
 // expirado retorna ErrConfirmationExpired sem cair no LLM com mensagem vazia ("Olá").
 func TestBotCreationHITL_ExpiredConfirmPendingIDReturnsErrorNotFallbackLLM(t *testing.T) {
-	provider := &fakeAgentProvider{
-		name:          "Fake-NoCall",
-		model:         "gemini-2.5-flash",
-		tier:          3,
-		supportsTools: true,
+	provider := &fakeADKLLM{
+		model: "gemini-2.5-flash",
 	}
 
 	facade, _, confGate, convRepo, userID := setupBotCreationHITLFixture(t, provider)
@@ -194,7 +176,7 @@ func TestBotCreationHITL_ExpiredConfirmPendingIDReturnsErrorNotFallbackLLM(t *te
 		UserID:        userID,
 		ThreadID:      threadID,
 		Channel:       "app_mobile",
-		ToolsetName:   string(domain.ToolsetRadarTrigger),
+		ToolsetName:   string(domain.ToolsetBots),
 		Operation:     "create_trigger",
 		ArgumentsJSON: `{"title":"Bot Expirado","goal":"Teste"}`,
 		TTL:           -1 * time.Second,

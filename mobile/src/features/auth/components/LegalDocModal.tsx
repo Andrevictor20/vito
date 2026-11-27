@@ -10,7 +10,7 @@ import {
   type TextStyle,
   type ViewStyle,
 } from 'react-native'
-import { CloseSvgIcon } from '../../../icons/ChatProtoIcons'
+import { CloseSvgIcon } from '../../../icons/ProtoUiIcons'
 import { useTheme } from '../../../context/ThemeContext'
 import { loginPalette } from '../utils/loginPalette'
 import { LEGAL_DOCS, type LegalDocKind } from '../utils/legalDocs'

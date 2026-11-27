@@ -13,6 +13,7 @@ export interface RunAssistantStreamTurnParams {
   historySource: ChatMessage[];
   threadId: string;
   focusMode?: string;
+  resetHistory?: boolean;
   signal: AbortSignal;
   setMessages: (next: ChatMessage[]) => void;
   setStreamingSteps: (steps: string[]) => void;
@@ -24,6 +25,7 @@ export async function runAssistantStreamTurn({
   historySource,
   threadId,
   focusMode,
+  resetHistory,
   signal,
   setMessages,
   setStreamingSteps,
@@ -53,6 +55,7 @@ export async function runAssistantStreamTurn({
     thread_id: threadId,
     channel: 'app_mobile',
     history: recentHistory,
+    reset_history: resetHistory,
     signal,
     focus_mode: focusMode,
   };

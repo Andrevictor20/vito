@@ -11,7 +11,6 @@ import (
 	"google.golang.org/adk/v2/agent/workflowagents/parallelagent"
 	"google.golang.org/adk/v2/agent/workflowagents/sequentialagent"
 	"google.golang.org/adk/v2/model"
-	"google.golang.org/adk/v2/plugin"
 	"google.golang.org/adk/v2/runner"
 	"google.golang.org/adk/v2/session"
 	"google.golang.org/adk/v2/tool"
@@ -34,7 +33,7 @@ func BuildCrossDomainBriefingWorkflow(llm model.LLM, bridge *ToolsetBridge) (*Cr
 	var routineTools, financeTools, commsTools []tool.Tool
 	if bridge != nil {
 		routineTools = bridge.BuildDomainTools(domain.ToolsetCalendar, domain.ToolsetTaskPending, domain.ToolsetMeetingBooking)
-		financeTools = bridge.BuildDomainTools(domain.ToolsetName("finance_manager"))
+		financeTools = bridge.BuildDomainTools(domain.ToolsetFinance)
 		commsTools = bridge.BuildDomainTools(domain.ToolsetWhatsApp, domain.ToolsetGmail)
 	}
 
@@ -42,7 +41,7 @@ func BuildCrossDomainBriefingWorkflow(llm model.LLM, bridge *ToolsetBridge) (*Cr
 		Name:        "briefing_routine_collector",
 		Description: "Coleta compromissos do dia, conflitos de agenda e tarefas prioritárias pendentes.",
 		Model:       llm,
-		Instruction: "Colete os compromissos de hoje e as tarefas pendentes prioritárias de forma concisa.",
+		Instruction: "Colete os compromissos de hoje e as tarefas pendentes prioritárias de forma concisa em texto curto. Se não houver itens relevantes, responda \"Nenhum alerta relevante.\".",
 		Tools:       routineTools,
 		OutputKey:   "briefing_routine_signals",
 	})
@@ -54,7 +53,7 @@ func BuildCrossDomainBriefingWorkflow(llm model.LLM, bridge *ToolsetBridge) (*Cr
 		Name:        "briefing_finance_collector",
 		Description: "Coleta resumo financeiro Safe-to-Spend e faturas próximas.",
 		Model:       llm,
-		Instruction: "Verifique o resumo financeiro Safe-to-Spend e alertas de vencimento próximos.",
+		Instruction: "Verifique o resumo financeiro Safe-to-Spend e alertas de vencimento próximos em texto objetivo. Se não houver dados, responda \"Nenhum alerta relevante.\".",
 		Tools:       financeTools,
 		OutputKey:   "briefing_finance_signals",
 	})
@@ -66,7 +65,7 @@ func BuildCrossDomainBriefingWorkflow(llm model.LLM, bridge *ToolsetBridge) (*Cr
 		Name:        "briefing_comms_collector",
 		Description: "Coleta mensagens urgentes não respondidas no WhatsApp e Gmail.",
 		Model:       llm,
-		Instruction: "Identifique pendências urgentes de resposta em WhatsApp e Gmail.",
+		Instruction: "Identifique pendências urgentes de resposta em WhatsApp e Gmail em texto curto. Se não houver mensagens urgentes, responda \"Nenhum alerta relevante.\".",
 		Tools:       commsTools,
 		OutputKey:   "briefing_comms_signals",
 	})
@@ -89,7 +88,7 @@ func BuildCrossDomainBriefingWorkflow(llm model.LLM, bridge *ToolsetBridge) (*Cr
 		Name:        "vito_briefing_synthesizer",
 		Description: "Sintetiza os sinais coletados em paralelo em um briefing executivo acionável.",
 		Model:       llm,
-		Instruction: "Combine os sinais coletados de agenda, tarefas, finanças e comunicações em 3 prioridades claras e acionáveis para o usuário.",
+		Instruction: "Combine os sinais reais coletados em paralelo abaixo em um briefing executivo conciso, acionável e sem inventar dados:\n\n- Rotina (Agenda e Tarefas): {briefing_routine_signals?}\n- Finanças (Safe-to-Spend e Faturas): {briefing_finance_signals?}\n- Comunicações (WhatsApp e Gmail): {briefing_comms_signals?}\n\nDestaque até 3 prioridades claras e cruze relações entre domínios.",
 		OutputKey:   "executive_briefing_summary",
 	})
 	if err != nil {
@@ -131,11 +130,13 @@ func NewCrossDomainBriefingWorkflowRunner(llm model.LLM, bridge *ToolsetBridge, 
 		return nil, err
 	}
 	sessSvc := session.InMemoryService()
-	var plugins []*plugin.Plugin
-	if len(guardrails) > 0 && guardrails[0] != nil {
-		if p, pErr := guardrails[0].BuildADKPlugin(); pErr == nil && p != nil {
-			plugins = append(plugins, p)
-		}
+	var guard *GuardrailPlugin
+	if len(guardrails) > 0 {
+		guard = guardrails[0]
+	}
+	plugins, err := buildStandardADKPlugins(guard)
+	if err != nil {
+		return nil, err
 	}
 	r, err := runner.New(runner.Config{
 		AppName:           "vito_briefing",

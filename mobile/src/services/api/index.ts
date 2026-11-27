@@ -3,29 +3,24 @@ import { fileUriToBase64 } from './fileUtils';
 import { ApiRequestOptions, ChatHistoryItem, AssistantChatOptions } from './types';
 import { AuthApi } from './authApi';
 import { CalendarApi } from '../../features/calendar/services/calendarApi';
-import { TodosApi } from '../../features/tasks/services/todosApi';
+import { PendingApi, TodosApi } from '../../features/tasks/services/tasksApi';
 import { ChatApi, ChatStreamDelta } from '../../features/chat/services/chatApi';
-import { PendingApi } from '../../features/tasks/services/pendingApi';
-import { BookingApi } from '../../features/calendar/services/bookingApi';
-import { MeetingsApi } from '../../features/calendar/services/meetingsApi';
-import { P2PMeetingsApi } from '../../features/calendar/services/p2pMeetingsApi';
+import { BookingApi, MeetingsApi } from '../../features/calendar/services/bookingApi';
+import { PhoneVerificationApi } from '../../features/profile/services/phoneVerificationService';
 import { NotificationsApi } from '../../features/notifications/services/notificationsApi';
+import { AiSettingsApi } from '../../features/profile/services/aiSettingsApi';
 import { WhatsAppApi, WhatsAppIntegrationStatus } from '../../features/profile/services/whatsappApi';
-import { WhatsAppContextApi, WhatsAppContextScope, WhatsAppContextSettings, WhatsAppContextPreview, WhatsAppDirectory, WhatsAppMediaStatus } from '../../features/profile/services/whatsappContextApi';
-import { GmailApi, GmailStatusResponse, GmailScanResult, GmailDraftInput, GmailDraftResponse, GmailSendResponse, ScannedBill, ScannedFlight, UrgentEmail } from '../../features/profile/services/gmailApi';
+import { GmailApi, GmailStatusResponse, GmailScanResult, ScannedBill, ScannedFlight, UrgentEmail } from '../../features/profile/services/gmailApi';
 import { WhatsAppAuthApi, RequestWhatsAppOTPResponse, VerifyWhatsAppOTPResponse } from '../../features/profile/services/whatsappAuthApi';
 import { FinanceApi } from '../../features/finance/services/financeApi';
 import { AiProvidersApi } from '../../features/profile/services/aiProvidersApi';
 import { BotsApi } from '../../features/bots/services/botsApi';
-import { InboxNotificationsApi } from '../../features/notifications/services/inboxNotificationsApi';
 import { StoreComplianceApi } from '../../features/store/services/storeComplianceApi';
 import type {
   ActionPolicy,
   Bot,
-  BotActivityItem,
   BotAppInfo,
   BotChatMessage,
-  BotMemoryItem,
   BotRunReport,
   BotTemplate,
   CreateBotPayload,
@@ -33,20 +28,18 @@ import type {
   SkillPackage,
   UpdateBotPayload,
 } from '../../features/bots/types/bots';
-import { FinancialSummary, FinanceAccount, FinanceConnection, FinanceTransaction, FinanceAlert, CategorySpendItem, SubscriptionItem, FinanceSyncPayload, FinanceConnectTokenResponse } from '../../features/finance/types/finance';
 import {
   User, AuthResponse, Event, Todo, Subtask, AssistantChatResponse, ConflictInfo, Trigger, TriggerCategory,
-  TriggerLog, TriggerTestResult, TriggerStatus, CreateTriggerInput, TriggerTemplate, MorningBriefingSettings,
+  TriggerLog, TriggerTestResult, TriggerStatus, CreateTriggerInput, TriggerTemplate,
   AutonomyMode, AISettings, PendingItem, PendingStatus, CreatePendingInput, UpdatePendingInput, BookingType,
-  BookingAppointment, CreateBookingTypeInput, DeleteBookingImpact, Meeting, MeetingWithDetails,
-  CreateMeetingInput, WhatsAppShareData, ChatMessage, ConversationSession, P2PMeetingInvite,
-  ContactMatchResult, P2PMutualSlot, SendP2PInviteInput, UserSession,
+  BookingAppointment, DeleteBookingImpact, Meeting, MeetingWithDetails,
+  ChatMessage, ConversationSession, UserSession,
 } from '../../types';
 
 export {
   PI_SERVER_URL, CLOUDFLARE_SERVER_URL, DEFAULT_SERVER_URL, isCloudServer, fileUriToBase64,
   ApiRequestOptions, ChatHistoryItem, AssistantChatOptions, WhatsAppIntegrationStatus,
-  GmailStatusResponse, GmailScanResult, GmailDraftInput, GmailDraftResponse, GmailSendResponse,
+  GmailStatusResponse, GmailScanResult,
   ScannedBill, ScannedFlight, UrgentEmail, RequestWhatsAppOTPResponse, VerifyWhatsAppOTPResponse,
 };
 
@@ -58,22 +51,21 @@ export class ApiService extends ApiClient {
   private pendingApi = new PendingApi(this);
   private bookingApi = new BookingApi(this);
   private meetingsApi = new MeetingsApi(this);
-  private p2pMeetingsApi = new P2PMeetingsApi(this);
+  private phoneVerificationApi = new PhoneVerificationApi(this);
   private notificationsApi = new NotificationsApi(this);
+  private aiSettingsApi = new AiSettingsApi(this);
   private whatsappApi = new WhatsAppApi(this);
   private gmailApi = new GmailApi(this);
   private whatsappAuthApi = new WhatsAppAuthApi(this);
-  private whatsappContextApi = new WhatsAppContextApi(this);
   private financeApi = new FinanceApi(this);
   private aiProvidersApi = new AiProvidersApi(this);
   private botsApi = new BotsApi(this);
-  private inboxNotificationsApi = new InboxNotificationsApi(this);
   private storeComplianceApi = new StoreComplianceApi(this);
 
   // Bots
   listBots(): Promise<Bot[]> { return this.botsApi.listBots(); }
-  createBot(payload: CreateBotPayload): Promise<Bot> { return this.botsApi.createBot(payload); }
   getBot(id: string): Promise<Bot> { return this.botsApi.getBot(id); }
+  createBot(payload: CreateBotPayload): Promise<Bot> { return this.botsApi.createBot(payload); }
   updateBot(id: string, payload: UpdateBotPayload): Promise<Bot> { return this.botsApi.updateBot(id, payload); }
   deleteBot(id: string): Promise<void> { return this.botsApi.deleteBot(id); }
   runBot(id: string): Promise<BotRunReport> { return this.botsApi.runBot(id); }
@@ -85,11 +77,7 @@ export class ApiService extends ApiClient {
   addBotSkill(id: string, skillKey: string): Promise<Bot> { return this.botsApi.addBotSkill(id, skillKey); }
   removeBotSkill(id: string, skillKey: string): Promise<Bot> { return this.botsApi.removeBotSkill(id, skillKey); }
   upgradeBotSkill(id: string, skillKey: string): Promise<Bot> { return this.botsApi.upgradeBotSkill(id, skillKey); }
-  getBotMemories(id: string): Promise<BotMemoryItem[]> { return this.botsApi.getBotMemories(id); }
-  addBotMemory(id: string, content: string): Promise<BotMemoryItem> { return this.botsApi.addBotMemory(id, content); }
-  deleteBotMemory(id: string, memId: string): Promise<void> { return this.botsApi.deleteBotMemory(id, memId); }
   resolveBotPending(id: string, confirmationId: string, decision: PendingResolutionDecision, alwaysAsk?: boolean): Promise<void> { return this.botsApi.resolvePending(id, confirmationId, decision, alwaysAsk); }
-  getBotsActivity(limit = 20): Promise<BotActivityItem[]> { return this.botsApi.getActivity(limit); }
   getBotCatalogTemplates(): Promise<BotTemplate[]> { return this.botsApi.getCatalogTemplates(); }
   getBotCatalogSkills(): Promise<SkillPackage[]> { return this.botsApi.getCatalogSkills(); }
   getBotApps(): Promise<BotAppInfo[]> { return this.botsApi.getApps(); }
@@ -167,6 +155,9 @@ export class ApiService extends ApiClient {
   addSubtask(todoId: string, title: string): Promise<Subtask> {
     return this.todosApi.addSubtask(todoId, title);
   }
+  suggestSubtasks(todoId: string): Promise<Subtask[]> {
+    return this.todosApi.suggestSubtasks(todoId);
+  }
   toggleSubtask(todoId: string, subtaskId: string): Promise<Subtask> {
     return this.todosApi.toggleSubtask(todoId, subtaskId);
   }
@@ -196,9 +187,10 @@ export class ApiService extends ApiClient {
     filename: string = 'image.jpg',
     timezone?: string,
     base64Override?: string,
-    mimeType?: string
+    mimeType?: string,
+    threadId?: string
   ): Promise<AssistantChatResponse> {
-    return this.chatApi.assistantVision(imageUri, prompt, filename, timezone, base64Override, mimeType);
+    return this.chatApi.assistantVision(imageUri, prompt, filename, timezone, base64Override, mimeType, threadId);
   }
   getChatSessions(): Promise<ConversationSession[]> {
     return this.chatApi.getChatSessions();
@@ -211,6 +203,9 @@ export class ApiService extends ApiClient {
   }
   deleteChatSession(id: string): Promise<void> {
     return this.chatApi.deleteChatSession(id);
+  }
+  sendMessageFeedback(messageId: string, rating: 'like' | 'dislike', content?: string): Promise<void> {
+    return this.chatApi.sendMessageFeedback(messageId, rating, content);
   }
 
   voiceTTS(
@@ -226,9 +221,6 @@ export class ApiService extends ApiClient {
   }
   createPendingItem(data: CreatePendingInput): Promise<PendingItem> {
     return this.pendingApi.createPendingItem(data);
-  }
-  getPendingItem(id: string): Promise<PendingItem> {
-    return this.pendingApi.getPendingItem(id);
   }
   updatePendingItem(id: string, data: UpdatePendingInput): Promise<PendingItem> {
     return this.pendingApi.updatePendingItem(id, data);
@@ -247,9 +239,6 @@ export class ApiService extends ApiClient {
   getBookingTypes(): Promise<BookingType[]> {
     return this.bookingApi.getBookingTypes();
   }
-  createBookingType(data: CreateBookingTypeInput): Promise<BookingType> {
-    return this.bookingApi.createBookingType(data);
-  }
   updateBookingType(id: string, data: Partial<BookingType>): Promise<BookingType> {
     return this.bookingApi.updateBookingType(id, data);
   }
@@ -267,97 +256,33 @@ export class ApiService extends ApiClient {
   getMeetings(status?: string): Promise<MeetingWithDetails[]> {
     return this.meetingsApi.getMeetings(status);
   }
-  getMeeting(id: string): Promise<MeetingWithDetails> {
-    return this.meetingsApi.getMeeting(id);
-  }
-  createMeeting(data: CreateMeetingInput): Promise<MeetingWithDetails> {
-    return this.meetingsApi.createMeeting(data);
-  }
-  updateMeeting(id: string, data: { title: string; description?: string; duration_minutes: number; slots: { start_at: string; end_at: string }[] }): Promise<MeetingWithDetails> {
-    return this.meetingsApi.updateMeeting(id, data);
-  }
   deleteMeeting(id: string): Promise<void> {
     return this.meetingsApi.deleteMeeting(id);
   }
   confirmMeetingConsensus(id: string, slotId: string): Promise<{ status: string }> {
     return this.meetingsApi.confirmConsensus(id, slotId);
   }
-  getMeetingWhatsAppShare(id: string): Promise<WhatsAppShareData> {
-    return this.meetingsApi.getWhatsAppShare(id);
-  }
 
-  // P2P Meetings & Contacts
-  getP2PChallenge(): Promise<{ salt: string }> {
-    return this.p2pMeetingsApi.getChallenge();
-  }
-  matchP2PContacts(salt: string, hashes: string[]): Promise<ContactMatchResult[]> {
-    return this.p2pMeetingsApi.matchContacts(salt, hashes);
-  }
-  updateP2PPhone(phone: string): Promise<{ status: string; phone?: string }> {
-    return this.p2pMeetingsApi.updatePhone(phone);
-  }
-
-  updatePhone(phone: string): Promise<{ status: string; phone?: string }> {
-    return this.updateP2PPhone(phone);
-  }
-
+  // Phone Verification
   requestPhoneVerification(phone: string) {
-    return this.p2pMeetingsApi.requestPhoneVerification(phone);
+    return this.phoneVerificationApi.requestPhoneVerification(phone);
   }
-
   verifyPhoneCode(payload: { code?: string; token?: string }) {
-    return this.p2pMeetingsApi.verifyPhoneCode(payload);
-  }
-  getP2PMutualSlots(targetUserId: string, from?: string, to?: string, duration?: number): Promise<P2PMutualSlot[]> {
-    return this.p2pMeetingsApi.getMutualSlots(targetUserId, from, to, duration);
-  }
-  sendP2PInvite(data: SendP2PInviteInput): Promise<P2PMeetingInvite> {
-    return this.p2pMeetingsApi.sendInvite(data);
-  }
-  getP2PPendingInvites(): Promise<P2PMeetingInvite[]> {
-    return this.p2pMeetingsApi.getPendingInvites();
-  }
-  getP2PInvites(): Promise<P2PMeetingInvite[]> {
-    return this.p2pMeetingsApi.getInvites();
-  }
-  acceptP2PInvite(id: string): Promise<P2PMeetingInvite> {
-    return this.p2pMeetingsApi.acceptInvite(id);
-  }
-  declineP2PInvite(id: string): Promise<{ status: string }> {
-    return this.p2pMeetingsApi.declineInvite(id);
-  }
-  cancelP2PInvite(id: string): Promise<{ status: string }> {
-    return this.p2pMeetingsApi.cancelInvite(id);
+    return this.phoneVerificationApi.verifyPhoneCode(payload);
   }
 
-  get p2p(): P2PMeetingsApi {
-    return this.p2pMeetingsApi;
-  }
-
-  // Notifications & Briefing & Settings
+  // Notifications & AI Settings
   registerPushToken(token: string, platform: string = 'expo'): Promise<{ status: string; token: string }> {
     return this.notificationsApi.registerPushToken(token, platform);
   }
   revokePushToken(token: string): Promise<{ status: string; token: string }> {
     return this.notificationsApi.revokePushToken(token);
   }
-  getNotificationStatus(): Promise<{ registered: boolean; device_count: number }> {
-    return this.notificationsApi.getNotificationStatus();
-  }
-  testPushNotification(priority?: 'default' | 'silent', title?: string, body?: string): Promise<{ status: string; dispatched: number }> {
-    return this.notificationsApi.testPushNotification(priority, title, body);
-  }
-  getBriefingSettings(): Promise<MorningBriefingSettings> {
-    return this.notificationsApi.getBriefingSettings();
-  }
-  updateBriefingSettings(data: Partial<MorningBriefingSettings>): Promise<MorningBriefingSettings> {
-    return this.notificationsApi.updateBriefingSettings(data);
-  }
   getAISettings(): Promise<AISettings> {
-    return this.notificationsApi.getAISettings();
+    return this.aiSettingsApi.getAISettings();
   }
-  updateAISettings(data: Parameters<NotificationsApi['updateAISettings']>[0]): Promise<AISettings> {
-    return this.notificationsApi.updateAISettings(data);
+  updateAISettings(data: Parameters<AiSettingsApi['updateAISettings']>[0]): Promise<AISettings> {
+    return this.aiSettingsApi.updateAISettings(data);
   }
 
   // WhatsApp (Evolution API v2)
@@ -365,21 +290,6 @@ export class ApiService extends ApiClient {
   requestWhatsAppPairingCode = (phone: string): Promise<{ pairing_code: string; status: string }> =>
     this.whatsappApi.requestPairingCode(phone);
   disconnectWhatsApp = (): Promise<{ message: string; status: string }> => this.whatsappApi.disconnect();
-  getWhatsAppContacts = (): Promise<{ contacts: import('../../features/profile/services/whatsappApi').WhatsAppMatchedContact[]; count: number }> =>
-    this.whatsappApi.getContacts();
-  getWhatsAppContextSettings = (): Promise<WhatsAppContextSettings> => this.whatsappContextApi.getSettings();
-  getWhatsAppContextPreview = (): Promise<WhatsAppContextPreview> => this.whatsappContextApi.getPreview();
-  getWhatsAppDirectory = (): Promise<WhatsAppDirectory> => this.whatsappContextApi.getDirectory();
-  updateWhatsAppContextSettings = (
-    scope: WhatsAppContextScope,
-    windowSize: number,
-  ): Promise<WhatsAppContextSettings> => this.whatsappContextApi.updateSettings(scope, windowSize);
-  purgeWhatsAppContextMessages = (): Promise<{ message: string }> => this.whatsappContextApi.purgeMessages();
-  getWhatsAppMediaStatus = (): Promise<WhatsAppMediaStatus> => this.whatsappContextApi.getMediaStatus();
-  processWhatsAppMedia = (limit = 5): Promise<{ enriched: number }> => this.whatsappContextApi.processMedia(limit);
-  importWhatsAppContactNames = (
-    names: { phone: string; name: string }[],
-  ): Promise<{ imported: number }> => this.whatsappContextApi.importContactNames(names);
   get whatsapp(): WhatsAppApi {
     return this.whatsappApi;
   }
@@ -405,10 +315,6 @@ export class ApiService extends ApiClient {
   disconnectGmail(): Promise<{ message: string }> {
     return this.gmailApi.disconnect();
   }
-  createGmailDraft(draft: GmailDraftInput): Promise<GmailDraftResponse> {
-    return this.gmailApi.createDraft(draft);
-  }
-  sendGmailEmail = (email: GmailDraftInput): Promise<GmailSendResponse> => this.gmailApi.sendEmail(email);
   get gmail(): GmailApi {
     return this.gmailApi;
   }
@@ -416,14 +322,8 @@ export class ApiService extends ApiClient {
   // Finance & Open Finance (Vito Finance MVP)
   get finance(): FinanceApi { return this.financeApi; }
   get aiProviders(): AiProvidersApi { return this.aiProvidersApi; }
-  get inbox(): InboxNotificationsApi { return this.inboxNotificationsApi; }
+  get inbox(): NotificationsApi { return this.notificationsApi; }
   get store(): StoreComplianceApi { return this.storeComplianceApi; }
-  getFinancialSummary(): Promise<FinancialSummary> {
-    return this.financeApi.getSummary();
-  }
-  getFinanceConnections(): Promise<FinanceConnection[]> {
-    return this.financeApi.getConnections();
-  }
 }
 
 export const api = new ApiService();

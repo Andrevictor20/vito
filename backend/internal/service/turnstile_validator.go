@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 )
 
@@ -50,11 +51,10 @@ func (v *TurnstileValidator) Validate(ctx context.Context, token, remoteIP strin
 		form.Set("remoteip", remoteIP)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, v.endpoint, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, v.endpoint, strings.NewReader(form.Encode()))
 	if err != nil {
 		return false, err
 	}
-	req.PostForm = form
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	resp, err := v.httpClient.Do(req)

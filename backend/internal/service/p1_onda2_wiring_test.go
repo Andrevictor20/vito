@@ -3,21 +3,21 @@ package service_test
 import (
 	"context"
 	"encoding/json"
-	"github.com/andrevmp/vito/backend/internal/calendar"
-	"github.com/andrevmp/vito/backend/internal/finance"
-	"github.com/andrevmp/vito/backend/internal/tasks"
-	"github.com/andrevmp/vito/backend/internal/whatsapp"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/andrevmp/vito/backend/internal/ai"
-	"github.com/andrevmp/vito/backend/internal/platform/database"
+	"github.com/andrevmp/vito/backend/internal/calendar"
 	"github.com/andrevmp/vito/backend/internal/domain"
+	"github.com/andrevmp/vito/backend/internal/finance"
+	"github.com/andrevmp/vito/backend/internal/gmail"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/andrevmp/vito/backend/internal/service"
-	"github.com/andrevmp/vito/backend/internal/service/toolsets"
+	"github.com/andrevmp/vito/backend/internal/tasks"
+	"github.com/andrevmp/vito/backend/internal/whatsapp"
 )
 
 func TestSQLiteFinanceSnapshotProvider_CompactContextAndEnricher(t *testing.T) {
@@ -138,12 +138,12 @@ func TestEntityLinkRepository_ProductionFlows(t *testing.T) {
 	}
 
 	// WhatsApp archive + toolsets + enricher
-	_ = entityRepo.Upsert(ctx, &repository.EntityLink{
+	_ = entityRepo.Upsert(ctx, &domain.EntityLink{
 		UserID: userID, CanonicalName: "Marina Costa", EntityType: "person",
 		WhatsAppJID: "5511999887766@s.whatsapp.net", Phone: "5511999887766", Email: "marina.costa@empresa.com",
 	})
 
-	gmailTS := toolsets.NewGmailToolset(&fakeGmailContract{})
+	gmailTS := gmail.NewGmailToolset(&fakeGmailContract{})
 	gmailTS.SetEntityLinkResolver(entityRepo)
 	resEmail, err := gmailTS.Execute(ctx, &domain.ToolExecutionContext{UserID: userID}, "send_email", json.RawMessage(`{"to":"Marina Costa","subject":"Oi","body":"Tudo bem?"}`))
 	if err != nil || resEmail.Status != "COMPLETED" || !strings.Contains(resEmail.SummaryForLLM, "marina.costa@empresa.com") {

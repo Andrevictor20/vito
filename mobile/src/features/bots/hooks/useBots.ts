@@ -169,13 +169,24 @@ export const useBots = (userId?: string) => {
     await api.deleteBot(id);
   }, []);
 
+  const loadBotDetails = useCallback(async (id: string): Promise<Bot | null> => {
+    try {
+      const detailed = await api.getBot(id);
+      setBots((prev) => prev.map((b) => (b.id === id ? detailed : b)));
+      return detailed;
+    } catch {
+      return null;
+    }
+  }, []);
+
   const runBot = useCallback(
     async (id: string) => {
       const report = await api.runBot(id);
+      await loadBotDetails(id);
       await fetchAll(false);
       return report;
     },
-    [fetchAll]
+    [fetchAll, loadBotDetails]
   );
 
   const resolvePending = useCallback(
@@ -272,6 +283,7 @@ export const useBots = (userId?: string) => {
     toggleBot,
     deleteBot,
     runBot,
+    loadBotDetails,
     resolvePending,
     updateActionPolicy,
     addAction,

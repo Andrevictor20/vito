@@ -129,7 +129,7 @@ describe('Plano 03 — Provedores de IA BYOK & Seletor de Modelo (Ondas D & E)',
         models: [
           {
             id: 'haiku',
-            name: 'Claude Haiku 5.5',
+            name: 'Claude 3.5 Haiku',
             supports_tools: true,
             supports_vision: true,
             reasoning: false,
@@ -138,7 +138,7 @@ describe('Plano 03 — Provedores de IA BYOK & Seletor de Modelo (Ondas D & E)',
           },
           {
             id: 'sonnet',
-            name: 'Claude Sonnet 5.5',
+            name: 'Claude Sonnet 4.5',
             supports_tools: true,
             supports_vision: true,
             reasoning: true,
@@ -154,7 +154,7 @@ describe('Plano 03 — Provedores de IA BYOK & Seletor de Modelo (Ondas D & E)',
         models: [
           {
             id: 'gpt-4.1',
-            name: 'GPT-5.5',
+            name: 'GPT-4.1',
             supports_tools: true,
             supports_vision: true,
             reasoning: true,

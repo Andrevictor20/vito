@@ -11,7 +11,6 @@ import {
   BotActivityItem,
   BotAppInfo,
   BotChatMessage,
-  BotMemoryItem,
   BotRunReport,
   BotTemplate,
   CreateBotPayload,
@@ -38,16 +37,16 @@ export class BotsApi {
     return list.map(normalizeBot);
   }
 
+  async getBot(id: string): Promise<Bot> {
+    const raw = await this.client.request<Bot>(`/api/v1/bots/${id}`);
+    return normalizeBot(raw);
+  }
+
   async createBot(payload: CreateBotPayload): Promise<Bot> {
     const raw = await this.client.request<Bot>('/api/v1/bots', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
-    return normalizeBot(raw);
-  }
-
-  async getBot(id: string): Promise<Bot> {
-    const raw = await this.client.request<Bot>(`/api/v1/bots/${id}`);
     return normalizeBot(raw);
   }
 
@@ -88,11 +87,17 @@ export class BotsApi {
     id: string,
     message: string
   ): Promise<{ reply?: BotChatMessage; messages?: BotChatMessage[] }> {
-    return this.client.request(`/api/v1/bots/${id}/chat`, {
+    const raw = await this.client.request<
+      BotChatMessage | { reply?: BotChatMessage; messages?: BotChatMessage[] }
+    >(`/api/v1/bots/${id}/chat`, {
       method: 'POST',
       timeoutMs: AI_ENDPOINT_TIMEOUT_MS,
       body: JSON.stringify({ message }),
     });
+    if (raw && !Array.isArray((raw as { messages?: BotChatMessage[] }).messages) && !('reply' in raw)) {
+      return { reply: raw as BotChatMessage };
+    }
+    return raw as { reply?: BotChatMessage; messages?: BotChatMessage[] };
   }
 
   async addBotAction(
@@ -153,27 +158,6 @@ export class BotsApi {
       method: 'POST',
     });
     return normalizeBot(raw);
-  }
-
-  async getBotMemories(id: string): Promise<BotMemoryItem[]> {
-    const raw = await this.client.request<
-      BotMemoryItem[] | { memories?: BotMemoryItem[]; data?: BotMemoryItem[] }
-    >(`/api/v1/bots/${id}/memories`);
-    if (Array.isArray(raw)) return raw;
-    return raw?.memories ?? raw?.data ?? [];
-  }
-
-  async addBotMemory(id: string, content: string): Promise<BotMemoryItem> {
-    return this.client.request<BotMemoryItem>(`/api/v1/bots/${id}/memories`, {
-      method: 'POST',
-      body: JSON.stringify({ content }),
-    });
-  }
-
-  async deleteBotMemory(id: string, memId: string): Promise<void> {
-    await this.client.request<void>(`/api/v1/bots/${id}/memories/${memId}`, {
-      method: 'DELETE',
-    });
   }
 
   async resolvePending(

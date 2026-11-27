@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"github.com/andrevmp/vito/backend/internal/platform/httpx"
 	"net/http"
 	"strings"
 
@@ -11,6 +12,7 @@ import (
 
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/handler/middleware"
+	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/andrevmp/vito/backend/internal/service"
 )
 
@@ -30,6 +32,13 @@ func (h *ChatHandler) SetAIProviderService(svc *service.AIProviderService) {
 	h.aiProviderSvc = svc
 }
 
+// SetConversationStore conecta o repositório de threads ADK ao serviço de chat.
+func (h *ChatHandler) SetConversationStore(convRepo *repository.ConversationStoreRepository) {
+	if h.svc != nil {
+		h.svc.SetConversationStore(convRepo)
+	}
+}
+
 type syncChatRequest struct {
 	Session  domain.ChatSession   `json:"session"`
 	Messages []domain.ChatMessage `json:"messages"`
@@ -39,13 +48,13 @@ type syncChatRequest struct {
 func (h *ChatHandler) ListSessions(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		http.Error(w, `{"error":"não autorizado"}`, http.StatusUnauthorized)
+		httpx.WriteJSONError(w, http.StatusUnauthorized, "não autorizado")
 		return
 	}
 
 	sessions, err := h.svc.ListSessions(r.Context(), userID)
 	if err != nil {
-		http.Error(w, `{"error":"falha ao listar conversas"}`, http.StatusInternalServerError)
+		httpx.WriteJSONError(w, http.StatusInternalServerError, "falha ao listar conversas")
 		return
 	}
 
@@ -57,23 +66,23 @@ func (h *ChatHandler) ListSessions(w http.ResponseWriter, r *http.Request) {
 func (h *ChatHandler) GetSessionMessages(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		http.Error(w, `{"error":"não autorizado"}`, http.StatusUnauthorized)
+		httpx.WriteJSONError(w, http.StatusUnauthorized, "não autorizado")
 		return
 	}
 
 	sessionID := chi.URLParam(r, "id")
 	if sessionID == "" {
-		http.Error(w, `{"error":"id da conversa obrigatório"}`, http.StatusBadRequest)
+		httpx.WriteJSONError(w, http.StatusBadRequest, "id da conversa obrigatório")
 		return
 	}
 
 	res, err := h.svc.GetSessionWithMessages(r.Context(), sessionID, userID)
 	if err != nil {
-		http.Error(w, `{"error":"falha ao buscar histórico da conversa"}`, http.StatusInternalServerError)
+		httpx.WriteJSONError(w, http.StatusInternalServerError, "falha ao buscar histórico da conversa")
 		return
 	}
 	if res == nil {
-		respondError(w, domain.ErrChatSessionNotFound)
+		httpx.RespondError(w, domain.ErrChatSessionNotFound)
 		return
 	}
 
@@ -85,24 +94,24 @@ func (h *ChatHandler) GetSessionMessages(w http.ResponseWriter, r *http.Request)
 func (h *ChatHandler) SyncSession(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		http.Error(w, `{"error":"não autorizado"}`, http.StatusUnauthorized)
+		httpx.WriteJSONError(w, http.StatusUnauthorized, "não autorizado")
 		return
 	}
 
 	var req syncChatRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, `{"error":"payload inválido"}`, http.StatusBadRequest)
+		httpx.WriteJSONError(w, http.StatusBadRequest, "payload inválido")
 		return
 	}
 
 	if req.Session.ID == "" {
-		http.Error(w, `{"error":"id da conversa obrigatório"}`, http.StatusBadRequest)
+		httpx.WriteJSONError(w, http.StatusBadRequest, "id da conversa obrigatório")
 		return
 	}
 
 	res, err := h.svc.SyncSession(r.Context(), userID, &req.Session, req.Messages)
 	if err != nil {
-		http.Error(w, `{"error":"falha ao sincronizar conversa"}`, http.StatusInternalServerError)
+		httpx.WriteJSONError(w, http.StatusInternalServerError, "falha ao sincronizar conversa")
 		return
 	}
 
@@ -114,18 +123,18 @@ func (h *ChatHandler) SyncSession(w http.ResponseWriter, r *http.Request) {
 func (h *ChatHandler) DeleteSession(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		http.Error(w, `{"error":"não autorizado"}`, http.StatusUnauthorized)
+		httpx.WriteJSONError(w, http.StatusUnauthorized, "não autorizado")
 		return
 	}
 
 	sessionID := chi.URLParam(r, "id")
 	if sessionID == "" {
-		http.Error(w, `{"error":"id da conversa obrigatório"}`, http.StatusBadRequest)
+		httpx.WriteJSONError(w, http.StatusBadRequest, "id da conversa obrigatório")
 		return
 	}
 
 	if err := h.svc.DeleteSession(r.Context(), sessionID, userID); err != nil {
-		http.Error(w, `{"error":"falha ao deletar conversa"}`, http.StatusInternalServerError)
+		httpx.WriteJSONError(w, http.StatusInternalServerError, "falha ao deletar conversa")
 		return
 	}
 
@@ -136,30 +145,69 @@ func (h *ChatHandler) DeleteSession(w http.ResponseWriter, r *http.Request) {
 func (h *ChatHandler) UpdateThreadModelPref(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok || userID == "" {
-		writeJSONError(w, http.StatusUnauthorized, "não autorizado")
+		httpx.WriteJSONError(w, http.StatusUnauthorized, "não autorizado")
 		return
 	}
 	if h.aiProviderSvc == nil {
-		writeJSONError(w, http.StatusServiceUnavailable, "serviço de provedores de IA não configurado")
+		httpx.WriteJSONError(w, http.StatusServiceUnavailable, "serviço de provedores de IA não configurado")
 		return
 	}
 	threadID := strings.TrimSpace(chi.URLParam(r, "id"))
 	if threadID == "" {
-		writeJSONError(w, http.StatusBadRequest, "id da conversa obrigatório")
+		httpx.WriteJSONError(w, http.StatusBadRequest, "id da conversa obrigatório")
 		return
 	}
 	var body domain.ModelPreferenceUpdate
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		writeJSONError(w, http.StatusBadRequest, "payload JSON inválido")
+		httpx.WriteJSONError(w, http.StatusBadRequest, "payload JSON inválido")
 		return
 	}
 	if err := h.aiProviderSvc.UpdateThreadModelPref(r.Context(), userID, threadID, body.ModelPref, body.EffortPref); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			writeJSONError(w, http.StatusNotFound, "conversa não encontrada")
+			httpx.WriteJSONError(w, http.StatusNotFound, "conversa não encontrada")
 			return
 		}
-		writeJSONError(w, http.StatusBadRequest, err.Error())
+		httpx.WriteJSONError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, body)
+	httpx.WriteJSON(w, http.StatusOK, body)
+}
+
+// RecordMessageFeedback registra reação explícita (like/dislike) do usuário para aprendizado contínuo.
+func (h *ChatHandler) RecordMessageFeedback(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok || userID == "" {
+		httpx.WriteJSONError(w, http.StatusUnauthorized, "não autorizado")
+		return
+	}
+	var req struct {
+		MessageID string `json:"message_id"`
+		SessionID string `json:"session_id,omitempty"`
+		Rating    string `json:"rating"`
+		Content   string `json:"content,omitempty"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpx.WriteJSONError(w, http.StatusBadRequest, "payload inválido")
+		return
+	}
+	rating := strings.ToLower(strings.TrimSpace(req.Rating))
+	if rating != "like" && rating != "dislike" {
+		httpx.WriteJSONError(w, http.StatusBadRequest, "rating inválido (use 'like' ou 'dislike')")
+		return
+	}
+	snippet := strings.TrimSpace(req.Content)
+	if len(snippet) > 140 {
+		snippet = strings.TrimSpace(snippet[:140])
+	}
+	if snippet != "" {
+		label := "aprovou"
+		if rating == "dislike" {
+			label = "não gostou de"
+		}
+		service.EmitImplicitFeedback(userID, "Usuário "+label+" resposta no estilo: \""+snippet+"\"")
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]string{
+		"status": "recorded",
+		"rating": rating,
+	})
 }

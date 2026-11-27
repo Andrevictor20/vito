@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"time"
 
 	"github.com/andrevmp/vito/backend/internal/domain"
@@ -22,10 +23,13 @@ func NewChatRepository(db *sql.DB) *ChatRepositorySQLite {
 // ListSessions lista todas as sessões de chat do usuário ordenadas por updated_at DESC.
 func (r *ChatRepositorySQLite) ListSessions(ctx context.Context, userID string) ([]domain.ChatSession, error) {
 	query := `
-		SELECT id, user_id, title, preview, created_at, updated_at
-		FROM chat_sessions
-		WHERE user_id = ?
-		ORDER BY updated_at DESC
+		SELECT cs.id, cs.user_id, cs.title, cs.preview,
+		       COALESCE(ct.model_pref, ''), COALESCE(ct.effort_pref, ''),
+		       cs.created_at, cs.updated_at
+		FROM chat_sessions cs
+		LEFT JOIN conversation_threads ct ON ct.id = cs.id AND ct.user_id = cs.user_id
+		WHERE cs.user_id = ?
+		ORDER BY cs.updated_at DESC
 	`
 	rows, err := r.db.QueryContext(ctx, query, userID)
 	if err != nil {
@@ -36,7 +40,7 @@ func (r *ChatRepositorySQLite) ListSessions(ctx context.Context, userID string) 
 	sessions := make([]domain.ChatSession, 0)
 	for rows.Next() {
 		var s domain.ChatSession
-		if err := rows.Scan(&s.ID, &s.UserID, &s.Title, &s.Preview, &s.CreatedAt, &s.UpdatedAt); err != nil {
+		if err := rows.Scan(&s.ID, &s.UserID, &s.Title, &s.Preview, &s.ModelPref, &s.EffortPref, &s.CreatedAt, &s.UpdatedAt); err != nil {
 			return nil, err
 		}
 		sessions = append(sessions, s)
@@ -47,13 +51,16 @@ func (r *ChatRepositorySQLite) ListSessions(ctx context.Context, userID string) 
 // GetSession busca os metadados de uma sessão específica.
 func (r *ChatRepositorySQLite) GetSession(ctx context.Context, id, userID string) (*domain.ChatSession, error) {
 	query := `
-		SELECT id, user_id, title, preview, created_at, updated_at
-		FROM chat_sessions
-		WHERE id = ? AND user_id = ?
+		SELECT cs.id, cs.user_id, cs.title, cs.preview,
+		       COALESCE(ct.model_pref, ''), COALESCE(ct.effort_pref, ''),
+		       cs.created_at, cs.updated_at
+		FROM chat_sessions cs
+		LEFT JOIN conversation_threads ct ON ct.id = cs.id AND ct.user_id = cs.user_id
+		WHERE cs.id = ? AND cs.user_id = ?
 	`
 	var s domain.ChatSession
 	err := r.db.QueryRowContext(ctx, query, id, userID).Scan(
-		&s.ID, &s.UserID, &s.Title, &s.Preview, &s.CreatedAt, &s.UpdatedAt,
+		&s.ID, &s.UserID, &s.Title, &s.Preview, &s.ModelPref, &s.EffortPref, &s.CreatedAt, &s.UpdatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -121,7 +128,7 @@ func (r *ChatRepositorySQLite) SaveSession(ctx context.Context, session *domain.
 			preview = excluded.preview,
 			updated_at = excluded.updated_at
 	`
-	return ExecuteQueuedWrite(ctx, func() error {
+	return database.ExecuteQueuedWrite(ctx, func() error {
 		_, err := r.db.ExecContext(ctx, query,
 			session.ID, session.UserID, session.Title, session.Preview, session.CreatedAt, session.UpdatedAt,
 		)
@@ -135,7 +142,7 @@ func (r *ChatRepositorySQLite) SaveMessages(ctx context.Context, messages []doma
 		return nil
 	}
 
-	return ExecuteQueuedWrite(ctx, func() error {
+	return database.ExecuteQueuedWrite(ctx, func() error {
 		tx, err := r.db.BeginTx(ctx, nil)
 		if err != nil {
 			return err
@@ -178,7 +185,7 @@ func (r *ChatRepositorySQLite) SaveMessages(ctx context.Context, messages []doma
 // DeleteSession remove a sessão e cascateia a remoção das mensagens.
 func (r *ChatRepositorySQLite) DeleteSession(ctx context.Context, id, userID string) error {
 	query := `DELETE FROM chat_sessions WHERE id = ? AND user_id = ?`
-	return ExecuteQueuedWrite(ctx, func() error {
+	return database.ExecuteQueuedWrite(ctx, func() error {
 		_, err := r.db.ExecContext(ctx, query, id, userID)
 		return err
 	})

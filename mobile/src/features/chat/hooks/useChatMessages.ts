@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { ChatMessage, ConversationSession } from '../../../types';
 import { api } from '../../../services/api';
 import { isAbortError, truncateMessagesForEdit } from '../utils/chatActions';
-import { humanizePreview, semanticTitle } from '../utils/chatPreview';
+import { humanizePreview } from '../utils/chatPreview';
 import { toChatMeeting, toChatBooking, sanitizeErrorMessage } from '../utils/chatCards';
 import type { ChatStorageKeys } from '../services/chatStorageService';
 import { getChatStorageKeys } from '../services/chatStorageService';
@@ -13,6 +13,12 @@ import {
   handleAssistantSideEffects,
 } from './chatMessageEffects';
 import { formatHistoryForStream, runAssistantStreamTurn } from './chatStreamRunner';
+import {
+  buildUpdatedSessionList,
+  createChatMessage,
+  createStoppedChatMessage,
+  resolveMediaErrorText,
+} from './chatMessageHelpers';
 
 export {
   toChatMeeting,
@@ -47,16 +53,14 @@ export interface UseChatMessagesResult {
   clearHistory: () => Promise<void>;
 }
 
-
 /**
  * A3: dono de messages/loading/abort/send/stop/retry. Recebe o
- * activeSessionId + setter de sessions para persistir preview/título
- * via saveMessages.
+ * activeSessionId + setter de sessions para persistir preview/título via saveMessages.
  */
 export function useChatMessages(
   activeSessionId: string,
   setSessions: React.Dispatch<React.SetStateAction<ConversationSession[]>>,
-  options?: UseChatMessagesOptions
+  options?: UseChatMessagesOptions,
 ): UseChatMessagesResult {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
@@ -67,13 +71,10 @@ export function useChatMessages(
   const onDataChanged = options?.onDataChanged;
   const keys = options?.keys ?? getChatStorageKeys();
 
-  // Ref interno espelha o activeSessionId (prop) para leitura síncrona em saveMessages;
-  // se a fachada passar o ref das sessões, usa-o como fonte única.
   const internalRef = useRef<string>(activeSessionId);
   useEffect(() => {
     internalRef.current = activeSessionId;
     if (options?.activeSessionIdRef) {
-      // Mantém o ref externo como fonte de verdade quando presente.
       internalRef.current = options.activeSessionIdRef.current || activeSessionId;
     }
   }, [activeSessionId, options?.activeSessionIdRef]);
@@ -94,311 +95,203 @@ export function useChatMessages(
       const currentId = activeRef.current || activeSessionId;
 
       setSessions((prevSessions) => {
-        const firstUser = newMessages.find((m) => m.sender === 'user');
-        const latestMsg = newMessages[newMessages.length - 1];
-        const previewText = humanizePreview(latestMsg?.text);
-        const freshTitle = semanticTitle(firstUser?.text);
-
-        let targetFound = false;
-        const updated = prevSessions.map((s) => {
-          if (s.id === currentId) {
-            targetFound = true;
-            let title = s.title;
-            if ((title === 'Conversa Atual' || title === 'Nova Conversa') && firstUser) {
-              title = freshTitle;
-            }
-            return {
-              ...s,
-              title,
-              preview: previewText,
-              timestamp: new Date().toISOString(),
-              messages: newMessages.slice(-100),
-            };
-          }
-          return s;
-        });
-
-        const finalList = targetFound
-          ? updated
-          : [
-              {
-                id: currentId || `conv-${Date.now()}`,
-                title: firstUser ? freshTitle : 'Conversa Atual',
-                preview: previewText,
-                timestamp: new Date().toISOString(),
-                messages: newMessages.slice(-100),
-              },
-              ...updated,
-            ];
-
+        const finalList = buildUpdatedSessionList(prevSessions, currentId, newMessages);
+        const sliced = newMessages.slice(-100);
         AsyncStorage.setItem(keys.sessionsKey, JSON.stringify(finalList)).catch(() => {});
-        AsyncStorage.setItem(keys.chatKey, JSON.stringify(newMessages.slice(-100))).catch(() => {});
+        AsyncStorage.setItem(keys.chatKey, JSON.stringify(sliced)).catch(() => {});
 
         const activeTarget = finalList.find((s) => s.id === currentId);
         if (activeTarget) {
-          api.syncChatSession(activeTarget, newMessages.slice(-100)).catch(() => {});
+          api.syncChatSession(activeTarget, sliced).catch(() => {});
         }
         return finalList;
       });
     },
-    [activeSessionId, keys.sessionsKey, keys.chatKey, setSessions]
+    [activeSessionId, keys.sessionsKey, keys.chatKey, setSessions],
+  );
+
+  const runManagedTurn = useCallback(
+    async (
+      baseMessages: ChatMessage[],
+      runStream: (signal: AbortSignal) => ReturnType<typeof runAssistantStreamTurn>,
+      warnLabel: string,
+    ) => {
+      setMessages(baseMessages);
+      saveMessages(baseMessages);
+      setLoading(true);
+
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+      isUserStoppedRef.current = false;
+      setStreamingSteps([]);
+
+      try {
+        const { res, vitoMsg } = await runStream(controller.signal);
+        const withVito = [...baseMessages, vitoMsg];
+        setMessages(withVito);
+        saveMessages(withVito);
+        handleAssistantSideEffects(res, onDataChanged);
+      } catch (err: unknown) {
+        if (isUserStoppedRef.current && isAbortError(err)) {
+          const withStopped = [...baseMessages, createStoppedChatMessage()];
+          setMessages(withStopped);
+          saveMessages(withStopped);
+          return;
+        }
+        console.warn(warnLabel, err);
+        const errorMsg = createChatMessage('err', 'vito', sanitizeErrorMessage(err));
+        const withError = [...baseMessages, errorMsg];
+        setMessages(withError);
+        saveMessages(withError);
+      } finally {
+        if (abortControllerRef.current === controller) {
+          abortControllerRef.current = null;
+        }
+        isUserStoppedRef.current = false;
+        setStreamingSteps([]);
+        setLoading(false);
+      }
+    },
+    [onDataChanged, saveMessages],
   );
 
   const sendMessage = useCallback(
     async (text: string, focusMode?: string) => {
       if (!text.trim() || loading) return;
-
-      const userMsg: ChatMessage = {
-        id: `user-${Date.now()}`,
-        sender: 'user',
-        text: text.trim(),
-        timestamp: new Date().toISOString(),
-      };
-
-      const withUser = [...messages, userMsg];
-      setMessages(withUser);
-      saveMessages(withUser);
-      setLoading(true);
-
-      const controller = new AbortController();
-      abortControllerRef.current = controller;
-      isUserStoppedRef.current = false;
-      setStreamingSteps([]);
-
-      try {
-        const { res, vitoMsg } = await runAssistantStreamTurn({
-          prompt: text.trim(),
-          baseMessages: withUser,
-          historySource: messages,
-          threadId: activeRef.current || activeSessionId,
-          focusMode,
-          signal: controller.signal,
-          setMessages,
-          setStreamingSteps,
-        });
-
-        const withVito = [...withUser, vitoMsg];
-        setMessages(withVito);
-        saveMessages(withVito);
-
-        handleAssistantSideEffects(res, onDataChanged);
-      } catch (err: unknown) {
-        if (isUserStoppedRef.current && isAbortError(err)) {
-          // Geração intencionalmente cancelada pelo usuário
-          const stoppedMsg: ChatMessage = {
-            id: `stop-${Date.now()}`,
-            sender: 'vito',
-            text: '⏹️ *(Geração interrompida)*',
-            timestamp: new Date().toISOString(),
-          };
-          const withStopped = [...withUser, stoppedMsg];
-          setMessages(withStopped);
-          saveMessages(withStopped);
-          return;
-        }
-
-        console.warn('[useChat] falha no assistente:', err);
-        const errorMsg: ChatMessage = {
-          id: `err-${Date.now()}`,
-          sender: 'vito',
-          text: sanitizeErrorMessage(err),
-          timestamp: new Date().toISOString(),
-        };
-        const withError = [...withUser, errorMsg];
-        setMessages(withError);
-        saveMessages(withError);
-      } finally {
-        if (abortControllerRef.current === controller) {
-          abortControllerRef.current = null;
-        }
-        isUserStoppedRef.current = false;
-        setStreamingSteps([]);
-        setLoading(false);
-      }
+      const trimmed = text.trim();
+      const withUser = [...messages, createChatMessage('user', 'user', trimmed)];
+      await runManagedTurn(
+        withUser,
+        (signal) =>
+          runAssistantStreamTurn({
+            prompt: trimmed,
+            baseMessages: withUser,
+            historySource: messages,
+            threadId: activeRef.current || activeSessionId,
+            focusMode,
+            signal,
+            setMessages,
+            setStreamingSteps,
+          }),
+        '[useChat] falha no assistente:',
+      );
     },
-    [messages, loading, onDataChanged, saveMessages]
+    [messages, loading, activeSessionId, runManagedTurn],
   );
 
   const editAndResendMessage = useCallback(
     async (messageId: string, newText: string, focusMode?: string) => {
       if (!newText.trim() || loading) return;
-
       const targetIdx = messages.findIndex((m) => m.id === messageId);
       if (targetIdx === -1) return;
 
       const truncatedList = truncateMessagesForEdit(messages, messageId, newText);
-      setMessages(truncatedList);
-      saveMessages(truncatedList);
-      setLoading(true);
-
-      const controller = new AbortController();
-      abortControllerRef.current = controller;
-      isUserStoppedRef.current = false;
-      setStreamingSteps([]);
-
-      try {
-        const { res, vitoMsg } = await runAssistantStreamTurn({
-          prompt: newText.trim(),
-          baseMessages: truncatedList,
-          historySource: messages.slice(0, targetIdx),
-          threadId: activeRef.current || activeSessionId,
-          focusMode,
-          signal: controller.signal,
-          setMessages,
-          setStreamingSteps,
-        });
-
-        const withVito = [...truncatedList, vitoMsg];
-        setMessages(withVito);
-        saveMessages(withVito);
-
-        handleAssistantSideEffects(res, onDataChanged);
-      } catch (err: unknown) {
-        if (isUserStoppedRef.current && isAbortError(err)) {
-          const stoppedMsg: ChatMessage = {
-            id: `stop-${Date.now()}`,
-            sender: 'vito',
-            text: '⏹️ *(Geração interrompida)*',
-            timestamp: new Date().toISOString(),
-          };
-          const withStopped = [...truncatedList, stoppedMsg];
-          setMessages(withStopped);
-          saveMessages(withStopped);
-          return;
-        }
-
-        console.warn('[useChat] falha na re-geração após edição:', err);
-        const errorMsg: ChatMessage = {
-          id: `err-${Date.now()}`,
-          sender: 'vito',
-          text: sanitizeErrorMessage(err),
-          timestamp: new Date().toISOString(),
-        };
-        const withError = [...truncatedList, errorMsg];
-        setMessages(withError);
-        saveMessages(withError);
-      } finally {
-        if (abortControllerRef.current === controller) {
-          abortControllerRef.current = null;
-        }
-        isUserStoppedRef.current = false;
-        setStreamingSteps([]);
-        setLoading(false);
-      }
+      const historySlice = messages.slice(0, targetIdx);
+      await runManagedTurn(
+        truncatedList,
+        (signal) =>
+          runAssistantStreamTurn({
+            prompt: newText.trim(),
+            baseMessages: truncatedList,
+            historySource: historySlice,
+            threadId: activeRef.current || activeSessionId,
+            focusMode,
+            resetHistory: true,
+            signal,
+            setMessages,
+            setStreamingSteps,
+          }),
+        '[useChat] falha na re-geração após edição:',
+      );
     },
-    [messages, loading, onDataChanged, saveMessages]
+    [messages, loading, activeSessionId, runManagedTurn],
   );
 
   const sendAudio = useCallback(
     async (audioUri: string, focusMode?: string) => {
       if (loading) return;
-
-      // Mensagem placeholder do usuário indicando envio de voz
-      const userMsg: ChatMessage = {
-        id: `user-audio-${Date.now()}`,
-        sender: 'user',
-        text: 'Mensagem de voz enviada',
-        timestamp: new Date().toISOString(),
-      };
-
+      const userMsg = createChatMessage('user-audio', 'user', 'Mensagem de voz enviada');
       const withUser = [...messages, userMsg];
       setMessages(withUser);
       saveMessages(withUser);
       setLoading(true);
 
       try {
-        const recentHistory = formatHistoryForStream(messages);
         const res = await api.assistantAudio(audioUri, 'audio.m4a', {
           thread_id: activeRef.current || activeSessionId,
           channel: 'app_mobile',
-          history: recentHistory,
+          history: formatHistoryForStream(messages),
           focus_mode: focusMode,
           include_tts: false,
         });
-
-        // Substitui o placeholder com a transcrição real
-        const transcriptText = res.transcript
-          ? `"${res.transcript}"`
-          : 'Voz processada';
-
+        const transcriptText = res.transcript ? `"${res.transcript}"` : 'Voz processada';
         const updatedUserMsg: ChatMessage = { ...userMsg, text: transcriptText };
         const vitoMsg = buildAssistantMessage('vito-audio', res, 'Instrução de voz processada.');
-
         const withVito = [...messages, updatedUserMsg, vitoMsg];
         setMessages(withVito);
         saveMessages(withVito);
-
         handleAssistantSideEffects(res, onDataChanged);
       } catch (err: unknown) {
         console.warn('[useChat] falha no assistente:', err);
-        const errMsg = err instanceof Error ? err.message : '';
-        let fallbackText = 'Não consegui entender o áudio agora. Pode tentar de novo ou digitar o pedido?';
-        if (errMsg && (errMsg.includes('tempo limite') || errMsg.includes('60s') || errMsg.includes('Network request failed'))) {
-          fallbackText = 'O processamento do áudio demorou mais do que o esperado ou houve instabilidade de rede. Verifique sua conexão e tente novamente.';
-        }
-        const errorMsg: ChatMessage = {
-          id: `err-audio-${Date.now()}`,
-          sender: 'vito',
-          text: fallbackText,
-          timestamp: new Date().toISOString(),
-        };
-        const withError = [...withUser, errorMsg];
+        const fallbackText = resolveMediaErrorText(
+          err,
+          'Não consegui entender o áudio agora. Pode tentar de novo ou digitar o pedido?',
+          'O processamento do áudio demorou mais do que o esperado ou houve instabilidade de rede. Verifique sua conexão e tente novamente.',
+        );
+        const withError = [...withUser, createChatMessage('err-audio', 'vito', fallbackText)];
         setMessages(withError);
         saveMessages(withError);
       } finally {
         setLoading(false);
       }
     },
-    [messages, loading, onDataChanged, saveMessages]
+    [messages, loading, activeSessionId, onDataChanged, saveMessages],
   );
 
   const sendImage = useCallback(
     async (imageUri: string, prompt?: string, base64Override?: string, mimeType?: string) => {
       if (loading) return;
-
-      const userMsg: ChatMessage = {
-        id: `user-img-${Date.now()}`,
-        sender: 'user',
-        text: prompt?.trim() || 'Imagem enviada para análise',
-        imageUri,
-        timestamp: new Date().toISOString(),
-      };
-
+      const userMsg = createChatMessage(
+        'user-img',
+        'user',
+        prompt?.trim() || 'Imagem enviada para análise',
+        { imageUri },
+      );
       const withUser = [...messages, userMsg];
       setMessages(withUser);
       saveMessages(withUser);
       setLoading(true);
 
       try {
-        const res = await api.assistantVision(imageUri, prompt, 'image.jpg', undefined, base64Override, mimeType);
+        const res = await api.assistantVision(
+          imageUri,
+          prompt,
+          'image.jpg',
+          undefined,
+          base64Override,
+          mimeType,
+          activeRef.current || activeSessionId,
+        );
         const vitoMsg = buildAssistantMessage('vito-img', res, 'Imagem analisada com sucesso.');
-
         const withVito = [...withUser, vitoMsg];
         setMessages(withVito);
         saveMessages(withVito);
-
         handleAssistantSideEffects(res, onDataChanged);
       } catch (err: unknown) {
         console.warn('[useChat] falha no assistente:', err);
-        const errMsg = err instanceof Error ? err.message : '';
-        let fallbackText = 'Não consegui analisar a imagem agora. Pode tentar de novo em instantes?';
-        if (errMsg && (errMsg.includes('tempo limite') || errMsg.includes('60s') || errMsg.includes('Network request failed'))) {
-          fallbackText = 'O envio da imagem demorou mais do que o esperado ou houve instabilidade de rede. Verifique sua conexão e tente novamente.';
-        }
-        const errorMsg: ChatMessage = {
-          id: `err-img-${Date.now()}`,
-          sender: 'vito',
-          text: fallbackText,
-          timestamp: new Date().toISOString(),
-        };
-        const withError = [...withUser, errorMsg];
+        const fallbackText = resolveMediaErrorText(
+          err,
+          'Não consegui analisar a imagem agora. Pode tentar de novo em instantes?',
+          'O envio da imagem demorou mais do que o esperado ou houve instabilidade de rede. Verifique sua conexão e tente novamente.',
+        );
+        const withError = [...withUser, createChatMessage('err-img', 'vito', fallbackText)];
         setMessages(withError);
         saveMessages(withError);
       } finally {
         setLoading(false);
       }
     },
-    [messages, loading, onDataChanged, saveMessages]
+    [messages, loading, onDataChanged, saveMessages],
   );
 
   const clearHistory = useCallback(async () => {
@@ -410,38 +303,28 @@ export function useChatMessages(
     (text: string) => {
       const trimmed = text.trim();
       if (!trimmed) return;
-      const userMsg: ChatMessage = {
-        id: `user-voice-${Date.now()}`,
-        sender: 'user',
-        text: trimmed,
-        timestamp: new Date().toISOString(),
-      };
+      const userMsg = createChatMessage('user-voice', 'user', trimmed);
       setMessages((prev) => {
         const nextList = [...prev, userMsg];
         saveMessages(nextList);
         return nextList;
       });
     },
-    [saveMessages]
+    [saveMessages],
   );
 
   const appendAssistantMessage = useCallback(
     (text: string) => {
       const trimmed = text.trim();
       if (!trimmed) return;
-      const vitoMsg: ChatMessage = {
-        id: `vito-init-${Date.now()}`,
-        sender: 'vito',
-        text: trimmed,
-        timestamp: new Date().toISOString(),
-      };
+      const vitoMsg = createChatMessage('vito-init', 'vito', trimmed);
       setMessages((prev) => {
         const nextList = [...prev, vitoMsg];
         saveMessages(nextList);
         return nextList;
       });
     },
-    [saveMessages]
+    [saveMessages],
   );
 
   const resolveConfirmation = useCallback(
@@ -454,13 +337,13 @@ export function useChatMessages(
       const vitoMsg = buildAssistantMessage(
         'vito-confirm',
         res,
-        reject ? 'Ação cancelada.' : 'Ação concluída com sucesso.'
+        reject ? 'Ação cancelada.' : 'Ação concluída com sucesso.',
       );
       setMessages((prev) => {
         const updated = prev.map((m) =>
           m.id === messageId
             ? { ...m, confirmationStatus: (reject ? 'cancelled' : 'confirmed') as 'cancelled' | 'confirmed' }
-            : m
+            : m,
         );
         const nextList = [...updated, vitoMsg];
         saveMessages(nextList);
@@ -468,7 +351,7 @@ export function useChatMessages(
       });
       handleAssistantSideEffects(res, onDataChanged);
     },
-    [activeSessionId, onDataChanged, saveMessages]
+    [activeSessionId, onDataChanged, saveMessages],
   );
 
   return {

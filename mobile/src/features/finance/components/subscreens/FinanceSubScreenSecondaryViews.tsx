@@ -16,7 +16,7 @@ import {
   getSubscriptionName,
   hasSubscriptionIncrease,
   maskBRL,
-} from '../shared/financeHelpers';
+} from '../../utils/financeHelpers';
 import {
   CategorySemanticBadge,
   FinanceBankBadge,

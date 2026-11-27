@@ -135,6 +135,14 @@ describe('Plano 07 — Unified Mascot Rig Mobile', () => {
     assert.equal(hookSrc.includes('isReduceMotionEnabled'), true);
     assert.equal(rigSrc.includes('size <= 34'), true);
 
+    const nativeGuardIdx = rigSrc.indexOf("Platform.OS !== 'web'");
+    const firstAnimatedPropsIdx = rigSrc.indexOf('const wholeProps = useAnimatedProps');
+    assert.ok(nativeGuardIdx > 0, 'Guarda nativo Platform.OS !== web deve existir');
+    assert.ok(
+      firstAnimatedPropsIdx > nativeGuardIdx,
+      'MascotVectorRig deve retornar o canvas Skia nativo antes de instanciar hooks useAnimatedProps exclusivos da Web'
+    );
+
     for (const src of [rigSrc, hookSrc, buildersSrc, vitoSrc, avatarSrc, studioSrc]) {
       assert.ok(src.split('\n').length < 500, 'Arquivo excedeu 500 linhas');
     }

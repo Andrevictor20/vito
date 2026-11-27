@@ -1,5 +1,4 @@
-import { getRawTokens, token } from '../../../ds/tokens'
-import { parseColor } from '../../../prototype/cssToRn'
+import { darkColors, lightColors } from '../../../theme/tokens'
 
 export interface LoginPalette {
   acc: string
@@ -33,33 +32,32 @@ export interface LoginPalette {
 }
 
 function buildPalette(isDark: boolean): LoginPalette {
-  const t = (k: string) => token(k, isDark)
-  const raw = getRawTokens(isDark)
+  const c = isDark ? darkColors : lightColors
   return {
-    acc: t('--acc'),
-    page: t('--page'),
-    bg: t('--bg'),
-    surf: t('--surf'),
-    btn: t('--btn'),
-    ink: t('--ink'),
-    muted: t('--muted'),
-    line: t('--line'),
-    hairline: isDark ? 'rgba(255, 255, 255, 0.07)' : 'rgba(10, 10, 10, 0.065)',
-    accent: t('--acc'),
-    blue: t('--blue'),
-    blueBg: t('--blue-bg'),
-    greenBg: t('--green-bg'),
-    orange: t('--orange'),
-    orangeBg: t('--orange-bg'),
-    red: t('--red'),
-    redBg: t('--red-bg'),
-    purple: t('--purple'),
-    purpleBg: t('--purple-bg'),
-    teal: t('--teal'),
-    tealBg: t('--teal-bg'),
-    fin: t('--fin'),
-    finBg: t('--fin-bg'),
-    finBarBg: parseColor('color-mix(in srgb,var(--blue) 25%,var(--bg))', raw),
+    acc: c.acc,
+    page: c.page,
+    bg: c.bg,
+    surf: c.surf,
+    btn: c.btn,
+    ink: c.ink,
+    muted: c.muted,
+    line: c.line,
+    hairline: c.hairline,
+    accent: c.acc,
+    blue: c.blue,
+    blueBg: c.blueBg,
+    greenBg: c.greenBg,
+    orange: c.orange,
+    orangeBg: c.orangeBg,
+    red: c.red,
+    redBg: c.redBg,
+    purple: c.purple,
+    purpleBg: c.purpleBg,
+    teal: c.teal,
+    tealBg: c.tealBg,
+    fin: c.fin,
+    finBg: c.finBg,
+    finBarBg: isDark ? '#162c47' : '#c2deff',
     cardRing: isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.035)',
     wa: '#25d366',
     photoPaper: isDark ? '#3a3428' : '#efe7d2',

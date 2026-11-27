@@ -10,8 +10,8 @@ import (
 
 	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/ai/adkengine"
-	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/andrevmp/vito/backend/internal/service"
 	"github.com/andrevmp/vito/backend/internal/service/toolsets"
@@ -90,20 +90,13 @@ func TestAC01_NoDeadlockWithActiveWriterQueue(t *testing.T) {
 	reg := toolsets.NewToolsetsRegistry()
 	reg.Register(tasks.NewTaskPendingToolset(&testAC01TodoSvc{svc: todoSvc}))
 
-	provider := &fakeAgentProvider{
-		name:          "Fake-Gemini",
-		model:         "gemini-2.5-flash",
-		tier:          3,
-		supportsTools: true,
-		responses: []*ai.AgentChatResponse{
+	provider := &fakeADKLLM{
+		model: "gemini-2.5-flash",
+		responses: []scriptedModelResponse{
 			{
-				Text:         "Tudo certo por aqui!",
-				ProviderName: "Fake-Gemini",
-				ModelName:    "gemini-2.5-flash",
+				Text: "Tudo certo por aqui!",
 			},
 			{
-				ProviderName: "Fake-Gemini",
-				ModelName:    "gemini-2.5-flash",
 				ToolCalls: []ai.ToolCall{
 					{
 						ID:        "tc-1",
@@ -113,16 +106,13 @@ func TestAC01_NoDeadlockWithActiveWriterQueue(t *testing.T) {
 				},
 			},
 			{
-				Text:         "Confirma a criação da tarefa?",
-				ProviderName: "Fake-Gemini",
-				ModelName:    "gemini-2.5-flash",
+				Text: "Confirma a criação da tarefa?",
 			},
 		},
 	}
-	router := ai.NewModelRouter(provider)
 
 	facade, err := adkengine.NewADKLoopFacade(adkengine.FacadeConfig{
-		Router:           router,
+		ServerPool:       testServerPool("Fake-Gemini", "gemini-2.5-flash", provider),
 		Registry:         reg,
 		ScopeGuard:       scopeGuard,
 		ConfirmationGate: confGate,

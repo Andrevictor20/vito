@@ -4,7 +4,7 @@ import { ProtoUiIcon } from '../../../../icons/ProtoUiIcons';
 import { useTheme } from '../../../../context/ThemeContext';
 import { hapticFeedback } from '../../../../theme/motion';
 import type { FinanceAlert } from '../../types/finance';
-import { getAlertMessage, getAlertPrompt } from '../shared/financeHelpers';
+import { getAlertMessage, getAlertPrompt } from '../../utils/financeHelpers';
 
 interface FinanceAttentionSectionProps {
   alerts: FinanceAlert[];

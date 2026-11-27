@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"github.com/andrevmp/vito/backend/internal/platform/httpx"
 	"net/http"
 	"time"
 
@@ -29,13 +30,13 @@ type updateBriefingRequest struct {
 func (h *BriefingHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		http.Error(w, `{"error":"não autorizado"}`, http.StatusUnauthorized)
+		httpx.WriteJSONError(w, http.StatusUnauthorized, "não autorizado")
 		return
 	}
 
 	settings, err := h.briefingRepo.GetSettings(userID)
 	if err != nil {
-		http.Error(w, `{"error":"falha ao carregar configurações de briefing"}`, http.StatusInternalServerError)
+		httpx.WriteJSONError(w, http.StatusInternalServerError, "falha ao carregar configurações de briefing")
 		return
 	}
 
@@ -47,26 +48,26 @@ func (h *BriefingHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
 func (h *BriefingHandler) UpdateSettings(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		http.Error(w, `{"error":"não autorizado"}`, http.StatusUnauthorized)
+		httpx.WriteJSONError(w, http.StatusUnauthorized, "não autorizado")
 		return
 	}
 
 	var req updateBriefingRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, `{"error":"payload inválido"}`, http.StatusBadRequest)
+		httpx.WriteJSONError(w, http.StatusBadRequest, "payload inválido")
 		return
 	}
 
 	if req.ScheduledTime != "" {
 		if _, err := time.Parse("15:04", req.ScheduledTime); err != nil {
-			http.Error(w, `{"error":"formato de horário inválido (esperado HH:MM)"}`, http.StatusBadRequest)
+			httpx.WriteJSONError(w, http.StatusBadRequest, "formato de horário inválido (esperado HH:MM)")
 			return
 		}
 	}
 
 	current, err := h.briefingRepo.GetSettings(userID)
 	if err != nil {
-		http.Error(w, `{"error":"falha ao recuperar configurações atuais"}`, http.StatusInternalServerError)
+		httpx.WriteJSONError(w, http.StatusInternalServerError, "falha ao recuperar configurações atuais")
 		return
 	}
 
@@ -81,7 +82,7 @@ func (h *BriefingHandler) UpdateSettings(w http.ResponseWriter, r *http.Request)
 	}
 
 	if err := h.briefingRepo.UpsertSettings(current); err != nil {
-		http.Error(w, `{"error":"falha ao salvar configurações"}`, http.StatusInternalServerError)
+		httpx.WriteJSONError(w, http.StatusInternalServerError, "falha ao salvar configurações")
 		return
 	}
 

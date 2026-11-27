@@ -4,7 +4,6 @@ import type {
   AIProviderKey,
   ConnectProviderPayload,
   ModelProviderGroup,
-  ProviderModelInfo,
   TestProviderResponse,
   UpdateModelPrefPayload,
   UserAIProvider,
@@ -45,18 +44,6 @@ export class AiProvidersApi {
     return this.client.request<{ status: string }>(`/api/v1/ai/providers/${providerKey}`, {
       method: 'DELETE',
     });
-  }
-
-  async listProviderModels(
-    providerKey: AIProviderKey,
-    refresh: boolean = false
-  ): Promise<ProviderModelInfo[]> {
-    const qs = refresh ? '?refresh=1' : '';
-    const res = await this.client.request<ProviderModelInfo[] | { models?: ProviderModelInfo[] }>(
-      `/api/v1/ai/providers/${providerKey}/models${qs}`
-    );
-    if (Array.isArray(res)) return res;
-    return Array.isArray(res?.models) ? res.models : [];
   }
 
   async listSelectableModels(): Promise<ModelProviderGroup[]> {

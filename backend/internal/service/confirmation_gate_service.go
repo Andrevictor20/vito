@@ -5,11 +5,10 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
+	"github.com/google/uuid"
 	"strings"
 	"time"
-
-	"github.com/andrevmp/vito/backend/internal/repository"
-	"github.com/google/uuid"
 )
 
 var (
@@ -182,18 +181,6 @@ func (s *ConfirmationGateService) CancelWithReason(ctx context.Context, id, user
 	return nil
 }
 
-// RecordEditFeedback registra aprendizado quando o usuário modifica uma proposta antes/em vez de aprová-la.
-func (s *ConfirmationGateService) RecordEditFeedback(ctx context.Context, id, userID, reason string) error {
-	if s.feedbackRecorder == nil || strings.TrimSpace(reason) == "" {
-		return nil
-	}
-	p, err := s.GetByID(ctx, id, userID)
-	if err != nil {
-		return err
-	}
-	return s.feedbackRecorder.RecordImplicitFeedback(ctx, p.UserID, p.ToolsetName, p.Operation+"_edited", strings.TrimSpace(reason))
-}
-
 // GetLatestPending busca a última confirmação pendente ativa do usuário/thread.
 func (s *ConfirmationGateService) GetLatestPending(ctx context.Context, userID, threadID string) (*PendingConfirmationRecord, error) {
 	if s.db == nil || strings.TrimSpace(userID) == "" {
@@ -248,7 +235,7 @@ func (s *ConfirmationGateService) SaveExecutionResult(ctx context.Context, id, r
 		return nil
 	}
 	query := `UPDATE pending_confirmations SET execution_result_json = ? WHERE id = ?`
-	return repository.ExecuteQueuedWrite(ctx, func() error {
+	return database.ExecuteQueuedWrite(ctx, func() error {
 		_, err := s.db.ExecContext(ctx, query, resultJSON, id)
 		return err
 	})

@@ -11,8 +11,8 @@ import (
 
 	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/ai/adkengine"
-	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/andrevmp/vito/backend/internal/service"
 	"github.com/andrevmp/vito/backend/internal/service/toolsets"
@@ -40,21 +40,14 @@ func TestAITrace_AgentNameRecordedAndPersisted(t *testing.T) {
 	registry.Register(calendar.NewCalendarToolset(nil))
 
 	argsBytes, _ := json.Marshal(map[string]any{"date": "2026-11-21"})
-	prov := &fakeAgentProvider{
-		name:          "Gemini-Trace",
-		model:         "gemini-2.5-flash",
-		tier:          3,
-		supportsTools: true,
-		responses: []*ai.AgentChatResponse{
+	prov := &fakeADKLLM{
+		model: "gemini-2.5-flash",
+		responses: []scriptedModelResponse{
 			{
-				ToolCalls:    []ai.ToolCall{{ID: "call-trace-1", Name: "calendar_list_events", Arguments: argsBytes}},
-				ProviderName: "Gemini-Trace",
-				ModelName:    "gemini-2.5-flash",
+				ToolCalls: []ai.ToolCall{{ID: "call-trace-1", Name: "calendar_list_events", Arguments: argsBytes}},
 			},
 			{
-				Text:         "Agenda verificada.",
-				ProviderName: "Gemini-Trace",
-				ModelName:    "gemini-2.5-flash",
+				Text: "Agenda verificada.",
 			},
 		},
 	}
@@ -63,7 +56,7 @@ func TestAITrace_AgentNameRecordedAndPersisted(t *testing.T) {
 	defer traceRecorder.Close()
 
 	facade, err := adkengine.NewADKLoopFacade(adkengine.FacadeConfig{
-		Router:           ai.NewModelRouter(prov),
+		ServerPool:       testServerPool("Gemini-Trace", "gemini-2.5-flash", prov),
 		Registry:         registry,
 		ScopeGuard:       service.NewScopeGuard(),
 		ConfirmationGate: service.NewConfirmationGateService(db),

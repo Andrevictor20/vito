@@ -16,7 +16,7 @@ import {
   getPaymentMethodKind,
   isCreditTransaction,
   maskBRL,
-} from '../shared/financeHelpers';
+} from '../../utils/financeHelpers';
 import {
   CategorySemanticBadge,
   FinanceBankBadge,

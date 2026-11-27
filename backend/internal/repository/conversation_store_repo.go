@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"time"
 
 	"github.com/google/uuid"
@@ -92,7 +93,7 @@ func (r *ConversationStoreRepository) CreateThread(ctx context.Context, t *Conve
 			last_activity_at, last_consolidated_at, created_at, updated_at
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
-	return ExecuteQueuedWrite(ctx, func() error {
+	return database.ExecuteQueuedWrite(ctx, func() error {
 		_, err := r.db.ExecContext(ctx, query,
 			t.ID, t.UserID, t.Channel, t.ExternalChatID, t.Title, t.RollingSummary,
 			t.SummaryUpToTurnID, t.StickyModelName, t.StickyModelUntil,
@@ -117,11 +118,6 @@ func (r *ConversationStoreRepository) GetThreadByID(ctx context.Context, id stri
 	return scanThread(row)
 }
 
-// GetThread é alias de compatibilidade.
-func (r *ConversationStoreRepository) GetThread(ctx context.Context, id string) (*ConversationThread, error) {
-	return r.GetThreadByID(ctx, id)
-}
-
 // UpdateThreadSummary atualiza o resumo rolante da conversa.
 func (r *ConversationStoreRepository) UpdateThreadSummary(ctx context.Context, threadID string, summary string, upToTurnID string) error {
 	query := `
@@ -129,7 +125,7 @@ func (r *ConversationStoreRepository) UpdateThreadSummary(ctx context.Context, t
 		SET rolling_summary = ?, summary_up_to_turn_id = ?, updated_at = ?
 		WHERE id = ?
 	`
-	return ExecuteQueuedWrite(ctx, func() error {
+	return database.ExecuteQueuedWrite(ctx, func() error {
 		_, err := r.db.ExecContext(ctx, query, summary, upToTurnID, time.Now().UTC(), threadID)
 		return err
 	})
@@ -142,21 +138,28 @@ func (r *ConversationStoreRepository) UpdateThreadSticky(ctx context.Context, th
 		SET sticky_model_name = ?, sticky_model_until = ?, updated_at = ?
 		WHERE id = ?
 	`
-	return ExecuteQueuedWrite(ctx, func() error {
+	return database.ExecuteQueuedWrite(ctx, func() error {
 		_, err := r.db.ExecContext(ctx, query, modelName, until, time.Now().UTC(), threadID)
 		return err
 	})
 }
 
-// UpdateThreadModelPref atualiza a preferência de modelo e esforço da conversa.
+// UpdateThreadModelPref atualiza a preferência de modelo e esforço da conversa (criando a thread caso ainda não exista).
 func (r *ConversationStoreRepository) UpdateThreadModelPref(ctx context.Context, userID, threadID, modelPref, effortPref string) error {
+	now := time.Now().UTC()
 	const query = `
-		UPDATE conversation_threads
-		SET model_pref = ?, effort_pref = ?, updated_at = ?
-		WHERE id = ? AND user_id = ?
+		INSERT INTO conversation_threads (
+			id, user_id, channel, model_pref, effort_pref,
+			last_activity_at, created_at, updated_at
+		) VALUES (?, ?, 'app_mobile', ?, ?, ?, ?, ?)
+		ON CONFLICT(id) DO UPDATE SET
+			model_pref = excluded.model_pref,
+			effort_pref = excluded.effort_pref,
+			updated_at = excluded.updated_at
+		WHERE conversation_threads.user_id = excluded.user_id
 	`
-	n, err := ExecuteQueuedWriteRows(ctx, func() (sql.Result, error) {
-		return r.db.ExecContext(ctx, query, modelPref, effortPref, time.Now().UTC(), threadID, userID)
+	n, err := database.ExecuteQueuedWriteRows(ctx, func() (sql.Result, error) {
+		return r.db.ExecContext(ctx, query, threadID, userID, modelPref, effortPref, now, now, now)
 	})
 	if err != nil {
 		return err
@@ -174,7 +177,7 @@ func (r *ConversationStoreRepository) ClearProviderPrefs(ctx context.Context, us
 		SET model_pref = '', updated_at = ?
 		WHERE user_id = ? AND model_pref LIKE ?
 	`
-	return ExecuteQueuedWrite(ctx, func() error {
+	return database.ExecuteQueuedWrite(ctx, func() error {
 		_, err := r.db.ExecContext(ctx, query, time.Now().UTC(), userID, providerKey+":%")
 		return err
 	})
@@ -236,7 +239,7 @@ func (r *ConversationStoreRepository) CreateTurn(ctx context.Context, t *Convers
 		t.Origin = "direct"
 	}
 
-	return ExecuteQueuedWrite(ctx, func() error {
+	return database.ExecuteQueuedWrite(ctx, func() error {
 		tx, err := r.db.BeginTx(ctx, nil)
 		if err != nil {
 			return err
@@ -322,7 +325,7 @@ func (r *ConversationStoreRepository) ListTurnsByThread(ctx context.Context, thr
 // DeleteThread remove uma thread e aciona CASCADE para os turnos.
 func (r *ConversationStoreRepository) DeleteThread(ctx context.Context, threadID string) error {
 	query := `DELETE FROM conversation_threads WHERE id = ?`
-	return ExecuteQueuedWrite(ctx, func() error {
+	return database.ExecuteQueuedWrite(ctx, func() error {
 		_, err := r.db.ExecContext(ctx, query, threadID)
 		return err
 	})
@@ -332,7 +335,7 @@ func (r *ConversationStoreRepository) DeleteThread(ctx context.Context, threadID
 func (r *ConversationStoreRepository) TouchThread(ctx context.Context, threadID string) error {
 	query := `UPDATE conversation_threads SET last_activity_at = ?, updated_at = ? WHERE id = ?`
 	now := time.Now().UTC()
-	return ExecuteQueuedWrite(ctx, func() error {
+	return database.ExecuteQueuedWrite(ctx, func() error {
 		_, err := r.db.ExecContext(ctx, query, now, now, threadID)
 		return err
 	})

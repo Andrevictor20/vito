@@ -3,6 +3,8 @@ package tasks
 import (
 	"context"
 	"fmt"
+	"github.com/andrevmp/vito/backend/internal/platform/timeutil"
+	"github.com/andrevmp/vito/backend/internal/platform/worker"
 	"github.com/andrevmp/vito/backend/internal/service"
 	"log"
 	"strings"
@@ -20,9 +22,7 @@ type PendingNudgeWorker struct {
 	attentionBudget *service.AttentionBudgetService
 	checkInterval   time.Duration
 	targetTime      string // ex: "17:30"
-	stopCh          chan struct{}
-	wg              sync.WaitGroup
-	running         bool
+	loop            *worker.PeriodicLoop
 	mu              sync.Mutex
 	location        *time.Location
 }
@@ -52,10 +52,7 @@ func NewPendingNudgeWorker(
 		interval = checkInterval[0]
 	}
 
-	loc, err := time.LoadLocation("America/Sao_Paulo")
-	if err != nil {
-		loc = time.UTC
-	}
+	loc := timeutil.SaoPauloLocation()
 
 	return &PendingNudgeWorker{
 		pendingRepo:   pendingRepo,
@@ -63,7 +60,7 @@ func NewPendingNudgeWorker(
 		notifSvc:      notifSvc,
 		checkInterval: interval,
 		targetTime:    "17:30",
-		stopCh:        make(chan struct{}),
+		loop:          worker.NewPeriodicLoop(interval, false),
 		location:      loc,
 	}
 }
@@ -192,48 +189,22 @@ func (w *PendingNudgeWorker) ProcessNudges(now time.Time) (int, error) {
 
 // Start inicia o worker em background.
 func (w *PendingNudgeWorker) Start() {
-	w.mu.Lock()
-	if w.running {
-		w.mu.Unlock()
+	if !w.loop.Start(func() {
+		if _, err := w.ProcessNudges(time.Now()); err != nil {
+			log.Printf("[PendingNudgeWorker] Erro ao processar nudges: %v", err)
+		}
+	}) {
 		return
 	}
-	w.running = true
-	w.stopCh = make(chan struct{})
-	w.mu.Unlock()
-
-	w.wg.Add(1)
-	go func() {
-		defer w.wg.Done()
-		ticker := time.NewTicker(w.checkInterval)
-		defer ticker.Stop()
-
-		log.Printf("[PendingNudgeWorker] Iniciado com verificação a cada %v (Horário alvo: %s).", w.checkInterval, w.targetTime)
-
-		for {
-			select {
-			case <-w.stopCh:
-				log.Println("[PendingNudgeWorker] Encerrando worker...")
-				return
-			case tickTime := <-ticker.C:
-				if _, err := w.ProcessNudges(tickTime); err != nil {
-					log.Printf("[PendingNudgeWorker] Erro ao processar nudges: %v", err)
-				}
-			}
-		}
-	}()
+	log.Printf("[PendingNudgeWorker] Iniciado com verificação a cada %v (Horário alvo: %s).", w.checkInterval, w.targetTime)
 }
 
 // Stop encerra o worker com segurança.
 func (w *PendingNudgeWorker) Stop() {
-	w.mu.Lock()
-	if !w.running {
-		w.mu.Unlock()
+	if !w.loop.IsRunning() {
 		return
 	}
-	w.running = false
-	close(w.stopCh)
-	w.mu.Unlock()
-
-	w.wg.Wait()
+	log.Println("[PendingNudgeWorker] Encerrando worker...")
+	w.loop.Stop()
 	log.Println("[PendingNudgeWorker] Parado com sucesso.")
 }

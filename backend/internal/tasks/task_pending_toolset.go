@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/andrevmp/vito/backend/internal/calendar"
+	"github.com/andrevmp/vito/backend/internal/platform/timeutil"
 	"strings"
 	"time"
 
@@ -27,36 +27,55 @@ func NewTaskPendingToolset(svc TodoServiceContract) *TaskPendingToolset {
 	return &TaskPendingToolset{todoService: svc}
 }
 
+// NewTaskPendingToolsetFromService constrói o TaskPendingToolset diretamente a partir de *TodoService.
+func NewTaskPendingToolsetFromService(svc *TodoService) *TaskPendingToolset {
+	if svc == nil {
+		return NewTaskPendingToolset(nil)
+	}
+	return NewTaskPendingToolset(&todoServiceAdapter{svc: svc})
+}
+
+type todoServiceAdapter struct {
+	svc *TodoService
+}
+
+func (a *todoServiceAdapter) GetTodos(_ context.Context, userID string) ([]*domain.Todo, error) {
+	todos, err := a.svc.ListTodos(userID, "")
+	if err != nil {
+		return nil, err
+	}
+	res := make([]*domain.Todo, 0, len(todos))
+	for i := range todos {
+		res = append(res, &todos[i])
+	}
+	return res, nil
+}
+
+func (a *todoServiceAdapter) CreateTodo(_ context.Context, todo *domain.Todo) error {
+	created, err := a.svc.CreateTodo(todo.UserID, todo.Title, string(todo.Priority), todo.DueDate)
+	if err != nil {
+		return err
+	}
+	if created != nil {
+		*todo = *created
+	}
+	return nil
+}
+
+func (a *todoServiceAdapter) CompleteTodo(_ context.Context, id, userID string) error {
+	return a.svc.CompleteTodo(id, userID)
+}
+
+func (a *todoServiceAdapter) DeleteTodo(_ context.Context, id, userID string) error {
+	return a.svc.DeleteTodo(id, userID)
+}
+
 func (t *TaskPendingToolset) Name() domain.ToolsetName {
 	return domain.ToolsetTaskPending
 }
 
 func (t *TaskPendingToolset) Description() string {
 	return "Gerencia tarefas e pendências do usuário (listar, criar, concluir e excluir)."
-}
-
-func (t *TaskPendingToolset) JSONSchema() json.RawMessage {
-	return json.RawMessage(`{
-		"type": "object",
-		"properties": {
-			"operation": {
-				"type": "string",
-				"enum": ["list_todos", "create_todo", "complete_todo", "delete_todo"],
-				"description": "Operação de tarefa a executar."
-			},
-			"params": {
-				"type": "object",
-				"properties": {
-					"title": {"type": "string", "description": "Título da tarefa."},
-					"description": {"type": "string", "description": "Descrição da tarefa."},
-					"category": {"type": "string", "description": "Categoria (trabalho, pessoal, etc)."},
-					"due_date": {"type": "string", "description": "Data/hora limite opcional (RFC3339 ou YYYY-MM-DD HH:MM)."},
-					"todo_id": {"type": "string", "description": "ID da tarefa."}
-				}
-			}
-		},
-		"required": ["operation"]
-	}`)
 }
 
 func (t *TaskPendingToolset) IsWriteOperation(op string, rawParams json.RawMessage) (bool, bool, map[string]any) {
@@ -92,7 +111,7 @@ func (t *TaskPendingToolset) Execute(ctx context.Context, execCtx *domain.ToolEx
 			cat = "geral"
 		}
 		var dueDate *time.Time
-		if parsed := calendar.ParseFlexibleDateTime(params.DueDate); !parsed.IsZero() {
+		if parsed := timeutil.ParseFlexibleDateTime(params.DueDate); !parsed.IsZero() {
 			dueDate = &parsed
 		}
 		todo := &domain.Todo{

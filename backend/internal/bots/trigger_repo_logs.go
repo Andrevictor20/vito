@@ -3,7 +3,7 @@ package bots
 import (
 	"context"
 	"database/sql"
-	"github.com/andrevmp/vito/backend/internal/repository"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 
 	"github.com/andrevmp/vito/backend/internal/domain"
 )
@@ -13,7 +13,7 @@ func (r *TriggerRepositorySQLite) CreateLog(log *domain.TriggerLog) error {
 		INSERT INTO trigger_logs (id, trigger_id, triggered_at, message, payload, is_read)
 		VALUES (?, ?, ?, ?, ?, ?)
 	`
-	return repository.ExecuteQueuedWrite(context.Background(), func() error {
+	return database.ExecuteQueuedWrite(context.Background(), func() error {
 		_, err := r.db.Exec(query, log.ID, log.TriggerID, log.TriggeredAt, log.Message, log.Payload, log.IsRead)
 		return err
 	})
@@ -49,7 +49,7 @@ func (r *TriggerRepositorySQLite) DeleteLog(id, userID string) error {
 		DELETE FROM trigger_logs
 		WHERE id = ? AND trigger_id IN (SELECT id FROM triggers WHERE user_id = ?)
 	`
-	n, err := repository.ExecuteQueuedWriteRows(context.Background(), func() (sql.Result, error) {
+	n, err := database.ExecuteQueuedWriteRows(context.Background(), func() (sql.Result, error) {
 		return r.db.Exec(query, id, userID)
 	})
 	if err != nil {
@@ -66,7 +66,7 @@ func (r *TriggerRepositorySQLite) ClearLogs(triggerID, userID string) error {
 		DELETE FROM trigger_logs
 		WHERE trigger_id = ? AND trigger_id IN (SELECT id FROM triggers WHERE user_id = ?)
 	`
-	return repository.ExecuteQueuedWrite(context.Background(), func() error {
+	return database.ExecuteQueuedWrite(context.Background(), func() error {
 		_, err := r.db.Exec(query, triggerID, userID)
 		return err
 	})

@@ -15,7 +15,7 @@ import { useTheme } from '../../../context/ThemeContext';
 import { hapticFeedback } from '../../../theme/motion';
 import { api } from '../../../services/api';
 import { MemoriesApi, MemoriesResponse } from '../services/memoriesApi';
-import { BottomSheetModal } from '../../../components/ui/BottomSheetModal';
+import { VitoSheet } from '../../../components/ui/VitoSheet';
 
 type MemTab = 'themes' | 'episodes' | 'facts';
 
@@ -54,29 +54,48 @@ export const MemoryScreen: React.FC = () => {
   }, [fetchMemories]);
 
   const handleDeleteTheme = async (slug: string) => {
+    const prevThemes = data.themes;
     setData((prev) => ({ ...prev, themes: prev.themes.filter((t) => t.theme_slug !== slug) }));
-    await memoriesClient.deleteThematicSummary(slug).catch(() => {});
-    showToast('Memória removida');
+    try {
+      await memoriesClient.deleteThematicSummary(slug);
+      showToast('Memória removida');
+    } catch {
+      setData((prev) => ({ ...prev, themes: prevThemes }));
+      showToast('Falha ao remover memória');
+    }
   };
 
   const handleDeleteEpisode = async (id: string) => {
+    const prevEpisodes = data.episodes;
     setData((prev) => ({ ...prev, episodes: prev.episodes.filter((e) => e.id !== id) }));
-    await memoriesClient.deleteEpisode(id).catch(() => {});
-    showToast('Memória removida');
+    try {
+      await memoriesClient.deleteEpisode(id);
+      showToast('Memória removida');
+    } catch {
+      setData((prev) => ({ ...prev, episodes: prevEpisodes }));
+      showToast('Falha ao remover memória');
+    }
   };
 
   const handleDeleteFact = async (id: string) => {
+    const prevFacts = data.facts;
     setData((prev) => ({ ...prev, facts: prev.facts.filter((f) => f.id !== id) }));
-    await memoriesClient.deleteFact(id).catch(() => {});
-    showToast('Memória removida');
+    try {
+      await memoriesClient.deleteFact(id);
+      showToast('Memória removida');
+    } catch {
+      setData((prev) => ({ ...prev, facts: prevFacts }));
+      showToast('Falha ao remover fato');
+    }
   };
 
   const handleSaveFact = async () => {
     const content = factText.trim();
     if (!content) return;
     const category = factCat.trim() || 'Preferência';
-    const localFact = {
-      id: `f_${Date.now()}`,
+    const tempId = `f_${Date.now()}`;
+    const optimisticFact = {
+      id: tempId,
       user_id: 'me',
       category,
       content,
@@ -86,15 +105,26 @@ export const MemoryScreen: React.FC = () => {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
-    setData((prev) => ({ ...prev, facts: [localFact, ...prev.facts] }));
+    setData((prev) => ({ ...prev, facts: [optimisticFact, ...prev.facts] }));
     setTab('facts');
     setFactText('');
     setAddOpen(false);
-    await api.request('/api/v1/memories/facts', {
-      method: 'POST',
-      body: JSON.stringify({ category, content }),
-    }).catch(() => {});
-    showToast('Fato salvo na memória do Vito');
+    try {
+      const saved = await api.request<typeof optimisticFact>('/api/v1/memories/facts', {
+        method: 'POST',
+        body: JSON.stringify({ category, content }),
+      });
+      if (saved?.id) {
+        setData((prev) => ({
+          ...prev,
+          facts: prev.facts.map((f) => (f.id === tempId ? { ...optimisticFact, ...saved } : f)),
+        }));
+      }
+      showToast('Fato salvo na memória do Vito');
+    } catch {
+      setData((prev) => ({ ...prev, facts: prev.facts.filter((f) => f.id !== tempId) }));
+      showToast('Falha ao salvar fato');
+    }
   };
 
   return (
@@ -223,7 +253,7 @@ export const MemoryScreen: React.FC = () => {
         )}
       </ScrollView>
 
-      <BottomSheetModal
+      <VitoSheet
         visible={addOpen}
         onClose={() => setAddOpen(false)}
         title="Novo fato ou preferência"
@@ -253,7 +283,7 @@ export const MemoryScreen: React.FC = () => {
             <Text style={[styles.saveBtnText, { color: colors.bg }]}>Salvar na memória</Text>
           </TouchableOpacity>
         </View>
-      </BottomSheetModal>
+      </VitoSheet>
 
       {!!toast && (
         <View style={[styles.toast, { backgroundColor: colors.ink }]}>

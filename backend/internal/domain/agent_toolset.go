@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 )
 
-// ToolsetName enumera as 8 Macro-Ferramentas polimórficas (§5.6.1).
+// ToolsetName enumera as 9 Macro-Ferramentas polimórficas (§5.6.1 + Finance).
 type ToolsetName string
 
 const (
@@ -13,10 +13,12 @@ const (
 	ToolsetTaskPending    ToolsetName = "task_and_pending_manager"
 	ToolsetMeetingBooking ToolsetName = "meeting_and_booking_manager"
 	ToolsetWhatsApp       ToolsetName = "whatsapp_assistant"
-	ToolsetGmail          ToolsetName = "gmail_assistant"
-	ToolsetRadarTrigger   ToolsetName = "radar_and_trigger_manager"
-	ToolsetMemoryProfile  ToolsetName = "memory_and_profile"
+	ToolsetGmail         ToolsetName = "gmail_assistant"
+	// ToolsetBots preserva a string literal histórica no SQLite para compatibilidade com registries gravados.
+	ToolsetBots          ToolsetName = "radar_and_trigger_manager"
+	ToolsetMemoryProfile ToolsetName = "memory_and_profile"
 	ToolsetWebSearch      ToolsetName = "web_and_vertical_search"
+	ToolsetFinance        ToolsetName = "finance_manager"
 )
 
 // ToolExecutionContext carrega metadados de segurança e Taint Tracking do turno atual.
@@ -91,27 +93,15 @@ type ChatCard struct {
 	Dismiss     bool   `json:"dismiss,omitempty"`
 }
 
-// DomainToolset é a interface implementada por cada uma das 8 Macro-Ferramentas.
+// DomainToolset é a interface implementada por cada uma das 9 Macro-Ferramentas.
 type DomainToolset interface {
 	Name() ToolsetName
 	Description() string
-	JSONSchema() json.RawMessage
 	// IsWriteOperation informa se a operação altera estado externo ou exige Confirmation Gate.
 	IsWriteOperation(operation string, rawParams json.RawMessage) (isWrite bool, isDestructive bool, preview map[string]any)
 	// Execute roda a operação em Go e já constrói os ChatCards correspondentes.
 	Execute(ctx context.Context, execCtx *ToolExecutionContext, operation string, rawParams json.RawMessage) (*ToolExecutionResult, error)
 }
-
-// StreamEventType padroniza os eventos SSE enviados para Mobile e Desktop (§5.6.7).
-type StreamEventType string
-
-const (
-	SSEStatus    StreamEventType = "status"
-	SSEReasoning StreamEventType = "reasoning"
-	SSEToken     StreamEventType = "token"
-	SSECard      StreamEventType = "card"
-	SSEDone      StreamEventType = "done"
-)
 
 // ScopeGuard é a interface para verificação de segurança antes de execução de escrita.
 // Implementado pelo Agente 2 (a ser criado), integrado ao agent_loop.go e ao confirmation_state_machine.go.
@@ -147,6 +137,7 @@ type UnifiedAssistantRequest struct {
 	ImageB64             string                    `json:"image_b64,omitempty"`
 	ImageMime            string                    `json:"image_mime,omitempty"`
 	History              []ConversationHistoryItem `json:"history,omitempty"`
+	ResetHistory         bool                      `json:"reset_history,omitempty"`
 	IsNewSession         bool                      `json:"is_new_session,omitempty"`
 	WhatsAppPrivateScope bool                      `json:"whatsapp_private_scope,omitempty"`
 }

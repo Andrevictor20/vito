@@ -3,6 +3,8 @@ package tasks
 import (
 	"context"
 	"fmt"
+	"github.com/andrevmp/vito/backend/internal/platform/timeutil"
+	"github.com/andrevmp/vito/backend/internal/platform/worker"
 	"github.com/andrevmp/vito/backend/internal/service"
 	"log"
 	"sync"
@@ -18,9 +20,7 @@ type TodoReminderWorker struct {
 	attentionBudget *service.AttentionBudgetService
 	windowAhead     time.Duration
 	checkInterval   time.Duration
-	stopCh          chan struct{}
-	wg              sync.WaitGroup
-	running         bool
+	loop            *worker.PeriodicLoop
 	mu              sync.Mutex
 }
 
@@ -56,7 +56,7 @@ func NewTodoReminderWorker(
 		notifSvc:      notifSvc,
 		windowAhead:   windowAhead,
 		checkInterval: interval,
-		stopCh:        make(chan struct{}),
+		loop:          worker.NewPeriodicLoop(interval, true),
 	}
 }
 
@@ -88,7 +88,7 @@ func (w *TodoReminderWorker) CheckAndDispatchReminders(now time.Time) (int, erro
 
 			timeStr := ""
 			if todo.DueDate != nil {
-				timeStr = todo.DueDate.In(defaultReminderLocation()).Format("15:04")
+				timeStr = todo.DueDate.In(timeutil.SaoPauloLocation()).Format("15:04")
 			}
 			body := "Prazo se aproximando"
 			if timeStr != "" {
@@ -191,54 +191,23 @@ func (w *TodoReminderWorker) CheckAndDispatchReminders(now time.Time) (int, erro
 
 // Start inicia a rotina em background.
 func (w *TodoReminderWorker) Start() {
-	w.mu.Lock()
-	if w.running {
-		w.mu.Unlock()
+	if !w.loop.Start(func() {
+		if count, err := w.CheckAndDispatchReminders(time.Now()); err != nil {
+			log.Printf("[TodoReminderWorker] Erro ao processar lembretes: %v", err)
+		} else if count > 0 {
+			log.Printf("✓ [TodoReminderWorker] %d lembrete(s) de tarefa despachado(s).", count)
+		}
+	}) {
 		return
 	}
-	w.running = true
-	w.stopCh = make(chan struct{})
-	w.mu.Unlock()
-
-	w.wg.Add(1)
-	go func() {
-		defer w.wg.Done()
-		ticker := time.NewTicker(w.checkInterval)
-		defer ticker.Stop()
-
-		log.Printf("✓ [TodoReminderWorker] Monitoramento de tarefas iniciado (intervalo: %v, janela: %v).", w.checkInterval, w.windowAhead)
-
-		// Executa na inicialização
-		if _, err := w.CheckAndDispatchReminders(time.Now()); err != nil {
-			log.Printf("[TodoReminderWorker] Erro na verificação inicial: %v", err)
-		}
-
-		for {
-			select {
-			case <-w.stopCh:
-				log.Println("✓ [TodoReminderWorker] Encerrado.")
-				return
-			case t := <-ticker.C:
-				if count, err := w.CheckAndDispatchReminders(t); err != nil {
-					log.Printf("[TodoReminderWorker] Erro ao processar lembretes: %v", err)
-				} else if count > 0 {
-					log.Printf("✓ [TodoReminderWorker] %d lembrete(s) de tarefa despachado(s).", count)
-				}
-			}
-		}
-	}()
+	log.Printf("✓ [TodoReminderWorker] Monitoramento de tarefas iniciado (intervalo: %v, janela: %v).", w.checkInterval, w.windowAhead)
 }
 
 // Stop finaliza graciosamente a execução do worker.
 func (w *TodoReminderWorker) Stop() {
-	w.mu.Lock()
-	if !w.running {
-		w.mu.Unlock()
+	if !w.loop.IsRunning() {
 		return
 	}
-	w.running = false
-	close(w.stopCh)
-	w.mu.Unlock()
-
-	w.wg.Wait()
+	w.loop.Stop()
+	log.Println("✓ [TodoReminderWorker] Encerrado.")
 }

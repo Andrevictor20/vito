@@ -27,7 +27,7 @@ func (s *TodoService) linkTodoEventEntity(todo *domain.Todo) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	_ = s.entityLinkRepo.Upsert(ctx, &repository.EntityLink{
+	_ = s.entityLinkRepo.Upsert(ctx, &domain.EntityLink{
 		ID:            "todo-event-" + todo.ID,
 		UserID:        todo.UserID,
 		CanonicalName: name,
@@ -52,7 +52,7 @@ func (s *PendingService) linkPendingEntity(item *domain.PendingItem) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	_ = s.entityLinkRepo.Upsert(ctx, &repository.EntityLink{
+	_ = s.entityLinkRepo.Upsert(ctx, &domain.EntityLink{
 		ID:            "pending-" + item.ID,
 		UserID:        item.UserID,
 		CanonicalName: item.Title,

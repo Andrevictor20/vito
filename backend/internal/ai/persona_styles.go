@@ -2,6 +2,7 @@ package ai
 
 import (
 	"fmt"
+	"github.com/andrevmp/vito/backend/internal/platform/timeutil"
 	"strings"
 	"time"
 )
@@ -112,33 +113,9 @@ func BuildStaticPersonaSystemPrompt(style PersonaStyle, userName string, channel
 
 // BuildVolatileTurnContextHeader monta o cabeçalho volátil de data/hora atual para injeção fora do prefixo estático (COG-01).
 func BuildVolatileTurnContextHeader(now time.Time) string {
-	loc, err := time.LoadLocation("America/Sao_Paulo")
-	if err != nil {
-		loc = time.FixedZone("BRT", -3*3600)
-	}
+	loc := timeutil.SaoPauloLocation()
 	localNow := now.In(loc)
 	return fmt.Sprintf("### CONTEXTO TEMPORAL DO TURNO\n- Hoje é %s, %s (Horário de Brasília, UTC-3).",
-		formatPortugueseWeekday(localNow.Weekday()),
+		timeutil.WeekdayPTLower(localNow.Weekday()),
 		localNow.Format("02/01/2006 às 15:04"))
-}
-
-func formatPortugueseWeekday(w time.Weekday) string {
-	switch w {
-	case time.Sunday:
-		return "domingo"
-	case time.Monday:
-		return "segunda-feira"
-	case time.Tuesday:
-		return "terça-feira"
-	case time.Wednesday:
-		return "quarta-feira"
-	case time.Thursday:
-		return "quinta-feira"
-	case time.Friday:
-		return "sexta-feira"
-	case time.Saturday:
-		return "sábado"
-	default:
-		return ""
-	}
 }

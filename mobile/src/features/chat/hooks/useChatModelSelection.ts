@@ -90,28 +90,39 @@ export function useChatModelSelection(
 
   const selectThreadModel = useCallback(
     async (modelValue: string | null) => {
+      const prevModel = threadModel;
       setThreadModel(modelValue);
-      if (modelValue) {
-        const found = findModelInGroups(modelGroups, modelValue);
-        setToastMessage(`Próximas mensagens usam ${found?.model.name || modelValue}`);
-      } else {
-        setToastMessage('Voltou ao modelo padrão');
+      if (!activeSessionId) {
+        if (modelValue) {
+          const found = findModelInGroups(modelGroups, modelValue);
+          setToastMessage(`Próximas mensagens usam ${found?.model.name || modelValue}`);
+        } else {
+          setToastMessage('Voltou ao modelo padrão');
+        }
+        return;
       }
-      if (!activeSessionId) return;
       try {
         await api.aiProviders.updateThreadModel(activeSessionId, {
           model_pref: modelValue || '',
           effort_pref: modelValue ? threadEffort : '',
         });
+        if (modelValue) {
+          const found = findModelInGroups(modelGroups, modelValue);
+          setToastMessage(`Próximas mensagens usam ${found?.model.name || modelValue}`);
+        } else {
+          setToastMessage('Voltou ao modelo padrão');
+        }
       } catch {
-        // Silencioso caso thread ainda não tenha sido sincronizada
+        setThreadModel(prevModel);
+        setToastMessage('Não foi possível alterar o modelo da conversa');
       }
     },
-    [activeSessionId, modelGroups, threadEffort]
+    [activeSessionId, modelGroups, threadEffort, threadModel]
   );
 
   const selectThreadEffort = useCallback(
     async (effort: ReasoningEffort) => {
+      const prevEffort = threadEffort;
       setThreadEffort(effort);
       if (!activeSessionId) return;
       try {
@@ -120,10 +131,11 @@ export function useChatModelSelection(
           effort_pref: effort,
         });
       } catch {
-        // Silencioso
+        setThreadEffort(prevEffort);
+        setToastMessage('Não foi possível salvar o nível de raciocínio');
       }
     },
-    [activeSessionId, threadModel]
+    [activeSessionId, threadEffort, threadModel]
   );
 
   return {

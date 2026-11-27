@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, {
   Easing,
   Extrapolation,
@@ -9,7 +9,7 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
-import { getBezier } from '../../../ds/tokens';
+import { MOTION_CURVES } from '../../../theme/motion';
 import { ProtoUiIcon } from '../../../icons/ProtoUiIcons';
 import { useTheme } from '../../../context/ThemeContext';
 import { useReduceMotion } from '../../../theme/vitoMotion';
@@ -44,6 +44,7 @@ export interface BotDetailViewProps {
   onUpdateBot: (id: string, payload: UpdateBotPayload) => Promise<void>;
   onDeleteBot: (id: string) => Promise<void>;
   onRunNow: (id: string) => Promise<void>;
+  onRefreshBot?: (id: string) => Promise<Bot | null | void>;
   onResolvePending: (
     botId: string,
     pending: BotPendingApproval,
@@ -70,6 +71,7 @@ export const BotDetailView: React.FC<BotDetailViewProps> = ({
   onUpdateBot,
   onDeleteBot,
   onRunNow,
+  onRefreshBot,
   onResolvePending,
   onUpdateActionPolicy,
   onAddAction,
@@ -93,7 +95,7 @@ export const BotDetailView: React.FC<BotDetailViewProps> = ({
       subFade.value = 1;
       return;
     }
-    const [x1, y1, x2, y2] = getBezier('--ease-q');
+    const [x1, y1, x2, y2] = MOTION_CURVES.q;
     cancelAnimation(subFade);
     subFade.value = 0;
     subFade.value = withTiming(1, {
@@ -276,7 +278,10 @@ export const BotDetailView: React.FC<BotDetailViewProps> = ({
               model_pref: modelVal ?? '',
               effort_pref: (bot.effort_pref as ReasoningEffort) || 'auto',
             })
-            .catch(() => {});
+            .then(() => onRefreshBot?.(bot.id))
+            .catch(() => {
+              Alert.alert('Erro', 'Não foi possível salvar o modelo do bot.');
+            });
         }}
         onSelectEffort={(effort) => {
           api.aiProviders
@@ -284,7 +289,10 @@ export const BotDetailView: React.FC<BotDetailViewProps> = ({
               model_pref: bot.model_pref || '',
               effort_pref: effort,
             })
-            .catch(() => {});
+            .then(() => onRefreshBot?.(bot.id))
+            .catch(() => {
+              Alert.alert('Erro', 'Não foi possível salvar o nível de raciocínio.');
+            });
         }}
         onManageProviders={() => {
           setShowModelPicker(false);

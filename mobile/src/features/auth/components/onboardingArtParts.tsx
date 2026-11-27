@@ -24,15 +24,15 @@ import Reanimated, {
 } from 'react-native-reanimated'
 import { scheduleOnRN } from 'react-native-worklets'
 import type { LoginPalette } from '../utils/loginPalette'
-import { CheckIcon } from '../demo/DemoIcons'
-import { getBezier } from '../../../ds/tokens'
+import { CheckIcon } from '../../../icons/AppGlyphs'
+import { MOTION_CURVES } from '../../../theme/motion'
 import {
   ONBOARDING_FADE_DELAY_MS,
   ONBOARDING_FADE_MS,
   ONBOARDING_IN_MS,
 } from '../utils/onboardingMotion'
 
-export const EASE_Q = Easing.bezier(...getBezier('--ease-q'))
+export const EASE_Q = Easing.bezier(...MOTION_CURVES.q)
 const EASE_IO = Easing.inOut(Easing.ease)
 
 /** obIn: translateX 26 + scale .96 + fade, visível só no slide ativo. */

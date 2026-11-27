@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"github.com/andrevmp/vito/backend/internal/platform/httpx"
 	"net/http"
 	"strings"
 
@@ -25,7 +26,7 @@ func AuthMiddleware(authSvc *service.AuthService) func(http.Handler) http.Handle
 			if authHeader != "" {
 				parts := strings.SplitN(authHeader, " ", 2)
 				if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
-					http.Error(w, `{"error":"formato de token inválido (esperado: Bearer <token>)"}`, http.StatusUnauthorized)
+					httpx.WriteJSONError(w, http.StatusUnauthorized, "formato de token inválido (esperado: Bearer <token>)")
 					return
 				}
 				tokenStr = parts[1]
@@ -34,32 +35,32 @@ func AuthMiddleware(authSvc *service.AuthService) func(http.Handler) http.Handle
 			}
 
 			if tokenStr == "" {
-				http.Error(w, `{"error":"cabeçalho de autorização ausente"}`, http.StatusUnauthorized)
+				httpx.WriteJSONError(w, http.StatusUnauthorized, "cabeçalho de autorização ausente")
 				return
 			}
 
 			claims, err := authSvc.ValidateToken(tokenStr)
 			if err != nil {
-				http.Error(w, `{"error":"token inválido ou expirado"}`, http.StatusUnauthorized)
+				httpx.WriteJSONError(w, http.StatusUnauthorized, "token inválido ou expirado")
 				return
 			}
 
 			// Valida se o usuário referenciado no token realmente existe no banco ativo
 			user, err := authSvc.GetUserByID(claims.UserID)
 			if err != nil || user == nil {
-				http.Error(w, `{"error":"sessão inválida ou usuário não encontrado no banco ativo"}`, http.StatusUnauthorized)
+				httpx.WriteJSONError(w, http.StatusUnauthorized, "sessão inválida ou usuário não encontrado no banco ativo")
 				return
 			}
 
 			// Valida revogação ativa de sessão via TokenVersion (se o token for anterior ao reset)
 			if user.TokenVersion > 0 && claims.TokenVersion > 0 && user.TokenVersion != claims.TokenVersion {
-				http.Error(w, `{"error":"sessão revogada ou expirada. faça login novamente"}`, http.StatusUnauthorized)
+				httpx.WriteJSONError(w, http.StatusUnauthorized, "sessão revogada ou expirada. faça login novamente")
 				return
 			}
 
 			// Valida revogação granular de dispositivo (Sprint 13)
 			if claims.SessionID != "" && authSvc.IsSessionRevoked(claims.UserID, claims.SessionID) {
-				http.Error(w, `{"error":"sessão deste dispositivo foi revogada. faça login novamente"}`, http.StatusUnauthorized)
+				httpx.WriteJSONError(w, http.StatusUnauthorized, "sessão deste dispositivo foi revogada. faça login novamente")
 				return
 			}
 

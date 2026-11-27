@@ -1,5 +1,5 @@
 import { api } from '../../../services/api';
-import type { InboxNotification } from './inboxNotificationsApi';
+import type { InboxNotification } from './notificationsApi';
 import { getTaskBucket } from '../../tasks/utils/taskBuckets';
 
 type UnreadListener = (count: number) => void;

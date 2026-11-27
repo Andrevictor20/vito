@@ -110,7 +110,7 @@ func (c *SearXNGClient) Search(ctx context.Context, query string, opts ...SearXN
 		return nil, fmt.Errorf("falha ao criar requisição SearXNG: %w", err)
 	}
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", "VitoRadarBot/2.0")
+	req.Header.Set("User-Agent", "VitoBot/2.0")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {

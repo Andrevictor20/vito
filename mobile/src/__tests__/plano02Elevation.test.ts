@@ -101,7 +101,7 @@ describe('Plano 02 — Elevação Premium (SSE, Zero-Jank, Barge-In Kotlin & Ala
       path.resolve(__dirname, '../../android/app/src/main/java/com/andrevmp/vito/voice/VitoDuplexAudioModule.kt'),
       'utf8'
     );
-    const playTtsBlock = ktSrc.split('fun playTtsAudio')[1]?.split('fun startFullDuplexAudio')[0] || '';
+    const playTtsBlock = ktSrc.split('fun playTtsAudio')[1]?.split('fun stopBotPlaybackImmediately')[0] || '';
     assert.equal(playTtsBlock.includes('stopRecordingInternal()'), false);
     assert.ok(ktSrc.includes('stopBotPlaybackImmediately'));
     assert.ok(ktSrc.includes('stopBotPlaybackInternal'));

@@ -8,7 +8,6 @@ import (
 
 	"github.com/google/uuid"
 	"google.golang.org/adk/v2/agent"
-	"google.golang.org/adk/v2/plugin"
 	"google.golang.org/adk/v2/runner"
 	"google.golang.org/adk/v2/session"
 	"google.golang.org/genai"
@@ -120,11 +119,9 @@ func (a *BotRuntimeAdapter) ExecuteBotTurn(ctx context.Context, req bots.BotRunt
 		return nil, fmt.Errorf("falha ao instanciar llmagent do bot: %w", err)
 	}
 
-	var plugins []*plugin.Plugin
-	if a.guardrail != nil {
-		if p, pErr := a.guardrail.BuildADKPlugin(); pErr == nil && p != nil {
-			plugins = append(plugins, p)
-		}
+	plugins, err := buildStandardADKPlugins(a.guardrail)
+	if err != nil {
+		return nil, fmt.Errorf("falha ao construir plugins do bot: %w", err)
 	}
 
 	r, err := runner.New(runner.Config{
@@ -170,7 +167,8 @@ func (a *BotRuntimeAdapter) ExecuteBotTurn(ctx context.Context, req bots.BotRunt
 		"bot_id":                     req.Bot.ID,
 		"bot_action_policies":        req.ActionPolicies,
 		"tainted_by_untrusted_input": false,
-		"static_system_prompt":       BuildBotInstruction(req.Bot.ID, BotAgentConfig{BotID: req.Bot.ID, Name: req.Bot.Title, Goal: req.Bot.Goal, FiringFrame: req.FiringFrame, Rules: req.Bot.Rules, SkillsMarkdown: req.SkillsMarkdown, BotMemories: memories, LastRuns: req.LastRuns, ConnectedActions: req.ConnectedActions, LockedActions: req.LockedActions}),
+		// Instruction do llmagent já contém BuildBotInstruction; limpar chave estática evita duplicação no BeforeModel.
+		"static_system_prompt": "",
 	}
 
 	userContent := genai.NewContentFromText(req.Prompt, genai.RoleUser)

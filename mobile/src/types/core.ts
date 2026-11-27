@@ -194,6 +194,7 @@ export interface AssistantChatResponse {
   whatsapp_message?: ChatWhatsAppMessage;
   gmail_message?: ChatGmailMessage;
   tts_audio_b64?: string;
+  fallback_notice?: string;
   tts_audio_mime?: string;
   cards?: ChatCardPayload[];
   actions?: ChatCardPayload[];
@@ -287,7 +288,7 @@ export interface ScheduleNotificationParams {
 }
 
 
-export type AutonomyMode = 'assisted' | 'proactive' | 'low' | 'autonomous';
+export type AutonomyMode = 'assisted' | 'proactive' | 'autonomous';
 
 export interface AISettings {
   user_id: string;

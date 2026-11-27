@@ -9,12 +9,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/andrevmp/vito/backend/internal/service"
 )
@@ -315,20 +316,7 @@ func (s *stubBriefingWorkflowRunner) GenerateBriefing(ctx context.Context, input
 	return s.reply, s.err
 }
 
-type stubBriefingTextGen struct {
-	mu    sync.Mutex
-	calls int
-	reply string
-}
-
-func (s *stubBriefingTextGen) GenerateText(ctx context.Context, systemPrompt, userPrompt string) (string, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.calls++
-	return s.reply, nil
-}
-
-func TestMorningBriefingWorker_WorkflowRunnerPrimaryAndTextFallback(t *testing.T) {
+func TestMorningBriefingWorker_WorkflowRunnerPrimaryAndBaseTemplateFallback(t *testing.T) {
 	var mu sync.Mutex
 	var received []service.PushMessage
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -359,12 +347,10 @@ func TestMorningBriefingWorker_WorkflowRunnerPrimaryAndTextFallback(t *testing.T
 	todoRepo := &mockTodoRepoForBriefing{todos: []domain.Todo{{Title: "Fechar PR"}}}
 
 	wfRunner := &stubBriefingWorkflowRunner{reply: "Prioridade 1: Standup às 09:00 e fechar PR."}
-	textGen := &stubBriefingTextGen{reply: "Texto fallback do TextGenerator."}
 
 	worker := service.NewMorningBriefingWorker(briefingRepo, eventRepo, todoRepo, userRepo, notifSvc, time.Minute)
 	worker.SetLocation(time.UTC)
 	worker.SetBriefingWorkflowRunner(wfRunner)
-	worker.SetTextGenerator(textGen)
 
 	now := time.Date(2026, 11, 21, 7, 30, 0, 0, time.UTC)
 	count, err := worker.ProcessBriefings(now)
@@ -374,28 +360,22 @@ func TestMorningBriefingWorker_WorkflowRunnerPrimaryAndTextFallback(t *testing.T
 	if wfRunner.calls != 1 {
 		t.Fatalf("esperava 1 chamada ao BriefingWorkflowRunner, obteve %d", wfRunner.calls)
 	}
-	if textGen.calls != 0 {
-		t.Fatalf("não esperava chamada ao TextGenerator quando workflow teve sucesso, obteve %d", textGen.calls)
-	}
 	mu.Lock()
 	if len(received) != 1 || received[0].Body != "Prioridade 1: Standup às 09:00 e fechar PR." {
 		t.Fatalf("corpo inesperado do workflow: %+v", received)
 	}
 	mu.Unlock()
 
-	// Dia seguinte: se workflow falhar, faz fallback limpo para TextGenerator
+	// Dia seguinte: se workflow falhar, faz fallback limpo para template base formatado
 	wfRunner.err = errors.New("adk timeout")
 	nextDay := now.Add(24 * time.Hour)
 	count2, err := worker.ProcessBriefings(nextDay)
 	if err != nil || count2 != 1 {
 		t.Fatalf("esperava 1 briefing no fallback, obteve count=%d err=%v", count2, err)
 	}
-	if textGen.calls != 1 {
-		t.Fatalf("esperava 1 chamada ao TextGenerator no fallback, obteve %d", textGen.calls)
-	}
 	mu.Lock()
-	if len(received) != 2 || received[1].Body != "Texto fallback do TextGenerator." {
-		t.Fatalf("corpo inesperado no fallback: %+v", received)
+	if len(received) != 2 || !strings.Contains(received[1].Body, "Standup") {
+		t.Fatalf("corpo inesperado no fallback base: %+v", received)
 	}
 	mu.Unlock()
 }

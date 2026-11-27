@@ -159,6 +159,11 @@ func computeAdaptiveThinkingBudget(llmReq *model.LLMRequest, effort string) int3
 		"analis", "planej", "compar", "finan", "orçament", "orcament",
 		"gasto", "fatura", "semana", "resum", "estratég", "estrateg",
 		"reorganiz", "conflit", "relatóri", "relatori", "parcela",
+		"posso comprar", "vale a pena", "melhor cart", "melhor op",
+		"prioriz", "por que", "por quê", "sugira", "sugest", "organiz", "diagnost",
+	}
+	if countMentionedDomains(lastUserText) >= 2 {
+		return 2048
 	}
 	for _, kw := range analyticalKeywords {
 		if strings.Contains(lastUserText, kw) {
@@ -169,6 +174,27 @@ func computeAdaptiveThinkingBudget(llmReq *model.LLMRequest, effort string) int3
 		return 1024
 	}
 	return 0
+}
+
+func countMentionedDomains(lower string) int {
+	groups := [][]string{
+		{"agenda", "compromiss", "reunião", "reuniao", "horário", "horario", "booking"},
+		{"tarefa", "pendênci", "pendenci", "lembrete", "todo"},
+		{"fatura", "cartão", "cartao", "saldo", "gasto", "finan", "limite", "orçamento", "orcamento", "pagar"},
+		{"whatsapp", "mensagem", "e-mail", "email", "gmail"},
+		{"bot ", "bots", "vigília", "vigilia", "monitora"},
+		{"pesquis", "cotação", "cotacao", "preço", "preco", "notícia", "noticia"},
+	}
+	matched := 0
+	for _, cues := range groups {
+		for _, c := range cues {
+			if strings.Contains(lower, c) {
+				matched++
+				break
+			}
+		}
+	}
+	return matched
 }
 
 // BeforeModel intercepta a requisição antes de chamar a LLM para aplicar Context Caching e ThinkingBudget.
@@ -385,24 +411,12 @@ func (g *GuardrailPlugin) AfterTool(ctx agent.Context, t tool.Tool, args, result
 		if rawCards, ok := result["cards"]; ok && rawCards != nil {
 			if cards, ok := rawCards.([]domain.ChatCard); ok {
 				col.Cards = append(col.Cards, cards...)
-				for _, c := range cards {
-					if c.Type == "whatsapp" {
-						col.WhatsAppMessage = &domain.ChatWhatsAppMessage{
-							ID:            c.ID,
-							RecipientName: c.Title,
-							Message:       c.Subtitle,
-							Status:        "sent",
-							SentAt:        time.Now().Format(time.RFC3339),
-						}
-					} else if c.Type == "gmail" {
-						col.GmailMessage = &domain.ChatGmailMessage{
-							ID:             c.ID,
-							RecipientEmail: c.Subtitle,
-							Subject:        c.Title,
-							Status:         "sent",
-							SentAt:         time.Now().Format(time.RFC3339),
-						}
-					}
+				waMsg, gmailMsg := extractMessageCards(cards)
+				if waMsg != nil {
+					col.WhatsAppMessage = waMsg
+				}
+				if gmailMsg != nil {
+					col.GmailMessage = gmailMsg
 				}
 			}
 		}

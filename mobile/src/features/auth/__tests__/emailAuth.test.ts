@@ -32,6 +32,15 @@ describe('emailAuth — contrato dos fluxos de e-mail e Google', () => {
     assert.equal(
       validateEmailAuth({
         email: 'andre@vito.local',
+        password: 'semnumero',
+        isRegister: true,
+        name: 'André',
+      }),
+      'A senha deve ter no mínimo 8 caracteres com letra e número.',
+    )
+    assert.equal(
+      validateEmailAuth({
+        email: 'andre@vito.local',
         password: 'senha123',
         isRegister: true,
         name: '',

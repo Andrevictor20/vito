@@ -14,9 +14,9 @@ import (
 	"testing"
 
 	"github.com/andrevmp/vito/backend/internal/ai"
-	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/handler"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/andrevmp/vito/backend/internal/server"
 	"github.com/andrevmp/vito/backend/internal/service"
@@ -219,9 +219,7 @@ func TestAssistantChatStream_RouteAlias(t *testing.T) {
 	userRepo := repository.NewUserRepository(db)
 	authSvc := service.NewAuthService(userRepo, "test-secret")
 	authHandler := handler.NewAuthHandler(authSvc, userRepo)
-	loop := service.NewAgentLoop(nil, nil, nil, nil, nil, nil)
-	loop.SetEngine(&routeStreamEngine{})
-	streamHandler := handler.NewAssistantStreamHandler(loop)
+	streamHandler := handler.NewAssistantStreamHandler(&routeStreamEngine{})
 
 	srv := server.New(server.Config{
 		AuthSvc:          authSvc,

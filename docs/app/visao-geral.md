@@ -1,11 +1,11 @@
 # Vito — Guia do App (fonte da verdade para a IA)
 
-O Vito é o secretário executivo pessoal no bolso: agenda, tarefas, pendências, vigílias (radares), links de agendamento (Booking), perfil, WhatsApp e Gmail, operando sob uma arquitetura 100% conversacional e zero-modais.
+O Vito é o secretário executivo pessoal no bolso: agenda, tarefas, pendências, bots proativos, links de agendamento (Booking), finanças e perfil, com suporte a WhatsApp e Gmail, operando sob uma arquitetura conversacional orientada a ações.
 
 ## Paradigma Zero-Modais e IA Proativa (Botão Spark & Slot-Filling)
 
-- **Sem Modais de Formulário:** No Vito não existem telas de formulário, modais pop-up ou caixas de diálogo manuais para criar ou editar eventos, tarefas, radares ou bookings.
-- **Iniciativa Proativa da IA (Botão Spark):** No cabeçalho de cada tela (Agenda, Tarefas, Radares, Booking), o botão primário de ação exibe o ícone Spark. Ao tocar nele, o app navega instantaneamente para a aba Chat e o próprio Vito toma a iniciativa, fazendo uma pergunta contextual sobre o que você deseja planejar ou criar, com foco imediato no teclado.
+- **Sem Modais de Formulário:** No Vito não existem telas de formulário manuais complexos para criar ou editar eventos, tarefas, bots ou bookings.
+- **Iniciativa Proativa da IA (Botão Spark):** No cabeçalho de cada tela (Agenda, Tarefas, Bots, Booking), o botão primário de ação exibe o ícone Spark. Ao tocar nele, o app navega instantaneamente para a aba Chat e o próprio Vito toma a iniciativa, fazendo uma pergunta contextual sobre o que você deseja planejar ou criar, com foco imediato no teclado.
 - **Ações Contextuais nos Itens:** Tocar em qualquer compromisso, tarefa, vigília ou link abre opções contextuais onde o Vito pergunta diretamente detalhes como novo horário, prazo ou confirmação de ajuste.
 - **Slot-Filling Humanizado e Respostas Curtas:** O usuário pode responder com total liberdade ou de forma telegráfica (ex.: "Dentista", "Almoço sexta 13h"). O Vito retém o contexto e solicita apenas o dado ausente (1 pergunta por turno), aplicando defaults inteligentes sem questionários mecânicos.
 - **Cards Interativos no Chat:** O Vito responde sempre com um card estruturado elegante contendo botões de ação: "Desfazer", "Confirmar / Ajustar" e botão direto de retorno ("Ver na agenda", "Ver tarefas", "Ver Booking").
@@ -15,7 +15,7 @@ O Vito é o secretário executivo pessoal no bolso: agenda, tarefas, pendências
 1. **Chat** (ícone de balão de conversa) — Centro executivo do Vito. Conversa por texto, áudio e fotos (convites, recibos, boletos). O topo tem ☰ (gaveta de histórico) e + (novo chat).
 2. **Agenda** (ícone de calendário) — Compromissos e eventos com dia e hora. Botão Spark no topo ("Marca dentista terça às 15h"). Toque no evento para remarcar ou cancelar pelo chat. Sincronização nos dois sentidos com o Google Calendar.
 3. **Tarefas e Pendências** (ícone de checklist) — Lista mista por urgência (atrasadas, hoje, próximas, sem data). Botão Spark no topo ("Lembra de pagar o condomínio dia 5, prioridade alta"). Toque na tarefa para mover para amanhã, concluir ou excluir pelo chat.
-4. **Radares** (ícone de alvo/radar) — Vigílias e monitoramentos inteligentes em tempo real (concursos, ações, voos, notícias, preços). Botão Spark no topo ("Me avisa quando sair edital de concurso na minha área"). Toque no radar para pausar, retomar, mudar horário da checagem ou excluir.
+4. **Bots** (aba Bots) — Bots autônomos e vigílias inteligentes em tempo real (concursos, ações, voos, notícias, faturas, preços). Botão Spark/Novo bot no topo (*"Me avisa quando sair edital de concurso na minha área"*). Toque no bot para pausar, retomar, personalizar, mudar frequência ou excluir.
 5. **Booking** (ícone de elo/link) — Links de agendamento público 1-on-1 e reuniões em grupo com consenso. Botão Spark no topo com escolha rápida ("1-on-1" ou "Grupo"). Menu dos cards para mudar duração, duplicar ou excluir link pelo chat.
 6. **Perfil** (ícone de pessoa/silhueta, no rodapé) — Conta e governança: tema (Claro / Escuro / Sistema), nível de autonomia da IA (Nível 1, 2 ou 3), telefone, WhatsApp, Gmail, sincronização do Google Calendar e versão do app.
 

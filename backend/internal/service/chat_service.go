@@ -5,17 +5,31 @@ import (
 	"errors"
 	"time"
 
+	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/domain"
+	"github.com/andrevmp/vito/backend/internal/repository"
 )
+
+// AssistantEngine define o contrato do motor conversacional Google ADK v2.
+type AssistantEngine interface {
+	Run(ctx context.Context, req domain.UnifiedAssistantRequest) (*domain.UnifiedAssistantResponse, error)
+	RunStream(ctx context.Context, req domain.UnifiedAssistantRequest, onDelta func(ai.StreamDelta) error) (*domain.UnifiedAssistantResponse, error)
+}
 
 // ChatService gerencia a lógica de negócio e sincronização de conversas entre dispositivos.
 type ChatService struct {
-	repo domain.ChatRepository
+	repo     domain.ChatRepository
+	convRepo *repository.ConversationStoreRepository
 }
 
 // NewChatService instancia o serviço de sincronização de chat.
 func NewChatService(repo domain.ChatRepository) *ChatService {
 	return &ChatService{repo: repo}
+}
+
+// SetConversationStore conecta o repositório de threads ADK para limpeza consistente na exclusão.
+func (s *ChatService) SetConversationStore(convRepo *repository.ConversationStoreRepository) {
+	s.convRepo = convRepo
 }
 
 // ListSessions retorna as sessões de chat do usuário.
@@ -72,10 +86,13 @@ func (s *ChatService) SyncSession(ctx context.Context, userID string, session *d
 	return s.repo.GetSessionWithMessages(ctx, session.ID, userID)
 }
 
-// DeleteSession remove a sessão e todo o seu histórico no servidor.
+// DeleteSession remove a sessão e todo o seu histórico no servidor (inclusive thread ADK).
 func (s *ChatService) DeleteSession(ctx context.Context, sessionID, userID string) error {
 	if sessionID == "" || userID == "" {
 		return errors.New("sessionID e userID obrigatórios")
+	}
+	if s.convRepo != nil {
+		_ = s.convRepo.DeleteThread(ctx, sessionID)
 	}
 	return s.repo.DeleteSession(ctx, sessionID, userID)
 }

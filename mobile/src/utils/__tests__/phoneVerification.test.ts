@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { findSelfPhoneInContacts } from '../../features/calendar/services/contactMatchingService';
+import { findSelfPhoneInContacts } from '../../features/profile/services/phoneVerificationService';
 import { toE164Phone, formatPhoneNumber } from '../formatting/phoneFormat';
 
 test('findSelfPhoneInContacts detecta o número do próprio usuário pelo e-mail da conta', () => {

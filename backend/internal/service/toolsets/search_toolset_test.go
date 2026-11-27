@@ -82,7 +82,7 @@ func TestSearchToolset_FallbackToSubagent(t *testing.T) {
 	defer ts.Close()
 
 	searxng := search.NewSearXNGClient(ts.URL, ts.Client())
-	subagent := search.NewVerticalSearchSubagent(searxng, nil)
+	subagent := search.NewVerticalSearchSubagent(searxng)
 
 	toolset := toolsets.NewSearchToolset(subagent)
 
@@ -218,7 +218,7 @@ func TestSearchToolset_DeepWebScrapingOnSearchResult(t *testing.T) {
 	defer tsSearx.Close()
 
 	searxng := search.NewSearXNGClient(tsSearx.URL, tsSearx.Client())
-	subagent := search.NewVerticalSearchSubagent(searxng, nil)
+	subagent := search.NewVerticalSearchSubagent(searxng)
 
 	mockReader := &mockWebReader{
 		readURLFn: func(ctx context.Context, targetURL string) (*search.WebPageContent, error) {

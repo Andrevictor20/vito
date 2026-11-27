@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"time"
 
 	"github.com/andrevmp/vito/backend/internal/domain"
@@ -31,7 +32,7 @@ func (r *SessionRepositorySQLite) Create(rt *domain.RefreshToken) error {
 		rt.DeviceName = "Dispositivo Vito"
 	}
 
-	return ExecuteQueuedWrite(context.Background(), func() error {
+	return database.ExecuteQueuedWrite(context.Background(), func() error {
 		_, err := r.db.Exec(`
 			INSERT INTO refresh_tokens (id, user_id, token_hash, device_name, ip_address, expires_at, revoked_at, created_at, last_used_at)
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -128,7 +129,7 @@ func (r *SessionRepositorySQLite) RotateToken(id, userID, newTokenHash, ipAddres
 		args = []any{newTokenHash, newExpiresAt.UTC(), now.UTC(), id, userID}
 	}
 
-	affected, err := ExecuteQueuedWriteRows(context.Background(), func() (sql.Result, error) {
+	affected, err := database.ExecuteQueuedWriteRows(context.Background(), func() (sql.Result, error) {
 		return r.db.Exec(query, args...)
 	})
 	if err != nil {
@@ -141,7 +142,7 @@ func (r *SessionRepositorySQLite) RotateToken(id, userID, newTokenHash, ipAddres
 }
 
 func (r *SessionRepositorySQLite) RevokeByID(id, userID string, revokedAt time.Time) error {
-	affected, err := ExecuteQueuedWriteRows(context.Background(), func() (sql.Result, error) {
+	affected, err := database.ExecuteQueuedWriteRows(context.Background(), func() (sql.Result, error) {
 		return r.db.Exec(`
 			UPDATE refresh_tokens
 			SET revoked_at = ?
@@ -158,7 +159,7 @@ func (r *SessionRepositorySQLite) RevokeByID(id, userID string, revokedAt time.T
 }
 
 func (r *SessionRepositorySQLite) RevokeByHash(tokenHash string, revokedAt time.Time) error {
-	return ExecuteQueuedWrite(context.Background(), func() error {
+	return database.ExecuteQueuedWrite(context.Background(), func() error {
 		_, err := r.db.Exec(`
 			UPDATE refresh_tokens
 			SET revoked_at = ?
@@ -169,7 +170,7 @@ func (r *SessionRepositorySQLite) RevokeByHash(tokenHash string, revokedAt time.
 }
 
 func (r *SessionRepositorySQLite) RevokeAllByUserExcept(userID, keepID string, revokedAt time.Time) error {
-	return ExecuteQueuedWrite(context.Background(), func() error {
+	return database.ExecuteQueuedWrite(context.Background(), func() error {
 		_, err := r.db.Exec(`
 			UPDATE refresh_tokens
 			SET revoked_at = ?
@@ -180,7 +181,7 @@ func (r *SessionRepositorySQLite) RevokeAllByUserExcept(userID, keepID string, r
 }
 
 func (r *SessionRepositorySQLite) RevokeAllByUser(userID string, revokedAt time.Time) error {
-	return ExecuteQueuedWrite(context.Background(), func() error {
+	return database.ExecuteQueuedWrite(context.Background(), func() error {
 		_, err := r.db.Exec(`
 			UPDATE refresh_tokens
 			SET revoked_at = ?

@@ -45,11 +45,6 @@ func (s *ShortIoShortenerService) SetTimeout(timeout time.Duration) {
 	s.httpClient.Timeout = timeout
 }
 
-// SetDomain altera o domínio alvo cadastrado no Short.io.
-func (s *ShortIoShortenerService) SetDomain(domain string) {
-	s.domain = domain
-}
-
 // ShortenLink gera o link curto com slug customizado. Caso não haja chave configurada,
 // ou caso ocorra qualquer indisponibilidade no serviço externo, retorna a targetURL canônica.
 func (s *ShortIoShortenerService) ShortenLink(ctx context.Context, targetURL, key string) (string, error) {

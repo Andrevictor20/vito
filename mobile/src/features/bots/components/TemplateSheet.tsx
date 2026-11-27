@@ -4,7 +4,7 @@ import { ProtoUiIcon } from '../../../icons/ProtoUiIcons';
 import { useTheme } from '../../../context/ThemeContext';
 import { MASCOT_PRESETS } from '../data/botsCatalogFallback';
 import { BotAppInfo, BotSkin, BotTemplate } from '../types/bots';
-import { BottomSheetModal } from '../../../components/ui/BottomSheetModal';
+import { VitoSheet } from '../../../components/ui/VitoSheet';
 import { BotMascotAvatar } from './BotMascotAvatar';
 
 export interface TemplateSheetProps {
@@ -50,7 +50,7 @@ export const TemplateSheet: React.FC<TemplateSheetProps> = ({
   };
 
   return (
-    <BottomSheetModal
+    <VitoSheet
       visible={visible}
       onClose={onClose}
       title={template.name}
@@ -135,7 +135,7 @@ export const TemplateSheet: React.FC<TemplateSheetProps> = ({
           </Text>
         </TouchableOpacity>
       </ScrollView>
-    </BottomSheetModal>
+    </VitoSheet>
   );
 };
 

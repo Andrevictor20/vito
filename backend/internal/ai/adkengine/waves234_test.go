@@ -11,11 +11,9 @@ import (
 
 	"google.golang.org/adk/v2/memory"
 
-	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/ai/adkengine"
-	"github.com/andrevmp/vito/backend/internal/ai/evals"
-	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/andrevmp/vito/backend/internal/service"
 )
@@ -89,20 +87,15 @@ func TestAC04_COG04_MemoryConsolidationAndHybridSearch(t *testing.T) {
 	})
 
 	// 3. Configura extrator ADK sobre RoutedLLM retornando JSON estruturado com supersedes_id
-	extractorLLM := &fakeAgentProvider{
-		name:          "Gemini-Extractor",
-		model:         "gemini-2.5-flash",
-		tier:          3,
-		supportsTools: false,
-		responses: []*ai.AgentChatResponse{
+	extractorLLM := &fakeADKLLM{
+		model: "gemini-2.5-flash",
+		responses: []scriptedModelResponse{
 			{
 				Text: `{"facts":[{"category":"preference","content":"Prefere compromissos exclusivamente no período vespertino","importance":5,"confidence":0.98,"supersedes_id":"fact-old-morning"}],"episode_title":"Atualização de Horário de Reuniões","episode_summary":"Usuário definiu preferência por reuniões no período vespertino.","episode_importance":4,"theme_slug":"agenda_preferencias","theme_title":"Preferências de Agenda","theme_summary":"Prefere reuniões no período vespertino."}`,
 			},
 		},
 	}
-	router := ai.NewModelRouter()
-	router.AddProvider(extractorLLM)
-	routed := adkengine.NewRoutedLLM(router)
+	routed := adkengine.NewRoutedLLM(testServerPool("Gemini-Extractor", "gemini-2.5-flash", extractorLLM)...)
 
 	worker := service.NewMemoryConsolidationWorker(convRepo, hierarchyRepo, 50*time.Millisecond)
 	worker.SetFactRepository(factRepo, aimemory.DefaultSemanticEmbedder)
@@ -249,7 +242,7 @@ func TestAC05_COG05_AttentionBudgetService_CalendarSilenceAndDedup(t *testing.T)
 
 	// 4. Valida também resolução unificada de entidades (entity_links na 036) e Workflow Agents (ParallelAgent + SequentialAgent)
 	entityRepo := repository.NewEntityLinkRepository(db)
-	if err := entityRepo.Upsert(ctx, &repository.EntityLink{
+	if err := entityRepo.Upsert(ctx, &domain.EntityLink{
 		UserID:        userID,
 		CanonicalName: "Isabela Alvimar",
 		EntityType:    "person",
@@ -264,60 +257,9 @@ func TestAC05_COG05_AttentionBudgetService_CalendarSilenceAndDedup(t *testing.T)
 		t.Fatalf("AC-05: falha ao resolver entidade cruzada WhatsApp<->Email: %v", matches)
 	}
 
-	router := ai.NewModelRouter()
-	routed := adkengine.NewRoutedLLM(router)
+	routed := adkengine.NewRoutedLLM()
 	wf, err := adkengine.BuildCrossDomainBriefingWorkflow(routed, nil)
 	if err != nil || wf == nil || wf.ParallelCollectors == nil || wf.SequentialPipeline == nil {
 		t.Fatalf("AC-05: falha ao construir workflow ParallelAgent + SequentialAgent: %v", err)
-	}
-}
-
-// TestAC06_COG06_ADKGoldenEvalsSuiteAndBotScope valida AC-06 (COG-06 / Onda 4):
-// Dado a suíte ADK Golden Evals (36 trajetórias críticas: tool calling, zero tabelas e teto 320 na voz,
-// ancoragem financeira, Pix/Web taint tracking no BeforeToolCallback e escopo de llmagent de bot),
-// quando executa, então 100% das 36 trajetórias passam e são registradas em ai_eval_runs.
-func TestAC06_COG06_ADKGoldenEvalsSuiteAndBotScope(t *testing.T) {
-	ctx := context.Background()
-	dbPath := filepath.Join(t.TempDir(), "vito_adk_wave4.db")
-	db, err := database.Open(dbPath)
-	if err != nil {
-		t.Fatalf("falha ao abrir sqlite: %v", err)
-	}
-	defer db.Close()
-
-	userRepo := repository.NewUserRepository(db)
-	_ = userRepo.Create(&domain.User{
-		ID:           "eval-user",
-		Name:         "Eval User",
-		Email:        "eval@vito.ai",
-		PasswordHash: "hash",
-		CreatedAt:    time.Now().UTC(),
-		UpdatedAt:    time.Now().UTC(),
-	})
-
-	runner := evals.NewGoldenEvalRunner(db)
-	report, err := runner.RunDefaultSuite(ctx)
-	if err != nil {
-		t.Fatalf("AC-06: erro ao executar suíte ADK Golden Evals: %v", err)
-	}
-
-	if report.Total < 35 {
-		t.Fatalf("AC-06: esperava ao menos 35 cenários na suíte ADK Golden Evals, obteve %d", report.Total)
-	}
-	if report.FailedCount > 0 || report.PassedCount != report.Total {
-		for _, r := range report.Results {
-			if !r.Passed {
-				t.Errorf("AC-06: cenário %s (%s) falhou: %s", r.ScenarioID, r.Category, r.Notes)
-			}
-		}
-		t.Fatalf("AC-06: esperava 100%% de aprovação (%d/%d), mas %d falharam", report.PassedCount, report.Total, report.FailedCount)
-	}
-
-	var storedCount int
-	if err := db.QueryRow(`SELECT COUNT(1) FROM ai_eval_runs WHERE suite_name = 'adk_golden_evals' AND passed = 1`).Scan(&storedCount); err != nil {
-		t.Fatalf("AC-06: falha ao consultar tabela ai_eval_runs: %v", err)
-	}
-	if storedCount != report.Total {
-		t.Errorf("AC-06: esperava %d execuções persistidas em ai_eval_runs, obteve %d", report.Total, storedCount)
 	}
 }

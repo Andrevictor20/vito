@@ -12,12 +12,14 @@ var (
 
 // ChatSession representa uma sessão de conversa do usuário com o assistente Vito.
 type ChatSession struct {
-	ID        string    `json:"id"`
-	UserID    string    `json:"user_id"`
-	Title     string    `json:"title"`
-	Preview   string    `json:"preview"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID         string    `json:"id"`
+	UserID     string    `json:"user_id"`
+	Title      string    `json:"title"`
+	Preview    string    `json:"preview"`
+	ModelPref  string    `json:"model_pref,omitempty"`
+	EffortPref string    `json:"effort_pref,omitempty"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
 }
 
 // ChatMessage representa uma mensagem individual dentro de uma sessão.

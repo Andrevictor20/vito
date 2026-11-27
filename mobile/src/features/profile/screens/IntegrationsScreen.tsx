@@ -13,11 +13,11 @@ import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../../context/ThemeContext';
 import { hapticFeedback } from '../../../theme/motion';
 import { api } from '../../../services/api';
-import { calendarSyncService } from '../../calendar/services/calendarSyncService';
-import { BottomSheetModal } from '../../../components/ui/BottomSheetModal';
-import { CalendarSyncSettingsModal } from '../components/profile/CalendarSyncSettingsModal';
-import { GmailConnectModal } from '../components/profile/GmailConnectModal';
-import { WhatsAppConnectModal } from '../components/profile/WhatsAppConnectModal';
+import { calendarSyncService } from '../../calendar/services/calendarApi';
+import { VitoSheet } from '../../../components/ui/VitoSheet';
+import { CalendarSyncSettingsModal } from '../components/CalendarSyncSettingsModal';
+import { GmailConnectModal } from '../components/GmailConnectModal';
+import { WhatsAppConnectModal } from '../components/WhatsAppConnectModal';
 import { integrationsStyles as styles } from './IntegrationsScreen.styles';
 
 interface IntegrationItem {
@@ -33,41 +33,7 @@ interface IntegrationItem {
   detailSub?: string;
 }
 
-const SOON_ITEMS: IntegrationItem[] = [
-  {
-    id: 'gdrive',
-    name: 'Google Drive',
-    desc: 'Arquivos e documentos',
-    category: 'Arquivos',
-    icon: 'folder-open',
-    color: '#0aa55c',
-    connected: false,
-    comingSoon: true,
-    actions: ['Buscar documentos', 'Resumir PDFs'],
-  },
-  {
-    id: 'notion',
-    name: 'Notion',
-    desc: 'Páginas e bases de dados',
-    category: 'Projetos',
-    icon: 'description',
-    color: '#0a0a0a',
-    connected: false,
-    comingSoon: true,
-    actions: ['Ler páginas', 'Criar notas'],
-  },
-  {
-    id: 'slack',
-    name: 'Slack',
-    desc: 'Mensagens e canais da equipe',
-    category: 'Mensagens',
-    icon: 'forum',
-    color: '#ff2fa0',
-    connected: false,
-    comingSoon: true,
-    actions: ['Monitorar canais', 'Resumir menções'],
-  },
-];
+const SOON_ITEMS: IntegrationItem[] = [];
 
 export const IntegrationsScreen: React.FC = () => {
   const { colors } = useTheme();
@@ -78,8 +44,6 @@ export const IntegrationsScreen: React.FC = () => {
   const [gmailConnected, setGmailConnected] = useState(false);
   const [gmailEmail, setGmailEmail] = useState('');
   const [waConnected, setWaConnected] = useState(false);
-  const [localConnected, setLocalConnected] = useState<Record<string, boolean>>({});
-  const [soonNotify, setSoonNotify] = useState<Record<string, boolean>>({});
   const [activeApp, setActiveApp] = useState<IntegrationItem | null>(null);
   const [suggestOpen, setSuggestOpen] = useState(false);
   const [suggestName, setSuggestName] = useState('');
@@ -144,51 +108,11 @@ export const IntegrationsScreen: React.FC = () => {
         detailSub: waConnected ? 'Sessão ativa e pronta' : 'Mensagens e avisos',
         actions: ['Enviar mensagem', 'Avisos no WhatsApp'],
       },
-      {
-        id: 'outlook',
-        name: 'Outlook',
-        desc: 'E-mails e agenda da Microsoft',
-        category: 'E-mail',
-        icon: 'mark-email-read',
-        color: '#0a7cff',
-        connected: !!localConnected.outlook,
-        actions: ['Ler e-mails do Outlook', 'Criar evento no Outlook'],
-      },
-      {
-        id: 'maps',
-        name: 'Google Maps',
-        desc: 'Rotas, trânsito e locais',
-        category: 'Mapas',
-        icon: 'place',
-        color: '#0aa55c',
-        connected: !!localConnected.maps,
-        actions: ['Calcular rota e tempo', 'Avisar a hora de sair'],
-      },
-      {
-        id: 'trello',
-        name: 'Trello',
-        desc: 'Quadros, listas e cartões',
-        category: 'Projetos',
-        icon: 'dashboard',
-        color: '#0aa5b5',
-        connected: !!localConnected.trello,
-        actions: ['Criar cartão', 'Mover cartão'],
-      },
-      {
-        id: 'telegram',
-        name: 'Telegram',
-        desc: 'Avisos e comandos pelo seu bot',
-        category: 'Mensagens',
-        icon: 'send',
-        color: '#0a7cff',
-        connected: !!localConnected.telegram,
-        actions: ['Avisar no Telegram', 'Receber comandos'],
-      },
     ],
-    [calConnected, gmailConnected, gmailEmail, waConnected, localConnected]
+    [calConnected, gmailConnected, gmailEmail, waConnected]
   );
 
-  const categories = ['Todas', 'Agenda', 'E-mail', 'Mensagens', 'Mapas', 'Projetos', 'Arquivos'];
+  const categories = ['Todas', 'Agenda', 'E-mail', 'Mensagens'];
   const q = query.trim().toLowerCase();
   const matches = (it: IntegrationItem) =>
     (selectedCat === 'Todas' || it.category === selectedCat) &&
@@ -196,7 +120,6 @@ export const IntegrationsScreen: React.FC = () => {
 
   const connectedList = items.filter((i) => i.connected && matches(i));
   const availableList = items.filter((i) => !i.connected && matches(i));
-  const soonList = SOON_ITEMS.filter(matches);
   const totalConnected = items.filter((i) => i.connected).length;
   const totalAvailable = items.length - totalConnected;
 
@@ -205,8 +128,6 @@ export const IntegrationsScreen: React.FC = () => {
     if (app.id === 'gcal') return setCalModal(true);
     if (app.id === 'gmail') return setGmailModal(true);
     if (app.id === 'wa') return setWaModal(true);
-    setLocalConnected((prev) => ({ ...prev, [app.id]: !app.connected }));
-    showToast(app.connected ? `${app.name} desconectado` : `${app.name} conectado`);
   };
 
   return (
@@ -273,7 +194,6 @@ export const IntegrationsScreen: React.FC = () => {
         {[
           { title: 'Conectadas', list: connectedList, soon: false },
           { title: 'Disponíveis', list: availableList, soon: false },
-          { title: 'Em breve', list: soonList, soon: true },
         ].map((sec) =>
           sec.list.length > 0 ? (
             <View key={sec.title} style={styles.section}>
@@ -282,31 +202,17 @@ export const IntegrationsScreen: React.FC = () => {
                 <Text style={[styles.secCount, { color: colors.muted }]}>{sec.list.length}</Text>
               </View>
               <View style={[styles.card, { backgroundColor: colors.surf, borderColor: colors.line }]}>
-                {sec.list.map((it, idx) => {
-                  const notified = !!soonNotify[it.id];
-                  return (
+                {sec.list.map((it, idx) => (
                     <TouchableOpacity
                       key={it.id}
                       style={[
                         styles.row,
                         idx > 0 && { borderTopWidth: 0.5, borderTopColor: colors.line },
                       ]}
-                      onPress={() => {
-                        if (sec.soon) {
-                          hapticFeedback.selection();
-                          setSoonNotify((prev) => ({ ...prev, [it.id]: !prev[it.id] }));
-                          showToast(!notified ? 'Avisaremos quando chegar' : 'Aviso cancelado');
-                          return;
-                        }
-                        setActiveApp(it);
-                      }}
+                      onPress={() => setActiveApp(it)}
                     >
                       <View style={[styles.appIcon, { backgroundColor: colors.bg }]}>
-                        {['gcal', 'gmail', 'wa', 'maps', 'trello', 'telegram', 'gdrive', 'notion', 'slack', 'outlook'].includes(it.id) ? (
-                          <BrandLogo group="app" id={it.id} size={22} color={it.color} />
-                        ) : (
-                          <ProtoUiIcon name={it.icon} size={20} color={it.color} />
-                        )}
+                        <BrandLogo group="app" id={it.id} size={22} color={it.color} />
                       </View>
                       <View style={styles.rowText}>
                         <Text style={[styles.rowTitle, { color: colors.ink }]}>{it.name}</Text>
@@ -316,34 +222,27 @@ export const IntegrationsScreen: React.FC = () => {
                         style={[
                           styles.statusPill,
                           {
-                            backgroundColor: it.connected || notified ? colors.greenBg : colors.bg,
+                            backgroundColor: it.connected ? colors.greenBg : colors.bg,
                           },
                         ]}
                       >
                         <Text
                           style={[
                             styles.statusPillText,
-                            { color: it.connected || notified ? colors.acc : colors.ink },
+                            { color: it.connected ? colors.acc : colors.ink },
                           ]}
                         >
-                          {sec.soon
-                            ? notified
-                              ? '✓ Avisaremos'
-                              : 'Avisar-me'
-                            : it.connected
-                              ? '✓ Conectado'
-                              : 'Conectar'}
+                          {it.connected ? '✓ Conectado' : 'Conectar'}
                         </Text>
                       </View>
                     </TouchableOpacity>
-                  );
-                })}
+                ))}
               </View>
             </View>
           ) : null
         )}
 
-        {connectedList.length === 0 && availableList.length === 0 && soonList.length === 0 && (
+        {connectedList.length === 0 && availableList.length === 0 && (
           <Text style={[styles.empty, { color: colors.muted }]}>Nenhuma integração encontrada.</Text>
         )}
       </ScrollView>
@@ -354,7 +253,7 @@ export const IntegrationsScreen: React.FC = () => {
         </View>
       )}
 
-      <BottomSheetModal
+      <VitoSheet
         visible={!!activeApp}
         onClose={() => setActiveApp(null)}
         title={activeApp?.name || ''}
@@ -378,9 +277,18 @@ export const IntegrationsScreen: React.FC = () => {
                 <TouchableOpacity
                   style={[styles.priBtn, { backgroundColor: colors.ink }]}
                   onPress={async () => {
-                    if (activeApp.id === 'gcal') await api.syncCalendar('google').catch(() => {});
-                    setActiveApp(null);
-                    showToast(`${activeApp.name} sincronizado agora`);
+                    const target = activeApp;
+                    try {
+                      if (target.id === 'gcal') await api.syncCalendar('google');
+                      else if (target.id === 'gmail') await api.gmail.scanEmails();
+                      else if (target.id === 'wa') await api.getWhatsAppStatus();
+                      await loadStatuses();
+                      setActiveApp(null);
+                      showToast(`${target.name} sincronizado agora`);
+                    } catch {
+                      setActiveApp(null);
+                      showToast(`Falha ao sincronizar ${target.name}`);
+                    }
                   }}
                 >
                   <Text style={[styles.priBtnText, { color: colors.bg }]}>Sincronizar</Text>
@@ -407,9 +315,9 @@ export const IntegrationsScreen: React.FC = () => {
             </View>
           </View>
         )}
-      </BottomSheetModal>
+      </VitoSheet>
 
-      <BottomSheetModal
+      <VitoSheet
         visible={suggestOpen}
         onClose={() => setSuggestOpen(false)}
         title="Sugerir integração"
@@ -437,7 +345,7 @@ export const IntegrationsScreen: React.FC = () => {
             <Text style={[styles.priBtnText, { color: colors.bg }]}>Enviar sugestão</Text>
           </TouchableOpacity>
         </View>
-      </BottomSheetModal>
+      </VitoSheet>
 
       <CalendarSyncSettingsModal
         visible={calModal}

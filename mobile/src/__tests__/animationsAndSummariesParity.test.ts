@@ -19,7 +19,7 @@ describe('Animações de entrada global, Resumos v5 e barras/contadores em Finan
     const pager = readSrc('components/common/AdaptivePager.tsx');
     assert.equal(pager.includes('ScreenFocusProvider'), true, 'AdaptivePager deve prover ScreenFocusProvider por aba');
 
-    const section = readSrc('ds/SectionTransition.tsx');
+    const section = readSrc('components/common/SectionTransition.tsx');
     assert.equal(section.includes('ScreenFocusProvider'), true, 'SectionTransition deve prover ScreenFocusProvider');
 
     const motion = readSrc('theme/vitoMotion.tsx');
@@ -31,7 +31,7 @@ describe('Animações de entrada global, Resumos v5 e barras/contadores em Finan
   it('2. Perfil, Agenda, Tarefas, Bots e Finanças usam StaggerItem para entrada suave de toda a tela', () => {
     for (const file of [
       'features/profile/screens/ProfileScreen.tsx',
-      'components/home/AgendaView.tsx',
+      'features/calendar/components/AgendaView.tsx',
       'features/tasks/screens/TasksScreen.tsx',
       'features/bots/screens/BotsScreen.tsx',
       'features/finance/screens/FinanceScreen.tsx',
@@ -77,7 +77,7 @@ describe('Animações de entrada global, Resumos v5 e barras/contadores em Finan
     assert.equal(monthly.includes('StaggerItem'), true, 'Monthly deve animar blocos com StaggerItem');
     assert.equal(monthly.includes('SummaryVitoNote'), false, 'Monthly não deve renderizar SummaryVitoNote');
 
-    const agenda = readSrc('components/home/AgendaView.tsx');
+    const agenda = readSrc('features/calendar/components/AgendaView.tsx');
     assert.equal(agenda.includes('vsugCard'), false, 'AgendaView não deve renderizar card de sugestão do Vito');
   });
 

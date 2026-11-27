@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 )
 
 func openPagedTestDB(t *testing.T, userID string) *TodoRepositorySQLite {

@@ -25,7 +25,7 @@ import {
   formatCountUpValue,
   getStaggerDelayMs,
 } from './motion';
-import { useScreenFocus } from '../ds/screenFocusContext';
+import { useScreenFocus } from './screenFocusContext';
 import { useReduceMotion } from './useReduceMotion';
 
 export { useReduceMotion };
@@ -34,7 +34,7 @@ export {
   useScreenEnterKey,
   useScreenFocus,
   type ScreenFocusState,
-} from '../ds/screenFocusContext';
+} from './screenFocusContext';
 export {
   AnimatedProgressBar,
   AnimatedSegmentedBar,

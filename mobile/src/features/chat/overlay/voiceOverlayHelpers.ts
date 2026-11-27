@@ -187,6 +187,8 @@ export interface OverlayActionCardData {
   subtitle: string;
   primaryLabel: string;
   secondaryLabel?: string;
+  entityId?: string;
+  entityKind?: 'event' | 'todo';
 }
 
 /**
@@ -214,7 +216,9 @@ export function extractOverlayActionCard(
       title: response.event.title || 'Compromisso',
       subtitle: response.event.start_at || 'GoogleAgenda',
       primaryLabel: 'Abrir no Vito',
-      secondaryLabel: 'Desfazer',
+      secondaryLabel: response.event.id ? 'Desfazer' : undefined,
+      entityId: response.event.id,
+      entityKind: 'event',
     };
   }
 
@@ -224,7 +228,9 @@ export function extractOverlayActionCard(
       title: response.todo.title || 'Tarefa criada',
       subtitle: response.todo.category || 'Tarefas · Pendente',
       primaryLabel: 'Abrir no Vito',
-      secondaryLabel: 'Desfazer',
+      secondaryLabel: response.todo.id ? 'Desfazer' : undefined,
+      entityId: response.todo.id,
+      entityKind: 'todo',
     };
   }
 
@@ -245,7 +251,6 @@ export function extractOverlayActionCard(
       title: first.title || 'Ação concluída',
       subtitle: first.subtitle || 'Sincronizado no Vito',
       primaryLabel: 'Abrir no Vito',
-      secondaryLabel: 'Desfazer',
     };
   }
 

@@ -4,13 +4,11 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"net/http"
 	"strings"
 	"time"
 
 	"google.golang.org/adk/v2/model"
 
-	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/domain"
 )
 
@@ -125,36 +123,8 @@ func (r *RoutedLLM) recordServerPoolSuccess(meta *TurnExecutionMeta, entry Serve
 	if meta.ModelDisplayName == "" {
 		meta.ModelDisplayName = entry.ModelID
 	}
-	effort := meta.Effort
-	agentName := meta.AgentName
-	fbUsed := meta.FallbackUsed
-	fbReason := meta.FallbackReason
-	tokensIn := meta.TokensIn
-	tokensOut := meta.TokensOut
 	meta.Mu.Unlock()
-
-	if r.traceRecorder != nil {
-		r.traceRecorder.RecordAsync(ai.AITrace{
-			UserID:            meta.UserID,
-			ThreadID:          meta.ThreadID,
-			TurnID:            meta.TurnID,
-			Channel:           meta.Channel,
-			AgentName:         agentName,
-			TaskType:          ai.TaskToolUse,
-			CredentialSource:  "server",
-			ProviderKey:       string(domain.ProviderKeyServer),
-			Effort:            effort,
-			ProviderName:      entry.DisplayName,
-			ModelName:         entry.ModelID,
-			FallbackTriggered: fbUsed,
-			FallbackReason:    fbReason,
-			TokensIn:          tokensIn,
-			TokensOut:         tokensOut,
-			LatencyMs:         time.Since(started).Milliseconds(),
-			StatusCode:        http.StatusOK,
-			CreatedAt:         time.Now().UTC(),
-		})
-	}
+	r.recordSuccessTrace(meta, "server", string(domain.ProviderKeyServer), entry.DisplayName, entry.ModelID, started)
 }
 
 func cloneLLMRequestWithModel(req *model.LLMRequest, modelID string) *model.LLMRequest {

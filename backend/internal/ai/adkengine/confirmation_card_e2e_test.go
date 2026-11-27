@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"github.com/andrevmp/vito/backend/internal/bots"
 	"github.com/andrevmp/vito/backend/internal/calendar"
+	"github.com/andrevmp/vito/backend/internal/calendar/booking"
 	"github.com/andrevmp/vito/backend/internal/tasks"
 	"path/filepath"
 	"testing"
@@ -12,8 +13,8 @@ import (
 
 	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/ai/adkengine"
-	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/andrevmp/vito/backend/internal/service"
 	"github.com/andrevmp/vito/backend/internal/service/toolsets"
@@ -62,7 +63,7 @@ func (a *testAC03CalSvc) DeleteEvent(ctx context.Context, id, userID string) err
 }
 
 type testAC03BookingSvc struct {
-	svc *calendar.BookingService
+	svc *booking.BookingService
 }
 
 func (a *testAC03BookingSvc) ListBookingTypes(ctx context.Context, userID string) ([]*domain.BookingType, error) {
@@ -151,7 +152,7 @@ func TestAC03_ChatToolsReturnRealTypedEntitiesAndCards(t *testing.T) {
 	todoSvc := tasks.NewTodoService(tasks.NewTodoRepository(db))
 	eventRepo := calendar.NewEventRepository(db)
 	calSvc := calendar.NewCalendarService(eventRepo)
-	bookingSvc := calendar.NewBookingService(calendar.NewBookingRepositorySQLite(db), eventRepo, userRepo, nil, nil, nil, "https://vito.local")
+	bookingSvc := booking.NewBookingService(booking.NewBookingRepositorySQLite(db), eventRepo, userRepo, nil, nil, nil, "https://vito.local")
 	triggerSvc := bots.NewTriggerService(bots.NewTriggerRepository(db))
 	confGate := service.NewConfirmationGateService(db)
 	scopeGuard := service.NewScopeGuard()
@@ -159,7 +160,7 @@ func TestAC03_ChatToolsReturnRealTypedEntitiesAndCards(t *testing.T) {
 	reg := toolsets.NewToolsetsRegistry()
 	reg.Register(tasks.NewTaskPendingToolset(&testAC01TodoSvc{svc: todoSvc}))
 	reg.Register(calendar.NewCalendarToolset(&testAC03CalSvc{svc: calSvc}))
-	reg.Register(calendar.NewMeetingBookingToolset(&testAC03BookingSvc{svc: bookingSvc}))
+	reg.Register(booking.NewMeetingBookingToolset(&testAC03BookingSvc{svc: bookingSvc}))
 	reg.Register(bots.NewBotTriggerToolset(&testAC03TriggerSvc{svc: triggerSvc}))
 
 	ctx := context.Background()
@@ -170,77 +171,26 @@ func TestAC03_ChatToolsReturnRealTypedEntitiesAndCards(t *testing.T) {
 		AutonomyMode: domain.AutonomyModeProactive,
 	})
 
-	providerDirect := &fakeAgentProvider{
-		name:          "Fake-Direct",
-		model:         "gemini-2.5-flash",
-		tier:          3,
-		supportsTools: true,
-		responses: []*ai.AgentChatResponse{
-			{
-				ProviderName: "Fake-Direct",
-				ModelName:    "gemini-2.5-flash",
-				ToolCalls: []ai.ToolCall{
-					{ID: "tr1", Name: "transfer_to_agent", Arguments: json.RawMessage(`{"agent_name":"vito_routine_agent"}`)},
-				},
-			},
-			{
-				ProviderName: "Fake-Direct",
-				ModelName:    "gemini-2.5-flash",
-				ToolCalls: []ai.ToolCall{
-					{ID: "t1", Name: "todo_create_todo", Arguments: json.RawMessage(`{"title":"Revisar orçamento"}`)},
-				},
-			},
-			{Text: "Tarefa criada!", ProviderName: "Fake-Direct", ModelName: "gemini-2.5-flash"},
-			{
-				ProviderName: "Fake-Direct",
-				ModelName:    "gemini-2.5-flash",
-				ToolCalls: []ai.ToolCall{
-					{ID: "tr2", Name: "transfer_to_agent", Arguments: json.RawMessage(`{"agent_name":"vito_routine_agent"}`)},
-				},
-			},
-			{
-				ProviderName: "Fake-Direct",
-				ModelName:    "gemini-2.5-flash",
-				ToolCalls: []ai.ToolCall{
-					{ID: "t2", Name: "calendar_create_event", Arguments: json.RawMessage(`{"title":"Reunião Trimestral","start_time":"2026-12-01T15:00:00-03:00","end_time":"2026-12-01T16:00:00-03:00"}`)},
-				},
-			},
-			{Text: "Evento agendado!", ProviderName: "Fake-Direct", ModelName: "gemini-2.5-flash"},
-			{
-				ProviderName: "Fake-Direct",
-				ModelName:    "gemini-2.5-flash",
-				ToolCalls: []ai.ToolCall{
-					{ID: "tr3", Name: "transfer_to_agent", Arguments: json.RawMessage(`{"agent_name":"vito_routine_agent"}`)},
-				},
-			},
-			{
-				ProviderName: "Fake-Direct",
-				ModelName:    "gemini-2.5-flash",
-				ToolCalls: []ai.ToolCall{
-					{ID: "t3", Name: "booking_create_link", Arguments: json.RawMessage(`{"title":"Café 30 min","duration_minutes":30}`)},
-				},
-			},
-			{Text: "Link de agendamento criado!", ProviderName: "Fake-Direct", ModelName: "gemini-2.5-flash"},
-			{
-				ProviderName: "Fake-Direct",
-				ModelName:    "gemini-2.5-flash",
-				ToolCalls: []ai.ToolCall{
-					{ID: "tr4", Name: "transfer_to_agent", Arguments: json.RawMessage(`{"agent_name":"vito_bots_architect"}`)},
-				},
-			},
-			{
-				ProviderName: "Fake-Direct",
-				ModelName:    "gemini-2.5-flash",
-				ToolCalls: []ai.ToolCall{
-					{ID: "t4", Name: "bot_create_bot", Arguments: json.RawMessage(`{"title":"Monitor Dólar","goal":"Avisar quando dólar cair"}`)},
-				},
-			},
-			{Text: "Bot criado!", ProviderName: "Fake-Direct", ModelName: "gemini-2.5-flash"},
+	providerDirect := &fakeADKLLM{
+		model: "gemini-2.5-flash",
+		responses: []scriptedModelResponse{
+			{ToolCalls: []ai.ToolCall{{ID: "tr1", Name: "transfer_to_agent", Arguments: json.RawMessage(`{"agent_name":"vito_routine_agent"}`)}}},
+			{ToolCalls: []ai.ToolCall{{ID: "t1", Name: "todo_create_todo", Arguments: json.RawMessage(`{"title":"Revisar orçamento"}`)}}},
+			{Text: "Tarefa criada!"},
+			{ToolCalls: []ai.ToolCall{{ID: "tr2", Name: "transfer_to_agent", Arguments: json.RawMessage(`{"agent_name":"vito_routine_agent"}`)}}},
+			{ToolCalls: []ai.ToolCall{{ID: "t2", Name: "calendar_create_event", Arguments: json.RawMessage(`{"title":"Reunião Trimestral","start_time":"2026-12-01T15:00:00-03:00","end_time":"2026-12-01T16:00:00-03:00"}`)}}},
+			{Text: "Evento agendado!"},
+			{ToolCalls: []ai.ToolCall{{ID: "tr3", Name: "transfer_to_agent", Arguments: json.RawMessage(`{"agent_name":"vito_routine_agent"}`)}}},
+			{ToolCalls: []ai.ToolCall{{ID: "t3", Name: "booking_create_link", Arguments: json.RawMessage(`{"title":"Café 30 min","duration_minutes":30}`)}}},
+			{Text: "Link de agendamento criado!"},
+			{ToolCalls: []ai.ToolCall{{ID: "tr4", Name: "transfer_to_agent", Arguments: json.RawMessage(`{"agent_name":"vito_bots_architect"}`)}}},
+			{ToolCalls: []ai.ToolCall{{ID: "t4", Name: "bot_create_bot", Arguments: json.RawMessage(`{"title":"Monitor Dólar","goal":"Avisar quando dólar cair"}`)}}},
+			{Text: "Bot criado!"},
 		},
 	}
 
 	facadeDirect, err := adkengine.NewADKLoopFacade(adkengine.FacadeConfig{
-		Router:           ai.NewModelRouter(providerDirect),
+		ServerPool:       testServerPool("Fake-Direct", "gemini-2.5-flash", providerDirect),
 		Registry:         reg,
 		ScopeGuard:       scopeGuard,
 		ConfirmationGate: confGate,
@@ -297,31 +247,16 @@ func TestAC03_ChatToolsReturnRealTypedEntitiesAndCards(t *testing.T) {
 		UserID:       userID,
 		AutonomyMode: domain.AutonomyModeAssisted,
 	})
-	providerHITL := &fakeAgentProvider{
-		name:          "Fake-HITL",
-		model:         "gemini-2.5-flash",
-		tier:          3,
-		supportsTools: true,
-		responses: []*ai.AgentChatResponse{
-			{
-				ProviderName: "Fake-HITL",
-				ModelName:    "gemini-2.5-flash",
-				ToolCalls: []ai.ToolCall{
-					{ID: "trh1", Name: "transfer_to_agent", Arguments: json.RawMessage(`{"agent_name":"vito_routine_agent"}`)},
-				},
-			},
-			{
-				ProviderName: "Fake-HITL",
-				ModelName:    "gemini-2.5-flash",
-				ToolCalls: []ai.ToolCall{
-					{ID: "h1", Name: "todo_create_todo", Arguments: json.RawMessage(`{"title":"Tarefa HITL"}`)},
-				},
-			},
-			{Text: "Confirma?", ProviderName: "Fake-HITL", ModelName: "gemini-2.5-flash"},
+	providerHITL := &fakeADKLLM{
+		model: "gemini-2.5-flash",
+		responses: []scriptedModelResponse{
+			{ToolCalls: []ai.ToolCall{{ID: "trh1", Name: "transfer_to_agent", Arguments: json.RawMessage(`{"agent_name":"vito_routine_agent"}`)}}},
+			{ToolCalls: []ai.ToolCall{{ID: "h1", Name: "todo_create_todo", Arguments: json.RawMessage(`{"title":"Tarefa HITL"}`)}}},
+			{Text: "Confirma?"},
 		},
 	}
 	facadeHITL, err := adkengine.NewADKLoopFacade(adkengine.FacadeConfig{
-		Router:           ai.NewModelRouter(providerHITL),
+		ServerPool:       testServerPool("Fake-HITL", "gemini-2.5-flash", providerHITL),
 		Registry:         reg,
 		ScopeGuard:       scopeGuard,
 		ConfirmationGate: confGate,
@@ -353,9 +288,9 @@ func TestAC03_ChatToolsReturnRealTypedEntitiesAndCards(t *testing.T) {
 	}
 
 	// Regressão: bot_create_bot com goal vazio faz fallback para title e não falha no TriggerService
-	ts, ok := reg.Get(domain.ToolsetRadarTrigger)
+	ts, ok := reg.Get(domain.ToolsetBots)
 	if !ok || ts == nil {
-		t.Fatalf("ToolsetRadarTrigger não registrado")
+		t.Fatalf("ToolsetBots não registrado")
 	}
 	botRes, botErr := ts.Execute(ctx, &domain.ToolExecutionContext{UserID: userID}, "create_bot", json.RawMessage(`{"title":"Rastreador Poco x8 Pro"}`))
 	if botErr != nil || botRes == nil || botRes.Status != "COMPLETED" {
@@ -367,24 +302,15 @@ func TestAC03_ChatToolsReturnRealTypedEntitiesAndCards(t *testing.T) {
 		UserID:       userID,
 		AutonomyMode: domain.AutonomyModeProactive,
 	})
-	providerRootBot := &fakeAgentProvider{
-		name:          "Fake-RootBot",
-		model:         "gemini-2.5-flash",
-		tier:          3,
-		supportsTools: true,
-		responses: []*ai.AgentChatResponse{
-			{
-				ProviderName: "Fake-RootBot",
-				ModelName:    "gemini-2.5-flash",
-				ToolCalls: []ai.ToolCall{
-					{ID: "rb1", Name: "bot_create_bot", Arguments: json.RawMessage(`{"title":"Bot Direto Root","goal":"Monitorar promoções"}`)},
-				},
-			},
-			{Text: "Bot Direto Root criado!", ProviderName: "Fake-RootBot", ModelName: "gemini-2.5-flash"},
+	providerRootBot := &fakeADKLLM{
+		model: "gemini-2.5-flash",
+		responses: []scriptedModelResponse{
+			{ToolCalls: []ai.ToolCall{{ID: "rb1", Name: "bot_create_bot", Arguments: json.RawMessage(`{"title":"Bot Direto Root","goal":"Monitorar promoções"}`)}}},
+			{Text: "Bot Direto Root criado!"},
 		},
 	}
 	facadeRootBot, err := adkengine.NewADKLoopFacade(adkengine.FacadeConfig{
-		Router:           ai.NewModelRouter(providerRootBot),
+		ServerPool:       testServerPool("Fake-RootBot", "gemini-2.5-flash", providerRootBot),
 		Registry:         reg,
 		ScopeGuard:       scopeGuard,
 		ConfirmationGate: confGate,

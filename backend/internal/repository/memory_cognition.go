@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 )
 
 // EmbedderFunc calcula o embedding vetorial float32 de um texto (ex.: gemini-embedding-001).
@@ -312,7 +312,7 @@ func (r *MemoryRepositorySQLite) recentActive(userID string, limit int) ([]domai
 
 // Reinforce aplica reforço por uso (Spaced Reinforcement, §8.3).
 func (r *MemoryRepositorySQLite) Reinforce(id, userID string) error {
-	return ExecuteQueuedWrite(context.Background(), func() error {
+	return database.ExecuteQueuedWrite(context.Background(), func() error {
 		_, err := r.db.Exec(`
 			UPDATE memories
 			SET access_count = COALESCE(access_count, 0) + 1,
@@ -325,7 +325,7 @@ func (r *MemoryRepositorySQLite) Reinforce(id, userID string) error {
 
 // Supersede marca a memória como substituída, preservando histórico.
 func (r *MemoryRepositorySQLite) Supersede(id, userID, supersededBy string) error {
-	return ExecuteQueuedWrite(context.Background(), func() error {
+	return database.ExecuteQueuedWrite(context.Background(), func() error {
 		_, err := r.db.Exec(`
 			UPDATE memories
 			SET superseded_by = ?, updated_at = ?

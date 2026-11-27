@@ -1,6 +1,6 @@
 {
   "name": "vito-mobile",
-  "version": "0.1.36",
+  "version": "0.1.37",
   "private": true,
   "scripts": {
     "start": "expo start",
@@ -8,25 +8,17 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "proto:extract": "node ../scripts/extract-prototype.mjs",
-    "test": "tsx --test src/__tests__/byokFixes.test.ts src/__tests__/notificationsInboxNoDuplicates.test.ts src/__tests__/notificationSingleSource.test.ts src/__tests__/chatConfirmationAndInlineCards.test.ts src/__tests__/chatStreamMetadataAndHistory.test.ts src/__tests__/chatStreamSafety.test.ts src/__tests__/fatia1ReanimatedSkia.test.ts src/__tests__/fatia2TabsVisualParity.test.ts src/__tests__/fatia3SubScreensParity.test.ts src/__tests__/notificationBarDesign.test.ts src/__tests__/navbarAndFinanceColors.test.ts src/__tests__/animationsAndSummariesParity.test.ts src/prototype/__tests__/cssToRn.test.ts src/ds/__tests__/dsParity.test.ts src/mascot/__tests__/mascotParity.test.ts src/charts/__tests__/chartsParity.test.ts src/features/chat/components/__tests__/onda5ChatVoiceParity.test.ts src/features/tasks/components/tasks/__tests__/onda6AgendaTasksParity.test.ts src/features/finance/components/__tests__/onda7FinanceParity.test.ts src/__tests__/onda8SecondaryScreensParity.test.ts src/__tests__/onda9ProfileEcosystemParity.test.ts src/__tests__/syncEngineV2.test.ts src/utils/device/clipboard.test.ts src/utils/formatting/smartActionBuilders.test.ts src/features/calendar/utils/__tests__/summaryCalculators.test.ts src/features/tasks/utils/__tests__/taskBuckets.test.ts src/features/calendar/utils/__tests__/agendaTabComponents.test.ts src/utils/navigation/pagerNavigation.test.ts src/features/calendar/utils/calendarDateUtils.test.ts src/features/calendar/utils/agendaFilter.test.ts src/features/calendar/utils/tokiCalendarUtils.test.ts src/features/chat/utils/chatActions.test.ts src/features/notifications/utils/notificationReconcile.test.ts src/features/chat/utils/chatGreetings.test.ts src/features/chat/utils/chatCards.test.ts src/features/chat/utils/chatSendGuard.test.ts src/features/chat/utils/chatPreview.test.ts src/features/tasks/utils/unifiedTasks.test.ts src/features/tasks/utils/reminderInput.test.ts src/utils/device/dateTimePicker.test.ts src/utils/device/keyboardHeight.test.ts src/utils/formatting/phoneFormat.test.ts src/features/calendar/services/contactMatchingService.test.ts src/features/calendar/services/p2pMeetingsApi.test.ts src/features/profile/services/whatsappApi.test.ts src/features/profile/services/gmailApi.test.ts src/features/profile/services/whatsappAuthApi.test.ts src/features/profile/services/whatsappContextApi.test.ts src/features/calendar/utils/slotAvailability.test.ts src/services/dataSync.test.ts src/types/focus.test.ts src/utils/device/platformInfo.test.ts src/services/api/authSession.test.ts src/services/googleSignInErrors.test.ts src/services/googleOAuthCallback.test.ts src/services/googleSignInOptions.test.ts src/features/notifications/utils/notificationPermissionPolicy.test.ts src/features/profile/utils/savedContactNames.test.ts src/features/auth/__tests__/demoScenes.test.ts src/features/auth/__tests__/demoMachine.test.ts src/features/auth/__tests__/AuthIconPill.test.ts src/features/auth/__tests__/EmailSheet.test.ts src/features/auth/__tests__/headlineReel.test.ts src/features/chat/utils/chatCardAnimation.test.ts src/features/chat/components/__tests__/chatIdeasDeck.test.ts src/features/chat/services/voice/__tests__/voiceActivationService.test.ts src/features/chat/overlay/__tests__/voiceOverlayHelpers.test.ts src/features/profile/components/profile/__tests__/voiceSelector.test.ts src/features/finance/components/__tests__/bentoAccountHero.test.ts src/__tests__/versionParity.test.ts src/theme/__tests__/keyframesParity.test.ts src/__tests__/plano02Elevation.test.ts src/__tests__/aiProvidersPlan3.test.ts src/__tests__/botsPlan4.test.ts src/features/bots/mascot/__tests__/mascotRig.test.ts src/features/finance/utils/__tests__/pluggyKeys.test.ts src/features/finance/utils/__tests__/byokFlow.test.ts src/features/finance/utils/__tests__/pluggyBrowserReset.test.ts src/features/finance/services/pluggyService.test.ts src/features/auth/__tests__/emailAuth.test.ts src/features/auth/__tests__/loginPalette.test.ts src/features/auth/__tests__/ondaV3.test.ts src/features/auth/__tests__/useDemoLoop.test.ts src/features/auth/__tests__/onda2Fidelity.test.ts"
+    "test": "tsx --test src/__tests__/byokFixes.test.ts src/__tests__/notificationsInboxNoDuplicates.test.ts src/__tests__/notificationSingleSource.test.ts src/__tests__/chatConfirmationAndInlineCards.test.ts src/__tests__/chatStreamMetadataAndHistory.test.ts src/__tests__/chatStreamSafety.test.ts src/__tests__/fatia1ReanimatedSkia.test.ts src/__tests__/fatia2TabsVisualParity.test.ts src/__tests__/fatia3SubScreensParity.test.ts src/__tests__/notificationBarDesign.test.ts src/__tests__/navbarAndFinanceColors.test.ts src/__tests__/animationsAndSummariesParity.test.ts src/theme/__tests__/designSystemParity.test.ts src/mascot/__tests__/mascotParity.test.ts src/charts/__tests__/chartsParity.test.ts src/features/chat/components/__tests__/onda5ChatVoiceParity.test.ts src/features/tasks/components/__tests__/onda6AgendaTasksParity.test.ts src/features/finance/components/__tests__/onda7FinanceParity.test.ts src/__tests__/onda8SecondaryScreensParity.test.ts src/__tests__/onda9ProfileEcosystemParity.test.ts src/__tests__/syncEngineV2.test.ts src/utils/device/clipboard.test.ts src/utils/formatting/smartActionBuilders.test.ts src/features/calendar/utils/__tests__/summaryCalculators.test.ts src/features/tasks/utils/__tests__/taskBuckets.test.ts src/features/calendar/utils/__tests__/agendaTabComponents.test.ts src/utils/navigation/pagerNavigation.test.ts src/features/calendar/utils/calendarDateUtils.test.ts src/features/calendar/utils/agendaFilter.test.ts src/features/calendar/utils/monthCalendarUtils.test.ts src/features/chat/utils/chatActions.test.ts src/features/chat/utils/chatGreetings.test.ts src/features/chat/utils/chatCards.test.ts src/features/chat/utils/chatSendGuard.test.ts src/features/chat/utils/chatPreview.test.ts src/features/tasks/utils/unifiedTasks.test.ts src/utils/device/keyboardHeight.test.ts src/utils/formatting/phoneFormat.test.ts src/features/profile/services/phoneVerificationService.test.ts src/features/profile/services/whatsappApi.test.ts src/features/profile/services/gmailApi.test.ts src/features/profile/services/whatsappAuthApi.test.ts src/services/dataSync.test.ts src/utils/device/platformInfo.test.ts src/services/api/authSession.test.ts src/services/googleSignInErrors.test.ts src/services/googleOAuthCallback.test.ts src/services/googleSignInOptions.test.ts src/features/notifications/utils/notificationPermissionPolicy.test.ts src/features/auth/__tests__/demoScenes.test.ts src/features/auth/__tests__/demoMachine.test.ts src/features/auth/__tests__/EmailSheet.test.ts src/features/auth/__tests__/headlineReel.test.ts src/features/chat/utils/chatCardAnimation.test.ts src/features/chat/components/__tests__/chatIdeasDeck.test.ts src/features/profile/services/voice/__tests__/voiceActivationService.test.ts src/features/chat/overlay/__tests__/voiceOverlayHelpers.test.ts src/features/profile/components/__tests__/voiceSelector.test.ts src/__tests__/versionParity.test.ts src/__tests__/plano02Elevation.test.ts src/__tests__/aiProvidersPlan3.test.ts src/__tests__/botsPlan4.test.ts src/features/bots/mascot/__tests__/mascotRig.test.ts src/features/finance/utils/__tests__/pluggyKeys.test.ts src/features/finance/utils/__tests__/byokFlow.test.ts src/features/finance/services/pluggyService.test.ts src/features/auth/__tests__/emailAuth.test.ts src/features/auth/__tests__/loginPalette.test.ts src/features/auth/__tests__/ondaV3.test.ts src/features/auth/__tests__/useDemoLoop.test.ts src/features/auth/__tests__/onda2Fidelity.test.ts"
   },
   "dependencies": {
     "@expo-google-fonts/geist": "^0.4.2",
     "@expo-google-fonts/geist-mono": "^0.4.3",
-    "@expo-google-fonts/inter": "^0.4.2",
-    "@expo-google-fonts/montserrat": "^0.4.2",
-    "@expo-google-fonts/roboto": "^0.4.3",
     "@expo/metro-runtime": "~57.0.16",
-    "@expo/vector-icons": "^15.1.1",
     "@react-native-async-storage/async-storage": "2.2.0",
-    "@react-native-community/datetimepicker": "^8.4.4",
     "@react-native-google-signin/google-signin": "^16.1.5",
-    "@react-navigation/bottom-tabs": "^7.21.0",
     "@react-navigation/native": "^7.5.1",
-    "@react-navigation/native-stack": "^7.21.0",
     "@react-navigation/stack": "^7.12.2",
     "@shopify/react-native-skia": "2.6.2",
-    "@tanstack/react-query": "^5.104.2",
     "expo": "^57.0.25",
     "expo-asset": "~57.0.18",
     "expo-audio": "~57.0.5",
@@ -49,13 +41,11 @@
     "react-dom": "19.2.3",
     "react-native": "0.86.3",
     "react-native-gesture-handler": "~2.32.0",
-    "react-native-pager-view": "^6.9.1",
     "react-native-reanimated": "4.5.1",
     "react-native-safe-area-context": "^5.10.1",
     "react-native-screens": "^4.30.0",
     "react-native-svg": "15.15.4",
     "react-native-web": "^0.21.2",
-    "react-native-webview": "13.16.1",
     "react-native-worklets": "0.10.1"
   },
   "devDependencies": {

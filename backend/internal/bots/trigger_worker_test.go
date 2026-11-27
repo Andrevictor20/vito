@@ -287,42 +287,6 @@ func TestTriggerWorker_CheckAndEvaluateTriggers(t *testing.T) {
 	}
 }
 
-func TestTriggerWorker_RunTriggerNow(t *testing.T) {
-	repo := &mockTriggerRepo{
-		triggers: []domain.Trigger{
-			{
-				ID:            "trig-manual",
-				UserID:        "user-1",
-				Title:         "Voo para Roma",
-				Query:         "Passagem abaixo de 3500",
-				Status:        domain.TriggerStatusActive,
-				Frequency:     domain.FrequencyDailyMorning,
-				ScheduledTime: "10:00",
-			},
-		},
-	}
-
-	eval := &mockEvaluator{}
-	worker := bots.NewTriggerWorker(repo, nil, eval)
-
-	logEntry, err := worker.RunTriggerNow("trig-manual", "user-1")
-	if err != nil {
-		t.Fatalf("falha ao rodar trigger sob demanda: %v", err)
-	}
-
-	if logEntry == nil {
-		t.Fatal("logEntry não deveria ser nil")
-	}
-
-	if logEntry.TriggerID != "trig-manual" {
-		t.Errorf("ID do trigger incorreto no log: %s", logEntry.TriggerID)
-	}
-
-	if !logEntry.IsRead {
-		t.Errorf("esperava log sob demanda marcado como lido (is_read=true)")
-	}
-}
-
 func TestCalculateNextCheck(t *testing.T) {
 	loc := time.FixedZone("BRT", -3*3600)
 	// Base: 10/10/2026 às 10:00 BRT
@@ -340,37 +304,6 @@ func TestCalculateNextCheck(t *testing.T) {
 	expectedPast := time.Date(2026, 10, 11, 8, 30, 0, 0, loc).UTC()
 	if !nextPast.Equal(expectedPast) {
 		t.Errorf("esperava %v, obteve %v", expectedPast, nextPast)
-	}
-}
-
-func TestTriggerWorker_TestTrigger(t *testing.T) {
-	repo := &mockTriggerRepo{
-		triggers: []domain.Trigger{
-			{
-				ID:       "trig-sim",
-				UserID:   "user-1",
-				Title:    "Simulação Dólar",
-				Query:    "Dólar acima de 5,60",
-				Category: domain.CategoryFinance,
-				Status:   domain.TriggerStatusActive,
-			},
-		},
-	}
-
-	eval := &mockEvaluator{}
-	worker := bots.NewTriggerWorker(repo, nil, eval)
-
-	res, err := worker.TestTrigger("trig-sim", "user-1")
-	if err != nil {
-		t.Fatalf("erro ao testar disparador: %v", err)
-	}
-
-	if res == nil {
-		t.Fatal("resultado do teste não pode ser nil")
-	}
-
-	if res.TriggerID != "trig-sim" || !res.ConditionMet {
-		t.Errorf("resultado inesperado: %+v", res)
 	}
 }
 

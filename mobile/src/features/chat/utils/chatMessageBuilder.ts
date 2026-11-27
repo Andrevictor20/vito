@@ -110,6 +110,7 @@ export const buildAssistantMessage = (
   const fallbackReason = res.telemetry?.fallback_reason || '';
   const byokWarning =
     res.byok_warning ||
+    res.fallback_notice ||
     (fallbackReason.startsWith('byok_401') || fallbackReason.startsWith('byok_403')
       ? 'Sua chave própria foi recusada. Usei o servidor nesta resposta.'
       : undefined);

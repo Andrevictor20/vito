@@ -174,6 +174,19 @@ func (r *RoutedLLM) recordBYOKSuccess(meta *TurnExecutionMeta, resolved *service
 	meta.ProviderUsed = service.ProviderDisplayName(resolved.ProviderKey)
 	meta.ModelUsed = resolved.ModelID
 	meta.ModelDisplayName = resolved.DisplayName
+	meta.Mu.Unlock()
+	r.recordSuccessTrace(meta, "byok", string(resolved.ProviderKey), service.ProviderDisplayName(resolved.ProviderKey), resolved.ModelID, started)
+}
+
+func (r *RoutedLLM) recordSuccessTrace(
+	meta *TurnExecutionMeta,
+	credentialSource, providerKey, providerName, modelName string,
+	started time.Time,
+) {
+	if r == nil || r.traceRecorder == nil || meta == nil {
+		return
+	}
+	meta.Mu.Lock()
 	effort := meta.Effort
 	agentName := meta.AgentName
 	fbUsed := meta.FallbackUsed
@@ -182,46 +195,6 @@ func (r *RoutedLLM) recordBYOKSuccess(meta *TurnExecutionMeta, resolved *service
 	tokensOut := meta.TokensOut
 	meta.Mu.Unlock()
 
-	if r.traceRecorder != nil {
-		r.traceRecorder.RecordAsync(ai.AITrace{
-			UserID:            meta.UserID,
-			ThreadID:          meta.ThreadID,
-			TurnID:            meta.TurnID,
-			Channel:           meta.Channel,
-			AgentName:         agentName,
-			TaskType:          ai.TaskToolUse,
-			CredentialSource:  "byok",
-			ProviderKey:       string(resolved.ProviderKey),
-			Effort:            effort,
-			ProviderName:      service.ProviderDisplayName(resolved.ProviderKey),
-			ModelName:         resolved.ModelID,
-			FallbackTriggered: fbUsed,
-			FallbackReason:    fbReason,
-			TokensIn:          tokensIn,
-			TokensOut:         tokensOut,
-			LatencyMs:         time.Since(started).Milliseconds(),
-			StatusCode:        http.StatusOK,
-			CreatedAt:         time.Now().UTC(),
-		})
-	}
-}
-
-func (r *RoutedLLM) recordServerTrace(meta *TurnExecutionMeta, provider ai.AgentProvider, resp *ai.AgentChatResponse, started time.Time) {
-	if r == nil || r.traceRecorder == nil || meta == nil || provider == nil {
-		return
-	}
-	meta.Mu.Lock()
-	effort := meta.Effort
-	agentName := meta.AgentName
-	fbUsed := meta.FallbackUsed
-	fbReason := meta.FallbackReason
-	meta.Mu.Unlock()
-
-	var tokIn, tokOut int
-	if resp != nil {
-		tokIn = resp.TokensIn
-		tokOut = resp.TokensOut
-	}
 	r.traceRecorder.RecordAsync(ai.AITrace{
 		UserID:            meta.UserID,
 		ThreadID:          meta.ThreadID,
@@ -229,15 +202,15 @@ func (r *RoutedLLM) recordServerTrace(meta *TurnExecutionMeta, provider ai.Agent
 		Channel:           meta.Channel,
 		AgentName:         agentName,
 		TaskType:          ai.TaskToolUse,
-		CredentialSource:  "server",
-		ProviderKey:       string(domain.ProviderKeyServer),
+		CredentialSource:  credentialSource,
+		ProviderKey:       providerKey,
 		Effort:            effort,
-		ProviderName:      provider.Name(),
-		ModelName:         provider.ModelName(),
+		ProviderName:      providerName,
+		ModelName:         modelName,
 		FallbackTriggered: fbUsed,
 		FallbackReason:    fbReason,
-		TokensIn:          tokIn,
-		TokensOut:         tokOut,
+		TokensIn:          tokensIn,
+		TokensOut:         tokensOut,
 		LatencyMs:         time.Since(started).Milliseconds(),
 		StatusCode:        http.StatusOK,
 		CreatedAt:         time.Now().UTC(),

@@ -77,6 +77,7 @@ export class ChatApi {
         timezone: tz,
         current_local_time: currentLocalTime,
         history: opts.history,
+        reset_history: opts.reset_history,
         focus_mode: opts.focus_mode,
       }),
     });
@@ -102,7 +103,8 @@ export class ChatApi {
 
     const bodyPayload = JSON.stringify({
       thread_id: opts.thread_id, channel: opts.channel || 'app_mobile', prompt,
-      timezone: tz, current_local_time: currentLocalTime, history: opts.history, focus_mode: opts.focus_mode,
+      timezone: tz, current_local_time: currentLocalTime, history: opts.history,
+      reset_history: opts.reset_history, focus_mode: opts.focus_mode,
     });
 
     return executeChatStreamFetch({
@@ -257,7 +259,8 @@ export class ChatApi {
     filename: string = 'image.jpg',
     timezone?: string,
     base64Override?: string,
-    mimeType?: string
+    mimeType?: string,
+    threadId?: string
   ): Promise<AssistantChatResponse> {
     const tz = timezone || this.getUserTimezone();
     const currentLocalTime = this.getCurrentLocalTimeISO();
@@ -276,7 +279,9 @@ export class ChatApi {
           method: 'POST',
           timeoutMs: visionTimeoutMs,
           body: JSON.stringify({
+            thread_id: threadId,
             image_b64: b64,
+            mime_type: resolvedMime,
             image_mime: resolvedMime,
             prompt,
             timezone: tz,
@@ -300,6 +305,9 @@ export class ChatApi {
       type: resolvedMime,
     } as unknown as Blob);
 
+    if (threadId) {
+      formData.append('thread_id', threadId);
+    }
     if (prompt) {
       formData.append('prompt', prompt);
     }
@@ -392,6 +400,21 @@ export class ChatApi {
     } catch {
       // Silencioso
     }
+  }
+
+  async sendMessageFeedback(
+    messageId: string,
+    rating: 'like' | 'dislike',
+    content?: string
+  ): Promise<void> {
+    await this.client.request<{ status?: string }>('/api/v1/chat/messages/feedback', {
+      method: 'POST',
+      body: JSON.stringify({
+        message_id: messageId,
+        rating,
+        content,
+      }),
+    });
   }
 
   async voiceTTS(

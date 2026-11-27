@@ -2,12 +2,10 @@ package evolution
 
 import (
 	"encoding/json"
-	"regexp"
+	"github.com/andrevmp/vito/backend/internal/domain"
 	"sort"
 	"strings"
 )
-
-var nonDigitsRe = regexp.MustCompile(`\D+`)
 
 // NormalizeJIDForSend normaliza o JID para envio de mensagens pela Evolution API.
 // Em conversas 1-on-1 (@s.whatsapp.net), remove o sufixo de dispositivo multi-device (:33, :1, etc.).
@@ -29,7 +27,7 @@ func NormalizeJIDForSend(jid string) string {
 
 // PhoneDigits extrai apenas os dígitos de um JID/telefone.
 func PhoneDigits(raw string) string {
-	return nonDigitsRe.ReplaceAllString(raw, "")
+	return domain.PhoneDigits(raw)
 }
 
 // SubtypesOf devolve as sub-mensagens do payload `message` por nome.
@@ -92,4 +90,3 @@ func ExtractQuotedContext(raw json.RawMessage, textExtractor func(json.RawMessag
 	}
 	return text, strings.TrimSpace(payload.ContextInfo.Participant)
 }
-

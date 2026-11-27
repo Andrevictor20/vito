@@ -8,7 +8,7 @@ import { tabularNumbers } from '../../../../theme/tokens';
 import { CountUpText, StaggerItem, useReduceMotion } from '../../../../theme/vitoMotion';
 import type { MonthWeekItem } from '../../utils/summaryCalculators';
 import type { WeeklySummaryItem } from '../../utils/weeklySummaryCalculator';
-import { withHexAlpha } from '../../../finance/components/shared/financeHelpers';
+import { withHexAlpha } from '../../../finance/utils/financeHelpers';
 import {
   SummaryBalanceDonut,
   SummaryCard,

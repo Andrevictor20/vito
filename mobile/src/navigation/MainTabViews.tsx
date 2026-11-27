@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { DOCK_TABS, type DockTabType } from '../components/common/FloatingTabBar';
 import { Header, HeaderRoundButton } from '../components/common/Header';
-import { dataSync, tabNavigationBus } from '../services/dataSync';
+import { chatPromptBus, dataSync, tabNavigationBus } from '../services/dataSync';
 import { BotsScreen } from '../features/bots/screens/BotsScreen';
 import { ChatScreen, ChatScreenRef } from '../features/chat/screens/ChatScreen';
 import { TasksScreen } from '../features/tasks/screens/TasksScreen';
@@ -165,7 +165,11 @@ export const TasksTabScreen: React.FC = () => {
           <HeaderRoundButton
             icon="auto-awesome"
             variant="primary"
-            onPress={() => tabNavigationBus.notify('chat')}
+            onPress={() =>
+              chatPromptBus.askAssistant(
+                'Quero criar uma nova tarefa. Me pergunte o título e o prazo, ou sugira como organizar minhas pendências de hoje.',
+              )
+            }
             accessibilityLabel="Pedir ao Vito: nova tarefa"
             size={20}
           />
@@ -186,7 +190,11 @@ export const TasksTabScreen: React.FC = () => {
         onDeleteSubtask={home.handleDeleteSubtask}
         onSaveTodoFull={home.handleCreateTodo}
         onUpdateTodoFull={home.handleUpdateTodo}
-        onOpenEventCreate={() => {}}
+        onOpenEventCreate={(title, date) =>
+          chatPromptBus.askAssistant(
+            `Agendar compromisso na agenda para a pendência "${title}"${date ? ` no dia ${date}` : ''}.`,
+          )
+        }
         createRequestId={createRequestId}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}

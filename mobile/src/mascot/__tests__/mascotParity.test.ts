@@ -1,9 +1,9 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import keyframesJson from '../../prototype/keyframes.json'
-import { MASCOT_PRESETS, MASCOT_TRACKS, resolveMascotSkin } from '../mascotSpecs'
+import { MASCOT_TRACKS } from '../../features/bots/mascot/mascotTracks.generated'
+import { MASCOT_PRESETS, resolveSkin } from '../../features/bots/mascot/mascotPalettes'
 
-describe('Onda 3C — Mascote derivado de keyframes.json + presets', () => {
+describe('Onda 3C — Mascote pré-compilado + presets', () => {
   it('todos os 9 estados têm trilhas derivadas do CSS', () => {
     const expectedStates = [
       'idle',
@@ -21,7 +21,7 @@ describe('Onda 3C — Mascote derivado de keyframes.json + presets', () => {
       const tracks = MASCOT_TRACKS[st]
       assert.ok(tracks.length > 0, `estado ${st} sem trilhas`)
       for (const t of tracks) {
-        assert.ok(t.keyframe in keyframesJson, `${t.keyframe} ausente em keyframes.json`)
+        assert.ok(t.keyframe.startsWith('anim-'), `${st}.${t.part} keyframe inválido: ${t.keyframe}`)
         assert.ok(t.durationMs > 0, `${st}.${t.part} duração inválida`)
         assert.ok(Object.keys(t.stops).length > 0, `${st}.${t.part} sem stops`)
       }
@@ -48,17 +48,17 @@ describe('Onda 3C — Mascote derivado de keyframes.json + presets', () => {
     assert.equal(z1?.durationMs, 3000)
   })
 
-  it('10 MASCOT_PRESETS e resolveMascotSkin funcionam em claro e escuro', () => {
+  it('10 MASCOT_PRESETS e resolveSkin funcionam em claro e escuro', () => {
     assert.equal(MASCOT_PRESETS.length, 10)
-    const light = resolveMascotSkin(MASCOT_PRESETS[0], false)
+    const light = resolveSkin(MASCOT_PRESETS[0], false)
     assert.equal(light.fill, '#FFFFFF')
     assert.equal(light.stroke, '#0A0A0A')
 
-    const dark = resolveMascotSkin(MASCOT_PRESETS[0], true)
+    const dark = resolveSkin(MASCOT_PRESETS[0], true)
     assert.equal(dark.fill, '#171717')
     assert.equal(dark.stroke, '#F5F5F5')
 
-    const noir = resolveMascotSkin(MASCOT_PRESETS[1], false)
+    const noir = resolveSkin(MASCOT_PRESETS[1], false)
     assert.equal(noir.fill, '#141416')
     assert.equal(noir.bowtie, '#FF3B30')
   })

@@ -13,7 +13,7 @@ import { useTheme } from '../../../context/ThemeContext';
 import { v5Radii } from '../../../theme/tokens';
 import { hapticFeedback } from '../../../theme/motion';
 
-export type ChatAttachmentOption = 'camera' | 'gallery' | 'pdf';
+export type ChatAttachmentOption = 'camera' | 'gallery';
 
 interface ChatAttachmentSheetProps {
   visible: boolean;
@@ -38,12 +38,6 @@ const OPTIONS: ReadonlyArray<{
     icon: 'photo-library',
     title: 'Galeria de fotos',
     subtitle: 'Enviar print ou comprovante',
-  },
-  {
-    id: 'pdf',
-    icon: 'description',
-    title: 'Arquivo ou PDF',
-    subtitle: 'Faturas, contratos e documentos',
   },
 ];
 
@@ -87,7 +81,7 @@ export const ChatAttachmentSheet: React.FC<ChatAttachmentSheetProps> = ({
             <View style={styles.headerText}>
               <Text style={[styles.title, { color: colors.ink }]}>Anexar ao chat</Text>
               <Text style={[styles.subtitle, { color: colors.muted }]}>
-                O Vito lê imagens e PDFs automaticamente
+                O Vito analisa fotos, recibos e comprovantes
               </Text>
             </View>
             <TouchableOpacity

@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"time"
 
 	"github.com/andrevmp/vito/backend/internal/domain"
@@ -119,7 +120,7 @@ func (r *AISettingsRepositorySQLite) UpsertSettings(s *domain.AISettings) error 
 			default_effort = excluded.default_effort,
 			updated_at = excluded.updated_at
 	`
-	return ExecuteQueuedWrite(context.Background(), func() error {
+	return database.ExecuteQueuedWrite(context.Background(), func() error {
 		_, err := r.db.Exec(
 			query,
 			s.UserID,
@@ -168,7 +169,7 @@ func (r *AISettingsRepositorySQLite) UpdatePreferences(ctx context.Context, user
 			default_effort = excluded.default_effort,
 			updated_at = excluded.updated_at
 	`
-	return ExecuteQueuedWrite(ctx, func() error {
+	return database.ExecuteQueuedWrite(ctx, func() error {
 		_, err := r.db.ExecContext(ctx, query, userID, defaultModel, defaultEffort, now, now)
 		return err
 	})
@@ -181,7 +182,7 @@ func (r *AISettingsRepositorySQLite) ClearProviderPrefs(ctx context.Context, use
 		SET default_model = '', updated_at = ?
 		WHERE user_id = ? AND default_model LIKE ?
 	`
-	return ExecuteQueuedWrite(ctx, func() error {
+	return database.ExecuteQueuedWrite(ctx, func() error {
 		_, err := r.db.ExecContext(ctx, query, time.Now().UTC(), userID, providerKey+":%")
 		return err
 	})

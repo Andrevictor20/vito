@@ -3,11 +3,11 @@ import {
   ActivityIndicator,
   RefreshControl,
   ScrollView,
-  StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { financeScreenStyles as styles } from './FinanceScreen.styles';
 import { ProtoUiIcon } from '../../../icons/ProtoUiIcons';
 import { tokens } from '../../../theme/tokens';
 import { useTheme } from '../../../context/ThemeContext';
@@ -34,7 +34,7 @@ import {
   EMPTY_FINANCIAL_SUMMARY,
   formatBRL,
   normalizeSummary,
-} from '../components/shared/financeHelpers';
+} from '../utils/financeHelpers';
 import { syncAllUserConnections } from '../services/financeSyncRunner';
 import { useFinanceAutoSync } from '../hooks/useFinanceAutoSync';
 
@@ -60,17 +60,51 @@ export const FinanceScreen: React.FC = () => {
 
   const loadAllFinanceData = useCallback(async () => {
     try {
-      const [sumRes, accRes, txRes, connRes] = await Promise.allSettled([
+      const [sumRes, accRes, txRes, connRes, limitsRes] = await Promise.allSettled([
         api.finance.getSummary(),
         api.finance.getAccounts(),
         api.finance.getTransactions(100, 0),
         api.finance.getConnections(),
+        api.finance.getLimits(),
       ]);
 
-      if (sumRes.status === 'fulfilled' && sumRes.value) {
-        setSummary(normalizeSummary(sumRes.value));
-      } else if (sumRes.status === 'rejected') {
-        setSummary(EMPTY_FINANCIAL_SUMMARY);
+      const baseSummary =
+        sumRes.status === 'fulfilled' && sumRes.value
+          ? normalizeSummary(sumRes.value)
+          : sumRes.status === 'rejected'
+            ? EMPTY_FINANCIAL_SUMMARY
+            : null;
+
+      if (baseSummary) {
+        if (limitsRes.status === 'fulfilled' && Array.isArray(limitsRes.value)) {
+          const mappedBudgets = limitsRes.value
+            .filter((lim) => lim.rule?.kind !== 'SAVINGS_GOAL')
+            .map((lim) => ({
+              id: lim.rule?.id,
+              title: lim.rule?.title || lim.rule?.category_filter || 'Limite',
+              category_filter: lim.rule?.category_filter,
+              used_amount: lim.spent_amount ?? 0,
+              target_amount: lim.rule?.target_amount ?? 0,
+              auto_alert_threshold:
+                lim.rule?.auto_alert_threshold ?? lim.rule?.alert_thresholds?.[0],
+            }));
+          const mappedGoals = limitsRes.value
+            .filter((lim) => lim.rule?.kind === 'SAVINGS_GOAL')
+            .map((lim) => ({
+              id: lim.rule?.id,
+              title: lim.rule?.title || 'Meta',
+              current_amount: lim.rule?.current_amount ?? lim.spent_amount ?? 0,
+              target_amount: lim.rule?.target_amount ?? 0,
+              deadline_date: lim.rule?.deadline_date,
+            }));
+          setSummary({
+            ...baseSummary,
+            budgets: mappedBudgets.length > 0 ? mappedBudgets : baseSummary.budgets,
+            goals: mappedGoals.length > 0 ? mappedGoals : baseSummary.goals,
+          });
+        } else {
+          setSummary(baseSummary);
+        }
       }
 
       if (accRes.status === 'fulfilled' && Array.isArray(accRes.value)) {
@@ -365,125 +399,11 @@ export const FinanceScreen: React.FC = () => {
         visible={connectModalVisible}
         onClose={() => setConnectModalVisible(false)}
         onConnectionSuccess={() => void loadAllFinanceData()}
+        onOpenCustomLimits={() => {
+          setConnectModalVisible(false);
+          setSubScreenKey('goal');
+        }}
       />
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 120,
-  },
-  head: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: 10,
-    marginBottom: 14,
-  },
-  headLeft: {
-    flex: 1,
-    minWidth: 0,
-  },
-  mainTitle: {
-    fontFamily: 'Geist_500Medium',
-    fontSize: 32,
-    lineHeight: 34,
-    fontWeight: '500',
-    letterSpacing: -0.96,
-  },
-  mainSubtitle: {
-    fontFamily: 'Geist',
-    fontSize: 14,
-    marginTop: 4,
-    fontWeight: '400',
-  },
-  headActs: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 2,
-  },
-  rb: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyCard: {
-    borderRadius: 22,
-    borderWidth: 1,
-    padding: 22,
-    alignItems: 'flex-start',
-    marginTop: 6,
-    marginBottom: 10,
-  },
-  emptyChip: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 14,
-  },
-  emptyTitle: {
-    fontFamily: 'Geist_500Medium',
-    fontSize: 18,
-    fontWeight: '500',
-    letterSpacing: -0.3,
-  },
-  emptySub: {
-    fontFamily: 'Geist',
-    fontSize: 13.5,
-    lineHeight: 20,
-    marginTop: 6,
-  },
-  emptyCta: {
-    height: 46,
-    borderRadius: 23,
-    paddingHorizontal: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 18,
-    alignSelf: 'stretch',
-  },
-  emptyCtaText: {
-    fontFamily: 'Geist_500Medium',
-    fontSize: 15,
-    fontWeight: '500',
-  },
-  secHeader: {
-    marginTop: 14,
-    marginBottom: 10,
-  },
-  secTitle: {
-    fontFamily: 'Geist_500Medium',
-    fontSize: 17,
-    fontWeight: '500',
-    letterSpacing: -0.3,
-  },
-  exScroll: {
-    gap: 8,
-    paddingBottom: 8,
-  },
-  exChip: {
-    height: 36,
-    paddingHorizontal: 14,
-    borderRadius: 18,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  exChipText: {
-    fontFamily: 'Geist_500Medium',
-    fontSize: 13,
-    fontWeight: '500',
-  },
-});

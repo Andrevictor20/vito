@@ -54,13 +54,6 @@ func DefaultWebReader() WebReader {
 	return defaultWebReader
 }
 
-// SetDefaultWebReader registra a instância global do leitor web.
-func SetDefaultWebReader(r WebReader) {
-	defaultWebReaderMu.Lock()
-	defer defaultWebReaderMu.Unlock()
-	defaultWebReader = r
-}
-
 // NewWebReaderService cria uma nova instância do serviço de leitura web.
 func NewWebReaderService(client *http.Client) *WebReaderService {
 	if client == nil {
@@ -83,16 +76,6 @@ func NewWebReaderService(client *http.Client) *WebReaderService {
 		cacheTTL:    30 * time.Minute,
 		maxChars:    DefaultMaxContentChars,
 	}
-}
-
-// SetJinaBaseURL configura a URL base do Jina Reader (ex: para testes ou proxy).
-func (s *WebReaderService) SetJinaBaseURL(baseURL string) {
-	s.jinaBaseURL = strings.TrimRight(baseURL, "/")
-}
-
-// SetMaxChars configura o limite máximo de caracteres permitidos por extração.
-func (s *WebReaderService) SetMaxChars(maxChars int) {
-	s.maxChars = maxChars
 }
 
 // ReadURL executa a leitura aprofundada da URL solicitada com cache, proteção SSRF e fallback.

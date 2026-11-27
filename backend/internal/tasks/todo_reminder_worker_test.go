@@ -12,6 +12,36 @@ import (
 	"github.com/andrevmp/vito/backend/internal/service"
 )
 
+type mockDeviceTokenRepo struct {
+	tokens []domain.DeviceToken
+}
+
+func (m *mockDeviceTokenRepo) Save(dt *domain.DeviceToken) error {
+	m.tokens = append(m.tokens, *dt)
+	return nil
+}
+
+func (m *mockDeviceTokenRepo) FindByUserID(userID string) ([]domain.DeviceToken, error) {
+	var result []domain.DeviceToken
+	for _, tk := range m.tokens {
+		if tk.UserID == userID {
+			result = append(result, tk)
+		}
+	}
+	return result, nil
+}
+
+func (m *mockDeviceTokenRepo) Delete(userID, token string) error {
+	var filtered []domain.DeviceToken
+	for _, tk := range m.tokens {
+		if !(tk.UserID == userID && tk.Token == token) {
+			filtered = append(filtered, tk)
+		}
+	}
+	m.tokens = filtered
+	return nil
+}
+
 type mockReminderTodoRepo struct {
 	todos []domain.Todo
 }

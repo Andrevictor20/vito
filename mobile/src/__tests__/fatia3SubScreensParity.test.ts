@@ -19,11 +19,11 @@ describe('Fatia 3 — Paridade Visual de Perfil, Sub-telas de Finanças e Sub-te
     assert.equal(profileStyles.includes("marginLeft: 'auto'"), true, 'themeSeg deve ser alinhado à direita');
     assert.equal(profileStyles.includes('fontSize: 26'), true, 'sbarTitle do Perfil deve usar 26px');
 
-    const userCard = readSrc('features/profile/components/profile/ProfileUserCard.tsx');
+    const userCard = readSrc('features/profile/components/ProfileUserCard.tsx');
     assert.equal(userCard.includes('width: 38'), true, 'Avatar .pf .av deve ter 38px');
     assert.equal(userCard.includes("fontWeight: '800'"), false, 'ProfileUserCard não deve usar peso 800');
 
-    const aiSection = readSrc('features/profile/components/profile/AiSection.tsx');
+    const aiSection = readSrc('features/profile/components/AiSection.tsx');
     assert.equal(aiSection.includes('Inteligência artificial'), true, 'AiSection label deve usar sentence case');
     assert.equal(aiSection.includes("textTransform: 'uppercase'"), false, 'AiSection label não deve usar uppercase');
     assert.equal(aiSection.includes('borderRadius: 22'), true, 'AiSection .lst deve usar borderRadius 22');
@@ -94,12 +94,8 @@ describe('Fatia 3 — Paridade Visual de Perfil, Sub-telas de Finanças e Sub-te
   it('Animações e transições: zero useNativeDriver: false no app e Reanimated 4 em gráficos, switches, onboarding e sub-telas financeiras', () => {
     const reanimatedTargets = [
       'components/ui/VitoSwitch.tsx',
-      'components/ui/M3Switch.tsx',
       'features/calendar/components/booking/MeetingPollSlotItem.tsx',
-      'features/calendar/components/summaries/SummaryRingSvg.tsx',
       'charts/ProtoDonutChart.tsx',
-      'charts/ProtoAreaChart.tsx',
-      'charts/ProtoBarsChart.tsx',
       'charts/ProtoRingChart.tsx',
       'features/auth/screens/OnboardingScreen.tsx',
       'features/auth/components/onboardingArtParts.tsx',
@@ -109,10 +105,6 @@ describe('Fatia 3 — Paridade Visual de Perfil, Sub-telas de Finanças e Sub-te
       assert.equal(src.includes("from 'react-native-reanimated'"), true, `${rel} deve usar react-native-reanimated`);
       assert.equal(src.includes('useNativeDriver: false'), false, `${rel} não deve usar useNativeDriver: false`);
     }
-
-    const loginRig = readSrc('features/auth/components/LoginMascotRig.tsx');
-    assert.equal(loginRig.includes('MascotVectorRig'), true, 'LoginMascotRig deve delegar para MascotVectorRig (Skia/Reanimated 4)');
-    assert.equal(loginRig.includes('addListener'), false, 'LoginMascotRig não deve fazer setState por frame via addListener');
 
     const finModal = readSrc('features/finance/components/subscreens/FinanceSubScreenModal.tsx');
     assert.equal(finModal.includes('SectionTransition'), true, 'FinanceSubScreenModal deve usar SectionTransition (push)');

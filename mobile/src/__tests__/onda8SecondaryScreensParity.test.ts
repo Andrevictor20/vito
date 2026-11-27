@@ -21,5 +21,5 @@ test('Onda 8 — Bots, Booking, Resumos e Notificações usam ds/tokens e SVGs p
     assert.equal(content.includes('MaterialIcons'), false, `${rel} não deve referenciar MaterialIcons`)
   }
   const slotItem = fs.readFileSync(path.join(MOBILE_SRC, 'features/calendar/components/booking/MeetingPollSlotItem.tsx'), 'utf8')
-  assert.equal(slotItem.includes("getBezier('--ease-q')"), true, 'MeetingPollSlotItem deve usar --ease-q')
+  assert.equal(slotItem.includes('MOTION_CURVES.q'), true, 'MeetingPollSlotItem deve usar MOTION_CURVES.q')
 })

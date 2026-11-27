@@ -207,11 +207,11 @@ func (b *ToolsetBridge) buildTypedAtomicFunctionTool(spec AtomicToolSpec, ts dom
 		return newTypedAtomicTool[MemoryGetProfileArgs](b, spec, ts)
 	case "memory_update_profile":
 		return newTypedAtomicTool[MemoryUpdateProfileArgs](b, spec, ts)
-	case "bot_list_bots", "radar_list_triggers":
+	case "bot_list_bots":
 		return newTypedAtomicTool[BotListArgs](b, spec, ts)
-	case "bot_create_bot", "radar_create_trigger":
+	case "bot_create_bot":
 		return newTypedAtomicTool[BotCreateArgs](b, spec, ts)
-	case "bot_delete_bot", "radar_delete_trigger":
+	case "bot_delete_bot":
 		return newTypedAtomicTool[BotDeleteArgs](b, spec, ts)
 	case "finance_get_summary", "finance_get_accounts", "finance_get_budgets", "finance_get_cards", "finance_get_spending_by_category", "finance_detect_subscriptions":
 		return newTypedAtomicTool[FinanceSummaryArgs](b, spec, ts)

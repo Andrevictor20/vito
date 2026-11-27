@@ -4,8 +4,26 @@ import { api } from '../../../services/api';
 import { dataSync } from '../../../services/dataSync';
 import { hapticFeedback } from '../../../theme/motion';
 import { useAuth } from '../../../context/AuthContext';
-import { getPendingCacheKey, parseCachedPendingItems, isNetworkError } from '../utils/pendingCache';
 import type { PendingItem } from '../../../types';
+
+const getPendingCacheKey = (userId?: string): string =>
+  `@vito_cache_pending${userId ? `_${userId}` : ''}`;
+
+const parseCachedPendingItems = (raw: string | null): PendingItem[] | null => {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as PendingItem[]) : null;
+  } catch {
+    return null;
+  }
+};
+
+const isNetworkError = (err: unknown): boolean => {
+  if (!err) return false;
+  const msg = err instanceof Error ? err.message : String(err);
+  return /Failed to fetch|Network request failed|Load failed|Tempo limite esgotado/i.test(msg);
+};
 
 /** Estado e mutações das pendências para a página unificada. */
 export function usePendingItems(onScheduled?: (title: string, dateStr: string) => void) {

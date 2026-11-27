@@ -174,7 +174,9 @@ func (s *TodoService) UpdateTodo(id, userID string, input domain.UpdateTodoInput
 		todo.Category = normalizeTodoCategory(*input.Category)
 	}
 
-	if input.DueDate != nil {
+	if input.ClearDueDate {
+		todo.DueDate = nil
+	} else if input.DueDate != nil {
 		todo.DueDate = input.DueDate
 	}
 
@@ -201,21 +203,37 @@ func (s *TodoService) UpdateTodo(id, userID string, input domain.UpdateTodoInput
 	return todo, nil
 }
 
-// normalizeTodoCategory valida a categoria da tarefa unificada.
+// normalizeTodoCategory valida e normaliza categorias padrão e listas customizadas (ex.: casa, list_*).
 func normalizeTodoCategory(raw string) string {
 	c := strings.ToLower(strings.TrimSpace(raw))
 	switch c {
-	case "geral", "trabalho", "financas", "finanças", "estudos", "saude", "saúde", "pessoal":
-		if c == "finanças" {
-			return "financas"
-		}
-		if c == "saúde" {
-			return "saude"
+	case "", "geral", "trabalho", "casa", "financas", "estudos", "saude", "pessoal":
+		if c == "" {
+			return "geral"
 		}
 		return c
+	case "finanças":
+		return "financas"
+	case "saúde":
+		return "saude"
 	default:
-		return "geral"
+		// Aceita IDs de listas customizadas criadas no mobile (ex: list_1700000000 ou slug curto seguro)
+		if len(c) > 40 {
+			c = c[:40]
+		}
+		for _, ch := range c {
+			valid := (ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9') || ch == '_' || ch == '-'
+			if !valid {
+				return "geral"
+			}
+		}
+		return c
 	}
+}
+
+// GetTodo retorna uma tarefa específica do usuário autenticado.
+func (s *TodoService) GetTodo(id, userID string) (*domain.Todo, error) {
+	return s.todoRepo.GetByID(id, userID)
 }
 
 // ReopenTodo desfaz a conclusão: tarefa concluída volta a pendente.

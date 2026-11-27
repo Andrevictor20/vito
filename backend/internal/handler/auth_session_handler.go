@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"github.com/andrevmp/vito/backend/internal/platform/httpx"
 	"net"
 	"net/http"
 	"strings"
@@ -101,7 +102,7 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 func (h *AuthHandler) ListSessions(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		http.Error(w, `{"error":"não autorizado"}`, http.StatusUnauthorized)
+		httpx.WriteJSONError(w, http.StatusUnauthorized, "não autorizado")
 		return
 	}
 
@@ -129,13 +130,13 @@ func (h *AuthHandler) ListSessions(w http.ResponseWriter, r *http.Request) {
 func (h *AuthHandler) RevokeSession(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		http.Error(w, `{"error":"não autorizado"}`, http.StatusUnauthorized)
+		httpx.WriteJSONError(w, http.StatusUnauthorized, "não autorizado")
 		return
 	}
 
 	sessionID := strings.TrimSpace(chi.URLParam(r, "id"))
 	if sessionID == "" {
-		http.Error(w, `{"error":"id da sessão é obrigatório"}`, http.StatusBadRequest)
+		httpx.WriteJSONError(w, http.StatusBadRequest, "id da sessão é obrigatório")
 		return
 	}
 
@@ -171,7 +172,7 @@ func (h *AuthHandler) RevokeSession(w http.ResponseWriter, r *http.Request) {
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		http.Error(w, `{"error":"não autorizado"}`, http.StatusUnauthorized)
+		httpx.WriteJSONError(w, http.StatusUnauthorized, "não autorizado")
 		return
 	}
 

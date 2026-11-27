@@ -218,20 +218,6 @@ func (r *UserProviderRegistry) GetOrCreate(
 	return vllm, nil
 }
 
-// InvalidateUser remove todas as instâncias em cache de um usuário.
-func (r *UserProviderRegistry) InvalidateUser(userID string) {
-	if r == nil {
-		return
-	}
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	for _, entry := range r.entries {
-		if entry.userID == userID {
-			r.removeLocked(entry)
-		}
-	}
-}
-
 // InvalidateProvider remove todas as instâncias em cache de um provedor do usuário.
 func (r *UserProviderRegistry) InvalidateProvider(userID string, key domain.ProviderKey) {
 	if r == nil {

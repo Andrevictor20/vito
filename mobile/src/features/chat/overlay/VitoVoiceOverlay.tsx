@@ -12,6 +12,7 @@ import {
   cleanVoiceText,
   isGoodbyeUtterance,
 } from './voiceOverlayHelpers';
+import { undoOverlayEntity } from './voiceOverlayUndo';
 import { VoiceFullscreenView } from './VoiceFullscreenView';
 import { VoiceCompactView } from './VoiceCompactView';
 import type { ChatWhatsAppMessage } from '../../../types';
@@ -369,12 +370,18 @@ export function VitoVoiceOverlay({
     else handleClose();
   }, [handleClose]);
 
-  const handleUndoAction = useCallback(() => {
-    setActionCard(null);
-    setWhatsappCard(null);
-    setReplyText('Ação desfeita.');
-    setHighlightedWordCount(2);
-  }, []);
+  const handleUndoAction = useCallback(async () => {
+    try {
+      const msg = await undoOverlayEntity(actionCard);
+      setActionCard(null);
+      setWhatsappCard(null);
+      setReplyText(msg);
+      setHighlightedWordCount(msg.split(/\s+/).length);
+    } catch {
+      setReplyText('Não consegui desfazer essa ação agora.');
+      setHighlightedWordCount(6);
+    }
+  }, [actionCard]);
 
   const handleConfirmWhatsApp = useCallback(async () => {
     if (!whatsappCard || isSendingWhatsApp || whatsAppSent) return;
@@ -461,18 +468,15 @@ export function VitoVoiceOverlay({
   if (isCompact) {
     return (
       <VoiceCompactView
-        state={state} transcript={transcript} userTranscript={userTranscript}
-        replyText={replyText} highlightedWordCount={highlightedWordCount}
-        barHeights5={barHeights5} isMuted={isMuted} screenContextLabel="Vendo esta tela"
-        screenContextVisible={screenContextVisible && Boolean(screenContext)}
-        actionCard={actionCard} slideAnim={slideAnim} fadeAnim={fadeAnim}
-        onClose={handleClose} onToggleMute={handleToggleMute} onTapAvatar={handleTapOrb}
-        onDismissScreenContext={() => setScreenContextVisible(false)}
-        onSelectSuggestion={handleSelectSuggestion} onOpenInVito={handleOpenInVito}
-        onUndoAction={handleUndoAction} onExpandFromMini={handleTapOrb}
-        whatsappCard={whatsappCard} isSendingWhatsApp={isSendingWhatsApp}
-        whatsAppSent={whatsAppSent} onConfirmWhatsApp={handleConfirmWhatsApp}
-        hasSources={hasSources}
+        state={state} transcript={transcript} userTranscript={userTranscript} replyText={replyText}
+        highlightedWordCount={highlightedWordCount} barHeights5={barHeights5} isMuted={isMuted}
+        screenContextLabel="Vendo esta tela" screenContextVisible={screenContextVisible && Boolean(screenContext)}
+        actionCard={actionCard} slideAnim={slideAnim} fadeAnim={fadeAnim} onClose={handleClose}
+        onToggleMute={handleToggleMute} onTapAvatar={handleTapOrb}
+        onDismissScreenContext={() => setScreenContextVisible(false)} onSelectSuggestion={handleSelectSuggestion}
+        onOpenInVito={handleOpenInVito} onUndoAction={handleUndoAction} onExpandFromMini={handleTapOrb}
+        whatsappCard={whatsappCard} isSendingWhatsApp={isSendingWhatsApp} whatsAppSent={whatsAppSent}
+        onConfirmWhatsApp={handleConfirmWhatsApp} hasSources={hasSources}
       />
     );
   }

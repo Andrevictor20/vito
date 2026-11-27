@@ -8,7 +8,7 @@ import { hapticFeedback } from '../../../../theme/motion';
 import { CountUpText } from '../../../../theme/vitoMotion';
 import type { FinanceAccount, FinanceConnection } from '../../types/finance';
 import { getBankBrand, partitionBankAccounts } from '../../utils/bankBrands';
-import { formatBRL, maskBRL, withHexAlpha } from '../shared/financeHelpers';
+import { formatBRL, maskBRL, withHexAlpha } from '../../utils/financeHelpers';
 
 interface FinanceHeroAndRailProps {
   totalBalance: number;

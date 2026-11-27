@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"time"
 
 	"github.com/andrevmp/vito/backend/internal/domain"
@@ -35,7 +36,7 @@ func (r *CoreProfileRepository) GetAll(userID string) ([]domain.CoreProfile, err
 }
 
 func (r *CoreProfileRepository) Set(userID, key, value string) error {
-	return ExecuteQueuedWrite(context.Background(), func() error {
+	return database.ExecuteQueuedWrite(context.Background(), func() error {
 		_, err := r.db.Exec(`INSERT INTO user_core_profile (user_id, profile_key, profile_value, updated_at) VALUES (?,?,?,?)
 			ON CONFLICT(user_id, profile_key) DO UPDATE SET profile_value=excluded.profile_value, updated_at=excluded.updated_at`,
 			userID, key, value, time.Now().UTC())

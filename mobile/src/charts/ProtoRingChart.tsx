@@ -9,8 +9,9 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated'
 import Svg, { Circle, G } from 'react-native-svg'
-import { getBezier, token } from '../ds/tokens'
+import { MOTION_CURVES } from '../theme/motion'
 import { useScreenFocus } from '../theme/screenFocusContext'
+import { darkColors, lightColors } from '../theme/tokens'
 import { CountUpText } from '../theme/vitoMotion'
 import { TK_RING_R, TK_RING_SIZE } from './chartSpecs'
 
@@ -69,7 +70,7 @@ export const ProtoRingChart: React.FC<ProtoRingChartProps> = ({
       dashOffset.value = circ
       return
     }
-    const [x1, y1, x2, y2] = getBezier('--ease-q')
+    const [x1, y1, x2, y2] = MOTION_CURVES.q
     dashOffset.value = circ
     const anim = withTiming(targetOffset, {
       duration: durationMs,
@@ -83,10 +84,11 @@ export const ProtoRingChart: React.FC<ProtoRingChartProps> = ({
     strokeDashoffset: dashOffset.value,
   }))
 
-  const track = trackColor ?? token('--line', isDark)
-  const fg = color ?? token('--acc', isDark)
-  const ink = token('--ink', isDark)
-  const muted = token('--muted', isDark)
+  const pal = isDark ? darkColors : lightColors
+  const track = trackColor ?? pal.line
+  const fg = color ?? pal.acc
+  const ink = pal.ink
+  const muted = pal.muted
   const fontSize = labelSize ?? (size >= 96 ? 22 : size >= 64 ? 15 : 12.5)
 
   return (

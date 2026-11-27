@@ -70,6 +70,7 @@ type UpdateTodoInput struct {
 	Priority      *string    `json:"priority,omitempty"`
 	Category      *string    `json:"category,omitempty"`
 	DueDate       *time.Time `json:"due_date,omitempty"`
+	ClearDueDate  bool       `json:"-"`
 	RemindAt      *time.Time `json:"remind_at,omitempty"`
 	RemindRepeat  *string    `json:"remind_repeat,omitempty"`
 	RemindAdvance *int       `json:"remind_advance_minutes,omitempty"`

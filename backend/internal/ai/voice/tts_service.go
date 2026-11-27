@@ -21,15 +21,6 @@ type TTSSynthesizer interface {
 	Synthesize(text string, voice string) ([]byte, string, error)
 }
 
-// NoOpTTSynthesizer é um sintetizador stub que retorna erro, permitindo
-// fallback silencioso no Android (speakText nativo). Um sintetizador
-// Edge-TTS real pode ser injetado futuramente via NewTTSService.
-type NoOpTTSynthesizer struct{}
-
-func (s *NoOpTTSynthesizer) Synthesize(text string, voice string) ([]byte, string, error) {
-	return nil, "", errors.New("sintetizador Edge-TTS não disponível neste ambiente")
-}
-
 // maxTTSChars é o limite de caracteres por requisição de síntese de áudio.
 const maxTTSChars = 2000
 
@@ -96,10 +87,14 @@ func detectAudioMime(data []byte) string {
 	return "audio/mpeg"
 }
 
-// cacheKey gera o nome do arquivo de cache a partir do SHA-256 de "(voice:text)".
+// cacheKey gera o nome padrão .mp3 do arquivo de cache a partir do SHA-256 de "(voice:text)".
 func (s *edgeTTSService) cacheKey(voice string, text string) string {
+	return s.cacheKeyWithExt(voice, text, ".mp3")
+}
+
+func (s *edgeTTSService) cacheKeyWithExt(voice string, text string, ext string) string {
 	sum := sha256.Sum256([]byte(voice + ":" + text))
-	return hex.EncodeToString(sum[:]) + ".mp3"
+	return hex.EncodeToString(sum[:]) + ext
 }
 
 func (s *edgeTTSService) cachePath(voice string, text string) string {
@@ -110,17 +105,19 @@ func (s *edgeTTSService) readCache(voice string, text string) ([]byte, bool) {
 	if s.cacheDir == "" {
 		return nil, false
 	}
-	path := s.cachePath(voice, text)
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, false
+	for _, ext := range []string{".wav", ".mp3"} {
+		path := filepath.Join(s.cacheDir, s.cacheKeyWithExt(voice, text, ext))
+		f, err := os.Open(path)
+		if err != nil {
+			continue
+		}
+		data, readErr := io.ReadAll(f)
+		_ = f.Close()
+		if readErr == nil {
+			return data, true
+		}
 	}
-	defer f.Close()
-	data, err := io.ReadAll(f)
-	if err != nil {
-		return nil, false
-	}
-	return data, true
+	return nil, false
 }
 
 func (s *edgeTTSService) writeCache(voice string, text string, audio []byte) error {
@@ -130,6 +127,10 @@ func (s *edgeTTSService) writeCache(voice string, text string, audio []byte) err
 	if err := os.MkdirAll(s.cacheDir, 0o755); err != nil {
 		return err
 	}
-	path := s.cachePath(voice, text)
+	ext := ".mp3"
+	if detectAudioMime(audio) == "audio/wav" {
+		ext = ".wav"
+	}
+	path := filepath.Join(s.cacheDir, s.cacheKeyWithExt(voice, text, ext))
 	return os.WriteFile(path, audio, 0o644)
 }

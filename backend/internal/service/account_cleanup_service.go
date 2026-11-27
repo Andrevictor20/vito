@@ -74,11 +74,6 @@ func (s *AccountCleanupService) hasActiveSession(ctx context.Context, userID str
 	return len(sessions) > 0
 }
 
-// ActiveSessionsForUser expõe se a conta ainda tem sessão ativa (usado em diagnósticos).
-func (s *AccountCleanupService) ActiveSessionsForUser(ctx context.Context, userID string) bool {
-	return s.hasActiveSession(ctx, userID)
-}
-
 // PurgeOrphanPlaceholderAccounts remove as contas placeholder abandonadas e devolve
 // o número de telefone ao seu dono real. Retorna quantas contas foram removidas.
 //

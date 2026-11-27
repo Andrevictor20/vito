@@ -3,13 +3,10 @@ package service
 import (
 	"context"
 	"fmt"
-	"regexp"
 	"strings"
 
 	"github.com/andrevmp/vito/backend/internal/repository"
 )
-
-var reEmailInText = regexp.MustCompile(`(?i)[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}`)
 
 // SetEntityLinkRepository conecta o repositório de resolução cruzada de entidades ao AssistantContextEnricher.
 func (e *AssistantContextEnricher) SetEntityLinkRepository(repo *repository.EntityLinkRepository) {

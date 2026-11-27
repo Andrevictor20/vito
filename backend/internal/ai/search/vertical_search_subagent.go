@@ -23,7 +23,7 @@ type VerticalSearchSubagent struct {
 }
 
 // NewVerticalSearchSubagent cria um novo subagente de busca factual.
-func NewVerticalSearchSubagent(searxng *SearXNGClient, _ ...any) *VerticalSearchSubagent {
+func NewVerticalSearchSubagent(searxng *SearXNGClient) *VerticalSearchSubagent {
 	return &VerticalSearchSubagent{
 		searxng:    searxng,
 		httpClient: &http.Client{Timeout: 10 * time.Second},

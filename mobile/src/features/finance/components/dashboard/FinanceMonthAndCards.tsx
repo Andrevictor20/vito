@@ -15,7 +15,7 @@ import {
   hasSubscriptionIncrease,
   maskBRL,
   withHexAlpha,
-} from '../shared/financeHelpers';
+} from '../../utils/financeHelpers';
 import {
   FinanceBankBadge,
   resolveCategoryVisual,

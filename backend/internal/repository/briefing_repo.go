@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"time"
 
 	"github.com/andrevmp/vito/backend/internal/domain"
@@ -74,7 +75,7 @@ func (r *BriefingRepositorySQLite) UpsertSettings(s *domain.BriefingSettings) er
 			last_sent_date = excluded.last_sent_date,
 			updated_at = excluded.updated_at
 	`
-	return ExecuteQueuedWrite(context.Background(), func() error {
+	return database.ExecuteQueuedWrite(context.Background(), func() error {
 		_, err := r.db.Exec(
 			query,
 			s.UserID,
@@ -142,7 +143,7 @@ func (r *BriefingRepositorySQLite) MarkSent(userID, dateStr string) error {
 			last_sent_date = excluded.last_sent_date,
 			updated_at = excluded.updated_at
 	`
-	return ExecuteQueuedWrite(context.Background(), func() error {
+	return database.ExecuteQueuedWrite(context.Background(), func() error {
 		_, err := r.db.Exec(query, userID, dateStr, now, now)
 		return err
 	})

@@ -9,7 +9,7 @@ import {
   type ViewStyle,
 } from 'react-native'
 import { useTheme } from '../../../context/ThemeContext'
-import { getBezier, token } from '../../../ds/tokens'
+import { MOTION_CURVES } from '../../../theme/motion'
 import { MascotVectorRig } from '../../bots/mascot/MascotVectorRig'
 import {
   SPLASH_BAR_FILL_RATIO,
@@ -50,11 +50,11 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
   autoDismiss = false,
   durationMs = SPLASH_OUT_DELAY_MS,
 }) => {
-  const { isDark } = useTheme()
+  const { colors, isDark } = useTheme()
   const palette = {
-    bg: token('--bg', isDark),
-    ink: token('--ink', isDark),
-    line: token('--line', isDark),
+    bg: colors.bg,
+    ink: colors.ink,
+    line: colors.line,
   }
   const [reduceMotion, setReduceMotion] = useState(false)
 
@@ -98,7 +98,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
   useEffect(() => {
     if (reduceMotion) return
 
-    const easeQ = Easing.bezier(...getBezier('--ease-q'))
+    const easeQ = Easing.bezier(...MOTION_CURVES.q)
 
     const enterAnim = Animated.parallel([
       Animated.timing(mascotOpacity, { toValue: 1, duration: SPLASH_POP_MS, easing: easeQ, useNativeDriver: true }),
@@ -123,7 +123,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
       Animated.timing(barX, {
         toValue: PROGRESS_WIDTH * 2,
         duration: SPLASH_BAR_LOOP_MS,
-        easing: Easing.bezier(...getBezier('--ease-std')),
+        easing: Easing.bezier(...MOTION_CURVES.std),
         useNativeDriver: true,
       }),
     )

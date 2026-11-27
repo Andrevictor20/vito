@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { VitoSwitch } from '../../../components/ui/VitoSwitch';
 import { ProtoUiIcon } from '../../../icons/ProtoUiIcons';
 import { useTheme } from '../../../context/ThemeContext';
 import { VitoMascot } from '../../../components/common/VitoMascot';
-import type { NotificationCategoryPreferences } from '../../notifications/services/inboxNotificationsApi';
-import { FAQ_ITEMS, NOTIFICATION_CATEGORY_ROWS } from './StoreCatalogData';
+import type { NotificationCategoryPreferences } from '../../notifications/services/notificationsApi';
+import { FAQ_ITEMS, NOTIFICATION_CATEGORY_ROWS } from '../data/storeCatalogData';
 
 interface StoreNotifViewProps {
   prefs: NotificationCategoryPreferences;
@@ -33,11 +34,9 @@ export const StoreNotifView: React.FC<StoreNotifViewProps> = ({
               <Text style={[styles.rowTitle, { color: colors.ink }]}>{r.label}</Text>
               <Text style={[styles.rowSub, { color: colors.muted }]}>{r.desc}</Text>
             </View>
-            <Switch
+            <VitoSwitch
               value={!!prefs[r.key]}
               onValueChange={() => onTogglePref(r.key)}
-              trackColor={{ false: colors.line, true: colors.acc }}
-              thumbColor="#ffffff"
             />
           </View>
         ))}

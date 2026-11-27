@@ -11,7 +11,7 @@ import {
   useReduceMotion,
 } from '../../../../theme/vitoMotion';
 import type { FocusBlock, TimelineSegment } from '../../utils/summaryCalculators';
-import { withHexAlpha } from '../../../finance/components/shared/financeHelpers';
+import { withHexAlpha } from '../../../finance/utils/financeHelpers';
 import {
   SummaryCard,
   SummaryEyebrow,

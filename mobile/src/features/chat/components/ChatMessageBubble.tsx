@@ -18,6 +18,7 @@ interface ChatMessageBubbleProps {
   onConfirmAction?: (confirmPrompt: string) => void;
   onResolveConfirmation?: (messageId: string, pendingId: string, reject: boolean) => Promise<void> | void;
   onPlayAudio?: () => void;
+  isPlayingAudio?: boolean;
   disabled?: boolean;
 }
 
@@ -29,6 +30,7 @@ const ChatMessageBubbleComponent: React.FC<ChatMessageBubbleProps> = ({
   onConfirmAction,
   onResolveConfirmation,
   onPlayAudio,
+  isPlayingAudio = false,
   disabled = false,
 }) => {
   const { colors, isDark } = useTheme();
@@ -258,10 +260,12 @@ const ChatMessageBubbleComponent: React.FC<ChatMessageBubbleProps> = ({
 
           {/* Barra de Ações Minimalista Estilo Claude / Gemini */}
           <ChatMessageActionBar
+            messageId={message.id}
             messageText={message.text}
             timestamp={message.timestamp}
             modelUsed={message.modelUsed}
             onPlayAudio={onPlayAudio}
+            isPlayingAudio={isPlayingAudio}
             disabled={disabled}
           />
         </View>

@@ -3,7 +3,7 @@ import { StyleSheet, View, Text, TouchableOpacity, ScrollView } from 'react-nati
 import { ProtoUiIcon } from '../../../../icons/ProtoUiIcons';
 import { tokens, MD3Shapes, tabularNumbers } from '../../../../theme/tokens';
 import { useTheme } from '../../../../context/ThemeContext';
-import { BottomSheetModal } from '../../../../components/ui/BottomSheetModal';
+import { VitoSheet } from '../../../../components/ui/VitoSheet';
 
 interface MonthlyMetrics {
   totalHours: string;
@@ -48,7 +48,7 @@ export const MonthlyRaioXModal: React.FC<MonthlyRaioXModalProps> = ({
   };
 
   return (
-    <BottomSheetModal
+    <VitoSheet
       visible={visible}
       onClose={onClose}
       title="Raio-X mensal"
@@ -132,7 +132,7 @@ export const MonthlyRaioXModal: React.FC<MonthlyRaioXModalProps> = ({
           </Text>
         </TouchableOpacity>
       </ScrollView>
-    </BottomSheetModal>
+    </VitoSheet>
   );
 };
 

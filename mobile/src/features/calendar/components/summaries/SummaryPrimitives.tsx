@@ -14,7 +14,7 @@ import { useTheme } from '../../../../context/ThemeContext';
 import { ProtoUiIcon, type ProtoUiIconName } from '../../../../icons/ProtoUiIcons';
 import { tabularNumbers } from '../../../../theme/tokens';
 import { AnimatedProgressBar, useReduceMotion } from '../../../../theme/vitoMotion';
-import { withHexAlpha } from '../../../finance/components/shared/financeHelpers';
+import { withHexAlpha } from '../../../finance/utils/financeHelpers';
 
 export {
   SummaryBalanceDonut,

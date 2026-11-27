@@ -13,15 +13,10 @@ function readSrc(rel: string): string {
 }
 
 describe('Fatia 1 (Base Global) — Paleta Light/Dark, Mascote Skia+Reanimated 4 e Transições UI Thread', () => {
-  it('Auditoria Light & Dark: ThemeContext, ProtoDock, FloatingTabBar e VitoSheet alinham 1:1 com o protótipo', () => {
+  it('Auditoria Light & Dark: ThemeContext, FloatingTabBar e VitoSheet alinham 1:1 com o protótipo', () => {
     const themeCtx = readSrc('context/ThemeContext.tsx');
     assert.equal(themeCtx.includes('#0e0e10'), false, 'ThemeContext não deve usar #0e0e10 (dark bg canônico é #0a0a0a)');
     assert.equal(themeCtx.includes('#0a0a0a'), true, 'ThemeContext deve usar #0a0a0a no reveal dark');
-
-    const protoDock = readSrc('ds/ProtoDock.tsx');
-    assert.equal(protoDock.includes('rgba(24, 24, 26, 0.78)'), true, 'ProtoDock dark deve usar glass rgba(24, 24, 26, 0.78)');
-    assert.equal(protoDock.includes('rgba(244, 244, 244, 0.80)'), true, 'ProtoDock light deve usar glass rgba(244, 244, 244, 0.80)');
-    assert.equal(protoDock.includes('../theme'), false, 'ProtoDock deve permanecer isolado de ../theme/');
 
     const dock = readSrc('components/common/FloatingTabBar.tsx');
     assert.equal(dock.includes('paddingTop: 18'), true, 'FloatingTabBar .dock deve usar paddingTop: 18');
@@ -41,7 +36,7 @@ describe('Fatia 1 (Base Global) — Paleta Light/Dark, Mascote Skia+Reanimated 4
 
     assert.equal(builders.includes("from 'react-native-reanimated'"), true);
     assert.equal(builders.includes('useNativeDriver: false'), false);
-    assert.equal(builders.includes('mascotSpecs'), true);
+    assert.equal(builders.includes('mascotTracks.generated'), true);
 
     assert.equal(hook.includes("from 'react-native-reanimated'"), true);
     assert.equal(hook.includes('useSharedValue'), true);
@@ -62,9 +57,7 @@ describe('Fatia 1 (Base Global) — Paleta Light/Dark, Mascote Skia+Reanimated 4
 
   it('Transições entre seções, dock, sheets e overlays migrados para Reanimated 4 (UI thread)', () => {
     const migrated = [
-      'ds/SectionTransition.tsx',
-      'ds/ProtoDock.tsx',
-      'ds/ProtoSheet.tsx',
+      'components/common/SectionTransition.tsx',
       'components/common/AdaptivePager.tsx',
       'components/common/FloatingTabBar.tsx',
       'components/ui/VitoSheet.tsx',
@@ -84,11 +77,8 @@ describe('Fatia 1 (Base Global) — Paleta Light/Dark, Mascote Skia+Reanimated 4
     assert.equal(vitoSheet.includes('Gesture.Pan'), true, 'VitoSheet deve suportar arrastar para fechar via Gesture.Pan');
     assert.equal(vitoSheet.includes('scheduleOnRN'), true, 'VitoSheet deve usar scheduleOnRN (react-native-worklets)');
 
-    const sectionTr = readSrc('ds/SectionTransition.tsx');
+    const sectionTr = readSrc('components/common/SectionTransition.tsx');
     assert.equal(sectionTr.includes('scheduleOnRN'), true, 'SectionTransition deve usar scheduleOnRN');
-    assert.equal(sectionTr.includes('../theme'), false, 'SectionTransition deve permanecer isolado de ../theme/');
-
-    const protoSheet = readSrc('ds/ProtoSheet.tsx');
-    assert.equal(protoSheet.includes('../theme'), false, 'ProtoSheet deve permanecer isolado de ../theme/');
+    assert.equal(sectionTr.includes('SCREEN_TRANSITIONS'), true, 'SectionTransition deve usar SCREEN_TRANSITIONS canônicos');
   });
 });

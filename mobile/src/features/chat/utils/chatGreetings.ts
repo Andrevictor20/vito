@@ -59,7 +59,7 @@ export const pickWelcomeGreeting = (
   return template.anonymous;
 };
 
-// Frases dinâmicas, progressivas e elegantes de pensamento (estilo Claude / Toki / Gemini)
+// Frases dinâmicas, progressivas e elegantes de pensamento (estilo Claude / Gemini)
 // Substituem a antiga faixa estática "Vito está organizando..."
 export const THINKING_PHRASES: string[] = [
   'Pensando...',

@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/repository"
 	_ "modernc.org/sqlite"
 )

@@ -1,7 +1,13 @@
 import { api } from '../../../services/api';
 import type { FinanceAccount, FinanceConnection, FinanceSyncPayload } from '../types/finance';
-import { getItem, listItems, PluggyError, type PluggyItem } from './pluggyService';
-import { pluggyFetchWithRetry, type PluggyHttpOptions } from './pluggyHttp';
+import {
+  getItem,
+  listItems,
+  PluggyError,
+  pluggyFetchWithRetry,
+  type PluggyHttpOptions,
+  type PluggyItem,
+} from './pluggyService';
 import * as byokStore from './byokStore';
 
 /**

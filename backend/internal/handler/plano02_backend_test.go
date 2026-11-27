@@ -17,9 +17,9 @@ import (
 
 	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/ai/adkengine"
-	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/handler/middleware"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/andrevmp/vito/backend/internal/service"
 )
@@ -68,19 +68,16 @@ func (f *fakeSentenceTTS) Synthesize(ctx context.Context, text string, voice str
 // TestPlano02_VoiceStreamSentenceChunker verifica que o pipeline de voz usa SentenceChunker
 // durante RunStream para sintetizar e emitir cada oração imediatamente (< 800ms) sem esperar o turno inteiro.
 func TestPlano02_VoiceStreamSentenceChunker(t *testing.T) {
-	loop := service.NewAgentLoop(nil, nil, nil, nil, nil, nil)
-	loop.SetEngine(&fakeStreamingVoiceEngine{
+	tts := &fakeSentenceTTS{}
+	h := NewVoiceStreamHandler()
+	h.SetAgentLoop(&fakeStreamingVoiceEngine{
 		deltas: []string{
 			"Bom dia, André! ",
 			"Seu primeiro compromisso é às nove horas. ",
 			"Quer que eu leia suas tarefas?",
 		},
 	})
-
-	tts := &fakeSentenceTTS{}
-	h := NewVoiceStreamHandler(nil)
-	h.SetAgentLoop(loop, nil)
-	h.SetAudioServices(nil, tts, "")
+	h.SetAudioServices(nil, tts)
 
 	var events []VoiceServerEvent
 	err := h.ProcessVoiceUtteranceStream(context.Background(), domain.UnifiedAssistantRequest{
@@ -261,9 +258,7 @@ func (f *fakeSSEEngine) RunStream(ctx context.Context, req domain.UnifiedAssista
 // TestPlano02_AssistantStream_EmitsDeltaContract valida que /api/v1/assistant/chat/stream serializa
 // os campos type, tool_name, reasoning_delta e text_delta no SSE para o cliente Mobile.
 func TestPlano02_AssistantStream_EmitsDeltaContract(t *testing.T) {
-	loop := service.NewAgentLoop(nil, nil, nil, nil, nil, nil)
-	loop.SetEngine(&fakeSSEEngine{})
-	h := NewAssistantStreamHandler(loop)
+	h := NewAssistantStreamHandler(&fakeSSEEngine{})
 
 	body, _ := json.Marshal(domain.UnifiedAssistantRequest{Message: "Qual minha agenda?", Channel: "app_mobile"})
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/assistant/chat/stream", bytes.NewReader(body))
@@ -326,15 +321,15 @@ func TestPlano02_ConfirmHandler_RejectRecordsImplicitFeedback(t *testing.T) {
 		t.Fatalf("CreatePending: %v", err)
 	}
 
-	loop := service.NewAgentLoop(nil, nil, service.NewScopeGuard(), gate, convRepo, nil)
-	if facade, fErr := adkengine.NewADKLoopFacade(adkengine.FacadeConfig{
+	facade, fErr := adkengine.NewADKLoopFacade(adkengine.FacadeConfig{
 		ScopeGuard:       service.NewScopeGuard(),
 		ConfirmationGate: gate,
 		ConvRepo:         convRepo,
-	}); fErr == nil {
-		loop.SetEngine(facade)
+	})
+	if fErr != nil {
+		t.Fatalf("NewADKLoopFacade falhou: %v", fErr)
 	}
-	h := NewAssistantStreamHandler(loop)
+	h := NewAssistantStreamHandler(facade)
 
 	body, _ := json.Marshal(map[string]any{
 		"pending_id": pending.ID,

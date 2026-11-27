@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/andrevmp/vito/backend/internal/ai/byok"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"sync"
 	"time"
 
@@ -131,13 +132,14 @@ func (r *RingBufferTraceRecorder) persistBatch(ctx context.Context, batch []AITr
 		return nil
 	}
 
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("falha ao iniciar transação para ai_traces: %w", err)
-	}
-	defer tx.Rollback()
+	writeBatch := func() error {
+		tx, err := r.db.BeginTx(ctx, nil)
+		if err != nil {
+			return fmt.Errorf("falha ao iniciar transação para ai_traces: %w", err)
+		}
+		defer tx.Rollback()
 
-	stmt, err := tx.PrepareContext(ctx, `
+		stmt, err := tx.PrepareContext(ctx, `
 		INSERT INTO ai_traces (
 			id, user_id, thread_id, turn_id, channel, agent_name, task_type,
 			credential_source, provider_key, effort,
@@ -146,32 +148,38 @@ func (r *RingBufferTraceRecorder) persistBatch(ctx context.Context, batch []AITr
 			tokens_in, tokens_out, latency_ms, status_code, error_code, created_at
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`)
-	if err != nil {
-		return fmt.Errorf("falha ao preparar statement para ai_traces: %w", err)
-	}
-	defer stmt.Close()
-
-	for _, t := range batch {
-		fallbackInt := 0
-		if t.FallbackTriggered {
-			fallbackInt = 1
-		}
-		taintedInt := 0
-		if t.TaintedTurn {
-			taintedInt = 1
-		}
-
-		_, err := stmt.ExecContext(ctx,
-			t.ID, t.UserID, t.ThreadID, t.TurnID, t.Channel, t.AgentName, string(t.TaskType),
-			t.CredentialSource, t.ProviderKey, t.Effort,
-			t.ProviderName, t.ModelName, t.StepIndex, t.ToolsetCalled, t.OperationCalled,
-			fallbackInt, t.FallbackReason, taintedInt, t.ConfirmationGateStatus,
-			t.TokensIn, t.TokensOut, t.LatencyMs, t.StatusCode, t.ErrorCode, t.CreatedAt,
-		)
 		if err != nil {
-			return fmt.Errorf("falha ao inserir registro ai_trace %s: %w", t.ID, err)
+			return fmt.Errorf("falha ao preparar statement para ai_traces: %w", err)
 		}
+		defer stmt.Close()
+
+		for _, t := range batch {
+			fallbackInt := 0
+			if t.FallbackTriggered {
+				fallbackInt = 1
+			}
+			taintedInt := 0
+			if t.TaintedTurn {
+				taintedInt = 1
+			}
+
+			_, err := stmt.ExecContext(ctx,
+				t.ID, t.UserID, t.ThreadID, t.TurnID, t.Channel, t.AgentName, string(t.TaskType),
+				t.CredentialSource, t.ProviderKey, t.Effort,
+				t.ProviderName, t.ModelName, t.StepIndex, t.ToolsetCalled, t.OperationCalled,
+				fallbackInt, t.FallbackReason, taintedInt, t.ConfirmationGateStatus,
+				t.TokensIn, t.TokensOut, t.LatencyMs, t.StatusCode, t.ErrorCode, t.CreatedAt,
+			)
+			if err != nil {
+				return fmt.Errorf("falha ao inserir registro ai_trace %s: %w", t.ID, err)
+			}
+		}
+
+		return tx.Commit()
 	}
 
-	return tx.Commit()
+	if q := database.DefaultWriterQueue(); q != nil {
+		return q.Execute(ctx, writeBatch)
+	}
+	return database.WithBusyRetry(4, writeBatch)
 }

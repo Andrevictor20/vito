@@ -1,17 +1,22 @@
 package main
 
 import (
-	"github.com/andrevmp/vito/backend/internal/gmail"
-	"github.com/andrevmp/vito/backend/internal/calendar/p2p"
 	"context"
 	"errors"
-	"github.com/andrevmp/vito/backend/internal/ai/search"
 	"github.com/andrevmp/vito/backend/internal/ai/voice"
 	"github.com/andrevmp/vito/backend/internal/bots"
 	"github.com/andrevmp/vito/backend/internal/calendar"
+	"github.com/andrevmp/vito/backend/internal/calendar/booking"
+	"github.com/andrevmp/vito/backend/internal/calendar/meeting"
+	"github.com/andrevmp/vito/backend/internal/calendar/p2p"
+	"github.com/andrevmp/vito/backend/internal/calendar/providers"
+	calsync "github.com/andrevmp/vito/backend/internal/calendar/sync"
 	"github.com/andrevmp/vito/backend/internal/finance"
+	"github.com/andrevmp/vito/backend/internal/gmail"
 	"github.com/andrevmp/vito/backend/internal/tasks"
 	"github.com/andrevmp/vito/backend/internal/whatsapp"
+	waauth "github.com/andrevmp/vito/backend/internal/whatsapp/auth"
+	"github.com/andrevmp/vito/backend/internal/whatsapp/evolution"
 	"log"
 	"net/http"
 	"os"
@@ -21,11 +26,10 @@ import (
 
 	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/ai/adkengine"
-	"github.com/andrevmp/vito/backend/internal/platform/config"
-	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/handler"
-	intcal "github.com/andrevmp/vito/backend/internal/integrations/calendar"
+	"github.com/andrevmp/vito/backend/internal/platform/config"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/andrevmp/vito/backend/internal/server"
 	"github.com/andrevmp/vito/backend/internal/service"
@@ -57,13 +61,7 @@ func main() {
 
 	var bkpMgr *database.BackupManager
 	if cfg.DBPath != ":memory:" && len(cfg.DataEncryptionKey) >= 16 {
-		backupDir := os.Getenv("BACKUP_DIR")
-		if backupDir == "" {
-			backupDir = "/app/data/backups"
-			if cfg.Environment != "production" {
-				backupDir = "./backups"
-			}
-		}
+		backupDir := resolveBackupDir(cfg)
 		var bkpErr error
 		bkpMgr, bkpErr = database.NewBackupManager(database.BackupConfig{
 			DB:         db,
@@ -92,16 +90,12 @@ func main() {
 	briefingRepo := repository.NewBriefingRepository(db)
 	aiSettingsRepo := repository.NewAISettingsRepository(db)
 	pendingRepo := tasks.NewPendingRepository(db)
-	bookingRepo := calendar.NewBookingRepositorySQLite(db)
-	meetingRepo := calendar.NewMeetingRepositorySQLite(db)
+	bookingRepo := booking.NewBookingRepositorySQLite(db)
+	meetingRepo := meeting.NewMeetingRepositorySQLite(db)
 	p2pRepo := p2p.NewP2PInviteRepositorySQLite(db)
 	chatRepo := repository.NewChatRepository(db)
 
-	// 3. Provedores de IA & AI Gateway com Failover.
-	// Ordem: Gemini 2.5 Flash primário (forte em resolução de referência e
-	// diretivas de contexto), Groq/Mistral como fallback de cota e OpenRouter por
-	// último. O modelo pequeno do Groq (gpt-oss-20b) ignorava o bloco de
-	// 4. Serviços
+	// 3. Provedores de IA & Serviços
 	sessionRepo := repository.NewSessionRepository(db)
 	authSvc := service.NewAuthService(userRepo, cfg.JWTSecret)
 	authSvc.SetSessionRepository(sessionRepo)
@@ -127,63 +121,27 @@ func main() {
 		})
 	}
 
-	syncRepo := calendar.NewCalendarSyncRepository(db)
-	syncSvc := calendar.NewCalendarSyncService(syncRepo, eventRepo, cfg.DataEncryptionKey)
-	googleCalCfg := intcal.GoogleConfig{
+	syncRepo := calsync.NewCalendarSyncRepository(db)
+	syncSvc := calsync.NewCalendarSyncService(syncRepo, eventRepo, cfg.DataEncryptionKey)
+	googleCalCfg := providers.GoogleConfig{
 		ClientID:     cfg.GoogleClientID,
 		ClientSecret: cfg.GoogleClientSecret,
 		RedirectURI:  cfg.GoogleRedirectURL,
 	}
-	syncSvc.RegisterProvider(intcal.NewGoogleProvider(googleCalCfg))
-	syncSvc.RegisterProvider(intcal.NewAppleCalDAVProvider(intcal.AppleCalDAVConfig{}))
+	syncSvc.RegisterProvider(providers.NewGoogleProvider(googleCalCfg))
+	syncSvc.RegisterProvider(providers.NewAppleCalDAVProvider(providers.AppleCalDAVConfig{}))
 	calSvc.SetSyncPusher(syncSvc)
 
 	// Worker em segundo plano para lembretes de compromissos (iniciado após wiring cognitivo)
-	reminderWorker := tasks.NewReminderWorker(eventRepo, notifSvc, 15*time.Minute)
+	reminderWorker := calendar.NewReminderWorker(eventRepo, notifSvc, 15*time.Minute)
 
 	// Worker em segundo plano para vigília autônoma de bots/disparadores (motor ADK v2 conectado via BotRunner)
 	triggerWorker := bots.NewTriggerWorker(triggerRepo, notifSvc, &bots.DefaultTriggerEvaluator{}, 1*time.Minute)
-	// Delta gate pré-IA (§9.3): hashes dos fatos atuais via conectores por categoria.
+	// Delta gate pré-IA (§9.3) e fast-path de preço-alvo (Fase 1).
 	triggerWorker.SetDeltaFetcher(func(fetchCtx context.Context, t *domain.Trigger) ([]string, []string, error) {
-		items, err := search.RouteTriggerSource(t).Fetch(fetchCtx, t)
-		if err != nil {
-			return nil, nil, err
-		}
-		stored, err := triggerRepo.GetSeenHashes(t.ID)
-		if err != nil {
-			return nil, nil, err
-		}
-		seen := map[string]bool{}
-		for _, h := range stored {
-			seen[h] = true
-		}
-		var fresh, all []string
-		for _, it := range items {
-			h := search.HashDataPoint(it)
-			all = append(all, h)
-			if !seen[h] {
-				fresh = append(fresh, h)
-			}
-		}
-		return fresh, all, nil
+		return fetchTriggerDelta(fetchCtx, triggerRepo, t)
 	})
-	// Fast-path determinístico de preço-alvo (Fase 1): primeiro valor numérico
-	// da fonte da categoria (ex: bid AwesomeAPI); sem número, cai na IA.
-	triggerWorker.SetPriceFetcher(func(fetchCtx context.Context, t *domain.Trigger) (float64, string, bool, error) {
-		if t.ConditionType != domain.ConditionPriceAbove && t.ConditionType != domain.ConditionPriceBelow {
-			return 0, "", false, nil
-		}
-		items, err := search.RouteTriggerSource(t).Fetch(fetchCtx, t)
-		if err != nil {
-			return 0, "", false, err
-		}
-		for _, it := range items {
-			if v, ok := bots.ParseMoneyValue(it.Value); ok {
-				return v, it.Value, true, nil
-			}
-		}
-		return 0, "", false, nil
-	})
+	triggerWorker.SetPriceFetcher(fetchTriggerPrice)
 
 	// Worker em segundo plano para briefing matinal proativo (ADK CrossDomainBriefingWorkflow conectado em wireCognitiveRuntime)
 	morningBriefingWorker := service.NewMorningBriefingWorker(briefingRepo, eventRepo, todoRepo, userRepo, notifSvc, 1*time.Minute)
@@ -205,7 +163,7 @@ func main() {
 	behavioralWorker := service.NewBehavioralWorker(todoRepo, eventRepo, memoryRepo)
 
 	// Worker em segundo plano para resumos executivos (diário, semanal e mensal)
-	executiveSummaryWorker := calendar.NewExecutiveSummaryWorker(db, userRepo, notifSvc, 1*time.Minute)
+	executiveSummaryWorker := service.NewExecutiveSummaryWorker(db, userRepo, notifSvc, 1*time.Minute)
 
 	googleAuthCfg := service.GoogleAuthConfig{
 		ClientID:       cfg.GoogleClientID,
@@ -229,25 +187,25 @@ func main() {
 	calHandler := calendar.NewCalendarHandler(calSvc)
 	todoHandler := tasks.NewTodoHandler(todoSvc)
 	notifHandler := handler.NewNotificationHandler(notifSvc)
-	syncHandler := calendar.NewCalendarSyncHandler(syncSvc)
+	syncHandler := calsync.NewCalendarSyncHandler(syncSvc)
 	briefingHandler := handler.NewBriefingHandler(briefingRepo)
 	aiSettingsHandler := handler.NewAISettingsHandler(aiSettingsRepo)
 	pendingHandler := tasks.NewPendingHandler(pendingSvc)
 
 	linkShortener := service.NewShortIoShortenerService(cfg.ShortIoAPIKey, cfg.ShortIoDomain, cfg.PublicBaseURL)
 	turnstileValidator := service.NewTurnstileValidator(cfg.TurnstileSecretKey)
-	bookingSvc := calendar.NewBookingService(bookingRepo, eventRepo, userRepo, notifSvc, linkShortener, turnstileValidator, cfg.PublicBaseURL)
+	bookingSvc := booking.NewBookingService(bookingRepo, eventRepo, userRepo, notifSvc, linkShortener, turnstileValidator, cfg.PublicBaseURL)
 	bookingSvc.SetSyncPusher(syncSvc)
-	bookingHandler := calendar.NewBookingHandler(bookingSvc)
+	bookingHandler := booking.NewBookingHandler(bookingSvc)
 
 	emailSvc := service.NewEmailService(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUser, cfg.SMTPPassword, cfg.SMTPFrom)
 	bookingSvc.SetEmailService(emailSvc)
 
-	meetingSvc := calendar.NewMeetingService(meetingRepo, eventRepo, notifSvc, linkShortener, cfg.PublicBaseURL)
+	meetingSvc := meeting.NewMeetingService(meetingRepo, eventRepo, notifSvc, linkShortener, cfg.PublicBaseURL)
 	meetingSvc.SetUserRepository(userRepo)
 	meetingSvc.SetSyncPusher(syncSvc)
 	meetingSvc.SetEmailService(emailSvc)
-	meetingHandler := calendar.NewMeetingHandler(meetingSvc)
+	meetingHandler := meeting.NewMeetingHandler(meetingSvc)
 
 	waRepo := whatsapp.NewWhatsAppRepository(db)
 
@@ -257,21 +215,7 @@ func main() {
 	chatSvc := service.NewChatService(chatRepo)
 	chatHandler := handler.NewChatHandler(chatSvc)
 
-	financeRepo := finance.NewFinanceRepository(db)
-	financeLimitRepo := finance.NewFinanceLimitRepository(db)
-	financeAnalyticsRepo := finance.NewFinanceAnalyticsRepository(db)
-	financeSvc := finance.NewFinanceService(financeRepo)
-	financeLimitSvc := finance.NewFinanceLimitService(financeLimitRepo, financeRepo)
-	financeAnalyticsSvc := finance.NewFinanceAnalyticsService(financeAnalyticsRepo, financeRepo)
-	spendingLimitEval := finance.NewSpendingLimitEvaluator(financeLimitRepo, nil)
-	financeSvc.SetOnSyncComplete(func(ctx context.Context, userID string) {
-		_, _ = spendingLimitEval.EvaluateUserLimits(ctx, userID, time.Now().UTC())
-	})
-	financeHandler := finance.NewFinanceHandler(financeSvc)
-	financeLimitHandler := finance.NewFinanceLimitHandler(financeLimitSvc)
-	financeAnalyticsHandler := finance.NewFinanceAnalyticsHandler(financeAnalyticsSvc)
-
-	evoClient := whatsapp.NewDefaultEvolutionClient(cfg.EvolutionAPIURL, cfg.EvolutionAPIKey, nil)
+	evoClient := evolution.NewDefaultEvolutionClient(cfg.EvolutionAPIURL, cfg.EvolutionAPIKey, nil)
 	waSvc := whatsapp.NewWhatsAppService(whatsapp.WhatsAppServiceConfig{
 		WebhookBaseURL:  whatsapp.ResolveWhatsAppWebhookBaseURL(cfg.PublicBaseURL, cfg.EvolutionAPIURL, cfg.Port),
 		EvolutionAPIURL: cfg.EvolutionAPIURL,
@@ -279,10 +223,8 @@ func main() {
 	}, waRepo, evoClient)
 	waSvc.SetNotificationSender(notifSvc)
 	waSvc.SetUserRepo(userRepo)
-	var audioTranscriber voice.AudioTranscriber
-	if cfg.GroqAPIKey != "" {
-		audioTranscriber = voice.NewGroqWhisper(cfg.GroqAPIKey)
-		waSvc.SetAudioTranscriber(audioTranscriber)
+	if whisperTranscriber != nil {
+		waSvc.SetAudioTranscriber(whisperTranscriber)
 	}
 
 	// Elo de VISÃO para o enriquecimento da mídia do histórico via ADK v2 (OpenRouter).
@@ -293,7 +235,7 @@ func main() {
 	}
 
 	// Assistente de WhatsApp: contexto, diretório de contatos, backfill e enriquecimento de mídia.
-	waWiring := setupWhatsAppAssistant(cfg, db, waRepo, evoClient, waSvc, notifSvc, accountCleanupWorker, mediaVision, audioTranscriber)
+	waWiring := setupWhatsAppAssistant(cfg, db, waRepo, evoClient, waSvc, notifSvc, accountCleanupWorker, mediaVision, whisperTranscriber)
 	if waWiring.BackfillWorker != nil {
 		defer waWiring.BackfillWorker.Stop()
 	}
@@ -319,10 +261,10 @@ func main() {
 	gmailHandler := gmail.NewGmailHandler(gmailSvc)
 
 	// WhatsApp Passwordless Login OTP
-	waAuthRepo := whatsapp.NewWhatsAppAuthRepository(db)
-	waAuthSvc := whatsapp.NewWhatsAppAuthService(waAuthRepo, userRepo, authSvc, evoClient, "vito_system", cfg.JWTSecret)
+	waAuthRepo := waauth.NewWhatsAppAuthRepository(db)
+	waAuthSvc := waauth.NewWhatsAppAuthService(waAuthRepo, userRepo, authSvc, evoClient, "vito_system", cfg.JWTSecret)
 	waAuthSvc.SetWhatsAppRepo(waRepo)
-	whatsappAuthHandler := whatsapp.NewWhatsAppAuthHandler(waAuthSvc)
+	whatsappAuthHandler := waauth.NewWhatsAppAuthHandler(waAuthSvc)
 
 	// Síntese de voz: Gemini TTS nativo (Google AI Studio) como motor primário
 	// com fallback em cascata para sintetizador neural pt-BR via HTTP.
@@ -339,6 +281,9 @@ func main() {
 
 	// 5.5 Inteligência Conversacional v2 (Loop de Agente, Toolsets e Memória Hierárquica)
 	agentSys := setupAgentSubsystem(cfg, db, calSvc, todoSvc, waSvc, gmailSvc, userRepo, aiSettingsRepo, triggerSvc, bookingSvc, memoryRepo, waWiring.Directory)
+	if agentSys.AssistantEngine != nil {
+		todoHandler.SetAssistantEngine(agentSys.AssistantEngine)
+	}
 	if agentSys.StreamHandler != nil {
 		if whisperTranscriber != nil {
 			agentSys.StreamHandler.SetTranscriber(whisperTranscriber)
@@ -347,6 +292,11 @@ func main() {
 	}
 	defer agentSys.TraceRecorder.Close()
 	defer agentSys.ConsolidationWorker.Stop()
+
+	spendingLimitEval := finance.NewSpendingLimitEvaluator(agentSys.FinanceLimitRepo, nil)
+	financeHandler := finance.NewFinanceHandler(agentSys.FinanceSvc)
+	financeLimitHandler := finance.NewFinanceLimitHandler(agentSys.FinanceLimitSvc)
+	financeAnalyticsHandler := finance.NewFinanceAnalyticsHandler(agentSys.FinanceSvc)
 
 	// Injeta ponte proativa e governança cognitiva (Ondas 2 e 3: AttentionBudget, CrossDomainBriefing e EntityLinks)
 	proactiveBridge := service.NewProactiveConversationBridge(agentSys.ConversationStore)
@@ -357,12 +307,14 @@ func main() {
 		PendingNudgeWorker: pendingNudgeWorker, ExecutiveSummaryWorker: executiveSummaryWorker,
 		TriggerWorker: triggerWorker, MorningBriefingWorker: morningBriefingWorker,
 		BehavioralWorker: behavioralWorker, AgentSys: agentSys,
+		FinanceRepo: agentSys.FinanceRepo, FinanceSvc: agentSys.FinanceSvc,
+		SpendingLimitEval: spendingLimitEval, WhatsAppSvc: waSvc,
 	})
 	botHandler, botRunner := setupBotSubsystem(db, triggerRepo, notifSvc, cognitiveRes.BudgetSvc, agentSys)
 	if botRunner != nil {
 		triggerWorker.SetEvaluator(botRunner)
 	}
-	v5Sys := setupV5Subsystem(db, cognitiveRes.BudgetSvc, agentSys, todoRepo)
+	inboxSys := setupInboxComplianceSubsystem(db, cognitiveRes.BudgetSvc, agentSys, todoRepo)
 
 	// Inicia workers proativos somente após AttentionBudgetService e inboxRecorder estarem conectados.
 	reminderWorker.Start()
@@ -386,15 +338,19 @@ func main() {
 	executiveSummaryWorker.Start()
 	defer executiveSummaryWorker.Stop()
 
-	// Handler de voz bidirecional conectado ao Loop de Agente e TTS
+	// Handler de voz bidirecional conectado ao motor ADK e TTS
 	voiceStreamHandler := handler.NewVoiceStreamHandler()
-	if agentSys.AgentLoop != nil {
-		voiceStreamHandler.SetAgentLoop(agentSys.AgentLoop, agentSys.ConversationStore)
-		voiceStreamHandler.SetAudioServices(whisperTranscriber, ttsSvc, cfg.GeminiAPIKey)
+	if agentSys.AssistantEngine != nil {
+		voiceStreamHandler.SetAgentLoop(agentSys.AssistantEngine)
+		voiceStreamHandler.SetAudioServices(whisperTranscriber, ttsSvc)
+		voiceStreamHandler.SetAISettingsRepository(aiSettingsRepo)
 	}
 
 	if agentSys.AIProviderSvc != nil {
 		chatHandler.SetAIProviderService(agentSys.AIProviderSvc)
+	}
+	if agentSys.ConversationStore != nil {
+		chatHandler.SetConversationStore(agentSys.ConversationStore)
 	}
 
 	// 6. Servidor HTTP
@@ -406,8 +362,8 @@ func main() {
 		AstStreamHandler:        agentSys.StreamHandler,
 		MemoryHandler:           agentSys.MemoryHandler,
 		NotifHandler:            notifHandler,
-		NotifInboxHandler:       v5Sys.NotifInboxHandler,
-		StoreComplianceHandler:  v5Sys.StoreComplianceHandler,
+		NotifInboxHandler:       inboxSys.NotifInboxHandler,
+		StoreComplianceHandler:  inboxSys.StoreComplianceHandler,
 		SyncHandler:             syncHandler,
 		BotHandler:              botHandler,
 		BriefingHandler:         briefingHandler,

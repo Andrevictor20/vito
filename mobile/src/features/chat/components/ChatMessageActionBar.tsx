@@ -6,8 +6,10 @@ import { useTheme } from '../../../context/ThemeContext';
 import { copyToClipboard } from '../../../utils/device/clipboard';
 import { preparePlainTextForCopy } from '../utils/chatActions';
 import { hapticFeedback } from '../../../theme/motion';
+import { api } from '../../../services/api';
 
 export interface ChatMessageActionBarProps {
+  messageId?: string;
   messageText: string;
   timestamp: string;
   modelUsed?: string;
@@ -17,6 +19,7 @@ export interface ChatMessageActionBarProps {
 }
 
 export const ChatMessageActionBar: React.FC<ChatMessageActionBarProps> = ({
+  messageId,
   messageText,
   timestamp,
   modelUsed,
@@ -50,7 +53,11 @@ export const ChatMessageActionBar: React.FC<ChatMessageActionBarProps> = ({
 
   const handleFeedback = (type: 'like' | 'dislike') => {
     hapticFeedback.selection();
-    setFeedback((prev) => (prev === type ? null : type));
+    const next = feedback === type ? null : type;
+    setFeedback(next);
+    if (next && messageId) {
+      void api.sendMessageFeedback(messageId, next, messageText).catch(() => {});
+    }
   };
 
   const iconColor = colors.onSurfaceVariant;

@@ -8,7 +8,7 @@ import {
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
-import { MASCOT_TRACKS, type ProtoMascotState } from '../../../mascot/mascotSpecs';
+import { MASCOT_TRACKS, type ProtoMascotState } from './mascotTracks.generated';
 import { MascotAnimationState } from './mascotPalettes';
 
 function getProtoDuration(state: ProtoMascotState, part: string, fallbackMs: number): number {

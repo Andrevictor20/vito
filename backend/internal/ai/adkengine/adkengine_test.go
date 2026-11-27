@@ -18,59 +18,13 @@ import (
 
 	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/ai/adkengine"
-	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
+	"github.com/andrevmp/vito/backend/internal/gmail"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/andrevmp/vito/backend/internal/service"
 	"github.com/andrevmp/vito/backend/internal/service/toolsets"
 )
-
-type fakeAgentProvider struct {
-	name          string
-	model         string
-	tier          int
-	supportsTools bool
-	failErr       error
-	responses     []*ai.AgentChatResponse
-	callIdx       int
-	capturedReqs  []ai.AgentChatRequest
-}
-
-func (f *fakeAgentProvider) Name() string          { return f.name }
-func (f *fakeAgentProvider) ModelName() string     { return f.model }
-func (f *fakeAgentProvider) SupportsTools() bool   { return f.supportsTools }
-func (f *fakeAgentProvider) SupportsVision() bool  { return true }
-func (f *fakeAgentProvider) QualityTier() int      { return f.tier }
-func (f *fakeAgentProvider) MaxContextTokens() int { return 65536 }
-
-func (f *fakeAgentProvider) Chat(ctx context.Context, req ai.AgentChatRequest) (*ai.AgentChatResponse, error) {
-	f.capturedReqs = append(f.capturedReqs, req)
-	if f.failErr != nil {
-		return nil, f.failErr
-	}
-	if f.callIdx < len(f.responses) {
-		r := f.responses[f.callIdx]
-		f.callIdx++
-		return r, nil
-	}
-	return &ai.AgentChatResponse{
-		Text:         "Resposta padrão ADK",
-		ProviderName: f.name,
-		ModelName:    f.model,
-	}, nil
-}
-
-func (f *fakeAgentProvider) StreamChat(ctx context.Context, req ai.AgentChatRequest, onDelta func(ai.StreamDelta) error) (*ai.AgentChatResponse, error) {
-	resp, err := f.Chat(ctx, req)
-	if err != nil {
-		return nil, err
-	}
-	if onDelta != nil && resp.Text != "" {
-		_ = onDelta(ai.StreamDelta{TextDelta: resp.Text})
-		_ = onDelta(ai.StreamDelta{Done: true, FinalMetrics: resp})
-	}
-	return resp, nil
-}
 
 // TestAC01_COG01_BeforeModelCallback_AdaptiveThinkingAndVoiceBudget valida AC-01 (COG-01):
 // ThinkingBudget > 0 em pedido analítico no texto vs ThinkingBudget = 0 e MaxOutputTokens = 320 na voz,
@@ -121,34 +75,28 @@ func TestAC01_COG01_BeforeModelCallback_AdaptiveThinkingAndVoiceBudget(t *testin
 }
 
 // TestAC02_COG02_RoutedLLM_TransparentFailoverOn429Or5xx valida AC-02 (COG-02):
-// Quando o provedor primário falha com HTTP 429/5xx, RoutedLLM aciona SelectFallbackProviders
-// transparentemente no mesmo passo do runner.Runner.
+// Quando o provedor primário do ServerPool falha com HTTP 429/5xx, RoutedLLM faz failover
+// transparentemente para o próximo provedor no mesmo passo do runner.Runner.
 func TestAC02_COG02_RoutedLLM_TransparentFailoverOn429Or5xx(t *testing.T) {
-	primary := &fakeAgentProvider{
-		name:          "Primary-Gemini",
-		model:         "gemini-2.5-flash",
-		tier:          3,
-		supportsTools: true,
-		failErr:       errors.New("gemini status 429: Resource exhausted"),
+	primary := &fakeADKLLM{
+		model:   "gemini-2.5-flash",
+		failErr: errors.New("gemini status 429: Resource exhausted"),
 	}
-	fallback := &fakeAgentProvider{
-		name:          "Fallback-OpenRouter",
-		model:         "google/gemini-2.5-flash",
-		tier:          3,
-		supportsTools: true,
-		responses: []*ai.AgentChatResponse{
+	fallback := &fakeADKLLM{
+		model: "google/gemini-2.5-flash",
+		responses: []scriptedModelResponse{
 			{
-				Text:         "Resposta entregue pelo provedor de failover no ADK!",
-				ProviderName: "Fallback-OpenRouter",
-				ModelName:    "google/gemini-2.5-flash",
-				TokensIn:     20,
-				TokensOut:    10,
+				Text:      "Resposta entregue pelo provedor de failover no ADK!",
+				TokensIn:  20,
+				TokensOut: 10,
 			},
 		},
 	}
 
-	router := ai.NewModelRouter(primary, fallback)
-	routedLLM := adkengine.NewRoutedLLM(router)
+	routedLLM := adkengine.NewRoutedLLM(
+		adkengine.ServerPoolEntry{ProviderKey: "gemini", DisplayName: "Primary-Gemini", ModelID: "gemini-2.5-flash", Tier: 3, LLM: primary},
+		adkengine.ServerPoolEntry{ProviderKey: "openrouter", DisplayName: "Fallback-OpenRouter", ModelID: "google/gemini-2.5-flash", Tier: 3, LLM: fallback},
+	)
 
 	req := &model.LLMRequest{
 		Model: "gemini-2.5-flash",
@@ -220,7 +168,7 @@ func TestAC03_COG03_ToolsetBridgeAndMultiAgentTopologyAndSession(t *testing.T) {
 	registry.Register(calendar.NewCalendarToolset(nil))
 	registry.Register(tasks.NewTaskPendingToolset(nil))
 	registry.Register(whatsapp.NewWhatsAppToolset(nil))
-	registry.Register(toolsets.NewGmailToolset(nil))
+	registry.Register(gmail.NewGmailToolset(nil))
 	registry.Register(toolsets.NewSearchToolset())
 
 	bridge := adkengine.NewToolsetBridge(registry)
@@ -247,14 +195,10 @@ func TestAC03_COG03_ToolsetBridgeAndMultiAgentTopologyAndSession(t *testing.T) {
 	argsBytes, _ := json.Marshal(map[string]any{
 		"date": "2026-11-21",
 	})
-	provider := &fakeAgentProvider{
-		name:          "Gemini-ADK",
-		model:         "gemini-2.5-flash",
-		tier:          3,
-		supportsTools: true,
-		responses: []*ai.AgentChatResponse{
+	provider := &fakeADKLLM{
+		model: "gemini-2.5-flash",
+		responses: []scriptedModelResponse{
 			{
-				Text: "",
 				ToolCalls: []ai.ToolCall{
 					{
 						ID:        "call-atomic-1",
@@ -262,23 +206,18 @@ func TestAC03_COG03_ToolsetBridgeAndMultiAgentTopologyAndSession(t *testing.T) {
 						Arguments: argsBytes,
 					},
 				},
-				ProviderName: "Gemini-ADK",
-				ModelName:    "gemini-2.5-flash",
 			},
 			{
-				Text:         "Consultei sua agenda via Google ADK e você está livre hoje!",
-				ProviderName: "Gemini-ADK",
-				ModelName:    "gemini-2.5-flash",
+				Text: "Consultei sua agenda via Google ADK e você está livre hoje!",
 			},
 		},
 	}
 
-	router := ai.NewModelRouter(provider)
 	guard := service.NewScopeGuard()
 	gate := service.NewConfirmationGateService(db)
 
 	facade, err := adkengine.NewADKLoopFacade(adkengine.FacadeConfig{
-		Router:           router,
+		ServerPool:       testServerPool("Gemini-ADK", "gemini-2.5-flash", provider),
 		Registry:         registry,
 		ScopeGuard:       guard,
 		ConfirmationGate: gate,
@@ -315,12 +254,9 @@ func TestAC03_COG03_ToolsetBridgeAndMultiAgentTopologyAndSession(t *testing.T) {
 		"recipient": "Carlos",
 		"message":   "Chego em 10 minutos",
 	})
-	providerHITL := &fakeAgentProvider{
-		name:          "Gemini-ADK",
-		model:         "gemini-2.5-flash",
-		tier:          3,
-		supportsTools: true,
-		responses: []*ai.AgentChatResponse{
+	providerHITL := &fakeADKLLM{
+		model: "gemini-2.5-flash",
+		responses: []scriptedModelResponse{
 			{
 				Text: "Vou preparar o envio.",
 				ToolCalls: []ai.ToolCall{
@@ -330,14 +266,12 @@ func TestAC03_COG03_ToolsetBridgeAndMultiAgentTopologyAndSession(t *testing.T) {
 						Arguments: waSendArgs,
 					},
 				},
-				ProviderName: "Gemini-ADK",
-				ModelName:    "gemini-2.5-flash",
 			},
 		},
 	}
 
 	facadeHITL, err := adkengine.NewADKLoopFacade(adkengine.FacadeConfig{
-		Router:           ai.NewModelRouter(providerHITL),
+		ServerPool:       testServerPool("Gemini-ADK", "gemini-2.5-flash", providerHITL),
 		Registry:         registry,
 		ScopeGuard:       guard,
 		ConfirmationGate: gate,
@@ -367,30 +301,22 @@ func TestAC03_COG03_ToolsetBridgeAndMultiAgentTopologyAndSession(t *testing.T) {
 	}
 }
 
-type reasoningStreamProvider struct {
-	fakeAgentProvider
-}
-
-func (r *reasoningStreamProvider) StreamChat(ctx context.Context, req ai.AgentChatRequest, onDelta func(ai.StreamDelta) error) (*ai.AgentChatResponse, error) {
-	r.capturedReqs = append(r.capturedReqs, req)
-	if onDelta != nil {
-		_ = onDelta(ai.StreamDelta{ReasoningDelta: "Verificando conflitos..."})
-		_ = onDelta(ai.StreamDelta{ToolCalls: []ai.ToolCall{{ID: "c1", Name: "calendar_list_events"}}})
-		_ = onDelta(ai.StreamDelta{TextDelta: "Agenda livre."})
-	}
-	return &ai.AgentChatResponse{
-		Text:         "Agenda livre.",
-		Thought:      "Verificando conflitos...",
-		ProviderName: r.name,
-		ModelName:    r.model,
-	}, nil
-}
-
 func TestRoutedLLM_ThinkingBudgetAndReasoningDeltaPropagation(t *testing.T) {
-	prov := &reasoningStreamProvider{
-		fakeAgentProvider: fakeAgentProvider{name: "Gemini-ADK", model: "gemini-2.5-flash", tier: 3, supportsTools: true},
+	prov := &fakeADKLLM{
+		model: "gemini-2.5-flash",
+		responses: []scriptedModelResponse{
+			{
+				Thought:      "Verificando conflitos...",
+				ToolCalls:    []ai.ToolCall{{ID: "c1", Name: "calendar_list_events"}},
+				Text:         "Agenda livre.",
+				StreamChunks: true,
+			},
+			{
+				Text: "Agenda livre na voz.",
+			},
+		},
 	}
-	routedLLM := adkengine.NewRoutedLLM(ai.NewModelRouter(prov))
+	routedLLM := adkengine.NewRoutedLLM(testServerPool("Gemini-ADK", "gemini-2.5-flash", prov)...)
 
 	budget := int32(2048)
 	req := &model.LLMRequest{
@@ -404,44 +330,56 @@ func TestRoutedLLM_ThinkingBudgetAndReasoningDeltaPropagation(t *testing.T) {
 		Contents: []*genai.Content{genai.NewContentFromText("Planeje minha semana", genai.RoleUser)},
 	}
 
-	var streamed []ai.StreamDelta
-	meta := &adkengine.TurnExecutionMeta{
+	ctx := adkengine.WithTurnExecutionMeta(context.Background(), &adkengine.TurnExecutionMeta{
 		UserID:  "u1",
 		Channel: "app_mobile",
-		OnDelta: func(d ai.StreamDelta) error {
-			streamed = append(streamed, d)
-			return nil
-		},
-	}
-	ctx := adkengine.WithTurnExecutionMeta(context.Background(), meta)
+	})
 
-	for _, err := range routedLLM.GenerateContent(ctx, req, true) {
+	var partialResponses []*model.LLMResponse
+	for resp, err := range routedLLM.GenerateContent(ctx, req, true) {
 		if err != nil {
 			t.Fatalf("GenerateContent falhou: %v", err)
 		}
+		if resp != nil && resp.Partial {
+			partialResponses = append(partialResponses, resp)
+		}
 	}
 
-	if len(prov.capturedReqs) != 1 || prov.capturedReqs[0].ThinkingBudget == nil || *prov.capturedReqs[0].ThinkingBudget != 2048 || !prov.capturedReqs[0].IncludeThoughts {
-		t.Fatalf("ThinkingConfig não propagado ao AgentChatRequest: %+v", prov.capturedReqs)
+	if len(prov.capturedReqs) != 1 || prov.capturedReqs[0].Config == nil || prov.capturedReqs[0].Config.ThinkingConfig == nil || *prov.capturedReqs[0].Config.ThinkingConfig.ThinkingBudget != 2048 || !prov.capturedReqs[0].Config.ThinkingConfig.IncludeThoughts {
+		t.Fatalf("ThinkingConfig não propagado ao model.LLMRequest: %+v", prov.capturedReqs)
 	}
-	if len(streamed) != 3 || streamed[0].Type != "reasoning" || streamed[0].ReasoningDelta != "Verificando conflitos..." {
-		t.Errorf("ReasoningDelta não propagado no streaming: %+v", streamed)
+	if len(partialResponses) != 3 {
+		t.Fatalf("esperava 3 respostas parciais (thought, tool_call, text), obteve %d", len(partialResponses))
 	}
-	if streamed[1].Type != "tool_call" || streamed[1].ToolName != "calendar_list_events" {
-		t.Errorf("ToolCall delta não propagado no streaming: %+v", streamed)
+	if !partialResponses[0].Content.Parts[0].Thought || partialResponses[0].Content.Parts[0].Text != "Verificando conflitos..." {
+		t.Errorf("Thought partial não propagado: %+v", partialResponses[0])
 	}
-	if streamed[2].Type != "text" || streamed[2].TextDelta != "Agenda livre." {
-		t.Errorf("TextDelta não propagado no streaming: %+v", streamed)
+	if partialResponses[1].Content.Parts[0].FunctionCall == nil || partialResponses[1].Content.Parts[0].FunctionCall.Name != "calendar_list_events" {
+		t.Errorf("ToolCall partial não propagado: %+v", partialResponses[1])
+	}
+	if partialResponses[2].Content.Parts[0].Text != "Agenda livre." {
+		t.Errorf("Text partial não propagado: %+v", partialResponses[2])
 	}
 
-	// Verifica que canal voice mantém ThinkingBudget=0 mesmo se ThinkingConfig tiver valor positivo
+	// Verifica que ApplyBeforeModelConfig + canal voice força ThinkingBudget=0 mesmo quando req tinha budget positivo
+	voiceReq := &model.LLMRequest{
+		Model: "gemini-2.5-flash",
+		Config: &genai.GenerateContentConfig{
+			ThinkingConfig: &genai.ThinkingConfig{
+				IncludeThoughts: true,
+				ThinkingBudget:  &budget,
+			},
+		},
+		Contents: []*genai.Content{genai.NewContentFromText("Qual minha agenda?", genai.RoleUser)},
+	}
+	adkengine.ApplyBeforeModelConfig(voiceReq, "voice", "auto", "", "")
 	voiceCtx := adkengine.WithTurnExecutionMeta(context.Background(), &adkengine.TurnExecutionMeta{UserID: "u1", Channel: "voice"})
-	for _, err := range routedLLM.GenerateContent(voiceCtx, req, false) {
+	for _, err := range routedLLM.GenerateContent(voiceCtx, voiceReq, false) {
 		if err != nil {
 			t.Fatalf("GenerateContent voice falhou: %v", err)
 		}
 	}
-	if len(prov.capturedReqs) != 2 || prov.capturedReqs[1].ThinkingBudget == nil || *prov.capturedReqs[1].ThinkingBudget != 0 {
-		t.Errorf("canal voice deve manter ThinkingBudget=0, obteve %+v", prov.capturedReqs[1].ThinkingBudget)
+	if len(prov.capturedReqs) != 2 || prov.capturedReqs[1].Config.ThinkingConfig.ThinkingBudget == nil || *prov.capturedReqs[1].Config.ThinkingConfig.ThinkingBudget != 0 {
+		t.Errorf("canal voice deve manter ThinkingBudget=0, obteve %+v", prov.capturedReqs[1].Config)
 	}
 }

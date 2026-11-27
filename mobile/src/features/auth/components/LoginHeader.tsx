@@ -11,7 +11,7 @@ import {
 } from 'react-native'
 import { MascotVectorRig } from '../../bots/mascot/MascotVectorRig'
 import { HeadlineReel } from './HeadlineReel'
-import { SunIcon } from '../demo/DemoIcons'
+import { SunIcon } from '../../../icons/AppGlyphs'
 import { loginPalette } from '../utils/loginPalette'
 import { headlineColor, type DemoTone } from '../demo/demoScenes'
 

@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/andrevmp/vito/backend/internal/service"
 )
@@ -93,6 +93,6 @@ func TestAC04_AllReminderWorkersUseAttentionBudget(t *testing.T) {
 	budgetSvc.SetCategoryPreference(userID, "tarefas", true)
 	pendingWorker := tasks.NewPendingNudgeWorker(pendingRepo, userRepo, notifSvc, 1*time.Minute)
 	pendingWorker.SetAttentionBudget(budgetSvc)
-	summaryWorker := calendar.NewExecutiveSummaryWorker(db, userRepo, notifSvc, 1*time.Minute)
+	summaryWorker := service.NewExecutiveSummaryWorker(db, userRepo, notifSvc, 1*time.Minute)
 	summaryWorker.SetAttentionBudget(budgetSvc)
 }

@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// TaskCategory classifica a natureza da chamada para o ModelRouter.
+// TaskCategory classifica a natureza da chamada de IA para telemetria e roteamento.
 type TaskCategory string
 
 const (
@@ -29,36 +29,7 @@ const (
 	StyleRelaxed      PersonaStyle = "relaxed"      // Descontraído
 )
 
-// ChatRole padroniza os papéis dos turnos reais (resolvendo C2).
-type ChatRole string
-
-const (
-	RoleSystem    ChatRole = "system"
-	RoleUser      ChatRole = "user"
-	RoleAssistant ChatRole = "assistant"
-	RoleTool      ChatRole = "tool"
-)
-
-// TurnMessage representa um turno real enviado ao modelo.
-type TurnMessage struct {
-	Role       ChatRole   `json:"role"`
-	Content    string     `json:"content,omitempty"`
-	Thought    string     `json:"thought,omitempty"`
-	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
-	ToolCallID string     `json:"tool_call_id,omitempty"`
-	Name       string     `json:"name,omitempty"`
-	ImageBytes []byte     `json:"-"`
-	ImageMIME  string     `json:"-"`
-}
-
-// ToolDefinition descreve uma das 8 Macro-Ferramentas (Domain Toolsets) para Function Calling.
-type ToolDefinition struct {
-	Name        string          `json:"name"`
-	Description string          `json:"description"`
-	Parameters  json.RawMessage `json:"parameters"` // JSON Schema Draft-07 compacto
-}
-
-// ToolCall representa a solicitação do modelo para invocar uma Macro-Ferramenta.
+// ToolCall representa a solicitação do modelo para invocar uma ferramenta.
 type ToolCall struct {
 	ID               string          `json:"id"`
 	Name             string          `json:"name"`
@@ -66,56 +37,14 @@ type ToolCall struct {
 	ThoughtSignature string          `json:"thought_signature,omitempty"`
 }
 
-// AgentChatRequest encapsula a entrada padronizada independente de provedor.
-type AgentChatRequest struct {
-	ThreadID        string           `json:"thread_id"`
-	UserID          string           `json:"user_id"`
-	Channel         string           `json:"channel"`
-	Task            TaskCategory     `json:"task"`
-	SystemPrompt    string           `json:"system_prompt"`
-	Messages        []TurnMessage    `json:"messages"`
-	Tools           []ToolDefinition `json:"tools,omitempty"`
-	Temperature     *float64         `json:"temperature,omitempty"`
-	MaxTokens       int              `json:"max_tokens,omitempty"`
-	ThinkingBudget  *int             `json:"thinking_budget,omitempty"`
-	IncludeThoughts bool             `json:"include_thoughts,omitempty"`
-	RequireTools    bool             `json:"require_tools,omitempty"`
-}
-
-// AgentChatResponse encapsula a resposta padronizada do provedor.
-type AgentChatResponse struct {
-	Text         string     `json:"text"`
-	Thought      string     `json:"thought,omitempty"`
-	Reasoning    []string   `json:"reasoning,omitempty"`
-	ToolCalls    []ToolCall `json:"tool_calls,omitempty"`
-	ProviderName string     `json:"provider_name"`
-	ModelName    string     `json:"model_name"`
-	TokensIn     int        `json:"tokens_in"`
-	TokensOut    int        `json:"tokens_out"`
-	LatencyMs    int64      `json:"latency_ms"`
-}
-
-// StreamDelta representa um fragmento emitido em tempo real durante StreamChat.
+// StreamDelta representa um fragmento emitido em tempo real durante streaming SSE.
 type StreamDelta struct {
-	Type           string             `json:"type,omitempty"`
-	ToolName       string             `json:"tool_name,omitempty"`
-	TextDelta      string             `json:"text_delta,omitempty"`
-	ReasoningDelta string             `json:"reasoning_delta,omitempty"`
-	ToolCalls      []ToolCall         `json:"tool_calls,omitempty"`
-	Done           bool               `json:"done,omitempty"`
-	FinalMetrics   *AgentChatResponse `json:"final_metrics,omitempty"`
-}
-
-// AgentProvider é a interface padronizada independente de provedor (Rev. 5 / Rev. 6).
-type AgentProvider interface {
-	Name() string
-	ModelName() string
-	SupportsTools() bool
-	SupportsVision() bool
-	QualityTier() int // 3 = Alto (Gemini 2.5 Flash), 2 = Médio, 1 = Pequeno (não executa escrita)
-	MaxContextTokens() int
-	Chat(ctx context.Context, req AgentChatRequest) (*AgentChatResponse, error)
-	StreamChat(ctx context.Context, req AgentChatRequest, onDelta func(StreamDelta) error) (*AgentChatResponse, error)
+	Type           string     `json:"type,omitempty"`
+	ToolName       string     `json:"tool_name,omitempty"`
+	TextDelta      string     `json:"text_delta,omitempty"`
+	ReasoningDelta string     `json:"reasoning_delta,omitempty"`
+	ToolCalls      []ToolCall `json:"tool_calls,omitempty"`
+	Done           bool       `json:"done,omitempty"`
 }
 
 // AITrace representa um registro de telemetria para o Ring Buffer (Fase 0 / §5.6.5).

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   RefreshControl,
   SafeAreaView,
   ScrollView,
@@ -20,7 +21,7 @@ import { notificationsInboxStore } from '../services/notificationsInboxStore';
 import type {
   InboxNotification,
   InboxNotificationAction,
-} from '../services/inboxNotificationsApi';
+} from '../services/notificationsApi';
 import { VitoMascot } from '../../../components/common/VitoMascot';
 import { NotificationItemCard } from '../components/NotificationItemCard';
 import {
@@ -28,7 +29,7 @@ import {
   filterNotifications,
   groupNotifications,
   NotificationFilter,
-} from '../components/notificationHelpers';
+} from '../utils/notificationHelpers';
 import { navigateToBooking, navigateToTab } from '../../../navigation/screensNav';
 import { getTaskBucket } from '../../tasks/utils/taskBuckets';
 
@@ -114,40 +115,48 @@ export const NotificationsScreen: React.FC<{ onBack?: () => void }> = ({ onBack 
         const decision = actionKey === 'always_allow' ? 'always_allow' : isReject ? 'deny' : 'allow_once';
         const botId = item.bot_id || act.value || '';
         const confId = item.source_id || '';
-        if (botId && confId && item.id.startsWith('bot-')) {
-          await api.resolveBotPending(botId, confId, decision).catch(() => {});
-        } else {
-          await api.inbox.performAction(item.id, actionKey).catch(() => {});
+        try {
+          if (botId && confId && item.id.startsWith('bot-')) {
+            await api.resolveBotPending(botId, confId, decision);
+          } else {
+            await api.inbox.performAction(item.id, actionKey);
+          }
+          setItems((prev) => {
+            const next = prev.filter((x) => x.id !== item.id);
+            notificationsInboxStore.setUnreadCount(countUnreadNotifications(next));
+            return next;
+          });
+          dataSync.notify('refresh_bots');
+          showToast(isReject ? 'Ação recusada' : 'Ação do bot aprovada');
+        } catch {
+          Alert.alert('Erro', 'Não foi possível processar a aprovação agora.');
         }
-        setItems((prev) => {
-          const next = prev.filter((x) => x.id !== item.id);
-          notificationsInboxStore.setUnreadCount(countUnreadNotifications(next));
-          return next;
-        });
-        dataSync.notify('refresh_bots');
-        showToast(isReject ? 'Ação recusada' : 'Ação do bot aprovada');
         return;
       }
 
       if (actionKey === 'reschedule_overdue' || actionKey === 'reschedule_today') {
-        if (item.id === 'tasks-atr') {
-          const endOfDay = new Date();
-          endOfDay.setHours(23, 59, 59, 0);
-          const todos = await api.getTodos('pending').catch(() => []);
-          const overdue = (todos || []).filter((t) => getTaskBucket(t.due_date) === 'atr');
-          await Promise.all(
-            overdue.map((t) => api.updateTodo(t.id, { due_date: endOfDay.toISOString() }).catch(() => null))
-          );
-        } else {
-          await api.inbox.performAction(item.id, 'reschedule_today').catch(() => {});
+        try {
+          if (item.id === 'tasks-atr') {
+            const endOfDay = new Date();
+            endOfDay.setHours(23, 59, 59, 0);
+            const todos = await api.getTodos('pending');
+            const overdue = (todos || []).filter((t) => getTaskBucket(t.due_date) === 'atr');
+            await Promise.all(
+              overdue.map((t) => api.updateTodo(t.id, { due_date: endOfDay.toISOString() }))
+            );
+          } else {
+            await api.inbox.performAction(item.id, 'reschedule_today');
+          }
+          setItems((prev) => {
+            const next = prev.filter((x) => x.id !== item.id);
+            notificationsInboxStore.setUnreadCount(countUnreadNotifications(next));
+            return next;
+          });
+          dataSync.notify('refresh_todos');
+          showToast('Tarefas atrasadas reagendadas para hoje');
+        } catch {
+          Alert.alert('Erro', 'Não foi possível reagendar as tarefas atrasadas.');
         }
-        setItems((prev) => {
-          const next = prev.filter((x) => x.id !== item.id);
-          notificationsInboxStore.setUnreadCount(countUnreadNotifications(next));
-          return next;
-        });
-        dataSync.notify('refresh_todos');
-        showToast('Tarefas atrasadas reagendadas para hoje');
         return;
       }
 
@@ -166,17 +175,44 @@ export const NotificationsScreen: React.FC<{ onBack?: () => void }> = ({ onBack 
       }
 
       if (actionKey === 'go_booking') {
+        await api.inbox.performAction(item.id, 'open').catch(() => {});
+        setItems((prev) => {
+          const next = prev.map((x) => (x.id === item.id ? { ...x, is_unread: false } : x));
+          notificationsInboxStore.setUnreadCount(countUnreadNotifications(next));
+          return next;
+        });
         handleBack();
         navigateToBooking();
         return;
       }
 
-      await api.inbox.performAction(item.id, actionKey).catch(() => {});
-      setItems((prev) => {
-        const next = prev.filter((x) => x.id !== item.id);
-        notificationsInboxStore.setUnreadCount(countUnreadNotifications(next));
-        return next;
-      });
+      try {
+        const res = await api.inbox.performAction(item.id, actionKey);
+        const keepAsRead = res?.status === 'opened' || res?.status === 'read';
+        setItems((prev) => {
+          const next = keepAsRead
+            ? prev.map((x) => (x.id === item.id ? { ...x, is_unread: false } : x))
+            : prev.filter((x) => x.id !== item.id);
+          notificationsInboxStore.setUnreadCount(countUnreadNotifications(next));
+          return next;
+        });
+        if (res?.navigate_to) {
+          handleBack();
+          if (res.navigate_to === 'booking') {
+            navigateToBooking();
+          } else if (
+            res.navigate_to === 'finance' ||
+            res.navigate_to === 'calendar' ||
+            res.navigate_to === 'tasks' ||
+            res.navigate_to === 'triggers' ||
+            res.navigate_to === 'chat'
+          ) {
+            navigateToTab(res.navigate_to);
+          }
+        }
+      } catch {
+        Alert.alert('Erro', 'Não foi possível executar esta ação agora.');
+      }
     } finally {
       setBusyId(null);
     }

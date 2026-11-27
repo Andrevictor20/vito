@@ -16,7 +16,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { ProtoUiIcon } from '../../../../icons/ProtoUiIcons';
-import { getBezier } from '../../../../ds/tokens';
+import { MOTION_CURVES } from '../../../../theme/motion';
 import { tabularNumbers } from '../../../../theme/tokens';
 import { useTheme } from '../../../../context/ThemeContext';
 import { MeetingSlot } from '../../../../types';
@@ -63,7 +63,7 @@ export const MeetingPollSlotItem: React.FC<MeetingPollSlotItemProps> = ({
           widthAnim.value = percentage;
           return;
         }
-        const [x1, y1, x2, y2] = getBezier('--ease-q');
+        const [x1, y1, x2, y2] = MOTION_CURVES.q;
         widthAnim.value = withTiming(percentage, {
           duration: 720,
           easing: Easing.bezier(x1, y1, x2, y2),

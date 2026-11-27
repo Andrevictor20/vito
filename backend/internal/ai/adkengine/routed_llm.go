@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"google.golang.org/adk/v2/model"
-	"google.golang.org/genai"
 
 	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/domain"
@@ -68,10 +67,9 @@ type ServerPoolEntry struct {
 	LLM         model.LLM
 }
 
-// RoutedLLM implementa google.golang.org/adk/v2/model.LLM integrando ModelResolver (BYOK),
-// ServerPool nativo ADK v2 (Sticky Thread + failover automático) e ModelRouter opcional.
+// RoutedLLM implementa google.golang.org/adk/v2/model.LLM integrando ModelResolver (BYOK)
+// e ServerPool nativo ADK v2 (Sticky Thread + failover automático).
 type RoutedLLM struct {
-	router        *ai.ModelRouter
 	serverPool    []ServerPoolEntry
 	stickyMu      sync.RWMutex
 	stickyThreads map[string]string
@@ -83,13 +81,16 @@ type RoutedLLM struct {
 	backoff       time.Duration
 }
 
-// NewRoutedLLM cria uma instância de model.LLM conectada ao ModelRouter/ServerPool do Vito.
-func NewRoutedLLM(router *ai.ModelRouter) *RoutedLLM {
-	return &RoutedLLM{
-		router:        router,
+// NewRoutedLLM cria uma instância de model.LLM configurada com os provedores do ServerPool do Vito.
+func NewRoutedLLM(entries ...ServerPoolEntry) *RoutedLLM {
+	r := &RoutedLLM{
 		stickyThreads: make(map[string]string),
 		defaultModel:  "gemini-2.5-flash",
 	}
+	if len(entries) > 0 {
+		r.SetServerPool(entries)
+	}
+	return r
 }
 
 // SetServerPool configura os modelos nativos ADK v2 do servidor (Gemini + OpenRouter + Groq).
@@ -134,161 +135,6 @@ func (r *RoutedLLM) GenerateContent(ctx context.Context, req *model.LLMRequest, 
 			r.generateFromServerPool(ctx, req, stream, meta, yield)
 			return
 		}
-		if r.router == nil {
-			yield(nil, fmt.Errorf("nenhum provedor de IA configurado no RoutedLLM"))
-			return
-		}
-
-		started := time.Now()
-		agentReq := convertADKToAgentChatRequest(req, meta)
-
-		provider, err := r.router.SelectProvider(ctx, agentReq)
-		if err != nil {
-			yield(nil, fmt.Errorf("falha ao selecionar provedor no RoutedLLM: %w", err))
-			return
-		}
-
-		chosenProvider := provider
-		var onDelta func(ai.StreamDelta) error
-		if meta != nil && meta.OnDelta != nil {
-			onDelta = meta.OnDelta
-		}
-
-		stepResp, stepErr := r.invokeProviderStep(ctx, provider, agentReq, stream, onDelta, yield)
-
-		// COG-02: Failover automático via SelectFallbackProviders no mesmo passo do runner.Runner
-		if stepErr != nil {
-			fallbacks := r.router.SelectFallbackProviders(ctx, agentReq, provider.Name())
-			for _, fb := range fallbacks {
-				stepResp, stepErr = r.invokeProviderStep(ctx, fb, agentReq, stream, onDelta, yield)
-				if stepErr == nil && stepResp != nil {
-					chosenProvider = fb
-					if meta != nil {
-						meta.Mu.Lock()
-						meta.FallbackUsed = true
-						meta.Mu.Unlock()
-					}
-					break
-				}
-			}
-		}
-
-		if stepErr != nil {
-			yield(nil, fmt.Errorf("erro na chamada ao provedor de IA (%s): %w", chosenProvider.Name(), stepErr))
-			return
-		}
-
-		if meta != nil && stepResp != nil {
-			meta.Mu.Lock()
-			if meta.CredentialSource == "" {
-				meta.CredentialSource = "server"
-			}
-			if meta.ProviderKey == "" {
-				meta.ProviderKey = string(domain.ProviderKeyServer)
-			}
-			meta.ProviderUsed = chosenProvider.Name()
-			meta.ModelUsed = chosenProvider.ModelName()
-			if meta.ModelDisplayName == "" {
-				meta.ModelDisplayName = chosenProvider.ModelName()
-			}
-			meta.TokensIn += stepResp.TokensIn
-			meta.TokensOut += stepResp.TokensOut
-			meta.Mu.Unlock()
-		}
-		r.recordServerTrace(meta, chosenProvider, stepResp, started)
-
-		llmResp := convertAgentChatToADKResponse(stepResp)
-		yield(llmResp, nil)
+		yield(nil, fmt.Errorf("nenhum provedor de IA configurado no RoutedLLM"))
 	}
-}
-
-func (r *RoutedLLM) invokeProviderStep(
-	ctx context.Context,
-	p ai.AgentProvider,
-	agentReq ai.AgentChatRequest,
-	stream bool,
-	onDelta func(ai.StreamDelta) error,
-	yield func(*model.LLMResponse, error) bool,
-) (*ai.AgentChatResponse, error) {
-	if stream && onDelta != nil {
-		return p.StreamChat(ctx, agentReq, func(d ai.StreamDelta) error {
-			if d.ReasoningDelta != "" {
-				outDelta := d
-				if outDelta.Type == "" {
-					outDelta.Type = "reasoning"
-				}
-				_ = onDelta(outDelta)
-				partial := &model.LLMResponse{
-					Partial: true,
-					Content: &genai.Content{
-						Role:  genai.RoleModel,
-						Parts: []*genai.Part{{Text: d.ReasoningDelta, Thought: true}},
-					},
-				}
-				if !yield(partial, nil) {
-					return context.Canceled
-				}
-			}
-			if d.TextDelta != "" {
-				outDelta := d
-				if outDelta.Type == "" {
-					outDelta.Type = "text"
-				}
-				_ = onDelta(outDelta)
-				partial := &model.LLMResponse{
-					Partial: true,
-					Content: &genai.Content{
-						Role:  genai.RoleModel,
-						Parts: []*genai.Part{{Text: d.TextDelta}},
-					},
-				}
-				if !yield(partial, nil) {
-					return context.Canceled
-				}
-			} else if d.ReasoningDelta == "" && len(d.ToolCalls) > 0 {
-				outDelta := d
-				if outDelta.Type == "" {
-					outDelta.Type = "tool_call"
-				}
-				if outDelta.ToolName == "" {
-					outDelta.ToolName = d.ToolCalls[0].Name
-				}
-				_ = onDelta(outDelta)
-			}
-			return nil
-		})
-	}
-
-	stepResp, stepErr := p.Chat(ctx, agentReq)
-	if stepErr == nil && stepResp != nil && onDelta != nil {
-		if stepResp.Thought != "" {
-			_ = onDelta(ai.StreamDelta{
-				Type:           "reasoning",
-				ReasoningDelta: stepResp.Thought,
-			})
-		} else {
-			for _, thought := range stepResp.Reasoning {
-				if thought != "" {
-					_ = onDelta(ai.StreamDelta{
-						Type:           "reasoning",
-						ReasoningDelta: thought,
-					})
-				}
-			}
-		}
-		if len(stepResp.ToolCalls) > 0 {
-			_ = onDelta(ai.StreamDelta{
-				Type:      "tool_call",
-				ToolName:  stepResp.ToolCalls[0].Name,
-				ToolCalls: stepResp.ToolCalls,
-			})
-		}
-		if stepResp.Text != "" && len(stepResp.ToolCalls) == 0 {
-			_ = onDelta(ai.StreamDelta{
-				Type:      "text",
-				TextDelta: stepResp.Text,
-			})
-		}
-	}
-	return stepResp, stepErr
 }

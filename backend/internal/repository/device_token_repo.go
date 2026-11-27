@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"time"
 
 	"github.com/andrevmp/vito/backend/internal/domain"
@@ -20,7 +21,7 @@ func NewDeviceTokenRepository(db *sql.DB) *DeviceTokenRepositorySQLite {
 
 // Save insere ou atualiza um token de dispositivo garantindo isolamento por user_id e exclusividade de hardware.
 func (r *DeviceTokenRepositorySQLite) Save(dt *domain.DeviceToken) error {
-	return ExecuteQueuedWrite(context.Background(), func() error {
+	return database.ExecuteQueuedWrite(context.Background(), func() error {
 		tx, err := r.db.Begin()
 		if err != nil {
 			return err
@@ -84,7 +85,7 @@ func (r *DeviceTokenRepositorySQLite) FindByUserID(userID string) ([]domain.Devi
 // Delete remove um token de dispositivo específico de um usuário.
 func (r *DeviceTokenRepositorySQLite) Delete(userID, token string) error {
 	query := `DELETE FROM device_tokens WHERE user_id = ? AND token = ?`
-	return ExecuteQueuedWrite(context.Background(), func() error {
+	return database.ExecuteQueuedWrite(context.Background(), func() error {
 		_, err := r.db.Exec(query, userID, token)
 		return err
 	})

@@ -8,7 +8,7 @@ import { BotMascotAvatar } from '../../bots/components/BotMascotAvatar';
 import type {
   InboxNotification,
   InboxNotificationAction,
-} from '../services/inboxNotificationsApi';
+} from '../services/notificationsApi';
 
 interface NotificationItemCardProps {
   item: InboxNotification;

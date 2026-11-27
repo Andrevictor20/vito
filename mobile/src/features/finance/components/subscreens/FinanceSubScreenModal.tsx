@@ -15,7 +15,7 @@ import { useTheme } from '../../../../context/ThemeContext';
 import { hapticFeedback } from '../../../../theme/motion';
 import { pagerSwipeLockBus } from '../../../../services/dataSync';
 import { resolveModalBottomInset, resolveModalTopInset } from '../../../../utils/device/safeArea';
-import { SectionTransition } from '../../../../ds/SectionTransition';
+import { SectionTransition } from '../../../../components/common/SectionTransition';
 import { useReduceMotion } from '../../../../theme/useReduceMotion';
 import type {
   FinanceAccount,

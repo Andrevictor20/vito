@@ -13,8 +13,8 @@ import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../../context/ThemeContext';
 import { hapticFeedback } from '../../../theme/motion';
 import { api } from '../../../services/api';
-import { voiceActivationService } from '../../chat/services/voice/voiceActivationService';
-import { VoiceSelector } from '../components/profile/VoiceSelector';
+import { voiceActivationService } from '../services/voice/voiceActivationService';
+import { VoiceSelector } from '../components/VoiceSelector';
 import { navigateToTab } from '../../../navigation/screensNav';
 
 export const VoiceSettingsScreen: React.FC = () => {

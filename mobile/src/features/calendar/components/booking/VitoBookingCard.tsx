@@ -143,12 +143,25 @@ export const VitoBookingCard: React.FC<VitoBookingCardProps> = ({
           </Text>
         </View>
 
-        <View style={[styles.pillst, { backgroundColor: colors.greenBg }]}>
-          <View style={[styles.pillDot, { backgroundColor: colors.acc }]} />
+        <View
+          style={[
+            styles.pillst,
+            { backgroundColor: statusText === 'Pausado' ? colors.btn : colors.greenBg },
+          ]}
+        >
+          <View
+            style={[
+              styles.pillDot,
+              { backgroundColor: statusText === 'Pausado' ? colors.muted : colors.acc },
+            ]}
+          />
           <Text
             style={[
               styles.pillstText,
-              { color: colors.acc, fontFamily: tokens.typography.family.semibold },
+              {
+                color: statusText === 'Pausado' ? colors.muted : colors.acc,
+                fontFamily: tokens.typography.family.semibold,
+              },
             ]}
           >
             {statusText}

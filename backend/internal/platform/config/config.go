@@ -19,11 +19,8 @@ type Config struct {
 	GeminiModel                  string
 	OpenRouterAPIKey             string
 	OpenRouterModel              string
-	OpenRouterVisionModel        string
 	GroqAPIKey                   string
 	GroqModel                    string
-	MistralAPIKey                string
-	MistralModel                 string
 	GoogleClientID               string
 	GoogleClientSecret           string
 	GoogleRedirectURL            string
@@ -55,7 +52,6 @@ type Config struct {
 	WhatsAppMediaVisionModel       string
 	// Síntese de fala neural (Edge-TTS pt-BR).
 	TTSVoice    string
-	TTSEnabled  bool
 	TTSCacheDir string
 	// Metabuscador SearXNG
 	SearXNGURL string
@@ -105,18 +101,6 @@ func Load() *Config {
 	if openRouterModel == "" {
 		openRouterModel = "nvidia/nemotron-3.5-lightning:free"
 	}
-	// Elo de VISÃO via OpenRouter: a cota do Google AI Studio (20 req/dia no
-	// free tier) é compartilhada por todos os modelos do Gemini, então o
-	// OpenRouter é a única redundância real para leitura de imagens.
-	openRouterVisionModel := os.Getenv("OPENROUTER_VISION_MODEL")
-	if openRouterVisionModel == "" {
-		openRouterVisionModel = "google/gemini-3.5-flash-lite"
-	}
-	// Mistral La Plateforme (4º elo): default pequeno e rápido (IDs 2512 válidos).
-	mistralModel := os.Getenv("MISTRAL_MODEL")
-	if mistralModel == "" {
-		mistralModel = "ministral-8b-latest"
-	}
 
 	dataKey := os.Getenv("DATA_ENCRYPTION_KEY")
 	if dataKey == "" {
@@ -160,11 +144,8 @@ func Load() *Config {
 		GeminiModel:                  geminiModel,
 		OpenRouterAPIKey:             os.Getenv("OPENROUTER_API_KEY"),
 		OpenRouterModel:              openRouterModel,
-		OpenRouterVisionModel:        openRouterVisionModel,
 		GroqAPIKey:                   os.Getenv("GROQ_API_KEY"),
 		GroqModel:                    groqModel,
-		MistralAPIKey:                os.Getenv("MISTRAL_API_KEY"),
-		MistralModel:                 mistralModel,
 		GoogleClientID:               os.Getenv("GOOGLE_CLIENT_ID"),
 		GoogleClientSecret:           os.Getenv("GOOGLE_CLIENT_SECRET"),
 		GoogleRedirectURL:            googleRedirectURL,
@@ -203,12 +184,11 @@ func Load() *Config {
 		WhatsAppMediaMaxAgeDays:        getEnvIntDefault("WHATSAPP_MEDIA_MAX_AGE_DAYS", 90),
 		// Visão via OpenRouter: cota separada da do Google AI Studio (que é
 		// compartilhada por todos os modelos do Gemini e é o gargalo do chat).
-		WhatsAppMediaVisionModel: getEnvDefault("WHATSAPP_MEDIA_VISION_MODEL", "google/gemini-3.5-flash-lite"),
+		WhatsAppMediaVisionModel: getEnvOrDefault("WHATSAPP_MEDIA_VISION_MODEL", "google/gemini-3.5-flash-lite"),
 		// Síntese de fala neural (Edge-TTS pt-BR).
-		TTSVoice:    getEnvDefault("TTS_VOICE", "pt-BR-AntonioNeural"),
-		TTSEnabled:  getEnvBoolDefault("TTS_ENABLED", true),
-		TTSCacheDir: getEnvDefault("TTS_CACHE_DIR", "./data/tts_cache"),
-		SearXNGURL:  getEnvDefault("SEARXNG_URL", "http://127.0.0.1:8185"),
+		TTSVoice:    getEnvOrDefault("TTS_VOICE", "pt-BR-AntonioNeural"),
+		TTSCacheDir: getEnvOrDefault("TTS_CACHE_DIR", "./data/tts_cache"),
+		SearXNGURL:  getEnvOrDefault("SEARXNG_URL", "http://127.0.0.1:8185"),
 	}
 }
 
@@ -224,14 +204,6 @@ func getEnvIntDefault(key string, fallback int) int {
 	return parsed
 }
 
-// getEnvDefault lê uma string do ambiente com fallback.
-func getEnvDefault(key, fallback string) string {
-	if v := strings.TrimSpace(os.Getenv(key)); v != "" {
-		return v
-	}
-	return fallback
-}
-
 func getEnvBoolDefault(key string, fallback bool) bool {
 	switch strings.ToLower(strings.TrimSpace(os.Getenv(key))) {
 	case "1", "true", "yes", "on":
@@ -244,11 +216,10 @@ func getEnvBoolDefault(key string, fallback bool) bool {
 }
 
 func getEnvOrDefault(key, fallback string) string {
-	v := os.Getenv(key)
-	if v == "" {
-		return fallback
+	if v := strings.TrimSpace(os.Getenv(key)); v != "" {
+		return v
 	}
-	return v
+	return fallback
 }
 
 // AllowedOrigins resolve as origens CORS: env explícito, PublicBaseURL em produção, * em development.

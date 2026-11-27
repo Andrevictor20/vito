@@ -16,7 +16,11 @@ export function validateEmailAuth(input: EmailAuthInput): string | null {
   if (!email.includes('@') || !email.includes('.')) {
     return 'Informe um endereço de e-mail válido.'
   }
-  if (password.length < 6) {
+  if (input.isRegister) {
+    if (password.length < 8 || !/[a-zA-Z]/.test(password) || !/\d/.test(password)) {
+      return 'A senha deve ter no mínimo 8 caracteres com letra e número.'
+    }
+  } else if (password.length < 6) {
     return 'A senha deve ter no mínimo 6 caracteres.'
   }
   return null

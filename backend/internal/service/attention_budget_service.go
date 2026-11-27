@@ -10,8 +10,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 )
 
 // AttentionStatus define o veredito do AttentionBudgetService para uma notificação proativa.
@@ -88,13 +88,6 @@ func (s *AttentionBudgetService) SetCategoryPreference(userID, category string, 
 		s.categoryEnabled[userID] = make(map[string]bool)
 	}
 	s.categoryEnabled[userID][strings.ToLower(strings.TrimSpace(category))] = enabled
-}
-
-// SetDailyLimit ajusta o teto diário de notificações não críticas por usuário.
-func (s *AttentionBudgetService) SetDailyLimit(limit int) {
-	if limit > 0 {
-		s.dailyLimit = limit
-	}
 }
 
 // ShouldDeliver avalia um candidato no AttentionBudgetService de forma nil-safe.

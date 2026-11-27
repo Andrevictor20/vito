@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"time"
 
 	"github.com/andrevmp/vito/backend/internal/domain"
@@ -66,7 +67,7 @@ func (r *AIProviderRepositorySQLite) Upsert(ctx context.Context, p *domain.UserA
 			models_fetched_at = excluded.models_fetched_at,
 			updated_at = excluded.updated_at
 	`
-	return ExecuteQueuedWrite(ctx, func() error {
+	return database.ExecuteQueuedWrite(ctx, func() error {
 		_, err := r.db.ExecContext(
 			ctx, query,
 			p.ID, p.UserID, string(p.ProviderKey), p.BaseURL, p.KeyCiphertext, p.KeyLast4,
@@ -169,7 +170,7 @@ func (r *AIProviderRepositorySQLite) UpdateStatus(ctx context.Context, userID st
 		SET status = ?, updated_at = ?
 		WHERE user_id = ? AND provider_key = ?
 	`
-	n, err := ExecuteQueuedWriteRows(ctx, func() (sql.Result, error) {
+	n, err := database.ExecuteQueuedWriteRows(ctx, func() (sql.Result, error) {
 		return r.db.ExecContext(ctx, query, status, time.Now().UTC(), userID, string(key))
 	})
 	if err != nil {
@@ -198,7 +199,7 @@ func (r *AIProviderRepositorySQLite) UpdateModels(ctx context.Context, userID st
 		SET models_json = ?, models_fetched_at = ?, updated_at = ?
 		WHERE user_id = ? AND provider_key = ?
 	`
-	n, err := ExecuteQueuedWriteRows(ctx, func() (sql.Result, error) {
+	n, err := database.ExecuteQueuedWriteRows(ctx, func() (sql.Result, error) {
 		return r.db.ExecContext(ctx, query, string(raw), fetchedAt.UTC(), time.Now().UTC(), userID, string(key))
 	})
 	if err != nil {
@@ -216,7 +217,7 @@ func (r *AIProviderRepositorySQLite) Delete(ctx context.Context, userID string, 
 		return domain.ErrInvalidProviderKey
 	}
 	const query = `DELETE FROM user_ai_providers WHERE user_id = ? AND provider_key = ?`
-	n, err := ExecuteQueuedWriteRows(ctx, func() (sql.Result, error) {
+	n, err := database.ExecuteQueuedWriteRows(ctx, func() (sql.Result, error) {
 		return r.db.ExecContext(ctx, query, userID, string(key))
 	})
 	if err != nil {

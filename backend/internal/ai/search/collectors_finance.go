@@ -85,7 +85,7 @@ func (c *FinanceCollector) fetchBrapiQuote(ctx context.Context, client *http.Cli
 		return nil, err
 	}
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", "VitoRadarBot/2.0")
+	req.Header.Set("User-Agent", "VitoBot/2.0")
 
 	resp, err := client.Do(req)
 	if err != nil {

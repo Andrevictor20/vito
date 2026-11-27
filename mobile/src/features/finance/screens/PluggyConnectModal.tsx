@@ -22,13 +22,19 @@ interface PluggyConnectModalProps {
   visible: boolean;
   onClose: () => void;
   onConnectionSuccess?: () => void;
+  onOpenCustomLimits?: () => void;
 }
 
 /**
  * Tela cheia `#s-fon` do fluxo BYOK Pluggy (Plano 26 v2.0):
  * tutorial → stepper com WebView de captura → progresso em 6 etapas → atalho pós-configuração.
  */
-export const PluggyConnectModal: React.FC<PluggyConnectModalProps> = ({ visible, onClose, onConnectionSuccess }) => {
+export const PluggyConnectModal: React.FC<PluggyConnectModalProps> = ({
+  visible,
+  onClose,
+  onConnectionSuccess,
+  onOpenCustomLimits,
+}) => {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const [connections, setConnections] = useState<FinanceConnection[]>([]);
@@ -155,8 +161,11 @@ export const PluggyConnectModal: React.FC<PluggyConnectModalProps> = ({ visible,
           error={setup.error}
           connectionItemId={setup.connectionItemId}
           limitSuggestions={setup.limitSuggestions}
-          onActivateSuggestion={setup.activateLimitSuggestion}
-          onOpenCustomLimits={onClose}
+          onActivateSuggestion={async (s) => {
+            await setup.activateLimitSuggestion(s);
+            dataSync.notify('refresh_finance');
+          }}
+          onOpenCustomLimits={onOpenCustomLimits || onClose}
           onUpdateItemId={setup.updateConnectionItemId}
           onPasteItemId={setup.pasteConnectionItemId}
           onSyncWithItemId={setup.completeConnectSync}

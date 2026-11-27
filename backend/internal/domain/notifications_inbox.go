@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"context"
 	"errors"
 	"time"
 )
@@ -97,19 +96,4 @@ type NotificationPreferencesUpdate struct {
 	Bots     *bool `json:"bots,omitempty"`
 	Resumo   *bool `json:"resumo,omitempty"`
 	Promo    *bool `json:"promo,omitempty"`
-}
-
-// NotificationsInboxRepository define o contrato de persistência da caixa de notificações.
-type NotificationsInboxRepository interface {
-	Create(ctx context.Context, n *UserNotification) error
-	UpsertBySource(ctx context.Context, n *UserNotification) error
-	GetByID(ctx context.Context, id, userID string) (*UserNotification, error)
-	ListByUser(ctx context.Context, userID string, filter NotificationInboxFilter) ([]UserNotification, NotificationInboxCounts, error)
-	MarkRead(ctx context.Context, id, userID string) error
-	Dismiss(ctx context.Context, id, userID string) error
-	MarkAllRead(ctx context.Context, userID string) (int64, error)
-	GetPreferences(ctx context.Context, userID string) (*NotificationPreferences, error)
-	UpsertPreferences(ctx context.Context, prefs *NotificationPreferences) error
-	SyncBotPendingNotifications(ctx context.Context, userID string) error
-	SyncOverdueTodoNotifications(ctx context.Context, userID string, now time.Time) error
 }

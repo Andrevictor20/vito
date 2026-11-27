@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import {
+  Linking,
   SafeAreaView,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -12,10 +14,16 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { useTheme } from '../../../context/ThemeContext';
 import { useAuth } from '../../../context/AuthContext';
 import { api } from '../../../services/api';
+import { copyToClipboard } from '../../../utils/device/clipboard';
+import {
+  openStoreAppRating,
+  readOsPermissionsSnapshot,
+  requestOsPermission,
+} from '../utils/storePermissionsSync';
 import {
   DEFAULT_NOTIFICATION_PREFS,
   NotificationCategoryPreferences,
-} from '../../notifications/services/inboxNotificationsApi';
+} from '../../notifications/services/notificationsApi';
 import {
   BillingCycle,
   DEFAULT_PRIVACY_SETTINGS,
@@ -68,10 +76,21 @@ export const StoreScreen: React.FC = () => {
   useEffect(() => {
     if (page === 'pro') {
       api.store.getSubscription().then((s) => setSubscription(s)).catch(() => {});
-    } else if (page === 'priv') {
-      api.store.getPrivacySettings().then((s) => setPrivacy(s)).catch(() => {});
-    } else if (page === 'notif') {
-      api.inbox.getPreferences().then((p) => setNotifPrefs(p)).catch(() => {});
+    } else if (page === 'priv' || page === 'notif') {
+      api.store
+        .getPrivacySettings()
+        .then(async (s) => {
+          const syncedPerms = await readOsPermissionsSnapshot(s.permissions);
+          setPrivacy({ ...s, permissions: syncedPerms });
+        })
+        .catch(() => {
+          void readOsPermissionsSnapshot(DEFAULT_PRIVACY_SETTINGS.permissions).then((perms) => {
+            setPrivacy((prev) => ({ ...prev, permissions: perms }));
+          });
+        });
+      if (page === 'notif') {
+        api.inbox.getPreferences().then((p) => setNotifPrefs(p)).catch(() => {});
+      }
     }
   }, [page]);
 
@@ -82,13 +101,11 @@ export const StoreScreen: React.FC = () => {
   const handleStartTrial = async () => {
     setBusy(true);
     try {
-      const sub = await api.store.subscribe(selectedPlan, billing).catch(() => ({
-        plan: selectedPlan,
-        billing_cycle: billing,
-        status: 'trialing',
-      }));
+      const sub = await api.store.subscribe(selectedPlan, billing);
       setSubscription(sub);
       showToast(`Teste grátis do Vito ${selectedPlan === 'pro' ? 'Pro' : 'Ultra'} ativado`);
+    } catch {
+      showToast('Não foi possível iniciar o teste agora. Tente novamente.');
     } finally {
       setBusy(false);
     }
@@ -105,27 +122,60 @@ export const StoreScreen: React.FC = () => {
         showToast('Nenhuma compra anterior encontrada');
       }
     } catch {
-      showToast('Nenhuma compra anterior encontrada');
+      showToast('Não foi possível verificar compras agora');
     }
   };
 
   const handleTogglePerm = async (k: keyof PrivacyPermissionsState) => {
+    const prevPrivacy = privacy;
+    const enabling = !privacy.permissions[k];
+    let nextVal = enabling;
+    if (enabling) {
+      const granted = await requestOsPermission(k);
+      if (granted === false) {
+        nextVal = false;
+        showToast('Ative esta permissão nos ajustes do aparelho.');
+        void Linking.openSettings().catch(() => {});
+      } else if (granted === true) {
+        nextVal = true;
+      }
+    } else {
+      showToast('Para revogar permissões do sistema, ajuste nas configurações do aparelho.');
+      void Linking.openSettings().catch(() => {});
+    }
     const next: PrivacySettingsState = {
       ...privacy,
-      permissions: { ...privacy.permissions, [k]: !privacy.permissions[k] },
+      permissions: { ...privacy.permissions, [k]: nextVal },
     };
     setPrivacy(next);
-    await api.store.updatePrivacySettings(next).catch(() => {});
+    try {
+      await api.store.updatePrivacySettings(next);
+    } catch {
+      setPrivacy(prevPrivacy);
+      showToast('Falha ao salvar configuração de permissão');
+    }
   };
 
   const handleExport = async () => {
     setExportDone(false);
     setActiveSheet('export');
-    await api.store.exportAccountData().catch(() => {});
-    setTimeout(() => {
+    try {
+      const bundle = await api.store.exportAccountData();
+      const jsonStr = JSON.stringify(bundle, null, 2);
+      try {
+        await Share.share({
+          title: 'Meus dados Vito (LGPD)',
+          message: jsonStr,
+        });
+      } catch {
+        await copyToClipboard(jsonStr);
+      }
       setExportDone(true);
-      showToast('Exportação enviada por e-mail');
-    }, 900);
+      showToast('Cópia JSON dos seus dados pronta');
+    } catch {
+      setActiveSheet(null);
+      showToast('Não foi possível exportar os dados agora.');
+    }
   };
 
   return (
@@ -163,14 +213,26 @@ export const StoreScreen: React.FC = () => {
             privacy={privacy}
             onTogglePermission={handleTogglePerm}
             onToggleAi={async () => {
+              const prev = privacy;
               const next = { ...privacy, ai_processing_enabled: !privacy.ai_processing_enabled };
               setPrivacy(next);
-              await api.store.updatePrivacySettings(next).catch(() => {});
+              try {
+                await api.store.updatePrivacySettings(next);
+              } catch {
+                setPrivacy(prev);
+                showToast('Falha ao atualizar preferência de IA');
+              }
             }}
             onToggleDiag={async () => {
+              const prev = privacy;
               const next = { ...privacy, analytics_enabled: !privacy.analytics_enabled };
               setPrivacy(next);
-              await api.store.updatePrivacySettings(next).catch(() => {});
+              try {
+                await api.store.updatePrivacySettings(next);
+              } catch {
+                setPrivacy(prev);
+                showToast('Falha ao atualizar diagnósticos');
+              }
             }}
             onExport={handleExport}
             onDeleteAccount={() => setActiveSheet('delete')}
@@ -181,9 +243,15 @@ export const StoreScreen: React.FC = () => {
             prefs={notifPrefs}
             systemNotifAllowed={privacy.permissions.notifications}
             onTogglePref={async (k) => {
+              const prev = notifPrefs;
               const next = { ...notifPrefs, [k]: !notifPrefs[k] };
               setNotifPrefs(next);
-              await api.inbox.updatePreferences({ [k]: next[k] }).catch(() => {});
+              try {
+                await api.inbox.updatePreferences({ [k]: next[k] });
+              } catch {
+                setNotifPrefs(prev);
+                showToast('Falha ao salvar preferência de notificação');
+              }
             }}
           />
         )}
@@ -204,24 +272,50 @@ export const StoreScreen: React.FC = () => {
         onClose={() => setActiveSheet(null)}
         exportDone={exportDone}
         onSendSupport={async (msg) => {
-          await api.store.sendSupportContact(msg).catch(() => {});
-          setActiveSheet(null);
-          showToast('Mensagem enviada. Respondemos por e-mail.');
+          try {
+            await api.store.sendSupportContact(msg);
+            setActiveSheet(null);
+            showToast('Mensagem registrada com sucesso.');
+          } catch {
+            showToast('Falha ao enviar mensagem. Tente novamente.');
+          }
         }}
         onReportAi={async (reason) => {
-          await api.store.reportAiContent(reason).catch(() => {});
-          setActiveSheet(null);
-          showToast('Denúncia enviada. Obrigado!');
+          try {
+            await api.store.reportAiContent(reason);
+            setActiveSheet(null);
+            showToast('Denúncia enviada. Obrigado!');
+          } catch {
+            showToast('Falha ao enviar denúncia.');
+          }
         }}
-        onRateApp={(s) => {
+        onRateApp={async (s) => {
           setActiveSheet(null);
-          showToast(s >= 4 ? 'Abrindo a loja…' : 'Obrigado pelo feedback!');
+          if (s >= 4) {
+            try {
+              await openStoreAppRating();
+              showToast('Abrindo avaliação na loja…');
+            } catch {
+              showToast('Não foi possível abrir a loja neste aparelho.');
+            }
+          } else {
+            try {
+              await api.store.sendSupportContact(`Avaliação do app: ${s}/5 estrelas`, 'Avaliação do Vito');
+              showToast('Feedback enviado. Obrigado!');
+            } catch {
+              showToast('Não foi possível enviar o feedback agora.');
+            }
+          }
         }}
         onConfirmDelete={async (confirmation) => {
-          await api.store.deleteAccount(confirmation).catch(() => {});
-          setActiveSheet(null);
-          showToast('Conta agendada para exclusão em 30 dias');
-          setTimeout(() => logout(), 700);
+          try {
+            await api.store.deleteAccount(confirmation);
+            setActiveSheet(null);
+            showToast('Conta agendada para exclusão em 30 dias');
+            setTimeout(() => logout(), 700);
+          } catch {
+            showToast('Não foi possível agendar a exclusão. Verifique e tente novamente.');
+          }
         }}
       />
 

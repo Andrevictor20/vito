@@ -18,7 +18,6 @@ import (
 	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/handler/middleware"
-	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/andrevmp/vito/backend/internal/service"
 	"golang.org/x/net/websocket"
 )
@@ -42,30 +41,32 @@ type VoiceServerEvent struct {
 	AudioB64 string `json:"audio_b64,omitempty"`
 }
 
-// VoiceStreamHandler gerencia streaming de voz bidirecional WebSocket conectando ao AgentLoop e TTS.
+// VoiceStreamHandler gerencia streaming de voz bidirecional WebSocket conectando ao motor ADK e TTS.
 type VoiceStreamHandler struct {
-	loop        *service.AgentLoop
-	convRepo    *repository.ConversationStoreRepository
-	transcriber voice.AudioTranscriber
-	ttsSvc      voice.TTSService
-	geminiKey   string
+	engine         service.AssistantEngine
+	transcriber    voice.AudioTranscriber
+	ttsSvc         voice.TTSService
+	aiSettingsRepo domain.AISettingsRepository
 }
 
-func NewVoiceStreamHandler(_ ...any) *VoiceStreamHandler {
+func NewVoiceStreamHandler() *VoiceStreamHandler {
 	return &VoiceStreamHandler{}
 }
 
-// SetAgentLoop conecta o cérebro único e o repositório de conversas.
-func (h *VoiceStreamHandler) SetAgentLoop(loop *service.AgentLoop, convRepo *repository.ConversationStoreRepository) {
-	h.loop = loop
-	h.convRepo = convRepo
+// SetAgentLoop conecta o motor conversacional ao handler de voz.
+func (h *VoiceStreamHandler) SetAgentLoop(engine service.AssistantEngine) {
+	h.engine = engine
 }
 
-// SetAudioServices configura o transcritor de entrada, sintetizador TTS e chave Gemini.
-func (h *VoiceStreamHandler) SetAudioServices(transcriber voice.AudioTranscriber, ttsSvc voice.TTSService, geminiKey string) {
+// SetAudioServices configura o transcritor de entrada e sintetizador TTS.
+func (h *VoiceStreamHandler) SetAudioServices(transcriber voice.AudioTranscriber, ttsSvc voice.TTSService) {
 	h.transcriber = transcriber
 	h.ttsSvc = ttsSvc
-	h.geminiKey = geminiKey
+}
+
+// SetAISettingsRepository conecta as preferências de voz do usuário ao stream bidirecional.
+func (h *VoiceStreamHandler) SetAISettingsRepository(repo domain.AISettingsRepository) {
+	h.aiSettingsRepo = repo
 }
 
 // Handler returns the http.Handler for WebSocket voice stream
@@ -151,9 +152,9 @@ func (h *VoiceStreamHandler) handleWebSocket(ws *websocket.Conn) {
 				copy(utterance, audioBuffer)
 				audioBuffer = audioBuffer[:0]
 
-				// Processamento do comando via AgentLoop e síntese TTS
+				// Processamento do comando via AssistantEngine e síntese TTS
 				go func(pcm []byte) {
-					if h.loop != nil {
+					if h.engine != nil {
 						var transcript string
 						if h.transcriber != nil {
 							wav := voice.PCMToWAV(pcm, 16000, 1, 16)
@@ -203,25 +204,31 @@ func (h *VoiceStreamHandler) handleWebSocket(ws *websocket.Conn) {
 	}
 }
 
-// ProcessVoiceUtteranceStream executa o comando de voz via AgentLoop.RunStream acoplado ao SentenceChunker,
+// ProcessVoiceUtteranceStream executa o comando de voz via AssistantEngine.RunStream acoplado ao SentenceChunker,
 // disparando a síntese TTS da primeira sentença imediatamente (< 800ms) enquanto o restante da resposta é gerado.
 func (h *VoiceStreamHandler) ProcessVoiceUtteranceStream(
 	ctx context.Context,
 	req domain.UnifiedAssistantRequest,
 	sendEvent func(VoiceServerEvent),
 ) error {
-	if h.loop == nil {
+	if h.engine == nil {
 		return nil
 	}
 
 	chunker := voice.NewSentenceChunker()
 	synthesizedCount := 0
+	voicePref := "Puck"
+	if h.aiSettingsRepo != nil && req.UserID != "" {
+		if settings, err := h.aiSettingsRepo.GetSettings(req.UserID); err == nil && settings != nil && strings.TrimSpace(settings.PreferredVoice) != "" {
+			voicePref = settings.PreferredVoice
+		}
+	}
 	emitSentenceAudio := func(sentence string) {
 		trimmed := strings.TrimSpace(sentence)
 		if trimmed == "" || h.ttsSvc == nil {
 			return
 		}
-		audio, _, err := h.ttsSvc.Synthesize(ctx, trimmed, "Puck")
+		audio, _, err := h.ttsSvc.Synthesize(ctx, trimmed, voicePref)
 		if err == nil && len(audio) > 0 {
 			synthesizedCount++
 			sendEvent(VoiceServerEvent{
@@ -232,7 +239,7 @@ func (h *VoiceStreamHandler) ProcessVoiceUtteranceStream(
 		}
 	}
 
-	resp, err := h.loop.RunStream(ctx, req, func(delta ai.StreamDelta) error {
+	resp, err := h.engine.RunStream(ctx, req, func(delta ai.StreamDelta) error {
 		if delta.TextDelta != "" {
 			for _, sentence := range chunker.Feed(delta.TextDelta) {
 				emitSentenceAudio(sentence)

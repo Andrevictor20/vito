@@ -28,7 +28,7 @@ func TestVerticalSearchSubagent_SearXNG(t *testing.T) {
 	defer ts.Close()
 
 	searxng := search.NewSearXNGClient(ts.URL, ts.Client())
-	sub := search.NewVerticalSearchSubagent(searxng, nil)
+	sub := search.NewVerticalSearchSubagent(searxng)
 
 	sources, summary, err := sub.Search(context.Background(), "cotação euro", "finance")
 	if err != nil {
@@ -67,7 +67,7 @@ func TestVerticalSearchSubagent_GeminiGrounding(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	sub := search.NewVerticalSearchSubagent(nil, nil)
+	sub := search.NewVerticalSearchSubagent(nil)
 	sub.SetGeminiConfig("test-key", "gemini-2.5-flash", ts.URL)
 
 	sources, summary, err := sub.Search(context.Background(), "jogo flamengo", "general")

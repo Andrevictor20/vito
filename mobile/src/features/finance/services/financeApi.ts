@@ -6,12 +6,9 @@ import {
   FinanceConnectionStatusUpdate,
   FinanceTransaction,
   FinanceSyncPayload,
-  FinanceConnectTokenResponse,
   FinanceLimitRule,
   FinanceLimitStatus,
   FinanceLimitSuggestion,
-  FinanceTransactionFilter,
-  SpendingLimitScope,
 } from '../types/finance';
 
 export interface ByokBackupPayload {
@@ -59,16 +56,6 @@ export class FinanceApi {
   }
 
   /**
-   * Registra uma nova conexão bancária após autorização no widget Meu Pluggy.
-   */
-  async createConnection(data: { pluggy_item_id: string; connector_id?: number; institution_name?: string }): Promise<FinanceConnection> {
-    return this.client.request<FinanceConnection>('/api/v1/finance/connections', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  }
-
-  /**
    * Atualiza status operacional e telemetria de uma conexão bancária (SyncEngine v2).
    */
   async updateConnectionStatus(connectionId: string, data: FinanceConnectionStatusUpdate): Promise<void> {
@@ -85,22 +72,6 @@ export class FinanceApi {
     await this.client.request<void>(`/api/v1/finance/connections/${connectionId}`, {
       method: 'DELETE',
     });
-  }
-
-  /**
-   * Obtém token efêmero para abertura do widget de conexão oficial Meu Pluggy.
-   */
-  async getConnectToken(): Promise<FinanceConnectTokenResponse> {
-    return this.client.request<FinanceConnectTokenResponse>('/api/v1/finance/connect-token', {
-      method: 'POST',
-    });
-  }
-
-  /**
-   * Endpoint de validação/teste para emissão de connectToken no ambiente de desenvolvimento/MVP.
-   */
-  async getTestToken(): Promise<FinanceConnectTokenResponse> {
-    return this.client.request<FinanceConnectTokenResponse>('/api/v1/finance/test-token');
   }
 
   /**
@@ -145,11 +116,9 @@ export class FinanceApi {
     });
   }
 
-  // --- Onda 1: Limites Multi-Escopo, Extrato Analítico e Recategorização ---
-
-  async getLimits(scope?: SpendingLimitScope): Promise<FinanceLimitStatus[]> {
-    const q = scope ? `?scope=${encodeURIComponent(scope)}` : '';
-    const res = await this.client.request<FinanceLimitStatus[]>(`/api/v1/finance/limits${q}`);
+  async getLimits(scope?: string): Promise<FinanceLimitStatus[]> {
+    const qs = scope ? `?scope=${encodeURIComponent(scope)}` : '';
+    const res = await this.client.request<FinanceLimitStatus[]>(`/api/v1/finance/limits${qs}`);
     return Array.isArray(res) ? res : [];
   }
 
@@ -160,48 +129,8 @@ export class FinanceApi {
     });
   }
 
-  async updateLimit(id: string, rule: FinanceLimitRule): Promise<FinanceLimitStatus> {
-    return this.client.request<FinanceLimitStatus>(`/api/v1/finance/limits/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(rule),
-    });
-  }
-
-  async deleteLimit(id: string): Promise<void> {
-    await this.client.request<void>(`/api/v1/finance/limits/${id}`, { method: 'DELETE' });
-  }
-
-  async muteLimit(id: string): Promise<FinanceLimitStatus> {
-    return this.client.request<FinanceLimitStatus>(`/api/v1/finance/limits/${id}/mute`, { method: 'POST' });
-  }
-
   async getLimitSuggestions(): Promise<FinanceLimitSuggestion[]> {
     const res = await this.client.request<FinanceLimitSuggestion[]>('/api/v1/finance/limits/suggestions');
     return Array.isArray(res) ? res : [];
-  }
-
-  async searchTransactions(filter: FinanceTransactionFilter = {}): Promise<FinanceTransaction[]> {
-    const params = new URLSearchParams();
-    if (filter.q) params.set('q', filter.q);
-    if (filter.account_id) params.set('account_id', filter.account_id);
-    if (filter.category) params.set('category', filter.category);
-    if (filter.type) params.set('type', filter.type);
-    if (filter.from) params.set('from', filter.from);
-    if (filter.to) params.set('to', filter.to);
-    params.set('limit', String(filter.limit ?? 50));
-    params.set('offset', String(filter.offset ?? 0));
-    const res = await this.client.request<FinanceTransaction[]>(`/api/v1/finance/transactions?${params.toString()}`);
-    return Array.isArray(res) ? res : [];
-  }
-
-  async recategorizeTransaction(
-    txId: string,
-    category: string,
-    applyToMerchant = false,
-  ): Promise<{ updated_count: number; category: string }> {
-    return this.client.request<{ updated_count: number; category: string }>(`/api/v1/finance/transactions/${txId}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ category, apply_to_merchant: applyToMerchant }),
-    });
   }
 }

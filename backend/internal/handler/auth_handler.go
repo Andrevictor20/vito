@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"github.com/andrevmp/vito/backend/internal/platform/httpx"
 	"net/http"
 	"strings"
 
@@ -47,7 +48,7 @@ type authResponse struct {
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	var req registerRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, `{"error":"payload inválido"}`, http.StatusBadRequest)
+		httpx.WriteJSONError(w, http.StatusBadRequest, "payload inválido")
 		return
 	}
 
@@ -71,7 +72,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	var req loginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, `{"error":"payload inválido"}`, http.StatusBadRequest)
+		httpx.WriteJSONError(w, http.StatusBadRequest, "payload inválido")
 		return
 	}
 
@@ -90,13 +91,13 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		http.Error(w, `{"error":"não autorizado"}`, http.StatusUnauthorized)
+		httpx.WriteJSONError(w, http.StatusUnauthorized, "não autorizado")
 		return
 	}
 
 	user, err := h.userRepo.GetByID(userID)
 	if err != nil {
-		http.Error(w, `{"error":"usuário não encontrado"}`, http.StatusNotFound)
+		httpx.WriteJSONError(w, http.StatusNotFound, "usuário não encontrado")
 		return
 	}
 

@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 	"fmt"
+	"github.com/andrevmp/vito/backend/internal/platform/timeutil"
+	"github.com/andrevmp/vito/backend/internal/platform/worker"
 	"log"
 	"strings"
 	"sync"
@@ -10,11 +12,6 @@ import (
 
 	"github.com/andrevmp/vito/backend/internal/domain"
 )
-
-// TextGenerator define a interface para síntese executiva por IA.
-type TextGenerator interface {
-	GenerateText(ctx context.Context, systemPrompt, userPrompt string) (string, error)
-}
 
 // BriefingWorkflowInput fornece os dados contextuais do dia para o workflow ADK multi-domínio.
 type BriefingWorkflowInput struct {
@@ -38,13 +35,10 @@ type MorningBriefingWorker struct {
 	todoRepo        domain.TodoRepository
 	userRepo        domain.UserRepository
 	notifSvc        *NotificationService
-	textGen         TextGenerator
 	workflowRunner  BriefingWorkflowRunner
 	attentionBudget *AttentionBudgetService
 	checkInterval   time.Duration
-	stopCh          chan struct{}
-	wg              sync.WaitGroup
-	running         bool
+	loop            *worker.PeriodicLoop
 	mu              sync.Mutex
 	location        *time.Location
 	bridge          *ProactiveConversationBridge
@@ -71,10 +65,7 @@ func NewMorningBriefingWorker(
 		interval = checkInterval[0]
 	}
 
-	loc, err := time.LoadLocation("America/Sao_Paulo")
-	if err != nil {
-		loc = time.UTC
-	}
+	loc := timeutil.SaoPauloLocation()
 
 	return &MorningBriefingWorker{
 		briefingRepo:  briefingRepo,
@@ -83,7 +74,7 @@ func NewMorningBriefingWorker(
 		userRepo:      userRepo,
 		notifSvc:      notifSvc,
 		checkInterval: interval,
-		stopCh:        make(chan struct{}),
+		loop:          worker.NewPeriodicLoop(interval, false),
 		location:      loc,
 	}
 }
@@ -93,13 +84,6 @@ func (w *MorningBriefingWorker) SetLocation(loc *time.Location) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	w.location = loc
-}
-
-// SetTextGenerator define um gerador de texto IA opcional para enriquecer os briefings com inteligência executiva.
-func (w *MorningBriefingWorker) SetTextGenerator(tg TextGenerator) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	w.textGen = tg
 }
 
 // SetBriefingWorkflowRunner injeta o workflow ADK (ParallelAgent + SequentialAgent) como gerador primário de briefing.
@@ -210,12 +194,10 @@ func (w *MorningBriefingWorker) ProcessBriefings(now time.Time) (int, error) {
 
 		w.mu.Lock()
 		wfRunner := w.workflowRunner
-		tg := w.textGen
 		budget := w.attentionBudget
 		bridge := w.bridge
 		w.mu.Unlock()
 
-		generatedByWorkflow := false
 		if wfRunner != nil {
 			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 			wfInput := BriefingWorkflowInput{
@@ -228,19 +210,8 @@ func (w *MorningBriefingWorker) ProcessBriefings(now time.Time) (int, error) {
 			}
 			if wfBody, wfErr := wfRunner.GenerateBriefing(ctx, wfInput); wfErr == nil && strings.TrimSpace(wfBody) != "" {
 				body = strings.TrimSpace(wfBody)
-				generatedByWorkflow = true
 			} else if wfErr != nil {
-				log.Printf("[MorningBriefingWorker] Fallback para TextGenerator após falha no workflow ADK para %s: %v", s.UserID, wfErr)
-			}
-			cancel()
-		}
-
-		if !generatedByWorkflow && tg != nil {
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			sysPrompt := "Você é o Vito, assistente executivo pessoal. Elabore um briefing matinal conciso (máximo 2 frases), elegante, motivador e executivo para o usuário iniciar o dia com clareza total. Sem emojis, direto ao ponto."
-			usrPrompt := fmt.Sprintf("Usuário: %s. Compromissos: %d. Tarefas pendentes: %d. Base: %s", userName, len(events), len(todos), body)
-			if aiBody, err := tg.GenerateText(ctx, sysPrompt, usrPrompt); err == nil && strings.TrimSpace(aiBody) != "" {
-				body = strings.TrimSpace(aiBody)
+				log.Printf("[MorningBriefingWorker] Falha no workflow ADK para %s (usando template base): %v", s.UserID, wfErr)
 			}
 			cancel()
 		}
@@ -302,48 +273,22 @@ func (w *MorningBriefingWorker) ProcessBriefings(now time.Time) (int, error) {
 
 // Start inicia o loop de monitoramento em background.
 func (w *MorningBriefingWorker) Start() {
-	w.mu.Lock()
-	if w.running {
-		w.mu.Unlock()
+	if !w.loop.Start(func() {
+		if _, err := w.ProcessBriefings(time.Now()); err != nil {
+			log.Printf("[MorningBriefingWorker] Erro ao processar briefings: %v", err)
+		}
+	}) {
 		return
 	}
-	w.running = true
-	w.stopCh = make(chan struct{})
-	w.mu.Unlock()
-
-	w.wg.Add(1)
-	go func() {
-		defer w.wg.Done()
-		ticker := time.NewTicker(w.checkInterval)
-		defer ticker.Stop()
-
-		log.Printf("[MorningBriefingWorker] Iniciado com verificação a cada %v.", w.checkInterval)
-
-		for {
-			select {
-			case <-w.stopCh:
-				log.Println("[MorningBriefingWorker] Encerrando worker...")
-				return
-			case tickTime := <-ticker.C:
-				if _, err := w.ProcessBriefings(tickTime); err != nil {
-					log.Printf("[MorningBriefingWorker] Erro ao processar briefings: %v", err)
-				}
-			}
-		}
-	}()
+	log.Printf("[MorningBriefingWorker] Iniciado com verificação a cada %v.", w.checkInterval)
 }
 
 // Stop finaliza a execução do worker de forma suave.
 func (w *MorningBriefingWorker) Stop() {
-	w.mu.Lock()
-	if !w.running {
-		w.mu.Unlock()
+	if !w.loop.IsRunning() {
 		return
 	}
-	w.running = false
-	close(w.stopCh)
-	w.mu.Unlock()
-
-	w.wg.Wait()
+	log.Println("[MorningBriefingWorker] Encerrando worker...")
+	w.loop.Stop()
 	log.Println("[MorningBriefingWorker] Parado com sucesso.")
 }

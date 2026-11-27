@@ -3,11 +3,11 @@ import {
   SafeAreaView,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { VitoSwitch } from '../../../components/ui/VitoSwitch';
 import { ProtoUiIcon } from '../../../icons/ProtoUiIcons';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../../context/ThemeContext';
@@ -42,7 +42,7 @@ export const BehaviorScreen: React.FC = () => {
     api
       .getAISettings()
       .then((s) => {
-        if (s?.autonomy_mode === 'autonomous') setAutMode('proactive');
+        if (s?.autonomy_mode === 'proactive' || s?.autonomy_mode === 'autonomous') setAutMode('proactive');
         else if (s?.autonomy_mode) setAutMode('assisted');
         if (typeof s?.auto_focus_blocks === 'boolean') setFocusBlocks(s.auto_focus_blocks);
         if (s?.persona_style) setPersonaStyle(s.persona_style);
@@ -50,30 +50,50 @@ export const BehaviorScreen: React.FC = () => {
           setVoiceLabel(s.preferred_voice.toLowerCase().includes('kore') ? 'Feminina' : 'Masculina');
         }
       })
-      .catch(() => {});
+      .catch(() => {
+        showToast('Não foi possível carregar preferências');
+      });
   }, []);
 
   const handleAutonomy = async (next: 'assisted' | 'proactive') => {
+    const prev = autMode;
     hapticFeedback.selection();
     setAutMode(next);
-    const mode: AutonomyMode = next === 'proactive' ? 'autonomous' : 'assisted';
-    await api.updateAISettings({ autonomy_mode: mode }).catch(() => {});
-    showToast(next === 'proactive' ? 'Modo Proativo ativado' : 'Modo Assistido ativado');
+    const mode: AutonomyMode = next === 'proactive' ? 'proactive' : 'assisted';
+    try {
+      await api.updateAISettings({ autonomy_mode: mode });
+      showToast(next === 'proactive' ? 'Modo Proativo ativado' : 'Modo Assistido ativado');
+    } catch {
+      setAutMode(prev);
+      showToast('Falha ao salvar modo de autonomia');
+    }
   };
 
   const handleFocusToggle = async (val: boolean) => {
+    const prev = focusBlocks;
     hapticFeedback.selection();
     setFocusBlocks(val);
-    await api.updateAISettings({ auto_focus_blocks: val }).catch(() => {});
-    showToast(val ? 'Blocos de foco ativados' : 'Blocos de foco desativados');
+    try {
+      await api.updateAISettings({ auto_focus_blocks: val });
+      showToast(val ? 'Blocos de foco ativados' : 'Blocos de foco desativados');
+    } catch {
+      setFocusBlocks(prev);
+      showToast('Falha ao salvar blocos de foco');
+    }
   };
 
   const handlePersona = async (id: string) => {
+    const prev = personaStyle;
     hapticFeedback.selection();
     setPersonaStyle(id);
-    await api.updateAISettings({ persona_style: id }).catch(() => {});
-    const p = PERSONAS.find((x) => x.id === id);
-    if (p) showToast(`Estilo: ${p.label}`);
+    try {
+      await api.updateAISettings({ persona_style: id });
+      const p = PERSONAS.find((x) => x.id === id);
+      if (p) showToast(`Estilo: ${p.label}`);
+    } catch {
+      setPersonaStyle(prev);
+      showToast('Falha ao salvar estilo');
+    }
   };
 
   const currentPersona = PERSONAS.find((p) => p.id === personaStyle) || PERSONAS[0];
@@ -137,11 +157,9 @@ export const BehaviorScreen: React.FC = () => {
                 Reserva janelas livres para trabalho profundo
               </Text>
             </View>
-            <Switch
+            <VitoSwitch
               value={focusBlocks}
               onValueChange={handleFocusToggle}
-              trackColor={{ false: colors.line, true: colors.acc }}
-              thumbColor="#ffffff"
             />
           </View>
         </View>

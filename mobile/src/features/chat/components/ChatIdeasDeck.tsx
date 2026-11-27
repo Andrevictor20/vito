@@ -12,7 +12,6 @@ import {
   View,
 } from 'react-native';
 import { useTheme } from '../../../context/ThemeContext';
-import { getBezier } from '../../../ds/tokens';
 import { pagerSwipeLockBus } from '../../../services/dataSync';
 import { MOTION_CURVES, hapticFeedback } from '../../../theme/motion';
 import { v5Radii } from '../../../theme/tokens';
@@ -29,7 +28,7 @@ import {
   MailIcon,
   RadarIcon,
   WhatsAppGlyph,
-} from '../../auth/demo/DemoIcons';
+} from '../../../icons/AppGlyphs';
 
 export { IDEA_CARDS, CAROUSEL_TIMING, getCardOffset, type IdeaCard };
 
@@ -84,7 +83,7 @@ export const ChatIdeasDeck: React.FC<ChatIdeasDeckProps> = ({
     }
     heroDeckAnim.setValue(0);
     heroDotsAnim.setValue(0);
-    const easeQ = Easing.bezier(...getBezier('--ease-q'));
+    const easeQ = Easing.bezier(...MOTION_CURVES.q);
     const anim = Animated.parallel([
       Animated.sequence([
         Animated.delay(70),

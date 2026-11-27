@@ -18,15 +18,16 @@ import {
   hasIdenticalKeys,
   normalizeKey,
 } from '../utils/pluggyKeys';
-import {
-  authenticate,
-  createConnectToken,
-  PluggyError,
-} from '../services/pluggyService';
+import { authenticate, createConnectToken, PluggyError } from '../services/pluggyService';
 import { syncAllDiscoveredItems, syncPluggyItem, PluggySyncResult } from '../services/pluggySync';
 import { api } from '../../../services/api';
 import type { FinanceLimitSuggestion } from '../types/finance';
 import * as store from '../services/byokStore';
+import {
+  extractUniqueBankNames,
+  formatByokError,
+  readFilteredClipboardUuids,
+} from './byokSetupHelpers';
 
 export const DASHBOARD_URL = 'https://dashboard.pluggy.ai';
 export const MEU_PLUGGY_URL = 'https://meu.pluggy.ai';
@@ -41,7 +42,7 @@ interface Options {
   onSynced?: (r: PluggySyncResult) => void;
 }
 
-/** Orquestra o onboarding BYOK (Plano 26 v2.0): tutorial → WebView/Etapa 1 → 2 → 3 → syncV/doneV → atalho. */
+/** Orquestra o onboarding BYOK: tutorial → Etapa 1 → 2 → 3 → sync → atalho. */
 export function useByokSetup({ visible, isDark, onSynced }: Options) {
   const [ready, setReady] = useState(false);
   const [step, setStepState] = useState<ByokStep>('tutorial');
@@ -115,23 +116,15 @@ export function useByokSetup({ visible, isDark, onSynced }: Options) {
       setSyncPhase('idle');
       setReady(true);
     })();
-    return () => {
-      alive = false;
-    };
+    return () => { alive = false; };
   }, [visible, clearPendingTimer]);
 
-  // Fallback clipboard: sugere UUIDs detectados ao voltar ao app (nunca preenche sem toque — BYOK-09).
   useEffect(() => {
     if (!visible) return;
-    const check = async () => {
-      const raw = await Clipboard.getStringAsync().catch(() => '');
-      const found = extractUuids(raw).filter(
-        (u) => u.toLowerCase() !== clientId.toLowerCase() && u.toLowerCase() !== clientSecret.toLowerCase(),
-      );
-      setClipboardUuids(found.slice(0, 2));
-    };
     const sub = AppState.addEventListener('change', (st) => {
-      if (st === 'active') void check();
+      if (st === 'active') {
+        void readFilteredClipboardUuids(clientId, clientSecret).then(setClipboardUuids);
+      }
     });
     return () => sub.remove();
   }, [visible, clientId, clientSecret]);
@@ -147,7 +140,6 @@ export function useByokSetup({ visible, isDark, onSynced }: Options) {
     goTo(keys ? '2' : '1');
   }, [goTo]);
 
-  // Etapa 1: valida via POST /auth; tenta par invertido em caso de 401 com 2 UUIDs distintos.
   const validateKeys = useCallback(
     async (overrideId?: string, overrideSecret?: string, opts?: { fromWebView?: boolean }): Promise<boolean> => {
       const id = normalizeKey(overrideId ?? clientId);
@@ -196,15 +188,13 @@ export function useByokSetup({ visible, isDark, onSynced }: Options) {
         setValidationNote(note);
 
         clearPendingTimer();
-        timerRef.current = setTimeout(() => {
-          goTo('2');
-        }, 950);
+        timerRef.current = setTimeout(() => goTo('2'), 950);
         return true;
       } catch (e) {
         setValidated(false);
         const isNet = e instanceof PluggyError && e.kind === 'network';
         setAuthStatus(isNet ? 'offline' : 'error');
-        setError(e instanceof PluggyError ? e.message : 'Falha ao validar as chaves.');
+        setError(formatByokError(e, 'Falha ao validar as chaves.'));
         return false;
       } finally {
         setBusy(false);
@@ -229,9 +219,8 @@ export function useByokSetup({ visible, isDark, onSynced }: Options) {
         return;
       }
 
-      if (field === 'id') {
-        setClientId(text);
-      } else {
+      if (field === 'id') setClientId(text);
+      else {
         setClientSecret(text);
         await Clipboard.setStringAsync('').catch(() => {});
       }
@@ -273,7 +262,13 @@ export function useByokSetup({ visible, isDark, onSynced }: Options) {
     if (text) { setConnectionItemId(text); setError(''); }
   }, []);
 
-  const clearDraftKeys = () => { setClientId(''); setClientSecret(''); setValidated(false); setAuthStatus('idle'); setError(''); };
+  const clearDraftKeys = () => {
+    setClientId('');
+    setClientSecret('');
+    setValidated(false);
+    setAuthStatus('idle');
+    setError('');
+  };
 
   const apiKeyFromStore = useCallback(async (): Promise<string> => {
     let keys = await store.getKeys();
@@ -294,6 +289,19 @@ export function useByokSetup({ visible, isDark, onSynced }: Options) {
     await api.finance.createLimit(buildLimitRuleFromSuggestion(s));
   }, []);
 
+  const finalizeSyncSuccess = useCallback(
+    (resultsList: PluggySyncResult[], extraBanks: string[] = []) => {
+      setSyncCompletedCount(6);
+      setSyncedBanks(extractUniqueBankNames(resultsList, extraBanks));
+      setSyncPhase('done');
+      setShortcut(true);
+      goTo('done');
+      void loadPostSyncSuggestions();
+      if (resultsList[0]) onSynced?.(resultsList[0]);
+    },
+    [goTo, loadPostSyncSuggestions, onSynced],
+  );
+
   const completeConnectSync = useCallback(
     async (overrideItemId?: string) => {
       const targetItemId = normalizeKey(overrideItemId || connectionItemId);
@@ -305,9 +313,10 @@ export function useByokSetup({ visible, isDark, onSynced }: Options) {
       setSyncCompletedCount(2);
       try {
         const apiKey = pendingApiKeyRef.current || (await apiKeyFromStore());
-        const resultsList: PluggySyncResult[] = targetItemId
-          ? [await syncPluggyItem(apiKey, targetItemId, (c) => setSyncCompletedCount(c), { mode: 'manual', onRefreshApiKey: apiKeyFromStore })]
-          : await syncAllDiscoveredItems(apiKey, (c) => setSyncCompletedCount(c), { mode: 'manual', onRefreshApiKey: apiKeyFromStore });
+        const opts = { mode: 'manual' as const, onRefreshApiKey: apiKeyFromStore };
+        const resultsList = targetItemId
+          ? [await syncPluggyItem(apiKey, targetItemId, (c) => setSyncCompletedCount(c), opts)]
+          : await syncAllDiscoveredItems(apiKey, (c) => setSyncCompletedCount(c), opts);
 
         const totalAccounts = resultsList.reduce((acc, r) => acc + r.accountsCount, 0);
         if (totalAccounts === 0) {
@@ -320,28 +329,17 @@ export function useByokSetup({ visible, isDark, onSynced }: Options) {
           );
           return;
         }
-
-        setSyncCompletedCount(6);
-        const banks = Array.from(
-          new Set([...resultsList.map((r) => r.institutionName), ...foundBanks].filter((n) => !!n && n.trim().length > 0)),
-        );
-        setSyncedBanks(banks.length > 0 ? banks : ['Meu Pluggy']);
-        setSyncPhase('done');
-        setShortcut(true);
-        goTo('done');
-        void loadPostSyncSuggestions();
-        onSynced?.(resultsList[0]);
+        finalizeSyncSuccess(resultsList, foundBanks);
       } catch (e) {
         setSyncPhase('error');
-        setError(e instanceof PluggyError ? e.message : e instanceof Error ? e.message : 'Falha ao sincronizar.');
+        setError(formatByokError(e, 'Falha ao sincronizar.'));
       } finally {
         setBusy(false);
       }
     },
-    [apiKeyFromStore, connectionItemId, foundBanks, goTo, loadPostSyncSuggestions, onSynced],
+    [apiKeyFromStore, connectionItemId, finalizeSyncSuccess, foundBanks, goTo],
   );
 
-  // Sincroniza todas as conexões existentes em 1 toque (Atalho Etapa 3) ou abre Pluggy Connect se não houver nenhuma.
   const syncNow = useCallback(async () => {
     setBusy(true);
     setError('');
@@ -356,44 +354,31 @@ export function useByokSetup({ visible, isDark, onSynced }: Options) {
       const apiKey = await apiKeyFromStore();
       const resultsList: PluggySyncResult[] = [];
       for (const conn of connections) {
-        const res = await syncPluggyItem(apiKey, conn.pluggy_item_id, (c) => setSyncCompletedCount(c), {
-          mode: 'manual',
-          connectionId: conn.id,
-          lastSyncAt: conn.last_sync_at,
-          lastBankRefreshAt: conn.last_bank_refresh_at,
-          onRefreshApiKey: apiKeyFromStore,
-        });
-        resultsList.push(res);
+        resultsList.push(
+          await syncPluggyItem(apiKey, conn.pluggy_item_id, (c) => setSyncCompletedCount(c), {
+            mode: 'manual',
+            connectionId: conn.id,
+            lastSyncAt: conn.last_sync_at,
+            lastBankRefreshAt: conn.last_bank_refresh_at,
+            onRefreshApiKey: apiKeyFromStore,
+          }),
+        );
       }
-      setSyncCompletedCount(6);
-      const banks = Array.from(
-        new Set(resultsList.map((r) => r.institutionName).filter((n) => !!n && n.trim().length > 0)),
-      );
-      setSyncedBanks(banks.length > 0 ? banks : ['Meu Pluggy']);
-      setSyncPhase('done');
-      setShortcut(true);
-      goTo('done');
-      void loadPostSyncSuggestions();
-      if (resultsList[0]) onSynced?.(resultsList[0]);
+      finalizeSyncSuccess(resultsList);
     } catch (e) {
       setSyncPhase('error');
-      setError(e instanceof PluggyError ? e.message : e instanceof Error ? e.message : 'Falha ao sincronizar.');
+      setError(formatByokError(e, 'Falha ao sincronizar.'));
     } finally {
       setBusy(false);
     }
-  }, [apiKeyFromStore, completeConnectSync, goTo, loadPostSyncSuggestions, onSynced]);
+  }, [apiKeyFromStore, completeConnectSync, finalizeSyncSuccess]);
 
-  const confirmBanks = useCallback(async () => {
-    await syncNow();
-  }, [syncNow]);
+  const confirmBanks = useCallback(async () => { await syncNow(); }, [syncNow]);
 
-  // Escuta deep links (ex.: vito://pluggy-success?itemId=...) quando o navegador externo redireciona de volta.
   useEffect(() => {
     const handleUrl = (event: { url: string }) => {
       const itemId = parseItemId(event.url);
-      if (itemId) {
-        void completeConnectSync(itemId);
-      }
+      if (itemId) void completeConnectSync(itemId);
     };
     const sub = Linking.addEventListener('url', handleUrl);
     void Linking.getInitialURL().then((url) => {
@@ -407,11 +392,8 @@ export function useByokSetup({ visible, isDark, onSynced }: Options) {
 
   const openDashboardExternal = useCallback(async () => {
     setError('');
-    try {
-      await WebBrowser.openBrowserAsync(DASHBOARD_URL);
-    } catch {
-      await Linking.openURL(DASHBOARD_URL).catch(() => {});
-    }
+    try { await WebBrowser.openBrowserAsync(DASHBOARD_URL); }
+    catch { await Linking.openURL(DASHBOARD_URL).catch(() => {}); }
   }, []);
 
   const launchConnectSession = useCallback(
@@ -433,16 +415,11 @@ export function useByokSetup({ visible, isDark, onSynced }: Options) {
             return;
           }
         }
-        try {
-          const raw = await Clipboard.getStringAsync();
-          const found = extractUuids(raw).filter(
-            (u) => u.toLowerCase() !== clientId.toLowerCase() && u.toLowerCase() !== clientSecret.toLowerCase(),
-          );
-          if (found.length > 0) setClipboardUuids(found.slice(0, 2));
-        } catch {}
+        const found = await readFilteredClipboardUuids(clientId, clientSecret);
+        if (found.length > 0) setClipboardUuids(found);
         setStep2Status('found');
       } catch (e) {
-        setError(e instanceof PluggyError ? e.message : e instanceof Error ? e.message : 'Falha ao abrir Pluggy Connect.');
+        setError(formatByokError(e, 'Falha ao abrir Pluggy Connect.'));
       } finally {
         setBusy(false);
       }
@@ -457,18 +434,10 @@ export function useByokSetup({ visible, isDark, onSynced }: Options) {
     (targetStep: ByokStep) => {
       clearPendingTimer();
       pendingApiKeyRef.current = '';
-      setClientId('');
-      setClientSecret('');
-      setConnectionItemId('');
-      setClipboardUuids([]);
-      setValidated(false);
-      setAuthStatus('idle');
-      setValidationNote('');
-      setStep2Status('idle');
-      setFoundBanks([]);
-      setLimitSuggestions([]);
-      setSyncPhase('idle');
-      setShortcut(false);
+      setClientId(''); setClientSecret(''); setConnectionItemId(''); setClipboardUuids([]);
+      setValidated(false); setAuthStatus('idle'); setValidationNote('');
+      setStep2Status('idle'); setFoundBanks([]); setLimitSuggestions([]);
+      setSyncPhase('idle'); setShortcut(false);
       goTo(targetStep);
     },
     [clearPendingTimer, goTo],

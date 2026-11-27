@@ -5,16 +5,16 @@ import {
   countUnreadNotifications,
   filterNotifications,
   groupNotifications,
-} from '../features/notifications/components/notificationHelpers';
+} from '../features/notifications/utils/notificationHelpers';
+import { formatBRL } from '../utils/formatting/currency';
 import {
   DEVICE_PERMISSION_ROWS,
   FAQ_ITEMS,
-  formatBrl,
   LEGAL_DOCS,
   NOTIFICATION_CATEGORY_ROWS,
   STORE_PLANS,
-} from '../features/store/components/StoreCatalogData';
-import type { InboxNotification } from '../features/notifications/services/inboxNotificationsApi';
+} from '../features/store/data/storeCatalogData';
+import type { InboxNotification } from '../features/notifications/services/notificationsApi';
 
 describe('Onda V5 qaParse (mobile)', () => {
   const ref = new Date(2026, 3, 20, 10, 0, 0); // Segunda-feira, 20/04/2026
@@ -110,7 +110,7 @@ describe('Onda V6 Store & LGPD catalog (mobile)', () => {
     assert.ok(pro && ultra);
     assert.equal(pro.monthlyPrice, 29.9);
     assert.equal(pro.yearlyPrice, 249.9);
-    assert.equal(formatBrl(29.9), 'R$ 29,90');
+    assert.equal(formatBRL(29.9), 'R$ 29,90');
     assert.equal(NOTIFICATION_CATEGORY_ROWS.length, 6);
     assert.equal(DEVICE_PERMISSION_ROWS.length, 5);
     assert.ok(FAQ_ITEMS.length >= 4);

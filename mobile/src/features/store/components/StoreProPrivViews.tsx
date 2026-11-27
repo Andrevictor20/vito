@@ -1,5 +1,6 @@
 import React from 'react';
-import { StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { VitoSwitch } from '../../../components/ui/VitoSwitch';
 import { ProtoUiIcon } from '../../../icons/ProtoUiIcons';
 import { useTheme } from '../../../context/ThemeContext';
 import { VitoMascot } from '../../../components/common/VitoMascot';
@@ -11,9 +12,9 @@ import type {
 } from '../services/storeComplianceApi';
 import {
   DEVICE_PERMISSION_ROWS,
-  formatBrl,
   STORE_PLANS,
-} from './StoreCatalogData';
+} from '../data/storeCatalogData';
+import { formatBRL } from '../../../utils/formatting/currency';
 
 interface StoreProViewProps {
   subscription: UserSubscriptionState;
@@ -50,7 +51,7 @@ export const StoreProView: React.FC<StoreProViewProps> = ({
         <View style={[styles.noteCard, { backgroundColor: colors.greenBg }]}>
           <Text style={[styles.noteBold, { color: colors.ink }]}>Vito {currentDef.name} ativo</Text>
           <Text style={[styles.noteText, { color: colors.ink }]}>
-            {isYearly ? 'Anual' : 'Mensal'} · teste grátis ativo. Cobrança: {formatBrl(priceFor(currentDef))}.
+            {isYearly ? 'Anual' : 'Mensal'} · teste grátis ativo. Cobrança: {formatBRL(priceFor(currentDef))}.
           </Text>
         </View>
         <Text style={[styles.lbl, { color: colors.muted }]}>Gerenciar</Text>
@@ -136,14 +137,14 @@ export const StoreProView: React.FC<StoreProViewProps> = ({
                 </View>
               </View>
               <Text style={[styles.planPrice, { color: colors.ink }]}>
-                {formatBrl(price)}
+                {formatBRL(price)}
                 <Text style={[styles.planUnit, { color: colors.muted }]}>
                   {isYearly ? ' /ano' : ' /mês'}
                 </Text>
               </Text>
               {isYearly && (
                 <Text style={[styles.planSubPrice, { color: colors.muted }]}>
-                  {formatBrl(plan.yearlyPrice / 12)}/mês
+                  {formatBRL(plan.yearlyPrice / 12)}/mês
                 </Text>
               )}
               <View style={styles.featList}>
@@ -174,7 +175,7 @@ export const StoreProView: React.FC<StoreProViewProps> = ({
       </TouchableOpacity>
 
       <Text style={[styles.fineCenter, { color: colors.muted }]}>
-        7 dias grátis, depois {formatBrl(priceFor(activePlan))}
+        7 dias grátis, depois {formatBRL(priceFor(activePlan))}
         {isYearly ? '/ano' : '/mês'}. Cancele quando quiser.
       </Text>
       <Text style={[styles.fineCenter, { color: colors.muted }]}>
@@ -238,11 +239,9 @@ export const StorePrivView: React.FC<StorePrivViewProps> = ({
               <Text style={[styles.rowTitle, { color: colors.ink }]}>{p.label}</Text>
               <Text style={[styles.rowSub, { color: colors.muted }]}>{p.desc}</Text>
             </View>
-            <Switch
+            <VitoSwitch
               value={!!privacy.permissions[p.key]}
               onValueChange={() => onTogglePermission(p.key)}
-              trackColor={{ false: colors.line, true: colors.acc }}
-              thumbColor="#ffffff"
             />
           </View>
         ))}
@@ -257,11 +256,9 @@ export const StorePrivView: React.FC<StorePrivViewProps> = ({
               Seu texto e voz são enviados a OpenAI, Google ou Anthropic para gerar respostas
             </Text>
           </View>
-          <Switch
+          <VitoSwitch
             value={privacy.ai_processing_enabled}
             onValueChange={onToggleAi}
-            trackColor={{ false: colors.line, true: colors.acc }}
-            thumbColor="#ffffff"
           />
         </View>
         <View style={[styles.row, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line }]}>
@@ -271,11 +268,9 @@ export const StorePrivView: React.FC<StorePrivViewProps> = ({
               Dados anônimos para corrigir erros
             </Text>
           </View>
-          <Switch
+          <VitoSwitch
             value={privacy.analytics_enabled}
             onValueChange={onToggleDiag}
-            trackColor={{ false: colors.line, true: colors.acc }}
-            thumbColor="#ffffff"
           />
         </View>
       </View>

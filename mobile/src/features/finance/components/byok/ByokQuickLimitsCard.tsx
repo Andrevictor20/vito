@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useTheme } from '../../../../context/ThemeContext';
 import type { FinanceLimitSuggestion } from '../../types/finance';
-import { formatBRL } from '../shared/financeHelpers';
+import { formatBRL } from '../../utils/financeHelpers';
 
 interface ByokQuickLimitsCardProps {
   suggestions: FinanceLimitSuggestion[];
@@ -25,8 +25,12 @@ export const ByokQuickLimitsCard: React.FC<ByokQuickLimitsCardProps> = ({
   if (suggestions.length === 0) return null;
 
   const handlePress = async (s: FinanceLimitSuggestion, key: string) => {
-    await onActivateSuggestion(s);
-    setActivatedKeys((prev) => [...prev, key]);
+    try {
+      await onActivateSuggestion(s);
+      setActivatedKeys((prev) => [...prev, key]);
+    } catch {
+      Alert.alert('Erro', 'Não foi possível ativar este limite agora.');
+    }
   };
 
   return (

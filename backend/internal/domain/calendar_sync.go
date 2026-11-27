@@ -1,9 +1,16 @@
 package domain
 
 import (
+	"context"
 	"errors"
 	"time"
 )
+
+// CalendarSyncPusher define o contrato para propagação de eventos locais para agendas remotas (ex: Google Calendar).
+type CalendarSyncPusher interface {
+	PushEvent(ctx context.Context, userID string, event *Event) error
+	DeleteEvent(ctx context.Context, userID, eventID string) error
+}
 
 var (
 	ErrIntegrationNotFound = errors.New("integração de calendário não encontrada")

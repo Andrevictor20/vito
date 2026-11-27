@@ -36,27 +36,6 @@ func (t *MemoryProfileToolset) Description() string {
 	return "Consulta e gerencia o perfil e as memórias de longo prazo do usuário (fatos, rotinas e preferências)."
 }
 
-func (t *MemoryProfileToolset) JSONSchema() json.RawMessage {
-	return json.RawMessage(`{
-		"type": "object",
-		"properties": {
-			"operation": {
-				"type": "string",
-				"enum": ["search_memories", "get_profile", "update_profile"],
-				"description": "Operação de memória/perfil."
-			},
-			"params": {
-				"type": "object",
-				"properties": {
-					"query": {"type": "string", "description": "Termo de busca em memórias passadas."},
-					"preferences": {"type": "string", "description": "Atualizações de perfil."}
-				}
-			}
-		},
-		"required": ["operation"]
-	}`)
-}
-
 func (t *MemoryProfileToolset) IsWriteOperation(op string, rawParams json.RawMessage) (bool, bool, map[string]any) {
 	preview := make(map[string]any)
 	_ = json.Unmarshal(rawParams, &preview)

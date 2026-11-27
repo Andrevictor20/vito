@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { calendarSyncService, CalendarIntegration } from '../services/calendarSyncService';
+import { calendarSyncService, CalendarIntegration } from '../services/calendarApi';
 import { nativeCalendarService } from '../services/nativeCalendarService';
 import { googleAuthService } from '../../../services/googleAuthService';
 import { api } from '../../../services/api';

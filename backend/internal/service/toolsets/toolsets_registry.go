@@ -3,7 +3,6 @@ package toolsets
 import (
 	"sync"
 
-	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/domain"
 )
 
@@ -44,54 +43,6 @@ func (r *ToolsetsRegistry) All() []domain.DomainToolset {
 		list = append(list, t)
 	}
 	return list
-}
-
-// Definitions exporta as definições no formato ai.ToolDefinition para os provedores.
-func (r *ToolsetsRegistry) Definitions() []ai.ToolDefinition {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	defs := make([]ai.ToolDefinition, 0, len(r.toolsets))
-	for _, t := range r.toolsets {
-		defs = append(defs, ai.ToolDefinition{
-			Name:        string(t.Name()),
-			Description: t.Description(),
-			Parameters:  t.JSONSchema(),
-		})
-	}
-	return defs
-}
-
-// DefinitionsForContext exporta apenas as definições permitidas para o ToolExecutionContext (AC-04).
-// Quando BotID == "" e não há AllowedToolsets/AllowedOperations configurados, retorna todas as definições.
-func (r *ToolsetsRegistry) DefinitionsForContext(execCtx *domain.ToolExecutionContext) []ai.ToolDefinition {
-	if execCtx == nil || (execCtx.BotID == "" && len(execCtx.AllowedToolsets) == 0 && len(execCtx.AllowedOperations) == 0) {
-		return r.Definitions()
-	}
-
-	allowed := make(map[domain.ToolsetName]bool, len(execCtx.AllowedToolsets)+len(execCtx.AllowedOperations))
-	for _, tsName := range execCtx.AllowedToolsets {
-		allowed[tsName] = true
-	}
-	for tsName, ops := range execCtx.AllowedOperations {
-		if len(ops) > 0 {
-			allowed[tsName] = true
-		}
-	}
-
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	defs := make([]ai.ToolDefinition, 0, len(allowed))
-	for _, t := range r.toolsets {
-		if !allowed[t.Name()] {
-			continue
-		}
-		defs = append(defs, ai.ToolDefinition{
-			Name:        string(t.Name()),
-			Description: t.Description(),
-			Parameters:  t.JSONSchema(),
-		})
-	}
-	return defs
 }
 
 // BotActionSpecs agrega todas as especificações BotActionSpec declaradas por toolsets que implementam BotCapableToolset.

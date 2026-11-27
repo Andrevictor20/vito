@@ -3,6 +3,8 @@ package middleware
 import (
 	"net/http"
 	"strings"
+
+	"github.com/andrevmp/vito/backend/internal/platform/httpx"
 )
 
 // Limites de payload (SEC-04): JSON padrão 1MB; áudio/visão 15MB.
@@ -20,7 +22,7 @@ func BodyLimitMiddleware(next http.Handler) http.Handler {
 			limit = int64(MediaBodyLimitBytes)
 		}
 		if r.ContentLength > limit {
-			http.Error(w, `{"error":"payload excede o limite permitido"}`, http.StatusRequestEntityTooLarge)
+			httpx.WriteJSONError(w, http.StatusRequestEntityTooLarge, "payload excede o limite permitido")
 			return
 		}
 		r.Body = http.MaxBytesReader(w, r.Body, limit)

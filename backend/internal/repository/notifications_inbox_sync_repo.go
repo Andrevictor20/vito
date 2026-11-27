@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
+	"github.com/andrevmp/vito/backend/internal/platform/timeutil"
 	"strings"
 	"time"
 
@@ -13,7 +15,7 @@ import (
 
 // SyncBotPendingNotifications sincroniza confirmações suspensas de bots com a caixa de notificações.
 func (r *NotificationsInboxRepositorySQLite) SyncBotPendingNotifications(ctx context.Context, userID string) error {
-	_ = ExecuteQueuedWrite(ctx, func() error {
+	_ = database.ExecuteQueuedWrite(ctx, func() error {
 		_, err := r.db.ExecContext(ctx, `
 			UPDATE user_notifications
 			SET is_dismissed = 1, is_unread = 0
@@ -91,14 +93,6 @@ func (r *NotificationsInboxRepositorySQLite) SyncBotPendingNotifications(ctx con
 	return nil
 }
 
-func defaultBrazilLocation() *time.Location {
-	loc, err := time.LoadLocation("America/Sao_Paulo")
-	if err != nil {
-		return time.FixedZone("BRT", -3*3600)
-	}
-	return loc
-}
-
 // SyncOverdueTodoNotifications sincroniza alerta resumido de tarefas atrasadas se houver pendências vencidas.
 func (r *NotificationsInboxRepositorySQLite) SyncOverdueTodoNotifications(ctx context.Context, userID string, now time.Time) error {
 	var overdueCount int
@@ -111,7 +105,7 @@ func (r *NotificationsInboxRepositorySQLite) SyncOverdueTodoNotifications(ctx co
 	}
 
 	if overdueCount == 0 {
-		_ = ExecuteQueuedWrite(ctx, func() error {
+		_ = database.ExecuteQueuedWrite(ctx, func() error {
 			_, err := r.db.ExecContext(ctx, `
 				UPDATE user_notifications
 				SET is_dismissed = 1, is_unread = 0
@@ -122,12 +116,12 @@ func (r *NotificationsInboxRepositorySQLite) SyncOverdueTodoNotifications(ctx co
 		return nil
 	}
 
-	loc := defaultBrazilLocation()
+	loc := timeutil.SaoPauloLocation()
 	localNow := now.In(loc)
 	sourceID := "overdue_summary:" + localNow.Format("2006-01-02")
 
 	// Limpa resumos de dias anteriores ou formato legado para manter apenas 1 card ativo.
-	_ = ExecuteQueuedWrite(ctx, func() error {
+	_ = database.ExecuteQueuedWrite(ctx, func() error {
 		_, err := r.db.ExecContext(ctx, `
 			UPDATE user_notifications
 			SET is_dismissed = 1, is_unread = 0
@@ -160,11 +154,11 @@ func (r *NotificationsInboxRepositorySQLite) SyncOverdueTodoNotifications(ctx co
 
 // RescheduleOverdueTodosToday move tarefas pendentes vencidas do usuário para o fim do dia atual no fuso local.
 func (r *NotificationsInboxRepositorySQLite) RescheduleOverdueTodosToday(ctx context.Context, userID string, now time.Time) (int64, error) {
-	loc := defaultBrazilLocation()
+	loc := timeutil.SaoPauloLocation()
 	localNow := now.In(loc)
 	endOfToday := time.Date(localNow.Year(), localNow.Month(), localNow.Day(), 23, 59, 59, 0, loc).UTC()
 
-	affected, err := ExecuteQueuedWriteRows(ctx, func() (sql.Result, error) {
+	affected, err := database.ExecuteQueuedWriteRows(ctx, func() (sql.Result, error) {
 		return r.db.ExecContext(ctx, `
 			UPDATE todos
 			SET due_date = ?, updated_at = ?
@@ -175,7 +169,7 @@ func (r *NotificationsInboxRepositorySQLite) RescheduleOverdueTodosToday(ctx con
 		return 0, err
 	}
 
-	_ = ExecuteQueuedWrite(ctx, func() error {
+	_ = database.ExecuteQueuedWrite(ctx, func() error {
 		_, execErr := r.db.ExecContext(ctx, `
 			UPDATE user_notifications
 			SET is_dismissed = 1, is_unread = 0

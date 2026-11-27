@@ -23,7 +23,7 @@ import { FinanceScreen } from '../features/finance/screens/FinanceScreen';
 import { NotificationsScreen } from '../features/notifications/screens/NotificationsScreen';
 import { ProfileScreen } from '../features/profile/screens/ProfileScreen';
 import { hapticFeedback } from '../theme/motion';
-import { SectionTransition } from '../ds/SectionTransition';
+import { SectionTransition } from '../components/common/SectionTransition';
 import {
   VfxCelebrationOverlay,
   useReduceMotion,

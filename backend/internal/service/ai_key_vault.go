@@ -11,8 +11,8 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/andrevmp/vito/backend/internal/platform/crypto"
 	"github.com/andrevmp/vito/backend/internal/domain"
+	"github.com/andrevmp/vito/backend/internal/platform/crypto"
 )
 
 const aiKeyVaultHKDFInfo = "vito-byok-ai-provider-vault-v1"

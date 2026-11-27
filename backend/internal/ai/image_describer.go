@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 )
 
 // ImageDescriber descreve uma imagem em texto puro (usado pelo enriquecimento do histórico do WhatsApp).
@@ -28,28 +27,6 @@ type ChatMessageContext struct {
 	Chat   string `json:"chat,omitempty"`
 	Quoted string `json:"quoted,omitempty"`
 	Kind   string `json:"kind,omitempty"`
-}
-
-// WeekdayPT retorna o nome do dia da semana em português.
-func WeekdayPT(wd time.Weekday) string {
-	switch wd {
-	case time.Sunday:
-		return "Domingo"
-	case time.Monday:
-		return "Segunda-feira"
-	case time.Tuesday:
-		return "Terça-feira"
-	case time.Wednesday:
-		return "Quarta-feira"
-	case time.Thursday:
-		return "Quinta-feira"
-	case time.Friday:
-		return "Sexta-feira"
-	case time.Saturday:
-		return "Sábado"
-	default:
-		return ""
-	}
 }
 
 // WrapUntrustedContent encapsula dados externos não confiáveis contra prompt injection.

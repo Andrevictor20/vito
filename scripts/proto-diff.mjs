@@ -66,7 +66,7 @@ async function main() {
     })
     const page = await ctx.newPage()
 
-    const protoUrl = `file://${path.join(ROOT, 'Vito-telas-atualizadas.html')}#${opts.screen.replace(/^s-/, '')}`
+    const protoUrl = `file://${path.join(ROOT, 'docs', 'prototypes', 'Vito-telas-atualizadas.html')}#${opts.screen.replace(/^s-/, '')}`
     await capture(page, protoUrl, protoPng, async (p) => {
       await p.evaluate((theme) => {
         document.documentElement.setAttribute('data-theme', theme)

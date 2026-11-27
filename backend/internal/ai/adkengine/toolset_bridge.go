@@ -58,20 +58,20 @@ var canonicalAtomicSpecs = []AtomicToolSpec{
 	{AtomicName: "memory_get_profile", ToolsetName: domain.ToolsetMemoryProfile, Operation: "get_profile", Description: "Obtém o perfil permanente e preferências conhecidas do usuário.", ActionKey: "mem:read"},
 	{AtomicName: "memory_update_profile", ToolsetName: domain.ToolsetMemoryProfile, Operation: "update_profile", Description: "Registra uma nova preferência ou fato de longo prazo sobre o usuário.", ActionKey: "mem:write"},
 	// Bots e Vigílias
-	{AtomicName: "bot_list_bots", ToolsetName: domain.ToolsetRadarTrigger, Operation: "list_triggers", Description: "Lista os bots e vigílias proativas ativas do usuário.", ActionKey: "bot:list"},
-	{AtomicName: "bot_create_bot", ToolsetName: domain.ToolsetRadarTrigger, Operation: "create_trigger", Description: "Cria um novo bot ou vigília proativa para monitorar preços, notícias ou mudanças.", ActionKey: "bot:create"},
-	{AtomicName: "bot_delete_bot", ToolsetName: domain.ToolsetRadarTrigger, Operation: "delete_trigger", Description: "Exclui um bot ou vigília proativa existente.", ActionKey: "bot:delete"},
+	{AtomicName: "bot_list_bots", ToolsetName: domain.ToolsetBots, Operation: "list_triggers", Description: "Lista os bots e vigílias proativas ativas do usuário.", ActionKey: "bot:list"},
+	{AtomicName: "bot_create_bot", ToolsetName: domain.ToolsetBots, Operation: "create_trigger", Description: "Cria um novo bot ou vigília proativa para monitorar preços, notícias ou mudanças.", ActionKey: "bot:create"},
+	{AtomicName: "bot_delete_bot", ToolsetName: domain.ToolsetBots, Operation: "delete_trigger", Description: "Exclui um bot ou vigília proativa existente.", ActionKey: "bot:delete"},
 	// Finanças (Plano 05)
-	{AtomicName: "finance_get_summary", ToolsetName: domain.ToolsetName("finance_manager"), Operation: "get_summary", Description: "Obtém o resumo financeiro Safe-to-Spend, faturas e despesas por categoria.", ActionKey: "fin:summary"},
-	{AtomicName: "finance_get_accounts", ToolsetName: domain.ToolsetName("finance_manager"), Operation: "get_accounts", Description: "Lista todas as contas bancárias, poupanças, investimentos e cartões conectados com saldos e IDs.", ActionKey: "fin:summary"},
-	{AtomicName: "finance_list_transactions", ToolsetName: domain.ToolsetName("finance_manager"), Operation: "list_transactions", Description: "Lista as transações financeiras recentes com filtros opcionais por conta, instituição, descrição ou categoria.", ActionKey: "fin:summary"},
-	{AtomicName: "finance_get_budgets", ToolsetName: domain.ToolsetName("finance_manager"), Operation: "get_budgets", Description: "Consulta os orçamentos por categoria e o progresso no mês.", ActionKey: "fin:summary"},
-	{AtomicName: "finance_get_cards", ToolsetName: domain.ToolsetName("finance_manager"), Operation: "get_cards", Description: "Lista os cartões de crédito conectados e suas faturas atuais.", ActionKey: "fin:summary"},
-	{AtomicName: "finance_get_spending_by_category", ToolsetName: domain.ToolsetName("finance_manager"), Operation: "get_spending_by_category", Description: "Agrega gastos por categoria no mês com comparação histórica.", ActionKey: "fin:analytics"},
-	{AtomicName: "finance_detect_subscriptions", ToolsetName: domain.ToolsetName("finance_manager"), Operation: "detect_subscriptions_and_recurring", Description: "Detecta assinaturas e cobranças recorrentes com alertas de reajuste.", ActionKey: "fin:analytics"},
-	{AtomicName: "finance_simulate_savings_plan", ToolsetName: domain.ToolsetName("finance_manager"), Operation: "simulate_savings_plan", Description: "Simula quanto poupar por mês e o impacto no Safe-to-Spend diário.", ActionKey: "fin:analytics"},
-	{AtomicName: "finance_get_limits_status", ToolsetName: domain.ToolsetName("finance_manager"), Operation: "get_spending_limits_status", Description: "Consulta o consumo atual e projeção dos limites de gasto configurados.", ActionKey: "fin:analytics"},
-	{AtomicName: "finance_upsert_spending_limit", ToolsetName: domain.ToolsetName("finance_manager"), Operation: "upsert_spending_limit", Description: "Cria ou ajusta um limite de gasto por cartão, categoria, assinaturas ou loja (exige confirmação).", ActionKey: "fin:write"},
+	{AtomicName: "finance_get_summary", ToolsetName: domain.ToolsetFinance, Operation: "get_summary", Description: "Obtém o resumo financeiro Safe-to-Spend, faturas e despesas por categoria.", ActionKey: "fin:summary"},
+	{AtomicName: "finance_get_accounts", ToolsetName: domain.ToolsetFinance, Operation: "get_accounts", Description: "Lista todas as contas bancárias, poupanças, investimentos e cartões conectados com saldos e IDs.", ActionKey: "fin:summary"},
+	{AtomicName: "finance_list_transactions", ToolsetName: domain.ToolsetFinance, Operation: "list_transactions", Description: "Lista as transações financeiras recentes com filtros opcionais por conta, instituição, descrição ou categoria.", ActionKey: "fin:summary"},
+	{AtomicName: "finance_get_budgets", ToolsetName: domain.ToolsetFinance, Operation: "get_budgets", Description: "Consulta os orçamentos por categoria e o progresso no mês.", ActionKey: "fin:summary"},
+	{AtomicName: "finance_get_cards", ToolsetName: domain.ToolsetFinance, Operation: "get_cards", Description: "Lista os cartões de crédito conectados e suas faturas atuais.", ActionKey: "fin:summary"},
+	{AtomicName: "finance_get_spending_by_category", ToolsetName: domain.ToolsetFinance, Operation: "get_spending_by_category", Description: "Agrega gastos por categoria no mês com comparação histórica.", ActionKey: "fin:analytics"},
+	{AtomicName: "finance_detect_subscriptions", ToolsetName: domain.ToolsetFinance, Operation: "detect_subscriptions_and_recurring", Description: "Detecta assinaturas e cobranças recorrentes com alertas de reajuste.", ActionKey: "fin:analytics"},
+	{AtomicName: "finance_simulate_savings_plan", ToolsetName: domain.ToolsetFinance, Operation: "simulate_savings_plan", Description: "Simula quanto poupar por mês e o impacto no Safe-to-Spend diário.", ActionKey: "fin:analytics"},
+	{AtomicName: "finance_get_limits_status", ToolsetName: domain.ToolsetFinance, Operation: "get_spending_limits_status", Description: "Consulta o consumo atual e projeção dos limites de gasto configurados.", ActionKey: "fin:analytics"},
+	{AtomicName: "finance_upsert_spending_limit", ToolsetName: domain.ToolsetFinance, Operation: "upsert_spending_limit", Description: "Cria ou ajusta um limite de gasto por cartão, categoria, assinaturas ou loja (exige confirmação).", ActionKey: "fin:write"},
 }
 
 // canonicalActionAliases mapeia action_keys curtas/canônicas do Plano 04 §3 para as specs atômicas do bridge.

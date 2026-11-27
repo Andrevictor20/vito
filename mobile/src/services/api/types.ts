@@ -15,6 +15,7 @@ export interface AssistantChatOptions {
   channel?: string;
   timezone?: string;
   history?: ChatHistoryItem[];
+  reset_history?: boolean;
   signal?: AbortSignal;
   focus_mode?: string;
   screen_context?: string;

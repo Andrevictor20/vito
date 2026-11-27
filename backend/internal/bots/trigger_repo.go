@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"github.com/andrevmp/vito/backend/internal/repository"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"time"
 
 	"github.com/andrevmp/vito/backend/internal/domain"
@@ -111,7 +111,7 @@ func (r *TriggerRepositorySQLite) Create(t *domain.Trigger) error {
 			last_checked_at, next_check_at, created_at, updated_at
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
-	return repository.ExecuteQueuedWrite(context.Background(), func() error {
+	return database.ExecuteQueuedWrite(context.Background(), func() error {
 		_, err := r.db.Exec(
 			query,
 			t.ID, t.UserID, t.Title, string(t.Category), t.Query, t.UserIntent, t.SearchKeywords,
@@ -222,7 +222,7 @@ func (r *TriggerRepositorySQLite) Update(t *domain.Trigger) error {
 		    model_pref = ?, effort_pref = ?, updated_at = ?
 		WHERE id = ? AND user_id = ?
 	`
-	n, err := repository.ExecuteQueuedWriteRows(context.Background(), func() (sql.Result, error) {
+	n, err := database.ExecuteQueuedWriteRows(context.Background(), func() (sql.Result, error) {
 		return r.db.Exec(
 			query,
 			t.Title, string(t.Category), t.Query, t.UserIntent, t.SearchKeywords,
@@ -251,7 +251,7 @@ func (r *TriggerRepositorySQLite) UpdateFingerprintsAndMetric(id string, seenFin
 		metricVal = sql.NullFloat64{Float64: *lastMetricValue, Valid: true}
 	}
 	query := `UPDATE triggers SET seen_fingerprints_json = ?, last_metric_value = ?, updated_at = ? WHERE id = ?`
-	return repository.ExecuteQueuedWrite(context.Background(), func() error {
+	return database.ExecuteQueuedWrite(context.Background(), func() error {
 		_, err := r.db.Exec(query, seenFingerprintsJSON, metricVal, time.Now().UTC(), id)
 		return err
 	})
@@ -263,7 +263,7 @@ func (r *TriggerRepositorySQLite) UpdateSearchConfig(id string, searchConfigJSON
 		searchConfigJSON = "{}"
 	}
 	query := `UPDATE triggers SET search_config_json = ?, updated_at = ? WHERE id = ?`
-	return repository.ExecuteQueuedWrite(context.Background(), func() error {
+	return database.ExecuteQueuedWrite(context.Background(), func() error {
 		_, err := r.db.Exec(query, searchConfigJSON, time.Now().UTC(), id)
 		return err
 	})
@@ -275,7 +275,7 @@ func (r *TriggerRepositorySQLite) UpdateStatus(id, userID string, status domain.
 		SET status = ?, updated_at = ?
 		WHERE id = ? AND user_id = ?
 	`
-	n, err := repository.ExecuteQueuedWriteRows(context.Background(), func() (sql.Result, error) {
+	n, err := database.ExecuteQueuedWriteRows(context.Background(), func() (sql.Result, error) {
 		return r.db.Exec(query, string(status), time.Now().UTC(), id, userID)
 	})
 	if err != nil {
@@ -293,7 +293,7 @@ func (r *TriggerRepositorySQLite) UpdateEvaluation(id string, currentValue strin
 		SET current_value = ?, status = ?, last_checked_at = ?, next_check_at = ?, updated_at = ?
 		WHERE id = ?
 	`
-	return repository.ExecuteQueuedWrite(context.Background(), func() error {
+	return database.ExecuteQueuedWrite(context.Background(), func() error {
 		_, err := r.db.Exec(query, currentValue, string(status), lastChecked, nextCheck, time.Now().UTC(), id)
 		return err
 	})
@@ -305,7 +305,7 @@ func (r *TriggerRepositorySQLite) UpdateRunResult(id string, currentValue string
 		SET current_value = ?, status = ?, last_run_status = ?, last_checked_at = ?, next_check_at = ?, updated_at = ?
 		WHERE id = ?
 	`
-	return repository.ExecuteQueuedWrite(context.Background(), func() error {
+	return database.ExecuteQueuedWrite(context.Background(), func() error {
 		_, err := r.db.Exec(query, currentValue, string(status), lastRunStatus, lastChecked, nextCheck, time.Now().UTC(), id)
 		return err
 	})
@@ -316,7 +316,7 @@ func (r *TriggerRepositorySQLite) UpdateLastError(id string, errMsg string) erro
 	if len(errMsg) > 500 {
 		errMsg = errMsg[:500]
 	}
-	return repository.ExecuteQueuedWrite(context.Background(), func() error {
+	return database.ExecuteQueuedWrite(context.Background(), func() error {
 		_, err := r.db.Exec(`UPDATE triggers SET last_error = ?, updated_at = ? WHERE id = ?`, errMsg, time.Now().UTC(), id)
 		return err
 	})
@@ -339,7 +339,7 @@ func (r *TriggerRepositorySQLite) GetLastNotifiedAt(id string) (*time.Time, erro
 
 // UpdateLastNotifiedAt registra o push enviado (cooldown Fase 1).
 func (r *TriggerRepositorySQLite) UpdateLastNotifiedAt(id string, t time.Time) error {
-	return repository.ExecuteQueuedWrite(context.Background(), func() error {
+	return database.ExecuteQueuedWrite(context.Background(), func() error {
 		_, err := r.db.Exec(`UPDATE triggers SET last_notified_at = ?, updated_at = ? WHERE id = ?`, t.UTC(), time.Now().UTC(), id)
 		return err
 	})
@@ -373,7 +373,7 @@ func (r *TriggerRepositorySQLite) SetSeenHashes(id string, hashes []string) erro
 	if err != nil {
 		return err
 	}
-	return repository.ExecuteQueuedWrite(context.Background(), func() error {
+	return database.ExecuteQueuedWrite(context.Background(), func() error {
 		_, err := r.db.Exec(`UPDATE triggers SET last_seen_hashes = ?, updated_at = ? WHERE id = ?`, string(encoded), time.Now().UTC(), id)
 		return err
 	})
@@ -386,7 +386,7 @@ func (r *TriggerRepositorySQLite) UpdateTriggerModelPref(ctx context.Context, us
 		SET model_pref = ?, effort_pref = ?, updated_at = ?
 		WHERE id = ? AND user_id = ?
 	`
-	n, err := repository.ExecuteQueuedWriteRows(ctx, func() (sql.Result, error) {
+	n, err := database.ExecuteQueuedWriteRows(ctx, func() (sql.Result, error) {
 		return r.db.ExecContext(ctx, query, modelPref, effortPref, time.Now().UTC(), triggerID, userID)
 	})
 	if err != nil {
@@ -405,7 +405,7 @@ func (r *TriggerRepositorySQLite) ClearProviderPrefs(ctx context.Context, userID
 		SET model_pref = '', updated_at = ?
 		WHERE user_id = ? AND model_pref LIKE ?
 	`
-	return repository.ExecuteQueuedWrite(ctx, func() error {
+	return database.ExecuteQueuedWrite(ctx, func() error {
 		_, err := r.db.ExecContext(ctx, query, time.Now().UTC(), userID, providerKey+":%")
 		return err
 	})
@@ -413,7 +413,7 @@ func (r *TriggerRepositorySQLite) ClearProviderPrefs(ctx context.Context, userID
 
 func (r *TriggerRepositorySQLite) Delete(id, userID string) error {
 	query := `DELETE FROM triggers WHERE id = ? AND user_id = ?`
-	n, err := repository.ExecuteQueuedWriteRows(context.Background(), func() (sql.Result, error) {
+	n, err := database.ExecuteQueuedWriteRows(context.Background(), func() (sql.Result, error) {
 		return r.db.Exec(query, id, userID)
 	})
 	if err != nil {

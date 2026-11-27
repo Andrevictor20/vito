@@ -11,7 +11,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useAuth } from '../../../context/AuthContext';
 import { useTheme } from '../../../context/ThemeContext';
-import { getBezier } from '../../../ds/tokens';
+import { MOTION_CURVES } from '../../../theme/motion';
 import { useBots } from '../hooks/useBots';
 import { chatPromptBus, tabNavigationBus } from '../../../services/dataSync';
 import { StaggerItem, useReduceMotion } from '../../../theme/vitoMotion';
@@ -69,6 +69,7 @@ export const BotsScreen: React.FC<BotsScreenProps> = ({
     toggleBot,
     deleteBot,
     runBot,
+    loadBotDetails,
     resolvePending,
     updateActionPolicy,
     addAction,
@@ -89,7 +90,7 @@ export const BotsScreen: React.FC<BotsScreenProps> = ({
       tabFade.value = 1;
       return;
     }
-    const [x1, y1, x2, y2] = getBezier('--ease-q');
+    const [x1, y1, x2, y2] = MOTION_CURVES.q;
     cancelAnimation(tabFade);
     tabFade.value = 0;
     tabFade.value = withTiming(1, {
@@ -205,6 +206,7 @@ export const BotsScreen: React.FC<BotsScreenProps> = ({
         onRunNow={async (id) => {
           await runBot(id);
         }}
+        onRefreshBot={loadBotDetails}
         onResolvePending={handleResolvePending}
         onUpdateActionPolicy={(botId, actionKey, policy, alwaysAsk) => {
           updateActionPolicy(botId, actionKey, policy, alwaysAsk).catch((err) => {
@@ -212,16 +214,24 @@ export const BotsScreen: React.FC<BotsScreenProps> = ({
           });
         }}
         onAddAction={(botId, actionKey, policy, alwaysAsk) => {
-          addAction(botId, actionKey, policy, alwaysAsk).catch(() => {});
+          addAction(botId, actionKey, policy, alwaysAsk).catch((err) => {
+            Alert.alert('Erro', err instanceof Error ? err.message : 'Falha ao adicionar ação.');
+          });
         }}
         onAddSkill={(botId, skillKey) => {
-          addSkill(botId, skillKey).catch(() => {});
+          addSkill(botId, skillKey).catch((err) => {
+            Alert.alert('Erro', err instanceof Error ? err.message : 'Falha ao adicionar habilidade.');
+          });
         }}
         onRemoveSkill={(botId, skillKey) => {
-          removeSkill(botId, skillKey).catch(() => {});
+          removeSkill(botId, skillKey).catch((err) => {
+            Alert.alert('Erro', err instanceof Error ? err.message : 'Falha ao remover habilidade.');
+          });
         }}
         onUpgradeSkill={(botId, skillKey) => {
-          upgradeSkill(botId, skillKey).catch(() => {});
+          upgradeSkill(botId, skillKey).catch((err) => {
+            Alert.alert('Erro', err instanceof Error ? err.message : 'Falha ao atualizar habilidade.');
+          });
         }}
       />
     );
@@ -309,9 +319,14 @@ export const BotsScreen: React.FC<BotsScreenProps> = ({
             isOfflineCache={isOfflineCache}
             onRefresh={onRefresh}
             onRetry={retry}
-            onOpenBot={(b: Bot) => setSelectedBotId(b.id)}
+            onOpenBot={(b: Bot) => {
+              setSelectedBotId(b.id);
+              void loadBotDetails(b.id);
+            }}
             onToggleBot={(b: Bot) => {
-              toggleBot(b).catch(() => {});
+              toggleBot(b).catch(() => {
+                Alert.alert('Erro', 'Não foi possível alterar o status do bot.');
+              });
             }}
             onResolvePending={handleResolvePending}
             onAskVitoChip={(prompt) => handleAskVito(prompt)}
@@ -408,9 +423,12 @@ export const BotsScreen: React.FC<BotsScreenProps> = ({
         bots={bots}
         onClose={() => setPickBotSkill(null)}
         onPickBot={(botId, skillKey) => {
-          addSkill(botId, skillKey).catch(() => {});
+          addSkill(botId, skillKey).catch(() => {
+            Alert.alert('Erro', 'Não foi possível aplicar a habilidade neste bot.');
+          });
           setActiveTab('my_bots');
           setSelectedBotId(botId);
+          void loadBotDetails(botId);
         }}
       />
     </View>

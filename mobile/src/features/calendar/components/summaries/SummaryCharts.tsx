@@ -10,12 +10,11 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { useTheme } from '../../../../context/ThemeContext';
-import { getBezier } from '../../../../ds/tokens';
-import { useScreenFocus } from '../../../../ds/screenFocusContext';
-import { hapticFeedback } from '../../../../theme/motion';
+import { MOTION_CURVES, hapticFeedback } from '../../../../theme/motion';
+import { useScreenFocus } from '../../../../theme/screenFocusContext';
 import { tabularNumbers } from '../../../../theme/tokens';
 import { useReduceMotion } from '../../../../theme/vitoMotion';
-import { withHexAlpha } from '../../../finance/components/shared/financeHelpers';
+import { withHexAlpha } from '../../../finance/utils/financeHelpers';
 
 export { SummaryBalanceDonut, SummaryTrendLineChart } from './SummaryMonthlyCharts';
 
@@ -58,7 +57,7 @@ const AnimatedSummaryBarColumn: React.FC<{
       labelOpacity.value = 0;
       return;
     }
-    const [x1, y1, x2, y2] = getBezier('--ease-q');
+    const [x1, y1, x2, y2] = MOTION_CURVES.q;
     progress.value = 0;
     labelOpacity.value = 0;
     const delay = index * 75;

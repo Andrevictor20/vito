@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"time"
 
 	"github.com/google/uuid"
@@ -75,7 +76,7 @@ func (r *StoreComplianceRepositorySQLite) UpsertSubscription(ctx context.Context
 			END,
 			updated_at = excluded.updated_at
 	`
-	return ExecuteQueuedWrite(ctx, func() error {
+	return database.ExecuteQueuedWrite(ctx, func() error {
 		_, err := r.db.ExecContext(ctx, q,
 			sub.UserID,
 			string(sub.Plan),
@@ -140,7 +141,7 @@ func (r *StoreComplianceRepositorySQLite) UpsertPrivacySettings(ctx context.Cont
 			permissions_json = excluded.permissions_json,
 			updated_at = excluded.updated_at
 	`
-	return ExecuteQueuedWrite(ctx, func() error {
+	return database.ExecuteQueuedWrite(ctx, func() error {
 		_, execErr := r.db.ExecContext(ctx, q,
 			ps.UserID,
 			b2i(ps.AIProcessingEnabled),
@@ -164,7 +165,7 @@ func (r *StoreComplianceRepositorySQLite) CreateComplianceRequest(ctx context.Co
 		INSERT INTO account_compliance_requests (id, user_id, kind, status, requested_at, scheduled_for)
 		VALUES (?, ?, ?, ?, ?, ?)
 	`
-	return ExecuteQueuedWrite(ctx, func() error {
+	return database.ExecuteQueuedWrite(ctx, func() error {
 		_, err := r.db.ExecContext(ctx, q,
 			req.ID, req.UserID, string(req.Kind), req.Status, req.RequestedAt, req.ScheduledFor,
 		)
@@ -214,7 +215,7 @@ func (r *StoreComplianceRepositorySQLite) CreateAIReport(ctx context.Context, re
 		INSERT INTO ai_content_reports (id, user_id, thread_id, reason, created_at)
 		VALUES (?, ?, ?, ?, ?)
 	`
-	return ExecuteQueuedWrite(ctx, func() error {
+	return database.ExecuteQueuedWrite(ctx, func() error {
 		_, err := r.db.ExecContext(ctx, q, rep.ID, rep.UserID, rep.ThreadID, rep.Reason, rep.CreatedAt)
 		return err
 	})
@@ -235,7 +236,7 @@ func (r *StoreComplianceRepositorySQLite) CreateSupportRequest(ctx context.Conte
 		INSERT INTO support_requests (id, user_id, subject, message, status, created_at)
 		VALUES (?, ?, ?, ?, ?, ?)
 	`
-	return ExecuteQueuedWrite(ctx, func() error {
+	return database.ExecuteQueuedWrite(ctx, func() error {
 		_, err := r.db.ExecContext(ctx, q, req.ID, req.UserID, req.Subject, req.Message, req.Status, req.CreatedAt)
 		return err
 	})

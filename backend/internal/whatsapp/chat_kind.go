@@ -1,0 +1,200 @@
+package whatsapp
+
+import (
+	"strings"
+
+	"github.com/andrevmp/vito/backend/internal/domain"
+	"github.com/andrevmp/vito/backend/internal/whatsapp/evolution"
+)
+
+// NormalizeJIDForSend normaliza o JID para envio de mensagens pela Evolution API.
+var NormalizeJIDForSend = evolution.NormalizeJIDForSend
+
+// ResolveReplyJID normaliza e resolve o destino da resposta na Evolution API.
+// Em conversas consigo mesmo ("Você" / self), remove prefixos de dispositivo do note-to-self
+// (ex.: 047...) e identificadores @lid, convertendo para o JID @s.whatsapp.net canônico do dono,
+// evitando que a Evolution API v2 rejeite o envio com HTTP 400 Bad Request (exists: false).
+func ResolveReplyJID(remoteJID, remoteJIDAlt, chatKind, ownerJID, ownerPhone string) string {
+	cleanRemote := strings.TrimSpace(remoteJID)
+	cleanAlt := strings.TrimSpace(remoteJIDAlt)
+
+	// Em grupos, o destino é sempre o próprio grupo
+	if strings.HasSuffix(cleanRemote, "@g.us") {
+		return NormalizeJIDForSend(cleanRemote)
+	}
+
+	// JID canônico do dono (@s.whatsapp.net)
+	canonicalOwner := ""
+	if strings.Contains(ownerJID, "@s.whatsapp.net") {
+		canonicalOwner = NormalizeJIDForSend(ownerJID)
+	} else if ownerPhone != "" {
+		digits := domain.PhoneDigits(ownerPhone)
+		if digits != "" {
+			canonicalOwner = digits + "@s.whatsapp.net"
+		}
+	}
+
+	// Se for chat pessoal ("Você" / self / self_group), a Evolution API exige o JID canônico do dono
+	if chatKind == domain.WhatsAppChatKindSelf || chatKind == domain.WhatsAppChatKindSelfGroup {
+		if canonicalOwner != "" {
+			return canonicalOwner
+		}
+		if strings.HasSuffix(cleanAlt, "@s.whatsapp.net") {
+			return NormalizeJIDForSend(cleanAlt)
+		}
+		// Fallback: se remoteJID terminar com @s.whatsapp.net mas tiver prefixo note-to-self (ex.: 04755...)
+		digits := domain.PhoneDigits(cleanRemote)
+		if len(digits) >= 12 && strings.HasPrefix(digits, "047") {
+			return digits[3:] + "@s.whatsapp.net"
+		}
+	}
+
+	// Se for @lid com alternativo @s.whatsapp.net disponível
+	if strings.HasSuffix(cleanRemote, "@lid") && strings.HasSuffix(cleanAlt, "@s.whatsapp.net") {
+		return NormalizeJIDForSend(cleanAlt)
+	}
+
+	return NormalizeJIDForSend(cleanRemote)
+}
+
+// ClassifyChat classifica uma conversa do WhatsApp para definir o escopo de contexto.
+//
+// Regra (SPEC §2.1):
+//   - `self`      → conversa comigo mesmo ("Você")
+//   - `self_group`→ grupo do WhatsApp com apenas o usuário (nenhum terceiro vê a resposta)
+//   - `group`     → grupo com outras pessoas
+//   - `direct`    → 1-on-1 com terceiro
+//
+// Quando os dados de participantes estão obsoletos ou ausentes, o fallback é o tipo
+// MAIS RESTRITIVO (`group`), que bloqueia o contexto cross-chat por construção.
+func ClassifyChat(remoteJID, myPhone string, groupParticipants int, participantsFresh bool, ownerLID ...string) string {
+	jid := strings.TrimSpace(remoteJID)
+	if jid == "" {
+		return domain.WhatsAppChatKindDirect
+	}
+
+	if strings.HasSuffix(jid, "@broadcast") || jid == "status@broadcast" {
+		return domain.WhatsAppChatKindBroadcast
+	}
+	if strings.HasSuffix(jid, "@newsletter") {
+		return domain.WhatsAppChatKindNewsletter
+	}
+
+	if strings.HasSuffix(jid, "@g.us") {
+		if participantsFresh && groupParticipants == 1 {
+			return domain.WhatsAppChatKindSelfGroup
+		}
+		return domain.WhatsAppChatKindGroup
+	}
+
+	cleanJID := strings.Split(jid, "@")[0]
+	cleanJID = strings.Split(cleanJID, ":")[0]
+
+	if len(ownerLID) > 0 && ownerLID[0] != "" {
+		cleanLID := strings.TrimSpace(ownerLID[0])
+		if strings.EqualFold(jid, cleanLID) || strings.EqualFold(cleanJID, strings.Split(cleanLID, "@")[0]) {
+			return domain.WhatsAppChatKindSelf
+		}
+	}
+
+	if myPhone != "" && IsSelfChatJID(cleanJID, myPhone) {
+		return domain.WhatsAppChatKindSelf
+	}
+	return domain.WhatsAppChatKindDirect
+}
+
+// IsSelfChatJID informa se um JID pertence à conversa do próprio usuário ("Você").
+//
+// O WhatsApp endereça a conversa consigo mesmo com um **prefixo** sobre o número
+// (observado em produção: `047559884097322@s.whatsapp.net` para o número
+// `559884097322`). Por isso a comparação é feita por **sufixo**, tolerando ainda
+// a diferença do 9º dígito brasileiro e o identificador de dispositivo multi-device (:33).
+func IsSelfChatJID(jid, phone string) bool {
+	cleanJID := strings.Split(jid, "@")[0]
+	cleanJID = strings.Split(cleanJID, ":")[0]
+	cleanPhone := strings.Split(phone, "@")[0]
+	cleanPhone = strings.Split(cleanPhone, ":")[0]
+
+	j := domain.PhoneDigits(cleanJID)
+	p := domain.PhoneDigits(cleanPhone)
+	if j == "" || p == "" {
+		return false
+	}
+	if j == p {
+		return true
+	}
+	// Prefixo do note-to-self: o JID termina com o número do usuário.
+	if strings.HasSuffix(j, p) {
+		return true
+	}
+	// Tolerância do 9º dígito brasileiro, nos dois sentidos.
+	jCanon, pCanon := domain.CanonicalBRPhone(j), domain.CanonicalBRPhone(p)
+	if jCanon == pCanon {
+		return true
+	}
+	return strings.HasSuffix(j, pCanon)
+}
+
+// IsOwnerSender verifica se um remetente (participant ou remoteJID) corresponde ao dono cadastrado.
+func IsOwnerSender(senderJID, ownerPhone, ownerJID string) bool {
+	cleanSender := strings.Split(senderJID, "@")[0]
+	cleanSender = strings.Split(cleanSender, ":")[0]
+	sDigits := domain.PhoneDigits(cleanSender)
+	if sDigits == "" {
+		return false
+	}
+
+	for _, candidate := range []string{ownerPhone, ownerJID} {
+		if candidate == "" {
+			continue
+		}
+		cleanCandidate := strings.Split(candidate, "@")[0]
+		cleanCandidate = strings.Split(cleanCandidate, ":")[0]
+		cDigits := domain.PhoneDigits(cleanCandidate)
+		if cDigits == "" {
+			continue
+		}
+		if sDigits == cDigits || domain.PhonesMatch(sDigits, cDigits) {
+			return true
+		}
+		if strings.HasSuffix(sDigits, cDigits) || strings.HasSuffix(cDigits, sDigits) {
+			return true
+		}
+	}
+	return false
+}
+
+// AllowsCrossChat informa se o Vito pode consultar mensagens de OUTROS chats.
+//
+// Liberado apenas em conversas pessoais (`self`, `self_group`), onde a resposta do Vito
+// não é entregue a terceiros. Em `group` e `direct` a resposta é visível a outras
+// pessoas, então o contexto fica restrito ao chat em que o Vito foi acionado.
+func AllowsCrossChat(chatKind string) bool {
+	return chatKind == domain.WhatsAppChatKindSelf || chatKind == domain.WhatsAppChatKindSelfGroup
+}
+
+// RequiresTrigger informa se a mensagem precisa de menção explícita (@vito, /vito, !vito) para
+// acionar o Vito. No WhatsApp, todos os chats agora exigem marcação explícita.
+func RequiresTrigger(chatKind string) bool {
+	return true
+}
+
+// CanActOnMessage informa se o Vito pode executar comandos a partir desta
+// mensagem.
+//
+// REGRA DE OURO: só o DONO da instância dá comandos ao Vito.
+//
+// Sem isso, qualquer pessoa num grupo (ou num 1-on-1) podia escrever
+// "@vito cria uma reunião amanhã" e o Vito criava o evento NA CONTA DO DONO —
+// além de poder responder pelo WhatsApp dele (SEND_WHATSAPP_MESSAGE).
+//
+// A exceção é o chat "Você" (`self`) e o grupo só dele (`self_group`): por
+// construção não há terceiros ali — o ClassifyChat cai sempre no tipo mais
+// restritivo (`group`) quando os participantes são desconhecidos, e o
+// fallback de `CanActOnMessage` mantém o dono com acesso.
+func CanActOnMessage(chatKind string, fromMe bool) bool {
+	if fromMe {
+		return true
+	}
+	return chatKind == domain.WhatsAppChatKindSelf || chatKind == domain.WhatsAppChatKindSelfGroup
+}

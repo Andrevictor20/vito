@@ -17,9 +17,6 @@ type stubDomainToolset struct {
 
 func (s *stubDomainToolset) Name() domain.ToolsetName { return s.name }
 func (s *stubDomainToolset) Description() string      { return "stub " + string(s.name) }
-func (s *stubDomainToolset) JSONSchema() json.RawMessage {
-	return json.RawMessage(`{"type":"object"}`)
-}
 func (s *stubDomainToolset) IsWriteOperation(_ string, _ json.RawMessage) (bool, bool, map[string]any) {
 	return false, false, nil
 }
@@ -37,8 +34,8 @@ func TestAC02_TypedSchemasAndCleanRootTopology(t *testing.T) {
 		domain.ToolsetGmail,
 		domain.ToolsetWebSearch,
 		domain.ToolsetMemoryProfile,
-		domain.ToolsetRadarTrigger,
-		domain.ToolsetName("finance_manager"),
+		domain.ToolsetBots,
+		domain.ToolsetFinance,
 	} {
 		reg.Register(&stubDomainToolset{name: name})
 	}

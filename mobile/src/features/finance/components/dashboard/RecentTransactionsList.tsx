@@ -10,7 +10,7 @@ import {
   getPaymentMethodKind,
   isCreditTransaction,
   maskBRL,
-} from '../shared/financeHelpers';
+} from '../../utils/financeHelpers';
 import { TransactionSemanticBadge } from '../shared/FinanceSemanticIcons';
 
 interface RecentTransactionsListProps {

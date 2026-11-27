@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/andrevmp/vito/backend/internal/platform/httpx"
 	"net/http"
 	"net/url"
 	"strings"
@@ -127,7 +128,7 @@ func (h *GoogleAuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if code == "" || stateStr == "" {
-		http.Error(w, `{"error":"parâmetros code e state são obrigatórios"}`, http.StatusBadRequest)
+		httpx.WriteJSONError(w, http.StatusBadRequest, "parâmetros code e state são obrigatórios")
 		return
 	}
 
@@ -160,12 +161,12 @@ type nativeGoogleAuthRequest struct {
 func (h *GoogleAuthHandler) NativeAuth(w http.ResponseWriter, r *http.Request) {
 	var req nativeGoogleAuthRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, `{"error":"payload JSON inválido"}`, http.StatusBadRequest)
+		httpx.WriteJSONError(w, http.StatusBadRequest, "payload JSON inválido")
 		return
 	}
 
 	if strings.TrimSpace(req.IDToken) == "" {
-		http.Error(w, `{"error":"id_token é obrigatório"}`, http.StatusBadRequest)
+		httpx.WriteJSONError(w, http.StatusBadRequest, "id_token é obrigatório")
 		return
 	}
 
@@ -187,7 +188,7 @@ func (h *GoogleAuthHandler) NativeAuth(w http.ResponseWriter, r *http.Request) {
 
 	tokens, user, err := h.googleAuthSvc.AuthenticateNativeIDToken(r.Context(), req.IDToken, deviceName, ipAddress)
 	if err != nil {
-		http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusUnauthorized)
+		httpx.WriteJSONError(w, http.StatusUnauthorized, err.Error())
 		return
 	}
 

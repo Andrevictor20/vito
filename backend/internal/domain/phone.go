@@ -62,6 +62,15 @@ func PhoneDigits(raw string) string {
 	return b.String()
 }
 
+// CanonicalBRPhone remove o 9º dígito de um celular brasileiro (DDI 55 + DDD + 9 + 8 dígitos)
+// para normalização canônica de chaves de lookup entre contatos e WhatsApp.
+func CanonicalBRPhone(digits string) string {
+	if len(digits) == 13 && strings.HasPrefix(digits, "55") {
+		return digits[:4] + digits[5:]
+	}
+	return digits
+}
+
 // localPartBR retorna DDD e os últimos 8 dígitos do número local brasileiro.
 func localPartBR(digits string) (ddd string, last8 string, ok bool) {
 	if !strings.HasPrefix(digits, "55") || len(digits) < 12 {

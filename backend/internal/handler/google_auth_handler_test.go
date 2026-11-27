@@ -1,9 +1,12 @@
 package handler_test
 
 import (
+	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/andrevmp/vito/backend/internal/domain"
@@ -175,5 +178,51 @@ func TestGoogleAuthHandler_CallbackErrorParam(t *testing.T) {
 	parsed, _ := url.Parse(loc)
 	if parsed.Query().Get("error") != "access_denied" {
 		t.Errorf("parâmetro de erro ausente ou incorreto no redirect: %s", loc)
+	}
+}
+
+type failingCreateUserRepo struct {
+	mockUserRepoForHandler
+}
+
+func (f *failingCreateUserRepo) Create(u *domain.User) error {
+	return errors.New(`falha com "aspas" no erro`)
+}
+
+func TestGoogleAuthHandler_NativeAuth_ReturnsJSONErrorEscaped(t *testing.T) {
+	tokenInfoSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"sub":"sub-1","email":"u@example.com","email_verified":"true","name":"User","aud":"mock-client-id","iss":"https://accounts.google.com","exp":"9999999999"}`))
+	}))
+	defer tokenInfoSrv.Close()
+
+	cfg := service.GoogleAuthConfig{
+		ClientID:     "mock-client-id",
+		JWTSecret:    "secret123",
+		TokenInfoURL: tokenInfoSrv.URL,
+	}
+	repo := &failingCreateUserRepo{}
+	authSvc := service.NewAuthService(repo, "secret123")
+	googleAuthSvc := service.NewGoogleAuthService(cfg, repo, authSvc, nil)
+	googleHandler := handler.NewGoogleAuthHandler(googleAuthSvc, authSvc)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/google/native", strings.NewReader(`{"id_token":"tok"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	googleHandler.NativeAuth(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("esperava 401, obteve %d", rec.Code)
+	}
+	if ct := rec.Header().Get("Content-Type"); !strings.Contains(ct, "application/json") {
+		t.Fatalf("esperava Content-Type application/json, obteve %q", ct)
+	}
+	var payload map[string]string
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("corpo de erro deveria ser JSON válido, obteve %q (err=%v)", rec.Body.String(), err)
+	}
+	if !strings.Contains(payload["error"], `"aspas"`) {
+		t.Errorf("mensagem de erro esperada no campo error, obteve %q", payload["error"])
 	}
 }

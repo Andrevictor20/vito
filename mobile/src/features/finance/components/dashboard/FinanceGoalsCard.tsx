@@ -6,7 +6,7 @@ import { useTheme } from '../../../../context/ThemeContext';
 import { hapticFeedback } from '../../../../theme/motion';
 import { AnimatedProgressBar, CountUpText } from '../../../../theme/vitoMotion';
 import type { FinancialSummary } from '../../types/finance';
-import { formatBRL, maskBRL, withHexAlpha } from '../shared/financeHelpers';
+import { formatBRL, maskBRL, withHexAlpha } from '../../utils/financeHelpers';
 import { CategorySemanticBadge, resolveCategoryVisual } from '../shared/FinanceSemanticIcons';
 
 interface FinanceGoalsCardProps {

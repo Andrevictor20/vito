@@ -13,12 +13,11 @@ import Animated, {
 import Svg, { Defs, Line, LinearGradient, Rect, Stop, Text as SvgText } from 'react-native-svg';
 import { useTheme } from '../../../../context/ThemeContext';
 import { ProtoDonutChart } from '../../../../charts/ProtoDonutChart';
-import { getBezier } from '../../../../ds/tokens';
-import { hapticFeedback } from '../../../../theme/motion';
+import { MOTION_CURVES, hapticFeedback } from '../../../../theme/motion';
 import { useScreenEnterKey } from '../../../../theme/screenFocusContext';
 import { tabularNumbers } from '../../../../theme/tokens';
 import { useReduceMotion } from '../../../../theme/useReduceMotion';
-import { formatBRL, maskBRL, withHexAlpha } from '../shared/financeHelpers';
+import { formatBRL, maskBRL, withHexAlpha } from '../../utils/financeHelpers';
 import { getFinanceChartPalette, resolveCategoryVisual } from '../shared/FinanceSemanticIcons';
 
 export { FinanceGroupedFlowChart } from '../dashboard/FinanceFlowChart';
@@ -108,7 +107,7 @@ export const AnimatedSvgBar: React.FC<{
       progress.value = 1;
       return;
     }
-    const [x1, y1, x2, y2] = getBezier('--ease-q');
+    const [x1, y1, x2, y2] = MOTION_CURVES.q;
     progress.value = 0;
     progress.value = withDelay(
       delayMs,

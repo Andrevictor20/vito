@@ -23,7 +23,7 @@ export function resolveKeyboardHeight(
 }
 
 /**
- * Calcula margem e padding inferiores do BottomSheetModal para que o teclado
+ * Calcula margem e padding inferiores do VitoSheet para que o teclado
  * nunca cubra inputs ou botões de ação no Android e no iOS.
  */
 export function computeSheetBottomMetrics(

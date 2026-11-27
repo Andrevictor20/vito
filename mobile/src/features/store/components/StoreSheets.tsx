@@ -10,8 +10,8 @@ import {
 } from 'react-native';
 import { ProtoUiIcon } from '../../../icons/ProtoUiIcons';
 import { useTheme } from '../../../context/ThemeContext';
-import { BottomSheetModal } from '../../../components/ui/BottomSheetModal';
-import { LEGAL_DOCS } from './StoreCatalogData';
+import { VitoSheet } from '../../../components/ui/VitoSheet';
+import { LEGAL_DOCS } from '../data/storeCatalogData';
 
 export type StoreActiveSheet =
   | null
@@ -52,7 +52,7 @@ export const StoreSheets: React.FC<StoreSheetsProps> = ({
   if (activeSheet === 'terms' || activeSheet === 'priv' || activeSheet === 'oss') {
     const doc = LEGAL_DOCS[activeSheet];
     return (
-      <BottomSheetModal visible title={doc.title} subtitle={doc.subtitle} onClose={onClose}>
+      <VitoSheet visible title={doc.title} subtitle={doc.subtitle} onClose={onClose}>
         <ScrollView contentContainerStyle={styles.body}>
           {doc.sections.map((s) => (
             <View key={s.heading} style={styles.docSec}>
@@ -64,13 +64,13 @@ export const StoreSheets: React.FC<StoreSheetsProps> = ({
             <Text style={[styles.secBtnText, { color: colors.ink }]}>Fechar</Text>
           </TouchableOpacity>
         </ScrollView>
-      </BottomSheetModal>
+      </VitoSheet>
     );
   }
 
   if (activeSheet === 'contact') {
     return (
-      <BottomSheetModal visible title="Falar com o suporte" subtitle="Descreva o que aconteceu" onClose={onClose}>
+      <VitoSheet visible title="Falar com o suporte" subtitle="Descreva o que aconteceu" onClose={onClose}>
         <View style={styles.body}>
           <TextInput
             style={[styles.textarea, { backgroundColor: colors.surf, borderColor: colors.line, color: colors.ink }]}
@@ -96,7 +96,7 @@ export const StoreSheets: React.FC<StoreSheetsProps> = ({
             <Text style={[styles.priBtnText, { color: colors.bg }]}>Enviar mensagem</Text>
           </TouchableOpacity>
         </View>
-      </BottomSheetModal>
+      </VitoSheet>
     );
   }
 
@@ -108,7 +108,7 @@ export const StoreSheets: React.FC<StoreSheetsProps> = ({
       'Outro motivo',
     ];
     return (
-      <BottomSheetModal visible title="Denunciar resposta" subtitle="Ajude a tornar o Vito mais seguro" onClose={onClose}>
+      <VitoSheet visible title="Denunciar resposta" subtitle="Ajude a tornar o Vito mais seguro" onClose={onClose}>
         <View style={styles.body}>
           <View style={[styles.lst, { backgroundColor: colors.surf, borderColor: colors.line }]}>
             {reasons.map((r, idx) => (
@@ -123,13 +123,13 @@ export const StoreSheets: React.FC<StoreSheetsProps> = ({
             ))}
           </View>
         </View>
-      </BottomSheetModal>
+      </VitoSheet>
     );
   }
 
   if (activeSheet === 'rate') {
     return (
-      <BottomSheetModal visible title="Gostando do Vito?" subtitle="Sua avaliação ajuda muito" onClose={onClose}>
+      <VitoSheet visible title="Gostando do Vito?" subtitle="Sua avaliação ajuda muito" onClose={onClose}>
         <View style={styles.body}>
           <View style={styles.starsRow}>
             {[1, 2, 3, 4, 5].map((n) => (
@@ -156,13 +156,13 @@ export const StoreSheets: React.FC<StoreSheetsProps> = ({
             </Text>
           </TouchableOpacity>
         </View>
-      </BottomSheetModal>
+      </VitoSheet>
     );
   }
 
   if (activeSheet === 'export') {
     return (
-      <BottomSheetModal visible title="Baixar meus dados" subtitle="Cópia completa em JSON" onClose={onClose}>
+      <VitoSheet visible title="Baixar meus dados" subtitle="Cópia completa em JSON" onClose={onClose}>
         <View style={[styles.body, { alignItems: 'center', paddingVertical: 20 }]}>
           {!exportDone ? (
             <>
@@ -175,19 +175,19 @@ export const StoreSheets: React.FC<StoreSheetsProps> = ({
             <>
               <ProtoUiIcon name="check-circle" size={40} color={colors.acc} />
               <Text style={[styles.docH, { color: colors.ink, textAlign: 'center' }]}>
-                Pronto! Cópia JSON gerada e enviada para seu e-mail.
+                Pronto! Cópia JSON gerada para salvar ou compartilhar.
               </Text>
             </>
           )}
         </View>
-      </BottomSheetModal>
+      </VitoSheet>
     );
   }
 
   if (activeSheet === 'delete') {
     const canDelete = delText.trim().toUpperCase() === 'EXCLUIR';
     return (
-      <BottomSheetModal
+      <VitoSheet
         visible
         title="Excluir conta?"
         subtitle="Esta ação é permanente após 30 dias"
@@ -226,7 +226,7 @@ export const StoreSheets: React.FC<StoreSheetsProps> = ({
             <Text style={[styles.secBtnText, { color: colors.ink }]}>Cancelar</Text>
           </TouchableOpacity>
         </View>
-      </BottomSheetModal>
+      </VitoSheet>
     );
   }
 

@@ -1,60 +1,34 @@
 package server
 
 import (
-	"github.com/andrevmp/vito/backend/internal/gmail"
-	"github.com/andrevmp/vito/backend/internal/calendar/p2p"
-	"github.com/andrevmp/vito/backend/internal/bots"
-	"github.com/andrevmp/vito/backend/internal/calendar"
-	"github.com/andrevmp/vito/backend/internal/finance"
-	"github.com/andrevmp/vito/backend/internal/tasks"
-	"github.com/andrevmp/vito/backend/internal/whatsapp"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
-
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 
+	"github.com/andrevmp/vito/backend/internal/bots"
+	"github.com/andrevmp/vito/backend/internal/calendar"
+	"github.com/andrevmp/vito/backend/internal/calendar/booking"
+	"github.com/andrevmp/vito/backend/internal/calendar/meeting"
+	"github.com/andrevmp/vito/backend/internal/calendar/p2p"
+	calsync "github.com/andrevmp/vito/backend/internal/calendar/sync"
+	"github.com/andrevmp/vito/backend/internal/finance"
+	"github.com/andrevmp/vito/backend/internal/gmail"
 	"github.com/andrevmp/vito/backend/internal/handler"
 	"github.com/andrevmp/vito/backend/internal/handler/middleware"
 	"github.com/andrevmp/vito/backend/internal/service"
+	"github.com/andrevmp/vito/backend/internal/tasks"
+	"github.com/andrevmp/vito/backend/internal/whatsapp"
+	waauth "github.com/andrevmp/vito/backend/internal/whatsapp/auth"
 )
 
 // Server encapsula o roteador Chi e dependências HTTP do Vito.
 type Server struct {
-	router                  *chi.Mux
-	allowedOrigins          []string
-	environment             string
-	authHandler             *handler.AuthHandler
-	googleAuthHandler       *handler.GoogleAuthHandler
-	calHandler              *calendar.CalendarHandler
-	todoHandler             *tasks.TodoHandler
-	astStreamHandler        *handler.AssistantStreamHandler
-	memoryHandler           *handler.MemoryHandler
-	notifHandler            *handler.NotificationHandler
-	notifInboxHandler       *handler.NotificationsInboxHandler
-	storeComplianceHandler  *handler.StoreComplianceHandler
-	syncHandler             *calendar.CalendarSyncHandler
-	botHandler              *bots.BotHandler
-	briefingHandler         *handler.BriefingHandler
-	aiSettingsHandler       *handler.AISettingsHandler
-	aiProviderHandler       *handler.AIProviderHandler
-	pendingHandler          *tasks.PendingHandler
-	bookingHandler          *calendar.BookingHandler
-	meetingHandler          *calendar.MeetingHandler
-	p2pHandler              *p2p.P2PMeetingHandler
-	chatHandler             *handler.ChatHandler
-	whatsappHandler         *whatsapp.WhatsAppHandler
-	gmailHandler            *gmail.GmailHandler
-	whatsappAuthHandler     *whatsapp.WhatsAppAuthHandler
-	voiceHandler            *handler.VoiceStreamHandler
-	voiceTTSHandler         *handler.VoiceTTSHandler
-	financeHandler          *finance.FinanceHandler
-	financeLimitHandler     *finance.FinanceLimitHandler
-	financeAnalyticsHandler *finance.FinanceAnalyticsHandler
-	authSvc                 *service.AuthService
+	router *chi.Mux
+	cfg    Config
 }
 
 // Config contém as dependências necessárias para inicializar o Server.
@@ -70,19 +44,19 @@ type Config struct {
 	NotifHandler            *handler.NotificationHandler
 	NotifInboxHandler       *handler.NotificationsInboxHandler
 	StoreComplianceHandler  *handler.StoreComplianceHandler
-	SyncHandler             *calendar.CalendarSyncHandler
+	SyncHandler             *calsync.CalendarSyncHandler
 	BotHandler              *bots.BotHandler
 	BriefingHandler         *handler.BriefingHandler
 	AISettingsHandler       *handler.AISettingsHandler
 	AIProviderHandler       *handler.AIProviderHandler
 	PendingHandler          *tasks.PendingHandler
-	BookingHandler          *calendar.BookingHandler
-	MeetingHandler          *calendar.MeetingHandler
+	BookingHandler          *booking.BookingHandler
+	MeetingHandler          *meeting.MeetingHandler
 	P2PHandler              *p2p.P2PMeetingHandler
 	ChatHandler             *handler.ChatHandler
 	WhatsAppHandler         *whatsapp.WhatsAppHandler
 	GmailHandler            *gmail.GmailHandler
-	WhatsAppAuthHandler     *whatsapp.WhatsAppAuthHandler
+	WhatsAppAuthHandler     *waauth.WhatsAppAuthHandler
 	VoiceHandler            *handler.VoiceStreamHandler
 	VoiceTTSHandler         *handler.VoiceTTSHandler
 	FinanceHandler          *finance.FinanceHandler
@@ -96,43 +70,10 @@ type Config struct {
 
 // New instancia o servidor com o roteador Chi, middlewares e rotas registrados.
 func New(cfg ...Config) *Server {
-	s := &Server{
-		router: chi.NewRouter(),
-	}
-
+	s := &Server{router: chi.NewRouter()}
 	if len(cfg) > 0 {
-		s.allowedOrigins = cfg[0].AllowedOrigins
-		s.environment = cfg[0].Environment
-		s.authHandler = cfg[0].AuthHandler
-		s.googleAuthHandler = cfg[0].GoogleAuthHandler
-		s.calHandler = cfg[0].CalHandler
-		s.todoHandler = cfg[0].TodoHandler
-		s.astStreamHandler = cfg[0].AstStreamHandler
-		s.memoryHandler = cfg[0].MemoryHandler
-		s.notifHandler = cfg[0].NotifHandler
-		s.notifInboxHandler = cfg[0].NotifInboxHandler
-		s.storeComplianceHandler = cfg[0].StoreComplianceHandler
-		s.syncHandler = cfg[0].SyncHandler
-		s.botHandler = cfg[0].BotHandler
-		s.briefingHandler = cfg[0].BriefingHandler
-		s.aiSettingsHandler = cfg[0].AISettingsHandler
-		s.aiProviderHandler = cfg[0].AIProviderHandler
-		s.pendingHandler = cfg[0].PendingHandler
-		s.bookingHandler = cfg[0].BookingHandler
-		s.meetingHandler = cfg[0].MeetingHandler
-		s.p2pHandler = cfg[0].P2PHandler
-		s.chatHandler = cfg[0].ChatHandler
-		s.whatsappHandler = cfg[0].WhatsAppHandler
-		s.gmailHandler = cfg[0].GmailHandler
-		s.whatsappAuthHandler = cfg[0].WhatsAppAuthHandler
-		s.voiceHandler = cfg[0].VoiceHandler
-		s.voiceTTSHandler = cfg[0].VoiceTTSHandler
-		s.financeHandler = cfg[0].FinanceHandler
-		s.financeLimitHandler = cfg[0].FinanceLimitHandler
-		s.financeAnalyticsHandler = cfg[0].FinanceAnalyticsHandler
-		s.authSvc = cfg[0].AuthSvc
+		s.cfg = cfg[0]
 	}
-
 	s.setupMiddlewares()
 	s.registerRoutes()
 	return s
@@ -151,12 +92,9 @@ func (s *Server) setupMiddlewares() {
 	s.router.Use(middleware.SecurityHeadersMiddleware)
 	s.router.Use(middleware.BodyLimitMiddleware)
 
-	// CORS restrito por ambiente (SEC-03): env explícito, PublicBaseURL em produção, * em dev.
-	// Em produção sem origens, o handler nem é instalado (o go-chi/cors trata
-	// lista vazia como allow-all): navegadores bloqueiam tudo (fail-closed) e
-	// o app nativo segue normal, pois não usa CORS.
-	origins := s.allowedOrigins
-	if len(origins) == 0 && !strings.EqualFold(s.environment, "production") {
+	// CORS restrito por ambiente (SEC-03): fail-closed em produção sem origens configuradas.
+	origins := s.cfg.AllowedOrigins
+	if len(origins) == 0 && !strings.EqualFold(s.cfg.Environment, "production") {
 		origins = []string{"*"}
 	}
 	if len(origins) == 0 {
@@ -173,6 +111,8 @@ func (s *Server) setupMiddlewares() {
 }
 
 func (s *Server) registerRoutes() {
+	c := s.cfg
+
 	s.router.Get("/", s.handleHomePage)
 	s.router.Get("/healthz", s.handleHealthCheck)
 	s.router.Get("/privacy", s.handlePrivacyPolicy)
@@ -181,307 +121,85 @@ func (s *Server) registerRoutes() {
 	s.router.Get("/.well-known/apple-app-site-association", s.handleAppleAppSiteAssociation)
 	s.router.Get("/apple-app-site-association", s.handleAppleAppSiteAssociation)
 
-	if s.voiceHandler != nil {
+	if c.VoiceHandler != nil {
 		s.router.Group(func(vr chi.Router) {
-			if s.authSvc != nil {
-				vr.Use(middleware.AuthMiddleware(s.authSvc))
+			if c.AuthSvc != nil {
+				vr.Use(middleware.AuthMiddleware(c.AuthSvc))
 			}
-			vr.Handle("/v1/voice/stream", s.voiceHandler.Handler())
-			vr.Handle("/api/v1/voice/stream", s.voiceHandler.Handler())
+			vr.Handle("/v1/voice/stream", c.VoiceHandler.Handler())
+			vr.Handle("/api/v1/voice/stream", c.VoiceHandler.Handler())
 		})
 	}
 
 	bookingLimiter := middleware.NewRateLimiter(60, 1*time.Minute)
-	if s.bookingHandler != nil {
+	if c.BookingHandler != nil {
 		s.router.Group(func(pub chi.Router) {
 			pub.Use(bookingLimiter)
-			pub.Get("/book/{username}/{slug}", s.bookingHandler.ServePublicPage)
-			pub.Get("/api/public/book/{username}/{slug}/slots", s.bookingHandler.GetPublicSlots)
-			pub.Post("/api/public/book/{username}/{slug}/reserve", s.bookingHandler.ReservePublicSlot)
+			c.BookingHandler.RegisterPublicRoutes(pub)
 		})
 	}
 
 	meetingLimiter := middleware.NewRateLimiter(60, 1*time.Minute)
-	if s.meetingHandler != nil {
+	if c.MeetingHandler != nil || c.P2PHandler != nil {
 		s.router.Group(func(pub chi.Router) {
 			pub.Use(meetingLimiter)
-			pub.Get("/meet/{id}", s.meetingHandler.ServePublicPage)
-			pub.Get("/api/public/meet/{id}", s.meetingHandler.GetPublicMeeting)
-			pub.Post("/api/public/meet/{id}/vote", s.meetingHandler.SubmitPublicVote)
-		})
-	}
-	if s.p2pHandler != nil {
-		s.router.Group(func(pub chi.Router) {
-			pub.Use(meetingLimiter)
-			pub.Get("/verify-phone/{token}", s.p2pHandler.VerifyPhonePublicPage)
+			c.MeetingHandler.RegisterPublicRoutes(pub)
+			c.P2PHandler.RegisterPublicRoutes(pub)
 		})
 	}
 
 	authLimiter := middleware.NewRateLimiter(10, 1*time.Minute)
 	aiLimiter := middleware.NewRateLimiter(30, 1*time.Minute)
-	// Rate limit global da API (SEC-05): 120 req/min por IP/usuário, além dos estritos.
 	apiLimiter := middleware.NewRateLimiter(120, 1*time.Minute)
 
 	s.router.Route("/api/v1", func(apiRouter chi.Router) {
-		// Webhooks internos da Evolution API ficam fora do rate limiter por IP (120/min)
-		// para que rajadas de reconexão pós-queda não recebam HTTP 429 em cascata.
-		if s.whatsappHandler != nil {
-			apiRouter.Post("/integrations/whatsapp/webhook", s.whatsappHandler.Webhook)
-			apiRouter.Post("/integrations/whatsapp/webhook/{event}", s.whatsappHandler.Webhook)
-		}
+		// Webhooks internos da Evolution API fora do rate limiter global (SEC-05).
+		c.WhatsAppHandler.RegisterWebhookRoutes(apiRouter)
 
 		apiRouter.Group(func(r chi.Router) {
 			r.Use(apiLimiter)
-			// Rotas públicas de autenticação com proteção anti-bruteforce
-			if s.authHandler != nil {
+
+			if c.AuthHandler != nil || c.WhatsAppAuthHandler != nil {
 				r.Group(func(ar chi.Router) {
 					ar.Use(authLimiter)
-					ar.Post("/auth/register", s.authHandler.Register)
-					ar.Post("/auth/login", s.authHandler.Login)
-					ar.Post("/auth/refresh", s.authHandler.Refresh)
-					if s.whatsappAuthHandler != nil {
-						ar.Post("/auth/whatsapp/request-otp", s.whatsappAuthHandler.RequestOTP)
-						ar.Post("/auth/whatsapp/verify-otp", s.whatsappAuthHandler.VerifyOTP)
-					}
+					c.AuthHandler.RegisterPublicRoutes(ar)
+					c.WhatsAppAuthHandler.RegisterPublicRoutes(ar)
 				})
 			}
-			if s.googleAuthHandler != nil {
-				r.Get("/auth/google/start", s.googleAuthHandler.Start)
-				r.Get("/auth/google/callback", s.googleAuthHandler.Callback)
-				r.Post("/auth/google/native", s.googleAuthHandler.NativeAuth)
-			}
+			c.GoogleAuthHandler.RegisterRoutes(r)
+			c.P2PHandler.RegisterContactsRoutes(r)
 
-			if s.p2pHandler != nil {
-				r.Get("/contacts/challenge", s.p2pHandler.GetChallenge)
-				r.Post("/contacts/match", s.p2pHandler.MatchContacts)
-			}
-
-			// Rotas protegidas por JWT
-			if s.authSvc != nil {
+			if c.AuthSvc != nil {
 				r.Group(func(protected chi.Router) {
-					protected.Use(middleware.AuthMiddleware(s.authSvc))
+					protected.Use(middleware.AuthMiddleware(c.AuthSvc))
 
-					if s.authHandler != nil {
-						protected.Get("/auth/me", s.authHandler.Me)
-						protected.Get("/auth/sessions", s.authHandler.ListSessions)
-						protected.Delete("/auth/sessions/{id}", s.authHandler.RevokeSession)
-						protected.Post("/auth/logout", s.authHandler.Logout)
-					}
-
-					if s.calHandler != nil {
-						protected.Route("/events", func(cr chi.Router) {
-							cr.Post("/", s.calHandler.CreateEvent)
-							cr.Get("/", s.calHandler.ListEvents)
-							cr.Patch("/{id}", s.calHandler.UpdateEvent)
-							cr.Delete("/{id}", s.calHandler.DeleteEvent)
-						})
-					}
-
-					if s.todoHandler != nil {
-						protected.Route("/todos", func(tr chi.Router) {
-							tr.Post("/", s.todoHandler.CreateTodo)
-							tr.Get("/", s.todoHandler.ListTodos)
-							tr.Patch("/{id}", s.todoHandler.UpdateTodo)
-							tr.Patch("/{id}/complete", s.todoHandler.CompleteTodo)
-							tr.Patch("/{id}/reopen", s.todoHandler.ReopenTodo)
-							tr.Delete("/{id}", s.todoHandler.DeleteTodo)
-							tr.Post("/{id}/subtasks", s.todoHandler.AddSubtask)
-							tr.Patch("/{id}/subtasks/{subtaskId}/toggle", s.todoHandler.ToggleSubtask)
-							tr.Delete("/{id}/subtasks/{subtaskId}", s.todoHandler.DeleteSubtask)
-						})
-					}
-
-					if s.astStreamHandler != nil {
+					c.AuthHandler.RegisterProtectedRoutes(protected)
+					c.CalHandler.RegisterRoutes(protected)
+					c.TodoHandler.RegisterRoutes(protected)
+					if c.AstStreamHandler != nil {
 						protected.Group(func(air chi.Router) {
 							air.Use(aiLimiter)
-							air.Post("/assistant/chat", s.astStreamHandler.Chat)
-							air.Post("/assistant/stream", s.astStreamHandler.Stream)
-							air.Post("/assistant/chat/stream", s.astStreamHandler.Stream)
-							air.Post("/assistant/confirm", s.astStreamHandler.Confirm)
-							air.Post("/assistant/audio", s.astStreamHandler.AudioChat)
-							air.Post("/assistant/vision", s.astStreamHandler.VisionChat)
+							c.AstStreamHandler.RegisterRoutes(air)
 						})
 					}
-
-					if s.memoryHandler != nil {
-						protected.Route("/memories", func(mr chi.Router) {
-							mr.Get("/", s.memoryHandler.ListMemories)
-							mr.Post("/facts", s.memoryHandler.CreateFact)
-							mr.Delete("/episodes/{id}", s.memoryHandler.DeleteEpisode)
-							mr.Delete("/themes/{slug}", s.memoryHandler.DeleteThematicSummary)
-							mr.Delete("/facts/{id}", s.memoryHandler.DeleteFact)
-						})
-					}
-
-					if s.voiceTTSHandler != nil {
-						protected.Post("/voice/tts", s.voiceTTSHandler.HandleTTS)
-					}
-
-					if s.syncHandler != nil {
-						protected.Route("/integrations/calendars", func(ir chi.Router) {
-							ir.Get("/", s.syncHandler.ListIntegrations)
-							ir.Post("/connect", s.syncHandler.ConnectIntegration)
-							ir.Post("/{provider}/sync", s.syncHandler.SyncIntegration)
-							ir.Delete("/{provider}", s.syncHandler.DisconnectIntegration)
-							ir.Post("/google/webhook", s.syncHandler.GoogleWebhook)
-						})
-					}
-
-					if s.whatsappHandler != nil {
-						protected.Route("/integrations/whatsapp", func(wr chi.Router) {
-							wr.Get("/status", s.whatsappHandler.GetStatus)
-							wr.Post("/pairing-code", s.whatsappHandler.RequestPairingCode)
-							wr.Delete("/disconnect", s.whatsappHandler.Disconnect)
-							wr.Get("/contacts", s.whatsappHandler.GetContacts)
-							wr.Get("/context-settings", s.whatsappHandler.GetContextSettings)
-							wr.Put("/context-settings", s.whatsappHandler.UpdateContextSettings)
-							wr.Get("/context-preview", s.whatsappHandler.GetContextPreview)
-							wr.Get("/context-directory", s.whatsappHandler.GetContextDirectory)
-							wr.Get("/media-status", s.whatsappHandler.GetMediaStatus)
-							wr.Get("/contacts-cache", s.whatsappHandler.GetContactsCache)
-							wr.Put("/contact-profile", s.whatsappHandler.UpdateContactProfile)
-							wr.Post("/contact-names", s.whatsappHandler.ImportContactNames)
-							wr.Post("/media-process", s.whatsappHandler.ProcessMedia)
-							wr.Delete("/context-messages", s.whatsappHandler.PurgeContextMessages)
-						})
-					}
-
-					if s.gmailHandler != nil {
-						protected.Route("/integrations/gmail", func(gr chi.Router) {
-							gr.Get("/status", s.gmailHandler.GetStatus)
-							gr.Post("/scan", s.gmailHandler.ScanEmails)
-							gr.Delete("/disconnect", s.gmailHandler.Disconnect)
-							gr.Post("/draft", s.gmailHandler.CreateDraft)
-							gr.Post("/send", s.gmailHandler.SendEmail)
-						})
-					}
-
-					if s.briefingHandler != nil {
-						protected.Route("/users/briefing", func(br chi.Router) {
-							br.Get("/", s.briefingHandler.GetSettings)
-							br.Put("/", s.briefingHandler.UpdateSettings)
-						})
-					}
-
-					if s.aiSettingsHandler != nil {
-						protected.Route("/users/ai-settings", func(air chi.Router) {
-							air.Get("/", s.aiSettingsHandler.GetSettings)
-							air.Put("/", s.aiSettingsHandler.UpdateSettings)
-						})
-					}
-
-					if s.pendingHandler != nil {
-						protected.Route("/pending", func(pr chi.Router) {
-							pr.Get("/", s.pendingHandler.ListPending)
-							pr.Post("/", s.pendingHandler.CreatePending)
-							pr.Get("/{id}", s.pendingHandler.GetPending)
-							pr.Patch("/{id}", s.pendingHandler.UpdatePending)
-							pr.Post("/{id}/schedule", s.pendingHandler.SchedulePending)
-							pr.Post("/{id}/complete", s.pendingHandler.CompletePending)
-							pr.Delete("/{id}", s.pendingHandler.DeletePending)
-						})
-					}
-
-					if s.bookingHandler != nil {
-						protected.Route("/booking", func(br chi.Router) {
-							br.Get("/types", s.bookingHandler.ListTypes)
-							br.Post("/types", s.bookingHandler.CreateType)
-							br.Put("/types/{id}", s.bookingHandler.UpdateType)
-							br.Delete("/types/{id}", s.bookingHandler.DeleteType)
-							br.Get("/appointments", s.bookingHandler.ListAppointments)
-							br.Delete("/appointments/{id}", s.bookingHandler.DeleteAppointment)
-						})
-					}
-
-					if s.meetingHandler != nil {
-						protected.Route("/meetings", func(mr chi.Router) {
-							mr.Get("/", s.meetingHandler.ListMeetings)
-							mr.Post("/", s.meetingHandler.CreateMeeting)
-							mr.Get("/{id}", s.meetingHandler.GetMeeting)
-							mr.Put("/{id}", s.meetingHandler.UpdateMeeting)
-							mr.Patch("/{id}", s.meetingHandler.UpdateMeeting)
-							mr.Delete("/{id}", s.meetingHandler.DeleteMeeting)
-							mr.Post("/{id}/confirm", s.meetingHandler.ConfirmConsensus)
-							mr.Get("/{id}/share", s.meetingHandler.GetWhatsAppShare)
-						})
-					}
-
-					if s.whatsappAuthHandler != nil {
-						protected.Post("/auth/whatsapp/link", s.whatsappAuthHandler.LinkPhone)
-					}
-
-					if s.p2pHandler != nil {
-						protected.Post("/users/phone", s.p2pHandler.UpdatePhone)
-						protected.Post("/users/phone/request-verification", s.p2pHandler.RequestPhoneVerification)
-						protected.Post("/users/phone/verify", s.p2pHandler.VerifyPhoneCode)
-						protected.Route("/meetings/p2p", func(p2pr chi.Router) {
-							p2pr.Get("/mutual-slots", s.p2pHandler.GetMutualSlots)
-							p2pr.Post("/invite", s.p2pHandler.SendInvite)
-							p2pr.Get("/invites/pending", s.p2pHandler.ListPendingInvites)
-							p2pr.Get("/invites", s.p2pHandler.ListUserInvites)
-							p2pr.Post("/invites/{id}/accept", s.p2pHandler.AcceptInvite)
-							p2pr.Post("/invites/{id}/decline", s.p2pHandler.DeclineInvite)
-							p2pr.Post("/invites/{id}/cancel", s.p2pHandler.CancelInvite)
-						})
-					}
-
-					if s.chatHandler != nil {
-						protected.Route("/chat", func(cr chi.Router) {
-							cr.Get("/sessions", s.chatHandler.ListSessions)
-							cr.Get("/sessions/{id}", s.chatHandler.GetSessionMessages)
-							cr.Post("/sync", s.chatHandler.SyncSession)
-							cr.Delete("/sessions/{id}", s.chatHandler.DeleteSession)
-						})
-					}
-
-					if s.financeHandler != nil || s.financeLimitHandler != nil || s.financeAnalyticsHandler != nil {
-						protected.Route("/finance", func(fr chi.Router) {
-							if s.financeHandler != nil {
-								fr.Get("/summary", s.financeHandler.GetSummary)
-								fr.Get("/accounts", s.financeHandler.ListAccounts)
-								if s.financeAnalyticsHandler == nil {
-									fr.Get("/transactions", s.financeHandler.ListTransactions)
-								}
-								fr.Get("/connections", s.financeHandler.ListConnections)
-								fr.Post("/connections", s.financeHandler.CreateConnection)
-								fr.Patch("/connections/{id}/status", s.financeHandler.UpdateConnectionStatus)
-								fr.Delete("/connections/{id}", s.financeHandler.DeleteConnection)
-								fr.Post("/sync", s.financeHandler.SyncPayload)
-								fr.Put("/byok-backup", s.financeHandler.PutByokBackup)
-								fr.Get("/byok-backup", s.financeHandler.GetByokBackup)
-								fr.Delete("/byok-backup", s.financeHandler.DeleteByokBackup)
-							}
-							if s.financeLimitHandler != nil {
-								fr.Get("/limits", s.financeLimitHandler.ListLimits)
-								fr.Post("/limits", s.financeLimitHandler.UpsertLimit)
-								fr.Get("/limits/suggestions", s.financeLimitHandler.GetLimitSuggestions)
-								fr.Put("/limits/{id}", s.financeLimitHandler.UpsertLimit)
-								fr.Delete("/limits/{id}", s.financeLimitHandler.DeleteLimit)
-								fr.Get("/limits/{id}/history", s.financeLimitHandler.GetLimitHistory)
-								fr.Post("/limits/{id}/mute", s.financeLimitHandler.MuteLimit)
-								// Aliases retrocompatíveis /finance/budgets
-								fr.Get("/budgets", s.financeLimitHandler.ListLimits)
-								fr.Post("/budgets", s.financeLimitHandler.UpsertLimit)
-								fr.Put("/budgets/{id}", s.financeLimitHandler.UpsertLimit)
-								fr.Delete("/budgets/{id}", s.financeLimitHandler.DeleteLimit)
-							}
-							if s.financeAnalyticsHandler != nil {
-								fr.Get("/transactions", s.financeAnalyticsHandler.SearchTransactions)
-								fr.Patch("/transactions/{id}", s.financeAnalyticsHandler.RecategorizeTransaction)
-								fr.Get("/analytics/spending", s.financeAnalyticsHandler.GetSpendingAnalytics)
-								fr.Get("/analytics/cashflow", s.financeAnalyticsHandler.GetCashFlowAnalytics)
-								fr.Get("/cards", s.financeAnalyticsHandler.GetCardsOverview)
-								fr.Get("/cards/{id}/bills", s.financeAnalyticsHandler.GetCardBills)
-								fr.Get("/installments", s.financeAnalyticsHandler.GetInstallmentsOverview)
-								fr.Get("/installments/projection", s.financeAnalyticsHandler.GetInstallmentsOverview)
-								fr.Get("/calendar", s.financeAnalyticsHandler.GetFinanceCalendar)
-							}
-						})
-					}
-
-					s.registerBotRoutes(protected)
-					s.registerAIRoutes(protected)
-					s.registerV5Routes(protected)
+					c.MemoryHandler.RegisterRoutes(protected)
+					c.VoiceTTSHandler.RegisterRoutes(protected)
+					c.SyncHandler.RegisterRoutes(protected)
+					c.WhatsAppHandler.RegisterRoutes(protected)
+					c.GmailHandler.RegisterRoutes(protected)
+					c.BriefingHandler.RegisterRoutes(protected)
+					c.AISettingsHandler.RegisterRoutes(protected)
+					c.PendingHandler.RegisterRoutes(protected)
+					c.BookingHandler.RegisterRoutes(protected)
+					c.MeetingHandler.RegisterRoutes(protected)
+					c.WhatsAppAuthHandler.RegisterProtectedRoutes(protected)
+					c.P2PHandler.RegisterRoutes(protected)
+					c.ChatHandler.RegisterRoutes(protected)
+					finance.RegisterRoutes(protected, c.FinanceHandler, c.FinanceLimitHandler, c.FinanceAnalyticsHandler)
+					c.BotHandler.RegisterRoutes(protected)
+					c.AIProviderHandler.RegisterRoutes(protected)
+					handler.RegisterNotificationRoutes(protected, c.NotifHandler, c.NotifInboxHandler)
+					c.StoreComplianceHandler.RegisterRoutes(protected)
 				})
 			}
 		})

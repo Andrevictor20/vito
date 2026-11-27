@@ -10,7 +10,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { useTheme } from '../../../context/ThemeContext';
-import { getBezier } from '../../../ds/tokens';
+import { MOTION_CURVES } from '../../../theme/motion';
 import { ProtoUiIcon } from '../../../icons/ProtoUiIcons';
 import { PressableScale, useReduceMotion } from '../../../theme/vitoMotion';
 import { BotTemplate, SkillPackage } from '../types/bots';
@@ -85,7 +85,7 @@ export const BotsCatalogTab: React.FC<BotsCatalogTabProps> = ({
       fadeAnim.value = 1;
       return;
     }
-    const [x1, y1, x2, y2] = getBezier('--ease-q');
+    const [x1, y1, x2, y2] = MOTION_CURVES.q;
     cancelAnimation(fadeAnim);
     fadeAnim.value = 0;
     fadeAnim.value = withTiming(1, {

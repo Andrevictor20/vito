@@ -80,6 +80,84 @@ export const MascotVectorRig: React.FC<MascotVectorRigProps> = ({
     onPartPress?.(part);
   };
 
+  const hasPartTap = Boolean(interactiveParts || onPartPress);
+
+  if (Platform.OS !== 'web') {
+    const u = size / 500;
+    return (
+      <View
+        style={[{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }, style]}
+        testID={`mascot-rig-${resolvedState}`}
+      >
+        <MascotSkiaCanvas
+          size={size}
+          resolvedState={resolvedState}
+          colors={c}
+          isCompact={isCompact}
+          isNotification={isNotification}
+          anim={anim}
+        />
+        {hasPartTap ? (
+          <>
+            <Pressable
+              accessibilityLabel="Cartola do mascote"
+              onPress={() => handlePart('hat')}
+              style={{ position: 'absolute', left: 265 * u, top: 20 * u, width: 145 * u, height: 115 * u }}
+            />
+            <Pressable
+              accessibilityLabel="Olhos do mascote"
+              onPress={() => handlePart('eyes')}
+              style={{ position: 'absolute', left: 175 * u, top: 165 * u, width: 150 * u, height: 95 * u }}
+            />
+            <Pressable
+              accessibilityLabel="Gravata do mascote"
+              onPress={() => handlePart('bowtie')}
+              style={{ position: 'absolute', left: 200 * u, top: 285 * u, width: 100 * u, height: 64 * u }}
+            />
+          </>
+        ) : null}
+      </View>
+    );
+  }
+
+  return (
+    <MascotSvgWebRig
+      anim={anim}
+      colors={c}
+      hasPartTap={hasPartTap}
+      isCompact={isCompact}
+      isNotification={isNotification}
+      onPartPress={handlePart}
+      resolvedState={resolvedState}
+      size={size}
+      style={style}
+    />
+  );
+};
+
+interface MascotSvgWebRigProps {
+  anim: ReturnType<typeof useMascotAnimation>;
+  colors: ReturnType<typeof resolveSkin>;
+  hasPartTap: boolean;
+  isCompact: boolean;
+  isNotification: boolean;
+  onPartPress: (part: MascotPart) => void;
+  resolvedState: ReturnType<typeof normalizeMascotState>;
+  size: number;
+  style?: StyleProp<ViewStyle>;
+}
+
+const MascotSvgWebRig: React.FC<MascotSvgWebRigProps> = ({
+  anim,
+  colors: c,
+  hasPartTap,
+  isCompact,
+  isNotification,
+  onPartPress: handlePart,
+  resolvedState,
+  size,
+  style,
+}) => {
   const wholeProps = useAnimatedProps<Partial<GProps>>(() => ({
     x: anim.wholeX.value,
     y: anim.wholeY.value,
@@ -161,46 +239,6 @@ export const MascotVectorRig: React.FC<MascotVectorRigProps> = ({
     y: anim.fxZ3Y.value,
     opacity: anim.fxZ3Opacity.value,
   }));
-
-  const hasPartTap = Boolean(interactiveParts || onPartPress);
-
-  if (Platform.OS !== 'web') {
-    const u = size / 500;
-    return (
-      <View
-        style={[{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }, style]}
-        testID={`mascot-rig-${resolvedState}`}
-      >
-        <MascotSkiaCanvas
-          size={size}
-          resolvedState={resolvedState}
-          colors={c}
-          isCompact={isCompact}
-          isNotification={isNotification}
-          anim={anim}
-        />
-        {hasPartTap ? (
-          <>
-            <Pressable
-              accessibilityLabel="Cartola do mascote"
-              onPress={() => handlePart('hat')}
-              style={{ position: 'absolute', left: 265 * u, top: 20 * u, width: 145 * u, height: 115 * u }}
-            />
-            <Pressable
-              accessibilityLabel="Olhos do mascote"
-              onPress={() => handlePart('eyes')}
-              style={{ position: 'absolute', left: 175 * u, top: 165 * u, width: 150 * u, height: 95 * u }}
-            />
-            <Pressable
-              accessibilityLabel="Gravata do mascote"
-              onPress={() => handlePart('bowtie')}
-              style={{ position: 'absolute', left: 200 * u, top: 285 * u, width: 100 * u, height: 64 * u }}
-            />
-          </>
-        ) : null}
-      </View>
-    );
-  }
 
   const showHappyEyes = resolvedState === 'happy';
   const showSleepingEyes = resolvedState === 'sleeping';

@@ -2,6 +2,7 @@ package tasks
 
 import (
 	"encoding/json"
+	"github.com/andrevmp/vito/backend/internal/platform/httpx"
 	"net/http"
 	"time"
 
@@ -49,13 +50,13 @@ type schedulePendingRequest struct {
 func (h *PendingHandler) CreatePending(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		http.Error(w, `{"error":"não autorizado"}`, http.StatusUnauthorized)
+		httpx.WriteJSONError(w, http.StatusUnauthorized, "não autorizado")
 		return
 	}
 
 	var req createPendingRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, `{"error":"payload inválido"}`, http.StatusBadRequest)
+		httpx.WriteJSONError(w, http.StatusBadRequest, "payload inválido")
 		return
 	}
 
@@ -69,7 +70,7 @@ func (h *PendingHandler) CreatePending(w http.ResponseWriter, r *http.Request) {
 		RemindAdvance: req.RemindAdvance,
 	})
 	if err != nil {
-		http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusBadRequest)
+		httpx.WriteJSONError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -81,7 +82,7 @@ func (h *PendingHandler) CreatePending(w http.ResponseWriter, r *http.Request) {
 func (h *PendingHandler) ListPending(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		http.Error(w, `{"error":"não autorizado"}`, http.StatusUnauthorized)
+		httpx.WriteJSONError(w, http.StatusUnauthorized, "não autorizado")
 		return
 	}
 
@@ -96,7 +97,7 @@ func (h *PendingHandler) ListPending(w http.ResponseWriter, r *http.Request) {
 
 	items, err := h.svc.ListByUser(userID, statusPtr, category)
 	if err != nil {
-		http.Error(w, `{"error":"falha ao listar pendências"}`, http.StatusInternalServerError)
+		httpx.WriteJSONError(w, http.StatusInternalServerError, "falha ao listar pendências")
 		return
 	}
 
@@ -111,7 +112,7 @@ func (h *PendingHandler) ListPending(w http.ResponseWriter, r *http.Request) {
 func (h *PendingHandler) GetPending(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		http.Error(w, `{"error":"não autorizado"}`, http.StatusUnauthorized)
+		httpx.WriteJSONError(w, http.StatusUnauthorized, "não autorizado")
 		return
 	}
 
@@ -123,10 +124,10 @@ func (h *PendingHandler) GetPending(w http.ResponseWriter, r *http.Request) {
 	item, err := h.svc.GetByID(id, userID)
 	if err != nil {
 		if err == domain.ErrPendingItemNotFound {
-			respondError(w, domain.ErrPendingItemNotFound)
+			httpx.RespondError(w, domain.ErrPendingItemNotFound)
 			return
 		}
-		http.Error(w, `{"error":"falha ao buscar pendência"}`, http.StatusInternalServerError)
+		httpx.WriteJSONError(w, http.StatusInternalServerError, "falha ao buscar pendência")
 		return
 	}
 
@@ -137,7 +138,7 @@ func (h *PendingHandler) GetPending(w http.ResponseWriter, r *http.Request) {
 func (h *PendingHandler) UpdatePending(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		http.Error(w, `{"error":"não autorizado"}`, http.StatusUnauthorized)
+		httpx.WriteJSONError(w, http.StatusUnauthorized, "não autorizado")
 		return
 	}
 
@@ -148,7 +149,7 @@ func (h *PendingHandler) UpdatePending(w http.ResponseWriter, r *http.Request) {
 
 	var req updatePendingRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, `{"error":"payload inválido"}`, http.StatusBadRequest)
+		httpx.WriteJSONError(w, http.StatusBadRequest, "payload inválido")
 		return
 	}
 
@@ -164,10 +165,10 @@ func (h *PendingHandler) UpdatePending(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		if err == domain.ErrPendingItemNotFound {
-			respondError(w, domain.ErrPendingItemNotFound)
+			httpx.RespondError(w, domain.ErrPendingItemNotFound)
 			return
 		}
-		http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusBadRequest)
+		httpx.WriteJSONError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -178,7 +179,7 @@ func (h *PendingHandler) UpdatePending(w http.ResponseWriter, r *http.Request) {
 func (h *PendingHandler) SchedulePending(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		http.Error(w, `{"error":"não autorizado"}`, http.StatusUnauthorized)
+		httpx.WriteJSONError(w, http.StatusUnauthorized, "não autorizado")
 		return
 	}
 
@@ -189,17 +190,17 @@ func (h *PendingHandler) SchedulePending(w http.ResponseWriter, r *http.Request)
 
 	var req schedulePendingRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.ScheduledDate == "" {
-		http.Error(w, `{"error":"data de agendamento obrigatória (YYYY-MM-DD)"}`, http.StatusBadRequest)
+		httpx.WriteJSONError(w, http.StatusBadRequest, "data de agendamento obrigatória (YYYY-MM-DD)")
 		return
 	}
 
 	item, err := h.svc.SchedulePending(id, userID, req.ScheduledDate)
 	if err != nil {
 		if err == domain.ErrPendingItemNotFound {
-			respondError(w, domain.ErrPendingItemNotFound)
+			httpx.RespondError(w, domain.ErrPendingItemNotFound)
 			return
 		}
-		http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusBadRequest)
+		httpx.WriteJSONError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -210,7 +211,7 @@ func (h *PendingHandler) SchedulePending(w http.ResponseWriter, r *http.Request)
 func (h *PendingHandler) CompletePending(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		http.Error(w, `{"error":"não autorizado"}`, http.StatusUnauthorized)
+		httpx.WriteJSONError(w, http.StatusUnauthorized, "não autorizado")
 		return
 	}
 
@@ -222,10 +223,10 @@ func (h *PendingHandler) CompletePending(w http.ResponseWriter, r *http.Request)
 	item, err := h.svc.CompletePending(id, userID)
 	if err != nil {
 		if err == domain.ErrPendingItemNotFound {
-			respondError(w, domain.ErrPendingItemNotFound)
+			httpx.RespondError(w, domain.ErrPendingItemNotFound)
 			return
 		}
-		http.Error(w, `{"error":"falha ao concluir pendência"}`, http.StatusInternalServerError)
+		httpx.WriteJSONError(w, http.StatusInternalServerError, "falha ao concluir pendência")
 		return
 	}
 
@@ -236,7 +237,7 @@ func (h *PendingHandler) CompletePending(w http.ResponseWriter, r *http.Request)
 func (h *PendingHandler) DeletePending(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		http.Error(w, `{"error":"não autorizado"}`, http.StatusUnauthorized)
+		httpx.WriteJSONError(w, http.StatusUnauthorized, "não autorizado")
 		return
 	}
 
@@ -247,12 +248,28 @@ func (h *PendingHandler) DeletePending(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.svc.DeletePending(id, userID); err != nil {
 		if err == domain.ErrPendingItemNotFound {
-			respondError(w, domain.ErrPendingItemNotFound)
+			httpx.RespondError(w, domain.ErrPendingItemNotFound)
 			return
 		}
-		http.Error(w, `{"error":"falha ao excluir pendência"}`, http.StatusInternalServerError)
+		httpx.WriteJSONError(w, http.StatusInternalServerError, "falha ao excluir pendência")
 		return
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// RegisterRoutes registra os endpoints da Incubadora de Pendências no roteador protegido.
+func (h *PendingHandler) RegisterRoutes(r chi.Router) {
+	if h == nil {
+		return
+	}
+	r.Route("/pending", func(pr chi.Router) {
+		pr.Get("/", h.ListPending)
+		pr.Post("/", h.CreatePending)
+		pr.Get("/{id}", h.GetPending)
+		pr.Patch("/{id}", h.UpdatePending)
+		pr.Post("/{id}/schedule", h.SchedulePending)
+		pr.Post("/{id}/complete", h.CompletePending)
+		pr.Delete("/{id}", h.DeletePending)
+	})
 }

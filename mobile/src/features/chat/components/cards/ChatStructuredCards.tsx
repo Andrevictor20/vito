@@ -11,8 +11,7 @@ import { WhatsAppMessageInlineCard } from './WhatsAppMessageInlineCard';
 import { GmailMessageInlineCard } from './GmailMessageInlineCard';
 import { DestructiveConfirmationCard } from './DestructiveConfirmationCard';
 import { ActionConfirmationCard } from './ActionConfirmationCard';
-import { FinanceSummaryCard } from './FinanceSummaryCard';
-import { SpendingLimitAlertCard } from './SpendingLimitAlertCard';
+import { FinanceSummaryCard, SpendingLimitAlertCard } from './FinanceInlineCards';
 import { SmoothCardEntrance } from './SmoothCardEntrance';
 
 export interface ChatStructuredCardsProps {
@@ -93,6 +92,11 @@ export const ChatStructuredCards: React.FC<ChatStructuredCardsProps> = ({
         <SmoothCardEntrance>
           <WhatsAppMessageInlineCard
             messageData={message.whatsapp_message}
+            pendingConfirmationId={pendingConfId || undefined}
+            confirmationStatus={message.confirmationStatus}
+            onResolveConfirmation={
+              onResolveConfirmation ? (id, reject) => onResolveConfirmation(message.id, id, reject) : undefined
+            }
             disabled={disabled}
           />
         </SmoothCardEntrance>
@@ -101,6 +105,11 @@ export const ChatStructuredCards: React.FC<ChatStructuredCardsProps> = ({
         <SmoothCardEntrance>
           <GmailMessageInlineCard
             messageData={message.gmail_message}
+            pendingConfirmationId={pendingConfId || undefined}
+            confirmationStatus={message.confirmationStatus}
+            onResolveConfirmation={
+              onResolveConfirmation ? (id, reject) => onResolveConfirmation(message.id, id, reject) : undefined
+            }
             disabled={disabled}
           />
         </SmoothCardEntrance>

@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import { ProtoUiIcon } from '../../../../icons/ProtoUiIcons';
-import { BottomSheetModal } from '../../../../components/ui/BottomSheetModal';
+import { VitoSheet } from '../../../../components/ui/VitoSheet';
 import { useTheme } from '../../../../context/ThemeContext';
 import { tokens } from '../../../../theme/tokens';
 import { api } from '../../../../services/api';
@@ -136,7 +136,7 @@ export const AiProviderSheet: React.FC<AiProviderSheetProps> = ({
         : entry.company;
 
   return (
-    <BottomSheetModal visible={visible} onClose={onClose} title={entry.name} subtitle={subtitle}>
+    <VitoSheet visible={visible} onClose={onClose} title={entry.name} subtitle={subtitle}>
       <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <View style={styles.heroRow}>
           <AiProviderLogo providerKey={provider.provider_key} size={46} />
@@ -331,7 +331,7 @@ export const AiProviderSheet: React.FC<AiProviderSheetProps> = ({
           </>
         )}
       </ScrollView>
-    </BottomSheetModal>
+    </VitoSheet>
   );
 };
 

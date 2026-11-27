@@ -10,9 +10,8 @@ import (
 
 	"github.com/google/uuid"
 	"google.golang.org/adk/v2/agent"
-	"google.golang.org/adk/v2/plugin"
 	"google.golang.org/adk/v2/runner"
-	"google.golang.org/adk/v2/session"
+	"google.golang.org/adk/v2/session/compaction"
 	"google.golang.org/genai"
 
 	"github.com/andrevmp/vito/backend/internal/ai"
@@ -38,9 +37,13 @@ type ActivityNotifier interface {
 	NotifyActivity(threadID, userID string)
 }
 
+// PrivacySettingsProvider abstrai a verificação de consentimento de processamento com IA.
+type PrivacySettingsProvider interface {
+	GetPrivacySettings(ctx context.Context, userID string) (*domain.PrivacySettings, error)
+}
+
 // FacadeConfig agrupa as dependências para inicializar o ADKLoopFacade.
 type FacadeConfig struct {
-	Router              *ai.ModelRouter
 	ServerPool          []ServerPoolEntry
 	Registry            *toolsets.ToolsetsRegistry
 	ScopeGuard          domain.ScopeGuard
@@ -49,6 +52,7 @@ type FacadeConfig struct {
 	TraceRecorder       ai.TraceRecorder
 	UserRepo            domain.UserRepository
 	AISettingsRepo      domain.AISettingsRepository
+	PrivacyChecker      PrivacySettingsProvider
 	ContextEnricher     ContextEnricherProvider
 	ConsolidationWorker ActivityNotifier
 	MemoryService       *aimemory.SQLiteMemoryService
@@ -76,23 +80,22 @@ type ADKLoopFacade struct {
 
 // NewADKLoopFacade instancia o motor Google ADK Go v2 completo.
 func NewADKLoopFacade(cfg FacadeConfig) (*ADKLoopFacade, error) {
-	routedLLM := NewRoutedLLM(cfg.Router)
-	if len(cfg.ServerPool) > 0 {
-		routedLLM.SetServerPool(cfg.ServerPool)
-	}
+	routedLLM := NewRoutedLLM(cfg.ServerPool...)
 	routedLLM.ConfigureBYOK(cfg.ModelResolver, cfg.AIProviderRepo, cfg.UserRegistry, cfg.TraceRecorder)
 	sessionSvc := NewSQLiteSessionService(cfg.ConvRepo)
 	bridge := NewToolsetBridge(cfg.Registry)
 	guardrail := NewGuardrailPlugin(bridge, cfg.ScopeGuard, cfg.ConfirmationGate, cfg.TraceRecorder)
 
-	topology, err := BuildAgentTopology(routedLLM, bridge)
+	topology, err := BuildAgentTopologyWithOptions(routedLLM, bridge, TopologyOptions{
+		EnableLoadMemory: cfg.MemoryService != nil,
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	adkPlugin, err := guardrail.BuildADKPlugin()
+	plugins, err := buildStandardADKPlugins(guardrail)
 	if err != nil {
-		return nil, fmt.Errorf("falha ao construir GuardrailPlugin do ADK: %w", err)
+		return nil, fmt.Errorf("falha ao construir plugins do ADK: %w", err)
 	}
 
 	runnerCfg := runner.Config{
@@ -101,7 +104,11 @@ func NewADKLoopFacade(cfg FacadeConfig) (*ADKLoopFacade, error) {
 		SessionService:    sessionSvc,
 		AutoCreateSession: true,
 		PluginConfig: runner.PluginConfig{
-			Plugins: []*plugin.Plugin{adkPlugin},
+			Plugins: plugins,
+		},
+		Compaction: &compaction.Config{
+			CompactionInterval: 10,
+			OverlapSize:        1,
 		},
 	}
 	if cfg.MemoryService != nil {
@@ -149,19 +156,9 @@ func (f *ADKLoopFacade) SetContextEnricher(enricher ContextEnricherProvider) {
 	f.contextEnricher = enricher
 }
 
-// SetConsolidationWorker conecta o worker de consolidação de memória pós-turno.
-func (f *ADKLoopFacade) SetConsolidationWorker(worker ActivityNotifier) {
-	f.consolidationWorker = worker
-}
-
 // SessionService retorna o SQLiteSessionService subjacente.
 func (f *ADKLoopFacade) SessionService() *SQLiteSessionService {
 	return f.sessionService
-}
-
-// Topology retorna a topologia de agentes ADK construída.
-func (f *ADKLoopFacade) Topology() *AgentTopology {
-	return f.topology
 }
 
 // Run executa um turno síncrono sobre o adk/v2/runner.Runner.
@@ -183,19 +180,14 @@ func (f *ADKLoopFacade) RunStream(ctx context.Context, req domain.UnifiedAssista
 		userID = "anonymous"
 	}
 
-	// 1. Resolução ou criação da thread
-	threadID := strings.TrimSpace(req.ThreadID)
-	if threadID == "" && f.cfg.ConvRepo != nil {
-		thread, err := f.cfg.ConvRepo.GetOrCreateThread(ctx, userID, req.Channel, "")
-		if err == nil && thread != nil {
-			threadID = thread.ID
+	if f.cfg.PrivacyChecker != nil && userID != "anonymous" {
+		if ps, err := f.cfg.PrivacyChecker.GetPrivacySettings(ctx, userID); err == nil && ps != nil && !ps.AIProcessingEnabled {
+			return nil, fmt.Errorf("processamento de IA desativado nas configurações de Privacidade")
 		}
-	} else if threadID != "" && f.cfg.ConvRepo != nil {
-		_, _ = f.cfg.ConvRepo.GetOrCreateThread(ctx, userID, req.Channel, threadID)
 	}
-	if threadID == "" {
-		threadID = uuid.New().String()
-	}
+
+	// 1. Resolução ou criação da thread
+	threadID := f.resolveOrCreateThread(ctx, userID, req.ThreadID, req.Channel)
 
 	// 2. Interceptação determinística de confirmação/cancelamento pendente no ConfirmationGate
 	if confResp, handled, confErr := f.tryHandlePendingConfirmation(ctx, req, userID, threadID, turnID, startTime, onDelta); handled {
@@ -203,53 +195,16 @@ func (f *ADKLoopFacade) RunStream(ctx context.Context, req domain.UnifiedAssista
 	}
 
 	// 3. Resolução de persona (Prefixo Estático Cacheável) + Contexto Volátil do Turno
-	userName, personaStyle, autonomyLevel := f.resolveUserPersonaAndAutonomy(req, userID)
+	userName, personaStyle, autonomyLevel, autonomyMode, autoFocusBlocks := f.resolveUserPersonaAndAutonomy(req, userID)
 	staticPrompt := ai.BuildStaticPersonaSystemPrompt(personaStyle, userName, req.Channel)
-	volatileParts := []string{ai.BuildVolatileTurnContextHeader(startTime)}
-	if f.contextEnricher != nil && userID != "" {
-		if lvl1 := f.contextEnricher.BuildLevel1Context(ctx, userID, req.Message, startTime); lvl1 != "" {
-			volatileParts = append(volatileParts, lvl1)
-		}
-	}
-	if strings.TrimSpace(req.QuotedContext) != "" {
-		volatileParts = append(volatileParts, "### CONTEXTO CITADO / TELA\n"+strings.TrimSpace(req.QuotedContext))
-	}
-	if req.Channel == "whatsapp" && !req.WhatsAppPrivateScope {
-		volatileParts = append(volatileParts, "### ESCOPO DE PRIVACIDADE WHATSAPP\nConversa visível para terceiros: NUNCA revele dados privados de outros chats, pendências pessoais ou informações confidenciais do dono.")
-	}
-	volatileContext := strings.Join(volatileParts, "\n\n")
+	volatileContext := f.buildVolatileTurnContext(ctx, req, userID, startTime, autonomyMode, autoFocusBlocks)
 
-	// 4. Sincronização de histórico enviado pelo cliente caso a sessão seja recém-criada
-	if len(req.History) > 0 {
-		_, _ = f.sessionService.Get(ctx, &session.GetRequest{
-			AppName:   adkAppName,
-			UserID:    userID,
-			SessionID: threadID,
-		})
-		startIdx := 0
-		if len(req.History) > 8 {
-			startIdx = len(req.History) - 8
-		}
-		var seed []struct{ Role, Content string }
-		for _, h := range req.History[startIdx:] {
-			seed = append(seed, struct{ Role, Content string }{Role: h.Role, Content: h.Content})
-		}
-		f.sessionService.SeedClientHistory(adkAppName, userID, threadID, seed)
-	}
+	// 4. Sincronização de histórico enviado pelo cliente (ou reset explícito ao editar/reenviar)
+	f.seedClientHistoryIfPresent(ctx, userID, threadID, req.History, req.ResetHistory)
 
 	// 5. Preparação do contexto e collector do turno para os callbacks do ADK
 	collector := &TurnCollector{}
-	initialEffort := ""
-	if f.cfg.ModelResolver != nil {
-		if resolved, resErr := f.cfg.ModelResolver.Resolve(ctx, service.ModelResolveRequest{
-			UserID:   userID,
-			ThreadID: threadID,
-			BotID:    req.BotID,
-			Channel:  req.Channel,
-		}); resErr == nil && resolved != nil {
-			initialEffort = resolved.Effort
-		}
-	}
+	initialEffort := f.resolveInitialEffort(ctx, userID, threadID, req.BotID, req.Channel)
 	meta := &TurnExecutionMeta{
 		UserID:    userID,
 		ThreadID:  threadID,
@@ -408,6 +363,22 @@ func (f *ADKLoopFacade) RunStream(ctx context.Context, req domain.UnifiedAssista
 	}
 	collectedEntities.ApplyToResponse(out)
 	return out, nil
+}
+
+// ToolsetBridge expõe o bridge compilado do facade para reuso sem duplicação no wiring.
+func (f *ADKLoopFacade) ToolsetBridge() *ToolsetBridge {
+	if f == nil {
+		return nil
+	}
+	return f.bridge
+}
+
+// GuardrailPlugin expõe o plugin de guardrails compartilhado pelo facade.
+func (f *ADKLoopFacade) GuardrailPlugin() *GuardrailPlugin {
+	if f == nil {
+		return nil
+	}
+	return f.guardrail
 }
 
 func buildUserGenaiContent(req domain.UnifiedAssistantRequest) *genai.Content {

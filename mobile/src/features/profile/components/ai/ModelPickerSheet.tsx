@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { ProtoUiIcon } from '../../../../icons/ProtoUiIcons';
-import { BottomSheetModal } from '../../../../components/ui/BottomSheetModal';
+import { VitoSheet } from '../../../../components/ui/VitoSheet';
 import { useTheme } from '../../../../context/ThemeContext';
 import { tokens } from '../../../../theme/tokens';
 import {
@@ -83,7 +83,7 @@ export const ModelPickerSheet: React.FC<ModelPickerSheetProps> = ({
   };
 
   return (
-    <BottomSheetModal visible={visible} onClose={onClose} title="Modelo" subtitle={scopeLabel}>
+    <VitoSheet visible={visible} onClose={onClose} title="Modelo" subtitle={scopeLabel}>
       {totalModels > 5 && (
         <View style={[styles.searchBox, { backgroundColor: colors.surf, borderColor: colors.line }]}>
           <ProtoUiIcon name="search" size={16} color={colors.muted} />
@@ -314,7 +314,7 @@ export const ModelPickerSheet: React.FC<ModelPickerSheetProps> = ({
           <Text style={[styles.footerBtnText, { color: colors.ink }]}>Gerenciar provedores</Text>
         </TouchableOpacity>
       </ScrollView>
-    </BottomSheetModal>
+    </VitoSheet>
   );
 };
 

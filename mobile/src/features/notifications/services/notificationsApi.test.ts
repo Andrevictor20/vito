@@ -25,37 +25,34 @@ describe('NotificationsApi Unit Tests', () => {
     assert.equal(calls[1].opt?.body, JSON.stringify({ token: 'ExponentPushToken[abc]' }));
   });
 
-  test('getNotificationStatus consulta endpoint /api/v1/notifications/status', async () => {
+  test('listNotifications, performAction e markAllRead normalizam inbox corretamente', async () => {
     const calls: { ep: string; opt?: any }[] = [];
     const client = {
       request: async (ep: string, opt?: any) => {
         calls.push({ ep, opt });
-        return { registered: true, device_count: 1 };
+        if (ep === '/api/v1/notifications') {
+          return {
+            notifications: [
+              { id: 'n1', group_key: 'Agora', type: 'aprovar', source_domain: 'bots', title: 'T', body: 'B', is_unread: true, actions: [{ id: 'approve', label: 'Aprovar', style: 'primary' }] },
+            ],
+          };
+        }
+        return { status: 'ok' };
       },
     } as unknown as ApiClient;
     const api = new NotificationsApi(client);
 
-    const status = await api.getNotificationStatus();
-    assert.equal(calls[0].ep, '/api/v1/notifications/status');
-    assert.equal(calls[0].opt?.method, 'GET');
-    assert.equal(status.registered, true);
-    assert.equal(status.device_count, 1);
-  });
+    const list = await api.listNotifications();
+    assert.equal(list.length, 1);
+    assert.equal(list[0].actions[0].action, 'approve');
+    assert.equal(list[0].actions[0].primary, true);
 
-  test('testPushNotification dispara requisição com prioridade e títulos opcionais', async () => {
-    const calls: { ep: string; opt?: any }[] = [];
-    const client = {
-      request: async (ep: string, opt?: any) => {
-        calls.push({ ep, opt });
-        return { status: 'sent', dispatched: 1 };
-      },
-    } as unknown as ApiClient;
-    const api = new NotificationsApi(client);
+    await api.performAction('n1', 'approve');
+    assert.equal(calls[1].ep, '/api/v1/notifications/n1/action');
+    assert.equal(calls[1].opt?.method, 'POST');
 
-    const res = await api.testPushNotification('default', 'Teste', 'Corpo');
-    assert.equal(calls[0].ep, '/api/v1/notifications/test');
-    assert.equal(calls[0].opt?.method, 'POST');
-    assert.equal(calls[0].opt?.body, JSON.stringify({ priority: 'default', title: 'Teste', body: 'Corpo' }));
-    assert.equal(res.dispatched, 1);
+    await api.markAllRead();
+    assert.equal(calls[2].ep, '/api/v1/notifications/read-all');
+    assert.equal(calls[2].opt?.method, 'POST');
   });
 });

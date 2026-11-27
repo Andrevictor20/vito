@@ -1,9 +1,9 @@
 import { ApiClient } from '../../../services/api/client';
 import {
-  BookingType,
-  CreateBookingTypeInput,
-  DeleteBookingImpact,
   BookingAppointment,
+  BookingType,
+  DeleteBookingImpact,
+  MeetingWithDetails,
 } from '../../../types';
 
 export class BookingApi {
@@ -12,13 +12,6 @@ export class BookingApi {
   async getBookingTypes(): Promise<BookingType[]> {
     const res = await this.client.request<BookingType[]>('/api/v1/booking/types');
     return Array.isArray(res) ? res : [];
-  }
-
-  async createBookingType(data: CreateBookingTypeInput): Promise<BookingType> {
-    return this.client.request<BookingType>('/api/v1/booking/types', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
   }
 
   async updateBookingType(id: string, data: Partial<BookingType>): Promise<BookingType> {
@@ -44,6 +37,29 @@ export class BookingApi {
   async deleteBookingAppointment(id: string): Promise<void> {
     await this.client.request<void>(`/api/v1/booking/appointments/${id}`, {
       method: 'DELETE',
+    });
+  }
+}
+
+export class MeetingsApi {
+  constructor(private client: ApiClient) {}
+
+  async getMeetings(status?: string): Promise<MeetingWithDetails[]> {
+    const query = status ? `?status=${encodeURIComponent(status)}` : '';
+    const res = await this.client.request<MeetingWithDetails[]>(`/api/v1/meetings${query}`);
+    return Array.isArray(res) ? res : [];
+  }
+
+  async deleteMeeting(id: string): Promise<void> {
+    await this.client.request<void>(`/api/v1/meetings/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async confirmConsensus(id: string, slotId: string): Promise<{ status: string }> {
+    return this.client.request<{ status: string }>(`/api/v1/meetings/${id}/confirm`, {
+      method: 'POST',
+      body: JSON.stringify({ slot_id: slotId }),
     });
   }
 }

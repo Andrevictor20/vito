@@ -16,8 +16,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/andrevmp/vito/backend/internal/platform/crypto"
 	"github.com/andrevmp/vito/backend/internal/domain"
+	"github.com/andrevmp/vito/backend/internal/platform/crypto"
 )
 
 // CalendarSyncConnector abstrai a conexão e sincronização com o serviço de calendários.

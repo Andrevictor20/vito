@@ -18,8 +18,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
-import { getBezier } from '../../ds/tokens';
-import { SECTION_TRANSITION_SPECS } from '../../ds/transitionSpecs';
+import { MOTION_CURVES, SCREEN_TRANSITIONS } from '../../theme/motion';
 import { ScreenFocusProvider } from '../../theme/screenFocusContext';
 import { useReduceMotion } from '../../theme/useReduceMotion';
 
@@ -64,7 +63,7 @@ export const AdaptivePager = forwardRef<AdaptivePagerRef, AdaptivePagerProps>(
     const leavingRef = useRef<number | null>(null);
     const animatedRef = useRef(false);
 
-    const tabSpec = SECTION_TRANSITION_SPECS.tab;
+    const tabSpec = SCREEN_TRANSITIONS.tab;
 
     const animateTo = useCallback(
       (nextIndex: number, animated: boolean) => {
@@ -95,8 +94,8 @@ export const AdaptivePager = forwardRef<AdaptivePagerRef, AdaptivePagerProps>(
         return;
       }
 
-      const [qx1, qy1, qx2, qy2] = getBezier('--ease-q');
-      const [sx1, sy1, sx2, sy2] = getBezier('--ease-std');
+      const [qx1, qy1, qx2, qy2] = MOTION_CURVES.q;
+      const [sx1, sy1, sx2, sy2] = MOTION_CURVES.std;
 
       enter.value = 0;
       leave.value = 1;
@@ -147,7 +146,7 @@ export const AdaptivePager = forwardRef<AdaptivePagerRef, AdaptivePagerProps>(
       }
     }, [count, initialPage]);
 
-    const leaveToY = tabSpec.leave.toY;
+    const leaveToY = tabSpec.leaveOffset.y;
 
     const enterStyle = useAnimatedStyle(() => {
       const p = enter.value;

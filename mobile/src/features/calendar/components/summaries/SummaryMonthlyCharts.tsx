@@ -21,12 +21,11 @@ import Svg, {
   Text as SvgText,
 } from 'react-native-svg';
 import { useTheme } from '../../../../context/ThemeContext';
-import { getBezier } from '../../../../ds/tokens';
-import { useScreenFocus } from '../../../../ds/screenFocusContext';
-import { hapticFeedback } from '../../../../theme/motion';
+import { MOTION_CURVES, hapticFeedback } from '../../../../theme/motion';
+import { useScreenFocus } from '../../../../theme/screenFocusContext';
 import { tabularNumbers } from '../../../../theme/tokens';
 import { CountUpText, useReduceMotion } from '../../../../theme/vitoMotion';
-import { withHexAlpha } from '../../../finance/components/shared/financeHelpers';
+import { withHexAlpha } from '../../../finance/utils/financeHelpers';
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
@@ -106,7 +105,7 @@ export const SummaryTrendLineChart: React.FC<{
       progress.value = 0;
       return;
     }
-    const [x1, y1, x2, y2] = getBezier('--ease-q');
+    const [x1, y1, x2, y2] = MOTION_CURVES.q;
     progress.value = 0;
     progress.value = withDelay(
       120,
@@ -294,7 +293,7 @@ export const SummaryBalanceDonut: React.FC<{
       progress.value = 0;
       return;
     }
-    const [x1, y1, x2, y2] = getBezier('--ease-q');
+    const [x1, y1, x2, y2] = MOTION_CURVES.q;
     progress.value = 0;
     progress.value = withDelay(
       140,

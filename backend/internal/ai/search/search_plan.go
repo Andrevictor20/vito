@@ -1,8 +1,6 @@
 package search
 
 import (
-	"context"
-	"encoding/json"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -139,51 +137,6 @@ func BuildTriggerSearchPlan(title, query string, category domain.TriggerCategory
 	}
 	config.MaxAgeHours = 24
 	return config
-}
-
-// BuildTriggerSearchPlanWithAI utiliza o modelo de linguagem para refinar o plano de busca se disponível.
-func BuildTriggerSearchPlanWithAI(ctx context.Context, generator interface {
-	GenerateText(ctx context.Context, systemPrompt, userPrompt string) (string, error)
-}, userPrompt string, defaultCat domain.TriggerCategory) (domain.TriggerSearchConfig, error) {
-	if generator == nil {
-		return BuildTriggerSearchPlan("Radar", userPrompt, defaultCat), nil
-	}
-
-	sysPrompt := `Você é o planejador de buscas e coletores do assistente Vito.
-Analise a solicitação de radar do usuário e devolva um plano JSON com o formato:
-{
-  "category": "finance|shopping|career|public_exams|travel|news",
-  "queries": ["query 1 com operadores", "query 2"],
-  "must_include_terms": ["termo1"],
-  "exclude_terms": ["termo_indesejado"],
-  "ticker": "PETR4 (se finanças)",
-  "target_value": 35.0 (numérico ou null),
-  "comparison_op": "lte|gte (se numérico)",
-  "origin_iata": "GRU (se voo)",
-  "destination_iata": "SSA (se voo)",
-  "flight_number": "LA3340 (se voo específico)",
-  "max_age_hours": 24
-}
-Responda EXCLUSIVAMENTE em JSON válido, sem comentários.`
-
-	respText, err := generator.GenerateText(ctx, sysPrompt, userPrompt)
-	if err != nil {
-		return BuildTriggerSearchPlan("Radar", userPrompt, defaultCat), nil
-	}
-
-	var plan domain.TriggerSearchConfig
-	clean := strings.TrimSpace(respText)
-	if start := strings.Index(clean, "{"); start != -1 {
-		if end := strings.LastIndex(clean, "}"); end != -1 && end > start {
-			clean = clean[start : end+1]
-		}
-	}
-
-	if err := json.Unmarshal([]byte(clean), &plan); err != nil || len(plan.Queries) == 0 {
-		return BuildTriggerSearchPlan("Radar", userPrompt, defaultCat), nil
-	}
-
-	return plan, nil
 }
 
 func extractTargetNumber(text string) *float64 {

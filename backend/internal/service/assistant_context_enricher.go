@@ -3,13 +3,12 @@ package service
 import (
 	"context"
 	"fmt"
+	"github.com/andrevmp/vito/backend/internal/domain"
+	"github.com/andrevmp/vito/backend/internal/platform/timeutil"
+	"github.com/andrevmp/vito/backend/internal/repository"
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/andrevmp/vito/backend/internal/ai"
-	"github.com/andrevmp/vito/backend/internal/domain"
-	"github.com/andrevmp/vito/backend/internal/repository"
 )
 
 // FormatScheduleLine formata um compromisso da agenda em uma linha legível para o contexto Nível 1.
@@ -17,7 +16,7 @@ func FormatScheduleLine(ev domain.Event, loc *time.Location) string {
 	evStart, evEnd := ev.StartAt.In(loc), ev.EndAt.In(loc)
 	line := fmt.Sprintf("%s (%s, das %s às %s): %s",
 		evStart.Format("02/01/2006"),
-		ai.WeekdayPT(evStart.Weekday()),
+		timeutil.WeekdayPT(evStart.Weekday()),
 		evStart.Format("15:04"),
 		evEnd.Format("15:04"),
 		ev.Title,
@@ -103,6 +102,122 @@ func (e *AssistantContextEnricher) SetFinanceSnapshotProvider(provider FinanceSn
 	e.financeProvider = provider
 }
 
+func runEnrichTask(wg *sync.WaitGroup, ctx context.Context, fn func()) {
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			fn()
+		}
+	}()
+}
+
+func appendContextSection(sb *strings.Builder, header string, lines []string) {
+	if len(lines) == 0 {
+		return
+	}
+	sb.WriteString("\n" + header + "\n")
+	for _, line := range lines {
+		sb.WriteString(fmt.Sprintf("  - %s\n", line))
+	}
+}
+
+func (e *AssistantContextEnricher) collectCoreProfile(userID string) []string {
+	items, err := e.coreProfileRepo.GetAll(userID)
+	if err != nil || len(items) == 0 {
+		return nil
+	}
+	var out []string
+	for _, it := range items {
+		k, v := strings.TrimSpace(it.Key), strings.TrimSpace(it.Value)
+		if k != "" && v != "" {
+			out = append(out, fmt.Sprintf("%s: %s", k, v))
+		}
+	}
+	return out
+}
+
+func (e *AssistantContextEnricher) collectMemories(userID, userMessage string) []string {
+	mems, err := e.memoryRepo.SearchRelevant(userID, userMessage, 6)
+	if err != nil || len(mems) == 0 {
+		return nil
+	}
+	var out []string
+	for _, m := range mems {
+		if strings.TrimSpace(m.Content) == "" {
+			continue
+		}
+		cat := m.Category
+		if cat == "" {
+			cat = "fato"
+		}
+		out = append(out, fmt.Sprintf("[%s] %s", cat, m.Content))
+	}
+	return out
+}
+
+func (e *AssistantContextEnricher) collectThemes(ctx context.Context, userID string) []string {
+	themes, err := e.hierarchyRepo.ListThematicSummaries(ctx, userID)
+	if err != nil || len(themes) == 0 {
+		return nil
+	}
+	limit := min(len(themes), 3)
+	var out []string
+	for _, th := range themes[:limit] {
+		if strings.TrimSpace(th.ConsolidatedSummary) != "" {
+			out = append(out, fmt.Sprintf("[%s] %s", th.ThemeTitle, th.ConsolidatedSummary))
+		}
+	}
+	return out
+}
+
+func (e *AssistantContextEnricher) collectUpcomingEvents(userID string, now time.Time, loc *time.Location) []string {
+	start := now.In(loc)
+	events, err := e.calSvc.ListEvents(userID, start, start.Add(7*24*time.Hour))
+	if err != nil || len(events) == 0 {
+		return nil
+	}
+	limit := min(len(events), 5)
+	out := make([]string, 0, limit)
+	for _, ev := range events[:limit] {
+		out = append(out, FormatScheduleLine(ev, loc))
+	}
+	return out
+}
+
+func (e *AssistantContextEnricher) collectPendingTodos(userID string) []string {
+	todos, err := e.todoSvc.ListTodos(userID, domain.TodoStatusPending)
+	if err != nil || len(todos) == 0 {
+		return nil
+	}
+	limit := min(len(todos), 5)
+	out := make([]string, 0, limit)
+	for _, td := range todos[:limit] {
+		prio := strings.ToUpper(string(td.Priority))
+		if prio == "" {
+			prio = "MÉDIA"
+		}
+		out = append(out, fmt.Sprintf("[%s] %s", prio, td.Title))
+	}
+	return out
+}
+
+func (e *AssistantContextEnricher) collectActiveTriggers(userID string) []string {
+	trs, err := e.triggerSvc.ListTriggers(userID, "", domain.TriggerStatusActive)
+	if err != nil || len(trs) == 0 {
+		return nil
+	}
+	limit := min(len(trs), 4)
+	out := make([]string, 0, limit)
+	for _, tr := range trs[:limit] {
+		out = append(out, fmt.Sprintf("[%s] %s", tr.Category, tr.Title))
+	}
+	return out
+}
+
 // BuildLevel1Context constrói o bloco de contexto essencial em paralelo com timeout estrito de 400ms.
 func (e *AssistantContextEnricher) BuildLevel1Context(ctx context.Context, userID, userMessage string, now time.Time) string {
 	if strings.TrimSpace(userID) == "" {
@@ -116,192 +231,39 @@ func (e *AssistantContextEnricher) BuildLevel1Context(ctx context.Context, userI
 	enrichCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	loc, err := time.LoadLocation("America/Sao_Paulo")
-	if err != nil {
-		loc = time.FixedZone("BRT", -3*3600)
-	}
-
+	loc := timeutil.SaoPauloLocation()
 	var (
-		coreProfileLines []string
-		memoryLines      []string
-		themeLines       []string
-		entityLines      []string
-		financeLine      string
-		scheduleLines    []string
-		todoLines        []string
-		triggerLines     []string
-		wg               sync.WaitGroup
+		coreProfileLines, memoryLines, themeLines, entityLines []string
+		scheduleLines, todoLines, triggerLines                 []string
+		financeLine                                            string
+		wg                                                     sync.WaitGroup
 	)
 
-	// 1. Core Profile
 	if e.coreProfileRepo != nil {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			select {
-			case <-enrichCtx.Done():
-				return
-			default:
-				if items, err := e.coreProfileRepo.GetAll(userID); err == nil && len(items) > 0 {
-					for _, it := range items {
-						k := strings.TrimSpace(it.Key)
-						v := strings.TrimSpace(it.Value)
-						if k != "" && v != "" {
-							coreProfileLines = append(coreProfileLines, fmt.Sprintf("%s: %s", k, v))
-						}
-					}
-				}
-			}
-		}()
+		runEnrichTask(&wg, enrichCtx, func() { coreProfileLines = e.collectCoreProfile(userID) })
 	}
-
-	// 2. Memórias de Longo Prazo Relevantes (Busca Híbrida FTS5 + Embeddings)
 	if e.memoryRepo != nil && strings.TrimSpace(userMessage) != "" {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			select {
-			case <-enrichCtx.Done():
-				return
-			default:
-				if mems, err := e.memoryRepo.SearchRelevant(userID, userMessage, 6); err == nil && len(mems) > 0 {
-					for _, m := range mems {
-						if strings.TrimSpace(m.Content) != "" {
-							cat := m.Category
-							if cat == "" {
-								cat = "fato"
-							}
-							memoryLines = append(memoryLines, fmt.Sprintf("[%s] %s", cat, m.Content))
-						}
-					}
-				}
-			}
-		}()
+		runEnrichTask(&wg, enrichCtx, func() { memoryLines = e.collectMemories(userID, userMessage) })
 	}
-
-	// 2.5 Resumos Temáticos e Episódios Relevantes (#s-memory)
 	if e.hierarchyRepo != nil {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			select {
-			case <-enrichCtx.Done():
-				return
-			default:
-				if themes, err := e.hierarchyRepo.ListThematicSummaries(enrichCtx, userID); err == nil && len(themes) > 0 {
-					limit := 3
-					if len(themes) < limit {
-						limit = len(themes)
-					}
-					for _, th := range themes[:limit] {
-						if strings.TrimSpace(th.ConsolidatedSummary) != "" {
-							themeLines = append(themeLines, fmt.Sprintf("[%s] %s", th.ThemeTitle, th.ConsolidatedSummary))
-						}
-					}
-				}
-			}
-		}()
+		runEnrichTask(&wg, enrichCtx, func() { themeLines = e.collectThemes(enrichCtx, userID) })
 	}
-
-	// 2.6 Entidades Vinculadas (entity_links cross-canal na 036)
 	if e.entityLinkRepo != nil && strings.TrimSpace(userMessage) != "" {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			select {
-			case <-enrichCtx.Done():
-				return
-			default:
-				entityLines = e.resolveEntityLinksInMessage(enrichCtx, userID, userMessage)
-			}
-		}()
+		runEnrichTask(&wg, enrichCtx, func() { entityLines = e.resolveEntityLinksInMessage(enrichCtx, userID, userMessage) })
 	}
-
-	// 2.8 Snapshot Financeiro Enxuto (Safe-to-Spend) apenas quando relevante à intenção
 	if e.financeProvider != nil && isFinanceRelevantQuery(userMessage) {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			select {
-			case <-enrichCtx.Done():
-				return
-			default:
-				financeLine = strings.TrimSpace(e.financeProvider.GetCompactFinanceContext(enrichCtx, userID))
-			}
-		}()
+		runEnrichTask(&wg, enrichCtx, func() {
+			financeLine = strings.TrimSpace(e.financeProvider.GetCompactFinanceContext(enrichCtx, userID))
+		})
 	}
-
-	// 3. Agenda dos Próximos Dias (Próximos 5 compromissos)
 	if e.calSvc != nil {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			select {
-			case <-enrichCtx.Done():
-				return
-			default:
-				start := now.In(loc)
-				end := start.Add(7 * 24 * time.Hour)
-				if events, err := e.calSvc.ListEvents(userID, start, end); err == nil && len(events) > 0 {
-					limit := 5
-					if len(events) < limit {
-						limit = len(events)
-					}
-					for _, ev := range events[:limit] {
-						line := FormatScheduleLine(ev, loc)
-						scheduleLines = append(scheduleLines, line)
-					}
-				}
-			}
-		}()
+		runEnrichTask(&wg, enrichCtx, func() { scheduleLines = e.collectUpcomingEvents(userID, now, loc) })
 	}
-
-	// 4. Tarefas Prioritárias Pendentes (Top 5)
 	if e.todoSvc != nil {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			select {
-			case <-enrichCtx.Done():
-				return
-			default:
-				if todos, err := e.todoSvc.ListTodos(userID, domain.TodoStatusPending); err == nil && len(todos) > 0 {
-					limit := 5
-					if len(todos) < limit {
-						limit = len(todos)
-					}
-					for _, t := range todos[:limit] {
-						prio := strings.ToUpper(string(t.Priority))
-						if prio == "" {
-							prio = "MÉDIA"
-						}
-						todoLines = append(todoLines, fmt.Sprintf("[%s] %s", prio, t.Title))
-					}
-				}
-			}
-		}()
+		runEnrichTask(&wg, enrichCtx, func() { todoLines = e.collectPendingTodos(userID) })
 	}
-
-	// 5. Vigílias e Radares Ativos
 	if e.triggerSvc != nil {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			select {
-			case <-enrichCtx.Done():
-				return
-			default:
-				if trs, err := e.triggerSvc.ListTriggers(userID, "", domain.TriggerStatusActive); err == nil && len(trs) > 0 {
-					limit := 4
-					if len(trs) < limit {
-						limit = len(trs)
-					}
-					for _, tr := range trs[:limit] {
-						triggerLines = append(triggerLines, fmt.Sprintf("[%s] %s", tr.Category, tr.Title))
-					}
-				}
-			}
-		}()
+		runEnrichTask(&wg, enrichCtx, func() { triggerLines = e.collectActiveTriggers(userID) })
 	}
 
 	wg.Wait()
@@ -313,61 +275,16 @@ func (e *AssistantContextEnricher) BuildLevel1Context(ctx context.Context, userI
 	var sb strings.Builder
 	sb.WriteString("### CONTEXTO PESSOAL E OPERACIONAL DO USUÁRIO (NÍVEL 1)\n")
 	sb.WriteString("Você já conhece os seguintes dados reais sobre o usuário e sua rotina atual:\n")
-
-	if len(coreProfileLines) > 0 {
-		sb.WriteString("\n* Perfil Permanente do Usuário:\n")
-		for _, line := range coreProfileLines {
-			sb.WriteString(fmt.Sprintf("  - %s\n", line))
-		}
-	}
-
-	if len(memoryLines) > 0 {
-		sb.WriteString("\n* Memórias Pessoais e Fatos Relevantes:\n")
-		for _, line := range memoryLines {
-			sb.WriteString(fmt.Sprintf("  - %s\n", line))
-		}
-	}
-
-	if len(themeLines) > 0 {
-		sb.WriteString("\n* Resumos Temáticos Consolidados:\n")
-		for _, line := range themeLines {
-			sb.WriteString(fmt.Sprintf("  - %s\n", line))
-		}
-	}
-
-	if len(entityLines) > 0 {
-		sb.WriteString("\n* Entidades Vinculadas (Cross-Canal):\n")
-		for _, line := range entityLines {
-			sb.WriteString(fmt.Sprintf("  - %s\n", line))
-		}
-	}
-
+	appendContextSection(&sb, "* Perfil Permanente do Usuário:", coreProfileLines)
+	appendContextSection(&sb, "* Memórias Pessoais e Fatos Relevantes:", memoryLines)
+	appendContextSection(&sb, "* Resumos Temáticos Consolidados:", themeLines)
+	appendContextSection(&sb, "* Entidades Vinculadas (Cross-Canal):", entityLines)
 	if financeLine != "" {
-		sb.WriteString("\n* Snapshot Financeiro (Safe-to-Spend):\n")
-		sb.WriteString(fmt.Sprintf("  - %s\n", financeLine))
+		appendContextSection(&sb, "* Snapshot Financeiro (Safe-to-Spend):", []string{financeLine})
 	}
-
-	if len(scheduleLines) > 0 {
-		sb.WriteString("\n* Próximos Compromissos na Agenda:\n")
-		for _, line := range scheduleLines {
-			sb.WriteString(fmt.Sprintf("  - %s\n", line))
-		}
-	}
-
-	if len(todoLines) > 0 {
-		sb.WriteString("\n* Tarefas Pendentes Prioritárias:\n")
-		for _, line := range todoLines {
-			sb.WriteString(fmt.Sprintf("  - %s\n", line))
-		}
-	}
-
-	if len(triggerLines) > 0 {
-		sb.WriteString("\n* Vigílias e Radares Ativos:\n")
-		for _, line := range triggerLines {
-			sb.WriteString(fmt.Sprintf("  - %s\n", line))
-		}
-	}
-
+	appendContextSection(&sb, "* Próximos Compromissos na Agenda:", scheduleLines)
+	appendContextSection(&sb, "* Tarefas Pendentes Prioritárias:", todoLines)
+	appendContextSection(&sb, "* Vigílias e Radares Ativos:", triggerLines)
 	sb.WriteString("\nDIRETRIZ DE USO DESTE CONTEXTO: Utilize estes dados diretamente para responder perguntas pessoais, sobre sua rotina, compromissos ou tarefas com calor humano e precisão, SEM precisar chamar ferramentas para o que já consta acima.\n")
 
 	return sb.String()

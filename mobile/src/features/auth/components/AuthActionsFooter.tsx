@@ -9,8 +9,8 @@ import {
   type TextStyle,
   type ViewStyle,
 } from 'react-native'
-import { GoogleIcon } from '../../../components/common/GoogleIcon'
-import { MailIcon, WhatsAppGlyph } from '../demo/DemoIcons'
+import { GoogleIcon } from '../../../icons/GoogleBrandLogos'
+import { MailIcon, WhatsAppGlyph } from '../../../icons/AppGlyphs'
 import { useTheme } from '../../../context/ThemeContext'
 import { loginPalette } from '../utils/loginPalette'
 import type { LegalDocKind } from './LegalDocModal'

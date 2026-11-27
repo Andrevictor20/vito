@@ -39,6 +39,11 @@ func NewSpendingLimitEvaluator(
 	}
 }
 
+// SetAttentionBudget injeta o controlador de orçamento de atenção após o boot.
+func (e *SpendingLimitEvaluator) SetAttentionBudget(att *service.AttentionBudgetService) {
+	e.attention = att
+}
+
 // SetNotifiers configura os canais opcionais de entrega Push e WhatsApp (self).
 func (e *SpendingLimitEvaluator) SetNotifiers(push FinancePushNotifier, waSelf FinanceWhatsAppSelfNotifier) {
 	e.push = push

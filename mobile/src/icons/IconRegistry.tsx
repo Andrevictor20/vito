@@ -48,37 +48,3 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
   const viewBoxOverride = group === 'app' ? APP_VIEWBOX_OVERRIDES[id] : undefined
   return <SvgTree tree={tree} size={size} color={color} viewBoxOverride={viewBoxOverride} />
 }
-
-export interface ProtoIconProps {
-  /** Índice 1-based em `icons.json#inlineIcons`, ou `'vito' | 'spark' | 'spk'`. */
-  name: number | 'vito' | 'spark' | 'spk'
-  size?: number
-  width?: number
-  height?: number
-  color?: string
-}
-
-/** Renderiza ícones inline da interface exatamente como no protótipo (sem bibliotecas genéricas). */
-export const ProtoIcon: React.FC<ProtoIconProps> = ({
-  name,
-  size = 22,
-  width,
-  height,
-  color = '#0a0a0a',
-}) => {
-  let tree: SvgNode | undefined
-  if (name === 'vito') {
-    tree = iconsData.symbols?.vito?.tree as SvgNode | undefined
-  } else if (name === 'spark') {
-    tree = iconsData.SPARK as SvgNode | undefined
-  } else if (name === 'spk') {
-    tree = iconsData.SPK as SvgNode | undefined
-  } else {
-    tree = (iconsData.inlineIcons as unknown as Array<{ index: number; tree: SvgNode }>).find(
-      (i) => i.index === name,
-    )?.tree
-  }
-
-  if (!tree) return null
-  return <SvgTree tree={tree} size={size} width={width} height={height} color={color} />
-}

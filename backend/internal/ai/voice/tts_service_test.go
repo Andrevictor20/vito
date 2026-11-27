@@ -282,3 +282,41 @@ func TestStripMarkdownForSpeech(t *testing.T) {
 		t.Errorf("StripMarkdownForSpeech removeu conteúdo textual: %q", clean)
 	}
 }
+
+func TestTTSService_CacheUsesWavExtensionForRiffAudio(t *testing.T) {
+	dir := t.TempDir()
+	wavBytes := []byte("RIFF\x24\x00\x00\x00WAVEfmt ")
+	mock := &mockSynthesizer{audio: wavBytes, mime: "audio/wav"}
+	svc := NewTTSService(mock, dir, testDefaultVoice)
+
+	audio1, mime1, err := svc.Synthesize(context.Background(), "olá em wav", testDefaultVoice)
+	if err != nil {
+		t.Fatalf("Synthesize falhou: %v", err)
+	}
+	if mime1 != "audio/wav" || string(audio1) != string(wavBytes) {
+		t.Fatalf("esperava WAV na primeira chamada, obteve mime=%q", mime1)
+	}
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("ReadDir falhou: %v", err)
+	}
+	if len(entries) != 1 || !strings.HasSuffix(entries[0].Name(), ".wav") {
+		var names []string
+		for _, e := range entries {
+			names = append(names, e.Name())
+		}
+		t.Fatalf("esperava arquivo de cache .wav, obteve %v", names)
+	}
+
+	audio2, mime2, err := svc.Synthesize(context.Background(), "olá em wav", testDefaultVoice)
+	if err != nil {
+		t.Fatalf("segunda chamada (cache WAV) falhou: %v", err)
+	}
+	if mime2 != "audio/wav" || string(audio2) != string(wavBytes) {
+		t.Errorf("cache WAV retornou mime=%q", mime2)
+	}
+	if mock.calls != 1 {
+		t.Errorf("esperava cache hit (calls=1), obteve %d", mock.calls)
+	}
+}

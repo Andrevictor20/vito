@@ -3,12 +3,10 @@ import { StyleSheet, View, Platform, StatusBar as RNStatusBar } from 'react-nati
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
 import { NavigationContainer, NavigatorScreenParams, type LinkingOptions } from '@react-navigation/native';
-import { QueryClientProvider } from '@tanstack/react-query';
-import { queryClient } from './services/queryClient';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { RootNavigator } from './navigation/RootNavigator';
-import { navigationRef, navigateToTab } from './navigation/navigationRef';
+import { navigationRef } from './navigation/navigationRef';
 import { tokens } from './theme/tokens';
 import { api, DEFAULT_SERVER_URL, CLOUDFLARE_SERVER_URL, PI_SERVER_URL, isCloudServer } from './services/api';
 import { notificationService } from './features/notifications/services/notificationService';
@@ -16,8 +14,8 @@ import { UpdateBanner } from './components/common/UpdateBanner';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { PrivacyScreenShield } from './components/common/PrivacyScreenShield';
 import { SplashScreen } from './features/auth/screens/SplashScreen';
-import { PostLoginPermissionsSheet } from './components/auth/PostLoginPermissionsSheet';
-import { hasPromptedPostLoginPerms } from './components/auth/onboardingStorage';
+import { PostLoginPermissionsSheet } from './features/auth/components/PostLoginPermissionsSheet';
+import { hasPromptedPostLoginPerms } from './features/auth/utils/onboardingStorage';
 
 export type MainTabParamList = {
   chat: undefined;
@@ -161,13 +159,11 @@ export const AppRoot: React.FC = () => {
   return (
     <ErrorBoundary>
       <SafeAreaProvider initialMetrics={initialWindowMetrics}>
-        <QueryClientProvider client={queryClient}>
-          <ThemeProvider>
-            <AuthProvider>
-              <MainNavigator />
-            </AuthProvider>
-          </ThemeProvider>
-        </QueryClientProvider>
+        <ThemeProvider>
+          <AuthProvider>
+            <MainNavigator />
+          </AuthProvider>
+        </ThemeProvider>
       </SafeAreaProvider>
     </ErrorBoundary>
   );
@@ -178,11 +174,5 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: tokens.colors.surface,
     paddingTop: Platform.OS === 'android' ? (RNStatusBar.currentHeight || 0) : 0,
-  },
-  loadingContainer: {
-    flex: 1,
-    backgroundColor: tokens.colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 });

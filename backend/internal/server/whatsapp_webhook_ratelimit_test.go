@@ -9,12 +9,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/andrevmp/vito/backend/internal/platform/database"
-	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/bots"
 	"github.com/andrevmp/vito/backend/internal/calendar/p2p"
+	"github.com/andrevmp/vito/backend/internal/domain"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/server"
 	"github.com/andrevmp/vito/backend/internal/whatsapp"
+	"github.com/andrevmp/vito/backend/internal/whatsapp/evolution"
 )
 
 type noopEvolutionClient struct{}
@@ -30,25 +31,25 @@ func (noopEvolutionClient) GetPairingCode(context.Context, string, string) (stri
 func (noopEvolutionClient) GetConnectionState(context.Context, string) (string, error) {
 	return "open", nil
 }
-func (noopEvolutionClient) DeleteInstance(context.Context, string) error              { return nil }
-func (noopEvolutionClient) Logout(context.Context, string) error                      { return nil }
-func (noopEvolutionClient) SendText(context.Context, string, string, string) error    { return nil }
+func (noopEvolutionClient) DeleteInstance(context.Context, string) error           { return nil }
+func (noopEvolutionClient) Logout(context.Context, string) error                   { return nil }
+func (noopEvolutionClient) SendText(context.Context, string, string, string) error { return nil }
 func (noopEvolutionClient) SendTextWithQuoted(context.Context, string, string, string, string) error {
 	return nil
 }
 func (noopEvolutionClient) GetMediaBase64(context.Context, string, interface{}) (string, error) {
 	return "", nil
 }
-func (noopEvolutionClient) FindContacts(context.Context, string) ([]whatsapp.WhatsAppContact, error) {
+func (noopEvolutionClient) FindContacts(context.Context, string) ([]evolution.WhatsAppContact, error) {
 	return nil, nil
 }
 func (noopEvolutionClient) SendReaction(context.Context, string, string, string, string, bool) error {
 	return nil
 }
-func (noopEvolutionClient) FindMessages(context.Context, whatsapp.EvolutionFindMessagesInput) ([]whatsapp.WhatsAppChatMessage, error) {
+func (noopEvolutionClient) FindMessages(context.Context, evolution.EvolutionFindMessagesInput) ([]evolution.WhatsAppChatMessage, error) {
 	return nil, nil
 }
-func (noopEvolutionClient) FindGroups(context.Context, string) ([]whatsapp.WhatsAppGroup, error) {
+func (noopEvolutionClient) FindGroups(context.Context, string) ([]evolution.WhatsAppGroup, error) {
 	return nil, nil
 }
 func (noopEvolutionClient) FindParticipants(context.Context, string, string) ([]string, error) {

@@ -20,6 +20,7 @@ export interface VitoSwitchProps {
   value: boolean;
   onValueChange: (val: boolean) => void;
   disabled?: boolean;
+  accessibilityLabel?: string;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -32,6 +33,7 @@ export const VitoSwitch: React.FC<VitoSwitchProps> = ({
   value,
   onValueChange,
   disabled = false,
+  accessibilityLabel,
   style,
 }) => {
   const { colors } = useTheme();
@@ -67,6 +69,7 @@ export const VitoSwitch: React.FC<VitoSwitchProps> = ({
       onPress={toggle}
       disabled={disabled}
       accessibilityRole="switch"
+      accessibilityLabel={accessibilityLabel}
       accessibilityState={{ checked: value }}
     >
       <Animated.View

@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '../../../services/api';
 import * as byokStore from './byokStore';
-import { clearPluggyApiKeyCache, getOrRefreshPluggyApiKey } from './pluggyHttp';
+import { clearPluggyApiKeyCache, getOrRefreshPluggyApiKey } from './pluggyService';
 import { syncPluggyItem, type PluggySyncResult, type SyncMode } from './pluggySync';
 
 const SYNC_LOCK_KEY = 'vito:finance:sync_lock_until';

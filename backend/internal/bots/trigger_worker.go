@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/andrevmp/vito/backend/internal/platform/worker"
 	"github.com/andrevmp/vito/backend/internal/service"
 	"log"
 	"strings"
@@ -111,57 +112,6 @@ func (e *DefaultTriggerEvaluator) TestEvaluate(ctx context.Context, t *domain.Tr
 	}, nil
 }
 
-// AITriggerEvaluator permite delegar a avaliação de disparador para provedores de IA ou funções customizadas.
-type AITriggerEvaluator struct {
-	evaluateFn func(ctx context.Context, t *domain.Trigger) (*domain.TriggerTestResult, error)
-}
-
-// NewAITriggerEvaluator instancia o avaliador com inteligência artificial.
-func NewAITriggerEvaluator(fn func(ctx context.Context, t *domain.Trigger) (*domain.TriggerTestResult, error)) *AITriggerEvaluator {
-	return &AITriggerEvaluator{evaluateFn: fn}
-}
-
-func (e *AITriggerEvaluator) Evaluate(ctx context.Context, t *domain.Trigger) (string, string, error) {
-	if e.evaluateFn != nil {
-		res, err := e.evaluateFn(ctx, t)
-		if err != nil {
-			return "", "", err
-		}
-		if res != nil {
-			payloadObj := map[string]interface{}{
-				"status":                 "evaluated",
-				"condition_met":          res.ConditionMet,
-				"data":                   res.CurrentData,
-				"metric_label":           res.MetricLabel,
-				"metric_value":           res.MetricValue,
-				"bullets":                res.Bullets,
-				"sources":                res.Sources,
-				"paragraphs":             res.Paragraphs,
-				"simulated_notification": res.SimulatedNotification,
-				"confidence":             res.Confidence,
-				"why_relevant":           res.WhyRelevant,
-				"urgency":                res.Urgency,
-				"tested_at":              res.TestedAt.Format(time.RFC3339),
-			}
-			payloadBytes, errMarshal := json.Marshal(payloadObj)
-			if errMarshal == nil {
-				return res.Summary, string(payloadBytes), nil
-			}
-			return res.Summary, `{"status":"evaluated"}`, nil
-		}
-	}
-	def := &DefaultTriggerEvaluator{}
-	return def.Evaluate(ctx, t)
-}
-
-func (e *AITriggerEvaluator) TestEvaluate(ctx context.Context, t *domain.Trigger) (*domain.TriggerTestResult, error) {
-	if e.evaluateFn != nil {
-		return e.evaluateFn(ctx, t)
-	}
-	def := &DefaultTriggerEvaluator{}
-	return def.TestEvaluate(ctx, t)
-}
-
 // TriggerWorker orquestra a vigília contínua, cumprimento de horários e despacho de relatórios.
 type TriggerWorker struct {
 	triggerRepo     domain.TriggerRepository
@@ -169,9 +119,7 @@ type TriggerWorker struct {
 	evaluator       TriggerEvaluator
 	attentionBudget *service.AttentionBudgetService
 	checkInterval   time.Duration
-	stopCh          chan struct{}
-	wg              sync.WaitGroup
-	running         bool
+	loop            *worker.PeriodicLoop
 	mu              sync.Mutex
 	// deltaFetcher retorna os hashes dos fatos atuais; nil desliga o delta gate.
 	// Na volta: (hashesNovos, todosHashes, erro).
@@ -218,63 +166,38 @@ func NewTriggerWorker(
 		notifSvc:      notifSvc,
 		evaluator:     evaluator,
 		checkInterval: interval,
-		stopCh:        make(chan struct{}),
+		loop:          worker.NewPeriodicLoop(interval, false),
 	}
 }
 
 // Start inicia a goroutine de vigília periódica.
 func (w *TriggerWorker) Start() {
-	w.mu.Lock()
-	if w.running {
-		w.mu.Unlock()
+	if !w.loop.Start(func() {
+		tickTime := time.Now()
+		evaluated, err := w.CheckAndEvaluateTriggers(tickTime)
+		if err != nil {
+			log.Printf("⚠️ [TriggerWorker] Erro ao avaliar disparadores: %v", err)
+		} else if evaluated > 0 {
+			log.Printf("✨ [TriggerWorker] %d disparador(es) avaliado(s) com sucesso.", evaluated)
+		}
+
+		// Vigília contínua de notícias breaking / urgentes fora do horário habitual (Ponto 5)
+		if breakingCount, errB := w.CheckBreakingTriggers(tickTime); errB == nil && breakingCount > 0 {
+			log.Printf("🚨 [TriggerWorker] %d alerta(s) breaking disparado(s) com sucesso.", breakingCount)
+		}
+	}) {
 		return
 	}
-	w.running = true
-	w.stopCh = make(chan struct{})
-	w.mu.Unlock()
-
-	w.wg.Add(1)
-	go func() {
-		defer w.wg.Done()
-		log.Printf("🔭 [TriggerWorker] Vigília autônoma iniciada (intervalo: %v)...", w.checkInterval)
-
-		ticker := time.NewTicker(w.checkInterval)
-		defer ticker.Stop()
-
-		for {
-			select {
-			case <-w.stopCh:
-				log.Println("🛑 [TriggerWorker] Finalizando goroutine de vigília...")
-				return
-			case tickTime := <-ticker.C:
-				evaluated, err := w.CheckAndEvaluateTriggers(tickTime)
-				if err != nil {
-					log.Printf("⚠️ [TriggerWorker] Erro ao avaliar disparadores: %v", err)
-				} else if evaluated > 0 {
-					log.Printf("✨ [TriggerWorker] %d disparador(es) avaliado(s) com sucesso.", evaluated)
-				}
-
-				// Vigília contínua de notícias breaking / urgentes fora do horário habitual (Ponto 5)
-				if breakingCount, errB := w.CheckBreakingTriggers(tickTime); errB == nil && breakingCount > 0 {
-					log.Printf("🚨 [TriggerWorker] %d alerta(s) breaking disparado(s) com sucesso.", breakingCount)
-				}
-			}
-		}
-	}()
+	log.Printf("🔭 [TriggerWorker] Vigília autônoma iniciada (intervalo: %v)...", w.checkInterval)
 }
 
 // Stop encerra graciosamente o worker de vigília.
 func (w *TriggerWorker) Stop() {
-	w.mu.Lock()
-	if !w.running {
-		w.mu.Unlock()
+	if !w.loop.IsRunning() {
 		return
 	}
-	w.running = false
-	close(w.stopCh)
-	w.mu.Unlock()
-
-	w.wg.Wait()
+	log.Println("🛑 [TriggerWorker] Finalizando goroutine de vigília...")
+	w.loop.Stop()
 	log.Println("✅ [TriggerWorker] Vigília autônoma encerrada.")
 }
 

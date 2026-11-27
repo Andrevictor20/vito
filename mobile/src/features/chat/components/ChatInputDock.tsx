@@ -9,15 +9,15 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { ProtoUiIcon } from '../../../icons/ProtoUiIcons';
 import {
   ChevronDownSvgIcon,
   CloseSvgIcon,
   MicSvgIcon,
   PlusSvgIcon,
+  ProtoUiIcon,
   SendUpSvgIcon,
   WaveSvgIcon,
-} from '../../../icons/ChatProtoIcons';
+} from '../../../icons/ProtoUiIcons';
 import { useTheme } from '../../../context/ThemeContext';
 import { getFloatingSurfaceShadow } from '../../../theme/surfaces';
 import { tokens, v5Radii } from '../../../theme/tokens';

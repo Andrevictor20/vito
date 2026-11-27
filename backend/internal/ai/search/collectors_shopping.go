@@ -96,7 +96,7 @@ func (c *ShoppingCollector) fetchMercadoLivre(ctx context.Context, client *http.
 		return nil, err
 	}
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", "VitoRadarBot/2.0")
+	req.Header.Set("User-Agent", "VitoBot/2.0")
 
 	resp, err := client.Do(req)
 	if err != nil {

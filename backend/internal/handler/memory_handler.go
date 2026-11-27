@@ -2,6 +2,8 @@ package handler
 
 import (
 	"encoding/json"
+	"github.com/andrevmp/vito/backend/internal/domain"
+	"github.com/andrevmp/vito/backend/internal/platform/httpx"
 	"net/http"
 	"strings"
 	"time"
@@ -14,7 +16,9 @@ import (
 
 // MemoryHandler expõe a API para o usuário inspecionar e gerenciar memórias ("O que o Vito sabe sobre mim").
 type MemoryHandler struct {
-	repo *repository.MemoryHierarchyRepository
+	repo     *repository.MemoryHierarchyRepository
+	factRepo *repository.MemoryRepositorySQLite
+	embedder repository.EmbedderFunc
 }
 
 // NewMemoryHandler instancia o MemoryHandler.
@@ -22,31 +26,69 @@ func NewMemoryHandler(repo *repository.MemoryHierarchyRepository) *MemoryHandler
 	return &MemoryHandler{repo: repo}
 }
 
+// SetFactRepository conecta o repositório de fatos atômicos usados em runtime pelo ADK/ContextEnricher.
+func (h *MemoryHandler) SetFactRepository(factRepo *repository.MemoryRepositorySQLite, embedder repository.EmbedderFunc) {
+	h.factRepo = factRepo
+	h.embedder = embedder
+}
+
 // ListMemories retorna a visão completa de memórias do usuário: temas, episódios recentes e fatos.
 func (h *MemoryHandler) ListMemories(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok || userID == "" {
-		http.Error(w, `{"error":"não autorizado"}`, http.StatusUnauthorized)
+		httpx.WriteJSONError(w, http.StatusUnauthorized, "não autorizado")
 		return
 	}
 
 	ctx := r.Context()
 	themes, err := h.repo.ListThematicSummaries(ctx, userID)
 	if err != nil {
-		http.Error(w, `{"error":"falha ao carregar temas"}`, http.StatusInternalServerError)
+		httpx.WriteJSONError(w, http.StatusInternalServerError, "falha ao carregar temas")
 		return
 	}
 
 	episodes, err := h.repo.ListRecentEpisodes(ctx, userID, 30)
 	if err != nil {
-		http.Error(w, `{"error":"falha ao carregar episódios"}`, http.StatusInternalServerError)
+		httpx.WriteJSONError(w, http.StatusInternalServerError, "falha ao carregar episódios")
 		return
 	}
 
 	facts, err := h.repo.ListAtomicFacts(ctx, userID, 100)
 	if err != nil {
-		http.Error(w, `{"error":"falha ao carregar fatos"}`, http.StatusInternalServerError)
+		httpx.WriteJSONError(w, http.StatusInternalServerError, "falha ao carregar fatos")
 		return
+	}
+	if h.factRepo != nil {
+		if runtimeFacts, lErr := h.factRepo.ListByUser(userID, 50); lErr == nil {
+			seenContent := make(map[string]bool, len(facts))
+			seenIDs := make(map[string]bool, len(facts))
+			for _, f := range facts {
+				seenIDs[f.ID] = true
+				seenContent[strings.ToLower(strings.TrimSpace(f.Content))] = true
+			}
+			for _, rf := range runtimeFacts {
+				if rf.SupersededBy != "" {
+					continue
+				}
+				norm := strings.ToLower(strings.TrimSpace(rf.Content))
+				if seenIDs[rf.ID] || seenContent[norm] {
+					continue
+				}
+				seenIDs[rf.ID] = true
+				seenContent[norm] = true
+				facts = append(facts, repository.UserMemoryFact{
+					ID:         rf.ID,
+					UserID:     rf.UserID,
+					Category:   rf.Category,
+					Content:    rf.Content,
+					Source:     "assistant",
+					Confidence: rf.Confidence,
+					IsActive:   true,
+					CreatedAt:  rf.CreatedAt,
+					UpdatedAt:  rf.UpdatedAt,
+				})
+			}
+		}
 	}
 
 	resp := map[string]any{
@@ -63,18 +105,18 @@ func (h *MemoryHandler) ListMemories(w http.ResponseWriter, r *http.Request) {
 func (h *MemoryHandler) DeleteEpisode(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok || userID == "" {
-		http.Error(w, `{"error":"não autorizado"}`, http.StatusUnauthorized)
+		httpx.WriteJSONError(w, http.StatusUnauthorized, "não autorizado")
 		return
 	}
 
 	id := chi.URLParam(r, "id")
 	if id == "" {
-		http.Error(w, `{"error":"id obrigatório"}`, http.StatusBadRequest)
+		httpx.WriteJSONError(w, http.StatusBadRequest, "id obrigatório")
 		return
 	}
 
 	if err := h.repo.DeleteEpisode(r.Context(), userID, id); err != nil {
-		http.Error(w, `{"error":"falha ao remover episódio"}`, http.StatusInternalServerError)
+		httpx.WriteJSONError(w, http.StatusInternalServerError, "falha ao remover episódio")
 		return
 	}
 
@@ -86,18 +128,18 @@ func (h *MemoryHandler) DeleteEpisode(w http.ResponseWriter, r *http.Request) {
 func (h *MemoryHandler) DeleteThematicSummary(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok || userID == "" {
-		http.Error(w, `{"error":"não autorizado"}`, http.StatusUnauthorized)
+		httpx.WriteJSONError(w, http.StatusUnauthorized, "não autorizado")
 		return
 	}
 
 	slug := chi.URLParam(r, "slug")
 	if slug == "" {
-		http.Error(w, `{"error":"slug obrigatório"}`, http.StatusBadRequest)
+		httpx.WriteJSONError(w, http.StatusBadRequest, "slug obrigatório")
 		return
 	}
 
 	if err := h.repo.DeleteThematicSummary(r.Context(), userID, slug); err != nil {
-		http.Error(w, `{"error":"falha ao remover resumo temático"}`, http.StatusInternalServerError)
+		httpx.WriteJSONError(w, http.StatusInternalServerError, "falha ao remover resumo temático")
 		return
 	}
 
@@ -109,19 +151,43 @@ func (h *MemoryHandler) DeleteThematicSummary(w http.ResponseWriter, r *http.Req
 func (h *MemoryHandler) DeleteFact(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok || userID == "" {
-		http.Error(w, `{"error":"não autorizado"}`, http.StatusUnauthorized)
+		httpx.WriteJSONError(w, http.StatusUnauthorized, "não autorizado")
 		return
 	}
 
 	id := chi.URLParam(r, "id")
 	if id == "" {
-		http.Error(w, `{"error":"id obrigatório"}`, http.StatusBadRequest)
+		httpx.WriteJSONError(w, http.StatusBadRequest, "id obrigatório")
 		return
 	}
 
+	var deletedContent string
+	if h.factRepo != nil {
+		if existing, lErr := h.repo.ListAtomicFacts(r.Context(), userID, 200); lErr == nil {
+			for _, f := range existing {
+				if f.ID == id {
+					deletedContent = strings.TrimSpace(f.Content)
+					break
+				}
+			}
+		}
+	}
+
 	if err := h.repo.DeleteAtomicFact(r.Context(), userID, id); err != nil {
-		http.Error(w, `{"error":"falha ao desativar fato"}`, http.StatusInternalServerError)
+		httpx.WriteJSONError(w, http.StatusInternalServerError, "falha ao desativar fato")
 		return
+	}
+	if h.factRepo != nil {
+		_ = h.factRepo.Delete(id, userID)
+		if deletedContent != "" {
+			if runtimeFacts, lErr := h.factRepo.ListByUser(userID, 100); lErr == nil {
+				for _, rf := range runtimeFacts {
+					if strings.EqualFold(strings.TrimSpace(rf.Content), deletedContent) {
+						_ = h.factRepo.Delete(rf.ID, userID)
+					}
+				}
+			}
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -132,7 +198,7 @@ func (h *MemoryHandler) DeleteFact(w http.ResponseWriter, r *http.Request) {
 func (h *MemoryHandler) CreateFact(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok || userID == "" {
-		http.Error(w, `{"error":"não autorizado"}`, http.StatusUnauthorized)
+		httpx.WriteJSONError(w, http.StatusUnauthorized, "não autorizado")
 		return
 	}
 
@@ -141,12 +207,12 @@ func (h *MemoryHandler) CreateFact(w http.ResponseWriter, r *http.Request) {
 		Content  string `json:"content"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, `{"error":"payload inválido"}`, http.StatusBadRequest)
+		httpx.WriteJSONError(w, http.StatusBadRequest, "payload inválido")
 		return
 	}
 	content := strings.TrimSpace(req.Content)
 	if content == "" {
-		http.Error(w, `{"error":"content obrigatório"}`, http.StatusBadRequest)
+		httpx.WriteJSONError(w, http.StatusBadRequest, "content obrigatório")
 		return
 	}
 	category := strings.TrimSpace(req.Category)
@@ -154,18 +220,38 @@ func (h *MemoryHandler) CreateFact(w http.ResponseWriter, r *http.Request) {
 		category = "preference"
 	}
 
+	now := time.Now().UTC()
 	fact := &repository.UserMemoryFact{
 		ID:         uuid.New().String(),
 		UserID:     userID,
 		Category:   category,
 		Content:    content,
+		Source:     "manual",
 		Confidence: 1.0,
-		CreatedAt:  time.Now().UTC(),
-		UpdatedAt:  time.Now().UTC(),
+		IsActive:   true,
+		CreatedAt:  now,
+		UpdatedAt:  now,
 	}
 	if err := h.repo.CreateAtomicFact(r.Context(), fact); err != nil {
-		http.Error(w, `{"error":"falha ao salvar fato"}`, http.StatusInternalServerError)
+		httpx.WriteJSONError(w, http.StatusInternalServerError, "falha ao salvar fato")
 		return
+	}
+	if h.factRepo != nil {
+		mem := &domain.Memory{
+			ID:         fact.ID,
+			UserID:     userID,
+			Category:   category,
+			Content:    content,
+			Importance: 4,
+			Confidence: 1.0,
+			CreatedAt:  now,
+			UpdatedAt:  now,
+		}
+		if err := h.factRepo.Create(mem); err == nil && h.embedder != nil {
+			if vec, embErr := h.embedder(r.Context(), content); embErr == nil && len(vec) > 0 {
+				_ = h.factRepo.UpsertEmbedding(r.Context(), mem.ID, userID, "gemini-embedding-001", vec)
+			}
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")

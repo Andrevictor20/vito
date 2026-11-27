@@ -26,7 +26,7 @@ func NewSearchToolset(subagent ...*search.VerticalSearchSubagent) *SearchToolset
 	if len(subagent) > 0 && subagent[0] != nil {
 		sub = subagent[0]
 	} else {
-		sub = search.NewVerticalSearchSubagent(search.DefaultSearXNGClient(), nil)
+		sub = search.NewVerticalSearchSubagent(search.DefaultSearXNGClient())
 	}
 
 	return &SearchToolset{
@@ -41,14 +41,6 @@ func (t *SearchToolset) SetFinanceCollector(fc *search.FinanceCollector) {
 	t.financeCollector = fc
 }
 
-func (t *SearchToolset) SetShoppingCollector(sc *search.ShoppingCollector) {
-	t.shoppingCollector = sc
-}
-
-func (t *SearchToolset) SetSubagent(sub *search.VerticalSearchSubagent) {
-	t.subagent = sub
-}
-
 func (t *SearchToolset) SetWebReader(wr search.WebReader) {
 	t.webReader = wr
 }
@@ -59,32 +51,6 @@ func (t *SearchToolset) Name() domain.ToolsetName {
 
 func (t *SearchToolset) Description() string {
 	return "Realiza buscas factuais em tempo real na web, coletores verticais e leitura aprofundada de links/páginas web com extração de Markdown."
-}
-
-func (t *SearchToolset) JSONSchema() json.RawMessage {
-	return json.RawMessage(`{
-		"type": "object",
-		"properties": {
-			"operation": {
-				"type": "string",
-				"enum": ["search", "read_page"],
-				"description": "Operação: 'search' para busca factual ou 'read_page' para leitura aprofundada de URL específica."
-			},
-			"params": {
-				"type": "object",
-				"properties": {
-					"query": {"type": "string", "description": "Termo de pesquisa factual na web (para operação search)."},
-					"category": {
-						"type": "string",
-						"enum": ["general", "finance", "shopping", "news", "jobs"],
-						"description": "Categoria vertical de busca."
-					},
-					"url": {"type": "string", "description": "URL completa da página para leitura aprofundada (para operação read_page)."}
-				}
-			}
-		},
-		"required": ["operation"]
-	}`)
 }
 
 func (t *SearchToolset) IsWriteOperation(op string, rawParams json.RawMessage) (bool, bool, map[string]any) {

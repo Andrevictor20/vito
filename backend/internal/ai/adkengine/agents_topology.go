@@ -1,22 +1,21 @@
 package adkengine
 
 import (
-	"context"
-	"encoding/json"
 	"fmt"
-	"log"
-	"strings"
-	"time"
 
 	"google.golang.org/adk/v2/agent"
 	"google.golang.org/adk/v2/agent/llmagent"
 	"google.golang.org/adk/v2/model"
 	"google.golang.org/adk/v2/tool"
+	"google.golang.org/adk/v2/tool/loadmemorytool"
 
-	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/domain"
-	"github.com/andrevmp/vito/backend/internal/service"
 )
+
+// TopologyOptions parametriza recursos opcionais na topologia multi-agente ADK.
+type TopologyOptions struct {
+	EnableLoadMemory bool
+}
 
 // AgentTopology encapsula o coordenador raiz (vito_executive) e os 6 sub-agentes especialistas de domínio.
 type AgentTopology struct {
@@ -30,10 +29,12 @@ type AgentTopology struct {
 }
 
 // BuildAgentTopology constrói a árvore Multi-Agente do Google ADK v2 para o Vito (COG-03).
-// Para perguntas diretas de 1 domínio, o vito_executive possui acesso direto às functiontools registradas
-// para resolução em 1 RTT (< 800ms na voz), e também conta com os 6 sub-agentes especialistas de domínio
-// para delegação e orquestração multi-domínio.
 func BuildAgentTopology(llm model.LLM, bridge *ToolsetBridge) (*AgentTopology, error) {
+	return BuildAgentTopologyWithOptions(llm, bridge, TopologyOptions{})
+}
+
+// BuildAgentTopologyWithOptions constrói a topologia multi-agente com suporte opcional à busca ativa de memória (`load_memory`).
+func BuildAgentTopologyWithOptions(llm model.LLM, bridge *ToolsetBridge, opts TopologyOptions) (*AgentTopology, error) {
 	if llm == nil {
 		return nil, fmt.Errorf("model.LLM é obrigatório para construir a topologia de agentes")
 	}
@@ -50,7 +51,7 @@ func BuildAgentTopology(llm model.LLM, bridge *ToolsetBridge) (*AgentTopology, e
 			domain.ToolsetGmail,
 		)
 		financeTools = bridge.BuildDomainTools(
-			domain.ToolsetName("finance_manager"),
+			domain.ToolsetFinance,
 		)
 		researchTools = bridge.BuildDomainTools(
 			domain.ToolsetWebSearch,
@@ -59,19 +60,23 @@ func BuildAgentTopology(llm model.LLM, bridge *ToolsetBridge) (*AgentTopology, e
 			domain.ToolsetMemoryProfile,
 		)
 		botsTools = bridge.BuildDomainTools(
-			domain.ToolsetRadarTrigger,
+			domain.ToolsetBots,
 		)
 		rootTools = bridge.BuildDomainTools(
 			domain.ToolsetMemoryProfile,
-			domain.ToolsetRadarTrigger,
+			domain.ToolsetBots,
 		)
+	}
+	if opts.EnableLoadMemory {
+		workspaceTools = append(workspaceTools, loadmemorytool.New())
+		rootTools = append(rootTools, loadmemorytool.New())
 	}
 
 	routineAgent, err := llmagent.New(llmagent.Config{
 		Name:        "vito_routine_agent",
 		Description: "Especialista em rotina pessoal: agenda (Google Calendar), tarefas, pendências, Vito Booking e reuniões.",
 		Model:       llm,
-		Instruction: "Você é o especialista de rotina do Vito. Gerencie compromissos na agenda, tarefas, pendências e links de agendamento com precisão em português.",
+		Instruction: "Você é o especialista de rotina do Vito. Gerencie compromissos na agenda, tarefas, pendências e links de agendamento com precisão em português. Use datas, compromissos e vínculos do contexto Nível 1 antes de perguntar detalhes óbvios. Se o pedido exigir também outro domínio (finanças, comunicações ou pesquisa), conclua sua etapa e devolva ao coordenador `vito_executive`.",
 		Tools:       routineTools,
 	})
 	if err != nil {
@@ -82,7 +87,7 @@ func BuildAgentTopology(llm model.LLM, bridge *ToolsetBridge) (*AgentTopology, e
 		Name:        "vito_comms_agent",
 		Description: "Especialista em comunicações omnichannel: mensagens de WhatsApp, e-mails do Gmail, rascunhos e busca de conversas.",
 		Model:       llm,
-		Instruction: "Você é o especialista de comunicações do Vito. Pesquise mensagens, redija rascunhos e prepare envios de WhatsApp e Gmail respeitando confirmação humana.",
+		Instruction: "Você é o especialista de comunicações do Vito. Pesquise mensagens, redija rascunhos e prepare envios de WhatsApp e Gmail respeitando confirmação humana e aproveitando contatos/entidades vinculadas no contexto. Se o usuário também pediu ação de outro domínio, devolva ao coordenador após finalizar sua parte.",
 		Tools:       commsTools,
 	})
 	if err != nil {
@@ -93,7 +98,7 @@ func BuildAgentTopology(llm model.LLM, bridge *ToolsetBridge) (*AgentTopology, e
 		Name:        "vito_finance_agent",
 		Description: "Especialista financeiro Open Finance: Safe-to-Spend, cartões, faturas, parcelas, transações e orçamentos.",
 		Model:       llm,
-		Instruction: "Você é o especialista financeiro do Vito. Analise gastos, saldo livre (Safe-to-Spend), cartões e faturas com rigor matemático sem inventar valores.",
+		Instruction: "Você é o especialista financeiro do Vito. Analise gastos, saldo livre (Safe-to-Spend), cartões, faturas e limites com rigor matemático sem inventar valores. Em perguntas de decisão (\"posso comprar?\", \"melhor cartão?\"), consulte o resumo financeiro, cartões e status de limites antes de concluir. Se houver ação complementar em agenda/tarefas, devolva ao `vito_executive`.",
 		Tools:       financeTools,
 	})
 	if err != nil {
@@ -104,7 +109,7 @@ func BuildAgentTopology(llm model.LLM, bridge *ToolsetBridge) (*AgentTopology, e
 		Name:        "vito_research_agent",
 		Description: "Especialista em pesquisa factual na web (SearXNG), leitura aprofundada de páginas (Jina Reader), cotações, notícias e preços.",
 		Model:       llm,
-		Instruction: "Você é o especialista de pesquisa factual do Vito. Consulte informações em tempo real na web e sintetize os fatos verificados com clareza.",
+		Instruction: "Você é o especialista de pesquisa factual do Vito. Consulte informações em tempo real na web e sintetize os fatos verificados com clareza, citando números e fontes reais sem inventar.",
 		Tools:       researchTools,
 	})
 	if err != nil {
@@ -115,7 +120,7 @@ func BuildAgentTopology(llm model.LLM, bridge *ToolsetBridge) (*AgentTopology, e
 		Name:        "vito_workspace_agent",
 		Description: "Especialista em memória de longo prazo, perfil do usuário e integrações de produtividade e servidores MCP.",
 		Model:       llm,
-		Instruction: "Você é o especialista de memória e workspace do Vito. Consulte e atualize preferências e integrações conectadas do usuário.",
+		Instruction: "Você é o especialista de memória e workspace do Vito. Quando precisar de fatos passados fora do contexto imediato, consulte a memória de longo prazo antes de responder e atualize preferências duradouras do usuário.",
 		Tools:       workspaceTools,
 	})
 	if err != nil {
@@ -146,7 +151,7 @@ func BuildAgentTopology(llm model.LLM, bridge *ToolsetBridge) (*AgentTopology, e
 		Name:        "vito_executive",
 		Description: "Coordenador executivo pessoal Vito: conversa natural, memória rápida e orquestração multi-domínio via sub-agentes especialistas.",
 		Model:       llm,
-		Instruction: "Você é o Vito, parceiro pessoal inteligente e secretário executivo do usuário. Responda sempre em português do Brasil com naturalidade e precisão, delegando operações de domínio aos sub-agentes especialistas. Quando o usuário pedir para criar, listar ou excluir um bot, invoque imediatamente `bot_create_bot`, `bot_list_bots` ou `bot_delete_bot` (ou delegue a `vito_bots_architect`). NUNCA afirme que criou um bot, tarefa, compromisso ou link sem antes receber confirmação real de execução da ferramenta correspondente.",
+		Instruction: "Você é o Vito, parceiro pessoal inteligente e secretário executivo do usuário. Responda sempre em português do Brasil com naturalidade e precisão. Use o contexto Nível 1 e `load_memory` (quando precisar de histórico antigo) para evitar perguntas repetidas. Orquestre sub-agentes especialistas sequencialmente quando a solicitação combinar múltiplos domínios (ex.: finanças + tarefa, e-mail + agenda). Quando o usuário pedir para criar, listar ou excluir um bot, invoque imediatamente `bot_create_bot`, `bot_list_bots` ou `bot_delete_bot` (ou delegue a `vito_bots_architect`). NUNCA afirme que criou, enviou ou excluiu algo sem antes receber confirmação real de execução da ferramenta correspondente.",
 		Tools:       rootTools,
 		SubAgents:   subAgents,
 	})
@@ -163,162 +168,4 @@ func BuildAgentTopology(llm model.LLM, bridge *ToolsetBridge) (*AgentTopology, e
 		WorkspaceAgent: workspaceAgent,
 		BotsAgent:      botsAgent,
 	}, nil
-}
-
-func (f *ADKLoopFacade) tryHandlePendingConfirmation(
-	ctx context.Context,
-	req domain.UnifiedAssistantRequest,
-	userID, threadID, turnID string,
-	startTime time.Time,
-	onDelta func(ai.StreamDelta) error,
-) (*domain.UnifiedAssistantResponse, bool, error) {
-	if f.cfg.ConfirmationGate == nil {
-		return nil, false, nil
-	}
-
-	userMsg := strings.TrimSpace(req.Message)
-	isConfirm := req.ConfirmPendingID != "" || service.IsShortConfirmationReply(userMsg)
-	isCancel := req.RejectPendingID != "" || service.IsExplicitSendCancellationText(userMsg)
-
-	if !isConfirm && !isCancel {
-		return nil, false, nil
-	}
-
-	var pending *service.PendingConfirmationRecord
-	var err error
-	if req.ConfirmPendingID != "" {
-		pending, err = f.cfg.ConfirmationGate.GetByID(ctx, req.ConfirmPendingID, userID)
-		if err != nil || pending == nil {
-			if err == nil {
-				err = service.ErrConfirmationNotFound
-			}
-			return nil, true, err
-		}
-	} else if req.RejectPendingID != "" {
-		pending, err = f.cfg.ConfirmationGate.GetByID(ctx, req.RejectPendingID, userID)
-		if err != nil || pending == nil {
-			if err == nil {
-				err = service.ErrConfirmationNotFound
-			}
-			return nil, true, err
-		}
-	} else {
-		pending, err = f.cfg.ConfirmationGate.GetLatestPending(ctx, userID, threadID)
-	}
-	if err != nil || pending == nil {
-		return nil, false, nil
-	}
-
-	emitStreamFinal := func(msg string) {
-		if onDelta != nil {
-			if msg != "" {
-				_ = onDelta(ai.StreamDelta{TextDelta: msg})
-			}
-			_ = onDelta(ai.StreamDelta{Done: true})
-		}
-	}
-
-	if isCancel {
-		_ = f.cfg.ConfirmationGate.CancelWithReason(ctx, pending.ID, userID, userMsg)
-		cancelMsg := FormatCancelledAction(pending.Operation)
-		f.recordSimpleTurns(ctx, threadID, turnID, userID, req.Channel, userMsg, cancelMsg, startTime)
-		emitStreamFinal(cancelMsg)
-		return &domain.UnifiedAssistantResponse{
-			ThreadID:  threadID,
-			TurnID:    turnID,
-			Text:      cancelMsg,
-			Reply:     cancelMsg,
-			Message:   cancelMsg,
-			Telemetry: domain.TurnTelemetry{LatencyMs: time.Since(startTime).Milliseconds()},
-		}, true, nil
-	}
-
-	resumed, err := f.cfg.ConfirmationGate.Resume(ctx, pending.ID, userID)
-	if err != nil {
-		if req.ConfirmPendingID != "" {
-			return nil, true, err
-		}
-		return nil, false, err
-	}
-	if f.cfg.Registry == nil {
-		return nil, false, fmt.Errorf("registry de toolsets não configurado")
-	}
-	toolset, ok := f.cfg.Registry.Get(domain.ToolsetName(resumed.ToolsetName))
-	if !ok || toolset == nil {
-		return nil, false, fmt.Errorf("toolset '%s' não encontrado", resumed.ToolsetName)
-	}
-
-	execCtx := &domain.ToolExecutionContext{
-		UserID:                  userID,
-		ThreadID:                threadID,
-		TurnID:                  turnID,
-		Channel:                 req.Channel,
-		FocusMode:               req.FocusMode,
-		AutonomyLevel:           "confirmed",
-		TaintedByUntrustedInput: resumed.TaintedContext,
-	}
-
-	rawArgs := json.RawMessage(resumed.ArgumentsJSON)
-	var env domain.ToolOperationEnvelope
-	if err := json.Unmarshal(rawArgs, &env); err == nil && len(env.Params) > 0 {
-		rawArgs = env.Params
-	}
-
-	res, execErr := toolset.Execute(ctx, execCtx, resumed.Operation, rawArgs)
-	if execErr != nil {
-		log.Printf("⚠️ [ADKLoopFacade] falha ao executar ação confirmada %s.%s: %v", resumed.ToolsetName, resumed.Operation, execErr)
-		errMsg := FormatActionError(resumed.Operation, execErr)
-		f.recordSimpleTurns(ctx, threadID, turnID, userID, req.Channel, userMsg, errMsg, startTime)
-		emitStreamFinal(errMsg)
-		return &domain.UnifiedAssistantResponse{
-			ThreadID:  threadID,
-			TurnID:    turnID,
-			Text:      errMsg,
-			Reply:     errMsg,
-			Message:   errMsg,
-			Telemetry: domain.TurnTelemetry{LatencyMs: time.Since(startTime).Milliseconds()},
-		}, true, nil
-	}
-
-	resBytes, _ := json.Marshal(res)
-	_ = f.cfg.ConfirmationGate.SaveExecutionResult(ctx, resumed.ID, string(resBytes))
-
-	successMsg := res.SummaryForLLM
-	if strings.TrimSpace(successMsg) == "" {
-		successMsg = fmt.Sprintf("Ação '%s' executada com sucesso.", resumed.Operation)
-	}
-
-	resp := &domain.UnifiedAssistantResponse{
-		ThreadID:  threadID,
-		TurnID:    turnID,
-		Text:      successMsg,
-		Reply:     successMsg,
-		Message:   successMsg,
-		Cards:     res.Cards,
-		Telemetry: domain.TurnTelemetry{LatencyMs: time.Since(startTime).Milliseconds()},
-	}
-	ExtractToolEntities(resumed.Operation, res.Data).ApplyToResponse(resp)
-	for _, c := range res.Cards {
-		if c.Type == "whatsapp" {
-			resp.WhatsAppMessage = &domain.ChatWhatsAppMessage{
-				ID:            c.ID,
-				RecipientName: c.Title,
-				Message:       c.Subtitle,
-				Status:        "sent",
-				SentAt:        time.Now().Format(time.RFC3339),
-			}
-		} else if c.Type == "gmail" {
-			resp.GmailMessage = &domain.ChatGmailMessage{
-				ID:             c.ID,
-				RecipientEmail: c.Subtitle,
-				Subject:        c.Title,
-				Status:         "sent",
-				SentAt:         time.Now().Format(time.RFC3339),
-			}
-		}
-	}
-
-	f.recordSimpleTurns(ctx, threadID, turnID, userID, req.Channel, userMsg, successMsg, startTime)
-	emitStreamFinal(successMsg)
-	return resp, true, nil
 }

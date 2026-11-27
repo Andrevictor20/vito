@@ -3,7 +3,7 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-nati
 import { ProtoUiIcon } from '../../../icons/ProtoUiIcons';
 import { useTheme } from '../../../context/ThemeContext';
 import { ActionPolicy, Bot, BotAppInfo, SkillPackage } from '../types/bots';
-import { BottomSheetModal } from '../../../components/ui/BottomSheetModal';
+import { VitoSheet } from '../../../components/ui/VitoSheet';
 
 export const NewBotChoiceSheet: React.FC<{
   visible: boolean;
@@ -13,7 +13,7 @@ export const NewBotChoiceSheet: React.FC<{
 }> = ({ visible, onClose, onChooseMascotStudio, onChooseAskVito }) => {
   const { colors } = useTheme();
   return (
-    <BottomSheetModal visible={visible} onClose={onClose} title="Novo bot">
+    <VitoSheet visible={visible} onClose={onClose} title="Novo bot">
       <View style={styles.choiceList}>
         <TouchableOpacity
           style={[styles.choiceRow, { backgroundColor: colors.surf, borderColor: colors.line }]}
@@ -51,7 +51,7 @@ export const NewBotChoiceSheet: React.FC<{
           <ProtoUiIcon name="chevron-right" size={20} color={colors.muted} />
         </TouchableOpacity>
       </View>
-    </BottomSheetModal>
+    </VitoSheet>
   );
 };
 
@@ -64,7 +64,7 @@ export const SkillDetailSheet: React.FC<{
   const { colors } = useTheme();
   if (!skill) return null;
   return (
-    <BottomSheetModal
+    <VitoSheet
       visible={visible}
       onClose={onClose}
       title={skill.name}
@@ -92,7 +92,7 @@ export const SkillDetailSheet: React.FC<{
           <Text style={[styles.primaryBtnText, { color: colors.bg }]}>Aplicar em um bot</Text>
         </TouchableOpacity>
       </ScrollView>
-    </BottomSheetModal>
+    </VitoSheet>
   );
 };
 
@@ -106,7 +106,7 @@ export const SkillPickBotSheet: React.FC<{
   const { colors } = useTheme();
   if (!skill) return null;
   return (
-    <BottomSheetModal
+    <VitoSheet
       visible={visible}
       onClose={onClose}
       title="Aplicar habilidade"
@@ -136,7 +136,7 @@ export const SkillPickBotSheet: React.FC<{
           ))
         )}
       </ScrollView>
-    </BottomSheetModal>
+    </VitoSheet>
   );
 };
 
@@ -151,7 +151,7 @@ export const AddSkillSheet: React.FC<{
   const safeExisting = Array.isArray(existingSkillKeys) ? existingSkillKeys : [];
   const available = (skills ?? []).filter((s) => !safeExisting.includes(s.key));
   return (
-    <BottomSheetModal visible={visible} onClose={onClose} title="Adicionar habilidade">
+    <VitoSheet visible={visible} onClose={onClose} title="Adicionar habilidade">
       <ScrollView style={styles.scroll}>
         {available.length === 0 ? (
           <Text style={[styles.desc, { color: colors.muted }]}>
@@ -178,7 +178,7 @@ export const AddSkillSheet: React.FC<{
           ))
         )}
       </ScrollView>
-    </BottomSheetModal>
+    </VitoSheet>
   );
 };
 
@@ -192,7 +192,7 @@ export const AddActionSheet: React.FC<{
   const { colors } = useTheme();
   const safeExisting = Array.isArray(existingActionKeys) ? existingActionKeys : [];
   return (
-    <BottomSheetModal visible={visible} onClose={onClose} title="Adicionar ação">
+    <VitoSheet visible={visible} onClose={onClose} title="Adicionar ação">
       <ScrollView style={styles.scroll}>
         {(apps ?? []).map((app) => {
           const appActions = Array.isArray(app?.actions) ? app.actions : [];
@@ -234,7 +234,7 @@ export const AddActionSheet: React.FC<{
           );
         })}
       </ScrollView>
-    </BottomSheetModal>
+    </VitoSheet>
   );
 };
 

@@ -2,7 +2,6 @@ package adkengine
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"iter"
@@ -17,7 +16,6 @@ import (
 	"google.golang.org/adk/v2/session"
 	"google.golang.org/genai"
 
-	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/repository"
 )
 
@@ -334,6 +332,11 @@ func (s *SQLiteSessionService) AppendEvent(ctx context.Context, curSession sessi
 
 // SeedClientHistory injeta histórico enviado pelo cliente quando a sessão SQLite é nova.
 func (s *SQLiteSessionService) SeedClientHistory(appName, userID, sessionID string, turns []struct{ Role, Content string }) {
+	s.SeedClientHistoryWithReset(appName, userID, sessionID, turns, false)
+}
+
+// SeedClientHistoryWithReset injeta histórico do cliente e, quando reset=true (edição/reenvio), substitui os eventos em cache.
+func (s *SQLiteSessionService) SeedClientHistoryWithReset(appName, userID, sessionID string, turns []struct{ Role, Content string }, reset bool) {
 	key := sessionMapKey(appName, userID, sessionID)
 	s.mu.RLock()
 	sess, ok := s.sessions[key]
@@ -344,8 +347,11 @@ func (s *SQLiteSessionService) SeedClientHistory(appName, userID, sessionID stri
 
 	sess.mu.Lock()
 	defer sess.mu.Unlock()
-	if len(sess.events) > 0 {
+	if len(sess.events) > 0 && !reset {
 		return
+	}
+	if reset {
+		sess.events = nil
 	}
 
 	now := time.Now().UTC().Add(-time.Duration(len(turns)+1) * time.Second)
@@ -408,77 +414,4 @@ func loadHistoricalEventsFromSQLite(ctx context.Context, convRepo *repository.Co
 		})
 	}
 	return events
-}
-
-func (f *ADKLoopFacade) persistCompletedTurn(
-	ctx context.Context,
-	threadID, turnID string,
-	req domain.UnifiedAssistantRequest,
-	finalAnswer string,
-	collectedCards []domain.ChatCard,
-	executedTools []domain.ExecutedTool,
-	collectedReasoning []string,
-	modelUsed string,
-	startTime time.Time,
-) {
-	if f.cfg.ConvRepo == nil {
-		return
-	}
-	cardsBytes, _ := json.Marshal(collectedCards)
-	toolsBytes, _ := json.Marshal(executedTools)
-	reasonBytes, _ := json.Marshal(collectedReasoning)
-
-	_ = f.cfg.ConvRepo.CreateTurn(ctx, &repository.ConversationTurn{
-		ID:        turnID,
-		ThreadID:  threadID,
-		UserID:    req.UserID,
-		Channel:   req.Channel,
-		Role:      "user",
-		Content:   req.Message,
-		CreatedAt: startTime,
-	})
-	_ = f.cfg.ConvRepo.CreateTurn(ctx, &repository.ConversationTurn{
-		ID:            uuid.New().String(),
-		ThreadID:      threadID,
-		UserID:        req.UserID,
-		Channel:       req.Channel,
-		Role:          "assistant",
-		Content:       finalAnswer,
-		ReasoningJSON: string(reasonBytes),
-		ToolCallsJSON: string(toolsBytes),
-		CardsJSON:     string(cardsBytes),
-		ModelUsed:     modelUsed,
-		LatencyMs:     time.Since(startTime).Milliseconds(),
-		CreatedAt:     time.Now().UTC(),
-	})
-}
-
-func (f *ADKLoopFacade) recordSimpleTurns(
-	ctx context.Context,
-	threadID, turnID, userID, channel, userMsg, assistantMsg string,
-	startTime time.Time,
-) {
-	if f.cfg.ConvRepo == nil {
-		return
-	}
-	if userMsg != "" {
-		_ = f.cfg.ConvRepo.CreateTurn(ctx, &repository.ConversationTurn{
-			ID:        turnID,
-			ThreadID:  threadID,
-			UserID:    userID,
-			Role:      "user",
-			Content:   userMsg,
-			Channel:   channel,
-			CreatedAt: startTime,
-		})
-	}
-	_ = f.cfg.ConvRepo.CreateTurn(ctx, &repository.ConversationTurn{
-		ID:        uuid.New().String(),
-		ThreadID:  threadID,
-		UserID:    userID,
-		Role:      "assistant",
-		Content:   assistantMsg,
-		Channel:   channel,
-		CreatedAt: time.Now().UTC(),
-	})
 }

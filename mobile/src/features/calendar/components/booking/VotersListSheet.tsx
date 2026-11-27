@@ -1,7 +1,7 @@
 import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '../../../../context/ThemeContext';
-import { BottomSheetModal } from '../../../../components/ui/BottomSheetModal';
+import { VitoSheet } from '../../../../components/ui/VitoSheet';
 
 export const VOTER_AVATAR_COLORS = ['#0a7cff', '#0aa55c', '#ff2fa0', '#f08300', '#7a4fe0', '#0aa5b5'];
 
@@ -28,7 +28,7 @@ export const VotersListSheet: React.FC<VotersListSheetProps> = ({
   const sub = `${voters.length} ${voters.length === 1 ? 'participante votou' : 'participantes votaram'}`;
 
   return (
-    <BottomSheetModal visible={visible} onClose={onClose} title={title} subtitle={sub}>
+    <VitoSheet visible={visible} onClose={onClose} title={title} subtitle={sub}>
       <ScrollView contentContainerStyle={styles.list}>
         {voters.map((name, idx) => (
           <View
@@ -53,7 +53,7 @@ export const VotersListSheet: React.FC<VotersListSheetProps> = ({
           </View>
         ))}
       </ScrollView>
-    </BottomSheetModal>
+    </VitoSheet>
   );
 };
 

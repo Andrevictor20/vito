@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 
 	"github.com/andrevmp/vito/backend/internal/domain"
 )
@@ -32,7 +33,7 @@ func (r *MemoryRepositorySQLite) Create(m *domain.Memory) error {
 		INSERT INTO memories (id, user_id, category, content, importance, confidence, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 	`
-	return ExecuteQueuedWrite(context.Background(), func() error {
+	return database.ExecuteQueuedWrite(context.Background(), func() error {
 		_, err := r.db.Exec(query, m.ID, m.UserID, m.Category, m.Content, imp, conf, m.CreatedAt, m.UpdatedAt)
 		return err
 	})
@@ -99,7 +100,7 @@ func (r *MemoryRepositorySQLite) ListByUser(userID string, limit int) ([]domain.
 
 func (r *MemoryRepositorySQLite) Delete(id, userID string) error {
 	query := `DELETE FROM memories WHERE id = ? AND user_id = ?`
-	rows, err := ExecuteQueuedWriteRows(context.Background(), func() (sql.Result, error) {
+	rows, err := database.ExecuteQueuedWriteRows(context.Background(), func() (sql.Result, error) {
 		return r.db.Exec(query, id, userID)
 	})
 	if err != nil {

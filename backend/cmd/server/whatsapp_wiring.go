@@ -3,15 +3,15 @@ package main
 import (
 	"context"
 	"database/sql"
-	"github.com/andrevmp/vito/backend/internal/ai/voice"
-	"github.com/andrevmp/vito/backend/internal/whatsapp"
 	"time"
 
 	"github.com/andrevmp/vito/backend/internal/ai"
-	"github.com/andrevmp/vito/backend/internal/platform/config"
+	"github.com/andrevmp/vito/backend/internal/ai/voice"
 	"github.com/andrevmp/vito/backend/internal/domain"
-	"github.com/andrevmp/vito/backend/internal/repository"
+	"github.com/andrevmp/vito/backend/internal/platform/config"
 	"github.com/andrevmp/vito/backend/internal/service"
+	"github.com/andrevmp/vito/backend/internal/whatsapp"
+	"github.com/andrevmp/vito/backend/internal/whatsapp/evolution"
 )
 
 // whatsappWiring concentra as peças do assistente de WhatsApp para manter o
@@ -29,13 +29,13 @@ type whatsappWiring struct {
 }
 
 // setupWhatsAppAssistant monta o assistente de WhatsApp (contexto, diretório de
-// contatos, cache de nomes, owner JID, Radar de pendências, backfill e
+// contatos, cache de nomes, owner JID, detecção de pendências, backfill e
 // enriquecimento de mídia).
 func setupWhatsAppAssistant(
 	cfg *config.Config,
 	db *sql.DB,
 	waRepo domain.WhatsAppRepository,
-	evoClient whatsapp.EvolutionAPIClient,
+	evoClient evolution.EvolutionAPIClient,
 	waSvc *whatsapp.WhatsAppService,
 	notifSvc *service.NotificationService,
 	accountCleanupWorker *service.AccountCleanupWorker,
@@ -59,7 +59,7 @@ func setupWhatsAppAssistant(
 	contextSvc := whatsapp.NewWhatsAppContextService(waConvRepo, waContextCfg)
 	groupMeta := whatsapp.NewWhatsAppGroupMeta(evoClient, time.Hour, 24*time.Hour)
 	ownerCache := whatsapp.NewWhatsAppOwnerCache(evoClient, time.Hour)
-	contactRepo := repository.NewContactRepository(db)
+	contactRepo := whatsapp.NewContactRepository(db)
 	contactsCache := whatsapp.NewWhatsAppContactsCache(evoClient, time.Hour)
 	if allContacts, err := contactRepo.ListAll(context.Background()); err == nil && len(allContacts) > 0 {
 		contactsCache.HydrateFromContacts(allContacts)

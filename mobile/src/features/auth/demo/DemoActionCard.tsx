@@ -17,7 +17,7 @@ import {
   MailIcon,
   RadarIcon,
   CheckCircleIcon,
-} from './DemoIcons'
+} from '../../../icons/AppGlyphs'
 
 export interface DemoActionCardProps {
   scene: DemoScene

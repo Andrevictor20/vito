@@ -2,7 +2,6 @@ import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Crypto from 'expo-crypto';
 import { ByokStep, isByokStep } from '../utils/byokFlow';
-import { clearPluggyWebViewData } from '../utils/pluggyBrowserReset';
 import { canValidate } from '../utils/pluggyKeys';
 import { api } from '../../../services/api';
 
@@ -134,7 +133,6 @@ export async function clearKeys(): Promise<void> {
   await SecureStore.deleteItemAsync(K_SECRET).catch(() => {});
   await AsyncStorage.removeItem(K_STEP).catch(() => {});
   await api.finance.deleteByokBackup().catch(() => {});
-  await clearPluggyWebViewData().catch(() => {});
 }
 
 /** Zera integralmente chaves, identificadores BYOK, tutorial, backup remoto e dados de navegação. */
@@ -147,7 +145,6 @@ export async function resetAllFromScratch(): Promise<void> {
     AsyncStorage.removeItem(K_STEP),
     AsyncStorage.removeItem(K_TUTORIAL),
     api.finance.deleteByokBackup(),
-    clearPluggyWebViewData(),
   ]);
 }
 

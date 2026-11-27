@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"github.com/andrevmp/vito/backend/internal/platform/httpx"
 	"net/http"
 	"time"
 
@@ -32,13 +33,13 @@ type testNotificationRequest struct {
 func (h *NotificationHandler) RegisterDeviceToken(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		http.Error(w, `{"error":"não autorizado"}`, http.StatusUnauthorized)
+		httpx.WriteJSONError(w, http.StatusUnauthorized, "não autorizado")
 		return
 	}
 
 	var req registerDeviceTokenRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, `{"error":"payload inválido"}`, http.StatusBadRequest)
+		httpx.WriteJSONError(w, http.StatusBadRequest, "payload inválido")
 		return
 	}
 
@@ -62,7 +63,7 @@ func (h *NotificationHandler) RegisterDeviceToken(w http.ResponseWriter, r *http
 func (h *NotificationHandler) UnregisterDeviceToken(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		http.Error(w, `{"error":"não autorizado"}`, http.StatusUnauthorized)
+		httpx.WriteJSONError(w, http.StatusUnauthorized, "não autorizado")
 		return
 	}
 
@@ -92,7 +93,7 @@ func (h *NotificationHandler) UnregisterDeviceToken(w http.ResponseWriter, r *ht
 func (h *NotificationHandler) SendTestNotification(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		http.Error(w, `{"error":"não autorizado"}`, http.StatusUnauthorized)
+		httpx.WriteJSONError(w, http.StatusUnauthorized, "não autorizado")
 		return
 	}
 
@@ -134,7 +135,7 @@ func (h *NotificationHandler) SendTestNotification(w http.ResponseWriter, r *htt
 func (h *NotificationHandler) GetNotificationStatus(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		http.Error(w, `{"error":"não autorizado"}`, http.StatusUnauthorized)
+		httpx.WriteJSONError(w, http.StatusUnauthorized, "não autorizado")
 		return
 	}
 

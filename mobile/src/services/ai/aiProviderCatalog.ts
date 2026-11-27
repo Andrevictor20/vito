@@ -64,9 +64,9 @@ export const AI_PROVIDER_CATALOG: Record<AIProviderKey, AIProviderCatalogEntry> 
     keyUrl: 'https://console.anthropic.com/settings/keys',
     keyUrlLabel: 'Abrir Console da Anthropic',
     defaultModels: [
-      { id: 'claude-3-5-haiku-latest', name: 'Claude Haiku 5.5', note: 'Rápido e econômico', supports_tools: true, supports_vision: true, reasoning: false, quality_tier: 2, max_context: 200000 },
-      { id: 'claude-sonnet-4-5', name: 'Claude Sonnet 5.5', note: 'Equilibrado', supports_tools: true, supports_vision: true, reasoning: true, quality_tier: 3, max_context: 200000 },
-      { id: 'claude-opus-4-1', name: 'Claude Opus 5.5', note: 'O mais capaz', supports_tools: true, supports_vision: true, reasoning: true, quality_tier: 3, max_context: 200000 },
+      { id: 'claude-3-5-haiku-latest', name: 'Claude 3.5 Haiku', note: 'Rápido e econômico', supports_tools: true, supports_vision: true, reasoning: false, quality_tier: 2, max_context: 200000 },
+      { id: 'claude-sonnet-4-5', name: 'Claude Sonnet 4.5', note: 'Equilibrado', supports_tools: true, supports_vision: true, reasoning: true, quality_tier: 3, max_context: 200000 },
+      { id: 'claude-opus-4-1', name: 'Claude Opus 4.1', note: 'O mais capaz', supports_tools: true, supports_vision: true, reasoning: true, quality_tier: 3, max_context: 200000 },
     ],
   },
   google: {
@@ -101,7 +101,7 @@ export const AI_PROVIDER_CATALOG: Record<AIProviderKey, AIProviderCatalogEntry> 
     keyUrl: 'https://platform.openai.com/api-keys',
     keyUrlLabel: 'Abrir Plataforma OpenAI',
     defaultModels: [
-      { id: 'gpt-4.1', name: 'GPT-5.5', note: 'Uso geral', supports_tools: true, supports_vision: true, reasoning: true, quality_tier: 3, max_context: 128000 },
+      { id: 'gpt-4.1', name: 'GPT-4.1', note: 'Uso geral', supports_tools: true, supports_vision: true, reasoning: true, quality_tier: 3, max_context: 128000 },
       { id: 'gpt-4o-mini', name: 'GPT-4o mini', note: 'Econômico', supports_tools: true, supports_vision: true, reasoning: false, quality_tier: 2, max_context: 128000 },
     ],
   },
@@ -137,7 +137,7 @@ export const AI_PROVIDER_CATALOG: Record<AIProviderKey, AIProviderCatalogEntry> 
     keyUrl: 'https://openrouter.ai/keys',
     keyUrlLabel: 'Abrir OpenRouter Keys',
     defaultModels: [
-      { id: 'anthropic/claude-sonnet-4-5', name: 'anthropic/claude-sonnet-5-5', note: 'Via OpenRouter', supports_tools: true, supports_vision: true, reasoning: true, quality_tier: 3, max_context: 200000 },
+      { id: 'anthropic/claude-sonnet-4-5', name: 'anthropic/claude-sonnet-4-5', note: 'Via OpenRouter', supports_tools: true, supports_vision: true, reasoning: true, quality_tier: 3, max_context: 200000 },
       { id: 'google/gemini-2.5-flash', name: 'google/gemini-2.5-flash', note: 'Via OpenRouter', supports_tools: true, supports_vision: true, reasoning: true, quality_tier: 3, max_context: 1048576 },
     ],
   },

@@ -3,7 +3,7 @@ import { StyleSheet, View, Text, TouchableOpacity, ScrollView } from "react-nati
 import { ProtoUiIcon } from '../../../../icons/ProtoUiIcons';
 import { tokens, MD3Shapes, tabularNumbers } from "../../../../theme/tokens";
 import { useTheme } from "../../../../context/ThemeContext";
-import { BottomSheetModal } from "../../../../components/ui/BottomSheetModal";
+import { VitoSheet } from "../../../../components/ui/VitoSheet";
 import { WeeklySummaryItem } from "../../utils/weeklySummaryCalculator";
 import { Event } from "../../../../types";
 
@@ -68,7 +68,7 @@ export const WeeklyRaioXModal: React.FC<WeeklyRaioXModalProps> = ({
   };
 
   return (
-    <BottomSheetModal
+    <VitoSheet
       visible={visible}
       onClose={onClose}
       title={`Raio-X · ${selectedWeek.period}`}
@@ -230,7 +230,7 @@ export const WeeklyRaioXModal: React.FC<WeeklyRaioXModalProps> = ({
           </Text>
         </TouchableOpacity>
       </ScrollView>
-    </BottomSheetModal>
+    </VitoSheet>
   );
 };
 

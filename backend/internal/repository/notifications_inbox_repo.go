@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
+	"github.com/andrevmp/vito/backend/internal/platform/timeutil"
 	"strings"
 	"time"
 
@@ -41,11 +43,7 @@ func normalizeActionsJSON(n *domain.UserNotification) string {
 // ComputeGroupKey calcula o grupo temporal dinâmico ("Agora", "Hoje", "Ontem", "Anteriores") no fuso local.
 func ComputeGroupKey(createdAt, now time.Time, loc *time.Location) string {
 	if loc == nil {
-		var err error
-		loc, err = time.LoadLocation("America/Sao_Paulo")
-		if err != nil {
-			loc = time.UTC
-		}
+		loc = timeutil.SaoPauloLocation()
 	}
 	if now.IsZero() {
 		now = time.Now()
@@ -148,7 +146,7 @@ func (r *NotificationsInboxRepositorySQLite) Create(ctx context.Context, n *doma
 			title, body, actions_json, is_unread, is_dismissed, created_at
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
-	return ExecuteQueuedWrite(ctx, func() error {
+	return database.ExecuteQueuedWrite(ctx, func() error {
 		_, err := r.db.ExecContext(ctx, q,
 			n.ID, n.UserID, n.GroupKey, string(n.Type), n.SourceDomain, n.SourceID, n.BotID,
 			n.Title, n.Body, actionsJSON, unread, dismissed, n.CreatedAt,
@@ -190,7 +188,7 @@ func (r *NotificationsInboxRepositorySQLite) UpsertBySource(ctx context.Context,
 			actions_json = excluded.actions_json,
 			bot_id = excluded.bot_id
 	`
-	return ExecuteQueuedWrite(ctx, func() error {
+	return database.ExecuteQueuedWrite(ctx, func() error {
 		_, err := r.db.ExecContext(ctx, q,
 			n.ID, n.UserID, n.GroupKey, string(n.Type), n.SourceDomain, n.SourceID, n.BotID,
 			n.Title, n.Body, actionsJSON, unread, n.CreatedAt,
@@ -283,7 +281,7 @@ func (r *NotificationsInboxRepositorySQLite) ListByUser(
 
 // MarkRead marca uma notificação específica do usuário como lida.
 func (r *NotificationsInboxRepositorySQLite) MarkRead(ctx context.Context, id, userID string) error {
-	affected, err := ExecuteQueuedWriteRows(ctx, func() (sql.Result, error) {
+	affected, err := database.ExecuteQueuedWriteRows(ctx, func() (sql.Result, error) {
 		return r.db.ExecContext(ctx, `
 			UPDATE user_notifications SET is_unread = 0 WHERE id = ? AND user_id = ?
 		`, id, userID)
@@ -299,7 +297,7 @@ func (r *NotificationsInboxRepositorySQLite) MarkRead(ctx context.Context, id, u
 
 // Dismiss oculta/resolve uma notificação do usuário e a marca como lida.
 func (r *NotificationsInboxRepositorySQLite) Dismiss(ctx context.Context, id, userID string) error {
-	affected, err := ExecuteQueuedWriteRows(ctx, func() (sql.Result, error) {
+	affected, err := database.ExecuteQueuedWriteRows(ctx, func() (sql.Result, error) {
 		return r.db.ExecContext(ctx, `
 			UPDATE user_notifications SET is_unread = 0, is_dismissed = 1 WHERE id = ? AND user_id = ?
 		`, id, userID)
@@ -315,7 +313,7 @@ func (r *NotificationsInboxRepositorySQLite) Dismiss(ctx context.Context, id, us
 
 // MarkAllRead marca todas as notificações não descartadas do usuário como lidas.
 func (r *NotificationsInboxRepositorySQLite) MarkAllRead(ctx context.Context, userID string) (int64, error) {
-	return ExecuteQueuedWriteRows(ctx, func() (sql.Result, error) {
+	return database.ExecuteQueuedWriteRows(ctx, func() (sql.Result, error) {
 		return r.db.ExecContext(ctx, `
 			UPDATE user_notifications SET is_unread = 0
 			WHERE user_id = ? AND is_dismissed = 0 AND is_unread = 1
@@ -371,7 +369,7 @@ func (r *NotificationsInboxRepositorySQLite) UpsertPreferences(ctx context.Conte
 			promo = excluded.promo,
 			updated_at = excluded.updated_at
 	`
-	return ExecuteQueuedWrite(ctx, func() error {
+	return database.ExecuteQueuedWrite(ctx, func() error {
 		_, err := r.db.ExecContext(ctx, q,
 			p.UserID,
 			b2i(p.Agenda),

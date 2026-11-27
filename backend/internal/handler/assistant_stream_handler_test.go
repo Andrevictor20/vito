@@ -6,8 +6,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/andrevmp/vito/backend/internal/ai/voice"
 	"io"
+	"iter"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -15,33 +15,47 @@ import (
 	"testing"
 	"time"
 
-	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/ai/adkengine"
-	"github.com/andrevmp/vito/backend/internal/platform/database"
+	"github.com/andrevmp/vito/backend/internal/ai/voice"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/handler"
 	"github.com/andrevmp/vito/backend/internal/handler/middleware"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/andrevmp/vito/backend/internal/service"
 	"github.com/andrevmp/vito/backend/internal/service/toolsets"
+	"google.golang.org/adk/v2/model"
+	"google.golang.org/genai"
 )
 
-type testHandlerMockProvider struct{}
-
-func (m *testHandlerMockProvider) Name() string          { return "test-provider" }
-func (m *testHandlerMockProvider) ModelName() string     { return "test-model" }
-func (m *testHandlerMockProvider) SupportsTools() bool   { return true }
-func (m *testHandlerMockProvider) SupportsVision() bool  { return false }
-func (m *testHandlerMockProvider) QualityTier() int      { return 3 }
-func (m *testHandlerMockProvider) MaxContextTokens() int { return 100000 }
-func (m *testHandlerMockProvider) Chat(ctx context.Context, req ai.AgentChatRequest) (*ai.AgentChatResponse, error) {
-	return &ai.AgentChatResponse{Text: "Resposta do endpoint", ProviderName: "test-provider", ModelName: "test-model"}, nil
+type testHandlerMockLLM struct {
+	model string
+	reply string
 }
-func (m *testHandlerMockProvider) StreamChat(ctx context.Context, req ai.AgentChatRequest, onDelta func(ai.StreamDelta) error) (*ai.AgentChatResponse, error) {
-	if onDelta != nil {
-		_ = onDelta(ai.StreamDelta{TextDelta: "Resposta do endpoint"})
+
+func (m *testHandlerMockLLM) Name() string {
+	if m.model != "" {
+		return m.model
 	}
-	return m.Chat(ctx, req)
+	return "test-model"
+}
+
+func (m *testHandlerMockLLM) GenerateContent(_ context.Context, _ *model.LLMRequest, stream bool) iter.Seq2[*model.LLMResponse, error] {
+	return func(yield func(*model.LLMResponse, error) bool) {
+		if stream {
+			if !yield(&model.LLMResponse{
+				Partial: true,
+				Content: &genai.Content{Role: genai.RoleModel, Parts: []*genai.Part{{Text: m.reply}}},
+			}, nil) {
+				return
+			}
+		}
+		yield(&model.LLMResponse{
+			ModelVersion: m.Name(),
+			TurnComplete: true,
+			Content:      &genai.Content{Role: genai.RoleModel, Parts: []*genai.Part{{Text: m.reply}}},
+		}, nil)
+	}
 }
 
 func setupStreamHandlerTest(t *testing.T) (*handler.AssistantStreamHandler, string) {
@@ -64,13 +78,12 @@ func setupStreamHandlerTest(t *testing.T) (*handler.AssistantStreamHandler, stri
 	})
 
 	convRepo := repository.NewConversationStoreRepository(db)
-	router := ai.NewModelRouter(&testHandlerMockProvider{})
 	guard := service.NewScopeGuard()
 	gate := service.NewConfirmationGateService(db)
 	reg := toolsets.NewToolsetsRegistry()
-	loop := service.NewAgentLoop(router, reg, guard, gate, convRepo, nil)
+	llm := &testHandlerMockLLM{model: "test-model", reply: "Resposta do endpoint"}
 	facade, fErr := adkengine.NewADKLoopFacade(adkengine.FacadeConfig{
-		Router:           router,
+		ServerPool:       []adkengine.ServerPoolEntry{{ProviderKey: "gemini", DisplayName: "test-provider", ModelID: "test-model", Tier: 3, LLM: llm}},
 		Registry:         reg,
 		ScopeGuard:       guard,
 		ConfirmationGate: gate,
@@ -79,9 +92,8 @@ func setupStreamHandlerTest(t *testing.T) (*handler.AssistantStreamHandler, stri
 	if fErr != nil {
 		t.Fatalf("NewADKLoopFacade falhou: %v", fErr)
 	}
-	loop.SetEngine(facade)
 
-	return handler.NewAssistantStreamHandler(loop), userID
+	return handler.NewAssistantStreamHandler(facade), userID
 }
 
 func TestAssistantStreamHandler_Chat(t *testing.T) {
@@ -281,21 +293,6 @@ func TestAssistantStreamHandler_AudioChat_EmptyTranscript_ReturnsImmediateNotice
 	}
 }
 
-type markdownMockProvider struct{}
-
-func (m *markdownMockProvider) Name() string          { return "markdown-provider" }
-func (m *markdownMockProvider) ModelName() string     { return "markdown-model" }
-func (m *markdownMockProvider) SupportsTools() bool   { return false }
-func (m *markdownMockProvider) SupportsVision() bool  { return false }
-func (m *markdownMockProvider) QualityTier() int      { return 3 }
-func (m *markdownMockProvider) MaxContextTokens() int { return 100000 }
-func (m *markdownMockProvider) Chat(ctx context.Context, req ai.AgentChatRequest) (*ai.AgentChatResponse, error) {
-	return &ai.AgentChatResponse{Text: "**Bom dia, André!** Você tem **2 compromissos** marcados hoje."}, nil
-}
-func (m *markdownMockProvider) StreamChat(ctx context.Context, req ai.AgentChatRequest, onDelta func(ai.StreamDelta) error) (*ai.AgentChatResponse, error) {
-	return m.Chat(ctx, req)
-}
-
 func TestAssistantStreamHandler_AudioChat_CleansMarkdownAndIsolatesThread(t *testing.T) {
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "test_markdown.db")
@@ -316,25 +313,23 @@ func TestAssistantStreamHandler_AudioChat_CleansMarkdownAndIsolatesThread(t *tes
 	})
 
 	convRepo := repository.NewConversationStoreRepository(db)
-	router := ai.NewModelRouter(&markdownMockProvider{})
 	guard := service.NewScopeGuard()
 	gate := service.NewConfirmationGateService(db)
 	reg := toolsets.NewToolsetsRegistry()
-	loop := service.NewAgentLoop(router, reg, guard, gate, convRepo, nil)
+	llm := &testHandlerMockLLM{model: "markdown-model", reply: "**Bom dia, André!** Você tem **2 compromissos** marcados hoje."}
 	facade, fErr := adkengine.NewADKLoopFacade(adkengine.FacadeConfig{
-		Router:           router,
+		ServerPool:       []adkengine.ServerPoolEntry{{ProviderKey: "gemini", DisplayName: "markdown-provider", ModelID: "markdown-model", Tier: 3, LLM: llm}},
 		Registry:         reg,
 		ScopeGuard:       guard,
 		ConfirmationGate: gate,
 		ConvRepo:         convRepo,
+		UserRepo:         userRepo,
 	})
 	if fErr != nil {
 		t.Fatalf("NewADKLoopFacade falhou: %v", fErr)
 	}
-	loop.SetEngine(facade)
-	loop.SetUserRepositories(userRepo, nil)
 
-	h := handler.NewAssistantStreamHandler(loop)
+	h := handler.NewAssistantStreamHandler(facade)
 	h.SetTranscriber(&streamMockTranscriber{})
 
 	bodyBytes, _ := json.Marshal(map[string]any{

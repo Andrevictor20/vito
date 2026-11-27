@@ -6,8 +6,8 @@ import { fileURLToPath } from 'node:url';
 import {
   filterNotifications,
   type NotificationFilter,
-} from '../features/notifications/components/notificationHelpers';
-import type { InboxNotification } from '../features/notifications/services/inboxNotificationsApi';
+} from '../features/notifications/utils/notificationHelpers';
+import type { InboxNotification } from '../features/notifications/services/notificationsApi';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

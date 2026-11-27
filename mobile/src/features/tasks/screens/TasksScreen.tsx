@@ -1,31 +1,33 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   ActivityIndicator,
   LayoutAnimation,
   Platform,
   RefreshControl,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   UIManager,
   View,
 } from 'react-native';
-import { ProtoUiIcon } from '../../../icons/ProtoUiIcons';
-import { PlusSvgIcon } from '../../../icons/ChatProtoIcons';
+import { PlusSvgIcon, ProtoUiIcon } from '../../../icons/ProtoUiIcons';
+import { api } from '../../../services/api';
+import { chatPromptBus } from '../../../services/dataSync';
+import { styles } from './TasksScreen.styles';
 import { tokens } from '../../../theme/tokens';
 import { useTheme } from '../../../context/ThemeContext';
 import { hapticFeedback } from '../../../theme/motion';
 import { StaggerItem } from '../../../theme/vitoMotion';
 import type { Todo } from '../../../types';
-import { TaskRow } from '../components/tasks/TaskRow';
-import { TaskListChips } from '../components/tasks/TaskListChips';
-import { DailyTasksSummaryCard } from '../components/tasks/DailyTasksSummaryCard';
-import { TaskQuickAddSheet } from '../components/tasks/TaskQuickAddSheet';
-import { TaskDetailSheet } from '../components/tasks/TaskDetailSheet';
-import { TaskGroupHeader } from '../components/tasks/TaskGroupHeader';
-import { CompletedAccordion } from '../components/tasks/CompletedAccordion';
+import { TaskRow } from '../components/TaskRow';
+import { TaskListChips } from '../components/TaskListChips';
+import { DailyTasksSummaryCard } from '../components/DailyTasksSummaryCard';
+import { TaskQuickAddSheet } from '../components/TaskQuickAddSheet';
+import { TaskDetailSheet } from '../components/TaskDetailSheet';
+import { TaskGroupHeader } from '../components/TaskGroupHeader';
+import { CompletedAccordion } from '../components/CompletedAccordion';
 import { VitoMascot } from '../../../components/common/VitoMascot';
 import { usePendingItems } from '../hooks/usePendingItems';
 import { toUnifiedRows, sortUnifiedRows, TaskSort, UnifiedRow } from '../utils/unifiedTasks';
@@ -107,6 +109,19 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
   const [selectedListId, setSelectedListId] = useState<string>('all');
   const [lists, setLists] = useState<TaskListDef[]>(DEFAULT_TASK_LISTS);
   const [collapsedBuckets, setCollapsedBuckets] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    AsyncStorage.getItem('@vito_task_custom_lists')
+      .then((raw) => {
+        if (!raw) return;
+        const custom = JSON.parse(raw) as TaskListDef[];
+        if (Array.isArray(custom) && custom.length > 0) {
+          const defaultIds = new Set(DEFAULT_TASK_LISTS.map((l) => l.id));
+          setLists([...DEFAULT_TASK_LISTS, ...custom.filter((c) => !defaultIds.has(c.id))]);
+        }
+      })
+      .catch(() => {});
+  }, []);
   const [sort] = useState<TaskSort>('date');
   const [internalQuery, setInternalQuery] = useState('');
   const [detailRow, setDetailRow] = useState<UnifiedRow | null>(null);
@@ -134,7 +149,7 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
 
   const resolveListId = useCallback(
     (row: UnifiedRow): string => {
-      const cat = (row.sourceTodo?.category || '').toLowerCase();
+      const cat = (row.sourceTodo?.category || row.sourcePending?.category || '').toLowerCase();
       const match = lists.find((l) => l.id === cat || l.name.toLowerCase() === cat);
       return match ? match.id : lists[0].id;
     },
@@ -169,6 +184,15 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
     [listFilteredRows, activeFilter, query, now]
   );
 
+  const todayIso = useMemo(() => formatIsoDate(new Date()), []);
+  const completedTodayCount = useMemo(
+    () =>
+      doneRows.filter((r) => {
+        const rawStamp = r.sourceTodo?.updated_at || r.sourcePending?.updated_at || '';
+        return typeof rawStamp === 'string' && rawStamp.slice(0, 10) === todayIso;
+      }).length,
+    [doneRows, todayIso]
+  );
   const todayCount = useMemo(
     () => activeRows.filter((r) => getTaskBucket(getRowDateStr(r), now) === 'hoje').length,
     [activeRows, now]
@@ -258,7 +282,15 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
           selectedListId={selectedListId}
           onSelectList={setSelectedListId}
           countsByList={countsByList}
-          onCreateList={(newList) => setLists((prev) => [...prev, newList])}
+          onCreateList={(newList) => {
+            setLists((prev) => {
+              const next = [...prev, newList];
+              const defaultIds = new Set(DEFAULT_TASK_LISTS.map((l) => l.id));
+              const customOnly = next.filter((l) => !defaultIds.has(l.id));
+              void AsyncStorage.setItem('@vito_task_custom_lists', JSON.stringify(customOnly));
+              return next;
+            });
+          }}
         />
       </StaggerItem>
 
@@ -280,7 +312,7 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
         {!query && (
           <StaggerItem index={1}>
             <DailyTasksSummaryCard
-              completedTodayCount={completedTodosList.length}
+              completedTodayCount={completedTodayCount}
               pendingTodayCount={todayCount}
               overdueCount={overdueCount}
             />
@@ -328,7 +360,11 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
                           onPostpone={() => handlePostponeTomorrow(row)}
                           onDelete={() => handleDeleteRow(row)}
                           onEdit={() => setDetailRow(row)}
-                          onAiAction={() => setDetailRow(row)}
+                          onAiAction={() =>
+                            chatPromptBus.askAssistant(
+                              `Me ajude com a tarefa "${row.title}"${rowList ? ` (lista ${rowList.name})` : ''}.`,
+                            )
+                          }
                           subtasks={row.sourceTodo?.subtasks}
                           onToggleSubtask={(sid) => row.sourceTodo && onToggleSubtask(row.sourceTodo.id, sid)}
                           onAddSubtask={(title) => row.sourceTodo && onAddSubtask(row.sourceTodo.id, title)}
@@ -349,6 +385,9 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
             completedRows={doneRows}
             onToggleRow={handleToggleRow}
             onEditRow={setDetailRow}
+            onAiRow={(row) =>
+              chatPromptBus.askAssistant(`Sobre a tarefa concluída "${row.title}", há algum próximo passo?`)
+            }
             onDeleteRow={handleDeleteRow}
           />
         </StaggerItem>
@@ -407,60 +446,13 @@ export const TasksScreen: React.FC<TasksScreenProps> = ({
         onAddSubtask={async (title) => {
           if (activeDetailRow?.sourceTodo) await onAddSubtask(activeDetailRow.sourceTodo.id, title);
         }}
+        onSuggestSubtasks={async (todoId) => {
+          await api.suggestSubtasks(todoId);
+          onRefresh();
+        }}
         onDeleteSubtask={(sid) => activeDetailRow?.sourceTodo && onDeleteSubtask(activeDetailRow.sourceTodo.id, sid)}
         onDeleteTask={() => activeDetailRow && handleDeleteRow(activeDetailRow)}
       />
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  scroll: { flex: 1 },
-  scrollContent: { paddingBottom: 150 },
-  searchSection: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4 },
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 1,
-    paddingHorizontal: 16,
-    gap: 10,
-  },
-  searchInput: { flex: 1, fontSize: 15, paddingVertical: 8 },
-  groupBlock: { marginTop: 4 },
-  groupList: { marginTop: 2 },
-  emptyContainer: { alignItems: 'center', justifyContent: 'center', paddingVertical: 40, paddingHorizontal: 24, gap: 8 },
-  emptyTitle: { fontSize: 17, fontWeight: '600', marginTop: 6 },
-  emptyText: { fontSize: 13.5, textAlign: 'center', maxWidth: 260, lineHeight: 20 },
-  fab: {
-    position: 'absolute',
-    right: 20,
-    bottom: 106,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-  toast: {
-    position: 'absolute',
-    bottom: 110,
-    left: 20,
-    right: 88,
-    borderRadius: 14,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  toastText: { fontSize: 13.5, fontWeight: '500' },
-  toastUndo: { fontSize: 13.5, fontWeight: '700' },
-});

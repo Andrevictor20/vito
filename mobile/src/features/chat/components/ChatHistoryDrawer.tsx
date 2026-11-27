@@ -17,8 +17,8 @@ import { ProtoUiIcon } from '../../../icons/ProtoUiIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../../context/ThemeContext';
 import { MOTION_CURVES } from '../../../theme/motion';
-import { v5Radii } from '../../../theme/tokens';
 import { useReduceMotion } from '../../../theme/vitoMotion';
+import { chatHistoryDrawerStyles as styles } from './ChatHistoryDrawer.styles';
 import type { ConversationSession } from '../../../types';
 import {
   filterSessionsByQuery,
@@ -386,107 +386,3 @@ export const ChatHistoryDrawer: React.FC<ChatHistoryDrawerProps> = ({
     </Modal>
   );
 };
-
-const styles = StyleSheet.create({
-  root: { flex: 1, flexDirection: 'row' },
-  backdrop: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(0, 0, 0, 0.40)',
-  },
-  panel: {
-    height: '100%',
-    borderTopRightRadius: v5Radii.sheet,
-    borderBottomRightRadius: v5Radii.sheet,
-    paddingHorizontal: 16,
-    overflow: 'hidden',
-    elevation: 12,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  headerTextCol: { flex: 1 },
-  headerTitle: {
-    fontFamily: 'Geist',
-    fontSize: 24,
-    fontWeight: '500',
-    letterSpacing: -0.48,
-  },
-  headerSub: { fontFamily: 'Geist', fontSize: 13, marginTop: 2 },
-  closeBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  searchBox: {
-    marginTop: 12,
-    height: 42,
-    borderRadius: 21,
-    borderWidth: 1,
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  searchInput: { flex: 1, fontFamily: 'Geist', fontSize: 14.5, paddingVertical: 0 },
-  suggestionCard: {
-    marginTop: 12,
-    padding: 12,
-    borderRadius: 20,
-    borderWidth: 1,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-  },
-  vitoBadge: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  vitoBadgeText: { fontFamily: 'Geist', fontSize: 12, fontWeight: '600' },
-  suggestionBody: { flex: 1, minWidth: 0 },
-  suggestionText: { fontFamily: 'Geist', fontSize: 13, lineHeight: 17.5 },
-  suggestionBold: { fontWeight: '600' },
-  suggestionActions: { flexDirection: 'row', gap: 6, marginTop: 8 },
-  suggestionBtnPrimary: {
-    height: 30,
-    paddingHorizontal: 12,
-    borderRadius: 999,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  suggestionBtnPrimaryText: { fontFamily: 'Geist', fontSize: 12, fontWeight: '500' },
-  suggestionBtnSecondary: {
-    height: 30,
-    paddingHorizontal: 12,
-    borderRadius: 999,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  suggestionBtnSecondaryText: { fontFamily: 'Geist', fontSize: 12, fontWeight: '500' },
-  listScroll: { flex: 1, marginTop: 10 },
-  listContent: { paddingBottom: 12 },
-  groupHeader: {
-    fontFamily: 'Geist',
-    fontSize: 13,
-    fontWeight: '500',
-    marginTop: 16,
-    marginBottom: 6,
-    marginHorizontal: 4,
-  },
-  emptyContainer: { paddingVertical: 44, paddingHorizontal: 16, alignItems: 'center', gap: 6 },
-  emptyTitle: { fontFamily: 'Geist', fontSize: 15, fontWeight: '500', textAlign: 'center' },
-  emptySub: { fontFamily: 'Geist', fontSize: 13, textAlign: 'center', lineHeight: 18 },
-  swipeHint: { textAlign: 'center', fontFamily: 'Geist', fontSize: 12, marginVertical: 8 },
-  newChatBtn: { height: 50, borderRadius: 999, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
-  newChatBtnText: { fontFamily: 'Geist', fontSize: 15, fontWeight: '500' },
-});

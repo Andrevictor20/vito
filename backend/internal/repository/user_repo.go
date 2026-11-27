@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"strings"
 
 	"github.com/andrevmp/vito/backend/internal/domain"
@@ -42,7 +43,7 @@ func (r *UserRepositorySQLite) Create(u *domain.User) error {
 		INSERT INTO users (id, name, email, phone, password_hash, token_version, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 	`
-	err := ExecuteQueuedWrite(context.Background(), func() error {
+	err := database.ExecuteQueuedWrite(context.Background(), func() error {
 		_, err := r.db.Exec(query, u.ID, u.Name, u.Email, u.Phone, u.PasswordHash, u.TokenVersion, u.CreatedAt, u.UpdatedAt)
 		return err
 	})
@@ -58,7 +59,7 @@ func (r *UserRepositorySQLite) Create(u *domain.User) error {
 // Delete remove o usuário do banco. Usado pela limpeza de contas placeholder órfãs
 // (contas @vito.local sem sessão ativa e sem qualquer dado do usuário).
 func (r *UserRepositorySQLite) Delete(id string) error {
-	rows, err := ExecuteQueuedWriteRows(context.Background(), func() (sql.Result, error) {
+	rows, err := database.ExecuteQueuedWriteRows(context.Background(), func() (sql.Result, error) {
 		return r.db.Exec(`DELETE FROM users WHERE id = ?`, id)
 	})
 	if err != nil {
@@ -151,7 +152,7 @@ func (r *UserRepositorySQLite) UpdatePhone(id, phone string) error {
 		phoneVal = normalized
 	}
 	query := `UPDATE users SET phone = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
-	rows, err := ExecuteQueuedWriteRows(context.Background(), func() (sql.Result, error) {
+	rows, err := database.ExecuteQueuedWriteRows(context.Background(), func() (sql.Result, error) {
 		return r.db.Exec(query, phoneVal, id)
 	})
 	if err != nil {
@@ -186,7 +187,7 @@ func (r *UserRepositorySQLite) ListIDs() ([]string, error) {
 
 func (r *UserRepositorySQLite) IncrementTokenVersion(id string) error {
 	query := `UPDATE users SET token_version = token_version + 1 WHERE id = ?`
-	rows, err := ExecuteQueuedWriteRows(context.Background(), func() (sql.Result, error) {
+	rows, err := database.ExecuteQueuedWriteRows(context.Background(), func() (sql.Result, error) {
 		return r.db.Exec(query, id)
 	})
 	if err != nil {

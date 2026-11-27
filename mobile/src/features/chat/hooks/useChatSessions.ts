@@ -145,8 +145,10 @@ export function useChatSessions(currentUserId?: string): UseChatSessionsResult {
               try {
                 const full = await api.getChatSessionWithMessages(rem.id);
                 if (full && full.session) {
+                  const rawSession = full.session as ConversationSession & { updated_at?: string; created_at?: string };
                   mergedMap.set(rem.id, {
-                    ...full.session,
+                    ...rawSession,
+                    timestamp: rawSession.timestamp || rawSession.updated_at || rawSession.created_at || new Date().toISOString(),
                     messages: full.messages || [INITIAL_MESSAGE],
                   });
                 }
@@ -155,7 +157,7 @@ export function useChatSessions(currentUserId?: string): UseChatSessionsResult {
           }
 
           const consolidated = Array.from(mergedMap.values()).sort(
-            (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+            (a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime()
           );
 
           if (consolidated.length > 0 && isMounted) {

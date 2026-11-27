@@ -7,14 +7,15 @@ import (
 	"github.com/andrevmp/vito/backend/internal/finance"
 	"github.com/andrevmp/vito/backend/internal/tasks"
 	"github.com/andrevmp/vito/backend/internal/whatsapp"
+	"github.com/andrevmp/vito/backend/internal/whatsapp/evolution"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/platform/config"
 	"github.com/andrevmp/vito/backend/internal/platform/database"
-	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/andrevmp/vito/backend/internal/service"
 )
@@ -58,16 +59,16 @@ func (m *mockEvoClientWiring) SendTextWithQuoted(ctx context.Context, instanceNa
 func (m *mockEvoClientWiring) GetMediaBase64(ctx context.Context, instanceName string, messagePayload interface{}) (string, error) {
 	return "", nil
 }
-func (m *mockEvoClientWiring) FindContacts(ctx context.Context, instanceName string) ([]whatsapp.WhatsAppContact, error) {
+func (m *mockEvoClientWiring) FindContacts(ctx context.Context, instanceName string) ([]evolution.WhatsAppContact, error) {
 	return nil, nil
 }
 func (m *mockEvoClientWiring) SendReaction(ctx context.Context, instanceName, remoteJid, messageID, reaction string, fromMe bool) error {
 	return nil
 }
-func (m *mockEvoClientWiring) FindMessages(ctx context.Context, in whatsapp.EvolutionFindMessagesInput) ([]whatsapp.WhatsAppChatMessage, error) {
+func (m *mockEvoClientWiring) FindMessages(ctx context.Context, in evolution.EvolutionFindMessagesInput) ([]evolution.WhatsAppChatMessage, error) {
 	return nil, nil
 }
-func (m *mockEvoClientWiring) FindGroups(ctx context.Context, instanceName string) ([]whatsapp.WhatsAppGroup, error) {
+func (m *mockEvoClientWiring) FindGroups(ctx context.Context, instanceName string) ([]evolution.WhatsAppGroup, error) {
 	return nil, nil
 }
 func (m *mockEvoClientWiring) FindParticipants(ctx context.Context, instanceName, groupJid string) ([]string, error) {
@@ -157,10 +158,7 @@ func TestWhatsAppServiceAdapter_SendMessage_ResolvesContactName(t *testing.T) {
 	dir := whatsapp.NewWhatsAppDirectoryService(nil, whatsapp.DefaultWhatsAppContextConfig(), nil)
 	dir.SetContactRepository(contactRepo)
 
-	adapter := &whatsAppServiceAdapter{
-		svc: waSvc,
-		dir: dir,
-	}
+	adapter := whatsapp.NewWhatsAppToolsetContract(waSvc, dir)
 
 	// 1. Envio por nome de contato ("Carlos")
 	err = adapter.SendMessage(context.Background(), userID, "Carlos", "Olá Carlos!")
@@ -236,7 +234,7 @@ func TestProductionCognitiveWiring_Onda2AndOnda3(t *testing.T) {
 	defer agentSys.TraceRecorder.Close()
 	defer agentSys.ConsolidationWorker.Stop()
 
-	reminderWorker := tasks.NewReminderWorker(eventRepo, notifSvc, 15*time.Minute)
+	reminderWorker := calendar.NewReminderWorker(eventRepo, notifSvc, 15*time.Minute)
 	triggerWorker := bots.NewTriggerWorker(triggerRepo, notifSvc, &bots.DefaultTriggerEvaluator{}, time.Minute)
 	morningWorker := service.NewMorningBriefingWorker(briefingRepo, eventRepo, todoRepo, userRepo, notifSvc, time.Minute)
 	behavioralWorker := service.NewBehavioralWorker(todoRepo, eventRepo, memoryRepo)

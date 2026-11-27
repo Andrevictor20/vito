@@ -5,6 +5,8 @@ import (
 	"log"
 	"sync"
 	"time"
+
+	"github.com/andrevmp/vito/backend/internal/platform/worker"
 )
 
 // WhatsAppContextPruner remove mensagens antigas do shadow inbox do WhatsApp.
@@ -18,9 +20,7 @@ type AccountCleanupWorker struct {
 	contextSvc    WhatsAppContextPruner
 	retentionDays int
 	checkInterval time.Duration
-	stopCh        chan struct{}
-	wg            sync.WaitGroup
-	running       bool
+	loop          *worker.PeriodicLoop
 	mu            sync.Mutex
 }
 
@@ -33,7 +33,7 @@ func NewAccountCleanupWorker(cleanupSvc *AccountCleanupService, checkInterval ..
 	return &AccountCleanupWorker{
 		cleanupSvc:    cleanupSvc,
 		checkInterval: interval,
-		stopCh:        make(chan struct{}),
+		loop:          worker.NewPeriodicLoop(interval, true),
 	}
 }
 
@@ -50,42 +50,12 @@ func (w *AccountCleanupWorker) SetContextService(contextSvc WhatsAppContextPrune
 
 // Start sobe o worker. A primeira limpeza roda logo no boot para limpar sobras de deploys.
 func (w *AccountCleanupWorker) Start() {
-	w.mu.Lock()
-	if w.running {
-		w.mu.Unlock()
-		return
-	}
-	w.running = true
-	w.mu.Unlock()
-
-	w.wg.Add(1)
-	go func() {
-		defer w.wg.Done()
-		w.runOnce()
-		ticker := time.NewTicker(w.checkInterval)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-w.stopCh:
-				return
-			case <-ticker.C:
-				w.runOnce()
-			}
-		}
-	}()
+	w.loop.Start(w.runOnce)
 }
 
 // Stop encerra o worker.
 func (w *AccountCleanupWorker) Stop() {
-	w.mu.Lock()
-	if !w.running {
-		w.mu.Unlock()
-		return
-	}
-	w.running = false
-	w.mu.Unlock()
-	close(w.stopCh)
-	w.wg.Wait()
+	w.loop.Stop()
 }
 
 func (w *AccountCleanupWorker) runOnce() {

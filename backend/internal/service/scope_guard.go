@@ -66,6 +66,11 @@ func (g *MemoryScopeGuard) CanExecute(ctx context.Context, execCtx *domain.ToolE
 		return false, "bloqueado por Taint Tracking: dados externos não confiáveis no contexto exigem confirmação explícita"
 	}
 
+	// Operações sensíveis ou destrutivas exigem confirmação explícita pontual mesmo no modo proativo.
+	if isAlwaysAskOperation(operation) && (execCtx == nil || execCtx.AutonomyLevel != "confirmed") {
+		return false, "ação sensível ou destrutiva exige confirmação explícita do usuário"
+	}
+
 	// Se não está contaminado e a confirmação humana ou autonomia prévia já foi concedida
 	if execCtx != nil && (execCtx.AutonomyLevel == "confirmed" || execCtx.AutonomyLevel == "autonomous_write") {
 		return true, "autorizado por confirmação prévia explícita do usuário"

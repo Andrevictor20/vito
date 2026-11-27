@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"github.com/andrevmp/vito/backend/internal/platform/httpx"
 	"net/http"
 	"strings"
 
@@ -32,13 +33,13 @@ type updateAISettingsRequest struct {
 func (h *AISettingsHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		http.Error(w, `{"error":"não autorizado"}`, http.StatusUnauthorized)
+		httpx.WriteJSONError(w, http.StatusUnauthorized, "não autorizado")
 		return
 	}
 
 	settings, err := h.repo.GetSettings(userID)
 	if err != nil {
-		http.Error(w, `{"error":"falha ao buscar preferências de IA"}`, http.StatusInternalServerError)
+		httpx.WriteJSONError(w, http.StatusInternalServerError, "falha ao buscar preferências de IA")
 		return
 	}
 
@@ -50,27 +51,27 @@ func (h *AISettingsHandler) GetSettings(w http.ResponseWriter, r *http.Request) 
 func (h *AISettingsHandler) UpdateSettings(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
-		http.Error(w, `{"error":"não autorizado"}`, http.StatusUnauthorized)
+		httpx.WriteJSONError(w, http.StatusUnauthorized, "não autorizado")
 		return
 	}
 
 	var req updateAISettingsRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, `{"error":"payload inválido"}`, http.StatusBadRequest)
+		httpx.WriteJSONError(w, http.StatusBadRequest, "payload inválido")
 		return
 	}
 
 	mode := strings.TrimSpace(req.AutonomyMode)
 	if mode != "" {
 		if mode != string(domain.AutonomyModeAssisted) && mode != string(domain.AutonomyModeProactive) {
-			http.Error(w, `{"error":"modo de autonomia inválido (deve ser 'assisted' ou 'proactive')"}`, http.StatusBadRequest)
+			httpx.WriteJSONError(w, http.StatusBadRequest, "modo de autonomia inválido (deve ser 'assisted' ou 'proactive')")
 			return
 		}
 	}
 
 	current, err := h.repo.GetSettings(userID)
 	if err != nil {
-		http.Error(w, `{"error":"falha ao carregar preferências atuais"}`, http.StatusInternalServerError)
+		httpx.WriteJSONError(w, http.StatusInternalServerError, "falha ao carregar preferências atuais")
 		return
 	}
 
@@ -94,7 +95,7 @@ func (h *AISettingsHandler) UpdateSettings(w http.ResponseWriter, r *http.Reques
 	}
 
 	if err := h.repo.UpsertSettings(current); err != nil {
-		http.Error(w, `{"error":"falha ao salvar preferências de IA"}`, http.StatusInternalServerError)
+		httpx.WriteJSONError(w, http.StatusInternalServerError, "falha ao salvar preferências de IA")
 		return
 	}
 

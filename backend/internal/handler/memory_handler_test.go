@@ -6,13 +6,14 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
-	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/handler"
 	"github.com/andrevmp/vito/backend/internal/handler/middleware"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/go-chi/chi/v5"
 	_ "modernc.org/sqlite"
@@ -125,5 +126,82 @@ func TestMemoryHandler_Deletes(t *testing.T) {
 	facts, _ := repo.ListAtomicFacts(ctx, userID, 10)
 	if len(facts) != 0 {
 		t.Errorf("esperava 0 fatos ativos após deleção, obteve %d", len(facts))
+	}
+}
+
+func TestMemoryHandler_CreateAndSyncRuntimeFact(t *testing.T) {
+	tmpDir := t.TempDir()
+	db, err := database.Open(filepath.Join(tmpDir, "test_mem_sync.db"))
+	if err != nil {
+		t.Fatalf("falha ao inicializar sqlite: %v", err)
+	}
+	defer db.Close()
+
+	userID := "user-mem-sync"
+	userRepo := repository.NewUserRepository(db)
+	_ = userRepo.Create(&domain.User{
+		ID:           userID,
+		Name:         "User Sync",
+		Email:        "memsync@example.com",
+		PasswordHash: "hash",
+		CreatedAt:    time.Now().UTC(),
+		UpdatedAt:    time.Now().UTC(),
+	})
+
+	hierRepo := repository.NewMemoryHierarchyRepository(db)
+	factRepo := repository.NewMemoryRepository(db)
+	h := handler.NewMemoryHandler(hierRepo)
+	h.SetFactRepository(factRepo, nil)
+
+	r := chi.NewRouter()
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			req = req.WithContext(context.WithValue(req.Context(), middleware.UserIDKey, userID))
+			next.ServeHTTP(w, req)
+		})
+	})
+	h.RegisterRoutes(r)
+
+	reqCreate := httptest.NewRequest("POST", "/memories/facts", strings.NewReader(`{"category":"Preferência","content":"Prefere voos pela manhã"}`))
+	rrCreate := httptest.NewRecorder()
+	r.ServeHTTP(rrCreate, reqCreate)
+	if rrCreate.Code != http.StatusCreated {
+		t.Fatalf("POST /memories/facts esperava 201, obteve %d: %s", rrCreate.Code, rrCreate.Body.String())
+	}
+
+	var created repository.UserMemoryFact
+	if err := json.NewDecoder(rrCreate.Body).Decode(&created); err != nil {
+		t.Fatalf("decode create fact: %v", err)
+	}
+	if !created.IsActive || created.ID == "" {
+		t.Fatalf("esperava IsActive=true e ID preenchido, obteve %+v", created)
+	}
+
+	runtimeMems, err := factRepo.ListByUser(userID, 20)
+	if err != nil || len(runtimeMems) != 1 || runtimeMems[0].Content != "Prefere voos pela manhã" {
+		t.Fatalf("esperava fato sincronizado na tabela memories do ADK, obteve %+v err=%v", runtimeMems, err)
+	}
+
+	reqList := httptest.NewRequest("GET", "/memories/", nil)
+	rrList := httptest.NewRecorder()
+	r.ServeHTTP(rrList, reqList)
+	var listResp struct {
+		Facts []repository.UserMemoryFact `json:"facts"`
+	}
+	_ = json.NewDecoder(rrList.Body).Decode(&listResp)
+	if len(listResp.Facts) != 1 {
+		t.Fatalf("esperava 1 fato ativo após criação, obteve %+v", listResp.Facts)
+	}
+
+	reqDel := httptest.NewRequest("DELETE", "/memories/facts/"+created.ID, nil)
+	rrDel := httptest.NewRecorder()
+	r.ServeHTTP(rrDel, reqDel)
+	if rrDel.Code != http.StatusOK {
+		t.Fatalf("DELETE /memories/facts esperava 200, obteve %d", rrDel.Code)
+	}
+
+	afterRuntime, _ := factRepo.ListByUser(userID, 20)
+	if len(afterRuntime) != 0 {
+		t.Fatalf("esperava remoção na tabela memories após DeleteFact, obteve %+v", afterRuntime)
 	}
 }

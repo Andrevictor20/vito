@@ -2,14 +2,14 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Header, HeaderRoundButton } from '../components/common/Header';
 import { ExecutiveSummariesHubView } from '../features/calendar/screens/ExecutiveSummariesHubView';
-import { FullMonthCalendarView } from '../features/calendar/components/calendar/FullMonthCalendarView';
-import { AgendaView } from '../components/home/AgendaView';
-import { AgendaFilterModal } from '../features/calendar/components/calendar/AgendaFilterModal';
+import { FullMonthCalendarView } from '../features/calendar/components/FullMonthCalendarView';
+import { AgendaView } from '../features/calendar/components/AgendaView';
+import { AgendaFilterModal } from '../features/calendar/components/AgendaFilterModal';
 import { SmartActionSheetModal } from '../components/ui/SmartActionSheetModal';
 import { buildAgendaSmartActions, formatEventSubtitle } from '../utils/formatting/smartActionBuilders';
 import { useHomeDataContext } from './HomeDataProvider';
 import { useTheme } from '../context/ThemeContext';
-import { SectionTransition } from '../ds/SectionTransition';
+import { SectionTransition } from '../components/common/SectionTransition';
 import { useReduceMotion } from '../theme/vitoMotion';
 import { chatPromptBus, tabNavigationBus } from '../services/dataSync';
 import { navigateToTab } from './navigationRef';
@@ -71,7 +71,9 @@ export const AgendaTabScreen: React.FC<AgendaTabScreenProps> = ({
   }, []);
 
   const handleCreatePrompt = useCallback(() => {
-    tabNavigationBus.notify('chat');
+    setShowSummaries(false);
+    setShowFullCalendar(false);
+    chatPromptBus.askAssistant('Quero agendar um novo compromisso na minha agenda. Me pergunte título, data e horário.');
   }, []);
 
   // Subtítulo editorial compacto igual ao protótipo: "Sex, 23 out · X eventos"
@@ -198,8 +200,8 @@ export const AgendaTabScreen: React.FC<AgendaTabScreenProps> = ({
         <ExecutiveSummariesHubView
           onBack={() => setShowSummaries(false)}
           onOpenChatWithPrompt={(prompt) => {
-            chatPromptBus.notify(prompt);
-            navigateToTab('chat');
+            setShowSummaries(false);
+            chatPromptBus.askAssistant(prompt);
           }}
         />
       </SectionTransition>

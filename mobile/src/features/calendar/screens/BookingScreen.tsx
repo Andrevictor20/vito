@@ -1,45 +1,22 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  ActivityIndicator,
-  AppState,
-  Alert,
-} from 'react-native';
+import { View, ActivityIndicator } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import { tokens } from '../../../theme/tokens';
+import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../../context/ThemeContext';
 import { useAuth } from '../../../context/AuthContext';
 import { hapticFeedback } from '../../../theme/motion';
-import { api } from '../../../services/api';
-import { dataSync, chatPromptBus, tabNavigationBus } from '../../../services/dataSync';
-import {
-  BookingType,
-  BookingAppointment,
-  Meeting,
-} from '../../../types';
-import {
-  promptDeleteBookingType,
-  promptDeleteMeeting,
-  promptCancelAppointment,
-} from '../utils/bookingActions';
+import { chatPromptBus, tabNavigationBus } from '../../../services/dataSync';
+import type { BookingType, Meeting } from '../../../types';
 import { BookingLinksTab } from '../components/booking/BookingLinksTab';
 import { BookingReceivedTab } from '../components/booking/BookingReceivedTab';
 import { BookingStackHeader } from '../components/booking/BookingStackHeader';
+import { BookingSegmentedControl, BookingTabKey } from '../components/booking/BookingSegmentedControl';
 import { MeetingPollDetailView } from '../components/booking/MeetingPollDetailView';
 import { SmartActionSheetModal } from '../../../components/ui/SmartActionSheetModal';
 import { buildBookingSmartActions } from '../../../utils/formatting/smartActionBuilders';
 import { bookingStyles as styles } from './BookingScreen.styles';
 import { copyToClipboard } from '../../../utils/device/clipboard';
-
-let NotificationsModule: any = null;
-try {
-  NotificationsModule = require('expo-notifications');
-} catch {
-  NotificationsModule = null;
-}
+import { useBookingData } from '../hooks/useBookingData';
 
 const extractBookingUsername = (types: BookingType[]): string => {
   for (const t of types || []) {
@@ -67,22 +44,48 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({
   const navigation = useNavigation();
   const firstCreateRender = React.useRef(true);
 
-  const [types, setTypes] = useState<BookingType[]>([]);
-  const [appointments, setAppointments] = useState<BookingAppointment[]>([]);
-  const [meetings, setMeetings] = useState<Meeting[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'links' | 'appointments'>('links');
-  const [confirmingSlotId, setConfirmingSlotId] = useState<string | null>(null);
-  const [selectedMeetingForDetail, setSelectedMeetingForDetail] = useState<Meeting | null>(null);
+  const [activeTab, setActiveTab] = useState<BookingTabKey>('links');
   const [actionTarget, setActionTarget] = useState<{
     item: BookingType | Meeting;
     type: 'type' | 'meeting';
   } | null>(null);
 
+  const {
+    types,
+    appointments,
+    meetings,
+    loading,
+    refreshing,
+    confirmingSlotId,
+    selectedMeetingForDetail,
+    setSelectedMeetingForDetail,
+    onRefresh,
+    handleToggleActive,
+    handleDeleteType,
+    handleDeleteMeeting,
+    handleCancelAppointment,
+    handleConfirmMeetingSlot,
+  } = useBookingData();
+
+  const navigateToChat = useCallback(
+    (prompt?: string) => {
+      if (prompt) {
+        chatPromptBus.askAssistant(prompt);
+      } else {
+        tabNavigationBus.notify('chat');
+      }
+      if (onBack) {
+        onBack();
+      } else if (navigation.canGoBack()) {
+        navigation.goBack();
+      }
+    },
+    [navigation, onBack],
+  );
+
   const handleBookingPrompt = useCallback(() => {
-    tabNavigationBus.notify('chat');
-  }, []);
+    navigateToChat('Quero criar um novo link de agendamento. Me ajude a definir título, duração e horários.');
+  }, [navigateToChat]);
 
   useEffect(() => {
     if (firstCreateRender.current) {
@@ -108,151 +111,10 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({
     return 'usuario';
   }, [types, authUser]);
 
-  const loadData = useCallback(async () => {
-    try {
-      const [fetchedTypes, fetchedAppts, fetchedMeetings] = await Promise.all([
-        api.getBookingTypes(),
-        api.getBookingAppointments(),
-        api.getMeetings(),
-      ]);
-      setTypes(fetchedTypes || []);
-      setAppointments(fetchedAppts || []);
-      setMeetings(fetchedMeetings || []);
-      setSelectedMeetingForDetail((prev) => {
-        if (!prev) return null;
-        return (fetchedMeetings || []).find((m) => m.id === prev.id) || prev;
-      });
-    } catch (err) {
-      console.error('[BookingScreen] erro ao carregar dados:', err);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      loadData();
-    }, [loadData])
-  );
-
-  useEffect(() => {
-    return dataSync.subscribe('refresh_bookings', () => {
-      loadData();
-    });
-  }, [loadData]);
-
-  useEffect(() => {
-    let notifSub: any = null;
-    if (NotificationsModule?.addNotificationReceivedListener) {
-      notifSub = NotificationsModule.addNotificationReceivedListener((notification: any) => {
-        const dataType = notification?.request?.content?.data?.type;
-        if (
-          dataType === 'meeting_vote' ||
-          dataType === 'meeting_confirmed' ||
-          dataType === 'booking_appointment'
-        ) {
-          loadData();
-        }
-      });
-    }
-
-    const appStateSub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') {
-        loadData();
-      }
-    });
-
-    return () => {
-      if (notifSub?.remove) notifSub.remove();
-      appStateSub.remove();
-    };
-  }, [loadData]);
-
-  useEffect(() => {
-    const pollInterval = setInterval(() => {
-      if (AppState.currentState === 'active') {
-        loadData();
-      }
-    }, 5000);
-    return () => clearInterval(pollInterval);
-  }, [loadData]);
-
-  const onRefresh = () => {
-    setRefreshing(true);
-    loadData();
-  };
-
-  const handleCopyLink = async (url: string) => {
+  const handleCopyLink = useCallback(async (url: string) => {
     hapticFeedback.medium();
     await copyToClipboard(url);
-  };
-
-  const handleToggleActive = async (bt: BookingType) => {
-    hapticFeedback.light();
-    try {
-      const updated = await api.updateBookingType(bt.id, { is_active: !bt.is_active });
-      setTypes((prev) =>
-        (prev || []).map((item) => (item.id === bt.id ? { ...item, is_active: updated.is_active } : item))
-      );
-    } catch (err) {
-      console.error('[BookingScreen] erro ao alternar status:', err);
-    }
-  };
-
-  const handleDeleteType = (id: string) => {
-    promptDeleteBookingType(async () => {
-      hapticFeedback.medium();
-      try {
-        await api.deleteBookingType(id);
-        setTypes((prev) => (prev || []).filter((item) => item.id !== id));
-        setAppointments((prev) => (prev || []).filter((a) => a.booking_type_id !== id));
-      } catch (err) {
-        console.error('[BookingScreen] erro ao excluir tipo:', err);
-      }
-    });
-  };
-
-  const handleDeleteMeeting = (id: string) => {
-    promptDeleteMeeting(async () => {
-      hapticFeedback.medium();
-      try {
-        await api.deleteMeeting(id);
-        setMeetings((prev) => (prev || []).filter((m) => m.id !== id));
-        hapticFeedback.success();
-      } catch (err) {
-        console.error('[BookingScreen] erro ao excluir reunião:', err);
-      }
-    });
-  };
-
-  const handleCancelAppointment = (appt: BookingAppointment) => {
-    promptCancelAppointment(appt, async () => {
-      hapticFeedback.medium();
-      try {
-        await api.deleteBookingAppointment(appt.id);
-        setAppointments((prev) => (prev || []).filter((item) => item.id !== appt.id));
-        dataSync.notify();
-      } catch (err) {
-        console.error('[BookingScreen] erro ao cancelar agendamento:', err);
-      }
-    });
-  };
-
-  const handleConfirmMeetingSlot = async (meetingId: string, slotId: string) => {
-    hapticFeedback.medium();
-    setConfirmingSlotId(slotId);
-    try {
-      await api.confirmMeetingConsensus(meetingId, slotId);
-      await loadData();
-      dataSync.notify();
-      hapticFeedback.success();
-    } catch (err) {
-      console.error('[BookingScreen] erro ao confirmar consenso:', err);
-    } finally {
-      setConfirmingSlotId(null);
-    }
-  };
+  }, []);
 
   const renderActionSheet = () => (
     <SmartActionSheetModal
@@ -283,18 +145,15 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({
                       bt.short_url ||
                       bt.public_url ||
                       `https://vito.rasppi.cloud/book/${bookingUsername}/${bt.slug}`;
-                    handleCopyLink(url);
+                    void handleCopyLink(url);
                   } else {
-                    const m = actionTarget.item as Meeting;
-                    const url =
-                      (m as any).public_url ||
-                      (m as any).short_url ||
-                      `https://vito.rasppi.cloud/meet/${m.id}`;
-                    handleCopyLink(url);
+                    const m = actionTarget.item as Meeting & { public_url?: string; short_url?: string };
+                    const url = m.public_url || m.short_url || `https://vito.rasppi.cloud/meet/${m.id}`;
+                    void handleCopyLink(url);
                   }
                 },
-                onAskVitoCustomize: (prompt) => chatPromptBus.askAssistant(prompt),
-                onAskVitoDuplicate: (prompt) => chatPromptBus.askAssistant(prompt),
+                onAskVitoCustomize: (prompt) => navigateToChat(prompt),
+                onAskVitoDuplicate: (prompt) => navigateToChat(prompt),
                 onDelete: () => {
                   if (actionTarget.type === 'type') {
                     handleDeleteType(actionTarget.item.id);
@@ -302,7 +161,7 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({
                     handleDeleteMeeting(actionTarget.item.id);
                   }
                 },
-              }
+              },
             )
           : []
       }
@@ -315,9 +174,7 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({
         <MeetingPollDetailView
           meeting={selectedMeetingForDetail}
           onBack={() => setSelectedMeetingForDetail(null)}
-          onEdit={(target) => {
-            setActionTarget({ item: target, type: 'meeting' });
-          }}
+          onEdit={(target) => setActionTarget({ item: target, type: 'meeting' })}
           onConfirmSlot={handleConfirmMeetingSlot}
           confirmingSlotId={confirmingSlotId}
           onDelete={async (id) => {
@@ -331,130 +188,25 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({
   }
 
   const linksCount = types.length + meetings.length;
-  const receivedCount =
-    appointments.length +
-    meetings.filter((m) => Array.isArray(m.participants) && m.participants.length > 0).length;
+  const receivedCount = appointments.length + meetings.length;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
       <StatusBar style={isDark ? 'light' : 'dark'} />
 
       {showBackHeader && (
-        <BookingStackHeader onBack={() => (onBack ? onBack() : navigation.goBack())} onPressNew={handleBookingPrompt} />
+        <BookingStackHeader
+          onBack={() => (onBack ? onBack() : navigation.goBack())}
+          onPressNew={handleBookingPrompt}
+        />
       )}
 
-      {/* Segmented Control .seg: Links [N] | Recebidos [N] */}
-      <View style={styles.segmentContainer}>
-        <View style={[styles.segmentTrack, { backgroundColor: colors.surf }]}>
-          <TouchableOpacity
-            style={[
-              styles.segmentTab,
-              activeTab === 'links' && [
-                styles.segmentTabActive,
-                { backgroundColor: colors.bg },
-              ],
-            ]}
-            onPress={() => {
-              hapticFeedback.selection();
-              setActiveTab('links');
-            }}
-            activeOpacity={0.8}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: activeTab === 'links' }}
-            accessibilityLabel="Links de agendamento"
-          >
-            <Text
-              style={[
-                styles.segmentTabText,
-                {
-                  color: activeTab === 'links' ? colors.ink : colors.muted,
-                  fontFamily: activeTab === 'links'
-                    ? tokens.typography.family.semibold
-                    : tokens.typography.family.medium,
-                },
-              ]}
-            >
-              Links
-            </Text>
-            {linksCount > 0 && (
-              <View
-                style={[
-                  styles.badge,
-                  {
-                    backgroundColor: activeTab === 'links' ? colors.surf : 'rgba(0,0,0,0.06)',
-                  },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.badgeText,
-                    {
-                      color: colors.muted,
-                      fontFamily: tokens.typography.family.semibold,
-                    },
-                  ]}
-                >
-                  {linksCount}
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.segmentTab,
-              activeTab === 'appointments' && [
-                styles.segmentTabActive,
-                { backgroundColor: colors.bg },
-              ],
-            ]}
-            onPress={() => {
-              hapticFeedback.selection();
-              setActiveTab('appointments');
-            }}
-            activeOpacity={0.8}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: activeTab === 'appointments' }}
-            accessibilityLabel="Agendamentos recebidos"
-          >
-            <Text
-              style={[
-                styles.segmentTabText,
-                {
-                  color: activeTab === 'appointments' ? colors.ink : colors.muted,
-                  fontFamily: activeTab === 'appointments'
-                    ? tokens.typography.family.semibold
-                    : tokens.typography.family.medium,
-                },
-              ]}
-            >
-              Recebidos
-            </Text>
-            {receivedCount > 0 && (
-              <View
-                style={[
-                  styles.badge,
-                  {
-                    backgroundColor: activeTab === 'appointments' ? colors.surf : 'rgba(0,0,0,0.06)',
-                  },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.badgeText,
-                    {
-                      color: colors.muted,
-                      fontFamily: tokens.typography.family.semibold,
-                    },
-                  ]}
-                >
-                  {receivedCount}
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        </View>
-      </View>
+      <BookingSegmentedControl
+        activeTab={activeTab}
+        linksCount={linksCount}
+        receivedCount={receivedCount}
+        onSelectTab={setActiveTab}
+      />
 
       {loading && !refreshing ? (
         <View style={styles.centerContainer}>
@@ -468,12 +220,8 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({
           refreshing={refreshing}
           onRefresh={onRefresh}
           onCopyLink={handleCopyLink}
-          onEditType={(bt) => {
-            setActionTarget({ item: bt, type: 'type' });
-          }}
-          onEditMeeting={(m) => {
-            setActionTarget({ item: m, type: 'meeting' });
-          }}
+          onEditType={(bt) => setActionTarget({ item: bt, type: 'type' })}
+          onEditMeeting={(m) => setActionTarget({ item: m, type: 'meeting' })}
           onDeleteType={handleDeleteType}
           onDeleteMeeting={handleDeleteMeeting}
           onOpenVotingDetail={(m) => setSelectedMeetingForDetail(m)}
@@ -491,7 +239,6 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({
         />
       )}
 
-      {/* Modal de Ações Contextuais Inteligentes (Padrão Vito) */}
       {renderActionSheet()}
     </View>
   );

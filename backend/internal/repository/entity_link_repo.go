@@ -9,26 +9,11 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/platform/database"
 )
 
-// EntityLink representa uma entidade unificada (pessoa, projeto ou organização) entre múltiplos canais.
-type EntityLink struct {
-	ID            string            `json:"id"`
-	UserID        string            `json:"user_id"`
-	CanonicalName string            `json:"canonical_name"`
-	EntityType    string            `json:"entity_type"` // 'person', 'project', 'organization'
-	WhatsAppJID   string            `json:"whatsapp_jid"`
-	Email         string            `json:"email"`
-	Phone         string            `json:"phone"`
-	Aliases       []string          `json:"aliases"`
-	ExternalIDs   map[string]string `json:"external_ids"`
-	Confidence    float64           `json:"confidence"`
-	CreatedAt     time.Time         `json:"created_at"`
-	UpdatedAt     time.Time         `json:"updated_at"`
-}
-
-// EntityLinkRepository gerencia a resolução cruzada de entidades (entity_links na migration 036).
+// EntityLinkRepository gerencia a resolução cruzada de entidades (entity_links).
 type EntityLinkRepository struct {
 	db *sql.DB
 }
@@ -39,7 +24,7 @@ func NewEntityLinkRepository(db *sql.DB) *EntityLinkRepository {
 }
 
 // Upsert insere ou atualiza um vínculo de entidade serializando escritas na DefaultWriterQueue.
-func (r *EntityLinkRepository) Upsert(ctx context.Context, link *EntityLink) error {
+func (r *EntityLinkRepository) Upsert(ctx context.Context, link *domain.EntityLink) error {
 	if link == nil || strings.TrimSpace(link.UserID) == "" || strings.TrimSpace(link.CanonicalName) == "" {
 		return nil
 	}
@@ -97,7 +82,7 @@ func (r *EntityLinkRepository) Upsert(ctx context.Context, link *EntityLink) err
 }
 
 // Resolve busca uma entidade por nome canônico, apelido, JID do WhatsApp, e-mail ou telefone.
-func (r *EntityLinkRepository) Resolve(ctx context.Context, userID, query string) ([]EntityLink, error) {
+func (r *EntityLinkRepository) Resolve(ctx context.Context, userID, query string) ([]domain.EntityLink, error) {
 	q := strings.ToLower(strings.TrimSpace(query))
 	if userID == "" || q == "" {
 		return nil, nil
@@ -115,9 +100,9 @@ func (r *EntityLinkRepository) Resolve(ctx context.Context, userID, query string
 	}
 	defer rows.Close()
 
-	var matched []EntityLink
+	var matched []domain.EntityLink
 	for rows.Next() {
-		var el EntityLink
+		var el domain.EntityLink
 		var aliasesRaw, extRaw string
 		if err := rows.Scan(
 			&el.ID, &el.UserID, &el.CanonicalName, &el.EntityType,
@@ -136,7 +121,7 @@ func (r *EntityLinkRepository) Resolve(ctx context.Context, userID, query string
 	return matched, rows.Err()
 }
 
-func matchesEntityQuery(el EntityLink, q string) bool {
+func matchesEntityQuery(el domain.EntityLink, q string) bool {
 	if strings.Contains(strings.ToLower(el.CanonicalName), q) {
 		return true
 	}

@@ -15,7 +15,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { MOTION_CURVES } from './motion';
-import { useScreenEnterKey, useScreenFocus } from '../ds/screenFocusContext';
+import { useScreenEnterKey, useScreenFocus } from './screenFocusContext';
 import { useReduceMotion } from './useReduceMotion';
 
 /** Barra de progresso animada na UI thread (scaleX ancorado à esquerda, 850ms --ease-q). */

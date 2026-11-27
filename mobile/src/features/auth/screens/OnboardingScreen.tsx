@@ -22,7 +22,7 @@ import Reanimated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTheme } from '../../../context/ThemeContext'
 import { loginPalette } from '../utils/loginPalette'
-import { getBezier } from '../../../ds/tokens'
+import { MOTION_CURVES } from '../../../theme/motion'
 import { MascotVectorRig } from '../../bots/mascot/MascotVectorRig'
 import {
   ONBOARDING_DESC_DELAY_MS,
@@ -51,8 +51,8 @@ export interface OnboardingScreenProps {
  * - Topbar com mascote blink + "vito" + botao "Pular" (oculto no slide 4)
  * - Dots expansiveis + CTA "Continuar" / "Começar" -> #s-login
  */
-const EASE_Q = Easing.bezier(...getBezier('--ease-q'))
-const EASE_STD = Easing.bezier(...getBezier('--ease-std'))
+const EASE_Q = Easing.bezier(...MOTION_CURVES.q)
+const EASE_STD = Easing.bezier(...MOTION_CURVES.std)
 
 /** obUp: translateY 14 -> 0 + fade, com delay (só quando o slide está ativo). */
 const RiseText: React.FC<{
@@ -91,7 +91,7 @@ const RiseText: React.FC<{
 const Dot: React.FC<{ active: boolean; on: string; off: string }> = ({ active, on, off }) => {
   const w = useSharedValue(active ? 24 : 7)
   useEffect(() => {
-    const [x1, y1, x2, y2] = getBezier('--ease-q')
+    const [x1, y1, x2, y2] = MOTION_CURVES.q
     cancelAnimation(w)
     w.value = withTiming(active ? 24 : 7, {
       duration: ONBOARDING_DOT_MS,

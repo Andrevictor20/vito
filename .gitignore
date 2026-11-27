@@ -12,9 +12,6 @@
 *.cert
 *firebase-adminsdk*.json
 mobile/google-services.json
-Arquitetura de Ativação por Voz no Android - Vito AI.md
-*Ativação por Voz*.md
-*Vito AI*.md
 
 # Dependências & Gerenciadores de Pacotes
 node_modules/
@@ -49,8 +46,6 @@ obj/
 .ruff_cache/
 .coverage
 htmlcov/
-Vito · Login v2.html
-vito-login-v2.html
 coverage/
 .turbo/
 .cache/
@@ -87,11 +82,8 @@ AGENTS.md
 CLAUDE.md
 .antigravityignore
 .geminiignore
-Relatório Técnico_ Arquitetura Inteligente de Radares e Motor de Busca (Vito).md
 /*.html
-*Modo conversa fora do app*
-*protótipo*.html
-*prototipo*.html
+docs/prototypes/*.html
 
 # IDEs & Editores
 .vscode/*

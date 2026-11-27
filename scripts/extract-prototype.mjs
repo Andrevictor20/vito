@@ -17,7 +17,7 @@ const require = createRequire(path.join(MOBILE, 'package.json'))
 const postcss = require('postcss')
 const parse5 = require('parse5')
 
-const HTML_PATH = path.join(ROOT, 'Vito-telas-atualizadas.html')
+const HTML_PATH = path.join(ROOT, 'docs', 'prototypes', 'Vito-telas-atualizadas.html')
 const OUT_DIR = path.join(MOBILE, 'src', 'prototype')
 
 function loadPlaywright() {
@@ -223,7 +223,100 @@ async function extractDynamicViaPlaywright(htmlPath) {
   }
 }
 
-/** Extrai dicionários de SVGs declarados no JS (`LOGO`, `AILOGO`, `BANK_ICON`, `MBRAND`, `SPARK`, `SPK`). */
+/** Gera as trilhas pré-compiladas do mascote (9 estados) direto do CSS do protótipo. */
+const MASCOT_STATES = [
+  'idle',
+  'blink',
+  'gentleman',
+  'happy',
+  'thinking',
+  'curious',
+  'surprised',
+  'sleeping',
+  'dance',
+]
+
+const EASE_MAP = {
+  'ease-in-out': [0.42, 0, 0.58, 1],
+  'ease-out': [0, 0, 0.58, 1],
+  'ease-in': [0.42, 0, 1, 1],
+  linear: [0, 0, 1, 1],
+}
+
+function parseCubicBezierDecl(raw) {
+  const m = raw.match(/cubic-bezier\(\s*([^)]+)\s*\)/i)
+  if (!m) return null
+  const pts = m[1].split(',').map((s) => Number.parseFloat(s.trim()))
+  return pts.length === 4 && pts.every((n) => Number.isFinite(n)) ? pts : null
+}
+
+function parseMascotAnimationDecl(decl) {
+  const kfMatch = decl.match(/^(anim-[a-z0-9-]+)\s+calc\(([\d.]+)s/i)
+  if (!kfMatch) return null
+  const keyframe = kfMatch[1]
+  const durationMs = Math.round(parseFloat(kfMatch[2]) * 1000)
+  const delayMatch = decl.match(/\binfinite\s+(\.?\d+(?:\.\d+)?)s\b/i)
+  const delayMs = delayMatch ? Math.round(parseFloat(delayMatch[1]) * 1000) : 0
+  const bezier =
+    parseCubicBezierDecl(decl.match(/cubic-bezier\([^)]+\)/)?.[0] ?? '') ??
+    EASE_MAP[decl.match(/\b(ease-in-out|ease-out|ease-in|linear)\b/)?.[1] ?? ''] ??
+    [0.4, 0, 0.2, 1]
+  return { keyframe, durationMs, delayMs, bezier }
+}
+
+function buildMascotTracks(rules, keyframes) {
+  const out = Object.fromEntries(MASCOT_STATES.map((s) => [s, []]))
+  for (const r of rules) {
+    const anim = r.decls.animation
+    if (!anim) continue
+    const parsed = parseMascotAnimationDecl(anim)
+    if (!parsed) continue
+    for (const sel of r.selector.split(',').map((s) => s.trim())) {
+      const m = sel.match(/^\.state-([a-z]+)\s+\.([a-z0-9-]+)$/)
+      if (!m) continue
+      const [, st, part] = m
+      if (st in out) {
+        out[st].push({
+          part,
+          ...parsed,
+          stops: keyframes[parsed.keyframe]?.stops ?? {},
+        })
+      }
+    }
+  }
+  return out
+}
+
+function formatMascotTracksTs(tracksByState) {
+  const lines = [
+    '// Arquivo gerado automaticamente por scripts/extract-prototype.mjs — não editar à mão.',
+    "export type ProtoMascotState = 'idle' | 'blink' | 'gentleman' | 'happy' | 'thinking' | 'curious' | 'surprised' | 'sleeping' | 'dance';",
+    '',
+    'export interface PartAnimationTrack {',
+    '  part: string;',
+    '  keyframe: string;',
+    '  durationMs: number;',
+    '  delayMs: number;',
+    '  bezier: [number, number, number, number];',
+    '  stops: Record<string, Record<string, string>>;',
+    '}',
+    '',
+    'export type MascotTracksByState = Record<ProtoMascotState, PartAnimationTrack[]>;',
+    '',
+    'export const MASCOT_TRACKS: MascotTracksByState = {',
+  ]
+  for (const st of MASCOT_STATES) {
+    lines.push(`  ${st}: [`)
+    for (const track of tracksByState[st]) {
+      lines.push(`    ${JSON.stringify(track)},`)
+    }
+    lines.push('  ],')
+  }
+  lines.push('};', '')
+  return lines.join('\n')
+}
+
+/** Extrai dicionários de SVGs declarados no JS (`LOGO`, `AILOGO`, `BANK_ICON`). */
 function extractJsSvgMaps(html) {
   const grabObj = (name) => {
     const m = html.match(new RegExp(`(?:var|const)\\s+${name}\\s*=\\s*(\\{[\\s\\S]*?\\});`))
@@ -244,49 +337,32 @@ function extractJsSvgMaps(html) {
       return {}
     }
   }
-  const grabSingle = (name) => {
-    const m = html.match(new RegExp(`(?:var|const)\\s+${name}\\s*=\\s*(['"\`])(<svg[\\s\\S]*?</svg>)\\1`))
-    return m ? parseSvgString(m[2]) : null
-  }
   return {
     LOGO: grabObj('LOGO'),
     AILOGO: grabObj('AILOGO'),
     BANK_ICON: grabObj('BANK_ICON'),
-    MBRAND: grabObj('MBRAND'),
-    SPARK: grabSingle('SPARK'),
-    SPK: grabSingle('SPK'),
   }
 }
 
 async function main() {
   const html = fs.readFileSync(HTML_PATH, 'utf8')
-  const { doc, tokens, rules, keyframes } = extractCss(html)
-  const { inlineIcons, symbols, staticScreens } = extractStaticIconsAndScreens(doc)
+  const { rules, keyframes } = extractCss(html)
   const jsSvgs = extractJsSvgMaps(html)
-  const { dynamicScreens } = await extractDynamicViaPlaywright(HTML_PATH)
+  const mascotTracks = buildMascotTracks(rules, keyframes)
 
+  const mascotOut = path.join(MOBILE, 'src', 'features', 'bots', 'mascot', 'mascotTracks.generated.ts')
   fs.mkdirSync(OUT_DIR, { recursive: true })
-  const writeJson = (file, data) =>
-    fs.writeFileSync(path.join(OUT_DIR, file), `${JSON.stringify(data, null, 2)}\n`, 'utf8')
-
-  writeJson('tokens.json', tokens)
-  writeJson('rules.json', rules)
-  writeJson('keyframes.json', keyframes)
-  writeJson('icons.json', { symbols, inlineIcons, ...jsSvgs })
-  writeJson('screens.json', { staticScreens, dynamicScreens })
+  fs.mkdirSync(path.dirname(mascotOut), { recursive: true })
+  fs.writeFileSync(path.join(OUT_DIR, 'icons.json'), `${JSON.stringify(jsSvgs, null, 2)}\n`, 'utf8')
+  fs.writeFileSync(mascotOut, formatMascotTracksTs(mascotTracks), 'utf8')
 
   console.log(
     JSON.stringify({
-      tokensLight: Object.keys(tokens.light).length,
-      tokensDark: Object.keys(tokens.dark).length,
-      rules: rules.length,
-      keyframes: Object.keys(keyframes).length,
-      inlineIcons: inlineIcons.length,
+      mascotStates: MASCOT_STATES.length,
+      mascotTracks: Object.values(mascotTracks).reduce((acc, list) => acc + list.length, 0),
       logos: Object.keys(jsSvgs.LOGO).length,
       aiLogos: Object.keys(jsSvgs.AILOGO).length,
       bankIcons: Object.keys(jsSvgs.BANK_ICON).length,
-      staticScreens: Object.keys(staticScreens).length,
-      dynamicScreens: Object.keys(dynamicScreens).length,
     }),
   )
 }

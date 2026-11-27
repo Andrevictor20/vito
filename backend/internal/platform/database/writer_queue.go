@@ -5,7 +5,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	"runtime"
 	"strconv"
 	"sync"
@@ -15,8 +14,6 @@ import (
 var (
 	// ErrQueueClosed indica que a fila de escrita foi encerrada.
 	ErrQueueClosed = errors.New("writer queue is closed")
-	// ErrQueueTimeout indica que a escrita expirou antes de ser processada.
-	ErrQueueTimeout = errors.New("writer queue operation timed out")
 	// ErrQueueReentrant indica tentativa de enfileirar uma escrita a partir da própria goroutine do worker.
 	ErrQueueReentrant = errors.New("writer queue reentrant call detected (self-deadlock prevented)")
 
@@ -158,24 +155,6 @@ func (q *SingleWriterQueue) Execute(ctx context.Context, op func() error) error 
 	}
 }
 
-// ExecuteTx executa uma transação gerenciada via SingleWriterQueue.
-func (q *SingleWriterQueue) ExecuteTx(ctx context.Context, db *sql.DB, fn func(tx *sql.Tx) error) error {
-	return q.Execute(ctx, func() error {
-		tx, err := db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable})
-		if err != nil {
-			return fmt.Errorf("falha ao iniciar transação na fila de escrita: %w", err)
-		}
-		defer func() {
-			_ = tx.Rollback()
-		}()
-
-		if err := fn(tx); err != nil {
-			return err
-		}
-		return tx.Commit()
-	})
-}
-
 // Close encerra a fila e aguarda o término do worker.
 func (q *SingleWriterQueue) Close() {
 	q.mu.Lock()
@@ -188,4 +167,32 @@ func (q *SingleWriterQueue) Close() {
 	q.mu.Unlock()
 
 	q.wg.Wait()
+}
+
+// ExecuteQueuedWrite serializa operações de escrita no SQLite (INSERT, UPDATE, DELETE)
+// através da DefaultWriterQueue() quando inicializada, ou aplica WithBusyRetry
+// como fallback em testes unitários isolados.
+func ExecuteQueuedWrite(ctx context.Context, op func() error) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if q := DefaultWriterQueue(); q != nil {
+		return q.Execute(ctx, op)
+	}
+	return WithBusyRetry(4, op)
+}
+
+// ExecuteQueuedWriteRows executa uma operação de escrita na fila e retorna RowsAffected.
+func ExecuteQueuedWriteRows(ctx context.Context, op func() (sql.Result, error)) (int64, error) {
+	var rowsAffected int64
+	err := ExecuteQueuedWrite(ctx, func() error {
+		res, execErr := op()
+		if execErr != nil {
+			return execErr
+		}
+		var raErr error
+		rowsAffected, raErr = res.RowsAffected()
+		return raErr
+	})
+	return rowsAffected, err
 }

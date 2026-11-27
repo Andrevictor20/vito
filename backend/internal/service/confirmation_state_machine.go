@@ -6,10 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"time"
-
-	"github.com/andrevmp/vito/backend/internal/repository"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/google/uuid"
+	"time"
 )
 
 var (
@@ -96,7 +95,7 @@ func (sm *ConfirmationStateMachine) SuspendAction(ctx context.Context, p *Pendin
 			status, expires_at, created_at
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
-	err := repository.ExecuteQueuedWrite(ctx, func() error {
+	err := database.ExecuteQueuedWrite(ctx, func() error {
 		_, execErr := sm.db.ExecContext(ctx, query,
 			p.ID, p.UserID, p.ThreadID, p.Channel, p.ToolsetName, p.Operation,
 			p.ArgumentsJSON, p.PreviewJSON, p.IdempotencyKey, taintedInt,
@@ -146,7 +145,7 @@ func (sm *ConfirmationStateMachine) ResumeAction(ctx context.Context, id string,
 		SET status = ?, resolved_at = ?, execution_result_json = ?
 		WHERE id = ? AND status = ?
 	`
-	affected, err := repository.ExecuteQueuedWriteRows(ctx, func() (sql.Result, error) {
+	affected, err := database.ExecuteQueuedWriteRows(ctx, func() (sql.Result, error) {
 		return sm.db.ExecContext(ctx, query, string(StatusResumed), now, string(resultBytes), id, string(StatusSuspended))
 	})
 	if err != nil {
@@ -166,7 +165,7 @@ func (sm *ConfirmationStateMachine) CancelAction(ctx context.Context, id string)
 		SET status = ?, resolved_at = ?
 		WHERE id = ? AND status = ?
 	`
-	affected, err := repository.ExecuteQueuedWriteRows(ctx, func() (sql.Result, error) {
+	affected, err := database.ExecuteQueuedWriteRows(ctx, func() (sql.Result, error) {
 		return sm.db.ExecContext(ctx, query, string(StatusCancelled), now, id, string(StatusSuspended))
 	})
 	if err != nil {
@@ -186,7 +185,7 @@ func (sm *ConfirmationStateMachine) ExpireAction(ctx context.Context, id string)
 		SET status = ?, resolved_at = ?
 		WHERE id = ? AND status = ?
 	`
-	return repository.ExecuteQueuedWrite(ctx, func() error {
+	return database.ExecuteQueuedWrite(ctx, func() error {
 		_, err := sm.db.ExecContext(ctx, query, string(StatusExpired), now, id, string(StatusSuspended))
 		return err
 	})
@@ -199,7 +198,7 @@ func (sm *ConfirmationStateMachine) ExpireStaleForUser(ctx context.Context, user
 		SET status = ?, resolved_at = ?
 		WHERE user_id = ? AND status = ? AND expires_at <= ?
 	`
-	return repository.ExecuteQueuedWrite(ctx, func() error {
+	return database.ExecuteQueuedWrite(ctx, func() error {
 		_, err := sm.db.ExecContext(ctx, query, string(StatusExpired), now, userID, string(StatusSuspended), now)
 		return err
 	})
@@ -212,7 +211,7 @@ func (sm *ConfirmationStateMachine) SupersedePendingForOperation(ctx context.Con
 		SET status = ?, resolved_at = ?
 		WHERE user_id = ? AND thread_id = ? AND toolset_name = ? AND operation = ? AND status = ?
 	`
-	return repository.ExecuteQueuedWrite(ctx, func() error {
+	return database.ExecuteQueuedWrite(ctx, func() error {
 		_, err := sm.db.ExecContext(ctx, query, string(StatusCancelled), now, userID, threadID, toolsetName, operation, string(StatusSuspended))
 		return err
 	})

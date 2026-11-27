@@ -3,64 +3,72 @@ package main
 import (
 	"context"
 	"database/sql"
-	"github.com/andrevmp/vito/backend/internal/ai/search"
-	"github.com/andrevmp/vito/backend/internal/bots"
 	"log"
-	"time"
 
 	"github.com/andrevmp/vito/backend/internal/ai/adkengine"
-	"github.com/andrevmp/vito/backend/internal/catalog"
+	"github.com/andrevmp/vito/backend/internal/ai/search"
+	"github.com/andrevmp/vito/backend/internal/bots"
+	"github.com/andrevmp/vito/backend/internal/bots/catalog"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/andrevmp/vito/backend/internal/service"
 )
 
-type botRunnerAdapter struct {
-	runner *bots.BotRunner
+func triggerFromBot(b *domain.Bot) *domain.Trigger {
+	if b == nil {
+		return nil
+	}
+	return &domain.Trigger{
+		ID:            b.ID,
+		UserID:        b.UserID,
+		Title:         b.Title,
+		Query:         b.Query,
+		Category:      domain.TriggerCategory(b.Category),
+		ConditionType: domain.TriggerConditionType(b.ConditionType),
+	}
 }
 
-func (a *botRunnerAdapter) RunBotNow(ctx context.Context, userID, botID string) (*domain.BotRunReport, error) {
-	return a.runner.RunBot(ctx, userID, botID, true)
-}
-
-type botChatAdapter struct {
-	svc *bots.BotChatService
-}
-
-func (a *botChatAdapter) GetMessages(ctx context.Context, userID, botID string) ([]bots.BotChatMessageDTO, error) {
-	hist, err := a.svc.GetHistory(ctx, userID, botID)
+func fetchTriggerDelta(fetchCtx context.Context, triggerRepo domain.TriggerRepository, t *domain.Trigger) ([]string, []string, error) {
+	if t == nil || triggerRepo == nil {
+		return nil, nil, nil
+	}
+	items, err := search.RouteTriggerSource(t).Fetch(fetchCtx, t)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	out := make([]bots.BotChatMessageDTO, 0, len(hist.Turns))
-	for _, t := range hist.Turns {
-		out = append(out, bots.BotChatMessageDTO{
-			ID:        t.ID,
-			Role:      t.Role,
-			Content:   t.Content,
-			CreatedAt: t.CreatedAt.UTC().Format(time.RFC3339),
-		})
+	stored, err := triggerRepo.GetSeenHashes(t.ID)
+	if err != nil {
+		return nil, nil, err
 	}
-	return out, nil
+	seen := make(map[string]bool, len(stored))
+	for _, h := range stored {
+		seen[h] = true
+	}
+	var fresh, all []string
+	for _, it := range items {
+		h := search.HashDataPoint(it)
+		all = append(all, h)
+		if !seen[h] {
+			fresh = append(fresh, h)
+		}
+	}
+	return fresh, all, nil
 }
 
-func (a *botChatAdapter) SendMessage(ctx context.Context, userID, botID, message string) (*bots.BotChatMessageDTO, error) {
-	resp, err := a.svc.SendMessage(ctx, userID, botID, message)
-	if err != nil {
-		return nil, err
+func fetchTriggerPrice(fetchCtx context.Context, t *domain.Trigger) (float64, string, bool, error) {
+	if t == nil || (t.ConditionType != domain.ConditionPriceAbove && t.ConditionType != domain.ConditionPriceBelow) {
+		return 0, "", false, nil
 	}
-	return &bots.BotChatMessageDTO{
-		ID:                    resp.ThreadID + "_reply",
-		Role:                  "assistant",
-		Content:               resp.Reply,
-		CreatedAt:             time.Now().UTC().Format(time.RFC3339),
-		ModelUsed:             resp.ModelUsed,
-		Cards:                 resp.Cards,
-		ToolCalls:             resp.ToolCalls,
-		RequiresConfirmation:  resp.RequiresConfirmation,
-		PendingConfirmationID: resp.PendingConfirmationID,
-		SuggestedChips:        resp.SuggestedChips,
-	}, nil
+	items, err := search.RouteTriggerSource(t).Fetch(fetchCtx, t)
+	if err != nil {
+		return 0, "", false, err
+	}
+	for _, it := range items {
+		if v, ok := bots.ParseMoneyValue(it.Value); ok {
+			return v, it.Value, true, nil
+		}
+	}
+	return 0, "", false, nil
 }
 
 // setupBotSubsystem instancia BotService/BotRunner, BotChatService e BotHandler com catálogo e ADK.
@@ -71,16 +79,35 @@ func setupBotSubsystem(
 	budgetSvc *service.AttentionBudgetService,
 	agentSys *AgentSubsystem,
 ) (*bots.BotHandler, *bots.BotRunner) {
-	botRepo := bots.NewBotRepository(db)
-	cat, err := catalog.LoadDefaultCatalog()
-	if err != nil {
-		log.Printf("⚠️ [Bots] Falha ao carregar catálogo de bots: %v", err)
+	var (
+		botRepo *bots.BotRepositorySQLite
+		cat     *catalog.Catalog
+	)
+	if agentSys != nil {
+		botRepo = agentSys.BotRepo
+		cat = agentSys.Catalog
+	}
+	if botRepo == nil && db != nil {
+		botRepo = bots.NewBotRepository(db)
+	}
+	if cat == nil {
+		var err error
+		cat, err = catalog.LoadDefaultCatalog()
+		if err != nil {
+			log.Printf("⚠️ [Bots] Falha ao carregar catálogo de bots: %v", err)
+		}
 	}
 
 	var botRuntime bots.BotADKRuntime
 	if agentSys != nil && agentSys.ADKFacade != nil {
-		bridge := adkengine.NewToolsetBridge(agentSys.ToolsetRegistry)
-		guardrail := adkengine.NewGuardrailPlugin(bridge, agentSys.ScopeGuard, agentSys.ConfGate, agentSys.TraceRecorder)
+		bridge := agentSys.ADKFacade.ToolsetBridge()
+		if bridge == nil {
+			bridge = adkengine.NewToolsetBridge(agentSys.ToolsetRegistry)
+		}
+		guardrail := agentSys.ADKFacade.GuardrailPlugin()
+		if guardrail == nil {
+			guardrail = adkengine.NewGuardrailPlugin(bridge, agentSys.ScopeGuard, agentSys.ConfGate, agentSys.TraceRecorder)
+		}
 		botRuntime = adkengine.NewBotRuntimeAdapter(
 			agentSys.ADKFacade.RoutedLLM(),
 			agentSys.ADKFacade.SessionService(),
@@ -96,60 +123,17 @@ func setupBotSubsystem(
 	botRunner := bots.NewBotRunner(botRepo, triggerRepo, convRepo, cat, botRuntime, notifSvc, budgetSvc)
 	if triggerRepo != nil {
 		botRunner.SetDeltaFetcher(func(fetchCtx context.Context, b *domain.Bot) ([]string, []string, error) {
-			if b == nil {
-				return nil, nil, nil
-			}
-			t := &domain.Trigger{
-				ID: b.ID, UserID: b.UserID, Title: b.Title, Query: b.Query,
-				Category: domain.TriggerCategory(b.Category), ConditionType: domain.TriggerConditionType(b.ConditionType),
-			}
-			items, err := search.RouteTriggerSource(t).Fetch(fetchCtx, t)
-			if err != nil {
-				return nil, nil, err
-			}
-			stored, err := triggerRepo.GetSeenHashes(b.ID)
-			if err != nil {
-				return nil, nil, err
-			}
-			seen := make(map[string]bool, len(stored))
-			for _, h := range stored {
-				seen[h] = true
-			}
-			var fresh, all []string
-			for _, it := range items {
-				h := search.HashDataPoint(it)
-				all = append(all, h)
-				if !seen[h] {
-					fresh = append(fresh, h)
-				}
-			}
-			return fresh, all, nil
+			return fetchTriggerDelta(fetchCtx, triggerRepo, triggerFromBot(b))
 		})
 		botRunner.SetPriceFetcher(func(fetchCtx context.Context, b *domain.Bot) (float64, string, bool, error) {
-			if b == nil || (domain.TriggerConditionType(b.ConditionType) != domain.ConditionPriceAbove && domain.TriggerConditionType(b.ConditionType) != domain.ConditionPriceBelow) {
-				return 0, "", false, nil
-			}
-			t := &domain.Trigger{
-				ID: b.ID, UserID: b.UserID, Title: b.Title, Query: b.Query,
-				Category: domain.TriggerCategory(b.Category), ConditionType: domain.TriggerConditionType(b.ConditionType),
-			}
-			items, err := search.RouteTriggerSource(t).Fetch(fetchCtx, t)
-			if err != nil {
-				return 0, "", false, err
-			}
-			for _, it := range items {
-				if v, ok := bots.ParseMoneyValue(it.Value); ok {
-					return v, it.Value, true, nil
-				}
-			}
-			return 0, "", false, nil
+			return fetchTriggerPrice(fetchCtx, triggerFromBot(b))
 		})
 	}
 	botChatSvc := bots.NewBotChatService(botRepo, triggerRepo, convRepo, cat, botRuntime, botRunner)
 
 	botHandler := bots.NewBotHandler(db, botRepo, cat)
-	botHandler.SetBotRunner(&botRunnerAdapter{runner: botRunner})
-	botHandler.SetBotChatService(&botChatAdapter{svc: botChatSvc})
+	botHandler.SetBotRunner(botRunner)
+	botHandler.SetBotChatService(botChatSvc.AsHandlerService())
 	if agentSys != nil {
 		if agentSys.ConfGate != nil {
 			botHandler.SetConfirmationGate(agentSys.ConfGate)

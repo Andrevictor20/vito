@@ -1,14 +1,15 @@
 package main
 
 import (
-	"github.com/andrevmp/vito/backend/internal/gmail"
 	"context"
 	"database/sql"
 	aimemory "github.com/andrevmp/vito/backend/internal/ai/memory"
 	"github.com/andrevmp/vito/backend/internal/ai/search"
 	"github.com/andrevmp/vito/backend/internal/bots"
 	"github.com/andrevmp/vito/backend/internal/calendar"
+	"github.com/andrevmp/vito/backend/internal/calendar/booking"
 	"github.com/andrevmp/vito/backend/internal/finance"
+	"github.com/andrevmp/vito/backend/internal/gmail"
 	"github.com/andrevmp/vito/backend/internal/tasks"
 	"github.com/andrevmp/vito/backend/internal/whatsapp"
 	"log"
@@ -16,10 +17,10 @@ import (
 
 	"github.com/andrevmp/vito/backend/internal/ai"
 	"github.com/andrevmp/vito/backend/internal/ai/adkengine"
-	"github.com/andrevmp/vito/backend/internal/catalog"
-	"github.com/andrevmp/vito/backend/internal/platform/config"
+	"github.com/andrevmp/vito/backend/internal/bots/catalog"
 	"github.com/andrevmp/vito/backend/internal/domain"
 	"github.com/andrevmp/vito/backend/internal/handler"
+	"github.com/andrevmp/vito/backend/internal/platform/config"
 	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/andrevmp/vito/backend/internal/service"
 	"github.com/andrevmp/vito/backend/internal/service/toolsets"
@@ -33,7 +34,7 @@ type AgentSubsystem struct {
 	TraceRecorder       *ai.RingBufferTraceRecorder
 	ConversationStore   *repository.ConversationStoreRepository
 	MemoryHierarchy     *repository.MemoryHierarchyRepository
-	AgentLoop           *service.AgentLoop
+	AssistantEngine     service.AssistantEngine
 	ContextEnricher     *service.AssistantContextEnricher
 	EntityLinkRepo      *repository.EntityLinkRepository
 	ToolsetRegistry     *toolsets.ToolsetsRegistry
@@ -42,6 +43,13 @@ type AgentSubsystem struct {
 	AIProviderSvc       *service.AIProviderService
 	ScopeGuard          *service.MemoryScopeGuard
 	ConfGate            *service.ConfirmationGateService
+	BotRepo             *bots.BotRepositorySQLite
+	Catalog             *catalog.Catalog
+	FinanceRepo         finance.FinanceRepository
+	FinanceAnalytics    finance.FinanceAnalyticsRepository
+	FinanceLimitRepo    finance.FinanceLimitRepository
+	FinanceSvc          *finance.FinanceService
+	FinanceLimitSvc     *finance.FinanceLimitService
 }
 
 // setupAgentSubsystem instancia e orquestra o cérebro único do assistente, ferramentas e memória.
@@ -55,7 +63,7 @@ func setupAgentSubsystem(
 	userRepo domain.UserRepository,
 	aiSettingsRepo domain.AISettingsRepository,
 	triggerSvc *bots.TriggerService,
-	bookingSvc *calendar.BookingService,
+	bookingSvc *booking.BookingService,
 	memoryRepo *repository.MemoryRepositorySQLite,
 	waDir ...*whatsapp.WhatsAppDirectoryService,
 ) *AgentSubsystem {
@@ -64,6 +72,10 @@ func setupAgentSubsystem(
 	memRepo := repository.NewMemoryHierarchyRepository(db)
 	entityLinkRepo := repository.NewEntityLinkRepository(db)
 	finRepo := finance.NewFinanceRepository(db)
+	finAnalyticsRepo := finance.NewFinanceAnalyticsRepository(db)
+	finLimitRepo := finance.NewFinanceLimitRepository(db)
+	finSvc := finance.NewFinanceService(finRepo, finAnalyticsRepo)
+	finLimitSvc := finance.NewFinanceLimitService(finLimitRepo, finRepo)
 	confGate := service.NewConfirmationGateService(db)
 	scopeGuard := service.NewMemoryScopeGuard()
 
@@ -74,11 +86,11 @@ func setupAgentSubsystem(
 	registry := toolsets.NewToolsetsRegistry()
 	if calSvc != nil {
 		calSvc.SetEntityLinkRepository(entityLinkRepo)
-		registry.Register(calendar.NewCalendarToolset(&calendarServiceAdapter{calSvc}))
+		registry.Register(calendar.NewCalendarToolsetFromService(calSvc))
 	}
 	if todoSvc != nil {
 		todoSvc.SetEntityLinkRepository(entityLinkRepo)
-		registry.Register(tasks.NewTaskPendingToolset(&todoServiceAdapter{todoSvc}))
+		registry.Register(tasks.NewTaskPendingToolsetFromService(todoSvc))
 	}
 	if waSvc != nil {
 		waBridge := whatsapp.NewWhatsAppConversationBridge(convRepo)
@@ -88,12 +100,12 @@ func setupAgentSubsystem(
 		if len(waDir) > 0 {
 			directory = waDir[0]
 		}
-		waTS := whatsapp.NewWhatsAppToolset(&whatsAppServiceAdapter{svc: waSvc, dir: directory})
+		waTS := whatsapp.NewWhatsAppToolsetFromService(waSvc, directory)
 		waTS.SetEntityLinkResolver(entityLinkRepo)
 		registry.Register(waTS)
 	}
 	if gmailSvc != nil {
-		gmailTS := toolsets.NewGmailToolset(&gmailServiceAdapter{gmailSvc})
+		gmailTS := gmail.NewGmailToolsetFromService(gmailSvc)
 		gmailTS.SetEntityLinkResolver(entityLinkRepo)
 		registry.Register(gmailTS)
 	}
@@ -104,32 +116,30 @@ func setupAgentSubsystem(
 		search.SetDefaultSearXNGClient(searxClient)
 	}
 
-	searchSubagent := search.NewVerticalSearchSubagent(searxClient, nil)
+	searchSubagent := search.NewVerticalSearchSubagent(searxClient)
 	if cfg.GeminiAPIKey != "" {
 		searchSubagent.SetGeminiConfig(cfg.GeminiAPIKey, cfg.GeminiModel, "")
 	}
 	registry.Register(toolsets.NewSearchToolset(searchSubagent))
-	if bookingSvc != nil {
-		registry.Register(calendar.NewMeetingBookingToolset(&bookingServiceAdapter{bookingSvc}))
-	} else {
-		registry.Register(calendar.NewMeetingBookingToolset())
-	}
-	var botTS *bots.BotTriggerToolset
-	if triggerSvc != nil {
-		botTS = bots.NewBotTriggerToolset(&triggerServiceAdapter{triggerSvc})
-	} else {
-		botTS = bots.NewBotTriggerToolset()
-	}
+	registry.Register(booking.NewMeetingBookingToolsetFromService(bookingSvc))
+	botTS := bots.NewBotTriggerToolsetFromService(triggerSvc)
+	var (
+		botRepo *bots.BotRepositorySQLite
+		botCat  *catalog.Catalog
+	)
 	if db != nil {
-		botRepo := bots.NewBotRepository(db)
-		cat, _ := catalog.LoadDefaultCatalog()
-		botTS.SetBotRepository(botRepo, cat)
+		botRepo = bots.NewBotRepository(db)
+		var catErr error
+		botCat, catErr = catalog.LoadDefaultCatalog()
+		if catErr != nil {
+			log.Printf("⚠️ [Bots] Falha ao carregar catálogo de bots: %v", catErr)
+		}
+		botTS.SetBotRepository(botRepo, botCat)
 	}
 	registry.Register(botTS)
 	if finRepo != nil {
-		finToolset := finance.NewFinanceToolset(finance.NewFinanceService(finRepo), finRepo)
-		finLimitRepo := finance.NewFinanceLimitRepository(db)
-		finToolset.SetLimitService(finance.NewFinanceLimitService(finLimitRepo, finRepo))
+		finToolset := finance.NewFinanceToolset(finSvc, finRepo)
+		finToolset.SetLimitService(finLimitSvc)
 		registry.Register(finToolset)
 	} else {
 		registry.Register(finance.NewFinanceToolset(nil))
@@ -211,19 +221,7 @@ func setupAgentSubsystem(
 		log.Printf("⚡ [ADK Server Pool] Provedor Groq ADK registrado (%s, Tier 2)", groqModel)
 	}
 
-	// 5. Fachada AgentLoop (delega ao ADKLoopFacade)
-	loop := service.NewAgentLoop(
-		nil,
-		registry,
-		scopeGuard,
-		confGate,
-		convRepo,
-		traceRecorder,
-	)
-	if userRepo != nil && aiSettingsRepo != nil {
-		loop.SetUserRepositories(userRepo, aiSettingsRepo)
-	}
-
+	// 5. Enriquecimento cognitivo e memória
 	coreProfileRepo := repository.NewCoreProfileRepository(db)
 	contextEnricher := service.NewAssistantContextEnricher(
 		userRepo,
@@ -237,7 +235,6 @@ func setupAgentSubsystem(
 	contextEnricher.SetMemoryHierarchyRepository(memRepo)
 	contextEnricher.SetFinanceSnapshotProvider(finance.NewSQLiteFinanceSnapshotProvider(finRepo))
 	contextEnricher.SetEntityLinkRepository(entityLinkRepo)
-	loop.SetContextEnricher(contextEnricher)
 
 	// 6. Worker de Consolidação com debounce de 150s + aimemory.SQLiteMemoryService Híbrido (FTS5 + Embeddings 036)
 	embedder := aimemory.BuildGenaiEmbedder(cfg.GeminiAPIKey)
@@ -249,7 +246,9 @@ func setupAgentSubsystem(
 	// 6.4 Provedores BYOK & Resolução de Modelos (§2-§5)
 	aiProviderRT := setupAIProviderSubsystem(cfg, db, aiSettingsRepo, convRepo)
 
-	// 6.5 Motor Google ADK Go v2 (ADKLoopFacade) plugado ao AgentLoop e ao WhatsAppService
+	// 6.5 Motor Google ADK Go v2 (ADKLoopFacade) plugado ao WhatsAppService, HTTP e Voz
+	var assistantEngine service.AssistantEngine
+	privacyRepo := repository.NewStoreComplianceRepository(db)
 	adkFacade, adkErr := adkengine.NewADKLoopFacade(adkengine.FacadeConfig{
 		ServerPool:          serverPool,
 		Registry:            registry,
@@ -259,6 +258,7 @@ func setupAgentSubsystem(
 		TraceRecorder:       traceRecorder,
 		UserRepo:            userRepo,
 		AISettingsRepo:      aiSettingsRepo,
+		PrivacyChecker:      privacyRepo,
 		ContextEnricher:     contextEnricher,
 		ConsolidationWorker: consolidationWorker,
 		MemoryService:       sqliteMemorySvc,
@@ -268,18 +268,19 @@ func setupAgentSubsystem(
 	})
 	if adkErr == nil && adkFacade != nil {
 		consolidationWorker.SetSemanticExtractor(aimemory.NewADKMemoryExtractor(adkFacade.RoutedLLM()))
-		loop.SetEngine(adkFacade)
+		assistantEngine = adkFacade
 		if waSvc != nil {
 			waSvc.SetAgentLoop(adkFacade)
 		}
 		log.Println("🧠 [Google ADK v2] Motor ADKLoopFacade inicializado e conectado aos canais Mobile, Desktop, Voz e WhatsApp.")
 	} else if adkErr != nil {
-		log.Printf("⚠️ [Google ADK v2] Falha ao inicializar ADKLoopFacade (%v); mantendo fallback ReAct.", adkErr)
+		log.Printf("⚠️ [Google ADK v2] Falha ao inicializar ADKLoopFacade: %v", adkErr)
 	}
 
 	// 7. Handlers HTTP REST e SSE
-	streamHandler := handler.NewAssistantStreamHandler(loop)
+	streamHandler := handler.NewAssistantStreamHandler(assistantEngine)
 	memoryHandler := handler.NewMemoryHandler(memRepo)
+	memoryHandler.SetFactRepository(memoryRepo, embedder)
 
 	return &AgentSubsystem{
 		StreamHandler:       streamHandler,
@@ -288,7 +289,7 @@ func setupAgentSubsystem(
 		TraceRecorder:       traceRecorder,
 		ConversationStore:   convRepo,
 		MemoryHierarchy:     memRepo,
-		AgentLoop:           loop,
+		AssistantEngine:     assistantEngine,
 		ContextEnricher:     contextEnricher,
 		EntityLinkRepo:      entityLinkRepo,
 		ToolsetRegistry:     registry,
@@ -297,5 +298,12 @@ func setupAgentSubsystem(
 		AIProviderSvc:       aiProviderRT.Service,
 		ScopeGuard:          scopeGuard,
 		ConfGate:            confGate,
+		BotRepo:             botRepo,
+		Catalog:             botCat,
+		FinanceRepo:         finRepo,
+		FinanceAnalytics:    finAnalyticsRepo,
+		FinanceLimitRepo:    finLimitRepo,
+		FinanceSvc:          finSvc,
+		FinanceLimitSvc:     finLimitSvc,
 	}
 }

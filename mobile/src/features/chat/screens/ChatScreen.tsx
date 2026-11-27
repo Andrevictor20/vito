@@ -23,6 +23,7 @@ import { ModelPickerSheet } from '../../profile/components/ai/ModelPickerSheet';
 import { useAuth } from '../../../context/AuthContext';
 import { useTheme } from '../../../context/ThemeContext';
 import { useChat } from '../hooks/useChat';
+import { useChatAudioPlayback } from '../hooks/useChatAudioPlayback';
 import { useChatImagePicker } from '../hooks/useChatImagePicker';
 import { useChatModelSelection } from '../hooks/useChatModelSelection';
 import { navigateToAiProviders } from '../../../navigation/navigationRef';
@@ -99,6 +100,7 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(
     const [isVoiceModeActive, setIsVoiceModeActive] = useState(false);
     const [keyboardHeight, setKeyboardHeight] = useState(0);
     const [deckGestureActive, setDeckGestureActive] = useState(false);
+    const { playingMessageId, togglePlayAudio } = useChatAudioPlayback();
 
     useEffect(() => {
       return pagerSwipeLockBus.subscribe((locked) => {
@@ -218,10 +220,6 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(
 
     const handleAttachmentOption = async (option: ChatAttachmentOption) => {
       if (loading) return;
-      if (option === 'pdf') {
-        inputRef.current?.setDraft('Analisar documento PDF: ');
-        return;
-      }
       if (!ImagePickerModule) {
         Alert.alert('Anexos', 'Módulo de mídia não disponível neste ambiente.');
         return;
@@ -354,6 +352,8 @@ export const ChatScreen = forwardRef<ChatScreenRef, ChatScreenProps>(
               onSaveEdit={(messageId, newText) => editAndResendMessage(messageId, newText)}
               onConfirmAction={handleQuickPrompt}
               onResolveConfirmation={resolveConfirmation}
+              onPlayAudio={() => void togglePlayAudio(item.id, item.text)}
+              isPlayingAudio={playingMessageId === item.id}
               disabled={loading}
             />
           )}

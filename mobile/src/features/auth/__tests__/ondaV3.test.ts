@@ -9,7 +9,7 @@ import {
   DEFAULT_PERM_PREFS,
   ONBOARDING_SEEN_KEY,
   POST_LOGIN_PERMS_PROMPTED_KEY,
-} from '../../../components/auth/onboardingStorage'
+} from '../utils/onboardingStorage'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -53,12 +53,11 @@ describe('Plano 09 Onda V3 — Splash, Onboarding, Login v5 e Permissões (Mobil
       'features/auth/components/AuthActionsFooter.tsx',
       'features/auth/components/EmailSheet.tsx',
       'features/auth/components/LegalDocModal.tsx',
-      'features/auth/components/LoginMascotRig.tsx',
       'features/auth/components/OnboardingSlideArt.tsx',
       'features/auth/utils/loginPalette.ts',
       'features/auth/demo/demoScenes.ts',
-      'components/auth/PostLoginPermissionsSheet.tsx',
-      'components/auth/onboardingStorage.ts',
+      'features/auth/components/PostLoginPermissionsSheet.tsx',
+      'features/auth/utils/onboardingStorage.ts',
     ]
 
     for (const rel of files) {
@@ -87,7 +86,7 @@ describe('Plano 09 Onda V3 — Splash, Onboarding, Login v5 e Permissões (Mobil
     assert.ok(loginFooterSrc.includes('13 anos'))
 
     const permsSrc = fs.readFileSync(
-      path.join(mobileSrc, 'components/auth/PostLoginPermissionsSheet.tsx'),
+      path.join(mobileSrc, 'features/auth/components/PostLoginPermissionsSheet.tsx'),
       'utf8',
     )
     assert.ok(permsSrc.includes('Permitir acesso?'))

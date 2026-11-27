@@ -11,6 +11,7 @@ import (
 
 	"github.com/andrevmp/vito/backend/internal/ai/adkengine"
 	"github.com/andrevmp/vito/backend/internal/domain"
+	"github.com/andrevmp/vito/backend/internal/gmail"
 	"github.com/andrevmp/vito/backend/internal/service"
 	"github.com/andrevmp/vito/backend/internal/service/toolsets"
 )
@@ -22,9 +23,6 @@ type stubDomainToolset struct {
 
 func (s *stubDomainToolset) Name() domain.ToolsetName { return s.name }
 func (s *stubDomainToolset) Description() string      { return "stub " + string(s.name) }
-func (s *stubDomainToolset) JSONSchema() json.RawMessage {
-	return json.RawMessage(`{"type":"object"}`)
-}
 func (s *stubDomainToolset) IsWriteOperation(op string, raw json.RawMessage) (bool, bool, map[string]any) {
 	isW := op == "create_event" || op == "send_message" || op == "create_todo"
 	return isW, false, map[string]any{"op": op}
@@ -33,7 +31,7 @@ func (s *stubDomainToolset) Execute(ctx context.Context, execCtx *domain.ToolExe
 	return &domain.ToolExecutionResult{Status: "COMPLETED", SummaryForLLM: "ok:" + op}, nil
 }
 
-func TestAC04_ToolsForBotContext_And_DefinitionsForContext(t *testing.T) {
+func TestAC04_ToolsForBotContext(t *testing.T) {
 	reg := toolsets.NewToolsetsRegistry()
 	reg.Register(&stubDomainToolset{name: domain.ToolsetWebSearch})
 	reg.Register(&stubDomainToolset{name: domain.ToolsetCalendar})
@@ -52,16 +50,6 @@ func TestAC04_ToolsForBotContext_And_DefinitionsForContext(t *testing.T) {
 			"gcal:free":  domain.ActionPolicyAuto,
 			"gcal:evt":   domain.ActionPolicyOff,
 		},
-	}
-
-	defs := reg.DefinitionsForContext(execCtx)
-	if len(defs) != 2 {
-		t.Fatalf("esperava 2 definitions no escopo, obteve %d", len(defs))
-	}
-	for _, d := range defs {
-		if d.Name == string(domain.ToolsetWhatsApp) {
-			t.Fatalf("AC-04 violado: WhatsApp não está em AllowedToolsets")
-		}
 	}
 
 	bridge := adkengine.NewToolsetBridge(reg)
@@ -133,7 +121,7 @@ func TestBuildBotLLMAgent_InstructionAndTools(t *testing.T) {
 	reg.Register(&stubDomainToolset{name: domain.ToolsetWhatsApp})
 	bridge := adkengine.NewToolsetBridge(reg)
 
-	llm := adkengine.NewRoutedLLM(nil)
+	llm := adkengine.NewRoutedLLM()
 	cfg := adkengine.BotAgentConfig{
 		BotID:             "bot-voo",
 		Name:              "Caçador de voos",
@@ -178,7 +166,7 @@ func TestToolsetsRegistry_BotActionSpecs(t *testing.T) {
 	reg.Register(calendar.NewCalendarToolset(nil))
 	reg.Register(tasks.NewTaskPendingToolset(nil))
 	reg.Register(whatsapp.NewWhatsAppToolset(nil))
-	reg.Register(toolsets.NewGmailToolset(nil))
+	reg.Register(gmail.NewGmailToolset(nil))
 	reg.Register(toolsets.NewSearchToolset(nil))
 
 	specs := reg.BotActionSpecs()

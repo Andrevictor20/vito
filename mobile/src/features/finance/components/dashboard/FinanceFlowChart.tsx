@@ -6,7 +6,7 @@ import { hapticFeedback } from '../../../../theme/motion';
 import { useScreenEnterKey } from '../../../../theme/screenFocusContext';
 import { tabularNumbers } from '../../../../theme/tokens';
 import { useReduceMotion } from '../../../../theme/useReduceMotion';
-import { formatBRL, maskBRL, withHexAlpha } from '../shared/financeHelpers';
+import { formatBRL, maskBRL, withHexAlpha } from '../../utils/financeHelpers';
 import { getFinanceChartPalette } from '../shared/FinanceSemanticIcons';
 import { AnimatedSvgBar, formatCompactAxisBRL } from '../subscreens/FinanceSubScreenCharts';
 

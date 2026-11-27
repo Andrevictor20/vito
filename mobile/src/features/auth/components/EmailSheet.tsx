@@ -16,7 +16,7 @@ import {
 } from 'react-native'
 import { useTheme } from '../../../context/ThemeContext'
 import { loginPalette } from '../utils/loginPalette'
-import { EyeIcon } from '../demo/DemoIcons'
+import { EyeIcon } from '../../../icons/AppGlyphs'
 import { normalizeEmail, validateEmailAuth } from '../utils/emailAuth'
 
 export type EmailSheetMode = 'login' | 'register'
@@ -216,7 +216,7 @@ export const EmailSheet: React.FC<EmailSheetProps> = ({
 
           <View style={styles.inpWrap}>
             <RNTextInput
-              placeholder={isRegister ? 'Criar senha (mín. 6 caracteres)' : 'Senha'}
+              placeholder={isRegister ? 'Criar senha (mín. 8 caracteres, letra e número)' : 'Senha'}
               placeholderTextColor={palette.muted}
               value={password}
               onChangeText={(v) => {
@@ -298,7 +298,7 @@ export const EmailSheet: React.FC<EmailSheetProps> = ({
               </TouchableOpacity>
             ) : null}
 
-            {!isRegister ? (
+            {!isRegister && onForgotPassword ? (
               <TouchableOpacity
                 testID="lg-forgot"
                 onPress={handleForgotPassword}

@@ -4,7 +4,7 @@ import {
   clearPluggyApiKeyCache,
   getOrRefreshPluggyApiKey,
   pluggyFetchWithRetry,
-} from '../features/finance/services/pluggyHttp';
+} from '../features/finance/services/pluggyService';
 
 describe('SyncEngine v2 (Onda 0-C)', () => {
   beforeEach(() => {

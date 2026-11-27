@@ -42,6 +42,18 @@ func TestPhoneDigits(t *testing.T) {
 	}
 }
 
+func TestCanonicalBRPhone(t *testing.T) {
+	if got := domain.CanonicalBRPhone("5511999998888"); got != "551199998888" {
+		t.Errorf("CanonicalBRPhone(13 digitos) = %q, esperava 551199998888", got)
+	}
+	if got := domain.CanonicalBRPhone("551188887777"); got != "551188887777" {
+		t.Errorf("CanonicalBRPhone(12 digitos) = %q, esperava 551188887777", got)
+	}
+	if got := domain.CanonicalBRPhone("14155552671"); got != "14155552671" {
+		t.Errorf("CanonicalBRPhone(internacional) = %q, esperava 14155552671", got)
+	}
+}
+
 func TestPhonesMatch(t *testing.T) {
 	cases := []struct {
 		name string

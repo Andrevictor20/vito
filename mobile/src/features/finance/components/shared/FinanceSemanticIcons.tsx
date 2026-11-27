@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import { BrandLogo } from '../../../../icons/IconRegistry';
 import { getBankBrand } from '../../utils/bankBrands';
-import { withHexAlpha } from './financeHelpers';
+import { withHexAlpha } from '../../utils/financeHelpers';
 
 /**
  * Paleta multicolorida oficial v5 dos gráficos financeiros (PAL / CPAL / GPAL de Vito-telas-atualizadas.html).

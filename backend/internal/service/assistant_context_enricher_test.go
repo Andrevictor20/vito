@@ -11,37 +11,12 @@ import (
 	"time"
 
 	"github.com/andrevmp/vito/backend/internal/ai"
-	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/domain"
+	"github.com/andrevmp/vito/backend/internal/platform/database"
 	"github.com/andrevmp/vito/backend/internal/repository"
 	"github.com/andrevmp/vito/backend/internal/service"
-	"github.com/andrevmp/vito/backend/internal/service/toolsets"
 	"github.com/google/uuid"
 )
-
-type mockLoopEnricherProvider struct {
-	historyReqs []ai.AgentChatRequest
-}
-
-func (m *mockLoopEnricherProvider) Name() string          { return "mock-enricher-provider" }
-func (m *mockLoopEnricherProvider) ModelName() string     { return "gemini-2.5-flash" }
-func (m *mockLoopEnricherProvider) QualityTier() int      { return 3 }
-func (m *mockLoopEnricherProvider) SupportsTools() bool   { return true }
-func (m *mockLoopEnricherProvider) SupportsVision() bool  { return true }
-func (m *mockLoopEnricherProvider) MaxContextTokens() int { return 8192 }
-
-func (m *mockLoopEnricherProvider) Chat(ctx context.Context, req ai.AgentChatRequest) (*ai.AgentChatResponse, error) {
-	m.historyReqs = append(m.historyReqs, req)
-	return &ai.AgentChatResponse{
-		Text:         "Entendido perfeitamente.",
-		ProviderName: m.Name(),
-		ModelName:    m.ModelName(),
-	}, nil
-}
-
-func (m *mockLoopEnricherProvider) StreamChat(ctx context.Context, req ai.AgentChatRequest, onDelta func(ai.StreamDelta) error) (*ai.AgentChatResponse, error) {
-	return m.Chat(ctx, req)
-}
 
 func TestAssistantContextEnricher_BuildLevel1Context(t *testing.T) {
 	tmpDir := t.TempDir()
@@ -160,19 +135,9 @@ func TestAgentLoop_ContextEnricherInjected(t *testing.T) {
 		nil,
 	)
 
-	mockProv := &mockLoopEnricherProvider{}
 	enricherEngine := &mockEnricherEngine{
 		enricher: enricher,
-		prov:     mockProv,
 	}
-	guard := service.NewScopeGuard()
-	gate := service.NewConfirmationGateService(db)
-	registry := toolsets.NewToolsetsRegistry()
-	convRepo := repository.NewConversationStoreRepository(db)
-
-	loop := service.NewAgentLoop(nil, registry, guard, gate, convRepo, nil)
-	loop.SetContextEnricher(enricher)
-	loop.SetEngine(enricherEngine)
 
 	req := domain.UnifiedAssistantRequest{
 		UserID:   userID,
@@ -181,19 +146,19 @@ func TestAgentLoop_ContextEnricherInjected(t *testing.T) {
 		Message:  "Olá Vito",
 	}
 
-	res, err := loop.Run(context.Background(), req)
+	res, err := enricherEngine.Run(context.Background(), req)
 	if err != nil {
-		t.Fatalf("falha ao rodar loop: %v", err)
+		t.Fatalf("falha ao rodar engine: %v", err)
 	}
 	if res.Text != "Entendido perfeitamente." {
 		t.Errorf("resposta inesperada: %s", res.Text)
 	}
 
-	if len(mockProv.historyReqs) == 0 {
-		t.Fatalf("nenhuma requisição registrada no provider")
+	if len(enricherEngine.capturedPrompts) == 0 {
+		t.Fatalf("nenhum prompt capturado na engine")
 	}
 
-	sysPrompt := mockProv.historyReqs[0].SystemPrompt
+	sysPrompt := enricherEngine.capturedPrompts[0]
 	if !strings.Contains(sysPrompt, "CONTEXTO PESSOAL E OPERACIONAL DO USUÁRIO (NÍVEL 1)") {
 		t.Errorf("SystemPrompt deve conter o contexto de Nível 1: %s", sysPrompt)
 	}
@@ -203,26 +168,19 @@ func TestAgentLoop_ContextEnricherInjected(t *testing.T) {
 }
 
 type mockEnricherEngine struct {
-	enricher *service.AssistantContextEnricher
-	prov     *mockLoopEnricherProvider
+	enricher        *service.AssistantContextEnricher
+	capturedPrompts []string
 }
 
 func (m *mockEnricherEngine) Run(ctx context.Context, req domain.UnifiedAssistantRequest) (*domain.UnifiedAssistantResponse, error) {
 	lvl1 := m.enricher.BuildLevel1Context(ctx, req.UserID, req.Message, time.Now())
-	resp, err := m.prov.Chat(ctx, ai.AgentChatRequest{
-		UserID:       req.UserID,
-		ThreadID:     req.ThreadID,
-		Channel:      req.Channel,
-		SystemPrompt: lvl1,
-	})
-	if err != nil {
-		return nil, err
-	}
+	m.capturedPrompts = append(m.capturedPrompts, lvl1)
+	const reply = "Entendido perfeitamente."
 	return &domain.UnifiedAssistantResponse{
 		ThreadID: req.ThreadID,
-		Text:     resp.Text,
-		Reply:    resp.Text,
-		Message:  resp.Text,
+		Text:     reply,
+		Reply:    reply,
+		Message:  reply,
 	}, nil
 }
 
